@@ -1,3 +1,4 @@
+from PhoPositionalData.analysis.interactive_placeCell_config import build_configs # TODO: should be replaced by a better and internal config
 
 class FilterablePipelineStage:
     
@@ -12,8 +13,11 @@ class FilterablePipelineStage:
     def select_filters(self, active_session_filter_configurations):
         self.filtered_sessions = dict()
         self.filtered_epochs = dict()
+        self.active_configs = dict() # active_config corresponding to each filtered session/epoch
         self.computation_results = dict()
         for a_select_config_name, a_select_config_filter_function in active_session_filter_configurations.items():
             print(f'Applying session filter named "{a_select_config_name}"...')
             self.filtered_sessions[a_select_config_name], self.filtered_epochs[a_select_config_name] = a_select_config_filter_function(self.sess)
+            # build the active filter config from the session's config and the filtered epoch
+            self.active_configs[a_select_config_name] = build_configs(self.filtered_sessions[a_select_config_name].config, self.filtered_epochs[a_select_config_name])
             self.computation_results[a_select_config_name] = None

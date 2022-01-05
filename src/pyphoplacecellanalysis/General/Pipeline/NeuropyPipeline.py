@@ -177,6 +177,7 @@ class ComputedPipelineStage(LoadableInput, LoadableSessionInput, FilterablePipel
 
     filtered_sessions: dict = None
     filtered_epochs: dict = None
+    active_configs: dict = None
     computation_results: dict = None
     
     def __init__(self, loaded_stage: LoadedPipelineStage):
@@ -188,6 +189,7 @@ class ComputedPipelineStage(LoadableInput, LoadableSessionInput, FilterablePipel
         # Initialize custom fields:
         self.filtered_sessions = dict()
         self.filtered_epochs = dict()
+        self.active_configs = dict() # active_config corresponding to each filtered session/epoch
         self.computation_results = dict()
 
 
@@ -260,6 +262,11 @@ class NeuropyPipeline():
     def filtered_sessions(self):
         """The filtered_sessions property, accessed through the stage."""
         return self.stage.filtered_sessions
+    
+    @property
+    def active_configs(self):
+        """The active_configs property corresponding to the InteractivePlaceCellConfig obtained by filtering the session. Accessed through the stage."""
+        return self.stage.active_configs
 
     ## Computed Properties:
     @property
