@@ -33,6 +33,17 @@ from neuropy.core.position import Position  # , PositionAccessor
 from neuropy.core.session.dataSession import DataSession
 
 
+
+""" See sess.laps.as_epoch_obj()
+lap_specific_epochs = sess.laps.as_epoch_obj()
+any_lap_specific_epochs = lap_specific_epochs.label_slice(lap_specific_epochs.labels[np.arange(len(sess.laps.lap_id))])
+even_lap_specific_epochs = lap_specific_epochs.label_slice(lap_specific_epochs.labels[np.arange(0, len(sess.laps.lap_id), 2)])
+odd_lap_specific_epochs = lap_specific_epochs.label_slice(lap_specific_epochs.labels[np.arange(1, len(sess.laps.lap_id), 2)])
+  
+
+"""
+
+
 ## Efficiently filter by cell type and desired ids
 def batch_filter_session(sess, position, spikes_df, epochs):
     """a workaround to efficiently filter DataSession objects by epochs and cell_type (currently hardcoded Pyramidal) that works around the issue with deepcopy(...) on DataSessions filled with Bapun's data."""
