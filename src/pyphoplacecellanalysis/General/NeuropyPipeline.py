@@ -128,7 +128,7 @@ class KnownDataSessionTypeProperties(object):
 
     load_function: Callable
     basedir: Path
-    filter_function: Callable
+    filter_function: Callable = None
 
 
 # known_data_session_type_dict = {'kdiba':KnownDataSessionTypeProperties(load_function=(lambda a_base_dir: DataSessionLoader.kdiba_old_format_session(a_base_dir)),
