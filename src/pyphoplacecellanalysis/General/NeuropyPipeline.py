@@ -21,12 +21,9 @@ except ImportError:
     sys.path.append(r"C:\Users\Pho\repos\NeuroPy")  # Windows
     # sys.path.append('/home/pho/repo/BapunAnalysis2021/NeuroPy') # Linux
     # sys.path.append(r'/Users/pho/repo/Python Projects/NeuroPy') # MacOS
-    print(
-        "neuropy module not found, adding directory to sys.path. \n >> Updated sys.path."
-    )
+    print("neuropy module not found, adding directory to sys.path. \n >> Updated sys.path.")
     from neuropy import core
 
-from dataclasses import dataclass
 
 from neuropy.core.session.data_session_loader import DataSessionLoader
 from neuropy.core.session.dataSession import DataSession
@@ -176,6 +173,22 @@ class NeuropyPipeline:
         return (self.stage is not None) and (
             isinstance(self.stage, LoadedPipelineStage)
         )
+        
+    @property
+    def sess(self):
+        """The sess property, accessed through the stage."""
+        return self.stage.sess
+    @property
+    def active_sess_config(self):
+        """The active_sess_config property."""
+        return self.sess.config
+
+    @property
+    def session_name(self):
+        """The session_name property."""
+        return self.sess.name
+
+        
 
     def __init__(self, name="pipeline", basedir=None, load_function: Callable = None):
         # super(NeuropyPipeline, self).__init__()
@@ -204,10 +217,24 @@ class NeuropyPipeline:
         if auto_load:
             self.load()
 
+    @classmethod
+    def perform_load(cls, input_stage) -> LoadedPipelineStage:
+        input_stage.load() # perform the load operation
+        return LoadedPipelineStage(input_stage)  # build the loaded stage
+
+
     def load(self):
         self.stage.load()  # perform the load operation:
         self.stage = LoadedPipelineStage(self.stage)  # build the loaded stage
 
+
+    @classmethod
+    def perform_compute(cls, loaded_stage):
+        pass        
+        # input_stage.load() # perform the load operation
+        # return LoadedPipelineStage(input_stage)  # build the loaded stage
+    
+    
     def compute(self, sess):
         pass
 
