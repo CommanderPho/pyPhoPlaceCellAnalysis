@@ -21,11 +21,18 @@ from neuropy.core.session.dataSession import DataSession
 from neuropy.analyses.placefields import PlacefieldComputationParameters
 
 
+
+
+
 @dataclass
 class ComputationResult(object):
-    """The result of a single computation, on a filtered session with a specified config """
+    """
+        The result of a single computation, on a filtered session with a specified config 
+        The primary output data is stored in self.computed_data's dict
+    """
     sess: DataSession
     computation_config: PlacefieldComputationParameters
     computed_data: dict
     
+
 

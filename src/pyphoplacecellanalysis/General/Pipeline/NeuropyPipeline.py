@@ -6,14 +6,19 @@ NeuropyPipeline.py
 """
 import importlib
 import sys
+import dataclasses
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Callable
+from typing import Callable, List
+
+from pyphocorehelpers.function_helpers import compose_functions
 
 import numpy as np
 import pandas as pd
+from pyphoplacecellanalysis.General.Pipeline.Computation import ComputablePipelineStage
+from pyphoplacecellanalysis.General.Pipeline.Filtering import FilterablePipelineStage
+from pyphoplacecellanalysis.General.Pipeline.Loading import LoadableInput, LoadableSessionInput
 
-from pyphoplacecellanalysis.General.ComputationResults import ComputationResult
 from pyphoplacecellanalysis.General.SessionSelectionAndFiltering import batch_filter_session
 
 # NeuroPy (Diba Lab Python Repo) Loading
@@ -25,9 +30,7 @@ except ImportError:
     sys.path.append(r"C:\Users\Pho\repos\NeuroPy")  # Windows
     # sys.path.append('/home/pho/repo/BapunAnalysis2021/NeuroPy') # Linux
     # sys.path.append(r'/Users/pho/repo/Python Projects/NeuroPy') # MacOS
-    print(
-        "neuropy module not found, adding directory to sys.path. \n >> Updated sys.path."
-    )
+    print("neuropy module not found, adding directory to sys.path. \n >> Updated sys.path.")
     from neuropy import core
 
 # Neuropy:
@@ -37,30 +40,6 @@ from neuropy.analyses.placefields import PlacefieldComputationParameters, perfor
 from neuropy.core.neuron_identities import NeuronIdentity, build_units_colormap, PlotStringBrevityModeEnum
 
 
-## Idea: Another set of computations will need to be done for each:
-""" 
-active_epoch_session: DataSession
-computation_config: PlacefieldComputationParameters
-
-"""
-
-def _perform_single_computation(active_session, computation_config):
-    # only requires that active_session has the .spikes_df and .position  properties
-    # active_epoch_placefields1D, active_epoch_placefields2D = compute_placefields_masked_by_epochs(active_epoch_session, active_config, included_epochs=None, should_display_2D_plots=should_display_2D_plots) ## This is causing problems due to deepcopy of session.
-    output_result = ComputationResult(active_session, computation_config, computed_data=dict())
-    # active_epoch_placefields1D, active_epoch_placefields2D = perform_compute_placefields(active_session.spikes_df, active_session.position, computation_config, None, None, included_epochs=None, should_force_recompute_placefields=True)
-    output_result.computed_data['pf1D'], output_result.computed_data['pf2D'] = perform_compute_placefields(active_session.spikes_df, active_session.position, computation_config, None, None, included_epochs=None, should_force_recompute_placefields=True)
-
-    # Compare the results:
-
-    # debug_print_ratemap(active_epoch_placefields1D.ratemap)
-    # num_spikes_per_spiketrain = np.array([np.shape(a_spk_train)[0] for a_spk_train in active_epoch_placefields1D.spk_t])
-    # num_spikes_per_spiketrain
-    # print('placefield_neuronID_spikes: {}; ({} total spikes)'.format(num_spikes_per_spiketrain, np.sum(num_spikes_per_spiketrain)))
-    # debug_print_placefield(active_epoch_placefields1D) #49 good
-    # debug_print_placefield(output_result.computed_data['pf2D']) #51 good
-
-    return output_result
 
 def get_neuron_identities(active_placefields, debug_print=False):
     """ 
@@ -125,10 +104,13 @@ def _temp_filter_session(sess):
 @dataclass
 class KnownDataSessionTypeProperties(object):
     """Docstring for KnownDataSessionTypeProperties."""
-
     load_function: Callable
     basedir: Path
-    filter_function: Callable = None
+    # Optional members
+    post_load_functions: List[Callable] = dataclasses.field(default_factory=list)
+    filter_functions: List[Callable] = dataclasses.field(default_factory=list)
+    post_compute_functions: List[Callable] = dataclasses.field(default_factory=list)
+    # filter_function: Callable = None
 
 
 # known_data_session_type_dict = {'kdiba':KnownDataSessionTypeProperties(load_function=(lambda a_base_dir: DataSessionLoader.kdiba_old_format_session(a_base_dir)),
@@ -145,78 +127,19 @@ class KnownDataSessionTypeProperties(object):
 
 @dataclass
 class BaseNeuropyPipelineStage(object):
-    """Docstring for InputPipelineStage."""
-
+    """ BaseNeuropyPipelineStage represents a single stage of a data session processing/rendering pipeline. """
     stage_name: str = ""
-
-
-class LoadableInput:
-    def _check(self):
-        assert (
-            self.load_function is not None
-        ), "self.load_function must be a valid single-argument load function that isn't None!"
-        assert callable(self.load_function), "self.load_function must be callable!"
-
-        assert self.basedir is not None, "self.basedir must not be None!"
-
-        assert isinstance(
-            self.basedir, Path
-        ), "self.basedir must be a pathlib.Path type object (or a pathlib.Path subclass)"
-        if not self.basedir.exists():
-            raise FileExistsError
-        else:
-            return True
-
-    def load(self):
-        self._check()
-
-        self.loaded_data = dict()
-
-        # call the internal load_function with the self.basedir.
-        self.loaded_data["sess"] = self.load_function(self.basedir)
-
-        # self.loaded_data['sess'] = DataSessionLoader.bapun_data_session(self.basedir)
-        # self.sess = DataSessionLoader.bapun_data_session(self.basedir)
-        # self.sess
-        # active_sess_config = sess.config
-        # session_name = sess.name
-        pass
-
-
-class LoadableSessionInput:
-    @property
-    def sess(self):
-        """The sess property."""
-        return self.loaded_data["sess"]
-
-    @sess.setter
-    def sess(self, value):
-        self.loaded_data["sess"] = value
-
-    @property
-    def active_sess_config(self):
-        """The active_sess_config property."""
-        return self.sess.config
-
-    @active_sess_config.setter
-    def active_sess_config(self, value):
-        self.sess.config = value
-
-    @property
-    def session_name(self):
-        """The session_name property."""
-        return self.sess.name
-
-    @session_name.setter
-    def session_name(self, value):
-        self.sess.name = value
 
 
 @dataclass
 class InputPipelineStage(LoadableInput, BaseNeuropyPipelineStage):
-    """Docstring for InputPipelineStage."""
+    """Docstring for InputPipelineStage.
+    
+    post_load_functions: List[Callable] a list of Callables that accept the loaded session as input and return the potentially modified session as output.
+    """
     basedir: Path = Path("")
     load_function: Callable = None
+    post_load_functions: List[Callable] = dataclasses.field(default_factory=list)
 
 
 
@@ -228,41 +151,26 @@ class LoadedPipelineStage(LoadableInput, LoadableSessionInput, BaseNeuropyPipeli
         self.stage_name = input_stage.stage_name
         self.basedir = input_stage.basedir
         self.loaded_data = input_stage.loaded_data
+        self.post_load_functions = input_stage.post_load_functions # the functions to be called post load
 
 
-class FilterablePipelineStage:
-    
-    # @property
-    # def filtered_data(self):
-    #     """The filtered_data property."""
-    #     return self._filtered_data
-    # @filtered_data.setter
-    # def filtered_data(self, value):
-    #     self._filtered_data = value
-    
-    def select_filters(self, active_session_filter_configurations):
-        self.filtered_sessions = dict()
-        self.filtered_epochs = dict()
-        self.computation_results = dict()
-        for a_select_config_name, a_select_config_filter_function in active_session_filter_configurations.items():
-            print(f'Applying session filter named "{a_select_config_name}"...')
-            self.filtered_sessions[a_select_config_name], self.filtered_epochs[a_select_config_name] = a_select_config_filter_function(self.sess)
-            self.computation_results[a_select_config_name] = None
+    def post_load(self, debug_print=False):
+        """ Called after load is complete to post-process the data """
+        if (len(self.post_load_functions) > 0):
+            if debug_print:
+                print(f'Performing on_post_load(...) with {len(self.post_load_functions)} post_load_functions...')
+            # self.sess = compose_functions(self.post_load_functions, self.sess)
+            composed_post_load_function = compose_functions(*self.post_load_functions) # functions are composed left-to-right
+            self.sess = composed_post_load_function(self.sess)
             
-        
-class ComputablePipelineStage:
-    
-    def single_computation(self, active_computation_params: PlacefieldComputationParameters):
-        assert (len(self.filtered_sessions.keys()) > 0), "Must have at least one filtered session before calling single_computation(...). Call self.select_filters(...) first."
-        # self.active_computation_results = dict()
-        for a_select_config_name, a_filtered_session in self.filtered_sessions.items():
-            print(f'Performing single_computation on filtered_session with filter named "{a_select_config_name}"...')
-            self.computation_results[a_select_config_name] = _perform_single_computation(a_filtered_session, active_computation_params) # returns a computation result. Does this store the computation config used to compute it?
-        
-        # pf_neuron_identities, pf_sort_ind, pf_colors, pf_colormap, pf_listed_colormap = _get_neuron_identities(computation_result.computed_data['pf1D'])
-        # pf_neuron_identities, pf_sort_ind, pf_colors, pf_colormap, pf_listed_colormap = _get_neuron_identities(self.active_computation_results[a_select_config_name].computed_data['pf2D'])
+        else:
+            if debug_print:
+                print(f'No post_load_functions, skipping post_load.')
 
-    
+        
+        
+            
+
 
 class ComputedPipelineStage(LoadableInput, LoadableSessionInput, FilterablePipelineStage, ComputablePipelineStage, BaseNeuropyPipelineStage):
     """Docstring for ComputedPipelineStage."""
@@ -277,6 +185,7 @@ class ComputedPipelineStage(LoadableInput, LoadableSessionInput, FilterablePipel
         self.basedir = loaded_stage.basedir
         self.loaded_data = loaded_stage.loaded_data
 
+        # Initialize custom fields:
         self.filtered_sessions = dict()
         self.filtered_epochs = dict()
         self.computation_results = dict()
@@ -290,6 +199,32 @@ class ComputedPipelineStage(LoadableInput, LoadableSessionInput, FilterablePipel
 
 
 class NeuropyPipeline():
+    """ 
+    
+    Usage:
+    > From properties:
+        curr_kdiba_pipeline = NeuropyPipeline(name='kdiba_pipeline', session_data_type='kdiba', basedir=known_data_session_type_dict['kdiba'].basedir, load_function=known_data_session_type_dict['kdiba'].load_function)
+    
+    > From KnownDataSessionTypeProperties object:
+        curr_kdiba_pipeline = NeuropyPipeline.init_from_known_data_session_type('kdiba', known_data_session_type_dict['kdiba'])
+
+    """
+    
+    def __init__(self, name="pipeline", session_data_type='kdiba', basedir=None,
+                 load_function: Callable = None,
+                 post_load_functions: List[Callable] = []):
+        # super(NeuropyPipeline, self).__init__()
+        self.pipeline_name = name
+        self.session_data_type = None
+        self.stage = None
+        self.set_input(name=name, session_data_type=session_data_type, basedir=basedir, load_function=load_function, post_load_functions=post_load_functions)
+
+
+    @classmethod
+    def init_from_known_data_session_type(cls, type_name: str, known_type_properties: KnownDataSessionTypeProperties):
+        return cls(name=f'{type_name}_pipeline', session_data_type=type_name, basedir=known_type_properties.basedir,
+            load_function=known_type_properties.load_function, post_load_functions=known_type_properties.post_load_functions)
+
     @property
     def is_loaded(self):
         """The is_loaded property."""
@@ -337,15 +272,11 @@ class NeuropyPipeline():
         """The computation_results property, accessed through the stage."""
         return self.stage.computation_results
     
-
-    def __init__(self, name="pipeline", session_data_type='kdiba', basedir=None, load_function: Callable = None):
-        # super(NeuropyPipeline, self).__init__()
-        self.pipeline_name = name
-        self.session_data_type = None
-        self.stage = None
-        self.set_input(name=name, session_data_type=session_data_type, basedir=basedir, load_function=load_function)
-
-    def set_input(self, session_data_type:str='', basedir="", load_function: Callable = None, auto_load=True, **kwargs):
+    
+    
+    def set_input(self, session_data_type:str='', basedir="", load_function: Callable = None, post_load_functions: List[Callable] = [],
+                  auto_load=True, **kwargs):
+        """ Called to set the input stage """
         if not isinstance(basedir, Path):
             print(f"basedir is not Path. Converting...")
             active_basedir = Path(basedir)
@@ -363,6 +294,7 @@ class NeuropyPipeline():
             stage_name=f"{self.pipeline_name}_input",
             basedir=active_basedir,
             load_function=load_function,
+            post_load_functions=post_load_functions
         )
         if auto_load:
             self.load()
@@ -375,6 +307,7 @@ class NeuropyPipeline():
     def load(self):
         self.stage.load()  # perform the load operation:
         self.stage = LoadedPipelineStage(self.stage)  # build the loaded stage
+        self.stage.post_load()
 
 
     def filter_sessions(self, active_session_filter_configurations):
