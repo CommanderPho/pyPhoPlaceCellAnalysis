@@ -26,20 +26,20 @@ except ImportError:
     )
     from neuropy import core
 
+from dataclasses import dataclass
+
 from neuropy.core.session.data_session_loader import DataSessionLoader
 from neuropy.core.session.dataSession import DataSession
-
-
-from dataclasses import dataclass
 
 
 @dataclass
 class KnownDataSessionTypeProperties(object):
     """Docstring for KnownDataSessionTypeProperties."""
+
     load_function: Callable
     basedir: Path
-    
-    
+
+
 # known_data_session_type_dict = {'kdiba':KnownDataSessionTypeProperties(load_function=(lambda a_base_dir: DataSessionLoader.kdiba_old_format_session(a_base_dir)),
 #                                basedir=Path(r'R:\data\KDIBA\gor01\one\2006-6-07_11-26-53')),
 #                 'bapun':KnownDataSessionTypeProperties(load_function=(lambda a_base_dir: DataSessionLoader.bapun_data_session(a_base_dir)),
