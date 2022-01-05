@@ -215,45 +215,30 @@ class LoadableSessionInput:
 @dataclass
 class InputPipelineStage(LoadableInput, BaseNeuropyPipelineStage):
     """Docstring for InputPipelineStage."""
-
     basedir: Path = Path("")
     load_function: Callable = None
 
-    # @property
-    # def basedir_path(self):
-    #     """The basedir_path property."""
-    #     return Path(self.basedir)
-
-    # def __init__(self, basedir='', **kwargs):
-    #     super(InputPipelineStage, self).__init__(**kwargs)
-    #     # BaseNeuropyPipelineStage(**kwargs)
-    #     if not isinstance(basedir, Path):
-    #         print(f'basedir is not Path. Converting...')
-    #         self.basedir = Path(basedir)
-    #     else:
-    #         print(f'basedir is already Path object.')
-    #         self.basedir = basedir
-
-    #     if not self.basedir.exists():
-    #         raise FileExistsError
 
 
-# @dataclass
-class LoadedPipelineStage(
-    LoadableInput, LoadableSessionInput, BaseNeuropyPipelineStage
-):
-    """Docstring for InputPipelineStage."""
-
+class LoadedPipelineStage(LoadableInput, LoadableSessionInput, BaseNeuropyPipelineStage):
+    """Docstring for LoadedPipelineStage."""
     loaded_data: dict = None
 
     def __init__(self, input_stage: InputPipelineStage):
-        # super(ClassName, self).__init__()
         self.stage_name = input_stage.stage_name
         self.basedir = input_stage.basedir
         self.loaded_data = input_stage.loaded_data
 
 
 class FilterablePipelineStage:
+    
+    # @property
+    # def filtered_data(self):
+    #     """The filtered_data property."""
+    #     return self._filtered_data
+    # @filtered_data.setter
+    # def filtered_data(self, value):
+    #     self._filtered_data = value
     
     def select_filters(self, active_session_filter_configurations):
         self.filtered_sessions = dict()
@@ -304,13 +289,11 @@ class ComputedPipelineStage(LoadableInput, LoadableSessionInput, FilterablePipel
 #         self.arg = arg
 
 
-class NeuropyPipeline:
+class NeuropyPipeline():
     @property
     def is_loaded(self):
         """The is_loaded property."""
-        return (self.stage is not None) and (
-            isinstance(self.stage, LoadedPipelineStage)
-        )
+        return (self.stage is not None) and (isinstance(self.stage, LoadedPipelineStage))
 
     @property
     def sess(self):
@@ -326,7 +309,29 @@ class NeuropyPipeline:
     def session_name(self):
         """The session_name property."""
         return self.sess.name
+
+    ## Filtered Properties:
+    @property
+    def is_filtered(self):
+        """The is_filtered property."""
+        return (self.stage is not None) and (isinstance(self.stage, ComputedPipelineStage))
     
+    @property
+    def filtered_epochs(self):
+        """The filtered_sessions property, accessed through the stage."""
+        return self.stage.filtered_epochs
+    
+    @property
+    def filtered_sessions(self):
+        """The filtered_sessions property, accessed through the stage."""
+        return self.stage.filtered_sessions
+
+    ## Computed Properties:
+    @property
+    def is_computed(self):
+        """The is_computed property. TODO: Needs validation/Testing """
+        return (self.stage is not None) and (isinstance(self.stage, ComputedPipelineStage) and (self.computation_results.values[0] is not None))
+
     @property
     def computation_results(self):
         """The computation_results property, accessed through the stage."""
