@@ -1,11 +1,11 @@
 name: pyPhoPlaceCellAnalysis
 channels:
-  - defaults
+  # - defaults
   - conda-forge
-  - pytorch
+  # - pytorch
   # - fastai
 dependencies:
-  - python>=3.6
+  - python>=3.9
   - pip
   # BASICS
   - numpy
@@ -20,6 +20,8 @@ dependencies:
   - seaborn
   # - altair
   # - yellowbrick
+  # Personal Libraries
+  # - pyPhoCoreHelpers
   # ML, STATS & DEEP LEARNING
   # - statsmodels
   # - scikit-learn
@@ -37,8 +39,10 @@ dependencies:
   # - optuna
   # - dask
   # - snakeviz
+
   - pip:
      - -e .  # install git checkout of pyPhoPlaceCellAnalysis in editable mode
+     - pyPhoCoreHelpers
      # add here only pip-packages that are not available in conda/conda-forge! E.g.:
      # - icecream
      # - jax
