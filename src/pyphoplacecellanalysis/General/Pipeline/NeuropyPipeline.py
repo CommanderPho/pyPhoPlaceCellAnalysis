@@ -203,6 +203,14 @@ class ComputedPipelineStage(LoadableInput, LoadableSessionInput, FilterablePipel
 class NeuropyPipeline():
     """ 
     
+    Exposes the active sessions via its .sess member.
+    
+    Stages:
+    1. Loading
+    2. Filtering
+    3. Computation
+    4. Display
+    
     Usage:
     > From properties:
         curr_kdiba_pipeline = NeuropyPipeline(name='kdiba_pipeline', session_data_type='kdiba', basedir=known_data_session_type_dict['kdiba'].basedir, load_function=known_data_session_type_dict['kdiba'].load_function)

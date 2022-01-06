@@ -52,6 +52,7 @@ class ComputablePipelineStage:
         # self.active_computation_results = dict()
         for a_select_config_name, a_filtered_session in self.filtered_sessions.items():
             print(f'Performing single_computation on filtered_session with filter named "{a_select_config_name}"...')
+            self.active_configs[a_select_config_name].computation_config = active_computation_params #TODO: if more than one computation config is passed in, the active_config should be duplicated for each computation config.
             self.computation_results[a_select_config_name] = ComputablePipelineStage._perform_single_computation(a_filtered_session, active_computation_params) # returns a computation result. Does this store the computation config used to compute it?
         
         # pf_neuron_identities, pf_sort_ind, pf_colors, pf_colormap, pf_listed_colormap = _get_neuron_identities(computation_result.computed_data['pf1D'])
