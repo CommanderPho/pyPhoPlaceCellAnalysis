@@ -22,6 +22,17 @@ def compute_time_binned_spiking_activity(spikes_df, max_time_bin_size:float=0.02
 
     Returns:
         [type]: [description]
+        
+    Usage:
+        time_bin_size=0.02
+
+        curr_result_label = 'maze1'
+        sess = curr_kdiba_pipeline.filtered_sessions[curr_result_label]
+        pf = curr_kdiba_pipeline.computation_results[curr_result_label].computed_data['pf1D']
+
+        spikes_df = sess.spikes_df.copy()
+        unit_specific_binned_spike_counts, out_digitized_variable_bins, out_binning_info = compute_time_binned_spiking_activity(spikes_df, time_bin_size)
+
     """
     time_variable_name = spikes_df.spikes.time_variable_name # 't_rel_seconds'
 
@@ -31,22 +42,12 @@ def compute_time_binned_spiking_activity(spikes_df, max_time_bin_size:float=0.02
         # assert (np.shape(out_digitized_variable_bins)[0] == np.shape(spikes_df)[0]), f'np.shape(out_digitized_variable_bins)[0]: {np.shape(out_digitized_variable_bins)[0]} should equal np.shape(spikes_df)[0]: {np.shape(spikes_df)[0]}'
         print(out_binning_info)
 
-    # spikes_df[time_variable_name].value_counts(bins=out_binning_info.num_bins, sort=False) # fast way to get the binned counts across all cells
+    # any_unit_spike_counts = spikes_df[time_variable_name].value_counts(bins=out_binning_info.num_bins, sort=False) # fast way to get the binned counts across all cells
 
-    # cut_bins = np.linspace(59200, 60800, 9)
-    # pd.cut(df[time_variable_name], bins=cut_bins)
-    # pd.cut(df['ext price'], bins=4)
-    # time_binned_spikes_df = pd.cut(spikes_df[time_variable_name].to_numpy(), bins=out_digitized_variable_bins)
     spikes_df['binned_time'] = pd.cut(spikes_df[time_variable_name].to_numpy(), bins=out_digitized_variable_bins, include_lowest=True, labels=out_binning_info.bin_indicies[1:]) # same shape as the input data (time_binned_spikes_df: (69142,))
-    # print(f'time_binned_spikes_df: {np.shape(time_binned_spikes_df)}, type(time_binned_spikes_df): {type(time_binned_spikes_df)}')
-    # spikes_df['binned_time'] = time_binned_spikes_df
-    # spikes_df[time_variable_name].to_numpy()[time_binned_spikes_df]
-
-    # df.groupby(bins)['Value'].agg(['count', 'sum'])
-    # spikes_df.groupby(time_binned_spikes_df)[time_variable_name].agg('count')
 
     # any_unit_spike_counts = spikes_df.groupby(['binned_time'])[time_variable_name].agg('count') # unused any cell spike counts
-
+    
     unit_specific_bin_specific_spike_counts = spikes_df.groupby(['aclu','binned_time'])[time_variable_name].agg('count')
     active_aclu_binned_time_multiindex = unit_specific_bin_specific_spike_counts.index
     active_unique_aclu_values = np.unique(active_aclu_binned_time_multiindex.get_level_values('aclu'))
@@ -54,6 +55,7 @@ def compute_time_binned_spiking_activity(spikes_df, max_time_bin_size:float=0.02
     if debug_print:
         print(f'np.shape(unit_specific_spike_counts): {np.shape(unit_specific_binned_spike_counts)}') # np.shape(unit_specific_spike_counts): (40, 85841)
 
+    unit_specific_binned_spike_counts = pd.DataFrame(unit_specific_binned_spike_counts, columns=active_unique_aclu_values, index=out_binning_info.bin_indicies[1:])
     # unit_specific_spike_counts.get_group(2)
 
     # spikes_df.groupby(['binned_time']).agg('count')
