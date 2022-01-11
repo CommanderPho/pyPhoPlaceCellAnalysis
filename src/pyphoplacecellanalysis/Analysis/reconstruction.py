@@ -3,7 +3,7 @@
 import numpy as np
 import pandas as pd
 
-from pyphocorehelpers.indexing_helpers import build_spanning_bins
+from pyphocorehelpers.indexing_helpers import BinningInfo, build_spanning_bins, get_bin_centers  
 from pyphocorehelpers.print_helpers import WrappingMessagePrinter
 
 # cut_bins = np.linspace(59200, 60800, 9)
@@ -54,15 +54,16 @@ class ZhangReconstructionImplementation:
         """
         time_variable_name = spikes_df.spikes.time_variable_name # 't_rel_seconds'
 
-        out_digitized_variable_bins, out_binning_info = build_spanning_bins(spikes_df[time_variable_name].to_numpy(), max_bin_size=max_time_bin_size, debug_print=debug_print) # np.shape(out_digitized_variable_bins)[0] == np.shape(spikes_df)[0]
+        time_window_edges, time_window_edges_binning_info = build_spanning_bins(spikes_df[time_variable_name].to_numpy(), max_bin_size=max_time_bin_size, debug_print=debug_print) # np.shape(out_digitized_variable_bins)[0] == np.shape(spikes_df)[0]
+
         if debug_print:
-            print(f'spikes_df[time_variable_name]: {np.shape(spikes_df[time_variable_name])}\nout_digitized_variable_bins: {np.shape(out_digitized_variable_bins)}')
+            print(f'spikes_df[time_variable_name]: {np.shape(spikes_df[time_variable_name])}\ntime_window_edges: {np.shape(time_window_edges)}')
             # assert (np.shape(out_digitized_variable_bins)[0] == np.shape(spikes_df)[0]), f'np.shape(out_digitized_variable_bins)[0]: {np.shape(out_digitized_variable_bins)[0]} should equal np.shape(spikes_df)[0]: {np.shape(spikes_df)[0]}'
-            print(out_binning_info)
+            print(time_window_edges_binning_info)
 
         # any_unit_spike_counts = spikes_df[time_variable_name].value_counts(bins=out_binning_info.num_bins, sort=False) # fast way to get the binned counts across all cells
 
-        spikes_df['binned_time'] = pd.cut(spikes_df[time_variable_name].to_numpy(), bins=out_digitized_variable_bins, include_lowest=True, labels=out_binning_info.bin_indicies[1:]) # same shape as the input data (time_binned_spikes_df: (69142,))
+        spikes_df['binned_time'] = pd.cut(spikes_df[time_variable_name].to_numpy(), bins=time_window_edges, include_lowest=True, labels=time_window_edges_binning_info.bin_indicies[1:]) # same shape as the input data (time_binned_spikes_df: (69142,))
 
         # any_unit_spike_counts = spikes_df.groupby(['binned_time'])[time_variable_name].agg('count') # unused any cell spike counts
         
@@ -73,7 +74,7 @@ class ZhangReconstructionImplementation:
         if debug_print:
             print(f'np.shape(unit_specific_spike_counts): {np.shape(unit_specific_binned_spike_counts)}') # np.shape(unit_specific_spike_counts): (40, 85841)
 
-        unit_specific_binned_spike_counts = pd.DataFrame(unit_specific_binned_spike_counts, columns=active_unique_aclu_values, index=out_binning_info.bin_indicies[1:])
+        unit_specific_binned_spike_counts = pd.DataFrame(unit_specific_binned_spike_counts, columns=active_unique_aclu_values, index=time_window_edges_binning_info.bin_indicies[1:])
         # unit_specific_spike_counts.get_group(2)
 
         # spikes_df.groupby(['binned_time']).agg('count')
@@ -87,7 +88,7 @@ class ZhangReconstructionImplementation:
         # spikes_df._obj.groupby(['aclu'])
         # neuron_ids, neuron_specific_spikes_dfs = partition(spikes_df, 'aclu')
 
-        return unit_specific_binned_spike_counts, out_digitized_variable_bins, out_binning_info
+        return unit_specific_binned_spike_counts, time_window_edges, time_window_edges_binning_info
 
     @staticmethod
     def build_concatenated_F(pf, debug_print=False):
@@ -115,11 +116,11 @@ class ZhangReconstructionImplementation:
     @staticmethod
     def time_bin_spike_counts_N_i(spikes_df, time_bin_size, debug_print=False):
         """ Returns the number of spikes that occured for each neuron in each time bin. """
-        unit_specific_binned_spike_counts, out_digitized_variable_bins, out_binning_info = ZhangReconstructionImplementation.compute_time_binned_spiking_activity(spikes_df, time_bin_size);
+        unit_specific_binned_spike_counts, time_window_edges, time_window_edges_binning_info = ZhangReconstructionImplementation.compute_time_binned_spiking_activity(spikes_df, time_bin_size);
         unit_specific_binned_spike_counts = unit_specific_binned_spike_counts.T # Want the outputs to have each time window as a column, with a single time window giving a column vector for each neuron
         if debug_print:
             print(f'unit_specific_binned_spike_counts.to_numpy(): {np.shape(unit_specific_binned_spike_counts.to_numpy())}') # (85841, 40)
-        return unit_specific_binned_spike_counts.to_numpy(), out_digitized_variable_bins, out_binning_info
+        return unit_specific_binned_spike_counts.to_numpy(), time_window_edges, time_window_edges_binning_info
 
 
     # Optimal Functions:
@@ -225,9 +226,9 @@ class BayesianPlacemapPositionDecoder(PlacemapPositionDecoder):
     @property
     def num_time_windows(self):
         """The num_time_windows property."""
-        return self.time_binning_info.num_bins
+        return self.time_window_center_binning_info.num_bins
     
-    
+
     def setup(self):        
         self.neuron_IDXs, self.neuron_IDs, f_i, F_i, self.F, self.P_x = ZhangReconstructionImplementation.build_concatenated_F(self.pf, debug_print=self.debug_print)
         """
@@ -237,13 +238,17 @@ class BayesianPlacemapPositionDecoder(PlacemapPositionDecoder):
             np.shape(F): (288, 40)
             np.shape(P_x): (288, 1)
         """
-        self.unit_specific_time_binned_spike_counts, self.digitized_time_variable_bins, self.time_binning_info = ZhangReconstructionImplementation.time_bin_spike_counts_N_i(self.spikes_df, self.time_bin_size, debug_print=self.debug_print) # unit_specific_binned_spike_counts.to_numpy(): (40, 85841)
+        self.unit_specific_time_binned_spike_counts, self.time_window_edges, self.time_window_edges_binning_info = ZhangReconstructionImplementation.time_bin_spike_counts_N_i(self.spikes_df, self.time_bin_size, debug_print=self.debug_print) # unit_specific_binned_spike_counts.to_numpy(): (40, 85841)
+        
+        self.time_window_centers = get_bin_centers(self.time_window_edges)
+        actual_time_window_size = self.time_window_centers[2] - self.time_window_centers[1]
+        self.time_window_center_binning_info = BinningInfo(self.time_window_edges_binning_info.variable_extents, actual_time_window_size, len(self.time_window_centers), np.arange(len(self.time_window_centers)))
         
         # pre-allocate:
-        with WrappingMessagePrinter(f'pre-allocating final_p_x_given_n: np.shape(final_p_x_given_n) will be: ({self.flat_position_size} x {self.time_binning_info.num_bins})...', begin_line_ending='... ', enable_print=self.debug_print):
+        with WrappingMessagePrinter(f'pre-allocating final_p_x_given_n: np.shape(final_p_x_given_n) will be: ({self.flat_position_size} x {self.num_time_windows})...', begin_line_ending='... ', enable_print=self.debug_print):
             # if self.debug_print:
             #     print(f'pre-allocating final_p_x_given_n: np.shape(final_p_x_given_n) will be: ({self.flat_position_size} x {self.time_binning_info.num_bins})...', end=' ') # np.shape(final_p_x_given_n): (288,)
-            self.final_p_x_given_n = np.zeros((self.flat_position_size, self.time_binning_info.num_bins))
+            self.final_p_x_given_n = np.zeros((self.flat_position_size, self.num_time_windows))
             # if self.debug_print:
             #     print('done.')
 
@@ -259,7 +264,7 @@ class BayesianPlacemapPositionDecoder(PlacemapPositionDecoder):
             
     def compute_all(self):
         with WrappingMessagePrinter(f'compute_all final_p_x_given_n called. Computing {np.shape(self.final_p_x_given_n)[0]} windows for self.final_p_x_given_n...', begin_line_ending='... ', finished_message='compute_all completed.', enable_print=self.debug_print):
-            for bin_idx in self.time_binning_info.bin_indicies:
+            for bin_idx in np.arange(self.num_time_windows):
                 with WrappingMessagePrinter(f'\t computing single final_p_x_given_n[:, {bin_idx}] for bin_idx {bin_idx}', begin_line_ending='... ', finished_message='', finished_line_ending='\n', enable_print=self.debug_print):
                     self.final_p_x_given_n[:, bin_idx] = self.perform_compute_single_time_bin(bin_idx)
             # # all computed
