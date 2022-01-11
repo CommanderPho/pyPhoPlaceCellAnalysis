@@ -5,6 +5,7 @@ import numpy as np
 
 
 from ...Analysis.reconstruction import BayesianPlacemapPositionDecoder
+from pyphocorehelpers.indexing_helpers import find_neighbours
 
 
 class DecoderResultDisplayingBaseClass:
@@ -71,7 +72,8 @@ class DecoderResultDisplayingBaseClass:
 class DecoderResultDisplayingPlot2D(DecoderResultDisplayingBaseClass):
     debug_print = False
     
-    def __init__(self, decoder: BayesianPlacemapPositionDecoder):
+    def __init__(self, decoder: BayesianPlacemapPositionDecoder, position_df):
+        self.position_df = position_df
         super(DecoderResultDisplayingPlot2D, self).__init__(decoder)
         
     def setup(self):
@@ -81,19 +83,23 @@ class DecoderResultDisplayingPlot2D(DecoderResultDisplayingBaseClass):
         # self.title_string = f'2D Decoded Positions'
         # self.fig.suptitle(self.title_string)
         self.index = 0
-        active_window, active_p_x_given_n, active_most_likely_x_position = self.get_data(self.index) # get the first item
+        active_window, active_p_x_given_n, active_most_likely_x_position, active_nearest_measured_position = self.get_data(self.index) # get the first item
         # self.active_im = self.axs.imshow(active_p_x_given_n, interpolation='none', aspect='auto', vmin=0, vmax=1)
         # self.active_im = plot_single_tuning_map_2D(self.xbin, self.ybin, active_p_x_given_n, self.occupancy, drop_below_threshold=None, ax=self.axs)
         self.active_im = DecoderResultDisplayingPlot2D.plot_single_decoder_result(self.xbin, self.ybin, active_p_x_given_n, drop_below_threshold=None, final_string_components=[f'Decoder Result[i: {self.index}]: time window: {active_window}'], ax=self.axs)
         
         # self.active_most_likely_pos = self.axs.plot([], [], lw=2) # how to use a plot(...)
+        
+        if self.position_df is not None:
+            self.active_nearest_measured_pos_plot = self.axs.scatter([], [], label='actual_recorded_position', color='w')
+    
         self.active_most_likely_pos_plot = self.axs.scatter([], [], label='most_likely_position', color='k') # How to initialize a scatter(...). see https://stackoverflow.com/questions/42722691/python-matplotlib-update-scatter-plot-from-a-function
         # line, = ax.plot([], [], lw=2)
         
         # self.fig.xticks()
         
         # Animation:
-        # self.ani = FuncAnimation(self.fig, self.animate, frames=2, interval=100, repeat=True)
+        # self.ani = FuncAnimation(self.fig, self.update, frames=2, interval=100, repeat=True)
         
         
 
@@ -104,7 +110,16 @@ class DecoderResultDisplayingPlot2D(DecoderResultDisplayingBaseClass):
         active_most_likely_x_indicies = self.decoder.most_likely_position_indicies[:,window_idx]
         active_most_likely_x_position = (self.xbin_centers[active_most_likely_x_indicies[0]], self.ybin_centers[active_most_likely_x_indicies[1]])
         
-        return active_window, active_p_x_given_n, active_most_likely_x_position
+        if self.position_df is not None:
+            active_window_start = active_window[0]
+            active_window_end = active_window[1]
+            active_window_midpoint = active_window_start + ((active_window_end - active_window_start) / 2.0)
+            [lowerneighbor_ind, upperneighbor_ind] = find_neighbours(active_window_midpoint, self.position_df, 't')
+            active_nearest_measured_position = self.position_df.loc[lowerneighbor_ind, ['x','y']].to_numpy()
+        else:
+            active_nearest_measured_position = None
+        
+        return active_window, active_p_x_given_n, active_most_likely_x_position, active_nearest_measured_position
 
     @staticmethod
     def prepare_data_for_plotting(p_x_given_n, drop_below_threshold: float=0.0000001):
@@ -172,9 +187,9 @@ class DecoderResultDisplayingPlot2D(DecoderResultDisplayingBaseClass):
         # curr_ax = self.axs
         # active_window = pho_custom_decoder.active_time_windows[i] # a tuple with a start time and end time
         # active_p_x_given_n = np.squeeze(pho_custom_decoder.p_x_given_n[:,:,i]) # same size as occupancy
-        active_window, active_p_x_given_n, active_most_likely_x_position = self.get_data(self.index)
+        active_window, active_p_x_given_n, active_most_likely_x_position, active_nearest_measured_position = self.get_data(self.index)
         if DecoderResultDisplayingPlot2D.debug_print:
-            print(f'active_window: {active_window}, active_p_x_given_n: {active_p_x_given_n}, active_most_likely_x_position: {active_most_likely_x_position}')
+            print(f'active_window: {active_window}, active_p_x_given_n: {active_p_x_given_n}, active_most_likely_x_position: {active_most_likely_x_position}, active_nearest_measured_position: {active_nearest_measured_position}')
 
         # Plot the main heatmap for this pfmap:
         # im = plot_single_tuning_map_2D(self.xbin, self.ybin, active_p_x_given_n, self.occupancy, neuron_extended_id=self.ratemap.neuron_extended_ids[cell_idx], drop_below_threshold=drop_below_threshold, brev_mode=brev_mode, plot_mode=plot_mode, ax=curr_ax)
@@ -184,6 +199,10 @@ class DecoderResultDisplayingPlot2D(DecoderResultDisplayingBaseClass):
         # Update only:
         self.active_im.set_array(DecoderResultDisplayingPlot2D.prepare_data_for_plotting(active_p_x_given_n, drop_below_threshold=None))
         self.active_most_likely_pos_plot.set_offsets(np.c_[active_most_likely_x_position[0], active_most_likely_x_position[1]]) # method for updating a scatter_plot
+        
+        if self.position_df is not None:
+            self.active_nearest_measured_pos_plot.set_offsets(np.c_[active_nearest_measured_position[0], active_nearest_measured_position[1]]) # method for updating a scatter_plot
+        
         self.axs.set_title(f'Decoder Result[i: {self.index}]: time window: {active_window}')  # update title
         return (self.active_im, self.active_most_likely_pos_plot)
         
