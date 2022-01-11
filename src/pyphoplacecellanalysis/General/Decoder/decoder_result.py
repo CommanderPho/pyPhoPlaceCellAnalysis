@@ -61,6 +61,11 @@ class DecoderResultDisplayingBaseClass:
     def ybin_centers(self):
         return self.ratemap.ybin_centers
     
+    @property
+    def most_likely_positions(self):
+        return self.decoder.most_likely_positions
+    
+    
     
 
 class DecoderResultDisplayingPlot2D(DecoderResultDisplayingBaseClass):
@@ -183,6 +188,6 @@ class DecoderResultDisplayingPlot2D(DecoderResultDisplayingBaseClass):
         
         # anim = animation.FuncAnimation(figure, func=update_figure, fargs=(bar_rects, iteration), frames=generator, interval=100, repeat=False)
         # return (self.active_im,)
-        return self.fig
+        return self.fig # returns fig
 
 
