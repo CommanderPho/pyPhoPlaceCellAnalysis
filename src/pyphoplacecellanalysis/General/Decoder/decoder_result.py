@@ -2,11 +2,36 @@ import matplotlib
 import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
 import numpy as np
+import pandas as pd
 
 
 from ...Analysis.reconstruction import BayesianPlacemapPositionDecoder
 from pyphocorehelpers.indexing_helpers import find_neighbours
 
+
+def build_position_df_time_window_idx(active_pos_df, curr_active_time_windows):
+    """ adds the time_window_idx column to the active_pos_df
+    Usage:
+        curr_active_time_windows = np.array(pho_custom_decoder.active_time_windows)
+        active_pos_df = build_position_df_time_window_idx(sess.position.to_dataframe(), curr_active_time_windows)
+    """
+    active_pos_df['time_window_idx'] = np.full_like(active_pos_df['t'], -1, dtype='int')
+    starts = curr_active_time_windows[:,0]
+    stops = curr_active_time_windows[:,1]
+    num_slices = len(starts)
+    print(f'starts: {np.shape(starts)}, stops: {np.shape(stops)}, num_slices: {num_slices}')
+    for i in np.arange(num_slices):
+        active_pos_df.loc[active_pos_df[active_pos_df.position.time_variable_name].between(starts[i], stops[i], inclusive='both'), ['time_window_idx']] = int(i) # set the 'time_window_idx' identifier on the object
+    active_pos_df['time_window_idx'] = active_pos_df['time_window_idx'].astype(int) # ensure output is the correct datatype
+    return active_pos_df
+
+def build_position_df_resampled_to_time_windows(active_pos_df, time_bin_size=0.02):
+    position_time_delta = pd.to_timedelta(active_pos_df[active_pos_df.position.time_variable_name], unit="sec")
+    active_pos_df['time_delta_sec'] = position_time_delta
+    active_pos_df = active_pos_df.set_index('time_delta_sec')
+    window_resampled_pos_df = active_pos_df.resample('0.02S').nearest() # 0.02 second bins
+    return window_resampled_pos_df
+    
 
 class DecoderResultDisplayingBaseClass:
     def __init__(self, decoder: BayesianPlacemapPositionDecoder):
@@ -66,8 +91,8 @@ class DecoderResultDisplayingBaseClass:
     def most_likely_positions(self):
         return self.decoder.most_likely_positions
     
-    
-    
+
+        
 
 class DecoderResultDisplayingPlot2D(DecoderResultDisplayingBaseClass):
     debug_print = False
@@ -91,6 +116,9 @@ class DecoderResultDisplayingPlot2D(DecoderResultDisplayingBaseClass):
         # self.active_most_likely_pos = self.axs.plot([], [], lw=2) # how to use a plot(...)
         
         if self.position_df is not None:
+            # Setup data:
+            self.position_df = build_position_df_resampled_to_time_windows(self.position_df, time_bin_size=self.decoder.time_bin_size)
+            # Build Scatter plot when done:
             self.active_nearest_measured_pos_plot = self.axs.scatter([], [], label='actual_recorded_position', color='w')
     
         self.active_most_likely_pos_plot = self.axs.scatter([], [], label='most_likely_position', color='k') # How to initialize a scatter(...). see https://stackoverflow.com/questions/42722691/python-matplotlib-update-scatter-plot-from-a-function
@@ -102,7 +130,6 @@ class DecoderResultDisplayingPlot2D(DecoderResultDisplayingBaseClass):
         # self.ani = FuncAnimation(self.fig, self.update, frames=2, interval=100, repeat=True)
         
         
-
     def get_data(self, window_idx):
         active_window = self.decoder.active_time_windows[window_idx] # a tuple with a start time and end time
         active_p_x_given_n = np.squeeze(self.decoder.p_x_given_n[:,:,window_idx]) # same size as occupancy
