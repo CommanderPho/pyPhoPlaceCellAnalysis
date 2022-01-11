@@ -195,13 +195,11 @@ class SerializedAttributesSpecifyingClass:
     
     
 # input_keys = ['pf']
-    # recomputed_input_keys = ['neuron_IDXs', 'neuron_IDs', 'F', 'P_x']
-    # intermediate_keys = ['original_position_data_shape']
-    
-    # saved_result_keys = ['flat_p_x_given_n']
-    
-    # recomputed_keys = ['p_x_given_n']
-    
+# recomputed_input_keys = ['neuron_IDXs', 'neuron_IDs', 'F', 'P_x']
+# intermediate_keys = ['original_position_data_shape']
+# saved_result_keys = ['flat_p_x_given_n']
+# recomputed_keys = ['p_x_given_n']
+
     
 class PlacemapPositionDecoder(SerializedAttributesSpecifyingClass, object, metaclass=OrderedMeta):
     """docstring for PlacemapPositionDecoder."""
@@ -357,7 +355,7 @@ class BayesianPlacemapPositionDecoder(PlacemapPositionDecoder):
             self._setup_time_bin_spike_counts_N_i()
             self._setup_time_window_centers()
             self.p_x_given_n = self.reshaped_output(self.flat_p_x_given_n)
-
+            self.perform_compute_most_likely_positions()
     
     
     
@@ -402,6 +400,8 @@ class BayesianPlacemapPositionDecoder(PlacemapPositionDecoder):
             #     print(f'pre-allocating final_p_x_given_n: np.shape(final_p_x_given_n) will be: ({self.flat_position_size} x {self.time_binning_info.num_bins})...', end=' ') # np.shape(final_p_x_given_n): (288,)
             self.flat_p_x_given_n = np.zeros((self.flat_position_size, self.num_time_windows))
             self.p_x_given_n = None
+            self.most_likely_position_flat_indicies = None
+            self.most_likely_position_indicies = None
 
     def _setup_time_window_centers(self):
         self.time_window_centers = get_bin_centers(self.time_window_edges)
@@ -410,7 +410,7 @@ class BayesianPlacemapPositionDecoder(PlacemapPositionDecoder):
         
     
     
-    
+    # Main computation functions:
     def perform_compute_single_time_bin(self, time_window_idx):
         n = self.unit_specific_time_binned_spike_counts[:, time_window_idx]
         if self.debug_print:
@@ -432,9 +432,9 @@ class BayesianPlacemapPositionDecoder(PlacemapPositionDecoder):
             
             # np.shape(self.final_p_x_given_n) # (288, 85842)
             self.p_x_given_n = self.reshaped_output(self.flat_p_x_given_n)
-            
-            # self.p_x_given_n = np.reshape(self.flat_p_x_given_n, (self.original_position_data_shape[0], self.original_position_data_shape[1], self.num_time_windows))
-            
+            self.perform_compute_most_likely_positions()
+
+            # self.p_x_given_n = np.reshape(self.flat_p_x_given_n, (self.original_position_data_shape[0], self.original_position_data_shape[1], self.num_time_windows))            
             # np.shape(rehsaped_final_p_x_given_n) # (48, 6, 85842) 
             # if self.debug_print:
             #     print('compute_all completed!')
@@ -442,5 +442,12 @@ class BayesianPlacemapPositionDecoder(PlacemapPositionDecoder):
     def reshaped_output(self, output_probability):
        return np.reshape(output_probability, (self.original_position_data_shape[0], self.original_position_data_shape[1], self.num_time_windows))
 
-
+    def perform_compute_most_likely_positions(self):
+        """ Computes the most likely positions at each timestep from self.flat_p_x_given_n """
+        self.most_likely_position_flat_indicies = np.argmax(self.flat_p_x_given_n, axis=0)
+        # np.shape(self.most_likely_position_flat_indicies) # (85841,)
+        self.most_likely_position_indicies = np.array(np.unravel_index(self.most_likely_position_flat_indicies, self.original_position_data_shape)) # convert back to an array
+        # np.shape(self.most_likely_position_indicies) # (2, 85841)
+        # self.most_likely_position_indicies
         
+
