@@ -81,12 +81,15 @@ class DecoderResultDisplayingPlot2D(DecoderResultDisplayingBaseClass):
         # self.active_im = plot_single_tuning_map_2D(self.xbin, self.ybin, active_p_x_given_n, self.occupancy, drop_below_threshold=None, ax=self.axs)
         self.active_im = DecoderResultDisplayingPlot2D.plot_single_decoder_result(self.xbin, self.ybin, active_p_x_given_n, drop_below_threshold=None, final_string_components=[f'Decoder Result[i: {self.index}]: time window: {active_window}'], ax=self.axs)
         
-        # self.active_most_likely_pos = self.axs.plot([], [], lw=2)
-        
-        self.active_most_likely_pos_plot = self.axs.scatter([], [], label='most_likely_position', color='k') # see https://stackoverflow.com/questions/42722691/python-matplotlib-update-scatter-plot-from-a-function
+        # self.active_most_likely_pos = self.axs.plot([], [], lw=2) # how to use a plot(...)
+        self.active_most_likely_pos_plot = self.axs.scatter([], [], label='most_likely_position', color='k') # How to initialize a scatter(...). see https://stackoverflow.com/questions/42722691/python-matplotlib-update-scatter-plot-from-a-function
         # line, = ax.plot([], [], lw=2)
         
         # self.fig.xticks()
+        
+        # Animation:
+        # self.ani = FuncAnimation(self.fig, self.animate, frames=2, interval=100, repeat=True)
+        
         
 
     def get_data(self, window_idx):
@@ -99,32 +102,32 @@ class DecoderResultDisplayingPlot2D(DecoderResultDisplayingBaseClass):
         return active_window, active_p_x_given_n, active_most_likely_x_position
 
     @staticmethod
-    def plot_single_decoder_result(xbin, ybin, p_x_given_n, drop_below_threshold: float=0.0000001, final_string_components=[], ax=None):
-        """Plots a single decoder posterior Heatmap
-        """
-        use_special_overlayed_title = True
-
-        if ax is None:
-            ax = plt.gca()
-
+    def prepare_data_for_plotting(p_x_given_n, drop_below_threshold: float=0.0000001):
         curr_p_x_given_n = p_x_given_n.copy()
         if drop_below_threshold is not None:
             curr_p_x_given_n[np.where(curr_p_x_given_n < drop_below_threshold)] = np.nan # null out the p_x_given_n below certain values
-
         ## Seems to work:
         curr_p_x_given_n = np.rot90(curr_p_x_given_n, k=-1)
         curr_p_x_given_n = np.fliplr(curr_p_x_given_n)
+        return curr_p_x_given_n
 
+    @staticmethod
+    def plot_single_decoder_result(xbin, ybin, p_x_given_n, drop_below_threshold: float=0.0000001, final_string_components=[], ax=None):
+        """Plots a single decoder posterior Heatmap
+        """
+        if ax is None:
+            ax = plt.gca()
+
+        curr_p_x_given_n = DecoderResultDisplayingPlot2D.prepare_data_for_plotting(p_x_given_n, drop_below_threshold=drop_below_threshold)
+        
         """ https://matplotlib.org/stable/tutorials/intermediate/imshow_extent.html """
-        """ Use the brightness to reflect the confidence in the outcome. Could also use opacity. """
-        # mesh_X, mesh_Y = np.meshgrid(xbin, ybin)
         xmin, xmax, ymin, ymax = (xbin[0], xbin[-1], ybin[0], ybin[-1])
         # The extent keyword arguments controls the bounding box in data coordinates that the image will fill specified as (left, right, bottom, top) in data coordinates, the origin keyword argument controls how the image fills that bounding box, and the orientation in the final rendered image is also affected by the axes limits.
         extent = (xmin, xmax, ymin, ymax)
         # print(f'extent: {extent}')
         # extent = None
         # We'll also create a black background into which the pixels will fade
-        background_black = np.full((*curr_p_x_given_n.shape, 3), 0, dtype=np.uint8)
+        # background_black = np.full((*curr_p_x_given_n.shape, 3), 0, dtype=np.uint8)
 
         imshow_shared_kwargs = {
             'origin': 'lower',
@@ -138,7 +141,7 @@ class DecoderResultDisplayingPlot2D(DecoderResultDisplayingBaseClass):
             'cmap': 'jet',
         }
 
-        ax.imshow(background_black, **imshow_shared_kwargs) # add black background image
+        # ax.imshow(background_black, **imshow_shared_kwargs) # add black background image
         im = ax.imshow(curr_p_x_given_n, **main_plot_kwargs) # add the curr_px_given_n image
         ax.axis("off")
 
@@ -171,14 +174,12 @@ class DecoderResultDisplayingPlot2D(DecoderResultDisplayingBaseClass):
         # Plot the main heatmap for this pfmap:
         # im = plot_single_tuning_map_2D(self.xbin, self.ybin, active_p_x_given_n, self.occupancy, neuron_extended_id=self.ratemap.neuron_extended_ids[cell_idx], drop_below_threshold=drop_below_threshold, brev_mode=brev_mode, plot_mode=plot_mode, ax=curr_ax)
         # self.active_im = plot_single_tuning_map_2D(self.xbin, self.ybin, active_p_x_given_n, self.occupancy, drop_below_threshold=None, ax=self.axs)
-        self.active_im = DecoderResultDisplayingPlot2D.plot_single_decoder_result(self.xbin, self.ybin, active_p_x_given_n, drop_below_threshold=None, final_string_components=[f'Decoder Result[i: {self.index}]: time window: {active_window}'], ax=self.axs);
-        # self.active_im.set_array(active_p_x_given_n)
+        # self.active_im = DecoderResultDisplayingPlot2D.plot_single_decoder_result(self.xbin, self.ybin, active_p_x_given_n, drop_below_threshold=None, final_string_components=[f'Decoder Result[i: {self.index}]: time window: {active_window}'], ax=self.axs);
         
-        # display the most likely position:
-        # self.active_most_likely_pos = self.axs.scatter(active_most_likely_x_position[0], active_most_likely_x_position[1])
-        # self.active_most_likely_pos.set_data(active_most_likely_x_position[0], active_most_likely_x_position[1])
+        # Update only:
+        self.active_im.set_array(DecoderResultDisplayingPlot2D.prepare_data_for_plotting(active_p_x_given_n, drop_below_threshold=None))
         self.active_most_likely_pos_plot.set_offsets(np.c_[active_most_likely_x_position[0], active_most_likely_x_position[1]]) # method for updating a scatter_plot
-        
+        self.axs.set_title(f'Decoder Result[i: {self.index}]: time window: {active_window}')  # update title
         
         # anim = animation.FuncAnimation(figure, func=update_figure, fargs=(bar_rects, iteration), frames=generator, interval=100, repeat=False)
         # return (self.active_im,)
