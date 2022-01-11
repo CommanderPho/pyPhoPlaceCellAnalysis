@@ -1,8 +1,10 @@
-# methods of reconstruction/decoding
+from pathlib import Path
+import pathlib
 
 import numpy as np
 import pandas as pd
 
+from pyphocorehelpers.general_helpers import OrderedMeta
 from pyphocorehelpers.indexing_helpers import BinningInfo, build_spanning_bins, get_bin_centers  
 from pyphocorehelpers.print_helpers import WrappingMessagePrinter
 
@@ -11,6 +13,9 @@ from pyphocorehelpers.print_helpers import WrappingMessagePrinter
 
 # # just want counts of number of occurences of each?
 # df['column_name'].value_counts(bins=8, sort=False)
+
+# methods of reconstruction/decoding:
+
 
 
 
@@ -115,7 +120,11 @@ class ZhangReconstructionImplementation:
 
     @staticmethod
     def time_bin_spike_counts_N_i(spikes_df, time_bin_size, debug_print=False):
-        """ Returns the number of spikes that occured for each neuron in each time bin. """
+        """ Returns the number of spikes that occured for each neuron in each time bin.
+        Example:
+            unit_specific_binned_spike_counts, out_digitized_variable_bins, out_binning_info = ZhangReconstructionImplementation.time_bin_spike_counts_N_i(sess.spikes_df.copy(), time_bin_size, debug_print=debug_print) # unit_specific_binned_spike_counts.to_numpy(): (40, 85841)
+            
+        """
         unit_specific_binned_spike_counts, time_window_edges, time_window_edges_binning_info = ZhangReconstructionImplementation.compute_time_binned_spiking_activity(spikes_df, time_bin_size);
         unit_specific_binned_spike_counts = unit_specific_binned_spike_counts.T # Want the outputs to have each time window as a column, with a single time window giving a column vector for each neuron
         if debug_print:
