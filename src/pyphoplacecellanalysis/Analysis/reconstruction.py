@@ -142,7 +142,9 @@ class ZhangReconstructionImplementation:
     def bayesian_prob(tau, P_x, F, n, debug_print=False):
         # n_i: the number of spikes fired by each cell during the time window of consideration
         assert(len(n) == np.shape(F)[1]), f'n must be a column vector with an entry for each place cell (neuron). Instead it is of np.shape(n): {np.shape(n)}'
-
+        
+        # total_number_spikes_n = np.sum(n) # the total number of spikes across all placecells during this timewindow
+        
         # take n as a row vector, and repeat it vertically for each column.
         element_wise_n = np.tile(n, (np.shape(F)[0], 1)) # repeat n for each row (coresponding to a position x) in F.
         # repeats_array = np.tile(an_array, (repetitions, 1))
@@ -433,6 +435,8 @@ class BayesianPlacemapPositionDecoder(PlacemapPositionDecoder):
         
     def _setup_time_bin_spike_counts_N_i(self):
         self.unit_specific_time_binned_spike_counts, self.time_window_edges, self.time_window_edges_binning_info = ZhangReconstructionImplementation.time_bin_spike_counts_N_i(self.spikes_df, self.time_bin_size, debug_print=self.debug_print) # unit_specific_binned_spike_counts.to_numpy(): (40, 85841)
+        self.total_spike_counts_per_window = np.sum(self.unit_specific_time_binned_spike_counts, axis=0) # gets the total number of spikes during each window (across all placefields)
+
 
     def _setup_preallocate_outputs(self):
         with WrappingMessagePrinter(f'pre-allocating final_p_x_given_n: np.shape(final_p_x_given_n) will be: ({self.flat_position_size} x {self.num_time_windows})...', begin_line_ending='... ', enable_print=self.debug_print):
@@ -452,7 +456,8 @@ class BayesianPlacemapPositionDecoder(PlacemapPositionDecoder):
     
     # Main computation functions:
     def perform_compute_single_time_bin(self, time_window_idx):
-        n = self.unit_specific_time_binned_spike_counts[:, time_window_idx]
+        n = self.unit_specific_time_binned_spike_counts[:, time_window_idx] # this gets the specific n_t for this time window
+        
         if self.debug_print:
             print(f'np.shape(n): {np.shape(n)}') # np.shape(n): (40,)
         final_p_x_given_n = ZhangReconstructionImplementation.bayesian_prob(self.time_bin_size, self.P_x, self.F, n, debug_print=self.debug_print) # np.shape(final_p_x_given_n): (288,)

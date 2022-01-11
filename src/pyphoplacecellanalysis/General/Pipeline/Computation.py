@@ -44,8 +44,6 @@ class ComputablePipelineStage:
 
         return output_result
 
-
-    
     def single_computation(self, active_computation_params: PlacefieldComputationParameters):
         """ Takes its filtered_session and applies the provided active_computation_params to it. The results are stored in self.computation_results under the same key as the filtered session. """
         assert (len(self.filtered_sessions.keys()) > 0), "Must have at least one filtered session before calling single_computation(...). Call self.select_filters(...) first."
@@ -55,7 +53,32 @@ class ComputablePipelineStage:
             self.active_configs[a_select_config_name].computation_config = active_computation_params #TODO: if more than one computation config is passed in, the active_config should be duplicated for each computation config.
             self.computation_results[a_select_config_name] = ComputablePipelineStage._perform_single_computation(a_filtered_session, active_computation_params) # returns a computation result. Does this store the computation config used to compute it?
         
+            # call to perform any registered computations:
+            self.computation_results[a_select_config_name] = self.perform_registered_computations(self.computation_results[a_select_config_name], debug_print=True)
+
         # pf_neuron_identities, pf_sort_ind, pf_colors, pf_colormap, pf_listed_colormap = _get_neuron_identities(computation_result.computed_data['pf1D'])
         # pf_neuron_identities, pf_sort_ind, pf_colors, pf_colormap, pf_listed_colormap = _get_neuron_identities(self.active_computation_results[a_select_config_name].computed_data['pf2D'])
 
+
+"""-------------- Specific Computation Functions to be registered --------------"""
+
+from pyphoplacecellanalysis.Analysis.reconstruction import BayesianPlacemapPositionDecoder
+
+def _perform_position_decoding_computation(computation_result: ComputationResult):
+    """ Builds the 2D Placefield Decoder """
+    def position_decoding_computation(active_session, computation_config, prev_output_result: ComputationResult):
+        prev_output_result.computed_data['pf2D_Decoder'] = BayesianPlacemapPositionDecoder(computation_config.time_bin_size, prev_output_result.computed_data['pf2D'], active_session.spikes_df.copy(), debug_print=False)
+        # %timeit pho_custom_decoder.compute_all():  18.8 s ± 149 ms per loop (mean ± std. dev. of 7 runs, 1 loop each)
+        prev_output_result.computed_data['pf2D_Decoder'].compute_all() #  --> n = self.
+        return prev_output_result
+
+    return position_decoding_computation(computation_result.sess, computation_result.computation_config, computation_result)
+
+
+
+class DefaultRegisteredComputations:
+    """ Simply enables specifying the default computation functions that will be defined in this file and automatically registered. """
+    def register_default_known_computation_functions(self):
+        self.register_computation(_perform_position_decoding_computation)
+    
     

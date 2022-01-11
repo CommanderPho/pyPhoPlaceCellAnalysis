@@ -15,7 +15,8 @@ from pyphocorehelpers.function_helpers import compose_functions
 
 import numpy as np
 import pandas as pd
-from pyphoplacecellanalysis.General.Pipeline.Computation import ComputablePipelineStage
+from pyphoplacecellanalysis.General.Pipeline.Computation import ComputablePipelineStage, DefaultRegisteredComputations
+from pyphoplacecellanalysis.General.Pipeline.Display import DefaultDisplayFunctions, DefaultRegisteredDisplayFunctions
 from pyphoplacecellanalysis.General.Pipeline.Filtering import FilterablePipelineStage
 from pyphoplacecellanalysis.General.Pipeline.Loading import LoadableInput, LoadableSessionInput
 
@@ -37,67 +38,22 @@ except ImportError:
 from neuropy.core.session.data_session_loader import DataSessionLoader
 from neuropy.core.session.dataSession import DataSession
 from neuropy.analyses.placefields import PlacefieldComputationParameters, perform_compute_placefields
-from neuropy.core.neuron_identities import NeuronIdentity, build_units_colormap, PlotStringBrevityModeEnum
 
 
 
-def get_neuron_identities(active_placefields, debug_print=False):
-    """ 
-    
-    Usage:
-        pf_neuron_identities, pf_sort_ind, pf_colors, pf_colormap, pf_listed_colormap = get_neuron_identities(computation_result.computed_data['pf1D'])
-        pf_neuron_identities, pf_sort_ind, pf_colors, pf_colormap, pf_listed_colormap = get_neuron_identities(computation_result.computed_data['pf2D'])
 
-    """
-    good_placefield_neuronIDs = np.array(active_placefields.ratemap.neuron_ids) # in order of ascending ID
-    good_placefield_tuple_neuronIDs = active_placefields.neuron_extended_ids
+# def _temp_filter_session(sess):
+#     """ 
+#     Usage:
+#         active_session, active_epoch = _temp_filter_session(curr_bapun_pipeline.sess)
+#     """
+#     # curr_kdiba_pipeline.sess.epochs['maze1']
+#     active_epoch = sess.epochs.get_named_timerange('maze1')
 
-    # good_placefields_neurons_obj = active_epoch_session.neurons.get_by_id(good_placefield_neuronIDs)
-    # good_placefields_neurons_obj
-    if debug_print:
-        np.shape(good_placefield_neuronIDs) # returns 51, why does it say that 49 are good then?
-        print(f'good_placefield_neuronIDs: {good_placefield_neuronIDs}\ngood_placefield_tuple_neuronIDs: {good_placefield_tuple_neuronIDs}\n len(good_placefield_neuronIDs): {len(good_placefield_neuronIDs)}')
-    
-    # ## Filter by neurons with good placefields only:
-    # # throwing an error because active_epoch_session's .neurons property is None. I think the memory usage from deepcopy is actually a bug, not real use.
-
-    # # good_placefields_flattened_spiketrains = active_epoch_session.flattened_spiketrains.get_by_id(good_placefield_neuronIDs) ## Working
-
-    # # Could alternatively build from the whole dataframe again, but prob. not needed.
-    # # filtered_spikes_df = active_epoch_session.spikes_df.query("`aclu` in @good_placefield_neuronIDs")
-    # # good_placefields_spk_df = good_placefields_flattened_spiketrains.to_dataframe() # .copy()
-    # # good_placefields_neurons_obj = active_epoch_session.neurons.get_by_id(good_placefield_neuronIDs)
-    # # good_placefields_neurons_obj = Neurons.from_dataframe(good_placefields_spk_df, active_epoch_session.recinfo.dat_sampling_rate, time_variable_name=good_placefields_spk_df.spikes.time_variable_name) # do we really want another neuron object? Should we throw out the old one?
-    # good_placefields_session = active_epoch_session
-    # good_placefields_session.neurons = active_epoch_session.neurons.get_by_id(good_placefield_neuronIDs)
-    # good_placefields_session.flattened_spiketrains = active_epoch_session.flattened_spiketrains.get_by_id(good_placefield_neuronIDs) ## Working
-
-    # # good_placefields_session = active_epoch_session.get_by_id(good_placefield_neuronIDs) # Filter by good placefields only, and this fetch also ensures they're returned in the order of sorted ascending index ([ 2  3  5  7  9 12 18 21 22 23 26 27 29 34 38 45 48 53 57])
-    # # good_placefields_session
-
-    pf_sort_ind, pf_colors, pf_colormap, pf_listed_colormap = build_units_colormap(good_placefield_neuronIDs)
-    # active_config.plotting_config.pf_sort_ind = pf_sort_ind
-    # active_config.plotting_config.pf_colors = pf_colors
-    # active_config.plotting_config.active_cells_colormap = pf_colormap
-    # active_config.plotting_config.active_cells_listed_colormap = ListedColormap(active_config.plotting_config.active_cells_colormap)
-
-    pf_neuron_identities = [NeuronIdentity.init_from_NeuronExtendedIdentityTuple(an_extended_identity, a_color=pf_colors[:, neuron_IDX]) for (neuron_IDX, an_extended_identity) in enumerate(good_placefield_tuple_neuronIDs)]
-    # pf_neuron_identities = [NeuronIdentity.init_from_NeuronExtendedIdentityTuple(good_placefield_tuple_neuronIDs[neuron_IDX], a_color=pf_colors[:, neuron_IDX]) for neuron_IDX in np.arange(len(good_placefield_neuronIDs))]
-    # pf_neuron_identities = [NeuronIdentity.init_from_NeuronExtendedIdentityTuple(an_extended_identity) for an_extended_identity in good_placefield_tuple_neuronIDs]
-    return pf_neuron_identities, pf_sort_ind, pf_colors, pf_colormap, pf_listed_colormap
-    
-def _temp_filter_session(sess):
-    """ 
-    Usage:
-        active_session, active_epoch = _temp_filter_session(curr_bapun_pipeline.sess)
-    """
-    # curr_kdiba_pipeline.sess.epochs['maze1']
-    active_epoch = sess.epochs.get_named_timerange('maze1')
-
-    ## All Spikes:
-    # active_epoch_session = sess.filtered_by_epoch(active_epoch) # old
-    active_session = batch_filter_session(sess, sess.position, sess.spikes_df, active_epoch.to_Epoch())
-    return active_session, active_epoch
+#     ## All Spikes:
+#     # active_epoch_session = sess.filtered_by_epoch(active_epoch) # old
+#     active_session = batch_filter_session(sess, sess.position, sess.spikes_df, active_epoch.to_Epoch())
+#     return active_session, active_epoch
 
 
 
@@ -172,7 +128,7 @@ class LoadedPipelineStage(LoadableInput, LoadableSessionInput, BaseNeuropyPipeli
             
 
 
-class ComputedPipelineStage(LoadableInput, LoadableSessionInput, FilterablePipelineStage, ComputablePipelineStage, BaseNeuropyPipelineStage):
+class ComputedPipelineStage(LoadableInput, LoadableSessionInput, FilterablePipelineStage, DefaultRegisteredComputations, ComputablePipelineStage, BaseNeuropyPipelineStage):
     """Docstring for ComputedPipelineStage."""
 
     filtered_sessions: dict = None
@@ -191,7 +147,46 @@ class ComputedPipelineStage(LoadableInput, LoadableSessionInput, FilterablePipel
         self.filtered_epochs = dict()
         self.active_configs = dict() # active_config corresponding to each filtered session/epoch
         self.computation_results = dict()
+        self.registered_computation_functions = list()
+        self.register_default_known_computation_functions() # registers the default
+        
+    def register_computation(self, computation_function):
+        self.registered_computation_functions.append(computation_function)
+        
+    def perform_registered_computations(self, previous_computation_result, debug_print=False):
+        """ Called after load is complete to post-process the data """
+        if (len(self.registered_computation_functions) > 0):
+            if debug_print:
+                print(f'Performing perform_registered_computations(...) with {len(self.registered_computation_functions)} registered_computation_functions...')            
+            composed_registered_computations_function = compose_functions(*self.registered_computation_functions) # functions are composed left-to-right
+            previous_computation_result = composed_registered_computations_function(previous_computation_result)
+            return previous_computation_result
+            
+        else:
+            if debug_print:
+                print(f'No registered_computation_functions, skipping extended computations.')
+            return previous_computation_result # just return the unaltered result
+    
 
+class DisplayPipelineStage(ComputedPipelineStage):
+
+    """docstring for DisplayPipelineStage."""
+    def __init__(self, computed_stage: ComputedPipelineStage, render_actions=dict()):
+        # super(DisplayPipelineStage, self).__init__()
+        # ComputedPipelineStage fields:
+        self.stage_name = computed_stage.stage_name
+        self.basedir = computed_stage.basedir
+        self.loaded_data = computed_stage.loaded_data
+        self.filtered_sessions = computed_stage.filtered_sessions
+        self.filtered_epochs = computed_stage.filtered_epochs
+        self.active_configs = computed_stage.active_configs # active_config corresponding to each filtered session/epoch
+        self.computation_results = computed_stage.computation_results
+        self.registered_computation_functions = computed_stage.registered_computation_functions
+
+        # Initialize custom fields:
+        self.render_actions = render_actions    
+    
+        
 
 # class ClassName(object):
 #     """docstring for ClassName."""
@@ -287,6 +282,12 @@ class NeuropyPipeline():
         """The computation_results property, accessed through the stage."""
         return self.stage.computation_results
     
+    ## Display Stage Properties:
+    @property
+    def is_displayed(self):
+        """The is_displayed property. TODO: Needs validation/Testing """
+        return (self.stage is not None) and (isinstance(self.stage, DisplayPipelineStage))
+    
     
     
     def set_input(self, session_data_type:str='', basedir="", load_function: Callable = None, post_load_functions: List[Callable] = [],
@@ -328,22 +329,30 @@ class NeuropyPipeline():
     def filter_sessions(self, active_session_filter_configurations):
         self.stage = ComputedPipelineStage(self.stage)
         self.stage.select_filters(active_session_filter_configurations) # select filters when done
-        
+       
+    ## Computation Helpers: 
     def perform_computations(self, active_computation_params: PlacefieldComputationParameters):     
         assert isinstance(self.stage, ComputedPipelineStage), "Current self.stage must already be a ComputedPipelineStage. Call self.filter_sessions with filter configs to reach this step."
         self.stage.single_computation(active_computation_params)
         
+    def register_computation(self, computation_function):
+        assert isinstance(self.stage, ComputedPipelineStage), "Current self.stage must already be a ComputedPipelineStage. Call self.filter_sessions with filter configs to reach this step."
+        self.stage.register_computation(computation_function)
+
+    def perform_registered_computations(self, previous_computation_result, debug_print=False):
+        assert isinstance(self.stage, ComputedPipelineStage), "Current self.stage must already be a ComputedPipelineStage. Call self.perform_computations to reach this step."
+        self.stage.perform_registered_computations()
+    
+    def prepare_for_display(self):
+        assert isinstance(self.stage, ComputedPipelineStage), "Current self.stage must already be a ComputedPipelineStage. Call self.perform_computations to reach this step."
+        self.stage = DisplayPipelineStage(self.stage)  # build the Display stage
         
-    # @classmethod
-    # def perform_compute(cls, loaded_stage):
-    #     pass
-    #     # input_stage.load() # perform the load operation
-    #     # return LoadedPipelineStage(input_stage)  # build the loaded stage
-
-
-
-    def display(self, computation_results):
-        pass
+    def display(self, display_function, active_session_filter_configuration: str):
+        # active_session_filter_configuration: 'maze1'
+        assert isinstance(self.stage, DisplayPipelineStage), "Current self.stage must already be a DisplayPipelineStage. Call self.prepare_for_display to reach this step."
+        if display_function is None:
+            display_function = DefaultDisplayFunctions._display_normal
+        return display_function(self.computation_results[active_session_filter_configuration], self.active_configs[active_session_filter_configuration])
 
 
 # class NeuropyPipeline:
