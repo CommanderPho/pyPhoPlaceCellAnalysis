@@ -15,17 +15,17 @@ from pyphocorehelpers.print_helpers import WrappingMessagePrinter
 
 
 class ZhangReconstructionImplementation:
-    def n_i(cell_idx_i, time_window):
-        """ number of spikes fired by cell i within the time window """
-        pass
+    # def n_i(cell_idx_i, time_window):
+    #     """ number of spikes fired by cell i within the time window """
+    #     pass
     
-    def phi_i(cell_idx_i, x):
-        """ an arbitrary basis function or template function associated with this cell """
-        pass
+    # def phi_i(cell_idx_i, x):
+    #     """ an arbitrary basis function or template function associated with this cell """
+    #     pass
 
-    def distribution(x):
-        """ x is 2D """
-        pass
+    # def distribution(x):
+    #     """ x is 2D """
+    #     pass
 
 
     # Shared:    
@@ -216,6 +216,11 @@ class BayesianPlacemapPositionDecoder(PlacemapPositionDecoder):
     def flat_position_size(self):
         """The flat_position_size property."""
         return np.shape(self.F)[0] # like 288
+    @property
+    def original_position_data_shape(self):
+        """The original_position_data_shape property."""
+        return np.shape(self.pf.occupancy)
+
     
     @property
     def num_time_windows(self):
