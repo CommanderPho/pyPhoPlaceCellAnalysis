@@ -344,19 +344,19 @@ class BayesianPlacemapPositionDecoder(PlacemapPositionDecoder):
         
         # [myDict.pop(x, None) for x in ['a', 'c', 'e']]
         # init_val_dict = {k: v for k, v in val_dict.items() if k != 'key'}
-        post_load_dict = {k: v for k, v in val_dict.items() if k not in ['time_bin_size', 'pf', 'spikes_df', 'debug_print', 'setup_on_init', 'post_load_on_init']}
-        print(f'post_load_dict: {post_load_dict.keys()}')
-        
+        # post_load_dict = {k: v for k, v in val_dict.items() if k not in ['time_bin_size', 'pf', 'spikes_df', 'debug_print', 'setup_on_init', 'post_load_on_init']}
+        # print(f'post_load_dict: {post_load_dict.keys()}')
         new_obj = BayesianPlacemapPositionDecoder(val_dict.get('time_bin_size', 0.25), val_dict.get('pf', None), val_dict.get('spikes_df', None), setup_on_init=val_dict.get('setup_on_init', True), post_load_on_init=val_dict.get('post_load_on_init', False), debug_print=val_dict.get('debug_print', False))
-        
         return new_obj
     
     
     def post_load(self):
-        self.neuron_IDXs, self.neuron_IDs, f_i, F_i, self.F, self.P_x = ZhangReconstructionImplementation.build_concatenated_F(self.pf, debug_print=self.debug_print)
-        self.unit_specific_time_binned_spike_counts, self.time_window_edges, self.time_window_edges_binning_info = ZhangReconstructionImplementation.time_bin_spike_counts_N_i(self.spikes_df, self.time_bin_size, debug_print=self.debug_print)
-        self._setup_time_window_centers()
-        self.p_x_given_n = self.reshaped_output(self.flat_p_x_given_n)
+        """ Called after deserializing/loading saved result from disk to rebuild the needed computed variables. """
+        with WrappingMessagePrinter(f'post_load() called.', begin_line_ending='... ', finished_message='all rebuilding completed.', enable_print=self.debug_print):
+            self._setup_concatenated_F()
+            self._setup_time_bin_spike_counts_N_i()
+            self._setup_time_window_centers()
+            self.p_x_given_n = self.reshaped_output(self.flat_p_x_given_n)
 
     
     
@@ -377,7 +377,13 @@ class BayesianPlacemapPositionDecoder(PlacemapPositionDecoder):
     # self.pf, self.debug_print, self.time_bin_size, self.spikes_df
     
     def setup(self):        
-        self.neuron_IDXs, self.neuron_IDs, f_i, F_i, self.F, self.P_x = ZhangReconstructionImplementation.build_concatenated_F(self.pf, debug_print=self.debug_print)
+        self._setup_concatenated_F()
+        self._setup_time_bin_spike_counts_N_i()
+        self._setup_time_window_centers()
+        # pre-allocate outputs:
+        self._setup_preallocate_outputs()
+        
+    def _setup_concatenated_F(self):
         """
             maps: (40, 48, 6)
             np.shape(f_i[i]): (48, 6)
@@ -385,12 +391,10 @@ class BayesianPlacemapPositionDecoder(PlacemapPositionDecoder):
             np.shape(F): (288, 40)
             np.shape(P_x): (288, 1)
         """
+        self.neuron_IDXs, self.neuron_IDs, f_i, F_i, self.F, self.P_x = ZhangReconstructionImplementation.build_concatenated_F(self.pf, debug_print=self.debug_print)
+        
+    def _setup_time_bin_spike_counts_N_i(self):
         self.unit_specific_time_binned_spike_counts, self.time_window_edges, self.time_window_edges_binning_info = ZhangReconstructionImplementation.time_bin_spike_counts_N_i(self.spikes_df, self.time_bin_size, debug_print=self.debug_print) # unit_specific_binned_spike_counts.to_numpy(): (40, 85841)
-        
-        self._setup_time_window_centers()
-        
-        # pre-allocate:
-        self._setup_preallocate_outputs()
 
     def _setup_preallocate_outputs(self):
         with WrappingMessagePrinter(f'pre-allocating final_p_x_given_n: np.shape(final_p_x_given_n) will be: ({self.flat_position_size} x {self.num_time_windows})...', begin_line_ending='... ', enable_print=self.debug_print):
@@ -404,6 +408,8 @@ class BayesianPlacemapPositionDecoder(PlacemapPositionDecoder):
         actual_time_window_size = self.time_window_centers[2] - self.time_window_centers[1]
         self.time_window_center_binning_info = BinningInfo(self.time_window_edges_binning_info.variable_extents, actual_time_window_size, len(self.time_window_centers), np.arange(len(self.time_window_centers)))
         
+    
+    
     
     def perform_compute_single_time_bin(self, time_window_idx):
         n = self.unit_specific_time_binned_spike_counts[:, time_window_idx]
