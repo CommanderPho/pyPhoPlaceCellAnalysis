@@ -190,7 +190,7 @@ class ZhangReconstructionImplementation:
     
 
 
-class PlacemapPositionDecoder(object):
+class PlacemapPositionDecoder(metaclass=OrderedMeta):
     """docstring for PlacemapPositionDecoder."""
     def __init__(self, time_bin_size: float, pf, spikes_df: pd.DataFrame, debug_print: bool=False):
         super(PlacemapPositionDecoder, self).__init__()
@@ -198,8 +198,53 @@ class PlacemapPositionDecoder(object):
         self.pf = pf
         self.spikes_df = spikes_df
         self.debug_print = debug_print
-        # self.arg = arg
         
+    def to_dict(self):
+        # return {member:self.__dict__[member] for member in PlacemapPositionDecoder._orderedKeys}  
+        return self.__dict__
+        # for member in PlacemapPositionDecoder._orderedKeys:
+        #     if not getattr(PlacemapPositionDecoder, member):
+        #         print(member)
+        
+    @classmethod
+    def from_dict(cls, val_dict):
+        # ordered_dict = {member:val_dict[member] for member in PlacemapPositionDecoder._orderedKeys}
+        return cls(**val_dict)
+        
+    ## FileRepresentable protocol:
+    @classmethod
+    def from_file(cls, f):
+        if f.is_file():
+            dict_rep = None
+            dict_rep = np.load(f, allow_pickle=True).item()
+            if dict_rep is not None:
+                # Convert to object
+                obj = cls.from_dict(dict_rep)
+                return obj
+            return dict_rep
+        else:
+            return None
+        
+    @classmethod
+    def to_file(cls, data: dict, f, status_print=True):
+        assert (f is not None), "WARNING: filename can not be None"
+        if isinstance(f, str):
+            f = Path(f) # conver to pathlib path
+        assert isinstance(f, Path)
+    
+        with WrappingMessagePrinter(f'saving obj to file f: {str(f)}', begin_line_ending='... ', finished_message=f"{f.name} saved", enable_print=status_print):
+            if not f.parent.exists():
+                with WrappingMessagePrinter(f'parent path: {str(f.parent)} does not exist. Creating', begin_line_ending='... ', finished_message=f"{str(f.parent)} created.", enable_print=status_print):
+                    f.parent.mkdir(parents=True, exist_ok=True) 
+            np.save(f, data)
+
+            
+    def save(self, f, status_print=True):
+        data = self.to_dict()
+        
+        PlacemapPositionDecoder.to_file(data, f, status_print=status_print)
+   
+            
         # """Get binned spike counts
 
         # Parameters
@@ -231,13 +276,35 @@ class BayesianPlacemapPositionDecoder(PlacemapPositionDecoder):
         """The original_position_data_shape property."""
         return np.shape(self.pf.occupancy)
 
-    
+   
     @property
     def num_time_windows(self):
         """The num_time_windows property."""
         return self.time_window_center_binning_info.num_bins
-    
 
+    @property
+    def active_time_windows(self):
+        """The num_time_windows property."""
+        window_starts = self.time_window_centers + (self.time_bin_size / 2.0)
+        window_ends = self.time_window_centers - (self.time_bin_size / 2.0)
+        active_time_windows = [(window_starts[i], window_ends[i]) for i in self.time_window_center_binning_info.bin_indicies]
+        return active_time_windows
+
+    # input_keys = ['pf']
+    # recomputed_input_keys = ['neuron_IDXs', 'neuron_IDs', 'F', 'P_x']
+    # intermediate_keys = ['original_position_data_shape']
+    
+    # saved_result_keys = ['flat_p_x_given_n']
+    
+    # recomputed_keys = ['p_x_given_n']
+
+
+    # def to_dict(self):
+    #     # return {member:self.__dict__[member] for member in PlacemapPositionDecoder._orderedKeys}  
+    #     return self.__dict__
+    # can rebuild from 
+    # self.pf, self.debug_print, self.time_bin_size, self.spikes_df
+    
     def setup(self):        
         self.neuron_IDXs, self.neuron_IDs, f_i, F_i, self.F, self.P_x = ZhangReconstructionImplementation.build_concatenated_F(self.pf, debug_print=self.debug_print)
         """
@@ -257,9 +324,8 @@ class BayesianPlacemapPositionDecoder(PlacemapPositionDecoder):
         with WrappingMessagePrinter(f'pre-allocating final_p_x_given_n: np.shape(final_p_x_given_n) will be: ({self.flat_position_size} x {self.num_time_windows})...', begin_line_ending='... ', enable_print=self.debug_print):
             # if self.debug_print:
             #     print(f'pre-allocating final_p_x_given_n: np.shape(final_p_x_given_n) will be: ({self.flat_position_size} x {self.time_binning_info.num_bins})...', end=' ') # np.shape(final_p_x_given_n): (288,)
-            self.final_p_x_given_n = np.zeros((self.flat_position_size, self.num_time_windows))
-            # if self.debug_print:
-            #     print('done.')
+            self.flat_p_x_given_n = np.zeros((self.flat_position_size, self.num_time_windows))
+            self.p_x_given_n = None
 
         
     def perform_compute_single_time_bin(self, time_window_idx):
@@ -268,14 +334,30 @@ class BayesianPlacemapPositionDecoder(PlacemapPositionDecoder):
             print(f'np.shape(n): {np.shape(n)}') # np.shape(n): (40,)
         final_p_x_given_n = ZhangReconstructionImplementation.bayesian_prob(self.time_bin_size, self.P_x, self.F, n, debug_print=self.debug_print) # np.shape(final_p_x_given_n): (288,)
         if self.debug_print:
-            print(f'np.shape(final_p_x_given_n): {np.shape(self.final_p_x_given_n)}') # np.shape(final_p_x_given_n): (288,)
+            print(f'np.shape(final_p_x_given_n): {np.shape(self.flat_p_x_given_n)}') # np.shape(final_p_x_given_n): (288,)
         return final_p_x_given_n
             
     def compute_all(self):
-        with WrappingMessagePrinter(f'compute_all final_p_x_given_n called. Computing {np.shape(self.final_p_x_given_n)[0]} windows for self.final_p_x_given_n...', begin_line_ending='... ', finished_message='compute_all completed.', enable_print=self.debug_print):
+        with WrappingMessagePrinter(f'compute_all final_p_x_given_n called. Computing {np.shape(self.flat_p_x_given_n)[0]} windows for self.final_p_x_given_n...', begin_line_ending='... ', finished_message='compute_all completed.', enable_print=self.debug_print):
             for bin_idx in np.arange(self.num_time_windows):
                 with WrappingMessagePrinter(f'\t computing single final_p_x_given_n[:, {bin_idx}] for bin_idx {bin_idx}', begin_line_ending='... ', finished_message='', finished_line_ending='\n', enable_print=self.debug_print):
-                    self.final_p_x_given_n[:, bin_idx] = self.perform_compute_single_time_bin(bin_idx)
-            # # all computed
+                    self.flat_p_x_given_n[:, bin_idx] = self.perform_compute_single_time_bin(bin_idx)
+                    
+            
+            # all computed
+            # Reshape the output variable:
+            
+            # np.shape(self.final_p_x_given_n) # (288, 85842)
+            self.p_x_given_n = self.reshaped_output(self.flat_p_x_given_n)
+            
+            # self.p_x_given_n = np.reshape(self.flat_p_x_given_n, (self.original_position_data_shape[0], self.original_position_data_shape[1], self.num_time_windows))
+            
+            # np.shape(rehsaped_final_p_x_given_n) # (48, 6, 85842) 
             # if self.debug_print:
             #     print('compute_all completed!')
+            
+    def reshaped_output(self, output_probability):
+       return np.reshape(output_probability, (self.original_position_data_shape[0], self.original_position_data_shape[1], self.num_time_windows))
+
+
+        
