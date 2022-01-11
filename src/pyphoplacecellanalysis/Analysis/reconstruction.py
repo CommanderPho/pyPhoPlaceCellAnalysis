@@ -326,7 +326,16 @@ class BayesianPlacemapPositionDecoder(PlacemapPositionDecoder):
         window_ends = self.time_window_centers + (self.time_bin_size / 2.0)
         active_time_windows = [(window_starts[i], window_ends[i]) for i in self.time_window_center_binning_info.bin_indicies]
         return active_time_windows
-
+    
+    @property
+    def active_time_window_centers(self):
+        """The active_time_window_centers property are the center timepoints for each window. """        
+        window_starts = self.time_window_centers - (self.time_bin_size / 2.0)
+        window_ends = self.time_window_centers + (self.time_bin_size / 2.0)
+        active_window_midpoints = window_starts + ((window_ends - window_starts) / 2.0)
+        return active_window_midpoints
+    
+    
     # placefield properties:
     @property
     def ratemap(self):
