@@ -1,6 +1,7 @@
 from pathlib import Path
 import numpy as np
 import pandas as pd
+import matplotlib.pyplot as plt
 import pyvista as pv
 import pyvistaqt as pvqt
 from PhoPositionalData.analysis.interactive_placeCell_config import InteractivePlaceCellConfig, PlottingConfig
@@ -18,7 +19,8 @@ from PhoGui.InteractivePlotter.InteractiveCustomDataExplorer import InteractiveC
 
 from pyphoplacecellanalysis.GUI.Panel.panel_placefield import build_panel_interactive_placefield_visibility_controls, build_all_placefield_output_panels, SingleEditablePlacefieldDisplayConfiguration, ActivePlacefieldsPlottingPanel
 from PhoGui.InteractivePlotter.InteractivePlaceCellTuningCurvesDataExplorer import InteractivePlaceCellTuningCurvesDataExplorer
-    
+
+from PhoPositionalData.plotting.placefield import plot_1d_placecell_validations    
 
 def get_neuron_identities(active_placefields, debug_print=False):
     """ 
@@ -65,20 +67,94 @@ def get_neuron_identities(active_placefields, debug_print=False):
     # pf_neuron_identities = [NeuronIdentity.init_from_NeuronExtendedIdentityTuple(an_extended_identity) for an_extended_identity in good_placefield_tuple_neuronIDs]
     return pf_neuron_identities, pf_sort_ind, pf_colors, pf_colormap, pf_listed_colormap
     
+def add_neuron_identity_info_if_needed(computation_result, active_config):
+    """ Attempts to add the neuron Identities and the color information to the active_config.plotting_config for use by my 3D classes and such. """
+    try:
+        len(active_config.plotting_config.pf_colors)
+    except AttributeError as e:
+        # add the attributes 
+        active_config.plotting_config.pf_neuron_identities, active_config.plotting_config.pf_sort_ind, active_config.plotting_config.pf_colors, active_config.plotting_config.pf_colormap, active_config.plotting_config.pf_listed_colormap = get_neuron_identities(computation_result.computed_data['pf2D'])
+    return active_config
+    
+    
 class DefaultDisplayFunctions:
+
+    def _display_1d_placefield_validations(computation_result, active_config):
+        """ Renders all of the flat 1D place cell validations with the yellow lines that trace across to their horizontally drawn placefield (rendered on the right of the plot) """
+        active_config = add_neuron_identity_info_if_needed(computation_result, active_config)
+        out_figures_list = plot_1d_placecell_validations(computation_result.computed_data['pf1D'], active_config.plotting_config, modifier_string='lap_only', should_save=False)
+
+
+    def _display_2d_placefield_result_plot_raw(computation_result, active_config):
+        active_config = add_neuron_identity_info_if_needed(computation_result, active_config)
+        computation_result.computed_data['pf2D'].plot_raw(label_cells=True); # Plots an overview of each cell all in one figure
+
+
+    def _display_2d_placefield_result_plot_ratemaps_2D(computation_result, active_config):
+        active_config = add_neuron_identity_info_if_needed(computation_result, active_config)
+        computation_result.computed_data['pf2D'].plot_ratemaps_2D(resolution_multiplier=1.0, brev_mode=PlotStringBrevityModeEnum.MINIMAL)
+
+
+ 
+    # def _display_2d_placefield_result(computation_result, active_config):
+    #     """ Renders the red trajectory info as the first figure, and then the ratemaps as the second. """
+    #     active_config = add_neuron_identity_info_if_needed(computation_result, active_config)
+    #     computation_result.computed_data['pf2D'].plot_raw(label_cells=True); # Plots an overview of each cell all in one figure
+    #     computation_result.computed_data['pf2D'].plot_ratemaps_2D(resolution_multiplier=2.5, brev_mode=PlotStringBrevityModeEnum.MINIMAL)
+
+        
+
+    def _display_plot_most_likely_position_comparisons(computation_result, active_config):
+        def plot_most_likely_position_comparsions(pho_custom_decoder, position_df):
+            """
+            Usage:
+                fig, axs = plot_most_likely_position_comparsions(pho_custom_decoder, sess.position.to_dataframe())
+            """
+            with plt.ion():
+                overlay_mode = True
+                if overlay_mode:
+                    nrows=2
+                else:
+                    nrows=4
+                fig, axs = plt.subplots(ncols=1, nrows=nrows, figsize=(15,15), clear=True, sharex=True, sharey=False, constrained_layout=True)
+                # active_window = pho_custom_decoder.active_time_windows[window_idx] # a tuple with a start time and end time
+                # active_p_x_given_n = np.squeeze(pho_custom_decoder.p_x_given_n[:,:,window_idx]) # same size as occupancy
+
+                # Actual Position Plots:
+                axs[0].plot(position_df['t'].to_numpy(), position_df['x'].to_numpy(), label='measured x')
+                axs[0].set_title('x')
+                axs[1].plot(position_df['t'].to_numpy(), position_df['y'].to_numpy(), label='measured y')
+                axs[1].set_title('y')
+                # # Most likely position plots:
+                # axs[2].plot(pho_custom_decoder.active_time_window_centers, np.squeeze(pho_custom_decoder.most_likely_positions[:,0]), lw=0.5) # (Num windows x 2)
+                # axs[2].set_title('most likely positions x')
+                # axs[3].plot(pho_custom_decoder.active_time_window_centers, np.squeeze(pho_custom_decoder.most_likely_positions[:,1]), lw=0.5) # (Num windows x 2)
+                # axs[3].set_title('most likely positions y')
+                
+                # Most likely position plots:
+                axs[0].plot(pho_custom_decoder.active_time_window_centers, np.squeeze(pho_custom_decoder.most_likely_positions[:,0]), lw=0.5, color='r', alpha=0.2, label='most likely positions x') # (Num windows x 2)
+                # axs[0].set_title('most likely positions x')
+                axs[1].plot(pho_custom_decoder.active_time_window_centers, np.squeeze(pho_custom_decoder.most_likely_positions[:,1]), lw=0.5, color='r', alpha=0.2, label='most likely positions y') # (Num windows x 2)
+                # axs[1].set_title('most likely positions y')
+                fig.suptitle(f'Decoded Position data component comparison')
+                return fig, axs
+        # Call the plot function with the decoder result.
+        plot_most_likely_position_comparsions(computation_result.computed_data['pf2D_Decoder'], computation_result.sess.position.to_dataframe())
+
+
     def _display_normal(computation_result, active_config):
         """
         Usage:
             _display_normal(curr_kdiba_pipeline.computation_results['maze1'], curr_kdiba_pipeline.active_configs['maze1'])
         """
-        
-        # from neuropy.core.neuron_identities import build_units_colormap
         # print(f'active_config: {active_config}')
         # active_config = computation_result.sess.config
         if active_config.computation_config is None:
             active_config.computation_config = computation_result.computation_config
 
-        pf_neuron_identities, pf_sort_ind, pf_colors, pf_colormap, pf_listed_colormap = get_neuron_identities(computation_result.computed_data['pf2D'])
+        # pf_neuron_identities, pf_sort_ind, pf_colors, pf_colormap, pf_listed_colormap = get_neuron_identities(computation_result.computed_data['pf2D'])
+        active_config = add_neuron_identity_info_if_needed(computation_result, active_config)
+        
         # ax_pf_1D, occupancy_fig, active_pf_2D_figures, active_pf_2D_gs = plot_all_placefields(computation_result.computed_data['pf1D'], computation_result.computed_data['pf2D'], active_config, should_save_to_disk=False)
         ax_pf_1D, occupancy_fig, active_pf_2D_figures, active_pf_2D_gs = plot_all_placefields(None, computation_result.computed_data['pf2D'], active_config, should_save_to_disk=False)
         
@@ -88,11 +164,12 @@ class DefaultDisplayFunctions:
         # try: pActiveTuningCurvesPlotter
         # except NameError: pActiveTuningCurvesPlotter = None # Checks variable p's existance, and sets its value to None if it doesn't exist so it can be checked in the next step
         pActiveTuningCurvesPlotter = None
-        try:
-            len(active_config.plotting_config.pf_colors)
-        except AttributeError as e:
-            # add the attributes 
-            active_config.plotting_config.pf_neuron_identities, active_config.plotting_config.pf_sort_ind, active_config.plotting_config.pf_colors, active_config.plotting_config.pf_colormap, active_config.plotting_config.pf_listed_colormap = get_neuron_identities(computation_result.computed_data['pf2D'])
+        # try:
+        #     len(active_config.plotting_config.pf_colors)
+        # except AttributeError as e:
+        #     # add the attributes 
+        #     active_config.plotting_config.pf_neuron_identities, active_config.plotting_config.pf_sort_ind, active_config.plotting_config.pf_colors, active_config.plotting_config.pf_colormap, active_config.plotting_config.pf_listed_colormap = get_neuron_identities(computation_result.computed_data['pf2D'])
+        active_config = add_neuron_identity_info_if_needed(computation_result, active_config)
         
         ipcDataExplorer = InteractivePlaceCellTuningCurvesDataExplorer(active_config, computation_result.sess, computation_result.computed_data['pf2D'], active_config.plotting_config.pf_colors, extant_plotter=pActiveTuningCurvesPlotter)
         pActiveTuningCurvesPlotter = ipcDataExplorer.plot(pActiveTuningCurvesPlotter) # [2, 17449]
@@ -124,7 +201,6 @@ class DefaultDisplayFunctions:
 
 
 
-
     def _display_3d_image_plotter(computation_result, active_config):
         def plot_3d_image_plotter(active_epoch_placefields2D, image_file=r'output\2006-6-07_11-26-53\maze\speedThresh_0.00-gridBin_5.00_3.00-smooth_0.00_0.00-frateThresh_0.10\pf2D-Occupancy-maze-odd_laps-speedThresh_0.00-gridBin_5.00_3.00-smooth_0.00_0.00-frateThresh_0.png'):
             loaded_image_tex = pv.read_texture(image_file)
@@ -140,7 +216,13 @@ class DefaultDisplayFunctions:
 class DefaultRegisteredDisplayFunctions:
     """ Simply enables specifying the default computation functions that will be defined in this file and automatically registered. """
     def register_default_known_display_functions(self):
+        self.register_display_function(DefaultDisplayFunctions._display_1d_placefield_validations)
+        self.register_display_function(DefaultDisplayFunctions._display_2d_placefield_result_plot_raw)
+        self.register_display_function(DefaultDisplayFunctions._display_2d_placefield_result_plot_ratemaps_2D)
         self.register_display_function(DefaultDisplayFunctions._display_normal)
+        
+        self.register_display_function(DefaultDisplayFunctions._display_plot_most_likely_position_comparisons)
+        
         self.register_display_function(DefaultDisplayFunctions._display_3d_interactive_tuning_curves_plotter)
         self.register_display_function(DefaultDisplayFunctions._display_3d_interactive_spike_and_behavior_browser)
         self.register_display_function(DefaultDisplayFunctions._display_3d_interactive_custom_data_explorer)
