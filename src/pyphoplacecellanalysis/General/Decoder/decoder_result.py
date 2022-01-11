@@ -164,9 +164,9 @@ class DecoderResultDisplayingPlot2D(DecoderResultDisplayingBaseClass):
 
         return im
 
-    def display(self, i):
+    def update(self, i):
         if DecoderResultDisplayingPlot2D.debug_print:
-            print(f'display(i: {i})')
+            print(f'update(i: {i})')
             
         self.index = i
         # curr_ax = self.axs
@@ -185,7 +185,11 @@ class DecoderResultDisplayingPlot2D(DecoderResultDisplayingBaseClass):
         self.active_im.set_array(DecoderResultDisplayingPlot2D.prepare_data_for_plotting(active_p_x_given_n, drop_below_threshold=None))
         self.active_most_likely_pos_plot.set_offsets(np.c_[active_most_likely_x_position[0], active_most_likely_x_position[1]]) # method for updating a scatter_plot
         self.axs.set_title(f'Decoder Result[i: {self.index}]: time window: {active_window}')  # update title
+        return (self.active_im, self.active_most_likely_pos_plot)
         
+        
+    def display(self, i):
+        updated_plots_tuple = self.update(i) # calls update
         # anim = animation.FuncAnimation(figure, func=update_figure, fargs=(bar_rects, iteration), frames=generator, interval=100, repeat=False)
         # return (self.active_im,)
         return self.fig # returns fig
