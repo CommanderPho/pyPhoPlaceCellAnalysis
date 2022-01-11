@@ -327,6 +327,39 @@ class BayesianPlacemapPositionDecoder(PlacemapPositionDecoder):
         active_time_windows = [(window_starts[i], window_ends[i]) for i in self.time_window_center_binning_info.bin_indicies]
         return active_time_windows
 
+    
+    # placefield properties:
+    @property
+    def ratemap(self):
+        return self.pf.ratemap
+            
+    # ratemap properties (xbin & ybin)  
+    @property
+    def xbin(self):
+        return self.ratemap.xbin
+    @property
+    def ybin(self):
+        return self.ratemap.ybin
+    @property
+    def xbin_centers(self):
+        return self.ratemap.xbin_centers
+    @property
+    def ybin_centers(self):
+        return self.ratemap.ybin_centers
+    
+    
+    @property
+    def most_likely_positions(self):
+        """The most_likely_positions for each window."""
+        # most_likely_x_indicies = [self.most_likely_position_indicies[:,window_idx] for window_idx in np.arange(self.num_time_windows)] # the most likely indicies for each time window
+        # most_likely_x_indicies = self.most_likely_position_indicies
+        # return [(self.xbin_centers[active_most_likely_x_indicies[0]], self.ybin_centers[active_most_likely_x_indicies[1]]) for active_most_likely_x_indicies in most_likely_x_indicies]
+        # return np.array([(self.xbin_centers[self.most_likely_position_indicies[0,window_idx]], self.ybin_centers[self.most_likely_position_indicies[1,window_idx]]) for window_idx in np.arange(self.num_time_windows)])
+        return np.vstack((self.xbin_centers[self.most_likely_position_indicies[0,:]], self.ybin_centers[self.most_likely_position_indicies[1,:]])).T # much more efficient than the other implementation. Result is # (85844, 2)
+    
+
+
+
 
     @classmethod
     def serialized_keys(cls):
