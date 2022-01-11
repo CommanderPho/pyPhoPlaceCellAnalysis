@@ -187,18 +187,48 @@ class ZhangReconstructionImplementation:
         """
         return result
 
+
+class SerializedAttributesSpecifyingClass:
+    @classmethod
+    def serialized_keys(cls):
+        raise NotImplementedError
     
-
-
-class PlacemapPositionDecoder(metaclass=OrderedMeta):
+    
+# input_keys = ['pf']
+    # recomputed_input_keys = ['neuron_IDXs', 'neuron_IDs', 'F', 'P_x']
+    # intermediate_keys = ['original_position_data_shape']
+    
+    # saved_result_keys = ['flat_p_x_given_n']
+    
+    # recomputed_keys = ['p_x_given_n']
+    
+    
+class PlacemapPositionDecoder(SerializedAttributesSpecifyingClass, object, metaclass=OrderedMeta):
     """docstring for PlacemapPositionDecoder."""
-    def __init__(self, time_bin_size: float, pf, spikes_df: pd.DataFrame, debug_print: bool=False):
+    
+    def __init__(self, time_bin_size: float, pf, spikes_df: pd.DataFrame, setup_on_init:bool=True, post_load_on_init:bool=False, debug_print:bool=False):
         super(PlacemapPositionDecoder, self).__init__()
         self.time_bin_size = time_bin_size
         self.pf = pf
         self.spikes_df = spikes_df
         self.debug_print = debug_print
+        if setup_on_init:
+            self.setup() # setup on init
+        if post_load_on_init:
+            self.post_load()
+            
+    def setup(self):
+        raise NotImplementedError
+    
+    def post_load(self):
+        raise NotImplementedError
         
+    @classmethod
+    def serialized_keys(cls):
+        input_keys = ['time_bin_size', 'pf', 'spikes_df', 'debug_print']
+        return input_keys
+    
+    
     def to_dict(self):
         # return {member:self.__dict__[member] for member in PlacemapPositionDecoder._orderedKeys}  
         return self.__dict__
@@ -206,10 +236,10 @@ class PlacemapPositionDecoder(metaclass=OrderedMeta):
         #     if not getattr(PlacemapPositionDecoder, member):
         #         print(member)
         
-    @classmethod
-    def from_dict(cls, val_dict):
-        # ordered_dict = {member:val_dict[member] for member in PlacemapPositionDecoder._orderedKeys}
-        return cls(**val_dict)
+    # @classmethod
+    # def from_dict(cls, val_dict):
+    #     return cls(val_dict.get('time_bin_size', 0.25), val_dict.get('pf', None), val_dict.get('spikes_df', None), setup_on_init=val_dict.get('setup_on_init', True), post_load_on_init=val_dict.get('post_load_on_init', False), debug_print=val_dict.get('debug_print', False))
+
         
     ## FileRepresentable protocol:
     @classmethod
@@ -219,7 +249,13 @@ class PlacemapPositionDecoder(metaclass=OrderedMeta):
             dict_rep = np.load(f, allow_pickle=True).item()
             if dict_rep is not None:
                 # Convert to object
+                dict_rep['setup_on_init'] = False
+                dict_rep['post_load_on_init'] = False # set that to false too
                 obj = cls.from_dict(dict_rep)
+                post_load_dict = {k: v for k, v in dict_rep.items() if k in ['flat_p_x_given_n']}
+                print(f'post_load_dict: {post_load_dict.keys()}')
+                obj.flat_p_x_given_n = post_load_dict['flat_p_x_given_n']
+                obj.post_load() # call the post_load function to update all the required variables
                 return obj
             return dict_rep
         else:
@@ -239,12 +275,15 @@ class PlacemapPositionDecoder(metaclass=OrderedMeta):
             np.save(f, data)
 
             
-    def save(self, f, status_print=True):
-        data = self.to_dict()
+    def save(self, f, status_print=True, debug_print=False):
+        active_serialization_keys = self.__class__.serialized_keys()
+        all_data = self.to_dict()
+        data = { a_serialized_key: all_data[a_serialized_key] for a_serialized_key in active_serialization_keys} # only get the serialized keys
+        if debug_print:
+            print(f'all_data.keys(): {all_data.keys()}, serialization_only_data.keys(): {data.keys()}')
+        self.__class__.to_file(data, f, status_print=status_print)
+    
         
-        PlacemapPositionDecoder.to_file(data, f, status_print=status_print)
-   
-            
         # """Get binned spike counts
 
         # Parameters
@@ -263,9 +302,9 @@ class PlacemapPositionDecoder(metaclass=OrderedMeta):
         
 class BayesianPlacemapPositionDecoder(PlacemapPositionDecoder):
     """docstring for BayesianPlacemapPositionDecoder."""
-    def __init__(self, *arg, **args):
-        super(BayesianPlacemapPositionDecoder, self).__init__(*arg, **args)
-        self.setup() # setup on run
+    def __init__(self, time_bin_size: float, pf, spikes_df: pd.DataFrame, setup_on_init:bool=True, post_load_on_init:bool=False, debug_print:bool=False, *arg, **args):
+        super(BayesianPlacemapPositionDecoder, self).__init__(time_bin_size, pf, spikes_df, setup_on_init=setup_on_init, post_load_on_init=post_load_on_init, debug_print=debug_print)
+        pass
         
     @property
     def flat_position_size(self):
@@ -290,6 +329,38 @@ class BayesianPlacemapPositionDecoder(PlacemapPositionDecoder):
         active_time_windows = [(window_starts[i], window_ends[i]) for i in self.time_window_center_binning_info.bin_indicies]
         return active_time_windows
 
+
+    @classmethod
+    def serialized_keys(cls):
+        input_keys = ['time_bin_size', 'pf', 'spikes_df', 'debug_print']
+        # intermediate_keys = ['unit_specific_time_binned_spike_counts', 'time_window_edges', 'time_window_edges_binning_info']
+        saved_result_keys = ['flat_p_x_given_n']
+        return input_keys + saved_result_keys
+    
+    @classmethod
+    def from_dict(cls, val_dict):
+        # post_load_dict = 'flat_p_x_given_n'
+        # ['time_bin_size', 'pf', 'spikes_df', 'debug_print']
+        
+        # [myDict.pop(x, None) for x in ['a', 'c', 'e']]
+        # init_val_dict = {k: v for k, v in val_dict.items() if k != 'key'}
+        post_load_dict = {k: v for k, v in val_dict.items() if k not in ['time_bin_size', 'pf', 'spikes_df', 'debug_print', 'setup_on_init', 'post_load_on_init']}
+        print(f'post_load_dict: {post_load_dict.keys()}')
+        
+        new_obj = BayesianPlacemapPositionDecoder(val_dict.get('time_bin_size', 0.25), val_dict.get('pf', None), val_dict.get('spikes_df', None), setup_on_init=val_dict.get('setup_on_init', True), post_load_on_init=val_dict.get('post_load_on_init', False), debug_print=val_dict.get('debug_print', False))
+        
+        return new_obj
+    
+    
+    def post_load(self):
+        self.neuron_IDXs, self.neuron_IDs, f_i, F_i, self.F, self.P_x = ZhangReconstructionImplementation.build_concatenated_F(self.pf, debug_print=self.debug_print)
+        self.unit_specific_time_binned_spike_counts, self.time_window_edges, self.time_window_edges_binning_info = ZhangReconstructionImplementation.time_bin_spike_counts_N_i(self.spikes_df, self.time_bin_size, debug_print=self.debug_print)
+        self._setup_time_window_centers()
+        self.p_x_given_n = self.reshaped_output(self.flat_p_x_given_n)
+
+    
+    
+    
     # input_keys = ['pf']
     # recomputed_input_keys = ['neuron_IDXs', 'neuron_IDs', 'F', 'P_x']
     # intermediate_keys = ['original_position_data_shape']
@@ -316,18 +387,24 @@ class BayesianPlacemapPositionDecoder(PlacemapPositionDecoder):
         """
         self.unit_specific_time_binned_spike_counts, self.time_window_edges, self.time_window_edges_binning_info = ZhangReconstructionImplementation.time_bin_spike_counts_N_i(self.spikes_df, self.time_bin_size, debug_print=self.debug_print) # unit_specific_binned_spike_counts.to_numpy(): (40, 85841)
         
-        self.time_window_centers = get_bin_centers(self.time_window_edges)
-        actual_time_window_size = self.time_window_centers[2] - self.time_window_centers[1]
-        self.time_window_center_binning_info = BinningInfo(self.time_window_edges_binning_info.variable_extents, actual_time_window_size, len(self.time_window_centers), np.arange(len(self.time_window_centers)))
+        self._setup_time_window_centers()
         
         # pre-allocate:
+        self._setup_preallocate_outputs()
+
+    def _setup_preallocate_outputs(self):
         with WrappingMessagePrinter(f'pre-allocating final_p_x_given_n: np.shape(final_p_x_given_n) will be: ({self.flat_position_size} x {self.num_time_windows})...', begin_line_ending='... ', enable_print=self.debug_print):
             # if self.debug_print:
             #     print(f'pre-allocating final_p_x_given_n: np.shape(final_p_x_given_n) will be: ({self.flat_position_size} x {self.time_binning_info.num_bins})...', end=' ') # np.shape(final_p_x_given_n): (288,)
             self.flat_p_x_given_n = np.zeros((self.flat_position_size, self.num_time_windows))
             self.p_x_given_n = None
 
+    def _setup_time_window_centers(self):
+        self.time_window_centers = get_bin_centers(self.time_window_edges)
+        actual_time_window_size = self.time_window_centers[2] - self.time_window_centers[1]
+        self.time_window_center_binning_info = BinningInfo(self.time_window_edges_binning_info.variable_extents, actual_time_window_size, len(self.time_window_centers), np.arange(len(self.time_window_centers)))
         
+    
     def perform_compute_single_time_bin(self, time_window_idx):
         n = self.unit_specific_time_binned_spike_counts[:, time_window_idx]
         if self.debug_print:
