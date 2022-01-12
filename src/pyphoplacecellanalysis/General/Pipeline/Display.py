@@ -20,7 +20,9 @@ from PhoGui.InteractivePlotter.InteractiveCustomDataExplorer import InteractiveC
 from pyphoplacecellanalysis.GUI.Panel.panel_placefield import build_panel_interactive_placefield_visibility_controls, build_all_placefield_output_panels, SingleEditablePlacefieldDisplayConfiguration, ActivePlacefieldsPlottingPanel
 from PhoGui.InteractivePlotter.InteractivePlaceCellTuningCurvesDataExplorer import InteractivePlaceCellTuningCurvesDataExplorer
 
-from PhoPositionalData.plotting.placefield import plot_1d_placecell_validations    
+from PhoPositionalData.plotting.placefield import plot_1d_placecell_validations
+from pyphoplacecellanalysis.General.Decoder.decoder_result import DecoderResultDisplayingPlot2D    
+
 
 def get_neuron_identities(active_placefields, debug_print=False):
     """ 
@@ -92,7 +94,7 @@ class DefaultDisplayFunctions:
 
     def _display_2d_placefield_result_plot_ratemaps_2D(computation_result, active_config):
         active_config = add_neuron_identity_info_if_needed(computation_result, active_config)
-        computation_result.computed_data['pf2D'].plot_ratemaps_2D(resolution_multiplier=1.0, brev_mode=PlotStringBrevityModeEnum.MINIMAL)
+        computation_result.computed_data['pf2D'].plot_ratemaps_2D(subplots=(None, 3), resolution_multiplier=1.0, enable_spike_overlay=False, brev_mode=PlotStringBrevityModeEnum.MINIMAL)
 
 
  
@@ -102,7 +104,16 @@ class DefaultDisplayFunctions:
     #     computation_result.computed_data['pf2D'].plot_raw(label_cells=True); # Plots an overview of each cell all in one figure
     #     computation_result.computed_data['pf2D'].plot_ratemaps_2D(resolution_multiplier=2.5, brev_mode=PlotStringBrevityModeEnum.MINIMAL)
 
+    
+    def _display_decoder_result(computation_result, active_config):
+        renderer = DecoderResultDisplayingPlot2D(computation_result.computed_data['pf2D_Decoder'], computation_result.sess.position.to_dataframe())
+        def animate(i):
+            # print(f'animate({i})')
+            return renderer.display(i)
         
+        
+        # interact(animate, i=(0, computation_result.computed_data['pf2D_Decoder'].num_time_windows, 10))
+  
 
     def _display_plot_most_likely_position_comparisons(computation_result, active_config):
         def plot_most_likely_position_comparsions(pho_custom_decoder, position_df):
@@ -221,6 +232,7 @@ class DefaultRegisteredDisplayFunctions:
         self.register_display_function(DefaultDisplayFunctions._display_2d_placefield_result_plot_ratemaps_2D)
         self.register_display_function(DefaultDisplayFunctions._display_normal)
         
+        self.register_display_function(DefaultDisplayFunctions._display_decoder_result)
         self.register_display_function(DefaultDisplayFunctions._display_plot_most_likely_position_comparisons)
         
         self.register_display_function(DefaultDisplayFunctions._display_3d_interactive_tuning_curves_plotter)

@@ -95,6 +95,7 @@ class DecoderResultDisplayingBaseClass:
         
 
 class DecoderResultDisplayingPlot2D(DecoderResultDisplayingBaseClass):
+    """ Displays the decoder for 2D position. """
     debug_print = False
     
     def __init__(self, decoder: BayesianPlacemapPositionDecoder, position_df):
