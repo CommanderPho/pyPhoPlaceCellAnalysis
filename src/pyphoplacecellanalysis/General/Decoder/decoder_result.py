@@ -4,6 +4,8 @@ from matplotlib.animation import FuncAnimation
 import numpy as np
 import pandas as pd
 
+# Neuropy:
+from neuropy.analyses.placefields import PfND # for build_position_df_discretized_binned_positions
 
 from ...Analysis.reconstruction import BayesianPlacemapPositionDecoder
 from pyphocorehelpers.indexing_helpers import find_neighbours
@@ -25,11 +27,22 @@ def build_position_df_time_window_idx(active_pos_df, curr_active_time_windows):
     active_pos_df['time_window_idx'] = active_pos_df['time_window_idx'].astype(int) # ensure output is the correct datatype
     return active_pos_df
 
+def build_position_df_discretized_binned_positions(active_pos_df, active_computation_config, debug_print=False):
+    """ Adds the binned_x and binned_y columns to the position dataframe """
+    if debug_print:
+        print(f'active_grid_bin: {active_computation_config.grid_bin}')
+    # bin the dataframe's x and y positions into bins, with binned_x and binned_y containing the index of the bin that the given position is contained within.
+    xbin, ybin, bin_info = PfND._bin_pos_nD(active_pos_df['x'].values, active_pos_df['y'].values, bin_size=active_computation_config.grid_bin) # bin_size mode
+    active_pos_df['binned_x'] = pd.cut(active_pos_df['x'].to_numpy(), bins=xbin, include_lowest=True, labels=np.arange(start=1, stop=len(xbin))) # same shape as the input data 
+    active_pos_df['binned_y'] = pd.cut(active_pos_df['y'].to_numpy(), bins=ybin, include_lowest=True, labels=np.arange(start=1, stop=len(ybin))) 
+    return active_pos_df
+
+
 def build_position_df_resampled_to_time_windows(active_pos_df, time_bin_size=0.02):
     position_time_delta = pd.to_timedelta(active_pos_df[active_pos_df.position.time_variable_name], unit="sec")
     active_pos_df['time_delta_sec'] = position_time_delta
     active_pos_df = active_pos_df.set_index('time_delta_sec')
-    window_resampled_pos_df = active_pos_df.resample('0.02S').nearest() # 0.02 second bins
+    window_resampled_pos_df = active_pos_df.resample(f'{time_bin_size}S', base=0)#.nearest() # '0.02S' 0.02 second bins
     return window_resampled_pos_df
     
 
