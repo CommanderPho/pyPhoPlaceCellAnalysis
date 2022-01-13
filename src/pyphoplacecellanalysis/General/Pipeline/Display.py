@@ -81,21 +81,20 @@ def add_neuron_identity_info_if_needed(computation_result, active_config):
     
 class DefaultDisplayFunctions:
 
-    def _display_1d_placefield_validations(computation_result, active_config):
+    def _display_1d_placefield_validations(computation_result, active_config, **kwargs):
         """ Renders all of the flat 1D place cell validations with the yellow lines that trace across to their horizontally drawn placefield (rendered on the right of the plot) """
         active_config = add_neuron_identity_info_if_needed(computation_result, active_config)
-        out_figures_list = plot_1d_placecell_validations(computation_result.computed_data['pf1D'], active_config.plotting_config, modifier_string='lap_only', should_save=False)
+        out_figures_list = plot_1d_placecell_validations(computation_result.computed_data['pf1D'], active_config.plotting_config, **({'modifier_string': 'lap_only', 'should_save': False} | kwargs))
 
 
-    def _display_2d_placefield_result_plot_raw(computation_result, active_config):
+    def _display_2d_placefield_result_plot_raw(computation_result, active_config, **kwargs):
         active_config = add_neuron_identity_info_if_needed(computation_result, active_config)
-        computation_result.computed_data['pf2D'].plot_raw(label_cells=True); # Plots an overview of each cell all in one figure
+        computation_result.computed_data['pf2D'].plot_raw(**({'label_cells': True} | kwargs)); # Plots an overview of each cell all in one figure
 
 
-    def _display_2d_placefield_result_plot_ratemaps_2D(computation_result, active_config):
+    def _display_2d_placefield_result_plot_ratemaps_2D(computation_result, active_config, **kwargs):
         active_config = add_neuron_identity_info_if_needed(computation_result, active_config)
-        computation_result.computed_data['pf2D'].plot_ratemaps_2D(subplots=(None, 3), resolution_multiplier=1.0, enable_spike_overlay=False, brev_mode=PlotStringBrevityModeEnum.MINIMAL)
-
+        computation_result.computed_data['pf2D'].plot_ratemaps_2D(**({'subplots': (None, 3), 'resolution_multiplier': 1.0, 'enable_spike_overlay': False, 'brev_mode': PlotStringBrevityModeEnum.MINIMAL} | kwargs))
 
  
     # def _display_2d_placefield_result(computation_result, active_config):
@@ -115,7 +114,7 @@ class DefaultDisplayFunctions:
         # interact(animate, i=(0, computation_result.computed_data['pf2D_Decoder'].num_time_windows, 10))
   
 
-    def _display_plot_most_likely_position_comparisons(computation_result, active_config):
+    def _display_plot_most_likely_position_comparisons(computation_result, active_config, **kwargs):
         def plot_most_likely_position_comparsions(pho_custom_decoder, position_df):
             """
             Usage:
@@ -153,7 +152,7 @@ class DefaultDisplayFunctions:
         plot_most_likely_position_comparsions(computation_result.computed_data['pf2D_Decoder'], computation_result.sess.position.to_dataframe())
 
 
-    def _display_normal(computation_result, active_config):
+    def _display_normal(computation_result, active_config, **kwargs):
         """
         Usage:
             _display_normal(curr_kdiba_pipeline.computation_results['maze1'], curr_kdiba_pipeline.active_configs['maze1'])
@@ -163,11 +162,8 @@ class DefaultDisplayFunctions:
         if active_config.computation_config is None:
             active_config.computation_config = computation_result.computation_config
 
-        # pf_neuron_identities, pf_sort_ind, pf_colors, pf_colormap, pf_listed_colormap = get_neuron_identities(computation_result.computed_data['pf2D'])
-        active_config = add_neuron_identity_info_if_needed(computation_result, active_config)
-        
         # ax_pf_1D, occupancy_fig, active_pf_2D_figures, active_pf_2D_gs = plot_all_placefields(computation_result.computed_data['pf1D'], computation_result.computed_data['pf2D'], active_config, should_save_to_disk=False)
-        ax_pf_1D, occupancy_fig, active_pf_2D_figures, active_pf_2D_gs = plot_all_placefields(None, computation_result.computed_data['pf2D'], active_config, should_save_to_disk=False)
+        ax_pf_1D, occupancy_fig, active_pf_2D_figures, active_pf_2D_gs = plot_all_placefields(None, computation_result.computed_data['pf2D'], active_config, **({'should_save_to_disk': False} | kwargs))
         
         
     ## Tuning Curves 3D Plot:
