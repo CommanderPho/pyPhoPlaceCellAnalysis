@@ -294,7 +294,7 @@ class BayesianPlacemapPositionDecoder(PlacemapPositionDecoder):
     """docstring for BayesianPlacemapPositionDecoder."""
     def __init__(self, time_bin_size: float, pf, spikes_df: pd.DataFrame, setup_on_init:bool=True, post_load_on_init:bool=False, debug_print:bool=False, *arg, **args):
         super(BayesianPlacemapPositionDecoder, self).__init__(time_bin_size, pf, spikes_df, setup_on_init=setup_on_init, post_load_on_init=post_load_on_init, debug_print=debug_print)
-        pass
+        
     
     # def n_i(cell_idx_i, time_window):
     #     """ number of spikes fired by cell i within the time window """

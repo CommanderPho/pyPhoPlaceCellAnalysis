@@ -45,14 +45,14 @@ odd_lap_specific_epochs = lap_specific_epochs.label_slice(lap_specific_epochs.la
 
 
 ## Efficiently filter by cell type and desired ids
-def batch_filter_session(sess, position, spikes_df, epochs):
+def batch_filter_session(sess, position, spikes_df, epochs, debug_print=False):
     """a workaround to efficiently filter DataSession objects by epochs and cell_type (currently hardcoded Pyramidal) that works around the issue with deepcopy(...) on DataSessions filled with Bapun's data."""
     position.compute_higher_order_derivatives()
     pos_df = (
         position.compute_smoothed_position_info()
     )  ## Smooth the velocity curve to apply meaningful logic to it
     pos_df = position.to_dataframe().copy()
-    pos_df.position.speed
+    pos_df.position.speed # ensures linear speed is calculatted by calling get accessor
     # pos_df = position.to_dataframe().copy() # 159 ms ± 3.95 ms per loop (mean ± std. dev. of 7 runs, 10 loops each)
     spk_df = (
         spikes_df.copy()
@@ -95,17 +95,18 @@ def batch_filter_session(sess, position, spikes_df, epochs):
     #     filtered_pos_df = pos_df.position.time_sliced(position.t_start, position.t_stop)
 
     # Debug print output:
-    print(
-        f"Spikes Dataframe: \nnp.shape(sess.spikes_df): {np.shape(sess.spikes_df)}"
-    )  # (16318817, 10)
-    print(
-        f"np.shape(filtered_spikes_df): {np.shape(filtered_spikes_df)}"
-    )  # (1236690, 10)
+    if debug_print:
+        print(
+            f"Spikes Dataframe: \nnp.shape(sess.spikes_df): {np.shape(sess.spikes_df)}"
+        )  # (16318817, 10)
+        print(
+            f"np.shape(filtered_spikes_df): {np.shape(filtered_spikes_df)}"
+        )  # (1236690, 10)
 
-    print(
-        f"Position Dataframe: \nnp.shape(sess.position.to_dataframe()): {np.shape(sess.position.to_dataframe())}"
-    )  # (2538347, 12)
-    print(f"np.shape(filtered_pos_df):{np.shape(filtered_pos_df)}")  # (174000, 5)
+        print(
+            f"Position Dataframe: \nnp.shape(sess.position.to_dataframe()): {np.shape(sess.position.to_dataframe())}"
+        )  # (2538347, 12)
+        print(f"np.shape(filtered_pos_df):{np.shape(filtered_pos_df)}")  # (174000, 5)
 
     # Once filtering is done, apply the grouping:
     Neurons.initialize_missing_spikes_df_columns(filtered_spikes_df)
