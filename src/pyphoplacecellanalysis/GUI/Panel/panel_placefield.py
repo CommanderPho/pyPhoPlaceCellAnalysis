@@ -314,7 +314,7 @@ class PlacefieldBatchActionsEndButtonPanel(object):
     """
     debug_logging = False
     
-    def __init__(self, pf_option_indicies=None, pf_option_selected_values=None, num_pfs=None, update_included_cell_Indicies_callback=None, hide_all_callback=None, **params):
+    def __init__(self, pf_option_indicies=None, pf_option_selected_values=None, num_pfs=None, update_included_cell_Indicies_callback=None, hide_all_callback=None, show_all_callback=None, **params):
         super(PlacefieldBatchActionsEndButtonPanel, self).__init__(**params)
         self.final_update_included_cell_Indicies_callback = None
         if update_included_cell_Indicies_callback is not None:
@@ -322,7 +322,7 @@ class PlacefieldBatchActionsEndButtonPanel(object):
                 self.final_update_included_cell_Indicies_callback = update_included_cell_Indicies_callback
 
         self.hide_all_callback = hide_all_callback
-        
+        self.show_all_callback = show_all_callback
         # assert (self.final_update_included_cell_Indicies_callback is not None), "An update_included_cell_Indicies_callback(x) callback is needed."
 
     def btn_hide_all_callback(self, event):
@@ -331,7 +331,15 @@ class PlacefieldBatchActionsEndButtonPanel(object):
         if self.hide_all_callback is not None:
             if callable(self.hide_all_callback):
                 self.hide_all_callback(event)
-
+    
+    def btn_show_all_callback(self, event):
+        if self.debug_logging:
+            print('EndButtonPanel.btn_show_all_callback(...)')
+        if self.show_all_callback is not None:
+            if callable(self.show_all_callback):
+                self.show_all_callback(event)
+                
+                
 
     def btn_update_active_placefields(self, event):
         if self.debug_logging:
@@ -344,9 +352,11 @@ class PlacefieldBatchActionsEndButtonPanel(object):
         # Action Buttons:
         self.button_hide_all = pn.widgets.Button(name='Hide All', width_policy='min')
         self.button_hide_all.on_click(self.btn_hide_all_callback)
+        self.button_show_all = pn.widgets.Button(name='Show All', width_policy='min')
+        self.button_show_all.on_click(self.btn_show_all_callback)
         self.button_update = pn.widgets.Button(name='Refresh', button_type='primary', width_policy='min')
         self.button_update.on_click(self.btn_update_active_placefields)
-        return pn.Column(self.button_hide_all, self.button_update, margin=0, width_policy='min', width=70)
+        return pn.Column(self.button_hide_all, self.button_show_all, self.button_update, margin=0, width_policy='min', width=70)
 
     
 def build_panel_interactive_placefield_visibility_controls(ipcDataExplorer, debug_logging=False):
@@ -368,10 +378,16 @@ def build_panel_interactive_placefield_visibility_controls(ipcDataExplorer, debu
         ipcDataExplorer.clear_all_spikes_included()
         ipcDataExplorer.update_active_placefields([])
         # self.on_hide_all_placefields()
-        
+  
+    def _btn_show_all_callback(event):
+        if debug_logging:
+            print('EndButtonPanel.btn_show_all_callback(...)')
+        ipcDataExplorer._show_all_tuning_curves()
+        ipcDataExplorer.update_active_placefields([])
+        # self.on_hide_all_placefields()      
         
     out_panels = build_all_placefield_output_panels(ipcDataExplorer)
-    end_button_panel_obj = PlacefieldBatchActionsEndButtonPanel(hide_all_callback=_btn_hide_all_callback)
+    end_button_panel_obj = PlacefieldBatchActionsEndButtonPanel(hide_all_callback=_btn_hide_all_callback, show_all_callback=_btn_show_all_callback)
     end_cap_buttons = end_button_panel_obj.panel()
     out_row = pn.Row(*out_panels, end_cap_buttons, height=120)
     # btn_occupancy_map_visibility = pn.widgets.Button(name='Occupancy Map Visibility', width_policy='min')

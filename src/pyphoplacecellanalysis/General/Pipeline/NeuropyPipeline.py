@@ -350,12 +350,12 @@ class NeuropyPipeline():
         for an_active_config_name in self.active_configs.keys():
             self.active_configs[an_active_config_name] = add_neuron_identity_info_if_needed(self.computation_results[an_active_config_name], self.active_configs[an_active_config_name])
         
-    def display(self, display_function, active_session_filter_configuration: str):
+    def display(self, display_function, active_session_filter_configuration: str, **kwargs):
         # active_session_filter_configuration: 'maze1'
         assert isinstance(self.stage, DisplayPipelineStage), "Current self.stage must already be a DisplayPipelineStage. Call self.prepare_for_display to reach this step."
         if display_function is None:
             display_function = DefaultDisplayFunctions._display_normal
-        return display_function(self.computation_results[active_session_filter_configuration], self.active_configs[active_session_filter_configuration])
+        return display_function(self.computation_results[active_session_filter_configuration], self.active_configs[active_session_filter_configuration], **kwargs)
 
 
 # class NeuropyPipeline:
