@@ -16,7 +16,7 @@ from pyphocorehelpers.function_helpers import compose_functions
 import numpy as np
 import pandas as pd
 from pyphoplacecellanalysis.General.Pipeline.Computation import ComputablePipelineStage, DefaultRegisteredComputations
-from pyphoplacecellanalysis.General.Pipeline.Display import DefaultDisplayFunctions, DefaultRegisteredDisplayFunctions
+from pyphoplacecellanalysis.General.Pipeline.Display import DefaultDisplayFunctions, DefaultRegisteredDisplayFunctions, add_neuron_identity_info_if_needed
 from pyphoplacecellanalysis.General.Pipeline.Filtering import FilterablePipelineStage
 from pyphoplacecellanalysis.General.Pipeline.Loading import LoadableInput, LoadableSessionInput
 
@@ -346,6 +346,9 @@ class NeuropyPipeline():
     def prepare_for_display(self):
         assert isinstance(self.stage, ComputedPipelineStage), "Current self.stage must already be a ComputedPipelineStage. Call self.perform_computations to reach this step."
         self.stage = DisplayPipelineStage(self.stage)  # build the Display stage
+        # Loops through all the configs and ensure that they have the neuron identity info if they need it.
+        for an_active_config_name in self.active_configs.keys():
+            self.active_configs[an_active_config_name] = add_neuron_identity_info_if_needed(self.computation_results[an_active_config_name], self.active_configs[an_active_config_name])
         
     def display(self, display_function, active_session_filter_configuration: str):
         # active_session_filter_configuration: 'maze1'
