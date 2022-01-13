@@ -6,7 +6,7 @@ import pandas as pd
 
 from pyphocorehelpers.general_helpers import OrderedMeta
 from pyphocorehelpers.indexing_helpers import BinningInfo, compute_spanning_bins, get_bin_centers  
-from pyphocorehelpers.print_helpers import WrappingMessagePrinter
+from pyphocorehelpers.print_helpers import WrappingMessagePrinter, SimplePrintable
 
 # cut_bins = np.linspace(59200, 60800, 9)
 # pd.cut(df['column_name'], bins=cut_bins)
@@ -193,7 +193,7 @@ class SerializedAttributesSpecifyingClass:
 # recomputed_keys = ['p_x_given_n']
 
     
-class PlacemapPositionDecoder(SerializedAttributesSpecifyingClass, object, metaclass=OrderedMeta):
+class PlacemapPositionDecoder(SerializedAttributesSpecifyingClass, SimplePrintable, object, metaclass=OrderedMeta):
     """docstring for PlacemapPositionDecoder."""
     
     def __init__(self, time_bin_size: float, pf, spikes_df: pd.DataFrame, setup_on_init:bool=True, post_load_on_init:bool=False, debug_print:bool=False):
@@ -207,6 +207,9 @@ class PlacemapPositionDecoder(SerializedAttributesSpecifyingClass, object, metac
         if post_load_on_init:
             self.post_load()
             
+    def __repr__(self) -> str:
+        return f"<{self.__class__.__name__}: {self.__dict__.keys()};>"
+    
     def setup(self):
         raise NotImplementedError
     
@@ -217,7 +220,6 @@ class PlacemapPositionDecoder(SerializedAttributesSpecifyingClass, object, metac
     def serialized_keys(cls):
         input_keys = ['time_bin_size', 'pf', 'spikes_df', 'debug_print']
         return input_keys
-    
     
     def to_dict(self):
         # return {member:self.__dict__[member] for member in PlacemapPositionDecoder._orderedKeys}  
@@ -341,6 +343,14 @@ class BayesianPlacemapPositionDecoder(PlacemapPositionDecoder):
         return active_window_midpoints
     
     
+    @property
+    def most_likely_positions(self):
+        """The most_likely_positions for each window."""
+        return np.vstack((self.xbin_centers[self.most_likely_position_indicies[0,:]], self.ybin_centers[self.most_likely_position_indicies[1,:]])).T # much more efficient than the other implementation. Result is # (85844, 2)
+    
+    
+    
+    
     # placefield properties:
     @property
     def ratemap(self):
@@ -360,11 +370,6 @@ class BayesianPlacemapPositionDecoder(PlacemapPositionDecoder):
     def ybin_centers(self):
         return self.ratemap.ybin_centers
     
-    
-    @property
-    def most_likely_positions(self):
-        """The most_likely_positions for each window."""
-        return np.vstack((self.xbin_centers[self.most_likely_position_indicies[0,:]], self.ybin_centers[self.most_likely_position_indicies[1,:]])).T # much more efficient than the other implementation. Result is # (85844, 2)
     
     @classmethod
     def serialized_keys(cls):
