@@ -16,6 +16,11 @@ from pyphocorehelpers.print_helpers import WrappingMessagePrinter, SimplePrintab
 
 # methods of reconstruction/decoding:
 
+""" 
+occupancy gives the P(x) in general.
+n_i: the number of spikes fired by each cell during the time window of consideration
+
+"""
 
 
 
@@ -411,12 +416,6 @@ class BayesianPlacemapPositionDecoder(PlacemapPositionDecoder):
     # recomputed_keys = ['p_x_given_n']
 
 
-    # def to_dict(self):
-    #     # return {member:self.__dict__[member] for member in PlacemapPositionDecoder._orderedKeys}  
-    #     return self.__dict__
-    # can rebuild from 
-    # self.pf, self.debug_print, self.time_bin_size, self.spikes_df
-    
     def setup(self):        
         self._setup_concatenated_F()
         self._setup_time_bin_spike_counts_N_i()
