@@ -175,18 +175,12 @@ class DefaultDisplayFunctions:
         # try: pActiveTuningCurvesPlotter
         # except NameError: pActiveTuningCurvesPlotter = None # Checks variable p's existance, and sets its value to None if it doesn't exist so it can be checked in the next step
         pActiveTuningCurvesPlotter = None
-        # try:
-        #     len(active_config.plotting_config.pf_colors)
-        # except AttributeError as e:
-        #     # add the attributes 
-        #     active_config.plotting_config.pf_neuron_identities, active_config.plotting_config.pf_sort_ind, active_config.plotting_config.pf_colors, active_config.plotting_config.pf_colormap, active_config.plotting_config.pf_listed_colormap = get_neuron_identities(computation_result.computed_data['pf2D'])
-        active_config = add_neuron_identity_info_if_needed(computation_result, active_config)
-        
         ipcDataExplorer = InteractivePlaceCellTuningCurvesDataExplorer(active_config, computation_result.sess, computation_result.computed_data['pf2D'], active_config.plotting_config.pf_colors, extant_plotter=pActiveTuningCurvesPlotter)
         pActiveTuningCurvesPlotter = ipcDataExplorer.plot(pActiveTuningCurvesPlotter) # [2, 17449]
         ### Build Dynamic Panel Interactive Controls for configuring Placefields:
         pane = build_panel_interactive_placefield_visibility_controls(ipcDataExplorer)
-        pane
+        return pane
+        
 
 
 
