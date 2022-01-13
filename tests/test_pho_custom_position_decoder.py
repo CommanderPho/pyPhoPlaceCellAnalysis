@@ -38,22 +38,22 @@ class TestPhoCustomPositionDecoderMethods(unittest.TestCase):
         self.assertEqual(out_digitized_variable_bins[0], out_binning_info.variable_extents[0], "out_digitized_variable_bins[0] should be the minimum variable extent!")
         
     
-        def test_pho_custom_decoder_save_to_disk(self):
-            # save the file out to disk:
-            curr_posterior_save_path = curr_kdiba_pipeline.active_configs[curr_result_label].plotting_config.active_output_parent_dir.joinpath(curr_kdiba_pipeline.active_configs[curr_result_label].computation_config.str_for_filename(True), 'decoded_posterior.npy') # WindowsPath('output/2006-6-07_11-26-53/maze1/speedThresh_0.00-gridBin_5.00_5.00-smooth_0.00_0.00-frateThresh_0.10/decoded_posterior.npz')
-            self.pho_custom_decoder.save(self.curr_posterior_save_path) # output is 417 MB
-            
-        def test_pho_custom_decoder_load_from_disk(self):
-            # try loading again
-            test_loaded_custom_decoder = BayesianPlacemapPositionDecoder.from_file(self.curr_posterior_save_path) # output is 417 MB
-            test_loaded_custom_decoder
+    def test_pho_custom_decoder_save_to_disk(self):
+        # save the file out to disk:
+        curr_posterior_save_path = curr_kdiba_pipeline.active_configs[curr_result_label].plotting_config.active_output_parent_dir.joinpath(curr_kdiba_pipeline.active_configs[curr_result_label].computation_config.str_for_filename(True), 'decoded_posterior.npy') # WindowsPath('output/2006-6-07_11-26-53/maze1/speedThresh_0.00-gridBin_5.00_5.00-smooth_0.00_0.00-frateThresh_0.10/decoded_posterior.npz')
+        self.pho_custom_decoder.save(self.curr_posterior_save_path) # output is 417 MB
+        
+    def test_pho_custom_decoder_load_from_disk(self):
+        # try loading again
+        test_loaded_custom_decoder = BayesianPlacemapPositionDecoder.from_file(self.curr_posterior_save_path) # output is 417 MB
+        test_loaded_custom_decoder
 
 
-        def build_position_df_resampled_to_time_windows(active_pos_df, time_bin_size=0.02):
-            position_time_delta = pd.to_timedelta(active_pos_df[active_pos_df.position.time_variable_name], unit="sec")
-            active_pos_df['time_delta_sec'] = position_time_delta
-            active_pos_df = active_pos_df.set_index('time_delta_sec')
-            return active_pos_df
+    def build_position_df_resampled_to_time_windows(active_pos_df, time_bin_size=0.02):
+        position_time_delta = pd.to_timedelta(active_pos_df[active_pos_df.position.time_variable_name], unit="sec")
+        active_pos_df['time_delta_sec'] = position_time_delta
+        active_pos_df = active_pos_df.set_index('time_delta_sec')
+        return active_pos_df
 
 
 
