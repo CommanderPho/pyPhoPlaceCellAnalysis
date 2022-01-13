@@ -115,7 +115,7 @@ class DefaultDisplayFunctions:
   
 
     def _display_plot_most_likely_position_comparisons(computation_result, active_config, **kwargs):
-        def plot_most_likely_position_comparsions(pho_custom_decoder, position_df):
+        def plot_most_likely_position_comparsions(pho_custom_decoder, position_df, show_posterior=True):
             """
             Usage:
                 fig, axs = plot_most_likely_position_comparsions(pho_custom_decoder, sess.position.to_dataframe())
@@ -141,6 +141,35 @@ class DefaultDisplayFunctions:
                 # axs[3].plot(pho_custom_decoder.active_time_window_centers, np.squeeze(pho_custom_decoder.most_likely_positions[:,1]), lw=0.5) # (Num windows x 2)
                 # axs[3].set_title('most likely positions y')
                 
+                if show_posterior:
+                    # TODO: need to re-normalize after summing
+                    marginal_posterior_y = np.squeeze(np.sum(pho_custom_decoder.p_x_given_n, 0)) # sum over all x. Result should be [y_bins x time_bins]
+                    marginal_posterior_x = np.squeeze(np.sum(pho_custom_decoder.p_x_given_n, 1)) # sum over all y. Result should be [x_bins x time_bins]
+                    
+                    # Compute extents foir imshow:
+                    
+                    # im = ax.imshow(curr_p_x_given_n, **main_plot_kwargs) # add the curr_px_given_n image
+                    main_plot_kwargs = {
+                        'origin': 'lower',
+                        'vmin': 0,
+                        'vmax': 1,
+                        'cmap': 'turbo',
+                        'aspect':'auto',
+                    }
+                        
+                    # Posterior distribution heatmaps at each point.
+                    # X
+                    xmin, xmax, ymin, ymax = (pho_custom_decoder.active_time_window_centers[0], pho_custom_decoder.active_time_window_centers[-1], pho_custom_decoder.xbin[0], pho_custom_decoder.xbin[-1])
+                    # xmin, xmax = axs[0].get_xlim()
+                    extent = (xmin, xmax, ymin, ymax)
+                    im_posterior_x = axs[0].imshow(marginal_posterior_x, extent=extent, **main_plot_kwargs)
+                    axs[0].axis("off")
+                    # Y
+                    xmin, xmax, ymin, ymax = (pho_custom_decoder.active_time_window_centers[0], pho_custom_decoder.active_time_window_centers[-1], pho_custom_decoder.ybin[0], pho_custom_decoder.ybin[-1])
+                    extent = (xmin, xmax, ymin, ymax)
+                    im_posterior_y = axs[1].imshow(marginal_posterior_y, extent=extent, **main_plot_kwargs)
+                    axs[1].axis("off")
+                    
                 # Most likely position plots:
                 axs[0].plot(pho_custom_decoder.active_time_window_centers, np.squeeze(pho_custom_decoder.most_likely_positions[:,0]), lw=0.5, color='r', alpha=0.2, label='most likely positions x') # (Num windows x 2)
                 # axs[0].set_title('most likely positions x')

@@ -366,10 +366,6 @@ class BayesianPlacemapPositionDecoder(PlacemapPositionDecoder):
         """The most_likely_positions for each window."""
         return np.vstack((self.xbin_centers[self.most_likely_position_indicies[0,:]], self.ybin_centers[self.most_likely_position_indicies[1,:]])).T # much more efficient than the other implementation. Result is # (85844, 2)
     
-
-
-
-
     @classmethod
     def serialized_keys(cls):
         input_keys = ['time_bin_size', 'pf', 'spikes_df', 'debug_print']
