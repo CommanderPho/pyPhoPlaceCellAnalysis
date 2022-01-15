@@ -31,7 +31,7 @@ class ComputablePipelineStage:
         # active_epoch_placefields1D, active_epoch_placefields2D = compute_placefields_masked_by_epochs(active_epoch_session, active_config, included_epochs=None, should_display_2D_plots=should_display_2D_plots) ## This is causing problems due to deepcopy of session.
         output_result = ComputationResult(active_session, computation_config, computed_data=dict())
         # active_epoch_placefields1D, active_epoch_placefields2D = perform_compute_placefields(active_session.spikes_df, active_session.position, computation_config, None, None, included_epochs=None, should_force_recompute_placefields=True)
-        output_result.computed_data['pf1D'], output_result.computed_data['pf2D'] = perform_compute_placefields(active_session.spikes_df, active_session.position, computation_config, None, None, included_epochs=None, should_force_recompute_placefields=True)
+        output_result.computed_data['pf1D'], output_result.computed_data['pf2D'] = perform_compute_placefields(active_session.spikes_df, active_session.position, computation_config, None, None, included_epochs=computation_config.computation_epochs, should_force_recompute_placefields=True)
 
         # Compare the results:
 
