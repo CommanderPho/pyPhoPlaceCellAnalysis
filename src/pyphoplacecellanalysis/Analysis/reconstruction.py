@@ -146,7 +146,7 @@ class ZhangReconstructionImplementation:
     @staticmethod
     def bayesian_prob(tau, P_x, F, n, debug_print=False):
         # n_i: the number of spikes fired by each cell during the time window of consideration
-        assert(len(n) == np.shape(F)[1]), f'n must be a column vector with an entry for each place cell (neuron). Instead it is of np.shape(n): {np.shape(n)}'
+        assert(len(n) == np.shape(F)[1]), f'n must be a column vector with an entry for each place cell (neuron). Instead it is of np.shape(n): {np.shape(n)}. np.shape(F): {np.shape(F)}'
         
         # total_number_spikes_n = np.sum(n) # the total number of spikes across all placecells during this timewindow
         
@@ -299,7 +299,7 @@ class PlacemapPositionDecoder(SerializedAttributesSpecifyingClass, SimplePrintab
         
 class BayesianPlacemapPositionDecoder(PlacemapPositionDecoder):
     """docstring for BayesianPlacemapPositionDecoder."""
-    def __init__(self, time_bin_size: float, pf, spikes_df: pd.DataFrame, setup_on_init:bool=True, post_load_on_init:bool=False, debug_print:bool=False, *arg, **args):
+    def __init__(self, time_bin_size: float, pf, spikes_df: pd.DataFrame, setup_on_init:bool=True, post_load_on_init:bool=False, debug_print:bool=True):
         super(BayesianPlacemapPositionDecoder, self).__init__(time_bin_size, pf, spikes_df, setup_on_init=setup_on_init, post_load_on_init=post_load_on_init, debug_print=debug_print)
         
     
