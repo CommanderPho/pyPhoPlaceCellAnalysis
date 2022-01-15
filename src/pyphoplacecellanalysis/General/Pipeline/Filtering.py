@@ -21,3 +21,4 @@ class FilterablePipelineStage:
             # build the active filter config from the session's config and the filtered epoch
             self.active_configs[a_select_config_name] = build_configs(self.filtered_sessions[a_select_config_name].config, self.filtered_epochs[a_select_config_name]) # Note that computation config is currently None because computation hasn't been performed yet at this stage.
             self.computation_results[a_select_config_name] = None
+            self.active_configs[a_select_config_name].filter_config = {'filter_function': a_select_config_filter_function} # add the makeshift filter config (which is currently just a dictionary)
