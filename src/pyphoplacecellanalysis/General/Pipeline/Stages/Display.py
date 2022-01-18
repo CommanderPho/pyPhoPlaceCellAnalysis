@@ -1,14 +1,23 @@
+from datetime import datetime
 from pathlib import Path
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import pyvista as pv
 import pyvistaqt as pvqt
+
+from pyphocorehelpers.print_helpers import WrappingMessagePrinter
+from pyphocorehelpers.plotting.mixins.figure_param_text_box import add_figure_text_box # for _display_add_computation_param_text_box
+
 from pyphoplacecellanalysis.General.Pipeline.Stages.Computation import ComputedPipelineStage
 from pyphoplacecellanalysis.General.Configs.DynamicConfigs import PlottingConfig, InteractivePlaceCellConfig
 
 from neuropy.core.neuron_identities import NeuronIdentity, build_units_colormap, PlotStringBrevityModeEnum
 from neuropy.plotting.placemaps import plot_all_placefields
+from neuropy.plotting.ratemaps import enumTuningMap2DPlotVariables # for getting the variant name from the dict
+
+
+
 from PhoGui.InteractivePlotter.Mixins.ImagePlaneRendering import ImagePlaneRendering
 
 import PhoGui
@@ -83,7 +92,91 @@ def add_neuron_identity_info_if_needed(computation_result, active_config):
         raise
     return active_config
     
+
+def update_figure_files_output_Format(computation_result, active_config, root_output_dir='output', debug_print=False):
+    def _set_figure_save_root_day_computed_mode(plotting_config, active_session_name, active_epoch_name, root_output_dir='output', debug_print=False):
+        """ Outputs to a path with the style of  """
+        out_figure_save_original_root = plotting_config.get_figure_save_path('test') # 2022-01-16/
+        if debug_print:
+            print(f'out_figure_save_original_root: {out_figure_save_original_root}')
+        # Update output figure root:
+        out_day_date_folder_name = datetime.today().strftime('%Y-%m-%d') # 2022-01-16
+        new_out_day_day_parent_dir = Path(root_output_dir, out_day_date_folder_name, active_session_name, active_epoch_name)
+        out_figure_save_root = plotting_config.change_active_out_parent_dir(new_out_day_day_parent_dir)
+        # out_figure_save_root = active_config.plotting_config.get_figure_save_path(out_day_date_folder_name, active_session_name, active_epoch_names.name) # 2022-01-16/
+        if debug_print:
+            print(f'out_figure_save_root: {out_figure_save_root}') # out_figure_save_root: output\2006-6-07_11-26-53\maze1\2022-01-18\2006-6-07_11-26-53\maze1
+        return plotting_config
     
+    
+    # def _test_get_full_figure_path_components(output_root, out_day_date_folder_name, active_session_name, active_epoch_name, active_computation_config_str, active_plot_type_name, active_variant_name):
+    #     return [output_root, out_day_date_folder_name, active_session_name, active_epoch_name, active_computation_config_str, active_plot_type_name, active_variant_name]
+    
+    
+    # _test_get_full_figure_path_components('output', datetime.today().strftime('%Y-%m-%d'), active_config.active_session_config.session_name, active_config.active_epochs.name, active_config.computation_config.str_for_filename(False),
+    #                                       active_plot_type_name, active_variant_name)
+    
+    
+    
+    if debug_print:
+        print(f'_display_custom_user_function(computation_result, active_config, **kwargs):')
+    # print(f'active_config.keys(): {list(active_config.keys())}') # active_config.keys(): ['active_session_config', 'active_epochs', 'video_output_config', 'plotting_config', 'computation_config', 'filter_config']
+    # print(f'active_config.plotting_config: {active_config.plotting_config}')
+    # print(f'active_config.active_session_config: {active_config.active_session_config}')
+    active_session_name = active_config.active_session_config.session_name
+    if debug_print:
+        print(f'active_session_name: {active_session_name}')
+    active_epoch_names = active_config.active_epochs
+    if debug_print:
+        print(f'active_epoch_names.name: {active_epoch_names.name}') # active_epoch_names: <NamedTimerange: {'name': 'maze1', 'start_end_times': array([  22.26      , 1739.15336412])};>
+    # active_epoch_names.name: maze1
+    active_config.plotting_config = _set_figure_save_root_day_computed_mode(active_config.plotting_config, active_session_name, active_epoch_names.name, root_output_dir=root_output_dir, debug_print=debug_print)
+    # get the output path for this figure name:
+    out_figure_save_root = active_config.plotting_config.get_figure_save_path('test_plot')
+    if debug_print:
+        print(f'out_figure_save_root: {out_figure_save_root}')
+    
+    # Now convert the computation parameters for filename display:
+    if debug_print:
+        print(f'active_config.computation_config: {active_config.computation_config}')
+    curr_computation_config_output_dir_name = active_config.computation_config.str_for_filename(False)
+    if debug_print:
+        print(f'curr_computation_config_output_dir_name: {curr_computation_config_output_dir_name}')
+    out_figure_save_current_computation_dir = active_config.plotting_config.get_figure_save_path(curr_computation_config_output_dir_name)
+    if debug_print:
+        print(f'out_figure_save_current_computation_dir: {out_figure_save_current_computation_dir}')
+    # change finally to the computation config determined subdir:
+    final_out_figure_save_root = active_config.plotting_config.change_active_out_parent_dir(out_figure_save_current_computation_dir)
+    if debug_print:
+        print(f'final_out_figure_save_root: {final_out_figure_save_root}')
+    return active_config
+    
+    
+def _save_displayed_figure_if_needed(plotting_config, plot_type_name='plot', active_variant_name=None, active_figures=list(), debug_print=False):
+    if active_variant_name is not None:
+        active_plot_filename = '-'.join([plot_type_name, active_variant_name])
+    else:
+        active_plot_filename = plot_type_name
+    active_plot_filepath = plotting_config.get_figure_save_path(active_plot_filename).with_suffix('.png')
+    if debug_print:
+        print(f'active_plot_filepath: {active_plot_filepath}')
+    with WrappingMessagePrinter('Saving 2D Placefield image out to "{}"...'.format(active_plot_filepath), begin_line_ending='...', finished_message='done.'):
+        for aFig in active_figures:
+            aFig.savefig(active_plot_filepath)
+    
+    
+# Post plotting figure helpers:
+def _display_add_computation_param_text_box(fig, computation_config):
+    """ Adds a small box containing the computation parmaters to the matplotlib figure. 
+    Usage:
+        _display_add_computation_param_text_box(plt.gcf(), active_session_computation_config)
+    """
+    if fig is None:
+        fig = plt.gcf()
+    render_text = computation_config.str_for_attributes_list_display(key_val_sep_char=':')
+    return add_figure_text_box(fig, render_text=render_text)
+
+                
 class DefaultDisplayFunctions:
 
     def _display_1d_placefield_validations(computation_result, active_config, **kwargs):
@@ -101,8 +194,30 @@ class DefaultDisplayFunctions:
          # Build the unique identifier config for this result:
         # combined_id_config = UniqueCombinedConfigIdentifier(filter_name, active_config, variant_identifier_label=variant_identifier_label)
     
+        # active_plot_type_name = '_display_2d_placefield_result_plot_ratemaps_2D' 
+        # active_variant_name = None
+        # if active_variant_name is not None:
+        #     active_plot_filename = '-'.join([active_plot_type_name, active_variant_name])
+        # else:
+        #     active_plot_filename = active_plot_type_name
+        # active_plot_filepath = active_config.plotting_config.get_figure_save_path(active_plot_filename).with_suffix('.png')
+        # print(f'active_plot_filepath: {active_plot_filepath}')
+        
+        
+        
+        # active_pf_2D_output_filepath = active_config.plotting_config.get_figure_save_path(common_parent_foldername, common_basename).with_suffix('.png')
+        # with WrappingMessagePrinter('Saving 2D Placefield image out to "{}"...'.format(active_pf_2D_output_filepath), begin_line_ending='...', finished_message='done.'):
+        #     for aFig in active_pf_2D_figures:
+        #         aFig.savefig(active_pf_2D_output_filepath)
         computation_result.computed_data['pf2D'].plot_ratemaps_2D(**({'subplots': (None, 3), 'resolution_multiplier': 1.0, 'enable_spike_overlay': False, 'brev_mode': PlotStringBrevityModeEnum.MINIMAL} | kwargs))
-
+        
+        # plot_variable_name = ({'plot_variable': None} | kwargs)
+        plot_variable_name = kwargs.get('plot_variable', enumTuningMap2DPlotVariables.TUNING_MAPS).name
+        active_figure = plt.gcf()
+        _display_add_computation_param_text_box(active_figure, active_config.computation_config) # Adds the parameters text.
+        active_pf_2D_figures = [active_figure]
+        _save_displayed_figure_if_needed(active_config.plotting_config, plot_type_name='_display_2d_placefield_result_plot_ratemaps_2D', active_variant_name=plot_variable_name, active_figures=active_pf_2D_figures)
+        
  
     # def _display_2d_placefield_result(computation_result, active_config):
     #     """ Renders the red trajectory info as the first figure, and then the ratemaps as the second. """
@@ -276,12 +391,14 @@ class PipelineWithDisplayPipelineStageMixin:
         """The is_displayed property. TODO: Needs validation/Testing """
         return (self.stage is not None) and (isinstance(self.stage, DisplayPipelineStage))
     
-    def prepare_for_display(self):
+    def prepare_for_display(self, root_output_dir=r'R:\data\Output'):
         assert isinstance(self.stage, ComputedPipelineStage), "Current self.stage must already be a ComputedPipelineStage. Call self.perform_computations to reach this step."
         self.stage = DisplayPipelineStage(self.stage)  # build the Display stage
         # Loops through all the configs and ensure that they have the neuron identity info if they need it.
         for an_active_config_name in self.active_configs.keys():
             self.active_configs[an_active_config_name] = add_neuron_identity_info_if_needed(self.computation_results[an_active_config_name], self.active_configs[an_active_config_name])
+            self.active_configs[an_active_config_name] = update_figure_files_output_Format(self.computation_results[an_active_config_name], self.active_configs[an_active_config_name], root_output_dir=root_output_dir)
+            
         
     def display(self, display_function, active_session_filter_configuration: str, **kwargs):
         # active_session_filter_configuration: 'maze1'

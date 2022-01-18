@@ -58,7 +58,14 @@ class PlottingConfig(DynamicParameters):
         curr_parent_out_path = self.active_output_parent_dir.joinpath(*subdirectories)
         # print(f'\t curr_parent_out_path: {curr_parent_out_path}')
         curr_parent_out_path.mkdir(parents=True, exist_ok=True)
-        return curr_parent_out_path.joinpath(basename)        
+        return curr_parent_out_path.joinpath(basename)
+    
+    
+    def change_active_out_parent_dir(self, new_parent):
+        self.active_output_parent_dir = new_parent
+        return self.active_output_parent_dir
+        
+        
 
 
 # class InteractivePlaceCellConfig:
