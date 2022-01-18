@@ -202,6 +202,9 @@ class DefaultComputationFunctions:
         # computation_result.computed_data['pf2D_TwoStepDecoder']['flat_p_x_given_n_and_x_prev'] = np.full_like(prev_one_step_bayesian_decoder.flat_p_x_given_n, np.nan) # fill with NaNs. Pre-allocate output
         
         computation_result.computed_data['pf2D_TwoStepDecoder']['p_x_given_n_and_x_prev'] = np.full_like(prev_one_step_bayesian_decoder.p_x_given_n, np.nan) # fill with NaNs. Pre-allocate output
+        computation_result.computed_data['pf2D_TwoStepDecoder']['most_likely_position_indicies'] = np.zeros((2, prev_one_step_bayesian_decoder.num_time_windows), dtype=int) # (2, 85841)
+        computation_result.computed_data['pf2D_TwoStepDecoder']['most_likely_positions'] = np.zeros((2, prev_one_step_bayesian_decoder.num_time_windows)) # (2, 85841)
+                
         
         if debug_print:
             print(f'np.shape(prev_one_step_bayesian_decoder.p_x_given_n): {np.shape(prev_one_step_bayesian_decoder.p_x_given_n)}')
@@ -235,7 +238,24 @@ class DefaultComputationFunctions:
             
             computation_result.computed_data['pf2D_TwoStepDecoder']['p_x_given_n_and_x_prev'][:,:,time_window_bin_idx] = Zhang_Two_Step.compute_bayesian_two_step_prob_single_timestep(curr_p_x_given_n, prev_x_position, computation_result.computed_data['pf2D_TwoStepDecoder']['all_x'], computation_result.computed_data['pf2D_TwoStepDecoder']['sigma_t_all'], computation_result.computed_data['pf2D_TwoStepDecoder']['C'], active_k)
             
+            # Compute the most-likely positions from the p_x_given_n_and_x_prev:
+            active_argmax_idx = np.argmax(computation_result.computed_data['pf2D_TwoStepDecoder']['p_x_given_n_and_x_prev'][:,:,time_window_bin_idx], axis=None)
+            # active_unreaveled_argmax_idx = np.array(np.unravel_index(active_argmax_idx, computation_result.computed_data['pf2D_TwoStepDecoder']['p_x_given_n_and_x_prev'].shape))
+            active_unreaveled_argmax_idx = np.array(np.unravel_index(active_argmax_idx, prev_one_step_bayesian_decoder.original_position_data_shape))
             
+            # print(f'active_argmax_idx: {active_argmax_idx}, active_unreaveled_argmax_idx: {active_unreaveled_argmax_idx}')
+            
+            computation_result.computed_data['pf2D_TwoStepDecoder']['most_likely_position_indicies'][:, time_window_bin_idx] = active_unreaveled_argmax_idx # build the multi-dimensional maximum index for the position (not using the flat notation used in the other class)            
+            computation_result.computed_data['pf2D_TwoStepDecoder']['most_likely_positions'][0, time_window_bin_idx] = prev_one_step_bayesian_decoder.xbin_centers[int(computation_result.computed_data['pf2D_TwoStepDecoder']['most_likely_position_indicies'][0, time_window_bin_idx])]
+            
+            computation_result.computed_data['pf2D_TwoStepDecoder']['most_likely_positions'][1, time_window_bin_idx] = prev_one_step_bayesian_decoder.ybin_centers[int(computation_result.computed_data['pf2D_TwoStepDecoder']['most_likely_position_indicies'][1, time_window_bin_idx])]
+            
+
+        # # POST-hoc most-likely computations: Compute the most-likely positions from the p_x_given_n_and_x_prev:
+        # computation_result.computed_data['pf2D_TwoStepDecoder']['most_likely_position_indicies'] = np.array(np.unravel_index(np.argmax(computation_result.computed_data['pf2D_TwoStepDecoder']['p_x_given_n_and_x_prev'], axis=None), computation_result.computed_data['pf2D_TwoStepDecoder']['p_x_given_n_and_x_prev'].shape)) # build the multi-dimensional maximum index for the position (not using the flat notation used in the other class)
+        # # np.shape(self.most_likely_position_indicies) # (2, 85841)
+        
+        
         # computation_result.computed_data['pf2D_TwoStepDecoder']['sigma_t_all'] = sigma_t_all # set sigma_t_all                
         # return position_decoding_second_order_computation(computation_result.sess, computation_result.computation_config, computation_result)
         return computation_result
