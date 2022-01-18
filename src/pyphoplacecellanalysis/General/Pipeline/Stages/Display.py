@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 import pyvista as pv
 import pyvistaqt as pvqt
 from pyphoplacecellanalysis.General.Pipeline.Stages.Computation import ComputedPipelineStage
-from PhoPositionalData.analysis.interactive_placeCell_config import InteractivePlaceCellConfig, PlottingConfig
+from pyphoplacecellanalysis.General.Configs.DynamicConfigs import PlottingConfig, InteractivePlaceCellConfig
 
 from neuropy.core.neuron_identities import NeuronIdentity, build_units_colormap, PlotStringBrevityModeEnum
 from neuropy.plotting.placemaps import plot_all_placefields
@@ -74,9 +74,13 @@ def add_neuron_identity_info_if_needed(computation_result, active_config):
     """ Attempts to add the neuron Identities and the color information to the active_config.plotting_config for use by my 3D classes and such. """
     try:
         len(active_config.plotting_config.pf_colors)
-    except AttributeError as e:
+    except (AttributeError, KeyError):
         # add the attributes 
         active_config.plotting_config.pf_neuron_identities, active_config.plotting_config.pf_sort_ind, active_config.plotting_config.pf_colors, active_config.plotting_config.pf_colormap, active_config.plotting_config.pf_listed_colormap = get_neuron_identities(computation_result.computed_data['pf2D'])
+    except Exception as e:
+        # other exception
+        print(f'Unexpected exception e: {e}')
+        raise
     return active_config
     
     
@@ -94,7 +98,9 @@ class DefaultDisplayFunctions:
 
 
     def _display_2d_placefield_result_plot_ratemaps_2D(computation_result, active_config, **kwargs):
-        active_config = add_neuron_identity_info_if_needed(computation_result, active_config)
+         # Build the unique identifier config for this result:
+        # combined_id_config = UniqueCombinedConfigIdentifier(filter_name, active_config, variant_identifier_label=variant_identifier_label)
+    
         computation_result.computed_data['pf2D'].plot_ratemaps_2D(**({'subplots': (None, 3), 'resolution_multiplier': 1.0, 'enable_spike_overlay': False, 'brev_mode': PlotStringBrevityModeEnum.MINIMAL} | kwargs))
 
  

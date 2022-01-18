@@ -5,10 +5,15 @@ from pyphocorehelpers.DataStructure.dynamic_parameters import DynamicParameters
 
 # Old class Names: VideoOutputModeConfig, PlottingConfig, InteractivePlaceCellConfig
 
+""" 
+TODO: See OccupancyPlottingConfig, decide if whether to refactor
+
+
+"""
 class VideoOutputModeConfig(DynamicParameters):
     
     def __init__(self, active_frame_range, video_output_parent_dir, active_is_video_output_mode): 
-        super(VideoOutputModeConfig, self).__init__()
+        super(VideoOutputModeConfig, self).__init__(active_frame_range=active_frame_range, video_output_parent_dir=video_output_parent_dir, active_is_video_output_mode=active_is_video_output_mode)
         self.active_is_video_output_mode = active_is_video_output_mode
         self.active_frame_range = active_frame_range
   
@@ -23,12 +28,12 @@ class VideoOutputModeConfig(DynamicParameters):
     
     
 
-class DynamicPlottingConfig(DynamicParameters):
+class PlottingConfig(DynamicParameters):
     def __init__(self, output_subplots_shape=(1,1), output_parent_dir=None, use_age_proportional_spike_scale=False, plotter_type='BackgroundPlotter'): 
         # output_subplots_shape="3|1" means 3 plots on the left and 1 on the right,
         # output_subplots_shape="4/2" means 4 plots on top of 2 at bottom.
         # use_age_proportional_spike_scale: if True, the scale of the recent spikes is inversely proportional to their age.
-        super(DynamicPlottingConfig, self).__init__()
+        super(PlottingConfig, self).__init__(output_subplots_shape=output_subplots_shape, output_parent_dir=output_parent_dir, use_age_proportional_spike_scale=use_age_proportional_spike_scale, plotter_type=plotter_type)
         if output_subplots_shape is None:
             output_subplots_shape = (1,1) # By default, only a single plot is needed
         self.subplots_shape = output_subplots_shape
