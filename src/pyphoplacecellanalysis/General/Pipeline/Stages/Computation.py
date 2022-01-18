@@ -1,4 +1,6 @@
 import sys
+import numpy as np
+import pandas as pd
 from pyphocorehelpers.function_helpers import compose_functions
 
 # NeuroPy (Diba Lab Python Repo) Loading
@@ -18,6 +20,7 @@ from pyphoplacecellanalysis.General.Pipeline.Stages.BaseNeuropyPipelineStage imp
 from pyphoplacecellanalysis.General.Pipeline.Stages.Filtering import FilterablePipelineStage
 from pyphoplacecellanalysis.General.Pipeline.Stages.Loading import LoadableInput, LoadableSessionInput, LoadedPipelineStage    
 from pyphoplacecellanalysis.General.ComputationResults import ComputationResult
+from pyphoplacecellanalysis.General.Decoder.decoder_result import build_position_df_discretized_binned_positions
 
 
 class ComputablePipelineStage:
@@ -39,7 +42,6 @@ class ComputablePipelineStage:
         # active_epoch_placefields1D, active_epoch_placefields2D = perform_compute_placefields(active_session.spikes_df, active_session.position, computation_config, None, None, included_epochs=None, should_force_recompute_placefields=True)
         
         # Test to see if included_epochs is set, if not, set it to None.
-        
         
         output_result.computed_data['pf1D'], output_result.computed_data['pf2D'] = perform_compute_placefields(active_session.spikes_df, active_session.position, computation_config, None, None, included_epochs=computation_config.computation_epochs, should_force_recompute_placefields=True)
 
@@ -72,24 +74,180 @@ class ComputablePipelineStage:
 
 """-------------- Specific Computation Functions to be registered --------------"""
 
-from pyphoplacecellanalysis.Analysis.reconstruction import BayesianPlacemapPositionDecoder
+from pyphocorehelpers.DataStructure.data_structure_builders import cartesian_product
+from pyphoplacecellanalysis.Analysis.reconstruction import BayesianPlacemapPositionDecoder, Zhang_Two_Step
 
-def _perform_position_decoding_computation(computation_result: ComputationResult):
-    """ Builds the 2D Placefield Decoder """
-    def position_decoding_computation(active_session, computation_config, prev_output_result: ComputationResult):
-        prev_output_result.computed_data['pf2D_Decoder'] = BayesianPlacemapPositionDecoder(computation_config.time_bin_size, prev_output_result.computed_data['pf2D'], active_session.spikes_df.copy(), debug_print=False)
-        # %timeit pho_custom_decoder.compute_all():  18.8 s ± 149 ms per loop (mean ± std. dev. of 7 runs, 1 loop each)
-        prev_output_result.computed_data['pf2D_Decoder'].compute_all() #  --> n = self.
-        return prev_output_result
+class DefaultComputationFunctions:
+    def _perform_position_decoding_computation(computation_result: ComputationResult):
+        """ Builds the 2D Placefield Decoder """
+        def position_decoding_computation(active_session, computation_config, prev_output_result: ComputationResult):
+            prev_output_result.computed_data['pf2D_Decoder'] = BayesianPlacemapPositionDecoder(computation_config.time_bin_size, prev_output_result.computed_data['pf2D'], active_session.spikes_df.copy(), debug_print=False)
+            
+            # prev_output_result.computed_data['pf2D_Decoder']
+            
+            # %timeit pho_custom_decoder.compute_all():  18.8 s ± 149 ms per loop (mean ± std. dev. of 7 runs, 1 loop each)
+            prev_output_result.computed_data['pf2D_Decoder'].compute_all() #  --> n = self.
+            return prev_output_result
 
-    return position_decoding_computation(computation_result.sess, computation_result.computation_config, computation_result)
+        return position_decoding_computation(computation_result.sess, computation_result.computation_config, computation_result)
+    
+    
+    
+    def _perform_two_step_position_decoding_computation(computation_result: ComputationResult, debug_print=False):
+        """ Builds the Zhang Velocity/Position For 2-step Bayesian Decoder for 2D Placefields """
+        def _compute_avg_speed_at_each_position_bin(active_position_df, active_computation_config, xbin, ybin, show_plots=False, debug_print=False):
+            """ compute the average speed at each position x: """
+            ## Non-working attempt to use edges instead of bins:
+            # xbin_edges = xbin + [(xbin[-1] + (xbin[1] - xbin[0]))] # add an additional (right) edge to the end of the xbin array for use with pd.cut
+            # ybin_edges = ybin + [(ybin[-1] + (ybin[1] - ybin[0]))] # add an additional (right) edge to the end of the ybin array for use with pd.cut
+            # print(f'xbin_edges: {np.shape(xbin_edges)}\n ybin_edges: {np.shape(ybin_edges)}, np.shape(np.arange(len(xbin_edges))): {np.shape(np.arange(len(xbin_edges)))}')
+            # active_position_df['binned_x'] = pd.cut(active_position_df['x'].to_numpy(), bins=xbin_edges, include_lowest=True, labels=np.arange(start=1, stop=len(xbin_edges))) # same shape as the input data 
+            # active_position_df['binned_y'] = pd.cut(active_position_df['y'].to_numpy(), bins=ybin_edges, include_lowest=True, labels=np.arange(start=1, stop=len(ybin_edges))) # same shape as the input data 
+
+            def _compute_group_stats_for_var(active_position_df, xbin, ybin, variable_name:str = 'speed'):
+                # For each unique binned_x and binned_y value, what is the average velocity_x at that point?
+                position_bin_dependent_specific_average_velocities = active_position_df.groupby(['binned_x','binned_y'])[variable_name].agg([np.nansum, np.nanmean, np.nanmin, np.nanmax]).reset_index() #.apply(lambda g: g.mean(skipna=True)) #.agg((lambda x: x.mean(skipna=False)))
+                # position_bin_dependent_specific_average_velocities # 1856 rows
+                output = np.zeros((len(xbin), len(ybin))) # (65, 30)
+                # np.shape(output)
+                output[position_bin_dependent_specific_average_velocities['binned_x'].to_numpy()-1, position_bin_dependent_specific_average_velocities['binned_y'].to_numpy()-1] = position_bin_dependent_specific_average_velocities['nanmean'].to_numpy() # ValueError: shape mismatch: value array of shape (1856,) could not be broadcast to indexing result of shape (1856,2,30)
+                return output
+
+            outputs = dict()
+            outputs['speed'] = _compute_group_stats_for_var(active_position_df, xbin, ybin, 'speed')
+            # if show_plots:
+            #     plt.figure(num=8)
+            #     plt.imshow(outputs['speed'])
+            #     plt.title('speed')
+
+            outputs['velocity_x'] = _compute_group_stats_for_var(active_position_df, xbin, ybin, 'velocity_x')
+            # if show_plots:
+            #     plt.figure(num=9)
+            #     plt.imshow(outputs['velocity_x'])
+            #     plt.title('velocity_x')
+
+            outputs['acceleration_x'] = _compute_group_stats_for_var(active_position_df, xbin, ybin, 'acceleration_x')
+            # if show_plots:
+            #     plt.figure(num=10)
+            #     plt.imshow(outputs['acceleration_x'])
+            #     plt.title('acceleration_x')
+
+            return outputs['speed']
+
+        # def position_decoding_second_order_computation(active_session, computation_config, prev_output_result: ComputationResult):
+        #     prev_output_result.computed_data['pf2D_Decoder'] = BayesianPlacemapPositionDecoder(computation_config.time_bin_size, prev_output_result.computed_data['pf2D'], active_session.spikes_df.copy(), debug_print=False)
+            
+        #     # prev_output_result.computed_data['pf2D_Decoder']
+            
+        #     # %timeit pho_custom_decoder.compute_all():  18.8 s ± 149 ms per loop (mean ± std. dev. of 7 runs, 1 loop each)
+        #     prev_output_result.computed_data['pf2D_Decoder'].compute_all() #  --> n = self.
+        #     return prev_output_result
+
+        prev_one_step_bayesian_decoder = computation_result.computed_data['pf2D_Decoder']
+        # prev_one_step_bayesian_decoder.xbin, prev_one_step_bayesian_decoder.ybin
+        
+        computation_result.sess.position.df, xbin, ybin, bin_info = build_position_df_discretized_binned_positions(computation_result.sess.position.df, computation_result.computation_config, debug_print=debug_print) # update the session's position dataframe with the new columns.
+        # prev_one_step_bayesian_decoder.xbin, prev_one_step_bayesian_decoder.ybin
+        # avg_speed_per_pos = _compute_avg_speed_at_each_position_bin(computation_result.sess.position.to_dataframe(), computation_result.computation_config, xbin, ybin)
+
+        active_xbins = xbin
+        active_ybins = ybin      
+        # active_xbins = prev_one_step_bayesian_decoder.xbin_centers
+        # active_ybins = prev_one_step_bayesian_decoder.ybin_centers
+        
+        # avg_speed_per_pos = _compute_avg_speed_at_each_position_bin(computation_result.sess.position.to_dataframe(), computation_result.computation_config, active_xbins, active_ybins)
+        avg_speed_per_pos = _compute_avg_speed_at_each_position_bin(computation_result.sess.position.to_dataframe(), computation_result.computation_config, prev_one_step_bayesian_decoder.xbin_centers, prev_one_step_bayesian_decoder.ybin_centers)
+                
+        if debug_print:
+            print(f'np.shape(avg_speed_per_pos): {np.shape(avg_speed_per_pos)}')
+        
+        
+        max_speed = np.nanmax(avg_speed_per_pos)
+        # max_speed # 73.80995983236636
+        min_speed = np.nanmin(avg_speed_per_pos)
+        # min_speed # 0.0
+        K_over_V = 60.0 / max_speed # K_over_V = 0.8128984236852197
+    
+        # K = 1.0
+        K = K_over_V
+        V = 1.0
+        sigma_t_all = Zhang_Two_Step.sigma_t(avg_speed_per_pos, K, V, d=1.0) # np.shape(sigma_t_all): (65, 30)
+        
+        if debug_print:
+            print(f'np.shape(sigma_t_all): {np.shape(sigma_t_all)}')
+        
+        
+        # normalize sigma_t_all:
+        # computation_result.computed_data['pf2D_TwoStepDecoder'] = dict()
+        computation_result.computed_data['pf2D_TwoStepDecoder'] = {'xbin':active_xbins, 'ybin':active_ybins,
+                                                                   'avg_speed_per_pos': avg_speed_per_pos,
+                                                                   'K':K, 'V':V,
+                                                                   'sigma_t_all':sigma_t_all
+        }
+        
+        computation_result.computed_data['pf2D_TwoStepDecoder']['C'] = 1.0
+        computation_result.computed_data['pf2D_TwoStepDecoder']['k'] = 1.0
+        # computation_result.computed_data['pf2D_TwoStepDecoder']['p_x_given_n_and_x_prev_fn'] = lambda x_prev, all_x: Zhang_Two_Step.compute_bayesian_two_step_prob_single_timestep(prev_one_step_bayesian_decoder.p_x_given_n, x_prev, all_x, 
+        #                                                                             computation_result.computed_data['pf2D_TwoStepDecoder']['sigma_t_all'], 
+        #                                                                             computation_result.computed_data['pf2D_TwoStepDecoder']['C'], computation_result.computed_data['pf2D_TwoStepDecoder']['k'])
+        
+        # ValueError: operands could not be broadcast together with shapes (64,29,3434) (65,30)
+
+        # pre-allocate outputs:
+        # np.vstack((self.xbin_centers[self.most_likely_position_indicies[0,:]], self.ybin_centers[self.most_likely_position_indicies[1,:]])).T
+        # twoDimGrid_x, twoDimGrid_y = np.meshgrid(prev_one_step_bayesian_decoder.xbin_centers, prev_one_step_bayesian_decoder.ybin_centers)
+        
+        computation_result.computed_data['pf2D_TwoStepDecoder']['all_x'] = cartesian_product((active_xbins, active_ybins)) # (1856, 2)
+        
+        # computation_result.computed_data['pf2D_TwoStepDecoder']['flat_p_x_given_n_and_x_prev'] = np.full_like(prev_one_step_bayesian_decoder.flat_p_x_given_n, np.nan) # fill with NaNs. Pre-allocate output
+        
+        computation_result.computed_data['pf2D_TwoStepDecoder']['p_x_given_n_and_x_prev'] = np.full_like(prev_one_step_bayesian_decoder.p_x_given_n, np.nan) # fill with NaNs. Pre-allocate output
+        
+        if debug_print:
+            print(f'np.shape(prev_one_step_bayesian_decoder.p_x_given_n): {np.shape(prev_one_step_bayesian_decoder.p_x_given_n)}')
+        
+        computation_result.computed_data['pf2D_TwoStepDecoder']['all_scaling_factors_k'] = Zhang_Two_Step.compute_scaling_factor_k(prev_one_step_bayesian_decoder.flat_p_x_given_n)
+        
+        
+        for time_window_bin_idx in np.arange(prev_one_step_bayesian_decoder.num_time_windows):
+            flat_p_x_given_n = prev_one_step_bayesian_decoder.flat_p_x_given_n[:, time_window_bin_idx] # this gets the specific n_t for this time window
+            curr_p_x_given_n = prev_one_step_bayesian_decoder.p_x_given_n[:, :, time_window_bin_idx]
+            # also have p_x_given_n = prev_one_step_bayesian_decoder.p_x_given_n if we'd prefer
+            prev_x_flat_index = prev_one_step_bayesian_decoder.most_likely_position_flat_indicies[time_window_bin_idx-1] # this is the most likely position (represented as the flattened position bin index) at the last dataframe
+            prev_x_position = prev_one_step_bayesian_decoder.most_likely_positions[time_window_bin_idx-1, :] # (85844, 2)
+
+            # active_most_likely_x_position = (prev_one_step_bayesian_decoder.xbin_centers[active_most_likely_x_indicies[0]], prev_one_step_bayesian_decoder.ybin_centers[active_most_likely_x_indicies[1]])
+            
+            # all_x = prev_one_step_bayesian_decoder.most_likely_positions
+            # all_x = test_out_points
+            
+            # all_x = prev_one_step_bayesian_decoder.most_likely_positions
+            
+            # curr_compute_fn = computation_result.computed_data['pf2D_TwoStepDecoder']['p_x_given_n_and_x_prev_fn']
+            # computation_result.computed_data['pf2D_TwoStepDecoder']['flat_p_x_given_n_and_x_prev'] = curr_compute_fn(prev_x_flat_index, computation_result.computed_data['pf2D_TwoStepDecoder']['flat_all_x']) # flat mode
+            # computation_result.computed_data['pf2D_TwoStepDecoder']['p_x_given_n_and_x_prev'][:,:,time_window_bin_idx] = curr_compute_fn(prev_x_position, computation_result.computed_data['pf2D_TwoStepDecoder']['all_x'])
+            
+            active_k = computation_result.computed_data['pf2D_TwoStepDecoder']['all_scaling_factors_k'][time_window_bin_idx] # get the specific k value
+            # active_k = computation_result.computed_data['pf2D_TwoStepDecoder']['k']
+            if debug_print:
+                print(f'np.shape(curr_p_x_given_n): {np.shape(curr_p_x_given_n)}')
+                print(f'np.shape(prev_x_position): {np.shape(prev_x_position)}')
+            
+            computation_result.computed_data['pf2D_TwoStepDecoder']['p_x_given_n_and_x_prev'][:,:,time_window_bin_idx] = Zhang_Two_Step.compute_bayesian_two_step_prob_single_timestep(curr_p_x_given_n, prev_x_position, computation_result.computed_data['pf2D_TwoStepDecoder']['all_x'], computation_result.computed_data['pf2D_TwoStepDecoder']['sigma_t_all'], computation_result.computed_data['pf2D_TwoStepDecoder']['C'], active_k)
+            
+            
+        # computation_result.computed_data['pf2D_TwoStepDecoder']['sigma_t_all'] = sigma_t_all # set sigma_t_all                
+        # return position_decoding_second_order_computation(computation_result.sess, computation_result.computation_config, computation_result)
+        return computation_result
 
 
 
 class DefaultRegisteredComputations:
     """ Simply enables specifying the default computation functions that will be defined in this file and automatically registered. """
     def register_default_known_computation_functions(self):
-        self.register_computation(_perform_position_decoding_computation)
+        self.register_computation(DefaultComputationFunctions._perform_two_step_position_decoding_computation)
+        self.register_computation(DefaultComputationFunctions._perform_position_decoding_computation)
+        
     
 
 
@@ -143,7 +301,7 @@ class ComputedPipelineStage(LoadableInput, LoadableSessionInput, FilterablePipel
         self.active_configs = dict() # active_config corresponding to each filtered session/epoch
         self.computation_results = dict()
         self.registered_computation_functions = list()
-        # self.register_default_known_computation_functions() # registers the default
+        self.register_default_known_computation_functions() # registers the default
         
     def register_computation(self, computation_function):
         self.registered_computation_functions.append(computation_function)
