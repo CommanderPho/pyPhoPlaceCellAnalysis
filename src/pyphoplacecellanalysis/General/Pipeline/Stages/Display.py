@@ -298,9 +298,9 @@ class DefaultDisplayFunctions:
                     axs[1].axis("off")
                     
                 # Most likely position plots:
-                axs[0].plot(pho_custom_decoder.active_time_window_centers, np.squeeze(pho_custom_decoder.most_likely_positions[:,0]), lw=0.5, color='r', alpha=0.2, label='most likely positions x') # (Num windows x 2)
+                axs[0].plot(pho_custom_decoder.active_time_window_centers, np.squeeze(pho_custom_decoder.most_likely_positions[:,0]), lw=1.0, color='white', alpha=0.4, label='most likely positions x') # (Num windows x 2)
                 # axs[0].set_title('most likely positions x')
-                axs[1].plot(pho_custom_decoder.active_time_window_centers, np.squeeze(pho_custom_decoder.most_likely_positions[:,1]), lw=0.5, color='r', alpha=0.2, label='most likely positions y') # (Num windows x 2)
+                axs[1].plot(pho_custom_decoder.active_time_window_centers, np.squeeze(pho_custom_decoder.most_likely_positions[:,1]), lw=1.0, color='white', alpha=0.4, label='most likely positions y') # (Num windows x 2)
                 # axs[1].set_title('most likely positions y')
                 fig.suptitle(f'Decoded Position data component comparison')
                 return fig, axs
