@@ -35,7 +35,7 @@ def build_position_df_discretized_binned_positions(active_pos_df, active_computa
     xbin, ybin, bin_info = PfND._bin_pos_nD(active_pos_df['x'].values, active_pos_df['y'].values, bin_size=active_computation_config.grid_bin) # bin_size mode
     active_pos_df['binned_x'] = pd.cut(active_pos_df['x'].to_numpy(), bins=xbin, include_lowest=True, labels=np.arange(start=1, stop=len(xbin))) # same shape as the input data 
     active_pos_df['binned_y'] = pd.cut(active_pos_df['y'].to_numpy(), bins=ybin, include_lowest=True, labels=np.arange(start=1, stop=len(ybin))) 
-    return active_pos_df
+    return active_pos_df, xbin, ybin, bin_info
 
 
 def build_position_df_resampled_to_time_windows(active_pos_df, time_bin_size=0.02):

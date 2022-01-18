@@ -253,9 +253,9 @@ class DefaultDisplayFunctions:
                 # active_p_x_given_n = np.squeeze(pho_custom_decoder.p_x_given_n[:,:,window_idx]) # same size as occupancy
 
                 # Actual Position Plots:
-                axs[0].plot(position_df['t'].to_numpy(), position_df['x'].to_numpy(), label='measured x')
+                axs[0].plot(position_df['t'].to_numpy(), position_df['x'].to_numpy(), label='measured x', color='#ff0000ff')
                 axs[0].set_title('x')
-                axs[1].plot(position_df['t'].to_numpy(), position_df['y'].to_numpy(), label='measured y')
+                axs[1].plot(position_df['t'].to_numpy(), position_df['y'].to_numpy(), label='measured y', color='#ff0000ff')
                 axs[1].set_title('y')
                 # # Most likely position plots:
                 # axs[2].plot(pho_custom_decoder.active_time_window_centers, np.squeeze(pho_custom_decoder.most_likely_positions[:,0]), lw=0.5) # (Num windows x 2)
@@ -264,10 +264,15 @@ class DefaultDisplayFunctions:
                 # axs[3].set_title('most likely positions y')
                 
                 if show_posterior:
-                    # TODO: need to re-normalize after summing
-                    marginal_posterior_y = np.squeeze(np.sum(pho_custom_decoder.p_x_given_n, 0)) # sum over all x. Result should be [y_bins x time_bins]
-                    marginal_posterior_x = np.squeeze(np.sum(pho_custom_decoder.p_x_given_n, 1)) # sum over all y. Result should be [x_bins x time_bins]
+                    active_posterior = pho_custom_decoder.p_x_given_n
+                    # active_posterior = pho_custom_decoder['p_x_given_n_and_x_prev'] # dict-style
                     
+                    # re-normalize each marginal after summing
+                    marginal_posterior_y = np.squeeze(np.sum(active_posterior, 0)) # sum over all x. Result should be [y_bins x time_bins]
+                    marginal_posterior_y = marginal_posterior_y / np.sum(marginal_posterior_y, axis=0) # sum over all positions for each time_bin (so there's a normalized distribution at each timestep)
+                    marginal_posterior_x = np.squeeze(np.sum(active_posterior, 1)) # sum over all y. Result should be [x_bins x time_bins]
+                    marginal_posterior_x = marginal_posterior_x / np.sum(marginal_posterior_x, axis=0) # sum over all positions for each time_bin (so there's a normalized distribution at each timestep)
+
                     # Compute extents foir imshow:
                     
                     # im = ax.imshow(curr_p_x_given_n, **main_plot_kwargs) # add the curr_px_given_n image
@@ -299,8 +304,10 @@ class DefaultDisplayFunctions:
                 # axs[1].set_title('most likely positions y')
                 fig.suptitle(f'Decoded Position data component comparison')
                 return fig, axs
+            
+        
         # Call the plot function with the decoder result.
-        plot_most_likely_position_comparsions(computation_result.computed_data['pf2D_Decoder'], computation_result.sess.position.to_dataframe())
+        plot_most_likely_position_comparsions(computation_result.computed_data['pf2D_Decoder'], computation_result.sess.position.to_dataframe(), **({'show_posterior':True}|kwargs) )
 
 
     def _display_normal(computation_result, active_config, **kwargs):
