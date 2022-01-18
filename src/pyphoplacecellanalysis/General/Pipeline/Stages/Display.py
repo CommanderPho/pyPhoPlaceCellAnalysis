@@ -4,6 +4,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import pyvista as pv
 import pyvistaqt as pvqt
+from General.Pipeline.Stages.Computation import ComputedPipelineStage
 from PhoPositionalData.analysis.interactive_placeCell_config import InteractivePlaceCellConfig, PlottingConfig
 
 from neuropy.core.neuron_identities import NeuronIdentity, build_units_colormap, PlotStringBrevityModeEnum
@@ -259,3 +260,52 @@ class DefaultRegisteredDisplayFunctions:
         self.register_display_function(DefaultDisplayFunctions._display_3d_interactive_custom_data_explorer)
         self.register_display_function(DefaultDisplayFunctions._display_3d_image_plotter)
   
+  
+
+class PipelineWithDisplayPipelineStageMixin:
+    """ To be added to the pipeline to enable conveninece access ot its pipeline stage post Display stage. """
+    ## Display Stage Properties:
+    @property
+    def is_displayed(self):
+        """The is_displayed property. TODO: Needs validation/Testing """
+        return (self.stage is not None) and (isinstance(self.stage, DisplayPipelineStage))
+    
+    def prepare_for_display(self):
+        assert isinstance(self.stage, ComputedPipelineStage), "Current self.stage must already be a ComputedPipelineStage. Call self.perform_computations to reach this step."
+        self.stage = DisplayPipelineStage(self.stage)  # build the Display stage
+        # Loops through all the configs and ensure that they have the neuron identity info if they need it.
+        for an_active_config_name in self.active_configs.keys():
+            self.active_configs[an_active_config_name] = add_neuron_identity_info_if_needed(self.computation_results[an_active_config_name], self.active_configs[an_active_config_name])
+        
+    def display(self, display_function, active_session_filter_configuration: str, **kwargs):
+        # active_session_filter_configuration: 'maze1'
+        assert isinstance(self.stage, DisplayPipelineStage), "Current self.stage must already be a DisplayPipelineStage. Call self.prepare_for_display to reach this step."
+        if display_function is None:
+            display_function = DefaultDisplayFunctions._display_normal
+        return display_function(self.computation_results[active_session_filter_configuration], self.active_configs[active_session_filter_configuration], **kwargs)
+
+
+
+    
+
+class DisplayPipelineStage(ComputedPipelineStage):
+    """ The concrete pipeline stage for displaying the output computed in previous stages."""
+    
+    def __init__(self, computed_stage: ComputedPipelineStage, render_actions=dict()):
+        # super(DisplayPipelineStage, self).__init__()
+        # ComputedPipelineStage fields:
+        self.stage_name = computed_stage.stage_name
+        self.basedir = computed_stage.basedir
+        self.loaded_data = computed_stage.loaded_data
+        self.filtered_sessions = computed_stage.filtered_sessions
+        self.filtered_epochs = computed_stage.filtered_epochs
+        self.active_configs = computed_stage.active_configs # active_config corresponding to each filtered session/epoch
+        self.computation_results = computed_stage.computation_results
+        self.registered_computation_functions = computed_stage.registered_computation_functions
+
+        # Initialize custom fields:
+        self.render_actions = render_actions    
+    
+        
+        
+        
