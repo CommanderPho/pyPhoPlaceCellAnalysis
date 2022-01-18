@@ -3,10 +3,13 @@ import pathlib
 
 import numpy as np
 import pandas as pd
+from scipy.stats import multivariate_normal
 
 from pyphocorehelpers.general_helpers import OrderedMeta
 from pyphocorehelpers.indexing_helpers import BinningInfo, compute_spanning_bins, get_bin_centers  
 from pyphocorehelpers.print_helpers import WrappingMessagePrinter, SimplePrintable
+from pyphocorehelpers.mixins.serialized import SerializedAttributesSpecifyingClass
+
 
 # cut_bins = np.linspace(59200, 60800, 9)
 # pd.cut(df['column_name'], bins=cut_bins)
@@ -185,10 +188,38 @@ class ZhangReconstructionImplementation:
         return result
 
 
-class SerializedAttributesSpecifyingClass:
+
+class Zhang_Two_Step:
     @classmethod
-    def serialized_keys(cls):
-        raise NotImplementedError
+    def sigma_t(cls, v_t, K, V, d:float=1.0):
+        """ The standard deviation of the Gaussian prior for position. Once computed and normalized, can be used such that it only requires the current position (x_t) to return the correct std_dev at a given timestamp.
+        K, V are constants
+        d is 0.5 for random walks and 1.0 for linear movements. 
+        """
+        return K * np.power((v_t / V), d)
+    
+    @classmethod
+    def compute_conditional_probability_x_prev_given_x_t(cls, x_prev, x, sigma_t, C):
+        """ Should return a value for all possible current locations x_t. x_prev should be a concrete position, not a matrix of them. """
+        # multivariate_normal.pdf()
+        
+        return C * np.exp(-np.square(np.linalg.norm(x - x_prev))/(2.0*np.square(sigma_t)))
+        
+        # output = multivariate_normal.pdf()
+        
+    @classmethod
+    def compute_scaling_factor_k(cls, flat_p_x_given_n):
+        """k can be computed in closed from in a vectorized fashion from the one_step bayesian posterior.
+        k is a scaling factor that doesn't depend on x_t. Determined by normalizing P(x_t|n_t, x_prev) over x_t"""        
+        out_k = np.append(np.nan, np.nansum(flat_p_x_given_n, axis=0)[:-1]) # we'll have one for each time_window_bin_idx [:, time_window_bin_idx]. Want all except the last element ([:-1])
+        return out_k
+        
+    
+    @classmethod
+    def compute_bayesian_two_step_prob_single_timestep(cls, one_step_p_x_given_n, x_prev, all_x, sigma_t, C, k):
+        return k * one_step_p_x_given_n * cls.compute_conditional_probability_x_prev_given_x_t(x_prev, all_x, sigma_t, C)
+
+
     
     
 # input_keys = ['pf']
@@ -299,6 +330,7 @@ class PlacemapPositionDecoder(SerializedAttributesSpecifyingClass, SimplePrintab
         
 class BayesianPlacemapPositionDecoder(PlacemapPositionDecoder):
     """docstring for BayesianPlacemapPositionDecoder."""
+    
     def __init__(self, time_bin_size: float, pf, spikes_df: pd.DataFrame, setup_on_init:bool=True, post_load_on_init:bool=False, debug_print:bool=True):
         super(BayesianPlacemapPositionDecoder, self).__init__(time_bin_size, pf, spikes_df, setup_on_init=setup_on_init, post_load_on_init=post_load_on_init, debug_print=debug_print)
         
@@ -418,6 +450,8 @@ class BayesianPlacemapPositionDecoder(PlacemapPositionDecoder):
 
     def setup(self):        
         self._setup_concatenated_F()
+        # Could pre-filter the self.spikes_df by the 
+        
         self._setup_time_bin_spike_counts_N_i()
         self._setup_time_window_centers()
         # pre-allocate outputs:
