@@ -4,7 +4,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import pyvista as pv
 import pyvistaqt as pvqt
-from General.Pipeline.Stages.Computation import ComputedPipelineStage
+from pyphoplacecellanalysis.General.Pipeline.Stages.Computation import ComputedPipelineStage
 from PhoPositionalData.analysis.interactive_placeCell_config import InteractivePlaceCellConfig, PlottingConfig
 
 from neuropy.core.neuron_identities import NeuronIdentity, build_units_colormap, PlotStringBrevityModeEnum

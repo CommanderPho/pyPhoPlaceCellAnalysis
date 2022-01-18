@@ -1,5 +1,5 @@
-from General.Pipeline.Stages.Computation import ComputedPipelineStage
 from PhoPositionalData.analysis.interactive_placeCell_config import build_configs # TODO: should be replaced by a better and internal config
+
 
 class FilterablePipelineStage:
         
@@ -23,13 +23,9 @@ class FilterablePipelineStage:
             
             
 
-class PipelineWithFilteredPipelineStageMixin:
+class FilteredPipelineMixin:
     """ To be added to the pipeline to enable conveninece access ot its pipeline stage post Filtered stage. """
-## Filtered Properties:
-    @property
-    def is_filtered(self):
-        """The is_filtered property."""
-        return (self.stage is not None) and (isinstance(self.stage, ComputedPipelineStage))
+    ## Filtered Properties:
     
     @property
     def filtered_epochs(self):
@@ -47,7 +43,3 @@ class PipelineWithFilteredPipelineStageMixin:
         return self.stage.active_configs
     
     
-    def filter_sessions(self, active_session_filter_configurations):
-        self.stage = ComputedPipelineStage(self.stage)
-        self.stage.select_filters(active_session_filter_configurations) # select filters when done
-       

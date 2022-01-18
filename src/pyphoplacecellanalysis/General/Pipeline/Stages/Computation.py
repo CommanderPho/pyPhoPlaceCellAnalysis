@@ -1,4 +1,6 @@
 import sys
+from pyphocorehelpers.function_helpers import compose_functions
+
 # NeuroPy (Diba Lab Python Repo) Loading
 try:
     from neuropy import core
@@ -10,7 +12,11 @@ except ImportError:
     from neuropy import core
 
 from neuropy.analyses.placefields import PlacefieldComputationParameters, perform_compute_placefields
-    
+
+
+from pyphoplacecellanalysis.General.Pipeline.Stages.BaseNeuropyPipelineStage import BaseNeuropyPipelineStage
+from pyphoplacecellanalysis.General.Pipeline.Stages.Filtering import FilterablePipelineStage
+from pyphoplacecellanalysis.General.Pipeline.Stages.Loading import LoadableInput, LoadableSessionInput, LoadedPipelineStage    
 from pyphoplacecellanalysis.General.ComputationResults import ComputationResult
 
 

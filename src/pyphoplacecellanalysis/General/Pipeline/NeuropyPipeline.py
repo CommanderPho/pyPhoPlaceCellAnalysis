@@ -15,10 +15,10 @@ from pyphocorehelpers.function_helpers import compose_functions
 
 import numpy as np
 import pandas as pd
-from General.Pipeline.Stages.Computation import PipelineWithComputedPipelineStageMixin
-from General.Pipeline.Stages.Display import PipelineWithDisplayPipelineStageMixin
-from General.Pipeline.Stages.Filtering import PipelineWithFilteredPipelineStageMixin
-from General.Pipeline.Stages.Loading import PipelineWithInputStage, PipelineWithLoadableStage
+from pyphoplacecellanalysis.General.Pipeline.Stages.Computation import PipelineWithComputedPipelineStageMixin, ComputedPipelineStage
+from pyphoplacecellanalysis.General.Pipeline.Stages.Display import PipelineWithDisplayPipelineStageMixin
+from pyphoplacecellanalysis.General.Pipeline.Stages.Filtering import FilteredPipelineMixin
+from pyphoplacecellanalysis.General.Pipeline.Stages.Loading import PipelineWithInputStage, PipelineWithLoadableStage
 
 from pyphoplacecellanalysis.General.SessionSelectionAndFiltering import batch_filter_session
 
@@ -57,13 +57,13 @@ from neuropy.analyses.placefields import PlacefieldComputationParameters, perfor
 
 
 
-class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, PipelineWithFilteredPipelineStageMixin, PipelineWithComputedPipelineStageMixin, PipelineWithDisplayPipelineStageMixin):
+class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, FilteredPipelineMixin, PipelineWithComputedPipelineStageMixin, PipelineWithDisplayPipelineStageMixin):
     """ 
     
     Exposes the active sessions via its .sess member.
     
     Stages:
-    1. Loading
+    1. Input/Loading
     2. Filtering
     3. Computation
     4. Display
@@ -109,10 +109,16 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Pipelin
         return self.sess.name
 
     
-
+    ## Filtered Properties:
+    @property
+    def is_filtered(self):
+        """The is_filtered property."""
+        return (self.stage is not None) and (isinstance(self.stage, ComputedPipelineStage))
  
-    
-    
+    def filter_sessions(self, active_session_filter_configurations):
+        self.stage = ComputedPipelineStage(self.stage)
+        self.stage.select_filters(active_session_filter_configurations) # select filters when done
+       
     
 
 
