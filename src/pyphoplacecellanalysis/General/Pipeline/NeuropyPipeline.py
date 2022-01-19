@@ -23,6 +23,7 @@ from pyphoplacecellanalysis.General.Pipeline.Stages.Loading import PipelineWithI
 from pyphoplacecellanalysis.General.SessionSelectionAndFiltering import batch_filter_session
 
 from pyphoplacecellanalysis.General.KnownDataSessionTypeProperties import KnownDataSessionTypeProperties
+from pyphoplacecellanalysis.General.Pipeline.Stages.BaseNeuropyPipelineStage import PipelineStage
 
 
 # NeuroPy (Diba Lab Python Repo) Loading
@@ -108,6 +109,11 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
         """The session_name property."""
         return self.sess.name
 
+    
+    @property
+    def last_completed_stage(self) -> PipelineStage:
+        """The last_completed_stage property."""
+        return self.stage.identity
     
     ## Filtered Properties:
     @property

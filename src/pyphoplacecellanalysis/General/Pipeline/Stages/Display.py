@@ -11,6 +11,7 @@ from pyphocorehelpers.plotting.mixins.figure_param_text_box import add_figure_te
 
 from pyphoplacecellanalysis.General.Pipeline.Stages.Computation import ComputedPipelineStage
 from pyphoplacecellanalysis.General.Configs.DynamicConfigs import PlottingConfig, InteractivePlaceCellConfig
+from General.Pipeline.Stages.BaseNeuropyPipelineStage import PipelineStage
 
 from neuropy.core.neuron_identities import NeuronIdentity, build_units_colormap, PlotStringBrevityModeEnum
 from neuropy.plotting.placemaps import plot_all_placefields
@@ -398,6 +399,12 @@ class PipelineWithDisplayPipelineStageMixin:
         """The is_displayed property. TODO: Needs validation/Testing """
         return (self.stage is not None) and (isinstance(self.stage, DisplayPipelineStage))
     
+    @property
+    def can_display(self):
+        """Whether the display functions can be performed."""
+        return (self.last_completed_stage >= PipelineStage.Displayed)
+    
+    
     def prepare_for_display(self, root_output_dir=r'R:\data\Output'):
         assert isinstance(self.stage, ComputedPipelineStage), "Current self.stage must already be a ComputedPipelineStage. Call self.perform_computations to reach this step."
         self.stage = DisplayPipelineStage(self.stage)  # build the Display stage
@@ -409,7 +416,7 @@ class PipelineWithDisplayPipelineStageMixin:
         
     def display(self, display_function, active_session_filter_configuration: str, **kwargs):
         # active_session_filter_configuration: 'maze1'
-        assert isinstance(self.stage, DisplayPipelineStage), "Current self.stage must already be a DisplayPipelineStage. Call self.prepare_for_display to reach this step."
+        assert self.can_display, "Current self.stage must already be a DisplayPipelineStage. Call self.prepare_for_display to reach this step."
         if display_function is None:
             display_function = DefaultDisplayFunctions._display_normal
         return display_function(self.computation_results[active_session_filter_configuration], self.active_configs[active_session_filter_configuration], **kwargs)
@@ -420,6 +427,7 @@ class PipelineWithDisplayPipelineStageMixin:
 
 class DisplayPipelineStage(ComputedPipelineStage):
     """ The concrete pipeline stage for displaying the output computed in previous stages."""
+    identity: PipelineStage = PipelineStage.Displayed
     
     def __init__(self, computed_stage: ComputedPipelineStage, render_actions=dict()):
         # super(DisplayPipelineStage, self).__init__()

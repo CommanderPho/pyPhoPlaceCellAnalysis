@@ -16,7 +16,7 @@ except ImportError:
 from neuropy.analyses.placefields import PlacefieldComputationParameters, perform_compute_placefields
 
 
-from pyphoplacecellanalysis.General.Pipeline.Stages.BaseNeuropyPipelineStage import BaseNeuropyPipelineStage
+from pyphoplacecellanalysis.General.Pipeline.Stages.BaseNeuropyPipelineStage import BaseNeuropyPipelineStage, PipelineStage
 from pyphoplacecellanalysis.General.Pipeline.Stages.Filtering import FilterablePipelineStage
 from pyphoplacecellanalysis.General.Pipeline.Stages.Loading import LoadableInput, LoadableSessionInput, LoadedPipelineStage    
 from pyphoplacecellanalysis.General.ComputationResults import ComputationResult
@@ -280,21 +280,26 @@ class PipelineWithComputedPipelineStageMixin:
         return (self.stage is not None) and (isinstance(self.stage, ComputedPipelineStage) and (self.computation_results.values[0] is not None))
 
     @property
+    def can_compute(self):
+        """The can_compute property."""
+        return (self.last_completed_stage >= PipelineStage.Filtered)
+
+    @property
     def computation_results(self):
         """The computation_results property, accessed through the stage."""
         return self.stage.computation_results
     
     ## Computation Helpers: 
-    def perform_computations(self, active_computation_params: PlacefieldComputationParameters):     
-        assert isinstance(self.stage, ComputedPipelineStage), "Current self.stage must already be a ComputedPipelineStage. Call self.filter_sessions with filter configs to reach this step."
+    def perform_computations(self, active_computation_params: PlacefieldComputationParameters):
+        assert (self.can_compute), "Current self.stage must already be a ComputedPipelineStage. Call self.filter_sessions with filter configs to reach this step."
         self.stage.single_computation(active_computation_params)
         
     def register_computation(self, computation_function):
-        assert isinstance(self.stage, ComputedPipelineStage), "Current self.stage must already be a ComputedPipelineStage. Call self.filter_sessions with filter configs to reach this step."
+        assert (self.can_compute), "Current self.stage must already be a ComputedPipelineStage. Call self.filter_sessions with filter configs to reach this step."
         self.stage.register_computation(computation_function)
 
     def perform_registered_computations(self, previous_computation_result, debug_print=False):
-        assert isinstance(self.stage, ComputedPipelineStage), "Current self.stage must already be a ComputedPipelineStage. Call self.perform_computations to reach this step."
+        assert (self.can_compute), "Current self.stage must already be a ComputedPipelineStage. Call self.perform_computations to reach this step."
         self.stage.perform_registered_computations()
     
     
@@ -303,7 +308,7 @@ class PipelineWithComputedPipelineStageMixin:
 
 class ComputedPipelineStage(LoadableInput, LoadableSessionInput, FilterablePipelineStage, DefaultRegisteredComputations, ComputablePipelineStage, BaseNeuropyPipelineStage):
     """Docstring for ComputedPipelineStage."""
-
+    identity: PipelineStage = PipelineStage.Computed
     filtered_sessions: dict = None
     filtered_epochs: dict = None
     active_configs: dict = None

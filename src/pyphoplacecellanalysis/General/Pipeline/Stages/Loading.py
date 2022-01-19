@@ -5,7 +5,7 @@ from pathlib import Path
 
 
 from pyphocorehelpers.function_helpers import compose_functions
-from pyphoplacecellanalysis.General.Pipeline.Stages.BaseNeuropyPipelineStage import BaseNeuropyPipelineStage
+from pyphoplacecellanalysis.General.Pipeline.Stages.BaseNeuropyPipelineStage import BaseNeuropyPipelineStage, PipelineStage
 
 # # NeuroPy (Diba Lab Python Repo) Loading
 # try:
@@ -87,6 +87,7 @@ class InputPipelineStage(LoadableInput, BaseNeuropyPipelineStage):
     
     post_load_functions: List[Callable] a list of Callables that accept the loaded session as input and return the potentially modified session as output.
     """
+    identity: PipelineStage = PipelineStage.Input
     basedir: Path = Path("")
     load_function: Callable = None
     post_load_functions: List[Callable] = dataclasses.field(default_factory=list)
@@ -95,6 +96,7 @@ class InputPipelineStage(LoadableInput, BaseNeuropyPipelineStage):
 
 class LoadedPipelineStage(LoadableInput, LoadableSessionInput, BaseNeuropyPipelineStage):
     """Docstring for LoadedPipelineStage."""
+    identity: PipelineStage = PipelineStage.Loaded
     loaded_data: dict = None
 
     def __init__(self, input_stage: InputPipelineStage):
@@ -151,6 +153,12 @@ class PipelineWithInputStage:
        
 class PipelineWithLoadableStage:
     """ Has a lodable stage. """
+    
+    @property
+    def can_load(self):
+        """Whether load can be performed."""
+        return (self.last_completed_stage >= PipelineStage.Input)
+
     @property
     def is_loaded(self):
         """The is_loaded property."""
