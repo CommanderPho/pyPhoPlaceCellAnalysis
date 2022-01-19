@@ -205,19 +205,21 @@ class DefaultComputationFunctions:
         computation_result.computed_data['pf2D_TwoStepDecoder']['most_likely_position_indicies'] = np.zeros((2, prev_one_step_bayesian_decoder.num_time_windows), dtype=int) # (2, 85841)
         computation_result.computed_data['pf2D_TwoStepDecoder']['most_likely_positions'] = np.zeros((2, prev_one_step_bayesian_decoder.num_time_windows)) # (2, 85841)
                 
-        
         if debug_print:
             print(f'np.shape(prev_one_step_bayesian_decoder.p_x_given_n): {np.shape(prev_one_step_bayesian_decoder.p_x_given_n)}')
         
         computation_result.computed_data['pf2D_TwoStepDecoder']['all_scaling_factors_k'] = Zhang_Two_Step.compute_scaling_factor_k(prev_one_step_bayesian_decoder.flat_p_x_given_n)
         
-        
+        # TODO: Efficiency: This will be inefficient, but do a slow iteration. 
         for time_window_bin_idx in np.arange(prev_one_step_bayesian_decoder.num_time_windows):
             flat_p_x_given_n = prev_one_step_bayesian_decoder.flat_p_x_given_n[:, time_window_bin_idx] # this gets the specific n_t for this time window
             curr_p_x_given_n = prev_one_step_bayesian_decoder.p_x_given_n[:, :, time_window_bin_idx]
             # also have p_x_given_n = prev_one_step_bayesian_decoder.p_x_given_n if we'd prefer
             prev_x_flat_index = prev_one_step_bayesian_decoder.most_likely_position_flat_indicies[time_window_bin_idx-1] # this is the most likely position (represented as the flattened position bin index) at the last dataframe
             prev_x_position = prev_one_step_bayesian_decoder.most_likely_positions[time_window_bin_idx-1, :] # (85844, 2)
+            
+            # TODO: as for prev_x_position: this should actually be the computed two-step position, not the one_step position.
+            
 
             # active_most_likely_x_position = (prev_one_step_bayesian_decoder.xbin_centers[active_most_likely_x_indicies[0]], prev_one_step_bayesian_decoder.ybin_centers[active_most_likely_x_indicies[1]])
             
