@@ -6,7 +6,7 @@ import pandas as pd
 from scipy.stats import multivariate_normal
 
 from pyphocorehelpers.general_helpers import OrderedMeta
-from pyphocorehelpers.indexing_helpers import BinningInfo, compute_spanning_bins, get_bin_centers  
+from pyphocorehelpers.indexing_helpers import BinningInfo, compute_spanning_bins, get_bin_centers, build_spanning_grid_matrix
 from pyphocorehelpers.print_helpers import WrappingMessagePrinter, SimplePrintable
 from pyphocorehelpers.mixins.serialized import SerializedAttributesSpecifyingClass
 
@@ -192,42 +192,12 @@ class Zhang_Two_Step:
     
     @classmethod
     def build_all_positions_matrix(cls, x_values, y_values, debug_print=False):
-        """ 
+        """ used to build a grid of position points from xbins and ybins.
         Usage:
-            all_positions_matrix = build_all_positions_matrix(active_one_step_decoder.xbin_centers, active_one_step_decoder.ybin_centers)
+            all_positions_matrix, flat_all_positions_matrix, original_data_shape = build_all_positions_matrix(active_one_step_decoder.xbin_centers, active_one_step_decoder.ybin_centers)
         """
-        num_rows = len(y_values)
-        num_cols = len(x_values)
+        return build_spanning_grid_matrix(x_values, y_values, debug_print=debug_print)
 
-        original_data_shape = (num_cols, num_rows) # original_position_data_shape: (64, 29)
-        if debug_print:
-            print(f'original_position_data_shape: {original_data_shape}')
-        x_only_matrix = np.repeat(np.expand_dims(x_values, 1).T, num_rows, axis=0).T
-        # np.shape(x_only_matrix) # (29, 64)
-        flat_x_only_matrix = np.reshape(x_only_matrix, (-1, 1))
-        if debug_print:
-            print(f'np.shape(x_only_matrix): {np.shape(x_only_matrix)}, np.shape(flat_x_only_matrix): {np.shape(flat_x_only_matrix)}') # np.shape(x_only_matrix): (64, 29), np.shape(flat_x_only_matrix): (1856, 1)
-        y_only_matrix = np.repeat(np.expand_dims(y_values, 1), num_cols, axis=1).T
-        # np.shape(y_only_matrix) # (29, 64)
-        flat_y_only_matrix = np.reshape(y_only_matrix, (-1, 1))
-        # y_only_matrix
-
-        # flat_all_positions_matrix = np.array([np.append(an_x, a_y) for (an_x, a_y) in zip(flat_x_only_matrix, flat_y_only_matrix)])
-        flat_all_positions_matrix = [tuple(np.append(an_x, a_y)) for (an_x, a_y) in zip(flat_x_only_matrix, flat_y_only_matrix)] # a list of position tuples (containing two elements)
-        flat_all_positions_matrix
-        # print(f'np.shape(flat_all_positions_matrix): {np.shape(flat_all_positions_matrix)}') # np.shape(flat_all_positions_matrix): (1856, 2)
-
-        # reconsitute its shape:
-        all_positions_matrix = np.reshape(flat_all_positions_matrix, (original_data_shape[0], original_data_shape[1], 2))
-        if debug_print:
-            print(f'np.shape(all_positions_matrix): {np.shape(all_positions_matrix)}') # np.shape(all_positions_matrix): (1856, 2) # np.shape(all_positions_matrix): (64, 29, 2)
-            print(f'flat_all_positions_matrix[0]: {flat_all_positions_matrix[0]}\nall_positions_matrix[0,0,:]: {all_positions_matrix[0,0,:]}')
-
-        return all_positions_matrix, flat_all_positions_matrix, original_data_shape
-
-
-
-    
     @classmethod
     def sigma_t(cls, v_t, K, V, d:float=1.0):
         """ The standard deviation of the Gaussian prior for position. Once computed and normalized, can be used such that it only requires the current position (x_t) to return the correct std_dev at a given timestamp.

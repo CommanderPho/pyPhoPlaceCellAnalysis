@@ -61,7 +61,6 @@ class ComputablePipelineStage:
 
 """-------------- Specific Computation Functions to be registered --------------"""
 
-from pyphocorehelpers.DataStructure.data_structure_builders import cartesian_product
 from pyphoplacecellanalysis.Analysis.reconstruction import BayesianPlacemapPositionDecoder, Zhang_Two_Step
 
 class DefaultComputationFunctions:
