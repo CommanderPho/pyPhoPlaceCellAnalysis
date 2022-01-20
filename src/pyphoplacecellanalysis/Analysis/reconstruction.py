@@ -429,13 +429,6 @@ class BayesianPlacemapPositionDecoder(PlacemapPositionDecoder):
     
     @classmethod
     def from_dict(cls, val_dict):
-        # post_load_dict = 'flat_p_x_given_n'
-        # ['time_bin_size', 'pf', 'spikes_df', 'debug_print']
-        
-        # [myDict.pop(x, None) for x in ['a', 'c', 'e']]
-        # init_val_dict = {k: v for k, v in val_dict.items() if k != 'key'}
-        # post_load_dict = {k: v for k, v in val_dict.items() if k not in ['time_bin_size', 'pf', 'spikes_df', 'debug_print', 'setup_on_init', 'post_load_on_init']}
-        # print(f'post_load_dict: {post_load_dict.keys()}')
         new_obj = BayesianPlacemapPositionDecoder(val_dict.get('time_bin_size', 0.25), val_dict.get('pf', None), val_dict.get('spikes_df', None), setup_on_init=val_dict.get('setup_on_init', True), post_load_on_init=val_dict.get('post_load_on_init', False), debug_print=val_dict.get('debug_print', False))
         return new_obj
     
