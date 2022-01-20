@@ -99,7 +99,7 @@ class ZhangReconstructionImplementation:
         maps = pf.ratemap.normalized_tuning_curves  # (40, 48) for 1D, (40, 48, 10) for 2D
         if debug_print:
             print(f'maps: {np.shape(maps)}') # maps: (40, 48, 10)
-        f_i = [np.squeeze(maps[i,:,:]) for i in neuron_IDXs] # produces (48 x 10) map
+        f_i = [np.squeeze(maps[i,:,:]) for i in neuron_IDXs] # produces a list of (48 x 10) maps
         if debug_print:
             print(f'np.shape(f_i[i]): {np.shape(f_i[0])}') # (48, 6)
         F_i = [np.reshape(f_i[i], (-1, 1)) for i in neuron_IDXs] # Convert each function to a column vector
@@ -518,6 +518,7 @@ class BayesianPlacemapPositionDecoder(PlacemapPositionDecoder):
         if self.debug_print:
             print(f'np.shape(final_p_x_given_n): {np.shape(self.flat_p_x_given_n)}') # np.shape(final_p_x_given_n): (288,)
         return final_p_x_given_n
+
             
     def compute_all(self):
         with WrappingMessagePrinter(f'compute_all final_p_x_given_n called. Computing {np.shape(self.flat_p_x_given_n)[0]} windows for self.final_p_x_given_n...', begin_line_ending='... ', finished_message='compute_all completed.', enable_print=self.debug_print):
