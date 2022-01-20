@@ -11,7 +11,7 @@ from pyphocorehelpers.plotting.mixins.figure_param_text_box import add_figure_te
 
 from pyphoplacecellanalysis.General.Pipeline.Stages.Computation import ComputedPipelineStage
 from pyphoplacecellanalysis.General.Configs.DynamicConfigs import PlottingConfig, InteractivePlaceCellConfig
-from General.Pipeline.Stages.BaseNeuropyPipelineStage import PipelineStage
+from pyphoplacecellanalysis.General.Pipeline.Stages.BaseNeuropyPipelineStage import PipelineStage
 
 from neuropy.core.neuron_identities import NeuronIdentity, build_units_colormap, PlotStringBrevityModeEnum
 from neuropy.plotting.placemaps import plot_all_placefields
@@ -406,7 +406,7 @@ class PipelineWithDisplayPipelineStageMixin:
     
     
     def prepare_for_display(self, root_output_dir=r'R:\data\Output'):
-        assert isinstance(self.stage, ComputedPipelineStage), "Current self.stage must already be a ComputedPipelineStage. Call self.perform_computations to reach this step."
+        assert (self.is_computed), "Current self.is_computed must be true. Call self.perform_computations to reach this step."
         self.stage = DisplayPipelineStage(self.stage)  # build the Display stage
         # Loops through all the configs and ensure that they have the neuron identity info if they need it.
         for an_active_config_name in self.active_configs.keys():

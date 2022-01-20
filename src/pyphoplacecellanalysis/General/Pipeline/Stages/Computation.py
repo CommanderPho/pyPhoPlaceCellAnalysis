@@ -37,39 +37,26 @@ class ComputablePipelineStage:
             [type]: [description]
         """
         # only requires that active_session has the .spikes_df and .position  properties
-        # active_epoch_placefields1D, active_epoch_placefields2D = compute_placefields_masked_by_epochs(active_epoch_session, active_config, included_epochs=None, should_display_2D_plots=should_display_2D_plots) ## This is causing problems due to deepcopy of session.
-        output_result = ComputationResult(active_session, computation_config, computed_data=dict())
-        # active_epoch_placefields1D, active_epoch_placefields2D = perform_compute_placefields(active_session.spikes_df, active_session.position, computation_config, None, None, included_epochs=None, should_force_recompute_placefields=True)
-        
-        # Test to see if included_epochs is set, if not, set it to None.
-        
+        output_result = ComputationResult(active_session, computation_config, computed_data=dict())        
         output_result.computed_data['pf1D'], output_result.computed_data['pf2D'] = perform_compute_placefields(active_session.spikes_df, active_session.position, computation_config, None, None, included_epochs=computation_config.computation_epochs, should_force_recompute_placefields=True)
-
-        # Compare the results:
-
-        # debug_print_ratemap(active_epoch_placefields1D.ratemap)
-        # num_spikes_per_spiketrain = np.array([np.shape(a_spk_train)[0] for a_spk_train in active_epoch_placefields1D.spk_t])
-        # num_spikes_per_spiketrain
-        # print('placefield_neuronID_spikes: {}; ({} total spikes)'.format(num_spikes_per_spiketrain, np.sum(num_spikes_per_spiketrain)))
-        # debug_print_placefield(active_epoch_placefields1D) #49 good
-        # debug_print_placefield(output_result.computed_data['pf2D']) #51 good
 
         return output_result
 
-    def single_computation(self, active_computation_params: PlacefieldComputationParameters):
+    def single_computation(self, active_computation_params: PlacefieldComputationParameters=None):
         """ Takes its filtered_session and applies the provided active_computation_params to it. The results are stored in self.computation_results under the same key as the filtered session. """
         assert (len(self.filtered_sessions.keys()) > 0), "Must have at least one filtered session before calling single_computation(...). Call self.select_filters(...) first."
         # self.active_computation_results = dict()
         for a_select_config_name, a_filtered_session in self.filtered_sessions.items():
             print(f'Performing single_computation on filtered_session with filter named "{a_select_config_name}"...')
-            self.active_configs[a_select_config_name].computation_config = active_computation_params #TODO: if more than one computation config is passed in, the active_config should be duplicated for each computation config.
+            if active_computation_params is None:
+                active_computation_params = self.active_configs[a_select_config_name].computation_config # get the previously set computation configs
+            else:
+                # set/update the computation configs:
+                self.active_configs[a_select_config_name].computation_config = active_computation_params #TODO: if more than one computation config is passed in, the active_config should be duplicated for each computation config.
             self.computation_results[a_select_config_name] = ComputablePipelineStage._perform_single_computation(a_filtered_session, active_computation_params) # returns a computation result. Does this store the computation config used to compute it?
         
             # call to perform any registered computations:
             self.computation_results[a_select_config_name] = self.perform_registered_computations(self.computation_results[a_select_config_name], debug_print=True)
-
-        # pf_neuron_identities, pf_sort_ind, pf_colors, pf_colormap, pf_listed_colormap = _get_neuron_identities(computation_result.computed_data['pf1D'])
-        # pf_neuron_identities, pf_sort_ind, pf_colors, pf_colormap, pf_listed_colormap = _get_neuron_identities(self.active_computation_results[a_select_config_name].computed_data['pf2D'])
 
 
 """-------------- Specific Computation Functions to be registered --------------"""
@@ -148,8 +135,7 @@ class DefaultComputationFunctions:
         
         computation_result.sess.position.df, xbin, ybin, bin_info = build_position_df_discretized_binned_positions(computation_result.sess.position.df, computation_result.computation_config, debug_print=debug_print) # update the session's position dataframe with the new columns.
         # prev_one_step_bayesian_decoder.xbin, prev_one_step_bayesian_decoder.ybin
-        # avg_speed_per_pos = _compute_avg_speed_at_each_position_bin(computation_result.sess.position.to_dataframe(), computation_result.computation_config, xbin, ybin)
-
+        
         active_xbins = xbin
         active_ybins = ybin      
         # active_xbins = prev_one_step_bayesian_decoder.xbin_centers
@@ -160,7 +146,6 @@ class DefaultComputationFunctions:
                 
         if debug_print:
             print(f'np.shape(avg_speed_per_pos): {np.shape(avg_speed_per_pos)}')
-        
         
         max_speed = np.nanmax(avg_speed_per_pos)
         # max_speed # 73.80995983236636
@@ -197,11 +182,13 @@ class DefaultComputationFunctions:
         # np.vstack((self.xbin_centers[self.most_likely_position_indicies[0,:]], self.ybin_centers[self.most_likely_position_indicies[1,:]])).T
         # twoDimGrid_x, twoDimGrid_y = np.meshgrid(prev_one_step_bayesian_decoder.xbin_centers, prev_one_step_bayesian_decoder.ybin_centers)
         
-        computation_result.computed_data['pf2D_TwoStepDecoder']['all_x'] = cartesian_product((active_xbins, active_ybins)) # (1856, 2)
+        # computation_result.computed_data['pf2D_TwoStepDecoder']['all_x'] = cartesian_product((active_xbins, active_ybins)) # (1856, 2)
+        
+        computation_result.computed_data['pf2D_TwoStepDecoder']['all_x'], computation_result.computed_data['pf2D_TwoStepDecoder']['flat_all_x'], computation_result.computed_data['pf2D_TwoStepDecoder']['original_all_x_shape'] = Zhang_Two_Step.build_all_positions_matrix(active_xbins, active_ybins) # all_x: (64, 29, 2), flat_all_x: (1856, 2)
         
         # computation_result.computed_data['pf2D_TwoStepDecoder']['flat_p_x_given_n_and_x_prev'] = np.full_like(prev_one_step_bayesian_decoder.flat_p_x_given_n, np.nan) # fill with NaNs. Pre-allocate output
         
-        computation_result.computed_data['pf2D_TwoStepDecoder']['p_x_given_n_and_x_prev'] = np.full_like(prev_one_step_bayesian_decoder.p_x_given_n, np.nan) # fill with NaNs. Pre-allocate output
+        computation_result.computed_data['pf2D_TwoStepDecoder']['p_x_given_n_and_x_prev'] = np.full_like(prev_one_step_bayesian_decoder.p_x_given_n, 9.0) # fill with NaNs. Pre-allocate output
         computation_result.computed_data['pf2D_TwoStepDecoder']['most_likely_position_indicies'] = np.zeros((2, prev_one_step_bayesian_decoder.num_time_windows), dtype=int) # (2, 85841)
         computation_result.computed_data['pf2D_TwoStepDecoder']['most_likely_positions'] = np.zeros((2, prev_one_step_bayesian_decoder.num_time_windows)) # (2, 85841)
                 
@@ -258,6 +245,8 @@ class DefaultComputationFunctions:
         # # np.shape(self.most_likely_position_indicies) # (2, 85841)
         
         
+        
+        
         # computation_result.computed_data['pf2D_TwoStepDecoder']['sigma_t_all'] = sigma_t_all # set sigma_t_all                
         # return position_decoding_second_order_computation(computation_result.sess, computation_result.computation_config, computation_result)
         return computation_result
@@ -279,7 +268,8 @@ class PipelineWithComputedPipelineStageMixin:
     @property
     def is_computed(self):
         """The is_computed property. TODO: Needs validation/Testing """
-        return (self.stage is not None) and (isinstance(self.stage, ComputedPipelineStage) and (self.computation_results.values[0] is not None))
+        return (self.can_compute and (self.computation_results is not None) and (len(self.computation_results) > 0))
+        # return (self.stage is not None) and (isinstance(self.stage, ComputedPipelineStage) and (self.computation_results is not None) and (len(self.computation_results) > 0))
 
     @property
     def can_compute(self):
@@ -292,7 +282,7 @@ class PipelineWithComputedPipelineStageMixin:
         return self.stage.computation_results
     
     ## Computation Helpers: 
-    def perform_computations(self, active_computation_params: PlacefieldComputationParameters):
+    def perform_computations(self, active_computation_params: PlacefieldComputationParameters=None):
         assert (self.can_compute), "Current self.stage must already be a ComputedPipelineStage. Call self.filter_sessions with filter configs to reach this step."
         self.stage.single_computation(active_computation_params)
         
@@ -300,9 +290,9 @@ class PipelineWithComputedPipelineStageMixin:
         assert (self.can_compute), "Current self.stage must already be a ComputedPipelineStage. Call self.filter_sessions with filter configs to reach this step."
         self.stage.register_computation(computation_function)
 
-    def perform_registered_computations(self, previous_computation_result, debug_print=False):
+    def perform_registered_computations(self, previous_computation_result=None, debug_print=False):
         assert (self.can_compute), "Current self.stage must already be a ComputedPipelineStage. Call self.perform_computations to reach this step."
-        self.stage.perform_registered_computations()
+        self.stage.perform_registered_computations(previous_computation_result, debug_print=debug_print)
     
     
     
@@ -333,12 +323,16 @@ class ComputedPipelineStage(LoadableInput, LoadableSessionInput, FilterablePipel
     def register_computation(self, computation_function):
         self.registered_computation_functions.append(computation_function)
         
-    def perform_registered_computations(self, previous_computation_result, debug_print=False):
+    def perform_registered_computations(self, previous_computation_result=None, debug_print=False):
         """ Called after load is complete to post-process the data """
         if (len(self.registered_computation_functions) > 0):
             if debug_print:
-                print(f'Performing perform_registered_computations(...) with {len(self.registered_computation_functions)} registered_computation_functions...')            
+                print(f'Performing perform_registered_computations(...) with {len(self.registered_computation_functions)} registered_computation_functions...')
             composed_registered_computations_function = compose_functions(*self.registered_computation_functions) # functions are composed left-to-right
+            # if previous_computation_result is None:
+            #     assert (self.computation_results is not None), "if no previous_computation_result is passed, one should have been computed previously."
+            #     previous_computation_result = self.computation_results # Get the previously computed computation results. Note that if this function is called multiple times and assumes the results are coming in fresh, this can be an error.
+            
             previous_computation_result = composed_registered_computations_function(previous_computation_result)
             return previous_computation_result
             

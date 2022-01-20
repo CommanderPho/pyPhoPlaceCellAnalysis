@@ -26,7 +26,6 @@ n_i: the number of spikes fired by each cell during the time window of considera
 """
 
 
-
 class ZhangReconstructionImplementation:
 
     # Shared:    
@@ -190,6 +189,45 @@ class ZhangReconstructionImplementation:
 
 
 class Zhang_Two_Step:
+    
+    @classmethod
+    def build_all_positions_matrix(cls, x_values, y_values, debug_print=False):
+        """ 
+        Usage:
+            all_positions_matrix = build_all_positions_matrix(active_one_step_decoder.xbin_centers, active_one_step_decoder.ybin_centers)
+        """
+        num_rows = len(y_values)
+        num_cols = len(x_values)
+
+        original_data_shape = (num_cols, num_rows) # original_position_data_shape: (64, 29)
+        if debug_print:
+            print(f'original_position_data_shape: {original_data_shape}')
+        x_only_matrix = np.repeat(np.expand_dims(x_values, 1).T, num_rows, axis=0).T
+        # np.shape(x_only_matrix) # (29, 64)
+        flat_x_only_matrix = np.reshape(x_only_matrix, (-1, 1))
+        if debug_print:
+            print(f'np.shape(x_only_matrix): {np.shape(x_only_matrix)}, np.shape(flat_x_only_matrix): {np.shape(flat_x_only_matrix)}') # np.shape(x_only_matrix): (64, 29), np.shape(flat_x_only_matrix): (1856, 1)
+        y_only_matrix = np.repeat(np.expand_dims(y_values, 1), num_cols, axis=1).T
+        # np.shape(y_only_matrix) # (29, 64)
+        flat_y_only_matrix = np.reshape(y_only_matrix, (-1, 1))
+        # y_only_matrix
+
+        # flat_all_positions_matrix = np.array([np.append(an_x, a_y) for (an_x, a_y) in zip(flat_x_only_matrix, flat_y_only_matrix)])
+        flat_all_positions_matrix = [tuple(np.append(an_x, a_y)) for (an_x, a_y) in zip(flat_x_only_matrix, flat_y_only_matrix)] # a list of position tuples (containing two elements)
+        flat_all_positions_matrix
+        # print(f'np.shape(flat_all_positions_matrix): {np.shape(flat_all_positions_matrix)}') # np.shape(flat_all_positions_matrix): (1856, 2)
+
+        # reconsitute its shape:
+        all_positions_matrix = np.reshape(flat_all_positions_matrix, (original_data_shape[0], original_data_shape[1], 2))
+        if debug_print:
+            print(f'np.shape(all_positions_matrix): {np.shape(all_positions_matrix)}') # np.shape(all_positions_matrix): (1856, 2) # np.shape(all_positions_matrix): (64, 29, 2)
+            print(f'flat_all_positions_matrix[0]: {flat_all_positions_matrix[0]}\nall_positions_matrix[0,0,:]: {all_positions_matrix[0,0,:]}')
+
+        return all_positions_matrix, flat_all_positions_matrix, original_data_shape
+
+
+
+    
     @classmethod
     def sigma_t(cls, v_t, K, V, d:float=1.0):
         """ The standard deviation of the Gaussian prior for position. Once computed and normalized, can be used such that it only requires the current position (x_t) to return the correct std_dev at a given timestamp.
@@ -201,10 +239,14 @@ class Zhang_Two_Step:
     @classmethod
     def compute_conditional_probability_x_prev_given_x_t(cls, x_prev, x, sigma_t, C):
         """ Should return a value for all possible current locations x_t. x_prev should be a concrete position, not a matrix of them. """
-        # multivariate_normal.pdf()
-        
-        return C * np.exp(-np.square(np.linalg.norm(x - x_prev))/(2.0*np.square(sigma_t)))
-        
+        # multivariate_normal.pdf()        
+        # return C * np.exp(-np.square(np.linalg.norm(x - x_prev, axis=1))/(2.0*np.square(sigma_t)))
+        numerator = -np.square(np.linalg.norm(x - x_prev, axis=1)) # (1950,)
+        denominator = 2.0*np.square(sigma_t) # (64,29)
+        # want output of the shape (64,29)
+        return C * np.exp(numerator/denominator)
+
+        # a[..., None] + c[None, None, :]
         # output = multivariate_normal.pdf()
         
     @classmethod
