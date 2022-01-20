@@ -93,9 +93,13 @@ class DefaultComputationFunctions:
             def _compute_group_stats_for_var(active_position_df, xbin, ybin, variable_name:str = 'speed'):
                 # For each unique binned_x and binned_y value, what is the average velocity_x at that point?
                 position_bin_dependent_specific_average_velocities = active_position_df.groupby(['binned_x','binned_y'])[variable_name].agg([np.nansum, np.nanmean, np.nanmin, np.nanmax]).reset_index() #.apply(lambda g: g.mean(skipna=True)) #.agg((lambda x: x.mean(skipna=False)))
+                print(f'np.shape(position_bin_dependent_specific_average_velocities): {np.shape(position_bin_dependent_specific_average_velocities)}')
                 # position_bin_dependent_specific_average_velocities # 1856 rows
                 output = np.zeros((len(xbin), len(ybin))) # (65, 30)
-                # np.shape(output)
+                print(f'np.shape(output): {np.shape(output)}')
+                print(f"np.shape(position_bin_dependent_specific_average_velocities['binned_x'].to_numpy()): {np.shape(position_bin_dependent_specific_average_velocities['binned_x'])}")
+                
+                
                 output[position_bin_dependent_specific_average_velocities['binned_x'].to_numpy()-1, position_bin_dependent_specific_average_velocities['binned_y'].to_numpy()-1] = position_bin_dependent_specific_average_velocities['nanmean'].to_numpy() # ValueError: shape mismatch: value array of shape (1856,) could not be broadcast to indexing result of shape (1856,2,30)
                 return output
 
@@ -207,31 +211,12 @@ class DefaultComputationFunctions:
             prev_x_position = prev_one_step_bayesian_decoder.most_likely_positions[time_window_bin_idx-1, :] # (85844, 2)
             
             # TODO: as for prev_x_position: this should actually be the computed two-step position, not the one_step position.
-            
-
-            # active_most_likely_x_position = (prev_one_step_bayesian_decoder.xbin_centers[active_most_likely_x_indicies[0]], prev_one_step_bayesian_decoder.ybin_centers[active_most_likely_x_indicies[1]])
-            
-            # all_x = prev_one_step_bayesian_decoder.most_likely_positions
-            # all_x = test_out_points
-            
-            # all_x = prev_one_step_bayesian_decoder.most_likely_positions
-            
-            # curr_compute_fn = computation_result.computed_data['pf2D_TwoStepDecoder']['p_x_given_n_and_x_prev_fn']
-            # computation_result.computed_data['pf2D_TwoStepDecoder']['flat_p_x_given_n_and_x_prev'] = curr_compute_fn(prev_x_flat_index, computation_result.computed_data['pf2D_TwoStepDecoder']['flat_all_x']) # flat mode
-            # computation_result.computed_data['pf2D_TwoStepDecoder']['p_x_given_n_and_x_prev'][:,:,time_window_bin_idx] = curr_compute_fn(prev_x_position, computation_result.computed_data['pf2D_TwoStepDecoder']['all_x'])
-            
             active_k = computation_result.computed_data['pf2D_TwoStepDecoder']['all_scaling_factors_k'][time_window_bin_idx] # get the specific k value
             # active_k = computation_result.computed_data['pf2D_TwoStepDecoder']['k']
             if debug_print:
                 print(f'np.shape(curr_p_x_given_n): {np.shape(curr_p_x_given_n)}')
                 print(f'np.shape(prev_x_position): {np.shape(prev_x_position)}')
-            
-            
-            
-            
-            # Non-flat version:
-            # computation_result.computed_data['pf2D_TwoStepDecoder']['p_x_given_n_and_x_prev'][:,:,time_window_bin_idx] = Zhang_Two_Step.compute_bayesian_two_step_prob_single_timestep(curr_p_x_given_n, prev_x_position, computation_result.computed_data['pf2D_TwoStepDecoder']['all_x'], computation_result.computed_data['pf2D_TwoStepDecoder']['sigma_t_all'], computation_result.computed_data['pf2D_TwoStepDecoder']['C'], active_k)
-            
+                        
             # Flat version:
             computation_result.computed_data['pf2D_TwoStepDecoder']['flat_p_x_given_n_and_x_prev'][:,time_window_bin_idx] = Zhang_Two_Step.compute_bayesian_two_step_prob_single_timestep(flat_p_x_given_n, prev_x_position, computation_result.computed_data['pf2D_TwoStepDecoder']['flat_all_x'], computation_result.computed_data['pf2D_TwoStepDecoder']['flat_sigma_t_all'], computation_result.computed_data['pf2D_TwoStepDecoder']['C'], active_k) # output shape (1856, )
             
@@ -255,8 +240,6 @@ class DefaultComputationFunctions:
         # # np.shape(self.most_likely_position_indicies) # (2, 85841)
         
         
-        
-        
         # computation_result.computed_data['pf2D_TwoStepDecoder']['sigma_t_all'] = sigma_t_all # set sigma_t_all                
         # return position_decoding_second_order_computation(computation_result.sess, computation_result.computation_config, computation_result)
         return computation_result
@@ -266,7 +249,7 @@ class DefaultComputationFunctions:
 class DefaultRegisteredComputations:
     """ Simply enables specifying the default computation functions that will be defined in this file and automatically registered. """
     def register_default_known_computation_functions(self):
-        self.register_computation(DefaultComputationFunctions._perform_two_step_position_decoding_computation)
+        # self.register_computation(DefaultComputationFunctions._perform_two_step_position_decoding_computation)
         self.register_computation(DefaultComputationFunctions._perform_position_decoding_computation)
         
     

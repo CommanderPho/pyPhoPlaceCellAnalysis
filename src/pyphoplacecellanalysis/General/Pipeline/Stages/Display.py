@@ -190,7 +190,7 @@ class DefaultDisplayFunctions:
         computation_result.computed_data['pf2D'].plot_raw(**({'label_cells': True} | kwargs)); # Plots an overview of each cell all in one figure
 
 
-    def _display_2d_placefield_result_plot_ratemaps_2D(computation_result, active_config, **kwargs):
+    def _display_2d_placefield_result_plot_ratemaps_2D(computation_result, active_config, enable_saving_to_disk=False, **kwargs):
          # Build the unique identifier config for this result:
         # combined_id_config = UniqueCombinedConfigIdentifier(filter_name, active_config, variant_identifier_label=variant_identifier_label)
     
@@ -215,8 +215,12 @@ class DefaultDisplayFunctions:
         plot_variable_name = kwargs.get('plot_variable', enumTuningMap2DPlotVariables.TUNING_MAPS).name
         active_figure = plt.gcf()
         _display_add_computation_param_text_box(active_figure, active_config.computation_config) # Adds the parameters text.
-        active_pf_2D_figures = [active_figure]
-        _save_displayed_figure_if_needed(active_config.plotting_config, plot_type_name='_display_2d_placefield_result_plot_ratemaps_2D', active_variant_name=plot_variable_name, active_figures=active_pf_2D_figures)
+        
+        # Save the figure out to disk if we need to:
+        should_save_to_disk = enable_saving_to_disk
+        if should_save_to_disk:
+            active_pf_2D_figures = [active_figure]            
+            _save_displayed_figure_if_needed(active_config.plotting_config, plot_type_name='_display_2d_placefield_result_plot_ratemaps_2D', active_variant_name=plot_variable_name, active_figures=active_pf_2D_figures)
         
  
     # def _display_2d_placefield_result(computation_result, active_config):
