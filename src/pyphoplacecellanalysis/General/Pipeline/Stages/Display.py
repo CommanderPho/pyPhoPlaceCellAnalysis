@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 import pyvista as pv
 import pyvistaqt as pvqt
 
+from pyphocorehelpers.indexing_helpers import interleave_elements
 from pyphocorehelpers.print_helpers import WrappingMessagePrinter
 from pyphocorehelpers.plotting.mixins.figure_param_text_box import add_figure_text_box # for _display_add_computation_param_text_box
 
@@ -16,8 +17,6 @@ from pyphoplacecellanalysis.General.Pipeline.Stages.BaseNeuropyPipelineStage imp
 from neuropy.core.neuron_identities import NeuronIdentity, build_units_colormap, PlotStringBrevityModeEnum
 from neuropy.plotting.placemaps import plot_all_placefields
 from neuropy.plotting.ratemaps import enumTuningMap2DPlotVariables # for getting the variant name from the dict
-
-
 
 from PhoGui.InteractivePlotter.Mixins.ImagePlaneRendering import ImagePlaneRendering
 
@@ -236,9 +235,9 @@ class DefaultDisplayFunctions:
         
         # interact(animate, i=(0, computation_result.computed_data['pf2D_Decoder'].num_time_windows, 10))
   
-
+    
     def _display_plot_most_likely_position_comparisons(computation_result, active_config, **kwargs):
-        def plot_most_likely_position_comparsions(pho_custom_decoder, position_df, show_posterior=True):
+        def plot_most_likely_position_comparsions(pho_custom_decoder, position_df, show_posterior=True, debug_print=False):
             """
             Usage:
                 fig, axs = plot_most_likely_position_comparsions(pho_custom_decoder, sess.position.to_dataframe())
@@ -299,9 +298,29 @@ class DefaultDisplayFunctions:
                     axs[1].axis("off")
                     
                 # Most likely position plots:
-                axs[0].plot(pho_custom_decoder.active_time_window_centers, np.squeeze(pho_custom_decoder.most_likely_positions[:,0]), lw=1.0, color='white', alpha=0.4, label='most likely positions x') # (Num windows x 2)
+                active_time_window_variable = pho_custom_decoder.active_time_window_centers
+                active_most_likely_positions_x = pho_custom_decoder.most_likely_positions[:,0].T
+                active_most_likely_positions_y = pho_custom_decoder.most_likely_positions[:,1].T
+                
+                # Enable drawing flat lines for each time bin interval instead of just displaying the single point in the middle:
+                #   build separate points for the start and end of each bin interval, and the repeat every element of the x and y values to line them up.
+                active_half_time_bin_seconds = pho_custom_decoder.time_bin_size / 2.0
+                active_time_window_start_points = np.expand_dims(pho_custom_decoder.active_time_window_centers - active_half_time_bin_seconds, axis=1)
+                active_time_window_end_points = np.expand_dims(pho_custom_decoder.active_time_window_centers + active_half_time_bin_seconds, axis=1)
+                active_time_window_start_end_points = interleave_elements(active_time_window_start_points, active_time_window_end_points) # from pyphocorehelpers.indexing_helpers import interleave_elements
+                
+                if debug_print:
+                    print(f'np.shape(active_time_window_end_points): {np.shape(active_time_window_end_points)}\nnp.shape(active_time_window_start_end_points): {np.shape(active_time_window_start_end_points)}') 
+                    # np.shape(active_time_window_end_points): (5783, 1)
+                    # np.shape(active_time_window_start_end_points): (11566, 1)
+
+                active_time_window_variable = active_time_window_start_end_points
+                active_most_likely_positions_x = np.repeat(active_most_likely_positions_x, 2, axis=0) # repeat each element twice
+                active_most_likely_positions_y = np.repeat(active_most_likely_positions_y, 2, axis=0) # repeat each element twice    
+                
+                axs[0].plot(active_time_window_variable, active_most_likely_positions_x, lw=1.0, color='white', alpha=0.4, label='most likely positions x') # (Num windows x 2)
                 # axs[0].set_title('most likely positions x')
-                axs[1].plot(pho_custom_decoder.active_time_window_centers, np.squeeze(pho_custom_decoder.most_likely_positions[:,1]), lw=1.0, color='white', alpha=0.4, label='most likely positions y') # (Num windows x 2)
+                axs[1].plot(active_time_window_variable, active_most_likely_positions_y, lw=1.0, color='white', alpha=0.4, label='most likely positions y') # (Num windows x 2)
                 # axs[1].set_title('most likely positions y')
                 fig.suptitle(f'Decoded Position data component comparison')
                 return fig, axs
