@@ -136,7 +136,11 @@ class DefaultComputationFunctions:
         prev_one_step_bayesian_decoder = computation_result.computed_data['pf2D_Decoder']
         # prev_one_step_bayesian_decoder.xbin, prev_one_step_bayesian_decoder.ybin
         
-        computation_result.sess.position.df, xbin, ybin, bin_info = build_position_df_discretized_binned_positions(computation_result.sess.position.df, computation_result.computation_config, debug_print=debug_print) # update the session's position dataframe with the new columns.
+        # computation_result.sess.position.df, xbin, ybin, bin_info = build_position_df_discretized_binned_positions(computation_result.sess.position.df, computation_result.computation_config, debug_print=debug_print) # update the session's position dataframe with the new columns.
+
+        # makes sure to use the xbin_center and ybin_center from the previous one_step decoder to bin the positions:
+        computation_result.sess.position.df, xbin, ybin, bin_info = build_position_df_discretized_binned_positions(computation_result.sess.position.df, computation_result.computation_config, xbin_values=prev_one_step_bayesian_decoder.xbin_centers, ybin_values=prev_one_step_bayesian_decoder.ybin_centers, debug_print=debug_print) # update the session's position dataframe with the new columns.
+        
         # prev_one_step_bayesian_decoder.xbin, prev_one_step_bayesian_decoder.ybin
         
         active_xbins = xbin
@@ -207,10 +211,16 @@ class DefaultComputationFunctions:
             flat_p_x_given_n = prev_one_step_bayesian_decoder.flat_p_x_given_n[:, time_window_bin_idx] # this gets the specific n_t for this time window
             curr_p_x_given_n = prev_one_step_bayesian_decoder.p_x_given_n[:, :, time_window_bin_idx]
             # also have p_x_given_n = prev_one_step_bayesian_decoder.p_x_given_n if we'd prefer
-            prev_x_flat_index = prev_one_step_bayesian_decoder.most_likely_position_flat_indicies[time_window_bin_idx-1] # this is the most likely position (represented as the flattened position bin index) at the last dataframe
-            prev_x_position = prev_one_step_bayesian_decoder.most_likely_positions[time_window_bin_idx-1, :] # (85844, 2)
-            
+
             # TODO: as for prev_x_position: this should actually be the computed two-step position, not the one_step position.
+            
+            # previous positions as determined by the one_step decoder:
+            # prev_x_flat_index = prev_one_step_bayesian_decoder.most_likely_position_flat_indicies[time_window_bin_idx-1] # this is the most likely position (represented as the flattened position bin index) at the last dataframe
+            # prev_x_position = prev_one_step_bayesian_decoder.most_likely_positions[time_window_bin_idx-1, :] # (85844, 2)
+            
+            # previous positions as determined by the two-step decoder: this uses the two_step previous position instead of the one_step previous position:
+            prev_x_position = computation_result.computed_data['pf2D_TwoStepDecoder']['most_likely_positions'][:, time_window_bin_idx-1]
+            
             active_k = computation_result.computed_data['pf2D_TwoStepDecoder']['all_scaling_factors_k'][time_window_bin_idx] # get the specific k value
             # active_k = computation_result.computed_data['pf2D_TwoStepDecoder']['k']
             if debug_print:
@@ -226,12 +236,10 @@ class DefaultComputationFunctions:
             active_argmax_idx = np.argmax(computation_result.computed_data['pf2D_TwoStepDecoder']['p_x_given_n_and_x_prev'][:,:,time_window_bin_idx], axis=None)
             # active_unreaveled_argmax_idx = np.array(np.unravel_index(active_argmax_idx, computation_result.computed_data['pf2D_TwoStepDecoder']['p_x_given_n_and_x_prev'].shape))
             active_unreaveled_argmax_idx = np.array(np.unravel_index(active_argmax_idx, prev_one_step_bayesian_decoder.original_position_data_shape))
-            
             # print(f'active_argmax_idx: {active_argmax_idx}, active_unreaveled_argmax_idx: {active_unreaveled_argmax_idx}')
             
             computation_result.computed_data['pf2D_TwoStepDecoder']['most_likely_position_indicies'][:, time_window_bin_idx] = active_unreaveled_argmax_idx # build the multi-dimensional maximum index for the position (not using the flat notation used in the other class)            
             computation_result.computed_data['pf2D_TwoStepDecoder']['most_likely_positions'][0, time_window_bin_idx] = prev_one_step_bayesian_decoder.xbin_centers[int(computation_result.computed_data['pf2D_TwoStepDecoder']['most_likely_position_indicies'][0, time_window_bin_idx])]
-            
             computation_result.computed_data['pf2D_TwoStepDecoder']['most_likely_positions'][1, time_window_bin_idx] = prev_one_step_bayesian_decoder.ybin_centers[int(computation_result.computed_data['pf2D_TwoStepDecoder']['most_likely_position_indicies'][1, time_window_bin_idx])]
             
 
@@ -249,7 +257,7 @@ class DefaultComputationFunctions:
 class DefaultRegisteredComputations:
     """ Simply enables specifying the default computation functions that will be defined in this file and automatically registered. """
     def register_default_known_computation_functions(self):
-        # self.register_computation(DefaultComputationFunctions._perform_two_step_position_decoding_computation)
+        self.register_computation(DefaultComputationFunctions._perform_two_step_position_decoding_computation)
         self.register_computation(DefaultComputationFunctions._perform_position_decoding_computation)
         
     
