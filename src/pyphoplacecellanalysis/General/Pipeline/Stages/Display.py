@@ -255,7 +255,6 @@ class DefaultDisplayFunctions:
                 fig, axs = plt.subplots(ncols=1, nrows=nrows, figsize=(15,15), clear=True, sharex=True, sharey=False, constrained_layout=True)
                 # active_window = pho_custom_decoder.active_time_windows[window_idx] # a tuple with a start time and end time
                 # active_p_x_given_n = np.squeeze(pho_custom_decoder.p_x_given_n[:,:,window_idx]) # same size as occupancy
-
                 # Actual Position Plots:
                 axs[0].plot(position_df['t'].to_numpy(), position_df['x'].to_numpy(), label='measured x', color='#ff0000ff')
                 axs[0].set_title('x')
@@ -285,6 +284,7 @@ class DefaultDisplayFunctions:
                         'vmin': 0,
                         'vmax': 1,
                         'cmap': 'turbo',
+                        'interpolation':'nearest',
                         'aspect':'auto',
                     }
                         
