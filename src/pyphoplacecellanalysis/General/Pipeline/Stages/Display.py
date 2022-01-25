@@ -338,9 +338,9 @@ class DefaultDisplayFunctions:
                     active_most_likely_positions_x = np.repeat(active_most_likely_positions_x, 2, axis=0) # repeat each element twice
                     active_most_likely_positions_y = np.repeat(active_most_likely_positions_y, 2, axis=0) # repeat each element twice    
                     
-                    axs[0].plot(active_time_window_variable, active_most_likely_positions_x, lw=1.0, color='white', alpha=0.4, label='most likely positions x') # (Num windows x 2)
+                    axs[0].plot(active_time_window_variable, active_most_likely_positions_x, lw=1.0, color='gray', alpha=0.4, label='1-step: most likely positions x') # (Num windows x 2)
                     # axs[0].set_title('most likely positions x')
-                    axs[1].plot(active_time_window_variable, active_most_likely_positions_y, lw=1.0, color='white', alpha=0.4, label='most likely positions y') # (Num windows x 2)
+                    axs[1].plot(active_time_window_variable, active_most_likely_positions_y, lw=1.0, color='gray', alpha=0.4, label='1-step: most likely positions y') # (Num windows x 2)
                     # axs[1].set_title('most likely positions y')
                     
                     
@@ -359,15 +359,15 @@ class DefaultDisplayFunctions:
             active_time_window_variable = computation_result.computed_data['pf2D_Decoder'].active_time_window_centers
             active_most_likely_positions_x = active_two_step_decoder['most_likely_positions'][0,:]
             active_most_likely_positions_y = active_two_step_decoder['most_likely_positions'][1,:]
-            {
+            two_step_options_dict = {
                 'color':'#00ff7f99',
                 'face_color':'#55ff0099',
                 'edge_color':'#00aa0099'
             }
             # marker_style: 'circle', marker_size:0.25
-            axs[0].plot(active_time_window_variable, active_most_likely_positions_x, lw=2.0, color='k', alpha=0.6, label='2-step: most likely positions x') # (Num windows x 2)
+            axs[0].plot(active_time_window_variable, active_most_likely_positions_x, lw=1.0, color='#00ff7f99', alpha=0.6, label='2-step: most likely positions x') # (Num windows x 2)
             # axs[0].set_title('most likely positions x')
-            axs[1].plot(active_time_window_variable, active_most_likely_positions_y, lw=2.0, color='k', alpha=0.6, label='2-step: most likely positions y') # (Num windows x 2)
+            axs[1].plot(active_time_window_variable, active_most_likely_positions_y, lw=1.0, color='#00ff7f99', alpha=0.6, label='2-step: most likely positions y') # (Num windows x 2)
             # axs[1].set_title('most likely positions y')
 
     def _display_normal(computation_result, active_config, **kwargs):
