@@ -11,7 +11,7 @@ from ...Analysis.reconstruction import BayesianPlacemapPositionDecoder
 from pyphocorehelpers.indexing_helpers import find_neighbours
 
 
-def build_position_df_time_window_idx(active_pos_df, curr_active_time_windows):
+def build_position_df_time_window_idx(active_pos_df, curr_active_time_windows, debug_print=False):
     """ adds the time_window_idx column to the active_pos_df
     Usage:
         curr_active_time_windows = np.array(pho_custom_decoder.active_time_windows)
@@ -21,7 +21,8 @@ def build_position_df_time_window_idx(active_pos_df, curr_active_time_windows):
     starts = curr_active_time_windows[:,0]
     stops = curr_active_time_windows[:,1]
     num_slices = len(starts)
-    print(f'starts: {np.shape(starts)}, stops: {np.shape(stops)}, num_slices: {num_slices}')
+    if debug_print:
+        print(f'starts: {np.shape(starts)}, stops: {np.shape(stops)}, num_slices: {num_slices}')
     for i in np.arange(num_slices):
         active_pos_df.loc[active_pos_df[active_pos_df.position.time_variable_name].between(starts[i], stops[i], inclusive='both'), ['time_window_idx']] = int(i) # set the 'time_window_idx' identifier on the object
     active_pos_df['time_window_idx'] = active_pos_df['time_window_idx'].astype(int) # ensure output is the correct datatype
@@ -50,6 +51,7 @@ def build_position_df_discretized_binned_positions(active_pos_df, active_computa
 
 
 def build_position_df_resampled_to_time_windows(active_pos_df, time_bin_size=0.02):
+    """ Note that this returns a TimedeltaIndexResampler, not a dataframe proper. To get the real dataframe call .nearest() on output. """
     position_time_delta = pd.to_timedelta(active_pos_df[active_pos_df.position.time_variable_name], unit="sec")
     active_pos_df['time_delta_sec'] = position_time_delta
     active_pos_df = active_pos_df.set_index('time_delta_sec')
