@@ -27,12 +27,23 @@ def build_position_df_time_window_idx(active_pos_df, curr_active_time_windows):
     active_pos_df['time_window_idx'] = active_pos_df['time_window_idx'].astype(int) # ensure output is the correct datatype
     return active_pos_df
 
-def build_position_df_discretized_binned_positions(active_pos_df, active_computation_config, debug_print=False):
+def build_position_df_discretized_binned_positions(active_pos_df, active_computation_config, xbin_values=None, ybin_values=None, debug_print=False):
     """ Adds the binned_x and binned_y columns to the position dataframe """
-    if debug_print:
-        print(f'active_grid_bin: {active_computation_config.grid_bin}')
+
     # bin the dataframe's x and y positions into bins, with binned_x and binned_y containing the index of the bin that the given position is contained within.
-    xbin, ybin, bin_info = PfND._bin_pos_nD(active_pos_df['x'].values, active_pos_df['y'].values, bin_size=active_computation_config.grid_bin) # bin_size mode
+    if (xbin_values is None) or (ybin_values is None):
+        # determine the correct bins to use from active_computation_config.grid_bin:
+        if debug_print:
+            print(f'active_grid_bin: {active_computation_config.grid_bin}')
+        xbin, ybin, bin_info = PfND._bin_pos_nD(active_pos_df['x'].values, active_pos_df['y'].values, bin_size=active_computation_config.grid_bin) # bin_size mode
+    else:
+        # use the extant values passed in:
+        if debug_print:
+            print(f'using extant bins passed as arguments: xbin_values.shape: {xbin_values.shape}, ybin_values.shape: {ybin_values.shape}')
+        xbin = xbin_values
+        ybin = ybin_values
+        bin_info = None
+    
     active_pos_df['binned_x'] = pd.cut(active_pos_df['x'].to_numpy(), bins=xbin, include_lowest=True, labels=np.arange(start=1, stop=len(xbin))) # same shape as the input data 
     active_pos_df['binned_y'] = pd.cut(active_pos_df['y'].to_numpy(), bins=ybin, include_lowest=True, labels=np.arange(start=1, stop=len(ybin))) 
     return active_pos_df, xbin, ybin, bin_info
