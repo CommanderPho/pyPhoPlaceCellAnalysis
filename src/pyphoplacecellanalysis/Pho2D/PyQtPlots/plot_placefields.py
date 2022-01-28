@@ -27,7 +27,7 @@ def pyqtplot_common_setup(a_title):
     pg.setConfigOptions(imageAxisOrder='row-major')
     pg.setConfigOptions(antialias = True)
     app = pg.mkQApp(a_title)
-    print(f'type(app): {type(app)}')
+    # print(f'type(app): {type(app)}')
     # Create window to hold the image:
     win = QtGui.QMainWindow()
     win.resize(1600, 1600)
@@ -42,6 +42,16 @@ def pyqtplot_plot_image_array(xbin_edges, ybin_edges, images, occupancy, max_num
     """ Plots an array of images provided in 'images' argument
     images should be an nd.array with dimensions like: (10, 63, 63), where (N_Images, X_Dim, Y_Dim)
         or (2, 5, 63, 63), where (N_Rows, N_Cols, X_Dim, Y_Dim)
+        
+    Example:
+        # Get flat list of images:
+        images = active_one_step_decoder.ratemap.normalized_tuning_curves # (43, 63, 63)
+        # images = active_one_step_decoder.ratemap.normalized_tuning_curves[0:40,:,:] # (43, 63, 63)
+        occupancy = active_one_step_decoder.ratemap.occupancy
+
+        app, win = pyqtplot_plot_image_array(active_one_step_decoder.xbin, active_one_step_decoder.ybin, images, occupancy)
+        win.show()
+
     """
 
     w, win, app = pyqtplot_common_setup(f'pyqtplot_plot_image_array: {np.shape(images)}')
@@ -86,6 +96,8 @@ def pyqtplot_plot_image_array(xbin_edges, ybin_edges, images, occupancy, max_num
             print(f'a_linear_index: {a_linear_index}, curr_page_relative_linear_index: {curr_page_relative_linear_index}, curr_row: {curr_row}, curr_col: {curr_col}, curr_page_relative_row: {curr_page_relative_row}, curr_page_relative_col: {curr_page_relative_col}, curr_included_unit_index: {curr_included_unit_index}')
 
         cell_idx = curr_included_unit_index
+        curr_cell_identifier_string = f'Cell[{cell_idx}]'
+        curr_plot_identifier_string = f'pyqtplot_plot_image_array.{curr_cell_identifier_string}'
 
         image = np.squeeze(images[a_linear_index,:,:])
         # Pre-filter the data:
@@ -104,16 +116,18 @@ def pyqtplot_plot_image_array(xbin_edges, ybin_edges, images, occupancy, max_num
         
 
         # # plot mode:
-        curr_plot = w.addPlot(row=curr_row, col=curr_col)
+        curr_plot = w.addPlot(row=curr_row, col=curr_col, name=curr_plot_identifier_string, title=curr_cell_identifier_string)
         curr_plot.addItem(img_item)  # add ImageItem to PlotItem
         curr_plot.showAxes(True)
         # curr_plot.showGrid(True, True, 0.7)
-
-        curr_label = pg.TextItem(f'Cell[{cell_idx}]', color=(230, 230, 230))
-        curr_label.setPos(30, 60)
-        curr_label.setParentItem(img_item)
-        # curr_plot.addItem(curr_label, ignoreBounds=True)
-        curr_plot.addItem(curr_label)
+        # curr_plot.setLabel('bottom', "Label to test offset")
+        
+        # # Overlay cell identifier text:
+        # curr_label = pg.TextItem(f'Cell[{cell_idx}]', color=(230, 230, 230))
+        # curr_label.setPos(30, 60)
+        # curr_label.setParentItem(img_item)
+        # # curr_plot.addItem(curr_label, ignoreBounds=True)
+        # curr_plot.addItem(curr_label)
 
         # Update the image:
         img_item.setImage(image, rect=image_bounds_extent)
