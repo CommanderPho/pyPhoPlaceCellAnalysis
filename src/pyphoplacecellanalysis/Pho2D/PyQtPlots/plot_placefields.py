@@ -9,16 +9,17 @@ import numpy as np
 import pyqtgraph as pg
 from pyqtgraph.Qt import QtCore, QtGui
 
+
 from dataclasses import dataclass
 
 from pyphocorehelpers.indexing_helpers import compute_paginated_grid_config
 
-# @dataclass
-# class BasicPyQtPlotApp(object):
-#     """Docstring for BasicPyQtPlotApp."""
-#     app: Any
-#     win: QtGui.QMainWindow
-#     w: pg.GraphicsLayoutWidget
+@dataclass
+class BasicPyQtPlotApp(object):
+    """Docstring for BasicPyQtPlotApp."""
+    app: QtGui.QApplication
+    win: QtGui.QMainWindow
+    w: pg.GraphicsLayoutWidget
 
 
 def pyqtplot_common_setup(a_title):
@@ -37,7 +38,7 @@ def pyqtplot_common_setup(a_title):
     return w, win, app
 
 
-def pyqtplot_plot_image_array(xbin_edges, ybin_edges, images, occupancy, max_num_columns = 5, drop_below_threshold: float=0.0000001, enable_LUT_Histogram=False):
+def pyqtplot_plot_image_array(xbin_edges, ybin_edges, images, occupancy, max_num_columns = 5, drop_below_threshold: float=0.0000001, enable_LUT_Histogram=False, debug_print=False):
     """ Plots an array of images provided in 'images' argument
     images should be an nd.array with dimensions like: (10, 63, 63), where (N_Images, X_Dim, Y_Dim)
         or (2, 5, 63, 63), where (N_Rows, N_Cols, X_Dim, Y_Dim)
@@ -57,7 +58,8 @@ def pyqtplot_plot_image_array(xbin_edges, ybin_edges, images, occupancy, max_num
     global_width = global_max_x - global_min_x
     global_height = global_max_y - global_min_y
 
-    # print(f'global_min_x: {global_min_x}, global_max_x: {global_max_x}, global_min_y: {global_min_y}, global_max_y: {global_max_y}\nglobal_width: {global_width}, global_height: {global_height}')
+    if debug_print:
+        print(f'global_min_x: {global_min_x}, global_max_x: {global_max_x}, global_min_y: {global_min_y}, global_max_y: {global_max_y}\nglobal_width: {global_width}, global_height: {global_height}')
     # Get rect image extent in the form [x, y, w, h]:
     image_bounds_extent = [global_min_x, global_min_y, global_width, global_height]
 
@@ -80,7 +82,8 @@ def pyqtplot_plot_image_array(xbin_edges, ybin_edges, images, occupancy, max_num
         curr_page_relative_linear_index = np.mod(a_linear_index, int(page_grid_sizes[page_idx].num_rows * page_grid_sizes[page_idx].num_columns))
         curr_page_relative_row = np.mod(curr_row, page_grid_sizes[page_idx].num_rows)
         curr_page_relative_col = np.mod(curr_col, page_grid_sizes[page_idx].num_columns)
-        # print(f'a_linear_index: {a_linear_index}, curr_page_relative_linear_index: {curr_page_relative_linear_index}, curr_row: {curr_row}, curr_col: {curr_col}, curr_page_relative_row: {curr_page_relative_row}, curr_page_relative_col: {curr_page_relative_col}, curr_included_unit_index: {curr_included_unit_index}')
+        if debug_print:
+            print(f'a_linear_index: {a_linear_index}, curr_page_relative_linear_index: {curr_page_relative_linear_index}, curr_row: {curr_row}, curr_col: {curr_col}, curr_page_relative_row: {curr_page_relative_row}, curr_page_relative_col: {curr_page_relative_col}, curr_included_unit_index: {curr_included_unit_index}')
 
         cell_idx = curr_included_unit_index
 
@@ -92,6 +95,13 @@ def pyqtplot_plot_image_array(xbin_edges, ybin_edges, images, occupancy, max_num
 
         # Build the image item:
         img_item = pg.ImageItem(image=image, levels=(0,1))
+        #     # Viewbox version:
+        #     # vb = layout.addViewBox(lockAspect=False)
+        #     # # Build the ImageItem (which I'm guessing is like pg.ImageView) to add the image
+        #     # imv = pg.ImageItem() # Create it with the current image
+        #     # vb.addItem(imv) # add the item to the view box: why do we need the wrapping view box?
+        #     # vb.autoRange()
+        
 
         # # plot mode:
         curr_plot = w.addPlot(row=curr_row, col=curr_col)
@@ -115,10 +125,10 @@ def pyqtplot_plot_image_array(xbin_edges, ybin_edges, images, occupancy, max_num
         curr_plot.setXRange(global_min_x-margin, global_max_x+margin)
         curr_plot.setYRange(global_min_y-margin, global_max_y+margin)
 
-        # # Interactive Color Bar:
-        # bar = pg.ColorBarItem(values= (0, 1), colorMap=cmap) # prepare interactive color bar
-        # # Have ColorBarItem control colors of img and appear in 'plot':
-        # bar.setImageItem(image, insert_in=curr_plot)
+        # Interactive Color Bar:
+        bar = pg.ColorBarItem(values= (0, 1), colorMap=cmap) # prepare interactive color bar
+        # Have ColorBarItem control colors of img and appear in 'plot':
+        bar.setImageItem(img_item, insert_in=curr_plot)
 
 
 
