@@ -18,7 +18,9 @@ class DefaultDecoderDisplayFunctions:
     """ Functions related to visualizing Bayesian Decoder performance. """
 
     def _display_two_step_decoder_prediction_error_2D(computation_result, active_config, enable_saving_to_disk=False, **kwargs):
-            """ Plots the prediction error for the two_step decoder at each point in time. """
+            """ Plots the prediction error for the two_step decoder at each point in time.
+                Based off of "_temp_debug_two_step_plots_animated_imshow"
+            """
             # Get the decoders from the computation result:
             active_one_step_decoder = computation_result.computed_data['pf2D_Decoder']
             active_two_step_decoder = computation_result.computed_data.get('pf2D_TwoStepDecoder', None)
@@ -37,38 +39,62 @@ class DefaultDecoderDisplayFunctions:
             # all_pairwise_overlaps = active_placefield_overlap['all_pairwise_overlaps']
             # np.shape(all_pairwise_overlaps) # (903, 63, 63)
 
-
             # Simple plot type 1:
             plotted_variable_name = kwargs.get('variable_name', 'p_x_given_n') # Tries to get the user-provided variable name, otherwise defaults to 'p_x_given_n'
             _temp_debug_two_step_plots_animated_imshow(active_one_step_decoder, active_two_step_decoder, variable_name=plotted_variable_name) # Works
-
             # _temp_debug_two_step_plots_animated_imshow(active_one_step_decoder, active_two_step_decoder, variable_name='p_x_given_n') # Works
             # _temp_debug_two_step_plots_animated_imshow(active_one_step_decoder, active_two_step_decoder, variable_name='p_x_given_n_and_x_prev')
-        
-                 
-            # # More advanced display with animation:
-            # active_resampled_pos_df = build_position_df_resampled_to_time_windows(active_measured_positions.copy(), time_bin_size=active_config.computation_config.time_bin_size).nearest() # 1717 rows × 16 columns
-            # active_resampled_measured_positions = active_resampled_pos_df[['x','y']].to_numpy() # The measured positions resampled (interpolated) at the window centers. 
-            # # np.shape(active_resampled_measured_positions) # (1717, 2)
-            # # np.shape(active_one_step_decoder.most_likely_positions) # (1717, 2)
-            # # assert (np.shape(active_resampled_measured_positions) == np.shape(active_one_step_decoder.most_likely_positions)), f"These better be equal! np.shape(active_resampled_measured_positions): {np.shape(active_resampled_measured_positions)}, np.shape(active_one_step_decoder.most_likely_positions): {np.shape(active_one_step_decoder.most_likely_positions)}"
-         
-            # # Draw difference between predicted and measured position:
-            # def perform_draw_predicted_position_difference(frame, ax=None):
-            #     return _temp_debug_draw_predicted_position_difference(active_one_step_decoder.most_likely_positions, active_resampled_measured_positions, frame, ax=ax)
-
-            # def perform_update_predicted_position_difference(frame, ax=None, predicted_line=None, measured_line=None, **kwargs):
-            #     return _temp_debug_draw_update_predicted_position_difference(active_one_step_decoder.most_likely_positions, active_resampled_measured_positions, frame, ax=ax, predicted_line=predicted_line, measured_line=measured_line, **kwargs)
-
-            # active_predicted_position_difference_plot_callback_wrapper = CallbackWrapper(perform_draw_predicted_position_difference, perform_update_predicted_position_difference, dict())
-
-
-            # # perform_draw_predicted_position_difference(0)
-            # # perform_draw_predicted_position_difference(1)
-            # # _temp_debug_two_step_plots_animated_imshow(active_one_step_decoder, active_two_step_decoder, variable_name='p_x_given_n', update_callback_function=perform_draw_predicted_position_difference)
-            # _temp_debug_two_step_plots_animated_imshow(active_one_step_decoder, active_two_step_decoder, variable_name='p_x_given_n', update_callback_function=active_predicted_position_difference_plot_callback_wrapper)
-            
             return # end
+        
+    def _display_two_step_decoder_prediction_error_animated_2D(computation_result, active_config, **kwargs):
+        """ More advanced plot that plots the prediction error for the two_step decoder at each point in time.
+            Based off of "_temp_debug_two_step_plots_animated_imshow"
+        """
+        raise NotImplementedError # Doesn't work, or even appear to be done!
+    
+        # Get the decoders from the computation result:
+        active_one_step_decoder = computation_result.computed_data['pf2D_Decoder']
+        active_two_step_decoder = computation_result.computed_data.get('pf2D_TwoStepDecoder', None)
+        # active_measured_positions = computation_result.sess.position.to_dataframe()
+
+        # # Extended Stats:
+        active_extended_stats = computation_result.computed_data['extended_stats']
+        # time_binned_pos_resampler = active_extended_stats['time_binned_positioned_resampler'] # TimedeltaIndexResampler
+        time_binned_pos_df = active_extended_stats['time_binned_position_df'] # actual dataframe
+        # time_binned_position_mean = active_extended_stats['time_binned_position_mean']
+
+        # # Active Placefield Overlap:
+        # active_placefield_overlap = computation_result.computed_data['placefield_overlap']
+        # all_pairwise_neuron_IDs_combinations = active_placefield_overlap['all_pairwise_neuron_IDs_combinations'] # TimedeltaIndexResampler
+        # total_pairwise_overlaps = active_placefield_overlap['total_pairwise_overlaps'] # actual dataframe
+        # all_pairwise_overlaps = active_placefield_overlap['all_pairwise_overlaps']
+        # np.shape(all_pairwise_overlaps) # (903, 63, 63)
+
+        # Simple plot type 1:
+        plotted_variable_name = kwargs.get('variable_name', 'p_x_given_n') # Tries to get the user-provided variable name, otherwise defaults to 'p_x_given_n'
+                
+        # More advanced display with animation:
+        active_resampled_pos_df = time_binned_pos_df  # 1717 rows × 16 columns
+        active_resampled_measured_positions = active_resampled_pos_df[['x','y']].to_numpy() # The measured positions resampled (interpolated) at the window centers. 
+        # np.shape(active_resampled_measured_positions) # (1717, 2)
+        # np.shape(active_one_step_decoder.most_likely_positions) # (1717, 2)
+        # assert (np.shape(active_resampled_measured_positions) == np.shape(active_one_step_decoder.most_likely_positions)), f"These better be equal! np.shape(active_resampled_measured_positions): {np.shape(active_resampled_measured_positions)}, np.shape(active_one_step_decoder.most_likely_positions): {np.shape(active_one_step_decoder.most_likely_positions)}"
+        
+        # Draw difference between predicted and measured position:
+        def perform_draw_predicted_position_difference(frame, ax=None):
+            return _temp_debug_draw_predicted_position_difference(active_one_step_decoder.most_likely_positions, active_resampled_measured_positions, frame, ax=ax)
+
+        def perform_update_predicted_position_difference(frame, ax=None, predicted_line=None, measured_line=None, **kwargs):
+            return _temp_debug_draw_update_predicted_position_difference(active_one_step_decoder.most_likely_positions, active_resampled_measured_positions, frame, ax=ax, predicted_line=predicted_line, measured_line=measured_line, **kwargs)
+
+        active_predicted_position_difference_plot_callback_wrapper = CallbackWrapper(perform_draw_predicted_position_difference, perform_update_predicted_position_difference, dict())
+
+        # perform_draw_predicted_position_difference(0)
+        # perform_draw_predicted_position_difference(1)
+        # _temp_debug_two_step_plots_animated_imshow(active_one_step_decoder, active_two_step_decoder, variable_name='p_x_given_n', update_callback_function=perform_draw_predicted_position_difference)
+        _temp_debug_two_step_plots_animated_imshow(active_one_step_decoder, active_two_step_decoder, variable_name=plotted_variable_name, update_callback_function=active_predicted_position_difference_plot_callback_wrapper)
+        
+        return # end
 
 
 
@@ -214,7 +240,7 @@ class DefaultDecoderDisplayFunctions:
     # TODO: enable registering its own functions, or at least returning a list of which to register:
     @classmethod
     def get_all_registerable_known_display_functions(cls):
-        return [cls._display_two_step_decoder_prediction_error_2D, cls._display_decoder_result, cls._display_plot_most_likely_position_comparisons]
+        return [cls._display_two_step_decoder_prediction_error_2D, cls._display_two_step_decoder_prediction_error_animated_2D, cls._display_decoder_result, cls._display_plot_most_likely_position_comparisons]
     
 
 
