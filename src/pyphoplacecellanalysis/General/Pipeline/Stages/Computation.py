@@ -3,6 +3,7 @@ import numpy as np
 import pandas as pd
 from pyphocorehelpers.function_helpers import compose_functions
 
+
 # NeuroPy (Diba Lab Python Repo) Loading
 try:
     from neuropy import core
@@ -15,13 +16,12 @@ except ImportError:
 
 from neuropy.analyses.placefields import PlacefieldComputationParameters, perform_compute_placefields
 
-
 from pyphoplacecellanalysis.General.Pipeline.Stages.BaseNeuropyPipelineStage import BaseNeuropyPipelineStage, PipelineStage
 from pyphoplacecellanalysis.General.Pipeline.Stages.Filtering import FilterablePipelineStage
 from pyphoplacecellanalysis.General.Pipeline.Stages.Loading import LoadableInput, LoadableSessionInput, LoadedPipelineStage    
 from pyphoplacecellanalysis.General.ComputationResults import ComputationResult
 from pyphoplacecellanalysis.General.Decoder.decoder_result import build_position_df_discretized_binned_positions, build_position_df_resampled_to_time_windows
-
+from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.ExtendedStats import ExtendedStatsComputations
 
 class ComputablePipelineStage:
     """ Designates that a pipeline stage is computable. """
@@ -74,25 +74,6 @@ class DefaultComputationFunctions:
 
         return position_decoding_computation(computation_result.sess, computation_result.computation_config, computation_result)
     
-    
-    def _perform_extended_statistics_computation(computation_result: ComputationResult, debug_print=False):
-        """ Computes extended statistics regarding firing rates and such from the various dataframes. """
-        time_binned_position_resampler = build_position_df_resampled_to_time_windows(computation_result.sess.position.to_dataframe(), time_bin_size=computation_result.computation_config.time_bin_size) # TimedeltaIndexResampler
-        time_binned_position_df = time_binned_position_resampler.nearest() # an actual dataframe
-        computation_result.computed_data['extended_stats'] = {
-         'time_binned_positioned_resampler': time_binned_position_resampler,
-         'time_binned_position_df': time_binned_position_df,
-         'time_binned_position_mean': time_binned_position_df.resample("1min").mean(), # 3 minutes
-         'time_binned_position_covariance': time_binned_position_df.cov(min_periods=12)
-        }
-        """ 
-        Access via ['extended_stats']['time_binned_position_df']
-        Example:
-            active_extended_stats = curr_active_pipeline.computation_results['maze1'].computed_data['extended_stats']
-            time_binned_pos_df = active_extended_stats['time_binned_position_df']
-            time_binned_pos_df
-        """
-        return computation_result
     
     def _perform_two_step_position_decoding_computation(computation_result: ComputationResult, debug_print=False):
         """ Builds the Zhang Velocity/Position For 2-step Bayesian Decoder for 2D Placefields """
@@ -250,9 +231,14 @@ class DefaultComputationFunctions:
 class DefaultRegisteredComputations:
     """ Simply enables specifying the default computation functions that will be defined in this file and automatically registered. """
     def register_default_known_computation_functions(self):
-        self.register_computation(DefaultComputationFunctions._perform_extended_statistics_computation)
+        self.register_computation(ExtendedStatsComputations._perform_placefield_overlap_computation)
+        self.register_computation(ExtendedStatsComputations._perform_extended_statistics_computation)
+        # self.register_computation(DefaultComputationFunctions._perform_extended_statistics_computation)
         self.register_computation(DefaultComputationFunctions._perform_two_step_position_decoding_computation)
         self.register_computation(DefaultComputationFunctions._perform_position_decoding_computation)
+        
+        
+        
         
     
 

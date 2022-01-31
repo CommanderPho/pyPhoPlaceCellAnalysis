@@ -15,6 +15,7 @@ from pyphocorehelpers.geometry_helpers import compute_data_extent, compute_data_
 from pyphoplacecellanalysis.General.Pipeline.Stages.Computation import ComputedPipelineStage
 from pyphoplacecellanalysis.General.Configs.DynamicConfigs import PlottingConfig, InteractivePlaceCellConfig
 from pyphoplacecellanalysis.General.Pipeline.Stages.BaseNeuropyPipelineStage import PipelineStage
+from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import DefaultDecoderDisplayFunctions
 
 from neuropy.core.neuron_identities import NeuronIdentity, build_units_colormap, PlotStringBrevityModeEnum
 from neuropy.plotting.placemaps import plot_all_placefields
@@ -33,7 +34,7 @@ from pyphoplacecellanalysis.GUI.Panel.panel_placefield import build_panel_intera
 from PhoGui.InteractivePlotter.InteractivePlaceCellTuningCurvesDataExplorer import InteractivePlaceCellTuningCurvesDataExplorer
 
 from PhoPositionalData.plotting.placefield import plot_1d_placecell_validations
-from pyphoplacecellanalysis.General.Decoder.decoder_result import DecoderResultDisplayingPlot2D    
+
 
 
 def get_neuron_identities(active_placefields, debug_print=False):
@@ -231,144 +232,7 @@ class DefaultDisplayFunctions:
     #     computation_result.computed_data['pf2D'].plot_raw(label_cells=True); # Plots an overview of each cell all in one figure
     #     computation_result.computed_data['pf2D'].plot_ratemaps_2D(resolution_multiplier=2.5, brev_mode=PlotStringBrevityModeEnum.MINIMAL)
 
-    
-    def _display_decoder_result(computation_result, active_config):
-        renderer = DecoderResultDisplayingPlot2D(computation_result.computed_data['pf2D_Decoder'], computation_result.sess.position.to_dataframe())
-        def animate(i):
-            # print(f'animate({i})')
-            return renderer.display(i)
-        
-        
-        # interact(animate, i=(0, computation_result.computed_data['pf2D_Decoder'].num_time_windows, 10))
-  
 
-    
-    def _display_plot_most_likely_position_comparisons(computation_result, active_config, **kwargs):
-        """ renders the computed posterior for the position from the Bayesian decoder and overlays the animal's actual position over the top. """
-        def plot_most_likely_position_comparsions(pho_custom_decoder, position_df, show_posterior=True, show_one_step_most_likely_positions_plots=True, debug_print=False):
-            """
-            Usage:
-                fig, axs = plot_most_likely_position_comparsions(pho_custom_decoder, sess.position.to_dataframe())
-            """
-            # xmin, xmax, ymin, ymax, tmin, tmax = compute_data_extent(position_df['x'].to_numpy(), position_df['y'].to_numpy(), position_df['t'].to_numpy())
-            
-            with plt.ion():
-                overlay_mode = True
-                if overlay_mode:
-                    nrows=2
-                else:
-                    nrows=4
-                fig, axs = plt.subplots(ncols=1, nrows=nrows, figsize=(15,15), clear=True, sharex=True, sharey=False, constrained_layout=False)
-                # active_window = pho_custom_decoder.active_time_windows[window_idx] # a tuple with a start time and end time
-                # active_p_x_given_n = np.squeeze(pho_custom_decoder.p_x_given_n[:,:,window_idx]) # same size as occupancy
-                # Actual Position Plots:
-                axs[0].plot(position_df['t'].to_numpy(), position_df['x'].to_numpy(), label='measured x', color='#ff0000ff')
-                axs[0].set_title('x')
-                axs[1].plot(position_df['t'].to_numpy(), position_df['y'].to_numpy(), label='measured y', color='#ff0000ff')
-                axs[1].set_title('y')
-                # # Most likely position plots:
-                # axs[2].plot(pho_custom_decoder.active_time_window_centers, np.squeeze(pho_custom_decoder.most_likely_positions[:,0]), lw=0.5) # (Num windows x 2)
-                # axs[2].set_title('most likely positions x')
-                # axs[3].plot(pho_custom_decoder.active_time_window_centers, np.squeeze(pho_custom_decoder.most_likely_positions[:,1]), lw=0.5) # (Num windows x 2)
-                # axs[3].set_title('most likely positions y')
-                
-                if show_posterior:
-                    active_posterior = pho_custom_decoder.p_x_given_n
-                    # active_posterior = pho_custom_decoder['p_x_given_n_and_x_prev'] # dict-style
-                    
-                    # re-normalize each marginal after summing
-                    marginal_posterior_y = np.squeeze(np.sum(active_posterior, 0)) # sum over all x. Result should be [y_bins x time_bins]
-                    marginal_posterior_y = marginal_posterior_y / np.sum(marginal_posterior_y, axis=0) # sum over all positions for each time_bin (so there's a normalized distribution at each timestep)
-                    marginal_posterior_x = np.squeeze(np.sum(active_posterior, 1)) # sum over all y. Result should be [x_bins x time_bins]
-                    marginal_posterior_x = marginal_posterior_x / np.sum(marginal_posterior_x, axis=0) # sum over all positions for each time_bin (so there's a normalized distribution at each timestep)
-
-                    # Compute extents foir imshow:
-                    
-                    # im = ax.imshow(curr_p_x_given_n, **main_plot_kwargs) # add the curr_px_given_n image
-                    main_plot_kwargs = {
-                        'origin': 'lower',
-                        'vmin': 0,
-                        'vmax': 1,
-                        'cmap': 'turbo',
-                        'interpolation':'nearest',
-                        'aspect':'auto',
-                    }
-                        
-                    # Posterior distribution heatmaps at each point.
-                    # X
-                    xmin, xmax, ymin, ymax = (pho_custom_decoder.active_time_window_centers[0], pho_custom_decoder.active_time_window_centers[-1], pho_custom_decoder.xbin[0], pho_custom_decoder.xbin[-1])           
-                    # xmin, xmax = axs[0].get_xlim()
-                    x_first_extent = (xmin, xmax, ymin, ymax)
-                    # y_first_extent = (ymin, ymax, xmin, xmax)
-                    active_extent = x_first_extent
-                    im_posterior_x = axs[0].imshow(marginal_posterior_x, extent=active_extent, **main_plot_kwargs)
-                    # axs[0].axis("off")
-                    axs[0].set_xlim((xmin, xmax))
-                    axs[0].set_ylim((ymin, ymax))
-                    # Y
-                    xmin, xmax, ymin, ymax = (pho_custom_decoder.active_time_window_centers[0], pho_custom_decoder.active_time_window_centers[-1], pho_custom_decoder.ybin[0], pho_custom_decoder.ybin[-1])
-                    x_first_extent = (xmin, xmax, ymin, ymax)
-                    # y_first_extent = (ymin, ymax, xmin, xmax)
-                    active_extent = x_first_extent
-                    im_posterior_y = axs[1].imshow(marginal_posterior_y, extent=active_extent, **main_plot_kwargs)
-                    # axs[1].axis("off")
-                    axs[1].set_xlim((xmin, xmax))
-                    axs[1].set_ylim((ymin, ymax))
-                    
-                    
-                if show_one_step_most_likely_positions_plots:
-                    # Most likely position plots:
-                    active_time_window_variable = pho_custom_decoder.active_time_window_centers
-                    active_most_likely_positions_x = pho_custom_decoder.most_likely_positions[:,0].T
-                    active_most_likely_positions_y = pho_custom_decoder.most_likely_positions[:,1].T
-                    
-                    # Enable drawing flat lines for each time bin interval instead of just displaying the single point in the middle:
-                    #   build separate points for the start and end of each bin interval, and the repeat every element of the x and y values to line them up.
-                    active_half_time_bin_seconds = pho_custom_decoder.time_bin_size / 2.0
-                    active_time_window_start_points = np.expand_dims(pho_custom_decoder.active_time_window_centers - active_half_time_bin_seconds, axis=1)
-                    active_time_window_end_points = np.expand_dims(pho_custom_decoder.active_time_window_centers + active_half_time_bin_seconds, axis=1)
-                    active_time_window_start_end_points = interleave_elements(active_time_window_start_points, active_time_window_end_points) # from pyphocorehelpers.indexing_helpers import interleave_elements
-                    
-                    if debug_print:
-                        print(f'np.shape(active_time_window_end_points): {np.shape(active_time_window_end_points)}\nnp.shape(active_time_window_start_end_points): {np.shape(active_time_window_start_end_points)}') 
-                        # np.shape(active_time_window_end_points): (5783, 1)
-                        # np.shape(active_time_window_start_end_points): (11566, 1)
-
-                    active_time_window_variable = active_time_window_start_end_points
-                    active_most_likely_positions_x = np.repeat(active_most_likely_positions_x, 2, axis=0) # repeat each element twice
-                    active_most_likely_positions_y = np.repeat(active_most_likely_positions_y, 2, axis=0) # repeat each element twice    
-                    
-                    axs[0].plot(active_time_window_variable, active_most_likely_positions_x, lw=1.0, color='gray', alpha=0.4, label='1-step: most likely positions x') # (Num windows x 2)
-                    # axs[0].set_title('most likely positions x')
-                    axs[1].plot(active_time_window_variable, active_most_likely_positions_y, lw=1.0, color='gray', alpha=0.4, label='1-step: most likely positions y') # (Num windows x 2)
-                    # axs[1].set_title('most likely positions y')
-                    
-                    
-                fig.suptitle(f'Decoded Position data component comparison')
-                return fig, axs
-        
-        # Call the plot function with the decoder result.
-        fig, axs = plot_most_likely_position_comparsions(computation_result.computed_data['pf2D_Decoder'], computation_result.sess.position.to_dataframe(), **({'show_posterior':True, 'show_one_step_most_likely_positions_plots':True}|kwargs) )
-        
-        # show_two_step_most_likely_positions_plots=True
-        
-        active_two_step_decoder = computation_result.computed_data.get('pf2D_TwoStepDecoder', None)
-        if active_two_step_decoder is not None:
-            # have valid two_step_decoder, plot those predictions as well:
-            # active_two_step_decoder['most_likely_positions'][:, time_window_bin_idx]
-            active_time_window_variable = computation_result.computed_data['pf2D_Decoder'].active_time_window_centers
-            active_most_likely_positions_x = active_two_step_decoder['most_likely_positions'][0,:]
-            active_most_likely_positions_y = active_two_step_decoder['most_likely_positions'][1,:]
-            two_step_options_dict = {
-                'color':'#00ff7f99',
-                'face_color':'#55ff0099',
-                'edge_color':'#00aa0099'
-            }
-            # marker_style: 'circle', marker_size:0.25
-            axs[0].plot(active_time_window_variable, active_most_likely_positions_x, lw=1.0, color='#00ff7f99', alpha=0.6, label='2-step: most likely positions x') # (Num windows x 2)
-            # axs[0].set_title('most likely positions x')
-            axs[1].plot(active_time_window_variable, active_most_likely_positions_y, lw=1.0, color='#00ff7f99', alpha=0.6, label='2-step: most likely positions y') # (Num windows x 2)
-            # axs[1].set_title('most likely positions y')
 
     def _display_normal(computation_result, active_config, **kwargs):
         """
@@ -396,8 +260,6 @@ class DefaultDisplayFunctions:
         return pane
         
 
-
-
     ## Interactive 3D Spike and Behavior Browser: 
     def _display_3d_interactive_spike_and_behavior_browser(computation_result, active_config):
         active_config.plotting_config.show_legend = True
@@ -419,7 +281,6 @@ class DefaultDisplayFunctions:
         pActiveInteractiveLapsPlotter = iplapsDataExplorer.plot(pActivePlotter=pActiveInteractiveLapsPlotter)
 
 
-
     def _display_3d_image_plotter(computation_result, active_config):
         def plot_3d_image_plotter(active_epoch_placefields2D, image_file=r'output\2006-6-07_11-26-53\maze\speedThresh_0.00-gridBin_5.00_3.00-smooth_0.00_0.00-frateThresh_0.10\pf2D-Occupancy-maze-odd_laps-speedThresh_0.00-gridBin_5.00_3.00-smooth_0.00_0.00-frateThresh_0.png'):
             loaded_image_tex = pv.read_texture(image_file)
@@ -433,15 +294,19 @@ class DefaultDisplayFunctions:
 
 
 class DefaultRegisteredDisplayFunctions:
-    """ Simply enables specifying the default computation functions that will be defined in this file and automatically registered. """
+    """ TODO: This doesn't seem to do anything rn, or even ever be called. 
+        Unlike the computation functions its not ever called.
+        Simply enables specifying the default computation functions that will be defined in this file and automatically registered. """
+    
     def register_default_known_display_functions(self):
         self.register_display_function(DefaultDisplayFunctions._display_1d_placefield_validations)
         self.register_display_function(DefaultDisplayFunctions._display_2d_placefield_result_plot_raw)
         self.register_display_function(DefaultDisplayFunctions._display_2d_placefield_result_plot_ratemaps_2D)
         self.register_display_function(DefaultDisplayFunctions._display_normal)
-        
-        self.register_display_function(DefaultDisplayFunctions._display_decoder_result)
-        self.register_display_function(DefaultDisplayFunctions._display_plot_most_likely_position_comparisons)
+               
+        # Register the Bayesian decoder display functions: 
+        for a_display_fn in DefaultDecoderDisplayFunctions.get_all_registerable_known_display_functions():
+            self.register_display_function(a_display_fn)
         
         self.register_display_function(DefaultDisplayFunctions._display_3d_interactive_tuning_curves_plotter)
         self.register_display_function(DefaultDisplayFunctions._display_3d_interactive_spike_and_behavior_browser)
