@@ -8,8 +8,8 @@ import numpy as np
 # Import the custom nodes:
 from .CustomNodes.ImageViewNode import ImageViewNode
 from .CustomNodes.UnsharpMaskNode import UnsharpMaskNode
-from .CustomNodes.PipelineInputDataNode import PipelineInputDataNode
-
+from .CustomNodes.PipelineInputDataNode import PipelineInputDataNode, PipelineFilteringDataNode
+from .CustomNodes.PipelineDisplayNode import PipelineDisplayNode
 
 def plot_flowchartWidget(title='PhoFlowchartApp'):
     app = pg.mkQApp(title)
@@ -67,13 +67,15 @@ def plot_flowchartWidget(title='PhoFlowchartApp'):
     library.addNodeType(ImageViewNode, [('Display',)])
     # Add the unsharp mask node to two locations in the menu to demonstrate
     # that we can create arbitrary menu structures
-    library.addNodeType(UnsharpMaskNode, [('Image',), 
-                                        ('Submenu_test','submenu2','submenu3')])
-    
+    library.addNodeType(UnsharpMaskNode, [('Image',)])
     
     library.addNodeType(PipelineInputDataNode, [('Data',), 
                                         ('Pho Pipeline','Input')])
+    library.addNodeType(PipelineFilteringDataNode, [('Filters',), 
+                                        ('Pho Pipeline','Filtering')])
     
+    library.addNodeType(PipelineDisplayNode, [('Display',), 
+                                        ('Pho Pipeline','Display')])
 
     fc.setLibrary(library)
 

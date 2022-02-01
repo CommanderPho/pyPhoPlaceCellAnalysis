@@ -40,7 +40,7 @@ from neuropy.plotting.ratemaps import enumTuningMap2DPlotVariables
 
 
 class PipelineInputDataNode(CtrlNode):
-    """Return the input data passed through an unsharp mask."""
+    """Configure, Load, and Return the input pipeline data as defined by a known data type (such as kdiba or Bapun)."""
     nodeName = "PipelineInputDataNode"
     uiTemplate = [
         ('data_mode', 'combo', {'values': ['bapun', 'kdiba', 'custom...'], 'index': 0}),
@@ -50,23 +50,32 @@ class PipelineInputDataNode(CtrlNode):
     def __init__(self, name):
         ## Define the input / output terminals available on this node
         terminals = {
-            'dataIn': dict(io='in'),    # each terminal needs at least a name and
-            'dataOut': dict(io='out'),  # to specify whether it is input or output
+            # 'dataIn': dict(io='in'),    # each terminal needs at least a name and
+            'loaded_pipeline': dict(io='out'),  # to specify whether it is input or output
+            'known_data_mode': dict(io='out'),
         }                              # other more advanced options are available
                                        # as well..
-        
         CtrlNode.__init__(self, name, terminals=terminals)
         
-    def process(self, dataIn, display=True):
+    def process(self, display=True):
         # CtrlNode has created self.ctrls, which is a dict containing {ctrlName: widget}
-        data_mode = self.ctrls['data_mode'].value()
-        
+        # data_mode = self.ctrls['data_mode'].value()        
+        s = self.stateGroup.state()
+        if s['data_mode'] == 'bapun':
+            data_mode = 'bapun'
+        elif s['data_mode'] == 'kdiba':
+            data_mode = 'kdiba'
+        else:
+            raise NotImplementedError
+            data_mode = None
+
         print(f'PipelineInputDataNode.data_mode: {data_mode}')
+
         active_known_data_session_type_dict = self._get_known_data_session_types_dict()
         # curr_bapun_pipeline = NeuropyPipeline.init_from_known_data_session_type('bapun', known_data_session_type_dict['bapun'])
-        curr_active_pipeline = NeuropyPipeline.init_from_known_data_session_type(data_mode, active_known_data_session_type_dict[data_mode])    
-    
-        return {'dataOut': curr_active_pipeline}
+        curr_active_pipeline = NeuropyPipeline.init_from_known_data_session_type(data_mode, active_known_data_session_type_dict[data_mode])
+        
+        return {'known_data_mode': data_mode, 'loaded_pipeline': curr_active_pipeline}
 
     def _get_known_data_session_types_dict(self):
         known_data_session_type_dict = {'kdiba':KnownDataSessionTypeProperties(load_function=(lambda a_base_dir: DataSessionLoader.kdiba_old_format_session(a_base_dir)),
@@ -79,6 +88,85 @@ class PipelineInputDataNode(CtrlNode):
 
 
 
+class PipelineFilteringDataNode(CtrlNode):
+    """Filters active pipeline"""
+    nodeName = "PipelineFilteringDataNode"
+    def __init__(self, name):
+        ## Define the input / output terminals available on this node
+        terminals = {
+            'active_data_mode': dict(io='in'),
+            'active_pipeline': dict(io='in'),
+            'computation_configs': dict(io='out'),
+            'filter_configurations': dict(io='out'),
+            'filtered_pipeline': dict(io='out'),
+        }
+        CtrlNode.__init__(self, name, terminals=terminals)
+        
+    def process(self, active_data_mode=None, active_pipeline=None, display=True):
+        # CtrlNode has created self.ctrls, which is a dict containing {ctrlName: widget}
+        # data_mode = self.ctrls['data_mode'].value()
+        
+        # print(f'PipelineFilteringDataNode.data_mode: {data_mode}')
+
+        # active_known_data_session_type_dict = self._get_known_data_session_types_dict()
+        # # curr_bapun_pipeline = NeuropyPipeline.init_from_known_data_session_type('bapun', known_data_session_type_dict['bapun'])
+        # curr_active_pipeline = NeuropyPipeline.init_from_known_data_session_type(data_mode, active_known_data_session_type_dict[data_mode])    
+        
+        # if active_data_mode is None:
+                
+        if ((active_pipeline is None) or (active_data_mode is None)):
+            return {'active_session_computation_configs': None, 'active_session_filter_configurations':None,
+                    'filtered_pipeline': None}
+
+        if active_data_mode is not None:
+            if active_data_mode == 'bapun':
+                curr_active_pipeline, active_session_computation_configs, active_session_filter_configurations = NonInteractiveWrapper.bapun_format(active_pipeline)
+            elif active_data_mode == 'kdiba':
+                curr_active_pipeline, active_session_computation_configs, active_session_filter_configurations = NonInteractiveWrapper.kdiba_format(active_pipeline)
+            else:
+                raise NotImplementedError
+
+        return {'computation_configs': active_session_computation_configs, 'filter_configurations':active_session_filter_configurations, 'filtered_pipeline': curr_active_pipeline}
+
+
+
+# class PipelineResultBreakoutNode(CtrlNode):
+#     """Breaks out results from active pipeline"""
+#     nodeName = "PipelineResultBreakoutNode"
+#     def __init__(self, name):
+#         ## Define the input / output terminals available on this node
+#         terminals = {
+#             'active_data_mode': dict(io='in'),
+#             'active_session_computation_configs': dict(io='in'),
+#             'active_session_filter_configurations': dict(io='in'),
+#             'active_pipeline': dict(io='in'),
+#             'sess': dict(io='out'),
+#             'pf1D': dict(io='out'),
+#             'active_one_step_decoder': dict(io='out'),
+#             'active_two_step_decoder': dict(io='out'),
+#             'active_measured_positions': dict(io='out'),
+#         }
+#         CtrlNode.__init__(self, name, terminals=terminals)
+        
+#     def process(self, active_data_mode=None, active_session_computation_configs=None, active_session_filter_configurations=None, active_pipeline=None, display=True):
+                
+#         if ((active_pipeline is None) or (active_data_mode is None)):
+#             return {'active_session_computation_configs': None, 'active_session_filter_configurations':None,
+#                     'filtered_pipeline': None}
+
+#         active_config_name = 'maze1'
+#         # Get relevant variables:
+#         # curr_active_pipeline is set above, and usable here
+#         sess = active_pipeline.filtered_sessions[active_config_name]
+#         pf1D = active_pipeline.computation_results[active_config_name].computed_data['pf1D']
+#         active_one_step_decoder = active_pipeline.computation_results[active_config_name].computed_data['pf2D_Decoder']
+#         active_two_step_decoder = active_pipeline.computation_results[active_config_name].computed_data.get('pf2D_TwoStepDecoder', None)
+#         active_measured_positions = active_pipeline.computation_results[active_config_name].sess.position.to_dataframe()
+#         {'sess':sess, 'pf1D':pf1D, 'active_one_step_decoder': active_one_step_decoder, 'active_two_step_decoder': active_two_step_decoder, 'active_measured_positions': active_measured_positions}
+    
+#         return {'active_session_computation_configs': active_session_computation_configs, 'active_session_filter_configurations':active_session_filter_configurations, 'filtered_pipeline': curr_active_pipeline}
+
+
 
 
 
@@ -86,7 +174,7 @@ class NonInteractiveWrapper(object):
     """docstring for NonInteractiveWrapper."""
     def __init__(self, enable_saving_to_disk=False):
         super(NonInteractiveWrapper, self).__init__()
-        self.enable_saving_to_disk = False
+        self.enable_saving_to_disk = enable_saving_to_disk
         # common_parent_foldername = Path(r'R:\Dropbox (Personal)\Active\Kamran Diba Lib\Pho-Kamran-Meetings\Final Placemaps 2021-01-14')
         self.common_parent_foldername = Path(r'R:\Dropbox (Personal)\Active\Kamran Diba Lib\Pho-Kamran-Meetings\2022-01-16')
         
@@ -135,7 +223,7 @@ class NonInteractiveWrapper(object):
         #        ]
         
         
-        
+    @staticmethod
     def bapun_format(curr_bapun_pipeline):
         # curr_bapun_pipeline = NeuropyPipeline(name='bapun_pipeline', session_data_type='bapun', basedir=known_data_session_type_dict['bapun'].basedir, load_function=known_data_session_type_dict['bapun'].load_function)
         # curr_bapun_pipeline = NeuropyPipeline.init_from_known_data_session_type('bapun', known_data_session_type_dict['bapun'])
@@ -182,11 +270,11 @@ class NonInteractiveWrapper(object):
         curr_bapun_pipeline.perform_computations(active_session_computation_configs[0])
         curr_bapun_pipeline.prepare_for_display() # TODO: pass a display config
         # Set curr_active_pipeline for testing:
-        curr_active_pipeline = curr_bapun_pipeline
-        return curr_active_pipeline
+        # curr_active_pipeline = curr_bapun_pipeline
+        return curr_bapun_pipeline, active_session_computation_configs, active_session_filter_configurations
 
 
-
+    @staticmethod
     def kdiba_format(curr_kdiba_pipeline):
         ## Data must be pre-processed using the MATLAB script located here: 
         # R:\data\KDIBA\gor01\one\IIDataMat_Export_ToPython_2021_11_23.m
@@ -217,7 +305,7 @@ class NonInteractiveWrapper(object):
 
         curr_kdiba_pipeline.perform_computations(active_session_computation_configs[0])
         curr_kdiba_pipeline.prepare_for_display() # TODO: pass a display config
-        return curr_kdiba_pipeline
+        return curr_kdiba_pipeline, active_session_computation_configs, active_session_filter_configurations
         
         # # set curr_active_pipeline for testing:
         # curr_active_pipeline = curr_kdiba_pipeline
@@ -248,7 +336,7 @@ class NonInteractiveWrapper(object):
         curr_kdiba_pipeline.perform_computations(active_session_computation_configs[0]) # Causes "IndexError: index 59 is out of bounds for axis 0 with size 59"
         curr_kdiba_pipeline.prepare_for_display() # TODO: pass a display config
         
-        return curr_kdiba_pipeline
+        return curr_kdiba_pipeline, active_session_computation_configs, active_session_filter_configurations
     
         # # set curr_active_pipeline for testing:
         # curr_active_pipeline = curr_kdiba_pipeline
