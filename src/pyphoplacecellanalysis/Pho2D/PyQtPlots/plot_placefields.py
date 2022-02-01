@@ -226,9 +226,13 @@ def pyqtplot_plot_image_array(xbin_edges, ybin_edges, images, occupancy, max_num
     #     lut.plot.setData(*h)
 
     # Post images loop:
-    win.show()
+    
+    enable_show = False
+    
+    if enable_show:
+        win.show()
+    
     win.setWindowTitle('pyqtplot image array')
 
-
-
+    # pg.exec()
     return app, win

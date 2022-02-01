@@ -15,7 +15,9 @@ from pyphocorehelpers.geometry_helpers import compute_data_extent, compute_data_
 from pyphoplacecellanalysis.General.Pipeline.Stages.Computation import ComputedPipelineStage
 from pyphoplacecellanalysis.General.Configs.DynamicConfigs import PlottingConfig, InteractivePlaceCellConfig
 from pyphoplacecellanalysis.General.Pipeline.Stages.BaseNeuropyPipelineStage import PipelineStage
+from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.Ratemaps import DefaultRatemapDisplayFunctions
 from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import DefaultDecoderDisplayFunctions
+
 
 from neuropy.core.neuron_identities import NeuronIdentity, build_units_colormap, PlotStringBrevityModeEnum
 from neuropy.plotting.placemaps import plot_all_placefields
@@ -304,6 +306,12 @@ class DefaultRegisteredDisplayFunctions:
         self.register_display_function(DefaultDisplayFunctions._display_2d_placefield_result_plot_ratemaps_2D)
         self.register_display_function(DefaultDisplayFunctions._display_normal)
                
+               
+        # Register the Ratemap/Placemap display functions: 
+        for a_display_fn in DefaultRatemapDisplayFunctions.get_all_registerable_known_display_functions():
+            self.register_display_function(a_display_fn)
+            
+            
         # Register the Bayesian decoder display functions: 
         for a_display_fn in DefaultDecoderDisplayFunctions.get_all_registerable_known_display_functions():
             self.register_display_function(a_display_fn)
