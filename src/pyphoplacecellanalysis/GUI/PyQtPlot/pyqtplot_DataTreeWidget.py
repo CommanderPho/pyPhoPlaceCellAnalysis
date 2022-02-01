@@ -1,5 +1,25 @@
 """
 Simple use of DataTreeWidget to display a structure of nested dicts, lists, and arrays
+
+Example:
+    d = {
+        'active_sess_config':curr_active_pipeline.active_sess_config.__dict__,
+        'active_configs':curr_active_pipeline.active_configs,
+        'active_session_computation_configs':active_session_computation_configs[0].__dict__
+    }
+    # d = {
+    #     'active_two_step_decoder': active_two_step_decoder,
+    #     'active_extended_stats': active_extended_stats
+    # }
+    # d = {
+    #     'active_session_computation_configs':active_session_computation_configs,
+    #     'active_two_step_decoder': active_two_step_decoder,
+    #     'active_extended_stats': active_extended_stats
+    # }
+
+    from pyphoplacecellanalysis.GUI.PyQtPlot.pyqtplot_DataTreeWidget import plot_dataTreeWidget
+    tree, app = plot_dataTreeWidget(data=d, title='PhoOutputDataTreeApp')
+
 """
 
 # required to enable non-blocking interaction:

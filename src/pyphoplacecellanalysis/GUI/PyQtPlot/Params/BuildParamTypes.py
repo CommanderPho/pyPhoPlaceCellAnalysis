@@ -54,7 +54,7 @@ def makeAllParamTypes():
         else:
             children.append(makeChild(name, paramCfg))
 
-    params = Parameter.create(name='Example Parameters', type='group', children=children)
+    params = Parameter.create(name='Pipeline Parameters', type='group', children=children)
 
     # Slider needs minor tweak
     sliderGrp = params.child('Sample Slider')
