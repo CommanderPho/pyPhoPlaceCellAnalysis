@@ -12,6 +12,12 @@ from .CustomNodes.PipelineInputDataNode import PipelineInputDataNode, PipelineFi
 from .CustomNodes.PipelineDisplayNode import PipelineDisplayNode
 
 def plot_flowchartWidget(title='PhoFlowchartApp'):
+    """ 
+
+    Usage:
+        from pyphoplacecellanalysis.GUI.PyQtPlot.Flowchart.pyqtplot_Flowchart import plot_flowchartWidget
+        pipeline_flowchart_window, pipeline_flowchart_app = plot_flowchartWidget(title='PhoMainPipelineFlowchartApp')
+    """
     app = pg.mkQApp(title)
 
     ## Create main window with a grid layout inside
