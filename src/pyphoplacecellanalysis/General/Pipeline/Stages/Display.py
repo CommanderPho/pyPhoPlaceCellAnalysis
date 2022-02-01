@@ -186,12 +186,10 @@ class DefaultDisplayFunctions:
 
     def _display_1d_placefield_validations(computation_result, active_config, **kwargs):
         """ Renders all of the flat 1D place cell validations with the yellow lines that trace across to their horizontally drawn placefield (rendered on the right of the plot) """
-        active_config = add_neuron_identity_info_if_needed(computation_result, active_config)
         out_figures_list = plot_1d_placecell_validations(computation_result.computed_data['pf1D'], active_config.plotting_config, **({'modifier_string': 'lap_only', 'should_save': False} | kwargs))
 
 
     def _display_2d_placefield_result_plot_raw(computation_result, active_config, **kwargs):
-        active_config = add_neuron_identity_info_if_needed(computation_result, active_config)
         computation_result.computed_data['pf2D'].plot_raw(**({'label_cells': True} | kwargs)); # Plots an overview of each cell all in one figure
 
 
@@ -235,7 +233,6 @@ class DefaultDisplayFunctions:
     #     computation_result.computed_data['pf2D'].plot_ratemaps_2D(resolution_multiplier=2.5, brev_mode=PlotStringBrevityModeEnum.MINIMAL)
 
 
-
     def _display_normal(computation_result, active_config, **kwargs):
         """
         Usage:
@@ -249,7 +246,7 @@ class DefaultDisplayFunctions:
         # ax_pf_1D, occupancy_fig, active_pf_2D_figures, active_pf_2D_gs = plot_all_placefields(computation_result.computed_data['pf1D'], computation_result.computed_data['pf2D'], active_config, should_save_to_disk=False)
         ax_pf_1D, occupancy_fig, active_pf_2D_figures, active_pf_2D_gs = plot_all_placefields(None, computation_result.computed_data['pf2D'], active_config, **({'should_save_to_disk': False} | kwargs))
         
-        
+
     ## Tuning Curves 3D Plot:
     def _display_3d_interactive_tuning_curves_plotter(computation_result, active_config):
         # try: pActiveTuningCurvesPlotter
@@ -264,7 +261,10 @@ class DefaultDisplayFunctions:
 
     ## Interactive 3D Spike and Behavior Browser: 
     def _display_3d_interactive_spike_and_behavior_browser(computation_result, active_config):
-        active_config.plotting_config.show_legend = True
+        active_config.plotting_config.show_legend = True        
+        active_session = computation_result.sess # this is unfiltered, shouldn't be used... actually, it should be filtered. Don't know what's wrong here.
+
+        print(f'computation_result.sess: {computation_result.sess}')
         # try: pActiveInteractivePlaceSpikesPlotter
         # except NameError: pActiveInteractivePlaceSpikesPlotter = None # Checks variable p's existance, and sets its value to None if it doesn't exist so it can be checked in the next step
         pActiveInteractivePlaceSpikesPlotter = None

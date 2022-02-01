@@ -211,3 +211,52 @@ def pyqtplot_plot_image_array(xbin_edges, ybin_edges, images, occupancy, max_num
 
     # pg.exec()
     return app, win
+
+
+
+
+def pyqtplot_plot_image(xbin_edges, ybin_edges, image, enable_LUT_Histogram=False, debug_print=False):
+    """ Single image plot using pyqtplot: 
+    Holy crap! It actually works to plot the maze, and the adjustable slider works as well!
+    
+    # Example: test single image plot:
+        curr_im = np.squeeze(active_one_step_decoder.ratemap.normalized_tuning_curves[0,:,:]) # (43, 63, 63)
+        app, win, imv = pyqtplot_plot_image(active_one_step_decoder.xbin, active_one_step_decoder.ybin, curr_im)
+        win.show()
+    """
+    # Interpret image data as row-major instead of col-major
+    pg.setConfigOptions(imageAxisOrder='row-major')
+    app = pg.mkQApp("Gradiant Layout Example")    
+    # Create window to hold the image:
+    win = QtGui.QMainWindow()
+    win.resize(800,800)
+    # Build a single image view to display the image:
+    imv = pg.ImageView()
+    win.setCentralWidget(imv)
+    # imv.setImage(image, xvals=np.linspace(1., 3., data.shape[0]))
+    win.show()
+    win.setWindowTitle('pyqtplot image')
+    # win.resize(800,600)
+    ## Display the data and assign each frame a time value from 1.0 to 3.0
+    # imv.setImage(image, xvals=xbin_edges)
+    imv.setImage(image, xvals=xbin_edges)
+    # Set the color map:
+    # cmap = pg.ColorMap(pos=np.linspace(0.0, 1.0, 6), color=colors)
+    cmap = pg.colormap.get('jet','matplotlib') # prepare a linear color map
+    imv.setColorMap(cmap)
+    
+    # if enable_LUT_Histogram:
+    #     lut = pg.HistogramLUTItem(orientation="horizontal")
+    #     imv.addItem(lut)
+    #     imv.setLookupTable(lut, autoLevel=True)
+    #     h = imv.getHistogram()
+    #     lut.plot.setData(*h)
+
+    # bar = pg.ColorBarItem( values= (0, 20_000), cmap=cm ) # prepare interactive color bar
+    # Have ColorBarItem control colors of img and appear in 'plot':
+    # bar.setImageItem(image, insert_in=imv) 
+
+    return app, win, imv
+ 
+ 
+ 

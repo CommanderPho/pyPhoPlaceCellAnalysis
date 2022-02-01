@@ -30,14 +30,14 @@ class ComputablePipelineStage:
     def _perform_single_computation(cls, active_session, computation_config):
         """Conceptually, a single computation consists of a specific active_session and a specific computation_config object
         Args:
-            active_session (DataSession): [description]
+            active_session (DataSession): this is the filtered data session
             computation_config (PlacefieldComputationParameters): [description]
 
         Returns:
             [type]: [description]
         """
         # only requires that active_session has the .spikes_df and .position  properties
-        output_result = ComputationResult(active_session, computation_config, computed_data=dict())        
+        output_result = ComputationResult(active_session, computation_config, computed_data=dict()) # Note that this active_session should be correctly filtered
         output_result.computed_data['pf1D'], output_result.computed_data['pf2D'] = perform_compute_placefields(active_session.spikes_df, active_session.position, computation_config, None, None, included_epochs=computation_config.computation_epochs, should_force_recompute_placefields=True)
 
         return output_result
