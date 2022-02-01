@@ -11,6 +11,8 @@ dependencies:
   - numpy
   - scipy
   - pandas
+  - pandas-flavor
+  - numba
   - tqdm
   - click
   - ipython
@@ -18,6 +20,16 @@ dependencies:
   - matplotlib
   - ipympl  # interactive matplotlib plots
   - seaborn
+  - pyqtgraph
+  - qtmodern
+  - pyvista
+  - pyvistaqt
+  - param
+  - panel
+  - pillow
+  - opencv
+  - openmp
+  - 
   # - altair
   # - yellowbrick
   # Personal Libraries
@@ -39,11 +51,23 @@ dependencies:
   # - optuna
   # - dask
   # - snakeviz
-
+  # DEVELOPMENT ONLY PACKAGES (could also be kept in a separate environment file)
+  - jupyterlab
+  - pytest
+  - pytest-cov
+  - tox
+  - nbdime
+  - nbstripout
+  - sphinx
+  - recommonmark
   - pip:
      - -e .  # install git checkout of pyPhoPlaceCellAnalysis in editable mode
-     - pyPhoCoreHelpers
+    #  - pyPhoCoreHelpers
      # add here only pip-packages that are not available in conda/conda-forge! E.g.:
+     - pyqt6
+     - pyqt6-tools
+
+
      # - icecream
      # - jax
      # - numpyro
@@ -51,13 +75,4 @@ dependencies:
      # - neptune-client
      # - neptune-contrib
 
-  # DEVELOPMENT ONLY PACKAGES (could also be kept in a separate environment file)
-  - jupyterlab
-  - pytest
-  - pytest-cov
-  - tox
-  - pre_commit
-  - nbdime
-  - nbstripout
-  - sphinx
-  - recommonmark
+
