@@ -9,33 +9,8 @@ import numpy as np
 import pyqtgraph as pg
 from pyqtgraph.Qt import QtCore, QtGui
 
-
-from dataclasses import dataclass
-
 from pyphocorehelpers.indexing_helpers import compute_paginated_grid_config
-
-@dataclass
-class BasicPyQtPlotApp(object):
-    """Docstring for BasicPyQtPlotApp."""
-    app: QtGui.QApplication
-    win: QtGui.QMainWindow
-    w: pg.GraphicsLayoutWidget
-
-
-def pyqtplot_common_setup(a_title):
-    # Interpret image data as row-major instead of col-major
-    pg.setConfigOptions(imageAxisOrder='row-major')
-    pg.setConfigOptions(antialias = True)
-    app = pg.mkQApp(a_title)
-    # print(f'type(app): {type(app)}')
-    # Create window to hold the image:
-    win = QtGui.QMainWindow()
-    win.resize(1600, 1600)
-    # Creating a GraphicsLayoutWidget as the central widget
-    w = pg.GraphicsLayoutWidget()
-    win.setCentralWidget(w)
-    
-    return w, win, app
+from pyphocorehelpers.plotting.pyqtplot_basic import pyqtplot_common_setup
 
 
 def pyqtplot_plot_image_array(xbin_edges, ybin_edges, images, occupancy, max_num_columns = 5, drop_below_threshold: float=0.0000001, enable_LUT_Histogram=False, debug_print=False):
