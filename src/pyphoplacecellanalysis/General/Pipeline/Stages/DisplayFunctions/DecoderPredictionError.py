@@ -303,6 +303,15 @@ def _temp_debug_two_step_plots_imshow(active_one_step_decoder, active_two_step_d
 
     
 def _temp_debug_two_step_plots_animated_imshow(active_one_step_decoder, active_two_step_decoder, variable_name='p_x_given_n_and_x_prev', override_variable_value=None, update_callback_function=None):
+    """Matplotlib-based imshow plot with interactive slider for displaying two-step bayesian decoding results
+
+    Args:
+        active_one_step_decoder ([type]): [description]
+        active_two_step_decoder ([type]): [description]
+        variable_name (str, optional): [description]. Defaults to 'p_x_given_n_and_x_prev'.
+        override_variable_value ([type], optional): [description]. Defaults to None.
+        update_callback_function ([type], optional): [description]. Defaults to None.
+    """
     if override_variable_value is None:
         try:
             variable_value = active_two_step_decoder[variable_name]

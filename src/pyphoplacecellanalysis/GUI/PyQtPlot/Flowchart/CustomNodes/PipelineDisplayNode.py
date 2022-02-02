@@ -10,7 +10,11 @@ from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPred
 
 
 class PipelineDisplayNode(CtrlNode):
-    """Displays active pipeline"""
+    """Displays active pipeline.
+        TODO: allow the user to select which display function will be used, and optionally pass any function-specific parameters by adding additional inputs.
+            - Probably should have a plaintext input like the arbitrary python exec example node to allow typing the function.
+            - Ideally would have an option to spawn the output widget in a new window or to add it to the main window.
+    """
     nodeName = "PipelineDisplayNode"
     # uiTemplate = [
     #     ('filter_function', 'combo', {'values': ['test1', 'test2', 'custom...'], 'index': 0}),
@@ -33,9 +37,12 @@ class PipelineDisplayNode(CtrlNode):
         if (active_pipeline is None) or (not display):
             return  {'display_outputs': None}
 
-
         active_config_name = 'maze1'
         display_outputs = active_pipeline.display(DefaultDecoderDisplayFunctions._display_two_step_decoder_prediction_error_2D, active_config_name, variable_name='p_x_given_n') # works!
- 
+        
+        
+        pg.show()
+        
+        
         return {'display_outputs': display_outputs}
 

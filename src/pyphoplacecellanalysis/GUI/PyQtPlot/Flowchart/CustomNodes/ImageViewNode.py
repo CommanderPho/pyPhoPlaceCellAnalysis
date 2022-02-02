@@ -13,14 +13,31 @@ import numpy as np
 class ImageViewNode(Node):
     """Node that displays image data in an ImageView widget"""
     nodeName = 'ImageView'
-    
+    view: QtGui.QWidget
+
     def __init__(self, name):
         self.view = None
+        self.on_remove_function = None
         ## Initialize node with only a single input terminal
         Node.__init__(self, name, terminals={'data': {'io':'in'}})
         
-    def setView(self, view):  ## setView must be called by the program
+    def setView(self, view, on_remove_function=None):  ## setView must be called by the program
         self.view = view
+        self.on_remove_function = on_remove_function
+        # TODO: remove the added widget from the interface when this node is closed.
+        self.sigClosed.connect(self.on_remove_view)
+        
+    
+    def on_remove_view(self, event):
+        """ Called when the view is to be removed"""
+        print("ImageViewNode.on_remove_view()")
+        if self.view is not None:
+            if self.on_remove_function is not None:
+                self.on_remove_function(self.view) # call on_remove_function with self to remove self from the layout
+                
+            self.view.deleteLater() # How to dynamically remove the widget
+            
+        
         
     def process(self, data, display=True):
         ## if process is called with display=False, then the flowchart is being operated
@@ -33,7 +50,12 @@ class ImageViewNode(Node):
             else:
                 self.view.setImage(data)
 
-
+    def close(self):
+        """Cleans up after the node--removes terminals, graphicsItem, widget"""
+        super(ImageViewNode, self).close() # call super to clean up
+        # self.sigClosed.emit(self)
+        
+        
 
 
 ## To make our custom node classes available in the flowchart context menu,
