@@ -91,6 +91,10 @@ class PipelineInputDataNode(CtrlNode):
 class PipelineFilteringDataNode(CtrlNode):
     """Filters active pipeline"""
     nodeName = "PipelineFilteringDataNode"
+    uiTemplate = [
+        ('included_configs', 'combo', {'values': [], 'index': 0}),
+    ]
+    
     def __init__(self, name):
         ## Define the input / output terminals available on this node
         terminals = {
@@ -101,6 +105,9 @@ class PipelineFilteringDataNode(CtrlNode):
             'filtered_pipeline': dict(io='out'),
         }
         CtrlNode.__init__(self, name, terminals=terminals)
+        self.keys = [] # the active config keys
+        
+        
         
     def process(self, active_data_mode=None, pipeline=None, display=True):
         # CtrlNode has created self.ctrls, which is a dict containing {ctrlName: widget}
@@ -111,10 +118,9 @@ class PipelineFilteringDataNode(CtrlNode):
         # active_known_data_session_type_dict = self._get_known_data_session_types_dict()
         # # curr_bapun_pipeline = NeuropyPipeline.init_from_known_data_session_type('bapun', known_data_session_type_dict['bapun'])
         # curr_pipeline = NeuropyPipeline.init_from_known_data_session_type(data_mode, active_known_data_session_type_dict[data_mode])    
-        
-        # if active_data_mode is None:
-                
-        if ((pipeline is None) or (active_data_mode is None)):
+        if (pipeline is None):
+            updated_configs = [] # empty list, no options
+            self.updateKeys(updated_configs) # Update the possible keys           
             return {'active_session_computation_configs': None, 'active_session_filter_configurations':None,
                     'filtered_pipeline': None}
 
@@ -127,10 +133,54 @@ class PipelineFilteringDataNode(CtrlNode):
                 curr_pipeline = None
                 active_session_computation_configs = None
                 active_session_filter_configurations = None
+                raise
 
+        assert (curr_pipeline is not None), 'curr_pipeline is None but has no reason to be!'
+        # Update the available config selection options:
+        updated_configs = list(curr_pipeline.computation_results.keys()) # ['maze1', 'maze2']
+        selected_config_value = str(self.ctrls['included_configs'].currentText())
+        print(f'selected_config_value: {selected_config_value}; updated_configs: {updated_configs}')
+        self.updateKeys(updated_configs) # Update the possible keys
+        
         return {'computation_configs': active_session_computation_configs, 'filter_configurations':active_session_filter_configurations, 'filtered_pipeline': curr_pipeline}
 
 
+    def updateKeys(self, data):
+        if isinstance(data, dict):
+            keys = list(data.keys())
+        elif isinstance(data, list) or isinstance(data, tuple):
+            keys = data
+        elif isinstance(data, np.ndarray) or isinstance(data, np.void):
+            keys = data.dtype.names
+        else:
+            print("Unknown data type:", type(data), data)
+            return
+            
+        for c in self.ctrls.values():
+            c.blockSignals(True)
+        #for c in [self.ctrls['included_configs'], self.ctrls['y'], self.ctrls['size']]:
+        for c in [self.ctrls['included_configs']]:
+            cur = str(c.currentText())
+            c.clear()
+            for k in keys:
+                c.addItem(k)
+                if k == cur:
+                    c.setCurrentIndex(c.count()-1)
+        # for c in [self.ctrls['color'], self.ctrls['border']]:
+        #     c.setArgList(keys)
+        for c in self.ctrls.values():
+            c.blockSignals(False)
+        # Update the self.keys value:
+        self.keys = keys
+        
+
+    def saveState(self):
+        state = CtrlNode.saveState(self)
+        return {'keys': self.keys, 'ctrls': state}
+        
+    def restoreState(self, state):
+        self.updateKeys(state['keys'])
+        CtrlNode.restoreState(self, state['ctrls'])
 
 # class PipelineResultBreakoutNode(CtrlNode):
 #     """Breaks out results from active pipeline"""

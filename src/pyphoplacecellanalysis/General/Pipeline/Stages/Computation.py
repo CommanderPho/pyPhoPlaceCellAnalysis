@@ -232,6 +232,7 @@ class DefaultRegisteredComputations:
     """ Simply enables specifying the default computation functions that will be defined in this file and automatically registered. """
     def register_default_known_computation_functions(self):
         self.register_computation(ExtendedStatsComputations._perform_placefield_overlap_computation)
+        self.register_computation(ExtendedStatsComputations._perform_firing_rate_trends_computation)
         self.register_computation(ExtendedStatsComputations._perform_extended_statistics_computation)
         # self.register_computation(DefaultComputationFunctions._perform_extended_statistics_computation)
         self.register_computation(DefaultComputationFunctions._perform_two_step_position_decoding_computation)

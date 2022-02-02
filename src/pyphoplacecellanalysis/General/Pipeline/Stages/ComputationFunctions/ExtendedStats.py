@@ -28,6 +28,48 @@ class ExtendedStatsComputations:
         return computation_result
     
     
+    def _perform_firing_rate_trends_computation(computation_result: ComputationResult, debug_print=False):
+        """ Computes trends and time-courses of each neuron's firing rate. 
+            Doesn't return an accurate set of windows corresponding to the bins, which is strange because it should be trivial given that these are the same windows used for position, right?
+        """
+        # compute the mean firing rates over all time for each cell
+        mean_firing_rates = np.nanmean(computation_result.computed_data['pf2D_Decoder'].F, axis=0) # output should be (n_units, )
+        # desired_window_length_seconds = 240.0 # 2 minutes
+        desired_window_length_seconds = 10.0 * 60.0 # 10 minutes
+        # desired_window_length_seconds = 2.5 * 60.0 # 2.5 minutes
+        # desired_window_length_seconds = 1.0 * 60.0 # 1.0 minutes
+        desired_window_length_bins = int(np.floor_divide(desired_window_length_seconds, computation_result.computed_data['pf2D_Decoder'].time_bin_size))
+        if debug_print:
+            print(f'desired_window_length_bins: {desired_window_length_bins}')
+        # Pandas rolling method:
+        active_firing_rates_df = pd.DataFrame(computation_result.computed_data['pf2D_Decoder'].F)
+
+        # Get actual time-widnows corresponding to the averages:
+        # active_rolling_window_times = computation_result.computed_data['extended_stats']['time_binned_position_df'].resample(f'{desired_window_length_seconds}sec').center(), # 3 minutes
+        active_rolling_window_times = computation_result.computed_data['extended_stats']['time_binned_position_df'].index # Get the dataframe index
+            # This should be the index. Also, does .center() work?
+        
+        # moving_mean_firing_rates_df = active_firing_rates_df.rolling(window=desired_window_length_bins).agg(['mean','var','max'])
+        moving_mean_firing_rates_df = active_firing_rates_df.rolling(window=desired_window_length_bins).mean()
+
+        computation_result.computed_data['firing_rate_trends'] = {
+         'active_rolling_window_times': active_rolling_window_times,
+         'mean_firing_rates': mean_firing_rates,
+         'desired_window_length_seconds': desired_window_length_seconds,
+         'desired_window_length_bins': desired_window_length_bins, # 3 minutes
+         'active_firing_rates_df': active_firing_rates_df,
+         'moving_mean_firing_rates_df': moving_mean_firing_rates_df
+        }
+        """ 
+        Access via ['firing_rate_trends']['moving_mean_firing_rates_df']
+        Example:
+            active_firing_rate_trends = curr_active_pipeline.computation_results['maze1'].computed_data['firing_rate_trends']
+            moving_mean_firing_rates_df = active_firing_rate_trends['moving_mean_firing_rates_df']
+            moving_mean_firing_rates_df
+            pg.plot(moving_mean_firing_rates_df)
+        """
+        return computation_result
+    
     
     def _perform_placefield_overlap_computation(computation_result: ComputationResult, debug_print=False):
         """ Computes the pairwise overlap between every pair of placefields. """
@@ -68,8 +110,10 @@ class ExtendedStatsComputations:
         """ 
         Access via ['placefield_overlap']['all_pairwise_overlaps']
         Example:
-            active_extended_stats = curr_active_pipeline.computation_results['maze1'].computed_data['extended_stats']
-            time_binned_pos_df = active_extended_stats['time_binned_position_df']
-            time_binned_pos_df
+            active_pf_overlap_results = curr_active_pipeline.computation_results[active_config_name].computed_data['placefield_overlap']
+            all_pairwise_neuron_IDs_combinations = active_pf_overlap_results['all_pairwise_neuron_IDs_combinations']
+            total_pairwise_overlaps = active_pf_overlap_results['total_pairwise_overlaps']
+            all_pairwise_overlaps = active_pf_overlap_results['all_pairwise_overlaps']
+            all_pairwise_overlaps
         """
         return computation_result

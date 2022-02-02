@@ -30,8 +30,9 @@ class PipelineDisplayNode(CtrlNode):
         
     def process(self, active_data_mode=None, active_session_computation_configs=None, active_session_filter_configurations=None, active_pipeline=None, display=True):
                 
-        if (active_pipeline is None):
+        if (active_pipeline is None) or (not display):
             return  {'display_outputs': None}
+
 
         active_config_name = 'maze1'
         display_outputs = active_pipeline.display(DefaultDecoderDisplayFunctions._display_two_step_decoder_prediction_error_2D, active_config_name, variable_name='p_x_given_n') # works!
