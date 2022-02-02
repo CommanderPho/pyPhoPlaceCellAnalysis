@@ -11,6 +11,7 @@ import numpy as np
 class AssociatedOutputWidgetNodeMixin:
     """Implementor should Node subclass that displays an output view widget
         Provides self.view and automatically handles removing the associated view when the node is removed.
+        Provides self.setView(view, on_remove_function) to setup the view
     """
     view: QtGui.QWidget
     
