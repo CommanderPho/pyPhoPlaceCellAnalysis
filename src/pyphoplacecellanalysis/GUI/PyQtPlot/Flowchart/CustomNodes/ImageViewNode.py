@@ -36,9 +36,7 @@ class ImageViewNode(Node):
                 self.on_remove_function(self.view) # call on_remove_function with self to remove self from the layout
                 
             self.view.deleteLater() # How to dynamically remove the widget
-            
-        
-        
+    
     def process(self, data, display=True):
         ## if process is called with display=False, then the flowchart is being operated
         ## in batch processing mode, so we should skip displaying to improve performance.
