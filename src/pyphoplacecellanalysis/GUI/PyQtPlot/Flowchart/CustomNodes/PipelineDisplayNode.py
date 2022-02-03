@@ -3,6 +3,9 @@ from pyqtgraph.flowchart.library.common import CtrlNode
 import pyqtgraph as pg
 import numpy as np
 
+# matplotlib:
+import matplotlib.pyplot as plt
+
 
 from pyphoplacecellanalysis.General.Pipeline.Stages.Display import DefaultDisplayFunctions
 from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.Ratemaps import DefaultRatemapDisplayFunctions
@@ -45,21 +48,37 @@ class PipelineDisplayNode(AssociatedOutputWidgetNodeMixin, AssociatedAppNodeMixi
             return {'display_outputs': None}
 
         active_config_name = 'maze1'
+        
+        print(f'plt.isinteractive(): {plt.isinteractive()}')
+              
+        # plt.plot(np.arange(9))
+        # plt.show()
+        
+        # with plt.ion():
+        #     plt.plot(np.arange(9))
+    
+        # not shown immediately:    
+        with plt.ioff():
+            plt.plot(np.arange(9))
+        plt.show()
+        display_outputs = {
+            'fig':plt.gcf() 
+        }
+        
         # display_outputs = active_pipeline.display(DefaultDecoderDisplayFunctions._display_two_step_decoder_prediction_error_2D, active_config_name, variable_name='p_x_given_n') # works!
-
-        if (self.app is not None) and (self.view is not None):
-            app, parent_root_widget, root_render_widget = active_pipeline.display(DefaultRatemapDisplayFunctions._display_placemaps_pyqtplot_2D, active_config_name, 
-                                                                                    app=self.app, parent_root_widget=self.view, root_render_widget=None)
+        # if (self.app is not None) and (self.view is not None):
+        #     app, parent_root_widget, root_render_widget = active_pipeline.display(DefaultRatemapDisplayFunctions._display_placemaps_pyqtplot_2D, active_config_name, 
+        #                                                                             app=self.app, parent_root_widget=self.view, root_render_widget=None)
             
-            # root_render_widget is added to parent_root_widget if it's needed, which currently it is every frame.
+        #     # root_render_widget is added to parent_root_widget if it's needed, which currently it is every frame.
             
-            # parent_root_widget.show()
-            display_outputs = {
-            'app':app, 'parent_root_widget':parent_root_widget, 'root_render_widget':root_render_widget   
-            }
-        else:
-            display_outputs = None
-            raise
+        #     # parent_root_widget.show()
+        #     display_outputs = {
+        #     'app':app, 'parent_root_widget':parent_root_widget, 'root_render_widget':root_render_widget   
+        #     }
+        # else:
+        #     display_outputs = None
+        #     raise
             
         return {'display_outputs': display_outputs}
 
