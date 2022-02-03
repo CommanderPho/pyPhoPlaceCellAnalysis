@@ -127,18 +127,27 @@ def _add_pho_pipeline_programmatic_flowchart_nodes(app, fc, layout):
     # need app and win
     # new_view_widget = pg.GraphicsWidget()
     
-    # Build the new outer container widget to hold the other views:
-    new_view_widget = QtGui.QWidget()
+    # # Build the new outer container widget to hold the other views:
+    # new_view_widget = QtGui.QWidget()
+    # layout.addWidget(new_view_widget, 1, 1) # start at 1 since the console is available at 0
+    
+    # # create a layout for the new container view:
+    # new_view_layout = QtGui.QGridLayout()
+    # new_view_widget.setLayout(new_view_layout)
+    # # build the internal widget
+    # new_root_render_widget = pg.GraphicsLayoutWidget()
+    # new_view_layout.addWidget(new_root_render_widget, 1, 1) # add the new view to the new layout
+    
+    
+    
+    # Matplotlib widget directly:
+    new_view_widget = MatplotlibWidget()
     layout.addWidget(new_view_widget, 1, 1) # start at 1 since the console is available at 0
     
-    # create a layout for the new container view:
-    new_view_layout = QtGui.QGridLayout()
-    new_view_widget.setLayout(new_view_layout)
-    # build the internal widget
-    new_root_render_widget = pg.GraphicsLayoutWidget()
-    new_view_layout.addWidget(new_root_render_widget, 1, 1) # add the new view to the new layout
-    
-    
+    subplot = new_view_widget.getFigure().add_subplot(111)
+    subplot.plot(np.arange(9))
+    new_view_widget.draw()
+        
     # new_view_widget.setCentralWidget(new_root_render_widget)
         
     
@@ -161,8 +170,10 @@ def _add_pho_pipeline_programmatic_flowchart_nodes(app, fc, layout):
 
     pipeline_display_node = fc.createNode('PipelineDisplayNode', pos=(154, 20))
     pipeline_display_node.setApp(app) # Sets the shared singleton app instance
-    pipeline_display_node.setView(new_root_render_widget, on_remove_function=on_remove_widget_fn) # Sets the view associated with the node. Note that this is the 
-    # pipeline_display_node.setView(new_view_widget, on_remove_function=on_remove_widget_fn) # Sets the view associated with the node. Note that this is the programmatically instantiated node
+    # pipeline_display_node.setView(new_root_render_widget, on_remove_function=on_remove_widget_fn) # Sets the view associated with the node. Note that this is the 
+    
+    # for direct matploblib widget mode:
+    pipeline_display_node.setView(new_view_widget, on_remove_function=on_remove_widget_fn) # Sets the view associated with the node. Note that this is the programmatically instantiated node
 
     # Setup connections:
     
