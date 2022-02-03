@@ -7,6 +7,25 @@ import numpy as np
 
 """ AssociatedOutputWidgetNodeMixin.py """
 
+class AssociatedAppNodeMixin:
+    """Implementors own an app, meaning a singleton instance of QApplication. """
+    
+    @property
+    def app(self):
+        """The app property."""
+        return self._app
+    @app.setter
+    def app(self, value):
+        self._app = value
+    
+    # def __init__(self, app):
+    #     super(AssociatedAppNodeMixin, self).__init__()
+    #     self._app = app
+        
+    def setApp(self, app):
+        self.app = app
+
+
 
 class AssociatedOutputWidgetNodeMixin:
     """Implementor should Node subclass that displays an output view widget
@@ -32,11 +51,11 @@ class AssociatedOutputWidgetNodeMixin:
         self._on_remove_function = value
 
 
-    def __init__(self, name):
-        self.view = None
-        self.on_remove_function = None
-        ## Initialize node with only a single input terminal
-        Node.__init__(self, name, terminals={'data': {'io':'in'}})
+    # def __init__(self, name):
+    #     self.view = None
+    #     self.on_remove_function = None
+    #     ## Initialize node with only a single input terminal
+    #     Node.__init__(self, name, terminals={'data': {'io':'in'}})
         
     def setView(self, view, on_remove_function=None):  ## setView must be called by the program
         self.view = view

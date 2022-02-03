@@ -65,7 +65,7 @@ def plot_flowchartWidget(title='PhoFlowchartApp'):
 
     _register_custom_node_types(fc)
     
-    _add_pho_pipeline_programmatic_flowchart_nodes(fc, layout)
+    _add_pho_pipeline_programmatic_flowchart_nodes(app, fc, layout)
     # _add_default_example_programmatic_flowchart_nodes(fc, layout)    
 
     # end node setup:
@@ -102,7 +102,7 @@ def _register_custom_node_types(fc):
 
 
 
-def _add_pho_pipeline_programmatic_flowchart_nodes(fc, layout):
+def _add_pho_pipeline_programmatic_flowchart_nodes(app, fc, layout):
     ## Now we will programmatically add nodes to define the function of the flowchart.
     ## Normally, the user will do this manually or by loading a pre-generated
     ## flowchart file.
@@ -124,6 +124,24 @@ def _add_pho_pipeline_programmatic_flowchart_nodes(fc, layout):
         layout.removeWidget(widget)
 
     ## Result/Visualization Widgets:
+    # need app and win
+    # new_view_widget = pg.GraphicsWidget()
+    
+    # Build the new outer container widget to hold the other views:
+    new_view_widget = QtGui.QWidget()
+    layout.addWidget(new_view_widget, 1, 1) # start at 1 since the console is available at 0
+    
+    # create a layout for the new container view:
+    new_view_layout = QtGui.QGridLayout()
+    new_view_widget.setLayout(new_view_layout)
+    # build the internal widget
+    new_root_render_widget = pg.GraphicsLayoutWidget()
+    new_view_layout.addWidget(new_root_render_widget, 1, 1) # add the new view to the new layout
+    
+    
+    # new_view_widget.setCentralWidget(new_root_render_widget)
+        
+    
     ## Create two ImageView widgets to display the raw and processed data with contrast
     ## and color control.
     # v1 = pg.ImageView()
@@ -142,7 +160,10 @@ def _add_pho_pipeline_programmatic_flowchart_nodes(fc, layout):
     # pipeline_filter_node.setView(v2, on_remove_function=on_remove_widget_fn)
 
     pipeline_display_node = fc.createNode('PipelineDisplayNode', pos=(154, 20))
-    
+    pipeline_display_node.setApp(app) # Sets the shared singleton app instance
+    pipeline_display_node.setView(new_root_render_widget, on_remove_function=on_remove_widget_fn) # Sets the view associated with the node. Note that this is the 
+    # pipeline_display_node.setView(new_view_widget, on_remove_function=on_remove_widget_fn) # Sets the view associated with the node. Note that this is the programmatically instantiated node
+
     # Setup connections:
     
     # fc.connectTerminals(fc['dataIn'], pipeline_display_node['dataIn'])
@@ -161,6 +182,7 @@ def _add_pho_pipeline_programmatic_flowchart_nodes(fc, layout):
     fc.connectTerminals(pipeline_filter_node['filtered_pipeline'], fc['dataOut']) # raw pipeline output from computation node
     
     # Display Node Outputs:   
+    
     
 
 def _add_default_example_programmatic_flowchart_nodes(fc, layout):

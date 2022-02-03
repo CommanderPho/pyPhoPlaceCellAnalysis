@@ -13,7 +13,7 @@ from pyphocorehelpers.indexing_helpers import compute_paginated_grid_config
 from pyphocorehelpers.plotting.pyqtplot_basic import pyqtplot_common_setup
 
 
-def pyqtplot_plot_image_array(xbin_edges, ybin_edges, images, occupancy, max_num_columns = 5, drop_below_threshold: float=0.0000001, enable_LUT_Histogram=False, debug_print=False):
+def pyqtplot_plot_image_array(xbin_edges, ybin_edges, images, occupancy, max_num_columns = 5, drop_below_threshold: float=0.0000001, enable_LUT_Histogram=False, app=None, parent_root_widget=None, root_render_widget=None, debug_print=False):
     """ Plots an array of images provided in 'images' argument
     images should be an nd.array with dimensions like: (10, 63, 63), where (N_Images, X_Dim, Y_Dim)
         or (2, 5, 63, 63), where (N_Rows, N_Cols, X_Dim, Y_Dim)
@@ -26,10 +26,8 @@ def pyqtplot_plot_image_array(xbin_edges, ybin_edges, images, occupancy, max_num
 
         app, win = pyqtplot_plot_image_array(active_one_step_decoder.xbin, active_one_step_decoder.ybin, images, occupancy)
         win.show()
-
     """
-
-    w, win, app = pyqtplot_common_setup(f'pyqtplot_plot_image_array: {np.shape(images)}')
+    root_render_widget, parent_root_widget, app = pyqtplot_common_setup(f'pyqtplot_plot_image_array: {np.shape(images)}', app=app, parent_root_widget=parent_root_widget, root_render_widget=root_render_widget)
     
     # cmap = pg.ColorMap(pos=np.linspace(0.0, 1.0, 6), color=colors)
     cmap = pg.colormap.get('jet','matplotlib') # prepare a linear color map
@@ -55,12 +53,6 @@ def pyqtplot_plot_image_array(xbin_edges, ybin_edges, images, occupancy, max_num
     # Paging Management: Constrain the subplots values to just those that you need
     subplot_no_pagination_configuration, included_combined_indicies_pages, page_grid_sizes = compute_paginated_grid_config(nMapsToShow, max_num_columns=max_num_columns, max_subplots_per_page=None, data_indicies=included_unit_indicies, last_figure_subplots_same_layout=True)
     page_idx = 0 # page_idx is zero here because we only have one page:
-
-    # ## Reshape images mode: reshape them into rows, columns, *, *
-    # flat_images_shape = np.shape(images)
-    # new_images_shape = (subplot_no_pagination_configuration.num_rows, subplot_no_pagination_configuration.num_columns, flat_images_shape[-2], flat_images_shape[-1])
-    # images = np.reshape(images, new_images_shape)
-    # # print(f'flat_images_shape: {flat_images_shape}, new_images_shape: {new_images_shape}, np.shape(images): {np.shape(images)}')
 
     for (a_linear_index, curr_row, curr_col, curr_included_unit_index) in included_combined_indicies_pages[page_idx]:
         # Need to convert to page specific:
@@ -89,9 +81,8 @@ def pyqtplot_plot_image_array(xbin_edges, ybin_edges, images, occupancy, max_num
         #     # vb.addItem(imv) # add the item to the view box: why do we need the wrapping view box?
         #     # vb.autoRange()
         
-
         # # plot mode:
-        curr_plot = w.addPlot(row=curr_row, col=curr_col, name=curr_plot_identifier_string, title=curr_cell_identifier_string)
+        curr_plot = root_render_widget.addPlot(row=curr_row, col=curr_col, name=curr_plot_identifier_string, title=curr_cell_identifier_string)
         curr_plot.addItem(img_item)  # add ImageItem to PlotItem
         curr_plot.showAxes(True)
         # curr_plot.showGrid(True, True, 0.7)
@@ -119,103 +110,23 @@ def pyqtplot_plot_image_array(xbin_edges, ybin_edges, images, occupancy, max_num
         # Have ColorBarItem control colors of img and appear in 'plot':
         bar.setImageItem(img_item, insert_in=curr_plot)
 
-
-
-    # ## Dual Index Iteration Mode:
-    # for i in np.arange(np.shape(images)[0]):
-    #     for j in np.arange(np.shape(images)[1]):
-    #         image = np.squeeze(images[i,j,:,:])
-    #         # Pre-filter the data:
-    #         image = np.array(image.copy()) / np.nanmax(image) # note scaling by maximum here!
-    #         if drop_below_threshold is not None:
-    #             image[np.where(occupancy < drop_below_threshold)] = np.nan # null out the occupancy
-    #
-    #         # ImageView version:
-    #         # imv = pg.ImageView()
-    #         # img_item = pg.ImageItem(image=np.eye(3), levels=(0,1))
-    #         img_item = pg.ImageItem(image=image, levels=(0,1))
-    #         # curr_item = w.addItem(img_item, row=i, col=j)
-    #
-    #         # # plot mode:
-    #         curr_plot = w.addPlot(row=i, col=j)
-    #         curr_plot.addItem(img_item)  # add ImageItem to PlotItem
-    #         curr_plot.showAxes(True)
-    #         # curr_plot.showGrid(True, True, 0.7)
-    #
-    #         curr_label = pg.TextItem(f'Cell[{i}]', color=(230, 230, 230))
-    #         curr_label.setPos(30, 60)
-    #         curr_label.setParentItem(img_item)
-    #         curr_plot.addItem(curr_label, ignoreBounds=True)
-    #
-    #         # img_item.setImage(image, xvals=xbin_edges, rect=image_bounds_extent)
-    #         img_item.setImage(image, rect=image_bounds_extent)
-    #         # img_item.setColorMap(cmap)
-    #         img_item.setLookupTable(cmap.getLookupTable(nPts=256))
-    #
-    #         margin = 2.0
-    #         # curr_plot.setXRange(np.min(geometry[:, 0])-margin, np.max(geometry[:, 0])+margin)
-    #         # curr_plot.setYRange(np.min(geometry[:, 1])-margin, np.max(geometry[:, 1])+margin)
-    #         curr_plot.setXRange(global_min_x-margin, global_max_x+margin)
-    #         curr_plot.setYRange(global_min_y-margin, global_max_y+margin)
-
-
-    # p1 = w.addPlot(row=0, col=0)
-
-    # # minimum width value of the label
-    # label.setFixedWidth(130)
-
-
-    # # Old linear mode:
-    # num_images = np.shape(images)[0]
-    # image_indicies = np.arange(num_images)
-    # for i in image_indicies:
-    #     image = np.squeeze(images[i,:,:])
-    #     ## Add 3 plots into the first row (automatic position)
-    #     # active_ax = layout.addPlot(title=f'Plot[{i}]')
-    #
-    #     # ImageView version:
-    #     imv = pg.ImageView()
-    #     # imv.setImage(image, xvals=xbin_edges)
-    #     layout.addWidget(imv)
-    #
-    #     # Viewbox version:
-    #     # vb = layout.addViewBox(lockAspect=False)
-    #     # # Build the ImageItem (which I'm guessing is like pg.ImageView) to add the image
-    #     # imv = pg.ImageItem() # Create it with the current image
-    #     # vb.addItem(imv) # add the item to the view box: why do we need the wrapping view box?
-    #     # vb.autoRange()
-    #
-    #     # layout.addItem(imv)
-    #
-    #     ## Display the data and assign each frame a time value from 1.0 to 3.0
-    #     # imv.setImage(image, xvals=xbin_edges)
-    #     imv.setImage(image, xvals=xbin_edges)
-    #     # Set the color map:
-    #     # imv.setColorMap(cmap)
-
-    # if enable_LUT_Histogram:
-    #     lut = pg.HistogramLUTItem(orientation="horizontal")
-    #     imv.addItem(lut)
-    #     imv.setLookupTable(lut, autoLevel=True)
-    #     h = imv.getHistogram()
-    #     lut.plot.setData(*h)
-
     # Post images loop:
     
     enable_show = False
     
-    if enable_show:
-        win.show()
-    
-    win.setWindowTitle('pyqtplot image array')
+    if parent_root_widget is not None:
+        if enable_show:
+            parent_root_widget.show()
+        
+        parent_root_widget.setWindowTitle('pyqtplot image array')
 
     # pg.exec()
-    return app, win
+    return app, parent_root_widget, root_render_widget
 
 
 
 
-def pyqtplot_plot_image(xbin_edges, ybin_edges, image, enable_LUT_Histogram=False, debug_print=False):
+def pyqtplot_plot_image(xbin_edges, ybin_edges, image, enable_LUT_Histogram=False, app=None, parent_root_widget=None, root_render_widget=None, debug_print=False):
     """ Single image plot using pyqtplot: 
     Holy crap! It actually works to plot the maze, and the adjustable slider works as well!
     
@@ -226,24 +137,28 @@ def pyqtplot_plot_image(xbin_edges, ybin_edges, image, enable_LUT_Histogram=Fals
     """
     # Interpret image data as row-major instead of col-major
     pg.setConfigOptions(imageAxisOrder='row-major')
-    app = pg.mkQApp("Gradiant Layout Example")    
-    # Create window to hold the image:
-    win = QtGui.QMainWindow()
-    win.resize(800,800)
-    # Build a single image view to display the image:
-    imv = pg.ImageView()
-    win.setCentralWidget(imv)
-    # imv.setImage(image, xvals=np.linspace(1., 3., data.shape[0]))
-    win.show()
-    win.setWindowTitle('pyqtplot image')
-    # win.resize(800,600)
+    if app is None:
+        app = pg.mkQApp("Gradiant Layout Example")
+        
+    if root_render_widget is None:
+        if parent_root_widget is None:
+            # Create window to hold the image:
+            parent_root_widget = QtGui.QMainWindow()
+            parent_root_widget.resize(800,800)
+        
+        # Build a single image view to display the image:
+        root_render_widget = pg.ImageView()
+        parent_root_widget.setCentralWidget(root_render_widget)
+        # imv.setImage(image, xvals=np.linspace(1., 3., data.shape[0]))
+        parent_root_widget.show()
+        parent_root_widget.setWindowTitle('pyqtplot image')
+
     ## Display the data and assign each frame a time value from 1.0 to 3.0
-    # imv.setImage(image, xvals=xbin_edges)
-    imv.setImage(image, xvals=xbin_edges)
+    root_render_widget.setImage(image, xvals=xbin_edges)
     # Set the color map:
     # cmap = pg.ColorMap(pos=np.linspace(0.0, 1.0, 6), color=colors)
     cmap = pg.colormap.get('jet','matplotlib') # prepare a linear color map
-    imv.setColorMap(cmap)
+    root_render_widget.setColorMap(cmap)
     
     # if enable_LUT_Histogram:
     #     lut = pg.HistogramLUTItem(orientation="horizontal")
@@ -256,7 +171,7 @@ def pyqtplot_plot_image(xbin_edges, ybin_edges, image, enable_LUT_Histogram=Fals
     # Have ColorBarItem control colors of img and appear in 'plot':
     # bar.setImageItem(image, insert_in=imv) 
 
-    return app, win, imv
+    return app, parent_root_widget, root_render_widget
  
  
  
