@@ -57,6 +57,13 @@ def plot_flowchartWidget(title='PhoFlowchartApp'):
     console_widget = ConsoleWidget(namespace=namespace, text=text)
     layout.addWidget(console_widget, 0, 1)
     
+    ## Create a container to hold all dynamically added widgets.
+    new_dynamic_node_view_container_widget = QtGui.QWidget()
+    layout.addWidget(new_dynamic_node_view_container_widget, 1, 1) # start at 1 since the console is available at 0
+    # create a layout for the new container view:
+    new_wrapper_container_layout = QtGui.QVBoxLayout()
+    new_dynamic_node_view_container_widget.setLayout(new_wrapper_container_layout)
+    
     # mw = MatplotlibWidget()
     # subplot = mw.getFigure().add_subplot(111)
     # subplot.plot(x,y)
@@ -65,7 +72,7 @@ def plot_flowchartWidget(title='PhoFlowchartApp'):
 
     _register_custom_node_types(fc)
     
-    _add_pho_pipeline_programmatic_flowchart_nodes(app, fc, layout)
+    _add_pho_pipeline_programmatic_flowchart_nodes(app, fc, new_wrapper_container_layout) # changed from layout to new_wrapper_container_layout
     # _add_default_example_programmatic_flowchart_nodes(fc, layout)    
 
     # end node setup:
@@ -101,6 +108,19 @@ def _register_custom_node_types(fc):
     
 
 
+class AnotherWindow(QtGui.QWidget):
+    """
+    This "window" is a QWidget. If it has no parent,
+    it will appear as a free-floating window.
+    """
+    def __init__(self, contents):
+        super().__init__()
+        layout = QtGui.QVBoxLayout()
+        for a_widget in contents:
+            layout.addWidget(a_widget)
+        self.setLayout(layout)
+
+
 
 def _add_pho_pipeline_programmatic_flowchart_nodes(app, fc, layout):
     ## Now we will programmatically add nodes to define the function of the flowchart.
@@ -122,6 +142,29 @@ def _add_pho_pipeline_programmatic_flowchart_nodes(app, fc, layout):
         item = layout.itemAt(item_index)
         widget = item.widget() # this should be the same as the passed in widget, but do this just to be sure
         layout.removeWidget(widget)
+        
+    def on_add_widget_fn(show_in_separate_window=True):
+        """ uses layout implicitly """
+        # Matplotlib widget directly:
+        new_view_widget = MatplotlibWidget()
+        if show_in_separate_window:
+            new_widget_window = AnotherWindow([new_view_widget])
+            new_widget_window.setWindowTitle(f'PhoFlowchartApp: Custom Result Window')
+            new_widget_window.show()
+            new_widget_window.resize(800,600)
+        else:
+            new_widget_window = None # no window created
+            layout.addWidget(new_view_widget) # now assumes layout is a QVBoxLayout
+            # layout.addWidget(new_view_widget, 1, 1) # start at 1 since the console is available at 0
+        
+        # add example plot to figure
+        subplot = new_view_widget.getFigure().add_subplot(111)
+        subplot.plot(np.arange(9))
+        new_view_widget.draw()
+        
+        return new_view_widget, new_widget_window
+    
+        
 
     ## Result/Visualization Widgets:
     # need app and win
@@ -138,16 +181,30 @@ def _add_pho_pipeline_programmatic_flowchart_nodes(app, fc, layout):
     # new_root_render_widget = pg.GraphicsLayoutWidget()
     # new_view_layout.addWidget(new_root_render_widget, 1, 1) # add the new view to the new layout
     
+    # New Window:
+    ## Create main window with a grid layout inside
+    # win = QtGui.QMainWindow()
+    # win.setWindowTitle(f'PhoFlowchartApp: Custom Result Window')
+    # cw = QtGui.QWidget()
+    # win.setCentralWidget(cw)
+    # # layout = QtGui.QGridLayout()
+    # layout = QtGui.QVBoxLayout()
+    # cw.setLayout(layout)
     
-    
-    # Matplotlib widget directly:
-    new_view_widget = MatplotlibWidget()
-    layout.addWidget(new_view_widget, 1, 1) # start at 1 since the console is available at 0
-    
-    subplot = new_view_widget.getFigure().add_subplot(111)
-    subplot.plot(np.arange(9))
-    new_view_widget.draw()
         
+    # # Matplotlib widget directly:
+    # new_view_widget = MatplotlibWidget()
+    # # layout.addWidget(new_view_widget, 1, 1) # start at 1 since the console is available at 0
+    
+    # new_widget_window = AnotherWindow([new_view_widget])
+    # new_widget_window.setWindowTitle(f'PhoFlowchartApp: Custom Result Window')
+    # new_widget_window.show()
+    # new_widget_window.resize(800,600)
+    
+    # subplot = new_view_widget.getFigure().add_subplot(111)
+    # subplot.plot(np.arange(9))
+    # new_view_widget.draw()
+    
     # new_view_widget.setCentralWidget(new_root_render_widget)
         
     
@@ -160,11 +217,11 @@ def _add_pho_pipeline_programmatic_flowchart_nodes(app, fc, layout):
     
     
     ## Set the raw data as the input value to the flowchart
-    fc.setInput(dataIn=None)
-
+    fc.setInput(dataIn='Bapun')
+    
     pipeline_input_node = fc.createNode('PipelineInputDataNode', pos=(-200, 50))
     # pipeline_input_node.setView(v1, on_remove_function=on_remove_widget_fn) # Sets the view associated with the node. Note that this is the programmatically instantiated node
-
+    
     pipeline_filter_node = fc.createNode('PipelineFilteringDataNode', pos=(-26, 50))
     # pipeline_filter_node.setView(v2, on_remove_function=on_remove_widget_fn)
 
@@ -173,11 +230,15 @@ def _add_pho_pipeline_programmatic_flowchart_nodes(app, fc, layout):
     # pipeline_display_node.setView(new_root_render_widget, on_remove_function=on_remove_widget_fn) # Sets the view associated with the node. Note that this is the 
     
     # for direct matploblib widget mode:
-    pipeline_display_node.setView(new_view_widget, on_remove_function=on_remove_widget_fn) # Sets the view associated with the node. Note that this is the programmatically instantiated node
+    # pipeline_display_node.setView(new_view_widget, on_remove_function=on_remove_widget_fn) # Sets the view associated with the node. Note that this is the programmatically instantiated node
+    # dynamic widget building mode:
+    pipeline_display_node.setView(on_add_function=on_add_widget_fn, on_remove_function=on_remove_widget_fn) # Sets the view associated with the node. Note that this is the programmatically instantiated node
+    
+    
+    
 
     # Setup connections:
-    
-    # fc.connectTerminals(fc['dataIn'], pipeline_display_node['dataIn'])
+    fc.connectTerminals(fc['dataIn'], pipeline_input_node['known_mode'])
     
     # Input Node Outputs:
     fc.connectTerminals(pipeline_input_node['loaded_pipeline'], pipeline_filter_node['pipeline'])

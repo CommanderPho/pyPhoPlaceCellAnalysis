@@ -38,35 +38,36 @@ class PipelineInputDataNode(CtrlNode):
         ## Define the input / output terminals available on this node
         terminals = {
             # 'dataIn': dict(io='in'),    # each terminal needs at least a name and
+            'known_mode': dict(io='in'),
             'loaded_pipeline': dict(io='out'),  # to specify whether it is input or output
             'known_data_mode': dict(io='out'),
         }                              # other more advanced options are available
                                        # as well..
+        # Static:
+        self.active_known_data_session_type_dict = PipelineInputDataNode._get_known_data_session_types_dict()
+        self.num_known_types = len(self.active_known_data_session_type_dict.keys())
+        print(f'num_known_types: {self.num_known_types}')
         CtrlNode.__init__(self, name, terminals=terminals)
         
-    def process(self, display=True):
+    def process(self, known_mode='Bapun', display=True):
         # CtrlNode has created self.ctrls, which is a dict containing {ctrlName: widget}
-        # data_mode = self.ctrls['data_mode'].value()        
+        # data_mode = self.ctrls['data_mode'].value()                
         s = self.stateGroup.state()
         if s['data_mode'] == 'bapun':
             data_mode = 'bapun'
         elif s['data_mode'] == 'kdiba':
             data_mode = 'kdiba'
         else:
-            raise NotImplementedError
-            data_mode = None
+            # raise NotImplementedError
+            data_mode = known_mode
 
         print(f'PipelineInputDataNode.data_mode: {data_mode}')
 
-        active_known_data_session_type_dict = self._get_known_data_session_types_dict()
-        num_known_types = len(active_known_data_session_type_dict.keys())
-        print(f'num_known_types: {num_known_types}')
-        
-        with ProgressDialog("Pipeline Input Loading..", 0, num_known_types, parent=None, busyCursor=True, wait=250) as dlg:
+        with ProgressDialog("Pipeline Input Loading..", 0, self.num_known_types, parent=None, busyCursor=True, wait=250) as dlg:
             # do stuff
             # dlg.setValue(0)   ## could also use dlg += 1
             # curr_bapun_pipeline = NeuropyPipeline.init_from_known_data_session_type('bapun', known_data_session_type_dict['bapun'])
-            curr_pipeline = NeuropyPipeline.init_from_known_data_session_type(data_mode, active_known_data_session_type_dict[data_mode])    
+            curr_pipeline = NeuropyPipeline.init_from_known_data_session_type(data_mode, self.active_known_data_session_type_dict[data_mode])    
             # dlg.setValue(num_known_types)   ## could also use dlg += 1
             if dlg.wasCanceled():
                 curr_pipeline = None
@@ -74,7 +75,9 @@ class PipelineInputDataNode(CtrlNode):
 
         return {'known_data_mode': data_mode, 'loaded_pipeline': curr_pipeline}
 
-    def _get_known_data_session_types_dict(self):
+
+    @classmethod
+    def _get_known_data_session_types_dict(cls):
         known_data_session_type_dict = {'kdiba':KnownDataSessionTypeProperties(load_function=(lambda a_base_dir: DataSessionLoader.kdiba_old_format_session(a_base_dir)),
                                     basedir=Path(r'R:\data\KDIBA\gor01\one\2006-6-07_11-26-53')),
                     'bapun':KnownDataSessionTypeProperties(load_function=(lambda a_base_dir: DataSessionLoader.bapun_data_session(a_base_dir)),
@@ -305,10 +308,13 @@ class NonInteractiveWrapper(object):
                 active_session = batch_filter_session(sess, sess.position, sess.spikes_df, active_epoch.to_Epoch())
                 return active_session, active_epoch
 
-            # return {'maze1':_temp_filter_session_by_epoch1}
-            return {'maze1':_temp_filter_session_by_epoch1,
-                    'maze2':_temp_filter_session_by_epoch2
-                }
+            return {'maze1':_temp_filter_session_by_epoch1}
+            # return {'maze1':_temp_filter_session_by_epoch1,
+            #         'maze2':_temp_filter_session_by_epoch2
+            #     }
+            
+            
+            
 
             # return {'maze1': lambda x: (x.filtered_by_epoch(x.epochs.get_named_timerange('maze1')), x.epochs.get_named_timerange('maze1')),
             #         'maze2': lambda x: (x.filtered_by_epoch(x.epochs.get_named_timerange('maze2')), x.epochs.get_named_timerange('maze2'))

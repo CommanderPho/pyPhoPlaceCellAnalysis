@@ -42,6 +42,16 @@ class AssociatedOutputWidgetNodeMixin:
     def view(self, value):
         self._view = value
         
+        
+    @property
+    def owned_parent_container(self):
+        """The owned_parent_container property."""
+        return self._owned_parent_container
+    @owned_parent_container.setter
+    def owned_parent_container(self, value):
+        self._owned_parent_container = value
+        
+    
     @property
     def on_remove_function(self):
         """The on_remove_function property."""
@@ -51,19 +61,37 @@ class AssociatedOutputWidgetNodeMixin:
         self._on_remove_function = value
 
 
+    @property
+    def on_add_function(self):
+        """The on_add_function property."""
+        return self._on_add_function
+    @on_add_function.setter
+    def on_add_function(self, value):
+        self._on_add_function = value
+        
     # def __init__(self, name):
     #     self.view = None
     #     self.on_remove_function = None
     #     ## Initialize node with only a single input terminal
     #     Node.__init__(self, name, terminals={'data': {'io':'in'}})
         
-    def setView(self, view, on_remove_function=None):  ## setView must be called by the program
-        self.view = view
-        self.on_remove_function = on_remove_function
+    def setView(self, owned_parent_container=None, view=None, on_add_function=None, on_remove_function=None):  ## setView must be called by the program
+        self._owned_parent_container = owned_parent_container
+        self._view = view
+        self._on_add_function = on_add_function
+        self._on_remove_function = on_remove_function
+
+        self.on_create_view(None)
+
         # removes the added widget from the interface when this node is closed.
         self.sigClosed.connect(self.on_remove_view) # sigClosed is called when the Node parent class calls its self.close() function, which occurs when it's being removed from the flowchart
         
     
+    def on_create_view(self, event):
+        """ Called to create/build the view using the on_add_function """
+        if self.on_add_function is not None:
+            self.view, self.owned_parent_container = self.on_add_function() # call on_remove_function with self to remove self from the layout
+                
     def on_remove_view(self, event):
         """ Called when the view is to be removed"""
         # print("AssociatedOutputWidgetNodeMixin.on_remove_view()")
