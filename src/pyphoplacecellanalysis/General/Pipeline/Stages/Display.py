@@ -187,6 +187,8 @@ class DefaultDisplayFunctions:
     def _display_1d_placefield_validations(computation_result, active_config, **kwargs):
         """ Renders all of the flat 1D place cell validations with the yellow lines that trace across to their horizontally drawn placefield (rendered on the right of the plot) """
         out_figures_list = plot_1d_placecell_validations(computation_result.computed_data['pf1D'], active_config.plotting_config, **({'modifier_string': 'lap_only', 'should_save': False} | kwargs))
+        return out_figures_list
+
 
 
     def _display_2d_placefield_result_plot_raw(computation_result, active_config, **kwargs):
@@ -245,6 +247,8 @@ class DefaultDisplayFunctions:
 
         # ax_pf_1D, occupancy_fig, active_pf_2D_figures, active_pf_2D_gs = plot_all_placefields(computation_result.computed_data['pf1D'], computation_result.computed_data['pf2D'], active_config, should_save_to_disk=False)
         ax_pf_1D, occupancy_fig, active_pf_2D_figures, active_pf_2D_gs = plot_all_placefields(None, computation_result.computed_data['pf2D'], active_config, **({'should_save_to_disk': False} | kwargs))
+        
+        return occupancy_fig, active_pf_2D_figures
         
 
     ## Tuning Curves 3D Plot:
