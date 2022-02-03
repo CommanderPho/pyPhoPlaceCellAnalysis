@@ -2,7 +2,7 @@ from pyqtgraph.flowchart import Flowchart, Node
 import pyqtgraph.flowchart.library as fclib
 from pyqtgraph.Qt import QtGui, QtCore
 from pyqtgraph.console import ConsoleWidget
-from pyqtgraph.widgets import MatplotlibWidget
+from pyqtgraph.widgets.MatplotlibWidget import MatplotlibWidget
 import pyqtgraph as pg
 import numpy as np
 

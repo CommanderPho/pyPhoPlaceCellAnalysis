@@ -4,7 +4,7 @@ import pyqtgraph as pg
 import numpy as np
 
 # matplotlib:
-import matplotlib.pyplot as plt
+# import matplotlib.pyplot as plt
 
 
 from pyphoplacecellanalysis.General.Pipeline.Stages.Display import DefaultDisplayFunctions
@@ -49,7 +49,7 @@ class PipelineDisplayNode(AssociatedOutputWidgetNodeMixin, AssociatedAppNodeMixi
 
         active_config_name = 'maze1'
         
-        print(f'plt.isinteractive(): {plt.isinteractive()}')
+        # print(f'plt.isinteractive(): {plt.isinteractive()}')
               
         # plt.plot(np.arange(9))
         # plt.show()
@@ -58,12 +58,22 @@ class PipelineDisplayNode(AssociatedOutputWidgetNodeMixin, AssociatedAppNodeMixi
         #     plt.plot(np.arange(9))
     
         # not shown immediately:    
-        with plt.ioff():
-            plt.plot(np.arange(9))
-        plt.show()
-        display_outputs = {
-            'fig':plt.gcf() 
-        }
+        # with plt.ioff():
+        #     plt.plot(np.arange(9))
+        # plt.show()
+        # display_outputs = {
+        #     'fig':plt.gcf() 
+        # }
+        
+        if (self.view is None):
+            return {'display_outputs': None}
+        else:
+            subplot = self.view.getFigure().add_subplot(111)
+            subplot.plot(np.arange(9), np.full((9,), 15))
+            display_outputs = {
+            'subplot':subplot 
+            }
+            self.view.draw()
         
         # display_outputs = active_pipeline.display(DefaultDecoderDisplayFunctions._display_two_step_decoder_prediction_error_2D, active_config_name, variable_name='p_x_given_n') # works!
         # if (self.app is not None) and (self.view is not None):
