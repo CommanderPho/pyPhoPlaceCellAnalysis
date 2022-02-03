@@ -1,3 +1,5 @@
+import sys
+import importlib
 from pyqtgraph.flowchart import Flowchart, Node
 from pyqtgraph.flowchart.library.common import CtrlNode
 import pyqtgraph as pg
@@ -5,7 +7,18 @@ import numpy as np
 
 # matplotlib:
 # import matplotlib.pyplot as plt
+# NeuroPy (Diba Lab Python Repo) Loading
+try:
+    from neuropy import core
+    importlib.reload(core)
+except ImportError:
+    sys.path.append(r"C:\Users\Pho\repos\NeuroPy")  # Windows
+    # sys.path.append('/home/pho/repo/BapunAnalysis2021/NeuroPy') # Linux
+    # sys.path.append(r'/Users/pho/repo/Python Projects/NeuroPy') # MacOS
+    print("neuropy module not found, adding directory to sys.path. \n >> Updated sys.path.")
+    from neuropy import core
 
+from neuropy.plotting.ratemaps import enumTuningMap2DPlotVariables
 
 from pyphoplacecellanalysis.General.Pipeline.Stages.Display import DefaultDisplayFunctions
 from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.Ratemaps import DefaultRatemapDisplayFunctions
@@ -48,6 +61,7 @@ class PipelineDisplayNode(AssociatedOutputWidgetNodeMixin, AssociatedAppNodeMixi
             return {'display_outputs': None}
 
         active_config_name = 'maze1'
+        enable_saving_to_disk = False
         
         # print(f'plt.isinteractive(): {plt.isinteractive()}')
               
@@ -68,11 +82,33 @@ class PipelineDisplayNode(AssociatedOutputWidgetNodeMixin, AssociatedAppNodeMixi
         if (self.view is None):
             return {'display_outputs': None}
         else:
-            subplot = self.view.getFigure().add_subplot(111)
-            subplot.plot(np.arange(9), np.full((9,), 15))
-            display_outputs = {
-            'subplot':subplot 
-            }
+            # test plot
+            active_fig = self.view.getFigure()
+            
+            # subplot = self.view.getFigure().add_subplot(111)
+            # subplot.plot(np.arange(9), np.full((9,), 15))
+            
+            # active_fig_num = None
+            active_fig_num = 1
+            # active_fig_num = active_fig.number
+                        
+            # active_fig_num = self.view.getFigure() # pass the figure itself as the fignum
+            # print(f'active_fig_num: {active_fig_num}')
+            
+            # curr_kdiba_pipeline.display(DefaultDisplayFunctions._display_2d_placefield_result_plot_ratemaps_2D, filter_name, enable_spike_overlay=False, plot_variable=enumTuningMap2DPlotVariables.FIRING_MAPS, fignum=0, max_screen_figure_size=(None, 1868), debug_print=False, enable_saving_to_disk=enable_saving_to_disk) # works!
+            
+            active_pf_2D_figures = active_pipeline.display(DefaultDisplayFunctions._display_2d_placefield_result_plot_ratemaps_2D, active_config_name, enable_spike_overlay=False, plot_variable=enumTuningMap2DPlotVariables.TUNING_MAPS, fignum=active_fig_num, max_screen_figure_size=(None, 1868), debug_print=False, enable_saving_to_disk=enable_saving_to_disk)
+
+            post_plot_active_fig = active_pf_2D_figures[0]
+            
+            # active_fig_num = post_plot_active_fig.number() # pass the figure itself as the fignum
+            print(f'active_fig_num: {active_fig_num}')
+            
+            active_fig.add_subfigure(post_plot_active_fig)
+            
+            # display_outputs = {'subplot':subplot}
+            display_outputs = {'fig':active_fig, 'fig_num':active_fig_num}
+            
             self.view.draw()
         
         # display_outputs = active_pipeline.display(DefaultDecoderDisplayFunctions._display_two_step_decoder_prediction_error_2D, active_config_name, variable_name='p_x_given_n') # works!

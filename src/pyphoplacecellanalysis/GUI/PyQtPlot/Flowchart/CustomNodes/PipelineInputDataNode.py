@@ -3,6 +3,7 @@ from pyqtgraph.flowchart import Flowchart, Node
 import pyqtgraph.flowchart.library as fclib
 from pyqtgraph.flowchart.library.common import CtrlNode
 from pyqtgraph.Qt import QtGui, QtCore
+from pyqtgraph.widgets.ProgressDialog import ProgressDialog
 import pyqtgraph as pg
 import numpy as np
 
@@ -23,20 +24,6 @@ from neuropy.analyses.placefields import PlacefieldComputationParameters, perfor
 from neuropy.core.neuron_identities import NeuronIdentity, build_units_colormap, PlotStringBrevityModeEnum
 from neuropy.utils.debug_helpers import debug_print_placefield, debug_print_spike_counts, debug_print_subsession_neuron_differences
 from neuropy.plotting.ratemaps import enumTuningMap2DPlotVariables
-
-
-# class AsType(CtrlNode):
-#     """Convert an array to a different dtype.
-#     """
-#     nodeName = 'AsType'
-#     uiTemplate = [
-#         ('dtype', 'combo', {'values': ['float', 'int', 'float32', 'float64', 'float128', 'int8', 'int16', 'int32', 'int64', 'uint8', 'uint16', 'uint32', 'uint64'], 'index': 0}),
-#     ]
-    
-#     def processData(self, data):
-#         s = self.stateGroup.state()
-#         return data.astype(s['dtype'])
-
 
 
 class PipelineInputDataNode(CtrlNode):
@@ -72,9 +59,19 @@ class PipelineInputDataNode(CtrlNode):
         print(f'PipelineInputDataNode.data_mode: {data_mode}')
 
         active_known_data_session_type_dict = self._get_known_data_session_types_dict()
-        # curr_bapun_pipeline = NeuropyPipeline.init_from_known_data_session_type('bapun', known_data_session_type_dict['bapun'])
-        curr_pipeline = NeuropyPipeline.init_from_known_data_session_type(data_mode, active_known_data_session_type_dict[data_mode])
+        num_known_types = len(active_known_data_session_type_dict.keys())
+        print(f'num_known_types: {num_known_types}')
         
+        with ProgressDialog("Pipeline Input Loading..", 0, num_known_types, parent=None, busyCursor=True, wait=250) as dlg:
+            # do stuff
+            # dlg.setValue(0)   ## could also use dlg += 1
+            # curr_bapun_pipeline = NeuropyPipeline.init_from_known_data_session_type('bapun', known_data_session_type_dict['bapun'])
+            curr_pipeline = NeuropyPipeline.init_from_known_data_session_type(data_mode, active_known_data_session_type_dict[data_mode])    
+            # dlg.setValue(num_known_types)   ## could also use dlg += 1
+            if dlg.wasCanceled():
+                curr_pipeline = None
+                raise Exception("Processing canceled by user")
+
         return {'known_data_mode': data_mode, 'loaded_pipeline': curr_pipeline}
 
     def _get_known_data_session_types_dict(self):
@@ -126,9 +123,11 @@ class PipelineFilteringDataNode(CtrlNode):
 
         if active_data_mode is not None:
             if active_data_mode == 'bapun':
-                curr_pipeline, active_session_computation_configs, active_session_filter_configurations = NonInteractiveWrapper.bapun_format(pipeline)
+                with ProgressDialog("Pipeline Input Loading: Bapun Format..", 0, 1, parent=None, busyCursor=True, wait=250) as dlg:
+                    curr_pipeline, active_session_computation_configs, active_session_filter_configurations = NonInteractiveWrapper.bapun_format(pipeline)
             elif active_data_mode == 'kdiba':
-                curr_pipeline, active_session_computation_configs, active_session_filter_configurations = NonInteractiveWrapper.kdiba_format(pipeline)
+                with ProgressDialog("Pipeline Input Loading: Kamran Format..", 0, 1, parent=None, busyCursor=True, wait=250) as dlg:
+                    curr_pipeline, active_session_computation_configs, active_session_filter_configurations = NonInteractiveWrapper.kdiba_format(pipeline)
             else:
                 curr_pipeline = None
                 active_session_computation_configs = None
