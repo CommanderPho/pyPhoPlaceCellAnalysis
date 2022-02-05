@@ -125,7 +125,6 @@ def pyqtplot_plot_image_array(xbin_edges, ybin_edges, images, occupancy, max_num
 
 
 
-
 def pyqtplot_plot_image(xbin_edges, ybin_edges, image, enable_LUT_Histogram=False, app=None, parent_root_widget=None, root_render_widget=None, debug_print=False):
     """ Single image plot using pyqtplot: 
     Holy crap! It actually works to plot the maze, and the adjustable slider works as well!

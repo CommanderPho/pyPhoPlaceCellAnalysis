@@ -38,11 +38,6 @@ except ImportError:
     print("neuropy module not found, adding directory to sys.path. \n >> Updated sys.path.")
     from neuropy import core
 
-# Neuropy:
-from neuropy.core.session.data_session_loader import DataSessionLoader
-from neuropy.core.session.dataSession import DataSession
-from neuropy.analyses.placefields import PlacefieldComputationParameters, perform_compute_placefields
-
 
 # known_data_session_type_dict = {'kdiba':KnownDataSessionTypeProperties(load_function=(lambda a_base_dir: DataSessionLoader.kdiba_old_format_session(a_base_dir)),
 #                                basedir=Path(r'R:\data\KDIBA\gor01\one\2006-6-07_11-26-53')),

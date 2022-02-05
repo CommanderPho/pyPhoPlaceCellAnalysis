@@ -1,7 +1,7 @@
 import sys
 import importlib
 from pyqtgraph.flowchart import Flowchart, Node
-from pyqtgraph.flowchart.library.common import CtrlNode
+from pyqtgraph.flowchart.library.common import CtrlNode, PlottingCtrlNode
 import pyqtgraph as pg
 import numpy as np
 
@@ -27,7 +27,7 @@ from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPred
 from pyphoplacecellanalysis.GUI.PyQtPlot.Flowchart.CustomNodes.Mixins.AssociatedOutputWidgetNodeMixin import AssociatedAppNodeMixin, AssociatedOutputWidgetNodeMixin
 
 
-class PipelineDisplayNode(AssociatedOutputWidgetNodeMixin, AssociatedAppNodeMixin, CtrlNode):
+class PipelineDisplayNode(AssociatedOutputWidgetNodeMixin, AssociatedAppNodeMixin, PlottingCtrlNode):
     """Displays active pipeline.
         TODO: allow the user to select which display function will be used, and optionally pass any function-specific parameters by adding additional inputs.
             - Probably should have a plaintext input like the arbitrary python exec example node to allow typing the function.
@@ -53,7 +53,7 @@ class PipelineDisplayNode(AssociatedOutputWidgetNodeMixin, AssociatedAppNodeMixi
             'active_pipeline': dict(io='in'),
             'display_outputs': dict(io='out'),            
         }
-        CtrlNode.__init__(self, name, terminals=terminals)
+        PlottingCtrlNode.__init__(self, name, terminals=terminals)
         
     def process(self, active_data_mode=None, active_session_computation_configs=None, active_session_filter_configurations=None, active_pipeline=None, display=True):
         
