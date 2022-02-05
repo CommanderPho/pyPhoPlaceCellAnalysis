@@ -42,13 +42,15 @@ class PhoPipelineMainWindow(QtWidgets.QMainWindow):
 
 
     def __init__(self, title='PhoFlowchartApp', *args, **kwargs):
+        self._app = pg.mkQApp(title)
         self._initialize_data()
+        
         super(PhoPipelineMainWindow, self).__init__(*args, **kwargs)
 
         #Load the UI Page
         uic.loadUi(uiFile, self)
         
-        self._app = pg.mkQApp(title)
+
 
         # self.graphWidget = pg.PlotWidget()
         # self.setCentralWidget(self.graphWidget)
@@ -60,7 +62,6 @@ class PhoPipelineMainWindow(QtWidgets.QMainWindow):
         # self.graphWidget.plot(hour, temperature)
 
     def _initialize_data(self):
-        self._app = None
         self._flowchart = None
         self._pipeline = None
         

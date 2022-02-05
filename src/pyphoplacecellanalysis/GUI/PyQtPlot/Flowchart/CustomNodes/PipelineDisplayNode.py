@@ -55,7 +55,6 @@ class PipelineDisplayNode(AssociatedOutputWidgetNodeMixin, AssociatedAppNodeMixi
         }
         PlottingCtrlNode.__init__(self, name, terminals=terminals)
         
-
         # Setup the display button:
         self.ctrls['display'].setText('Display')
         def click():

@@ -31,7 +31,6 @@ class PipelineFilteringDataNode(CtrlNode):
         }
         CtrlNode.__init__(self, name, terminals=terminals)
         self.keys = [] # the active config keys
-        self.ctrls['recompute'].setText('recompute')
         # Setup the recompute button:
         self.ctrls['recompute'].setText('recompute')
         def click():

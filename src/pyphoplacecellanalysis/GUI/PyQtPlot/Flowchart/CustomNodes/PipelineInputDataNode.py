@@ -41,7 +41,27 @@ class PipelineInputDataNode(CtrlNode):
         self.num_known_types = len(self.active_known_data_session_type_dict.keys())
         print(f'num_known_types: {self.num_known_types}')
         CtrlNode.__init__(self, name, terminals=terminals)
+
+        # Setup the reload button:
         self.ctrls['reload'].setText('Reload')
+        def click():
+            self.ctrls['reload'].processing("Hold on..")
+            # time.sleep(2.0)
+            
+            # Not sure whether to call self.changed() (from CtrlNode) or self.update() from its parent class.
+            # self.update() 
+            self.changed() # should trigger re-computation in a blocking manner.
+            
+            # global fail
+            # fail = not fail
+            
+            fail = False
+            if fail:
+                self.ctrls['reload'].failure(message="FAIL.", tip="There was a failure. Get over it.")
+            else:
+                self.ctrls['reload'].success(message="Bueno!")
+                
+        
         
     def process(self, known_mode='Bapun', display=True):
         # CtrlNode has created self.ctrls, which is a dict containing {ctrlName: widget}
