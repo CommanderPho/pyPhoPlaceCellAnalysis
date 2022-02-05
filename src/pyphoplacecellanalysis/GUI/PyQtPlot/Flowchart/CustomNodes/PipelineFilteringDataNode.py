@@ -26,12 +26,30 @@ class PipelineFilteringDataNode(CtrlNode):
             'active_data_mode': dict(io='in'),
             'pipeline': dict(io='in'),
             'computation_configs': dict(io='out'),
-            'filter_configurations': dict(io='out'),
+            'filter_configs': dict(io='out'),
             'filtered_pipeline': dict(io='out'),
         }
         CtrlNode.__init__(self, name, terminals=terminals)
         self.keys = [] # the active config keys
         self.ctrls['recompute'].setText('recompute')
+        # Setup the recompute button:
+        self.ctrls['recompute'].setText('recompute')
+        def click():
+            self.ctrls['recompute'].processing("Hold on..")
+            # Not sure whether to call self.changed() (from CtrlNode) or self.update() from its parent class.
+            # self.update() 
+            self.changed() # should trigger re-computation in a blocking manner.
+            
+            # global fail
+            # fail = not fail
+            
+            fail = False
+            if fail:
+                self.ctrls['recompute'].failure(message="FAIL.", tip="There was a failure. Get over it.")
+            else:
+                self.ctrls['recompute'].success(message="Bueno!")
+                
+        self.ctrls['recompute'].clicked.connect(click)
         
         
         
@@ -47,20 +65,20 @@ class PipelineFilteringDataNode(CtrlNode):
         if (pipeline is None):
             updated_configs = [] # empty list, no options
             self.updateKeys(updated_configs) # Update the possible keys           
-            return {'active_session_computation_configs': None, 'active_session_filter_configurations':None,
+            return {'active_session_computation_configs': None, 'active_session_filter_configs':None,
                     'filtered_pipeline': None}
 
         if active_data_mode is not None:
             if active_data_mode == 'bapun':
                 with ProgressDialog("Pipeline Input Loading: Bapun Format..", 0, 1, parent=None, busyCursor=True, wait=250) as dlg:
-                    curr_pipeline, active_session_computation_configs, active_session_filter_configurations = NonInteractiveWrapper.bapun_format(pipeline)
+                    curr_pipeline, active_session_computation_configs, active_session_filter_configs = NonInteractiveWrapper.bapun_format(pipeline)
             elif active_data_mode == 'kdiba':
                 with ProgressDialog("Pipeline Input Loading: Kamran Format..", 0, 1, parent=None, busyCursor=True, wait=250) as dlg:
-                    curr_pipeline, active_session_computation_configs, active_session_filter_configurations = NonInteractiveWrapper.kdiba_format(pipeline)
+                    curr_pipeline, active_session_computation_configs, active_session_filter_configs = NonInteractiveWrapper.kdiba_format(pipeline)
             else:
                 curr_pipeline = None
                 active_session_computation_configs = None
-                active_session_filter_configurations = None
+                active_session_filter_configs = None
                 raise
 
         assert (curr_pipeline is not None), 'curr_pipeline is None but has no reason to be!'
@@ -70,7 +88,7 @@ class PipelineFilteringDataNode(CtrlNode):
         print(f'selected_config_value: {selected_config_value}; updated_configs: {updated_configs}')
         self.updateKeys(updated_configs) # Update the possible keys
         
-        return {'computation_configs': active_session_computation_configs, 'filter_configurations':active_session_filter_configurations, 'filtered_pipeline': curr_pipeline}
+        return {'computation_configs': active_session_computation_configs, 'filter_configs':active_session_filter_configs, 'filtered_pipeline': curr_pipeline}
 
 
     def updateKeys(self, data):

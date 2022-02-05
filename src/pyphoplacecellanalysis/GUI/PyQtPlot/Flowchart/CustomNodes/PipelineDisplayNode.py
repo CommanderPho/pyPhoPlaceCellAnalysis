@@ -34,11 +34,11 @@ class PipelineDisplayNode(AssociatedOutputWidgetNodeMixin, AssociatedAppNodeMixi
             - Ideally would have an option to spawn the output widget in a new window or to add it to the main window.
     """
     nodeName = "PipelineDisplayNode"
-    # uiTemplate = [
-    #     ('filter_function', 'combo', {'values': ['test1', 'test2', 'custom...'], 'index': 0}),
-    #     # ('sigma',  'spin', {'value': 1.0, 'step': 1.0, 'bounds': [0.0, None]}),
-    #     # ('strength', 'spin', {'value': 1.0, 'dec': True, 'step': 0.5, 'minStep': 0.01, 'bounds': [0.0, None]}),
-    # ]
+    uiTemplate = [
+        ('display', 'action'),
+        # ('sigma',  'spin', {'value': 1.0, 'step': 1.0, 'bounds': [0.0, None]}),
+        # ('strength', 'spin', {'value': 1.0, 'dec': True, 'step': 0.5, 'minStep': 0.01, 'bounds': [0.0, None]}),
+    ]
     def __init__(self, name):
         # Initialize the associated app
         self.app = None
@@ -47,17 +47,41 @@ class PipelineDisplayNode(AssociatedOutputWidgetNodeMixin, AssociatedAppNodeMixi
         self.on_remove_function = None
         ## Define the input / output terminals available on this node
         terminals = {
-            'active_data_mode': dict(io='in'),
-            'active_session_computation_configs': dict(io='in'),
-            'active_session_filter_configurations': dict(io='in'),
-            'active_pipeline': dict(io='in'),
+            'mode': dict(io='in'),
+            'computation_configs': dict(io='in'),
+            'filter_configs': dict(io='in'),
+            'pipeline': dict(io='in'),
             'display_outputs': dict(io='out'),            
         }
         PlottingCtrlNode.__init__(self, name, terminals=terminals)
         
-    def process(self, active_data_mode=None, active_session_computation_configs=None, active_session_filter_configurations=None, active_pipeline=None, display=True):
+
+        # Setup the display button:
+        self.ctrls['display'].setText('Display')
+        def click():
+            self.ctrls['display'].processing("Hold on..")
+            # time.sleep(2.0)
+            
+            # Not sure whether to call self.changed() (from CtrlNode) or self.update() from its parent class.
+            # self.update() 
+            self.changed() # should trigger re-computation in a blocking manner.
+            
+            # global fail
+            # fail = not fail
+            
+            fail = False
+            if fail:
+                self.ctrls['display'].failure(message="FAIL.", tip="There was a failure. Get over it.")
+            else:
+                self.ctrls['display'].success(message="Bueno!")
+                
+                
+        self.ctrls['display'].clicked.connect(click)
         
-        if (active_pipeline is None) or (not display):
+        
+    def process(self, mode=None, computation_configs=None, filter_configs=None, pipeline=None, display=True):
+        
+        if (pipeline is None) or (not display):
             return {'display_outputs': None}
 
         active_config_name = 'maze1'
@@ -99,7 +123,7 @@ class PipelineDisplayNode(AssociatedOutputWidgetNodeMixin, AssociatedAppNodeMixi
             
             # curr_kdiba_pipeline.display(DefaultDisplayFunctions._display_2d_placefield_result_plot_ratemaps_2D, filter_name, enable_spike_overlay=False, plot_variable=enumTuningMap2DPlotVariables.FIRING_MAPS, fignum=0, max_screen_figure_size=(None, 1868), debug_print=False, enable_saving_to_disk=enable_saving_to_disk) # works!
             
-            active_pf_2D_figures = active_pipeline.display(DefaultDisplayFunctions._display_2d_placefield_result_plot_ratemaps_2D, active_config_name, enable_spike_overlay=False, plot_variable=enumTuningMap2DPlotVariables.TUNING_MAPS, fignum=active_fig_num, fig=active_fig, max_screen_figure_size=(None, 1868), debug_print=False, enable_saving_to_disk=enable_saving_to_disk)
+            active_pf_2D_figures = pipeline.display(DefaultDisplayFunctions._display_2d_placefield_result_plot_ratemaps_2D, active_config_name, enable_spike_overlay=False, plot_variable=enumTuningMap2DPlotVariables.TUNING_MAPS, fignum=active_fig_num, fig=active_fig, max_screen_figure_size=(None, 1868), debug_print=False, enable_saving_to_disk=enable_saving_to_disk)
 
             post_plot_active_fig = active_pf_2D_figures[0]
             
@@ -113,9 +137,9 @@ class PipelineDisplayNode(AssociatedOutputWidgetNodeMixin, AssociatedAppNodeMixi
             
             self.view.draw()
         
-        # display_outputs = active_pipeline.display(DefaultDecoderDisplayFunctions._display_two_step_decoder_prediction_error_2D, active_config_name, variable_name='p_x_given_n') # works!
+        # display_outputs = pipeline.display(DefaultDecoderDisplayFunctions._display_two_step_decoder_prediction_error_2D, active_config_name, variable_name='p_x_given_n') # works!
         # if (self.app is not None) and (self.view is not None):
-        #     app, parent_root_widget, root_render_widget = active_pipeline.display(DefaultRatemapDisplayFunctions._display_placemaps_pyqtplot_2D, active_config_name, 
+        #     app, parent_root_widget, root_render_widget = pipeline.display(DefaultRatemapDisplayFunctions._display_placemaps_pyqtplot_2D, active_config_name, 
         #                                                                             app=self.app, parent_root_widget=self.view, root_render_widget=None)
             
         #     # root_render_widget is added to parent_root_widget if it's needed, which currently it is every frame.
