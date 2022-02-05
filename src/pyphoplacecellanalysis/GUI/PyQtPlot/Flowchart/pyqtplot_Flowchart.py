@@ -45,7 +45,6 @@ def plot_flowchartWidget(title='PhoFlowchartApp'):
     mainAppWindow = PhoPipelineMainWindow(title)
     cw = mainAppWindow.flowchart_controls
     
-    
     mainAppWindow.setWindowTitle(f'PhoFlowchartApp: pyqtgraph FlowchartCustomNodes: {title}')
     layout = QtGui.QGridLayout()
     cw.setLayout(layout)
