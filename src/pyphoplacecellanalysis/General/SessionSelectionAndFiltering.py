@@ -114,13 +114,6 @@ def build_custom_epochs_filters(sess, included_epoch_labels=None):
     out_filter_dict = dict()
     for a_label in curr_epoch_labels:
         # build the filter function:
-        # def _temp_filter_session_by_curr_epoch(epoch_label=a_label, a_sess):
-        #     active_named_timerange = a_sess.epochs.get_named_timerange(epoch_label)
-        #     active_session = batch_filter_session(a_sess, a_sess.position, a_sess.spikes_df, active_named_timerange.to_Epoch())
-        #     return active_session, active_named_timerange
-
-        # out_filter_dict[a_label] = lambda x: (_temp_filter_session_by_curr_epoch(a_label, x)) # don't pass the session argument because we want the function to be callable
-        
         out_filter_dict[a_label] = _filter_function_factory(a_label) # don't pass the session argument because we want the function to be callable
         
     return out_filter_dict
