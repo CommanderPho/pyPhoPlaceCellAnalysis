@@ -410,7 +410,7 @@ class DisplayPipelineStage(DefaultRegisteredDisplayFunctions, ComputedPipelineSt
         self.filtered_epochs = computed_stage.filtered_epochs
         self.active_configs = computed_stage.active_configs # active_config corresponding to each filtered session/epoch
         self.computation_results = computed_stage.computation_results
-        self.registered_computation_functions = computed_stage.registered_computation_functions
+        self.registered_computation_function_dict = computed_stage.registered_computation_function_dict
 
         # Initialize custom fields:
         self.render_actions = render_actions    

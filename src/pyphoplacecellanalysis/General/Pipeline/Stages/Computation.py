@@ -239,10 +239,10 @@ class DefaultRegisteredComputations:
         # TODO: Note that order matters for the computation functions, unlike the display functions, so they need to be enumerated in the correct order and not sorted alphabetically
         
         # Register the Ratemap/Placemap display functions: 
-        for (a_computation_fn_name, a_computation_fn) in ExtendedStatsComputations.get_all_functions(use_definition_order=True):
+        for (a_computation_fn_name, a_computation_fn) in reversed(ExtendedStatsComputations.get_all_functions(use_definition_order=True)):
             self.register_computation(a_computation_fn_name, a_computation_fn)
             
-        for (a_computation_fn_name, a_computation_fn) in DefaultComputationFunctions.get_all_functions(use_definition_order=True):
+        for (a_computation_fn_name, a_computation_fn) in reversed(DefaultComputationFunctions.get_all_functions(use_definition_order=True)):
             self.register_computation(a_computation_fn_name, a_computation_fn)
             
         # # old way:
