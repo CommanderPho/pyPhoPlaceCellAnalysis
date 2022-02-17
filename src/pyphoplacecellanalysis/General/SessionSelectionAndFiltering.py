@@ -166,7 +166,7 @@ def batch_filter_session(sess, position, spikes_df, epochs, debug_print=False):
 
 
     # TODO: need to filter the sess.pbe by the epochs as well. sess.pbe is an Epoch type object
-    # sess.pbe.time_slice(t_start, t_stop)
+    filtered_pbe = sess.pbe.time_slice(epochs.starts[0], epochs.stops[-1]) # TODO: do I need to copy this object?
     
     # .time_sliced(
     #     epochs.starts, epochs.stops
@@ -232,7 +232,7 @@ def batch_filter_session(sess, position, spikes_df, epochs, debug_print=False):
             t_start=epochs.t_start,
             metadata=sess.flattened_spiketrains.metadata,
         ),
-        pbe=sess.pbe
+        pbe=filtered_pbe
     )  # 15.6 ms
 
     return filtered_sess
