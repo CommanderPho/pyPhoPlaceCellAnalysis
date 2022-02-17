@@ -44,6 +44,94 @@ odd_lap_specific_epochs = lap_specific_epochs.label_slice(lap_specific_epochs.la
 """
 
 
+
+class CustomSessionFilter(object):
+    """docstring for CustomSessionFilter."""
+    def __init__(self, sess):
+        super(CustomSessionFilter, self).__init__()
+        # don't want to store a reference to sess probably
+        self.setup(sess)
+        
+    def setup(self, sess):
+        self.epoch_labels = list(sess.epochs.labels) # ['pre', 'maze1', 'post1', 'maze2', 'post2']
+        self.epoch_is_included = np.full_like(self.epoch_labels, True) # include all by default
+        
+        # curr_named_timeranges = [sess.epochs.get_named_timerange(a_label) for a_label in curr_epoch_labels]
+
+    def build(self, sess):
+        active_session_filter_configurations = build_custom_epochs_filters(sess)
+        
+        
+# def f_factory(i):
+#     def f(offset):
+#       nonlocal i
+#       i += offset
+#       return i  # i is now a *local* variable of f_factory and can't ever change
+#     return f
+
+
+def _filter_function_factory(epoch_label):
+    """ Use a function factory to capture the current value of i in a closure. 
+        # epoch_label is now a *local* variable of f_factory and can't ever change
+    Reference:
+        See Aran-Fey's answer at https://stackoverflow.com/questions/3431676/creating-functions-in-a-loop
+    """
+    def _temp_filter_session_by_curr_epoch(a_sess):
+        # nonlocal epoch_label # if we want to modify epoch_label
+        active_named_timerange = a_sess.epochs.get_named_timerange(epoch_label)
+        active_session = batch_filter_session(a_sess, a_sess.position, a_sess.spikes_df, active_named_timerange.to_Epoch())
+        return active_session, active_named_timerange
+    return _temp_filter_session_by_curr_epoch
+
+
+
+def build_custom_epochs_filters(sess, included_epoch_labels=None):
+    """ 
+    
+        # Usage Example:
+            active_session_filter_configurations = build_custom_epochs_filters(curr_active_pipeline.sess)
+            curr_active_pipeline.filter_sessions(active_session_filter_configurations)
+        
+        # include only specific epoch labels:
+            maze_only_filters = build_custom_epochs_filters(sess, included_epoch_labels=['maze1','maze2'])
+            curr_active_pipeline.filter_sessions(maze_only_filters)
+    
+    
+    """
+    curr_epoch_labels = np.array(list(sess.epochs.labels)) # ['pre', 'maze1', 'post1', 'maze2', 'post2']
+    
+    if included_epoch_labels is not None:
+        # filter the included_epoch_labels
+        if callable(included_epoch_labels):
+            curr_epoch_labels = included_epoch_labels(curr_epoch_labels)
+        else:
+            curr_epoch_labels = np.array(curr_epoch_labels)
+            included_epoch_labels = np.array(included_epoch_labels)
+            is_included = np.isin(curr_epoch_labels, included_epoch_labels)
+            curr_epoch_labels = curr_epoch_labels[is_included]
+    
+    # curr_named_timeranges = [sess.epochs.get_named_timerange(a_label) for a_label in curr_epoch_labels]
+    out_filter_dict = dict()
+    for a_label in curr_epoch_labels:
+        # build the filter function:
+        # def _temp_filter_session_by_curr_epoch(epoch_label=a_label, a_sess):
+        #     active_named_timerange = a_sess.epochs.get_named_timerange(epoch_label)
+        #     active_session = batch_filter_session(a_sess, a_sess.position, a_sess.spikes_df, active_named_timerange.to_Epoch())
+        #     return active_session, active_named_timerange
+
+        # out_filter_dict[a_label] = lambda x: (_temp_filter_session_by_curr_epoch(a_label, x)) # don't pass the session argument because we want the function to be callable
+        
+        out_filter_dict[a_label] = _filter_function_factory(a_label) # don't pass the session argument because we want the function to be callable
+        
+    return out_filter_dict
+
+
+
+
+
+
+
+
 ## Efficiently filter by cell type and desired ids
 def batch_filter_session(sess, position, spikes_df, epochs, debug_print=False):
     """a workaround to efficiently filter DataSession objects by epochs and cell_type (currently hardcoded Pyramidal) that works around the issue with deepcopy(...) on DataSessions filled with Bapun's data."""
