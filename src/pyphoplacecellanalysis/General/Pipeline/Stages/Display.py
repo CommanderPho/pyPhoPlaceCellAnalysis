@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 import pyvista as pv
 import pyvistaqt as pvqt
 
+
 from pyphocorehelpers.indexing_helpers import interleave_elements
 from pyphocorehelpers.print_helpers import WrappingMessagePrinter
 from pyphocorehelpers.plotting.mixins.figure_param_text_box import add_figure_text_box # for _display_add_computation_param_text_box
@@ -17,6 +18,7 @@ from pyphoplacecellanalysis.General.Configs.DynamicConfigs import PlottingConfig
 from pyphoplacecellanalysis.General.Pipeline.Stages.BaseNeuropyPipelineStage import PipelineStage
 from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.Ratemaps import DefaultRatemapDisplayFunctions
 from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import DefaultDecoderDisplayFunctions
+from pyphoplacecellanalysis.General.Mixins.AllFunctionEnumeratingMixin import AllFunctionEnumeratingMixin
 
 
 from neuropy.core.neuron_identities import NeuronIdentity, build_units_colormap, PlotStringBrevityModeEnum
@@ -182,8 +184,8 @@ def _display_add_computation_param_text_box(fig, computation_config):
     return add_figure_text_box(fig, render_text=render_text)
 
                 
-class DefaultDisplayFunctions:
-
+class DefaultDisplayFunctions(AllFunctionEnumeratingMixin):
+    
     def _display_1d_placefield_validations(computation_result, active_config, **kwargs):
         """ Renders all of the flat 1D place cell validations with the yellow lines that trace across to their horizontally drawn placefield (rendered on the right of the plot) """
         out_figures_list = plot_1d_placecell_validations(computation_result.computed_data['pf1D'], active_config.plotting_config, **({'modifier_string': 'lap_only', 'should_save': False} | kwargs))

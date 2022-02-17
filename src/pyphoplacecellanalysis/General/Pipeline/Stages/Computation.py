@@ -1,3 +1,4 @@
+from collections import OrderedDict
 import sys
 import numpy as np
 import pandas as pd
@@ -20,8 +21,11 @@ from pyphoplacecellanalysis.General.Pipeline.Stages.BaseNeuropyPipelineStage imp
 from pyphoplacecellanalysis.General.Pipeline.Stages.Filtering import FilterablePipelineStage
 from pyphoplacecellanalysis.General.Pipeline.Stages.Loading import LoadableInput, LoadableSessionInput, LoadedPipelineStage    
 from pyphoplacecellanalysis.General.ComputationResults import ComputationResult
+from pyphoplacecellanalysis.General.Mixins.AllFunctionEnumeratingMixin import AllFunctionEnumeratingMixin
+
 from pyphoplacecellanalysis.General.Decoder.decoder_result import build_position_df_discretized_binned_positions, build_position_df_resampled_to_time_windows
 from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.ExtendedStats import ExtendedStatsComputations
+
 
 class ComputablePipelineStage:
     """ Designates that a pipeline stage is computable. """
@@ -63,7 +67,8 @@ class ComputablePipelineStage:
 
 from pyphoplacecellanalysis.Analysis.reconstruction import BayesianPlacemapPositionDecoder, Zhang_Two_Step
 
-class DefaultComputationFunctions:
+class DefaultComputationFunctions(AllFunctionEnumeratingMixin):
+    
     def _perform_position_decoding_computation(computation_result: ComputationResult):
         """ Builds the 2D Placefield Decoder """
         def position_decoding_computation(active_session, computation_config, prev_output_result: ComputationResult):
@@ -231,12 +236,22 @@ class DefaultComputationFunctions:
 class DefaultRegisteredComputations:
     """ Simply enables specifying the default computation functions that will be defined in this file and automatically registered. """
     def register_default_known_computation_functions(self):
-        self.register_computation(ExtendedStatsComputations._perform_placefield_overlap_computation)
-        self.register_computation(ExtendedStatsComputations._perform_firing_rate_trends_computation)
-        self.register_computation(ExtendedStatsComputations._perform_extended_statistics_computation)
-        # self.register_computation(DefaultComputationFunctions._perform_extended_statistics_computation)
-        self.register_computation(DefaultComputationFunctions._perform_two_step_position_decoding_computation)
-        self.register_computation(DefaultComputationFunctions._perform_position_decoding_computation)
+        # TODO: Note that order matters for the computation functions, unlike the display functions, so they need to be enumerated in the correct order and not sorted alphabetically
+        
+        # Register the Ratemap/Placemap display functions: 
+        for (a_computation_fn_name, a_computation_fn) in ExtendedStatsComputations.get_all_functions():
+            self.register_computation(a_computation_fn_name, a_computation_fn)
+            
+        for (a_computation_fn_name, a_computation_fn) in DefaultComputationFunctions.get_all_functions():
+            self.register_computation(a_computation_fn_name, a_computation_fn)
+            
+        # # old way:
+        # self.register_computation(ExtendedStatsComputations._perform_placefield_overlap_computation)
+        # self.register_computation(ExtendedStatsComputations._perform_firing_rate_trends_computation)
+        # self.register_computation(ExtendedStatsComputations._perform_extended_statistics_computation)
+        # # self.register_computation(DefaultComputationFunctions._perform_extended_statistics_computation)
+        # self.register_computation(DefaultComputationFunctions._perform_two_step_position_decoding_computation)
+        # self.register_computation(DefaultComputationFunctions._perform_position_decoding_computation)
         
         
         
@@ -299,11 +314,20 @@ class ComputedPipelineStage(LoadableInput, LoadableSessionInput, FilterablePipel
         self.filtered_epochs = dict()
         self.active_configs = dict() # active_config corresponding to each filtered session/epoch
         self.computation_results = dict()
-        self.registered_computation_functions = list()
+        
+        self.registered_computation_function_dict = OrderedDict()
+        # self.registered_computation_functions = list()
         self.register_default_known_computation_functions() # registers the default
         
-    def register_computation(self, computation_function):
-        self.registered_computation_functions.append(computation_function)
+    @property
+    def registered_computation_functions(self):
+        """The registered_computation_functions property."""
+        return list(self.registered_computation_function_dict.values())
+
+    
+    def register_computation(self, registered_name, computation_function):
+        self.registered_computation_function_dict[registered_name] = computation_function
+        # self.registered_computation_functions.append(computation_function)
         
     def perform_registered_computations(self, previous_computation_result=None, debug_print=False):
         """ Called after load is complete to post-process the data """

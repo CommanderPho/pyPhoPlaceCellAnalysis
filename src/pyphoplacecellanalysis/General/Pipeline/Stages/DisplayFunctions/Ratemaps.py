@@ -1,10 +1,11 @@
 import numpy as np
 import pandas as pd
 
+from pyphoplacecellanalysis.General.Mixins.AllFunctionEnumeratingMixin import AllFunctionEnumeratingMixin
 from pyphoplacecellanalysis.Pho2D.PyQtPlots.plot_placefields import pyqtplot_plot_image_array, pyqtplot_common_setup
 
 
-class DefaultRatemapDisplayFunctions:
+class DefaultRatemapDisplayFunctions(AllFunctionEnumeratingMixin):
     """ Functions related to visualizing Bayesian Decoder performance. """
     
     def _display_placemaps_pyqtplot_2D(computation_result, active_config, enable_saving_to_disk=False, **kwargs):

@@ -8,13 +8,15 @@ from matplotlib import patheffects
 
 from pyphocorehelpers.gui.interaction_helpers import CallbackWrapper
 
+
+from pyphoplacecellanalysis.General.Mixins.AllFunctionEnumeratingMixin import AllFunctionEnumeratingMixin
 from pyphoplacecellanalysis.General.Decoder.decoder_result import DecoderResultDisplayingPlot2D
 from pyphoplacecellanalysis.General.Decoder.decoder_result import build_position_df_resampled_to_time_windows, build_position_df_time_window_idx
 
 
 
 
-class DefaultDecoderDisplayFunctions:
+class DefaultDecoderDisplayFunctions(AllFunctionEnumeratingMixin):
     """ Functions related to visualizing Bayesian Decoder performance. """
 
     def _display_two_step_decoder_prediction_error_2D(computation_result, active_config, enable_saving_to_disk=False, **kwargs):

@@ -1,12 +1,13 @@
 import numpy as np
 import pandas as pd
 import itertools
+
+from pyphoplacecellanalysis.General.Mixins.AllFunctionEnumeratingMixin import AllFunctionEnumeratingMixin
 from pyphoplacecellanalysis.General.ComputationResults import ComputationResult
 from pyphoplacecellanalysis.General.Decoder.decoder_result import build_position_df_resampled_to_time_windows
 
 
-
-class ExtendedStatsComputations:
+class ExtendedStatsComputations(AllFunctionEnumeratingMixin):
     
     def _perform_extended_statistics_computation(computation_result: ComputationResult, debug_print=False):
         """ Computes extended statistics regarding firing rates and such from the various dataframes. """
