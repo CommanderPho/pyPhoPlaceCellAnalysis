@@ -83,6 +83,15 @@ def batch_filter_session(sess, position, spikes_df, epochs, debug_print=False):
         epochs.starts, epochs.stops
     )  # 27.6 ms ± 2.08 ms per loop (mean ± std. dev. of 7 runs, 10 loops each)
 
+
+    # TODO: need to filter the sess.pbe by the epochs as well. sess.pbe is an Epoch type object
+    # sess.pbe.time_slice(t_start, t_stop)
+    
+    # .time_sliced(
+    #     epochs.starts, epochs.stops
+    # )
+    
+    
     ## Old Separate way:
     # if epochs is not None:
     #     # filter the spikes_df:
@@ -142,6 +151,7 @@ def batch_filter_session(sess, position, spikes_df, epochs, debug_print=False):
             t_start=epochs.t_start,
             metadata=sess.flattened_spiketrains.metadata,
         ),
+        pbe=sess.pbe
     )  # 15.6 ms
 
     return filtered_sess
