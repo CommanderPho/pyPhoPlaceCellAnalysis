@@ -30,7 +30,7 @@ from pyphocorehelpers.indexing_helpers import compute_position_grid_size
 from pyphoplacecellanalysis.General.KnownDataSessionTypeProperties import KnownDataSessionTypeProperties
 # pyPhoPlaceCellAnalysis:
 from pyphoplacecellanalysis.General.Pipeline.NeuropyPipeline import NeuropyPipeline # get_neuron_identities
-from pyphoplacecellanalysis.General.SessionSelectionAndFiltering import batch_filter_session
+from pyphoplacecellanalysis.General.SessionSelectionAndFiltering import batch_filter_session, build_custom_epochs_filters
 
 
 
@@ -118,39 +118,24 @@ class NonInteractiveWrapper(object):
 				
 		# Bapun/DataFrame style session filter functions:
 		def build_bapun_any_maze_epochs_filters(sess):
-			def _temp_filter_session_by_epoch1(sess):
-				""" 
-				Usage:
-					active_session, active_epoch = _temp_filter_session(curr_bapun_pipeline.sess)
-				"""
-				active_epoch = sess.epochs.get_named_timerange('maze1')
-				## All Spikes:
-				# active_epoch_session = sess.filtered_by_epoch(active_epoch) # old
-				active_session = batch_filter_session(sess, sess.position, sess.spikes_df, active_epoch.to_Epoch())
-				return active_session, active_epoch
+			# all_filters = build_custom_epochs_filters(sess)
+			# # print(f'all_filters: {all_filters}')
+			# maze_only_filters = dict()
+			# for (name, filter_fcn) in all_filters.items():
+			#     if 'maze' in name:
+			#         maze_only_filters[name] = filter_fcn
+			# maze_only_filters = build_custom_epochs_filters(sess, included_epoch_labels=['maze1','maze2'])
+			# { key:value for (key,value) in dictOfNames.items() if key % 2 == 0}
+			# dict(filter(lambda elem: len(elem[1]) == 6,dictOfNames.items()))
+			# maze_only_name_filter_fn = lambda dict: dict(filter(lambda elem: 'maze' in elem[0], dict.items()))
+			maze_only_name_filter_fn = lambda names: list(filter(lambda elem: elem.startswith('maze'), names)) # include only maze tracks
+			# print(f'callable(maze_only_name_filter_fn): {callable(maze_only_name_filter_fn)}')
+			# print(maze_only_name_filter_fn(['pre', 'maze1', 'post1', 'maze2', 'post2']))
+			# lambda elem: elem[0] % 2 == 0
+			maze_only_filters = build_custom_epochs_filters(sess, included_epoch_labels=maze_only_name_filter_fn)
+			# print(f'maze_only_filters: {maze_only_filters}')
+			return maze_only_filters
 
-			def _temp_filter_session_by_epoch2(sess):
-				""" 
-				Usage:
-					active_session, active_epoch = _temp_filter_session(curr_bapun_pipeline.sess)
-				"""
-				active_epoch = sess.epochs.get_named_timerange('maze2')
-				## All Spikes:
-				# active_epoch_session = sess.filtered_by_epoch(active_epoch) # old
-				active_session = batch_filter_session(sess, sess.position, sess.spikes_df, active_epoch.to_Epoch())
-				return active_session, active_epoch
-
-			return {'maze1':_temp_filter_session_by_epoch1}
-			# return {'maze1':_temp_filter_session_by_epoch1,
-			#         'maze2':_temp_filter_session_by_epoch2
-			#     }
-			
-			
-			
-
-			# return {'maze1': lambda x: (x.filtered_by_epoch(x.epochs.get_named_timerange('maze1')), x.epochs.get_named_timerange('maze1')),
-			#         'maze2': lambda x: (x.filtered_by_epoch(x.epochs.get_named_timerange('maze2')), x.epochs.get_named_timerange('maze2'))
-			#        }
 
 		active_session_filter_configurations = build_bapun_any_maze_epochs_filters(curr_bapun_pipeline.sess)
 		curr_bapun_pipeline.filter_sessions(active_session_filter_configurations)
