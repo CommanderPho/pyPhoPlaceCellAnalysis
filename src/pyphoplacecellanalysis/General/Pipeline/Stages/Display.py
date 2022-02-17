@@ -1,3 +1,4 @@
+from collections import OrderedDict
 from datetime import datetime
 from pathlib import Path
 import numpy as np
@@ -309,25 +310,40 @@ class DefaultRegisteredDisplayFunctions:
         Simply enables specifying the default computation functions that will be defined in this file and automatically registered. """
     
     def register_default_known_display_functions(self):
-        self.register_display_function(DefaultDisplayFunctions._display_1d_placefield_validations)
-        self.register_display_function(DefaultDisplayFunctions._display_2d_placefield_result_plot_raw)
-        self.register_display_function(DefaultDisplayFunctions._display_2d_placefield_result_plot_ratemaps_2D)
-        self.register_display_function(DefaultDisplayFunctions._display_normal)
-               
-               
+        """ Registers all known display functions """
         # Register the Ratemap/Placemap display functions: 
-        for a_display_fn in DefaultRatemapDisplayFunctions.get_all_registerable_known_display_functions():
-            self.register_display_function(a_display_fn)
+        for (a_display_fn_name, a_display_fn) in DefaultDisplayFunctions.get_all_functions(use_definition_order=False):
+            self.register_display_function(a_display_fn_name, a_display_fn)
             
+        # Register the Ratemap/Placemap display functions: 
+        for (a_display_fn_name, a_display_fn) in DefaultRatemapDisplayFunctions.get_all_functions(use_definition_order=False):
+            self.register_display_function(a_display_fn_name, a_display_fn)
             
         # Register the Bayesian decoder display functions: 
-        for a_display_fn in DefaultDecoderDisplayFunctions.get_all_registerable_known_display_functions():
-            self.register_display_function(a_display_fn)
+        for (a_display_fn_name, a_display_fn) in DefaultDecoderDisplayFunctions.get_all_functions(use_definition_order=False):
+            self.register_display_function(a_display_fn_name, a_display_fn)
+            
+ 
+        # # Old Way:
+        # self.register_display_function(DefaultDisplayFunctions._display_1d_placefield_validations)
+        # self.register_display_function(DefaultDisplayFunctions._display_2d_placefield_result_plot_raw)
+        # self.register_display_function(DefaultDisplayFunctions._display_2d_placefield_result_plot_ratemaps_2D)
+        # self.register_display_function(DefaultDisplayFunctions._display_normal)
+               
+               
+        # # Register the Ratemap/Placemap display functions: 
+        # for a_display_fn in DefaultRatemapDisplayFunctions.get_all_registerable_known_display_functions():
+        #     self.register_display_function(a_display_fn)
+            
+            
+        # # Register the Bayesian decoder display functions: 
+        # for a_display_fn in DefaultDecoderDisplayFunctions.get_all_registerable_known_display_functions():
+        #     self.register_display_function(a_display_fn)
         
-        self.register_display_function(DefaultDisplayFunctions._display_3d_interactive_tuning_curves_plotter)
-        self.register_display_function(DefaultDisplayFunctions._display_3d_interactive_spike_and_behavior_browser)
-        self.register_display_function(DefaultDisplayFunctions._display_3d_interactive_custom_data_explorer)
-        self.register_display_function(DefaultDisplayFunctions._display_3d_image_plotter)
+        # self.register_display_function(DefaultDisplayFunctions._display_3d_interactive_tuning_curves_plotter)
+        # self.register_display_function(DefaultDisplayFunctions._display_3d_interactive_spike_and_behavior_browser)
+        # self.register_display_function(DefaultDisplayFunctions._display_3d_interactive_custom_data_explorer)
+        # self.register_display_function(DefaultDisplayFunctions._display_3d_image_plotter)
   
   
 
@@ -344,7 +360,22 @@ class PipelineWithDisplayPipelineStageMixin:
         """Whether the display functions can be performed."""
         return (self.last_completed_stage >= PipelineStage.Displayed)
     
+    @property
+    def registered_display_functions(self):
+        """The registered_display_functions property."""
+        return self.stage.registered_display_functions
+        
+    @property
+    def registered_display_function_names(self):
+        """The registered_display_function_names property."""
+        return self.stage.registered_display_function_names
     
+    
+    
+    def register_display_function(self, registered_name, display_function):
+        # assert (self.can_display), "Current self.stage must already be a ComputedPipelineStage. Call self.filter_sessions with filter configs to reach this step."
+        self.stage.register_display_function(registered_name, display_function)
+        
     def prepare_for_display(self, root_output_dir=r'R:\data\Output'):
         assert (self.is_computed), "Current self.is_computed must be true. Call self.perform_computations to reach this step."
         self.stage = DisplayPipelineStage(self.stage)  # build the Display stage
@@ -365,7 +396,7 @@ class PipelineWithDisplayPipelineStageMixin:
 
     
 
-class DisplayPipelineStage(ComputedPipelineStage):
+class DisplayPipelineStage(DefaultRegisteredDisplayFunctions, ComputedPipelineStage):
     """ The concrete pipeline stage for displaying the output computed in previous stages."""
     identity: PipelineStage = PipelineStage.Displayed
     
@@ -383,7 +414,20 @@ class DisplayPipelineStage(ComputedPipelineStage):
 
         # Initialize custom fields:
         self.render_actions = render_actions    
+        self.registered_display_function_dict = OrderedDict()
+        self.register_default_known_display_functions() # registers the default display functions
+        
+    @property
+    def registered_display_functions(self):
+        """The registered_display_functions property."""
+        return list(self.registered_display_function_dict.values()) 
+        
+    @property
+    def registered_display_function_names(self):
+        """The registered_display_function_names property."""
+        return list(self.registered_display_function_dict.keys()) 
     
-        
-        
+    
+    def register_display_function(self, registered_name, display_function):
+        self.registered_display_function_dict[registered_name] = display_function
         

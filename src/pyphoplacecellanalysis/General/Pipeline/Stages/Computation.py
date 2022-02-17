@@ -239,10 +239,10 @@ class DefaultRegisteredComputations:
         # TODO: Note that order matters for the computation functions, unlike the display functions, so they need to be enumerated in the correct order and not sorted alphabetically
         
         # Register the Ratemap/Placemap display functions: 
-        for (a_computation_fn_name, a_computation_fn) in ExtendedStatsComputations.get_all_functions():
+        for (a_computation_fn_name, a_computation_fn) in ExtendedStatsComputations.get_all_functions(use_definition_order=True):
             self.register_computation(a_computation_fn_name, a_computation_fn)
             
-        for (a_computation_fn_name, a_computation_fn) in DefaultComputationFunctions.get_all_functions():
+        for (a_computation_fn_name, a_computation_fn) in DefaultComputationFunctions.get_all_functions(use_definition_order=True):
             self.register_computation(a_computation_fn_name, a_computation_fn)
             
         # # old way:
@@ -278,14 +278,25 @@ class PipelineWithComputedPipelineStageMixin:
         """The computation_results property, accessed through the stage."""
         return self.stage.computation_results
     
+    @property
+    def registered_computation_functions(self):
+        """The registered_computation_functions property."""
+        return self.stage.registered_computation_functions
+        
+    @property
+    def registered_computation_function_names(self):
+        """The registered_computation_function_names property."""
+        return self.stage.registered_computation_function_names
+    
+    
     ## Computation Helpers: 
     def perform_computations(self, active_computation_params: PlacefieldComputationParameters=None):
         assert (self.can_compute), "Current self.stage must already be a ComputedPipelineStage. Call self.filter_sessions with filter configs to reach this step."
         self.stage.single_computation(active_computation_params)
         
-    def register_computation(self, computation_function):
+    def register_computation(self, registered_name, computation_function):
         assert (self.can_compute), "Current self.stage must already be a ComputedPipelineStage. Call self.filter_sessions with filter configs to reach this step."
-        self.stage.register_computation(computation_function)
+        self.stage.register_computation(registered_name, computation_function)
 
     def perform_registered_computations(self, previous_computation_result=None, debug_print=False):
         assert (self.can_compute), "Current self.stage must already be a ComputedPipelineStage. Call self.perform_computations to reach this step."
@@ -324,6 +335,11 @@ class ComputedPipelineStage(LoadableInput, LoadableSessionInput, FilterablePipel
         """The registered_computation_functions property."""
         return list(self.registered_computation_function_dict.values())
 
+    @property
+    def registered_computation_function_names(self):
+        """The registered_computation_function_names property."""
+        return list(self.registered_computation_function_dict.keys()) 
+    
     
     def register_computation(self, registered_name, computation_function):
         self.registered_computation_function_dict[registered_name] = computation_function
