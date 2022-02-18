@@ -1,7 +1,7 @@
 from pyqtgraph.parametertree import Parameter
 from pyqtgraph.parametertree.Parameter import PARAM_TYPES
 from pyqtgraph.parametertree.parameterTypes import GroupParameter
-from .ParamTreeCfg import cfg
+from ParamTreeCfg import cfg
 
 _encounteredTypes = {'group'}
 

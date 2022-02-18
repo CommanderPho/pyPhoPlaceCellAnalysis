@@ -9,7 +9,7 @@ import numpy as np
 import pyqtgraph as pg
 from pyqtgraph.Qt import QtCore, QtGui
 
-from .BuildParamTypes import makeAllParamTypes
+from BuildParamTypes import makeAllParamTypes
 
 import pyqtgraph.parametertree.parameterTypes as pTypes
 from pyqtgraph.parametertree import Parameter, ParameterTree
