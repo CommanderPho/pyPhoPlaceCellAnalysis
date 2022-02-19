@@ -86,12 +86,13 @@ def plot_flowchartWidget(title='PhoFlowchartApp'):
     
     _register_custom_node_types(mainAppWindow.flowchart)
     
-    _add_pho_pipeline_programmatic_flowchart_nodes(mainAppWindow.app, mainAppWindow.flowchart, new_wrapper_container_layout) # changed from layout to new_wrapper_container_layout
-    # _add_default_example_programmatic_flowchart_nodes(fc, layout)    
-
     # end node setup:
     mainAppWindow.show()
     mainAppWindow.resize(1920, 1080)
+    
+    _add_pho_pipeline_programmatic_flowchart_nodes(mainAppWindow.app, mainAppWindow.flowchart, new_wrapper_container_layout) # changed from layout to new_wrapper_container_layout
+    # _add_default_example_programmatic_flowchart_nodes(fc, layout)    
+
     return mainAppWindow, mainAppWindow.app
 
 
