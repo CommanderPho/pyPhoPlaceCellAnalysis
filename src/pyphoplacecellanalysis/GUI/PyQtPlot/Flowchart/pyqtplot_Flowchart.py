@@ -14,6 +14,7 @@ from pyphoplacecellanalysis.GUI.PyQtPlot.Flowchart.CustomNodes.ImageViewNode imp
 from pyphoplacecellanalysis.GUI.PyQtPlot.Flowchart.CustomNodes.UnsharpMaskNode import UnsharpMaskNode
 from pyphoplacecellanalysis.GUI.PyQtPlot.Flowchart.CustomNodes.PipelineInputDataNode import PipelineInputDataNode
 from pyphoplacecellanalysis.GUI.PyQtPlot.Flowchart.CustomNodes.PipelineFilteringDataNode import PipelineFilteringDataNode
+from pyphoplacecellanalysis.GUI.PyQtPlot.Flowchart.CustomNodes.PipelineComputationsNode import PipelineComputationsNode
 from pyphoplacecellanalysis.GUI.PyQtPlot.Flowchart.CustomNodes.PipelineDisplayNode import PipelineDisplayNode
 
 
@@ -116,7 +117,8 @@ def _register_custom_node_types(fc):
                                         ('Pho Pipeline','Input')])
     library.addNodeType(PipelineFilteringDataNode, [('Filters',), 
                                         ('Pho Pipeline','Filtering')])
-    
+    library.addNodeType(PipelineComputationsNode, [('Data',), 
+                                        ('Pho Pipeline','Computation')])
     library.addNodeType(PipelineDisplayNode, [('Display',), 
                                         ('Pho Pipeline','Display')])
     fc.setLibrary(library)
@@ -226,8 +228,11 @@ def _add_pho_pipeline_programmatic_flowchart_nodes(app, fc, layout):
     
     pipeline_filter_node = fc.createNode('PipelineFilteringDataNode', pos=(-26, 50))
     # pipeline_filter_node.setView(v2, on_remove_function=on_remove_widget_fn)
+    
+    pipeline_computation_node = fc.createNode('PipelineComputationsNode', pos=(154, 50))
+    
 
-    pipeline_display_node = fc.createNode('PipelineDisplayNode', pos=(154, 20))
+    pipeline_display_node = fc.createNode('PipelineDisplayNode', pos=(280, 20))
     pipeline_display_node.setApp(app) # Sets the shared singleton app instance
     # pipeline_display_node.setView(new_root_render_widget, on_remove_function=on_remove_widget_fn) # Sets the view associated with the node. Note that this is the 
     
@@ -245,12 +250,17 @@ def _add_pho_pipeline_programmatic_flowchart_nodes(app, fc, layout):
     
     fc.connectTerminals(pipeline_input_node['known_data_mode'], pipeline_display_node['mode'])
     
-    # Computation Node Outputs:
-    fc.connectTerminals(pipeline_filter_node['filtered_pipeline'], pipeline_display_node['pipeline'])
-    fc.connectTerminals(pipeline_filter_node['computation_configs'], pipeline_display_node['computation_configs'])
+    # Filter Node Outputs:
+    fc.connectTerminals(pipeline_filter_node['filtered_pipeline'], pipeline_computation_node['pipeline'])
+    fc.connectTerminals(pipeline_filter_node['computation_configs'], pipeline_computation_node['computation_configs'])
     fc.connectTerminals(pipeline_filter_node['filter_configs'], pipeline_display_node['filter_configs'])
+    
+    # Computation Node Outputs:
+    fc.connectTerminals(pipeline_computation_node['computed_pipeline'], pipeline_display_node['pipeline'])
+    fc.connectTerminals(pipeline_computation_node['updated_computation_configs'], pipeline_display_node['computation_configs'])
 
-    fc.connectTerminals(pipeline_filter_node['filtered_pipeline'], fc['dataOut']) # raw pipeline output from computation node
+    fc.connectTerminals(pipeline_computation_node['computed_pipeline'], fc['dataOut']) # raw pipeline output from computation node
+    
     
     # Display Node Outputs:   
 
