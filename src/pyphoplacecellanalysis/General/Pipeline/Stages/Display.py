@@ -381,6 +381,8 @@ class PipelineWithDisplayPipelineStageMixin:
         self.stage = DisplayPipelineStage(self.stage)  # build the Display stage
         # Loops through all the configs and ensure that they have the neuron identity info if they need it.
         for an_active_config_name in self.active_configs.keys():
+            # Note that there may be different numbers of neurons included in the different configs (which include different epochs/filters) so a single one-size-fits-all approach to assigning color identities won't work here.
+            
             self.active_configs[an_active_config_name] = add_neuron_identity_info_if_needed(self.computation_results[an_active_config_name], self.active_configs[an_active_config_name])
             self.active_configs[an_active_config_name] = update_figure_files_output_Format(self.computation_results[an_active_config_name], self.active_configs[an_active_config_name], root_output_dir=root_output_dir)
             
