@@ -113,18 +113,28 @@ class NonInteractiveWrapper(object):
 		pipeline.perform_computations(active_computation_configs[0])
 		pipeline.prepare_for_display() # TODO: pass a display config
 		return pipeline
+
+	@staticmethod
+	def perform_filtering(pipeline, filter_configs):
+		pipeline.filter_sessions(filter_configs)
+		return pipeline
+
+
 		
   
   
 	@staticmethod
 	def bapun_format_all(pipeline):
-		pipeline, active_session_computation_configs, active_session_filter_configurations = NonInteractiveWrapper.bapun_format_perform_filter(pipeline)
+		active_session_computation_configs, active_session_filter_configurations = NonInteractiveWrapper.bapun_format_define_configs(pipeline)
+		pipeline = NonInteractiveWrapper.perform_filtering(pipeline, active_session_filter_configurations)
 		pipeline = NonInteractiveWrapper.perform_computation(pipeline, active_session_computation_configs)
 		return pipeline, active_session_computation_configs, active_session_filter_configurations
 
      
+     
+     
 	@staticmethod
-	def bapun_format_perform_filter(curr_bapun_pipeline):
+	def bapun_format_define_configs(curr_bapun_pipeline):
 		# curr_bapun_pipeline = NeuropyPipeline(name='bapun_pipeline', session_data_type='bapun', basedir=known_data_session_type_dict['bapun'].basedir, load_function=known_data_session_type_dict['bapun'].load_function)
 		# curr_bapun_pipeline = NeuropyPipeline.init_from_known_data_session_type('bapun', known_data_session_type_dict['bapun'])
 		active_session_computation_configs = NonInteractiveWrapper._build_active_computation_configs(curr_bapun_pipeline.sess)
@@ -152,22 +162,21 @@ class NonInteractiveWrapper(object):
 
 
 		active_session_filter_configurations = build_bapun_any_maze_epochs_filters(curr_bapun_pipeline.sess)
-		curr_bapun_pipeline.filter_sessions(active_session_filter_configurations)
 		for i in np.arange(len(active_session_computation_configs)):
 			active_session_computation_configs[i].computation_epochs = None  # set the placefield computation epochs to None, using all epochs.
-
-		return curr_bapun_pipeline, active_session_computation_configs, active_session_filter_configurations
+		return active_session_computation_configs, active_session_filter_configurations
 
 
 	@staticmethod
 	def kdiba_format_all(pipeline):
-		pipeline, active_session_computation_configs, active_session_filter_configurations = NonInteractiveWrapper.kdiba_format_perform_filter(pipeline)
+		active_session_computation_configs, active_session_filter_configurations = NonInteractiveWrapper.kdiba_format_define_configs(pipeline)
+		pipeline = NonInteractiveWrapper.perform_filtering(pipeline, active_session_filter_configurations)
 		pipeline = NonInteractiveWrapper.perform_computation(pipeline, active_session_computation_configs)
 		return pipeline, active_session_computation_configs, active_session_filter_configurations
 
 
 	@staticmethod
-	def kdiba_format_perform_filter(curr_kdiba_pipeline):
+	def kdiba_format_define_configs(curr_kdiba_pipeline):
 		## Data must be pre-processed using the MATLAB script located here: 
 		# R:\data\KDIBA\gor01\one\IIDataMat_Export_ToPython_2021_11_23.m
 		# From pre-computed .mat files:
@@ -191,11 +200,10 @@ class NonInteractiveWrapper(object):
 			return active_session_filter_configurations
 
 		active_session_filter_configurations = build_any_maze_epochs_filters(curr_kdiba_pipeline.sess)
-		curr_kdiba_pipeline.filter_sessions(active_session_filter_configurations)
 		for i in np.arange(len(active_session_computation_configs)):
 			active_session_computation_configs[i].computation_epochs = None # add the laps epochs to all of the computation configs.
 
-		return curr_kdiba_pipeline, active_session_computation_configs, active_session_filter_configurations
+		return active_session_computation_configs, active_session_filter_configurations
 		
 		# # set curr_pipeline for testing:
 		# curr_pipeline = curr_kdiba_pipeline
@@ -222,11 +230,7 @@ class NonInteractiveWrapper(object):
 		for i in np.arange(len(active_session_computation_configs)):
 			active_session_computation_configs[i].computation_epochs = any_lap_specific_epochs # add the laps epochs to all of the computation configs.
 
-		curr_kdiba_pipeline.filter_sessions(active_session_filter_configurations)
-		curr_kdiba_pipeline.perform_computations(active_session_computation_configs[0]) # Causes "IndexError: index 59 is out of bounds for axis 0 with size 59"
-		curr_kdiba_pipeline.prepare_for_display() # TODO: pass a display config
-		
-		return curr_kdiba_pipeline, active_session_computation_configs, active_session_filter_configurations
+		return active_session_computation_configs, active_session_filter_configurations
 	
 		# # set curr_pipeline for testing:
 		# curr_pipeline = curr_kdiba_pipeline
