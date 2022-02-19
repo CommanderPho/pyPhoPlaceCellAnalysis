@@ -46,21 +46,27 @@ class ComputablePipelineStage:
 
         return output_result
 
-    def single_computation(self, active_computation_params: PlacefieldComputationParameters=None):
+    def single_computation(self, active_computation_params: PlacefieldComputationParameters=None, enabled_filter_names=None):
         """ Takes its filtered_session and applies the provided active_computation_params to it. The results are stored in self.computation_results under the same key as the filtered session. """
         assert (len(self.filtered_sessions.keys()) > 0), "Must have at least one filtered session before calling single_computation(...). Call self.select_filters(...) first."
         # self.active_computation_results = dict()
-        for a_select_config_name, a_filtered_session in self.filtered_sessions.items():
-            print(f'Performing single_computation on filtered_session with filter named "{a_select_config_name}"...')
-            if active_computation_params is None:
-                active_computation_params = self.active_configs[a_select_config_name].computation_config # get the previously set computation configs
+        if enabled_filter_names is None:
+            enabled_filter_names = list(self.filtered_sessions.keys()) # all filters if specific enabled names aren't specified
+
+        for a_select_config_name, a_filtered_session in self.filtered_sessions.items():                
+            if a_select_config_name in enabled_filter_names:
+                print(f'Performing single_computation on filtered_session with filter named "{a_select_config_name}"...')
+                if active_computation_params is None:
+                    active_computation_params = self.active_configs[a_select_config_name].computation_config # get the previously set computation configs
+                else:
+                    # set/update the computation configs:
+                    self.active_configs[a_select_config_name].computation_config = active_computation_params #TODO: if more than one computation config is passed in, the active_config should be duplicated for each computation config.
+                self.computation_results[a_select_config_name] = ComputablePipelineStage._perform_single_computation(a_filtered_session, active_computation_params) # returns a computation result. Does this store the computation config used to compute it?
+                # call to perform any registered computations:
+                self.computation_results[a_select_config_name] = self.perform_registered_computations(self.computation_results[a_select_config_name], debug_print=True)
             else:
-                # set/update the computation configs:
-                self.active_configs[a_select_config_name].computation_config = active_computation_params #TODO: if more than one computation config is passed in, the active_config should be duplicated for each computation config.
-            self.computation_results[a_select_config_name] = ComputablePipelineStage._perform_single_computation(a_filtered_session, active_computation_params) # returns a computation result. Does this store the computation config used to compute it?
-        
-            # call to perform any registered computations:
-            self.computation_results[a_select_config_name] = self.perform_registered_computations(self.computation_results[a_select_config_name], debug_print=True)
+                # this filter is excluded from the enabled list, no computations will we performed on it
+                self.computation_results.pop(a_select_config_name, None) # remove the computation results from previous runs from the dictionary to indicate that it hasn't been computed
 
 
 """-------------- Specific Computation Functions to be registered --------------"""
@@ -290,9 +296,9 @@ class PipelineWithComputedPipelineStageMixin:
     
     
     ## Computation Helpers: 
-    def perform_computations(self, active_computation_params: PlacefieldComputationParameters=None):
+    def perform_computations(self, active_computation_params: PlacefieldComputationParameters=None, enabled_filter_names=None):
         assert (self.can_compute), "Current self.stage must already be a ComputedPipelineStage. Call self.filter_sessions with filter configs to reach this step."
-        self.stage.single_computation(active_computation_params)
+        self.stage.single_computation(active_computation_params, enabled_filter_names=enabled_filter_names)
         
     def register_computation(self, registered_name, computation_function):
         assert (self.can_compute), "Current self.stage must already be a ComputedPipelineStage. Call self.filter_sessions with filter configs to reach this step."

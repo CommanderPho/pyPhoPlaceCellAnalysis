@@ -109,8 +109,8 @@ class NonInteractiveWrapper(object):
 		#        ]
 		
 	@staticmethod
-	def perform_computation(pipeline, active_computation_configs):
-		pipeline.perform_computations(active_computation_configs[0])
+	def perform_computation(pipeline, active_computation_configs, enabled_filter_names=None):
+		pipeline.perform_computations(active_computation_configs[0], enabled_filter_names) # unuses the first config
 		pipeline.prepare_for_display() # TODO: pass a display config
 		return pipeline
 
