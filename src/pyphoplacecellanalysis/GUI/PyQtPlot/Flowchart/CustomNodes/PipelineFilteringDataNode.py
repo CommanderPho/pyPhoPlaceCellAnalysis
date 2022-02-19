@@ -17,7 +17,7 @@ class PipelineFilteringDataNode(CtrlNode):
     nodeName = "PipelineFilteringDataNode"
     uiTemplate = [
         ('included_configs', 'combo', {'values': [], 'index': 0}),
-        ('recompute', 'action'),
+        ('refilter', 'action'),
     ]
     
     def __init__(self, name):
@@ -31,10 +31,14 @@ class PipelineFilteringDataNode(CtrlNode):
         }
         CtrlNode.__init__(self, name, terminals=terminals)
         self.keys = [] # the active config keys
+        self.ui_build()
+
+    
+    def ui_build(self):
         # Setup the recompute button:
-        self.ctrls['recompute'].setText('recompute')
+        self.ctrls['refilter'].setText('refilter')
         def click():
-            self.ctrls['recompute'].processing("Hold on..")
+            self.ctrls['refilter'].processing("Hold on..")
             # Not sure whether to call self.changed() (from CtrlNode) or self.update() from its parent class.
             # self.update() 
             self.changed() # should trigger re-computation in a blocking manner.
@@ -44,12 +48,11 @@ class PipelineFilteringDataNode(CtrlNode):
             
             fail = False
             if fail:
-                self.ctrls['recompute'].failure(message="FAIL.", tip="There was a failure. Get over it.")
+                self.ctrls['refilter'].failure(message="FAIL.", tip="There was a failure. Get over it.")
             else:
-                self.ctrls['recompute'].success(message="Bueno!")
+                self.ctrls['refilter'].success(message="Bueno!")
                 
-        self.ctrls['recompute'].clicked.connect(click)
-        
+        self.ctrls['refilter'].clicked.connect(click)
         
         
     def process(self, active_data_mode=None, pipeline=None, display=True):
@@ -70,10 +73,10 @@ class PipelineFilteringDataNode(CtrlNode):
         if active_data_mode is not None:
             if active_data_mode == 'bapun':
                 with ProgressDialog("Pipeline Input Loading: Bapun Format..", 0, 1, parent=None, busyCursor=True, wait=250) as dlg:
-                    curr_pipeline, active_session_computation_configs, active_session_filter_configs = NonInteractiveWrapper.bapun_format(pipeline)
+                    curr_pipeline, active_session_computation_configs, active_session_filter_configs = NonInteractiveWrapper.bapun_format_perform_filter(pipeline)
             elif active_data_mode == 'kdiba':
                 with ProgressDialog("Pipeline Input Loading: Kamran Format..", 0, 1, parent=None, busyCursor=True, wait=250) as dlg:
-                    curr_pipeline, active_session_computation_configs, active_session_filter_configs = NonInteractiveWrapper.kdiba_format(pipeline)
+                    curr_pipeline, active_session_computation_configs, active_session_filter_configs = NonInteractiveWrapper.kdiba_format_perform_filter(pipeline)
             else:
                 curr_pipeline = None
                 active_session_computation_configs = None

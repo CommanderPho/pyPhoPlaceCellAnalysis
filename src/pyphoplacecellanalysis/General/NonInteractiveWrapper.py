@@ -108,9 +108,23 @@ class NonInteractiveWrapper(object):
 		#         PlacefieldComputationParameters(speed_thresh=10.0, grid_bin=compute_position_grid_bin_size(sess.position.x, sess.position.y, num_bins=(128, 128)), smooth=(1.0, 1.0), frate_thresh=0.2, time_bin_size=0.5, computation_epochs = None),
 		#        ]
 		
-		
 	@staticmethod
-	def bapun_format(curr_bapun_pipeline):
+	def perform_computation(pipeline, active_computation_configs):
+		pipeline.perform_computations(active_computation_configs[0])
+		pipeline.prepare_for_display() # TODO: pass a display config
+		return pipeline
+		
+  
+  
+	@staticmethod
+	def bapun_format_all(pipeline):
+		pipeline, active_session_computation_configs, active_session_filter_configurations = NonInteractiveWrapper.bapun_format_perform_filter(pipeline)
+		pipeline = NonInteractiveWrapper.perform_computation(pipeline, active_session_computation_configs)
+		return pipeline, active_session_computation_configs, active_session_filter_configurations
+
+     
+	@staticmethod
+	def bapun_format_perform_filter(curr_bapun_pipeline):
 		# curr_bapun_pipeline = NeuropyPipeline(name='bapun_pipeline', session_data_type='bapun', basedir=known_data_session_type_dict['bapun'].basedir, load_function=known_data_session_type_dict['bapun'].load_function)
 		# curr_bapun_pipeline = NeuropyPipeline.init_from_known_data_session_type('bapun', known_data_session_type_dict['bapun'])
 		active_session_computation_configs = NonInteractiveWrapper._build_active_computation_configs(curr_bapun_pipeline.sess)
@@ -141,15 +155,19 @@ class NonInteractiveWrapper(object):
 		curr_bapun_pipeline.filter_sessions(active_session_filter_configurations)
 		for i in np.arange(len(active_session_computation_configs)):
 			active_session_computation_configs[i].computation_epochs = None  # set the placefield computation epochs to None, using all epochs.
-		curr_bapun_pipeline.perform_computations(active_session_computation_configs[0])
-		curr_bapun_pipeline.prepare_for_display() # TODO: pass a display config
-		# Set curr_pipeline for testing:
-		# curr_pipeline = curr_bapun_pipeline
+
 		return curr_bapun_pipeline, active_session_computation_configs, active_session_filter_configurations
 
 
 	@staticmethod
-	def kdiba_format(curr_kdiba_pipeline):
+	def kdiba_format_all(pipeline):
+		pipeline, active_session_computation_configs, active_session_filter_configurations = NonInteractiveWrapper.kdiba_format_perform_filter(pipeline)
+		pipeline = NonInteractiveWrapper.perform_computation(pipeline, active_session_computation_configs)
+		return pipeline, active_session_computation_configs, active_session_filter_configurations
+
+
+	@staticmethod
+	def kdiba_format_perform_filter(curr_kdiba_pipeline):
 		## Data must be pre-processed using the MATLAB script located here: 
 		# R:\data\KDIBA\gor01\one\IIDataMat_Export_ToPython_2021_11_23.m
 		# From pre-computed .mat files:
@@ -177,8 +195,6 @@ class NonInteractiveWrapper(object):
 		for i in np.arange(len(active_session_computation_configs)):
 			active_session_computation_configs[i].computation_epochs = None # add the laps epochs to all of the computation configs.
 
-		curr_kdiba_pipeline.perform_computations(active_session_computation_configs[0])
-		curr_kdiba_pipeline.prepare_for_display() # TODO: pass a display config
 		return curr_kdiba_pipeline, active_session_computation_configs, active_session_filter_configurations
 		
 		# # set curr_pipeline for testing:
