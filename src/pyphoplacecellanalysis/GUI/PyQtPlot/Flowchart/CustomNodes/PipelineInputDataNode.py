@@ -40,7 +40,7 @@ class PipelineInputDataNode(ExtendedCtrlNode):
         self.active_known_data_session_type_dict = PipelineInputDataNode._get_known_data_session_types_dict()
         self.num_known_types = len(self.active_known_data_session_type_dict.keys())
         print(f'num_known_types: {self.num_known_types}')
-        CtrlNode.__init__(self, name, terminals=terminals)
+        ExtendedCtrlNode.__init__(self, name, terminals=terminals)
 
         # Setup the reload button:
         self.ctrls['reload'].setText('Reload')

@@ -29,7 +29,7 @@ class PipelineFilteringDataNode(ExtendedCtrlNode):
             'filter_configs': dict(io='out'),
             'filtered_pipeline': dict(io='out'),
         }
-        CtrlNode.__init__(self, name, terminals=terminals)
+        ExtendedCtrlNode.__init__(self, name, terminals=terminals)
         self.keys = [] # the active config keys
         self.ui_build()
 

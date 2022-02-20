@@ -19,7 +19,7 @@ class PipelineComputationsNode(ExtendedCtrlNode):
     nodeName = "PipelineComputationsNode"
     uiTemplate = [
         ('recompute', 'action'),
-        ('included_configs_table', 'checktable', {'columns': ['filter','compute'], 'rows': ['test1', 'test2']}),
+        ('included_configs_table', 'extendedchecktable', {'columns': ['filter','compute'], 'rows': ['test1', 'test2']}),
     ]
     
     def __init__(self, name):
@@ -30,7 +30,7 @@ class PipelineComputationsNode(ExtendedCtrlNode):
             'updated_computation_configs': dict(io='out'),
             'computed_pipeline': dict(io='out'),
         }
-        CtrlNode.__init__(self, name, terminals=terminals)
+        ExtendedCtrlNode.__init__(self, name, terminals=terminals)
         self.ui_build()
         
     @property

@@ -11,8 +11,10 @@ class ExtendedCtrlNode(CtrlNode):
  
 	@classmethod
 	def process_uiTemplate(cls, opts):
-		ctrl_node_ops = dict()
-		custom_ops = dict()
+		# ctrl_node_ops = dict()
+		# custom_ops = dict()
+		ctrl_node_ops = list()
+		custom_ops = list()
 		for opt in opts:
 			if len(opt) == 2:
 				k, t = opt
@@ -23,14 +25,16 @@ class ExtendedCtrlNode(CtrlNode):
 				raise Exception("Widget specification must be (name, type) or (name, type, {opts})")
 			
 			if t in ['intSpin','doubleSpin','spin','check','combo','color']:
-				ctrl_node_ops[t] = opt
+				# ctrl_node_ops[t] = opt
+				ctrl_node_ops.append(opt)
 			else:
-				custom_ops[t] = opt
+				# custom_ops[t] = opt
+				custom_ops.append(opt)
 		return ctrl_node_ops, custom_ops
 
 	@classmethod
 	def generate_extended_Ui(cls, node, unhandled_opts):
-		layout = node.ui.layout
+		layout = node.ui.layout()
 		ctrls = node.ctrls
 		num_curr_ctrls = len(ctrls)
 		row = num_curr_ctrls - 1 # index of the last row number
@@ -95,16 +99,22 @@ class ExtendedCtrlNode(CtrlNode):
 				ui = self.uiTemplate
 				# Get the CtrlNode safe ui elements:
 				ctrl_node_ops, custom_ops = ExtendedCtrlNode.process_uiTemplate(ui)
+				
 				ui = ctrl_node_ops
+				setattr(self, 'uiTemplate', ctrl_node_ops) # set the self.uiTemplate
+				self.uiTemplate = ctrl_node_ops
+				print(f'ctrl_node_ops: {ctrl_node_ops}\n custom_ops:{custom_ops}\n self.uiTemplate: {self.uiTemplate}\n')
 			else:
 				ui = []
+    
+		
 
 				
 		CtrlNode.__init__(self, name, ui=ui, terminals=terminals)
 		if custom_ops is not None:
 			ExtendedCtrlNode.generate_extended_Ui(self, custom_ops)
   
-		self.ui_build()
+		# self.ui_build()
   
   
 		
