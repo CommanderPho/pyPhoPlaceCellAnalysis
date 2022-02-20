@@ -10,9 +10,11 @@ import numpy as np
 # pyPhoPlaceCellAnalysis:
 from pyphoplacecellanalysis.General.NonInteractiveWrapper import NonInteractiveWrapper
 
+from pyphoplacecellanalysis.GUI.PyQtPlot.Flowchart.CustomNodes.ExtendedCtrlNode import ExtendedCtrlNode
 
 
-class PipelineComputationsNode(CtrlNode):
+
+class PipelineComputationsNode(ExtendedCtrlNode):
     """Performs computations on the active pipeline"""
     nodeName = "PipelineComputationsNode"
     uiTemplate = [

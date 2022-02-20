@@ -31,3 +31,16 @@ def ctrlWidget(self):
 	when they are constructing their Node list."""
 	return None
 ```
+
+
+## Class Notes:
+
+### Terminal 
+The input/output terminal on a Node
+
+multi           bool, for inputs: whether this terminal may make multiple connections
+                        for outputs: whether this terminal creates a different value for each connection
+
+
+
+boundingRect

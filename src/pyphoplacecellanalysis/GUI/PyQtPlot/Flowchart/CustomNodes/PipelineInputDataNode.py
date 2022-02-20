@@ -11,14 +11,14 @@ import numpy as np
 from pyphoplacecellanalysis.General.KnownDataSessionTypeProperties import KnownDataSessionTypeProperties
 # pyPhoPlaceCellAnalysis:
 from pyphoplacecellanalysis.General.Pipeline.NeuropyPipeline import NeuropyPipeline # get_neuron_identities
-
+from pyphoplacecellanalysis.GUI.PyQtPlot.Flowchart.CustomNodes.ExtendedCtrlNode import ExtendedCtrlNode
 
 # Neuropy:
 from neuropy.core.session.data_session_loader import DataSessionLoader
 from neuropy.analyses.laps import estimation_session_laps
 
 
-class PipelineInputDataNode(CtrlNode):
+class PipelineInputDataNode(ExtendedCtrlNode):
     """Configure, Load, and Return the input pipeline data as defined by a known data type (such as kdiba or Bapun)."""
     nodeName = "PipelineInputDataNode"
     uiTemplate = [
