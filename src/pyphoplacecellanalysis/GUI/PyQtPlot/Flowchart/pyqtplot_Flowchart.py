@@ -223,7 +223,7 @@ def _add_pho_pipeline_programmatic_flowchart_nodes(app, fc, layout):
     ## Set the raw data as the input value to the flowchart
     fc.setInput(dataIn='Bapun')
     
-    pipeline_input_node = fc.createNode('PipelineInputDataNode', pos=(-200, 50))
+    pipeline_input_node = fc.createNode('PipelineInputDataNode', pos=(-300, 50))
     # pipeline_input_node.setView(v1, on_remove_function=on_remove_widget_fn) # Sets the view associated with the node. Note that this is the programmatically instantiated node
     
     pipeline_filter_node = fc.createNode('PipelineFilteringDataNode', pos=(-26, 50))
@@ -232,10 +232,9 @@ def _add_pho_pipeline_programmatic_flowchart_nodes(app, fc, layout):
     pipeline_computation_node = fc.createNode('PipelineComputationsNode', pos=(154, 50))
     
 
-    pipeline_display_node = fc.createNode('PipelineDisplayNode', pos=(280, 20))
+    pipeline_display_node = fc.createNode('PipelineDisplayNode', pos=(280, 120))
     pipeline_display_node.setApp(app) # Sets the shared singleton app instance
     # pipeline_display_node.setView(new_root_render_widget, on_remove_function=on_remove_widget_fn) # Sets the view associated with the node. Note that this is the 
-    
     # for direct matploblib widget mode:
     # pipeline_display_node.setView(new_view_widget, on_remove_function=on_remove_widget_fn) # Sets the view associated with the node. Note that this is the programmatically instantiated node
     # dynamic widget building mode:
