@@ -59,6 +59,8 @@ def plot_flowchartWidget(title='PhoFlowchartApp'):
     # Add the flowchart widget. This is actually not the programmatic programming environment itself, it's the column that lists the nodes and lets you set their parameters.
     layout.addWidget(mainAppWindow.flowchart.widget(), 0, 0, 2, 1) # spans 2 rows and 1 column
 
+
+
     ## Result/Visualization Widgets:
     ## build an initial namespace for console commands to be executed in (this is optional;
     ## the user can always import these modules manually)
@@ -93,6 +95,11 @@ def plot_flowchartWidget(title='PhoFlowchartApp'):
     
     _add_pho_pipeline_programmatic_flowchart_nodes(mainAppWindow.app, mainAppWindow.flowchart, new_wrapper_container_layout) # changed from layout to new_wrapper_container_layout
     # _add_default_example_programmatic_flowchart_nodes(fc, layout)    
+
+    # Expand all pipeline widget items on startup:
+    flowchart_controls_widget = mainAppWindow.flowchart.widget() 
+    # flowchart_controls_widget.ui.ctrlList is a TreeWidget
+    flowchart_controls_widget.ui.ctrlList.expandAll()
 
     return mainAppWindow, mainAppWindow.app
 
