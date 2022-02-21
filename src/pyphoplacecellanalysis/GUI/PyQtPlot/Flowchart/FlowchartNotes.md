@@ -73,3 +73,28 @@ setPos
 	s['dtype']
 ```
 
+
+
+
+# Computation Functions:
+
+Each computation function should take a `computation_result: ComputationResult` argument followed by any optional arguments it needs.
+
+From the computation_result, the function has access to:
+
+1. computation_result.sess
+2. All previously computed computation results (accessible by knowing their keys)
+	`prev_one_step_bayesian_decoder = computation_result.computed_data['pf2D_Decoder']`
+
+
+Within the function body it adds its specific computed data to one or more (usually one) key in the `computation_result.computed_data` dictionary using a short version of its function name. This dict can have as many items added as desired.
+```python
+	computation_result.computed_data['pf2D_TwoStepDecoder'] = {'xbin':active_xbins, 'ybin':active_ybins,
+		'avg_speed_per_pos': avg_speed_per_pos,
+		'K':K, 'V':V,
+		'sigma_t_all':sigma_t_all, 'flat_sigma_t_all': np.squeeze(np.reshape(sigma_t_all, (-1, 1)))
+	}
+```
+
+
+

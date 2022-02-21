@@ -5,9 +5,7 @@ from matplotlib.widgets import Slider
 from matplotlib.patches import FancyArrowPatch, FancyArrow
 from matplotlib import patheffects
 
-
 from pyphocorehelpers.gui.interaction_helpers import CallbackWrapper
-
 
 from pyphoplacecellanalysis.General.Mixins.AllFunctionEnumeratingMixin import AllFunctionEnumeratingMixin
 from pyphoplacecellanalysis.General.Decoder.decoder_result import DecoderResultDisplayingPlot2D
@@ -99,8 +97,6 @@ class DefaultDecoderDisplayFunctions(AllFunctionEnumeratingMixin):
         return # end
 
 
-
-            
     def _display_decoder_result(computation_result, active_config):
         renderer = DecoderResultDisplayingPlot2D(computation_result.computed_data['pf2D_Decoder'], computation_result.sess.position.to_dataframe())
         def animate(i):
@@ -238,12 +234,6 @@ class DefaultDecoderDisplayFunctions(AllFunctionEnumeratingMixin):
             # axs[0].set_title('most likely positions x')
             axs[1].plot(active_time_window_variable, active_most_likely_positions_y, lw=1.0, color='#00ff7f99', alpha=0.6, label='2-step: most likely positions y') # (Num windows x 2)
             # axs[1].set_title('most likely positions y')
-
-    # TODO: enable registering its own functions, or at least returning a list of which to register:
-    @classmethod
-    def get_all_registerable_known_display_functions(cls):
-        return [cls._display_two_step_decoder_prediction_error_2D, cls._display_two_step_decoder_prediction_error_animated_2D, cls._display_decoder_result, cls._display_plot_most_likely_position_comparisons]
-    
 
 
 def _temp_debug_two_step_plots(active_one_step_decoder, active_two_step_decoder, variable_name='all_scaling_factors_k', override_variable_value=None):

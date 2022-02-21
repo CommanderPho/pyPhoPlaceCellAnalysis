@@ -1,7 +1,7 @@
 import numpy as np
 
 class KeysListAccessingMixin:
-    
+    """ Provides a helper function to get the keys from a variety of different data-types. Used for combo-boxes."""
     @classmethod
     def get_keys_list(cls, data):
         if isinstance(data, dict):

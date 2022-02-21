@@ -24,11 +24,3 @@ class DefaultRatemapDisplayFunctions(AllFunctionEnumeratingMixin):
         return app, parent_root_widget, root_render_widget
 
 
-
-    # TODO: enable registering its own functions, or at least returning a list of which to register:
-    @classmethod
-    def get_all_registerable_known_display_functions(cls):
-        return [cls._display_placemaps_pyqtplot_2D]
-    
-    
-
