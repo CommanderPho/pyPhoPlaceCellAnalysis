@@ -98,3 +98,7 @@ Within the function body it adds its specific computed data to one or more (usua
 
 
 
+# Display Functions:
+
+Each display function should take a `computation_result: ComputationResult` argument followed by any optional arguments it needs. It often needs `active_config` as well, and typically ends with `**kwargs` to allow passing arguments into the display function it wraps.
+

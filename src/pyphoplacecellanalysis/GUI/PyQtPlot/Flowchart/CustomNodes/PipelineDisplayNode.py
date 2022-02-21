@@ -87,6 +87,16 @@ class PipelineDisplayNode(AssociatedOutputWidgetNodeMixin, AssociatedAppNodeMixi
                 
         self.ctrls['display'].clicked.connect(click)
         
+    @property
+    def selected_display_function_name(self):
+        """The selected_display_function_name property."""
+        return str(self.ctrls['display_function'].currentText())
+    
+    @property
+    def selected_computed_result_name(self):
+        """The selected_display_function_name property."""
+        return str(self.ctrls['computed_result'].currentText())
+    
         
     def process(self, mode=None, computation_configs=None, filter_configs=None, pipeline=None, display=True):
         # Get the list of available display functions:
@@ -116,8 +126,8 @@ class PipelineDisplayNode(AssociatedOutputWidgetNodeMixin, AssociatedAppNodeMixi
         all_computation_results_keys = list(pipeline.computation_results.keys()) # ['maze1', 'maze2']
         self.updateKeys('computed_result', all_computation_results_keys)
         
-        
-        active_config_name = 'maze1'
+        # active_config_name = 'maze1'
+        active_config_name = self.selected_computed_result_name
         enable_saving_to_disk = False
         
         # print(f'plt.isinteractive(): {plt.isinteractive()}')
@@ -156,9 +166,20 @@ class PipelineDisplayNode(AssociatedOutputWidgetNodeMixin, AssociatedAppNodeMixi
             
             # curr_kdiba_pipeline.display(DefaultDisplayFunctions._display_2d_placefield_result_plot_ratemaps_2D, filter_name, enable_spike_overlay=False, plot_variable=enumTuningMap2DPlotVariables.FIRING_MAPS, fignum=0, max_screen_figure_size=(None, 1868), debug_print=False, enable_saving_to_disk=enable_saving_to_disk) # works!
             
-            active_pf_2D_figures = pipeline.display(DefaultDisplayFunctions._display_2d_placefield_result_plot_ratemaps_2D, active_config_name, enable_spike_overlay=False, plot_variable=enumTuningMap2DPlotVariables.TUNING_MAPS, fignum=active_fig_num, fig=active_fig, max_screen_figure_size=(None, 1868), debug_print=False, enable_saving_to_disk=enable_saving_to_disk)
+            curr_display_fcn = pipeline.registered_display_function_dict.get(self.selected_display_function_name, None)
+            
+            # if self.selected_display_function_name in pipeline.registered_display_function_dict:
+            if curr_display_fcn is not None:
+                # if there's a valid selected display function
+                print(f'curr_display_fcn: {self.selected_display_function_name}')
+                active_pf_2D_figures = pipeline.display(curr_display_fcn, active_config_name, enable_spike_overlay=False, plot_variable=enumTuningMap2DPlotVariables.TUNING_MAPS, fignum=active_fig_num, fig=active_fig, max_screen_figure_size=(None, 1868), debug_print=False, enable_saving_to_disk=enable_saving_to_disk)
+            else:
+                active_pf_2D_figures = []
+            
+            # Old style:
+            # active_pf_2D_figures = pipeline.display(DefaultDisplayFunctions._display_2d_placefield_result_plot_ratemaps_2D, active_config_name, enable_spike_overlay=False, plot_variable=enumTuningMap2DPlotVariables.TUNING_MAPS, fignum=active_fig_num, fig=active_fig, max_screen_figure_size=(None, 1868), debug_print=False, enable_saving_to_disk=enable_saving_to_disk)
 
-            post_plot_active_fig = active_pf_2D_figures[0]
+            # post_plot_active_fig = active_pf_2D_figures[0]
             
             # active_fig_num = post_plot_active_fig.number() # pass the figure itself as the fignum
             print(f'active_fig_num: {active_fig_num}')

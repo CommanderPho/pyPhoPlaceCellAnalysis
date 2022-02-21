@@ -191,6 +191,10 @@ class PipelineWithDisplayPipelineStageMixin:
         """The registered_display_function_names property."""
         return self.stage.registered_display_function_names
     
+    @property
+    def registered_display_function_dict(self):
+        """The registered_display_function_dict property can be used to get the corresponding function from the string name."""
+        return self.stage.registered_display_function_dict
     
     
     def register_display_function(self, registered_name, display_function):
