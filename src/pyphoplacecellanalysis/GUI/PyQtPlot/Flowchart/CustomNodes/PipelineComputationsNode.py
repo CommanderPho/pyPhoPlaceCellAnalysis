@@ -19,7 +19,7 @@ class PipelineComputationsNode(ExtendedCtrlNode):
     nodeName = "PipelineComputationsNode"
     uiTemplate = [
         ('recompute', 'action'),
-        ('included_configs_table', 'extendedchecktable', {'columns': ['filter','compute'], 'rows': ['test1', 'test2']}),
+        ('included_configs_table', 'extendedchecktable', {'columns': ['compute'], 'rows': ['test1', 'test2']}),
     ]
     
     def __init__(self, name):
@@ -138,9 +138,9 @@ class PipelineComputationsNode(ExtendedCtrlNode):
         
 
     def saveState(self):
-        state = CtrlNode.saveState(self)
+        state = ExtendedCtrlNode.saveState(self)
         return {'config_rows':self.configRows, 'ctrls': state}
         
     def restoreState(self, state):
         self.updateConfigRows(state['config_rows'])
-        CtrlNode.restoreState(self, state['ctrls'])
+        ExtendedCtrlNode.restoreState(self, state['ctrls'])
