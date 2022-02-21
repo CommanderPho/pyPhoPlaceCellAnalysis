@@ -44,3 +44,32 @@ multi           bool, for inputs: whether this terminal may make multiple connec
 
 
 boundingRect
+
+
+### NodeGraphicsItem
+
+setPos
+
+
+
+
+# Adding Controls to Nodes:
+
+# 'combo': Combo Box with Dynamic Keys:
+```python
+	uiTemplate = [
+			('included_configs', 'combo', {'values': [], 'index': 0}),
+	]
+	# __init__(self, ...):
+	self.keys = [] # the active config keys
+	# Updating Keys:
+	self.updateKeys(updated_configs) # Update the possible keys
+
+	# Getting value:
+	selected_config_value = str(self.ctrls['included_configs'].currentText())
+	print(f'selected_config_value: {selected_config_value}; updated_configs: {updated_configs}')
+        
+	s = self.stateGroup.state()
+	s['dtype']
+```
+

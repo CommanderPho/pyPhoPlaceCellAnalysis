@@ -5,6 +5,7 @@ from pyqtgraph.flowchart.library.common import CtrlNode, PlottingCtrlNode
 import pyqtgraph as pg
 import numpy as np
 
+
 # matplotlib:
 # import matplotlib.pyplot as plt
 # NeuroPy (Diba Lab Python Repo) Loading
@@ -25,9 +26,10 @@ from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.Ratemaps im
 from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import DefaultDecoderDisplayFunctions
 
 from pyphoplacecellanalysis.GUI.PyQtPlot.Flowchart.CustomNodes.Mixins.AssociatedOutputWidgetNodeMixin import AssociatedAppNodeMixin, AssociatedOutputWidgetNodeMixin
+from pyphoplacecellanalysis.GUI.PyQtPlot.Flowchart.CustomNodes.Mixins.CtrlNodeMixins import KeysListAccessingMixin
 
 
-class PipelineDisplayNode(AssociatedOutputWidgetNodeMixin, AssociatedAppNodeMixin, PlottingCtrlNode):
+class PipelineDisplayNode(AssociatedOutputWidgetNodeMixin, AssociatedAppNodeMixin, KeysListAccessingMixin, PlottingCtrlNode):
     """Displays active pipeline.
         TODO: allow the user to select which display function will be used, and optionally pass any function-specific parameters by adding additional inputs.
             - Probably should have a plaintext input like the arbitrary python exec example node to allow typing the function.
@@ -35,6 +37,8 @@ class PipelineDisplayNode(AssociatedOutputWidgetNodeMixin, AssociatedAppNodeMixi
     """
     nodeName = "PipelineDisplayNode"
     uiTemplate = [
+        ('display_function', 'combo', {'values': [], 'index': 0}),
+        ('computed_result', 'combo', {'values': [], 'index': 0}),
         ('display', 'action'),
         # ('sigma',  'spin', {'value': 1.0, 'step': 1.0, 'bounds': [0.0, None]}),
         # ('strength', 'spin', {'value': 1.0, 'dec': True, 'step': 0.5, 'minStep': 0.01, 'bounds': [0.0, None]}),
@@ -54,6 +58,12 @@ class PipelineDisplayNode(AssociatedOutputWidgetNodeMixin, AssociatedAppNodeMixi
             'display_outputs': dict(io='out'),            
         }
         PlottingCtrlNode.__init__(self, name, terminals=terminals)
+        
+        # Set up the combo boxes:
+        # self.display_function_keys = []
+        # self.computed_result_keys = []
+        self.combo_box_keys_dict = {'display_function':[], 'computed_result':[]}
+
         
         # Setup the display button:
         self.ctrls['display'].setText('Display')
@@ -79,10 +89,34 @@ class PipelineDisplayNode(AssociatedOutputWidgetNodeMixin, AssociatedAppNodeMixi
         
         
     def process(self, mode=None, computation_configs=None, filter_configs=None, pipeline=None, display=True):
+        # Get the list of available display functions:
+        all_display_functions_list = pipeline.registered_display_function_names
+        """
+            ['_display_1d_placefield_validations',
+            '_display_2d_placefield_result_plot_ratemaps_2D',
+            '_display_2d_placefield_result_plot_raw',
+            '_display_3d_image_plotter',
+            '_display_3d_interactive_custom_data_explorer',
+            '_display_3d_interactive_spike_and_behavior_browser',
+            '_display_3d_interactive_tuning_curves_plotter',
+            '_display_normal',
+            '_display_placemaps_pyqtplot_2D',
+            '_display_decoder_result',
+            '_display_plot_most_likely_position_comparisons',
+            '_display_two_step_decoder_prediction_error_2D',
+            '_display_two_step_decoder_prediction_error_animated_2D']
+        """
+        self.updateKeys('display_function', all_display_functions_list)
+        
         
         if (pipeline is None) or (not display):
             return {'display_outputs': None}
 
+        # Update the list of available results:
+        all_computation_results_keys = list(pipeline.computation_results.keys()) # ['maze1', 'maze2']
+        self.updateKeys('computed_result', all_computation_results_keys)
+        
+        
         active_config_name = 'maze1'
         enable_saving_to_disk = False
         
@@ -153,3 +187,40 @@ class PipelineDisplayNode(AssociatedOutputWidgetNodeMixin, AssociatedAppNodeMixi
             
         return {'display_outputs': display_outputs}
 
+        
+    def updateKeys(self, ctrl_name, data):
+        keys = PipelineDisplayNode.get_keys_list(data)
+        
+        for c in self.ctrls.values():
+            c.blockSignals(True)
+
+        for c in [self.ctrls[ctrl_name]]:
+            cur = str(c.currentText())
+            c.clear()
+            for k in keys:
+                c.addItem(k)
+                if k == cur:
+                    c.setCurrentIndex(c.count()-1)
+        # for c in [self.ctrls['color'], self.ctrls['border']]:
+        #     c.setArgList(keys)
+        for c in self.ctrls.values():
+            c.blockSignals(False)
+        # Update the self.keys value:
+        self.combo_box_keys_dict[ctrl_name] = keys
+       
+        
+    def saveState(self):
+        state = PlottingCtrlNode.saveState(self)        
+        # return {'display_function_keys': self.display_function_keys, 'computed_result_keys': self.computed_result_keys, 'ctrls': state}
+        return {'combo_box_keys_dict': self.combo_box_keys_dict, 'ctrls': state}
+        
+    
+
+        
+    def restoreState(self, state):
+        combo_box_keys_dict = state['combo_box_keys_dict'] 
+        self.updateKeys('display_function', combo_box_keys_dict['display_function'])
+        self.updateKeys('computed_result', combo_box_keys_dict['computed_result'])
+        # self.updateKeys('display_function', state['display_function_keys'])
+        # self.updateKeys('computed_result', state['computed_result_keys'])
+        PlottingCtrlNode.restoreState(self, state['ctrls'])

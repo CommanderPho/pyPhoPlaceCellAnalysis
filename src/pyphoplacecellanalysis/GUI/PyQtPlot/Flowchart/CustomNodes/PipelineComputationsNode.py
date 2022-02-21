@@ -102,6 +102,18 @@ class PipelineComputationsNode(ExtendedCtrlNode):
             return {'updated_computation_configs': computation_configs, 'computed_pipeline': None}
 
         assert (pipeline is not None), 'curr_pipeline is None but has no reason to be!'
+        # Get the list of available functions:
+        all_computation_functions_list = pipeline.registered_computation_function_names
+        """
+            ['_perform_placefield_overlap_computation',
+            '_perform_firing_rate_trends_computation',
+            '_perform_extended_statistics_computation',
+            '_perform_two_step_position_decoding_computation',
+            '_perform_position_decoding_computation']
+        """
+        # TODO:L allow selecting which of these are active too.
+        
+        
         
         # Gets the names of the filters applied and updates the config rows with them
         all_filters_list = list(pipeline.filtered_sessions.keys())
