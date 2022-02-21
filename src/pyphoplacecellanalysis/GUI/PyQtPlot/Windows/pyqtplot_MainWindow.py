@@ -68,7 +68,13 @@ class PhoPipelineMainWindow(QtWidgets.QMainWindow):
         # ## later on, process data through the node
         # filteredData = filterNode.process(inputTerminal=rawData)
         
-
+    
+    def closeEvent(self, event):
+        # Enables closing all secondary windows when this (main) window is closed.
+        for window in QtWidgets.QApplication.topLevelWidgets():
+            window.close()
+            
+            
 
 def main():
     app = QtWidgets.QApplication(sys.argv)
