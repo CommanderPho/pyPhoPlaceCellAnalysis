@@ -14,21 +14,16 @@ from pyqtgraph.Qt import QtCore, QtGui, QtWidgets
 # from PyQt5.QtCore import Qt, QPoint, QRect, QObject, QEvent, pyqtSignal, pyqtSlot, QSize, QDir
 
 
-
 ## IMPORTS:
 from pyqtgraph.widgets.ColorButton import ColorButton
+
+from pyphoplacecellanalysis.GUI.Qt.PhoUIContainer import PhoUIContainer
 # from ...pyPhoPlaceCellAnalysis.src.pyphoplacecellanalysis.GUI.Qt import PlacefieldVisualSelectionWidget
 
 
-class PhoUIContainer(object):
-	"""docstring for PhoUIContainer."""
-	def __init__(self):
-		super(PhoUIContainer, self).__init__()
-
- 
 class PlacefieldVisualSelectionWidget(QtWidgets.QWidget):
-    """ Aims to serve the same purpose of the Panel widget.
-    Usage Example:
+	""" Aims to serve the same purpose of the Panel widget.
+	Usage Example:
 		def placefieldSelectionWidgetExample(title='PhoPfSelectionWidgetExampleApp'):
 			app = pg.mkQApp(title)
 			
@@ -51,7 +46,7 @@ class PlacefieldVisualSelectionWidget(QtWidgets.QWidget):
 			pg.exec()
 
 
-    """
+	"""
 	def __init__(self, parent=None):
 		super().__init__(parent=parent) # Call the inherited classes __init__ method
 		# self.ui = uic.loadUi("PlacefieldVisualSelectionWidget.ui", self) # Load the .ui file
@@ -64,14 +59,19 @@ class PlacefieldVisualSelectionWidget(QtWidgets.QWidget):
 
 	def initUI(self):
 		self.ui.btnTitle = QtWidgets.QPushButton('Title')
+		self.ui.btnTitle.setObjectName("btnTitle")
+  
 		self.ui.btnColorButton = ColorButton(self)
+		self.ui.btnColorButton.setObjectName("btnColorButton")
 		
 		self.ui.chkbtnPlacefield = QtWidgets.QToolButton()
+		self.ui.chkbtnPlacefield.setObjectName("chkbtnPlacefield")  
 		self.ui.chkbtnPlacefield.setText('pf')
 		self.ui.chkbtnPlacefield.setCheckable(True)
 		self.ui.chkbtnPlacefield.setToolButtonStyle(QtCore.Qt.ToolButtonTextBesideIcon)
 
 		self.ui.chkbtnSpikes = QtWidgets.QToolButton()
+		self.ui.chkbtnSpikes.setObjectName("chkbtnSpikes")  
 		self.ui.chkbtnSpikes.setText('spikes')
 		self.ui.chkbtnSpikes.setCheckable(True)
 		self.ui.chkbtnSpikes.setToolButtonStyle(QtCore.Qt.ToolButtonTextBesideIcon)
@@ -85,9 +85,6 @@ class PlacefieldVisualSelectionWidget(QtWidgets.QWidget):
 		self.layout.addWidget(self.ui.chkbtnPlacefield, 2, 0)
 		self.layout.addWidget(self.ui.chkbtnSpikes, 3, 0)
 
-		
-  
-		pass
 
 
 	def __str__(self):
