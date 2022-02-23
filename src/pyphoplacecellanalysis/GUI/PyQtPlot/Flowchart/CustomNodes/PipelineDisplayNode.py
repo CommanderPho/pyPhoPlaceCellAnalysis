@@ -171,29 +171,29 @@ class PipelineDisplayNode(AssociatedOutputWidgetNodeMixin, AssociatedAppNodeMixi
                 custom_args = {} # no custom args, just pass empty dictionary
 
             display_outputs = pipeline.display(curr_display_fcn, active_config_name, **custom_args)
-            # For 3D pyvista display functions:     'pActiveInteractivePlaceSpikesPlotter', etc.
-            # self.display_results = dict()
-            self.display_results['outputs'] = display_outputs
-            # Search for extant_plotter to reuse in the future calls:
-            active_plotter = display_outputs.get('plotter', None)
-            # BackgroundPlotter, MultiPlotter
-            self.display_results['kwargs'] = {'extant_plotter':active_plotter}
+            # # For 3D pyvista display functions:     'pActiveInteractivePlaceSpikesPlotter', etc.
+            # # self.display_results = dict()
+            # self.display_results['outputs'] = display_outputs
+            # # Search for extant_plotter to reuse in the future calls:
+            # active_plotter = display_outputs.get('plotter', None)
+            # # BackgroundPlotter, MultiPlotter
+            # self.display_results['kwargs'] = {'extant_plotter':active_plotter}
             
                 
-            # if display_outputs is dict:
-            #     # For 3D pyvista display functions:     'pActiveInteractivePlaceSpikesPlotter', etc.
-            #     # self.display_results = dict()
-            #     self.display_results['outputs'] = display_outputs
-            #     # Search for extant_plotter to reuse in the future calls:
-            #     active_plotter = display_outputs.get('plotter', None)
-            #     # BackgroundPlotter, MultiPlotter
-            #     self.display_results['kwargs'] = {'extant_plotter':active_plotter}
-            # elif display_outputs is list:
-            #     # 2d functions typically
-            #     self.display_results['outputs'] = display_outputs # set the 'outputs' key to the list
-            #     self.display_results['kwargs'] = {}
-            # else:
-            #     raise
+            if isinstance(display_outputs, dict):
+                # For 3D pyvista display functions:     'pActiveInteractivePlaceSpikesPlotter', etc.
+                # self.display_results = dict()
+                self.display_results['outputs'] = display_outputs
+                # Search for extant_plotter to reuse in the future calls:
+                active_plotter = display_outputs.get('plotter', None)
+                # BackgroundPlotter, MultiPlotter
+                self.display_results['kwargs'] = {'extant_plotter':active_plotter}
+            elif isinstance(display_outputs, list):
+                # 2d functions typically
+                self.display_results['outputs'] = display_outputs # set the 'outputs' key to the list
+                self.display_results['kwargs'] = {}
+            else:
+                raise
             
             # Old style:
             # active_pf_2D_figures = pipeline.display(DefaultDisplayFunctions._display_2d_placefield_result_plot_ratemaps_2D, active_config_name, enable_spike_overlay=False, plot_variable=enumTuningMap2DPlotVariables.TUNING_MAPS, fignum=active_fig_num, fig=active_fig, max_screen_figure_size=(None, 1868), debug_print=False, enable_saving_to_disk=enable_saving_to_disk)
