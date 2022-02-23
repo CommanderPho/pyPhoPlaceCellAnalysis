@@ -6,6 +6,7 @@ import pyqtgraph as pg
 import numpy as np
 
 
+
 # matplotlib:
 # import matplotlib.pyplot as plt
 # NeuroPy (Diba Lab Python Repo) Loading
@@ -27,9 +28,9 @@ from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPred
 
 from pyphoplacecellanalysis.GUI.PyQtPlot.Flowchart.CustomNodes.Mixins.AssociatedOutputWidgetNodeMixin import AssociatedAppNodeMixin, AssociatedOutputWidgetNodeMixin
 from pyphoplacecellanalysis.GUI.PyQtPlot.Flowchart.CustomNodes.Mixins.CtrlNodeMixins import KeysListAccessingMixin
+from pyphoplacecellanalysis.GUI.PyQtPlot.Flowchart.CustomNodes.Mixins.DisplayNodeViewHelpers import DisplayMatplotlibWidgetMixin
 
-
-class PipelineDisplayNode(AssociatedOutputWidgetNodeMixin, AssociatedAppNodeMixin, KeysListAccessingMixin, PlottingCtrlNode):
+class PipelineDisplayNode(DisplayMatplotlibWidgetMixin, AssociatedOutputWidgetNodeMixin, AssociatedAppNodeMixin, KeysListAccessingMixin, PlottingCtrlNode):
     """Displays active pipeline.
         TODO: allow the user to select which display function will be used, and optionally pass any function-specific parameters by adding additional inputs.
             - Probably should have a plaintext input like the arbitrary python exec example node to allow typing the function.
@@ -41,14 +42,24 @@ class PipelineDisplayNode(AssociatedOutputWidgetNodeMixin, AssociatedAppNodeMixi
         ('computed_result', 'combo', {'values': [], 'index': 0}),
         ('display', 'action'),
     ]
+    # TODO: currently hardcoded:
+    plotter_widget_fcns = ['_display_3d_image_plotter', '_display_3d_interactive_custom_data_explorer','_display_3d_interactive_spike_and_behavior_browser','_display_3d_interactive_tuning_curves_plotter']
+    
     def __init__(self, name):
         # Initialize the associated app
         self.app = None
         # Initialize the associated view
         self._display_results = dict()
         
+        # self.setView() # initializes self._view, self._owned_parent_container, self.on_add_function, and self._on_remove_function to None
+        self._owned_parent_container = None
+        self._view = None
+        self._on_add_function = None
+        self._on_remove_function = None
+        
         self.view = None
         self.on_remove_function = None
+        
         ## Define the input / output terminals available on this node
         terminals = {
             'mode': dict(io='in'),
@@ -142,26 +153,19 @@ class PipelineDisplayNode(AssociatedOutputWidgetNodeMixin, AssociatedAppNodeMixi
         # if self.selected_display_function_name in pipeline.registered_display_function_dict:
         if curr_display_fcn is not None:
             # if there's a valid selected display function
-            print(f'curr_display_fcn: {self.selected_display_function_name}')
+            # print(f'curr_display_fcn: {self.selected_display_function_name}')
             # active_pf_2D_figures = pipeline.display(curr_display_fcn, active_config_name, enable_spike_overlay=False, plot_variable=enumTuningMap2DPlotVariables.TUNING_MAPS, fignum=active_fig_num, fig=active_fig, max_screen_figure_size=(None, 1868), debug_print=False, enable_saving_to_disk=enable_saving_to_disk)
-            if (self.view is None):
-                # re-open view:
-                self.on_create_view(None)
-
-            # test plot
-            active_fig = self.view.getFigure()
-            active_fig.clf()
-            self.view.draw()
             
-            # subplot = self.view.getFigure().add_subplot(111)
-            # subplot.plot(np.arange(9), np.full((9,), 15))
-            
-            # active_fig_num = None
-            active_fig_num = 1
-            # active_fig_num = active_fig.number
-                        
-            # active_fig_num = self.view.getFigure() # pass the figure itself as the fignum
-            # print(f'active_fig_num: {active_fig_num}')
+            is_plotter_widget_fcn = (self.selected_display_function_name in PipelineDisplayNode.plotter_widget_fcns)
+            # is_matplotlib_widget_fcn = (self.selected_display_function_name not in self.plotter_widget_fcns)
+            if is_plotter_widget_fcn:
+                pass
+            elif is_matplotlib_widget_fcn:
+                raise
+                self.display_results['kwargs'] = self.display_widget() # provided by DisplayMatplotlibWidgetMixin. Returns a dict like {'fignum':active_fig_num, 'fig':active_fig}
+            else:
+                raise
+                pass 
             
             # curr_kdiba_pipeline.display(DefaultDisplayFunctions._display_2d_placefield_result_plot_ratemaps_2D, filter_name, enable_spike_overlay=False, plot_variable=enumTuningMap2DPlotVariables.FIRING_MAPS, fignum=0, max_screen_figure_size=(None, 1868), debug_print=False, enable_saving_to_disk=enable_saving_to_disk) # works!
             
@@ -183,8 +187,9 @@ class PipelineDisplayNode(AssociatedOutputWidgetNodeMixin, AssociatedAppNodeMixi
             elif isinstance(display_outputs, list):
                 # 2d functions typically
                 self.display_results['outputs'] = display_outputs # set the 'outputs' key to the list
-                self.display_results['kwargs'] = {}
+                # self.display_results['kwargs'] = {}
                 # self.display_results['kwargs'] = {'fignum':active_fig_num, 'fig':active_fig} # could do, but it wouldn't work for 2d functions that didn't accept either of thse parameters.
+                # Here there will be an issue with neededing to clear the old kwargs when switching from 3d to 2d mode. Will encounter 'extant_plotter' arg being passed into 2D functions.
             else:
                 raise
             
@@ -194,12 +199,15 @@ class PipelineDisplayNode(AssociatedOutputWidgetNodeMixin, AssociatedAppNodeMixi
             # post_plot_active_fig = active_pf_2D_figures[0]
             
             # active_fig_num = post_plot_active_fig.number() # pass the figure itself as the fignum
-            print(f'active_fig_num: {active_fig_num}')
+            # print(f'active_fig_num: {active_fig_num}')
             
             # active_fig.add_subfigure(post_plot_active_fig)
             
         else:
             # curr_display_fcn is None, meaning all display_outputs should be properly closed.
+            if self.display_results is not None:
+                active_fig = self.display_results.get('kwargs',{}).get('fig', None) # get the active figure for matplotlib style plots.
+
             if active_fig is not None:
                 active_fig.close()
             active_fig = None

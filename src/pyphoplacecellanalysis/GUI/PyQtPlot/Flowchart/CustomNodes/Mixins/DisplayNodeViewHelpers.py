@@ -40,7 +40,10 @@ class DisplayNodeViewHelpers:
     
     """
     
-     def on_remove_widget_fn(widget):
+    
+    
+    # Matplotlib Widget Mode:
+    def on_remove_widget_fn(self, widget, layout):
         """ the callback to remove the widget from the layout.
             implicitly used 'layout'.
         """
@@ -49,8 +52,9 @@ class DisplayNodeViewHelpers:
         item = layout.itemAt(item_index)
         widget = item.widget() # this should be the same as the passed in widget, but do this just to be sure
         layout.removeWidget(widget)
-        
-    def on_add_widget_fn(show_in_separate_window=True):
+
+
+    def on_add_widget_fn(self, layout, show_in_separate_window=True):
         """ uses layout implicitly """
         # Matplotlib widget directly:
         new_view_widget = MatplotlibWidget()
@@ -94,6 +98,28 @@ class DisplayNodeChangeSelectedFunctionMixin:
     
     
     
+class DisplayMatplotlibWidgetMixin:
+    def display_matplotlib_widget(self):
+        if (self.view is None):
+                # re-open view if we have a function to do so:
+                if self.on_add_function is not None:
+                    self.on_create_view(None)
+
+            # test plot
+            active_fig = self.view.getFigure()
+            active_fig.clf()
+            self.view.draw()
+    
+            # subplot = self.view.getFigure().add_subplot(111)
+            # subplot.plot(np.arange(9), np.full((9,), 15))
+            
+            # active_fig_num = None
+            active_fig_num = 1
+            # active_fig_num = active_fig.number
+                        
+            # active_fig_num = self.view.getFigure() # pass the figure itself as the fignum
+            # print(f'active_fig_num: {active_fig_num}')
+            return {'fignum':active_fig_num, 'fig':active_fig} # could do, but it wouldn't work for 2d functions that didn't accept either of thse parameters.
     
     
     def example_run_3d_pyvista_fcn():
