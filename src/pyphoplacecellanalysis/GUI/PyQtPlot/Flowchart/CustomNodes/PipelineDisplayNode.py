@@ -40,8 +40,6 @@ class PipelineDisplayNode(AssociatedOutputWidgetNodeMixin, AssociatedAppNodeMixi
         ('display_function', 'combo', {'values': [], 'index': 0}),
         ('computed_result', 'combo', {'values': [], 'index': 0}),
         ('display', 'action'),
-        # ('sigma',  'spin', {'value': 1.0, 'step': 1.0, 'bounds': [0.0, None]}),
-        # ('strength', 'spin', {'value': 1.0, 'dec': True, 'step': 0.5, 'minStep': 0.01, 'bounds': [0.0, None]}),
     ]
     def __init__(self, name):
         # Initialize the associated app
@@ -126,29 +124,19 @@ class PipelineDisplayNode(AssociatedOutputWidgetNodeMixin, AssociatedAppNodeMixi
         all_computation_results_keys = list(pipeline.computation_results.keys()) # ['maze1', 'maze2']
         self.updateKeys('computed_result', all_computation_results_keys)
         
-        # active_config_name = 'maze1'
+        # Get current setup from GUI:
         active_config_name = self.selected_computed_result_name
-        enable_saving_to_disk = False
+        curr_display_fcn = pipeline.registered_display_function_dict.get(self.selected_display_function_name, None)
         
-        # print(f'plt.isinteractive(): {plt.isinteractive()}')
-              
-        # plt.plot(np.arange(9))
-        # plt.show()
-        
-        # with plt.ion():
-        #     plt.plot(np.arange(9))
-    
-        # not shown immediately:    
-        # with plt.ioff():
-        #     plt.plot(np.arange(9))
-        # plt.show()
-        # display_outputs = {
-        #     'fig':plt.gcf() 
-        # }
-        
-        if (self.view is None):
-            return {'display_outputs': None}
-        else:
+        # if self.selected_display_function_name in pipeline.registered_display_function_dict:
+        if curr_display_fcn is not None:
+            # if there's a valid selected display function
+            print(f'curr_display_fcn: {self.selected_display_function_name}')
+            # active_pf_2D_figures = pipeline.display(curr_display_fcn, active_config_name, enable_spike_overlay=False, plot_variable=enumTuningMap2DPlotVariables.TUNING_MAPS, fignum=active_fig_num, fig=active_fig, max_screen_figure_size=(None, 1868), debug_print=False, enable_saving_to_disk=enable_saving_to_disk)
+            if (self.view is None):
+                # re-open view:
+                self.on_create_view(None)
+
             # test plot
             active_fig = self.view.getFigure()
             active_fig.clf()
@@ -166,17 +154,8 @@ class PipelineDisplayNode(AssociatedOutputWidgetNodeMixin, AssociatedAppNodeMixi
             
             # curr_kdiba_pipeline.display(DefaultDisplayFunctions._display_2d_placefield_result_plot_ratemaps_2D, filter_name, enable_spike_overlay=False, plot_variable=enumTuningMap2DPlotVariables.FIRING_MAPS, fignum=0, max_screen_figure_size=(None, 1868), debug_print=False, enable_saving_to_disk=enable_saving_to_disk) # works!
             
-            curr_display_fcn = pipeline.registered_display_function_dict.get(self.selected_display_function_name, None)
+            active_pf_2D_figures = pipeline.display(curr_display_fcn, active_config_name)
             
-            # if self.selected_display_function_name in pipeline.registered_display_function_dict:
-            if curr_display_fcn is not None:
-                # if there's a valid selected display function
-                print(f'curr_display_fcn: {self.selected_display_function_name}')
-                # active_pf_2D_figures = pipeline.display(curr_display_fcn, active_config_name, enable_spike_overlay=False, plot_variable=enumTuningMap2DPlotVariables.TUNING_MAPS, fignum=active_fig_num, fig=active_fig, max_screen_figure_size=(None, 1868), debug_print=False, enable_saving_to_disk=enable_saving_to_disk)
-                
-                active_pf_2D_figures = pipeline.display(curr_display_fcn, active_config_name)
-            else:
-                active_pf_2D_figures = []
             
             # Old style:
             # active_pf_2D_figures = pipeline.display(DefaultDisplayFunctions._display_2d_placefield_result_plot_ratemaps_2D, active_config_name, enable_spike_overlay=False, plot_variable=enumTuningMap2DPlotVariables.TUNING_MAPS, fignum=active_fig_num, fig=active_fig, max_screen_figure_size=(None, 1868), debug_print=False, enable_saving_to_disk=enable_saving_to_disk)
@@ -188,10 +167,17 @@ class PipelineDisplayNode(AssociatedOutputWidgetNodeMixin, AssociatedAppNodeMixi
             
             # active_fig.add_subfigure(post_plot_active_fig)
             
-            # display_outputs = {'subplot':subplot}
-            display_outputs = {'fig':active_fig, 'fig_num':active_fig_num}
+        else:
+            if active_fig is not None:
+                active_fig.close()
+            active_fig = None
+            active_fig_num = None
+                    
+            active_pf_2D_figures = []
             
-            self.view.draw()
+
+        
+
         
         # display_outputs = pipeline.display(DefaultDecoderDisplayFunctions._display_two_step_decoder_prediction_error_2D, active_config_name, variable_name='p_x_given_n') # works!
         # if (self.app is not None) and (self.view is not None):

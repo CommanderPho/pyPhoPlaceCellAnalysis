@@ -26,7 +26,12 @@ uiFile = os.path.join(path, 'MainPipelineWindow.ui')
 
 
 class PhoPipelineMainWindow(QtWidgets.QMainWindow):
-
+    
+    @property
+    def app(self):
+        """The app property."""
+        return self._app
+    
     @property
     def flowchart(self):
         """The flowchart property."""
@@ -36,9 +41,61 @@ class PhoPipelineMainWindow(QtWidgets.QMainWindow):
         self._flowchart = value
         
     @property
-    def app(self):
-        """The app property."""
-        return self._app
+    def flowchart_controls_widget(self):
+        """ """
+        return self.flowchart.widget() # FlowchartCtrlWidget
+
+    @property
+    def flowchart_controls_tree_widget(self):
+        # flowchart_controls_widget.ui.ctrlList is a TreeWidget
+        return self.flowchart_controls_widget.ui.ctrlList
+
+    @property
+    def flowchart_window(self):
+        """ The window that the flowchart is displayed in. Not the one with the controls by default. """
+        return self.flowchart_controls_widget.cwWin
+    
+    
+    ## Specific Flowchart Nodes:
+    @property
+    def flowchart_nodes(self):
+        """ 
+        Example:
+            {'Input': <Node Input @13fc5877a60>,
+            'Output': <Node Output @13fc5877af0>,
+            'PipelineInputDataNode.0': <Node PipelineInputDataNode.0 @13fcb1428b0>,
+            'PipelineFilteringDataNode.0': <Node PipelineFilteringDataNode.0 @13fcb145ca0>,
+            'PipelineComputationsNode.0': <Node PipelineComputationsNode.0 @13fcb14c1f0>,
+            'PipelineDisplayNode.0': <Node PipelineDisplayNode.0 @13fcb14eb80>}
+        """
+        return self.flowchart.nodes()
+    
+    @property
+    def flowchart_input_node(self):
+        return self.flowchart_nodes.get('Input', None) # Node or None
+    
+    
+    @property
+    def flowchart_output_node(self):
+        return self.flowchart_nodes.get('Output', None) # Node or None
+    
+    
+    
+    
+    
+
+
+
+# # curr_node = pipeline_flowchart_nodes['Input']
+# # curr_node = pipeline_flowchart_nodes['PipelineFilteringDataNode.0']
+# curr_node = pipeline_flowchart_nodes['PipelineComputationsNode.0']
+
+# curr_check_table = curr_node.ctrls['included_configs_table']
+# curr_check_table.checked_state # OrderedDict([('maze1', [False, False]), ('maze2', [False, False])])
+# curr_check_table.checked_state['maze1']
+
+# curr_check_table.saveState()
+
 
 
     def __init__(self, title='PhoFlowchartApp', *args, **kwargs):
