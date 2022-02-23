@@ -171,15 +171,7 @@ class PipelineDisplayNode(AssociatedOutputWidgetNodeMixin, AssociatedAppNodeMixi
                 custom_args = {} # no custom args, just pass empty dictionary
 
             display_outputs = pipeline.display(curr_display_fcn, active_config_name, **custom_args)
-            # # For 3D pyvista display functions:     'pActiveInteractivePlaceSpikesPlotter', etc.
-            # # self.display_results = dict()
-            # self.display_results['outputs'] = display_outputs
-            # # Search for extant_plotter to reuse in the future calls:
-            # active_plotter = display_outputs.get('plotter', None)
-            # # BackgroundPlotter, MultiPlotter
-            # self.display_results['kwargs'] = {'extant_plotter':active_plotter}
-            
-                
+
             if isinstance(display_outputs, dict):
                 # For 3D pyvista display functions:     'pActiveInteractivePlaceSpikesPlotter', etc.
                 # self.display_results = dict()
@@ -192,6 +184,7 @@ class PipelineDisplayNode(AssociatedOutputWidgetNodeMixin, AssociatedAppNodeMixi
                 # 2d functions typically
                 self.display_results['outputs'] = display_outputs # set the 'outputs' key to the list
                 self.display_results['kwargs'] = {}
+                # self.display_results['kwargs'] = {'fignum':active_fig_num, 'fig':active_fig} # could do, but it wouldn't work for 2d functions that didn't accept either of thse parameters.
             else:
                 raise
             
