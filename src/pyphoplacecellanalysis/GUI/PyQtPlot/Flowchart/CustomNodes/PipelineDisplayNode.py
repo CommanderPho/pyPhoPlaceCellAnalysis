@@ -45,6 +45,8 @@ class PipelineDisplayNode(AssociatedOutputWidgetNodeMixin, AssociatedAppNodeMixi
         # Initialize the associated app
         self.app = None
         # Initialize the associated view
+        self._display_results = dict()
+        
         self.view = None
         self.on_remove_function = None
         ## Define the input / output terminals available on this node
@@ -53,7 +55,8 @@ class PipelineDisplayNode(AssociatedOutputWidgetNodeMixin, AssociatedAppNodeMixi
             'computation_configs': dict(io='in'),
             'filter_configs': dict(io='in'),
             'pipeline': dict(io='in'),
-            'display_outputs': dict(io='out'),            
+            'display_outputs': dict(io='out'),
+            'display_results': dict(io='out'),             
         }
         PlottingCtrlNode.__init__(self, name, terminals=terminals)
         
@@ -84,7 +87,7 @@ class PipelineDisplayNode(AssociatedOutputWidgetNodeMixin, AssociatedAppNodeMixi
                 
                 
         self.ctrls['display'].clicked.connect(click)
-        
+    
     @property
     def selected_display_function_name(self):
         """The selected_display_function_name property."""
@@ -95,6 +98,14 @@ class PipelineDisplayNode(AssociatedOutputWidgetNodeMixin, AssociatedAppNodeMixi
         """The selected_display_function_name property."""
         return str(self.ctrls['computed_result'].currentText())
     
+    
+    @property
+    def display_results(self):
+        """The display_results property."""
+        return self._display_results
+    @display_results.setter
+    def display_results(self, value):
+        self._display_results = value
         
     def process(self, mode=None, computation_configs=None, filter_configs=None, pipeline=None, display=True):
         # Get the list of available display functions:
@@ -154,8 +165,35 @@ class PipelineDisplayNode(AssociatedOutputWidgetNodeMixin, AssociatedAppNodeMixi
             
             # curr_kdiba_pipeline.display(DefaultDisplayFunctions._display_2d_placefield_result_plot_ratemaps_2D, filter_name, enable_spike_overlay=False, plot_variable=enumTuningMap2DPlotVariables.FIRING_MAPS, fignum=0, max_screen_figure_size=(None, 1868), debug_print=False, enable_saving_to_disk=enable_saving_to_disk) # works!
             
-            display_outputs = pipeline.display(curr_display_fcn, active_config_name)
+            if self.display_results is not None:
+                custom_args = self.display_results.get('kwargs', {})
+            else:
+                custom_args = {} # no custom args, just pass empty dictionary
+
+            display_outputs = pipeline.display(curr_display_fcn, active_config_name, **custom_args)
+            # For 3D pyvista display functions:     'pActiveInteractivePlaceSpikesPlotter', etc.
+            # self.display_results = dict()
+            self.display_results['outputs'] = display_outputs
+            # Search for extant_plotter to reuse in the future calls:
+            active_plotter = display_outputs.get('plotter', None)
+            # BackgroundPlotter, MultiPlotter
+            self.display_results['kwargs'] = {'extant_plotter':active_plotter}
             
+                
+            # if display_outputs is dict:
+            #     # For 3D pyvista display functions:     'pActiveInteractivePlaceSpikesPlotter', etc.
+            #     # self.display_results = dict()
+            #     self.display_results['outputs'] = display_outputs
+            #     # Search for extant_plotter to reuse in the future calls:
+            #     active_plotter = display_outputs.get('plotter', None)
+            #     # BackgroundPlotter, MultiPlotter
+            #     self.display_results['kwargs'] = {'extant_plotter':active_plotter}
+            # elif display_outputs is list:
+            #     # 2d functions typically
+            #     self.display_results['outputs'] = display_outputs # set the 'outputs' key to the list
+            #     self.display_results['kwargs'] = {}
+            # else:
+            #     raise
             
             # Old style:
             # active_pf_2D_figures = pipeline.display(DefaultDisplayFunctions._display_2d_placefield_result_plot_ratemaps_2D, active_config_name, enable_spike_overlay=False, plot_variable=enumTuningMap2DPlotVariables.TUNING_MAPS, fignum=active_fig_num, fig=active_fig, max_screen_figure_size=(None, 1868), debug_print=False, enable_saving_to_disk=enable_saving_to_disk)
@@ -168,15 +206,16 @@ class PipelineDisplayNode(AssociatedOutputWidgetNodeMixin, AssociatedAppNodeMixi
             # active_fig.add_subfigure(post_plot_active_fig)
             
         else:
+            # curr_display_fcn is None, meaning all display_outputs should be properly closed.
             if active_fig is not None:
                 active_fig.close()
             active_fig = None
             active_fig_num = None
                     
             display_outputs = []
+            # TODO: properly close all the figures and such if there are some open: do 'self.on_deselect_display_fcn(...)' stuff
+            # self.display_results.clear()
             
-
-        
 
         
         # display_outputs = pipeline.display(DefaultDecoderDisplayFunctions._display_two_step_decoder_prediction_error_2D, active_config_name, variable_name='p_x_given_n') # works!
@@ -194,7 +233,7 @@ class PipelineDisplayNode(AssociatedOutputWidgetNodeMixin, AssociatedAppNodeMixi
         #     display_outputs = None
         #     raise
             
-        return {'display_outputs': display_outputs}
+        return {'display_outputs': display_outputs, 'display_results': self.display_results}
 
         
     def updateKeys(self, ctrl_name, data):

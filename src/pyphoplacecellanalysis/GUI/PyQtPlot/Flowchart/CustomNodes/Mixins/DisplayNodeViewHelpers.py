@@ -17,9 +17,11 @@ from pyphoplacecellanalysis.GUI.PyQtPlot.Windows.pyqtplot_SecondaryWindow import
 
 class ProducedViewType(Enum):
     """Docstring for ProducedViewType."""
-    Matplotlib = "Matplotlib" # MatplotlibWidget
-    Pyvista = 'Pyvista' # BackgroundPlotter, MultiPlotter
+    Matplotlib = "Matplotlib" # MatplotlibWidget, needs to be passed into display function as "fig=active_fig" argument
+    Pyvista = 'Pyvista' # BackgroundPlotter, MultiPlotter: needs to be passed into display function as "extant_plotter=active_plotter" argument
     Custom = "Custom"
+    
+    
     
  
  
@@ -92,3 +94,21 @@ class DisplayNodeChangeSelectedFunctionMixin:
     
     
     
+    
+    
+    def example_run_3d_pyvista_fcn():
+        
+        if self.display_results is not None:
+            custom_args = self.display_results.get('kwargs', {})
+        else:
+            custom_args = {} # no custom args, just pass empty dictionary
+
+        display_outputs = pipeline.display(curr_display_fcn, active_config_name, **custom_args) # extant_plotter=
+        if display_outputs is dict:
+            # self.display_results = dict()
+            self.display_results['outputs'] = display_outputs
+            # Search for extant_plotter to reuse in the future calls:
+            active_plotter = display_outputs.get('plotter', None)
+            # BackgroundPlotter, MultiPlotter
+            self.display_results['kwargs'] = {'extant_plotter':active_plotter}
+            
