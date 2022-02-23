@@ -27,6 +27,31 @@ class PhoUIContainer(object):
 
  
 class PlacefieldVisualSelectionWidget(QtWidgets.QWidget):
+    """ Aims to serve the same purpose of the Panel widget.
+    Usage Example:
+		def placefieldSelectionWidgetExample(title='PhoPfSelectionWidgetExampleApp'):
+			app = pg.mkQApp(title)
+			
+			w = PlacefieldVisualSelectionWidget()
+			
+			window = QtWidgets.QWidget()
+			layout = QtGui.QVBoxLayout()
+			layout.addWidget(w)
+
+			window.setLayout(layout)
+
+			window.show()
+			window.resize(500,500)
+			window.setWindowTitle('pho example: PfSelectionWidget')
+
+			return window, app
+
+		if __name__ == '__main__':
+			win, app = placefieldSelectionWidgetExample()
+			pg.exec()
+
+
+    """
 	def __init__(self, parent=None):
 		super().__init__(parent=parent) # Call the inherited classes __init__ method
 		# self.ui = uic.loadUi("PlacefieldVisualSelectionWidget.ui", self) # Load the .ui file
