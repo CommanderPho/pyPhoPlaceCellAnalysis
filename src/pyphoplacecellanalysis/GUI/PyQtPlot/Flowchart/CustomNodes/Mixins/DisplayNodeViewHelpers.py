@@ -6,16 +6,21 @@ from pyqtgraph.widgets.MatplotlibWidget import MatplotlibWidget
 import pyqtgraph as pg
 import numpy as np
 
+# For 3D Plotter Windows:
+from pyvistaqt import BackgroundPlotter
+from pyvistaqt.plotting import MultiPlotter
 
+# For Matplotlib Windows:
 from pyphoplacecellanalysis.GUI.PyQtPlot.Windows.pyqtplot_SecondaryWindow import PhoPipelineSecondaryWindow
 
 
 
 class ProducedViewType(Enum):
-	"""Docstring for ProducedViewType."""
-	Matplotlib = "Matplotlib"
-	Custom = "Custom"
-	
+    """Docstring for ProducedViewType."""
+    Matplotlib = "Matplotlib" # MatplotlibWidget
+    Pyvista = 'Pyvista' # BackgroundPlotter, MultiPlotter
+    Custom = "Custom"
+    
  
  
  
@@ -63,5 +68,27 @@ class DisplayNodeViewHelpers:
         new_view_widget.draw()
         
         return new_view_widget, new_widget_window
+    
+    
+class DisplayNodeChangeSelectedFunctionMixin:
+    
+    def on_changed_display_fcn(self, old_fcn, new_fcn):
+        """ called when the node changes its display function for any reason.
+            - call the self.on_deselect_display_fcn(...) for any previously selected functions.
+            - call new display fcn and set any views the function produces as owned by this node. Cache in extant views variable.
+        """
+        self.on_deselect_display_fcn(old_fcn)
+        pass
+
+
+    def on_deselect_display_fcn(self, old_fcn):
+        """ called when the node stops displaying a previously selected display function for any reason (changing to a new function, invalid input, closing, etc)
+            - close out extant views it owns
+            - null out extant views variable
+        
+        """
+        pass
+    
+    
     
     

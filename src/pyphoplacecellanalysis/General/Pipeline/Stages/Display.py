@@ -213,7 +213,10 @@ class PipelineWithDisplayPipelineStageMixin:
 
                     
     def display(self, display_function, active_session_filter_configuration: str, **kwargs):
-        # active_session_filter_configuration: 'maze1'
+        """ Called to actually perform the display. Should output a figure/widget/graphic of some kind. 
+        
+        active_session_filter_configuration: the string that's a key into the computation results like 'maze1' or 'maze2'.
+        """
         assert self.can_display, "Current self.stage must already be a DisplayPipelineStage. Call self.prepare_for_display to reach this step."
         if display_function is None:
             display_function = DefaultDisplayFunctions._display_normal

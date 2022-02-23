@@ -108,42 +108,66 @@ class DefaultDisplayFunctions(AllFunctionEnumeratingMixin):
         
 
     ## Tuning Curves 3D Plot:
-    def _display_3d_interactive_tuning_curves_plotter(computation_result, active_config):
+    def _display_3d_interactive_tuning_curves_plotter(computation_result, active_config, **kwargs):
+        """ 
+        Inputs: {'extant_plotter': None} 
+        Outputs: {'ipcDataExplorer', 'pActiveTuningCurvesPlotter', 'pane'}
+        """
         # try: pActiveTuningCurvesPlotter
         # except NameError: pActiveTuningCurvesPlotter = None # Checks variable p's existance, and sets its value to None if it doesn't exist so it can be checked in the next step
-        pActiveTuningCurvesPlotter = None
-        ipcDataExplorer = InteractivePlaceCellTuningCurvesDataExplorer(active_config, computation_result.sess, computation_result.computed_data['pf2D'], active_config.plotting_config.pf_colors, extant_plotter=pActiveTuningCurvesPlotter)
+
+        pActiveTuningCurvesPlotter = kwargs.get('extant_plotter', None)
+        # if pActiveTuningCurvesPlotter is None:
+        #     print('_display_3d_interactive_tuning_curves_plotter: No extant plotter provided!')
+        # else:
+        #     print(f"_display_3d_interactive_tuning_curves_plotter: extant_plotter: {kwargs['extant_plotter']}")
+
+        ipcDataExplorer = InteractivePlaceCellTuningCurvesDataExplorer(active_config, computation_result.sess, computation_result.computed_data['pf2D'], active_config.plotting_config.pf_colors, **({'extant_plotter':None} | kwargs))
         pActiveTuningCurvesPlotter = ipcDataExplorer.plot(pActiveTuningCurvesPlotter) # [2, 17449]
         ### Build Dynamic Panel Interactive Controls for configuring Placefields:
         pane = build_panel_interactive_placefield_visibility_controls(ipcDataExplorer)
-        return pane
+        # return pane
+        return {'ipcDataExplorer': ipcDataExplorer, 'pActiveTuningCurvesPlotter': pActiveTuningCurvesPlotter, 'pane': pane}
+            
         
 
     ## Interactive 3D Spike and Behavior Browser: 
-    def _display_3d_interactive_spike_and_behavior_browser(computation_result, active_config):
+    def _display_3d_interactive_spike_and_behavior_browser(computation_result, active_config, **kwargs):
+        """ 
+        Inputs: {'extant_plotter': None} 
+        Outputs: {'ipspikesDataExplorer', 'pActiveInteractivePlaceSpikesPlotter'}
+        """
         active_config.plotting_config.show_legend = True        
         active_session = computation_result.sess # this is unfiltered, shouldn't be used... actually, it should be filtered. Don't know what's wrong here.
 
         print(f'computation_result.sess: {computation_result.sess}')
         # try: pActiveInteractivePlaceSpikesPlotter
         # except NameError: pActiveInteractivePlaceSpikesPlotter = None # Checks variable p's existance, and sets its value to None if it doesn't exist so it can be checked in the next step
-        pActiveInteractivePlaceSpikesPlotter = None
-        ipspikesDataExplorer = InteractivePlaceCellDataExplorer(active_config, computation_result.sess, extant_plotter=pActiveInteractivePlaceSpikesPlotter)
+        pActiveInteractivePlaceSpikesPlotter = kwargs.get('extant_plotter', None)
+        ipspikesDataExplorer = InteractivePlaceCellDataExplorer(active_config, computation_result.sess, **({'extant_plotter':None} | kwargs))
         pActiveInteractivePlaceSpikesPlotter = ipspikesDataExplorer.plot(pActivePlotter=pActiveInteractivePlaceSpikesPlotter)
-
+        return {'ipspikesDataExplorer': ipspikesDataExplorer, 'pActiveInteractivePlaceSpikesPlotter': pActiveInteractivePlaceSpikesPlotter}
 
     ## CustomDataExplorer 3D Plotter:
-    def _display_3d_interactive_custom_data_explorer(computation_result, active_config):
+    def _display_3d_interactive_custom_data_explorer(computation_result, active_config, **kwargs):
+        """ 
+        Inputs: {'extant_plotter': None} 
+        Outputs: {'iplapsDataExplorer', 'pActiveInteractiveLapsPlotter'}
+        """
         active_laps_config = InteractivePlaceCellConfig(active_session_config=computation_result.sess.config, active_epochs=None, video_output_config=None, plotting_config=None) # '3|1    
         active_laps_config.plotting_config = PlottingConfig(output_subplots_shape='1|5', output_parent_dir=Path('output', computation_result.sess.config.session_name, 'custom_laps'))
         # try: pActiveInteractiveLapsPlotter
         # except NameError: pActiveInteractiveLapsPlotter = None # Checks variable p's existance, and sets its value to None if it doesn't exist so it can be checked in the next step
-        pActiveInteractiveLapsPlotter = None
-        iplapsDataExplorer = InteractiveCustomDataExplorer(active_laps_config, computation_result.sess, extant_plotter=pActiveInteractiveLapsPlotter)
+        pActiveInteractiveLapsPlotter = kwargs.get('extant_plotter', None)
+        iplapsDataExplorer = InteractiveCustomDataExplorer(active_laps_config, computation_result.sess, **({'extant_plotter':None} | kwargs))
         pActiveInteractiveLapsPlotter = iplapsDataExplorer.plot(pActivePlotter=pActiveInteractiveLapsPlotter)
+        return {'iplapsDataExplorer': iplapsDataExplorer, 'pActiveInteractiveLapsPlotter': pActiveInteractiveLapsPlotter}
 
-
-    def _display_3d_image_plotter(computation_result, active_config):
+    def _display_3d_image_plotter(computation_result, active_config, **kwargs):
+        """ 
+        Inputs: {'extant_plotter': None} 
+        Outputs: {'pActiveImageTestPlotter'}
+        """
         def plot_3d_image_plotter(active_epoch_placefields2D, image_file=r'output\2006-6-07_11-26-53\maze\speedThresh_0.00-gridBin_5.00_3.00-smooth_0.00_0.00-frateThresh_0.10\pf2D-Occupancy-maze-odd_laps-speedThresh_0.00-gridBin_5.00_3.00-smooth_0.00_0.00-frateThresh_0.png'):
             loaded_image_tex = pv.read_texture(image_file)
             pActiveImageTestPlotter = pvqt.BackgroundPlotter()
@@ -152,4 +176,4 @@ class DefaultDisplayFunctions(AllFunctionEnumeratingMixin):
         # Texture from file:
         image_file = r'output\2006-6-07_11-26-53\maze\speedThresh_0.00-gridBin_5.00_3.00-smooth_0.00_0.00-frateThresh_0.10\pf2D-Occupancy-maze-odd_laps-speedThresh_0.00-gridBin_5.00_3.00-smooth_0.00_0.00-frateThresh_0.png'
         pActiveImageTestPlotter = plot_3d_image_plotter(computation_result.computed_data['pf2D'], image_file=image_file)
-
+        return {'pActiveImageTestPlotter': pActiveImageTestPlotter}
