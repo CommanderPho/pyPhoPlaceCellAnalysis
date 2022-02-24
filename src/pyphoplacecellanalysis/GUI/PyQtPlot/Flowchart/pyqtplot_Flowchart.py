@@ -1,5 +1,9 @@
 from pyqtgraph.flowchart import Flowchart, Node
 import pyqtgraph.flowchart.library as fclib
+
+from pyphoplacecellanalysis.GUI.PyQtPlot.Flowchart.ReloadableNodeLibrary import ReloadableNodeLibrary
+
+
 from pyqtgraph.Qt import QtGui, QtCore
 from pyqtgraph.console import ConsoleWidget
 from pyqtgraph.widgets.MatplotlibWidget import MatplotlibWidget
@@ -114,7 +118,10 @@ def _register_custom_node_types(fc):
     ## Method 2: If we want to make our custom node available only to this flowchart,
     ## then instead of registering the node type globally, we can create a new 
     ## NodeLibrary:
-    library = fclib.LIBRARY.copy() # start with the default node set
+    # library = fclib.LIBRARY.copy() # start with the default node set
+    library = ReloadableNodeLibrary.from_node_library(fclib.LIBRARY.copy())  # start with the default node set
+    
+    
     library.addNodeType(ImageViewNode, [('Display',)])
     # Add the unsharp mask node to two locations in the menu to demonstrate
     # that we can create arbitrary menu structures
