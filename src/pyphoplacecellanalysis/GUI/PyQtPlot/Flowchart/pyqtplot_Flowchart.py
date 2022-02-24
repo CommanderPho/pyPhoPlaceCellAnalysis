@@ -20,6 +20,7 @@ from pyphoplacecellanalysis.GUI.PyQtPlot.Flowchart.CustomNodes.PipelineInputData
 from pyphoplacecellanalysis.GUI.PyQtPlot.Flowchart.CustomNodes.PipelineFilteringDataNode import PipelineFilteringDataNode
 from pyphoplacecellanalysis.GUI.PyQtPlot.Flowchart.CustomNodes.PipelineComputationsNode import PipelineComputationsNode
 from pyphoplacecellanalysis.GUI.PyQtPlot.Flowchart.CustomNodes.PipelineDisplayNode import PipelineDisplayNode
+from pyphoplacecellanalysis.GUI.PyQtPlot.Flowchart.CustomNodes.PhoPythonEvalNode import PhoPythonEvalNode
 
 
 """
@@ -127,6 +128,12 @@ def _register_custom_node_types(fc):
     # that we can create arbitrary menu structures
     library.addNodeType(UnsharpMaskNode, [('Image',)])
     
+    # Custom Nodes:
+    library.addNodeType(PhoPythonEvalNode, [('Data',), 
+                                        ('Pho Pipeline','Eval')])
+        
+    
+    # Pipeline Nodes:
     library.addNodeType(PipelineInputDataNode, [('Data',), 
                                         ('Pho Pipeline','Input')])
     library.addNodeType(PipelineFilteringDataNode, [('Filters',), 
