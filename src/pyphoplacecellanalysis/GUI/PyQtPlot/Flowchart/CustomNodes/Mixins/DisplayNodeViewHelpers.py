@@ -105,36 +105,37 @@ class DisplayMatplotlibWidgetMixin:
                 if self.on_add_function is not None:
                     self.on_create_view(None)
 
-            # test plot
-            active_fig = self.view.getFigure()
-            active_fig.clf()
-            self.view.draw()
-    
-            # subplot = self.view.getFigure().add_subplot(111)
-            # subplot.plot(np.arange(9), np.full((9,), 15))
-            
-            # active_fig_num = None
-            active_fig_num = 1
-            # active_fig_num = active_fig.number
-                        
-            # active_fig_num = self.view.getFigure() # pass the figure itself as the fignum
-            # print(f'active_fig_num: {active_fig_num}')
-            return {'fignum':active_fig_num, 'fig':active_fig} # could do, but it wouldn't work for 2d functions that didn't accept either of thse parameters.
-    
-    
-    def example_run_3d_pyvista_fcn():
-        
-        if self.display_results is not None:
-            custom_args = self.display_results.get('kwargs', {})
-        else:
-            custom_args = {} # no custom args, just pass empty dictionary
+        # test plot
+        active_fig = self.view.getFigure()
+        active_fig.clf()
+        self.view.draw()
 
-        display_outputs = pipeline.display(curr_display_fcn, active_config_name, **custom_args) # extant_plotter=
-        if display_outputs is dict:
-            # self.display_results = dict()
-            self.display_results['outputs'] = display_outputs
-            # Search for extant_plotter to reuse in the future calls:
-            active_plotter = display_outputs.get('plotter', None)
-            # BackgroundPlotter, MultiPlotter
-            self.display_results['kwargs'] = {'extant_plotter':active_plotter}
+        # subplot = self.view.getFigure().add_subplot(111)
+        # subplot.plot(np.arange(9), np.full((9,), 15))
+        
+        # active_fig_num = None
+        active_fig_num = 1
+        # active_fig_num = active_fig.number
+                    
+        # active_fig_num = self.view.getFigure() # pass the figure itself as the fignum
+        # print(f'active_fig_num: {active_fig_num}')
+        return {'fignum':active_fig_num, 'fig':active_fig} # could do, but it wouldn't work for 2d functions that didn't accept either of thse parameters.
+    
+    
+    
+    # def example_run_3d_pyvista_fcn():
+        
+    #     if self.display_results is not None:
+    #         custom_args = self.display_results.get('kwargs', {})
+    #     else:
+    #         custom_args = {} # no custom args, just pass empty dictionary
+
+    #     display_outputs = pipeline.display(curr_display_fcn, active_config_name, **custom_args) # extant_plotter=
+    #     if display_outputs is dict:
+    #         # self.display_results = dict()
+    #         self.display_results['outputs'] = display_outputs
+    #         # Search for extant_plotter to reuse in the future calls:
+    #         active_plotter = display_outputs.get('plotter', None)
+    #         # BackgroundPlotter, MultiPlotter
+    #         self.display_results['kwargs'] = {'extant_plotter':active_plotter}
             
