@@ -92,6 +92,7 @@ class PipelineInputDataNode(ExtendedCtrlNode):
 
     @classmethod
     def _get_known_data_session_types_dict(cls):
+        """ a static accessor for the knwon data session types. Note here the default paths and such are defined. """
         known_data_session_type_dict = {'kdiba':KnownDataSessionTypeProperties(load_function=(lambda a_base_dir: DataSessionLoader.kdiba_old_format_session(a_base_dir)),
                                     basedir=Path(r'R:\data\KDIBA\gor01\one\2006-6-07_11-26-53')),
                     'bapun':KnownDataSessionTypeProperties(load_function=(lambda a_base_dir: DataSessionLoader.bapun_data_session(a_base_dir)),

@@ -85,6 +85,7 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
 
     @classmethod
     def init_from_known_data_session_type(cls, type_name: str, known_type_properties: KnownDataSessionTypeProperties):
+        """ Initializes a new pipeline from a known data session type (e.g. 'bapun' or 'kdiba', which loads some defaults) """
         return cls(name=f'{type_name}_pipeline', session_data_type=type_name, basedir=known_type_properties.basedir,
             load_function=known_type_properties.load_function, post_load_functions=known_type_properties.post_load_functions)
 
