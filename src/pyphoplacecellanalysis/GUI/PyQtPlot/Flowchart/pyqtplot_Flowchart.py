@@ -79,16 +79,16 @@ def plot_flowchartWidget(title='PhoFlowchartApp'):
     ## Create docks, place them into the window one at a time.
     ## Note that size arguments are only a suggestion; docks will still have to
     ## fill the entire dock area and obey the limits of their internal widgets.
-    d1 = Dock("Dock1", size=(1, 1))     ## give this dock the minimum possible size
-    d2 = Dock("Dock2 - Console", size=(500,300), closable=True)
-    d3 = Dock("Dock3", size=(500,400))
-    # d4 = Dock("Dock4 (tabbed) - Plot", size=(500,200))
+    d1 = Dock("GUI Layout Controls", size=(1, 1))     ## give this dock the minimum possible size
+    d2 = Dock("Display Outputs", size=(500,300), closable=True)
+    d3 = Dock("Flowchart Configuration Widgets", size=(500,400))
+    d4 = Dock("Flowchart", size=(500,200))
     # d5 = Dock("Dock5 - Image", size=(500,200))
     # d6 = Dock("Dock6 (tabbed) - Plot", size=(500,200))
     mainAppWindow.area.addDock(d1, 'left')      ## place d1 at left edge of dock area (it will fill the whole space since there are no other docks yet)
     mainAppWindow.area.addDock(d2, 'right')     ## place d2 at right edge of dock area
     mainAppWindow.area.addDock(d3, 'bottom', d1)## place d3 at bottom edge of d1
-    # mainAppWindow.area.addDock(d4, 'right')     ## place d4 at right edge of dock area
+    mainAppWindow.area.addDock(d4, 'right')     ## place d4 at right edge of dock area
     # mainAppWindow.area.addDock(d5, 'left', d1)  ## place d5 at left edge of d1
     # mainAppWindow.area.addDock(d6, 'top', d4)   ## place d5 at top edge of d4
 
@@ -133,17 +133,12 @@ def plot_flowchartWidget(title='PhoFlowchartApp'):
         'dataOut': {'io': 'out'}    
     })
     
-    # w = fc.widget() # This is unused?
     # Add the flowchart widget. This is actually not the programmatic programming environment itself, it's the column that lists the nodes and lets you set their parameters.
+    flowchart_controls_widget = mainAppWindow.flowchart.widget() 
     # layout.addWidget(mainAppWindow.flowchart.widget(), 0, 0, 2, 1) # spans 2 rows and 1 column
-
-    # w3 = pg.LayoutWidget()
-    # w3.addWidget(mainAppWindow.flowchart.widget(), row=0, col=0)
-    # d3.addWidget(w3)
-    d3.addWidget(mainAppWindow.flowchart.widget())
+    d3.addWidget(flowchart_controls_widget)
     
     
-
     ## Result/Visualization Widgets:    
     # _setup_console(mainAppWindow)
     # _build_dynamic_results_widgets(mainAppWindow, layout)
@@ -158,6 +153,11 @@ def plot_flowchartWidget(title='PhoFlowchartApp'):
     new_wrapper_container_layout = QtGui.QVBoxLayout()
     new_dynamic_node_view_container_widget.setLayout(new_wrapper_container_layout)
     
+    # Get the flowchart window which displays the actual flowchart:
+    flowchart_window = flowchart_controls_widget.cwWin
+    d4.addWidget(flowchart_window)
+    
+    
     # Setup the nodes in the flowchart:
     _register_custom_node_types(mainAppWindow.flowchart)
     
@@ -169,7 +169,6 @@ def plot_flowchartWidget(title='PhoFlowchartApp'):
     # _add_default_example_programmatic_flowchart_nodes(fc, layout)    
 
     # Expand all pipeline widget items on startup:
-    flowchart_controls_widget = mainAppWindow.flowchart.widget() 
     # flowchart_controls_widget.ui.ctrlList is a TreeWidget
     flowchart_controls_widget.ui.ctrlList.expandAll()
 
