@@ -22,8 +22,8 @@ from pyphoplacecellanalysis.GUI.PyQtPlot.Flowchart.CustomNodes.PipelineDisplayNo
 
 
 path = os.path.dirname(os.path.abspath(__file__))
-uiFile = os.path.join(path, 'MainPipelineWindow.ui')
-
+# uiFile = os.path.join(path, 'MainPipelineWindow.ui')
+uiFile = os.path.join(path, 'MainPipelineWindowWithDockArea.ui') # mostly empty
 
 class PhoPipelineMainWindow(QtWidgets.QMainWindow):
     
@@ -99,15 +99,14 @@ class PhoPipelineMainWindow(QtWidgets.QMainWindow):
 
 
     def __init__(self, title='PhoFlowchartApp', *args, **kwargs):
-        self._app = pg.mkQApp(title)
+        self._app = pg.mkQApp(title) # makes a new QApplication or gets the reference to an existing one.
         self._initialize_data()
         
         super(PhoPipelineMainWindow, self).__init__(*args, **kwargs)
 
         #Load the UI Page
-        uic.loadUi(uiFile, self)
+        uic.loadUi(uiFile, self) # load from the ui file
         
-
 
         # self.graphWidget = pg.PlotWidget()
         # self.setCentralWidget(self.graphWidget)

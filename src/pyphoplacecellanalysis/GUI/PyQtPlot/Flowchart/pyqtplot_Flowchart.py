@@ -4,9 +4,13 @@ import pyqtgraph.flowchart.library as fclib
 from pyphoplacecellanalysis.GUI.PyQtPlot.Flowchart.ReloadableNodeLibrary import ReloadableNodeLibrary
 
 
-from pyqtgraph.Qt import QtGui, QtCore
+from pyqtgraph.Qt import QtGui, QtCore, QtWidgets
 from pyqtgraph.console import ConsoleWidget
 from pyqtgraph.widgets.MatplotlibWidget import MatplotlibWidget
+from pyqtgraph.dockarea.Dock import Dock
+from pyqtgraph.dockarea.DockArea import DockArea
+
+
 import pyqtgraph as pg
 import numpy as np
 
@@ -49,49 +53,112 @@ def plot_flowchartWidget(title='PhoFlowchartApp'):
     
     # Use the widget defined in the designer as the central widget   
     mainAppWindow = PhoPipelineMainWindow(title)
-    cw = mainAppWindow.flowchart_controls
-    
     mainAppWindow.setWindowTitle(f'PhoFlowchartApp: pyqtgraph FlowchartCustomNodes: {title}')
-    layout = QtGui.QGridLayout()
+    
+    # get central widget:
+    # cw = mainAppWindow.flowchart_controls
+    cw = mainAppWindow.centralwidget
+    print(f'cw: {cw}')
+    
+    # setup the main layout of the central widget:
+    # layout = QtGui.QGridLayout()
+    # cw.setLayout(layout)
+    
+    layout = QtGui.QVBoxLayout()
     cw.setLayout(layout)
+    
 
+    # area = _build_dock_area(mainAppWindow, layout)    
+    mainAppWindow.area = DockArea()
+    # mainAppWindow.setCentralWidget(area)
+    # mainAppWindow.resize(1000,500)
+    # layout.addWidget(mainAppWindow.area, 0, 0) # start at 1 since the console is available at 0
+    layout.addWidget(mainAppWindow.area) # start at 1 since the console is available at 0
+
+    
+    ## Create docks, place them into the window one at a time.
+    ## Note that size arguments are only a suggestion; docks will still have to
+    ## fill the entire dock area and obey the limits of their internal widgets.
+    d1 = Dock("Dock1", size=(1, 1))     ## give this dock the minimum possible size
+    d2 = Dock("Dock2 - Console", size=(500,300), closable=True)
+    d3 = Dock("Dock3", size=(500,400))
+    # d4 = Dock("Dock4 (tabbed) - Plot", size=(500,200))
+    # d5 = Dock("Dock5 - Image", size=(500,200))
+    # d6 = Dock("Dock6 (tabbed) - Plot", size=(500,200))
+    mainAppWindow.area.addDock(d1, 'left')      ## place d1 at left edge of dock area (it will fill the whole space since there are no other docks yet)
+    mainAppWindow.area.addDock(d2, 'right')     ## place d2 at right edge of dock area
+    mainAppWindow.area.addDock(d3, 'bottom', d1)## place d3 at bottom edge of d1
+    # mainAppWindow.area.addDock(d4, 'right')     ## place d4 at right edge of dock area
+    # mainAppWindow.area.addDock(d5, 'left', d1)  ## place d5 at left edge of d1
+    # mainAppWindow.area.addDock(d6, 'top', d4)   ## place d5 at top edge of d4
+
+    # ## Test ability to move docks programatically after they have been placed
+    # area.moveDock(d4, 'top', d2)     ## move d4 to top edge of d2
+    # area.moveDock(d6, 'above', d4)   ## move d6 to stack on top of d4
+    # area.moveDock(d5, 'top', d2)     ## move d5 to top edge of d2
+    
+    ## Add widgets into each dock
+    # _build_dock_save_load(mainAppWindow.area, d1)
+     ## first dock gets save/restore buttons
+    w1 = pg.LayoutWidget()
+    label = QtWidgets.QLabel(""" -- DockArea Example -- 
+    This window has 6 Dock widgets in it. Each dock can be dragged
+    by its title bar to occupy a different space within the window 
+    but note that one dock has its title bar hidden). Additionally,
+    the borders between docks may be dragged to resize. Docks that are dragged on top
+    of one another are stacked in a tabbed layout. Double-click a dock title
+    bar to place it in its own window.
+    """)
+    saveBtn = QtWidgets.QPushButton('Save dock state')
+    restoreBtn = QtWidgets.QPushButton('Restore dock state')
+    restoreBtn.setEnabled(False)
+    w1.addWidget(label, row=0, col=0)
+    w1.addWidget(saveBtn, row=1, col=0)
+    w1.addWidget(restoreBtn, row=2, col=0)
+    d1.addWidget(w1)
+    state = None
+    def save():
+        global state
+        state = mainAppWindow.area.saveState()
+        restoreBtn.setEnabled(True)
+    def load():
+        global state
+        mainAppWindow.area.restoreState(state)
+    saveBtn.clicked.connect(save)
+    restoreBtn.clicked.connect(load)
+    
     ## Create an empty flowchart with a single input and output
     mainAppWindow.flowchart = Flowchart(terminals={
         'dataIn': {'io': 'in'},
         'dataOut': {'io': 'out'}    
     })
+    
     # w = fc.widget() # This is unused?
     # Add the flowchart widget. This is actually not the programmatic programming environment itself, it's the column that lists the nodes and lets you set their parameters.
-    layout.addWidget(mainAppWindow.flowchart.widget(), 0, 0, 2, 1) # spans 2 rows and 1 column
+    # layout.addWidget(mainAppWindow.flowchart.widget(), 0, 0, 2, 1) # spans 2 rows and 1 column
 
-
-
-    ## Result/Visualization Widgets:
-    ## build an initial namespace for console commands to be executed in (this is optional;
-    ## the user can always import these modules manually)
-    namespace = {'pg': pg, 'np': np}
-
-    ## initial text to display in the console
-    text = """
-    This is an interactive python console. The numpy and pyqtgraph modules have already been imported 
-    as 'np' and 'pg'. 
-
-    Go, play.
-    """
+    # w3 = pg.LayoutWidget()
+    # w3.addWidget(mainAppWindow.flowchart.widget(), row=0, col=0)
+    # d3.addWidget(w3)
+    d3.addWidget(mainAppWindow.flowchart.widget())
     
-    mainAppWindow.console.localNamespace = namespace
-    mainAppWindow.console.text = text
+    
 
-    # console_widget = ConsoleWidget(namespace=namespace, text=text)
-    # layout.addWidget(console_widget, 0, 1)
+    ## Result/Visualization Widgets:    
+    # _setup_console(mainAppWindow)
+    # _build_dynamic_results_widgets(mainAppWindow, layout)
     
     ## Create a container to hold all dynamically added widgets.
     new_dynamic_node_view_container_widget = QtGui.QWidget()
-    layout.addWidget(new_dynamic_node_view_container_widget, 1, 1) # start at 1 since the console is available at 0
+    w2 = pg.LayoutWidget()
+    w2.addWidget(new_dynamic_node_view_container_widget, row=0, col=0)
+    d2.addWidget(w2)
+    
     # create a layout for the new container view:
     new_wrapper_container_layout = QtGui.QVBoxLayout()
     new_dynamic_node_view_container_widget.setLayout(new_wrapper_container_layout)
     
+    # Setup the nodes in the flowchart:
     _register_custom_node_types(mainAppWindow.flowchart)
     
     # end node setup:
@@ -107,6 +174,73 @@ def plot_flowchartWidget(title='PhoFlowchartApp'):
     flowchart_controls_widget.ui.ctrlList.expandAll()
 
     return mainAppWindow, mainAppWindow.app
+
+
+def _setup_console(mainAppWindow):
+    ## build an initial namespace for console commands to be executed in (this is optional;
+    ## the user can always import these modules manually)
+    namespace = {'pg': pg, 'np': np}
+
+    ## initial text to display in the console
+    text = """
+    This is an interactive python console. The numpy and pyqtgraph modules have already been imported 
+    as 'np' and 'pg'. 
+
+    Go, play.
+    """
+    # console_widget = ConsoleWidget(namespace=namespace, text=text)
+    # layout.addWidget(console_widget, 0, 1)
+    mainAppWindow.console.localNamespace = namespace
+    mainAppWindow.console.text = text
+    
+    
+def _build_dynamic_results_widgets(mainAppWindow, layout):
+    ## Create a container to hold all dynamically added widgets.
+    new_dynamic_node_view_container_widget = QtGui.QWidget()
+    layout.addWidget(new_dynamic_node_view_container_widget, 0, 0)
+    # create a layout for the new container view:
+    new_wrapper_container_layout = QtGui.QVBoxLayout()
+    new_dynamic_node_view_container_widget.setLayout(new_wrapper_container_layout)
+    return new_dynamic_node_view_container_widget
+    
+    
+def _build_dock_area(mainAppWindow, layout):
+    area = DockArea()
+    # mainAppWindow.setCentralWidget(area)
+    # mainAppWindow.resize(1000,500)
+    layout.addWidget(area, 0, 0) # start at 1 since the console is available at 0
+    # layout.addWidget(area, 1, 1, 2, 4) # start at 1 since the console is available at 0
+    return area
+
+def _build_dock_save_load(area, d1):
+    ## first dock gets save/restore buttons
+    w1 = pg.LayoutWidget()
+    label = QtWidgets.QLabel(""" -- DockArea Example -- 
+    This window has 6 Dock widgets in it. Each dock can be dragged
+    by its title bar to occupy a different space within the window 
+    but note that one dock has its title bar hidden). Additionally,
+    the borders between docks may be dragged to resize. Docks that are dragged on top
+    of one another are stacked in a tabbed layout. Double-click a dock title
+    bar to place it in its own window.
+    """)
+    saveBtn = QtWidgets.QPushButton('Save dock state')
+    restoreBtn = QtWidgets.QPushButton('Restore dock state')
+    restoreBtn.setEnabled(False)
+    w1.addWidget(label, row=0, col=0)
+    w1.addWidget(saveBtn, row=1, col=0)
+    w1.addWidget(restoreBtn, row=2, col=0)
+    d1.addWidget(w1)
+    state = None
+    def save():
+        global state
+        state = area.saveState()
+        restoreBtn.setEnabled(True)
+    def load():
+        global state
+        area.restoreState(state)
+    saveBtn.clicked.connect(save)
+    restoreBtn.clicked.connect(load)
+
 
 
 
