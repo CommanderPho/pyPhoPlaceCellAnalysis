@@ -107,6 +107,14 @@ class PhoPipelineMainWindow(QtWidgets.QMainWindow):
         #Load the UI Page
         uic.loadUi(uiFile, self) # load from the ui file
         
+        # Set window icon:
+        
+
+        # icon_path = 'Resources\Icons\ProcessIcon.ico'
+        icon_path = r'C:\Users\pho\repos\pyPhoPlaceCellAnalysis\src\pyphoplacecellanalysis\Resources\Icons\ProcessIcon.ico'
+        self.setWindowIcon(QtGui.QIcon(icon_path))
+        
+        # ':/Icons/Icons/ProcessIcon.ico' 
 
         # self.graphWidget = pg.PlotWidget()
         # self.setCentralWidget(self.graphWidget)
