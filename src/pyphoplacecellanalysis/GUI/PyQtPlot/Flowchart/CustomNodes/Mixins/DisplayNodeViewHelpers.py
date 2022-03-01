@@ -62,18 +62,35 @@ class PipelineDynamicDockDisplayAreaMixin:
         display_dock_area = self.displayDockArea
         curr_display_dock_items = display_dock_area.children()
         curr_num_display_dock_items = len(curr_display_dock_items)
+
+        if identifier is None:
+            identifier = 'item'
         
-        dDisplayItem = Dock(f"Display Subdock Item {curr_num_display_dock_items}", size=(300,200), closable=True) # add the new display item
-        display_dock_area.addDock(dDisplayItem, 'left')
+        extant_group_items = self._dynamic_display_output_dict.get(identifier, None) # tries to find extant items with this identifier in the dict of extant plots
+        if extant_group_items is not None:
+            # Item was found with this identifier, implement one of the strategies
+            curr_extant_group_item_count = len(extant_group_items)
+            unique_identifier = f'{identifier}-{curr_extant_group_item_count}'
+        else:
+            # no extant items found
+            unique_identifier = identifier
+
+        # if identifier is None:
+        #     identifier = f'Display Subdock Item {curr_num_display_dock_items}'
+        # else:
+        #     identifier = f'{identifier}-{curr_num_display_dock_items}'        
+        
+        dDisplayItem = Dock(unique_identifier, size=(300,200), closable=True) # add the new display item
+        display_dock_area.addDock(dDisplayItem, 'bottom')
         
         # Add the widget to the new display item:
-        if viewContentsType is ProducedViewType.Matplotlib:
+        if viewContentsType.value is ProducedViewType.Matplotlib.value:
             new_view_widget = MatplotlibWidget() # Matplotlib widget directly
             # add example plot to figure
             subplot = new_view_widget.getFigure().add_subplot(111)
             subplot.plot(np.arange(9))
             new_view_widget.draw()
-        elif viewContentsType is ProducedViewType.Pyvista:
+        elif viewContentsType.value is ProducedViewType.Pyvista.value:
             new_view_widget = None
             raise NotImplementedError
         else:
@@ -83,6 +100,16 @@ class PipelineDynamicDockDisplayAreaMixin:
         # Set the dock item's widget to the new_view_widget    
         dDisplayItem.addWidget(new_view_widget)
         
+        
+        if extant_group_items is not None:
+            # Item was found with this identifier, implement one of the strategies
+            extant_group_items[unique_identifier] = {"dock":dDisplayItem, "widget":new_view_widget} # add the unique item to the group's dict
+            self._dynamic_display_output_dict[identifier] = extant_group_items # update the extant group's dict
+        else:
+            self._dynamic_display_output_dict[identifier] = OrderedDict() # initialize an empty group for the dict
+            self._dynamic_display_output_dict[identifier][unique_identifier] = {"dock":dDisplayItem, "widget":new_view_widget}
+            
+        # self._dynamic_display_output_dict[identifier] = {"dock":dDisplayItem, "widget":new_view_widget}        
         return new_view_widget, dDisplayItem
     
     
