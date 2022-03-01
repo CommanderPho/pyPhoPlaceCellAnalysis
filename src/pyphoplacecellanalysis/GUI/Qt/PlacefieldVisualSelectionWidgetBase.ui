@@ -71,9 +71,9 @@ border-color: rgb(0, 0, 0);</string>
        <number>4</number>
       </property>
       <item>
-       <widget class="QPushButton" name="pushButton">
+       <widget class="QPushButton" name="btnTitle">
         <property name="text">
-         <string>Title</string>
+         <string>pf[i]</string>
         </property>
        </widget>
       </item>

@@ -36,11 +36,13 @@ class MainWindow(QtWidgets.QMainWindow):
         
         self.pf_widgets = []
         for i in np.arange(30):
+            curr_pf_string = f"pf[{i}]"
             curr_widget = PlacefieldVisualSelectionWidget()
-            curr_widget.setObjectName(f"pf[{i}]")
+            curr_widget.setObjectName(curr_pf_string)
+            curr_widget.name = curr_pf_string # be sure to set the name
+            # TODO: set the color and such too
             self.ui.pf_layout.addWidget(curr_widget)
             self.pf_widgets.append(curr_widget)
-        
         
         
         
