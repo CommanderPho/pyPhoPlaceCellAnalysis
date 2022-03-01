@@ -1,4 +1,5 @@
 # from PyQt6 import QtWidgets, uic
+from typing import OrderedDict
 from PyQt5 import QtWidgets, uic
 
 from pyqtgraph.flowchart import Flowchart, Node
@@ -131,6 +132,8 @@ class PhoPipelineMainWindow(PipelineDynamicDockDisplayAreaMixin, QtWidgets.QMain
         self._flowchart = None
         self._pipeline = None
         
+        
+        self._dynamic_display_output_dict = OrderedDict() # for PipelineDynamicDockDisplayAreaMixin
         # ## later on, process data through the node
         # filteredData = filterNode.process(inputTerminal=rawData)
         

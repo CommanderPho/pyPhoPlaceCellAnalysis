@@ -1,4 +1,5 @@
 # DisplayNodeViewHelpers.py
+from collections import OrderedDict
 from enum import Enum
 from pyqtgraph.Qt import QtGui, QtCore, QtWidgets
 from pyqtgraph.console import ConsoleWidget
@@ -19,9 +20,9 @@ from pyphoplacecellanalysis.GUI.PyQtPlot.Windows.pyqtplot_SecondaryWindow import
 
 class ProducedViewType(Enum):
     """Docstring for ProducedViewType."""
-    Matplotlib = "Matplotlib" # MatplotlibWidget, needs to be passed into display function as "fig=active_fig" argument
+    Matplotlib = 'Matplotlib' # MatplotlibWidget, needs to be passed into display function as "fig=active_fig" argument
     Pyvista = 'Pyvista' # BackgroundPlotter, MultiPlotter: needs to be passed into display function as "extant_plotter=active_plotter" argument
-    Custom = "Custom"
+    Custom = 'Custom'
     
     
     
@@ -38,14 +39,25 @@ class PipelineDynamicDockDisplayAreaMixin:
         
     
     """
+    
+    @property
+    def dynamic_display_dict(self):
+        """The dynamic_display_dict property."""
+        return self._dynamic_display_output_dict
+    @dynamic_display_dict.setter
+    def dynamic_display_dict(self, value):
+        self._dynamic_display_output_dict = value
+    
+    
     def _build_dynamic_display_dockarea(self):
         dItem = Dock("Display Outputs - Dynamic", size=(600,900), closable=True)
         self.area.addDock(dItem, 'right')
         self.displayDockArea = DockArea()
         dItem.addWidget(self.displayDockArea) # add the dynamic nested Dock area to the dItem widget
+        self._dynamic_display_output_dict = OrderedDict() # for PipelineDynamicDockDisplayAreaMixin
         return dItem
     
-    def add_display_dock(self, identifier, viewContentsType: ProducedViewType):
+    def add_display_dock(self, identifier = None, viewContentsType: ProducedViewType = ProducedViewType.Matplotlib):
         # Add the sample display dock items to the nested dynamic display dock:
         display_dock_area = self.displayDockArea
         curr_display_dock_items = display_dock_area.children()
@@ -72,6 +84,13 @@ class PipelineDynamicDockDisplayAreaMixin:
         dDisplayItem.addWidget(new_view_widget)
         
         return new_view_widget, dDisplayItem
+    
+    
+    
+    # TODO: Persistance:
+    # self.plotDict[name] = {"dock":dock, "widget":widget, "view":view}
+    
+    
  
  
     #  def _build_debug_test_menu(self):
