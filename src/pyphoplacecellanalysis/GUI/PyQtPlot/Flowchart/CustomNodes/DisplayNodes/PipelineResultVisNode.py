@@ -32,13 +32,10 @@ from pyphoplacecellanalysis.GUI.PyQtPlot.Flowchart.CustomNodes.Mixins.DisplayNod
 
 
 
-class PipelineDisplayNode(DisplayMatplotlibWidgetMixin, AssociatedOutputWidgetNodeMixin, AssociatedAppNodeMixin, KeysListAccessingMixin, PlottingCtrlNode):
-    """Displays active pipeline.
-        TODO: allow the user to select which display function will be used, and optionally pass any function-specific parameters by adding additional inputs.
-            - Probably should have a plaintext input like the arbitrary python exec example node to allow typing the function.
-            - Ideally would have an option to spawn the output widget in a new window or to add it to the main window.
+class PipelineResultVisNode(DisplayMatplotlibWidgetMixin, AssociatedOutputWidgetNodeMixin, AssociatedAppNodeMixin, KeysListAccessingMixin, PlottingCtrlNode):
+    """A display node that's bound one-to-one with an output widget on the dynamic display widgets dock area in the main window.
     """
-    nodeName = "PipelineDisplayNode"
+    nodeName = "PipelineResultVisNode"
     uiTemplate = [
         ('display_function', 'combo', {'values': [], 'index': 0}),
         ('computed_result', 'combo', {'values': [], 'index': 0}),
@@ -184,7 +181,7 @@ class PipelineDisplayNode(DisplayMatplotlibWidgetMixin, AssociatedOutputWidgetNo
             # print(f'curr_display_fcn: {self.selected_display_function_name}')
             # active_pf_2D_figures = pipeline.display(curr_display_fcn, active_config_name, enable_spike_overlay=False, plot_variable=enumTuningMap2DPlotVariables.TUNING_MAPS, fignum=active_fig_num, fig=active_fig, max_screen_figure_size=(None, 1868), debug_print=False, enable_saving_to_disk=enable_saving_to_disk)
             
-            is_plotter_widget_fcn = (self.selected_display_function_name in PipelineDisplayNode.plotter_widget_fcns)
+            is_plotter_widget_fcn = (self.selected_display_function_name in PipelineResultVisNode.plotter_widget_fcns)
             is_matplotlib_widget_fcn = (self.selected_display_function_name not in self.plotter_widget_fcns)
             if is_plotter_widget_fcn:
                 pass
@@ -266,7 +263,7 @@ class PipelineDisplayNode(DisplayMatplotlibWidgetMixin, AssociatedOutputWidgetNo
 
         
     def updateKeys(self, ctrl_name, data):
-        keys = PipelineDisplayNode.get_keys_list(data)
+        keys = PipelineResultVisNode.get_keys_list(data)
         
         for c in self.ctrls.values():
             c.blockSignals(True)

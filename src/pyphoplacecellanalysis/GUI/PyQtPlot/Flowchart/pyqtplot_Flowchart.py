@@ -25,6 +25,7 @@ from pyphoplacecellanalysis.GUI.PyQtPlot.Flowchart.CustomNodes.PipelineFiltering
 from pyphoplacecellanalysis.GUI.PyQtPlot.Flowchart.CustomNodes.PipelineComputationsNode import PipelineComputationsNode
 from pyphoplacecellanalysis.GUI.PyQtPlot.Flowchart.CustomNodes.PipelineDisplayNode import PipelineDisplayNode
 from pyphoplacecellanalysis.GUI.PyQtPlot.Flowchart.CustomNodes.PhoPythonEvalNode import PhoPythonEvalNode
+from pyphoplacecellanalysis.GUI.PyQtPlot.Flowchart.CustomNodes.DisplayNodes.PipelineResultVisNode import PipelineResultVisNode
 
 
 """
@@ -329,7 +330,10 @@ def _register_custom_node_types(fc):
     library.addNodeType(PipelineComputationsNode, [('Data',), 
                                         ('Pho Pipeline','Computation')])
     library.addNodeType(PipelineDisplayNode, [('Display',), 
+                                        ('Pho Pipeline','Display')])    
+    library.addNodeType(PipelineResultVisNode, [('Display',), 
                                         ('Pho Pipeline','Display')])
+
     fc.setLibrary(library)
     
 
@@ -376,58 +380,7 @@ def _add_pho_pipeline_programmatic_flowchart_nodes(app, fc, on_add_function=None
         
     #     return new_view_widget, new_widget_window
     
-        
 
-    ## Result/Visualization Widgets:
-    # need app and win
-    # new_view_widget = pg.GraphicsWidget()
-    
-    # # Build the new outer container widget to hold the other views:
-    # new_view_widget = QtGui.QWidget()
-    # layout.addWidget(new_view_widget, 1, 1) # start at 1 since the console is available at 0
-    
-    # # create a layout for the new container view:
-    # new_view_layout = QtGui.QGridLayout()
-    # new_view_widget.setLayout(new_view_layout)
-    # # build the internal widget
-    # new_root_render_widget = pg.GraphicsLayoutWidget()
-    # new_view_layout.addWidget(new_root_render_widget, 1, 1) # add the new view to the new layout
-    
-    # New Window:
-    ## Create main window with a grid layout inside
-    # win = QtGui.QMainWindow()
-    # win.setWindowTitle(f'PhoFlowchartApp: Custom Result Window')
-    # cw = QtGui.QWidget()
-    # win.setCentralWidget(cw)
-    # # layout = QtGui.QGridLayout()
-    # layout = QtGui.QVBoxLayout()
-    # cw.setLayout(layout)
-    
-        
-    # # Matplotlib widget directly:
-    # new_view_widget = MatplotlibWidget()
-    # # layout.addWidget(new_view_widget, 1, 1) # start at 1 since the console is available at 0
-    
-    # new_widget_window = AnotherWindow([new_view_widget])
-    # new_widget_window.setWindowTitle(f'PhoFlowchartApp: Custom Result Window')
-    # new_widget_window.show()
-    # new_widget_window.resize(800,600)
-    
-    # subplot = new_view_widget.getFigure().add_subplot(111)
-    # subplot.plot(np.arange(9))
-    # new_view_widget.draw()
-    
-    # new_view_widget.setCentralWidget(new_root_render_widget)
-        
-    
-    ## Create two ImageView widgets to display the raw and processed data with contrast
-    ## and color control.
-    # v1 = pg.ImageView()
-    # v2 = pg.ImageView()
-    # layout.addWidget(v1, 1, 1) # start at 1 since the console is available at 0
-    # layout.addWidget(v2, 2, 1)
-    
-    
     ## Set the raw data as the input value to the flowchart
     fc.setInput(dataIn='Bapun')
     
