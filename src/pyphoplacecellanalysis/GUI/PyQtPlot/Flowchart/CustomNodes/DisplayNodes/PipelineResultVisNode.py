@@ -26,13 +26,13 @@ from pyphoplacecellanalysis.General.Pipeline.Stages.Display import DefaultDispla
 from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.Ratemaps import DefaultRatemapDisplayFunctions
 from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import DefaultDecoderDisplayFunctions
 
-from pyphoplacecellanalysis.GUI.PyQtPlot.Flowchart.CustomNodes.Mixins.AssociatedOutputWidgetNodeMixin import AssociatedAppNodeMixin, AssociatedOutputWidgetNodeMixin
+from pyphoplacecellanalysis.GUI.PyQtPlot.Flowchart.CustomNodes.Mixins.AssociatedOutputWidgetNodeMixin import AddRemoveActionNodeMixin, AssociatedAppNodeMixin, AssociatedOutputWidgetNodeMixin
 from pyphoplacecellanalysis.GUI.PyQtPlot.Flowchart.CustomNodes.Mixins.CtrlNodeMixins import KeysListAccessingMixin
 from pyphoplacecellanalysis.GUI.PyQtPlot.Flowchart.CustomNodes.Mixins.DisplayNodeViewHelpers import DisplayMatplotlibWidgetMixin
 
 
-
-class PipelineResultVisNode(DisplayMatplotlibWidgetMixin, AssociatedOutputWidgetNodeMixin, AssociatedAppNodeMixin, KeysListAccessingMixin, PlottingCtrlNode):
+# DisplayNodeChangeSelectedFunctionMixin
+class PipelineResultVisNode(AssociatedOutputWidgetNodeMixin, AddRemoveActionNodeMixin, AssociatedAppNodeMixin, KeysListAccessingMixin, PlottingCtrlNode):
     """A display node that's bound one-to-one with an output widget on the dynamic display widgets dock area in the main window.
     """
     nodeName = "PipelineResultVisNode"
@@ -41,37 +41,37 @@ class PipelineResultVisNode(DisplayMatplotlibWidgetMixin, AssociatedOutputWidget
         ('computed_result', 'combo', {'values': [], 'index': 0}),
         ('rebuild_widgets', 'action'),
         ('display', 'action'),
+        ('clear_widgets', 'action'),
+        
     ]
     # TODO: currently hardcoded:
     plotter_widget_fcns = ['_display_3d_image_plotter', '_display_3d_interactive_custom_data_explorer','_display_3d_interactive_spike_and_behavior_browser','_display_3d_interactive_tuning_curves_plotter']
     
-    def __init__(self, name, on_add_function=None, on_remove_function=None):
-        # Initialize the associated app
-        self.app = None
-        # Initialize the associated view
-        self._display_results = dict()
-        
-        # self.setView() # initializes self._view, self._owned_parent_container, self.on_add_function, and self._on_remove_function to None
-        self._owned_parent_container = None
-        self._view = None
-        self._on_add_function = on_add_function
-        self._on_remove_function = on_remove_function
-        
-        # self.view = None
-        # self.on_remove_function = None
-        
-
+    def __init__(self, name):
         ## Define the input / output terminals available on this node
         terminals = {
-            'mode': dict(io='in'),
             'computation_configs': dict(io='in'),
-            'filter_configs': dict(io='in'),
             'pipeline': dict(io='in'),
             'display_outputs': dict(io='out'),
             'display_results': dict(io='out'),             
         }
         PlottingCtrlNode.__init__(self, name, terminals=terminals)
         
+        # Initialize the associated app
+        self.app = None
+        # Initialize the associated view
+        self._display_results = dict()
+        
+        # self.setView() # initializes self._view, self._owned_parent_container, self.on_add_function, and self._on_remove_function to None
+        # self._owned_parent_container = None
+        # self._view = None
+        self._on_add_function = None
+        self._on_remove_function = None
+        
+        # self.view = None
+        self.on_add_function = None
+        self.on_remove_function = None
+                        
         # Set up the combo boxes:
         # self.display_function_keys = []
         # self.computed_result_keys = []
@@ -104,16 +104,19 @@ class PipelineResultVisNode(DisplayMatplotlibWidgetMixin, AssociatedOutputWidget
         self.ctrls['rebuild_widgets'].setText('Rebuild')
         def click_rebuild_widgets():
             self.ctrls['rebuild_widgets'].processing("Hold on..")
-            # time.sleep(2.0)
+            # the identifier should be: f'{node_identifier_name}'
+            node_identifier_name = self.name
+            active_display_output_identifier = f'{node_identifier_name}'
+            if self.on_add_function is not None:
+                self.on_add_function(active_display_output_identifier) # remove all widgets with this name
+                fail = False
+            else:
+                print('no key found')
+                fail = True
             
             # Not sure whether to call self.changed() (from CtrlNode) or self.update() from its parent class.
             # self.update() 
             self.changed() # should trigger re-computation in a blocking manner.
-            
-            # global fail
-            # fail = not fail
-            
-            fail = False
             if fail:
                 self.ctrls['rebuild_widgets'].failure(message="FAIL.", tip="There was a failure. Get over it.")
             else:
@@ -122,6 +125,38 @@ class PipelineResultVisNode(DisplayMatplotlibWidgetMixin, AssociatedOutputWidget
         self.ctrls['rebuild_widgets'].clicked.connect(click_rebuild_widgets)
         
         
+        # Setup the clear_widgets button:
+        self.ctrls['clear_widgets'].setText('Clear Dynamic Display Widgets')
+        def click_clear_widgets():
+            self.ctrls['clear_widgets'].processing("Hold on..")
+            # the identifier should be: f'{node_identifier_name}'
+            node_identifier_name = self.name
+            active_display_output_identifier = f'{node_identifier_name}'
+            if self.on_remove_function is not None:
+                self.on_remove_function(active_display_output_identifier) # remove all widgets with this name
+                fail = False
+            else:
+                print('no key found')
+                fail = True
+
+            # Not sure whether to call self.changed() (from CtrlNode) or self.update() from its parent class.
+            # self.update() 
+            self.changed() # should trigger re-computation in a blocking manner.
+            # global fail
+            # fail = not fail            
+            # fail = False
+            if fail:
+                self.ctrls['clear_widgets'].failure(message="FAIL.", tip="There was a failure. Get over it.")
+            else:
+                self.ctrls['clear_widgets'].success(message="Bueno!")
+                
+        self.ctrls['clear_widgets'].clicked.connect(click_clear_widgets)
+        
+        
+        #TODO: should remove dynamic display outputs on:
+            # - node rename (as the key will change, the outputs will change)
+            # - display function change (different functions will output different displays)
+   
         
     
     @property
@@ -186,10 +221,11 @@ class PipelineResultVisNode(DisplayMatplotlibWidgetMixin, AssociatedOutputWidget
             if is_plotter_widget_fcn:
                 pass
             elif is_matplotlib_widget_fcn:
-                raise
-                self.display_results['kwargs'] = self.display_widget() # provided by DisplayMatplotlibWidgetMixin. Returns a dict like {'fignum':active_fig_num, 'fig':active_fig}
+                # raise
+                # self.display_results['kwargs'] = self.display_widget() # provided by DisplayMatplotlibWidgetMixin. Returns a dict like {'fignum':active_fig_num, 'fig':active_fig}
+                pass
             else:
-                raise
+                # raise
                 pass 
             
             # curr_kdiba_pipeline.display(DefaultDisplayFunctions._display_2d_placefield_result_plot_ratemaps_2D, filter_name, enable_spike_overlay=False, plot_variable=enumTuningMap2DPlotVariables.FIRING_MAPS, fignum=0, max_screen_figure_size=(None, 1868), debug_print=False, enable_saving_to_disk=enable_saving_to_disk) # works!

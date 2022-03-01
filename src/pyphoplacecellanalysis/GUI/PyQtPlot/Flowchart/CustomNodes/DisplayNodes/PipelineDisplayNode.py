@@ -26,13 +26,13 @@ from pyphoplacecellanalysis.General.Pipeline.Stages.Display import DefaultDispla
 from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.Ratemaps import DefaultRatemapDisplayFunctions
 from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import DefaultDecoderDisplayFunctions
 
-from pyphoplacecellanalysis.GUI.PyQtPlot.Flowchart.CustomNodes.Mixins.AssociatedOutputWidgetNodeMixin import AssociatedAppNodeMixin, AssociatedOutputWidgetNodeMixin
+from pyphoplacecellanalysis.GUI.PyQtPlot.Flowchart.CustomNodes.Mixins.AssociatedOutputWidgetNodeMixin import AddRemoveActionNodeMixin, AssociatedAppNodeMixin, AssociatedOutputWidgetNodeMixin
 from pyphoplacecellanalysis.GUI.PyQtPlot.Flowchart.CustomNodes.Mixins.CtrlNodeMixins import KeysListAccessingMixin
 from pyphoplacecellanalysis.GUI.PyQtPlot.Flowchart.CustomNodes.Mixins.DisplayNodeViewHelpers import DisplayMatplotlibWidgetMixin
 
 
 
-class PipelineDisplayNode(DisplayMatplotlibWidgetMixin, AssociatedOutputWidgetNodeMixin, AssociatedAppNodeMixin, KeysListAccessingMixin, PlottingCtrlNode):
+class PipelineDisplayNode(DisplayMatplotlibWidgetMixin, AssociatedOutputWidgetNodeMixin, AddRemoveActionNodeMixin, AssociatedAppNodeMixin, KeysListAccessingMixin, PlottingCtrlNode):
     """Displays active pipeline.
         TODO: allow the user to select which display function will be used, and optionally pass any function-specific parameters by adding additional inputs.
             - Probably should have a plaintext input like the arbitrary python exec example node to allow typing the function.
@@ -66,9 +66,7 @@ class PipelineDisplayNode(DisplayMatplotlibWidgetMixin, AssociatedOutputWidgetNo
 
         ## Define the input / output terminals available on this node
         terminals = {
-            'mode': dict(io='in'),
             'computation_configs': dict(io='in'),
-            'filter_configs': dict(io='in'),
             'pipeline': dict(io='in'),
             'display_outputs': dict(io='out'),
             'display_results': dict(io='out'),             
@@ -88,8 +86,8 @@ class PipelineDisplayNode(DisplayMatplotlibWidgetMixin, AssociatedOutputWidgetNo
             # time.sleep(2.0)
             
             # Not sure whether to call self.changed() (from CtrlNode) or self.update() from its parent class.
-            # self.update() 
-            self.changed() # should trigger re-computation in a blocking manner.
+            self.update() 
+            # self.changed() # should trigger re-computation in a blocking manner.
             
             # global fail
             # fail = not fail
@@ -110,8 +108,8 @@ class PipelineDisplayNode(DisplayMatplotlibWidgetMixin, AssociatedOutputWidgetNo
             # time.sleep(2.0)
             
             # Not sure whether to call self.changed() (from CtrlNode) or self.update() from its parent class.
-            # self.update() 
-            self.changed() # should trigger re-computation in a blocking manner.
+            self.update() 
+            # self.changed() # should trigger re-computation in a blocking manner.
             
             # global fail
             # fail = not fail
@@ -189,7 +187,7 @@ class PipelineDisplayNode(DisplayMatplotlibWidgetMixin, AssociatedOutputWidgetNo
             if is_plotter_widget_fcn:
                 pass
             elif is_matplotlib_widget_fcn:
-                raise
+                # raise
                 self.display_results['kwargs'] = self.display_widget() # provided by DisplayMatplotlibWidgetMixin. Returns a dict like {'fignum':active_fig_num, 'fig':active_fig}
             else:
                 raise

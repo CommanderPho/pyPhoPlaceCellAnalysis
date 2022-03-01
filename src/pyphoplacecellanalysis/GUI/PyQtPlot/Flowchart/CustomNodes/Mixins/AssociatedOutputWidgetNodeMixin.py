@@ -27,6 +27,28 @@ class AssociatedAppNodeMixin:
 
 
 
+
+class AddRemoveActionNodeMixin:
+    """ """
+    @property
+    def on_remove_function(self):
+        """The on_remove_function property."""
+        return self._on_remove_function
+    @on_remove_function.setter
+    def on_remove_function(self, value):
+        self._on_remove_function = value
+
+
+    @property
+    def on_add_function(self):
+        """The on_add_function property."""
+        return self._on_add_function
+    @on_add_function.setter
+    def on_add_function(self, value):
+        self._on_add_function = value
+        
+
+        
 class AssociatedOutputWidgetNodeMixin:
     """Implementor should be Node subclass that displays an output view widget
         Provides self.view and automatically handles removing the associated view when the node is removed.
@@ -52,22 +74,7 @@ class AssociatedOutputWidgetNodeMixin:
         self._owned_parent_container = value
         
     
-    @property
-    def on_remove_function(self):
-        """The on_remove_function property."""
-        return self._on_remove_function
-    @on_remove_function.setter
-    def on_remove_function(self, value):
-        self._on_remove_function = value
-
-
-    @property
-    def on_add_function(self):
-        """The on_add_function property."""
-        return self._on_add_function
-    @on_add_function.setter
-    def on_add_function(self, value):
-        self._on_add_function = value
+   
         
     # def __init__(self, name):
     #     self.view = None
@@ -89,16 +96,15 @@ class AssociatedOutputWidgetNodeMixin:
     
     def on_create_view(self, event):
         """ Called to create/build the view using the on_add_function """
-        if self.on_add_function is not None:
-            self.view, self.owned_parent_container = self.on_add_function() # call on_remove_function with self to remove self from the layout
+        if self._on_add_function is not None:
+            self.view, self.owned_parent_container = self._on_add_function() # call on_remove_function with self to remove self from the layout
                 
     def on_remove_view(self, event):
         """ Called when the view is to be removed"""
         # print("AssociatedOutputWidgetNodeMixin.on_remove_view()")
         if self.view is not None:
-            if self.on_remove_function is not None:
-                self.on_remove_function(self.view) # call on_remove_function with self to remove self from the layout
-                
+            if self._on_remove_function is not None:
+                self._on_remove_function(self.view) # call on_remove_function with self to remove self from the layout
             self.view.deleteLater() # How to dynamically remove the widget
     
     # def process(self, data, display=True):

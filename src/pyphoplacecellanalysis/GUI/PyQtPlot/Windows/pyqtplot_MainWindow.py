@@ -19,8 +19,7 @@ from pyphoplacecellanalysis.GUI.PyQtPlot.Flowchart.CustomNodes.ImageViewNode imp
 from pyphoplacecellanalysis.GUI.PyQtPlot.Flowchart.CustomNodes.UnsharpMaskNode import UnsharpMaskNode
 from pyphoplacecellanalysis.GUI.PyQtPlot.Flowchart.CustomNodes.PipelineInputDataNode import PipelineInputDataNode
 from pyphoplacecellanalysis.GUI.PyQtPlot.Flowchart.CustomNodes.PipelineFilteringDataNode import PipelineFilteringDataNode
-from pyphoplacecellanalysis.GUI.PyQtPlot.Flowchart.CustomNodes.PipelineDisplayNode import PipelineDisplayNode
-
+from pyphoplacecellanalysis.GUI.PyQtPlot.Flowchart.CustomNodes.DisplayNodes.PipelineDisplayNode import PipelineDisplayNode
 from pyphoplacecellanalysis.GUI.PyQtPlot.Flowchart.CustomNodes.Mixins.DisplayNodeViewHelpers import PipelineDynamicDockDisplayAreaMixin
 
 

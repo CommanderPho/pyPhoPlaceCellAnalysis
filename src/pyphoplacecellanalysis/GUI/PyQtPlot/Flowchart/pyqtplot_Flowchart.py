@@ -23,9 +23,11 @@ from pyphoplacecellanalysis.GUI.PyQtPlot.Flowchart.CustomNodes.UnsharpMaskNode i
 from pyphoplacecellanalysis.GUI.PyQtPlot.Flowchart.CustomNodes.PipelineInputDataNode import PipelineInputDataNode
 from pyphoplacecellanalysis.GUI.PyQtPlot.Flowchart.CustomNodes.PipelineFilteringDataNode import PipelineFilteringDataNode
 from pyphoplacecellanalysis.GUI.PyQtPlot.Flowchart.CustomNodes.PipelineComputationsNode import PipelineComputationsNode
-from pyphoplacecellanalysis.GUI.PyQtPlot.Flowchart.CustomNodes.PipelineDisplayNode import PipelineDisplayNode
+from pyphoplacecellanalysis.GUI.PyQtPlot.Flowchart.CustomNodes.DisplayNodes.PipelineDisplayNode import PipelineDisplayNode
 from pyphoplacecellanalysis.GUI.PyQtPlot.Flowchart.CustomNodes.PhoPythonEvalNode import PhoPythonEvalNode
 from pyphoplacecellanalysis.GUI.PyQtPlot.Flowchart.CustomNodes.DisplayNodes.PipelineResultVisNode import PipelineResultVisNode
+
+from pyphoplacecellanalysis.GUI.PyQtPlot.Flowchart.CustomNodes.Mixins.DisplayNodeViewHelpers import ProducedViewType
 
 
 """
@@ -138,7 +140,6 @@ def plot_flowchartWidget(title='PhoFlowchartApp'):
     flowchart_controls_widget = mainAppWindow.flowchart.widget()
     d3.addWidget(flowchart_controls_widget)
     
-    
     ## Result/Visualization Widgets:    
     # _setup_console(mainAppWindow)
     # _build_dynamic_results_widgets(mainAppWindow, layout)
@@ -156,44 +157,22 @@ def plot_flowchartWidget(title='PhoFlowchartApp'):
     flowchart_window = flowchart_controls_widget.cwWin
     d4.addWidget(flowchart_window)
     
-    
-    
     ## Define the dynamic add/remove functions for the display dock widgets:
-    def on_remove_widget_fn(widget):
-        """ the callback to remove the widget from the layout.
-            implicitly used 'layout'.
+    def on_remove_widget_fn(identifier):
+        """ uses mainAppWindow implicitly. the callback to remove the widgets with the group identifier 'identifier' from the dock areas
         """
-        item_index = layout.indexOf(widget)
-        print(f'on_remove_widget_fn(...): item_index: {item_index}')
-        item = layout.itemAt(item_index)
-        widget = item.widget() # this should be the same as the passed in widget, but do this just to be sure
-        layout.removeWidget(widget)
-        
+        print(f'on_remove_widget_fn({identifier})')
+        return mainAppWindow.remove_display_dock(identifier)
 
-    def on_add_widget_fn():
+    def on_add_widget_fn(identifier, viewContentsType: ProducedViewType):
         """ uses mainAppWindow implicitly """
         # Add the sample display dock items to the nested dynamic display dock:
-        curr_display_dock_items = display_dock_area.children()
-        curr_num_display_dock_items = len(curr_display_dock_items)
-        
-        dDisplayItem = Dock(f"Display Subdock Item {curr_num_display_dock_items}", size=(300,200), closable=True) # add the new display item
-        mainAppWindow.displayDockArea.addDock(dDisplayItem, 'left')
-        # Add the widget to the new display item:
-        new_view_widget = MatplotlibWidget() # Matplotlib widget directly
-        dDisplayItem.addWidget(new_view_widget)
-        
-        # add example plot to figure
-        subplot = new_view_widget.getFigure().add_subplot(111)
-        subplot.plot(np.arange(9))
-        new_view_widget.draw()
-        
+        print(f'on_add_widget_fn({identifier})')
+        new_view_widget, dDisplayItem = mainAppWindow.add_display_dock(identifier=identifier, viewContentsType=viewContentsType)
         return new_view_widget, dDisplayItem
     
-    
-    
-    
     # Setup the nodes in the flowchart:
-    _register_custom_node_types(mainAppWindow.flowchart)
+    _setup_custom_node_library(mainAppWindow.flowchart)
     
     # end node setup:
     mainAppWindow.show()
@@ -299,7 +278,26 @@ def _build_dock_save_load(area, d1):
     restoreBtn.clicked.connect(load)
 
 
-def _register_custom_node_types(fc):
+def _register_only_custom_node_types(library):
+    # Custom Nodes:
+    library.addNodeType(PhoPythonEvalNode, [('Data',), 
+                                        ('Pho Pipeline','Eval')])
+        
+    # Pipeline Nodes:
+    library.addNodeType(PipelineInputDataNode, [('Data',), 
+                                        ('Pho Pipeline','Input')])
+    library.addNodeType(PipelineFilteringDataNode, [('Filters',), 
+                                        ('Pho Pipeline','Filtering')])
+    library.addNodeType(PipelineComputationsNode, [('Data',), 
+                                        ('Pho Pipeline','Computation')])
+    library.addNodeType(PipelineDisplayNode, [('Display',), 
+                                        ('Pho Pipeline','Display')])    
+    library.addNodeType(PipelineResultVisNode, [('Display',), 
+                                        ('Pho Pipeline','Display')])
+    return library
+
+
+def _setup_custom_node_library(fc):
     """Register Custom Nodes so they appear in the flowchart context menu"""
     ## Method 1: Register to global default library:
     #fclib.registerNodeType(ImageViewNode, [('Display',)])
@@ -317,22 +315,9 @@ def _register_custom_node_types(fc):
     # that we can create arbitrary menu structures
     library.addNodeType(UnsharpMaskNode, [('Image',)])
     
-    # Custom Nodes:
-    library.addNodeType(PhoPythonEvalNode, [('Data',), 
-                                        ('Pho Pipeline','Eval')])
-        
+    library = _register_only_custom_node_types(library=library)
     
-    # Pipeline Nodes:
-    library.addNodeType(PipelineInputDataNode, [('Data',), 
-                                        ('Pho Pipeline','Input')])
-    library.addNodeType(PipelineFilteringDataNode, [('Filters',), 
-                                        ('Pho Pipeline','Filtering')])
-    library.addNodeType(PipelineComputationsNode, [('Data',), 
-                                        ('Pho Pipeline','Computation')])
-    library.addNodeType(PipelineDisplayNode, [('Display',), 
-                                        ('Pho Pipeline','Display')])    
-    library.addNodeType(PipelineResultVisNode, [('Display',), 
-                                        ('Pho Pipeline','Display')])
+    library.register_custom_nodes_function = _register_only_custom_node_types # set the reload custom nodes function to the function used to register the custom nodes
 
     fc.setLibrary(library)
     
@@ -382,9 +367,10 @@ def _add_pho_pipeline_programmatic_flowchart_nodes(app, fc, on_add_function=None
     
 
     ## Set the raw data as the input value to the flowchart
-    fc.setInput(dataIn='Bapun')
+    # fc.setInput(dataIn='Bapun')
+    fc.setInput(dataIn='kdiba')
     
-    pipeline_input_node = fc.createNode('PipelineInputDataNode', pos=(-300, 50))
+    pipeline_input_node = fc.createNode('PipelineInputDataNode', pos=(-400, 50))
     # pipeline_input_node.setView(v1, on_remove_function=on_remove_widget_fn) # Sets the view associated with the node. Note that this is the programmatically instantiated node
     
     pipeline_filter_node = fc.createNode('PipelineFilteringDataNode', pos=(-26, 50))
@@ -394,13 +380,19 @@ def _add_pho_pipeline_programmatic_flowchart_nodes(app, fc, on_add_function=None
     
 
     pipeline_display_node = fc.createNode('PipelineDisplayNode', pos=(280, 120))
-    pipeline_display_node.setApp(app) # Sets the shared singleton app instance
+    # pipeline_display_node.setApp(app) # Sets the shared singleton app instance
     # pipeline_display_node.setView(new_root_render_widget, on_remove_function=on_remove_widget_fn) # Sets the view associated with the node. Note that this is the 
     # for direct matploblib widget mode:
     # pipeline_display_node.setView(new_view_widget, on_remove_function=on_remove_widget_fn) # Sets the view associated with the node. Note that this is the programmatically instantiated node
     # dynamic widget building mode:
     # pipeline_display_node.setView(on_add_function=on_add_widget_fn, on_remove_function=on_remove_widget_fn) # Sets the view associated with the node. Note that this is the programmatically instantiated node
-    pipeline_display_node.setView(on_add_function=on_add_function, on_remove_function=on_remove_function) # Sets the view associated with the node. Note that this is the programmatically instantiated node
+    # pipeline_display_node.setView(on_add_function=on_add_function, on_remove_function=on_remove_function) # Sets the view associated with the node. Note that this is the programmatically instantiated node
+    
+    
+    # Pipeline Result Visualization Node:
+    pipeline_result_viz_node = fc.createNode('PipelineResultVisNode', pos=(280, 220))
+    pipeline_result_viz_node.on_add_function = on_add_function
+    pipeline_result_viz_node.on_remove_function = on_remove_function
     
     # Setup connections:
     fc.connectTerminals(fc['dataIn'], pipeline_input_node['known_mode'])
@@ -409,17 +401,20 @@ def _add_pho_pipeline_programmatic_flowchart_nodes(app, fc, on_add_function=None
     fc.connectTerminals(pipeline_input_node['loaded_pipeline'], pipeline_filter_node['pipeline'])
     fc.connectTerminals(pipeline_input_node['known_data_mode'], pipeline_filter_node['active_data_mode'])
     
-    fc.connectTerminals(pipeline_input_node['known_data_mode'], pipeline_display_node['mode'])
+    # fc.connectTerminals(pipeline_input_node['known_data_mode'], pipeline_display_node['mode'])
     
     # Filter Node Outputs:
     fc.connectTerminals(pipeline_filter_node['filtered_pipeline'], pipeline_computation_node['pipeline'])
     fc.connectTerminals(pipeline_filter_node['computation_configs'], pipeline_computation_node['computation_configs'])
-    fc.connectTerminals(pipeline_filter_node['filter_configs'], pipeline_display_node['filter_configs'])
+    # fc.connectTerminals(pipeline_filter_node['filter_configs'], pipeline_display_node['filter_configs'])
     
     # Computation Node Outputs:
     fc.connectTerminals(pipeline_computation_node['computed_pipeline'], pipeline_display_node['pipeline'])
     fc.connectTerminals(pipeline_computation_node['updated_computation_configs'], pipeline_display_node['computation_configs'])
 
+    fc.connectTerminals(pipeline_computation_node['computed_pipeline'], pipeline_result_viz_node['pipeline'])
+    fc.connectTerminals(pipeline_computation_node['updated_computation_configs'], pipeline_result_viz_node['computation_configs'])
+    
     fc.connectTerminals(pipeline_computation_node['computed_pipeline'], fc['dataOut']) # raw pipeline output from computation node
     
     
