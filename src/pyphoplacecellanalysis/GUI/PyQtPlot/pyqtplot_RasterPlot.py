@@ -4,7 +4,12 @@ import pyqtgraph.opengl as gl # for 3D raster plot
 
 import numpy as np
 
-from pyphocorehelpers.indexing_helpers import interleave_elements
+from pyphocorehelpers.indexing_helpers import interleave_elements, partition
+
+# Windowing helpers for spikes_df:
+from PhoPositionalData.plotting.visualization_window import VisualizationWindow # Used to build "Windows" into the data points such as the window defining the fixed time period preceeding the current time where spikes had recently fired, etc.
+from numpy.lib.stride_tricks import sliding_window_view
+
 
 def plot_raster_plot(x=np.arange(100), y=np.random.normal(size=100)):
     
@@ -104,6 +109,27 @@ def _display_pyqtgraph_raster_plot(curr_spikes_df, debug_print=False):
     # # timer.stop()    
     # app.exec_()
 
+def _compute_windowed_spikes_raster(curr_spikes_df, render_window_duration=6.0):
+    # curr_spikes_df
+    
+    
+    recent_spikes_window = VisualizationWindow(duration_seconds=6.0, sampling_rate=self.active_session.position.sampling_rate) # increasing this increases the length of the position tail
+    curr_view_window_length_samples = self.params.recent_spikes_window.duration_num_frames # number of samples the window should last
+    print('recent_spikes_window - curr_view_window_length_samples - {}'.format(curr_view_window_length_samples))
+    ## Build the sliding windows:
+    # build a sliding window to be able to retreive the correct flattened indicies for any given timestep
+    active_epoch_position_linear_indicies = np.arange(np.size(self.active_session.position.time))
+    pre_computed_window_sample_indicies = recent_spikes_window.build_sliding_windows(active_epoch_position_linear_indicies)
+    # print('pre_computed_window_sample_indicies: {}\n shape: {}'.format(pre_computed_window_sample_indicies, np.shape(pre_computed_window_sample_indicies)))
+
+    ## New Pre Computed Indicies Way:
+    z_fixed = np.full((recent_spikes_window.duration_num_frames,), 1.1) # this seems to be about position, not spikes
+    
+        
+    
+    unit_split_spikes_df = partition(curr_spikes_df, 'unit_id') # split on the unitID
+    
+    
 
 
 def plot_3d_raster_plot(curr_spikes_df):
