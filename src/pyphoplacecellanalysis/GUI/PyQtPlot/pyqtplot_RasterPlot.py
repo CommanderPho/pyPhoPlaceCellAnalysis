@@ -112,47 +112,120 @@ def plot_3d_raster_plot(curr_spikes_df):
     # curr_spike_t = curr_spikes_df[curr_spikes_df.spikes.time_variable_name].to_numpy() # this will map to the depth dimension in 3D or x-pos in 2D
     unit_ids = np.unique(curr_spikes_df['unit_id'].to_numpy())
     n = len(unit_ids)
+    render_window_duration = 60.0 # in seconds, 1minute by default
+    spike_start_z = -10.0
+    spike_end_z = 0.1
     
+    n_half_cells = np.ceil(float(n)/2.0)
+    n_full_cell_grid = 2.0 * n_half_cells # could be one more than n
+    half_render_window_duration = np.ceil(float(render_window_duration)/2.0) # 10 by default
+    
+    print(f'plot_3d_raster_plot(...): unit_ids: {unit_ids}, n: {n}')
     # print(f'plot_3d_raster_plot(np.shape(x): {np.shape(x)}, np.shape(y): {np.shape(y)})')
     # print(f'\t x: {x}\n y: {y}')
     
     app = pg.mkQApp("Pyqtgraph 3D Raster Plot")
-    #mw = QtGui.QMainWindow()
-    #mw.resize(800,800)
     w = gl.GLViewWidget()
     w.show()
     w.resize(1000,600)
     w.setWindowTitle('pyqtgraph: 3D Raster Spikes Plotting')
     w.setCameraPosition(distance=40)
+    
+    
     # Add axes planes:
-    gx = gl.GLGridItem()
+    
+    # X-plane:
+    gx = gl.GLGridItem(color=(255, 155, 155, 76.5))
     gx.rotate(90, 0, 1, 0)
-    gx.translate(-10, 0, 0)
+    gx.translate(-half_render_window_duration, 0, 0) # shift backwards
+    gx.setSize(20, n_full_cell_grid) # std size in z-dir, n_cell size across
+    gx.setSpacing(10.0, 1) 
     w.addItem(gx)
-    gy = gl.GLGridItem()
+    
+    # Y-plane:
+    gy = gl.GLGridItem(color=(155, 255, 155, 76.5))
     gy.rotate(90, 1, 0, 0)
-    gy.translate(0, -10, 0)
+    # gy.translate(0, -10, 0)
+    gy.translate(0, -n_half_cells, 0) # offset by half the number of units in the -y direction
+    gy.setSize(render_window_duration, 20)
+    # gy.setSpacing(1, 1)
     w.addItem(gy)
-    gz = gl.GLGridItem()
-    gz.translate(0, 0, -10)
+    
+    # XY-plane (with normal in z-dir):
+    gz = gl.GLGridItem(color=(155, 155, 255, 76.5))
+    gz.translate(0, 0, -10) # Shift down by 10 units in the z-dir
+    gz.setSize(render_window_duration, n_full_cell_grid)
+    gz.setSpacing(20.0, 1)
+    # gz.setSize(n_full_cell_grid, n_full_cell_grid)
     w.addItem(gz)
 
-    # Custom 3D raster plot:
-    y = np.linspace(-10,10,n) # the line location I think
-    x = np.linspace(-10,10,100) # the temporal location
     
-    for cell_id in unit_ids:
-        # Filter the dataframe using that column and value from the list
-        curr_cell_df = curr_spikes_df[curr_spikes_df['unit_id']==cell_id].copy()
-        curr_unit_id = curr_cell_df['unit_id'].to_numpy() # this will map to the y position
-        curr_spike_t = curr_cell_df[curr_spikes_df.spikes.time_variable_name].to_numpy() # this will map 
+    # # For scatter plot:
+    # pos = np.empty((53, 3))
+    # size = np.empty((53))
+    # color = np.empty((53, 4))
+    # pos[0] = (1,0,0); size[0] = 0.5;   color[0] = (1.0, 0.0, 0.0, 0.5)
 
-        yi = y[cell_id]
-        z = curr_spike_t[np.arange(20)] # get the first 20 spikes for each
-        pts = np.column_stack([x, np.full_like(x, yi), z])
-        plt = gl.GLLinePlotItem(pos=pts, color=pg.mkColor((cell_id,n*1.3)), width=(cell_id+1)/10., antialias=True)
-        w.addItem(plt)
+
+    # Custom 3D raster plot:
+    # y = np.linspace(-10,10,n) # the line location I think
+    # # x = np.linspace(-10,10,100) # the temporal location, size 100 by default
+    # x = np.linspace(-10, 25, 100) # the temporal location, size 100 by default
+    # # x = np.linspace(0.0, render_window_duration, 100) # the temporal location, size 100 by default
+    
+    # New attempt
+    y = np.linspace(-n_half_cells, n_half_cells, n) + 0.5 # add 0.5 so they're centered
+    # x = np.linspace(-half_render_window_duration, half_render_window_duration, 100)
+    
+    # Filter based on the current spikes window to show:
+    
+    curr_render_window_start_time = 30.0
+    curr_render_window_end_time = curr_render_window_start_time + render_window_duration
+    curr_time_windowed_spikes_df = curr_spikes_df[curr_spikes_df[curr_spikes_df.spikes.time_variable_name].between(curr_render_window_start_time, curr_render_window_end_time)]
+    
+    
+    # np.interp(a, (a.min(), a.max()), (-1, +1))
+    
+    # Plot each unit one at a time:
+    for cell_id in unit_ids:
+        curr_color = pg.mkColor((cell_id, n*1.3))
+        # curr_color.SetAlpha(120) # alpha should be between 0-255
+        curr_color.setAlphaF(0.5)
+        print(f'cell_id: {cell_id}, curr_color: {curr_color.alpha()}')
         
+        
+                        
+        # Filter the dataframe using that column and value from the list
+        curr_cell_df = curr_time_windowed_spikes_df[curr_time_windowed_spikes_df['unit_id']==cell_id].copy()
+        # curr_unit_id = curr_cell_df['unit_id'].to_numpy() # this will map to the y position
+        curr_spike_t = curr_cell_df[curr_cell_df.spikes.time_variable_name].to_numpy() # this will map 
+        yi = y[cell_id] # get the correct y-position for all spikes of this cell
+        # print(f'cell_id: {cell_id}, yi: {yi}')
+        # map the current spike times back onto the range of the window's (-half_render_window_duration, +half_render_window_duration) so they represent the x coordinate
+        curr_x = np.interp(curr_spike_t, (curr_render_window_start_time, curr_render_window_end_time), (-half_render_window_duration, +half_render_window_duration))
+        curr_paired_x = np.squeeze(interleave_elements(np.atleast_2d(curr_x).T, np.atleast_2d(curr_x).T))        
+        
+        # Z-positions:
+        # z = curr_spike_t[np.arange(100)] # get the first 20 spikes for each
+        spike_bottom_zs = np.full_like(curr_x, spike_start_z)
+        spike_top_zs = np.full_like(curr_x, spike_end_z)
+        curr_paired_spike_zs = np.squeeze(interleave_elements(np.atleast_2d(spike_bottom_zs).T, np.atleast_2d(spike_top_zs).T)) # alternating top and bottom z-positions
+     
+        # sp1 = gl.GLScatterPlotItem(pos=pos, size=size, color=color, pxMode=False)
+        # sp1.translate(5,5,0)
+        # w.addItem(sp1)
+        
+        # Build lines:
+        pts = np.column_stack([curr_paired_x, np.full_like(curr_paired_x, yi), curr_paired_spike_zs]) # the middle coordinate is the size of the x array with the value given by yi. yi must be the scalar for this cell.
+        # pts = np.column_stack([x, np.full_like(x, yi), z]) # the middle coordinate is the size of the x array with the value given by yi. yi must be the scalar for this cell.
+        # plt = gl.GLLinePlotItem(pos=pts, color=pg.mkColor((cell_id,n*1.3)), width=(cell_id+1)/10., antialias=True)
+        plt = gl.GLLinePlotItem(pos=pts, color=curr_color, width=0.5, antialias=True, mode='lines') # mode='lines' means that each pair of vertexes draws a single line segement
+        w.addItem(plt)
+
+        # # Adds a helper widget that displays the x/y/z vector at the origin:
+        # ref_axes_indicator = gl.GLAxisItem()
+        # ref_axes_indicator.setSize(x=10.0, y=10.0, z=5.0)
+        # w.addItem(ref_axes_indicator)
     
     # # Example 3D wave plot made of lines:
     # n = 51
@@ -168,6 +241,7 @@ def plot_3d_raster_plot(curr_spikes_df):
     #     w.addItem(plt)
 
     return w, app
+
 
 
 
