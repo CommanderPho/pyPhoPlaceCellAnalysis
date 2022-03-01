@@ -5,6 +5,11 @@ from pyphoplacecellanalysis.GUI.PyQtPlot.Flowchart.ReloadableNodeLibrary import 
 
 
 from pyqtgraph.Qt import QtGui, QtCore, QtWidgets
+
+# Must be called before any figures are created:
+import matplotlib
+matplotlib.use('qtagg')
+
 from pyqtgraph.console import ConsoleWidget
 from pyqtgraph.widgets.MatplotlibWidget import MatplotlibWidget
 from pyqtgraph.dockarea.Dock import Dock
