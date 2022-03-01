@@ -58,6 +58,7 @@ class PipelineDynamicDockDisplayAreaMixin:
         return dItem
     
     def add_display_dock(self, identifier = None, viewContentsType: ProducedViewType = ProducedViewType.Matplotlib):
+        """ adds a dynamic display dock with an appropriate widget of type 'viewContentsType' to the dock area container on the main window. """
         # Add the sample display dock items to the nested dynamic display dock:
         display_dock_area = self.displayDockArea
         curr_display_dock_items = display_dock_area.children()
@@ -66,7 +67,7 @@ class PipelineDynamicDockDisplayAreaMixin:
         if identifier is None:
             identifier = 'item'
         
-        extant_group_items = self._dynamic_display_output_dict.get(identifier, None) # tries to find extant items with this identifier in the dict of extant plots
+        extant_group_items = self.dynamic_display_dict.get(identifier, None) # tries to find extant items with this identifier in the dict of extant plots
         if extant_group_items is not None:
             # Item was found with this identifier, implement one of the strategies
             curr_extant_group_item_count = len(extant_group_items)
@@ -104,16 +105,42 @@ class PipelineDynamicDockDisplayAreaMixin:
         if extant_group_items is not None:
             # Item was found with this identifier, implement one of the strategies
             extant_group_items[unique_identifier] = {"dock":dDisplayItem, "widget":new_view_widget} # add the unique item to the group's dict
-            self._dynamic_display_output_dict[identifier] = extant_group_items # update the extant group's dict
+            self.dynamic_display_dict[identifier] = extant_group_items # update the extant group's dict
         else:
-            self._dynamic_display_output_dict[identifier] = OrderedDict() # initialize an empty group for the dict
-            self._dynamic_display_output_dict[identifier][unique_identifier] = {"dock":dDisplayItem, "widget":new_view_widget}
+            self.dynamic_display_dict[identifier] = OrderedDict() # initialize an empty group for the dict
+            self.dynamic_display_dict[identifier][unique_identifier] = {"dock":dDisplayItem, "widget":new_view_widget}
             
-        # self._dynamic_display_output_dict[identifier] = {"dock":dDisplayItem, "widget":new_view_widget}        
+        # self.dynamic_display_dict[identifier] = {"dock":dDisplayItem, "widget":new_view_widget}        
         return new_view_widget, dDisplayItem
     
     
-    
+    def remove_display_dock(self, identifier):
+        """ removes a group of dynamic display widgets with identifier 'identifier'. """
+        extant_group_items = self.dynamic_display_dict.get(identifier, None) # tries to find extant items with this identifier in the dict of extant plots
+        if extant_group_items is not None:
+            num_found_group_items = len(extant_group_items)
+            if num_found_group_items > 0:
+                # Item was found with this identifier
+                print(f'Found a group with the identifier {identifier} containing {num_found_group_items} items. Removing all...')
+                for (unique_identifier, item_dict) in extant_group_items.items():
+                    # loop through the dictionary and remove the children items:
+                    # item_dict['widget'].close() # this shouldn't be needed because the 'dock' is the parent, meaning it should properly close the widget as well.
+                    item_dict["dock"].close() # close the dock
+                    # del extant_group_items[unique_identifier]
+                
+                # once done with all children, remove the extant_group_items group:
+                del self.dynamic_display_dict[identifier]
+                
+            else:
+                # group was found and valid but already empty prior to remove:
+                ## TODO: remove group entirely
+                del self.dynamic_display_dict[identifier] # remove the empty dict
+
+        else:
+            # no extant items found
+            print(f'No extant groups/items found with name {identifier}')
+            return
+        
     # TODO: Persistance:
     # self.plotDict[name] = {"dock":dock, "widget":widget, "view":view}
     
