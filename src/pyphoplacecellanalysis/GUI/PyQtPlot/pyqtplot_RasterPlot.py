@@ -107,6 +107,7 @@ def _display_pyqtgraph_raster_plot(curr_spikes_df, debug_print=False):
 
 
 def plot_3d_raster_plot(curr_spikes_df):
+    """ plots a 3-dimensional raster plot for neural spiking data. """
 # def plot_3d_raster_plot(x=np.linspace(-10,10,100), y=np.random.normal(size=100), z=None):
     # curr_unit_id = curr_spikes_df['unit_id'].to_numpy() # this will map to the y position
     # curr_spike_t = curr_spikes_df[curr_spikes_df.spikes.time_variable_name].to_numpy() # this will map to the depth dimension in 3D or x-pos in 2D
