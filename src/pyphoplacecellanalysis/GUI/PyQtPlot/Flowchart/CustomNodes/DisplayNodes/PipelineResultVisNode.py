@@ -28,7 +28,7 @@ from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPred
 
 from pyphoplacecellanalysis.GUI.PyQtPlot.Flowchart.CustomNodes.Mixins.AssociatedOutputWidgetNodeMixin import AddRemoveActionNodeMixin, AssociatedAppNodeMixin, AssociatedOutputWidgetNodeMixin
 from pyphoplacecellanalysis.GUI.PyQtPlot.Flowchart.CustomNodes.Mixins.CtrlNodeMixins import KeysListAccessingMixin
-from pyphoplacecellanalysis.GUI.PyQtPlot.Flowchart.CustomNodes.Mixins.DisplayNodeViewHelpers import DisplayMatplotlibWidgetMixin
+from pyphoplacecellanalysis.GUI.PyQtPlot.Flowchart.CustomNodes.Mixins.DisplayNodeViewHelpers import DisplayMatplotlibWidgetMixin, ProducedViewType
 
 
 # DisplayNodeChangeSelectedFunctionMixin
@@ -39,6 +39,7 @@ class PipelineResultVisNode(AssociatedOutputWidgetNodeMixin, AddRemoveActionNode
     uiTemplate = [
         ('display_function', 'combo', {'values': [], 'index': 0}),
         ('computed_result', 'combo', {'values': [], 'index': 0}),
+        ('add_matplotlib_widget', 'action'),
         ('rebuild_widgets', 'action'),
         ('display', 'action'),
         ('clear_widgets', 'action'),
@@ -77,6 +78,31 @@ class PipelineResultVisNode(AssociatedOutputWidgetNodeMixin, AddRemoveActionNode
         # self.computed_result_keys = []
         self.combo_box_keys_dict = {'display_function':[], 'computed_result':[]}
 
+        # Setup the rebuild_widgets button:
+        self.ctrls['add_matplotlib_widget'].setText('Add Matplotlib Widget')
+        def click_add_matplotlib_widget():
+            # self.ctrls['add_matplotlib_widget'].processing("Hold on..")
+            # the identifier should be: f'{node_identifier_name}'
+            node_identifier_name = self.name()
+            active_display_output_identifier = f'{node_identifier_name}'
+            if self.on_add_function is not None:
+                self.on_add_function(active_display_output_identifier, viewContentsType=ProducedViewType.Matplotlib) # remove all widgets with this name
+                fail = False
+            else:
+                print('no key found')
+                fail = True
+            
+            # # Not sure whether to call self.changed() (from CtrlNode) or self.update() from its parent class.
+            # # self.update() 
+            # self.changed() # should trigger re-computation in a blocking manner.
+            # if fail:
+            #     self.ctrls['add_matplotlib_widget'].failure(message="FAIL.", tip="There was a failure. Get over it.")
+            # else:
+            #     self.ctrls['add_matplotlib_widget'].success(message="Bueno!")
+                
+        self.ctrls['add_matplotlib_widget'].clicked.connect(click_add_matplotlib_widget)
+        
+        
         
         # Setup the display button:
         self.ctrls['display'].setText('Display')
@@ -105,10 +131,10 @@ class PipelineResultVisNode(AssociatedOutputWidgetNodeMixin, AddRemoveActionNode
         def click_rebuild_widgets():
             self.ctrls['rebuild_widgets'].processing("Hold on..")
             # the identifier should be: f'{node_identifier_name}'
-            node_identifier_name = self.name
+            node_identifier_name = self.name()
             active_display_output_identifier = f'{node_identifier_name}'
             if self.on_add_function is not None:
-                self.on_add_function(active_display_output_identifier) # remove all widgets with this name
+                self.on_add_function(active_display_output_identifier, viewContentsType=ProducedViewType.Matplotlib) # remove all widgets with this name
                 fail = False
             else:
                 print('no key found')
@@ -130,7 +156,7 @@ class PipelineResultVisNode(AssociatedOutputWidgetNodeMixin, AddRemoveActionNode
         def click_clear_widgets():
             self.ctrls['clear_widgets'].processing("Hold on..")
             # the identifier should be: f'{node_identifier_name}'
-            node_identifier_name = self.name
+            node_identifier_name = self.name()
             active_display_output_identifier = f'{node_identifier_name}'
             if self.on_remove_function is not None:
                 self.on_remove_function(active_display_output_identifier) # remove all widgets with this name

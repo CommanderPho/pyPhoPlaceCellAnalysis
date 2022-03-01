@@ -46,15 +46,9 @@ class PipelineInputDataNode(ExtendedCtrlNode):
         self.ctrls['reload'].setText('Reload')
         def click():
             self.ctrls['reload'].processing("Hold on..")
-            # time.sleep(2.0)
-            
-            # Not sure whether to call self.changed() (from CtrlNode) or self.update() from its parent class.
-            # self.update() 
             self.changed() # should trigger re-computation in a blocking manner.
-            
             # global fail
             # fail = not fail
-            
             fail = False
             if fail:
                 self.ctrls['reload'].failure(message="FAIL.", tip="There was a failure. Get over it.")
