@@ -80,13 +80,13 @@ def plot_flowchartWidget(title='PhoFlowchartApp'):
     ## Note that size arguments are only a suggestion; docks will still have to
     ## fill the entire dock area and obey the limits of their internal widgets.
     d1 = Dock("GUI Layout Controls", size=(1, 1))     ## give this dock the minimum possible size
-    d2 = Dock("Display Outputs", size=(500,300), closable=True)
+    # d2 = Dock("Display Outputs", size=(500,300), closable=True)
     d3 = Dock("Flowchart Configuration Widgets", size=(500,400))
     d4 = Dock("Flowchart", size=(500,200))
     # d5 = Dock("Dock5 - Image", size=(500,200))
     # d6 = Dock("Dock6 (tabbed) - Plot", size=(500,200))
     mainAppWindow.area.addDock(d1, 'left')      ## place d1 at left edge of dock area (it will fill the whole space since there are no other docks yet)
-    mainAppWindow.area.addDock(d2, 'right')     ## place d2 at right edge of dock area
+    # mainAppWindow.area.addDock(d2, 'right')     ## place d2 at right edge of dock area
     mainAppWindow.area.addDock(d3, 'bottom', d1)## place d3 at bottom edge of d1
     mainAppWindow.area.addDock(d4, 'right')     ## place d4 at right edge of dock area
     # mainAppWindow.area.addDock(d5, 'left', d1)  ## place d5 at left edge of d1
@@ -134,8 +134,7 @@ def plot_flowchartWidget(title='PhoFlowchartApp'):
     })
     
     # Add the flowchart widget. This is actually not the programmatic programming environment itself, it's the column that lists the nodes and lets you set their parameters.
-    flowchart_controls_widget = mainAppWindow.flowchart.widget() 
-    # layout.addWidget(mainAppWindow.flowchart.widget(), 0, 0, 2, 1) # spans 2 rows and 1 column
+    flowchart_controls_widget = mainAppWindow.flowchart.widget()
     d3.addWidget(flowchart_controls_widget)
     
     
@@ -143,19 +142,53 @@ def plot_flowchartWidget(title='PhoFlowchartApp'):
     # _setup_console(mainAppWindow)
     # _build_dynamic_results_widgets(mainAppWindow, layout)
     
-    ## Create a container to hold all dynamically added widgets.
-    new_dynamic_node_view_container_widget = QtGui.QWidget()
-    w2 = pg.LayoutWidget()
-    w2.addWidget(new_dynamic_node_view_container_widget, row=0, col=0)
-    d2.addWidget(w2)
+    # Old static widget way:
+    # new_dynamic_node_view_container_widget, new_wrapper_container_layout = _build_static_display_widget(mainAppWindow)
     
-    # create a layout for the new container view:
-    new_wrapper_container_layout = QtGui.QVBoxLayout()
-    new_dynamic_node_view_container_widget.setLayout(new_wrapper_container_layout)
+    # New nested Dock area widget way:
+    dItem = _build_dynamic_display_dockarea(mainAppWindow) 
+    display_dock_area = mainAppWindow.displayDockArea
+    
+
     
     # Get the flowchart window which displays the actual flowchart:
     flowchart_window = flowchart_controls_widget.cwWin
     d4.addWidget(flowchart_window)
+    
+    
+    
+    ## Define the dynamic add/remove functions for the display dock widgets:
+    def on_remove_widget_fn(widget):
+        """ the callback to remove the widget from the layout.
+            implicitly used 'layout'.
+        """
+        item_index = layout.indexOf(widget)
+        print(f'on_remove_widget_fn(...): item_index: {item_index}')
+        item = layout.itemAt(item_index)
+        widget = item.widget() # this should be the same as the passed in widget, but do this just to be sure
+        layout.removeWidget(widget)
+        
+
+    def on_add_widget_fn():
+        """ uses mainAppWindow implicitly """
+        # Add the sample display dock items to the nested dynamic display dock:
+        curr_display_dock_items = display_dock_area.children()
+        curr_num_display_dock_items = len(curr_display_dock_items)
+        
+        dDisplayItem = Dock(f"Display Subdock Item {curr_num_display_dock_items}", size=(300,200), closable=True) # add the new display item
+        mainAppWindow.displayDockArea.addDock(dDisplayItem, 'left')
+        # Add the widget to the new display item:
+        new_view_widget = MatplotlibWidget() # Matplotlib widget directly
+        dDisplayItem.addWidget(new_view_widget)
+        
+        # add example plot to figure
+        subplot = new_view_widget.getFigure().add_subplot(111)
+        subplot.plot(np.arange(9))
+        new_view_widget.draw()
+        
+        return new_view_widget, dDisplayItem
+    
+    
     
     
     # Setup the nodes in the flowchart:
@@ -165,7 +198,9 @@ def plot_flowchartWidget(title='PhoFlowchartApp'):
     mainAppWindow.show()
     mainAppWindow.resize(1920, 1080)
     
-    _add_pho_pipeline_programmatic_flowchart_nodes(mainAppWindow.app, mainAppWindow.flowchart, new_wrapper_container_layout) # changed from layout to new_wrapper_container_layout
+    # _add_pho_pipeline_programmatic_flowchart_nodes(mainAppWindow.app, mainAppWindow.flowchart, new_wrapper_container_layout) # changed from layout to new_wrapper_container_layout
+    _add_pho_pipeline_programmatic_flowchart_nodes(mainAppWindow.app, mainAppWindow.flowchart, on_add_function=on_add_widget_fn, on_remove_function=on_remove_widget_fn) # dynamic dockarea version
+    
     # _add_default_example_programmatic_flowchart_nodes(fc, layout)    
 
     # Expand all pipeline widget items on startup:
@@ -174,6 +209,30 @@ def plot_flowchartWidget(title='PhoFlowchartApp'):
 
     return mainAppWindow, mainAppWindow.app
 
+
+
+
+
+def _build_dynamic_display_dockarea(mainAppWindow):
+    dItem = Dock("Display Outputs - Dynamic", size=(600,900), closable=True)
+    mainAppWindow.area.addDock(dItem, 'right')
+    mainAppWindow.displayDockArea = DockArea()
+    dItem.addWidget(mainAppWindow.displayDockArea) # add the dynamic nested Dock area to the dItem widget
+    return dItem
+    
+def _build_static_display_widget(mainAppWindow):
+    d2 = Dock("Display Outputs", size=(500,300), closable=True)
+    mainAppWindow.area.addDock(d2, 'right')     ## place d2 at right edge of dock area
+    ## Create a container to hold all dynamically added widgets.
+    new_dynamic_node_view_container_widget = QtGui.QWidget()
+    w2 = pg.LayoutWidget()
+    w2.addWidget(new_dynamic_node_view_container_widget, row=0, col=0)
+    d2.addWidget(w2)
+    
+    # create a layout for the new container view:
+    new_wrapper_container_layout = QtGui.QVBoxLayout()
+    new_dynamic_node_view_container_widget.setLayout(new_wrapper_container_layout)
+    return new_dynamic_node_view_container_widget, new_wrapper_container_layout
 
 def _setup_console(mainAppWindow):
     ## build an initial namespace for console commands to be executed in (this is optional;
@@ -191,8 +250,7 @@ def _setup_console(mainAppWindow):
     # layout.addWidget(console_widget, 0, 1)
     mainAppWindow.console.localNamespace = namespace
     mainAppWindow.console.text = text
-    
-    
+        
 def _build_dynamic_results_widgets(mainAppWindow, layout):
     ## Create a container to hold all dynamically added widgets.
     new_dynamic_node_view_container_widget = QtGui.QWidget()
@@ -201,7 +259,6 @@ def _build_dynamic_results_widgets(mainAppWindow, layout):
     new_wrapper_container_layout = QtGui.QVBoxLayout()
     new_dynamic_node_view_container_widget.setLayout(new_wrapper_container_layout)
     return new_dynamic_node_view_container_widget
-    
     
 def _build_dock_area(mainAppWindow, layout):
     area = DockArea()
@@ -241,8 +298,6 @@ def _build_dock_save_load(area, d1):
     restoreBtn.clicked.connect(load)
 
 
-
-
 def _register_custom_node_types(fc):
     """Register Custom Nodes so they appear in the flowchart context menu"""
     ## Method 1: Register to global default library:
@@ -280,47 +335,46 @@ def _register_custom_node_types(fc):
 
 
 
-def _add_pho_pipeline_programmatic_flowchart_nodes(app, fc, layout):
+def _add_pho_pipeline_programmatic_flowchart_nodes(app, fc, on_add_function=None, on_remove_function=None):
     ## Now we will programmatically add nodes to define the function of the flowchart.
     ## Normally, the user will do this manually or by loading a pre-generated
     ## flowchart file.
     """[summary]
-
     Args:
         fc ([type]): [description]
         layout ([type]): a grid layout to add result/visualization widgets to. 
     """
 
-    def on_remove_widget_fn(widget):
-        """ the callback to remove the widget from the layout.
-            implicitly used 'layout'.
-        """
-        item_index = layout.indexOf(widget)
-        print(f'on_remove_widget_fn(...): item_index: {item_index}')
-        item = layout.itemAt(item_index)
-        widget = item.widget() # this should be the same as the passed in widget, but do this just to be sure
-        layout.removeWidget(widget)
+    # def on_remove_widget_fn(widget):
+    #     """ the callback to remove the widget from the layout.
+    #         implicitly used 'layout'.
+    #     """
+    #     item_index = layout.indexOf(widget)
+    #     print(f'on_remove_widget_fn(...): item_index: {item_index}')
+    #     item = layout.itemAt(item_index)
+    #     widget = item.widget() # this should be the same as the passed in widget, but do this just to be sure
+    #     layout.removeWidget(widget)
         
-    def on_add_widget_fn(show_in_separate_window=True):
-        """ uses layout implicitly """
-        # Matplotlib widget directly:
-        new_view_widget = MatplotlibWidget()
-        if show_in_separate_window:
-            new_widget_window = PhoPipelineSecondaryWindow([new_view_widget])
-            new_widget_window.setWindowTitle(f'PhoFlowchartApp: Custom Result Window')
-            new_widget_window.show()
-            new_widget_window.resize(800,600)
-        else:
-            new_widget_window = None # no window created
-            layout.addWidget(new_view_widget) # now assumes layout is a QVBoxLayout
-            # layout.addWidget(new_view_widget, 1, 1) # start at 1 since the console is available at 0
+    # def on_add_widget_fn(show_in_separate_window=True):
+    #     """ uses layout implicitly """
+    #     # Matplotlib widget directly:
+    #     new_view_widget = MatplotlibWidget()
+    #     if show_in_separate_window:
+    #         new_widget_window = PhoPipelineSecondaryWindow([new_view_widget])
+    #         new_widget_window.setWindowTitle(f'PhoFlowchartApp: Custom Result Window')
+    #         new_widget_window.show()
+    #         new_widget_window.resize(800,600)
+    #     else:
+    #         new_widget_window = None # no window created
+    #         layout.addWidget(new_view_widget) # now assumes layout is a QVBoxLayout
+    #         # layout.addWidget(new_view_widget, 1, 1) # start at 1 since the console is available at 0
         
-        # add example plot to figure
-        subplot = new_view_widget.getFigure().add_subplot(111)
-        subplot.plot(np.arange(9))
-        new_view_widget.draw()
+    #     # add example plot to figure
+    #     subplot = new_view_widget.getFigure().add_subplot(111)
+    #     subplot.plot(np.arange(9))
+    #     new_view_widget.draw()
         
-        return new_view_widget, new_widget_window
+    #     return new_view_widget, new_widget_window
     
         
 
@@ -392,7 +446,8 @@ def _add_pho_pipeline_programmatic_flowchart_nodes(app, fc, layout):
     # for direct matploblib widget mode:
     # pipeline_display_node.setView(new_view_widget, on_remove_function=on_remove_widget_fn) # Sets the view associated with the node. Note that this is the programmatically instantiated node
     # dynamic widget building mode:
-    pipeline_display_node.setView(on_add_function=on_add_widget_fn, on_remove_function=on_remove_widget_fn) # Sets the view associated with the node. Note that this is the programmatically instantiated node
+    # pipeline_display_node.setView(on_add_function=on_add_widget_fn, on_remove_function=on_remove_widget_fn) # Sets the view associated with the node. Note that this is the programmatically instantiated node
+    pipeline_display_node.setView(on_add_function=on_add_function, on_remove_function=on_remove_function) # Sets the view associated with the node. Note that this is the programmatically instantiated node
     
     # Setup connections:
     fc.connectTerminals(fc['dataIn'], pipeline_input_node['known_mode'])
