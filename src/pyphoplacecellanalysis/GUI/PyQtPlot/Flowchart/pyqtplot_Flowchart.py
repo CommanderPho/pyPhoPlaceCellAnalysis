@@ -146,10 +146,10 @@ def plot_flowchartWidget(title='PhoFlowchartApp'):
     # new_dynamic_node_view_container_widget, new_wrapper_container_layout = _build_static_display_widget(mainAppWindow)
     
     # New nested Dock area widget way:
-    dItem = _build_dynamic_display_dockarea(mainAppWindow) 
-    display_dock_area = mainAppWindow.displayDockArea
+    # dItem = _build_dynamic_display_dockarea(mainAppWindow)
+    dItem = mainAppWindow._build_dynamic_display_dockarea()
     
-
+    display_dock_area = mainAppWindow.displayDockArea
     
     # Get the flowchart window which displays the actual flowchart:
     flowchart_window = flowchart_controls_widget.cwWin

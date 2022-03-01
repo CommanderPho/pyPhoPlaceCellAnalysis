@@ -1,8 +1,10 @@
 # DisplayNodeViewHelpers.py
 from enum import Enum
-from pyqtgraph.Qt import QtGui, QtCore
+from pyqtgraph.Qt import QtGui, QtCore, QtWidgets
 from pyqtgraph.console import ConsoleWidget
 from pyqtgraph.widgets.MatplotlibWidget import MatplotlibWidget
+from pyqtgraph.dockarea.Dock import Dock
+from pyqtgraph.dockarea.DockArea import DockArea
 import pyqtgraph as pg
 import numpy as np
 
@@ -25,7 +27,82 @@ class ProducedViewType(Enum):
     
  
  
+class PipelineDynamicDockDisplayAreaMixin:
+    """ PhoPipelineMainWindow only right now 
+    
+    Requires at minimum:
+        'self.area': a pg.Dock(...) object containing the root items
+    
+    Creates: 
+        self.displayDockArea: a pg.Dock(...) object containing dynamically created Docks/Widgets for display of display nodes.
+        
+    
+    """
+    def _build_dynamic_display_dockarea(self):
+        dItem = Dock("Display Outputs - Dynamic", size=(600,900), closable=True)
+        self.area.addDock(dItem, 'right')
+        self.displayDockArea = DockArea()
+        dItem.addWidget(self.displayDockArea) # add the dynamic nested Dock area to the dItem widget
+        return dItem
+    
+    def add_display_dock(self, identifier, viewContentsType: ProducedViewType):
+        # Add the sample display dock items to the nested dynamic display dock:
+        display_dock_area = self.displayDockArea
+        curr_display_dock_items = display_dock_area.children()
+        curr_num_display_dock_items = len(curr_display_dock_items)
+        
+        dDisplayItem = Dock(f"Display Subdock Item {curr_num_display_dock_items}", size=(300,200), closable=True) # add the new display item
+        display_dock_area.addDock(dDisplayItem, 'left')
+        
+        # Add the widget to the new display item:
+        if viewContentsType is ProducedViewType.Matplotlib:
+            new_view_widget = MatplotlibWidget() # Matplotlib widget directly
+            # add example plot to figure
+            subplot = new_view_widget.getFigure().add_subplot(111)
+            subplot.plot(np.arange(9))
+            new_view_widget.draw()
+        elif viewContentsType is ProducedViewType.Pyvista:
+            new_view_widget = None
+            raise NotImplementedError
+        else:
+            new_view_widget = None
+            raise NotImplementedError
+    
+        # Set the dock item's widget to the new_view_widget    
+        dDisplayItem.addWidget(new_view_widget)
+        
+        return new_view_widget, dDisplayItem
  
+ 
+    #  def _build_debug_test_menu(self):
+    #     w1 = pg.LayoutWidget()
+    #     label = QtWidgets.QLabel(""" -- DockArea Example -- 
+    #     This window has 6 Dock widgets in it. Each dock can be dragged
+    #     by its title bar to occupy a different space within the window 
+    #     but note that one dock has its title bar hidden). Additionally,
+    #     the borders between docks may be dragged to resize. Docks that are dragged on top
+    #     of one another are stacked in a tabbed layout. Double-click a dock title
+    #     bar to place it in its own window.
+    #     """)
+    #     saveBtn = QtWidgets.QPushButton('Save dock state')
+    #     restoreBtn = QtWidgets.QPushButton('Restore dock state')
+    #     restoreBtn.setEnabled(False)
+    #     w1.addWidget(label, row=0, col=0)
+    #     w1.addWidget(saveBtn, row=1, col=0)
+    #     w1.addWidget(restoreBtn, row=2, col=0)
+    #     d1.addWidget(w1)
+    #     state = None
+    #     def save():
+    #         global state
+    #         state = self.area.saveState()
+    #         restoreBtn.setEnabled(True)
+    #     def load():
+    #         global state
+    #         self.area.restoreState(state)
+    #     saveBtn.clicked.connect(save)
+    #     restoreBtn.clicked.connect(load)
+        
+        
  
 class DisplayNodeViewHelpers:
     """ Display node is instantiated like so:

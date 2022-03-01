@@ -20,12 +20,14 @@ from pyphoplacecellanalysis.GUI.PyQtPlot.Flowchart.CustomNodes.PipelineInputData
 from pyphoplacecellanalysis.GUI.PyQtPlot.Flowchart.CustomNodes.PipelineFilteringDataNode import PipelineFilteringDataNode
 from pyphoplacecellanalysis.GUI.PyQtPlot.Flowchart.CustomNodes.PipelineDisplayNode import PipelineDisplayNode
 
+from pyphoplacecellanalysis.GUI.PyQtPlot.Flowchart.CustomNodes.Mixins.DisplayNodeViewHelpers import PipelineDynamicDockDisplayAreaMixin
+
 
 path = os.path.dirname(os.path.abspath(__file__))
 # uiFile = os.path.join(path, 'MainPipelineWindow.ui')
 uiFile = os.path.join(path, 'MainPipelineWindowWithDockArea.ui') # mostly empty
 
-class PhoPipelineMainWindow(QtWidgets.QMainWindow):
+class PhoPipelineMainWindow(PipelineDynamicDockDisplayAreaMixin, QtWidgets.QMainWindow):
     
     @property
     def app(self):
