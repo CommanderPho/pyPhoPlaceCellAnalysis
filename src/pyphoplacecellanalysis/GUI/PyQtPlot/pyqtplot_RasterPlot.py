@@ -142,7 +142,71 @@ def _compute_windowed_spikes_raster(curr_spikes_df, render_window_duration=6.0):
     unit_split_spikes_df = partition(curr_spikes_df, 'unit_id') # split on the unitID
     
     
+class SpikesDataframeWindow(QtCore.QObject):
+    """ a zoomable (variable sized) window into a dataframe with a time axis 
     
+    active_window_start_time can be adjusted to set the location of the current window.
+    
+    """
+    window_changed_signal = QtCore.pyqtSignal()
+    
+    @property
+    def active_windowed_df(self):
+        """The dataframe sliced to the current time window (active_time_window)"""
+        return self.df[self.df[self.df.spikes.time_variable_name].between(self.active_time_window[0], self.active_time_window[1])]
+
+    @property
+    def active_time_window(self):
+        """ a 2-element time window [start_time, end_time]"""
+        return [self.active_window_start_time, self.active_window_end_time]
+        
+    @property
+    def active_window_end_time(self):
+        """The active_window_end_time property."""
+        return (self.active_window_start_time + self.window_duration)
+        
+    @property
+    def active_window_num_spikes(self):
+        """The number of spikes (across all units) in the active window."""
+        return self.active_windowed_df.shape[0] 
+        
+    ##### Get/Set Properties ####:
+    @property
+    def df(self):
+        """The df property."""
+        return self._df
+    @df.setter
+    def df(self, value):
+        self._df = value
+        
+    @property
+    def window_duration(self):
+        """The window_duration property."""
+        return self._window_duration
+    @window_duration.setter
+    def window_duration(self, value):
+        self._window_duration = value
+        self.window_changed_signal.emit() # emit window changed signal
+        
+    @property
+    def active_window_start_time(self):
+        """The current start time of the sliding time window"""
+        return self._active_window_start_time
+    @active_window_start_time.setter
+    def active_window_start_time(self, value):
+        self._active_window_start_time = value
+        self.window_changed_signal.emit() # emit window changed signal
+    
+    
+    def __init__(self, spikes_df, window_duration=15.0, window_start_time=0.0):
+        QtCore.QObject.__init__(self)
+        self._df = spikes_df
+        self._window_duration = window_duration
+        self._active_window_start_time = window_start_time
+        
+        
+        
+        
 class SliderRunner(QtCore.QThread):
     update_signal = QtCore.pyqtSignal()
 
@@ -152,12 +216,13 @@ class SliderRunner(QtCore.QThread):
     def run(self):
         while(True):
             self.update_signal.emit()
-            time.sleep(.03)
+            time.sleep(.03) # probably do a different form of rate limiting instead (like use SignalProxy)? Actually this might be okay because it's on a different thread.
             
                 
 
 class Spike3DRaster(QtWidgets.QWidget):
     """docstring for 3d_raster_app."""
+    
     def __init__(self, *args, **kwargs):
         super(Spike3DRaster, self).__init__(*args, **kwargs)
         # Initialize member variables:
@@ -171,8 +236,6 @@ class Spike3DRaster(QtWidgets.QWidget):
 
         
     def buildUI(self):
-        
-
         layout = QtWidgets.QGridLayout()
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setVerticalSpacing(0)
