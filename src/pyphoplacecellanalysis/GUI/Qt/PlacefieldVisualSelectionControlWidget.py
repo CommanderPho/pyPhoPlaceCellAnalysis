@@ -7,7 +7,7 @@ import numpy as np
 import pyqtgraph as pg
 from pyqtgraph.Qt import QtCore, QtGui, QtWidgets, mkQApp
 
-from pyphoplacecellanalysis.GUI.Qt.PhoUIContainer import PhoUIContainer
+
 from .PlacefieldVisualSelectionWidgetBase import Ui_rootForm # Generated file from .ui
 
 # For compatibility with the panel ui version:
