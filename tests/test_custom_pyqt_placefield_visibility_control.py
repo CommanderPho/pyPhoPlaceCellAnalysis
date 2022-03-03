@@ -7,8 +7,8 @@ import numpy as np
 import pyqtgraph as pg
 from pyqtgraph.Qt import QtCore, QtGui, QtWidgets, mkQApp
 
-from pyphoplacecellanalysis.GUI.Qt.PhoUIContainer import PhoUIContainer
-# from pyphoplacecellanalysis.GUI.Qt.PlacefieldVisualSelectionWidget import PlacefieldVisualSelectionWidget
+
+from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer
 from pyphoplacecellanalysis.GUI.Qt.PlacefieldVisualSelectionControlWidget import PlacefieldVisualSelectionWidget
 
 
