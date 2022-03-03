@@ -12,6 +12,8 @@ from .PlacefieldVisualSelectionWidgetBase import Ui_rootForm # Generated file fr
 
 # For compatibility with the panel ui version:
 # from PhoPositionalData.plotting.mixins.general_plotting_mixins import SingleNeuronPlottingExtended
+from PhoPositionalData.plotting.mixins.general_plotting_mixins import SingleNeuronPlottingExtended
+
 
 
 class PlacefieldVisualSelectionWidget(QtWidgets.QWidget):
@@ -102,8 +104,8 @@ class PlacefieldVisualSelectionWidget(QtWidgets.QWidget):
         self.spikesVisible = config.spikesVisible
 
     
-    # def config_from_state(self):
-    #     return SingleNeuronPlottingExtended(name=self.name, isVisible=self.isVisible, color=self.color, spikesVisible=self.spikesVisible)
+    def config_from_state(self):
+        return SingleNeuronPlottingExtended(name=self.name, isVisible=self.isVisible, color=self.color, spikesVisible=self.spikesVisible)
 
 
 
