@@ -19,6 +19,12 @@ from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.GLViewportOverlayPainterItem im
 """ For threading info see:
 https://stackoverflow.com/questions/41526832/pyqt5-qthread-signal-not-working-gui-freeze
 
+For PyOpenGL Requirements, see here: https://stackoverflow.com/questions/57971352/pip-install-pyopengl-accelerate-doesnt-work-on-windows-10-python-3-7 and below.
+I found unofficial Windows builds here:
+https://www.lfd.uci.edu/~gohlke/pythonlibs/#pyopengl
+
+I downloaded PyOpenGL-3.1.3b2-cp37-cp37m-win_amd64.whl and PyOpenGL_accelerate-3.1.3b2-cp37-cp37m-win_amd64.whl. Next, I navigate to my Downloads folder in a Windows terminal and start the installation:
+
 
 """
 
