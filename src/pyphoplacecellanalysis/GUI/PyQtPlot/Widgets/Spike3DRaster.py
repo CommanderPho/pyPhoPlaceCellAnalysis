@@ -13,6 +13,8 @@ import qdarkstyle
 import numpy as np
 import time
 
+from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.GLDebugAxisItem import GLDebugAxisItem
+from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.GLViewportOverlayPainterItem import GLViewportOverlayPainterItem
 
 """ For threading info see:
 https://stackoverflow.com/questions/41526832/pyqt5-qthread-signal-not-working-gui-freeze
@@ -179,7 +181,27 @@ class Spike3DRaster(QtWidgets.QWidget):
     def half_render_window_duration(self):
         """ """
         return np.ceil(float(self.spikes_window.window_duration)/2.0) # 10 by default 
+
+    @property
+    def temporal_axis_length(self):
+        """The temporal_axis_length property."""
+        return self.temporal_zoom_factor * self.render_window_duration
+    @property
+    def half_temporal_axis_length(self):
+        """The temporal_axis_length property."""
+        return self.temporal_axis_length / 2.0
     
+
+    @property
+    def temporal_zoom_factor(self):
+        """The time dilation factor that maps spikes in the current window to x-positions along the time axis multiplicatively.
+            Increasing this factor will result in a more spatially expanded time axis while leaving the visible window unchanged.
+        """
+        return self._temporal_zoom_factor
+    @temporal_zoom_factor.setter
+    def temporal_zoom_factor(self, value):
+        self._temporal_zoom_factor = value
+
 
     def __init__(self, spikes_df, *args, window_duration=15.0, window_start_time=0.0, **kwargs):
         super(Spike3DRaster, self).__init__(*args, **kwargs)
@@ -189,6 +211,11 @@ class Spike3DRaster(QtWidgets.QWidget):
         self.spike_start_z = -10.0
         self.spike_end_z = 0.1
         self.side_bin_margins = 1.0 # space to sides of the first and last cell on the y-axis
+        # by default we want the time axis to approximately span -20 to 20. So we set the temporal_zoom_factor to 
+        self._temporal_zoom_factor = 40.0 / float(self.render_window_duration)
+        
+        self.enable_debug_print = True
+        
         
         self.app = pg.mkQApp("Spike3DRaster")
         
@@ -238,7 +265,8 @@ class Spike3DRaster(QtWidgets.QWidget):
         self.ui.slider.setSizePolicy(QtGui.QSizePolicy.Expanding, QtGui.QSizePolicy.Preferred)
         # self.ui.slider.setFocusPolicy(Qt.NoFocus) # removes ugly focus rectangle frm around the slider
         self.ui.slider.setRange(0, 100)
-        self.ui.slider.setSingleStep(2)
+        self.ui.slider.setSingleStep(1)
+        # self.ui.slider.setSingleStep(2)
         self.ui.slider.setValue(0)
         self.ui.slider.valueChanged.connect(self.slider_val_changed)
         # sliderMoved vs valueChanged? vs sliderChange?
@@ -259,8 +287,8 @@ class Spike3DRaster(QtWidgets.QWidget):
         self.resize(1920, 900)
         self.setWindowTitle('Spike3DRaster')
         # Connect window update signals
-        self.spikes_window.spike_dataframe_changed_signal.connect(self.on_spikes_df_changed)
-        self.spikes_window.window_duration_changed_signal.connect(self.on_window_duration_changed)
+        # self.spikes_window.spike_dataframe_changed_signal.connect(self.on_spikes_df_changed)
+        # self.spikes_window.window_duration_changed_signal.connect(self.on_window_duration_changed)
         self.spikes_window.window_changed_signal.connect(self.on_window_changed)
 
         # Slider update thread:        
@@ -269,31 +297,53 @@ class Spike3DRaster(QtWidgets.QWidget):
         self.show()
       
     def _buildGraphics(self, w):
+        # Add debugging widget:
+        
+        # Adds a helper widget that displays the x/y/z vector at the origin:
+        self.ui.ref_axes_indicator = GLDebugAxisItem()
+        self.ui.ref_axes_indicator.setSize(x=15.0, y=10.0, z=5.0)
+        w.addItem(self.ui.ref_axes_indicator)
+        
+        self.ui.viewport_overlay = GLViewportOverlayPainterItem()
+        w.addItem(self.ui.viewport_overlay)
+        
         # Add axes planes:
         # X-plane:
-        self.ui.gx = gl.GLGridItem(color=(255, 155, 155, 76.5))
+        x_color = (255, 155, 155, 76.5)
+        self.ui.gx = gl.GLGridItem(color=x_color) # 'x' plane, red
         self.ui.gx.rotate(90, 0, 1, 0)
-        self.ui.gx.translate(-self.half_render_window_duration, 0, 0) # shift backwards
+        self.ui.gx.translate(-self.half_temporal_axis_length, 0, 0) # shift backwards
         self.ui.gx.setSize(20, self.n_full_cell_grid) # std size in z-dir, n_cell size across
         self.ui.gx.setSpacing(10.0, 1) 
         w.addItem(self.ui.gx)
         
+        self.ui.x_txtitem = gl.GLTextItem(pos=(-self.half_temporal_axis_length, self.n_half_cells, 0.0), text='x', color=x_color) # position label 
+        w.addItem(self.ui.x_txtitem)
+
         # Y-plane:
-        self.ui.gy = gl.GLGridItem(color=(155, 255, 155, 76.5))
+        y_color = (155, 255, 155, 76.5)
+        self.ui.gy = gl.GLGridItem(color=y_color) # 'y' plane, green
         self.ui.gy.rotate(90, 1, 0, 0)
         # gy.translate(0, -10, 0)
         self.ui.gy.translate(0, -self.n_half_cells, 0) # offset by half the number of units in the -y direction
-        self.ui.gy.setSize(self.render_window_duration, 20)
-        # gy.setSpacing(1, 1)
+        self.ui.gy.setSize(self.temporal_axis_length, 20)
+        self.ui.gy.setSpacing(1, 10.0) # unit along the y axis itself, only one subdivision along the z-axis
         w.addItem(self.ui.gy)
         
+        self.ui.y_txtitem = gl.GLTextItem(pos=(self.half_temporal_axis_length+0.5, -self.n_half_cells, 0.0), text='y', color=y_color)
+        w.addItem(self.ui.y_txtitem)
+        
         # XY-plane (with normal in z-dir):
-        self.ui.gz = gl.GLGridItem(color=(155, 155, 255, 76.5))
+        z_color = (155, 155, 255, 76.5)
+        self.ui.gz = gl.GLGridItem(color=z_color) # 'z' plane, blue
         self.ui.gz.translate(0, 0, -10) # Shift down by 10 units in the z-dir
-        self.ui.gz.setSize(self.render_window_duration, self.n_full_cell_grid)
+        self.ui.gz.setSize(self.temporal_axis_length, self.n_full_cell_grid)
         self.ui.gz.setSpacing(20.0, 1)
         # gz.setSize(n_full_cell_grid, n_full_cell_grid)
         w.addItem(self.ui.gz)
+        
+        self.ui.z_txtitem = gl.GLTextItem(pos=(-self.half_temporal_axis_length, -self.n_half_cells, 10.5), text='z', color=z_color)
+        w.addItem(self.ui.z_txtitem)
         
         # Custom 3D raster plot:
         
@@ -319,7 +369,7 @@ class Spike3DRaster(QtWidgets.QWidget):
             yi = y[cell_id] # get the correct y-position for all spikes of this cell
             # print(f'cell_id: {cell_id}, yi: {yi}')
             # map the current spike times back onto the range of the window's (-half_render_window_duration, +half_render_window_duration) so they represent the x coordinate
-            curr_x = np.interp(curr_spike_t, (self.spikes_window.active_window_start_time, self.spikes_window.active_window_end_time), (-self.half_render_window_duration, +self.half_render_window_duration))
+            curr_x = np.interp(curr_spike_t, (self.spikes_window.active_window_start_time, self.spikes_window.active_window_end_time), (-self.half_temporal_axis_length, +self.half_temporal_axis_length))
             curr_paired_x = np.squeeze(interleave_elements(np.atleast_2d(curr_x).T, np.atleast_2d(curr_x).T))        
             
             # Z-positions:
@@ -338,8 +388,8 @@ class Spike3DRaster(QtWidgets.QWidget):
             # plt = gl.GLLinePlotItem(pos=pts, color=pg.mkColor((cell_id,n*1.3)), width=(cell_id+1)/10., antialias=True)
             plt = gl.GLLinePlotItem(pos=pts, color=curr_color, width=0.5, antialias=True, mode='lines') # mode='lines' means that each pair of vertexes draws a single line segement
 
-            plt.setYRange((-self.n_half_cells - self.side_bin_margins), (self.n_half_cells + self.side_bin_margins))
-            plt.setXRange(-self.half_render_window_duration, +self.half_render_window_duration)
+            # plt.setYRange((-self.n_half_cells - self.side_bin_margins), (self.n_half_cells + self.side_bin_margins))
+            # plt.setXRange(-self.half_render_window_duration, +self.half_render_window_duration)
             
             w.addItem(plt)
             self.ui.gl_line_plots.append(plt)
@@ -360,26 +410,30 @@ class Spike3DRaster(QtWidgets.QWidget):
         # TODO: these '.translate(...)' instructions might not be right if they're relative to the original transform. May need to translate back to by the inverse of the old value, and then do the fresh transform with the new value. Or compute the difference between the old and new.
         self.ui.gx.setSize(20, self.n_full_cell_grid) # std size in z-dir, n_cell size across
         self.ui.gy.translate(0, -self.n_half_cells, 0) # offset by half the number of units in the -y direction
-        self.ui.gz.setSize(self.render_window_duration, self.n_full_cell_grid)
+        self.ui.gz.setSize(self.temporal_axis_length, self.n_full_cell_grid)
         self.rebuild_main_gl_line_plots_if_needed()
         
 
     def on_window_duration_changed(self):
         """ changes self.half_render_window_duration """
         print(f'Spike3DRaster.on_window_duration_changed()')
-        self.ui.gx.translate(-self.half_render_window_duration, 0, 0) # shift backwards
-        self.ui.gy.setSize(self.render_window_duration, 20)
-        self.ui.gz.setSize(self.render_window_duration, self.n_full_cell_grid)
+        self.ui.gx.translate(-self.half_temporal_axis_length, 0, 0) # shift backwards
+        self.ui.gy.setSize(self.temporal_axis_length, 20)
+        self.ui.gz.setSize(self.temporal_axis_length, self.n_full_cell_grid)
         # update grids. on_window_changed should be triggered separately        
         
     def on_window_changed(self):
         # called when the window is updated
-        print(f'Spike3DRaster.on_window_changed()')
+        if self.enable_debug_print:
+            print(f'Spike3DRaster.on_window_changed()')
+        profiler = pg.debug.Profiler(disabled=False, delayed=False)
         self._update_plots()
+        profiler('Finished calling _update_plots()')
         
             
     def _update_plots(self):
-        print(f'Spike3DRaster._update_plots()')
+        if self.enable_debug_print:
+            print(f'Spike3DRaster._update_plots()')
         assert (len(self.ui.gl_line_plots) == self.n_cells), f"after all operations the length of the plots array should be the same as the n_cells, but len(self.ui.gl_line_plots): {len(self.ui.gl_line_plots)} and self.n_cells: {self.n_cells}!"
         y = np.linspace(-self.n_half_cells, self.n_half_cells, self.n_cells) + 0.5 # add 0.5 so they're centered
         
@@ -392,7 +446,8 @@ class Spike3DRaster(QtWidgets.QWidget):
             curr_spike_t = curr_cell_df[curr_cell_df.spikes.time_variable_name].to_numpy() # this will map 
             yi = y[cell_id] # get the correct y-position for all spikes of this cell
             # map the current spike times back onto the range of the window's (-half_render_window_duration, +half_render_window_duration) so they represent the x coordinate
-            curr_x = np.interp(curr_spike_t, (self.spikes_window.active_window_start_time, self.spikes_window.active_window_end_time), (-self.half_render_window_duration, +self.half_render_window_duration))
+            # curr_x = np.interp(curr_spike_t, (self.spikes_window.active_window_start_time, self.spikes_window.active_window_end_time), (-self.half_render_window_duration, +self.half_render_window_duration))
+            curr_x = np.interp(curr_spike_t, (self.spikes_window.active_window_start_time, self.spikes_window.active_window_end_time), (-self.half_temporal_axis_length, +self.half_temporal_axis_length))
             curr_paired_x = np.squeeze(interleave_elements(np.atleast_2d(curr_x).T, np.atleast_2d(curr_x).T))        
             
             # Z-positions:
@@ -418,22 +473,21 @@ class Spike3DRaster(QtWidgets.QWidget):
         if (n_extant_plts < self.n_cells):
             # need to create new plots for the difference
             if debug_print:
-                print(f'Spike3DRaster.on_spikes_df_changed(): building additional plots: n_extant_plts: {n_extant_plts}, self.n_cells: {self.n_cells}')
+                print(f'!! Spike3DRaster.rebuild_main_gl_line_plots_if_needed(): building additional plots: n_extant_plts: {n_extant_plts}, self.n_cells: {self.n_cells}')
             for new_unit_i in np.arange(n_extant_plts-1, self.n_cells, 1):
                 cell_id = self.unit_ids[new_unit_i]
                 curr_color = pg.mkColor((cell_id, self.n_cells*1.3))
                 curr_color.setAlphaF(0.5)
                 plt = gl.GLLinePlotItem(pos=[], color=curr_color, width=0.5, antialias=True, mode='lines') # mode='lines' means that each pair of vertexes draws a single line segement
-                plt.setYRange((-self.n_half_cells - self.side_bin_margins), (self.n_half_cells + self.side_bin_margins))
-                plt.setXRange(-self.half_render_window_duration, +self.half_render_window_duration)
-            
+                # plt.setYRange((-self.n_half_cells - self.side_bin_margins), (self.n_half_cells + self.side_bin_margins))
+                # plt.setXRange(-self.half_render_window_duration, +self.half_render_window_duration)
                 self.ui.main_gl_widget.addItem(plt)
                 self.ui.gl_line_plots.append(plt) # append to the gl_line_plots array
                 
         elif (n_extant_plts > self.n_cells):
             # excess plots, need to remove (or at least hide) them:              
             if debug_print:
-                print(f'on_spikes_df_changed(): removing excess plots: n_extant_plts: {n_extant_plts}, self.n_cells: {self.n_cells}')
+                print(f'!! Spike3DRaster.rebuild_main_gl_line_plots_if_needed(): removing excess plots: n_extant_plts: {n_extant_plts}, self.n_cells: {self.n_cells}')
             for extra_unit_i in np.arange(n_extant_plts, self.n_cells, 1):
                 plt = self.ui.gl_line_plots[extra_unit_i] # get the unit to be removed 
                 self.ui.main_gl_widget.removeItem(plt)
@@ -447,9 +501,9 @@ class Spike3DRaster(QtWidgets.QWidget):
     def _compute_window_transform(self, relative_offset):
         """ computes the transform from 0.0-1.0 as the slider would provide to the offset given the current information. """
         earliest_t, latest_t = self.spikes_window.total_df_start_end_times
-        render_window_offset = (self.render_window_duration * relative_offset) + earliest_t
+        total_spikes_df_duration = latest_t - earliest_t # get the duration of the entire spikes df
+        render_window_offset = (total_spikes_df_duration * relative_offset) + earliest_t
         return render_window_offset
-    
     
     
     def btn_slide_run_clicked(self):
@@ -468,7 +522,8 @@ class Spike3DRaster(QtWidgets.QWidget):
 
     def increase_slider_val(self):
         slider_val = self.ui.slider.value()
-        print(f'Spike3DRaster.increase_slider_val(): slider_val: {slider_val}')
+        if self.enable_debug_print:
+            print(f'Spike3DRaster.increase_slider_val(): slider_val: {slider_val}')
         if slider_val < 100:
             self.ui.slider.setValue(slider_val + 1)
         else:
@@ -482,20 +537,14 @@ class Spike3DRaster(QtWidgets.QWidget):
         # Gets the transform from relative (0.0 - 1.0) to absolute timestamp offset
         curr_t = self._compute_window_transform(self.slidebar_val)
         
-        print(f'Spike3DRaster.slider_val_changed(): self.slidebar_val: {self.slidebar_val}, curr_t: {curr_t}')
-        
-        print(f'BEFORE: self.spikes_window.active_time_window: {self.spikes_window.active_time_window}')
+        if self.enable_debug_print:
+            print(f'Spike3DRaster.slider_val_changed(): self.slidebar_val: {self.slidebar_val}, curr_t: {curr_t}')
+            print(f'BEFORE: self.spikes_window.active_time_window: {self.spikes_window.active_time_window}')
          # set the start time which will trigger the update cascade and result in on_window_changed(...) being called
         self.spikes_window.update_window_start(curr_t)
-        # self.spikes_window.active_window_start_time = curr_t
-        print(f'AFTER: self.spikes_window.active_time_window: {self.spikes_window.active_time_window}')
-        
-        #self.updateMatrix()
-        # self.updateVector1(self.v1_x, self.v1_y)
-        # self.updateVector2(self.v2_x, self.v2_y)
-        # self.updateGrid()
-        # self.updateCircle()
-        # self.updateOutput()
+        if self.enable_debug_print:
+            print(f'AFTER: self.spikes_window.active_time_window: {self.spikes_window.active_time_window}')
+    
         
     # def computeTransform(self, x, y, t = None):
     #     if t == None:
