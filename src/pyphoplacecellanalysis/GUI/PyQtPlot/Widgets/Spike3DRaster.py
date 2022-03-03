@@ -141,7 +141,8 @@ class SliderRunner(QtCore.QThread):
     def run(self):
         while(True):
             self.update_signal.emit()
-            time.sleep(.03) # probably do a different form of rate limiting instead (like use SignalProxy)? Actually this might be okay because it's on a different thread.
+            time.sleep(.32) # 320ms
+            # time.sleep(.03) # probably do a different form of rate limiting instead (like use SignalProxy)? Actually this might be okay because it's on a different thread.
             
                 
 
@@ -363,8 +364,6 @@ class Spike3DRaster(QtWidgets.QWidget):
         
         self.ui.gl_line_plots = [] # create an empty array for each GLLinePlotItem, of which there will be one for each unit.
         
-        
-                    
         y = np.linspace(-self.n_half_cells, self.n_half_cells, self.n_cells) + 0.5 # add 0.5 so they're centered
         # Plot each unit one at a time:
         for cell_id in self.unit_ids:
@@ -404,11 +403,8 @@ class Spike3DRaster(QtWidgets.QWidget):
             
             w.addItem(plt)
             self.ui.gl_line_plots.append(plt)
-            
-            # # Adds a helper widget that displays the x/y/z vector at the origin:
-            # ref_axes_indicator = gl.GLAxisItem()
-            # ref_axes_indicator.setSize(x=10.0, y=10.0, z=5.0)
-            # w.addItem(ref_axes_indicator)
+
+        
 
     def on_spikes_df_changed(self):
         """ changes:
@@ -443,13 +439,19 @@ class Spike3DRaster(QtWidgets.QWidget):
         
             
     def _update_plots(self):
-        """ performance went from:
-        
-        > Entering Spike3DRaster.on_window_changed
-        Finished calling _update_plots(): 1179.6892 ms
-        < Exiting Spike3DRaster.on_window_changed, total time: 1179.7600 ms
+        """ performance went:
+        FROM:
+            > Entering Spike3DRaster.on_window_changed
+            Finished calling _update_plots(): 1179.6892 ms
+            < Exiting Spike3DRaster.on_window_changed, total time: 1179.7600 ms
 
-        
+        TO:
+            > Entering Spike3DRaster.on_window_changed
+            Finished calling _update_plots(): 203.8840 ms
+            < Exiting Spike3DRaster.on_window_changed, total time: 203.9544 ms
+
+        Just by removing the lines that initialized the color. Conclusion is that pg.mkColor((cell_id, self.n_cells*1.3)) must be VERY slow.
+    
         """
         if self.enable_debug_print:
             print(f'Spike3DRaster._update_plots()')
@@ -519,7 +521,6 @@ class Spike3DRaster(QtWidgets.QWidget):
         render_window_offset = (total_spikes_df_duration * relative_offset) + earliest_t
         return render_window_offset
     
-    
     def btn_slide_run_clicked(self):
         if self.ui.btn_slide_run.tag == "paused" or self.slidebar_val == 1:
             if self.slidebar_val == 1:
@@ -535,7 +536,7 @@ class Spike3DRaster(QtWidgets.QWidget):
             self.sliderThread.terminate()
 
     def increase_slider_val(self):
-        slider_val = self.ui.slider.value()
+        slider_val = self.ui.slider.value() # integer value between 0-100
         if self.enable_debug_print:
             print(f'Spike3DRaster.increase_slider_val(): slider_val: {slider_val}')
         if slider_val < 100:
