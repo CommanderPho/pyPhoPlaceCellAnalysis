@@ -51,8 +51,8 @@ class SliderRunner(QtCore.QThread):
     def run(self):
         while(True):
             self.update_signal.emit()
-            time.sleep(.32) # 320ms
-            # time.sleep(.03) # probably do a different form of rate limiting instead (like use SignalProxy)? Actually this might be okay because it's on a different thread.
+            # time.sleep(.32) # 320ms
+            time.sleep(0.05) # probably do a different form of rate limiting instead (like use SignalProxy)? Actually this might be okay because it's on a different thread.
             
                 
 
@@ -118,7 +118,8 @@ class Spike3DRaster(NeuronIdentityAccessingMixin, SpikeRenderingBaseMixin, Spike
     def animation_time_step(self):
         """ How much to step forward in time at each frame of animation. """
         # return (self.render_window_duration * 0.02) # each animation timestep is 2% of the render window duration
-        return 0.05 # each animation timestep is a fixed 50ms
+        # return 0.05 # each animation timestep is a fixed 50ms
+        return 0.03 # faster then 30fps
 
     # from NeuronIdentityAccessingMixin
     @property
@@ -137,6 +138,20 @@ class Spike3DRaster(NeuronIdentityAccessingMixin, SpikeRenderingBaseMixin, Spike
     def spikes_df(self):
         """The spikes_df property."""
         return self.spikes_window.df
+    
+    
+    
+    @property
+    def overlay_text_lines(self):
+        """The lines to be displayed in the overlay."""
+        lines = []
+        lines.append(f'active_time_window: {self.spikes_window.active_time_window}')
+        lines.append(f"n_cells : {self.n_cells}")
+        lines.append(f'active num spikes: {self.active_windowed_df.shape[0]}')
+        lines.append(f'render_window_duration: {self.render_window_duration}')
+        lines.append(f'animation_time_step: {self.animation_time_step}')
+        lines.append(f'temporal_axis_length: {self.temporal_axis_length}')
+        return lines
     
     
     ######  Get/Set Properties ######:
@@ -298,6 +313,9 @@ class Spike3DRaster(NeuronIdentityAccessingMixin, SpikeRenderingBaseMixin, Spike
         self.ui.viewport_overlay = GLViewportOverlayPainterItem()
         w.addItem(self.ui.viewport_overlay)
         
+        # Update the additional display lines information on the overlay:
+        self.ui.viewport_overlay.additional_overlay_text_lines = self.overlay_text_lines
+                
         # Add axes planes:
         # X-plane:
         x_color = (255, 155, 155, 76.5)
@@ -375,7 +393,7 @@ class Spike3DRaster(NeuronIdentityAccessingMixin, SpikeRenderingBaseMixin, Spike
             pts = np.column_stack([curr_paired_x, np.full_like(curr_paired_x, yi), curr_paired_spike_zs]) # the middle coordinate is the size of the x array with the value given by yi. yi must be the scalar for this cell.
             # pts = np.column_stack([x, np.full_like(x, yi), z]) # the middle coordinate is the size of the x array with the value given by yi. yi must be the scalar for this cell.
             # plt = gl.GLLinePlotItem(pos=pts, color=pg.mkColor((cell_id,n*1.3)), width=(cell_id+1)/10., antialias=True)
-            plt = gl.GLLinePlotItem(pos=pts, color=curr_color, width=0.5, antialias=True, mode='lines') # mode='lines' means that each pair of vertexes draws a single line segement
+            plt = gl.GLLinePlotItem(pos=pts, color=curr_color, width=1.0, antialias=True, mode='lines') # mode='lines' means that each pair of vertexes draws a single line segement
 
             # plt.setYRange((-self.n_half_cells - self.side_bin_margins), (self.n_half_cells + self.side_bin_margins))
             # plt.setXRange(-self.half_render_window_duration, +self.half_render_window_duration)
@@ -427,7 +445,7 @@ class Spike3DRaster(NeuronIdentityAccessingMixin, SpikeRenderingBaseMixin, Spike
         # called when the window is updated
         if self.enable_debug_print:
             print(f'Spike3DRaster.on_window_changed()')
-        profiler = pg.debug.Profiler(disabled=False, delayed=False)
+        profiler = pg.debug.Profiler(disabled=True, delayed=True)
         self._update_plots()
         profiler('Finished calling _update_plots()')
         
@@ -450,7 +468,8 @@ class Spike3DRaster(NeuronIdentityAccessingMixin, SpikeRenderingBaseMixin, Spike
         if self.enable_debug_print:
             print(f'Spike3DRaster._update_plots()')
         assert (len(self.ui.gl_line_plots) == self.n_cells), f"after all operations the length of the plots array should be the same as the n_cells, but len(self.ui.gl_line_plots): {len(self.ui.gl_line_plots)} and self.n_cells: {self.n_cells}!"
-        y = np.linspace(-self.n_half_cells, self.n_half_cells, self.n_cells) + 0.5 # add 0.5 so they're centered
+        # y = np.linspace(-self.n_half_cells, self.n_half_cells, self.n_cells) + 0.5 # add 0.5 so they're centered
+        y = np.linspace(-self.n_half_cells, self.n_half_cells, self.n_cells) # add 0.5 so they're centered
         
         # Plot each unit one at a time:
         for i, cell_id in enumerate(self.unit_ids):    
@@ -481,6 +500,12 @@ class Spike3DRaster(NeuronIdentityAccessingMixin, SpikeRenderingBaseMixin, Spike
             # self.ui.main_gl_widget.addItem(plt)
             # self.ui.gl_line_plots.append(plt) # append to the gl_line_plots array
             
+    
+        # Update the additional display lines information on the overlay:
+        self.ui.viewport_overlay.additional_overlay_text_lines = self.overlay_text_lines
+        
+        
+            
     def rebuild_main_gl_line_plots_if_needed(self, debug_print=True):
         """ adds or removes GLLinePlotItems to self.ui.gl_line_plots based on the current number of cells. """
         n_extant_plts = len(self.ui.gl_line_plots)
@@ -493,7 +518,7 @@ class Spike3DRaster(NeuronIdentityAccessingMixin, SpikeRenderingBaseMixin, Spike
                 # curr_color = pg.mkColor((cell_id, self.n_cells*1.3))
                 # curr_color.setAlphaF(0.5)
                 curr_color = self.params.neuron_qcolors[cell_id] # get the pre-build color
-                plt = gl.GLLinePlotItem(pos=[], color=curr_color, width=0.5, antialias=True, mode='lines') # mode='lines' means that each pair of vertexes draws a single line segement
+                plt = gl.GLLinePlotItem(pos=[], color=curr_color, width=1.0, antialias=True, mode='lines') # mode='lines' means that each pair of vertexes draws a single line segement
                 # plt.setYRange((-self.n_half_cells - self.side_bin_margins), (self.n_half_cells + self.side_bin_margins))
                 # plt.setXRange(-self.half_render_window_duration, +self.half_render_window_duration)
                 self.ui.main_gl_widget.addItem(plt)
@@ -577,8 +602,7 @@ class Spike3DRaster(NeuronIdentityAccessingMixin, SpikeRenderingBaseMixin, Spike
             
     def set_plotdata(self, name, points, color, width):
         # self.traces in the original
-        self.ui.gl_line_plots[name].setData(pos=points, color=color, width=width, mode='lines')
-        
+        self.ui.gl_line_plots[name].setData(pos=points, color=color, width=width, mode='lines', antialias=True)
         
     def update(self):
         self._update_plots()

@@ -15,6 +15,7 @@ class GLViewportOverlayPainterItem(GLGraphicsItem.GLGraphicsItem):
     """
     def __init__(self, **kwds):
         super().__init__()
+        self.additional_overlay_text_lines = []
         glopts = kwds.pop('glOptions', 'additive')
         self.setGLOptions(glopts)
 
@@ -49,6 +50,7 @@ class GLViewportOverlayPainterItem(GLGraphicsItem.GLGraphicsItem):
         painter.drawText(rect, af.AlignBottom | af.AlignLeft, 'BL')
         painter.drawText(rect, af.AlignBottom | af.AlignRight, 'BR')
 
+        # Gets current info from the camera
         opts = self.view().cameraParams()
         lines = []
         center = opts['center']
@@ -57,6 +59,11 @@ class GLViewportOverlayPainterItem(GLGraphicsItem.GLGraphicsItem):
             lines.append(f"{key} : {opts[key]:.1f}")
         xyz = self.view().cameraPosition()
         lines.append(f"xyz : ({xyz.x():.1f}, {xyz.y():.1f}, {xyz.z():.1f})")
+        
+        # Add any additional lines that may have been set:
+        lines.extend(self.additional_overlay_text_lines)
+        
+        # Build the final text output
         info = "\n".join(lines)
         painter.drawText(rect, af.AlignTop | af.AlignLeft, info)
 
