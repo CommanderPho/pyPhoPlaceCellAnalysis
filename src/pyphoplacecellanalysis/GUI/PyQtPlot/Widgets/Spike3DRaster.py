@@ -449,11 +449,10 @@ class Spike3DRaster(QtWidgets.QWidget):
         y = np.linspace(-self.n_half_cells, self.n_half_cells, self.n_cells) + 0.5 # add 0.5 so they're centered
         
         # Plot each unit one at a time:
-        for cell_id in self.unit_ids:
-            curr_color = pg.mkColor((cell_id, self.n_cells*1.3))
-            curr_color.setAlphaF(0.5)            
+        for cell_id in self.unit_ids:      
             # Filter the dataframe using that column and value from the list
-            curr_cell_df = self.active_windowed_df[self.active_windowed_df['unit_id']==cell_id].copy() # is .copy() needed here since nothing is updated???
+            # curr_cell_df = self.active_windowed_df[self.active_windowed_df['unit_id']==cell_id].copy() # is .copy() needed here since nothing is updated???
+            curr_cell_df = self.active_windowed_df[self.active_windowed_df['unit_id']==cell_id]
             curr_spike_t = curr_cell_df[curr_cell_df.spikes.time_variable_name].to_numpy() # this will map 
             yi = y[cell_id] # get the correct y-position for all spikes of this cell
             # map the current spike times back onto the range of the window's (-half_render_window_duration, +half_render_window_duration) so they represent the x coordinate
