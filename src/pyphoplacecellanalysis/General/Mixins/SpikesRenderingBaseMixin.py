@@ -92,8 +92,8 @@ class SpikeRenderingBaseMixin:
         
         self.params.flat_spike_colors_array = np.array([self.params.cell_spike_opaque_colors_dict.get(idx, fallback_color_rgb) for idx in self.spikes_df['cell_idx'].to_numpy()]) # Drop the opacity component, so we only have RGB values. np.shape(flat_spike_colors) # (77726, 3)
         
-        if self.debug_logging:
-            print(f'SpikeRenderingBaseMixin.build_flat_color_data(): built rgb array from neuron_colors, droppping the alpha components: np.shape(self.params.flat_spike_colors_array): {np.shape(self.params.flat_spike_colors_array)}')
+        # if self.debug_logging:
+        #     print(f'SpikeRenderingBaseMixin.build_flat_color_data(): built rgb array from neuron_colors, droppping the alpha components: np.shape(self.params.flat_spike_colors_array): {np.shape(self.params.flat_spike_colors_array)}')
         # Add the split RGB columns to the DataFrame
         self.spikes_df[['R','G','B']] = self.params.flat_spike_colors_array
         # RGBA version:
