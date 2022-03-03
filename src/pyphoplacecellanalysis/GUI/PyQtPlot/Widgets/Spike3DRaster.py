@@ -421,7 +421,22 @@ class Spike3DRaster(QtWidgets.QWidget):
             w.addItem(plt)
             self.ui.gl_line_plots.append(plt)
 
-        
+    def keyPressEvent(self, e):
+        """ called automatically when a keyboard key is pressed and this widget has focus. 
+        TODO: doesn't actually work right now.
+        """
+        if e.key() == QtCore.Qt.Key_Escape:
+            self.close()
+        elif e.key() == QtCore.Qt.Key_Backspace:
+            print('TODO')
+        elif e.key() == QtCore.Qt.Key_Left:
+            self.shift_animation_frame_val(-1) # jump back one frame
+            
+        elif e.key() == QtCore.Qt.Key_Right:
+            self.shift_animation_frame_val(1) # jump forward one frame
+        else:
+            pass
+            
 
     def on_spikes_df_changed(self):
         """ changes:
@@ -586,6 +601,7 @@ class Spike3DRaster(QtWidgets.QWidget):
         next_start_timestamp = self.spikes_window.active_window_start_time + (self.animation_time_step * float(shift_frames))
         self.spikes_window.update_window_start(next_start_timestamp)
         # TODO: doesn't update the slider or interact with the slider in any way.
+        
         
         
     # def computeTransform(self, x, y, t = None):
