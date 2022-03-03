@@ -466,10 +466,6 @@ class Spike3DRaster(QtWidgets.QWidget):
             spike_top_zs = np.full_like(curr_x, self.spike_end_z)
             curr_paired_spike_zs = np.squeeze(interleave_elements(np.atleast_2d(spike_bottom_zs).T, np.atleast_2d(spike_top_zs).T)) # alternating top and bottom z-positions
         
-            # sp1 = gl.GLScatterPlotItem(pos=pos, size=size, color=color, pxMode=False)
-            # sp1.translate(5,5,0)
-            # w.addItem(sp1)
-            
             # Build lines:
             pts = np.column_stack([curr_paired_x, np.full_like(curr_paired_x, yi), curr_paired_spike_zs]) # the middle coordinate is the size of the x array with the value given by yi. yi must be the scalar for this cell.
             # plt = gl.GLLinePlotItem(pos=pts, color=curr_color, width=0.5, antialias=True, mode='lines') # mode='lines' means that each pair of vertexes draws a single line segement
