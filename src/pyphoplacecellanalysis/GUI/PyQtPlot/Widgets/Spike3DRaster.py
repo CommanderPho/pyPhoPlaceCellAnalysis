@@ -443,6 +443,14 @@ class Spike3DRaster(QtWidgets.QWidget):
         
             
     def _update_plots(self):
+        """ performance went from:
+        
+        > Entering Spike3DRaster.on_window_changed
+        Finished calling _update_plots(): 1179.6892 ms
+        < Exiting Spike3DRaster.on_window_changed, total time: 1179.7600 ms
+
+        
+        """
         if self.enable_debug_print:
             print(f'Spike3DRaster._update_plots()')
         assert (len(self.ui.gl_line_plots) == self.n_cells), f"after all operations the length of the plots array should be the same as the n_cells, but len(self.ui.gl_line_plots): {len(self.ui.gl_line_plots)} and self.n_cells: {self.n_cells}!"
