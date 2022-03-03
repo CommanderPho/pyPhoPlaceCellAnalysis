@@ -117,7 +117,8 @@ class Spike3DRaster(NeuronIdentityAccessingMixin, SpikeRenderingBaseMixin, Spike
     @property
     def animation_time_step(self):
         """ How much to step forward in time at each frame of animation. """
-        return (self.render_window_duration * 0.02) # each animation timestep is 2% of the render window duration
+        # return (self.render_window_duration * 0.02) # each animation timestep is 2% of the render window duration
+        return 0.05 # each animation timestep is a fixed 50ms
 
     # from NeuronIdentityAccessingMixin
     @property
@@ -569,6 +570,27 @@ class Spike3DRaster(NeuronIdentityAccessingMixin, SpikeRenderingBaseMixin, Spike
         # TODO: doesn't update the slider or interact with the slider in any way.
         
         
+    #### from pyqtgraph_animated3Dplot_pairedLines's animation style ###:
+    def start(self):
+        if (sys.flags.interactive != 1) or not hasattr(QtCore, 'PYQT_VERSION'):
+            QtGui.QApplication.instance().exec_()
+            
+    def set_plotdata(self, name, points, color, width):
+        # self.traces in the original
+        self.ui.gl_line_plots[name].setData(pos=points, color=color, width=width, mode='lines')
+        
+        
+    def update(self):
+        self._update_plots()
+        self.shift_animation_frame_val(1)
+        
+        
+    def animation(self):
+        timer = QtCore.QTimer()
+        timer.timeout.connect(self.update)
+        # timer.start(20)
+        timer.start(50)
+        self.start()
         
     # def computeTransform(self, x, y, t = None):
     #     if t == None:
@@ -597,3 +619,8 @@ class Spike3DRaster(NeuronIdentityAccessingMixin, SpikeRenderingBaseMixin, Spike
         
     #     print(f'plot_3d_raster_plot(...): unit_ids: {unit_ids}, n: {self.n_cells}')
     
+# Start Qt event loop unless running in interactive mode.
+# if __name__ == '__main__':
+#     # v = Visualizer()
+#     v = Spike3DRaster()
+#     v.animation()
