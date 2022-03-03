@@ -147,7 +147,16 @@ class SliderRunner(QtCore.QThread):
                 
 
 class Spike3DRaster(QtWidgets.QWidget):
-    """docstring for 3d_raster_app."""
+    """ Displays a 3D version of a raster plot with the spikes occuring along a plane. 
+    
+    Usage:
+        from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.Spike3DRaster import Spike3DRaster
+        curr_epoch_name = 'maze1'
+        curr_epoch = curr_active_pipeline.filtered_epochs[curr_epoch_name] # <NamedTimerange: {'name': 'maze1', 'start_end_times': array([  22.26      , 1739.15336412])};>
+        curr_sess = curr_active_pipeline.filtered_sessions[curr_epoch_name]
+        curr_spikes_df = curr_sess.spikes_df
+        spike_raster_plt = Spike3DRaster(curr_spikes_df, window_duration=4.0, window_start_time=30.0)
+    """
     
     @property
     def spikes_window(self):
@@ -208,6 +217,13 @@ class Spike3DRaster(QtWidgets.QWidget):
     @temporal_zoom_factor.setter
     def temporal_zoom_factor(self, value):
         self._temporal_zoom_factor = value
+        
+        
+    @property
+    def animation_time_step(self):
+        """ How much to step forward in time at each frame of animation. """
+        return (self.render_window_duration * 0.02) # each animation timestep is 2% of the render window duration
+
 
 
     def __init__(self, spikes_df, *args, window_duration=15.0, window_start_time=0.0, **kwargs):
@@ -216,7 +232,8 @@ class Spike3DRaster(QtWidgets.QWidget):
         self.slidebar_val = 0
         self._spikes_window = SpikesDataframeWindow(spikes_df, window_duration=window_duration, window_start_time=window_start_time)
         self.spike_start_z = -10.0
-        self.spike_end_z = 0.1
+        # self.spike_end_z = 0.1
+        self.spike_end_z = -6.0
         self.side_bin_margins = 1.0 # space to sides of the first and last cell on the y-axis
         # by default we want the time axis to approximately span -20 to 20. So we set the temporal_zoom_factor to 
         self._temporal_zoom_factor = 40.0 / float(self.render_window_duration)        
@@ -280,10 +297,8 @@ class Spike3DRaster(QtWidgets.QWidget):
         self.ui.slider.setSingleStep(1)
         # self.ui.slider.setSingleStep(2)
         self.ui.slider.setValue(0)
-        self.ui.slider.valueChanged.connect(self.slider_val_changed)
+        # self.ui.slider.valueChanged.connect(self.slider_val_changed)
         # sliderMoved vs valueChanged? vs sliderChange?
-        
-
         self.ui.layout_slide_bar.addWidget(self.ui.slider)
 
         self.ui.btn_slide_run = QtWidgets.QPushButton(">")
@@ -305,7 +320,9 @@ class Spike3DRaster(QtWidgets.QWidget):
 
         # Slider update thread:        
         self.sliderThread = SliderRunner()
-        self.sliderThread.update_signal.connect(self.increase_slider_val)
+        # self.sliderThread.update_signal.connect(self.increase_slider_val)
+        self.sliderThread.update_signal.connect(self.increase_animation_frame_val)
+        
         self.show()
       
     def _buildGraphics(self, w):
@@ -366,8 +383,8 @@ class Spike3DRaster(QtWidgets.QWidget):
         
         y = np.linspace(-self.n_half_cells, self.n_half_cells, self.n_cells) + 0.5 # add 0.5 so they're centered
         # Plot each unit one at a time:
-        for cell_id in self.unit_ids:
-            curr_color = pg.mkColor((cell_id, self.n_cells*1.3))
+        for i, cell_id in enumerate(self.unit_ids):
+            curr_color = pg.mkColor((i, self.n_cells*1.3))
             # curr_color.SetAlpha(120) # alpha should be between 0-255
             curr_color.setAlphaF(0.5)
             # print(f'cell_id: {cell_id}, curr_color: {curr_color.alpha()}')
@@ -376,7 +393,7 @@ class Spike3DRaster(QtWidgets.QWidget):
             curr_cell_df = self.active_windowed_df[self.active_windowed_df['unit_id']==cell_id].copy() # is .copy() needed here since nothing is updated???
             # curr_unit_id = curr_cell_df['unit_id'].to_numpy() # this will map to the y position
             curr_spike_t = curr_cell_df[curr_cell_df.spikes.time_variable_name].to_numpy() # this will map 
-            yi = y[cell_id] # get the correct y-position for all spikes of this cell
+            yi = y[i] # get the correct y-position for all spikes of this cell
             # print(f'cell_id: {cell_id}, yi: {yi}')
             # map the current spike times back onto the range of the window's (-half_render_window_duration, +half_render_window_duration) so they represent the x coordinate
             curr_x = np.interp(curr_spike_t, (self.spikes_window.active_window_start_time, self.spikes_window.active_window_end_time), (-self.half_temporal_axis_length, +self.half_temporal_axis_length))
@@ -459,12 +476,12 @@ class Spike3DRaster(QtWidgets.QWidget):
         y = np.linspace(-self.n_half_cells, self.n_half_cells, self.n_cells) + 0.5 # add 0.5 so they're centered
         
         # Plot each unit one at a time:
-        for cell_id in self.unit_ids:      
+        for i, cell_id in enumerate(self.unit_ids):    
             # Filter the dataframe using that column and value from the list
             # curr_cell_df = self.active_windowed_df[self.active_windowed_df['unit_id']==cell_id].copy() # is .copy() needed here since nothing is updated???
             curr_cell_df = self.active_windowed_df[self.active_windowed_df['unit_id']==cell_id]
             curr_spike_t = curr_cell_df[curr_cell_df.spikes.time_variable_name].to_numpy() # this will map 
-            yi = y[cell_id] # get the correct y-position for all spikes of this cell
+            yi = y[i] # get the correct y-position for all spikes of this cell
             # map the current spike times back onto the range of the window's (-half_render_window_duration, +half_render_window_duration) so they represent the x coordinate
             # curr_x = np.interp(curr_spike_t, (self.spikes_window.active_window_start_time, self.spikes_window.active_window_end_time), (-self.half_render_window_duration, +self.half_render_window_duration))
             curr_x = np.interp(curr_spike_t, (self.spikes_window.active_window_start_time, self.spikes_window.active_window_end_time), (-self.half_temporal_axis_length, +self.half_temporal_axis_length))
@@ -478,7 +495,7 @@ class Spike3DRaster(QtWidgets.QWidget):
             # Build lines:
             pts = np.column_stack([curr_paired_x, np.full_like(curr_paired_x, yi), curr_paired_spike_zs]) # the middle coordinate is the size of the x array with the value given by yi. yi must be the scalar for this cell.
             # plt = gl.GLLinePlotItem(pos=pts, color=curr_color, width=0.5, antialias=True, mode='lines') # mode='lines' means that each pair of vertexes draws a single line segement
-            self.ui.gl_line_plots[cell_id].setData(pos=pts, mode='lines') # update the current data
+            self.ui.gl_line_plots[i].setData(pos=pts, mode='lines') # update the current data
             
             # self.ui.main_gl_widget.addItem(plt)
             # self.ui.gl_line_plots.append(plt) # append to the gl_line_plots array
@@ -560,6 +577,12 @@ class Spike3DRaster(QtWidgets.QWidget):
         if self.enable_debug_print:
             print(f'AFTER: self.spikes_window.active_time_window: {self.spikes_window.active_time_window}')
     
+        
+    def increase_animation_frame_val(self):
+        next_start_timestamp = self.spikes_window.active_window_start_time + self.animation_time_step
+        self.spikes_window.update_window_start(next_start_timestamp)
+        # TODO: doesn't update the slider or interact with the slider in any way.
+        
         
     # def computeTransform(self, x, y, t = None):
     #     if t == None:
