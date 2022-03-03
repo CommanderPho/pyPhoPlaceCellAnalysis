@@ -39,7 +39,12 @@ def build_single_placefield_output_widget(render_config):
 
 
 def build_all_placefield_output_panels(ipcDataExplorer):
-    """ Builds the row of custom SingleEditablePlacefieldDisplayConfiguration widgets for each placecell that allow configuring their display """
+    """ Builds the row of custom SingleEditablePlacefieldDisplayConfiguration widgets for each placecell that allow configuring their display
+    
+    TODO: can't get signals working unfortunately. https://stackoverflow.com/questions/45090982/passing-extra-arguments-through-connect
+    https://eli.thegreenplace.net/2011/04/25/passing-extra-arguments-to-pyqt-slot
+    
+    """
     # out_panels = SingleEditablePlacefieldDisplayConfiguration.build_all_placefield_output_panels(ipcDataExplorer.active_tuning_curve_render_configs,
     #                                                                                              tuning_curve_config_changed_callback=ipcDataExplorer.on_update_tuning_curve_display_config,
     #                                                                                              spikes_config_changed_callback=ipcDataExplorer.change_unit_spikes_included)
