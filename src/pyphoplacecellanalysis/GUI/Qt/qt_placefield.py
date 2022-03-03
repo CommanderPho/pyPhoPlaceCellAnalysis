@@ -81,8 +81,8 @@ def build_all_placefield_output_panels(ipcDataExplorer):
         # curr_widget.spike_config_changed.connect(lambda are_included_list, cell_IDXs=val1, arg2= value2, ... : ipcDataExplorer.change_unit_spikes_included(param1, param2,... , arg1, arg2, ....) )
         # curr_widget.tuning_curve_display_config_changed.connect(lambda are_included, i_copy=idx: spikes_config_changed_callback(cell_IDXs=[i_copy], cell_IDs=None, are_included=are_included)
         
-        curr_widget.spike_config_changed.connect(lambda are_included, i_copy=idx: ipcDataExplorer.change_unit_spikes_included(cell_IDXs=[i_copy], cell_IDs=None, are_included=are_included))
-        curr_widget.tuning_curve_display_config_changed.connect(lambda updated_config_copy=a_config, i_copy=idx: ipcDataExplorer.on_update_tuning_curve_display_config([i_copy], [updated_config_copy]))
+        curr_widget.spike_config_changed.connect(lambda are_included, spikes_config_changed_callback=ipcDataExplorer.change_unit_spikes_included, i_copy=idx: spikes_config_changed_callback(cell_IDXs=[i_copy], cell_IDs=None, are_included=are_included))
+        curr_widget.tuning_curve_display_config_changed.connect(lambda updated_config_copy=a_config, i_copy=idx, tuning_curve_config_changed_callback=ipcDataExplorer.on_update_tuning_curve_display_config: tuning_curve_config_changed_callback([i_copy], [updated_config_copy]))
                                  
         # partial(self.on_button, 1), i_copy=idx
         # cell_IDXs=None, cell_IDs=None
