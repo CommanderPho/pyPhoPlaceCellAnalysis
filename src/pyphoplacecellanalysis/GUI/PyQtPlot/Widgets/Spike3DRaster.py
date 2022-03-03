@@ -456,17 +456,21 @@ class Spike3DRaster(NeuronIdentityAccessingMixin, SpikeRenderingBaseMixin, Spike
             # Filter the dataframe using that column and value from the list
             # curr_cell_df = self.active_windowed_df[self.active_windowed_df['unit_id']==cell_id].copy() # is .copy() needed here since nothing is updated???
             curr_cell_df = self.active_windowed_df[self.active_windowed_df['unit_id']==cell_id]
-            curr_spike_t = curr_cell_df[curr_cell_df.spikes.time_variable_name].to_numpy() # this will map 
+            curr_spike_t = curr_cell_df[curr_cell_df.spikes.time_variable_name].to_numpy() # this will map
+            curr_unit_n_spikes = len(curr_spike_t)
+            
             yi = y[i] # get the correct y-position for all spikes of this cell
             # map the current spike times back onto the range of the window's (-half_render_window_duration, +half_render_window_duration) so they represent the x coordinate
             # curr_x = np.interp(curr_spike_t, (self.spikes_window.active_window_start_time, self.spikes_window.active_window_end_time), (-self.half_render_window_duration, +self.half_render_window_duration))
             curr_x = np.interp(curr_spike_t, (self.spikes_window.active_window_start_time, self.spikes_window.active_window_end_time), (-self.half_temporal_axis_length, +self.half_temporal_axis_length))
-            curr_paired_x = np.squeeze(interleave_elements(np.atleast_2d(curr_x).T, np.atleast_2d(curr_x).T))        
+            # curr_paired_x = np.squeeze(interleave_elements(np.atleast_2d(curr_x).T, np.atleast_2d(curr_x).T))        
+            curr_paired_x = curr_x.repeat(2)
             
             # Z-positions:
-            spike_bottom_zs = np.full_like(curr_x, self.params.spike_start_z)
-            spike_top_zs = np.full_like(curr_x, self.params.spike_end_z)
-            curr_paired_spike_zs = np.squeeze(interleave_elements(np.atleast_2d(spike_bottom_zs).T, np.atleast_2d(spike_top_zs).T)) # alternating top and bottom z-positions
+            # spike_bottom_zs = np.full_like(curr_x, self.params.spike_start_z)
+            # spike_top_zs = np.full_like(curr_x, self.params.spike_end_z)
+            # curr_paired_spike_zs = np.squeeze(interleave_elements(np.atleast_2d(spike_bottom_zs).T, np.atleast_2d(spike_top_zs).T)) # alternating top and bottom z-positions
+            curr_paired_spike_zs = np.squeeze(np.tile(np.array([self.params.spike_start_z, self.params.spike_end_z]), curr_unit_n_spikes)) # repeat pair of z values once for each spike
         
             # Build lines:
             pts = np.column_stack([curr_paired_x, np.full_like(curr_paired_x, yi), curr_paired_spike_zs]) # the middle coordinate is the size of the x array with the value given by yi. yi must be the scalar for this cell.
@@ -485,8 +489,9 @@ class Spike3DRaster(NeuronIdentityAccessingMixin, SpikeRenderingBaseMixin, Spike
                 print(f'!! Spike3DRaster.rebuild_main_gl_line_plots_if_needed(): building additional plots: n_extant_plts: {n_extant_plts}, self.n_cells: {self.n_cells}')
             for new_unit_i in np.arange(n_extant_plts-1, self.n_cells, 1):
                 cell_id = self.unit_ids[new_unit_i]
-                curr_color = pg.mkColor((cell_id, self.n_cells*1.3))
-                curr_color.setAlphaF(0.5)
+                # curr_color = pg.mkColor((cell_id, self.n_cells*1.3))
+                # curr_color.setAlphaF(0.5)
+                curr_color = self.params.neuron_qcolors[cell_id] # get the pre-build color
                 plt = gl.GLLinePlotItem(pos=[], color=curr_color, width=0.5, antialias=True, mode='lines') # mode='lines' means that each pair of vertexes draws a single line segement
                 # plt.setYRange((-self.n_half_cells - self.side_bin_margins), (self.n_half_cells + self.side_bin_margins))
                 # plt.setXRange(-self.half_render_window_duration, +self.half_render_window_duration)
