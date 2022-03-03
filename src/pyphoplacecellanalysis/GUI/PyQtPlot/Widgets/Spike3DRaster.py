@@ -8,11 +8,9 @@ import numpy as np
 
 from pyphocorehelpers.indexing_helpers import interleave_elements, partition
 from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer
+# import qdarkstyle
 
-import qdarkstyle
-import numpy as np
-import time
-
+from pyphoplacecellanalysis.General.SpikesDataframeWindow import SpikesDataframeWindow
 from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.GLDebugAxisItem import GLDebugAxisItem
 from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.GLViewportOverlayPainterItem import GLViewportOverlayPainterItem
 
@@ -37,101 +35,6 @@ def trap_exc_during_debug(*args):
 sys.excepthook = trap_exc_during_debug
 
 
-
-
-class SpikesDataframeWindow(QtCore.QObject):
-    """ a zoomable (variable sized) window into a dataframe with a time axis 
-    
-    active_window_start_time can be adjusted to set the location of the current window.
-
-    Usage:
-        render_window_duration = 60.0
-        curr_spikes_df_window = SpikesDataframeWindow(curr_spikes_df, window_duration=render_window_duration)
-        curr_spikes_df_window
-
-    """
-    spike_dataframe_changed_signal = QtCore.pyqtSignal() # signal emitted when the spike dataframe is changed, which might change the number of units, number of spikes, and other properties.
-    window_duration_changed_signal = QtCore.pyqtSignal() # more conservitive singal that only changes when the duration of the window changes
-    window_changed_signal = QtCore.pyqtSignal()
-    
-    @property
-    def active_windowed_df(self):
-        """The dataframe sliced to the current time window (active_time_window)"""
-        return self.df[self.df[self.df.spikes.time_variable_name].between(self.active_time_window[0], self.active_time_window[1])]
-
-    @property
-    def active_time_window(self):
-        """ a 2-element time window [start_time, end_time]"""
-        return [self.active_window_start_time, self.active_window_end_time]
-        
-    @property
-    def active_window_end_time(self):
-        """The active_window_end_time property."""
-        return (self.active_window_start_time + self.window_duration)
-        
-    @property
-    def active_window_num_spikes(self):
-        """The number of spikes (across all units) in the active window."""
-        return self.active_windowed_df.shape[0] 
-    
-    @property
-    def total_df_start_end_times(self):
-        """[earliest_df_time, latest_df_time]: The earliest and latest spiketimes in the total df """
-        earliest_df_time = np.nanmin(self.df[self.df.spikes.time_variable_name])
-        latest_df_time = np.nanmax(self.df[self.df.spikes.time_variable_name])
-        
-        df_timestamps = self.df[self.df.spikes.time_variable_name].to_numpy()
-        earliest_df_time = df_timestamps[0]
-        latest_df_time = df_timestamps[-1]
-        return [earliest_df_time, latest_df_time]
-            
-    ##### Get/Set Properties ####:
-    @property
-    def df(self):
-        """The df property."""
-        return self._df
-    @df.setter
-    def df(self, value):
-        self._df = value
-        self.spike_dataframe_changed_signal.emit()
-        
-    @property
-    def window_duration(self):
-        """The window_duration property."""
-        return self._window_duration
-    @window_duration.setter
-    def window_duration(self, value):
-        self._window_duration = value
-        self.window_duration_changed_signal.emit() # emit window duration changed signal
-        self.window_changed_signal.emit() # emit window changed signal
-        
-    @property
-    def active_window_start_time(self):
-        """The current start time of the sliding time window"""
-        return self._active_window_start_time
-    @active_window_start_time.setter
-    def active_window_start_time(self, value):
-        self._active_window_start_time = value
-        self.window_changed_signal.emit() # emit window changed signal
-    
-    def __init__(self, spikes_df, window_duration=15.0, window_start_time=0.0):
-        QtCore.QObject.__init__(self)
-        self._df = spikes_df
-        self._window_duration = window_duration
-        self._active_window_start_time = window_start_time
-        self.window_changed_signal.connect(self.on_window_changed)
-        
-    @QtCore.pyqtSlot(float)
-    def update_window_start(self, new_value):
-        self.active_window_start_time = new_value
-
-        
-    def on_window_changed(self):
-        print(f'SpikesDataframeWindow.on_window_changed(): window_changed_signal emitted. self.active_time_window: {self.active_time_window}')
-        
-        
-        
-        
 class SliderRunner(QtCore.QThread):
     update_signal = QtCore.pyqtSignal()
 
@@ -177,12 +80,10 @@ class Spike3DRaster(QtWidgets.QWidget):
     def n_cells(self):
         """The number_units property."""
         return len(self.unit_ids)
-    
     @property
     def n_half_cells(self):
         """ """
         return np.ceil(float(self.n_cells)/2.0)
-    
     @property
     def n_full_cell_grid(self):
         """ """
@@ -192,7 +93,6 @@ class Spike3DRaster(QtWidgets.QWidget):
     def render_window_duration(self):
         """ """
         return float(self.spikes_window.window_duration)
-    
     @property
     def half_render_window_duration(self):
         """ """
@@ -207,7 +107,13 @@ class Spike3DRaster(QtWidgets.QWidget):
         """The temporal_axis_length property."""
         return self.temporal_axis_length / 2.0
     
+    @property
+    def animation_time_step(self):
+        """ How much to step forward in time at each frame of animation. """
+        return (self.render_window_duration * 0.02) # each animation timestep is 2% of the render window duration
 
+
+    ######  Get/Set Properties ######:
     @property
     def temporal_zoom_factor(self):
         """The time dilation factor that maps spikes in the current window to x-positions along the time axis multiplicatively.
@@ -218,12 +124,6 @@ class Spike3DRaster(QtWidgets.QWidget):
     def temporal_zoom_factor(self, value):
         self._temporal_zoom_factor = value
         
-        
-    @property
-    def animation_time_step(self):
-        """ How much to step forward in time at each frame of animation. """
-        return (self.render_window_duration * 0.02) # each animation timestep is 2% of the render window duration
-
 
 
     def __init__(self, spikes_df, *args, window_duration=15.0, window_start_time=0.0, **kwargs):
@@ -259,10 +159,6 @@ class Spike3DRaster(QtWidgets.QWidget):
         
     def buildUI(self):
         self.ui = PhoUIContainer()
-        
-        # widget = QWidget()
-        # widget.setLayout(layout)
-        # self.setCentralWidget(widget)
         
         self.ui.layout = QtWidgets.QGridLayout()
         self.ui.layout.setContentsMargins(0, 0, 0, 0)
