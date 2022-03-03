@@ -218,10 +218,8 @@ class Spike3DRaster(QtWidgets.QWidget):
         self.spike_end_z = 0.1
         self.side_bin_margins = 1.0 # space to sides of the first and last cell on the y-axis
         # by default we want the time axis to approximately span -20 to 20. So we set the temporal_zoom_factor to 
-        self._temporal_zoom_factor = 40.0 / float(self.render_window_duration)
-        
-        self.enable_debug_print = True
-        
+        self._temporal_zoom_factor = 40.0 / float(self.render_window_duration)        
+        self.enable_debug_print = False
         
         self.app = pg.mkQApp("Spike3DRaster")
         
