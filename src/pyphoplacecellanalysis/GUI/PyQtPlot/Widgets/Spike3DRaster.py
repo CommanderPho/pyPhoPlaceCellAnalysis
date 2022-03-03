@@ -183,6 +183,7 @@ class Spike3DRaster(NeuronIdentityAccessingMixin, SpikeRenderingBaseMixin, Spike
         # by default we want the time axis to approximately span -20 to 20. So we set the temporal_zoom_factor to 
         self._temporal_zoom_factor = 40.0 / float(self.render_window_duration)        
         self.enable_debug_print = False
+        self.enable_debug_widgets = False
         
         if neuron_colors is None:
             # neuron_colors = [pg.mkColor((i, self.n_cells*1.3)) for i, cell_id in enumerate(self.unit_ids)]
@@ -306,13 +307,14 @@ class Spike3DRaster(NeuronIdentityAccessingMixin, SpikeRenderingBaseMixin, Spike
         # Add debugging widget:
         
         # Adds a helper widget that displays the x/y/z vector at the origin:
-        self.ui.ref_axes_indicator = GLDebugAxisItem()
-        self.ui.ref_axes_indicator.setSize(x=15.0, y=10.0, z=5.0)
-        w.addItem(self.ui.ref_axes_indicator)
-        
+        if self.enable_debug_widgets:
+            self.ui.ref_axes_indicator = GLDebugAxisItem()
+            self.ui.ref_axes_indicator.setSize(x=15.0, y=10.0, z=5.0)
+            w.addItem(self.ui.ref_axes_indicator)
+
+        # The 2D viewport overlay that contains text:
         self.ui.viewport_overlay = GLViewportOverlayPainterItem()
         w.addItem(self.ui.viewport_overlay)
-        
         # Update the additional display lines information on the overlay:
         self.ui.viewport_overlay.additional_overlay_text_lines = self.overlay_text_lines
                 
@@ -608,7 +610,6 @@ class Spike3DRaster(NeuronIdentityAccessingMixin, SpikeRenderingBaseMixin, Spike
         self._update_plots()
         self.shift_animation_frame_val(1)
         
-        
     def animation(self):
         timer = QtCore.QTimer()
         timer.timeout.connect(self.update)
@@ -630,19 +631,6 @@ class Spike3DRaster(NeuronIdentityAccessingMixin, SpikeRenderingBaseMixin, Spike
     #         v2_y = self.v2_y
     #     return ((v1_x * x) + (v2_x * y), (v1_y * x) + (v2_y * y))
 
-    # def set_spikes_data(self, curr_spikes_df):
-    #     unit_ids = np.unique(curr_spikes_df['unit_id'].to_numpy())
-    #     self.n_cells = len(unit_ids)
-    #     render_window_duration = 60.0 # in seconds, 1minute by default
-    #     spike_start_z = -10.0
-    #     spike_end_z = 0.1
-        
-    #     n_half_cells = np.ceil(float(self.n_cells)/2.0)
-    #     n_full_cell_grid = 2.0 * n_half_cells # could be one more than n
-    #     half_render_window_duration = np.ceil(float(render_window_duration)/2.0) # 10 by default
-        
-    #     print(f'plot_3d_raster_plot(...): unit_ids: {unit_ids}, n: {self.n_cells}')
-    
 # Start Qt event loop unless running in interactive mode.
 # if __name__ == '__main__':
 #     # v = Visualizer()
