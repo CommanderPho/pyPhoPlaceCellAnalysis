@@ -1,3 +1,4 @@
+from copy import deepcopy
 import time
 import sys
 import pyqtgraph as pg
@@ -5,6 +6,12 @@ from pyqtgraph.Qt import QtCore, QtGui, QtWidgets
 import pyqtgraph.opengl as gl # for 3D raster plot
 
 import numpy as np
+from matplotlib.colors import ListedColormap, to_hex # for neuron colors to_hex
+
+from neuropy.core.neuron_identities import NeuronIdentityAccessingMixin
+
+from pyphocorehelpers.DataStructure.general_parameter_containers import DebugHelper, VisualizationParameters
+from pyphoplacecellanalysis.General.Mixins.SpikesRenderingBaseMixin import SpikeRenderingBaseMixin, SpikesDataframeOwningMixin
 
 from pyphocorehelpers.indexing_helpers import interleave_elements, partition
 from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer
@@ -49,7 +56,7 @@ class SliderRunner(QtCore.QThread):
             
                 
 
-class Spike3DRaster(QtWidgets.QWidget):
+class Spike3DRaster(NeuronIdentityAccessingMixin, SpikeRenderingBaseMixin, SpikesDataframeOwningMixin, QtWidgets.QWidget):
     """ Displays a 3D version of a raster plot with the spikes occuring along a plane. 
     
     Usage:
@@ -112,7 +119,25 @@ class Spike3DRaster(QtWidgets.QWidget):
         """ How much to step forward in time at each frame of animation. """
         return (self.render_window_duration * 0.02) # each animation timestep is 2% of the render window duration
 
+    # from NeuronIdentityAccessingMixin
+    @property
+    def neuron_ids(self):
+        """ an alias for self.cell_ids required for NeuronIdentityAccessingMixin """
+        return self.cell_ids
 
+    @property
+    def cell_ids(self):
+        """ e.g. the list of valid cell_ids (unique aclu values) """
+        # return self.unit_ids
+        return np.unique(self.spikes_window.df['aclu'].to_numpy()) 
+    
+    # from SpikesDataframeOwningMixin
+    @property
+    def spikes_df(self):
+        """The spikes_df property."""
+        return self.spikes_window.df
+    
+    
     ######  Get/Set Properties ######:
     @property
     def temporal_zoom_factor(self):
@@ -126,18 +151,57 @@ class Spike3DRaster(QtWidgets.QWidget):
         
 
 
-    def __init__(self, spikes_df, *args, window_duration=15.0, window_start_time=0.0, **kwargs):
+    def __init__(self, spikes_df, *args, window_duration=15.0, window_start_time=0.0, neuron_colors=None, **kwargs):
         super(Spike3DRaster, self).__init__(*args, **kwargs)
         # Initialize member variables:
+        
+        # Helper container variables
+        self.params = VisualizationParameters('')
+        
         self.slidebar_val = 0
         self._spikes_window = SpikesDataframeWindow(spikes_df, window_duration=window_duration, window_start_time=window_start_time)
-        self.spike_start_z = -10.0
+        self.params.spike_start_z = -10.0
         # self.spike_end_z = 0.1
-        self.spike_end_z = -6.0
-        self.side_bin_margins = 1.0 # space to sides of the first and last cell on the y-axis
+        self.params.spike_end_z = -6.0
+        self.params.side_bin_margins = 1.0 # space to sides of the first and last cell on the y-axis
         # by default we want the time axis to approximately span -20 to 20. So we set the temporal_zoom_factor to 
         self._temporal_zoom_factor = 40.0 / float(self.render_window_duration)        
         self.enable_debug_print = False
+        
+        if neuron_colors is None:
+            # neuron_colors = [pg.mkColor((i, self.n_cells*1.3)) for i, cell_id in enumerate(self.unit_ids)]
+            neuron_colors = []
+            for i, cell_id in enumerate(self.unit_ids):
+                curr_color = pg.mkColor((i, self.n_cells*1.3))
+                curr_color.setAlphaF(0.5)
+                neuron_colors.append(curr_color)
+    
+        self.params.neuron_qcolors = deepcopy(neuron_colors)
+
+        # allocate new neuron_colors array:
+        self.params.neuron_colors = np.zeros((4, self.n_cells))
+        for i, curr_qcolor in enumerate(self.params.neuron_qcolors):
+            curr_color = curr_qcolor.getRgbF() # (1.0, 0.0, 0.0, 0.5019607843137255)
+            self.params.neuron_colors[:, i] = curr_color[:]
+            # self.params.neuron_colors[:, i] = curr_color[:]
+            
+        # self.params.neuron_colors = [self.params.neuron_qcolors[i].getRgbF() for i, cell_id in enumerate(self.unit_ids)] 
+        # self.params.neuron_colors = deepcopy(neuron_colors)
+        self.params.neuron_colors_hex = None
+        
+        # spike_raster_plt.params.neuron_colors[0].getRgbF() # (1.0, 0.0, 0.0, 0.5019607843137255)
+        
+        # get hex colors:
+        #  getting the name of a QColor with .name(QtGui.QColor.HexRgb) results in a string like '#ff0000'
+        #  getting the name of a QColor with .name(QtGui.QColor.HexArgb) results in a string like '#80ff0000' 
+        # self.params.neuron_colors_hex = [to_hex(self.params.neuron_colors[:,i], keep_alpha=False) for i, cell_id in enumerate(self.unit_ids)]
+        self.params.neuron_colors_hex = [self.params.neuron_qcolors[i].name(QtGui.QColor.HexRgb) for i, cell_id in enumerate(self.unit_ids)] 
+        
+        # included_cell_INDEXES = np.array([self.get_neuron_id_and_idx(neuron_id=an_included_cell_ID)[0] for an_included_cell_ID in self.spikes_df['aclu'].to_numpy()]) # get the indexes from the cellIDs
+        # self.spikes_df['cell_idx'] = included_cell_INDEXES.copy()
+        self.spikes_df['cell_idx'] = self.spikes_df['unit_id'].copy() # TODO: this is bad! The self.get_neuron_id_and_idx(...) function doesn't work!
+        
+        # self.setup_spike_rendering_mixin() # NeuronIdentityAccessingMixin
         
         self.app = pg.mkQApp("Spike3DRaster")
         
@@ -152,6 +216,7 @@ class Spike3DRaster(QtWidgets.QWidget):
         pg.setConfigOptions(antialias = True)
         pg.setConfigOption('background', "#1B1B1B")
         pg.setConfigOption('foreground', "#727272")
+        
         # build the UI components:
         self.buildUI()
         
@@ -297,8 +362,8 @@ class Spike3DRaster(QtWidgets.QWidget):
             
             # Z-positions:
             # z = curr_spike_t[np.arange(100)] # get the first 20 spikes for each
-            spike_bottom_zs = np.full_like(curr_x, self.spike_start_z)
-            spike_top_zs = np.full_like(curr_x, self.spike_end_z)
+            spike_bottom_zs = np.full_like(curr_x, self.params.spike_start_z)
+            spike_top_zs = np.full_like(curr_x, self.params.spike_end_z)
             curr_paired_spike_zs = np.squeeze(interleave_elements(np.atleast_2d(spike_bottom_zs).T, np.atleast_2d(spike_top_zs).T)) # alternating top and bottom z-positions
         
             # sp1 = gl.GLScatterPlotItem(pos=pos, size=size, color=color, pxMode=False)
@@ -399,8 +464,8 @@ class Spike3DRaster(QtWidgets.QWidget):
             curr_paired_x = np.squeeze(interleave_elements(np.atleast_2d(curr_x).T, np.atleast_2d(curr_x).T))        
             
             # Z-positions:
-            spike_bottom_zs = np.full_like(curr_x, self.spike_start_z)
-            spike_top_zs = np.full_like(curr_x, self.spike_end_z)
+            spike_bottom_zs = np.full_like(curr_x, self.params.spike_start_z)
+            spike_top_zs = np.full_like(curr_x, self.params.spike_end_z)
             curr_paired_spike_zs = np.squeeze(interleave_elements(np.atleast_2d(spike_bottom_zs).T, np.atleast_2d(spike_top_zs).T)) # alternating top and bottom z-positions
         
             # Build lines:
