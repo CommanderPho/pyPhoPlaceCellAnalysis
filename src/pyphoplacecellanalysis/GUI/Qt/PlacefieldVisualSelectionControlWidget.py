@@ -19,6 +19,15 @@ from pyphoplacecellanalysis.PhoPositionalData.plotting.mixins.general_plotting_m
 class PlacefieldVisualSelectionWidget(QtWidgets.QWidget):
     """docstring for PlacefieldVisualSelectionWidget."""
  
+    # spike_config_changed = QtCore.pyqtSignal(list, list, bool) # change_unit_spikes_included(self, cell_IDXs=None, cell_IDs=None, are_included=True)
+    # tuning_curve_display_config_changed = QtCore.pyqtSignal(list, list) # on_update_tuning_curve_display_config(self, updated_config_indicies, updated_configs)
+    
+    spike_config_changed = QtCore.pyqtSignal(bool) # change_unit_spikes_included(self, cell_IDXs=None, cell_IDs=None, are_included=True)
+    tuning_curve_display_config_changed = QtCore.pyqtSignal(list) # on_update_tuning_curve_display_config(self, updated_config_indicies, updated_configs)
+    
+    # update_signal = QtCore.pyqtSignal(list, list, float, float, list, list, list, list)
+    # finish_signal = QtCore.pyqtSignal(float, float)
+    
     def __init__(self, *args, **kwargs):
         super(PlacefieldVisualSelectionWidget, self).__init__(*args, **kwargs)
         self.ui = Ui_rootForm()
@@ -43,6 +52,8 @@ class PlacefieldVisualSelectionWidget(QtWidgets.QWidget):
     @QtCore.pyqtSlot(bool)
     def togglePlacefieldVisibility(self, value):
         print(f'_on_toggle_plot_visible_changed(value: {value})')
+        self.tuning_curve_display_config_changed.emit([self.config_from_state()]) # emit signal
+        
         if self._callbacks is not None:
             self._callbacks['pf'](self.config_from_state()) # get the config from the updated state
             # self._callbacks(self.config_from_state()) # get the config from the updated state
@@ -53,6 +64,8 @@ class PlacefieldVisualSelectionWidget(QtWidgets.QWidget):
     @QtCore.pyqtSlot(bool)
     def toggleSpikeVisibility(self, value):
         print(f'_on_toggle_spikes_visible_changed(value: {value})')
+        self.spike_config_changed.emit(bool(self.spikesVisible)) # emit signal
+        
         if self._callbacks is not None:
             updated_config = self.spikesVisible
             self._callbacks['spikes'](bool(self.spikesVisible)) # get the config from the updated state
