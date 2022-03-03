@@ -9,9 +9,9 @@ import numpy as np
 import pandas as pd
 from pathlib import Path
 
-from PhoPositionalData.load_exported import import_mat_file
-# from PhoPositionalData.process_data import process_positionalAnalysis_data, gen_2d_histrogram, get_heatmap_color_vectors, process_chunk_equal_poritions_data, extract_spike_timeseries
-from PhoPositionalData.process_data import process_positionalAnalysis_data, extract_spike_timeseries
+from pyphoplacecellanalysis.PhoPositionalData.load_exported import import_mat_file
+# from pyphoplacecellanalysis.PhoPositionalData.process_data import process_positionalAnalysis_data, gen_2d_histrogram, get_heatmap_color_vectors, process_chunk_equal_poritions_data, extract_spike_timeseries
+from pyphoplacecellanalysis.PhoPositionalData.process_data import process_positionalAnalysis_data, extract_spike_timeseries
 
 
 def build_spike_positions_list(spike_list, t, x, y):

@@ -2,7 +2,7 @@ import param
 import numpy as np
 import pandas as pd
 
-from PhoPositionalData.plotting.mixins.general_plotting_mixins import NeuronConfigOwningMixin, OptionsListMixin
+from pyphoplacecellanalysis.PhoPositionalData.plotting.mixins.general_plotting_mixins import NeuronConfigOwningMixin, OptionsListMixin
 from neuropy.core.neuron_identities import NeuronIdentityAccessingMixin
 
 

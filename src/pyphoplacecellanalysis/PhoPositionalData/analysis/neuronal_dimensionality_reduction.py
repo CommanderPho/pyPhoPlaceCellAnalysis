@@ -11,7 +11,7 @@ def runAnalysis_PCAandICA(active_session_Neurons, bin_size=0.250, frate_thresh=0
     
     Usage:
         should_show_2D_ICA_plots = False
-        from PhoPositionalData.analysis.neuronal_dimensionality_reduction import runAnalysis_PCAandICA
+        from pyphoplacecellanalysis.PhoPositionalData.analysis.neuronal_dimensionality_reduction import runAnalysis_PCAandICA
         active_session_ensembles, template, zsc_template, pca_data = runAnalysis_PCAandICA(active_epoch_session.neurons, bin_size=0.250, frate_thresh=0.1, should_plot=should_show_2D_ICA_plots, active_cells_colormap=active_config.plotting_config.active_cells_colormap)
 
     """

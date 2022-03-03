@@ -23,7 +23,7 @@ from matplotlib.cm import hsv
 
 import ipywidgets as widgets
 
-from PhoPositionalData.process_data import get_filtered_window
+from pyphoplacecellanalysis.PhoPositionalData.process_data import get_filtered_window
 
 
 def get_cmap(n, name='hsv'):

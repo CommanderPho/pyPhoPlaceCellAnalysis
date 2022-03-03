@@ -4,9 +4,9 @@ import numpy as np
 import pandas as pd
 import pyvista as pv
 
-from PhoPositionalData.analysis.helpers import partition
-from PhoPositionalData.plotting.mixins.general_plotting_mixins import NeuronConfigOwningMixin
-from PhoPositionalData.plotting.spikeAndPositions import build_active_spikes_plot_data_df
+from pyphoplacecellanalysis.PhoPositionalData.analysis.helpers import partition
+from pyphoplacecellanalysis.PhoPositionalData.plotting.mixins.general_plotting_mixins import NeuronConfigOwningMixin
+from pyphoplacecellanalysis.PhoPositionalData.plotting.spikeAndPositions import build_active_spikes_plot_data_df
 
 from pyphocorehelpers.indexing_helpers import safe_get
 

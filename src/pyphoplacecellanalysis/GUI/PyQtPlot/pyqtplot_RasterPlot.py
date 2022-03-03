@@ -9,7 +9,7 @@ from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer
 
 
 # Windowing helpers for spikes_df:
-from PhoPositionalData.plotting.visualization_window import VisualizationWindow # Used to build "Windows" into the data points such as the window defining the fixed time period preceeding the current time where spikes had recently fired, etc.
+from pyphoplacecellanalysis.PhoPositionalData.plotting.visualization_window import VisualizationWindow # Used to build "Windows" into the data points such as the window defining the fixed time period preceeding the current time where spikes had recently fired, etc.
 from numpy.lib.stride_tricks import sliding_window_view
 
 # from PyQt5.QtWidgets import QApplication, QWidget, QPushButton, QGridLayout, QHBoxLayout, QSlider, QCheckBox 

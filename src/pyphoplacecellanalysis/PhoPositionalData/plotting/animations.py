@@ -9,7 +9,7 @@ import pyvistaqt as pvqt
 import numpy as np
 from pathlib import Path
 
-# from PhoPositionalData.plotting.animations import * # make_mp4_from_plotter
+# from pyphoplacecellanalysis.PhoPositionalData.plotting.animations import * # make_mp4_from_plotter
 
 ## For animation/movie creation, see:
 # https://github.com/pyvista/pyvista-support/issues/81

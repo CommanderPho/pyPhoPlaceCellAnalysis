@@ -1,9 +1,9 @@
 import param
 import panel as pn
 from panel.viewable import Viewer
-from PhoPositionalData.plotting.mixins.general_plotting_mixins import SingleNeuronPlottingExtended
+from pyphoplacecellanalysis.PhoPositionalData.plotting.mixins.general_plotting_mixins import SingleNeuronPlottingExtended
 
-from PhoPositionalData.plotting.mixins.placefield_plotting_mixins import ActivePlacefieldsPlotting
+from pyphoplacecellanalysis.PhoPositionalData.plotting.mixins.placefield_plotting_mixins import ActivePlacefieldsPlotting
 
 
 def build_single_placefield_output_panel(render_config):

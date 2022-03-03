@@ -8,14 +8,14 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.collections import LineCollection, BrokenBarHCollection
 from matplotlib.colors import ListedColormap, BoundaryNorm
-from PhoPositionalData.plotting.spikeAndPositions import _build_flat_arena_data, build_active_spikes_plot_data, perform_plot_flat_arena
+from pyphoplacecellanalysis.PhoPositionalData.plotting.spikeAndPositions import _build_flat_arena_data, build_active_spikes_plot_data, perform_plot_flat_arena
 from PhoGui.InteractivePlotter.LapsVisualizationMixin import LapsVisualizationMixin
 from PhoGui.PhoCustomVtkWidgets import PhoWidgetHelper
 import pyvista as pv
 import pyvistaqt as pvqt
 
 """ 
-from PhoPositionalData.plotting.laps import plot_lap_trajectories_2d
+from pyphoplacecellanalysis.PhoPositionalData.plotting.laps import plot_lap_trajectories_2d
 # Complete Version:
 fig, axs, laps_pages = plot_lap_trajectories_2d(sess, curr_num_subplots=len(sess.laps.lap_id), active_page_index=0)
 # Paginated Version:

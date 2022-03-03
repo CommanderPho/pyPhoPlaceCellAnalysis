@@ -4,7 +4,7 @@ from matplotlib.backends.backend_pdf import PdfPages
 import matplotlib.pyplot as plt
 from sklearn.preprocessing import minmax_scale
 
-from PhoPositionalData.plotting.saving import save_to_multipage_pdf
+from pyphoplacecellanalysis.PhoPositionalData.plotting.saving import save_to_multipage_pdf
 
 def plot_placefield_tuning_curve(xbin_centers, tuning_curve, ax, is_horizontal=False, color='g'):
     """ Plots the 1D Normalized Tuning Curve in a 2D Plot

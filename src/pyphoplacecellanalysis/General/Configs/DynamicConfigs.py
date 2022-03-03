@@ -1,4 +1,4 @@
-# from PhoPositionalData.analysis.interactive_placeCell_config import InteractivePlaceCellConfig, PlottingConfig
+# from pyphoplacecellanalysis.PhoPositionalData.analysis.interactive_placeCell_config import InteractivePlaceCellConfig, PlottingConfig
 
 from pathlib import Path
 from pyphocorehelpers.DataStructure.dynamic_parameters import DynamicParameters

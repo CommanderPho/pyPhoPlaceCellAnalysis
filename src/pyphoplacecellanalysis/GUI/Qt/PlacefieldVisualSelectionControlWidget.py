@@ -11,8 +11,8 @@ from pyqtgraph.Qt import QtCore, QtGui, QtWidgets, mkQApp
 from .PlacefieldVisualSelectionWidgetBase import Ui_rootForm # Generated file from .ui
 
 # For compatibility with the panel ui version:
-# from PhoPositionalData.plotting.mixins.general_plotting_mixins import SingleNeuronPlottingExtended
-from PhoPositionalData.plotting.mixins.general_plotting_mixins import SingleNeuronPlottingExtended
+# from pyphoplacecellanalysis.PhoPositionalData.plotting.mixins.general_plotting_mixins import SingleNeuronPlottingExtended
+from pyphoplacecellanalysis.PhoPositionalData.plotting.mixins.general_plotting_mixins import SingleNeuronPlottingExtended
 
 
 

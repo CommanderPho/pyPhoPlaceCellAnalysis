@@ -1,4 +1,4 @@
-from PhoPositionalData.analysis.interactive_placeCell_config import build_configs # TODO: should be replaced by a better and internal config
+from pyphoplacecellanalysis.PhoPositionalData.analysis.interactive_placeCell_config import build_configs # TODO: should be replaced by a better and internal config
 
 
 class FilterablePipelineStage:

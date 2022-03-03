@@ -1,8 +1,8 @@
 # occupancy_plotting_mixins.py
 # from PhoGui.InteractivePlotter.shared_helpers import PlotGroupWrapper
 import param
-from PhoPositionalData.plotting.graphs import plot_3d_binned_bars, plot_point_labels
-from PhoPositionalData.plotting.mixins.general_plotting_mixins import BasePlotDataParams
+from pyphoplacecellanalysis.PhoPositionalData.plotting.graphs import plot_3d_binned_bars, plot_point_labels
+from pyphoplacecellanalysis.PhoPositionalData.plotting.mixins.general_plotting_mixins import BasePlotDataParams
 
 
 class OccupancyPlottingConfig(BasePlotDataParams):
