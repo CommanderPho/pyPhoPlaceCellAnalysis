@@ -49,7 +49,7 @@ class SpikeRenderingMixin:
             self.find_rows_matching_cell_IDXs(self, cell_IDXs)
             self.find_rows_matching_cell_ids(self, cell_ids)
     """
-    debug_logging = False
+    debug_logging = True
     spike_geom_cone = pv.Cone(direction=(0.0, 0.0, -1.0), height=10.0, radius=0.2) # The spike geometry that is only displayed for a short while after the spike occurs
     
     def plot_spikes(self):
@@ -202,7 +202,7 @@ class SpikeRenderingMixin:
 
 class HideShowSpikeRenderingMixin:
     """ Implementors present spiking data with the option to hide/show/etc some of the outputs interactively. """    
-    debug_logging = False
+    debug_logging = True
         
     @property
     def spike_exclusion_mask(self):
