@@ -220,6 +220,13 @@ class Spike3DRaster(QtWidgets.QWidget):
         self.app = pg.mkQApp("Spike3DRaster")
         
         # Configure pyqtgraph config:
+        try:
+            import OpenGL
+            pg.setConfigOption('useOpenGL', True)
+            pg.setConfigOption('enableExperimental', True)
+        except Exception as e:
+            print(f"Enabling OpenGL failed with {e}. Will result in slow rendering. Try installing PyOpenGL.")
+            
         pg.setConfigOptions(antialias = True)
         pg.setConfigOption('background', "#1B1B1B")
         pg.setConfigOption('foreground', "#727272")
