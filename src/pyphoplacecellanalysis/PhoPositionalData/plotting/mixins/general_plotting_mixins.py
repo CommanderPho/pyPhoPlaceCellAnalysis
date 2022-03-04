@@ -19,7 +19,13 @@ class OptionsListMixin:
     
     
 class NeuronConfigOwningMixin:
-    """ Implementors own a series of visual configurations for each neuron. """
+    """ Implementors own a series of visual configurations for each neuron.
+    
+    Requirements:
+        self.params.pf_active_configs
+        self.params.pf_colors_hex
+        
+    """
     debug_logging = False
     
     @property

@@ -3,8 +3,6 @@ import panel as pn
 from panel.viewable import Viewer
 from pyphoplacecellanalysis.PhoPositionalData.plotting.mixins.general_plotting_mixins import SingleNeuronPlottingExtended
 
-from pyphoplacecellanalysis.PhoPositionalData.plotting.mixins.placefield_plotting_mixins import ActivePlacefieldsPlotting
-
 
 def build_single_placefield_output_panel(render_config):
     """ An alternative to the whole SingleEditablePlacefieldDisplayConfiguration implementation """
@@ -153,108 +151,6 @@ def build_all_placefield_output_panels(ipcDataExplorer):
     out_panels = pn.Row(*out_panels, height=120)
     return out_panels
 
-
-
-class ActivePlacefieldsPlottingPanel(ActivePlacefieldsPlotting):
-    ## TODO: not used
-    """ Draws a selector for the active placefields to plot using two adjacent list controls.
-    Usage:
-        active_new_pf_panel = ActivePlacefieldsPlottingPanel(np.arange(ipcDataExplorer.num_tuning_curve_plot_actors), ipcDataExplorer.visible_tuning_curve_indicies)
-        active_new_pf_panel.panel()
-    """
-    
-    should_update_on_value_change = True
-    
-    def __init__(self, pf_option_indicies, pf_option_selected_values, num_pfs=None, update_included_cell_Indicies_callback=None, **params):
-        # super(ActivePlacefieldsPlottingPanel, self).__init__(num_pfs=num_pfs, **params)
-        super(ActivePlacefieldsPlottingPanel, self).__init__(**params)
-        self.final_update_included_cell_Indicies_callback = None
-        if update_included_cell_Indicies_callback is not None:
-            if callable(update_included_cell_Indicies_callback):
-                self.final_update_included_cell_Indicies_callback = update_included_cell_Indicies_callback
-        
-        assert (self.final_update_included_cell_Indicies_callback is not None), "An update_included_cell_Indicies_callback(x) callback is needed."
-                
-        if pf_option_indicies is not None:
-            self.pf_option_indicies = pf_option_indicies
-            self.num_pfs = len(pf_option_indicies)
-        else:
-            self.pf_option_indicies = np.arange(num_pfs)
-            self.num_pfs = num_pfs
-        if pf_option_selected_values is not None:
-            self.pf_option_selected_values = pf_option_selected_values
-        else:
-            self.pf_option_selected_values = []
-
-    def on_hide_all_placefields(self):
-        print('on_hide_all_placefields()')
-        self.pf_option_selected_values = []
-        self.final_update_included_cell_Indicies_callback([])
-
-    def on_update_active_placefields(self, updated_pf_indicies):
-        print(f'on_update_active_placefields({updated_pf_indicies})')
-        self.pf_option_selected_values = updated_pf_indicies
-        self.final_update_included_cell_Indicies_callback(updated_pf_indicies)
-
-    def btn_hide_all_callback(self, event):
-        print('btn_hide_all_callback(...)')
-        self.on_hide_all_placefields()
-
-    def btn_update_active_placefields(self, event):
-        print('btn_update_active_placefields(...)')
-        updated_pf_options_list_ints = ActivePlacefieldsPlottingPanel.options_to_int(self.cross_selector.value) # convert to ints
-        self.on_update_active_placefields(updated_pf_options_list_ints)
-
-    def index_selection_changed_callback(self, *events):
-        # print(events)
-        for event in events:
-            if event.name == 'options':
-                self.selections.object = 'Possible options: %s' % ', '.join(event.new)
-                self.pf_option_indicies = ActivePlacefieldsPlottingPanel.options_to_int(event.new) # convert to ints
-                self.num_pfs = len(self.pf_option_indicies)
-
-            elif event.name == 'value':
-                if ActivePlacefieldsPlottingPanel.should_update_on_value_change:
-                    updated_pf_options_list_ints = ActivePlacefieldsPlottingPanel.options_to_int(event.new) # convert to ints
-                    self.on_update_active_placefields(updated_pf_options_list_ints)
-                self.selected.object = 'Selected: %s' % ','.join(event.new)
-
-    def panel(self):
-        # Panel pane and widget objects:
-        self.selections = pn.pane.Markdown(object='')
-        self.selected = pn.pane.Markdown(object='')
-        self.cross_selector = pn.widgets.CrossSelector(name='Active Placefields', value=[], options=['0', '1', '2'], height=600, width=200) # cross_selector.value
-
-        # Action Buttons:
-        self.button_hide_all = pn.widgets.Button(name='Hide All Placefields')
-        self.button_hide_all.on_click(self.btn_hide_all_callback)
-        self.button_update = pn.widgets.Button(name='Update Active Placefields', button_type='primary')
-        self.button_update.on_click(self.btn_update_active_placefields)
-
-        self.watcher = self.cross_selector.param.watch(self.index_selection_changed_callback, ['options', 'value'], onlychanged=False)
-        # set initial
-        # active_new_pf_panel.set_initial(self.num_pfs, [0, 1, 5])
-        self.set_initial(self.pf_option_indicies, self.pf_option_selected_values, num_pfs=self.num_pfs)
-
-        return pn.Column(pn.Row(self.cross_selector, width=200, height=600),
-                         pn.Spacer(width=200, height=10),
-                         self.selections,
-                         pn.Spacer(width=200, height=10),
-                         self.selected,
-                         pn.Spacer(width=200, height=20),
-                         pn.Row(self.button_hide_all, self.button_update)
-                        )
-
-    def set_initial(self, option_values, selected_values, num_pfs=None):
-        # set initial
-        if option_values is None:
-            pf_options_list_ints, pf_options_list_strings = ActivePlacefieldsPlotting.build_pf_options_list(num_pfs)
-        else:
-            pf_options_list_strings = ActivePlacefieldsPlottingPanel.options_to_str(option_values)
-        options = pf_options_list_strings
-        # selected_values = [str(an_item) for an_item in selected_values]
-        selected_values = ActivePlacefieldsPlottingPanel.options_to_str(selected_values)
-        self.cross_selector.param.set_param(options=dict(zip(options, options)), value=selected_values)
 
 
 

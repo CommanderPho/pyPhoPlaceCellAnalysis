@@ -7,7 +7,16 @@ from neuropy.core.neuron_identities import NeuronIdentityAccessingMixin
 
 
 class PlacefieldOwningMixin(NeuronIdentityAccessingMixin, NeuronConfigOwningMixin):
-    """ Implementor owns placefields and has access to their data and configuration objects """
+    """ Implementor owns placefields and has access to their data and configuration objects
+    
+    TODO: remember that Placefields should be a subset of the neuron identities.
+    
+    Requires:
+        self.params.active_epoch_placefields
+        self.placefields.ratemap
+        self.ratemap.normalized_tuning_curves
+    
+    """
     debug_logging = False
     
     @property
@@ -61,7 +70,16 @@ class PlacefieldOwningMixin(NeuronIdentityAccessingMixin, NeuronConfigOwningMixi
 
     
 class HideShowPlacefieldsRenderingMixin(PlacefieldOwningMixin):
-    """ Implementor Visually Displays Placefield data and enables basic interactivity for it. """
+    """ Implementor Visually Displays Placefield data and enables basic interactivity for it.
+    
+    
+    Requirements:
+        self.plots['tuningCurvePlotActors']
+    
+        From PlacefieldOwningMixin:
+            self.active_tuning_curve_render_configs
+    
+    """
     debug_logging = False
         
     @property
@@ -127,57 +145,14 @@ class HideShowPlacefieldsRenderingMixin(PlacefieldOwningMixin):
             
         
     def update_tuning_curve_configs(self):
+        """ update the configs from the actual actors' state """
         for i, aTuningCurveActor in enumerate(self.tuning_curve_plot_actors):
             self.active_tuning_curve_render_configs[i].isVisible = bool(aTuningCurveActor.GetVisibility())
             
     def apply_tuning_curve_configs(self):
+        """ update the actual actors from the configs """
         for i, aTuningCurveActor in enumerate(self.tuning_curve_plot_actors):
             aTuningCurveActor.SetVisibility(int(self.active_tuning_curve_render_configs[i].isVisible))
 
 
-
-
-        
-        
-class ActivePlacefieldsPlotting(OptionsListMixin, param.Parameterized):
-    """ """
-    # _on_hide_all_placefields = lambda x: print(f'_on_hide_all_placefields({x})')
-    # _on_update_active_placefields = lambda x: print(f'_on_update_active_placefields({x})')
-    
-    # pf_options_list_ints, pf_options_list_strings = ActivePlacefieldsPlotting.build_pf_options_list(40)
-
-    # curr_active_pf_idx_list_label = param.Parameter(default="[]", constant=True)
-    curr_active_pf_idx_list_label = param.Parameter(default="[]", constant=False)
-    active_pf_idx_list = param.ListSelector(default=[], objects= ['0', '1', '2'], precedence=0.5)
-    dictionary = param.Dict(default={"a": 2, "b": 9})
-    
-    # hide_all_action = param.Action(lambda selected_indicies: self.on_hide_all_placefields(), doc="""Hide All Placefields.""", precedence=0.7)
-    # update_action = param.Action(lambda selected_indicies: self.on_update_active_placefields([int(an_idx) for an_idx in selected_indicies]), doc="""Update Placefield Visibility.""", precedence=0.7)
-    # active_pf_idx_list = pn.widgets.CrossSelector(name='Active Placefields', value=[], options=pf_options_list_strings) # cross_selector.value
-    
-    
-    def __init__(self, **params):
-        super(ActivePlacefieldsPlotting, self).__init__(**params)
-       
-    def on_hide_all_placefields(self):
-        print('on_hide_all_placefields()')
-        # lambda x: print(f'_on_hide_all_placefields({x})')
-
-    def on_update_active_placefields(self, updated_pf_indicies):
-        print(f'on_update_active_placefields({updated_pf_indicies})')
- 
-    # def index_selection_changed_callback(self, *events):
-    #     print(events)
-    #     for event in events:
-    #         if event.name == 'options':
-    #             self.selections.object = 'Possible options: %s' % ', '.join(event.new)
-    #         elif event.name == 'value':
-    #             self.selected.object = 'Selected: %s' % ','.join(event.new)
-  
-    @param.depends('active_pf_idx_list', watch=True)
-    def _update_curr_active_pf_idx_list_label(self):        
-        flat_updated_idx_list_string = ','.join(self.active_pf_idx_list)
-        flat_updated_idx_list_string = f'[{flat_updated_idx_list_string}]'
-        print('flat_updated_idx_list_string: {flat_updated_idx_list_string}')
-        self.curr_active_pf_idx_list_label = flat_updated_idx_list_string
 
