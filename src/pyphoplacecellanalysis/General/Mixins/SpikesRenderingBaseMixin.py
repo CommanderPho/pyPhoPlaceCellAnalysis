@@ -2,7 +2,7 @@ from typing import OrderedDict
 import numpy as np
 import pandas as pd
 
-# from PhoPositionalData.plotting.mixins.spikes_mixins import SpikesDataframeOwningMixin, SpikeRenderingMixin, HideShowSpikeRenderingMixin
+# from pyphoplacecellanalysis.PhoPositionalData.plotting.mixins.spikes_mixins import SpikesDataframeOwningMixin, SpikeRenderingMixin, HideShowSpikeRenderingMixin
 from pyphocorehelpers.indexing_helpers import safe_get
 
 class SpikesDataframeOwningMixin:

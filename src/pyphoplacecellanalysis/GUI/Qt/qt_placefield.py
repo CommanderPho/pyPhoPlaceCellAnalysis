@@ -1,5 +1,6 @@
 # TODO: Implement the functionality present in panel_placefield.py for the new PlacefieldVisualSelectionWidget Qt widget.
 
+from functools import partial
 import numpy as np
 
 import pyqtgraph as pg
@@ -38,7 +39,12 @@ def build_single_placefield_output_widget(render_config):
 
 
 def build_all_placefield_output_panels(ipcDataExplorer):
-    """ Builds the row of custom SingleEditablePlacefieldDisplayConfiguration widgets for each placecell that allow configuring their display """
+    """ Builds the row of custom SingleEditablePlacefieldDisplayConfiguration widgets for each placecell that allow configuring their display
+    
+    TODO: can't get signals working unfortunately. https://stackoverflow.com/questions/45090982/passing-extra-arguments-through-connect
+    https://eli.thegreenplace.net/2011/04/25/passing-extra-arguments-to-pyqt-slot
+    
+    """
     # out_panels = SingleEditablePlacefieldDisplayConfiguration.build_all_placefield_output_panels(ipcDataExplorer.active_tuning_curve_render_configs,
     #                                                                                              tuning_curve_config_changed_callback=ipcDataExplorer.on_update_tuning_curve_display_config,
     #                                                                                              spikes_config_changed_callback=ipcDataExplorer.change_unit_spikes_included)
@@ -56,11 +62,37 @@ def build_all_placefield_output_panels(ipcDataExplorer):
     
     pf_widgets = []
     # the active_tuning_curve_render_configs are an array of SingleNeuronPlottingExtended objects, one for each placefield
-    for a_config in ipcDataExplorer.active_tuning_curve_render_configs:
+    for (idx, a_config) in enumerate(ipcDataExplorer.active_tuning_curve_render_configs):
         curr_widget = build_single_placefield_output_widget(a_config)
         # TODO: Set the signals here:
-            # ipcDataExplorer.on_update_tuning_curve_display_config
-            # ipcDataExplorer.change_unit_spikes_included
+        """ 
+        obj.signal.connect(lambda param1, param2, ..., arg1=val1, arg2= value2, ... : fun(param1, param2,... , arg1, arg2, ....))
+        
+        def fun(param1, param2,... , arg1, arg2, ....):
+            [...]
+            
+        where:
+            param1, param2, ... : are the parameters sent by the signal
+            arg1, arg2, ...: are the extra parameters that you want to spend
+
+        """
+        # curr_widget.spike_config_changed.connect(ipcDataExplorer.change_unit_spikes_included)
+        # curr_widget.tuning_curve_display_config_changed.connect(ipcDataExplorer.on_update_tuning_curve_display_config)
+        
+        # current signals:
+        # spike_config_changed = QtCore.pyqtSignal(bool) # change_unit_spikes_included(self, cell_IDXs=None, cell_IDs=None, are_included=True)
+        # tuning_curve_display_config_changed = QtCore.pyqtSignal(list) # on_update_tuning_curve_display_config(self, updated_config_indicies, updated_configs)
+    
+        # curr_widget.spike_config_changed.connect(lambda are_included_list, cell_IDXs=val1, arg2= value2, ... : ipcDataExplorer.change_unit_spikes_included(param1, param2,... , arg1, arg2, ....) )
+        # curr_widget.tuning_curve_display_config_changed.connect(lambda are_included, i_copy=idx: spikes_config_changed_callback(cell_IDXs=[i_copy], cell_IDs=None, are_included=are_included)
+        
+        curr_widget.spike_config_changed.connect(lambda are_included, spikes_config_changed_callback=ipcDataExplorer.change_unit_spikes_included, i_copy=idx: spikes_config_changed_callback(cell_IDXs=[i_copy], cell_IDs=None, are_included=are_included))
+        curr_widget.tuning_curve_display_config_changed.connect(lambda updated_config_copy=a_config, i_copy=idx, tuning_curve_config_changed_callback=ipcDataExplorer.on_update_tuning_curve_display_config: tuning_curve_config_changed_callback([i_copy], [updated_config_copy]))
+                                 
+        # partial(self.on_button, 1), i_copy=idx
+        # cell_IDXs=None, cell_IDs=None
+        # ipcDataExplorer.on_update_tuning_curve_display_config
+        # ipcDataExplorer.change_unit_spikes_included
         pf_layout.addWidget(curr_widget)
         pf_widgets.append(curr_widget)
         
