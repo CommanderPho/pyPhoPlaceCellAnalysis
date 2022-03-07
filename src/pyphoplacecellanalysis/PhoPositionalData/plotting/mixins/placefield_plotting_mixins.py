@@ -2,9 +2,23 @@ import param
 import numpy as np
 import pandas as pd
 
+from pyqtgraph.Qt import QtCore
+
 from pyphoplacecellanalysis.PhoPositionalData.plotting.mixins.general_plotting_mixins import NeuronConfigOwningMixin, OptionsListMixin
 from neuropy.core.neuron_identities import NeuronIdentityAccessingMixin
 
+
+
+class RenderItemsConfiguration(QtCore.QObject):
+    """docstring for RenderItemsConfiguration."""
+    def __init__(self, arg, **kwargs):
+        QtCore.QObject.__init__(self, **kwargs)
+        
+        # super(RenderItemsConfiguration, self).__init__()
+    
+    # SignalProxy
+    
+    
 
 class PlacefieldOwningMixin(NeuronIdentityAccessingMixin, NeuronConfigOwningMixin):
     """ Implementor owns placefields and has access to their data and configuration objects

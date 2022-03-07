@@ -45,9 +45,10 @@ class SpikesDataframeOwningMixin:
 class SpikeRenderingMixin:
     """ Implementors render spikes from neural data in 3D 
         Requires:
-            self.spikes_df
-            self.find_rows_matching_cell_IDXs(self, cell_IDXs)
-            self.find_rows_matching_cell_ids(self, cell_ids)
+            From SpikesDataframeOwningMixin:
+                self.spikes_df
+                self.find_rows_matching_cell_IDXs(self, cell_IDXs)
+                self.find_rows_matching_cell_ids(self, cell_ids)
     """
     debug_logging = True
     spike_geom_cone = pv.Cone(direction=(0.0, 0.0, -1.0), height=10.0, radius=0.2) # The spike geometry that is only displayed for a short while after the spike occurs
@@ -189,6 +190,8 @@ class SpikeRenderingMixin:
                 'cell_idx', 'rgb_hex','R','G','B'
             
         """
+        # Hopefully self.get_neuron_id_and_idx(...) has access to all the cell info and not just those with active placefields.
+        # if self.spikes_df.columns
         included_cell_INDEXES = np.array([self.get_neuron_id_and_idx(neuron_id=an_included_cell_ID)[0] for an_included_cell_ID in self.spikes_df['aclu'].to_numpy()]) # get the indexes from the cellIDs
         self.spikes_df['cell_idx'] = included_cell_INDEXES.copy()
         # flat_spike_hex_colors = np.array(flat_spike_hex_colors)
@@ -213,6 +216,10 @@ class HideShowSpikeRenderingMixin:
         self.active_session.spikes_df['render_exclusion_mask'] = value    
     
     def setup_hide_show_spike_rendering_mixin(self):
+        """ 
+        # Adds columns to self.active_session.spikes_df:
+            'render_opacity', 'render_exclusion_mask'
+        """
         self.active_session.spikes_df['render_opacity'] = 0.0 # Initialize all spikes to 0.0 opacity, meaning they won't be rendered.
         self.active_session.spikes_df['render_exclusion_mask'] = False # all are included (not in the exclusion mask) to begin. This does not mean that they will be visible because 'render_opacity' is still set to zero.
         
