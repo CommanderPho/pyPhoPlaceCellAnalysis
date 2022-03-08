@@ -10,7 +10,7 @@ import numpy as np
 
 # pyPhoPlaceCellAnalysis:
 from pyphoplacecellanalysis.General.NonInteractiveWrapper import NonInteractiveWrapper
-from pyphoplacecellanalysis.GUI.PyQtPlot.Flowchart.CustomNodes.ExtendedCtrlNode import ExtendedCtrlNode
+from pyphoplacecellanalysis.GUI.PyQtPlot.Flowchart.CustomNodes.MiscNodes.ExtendedCtrlNode import ExtendedCtrlNode
 
 
 class PipelineFilteringDataNode(ExtendedCtrlNode):

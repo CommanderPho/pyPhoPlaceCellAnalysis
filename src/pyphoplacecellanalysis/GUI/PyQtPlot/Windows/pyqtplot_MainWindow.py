@@ -15,10 +15,10 @@ import os
 from pyphoplacecellanalysis.GUI.PyQtPlot.Windows.pyqtplot_SecondaryWindow import PhoPipelineSecondaryWindow
 
 # Import the custom nodes:
-from pyphoplacecellanalysis.GUI.PyQtPlot.Flowchart.CustomNodes.ImageViewNode import ImageViewNode
-from pyphoplacecellanalysis.GUI.PyQtPlot.Flowchart.CustomNodes.UnsharpMaskNode import UnsharpMaskNode
-from pyphoplacecellanalysis.GUI.PyQtPlot.Flowchart.CustomNodes.PipelineInputDataNode import PipelineInputDataNode
-from pyphoplacecellanalysis.GUI.PyQtPlot.Flowchart.CustomNodes.PipelineFilteringDataNode import PipelineFilteringDataNode
+from pyphoplacecellanalysis.GUI.PyQtPlot.Flowchart.CustomNodes.DisplayNodes.ImageViewNode import ImageViewNode
+from pyphoplacecellanalysis.GUI.PyQtPlot.Flowchart.CustomNodes.DisplayNodes.UnsharpMaskNode import UnsharpMaskNode
+from pyphoplacecellanalysis.GUI.PyQtPlot.Flowchart.CustomNodes.BasePipeline.PipelineInputDataNode import PipelineInputDataNode
+from pyphoplacecellanalysis.GUI.PyQtPlot.Flowchart.CustomNodes.BasePipeline.PipelineFilteringDataNode import PipelineFilteringDataNode
 from pyphoplacecellanalysis.GUI.PyQtPlot.Flowchart.CustomNodes.DisplayNodes.PipelineDisplayNode import PipelineDisplayNode
 from pyphoplacecellanalysis.GUI.PyQtPlot.Flowchart.CustomNodes.Mixins.DisplayNodeViewHelpers import PipelineDynamicDockDisplayAreaMixin
 

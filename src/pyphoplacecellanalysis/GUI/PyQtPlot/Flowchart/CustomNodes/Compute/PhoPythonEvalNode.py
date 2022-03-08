@@ -1,9 +1,8 @@
 from pyqtgraph.Qt import QtGui, QtCore, QtWidgets
 from pyqtgraph.flowchart.library.common import Node
 
-
 from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer
-from pyphoplacecellanalysis.GUI.PyQtPlot.Flowchart.CustomNodes.ExtendedCtrlNode import ExtendedCtrlNode
+from pyphoplacecellanalysis.GUI.PyQtPlot.Flowchart.CustomNodes.MiscNodes.ExtendedCtrlNode import ExtendedCtrlNode
 
 
 class TextEdit(QtWidgets.QTextEdit):
@@ -48,19 +47,26 @@ class PhoPythonEvalNode(Node):
         self.layout.addWidget(self.ui.text, 1, 0, 1, 2)        
         # Add load/save button widgets:
         self.ui.loadSaveBtnWidget = QtWidgets.QWidget()
-        self.ui.metaBtnLayout = QtWidgets.QHBoxLayout()
+        self.ui.loadSaveBtnWidget.setObjectName("loadSaveBtnWidget")
+        self.ui.metaBtnLayout = QtWidgets.QHBoxLayout(self.ui.loadSaveBtnWidget)
         self.ui.metaBtnLayout.setContentsMargins(0, 0, 0, 0)
         self.ui.metaBtnLayout.setSpacing(2)
-        self.ui.metaBtnLayout.addStretch(0)
-        self.ui.load_btn = QtWidgets.QPushButton('Load')
+        # self.ui.metaBtnLayout.addStretch(0)
+        self.ui.load_btn = QtWidgets.QPushButton()
+        self.ui.load_btn.setMinimumSize(QtCore.QSize(24, 24))
+        self.ui.load_btn.setText('Load')
+        self.ui.load_btn.setObjectName('btnLoad')
         self.ui.load_btn.clicked.connect(self.loadCustomNodeCode)
         self.ui.metaBtnLayout.addWidget(self.ui.load_btn)
-        self.ui.save_btn = QtWidgets.QPushButton('Save')
+        self.ui.save_btn = QtWidgets.QPushButton()
+        self.ui.save_btn.setMinimumSize(QtCore.QSize(24, 24))
+        self.ui.save_btn.setText('Save')
+        self.ui.save_btn.setObjectName('btnSave')
         self.ui.save_btn.clicked.connect(self.saveAsCustomNode)
         self.ui.metaBtnLayout.addWidget(self.ui.save_btn)
         # Set the button container layout:
-        self.ui.loadSaveBtnWidget.setLayout(self.ui.metaBtnLayout)
-        # self.layout.addWidget(self.ui.loadSaveBtnWidget, 2, 0, 1, 2)
+        # self.ui.loadSaveBtnWidget.setLayout(self.ui.metaBtnLayout)
+        self.layout.addWidget(self.ui.loadSaveBtnWidget, 2, 0, 1, 2)
         self.ui.root.setLayout(self.layout)
 
         
