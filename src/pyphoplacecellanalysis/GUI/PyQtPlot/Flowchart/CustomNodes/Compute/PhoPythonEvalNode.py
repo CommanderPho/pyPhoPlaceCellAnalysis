@@ -161,31 +161,7 @@ class PhoPythonEvalNode(Node):
         finally:
             self.blockSignals(False)
         
-        
-    # def _retrieveFileSelection_gui(self):
-    #     curVal = self.param.value()
-    #     if isinstance(curVal, list) and len(curVal):
-    #         # All files should be from the same directory, in principle
-    #         # Since no mechanism exists for preselecting multiple, the most sensible
-    #         # thing is to select nothing in the preview dialog
-    #         curVal = curVal[0]
-    #         if os.path.isfile(curVal):
-    #             curVal = os.path.dirname(curVal)
-    #     opts = self.param.opts.copy()
-    #     useDir = curVal or opts.get('directory') or os.getcwd()
-    #     startDir = os.path.abspath(useDir)
-    #     if os.path.isfile(startDir):
-    #         opts['selectFile'] = os.path.basename(startDir)
-    #         startDir = os.path.dirname(startDir)
-    #     if os.path.exists(startDir):
-    #         opts['directory'] = startDir
-    #     if opts.get('windowTitle') is None:
-    #         opts['windowTitle'] = self.param.title()
 
-    #     fname = popupFilePicker(None, **opts)
-    #     if not fname:
-    #         return
-    #     self.param.setValue(fname)
         
 
 
@@ -372,7 +348,33 @@ class PhoPythonEvalNodeCtrlWidget(QtWidgets.QWidget):
         configfile.writeConfigFile(self.eval_node.saveState(), fileName)
         self.sigFileSaved.emit(fileName)
 
+        
+    # def _retrieveFileSelection_gui(self):
+    #     curVal = self.param.value()
+    #     if isinstance(curVal, list) and len(curVal):
+    #         # All files should be from the same directory, in principle
+    #         # Since no mechanism exists for preselecting multiple, the most sensible
+    #         # thing is to select nothing in the preview dialog
+    #         curVal = curVal[0]
+    #         if os.path.isfile(curVal):
+    #             curVal = os.path.dirname(curVal)
+    #     opts = self.param.opts.copy()
+    #     useDir = curVal or opts.get('directory') or os.getcwd()
+    #     startDir = os.path.abspath(useDir)
+    #     if os.path.isfile(startDir):
+    #         opts['selectFile'] = os.path.basename(startDir)
+    #         startDir = os.path.dirname(startDir)
+    #     if os.path.exists(startDir):
+    #         opts['directory'] = startDir
+    #     if opts.get('windowTitle') is None:
+    #         opts['windowTitle'] = self.param.title()
 
+    #     fname = popupFilePicker(None, **opts)
+    #     if not fname:
+    #         return
+    #     self.param.setValue(fname)
+    
+    
     # Events
     @QtCore.pyqtSlot(object)
     def setCurrentFile(self, fileName):
@@ -390,4 +392,5 @@ class PhoPythonEvalNodeCtrlWidget(QtWidgets.QWidget):
         print(f'.on_file_saved(fileName: {fileName})')
         self.setCurrentFile(fileName)
         # self.ui.saveBtn.success("Saved.")
+        
         
