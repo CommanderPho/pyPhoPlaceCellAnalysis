@@ -33,7 +33,6 @@ class PhoPythonEvalNode(Node):
     For expressions, a single value may be evaluated for a single output, or a dict for multiple outputs.
     For a script, the text will be executed as the body of a function."""
     nodeName = 'PhoPythonEval'
-
     
     def __init__(self, name):
         # Setup member variables
@@ -107,10 +106,31 @@ class PhoPythonEvalNode(Node):
     # def chartGraphicsItem(self):
     #     """Return the graphicsItem that displays the internal nodes and
     #     connections of this flowchart.
-        
     #     Note that the similar method `graphicsItem()` is inherited from Node
     #     and returns the *external* graphical representation of this flowchart."""
     #     return self.viewBox
+    
+    # def graphicsItem(self):
+    #     """Return the GraphicsItem for this node. Subclasses may re-implement
+    #     this method to customize their appearance in the flowchart."""
+    #     if self._graphicsItem is None:
+    #         self._graphicsItem = NodeGraphicsItem(self)
+    #     return self._graphicsItem
+    
+    
+    # TODO: eventually update the code inputs/outputs on sigTerminalRenamed, sigTerminalAdded, and sigTerminalRemoved (all emitted by the parent Node class)
+
+    def rebuild_terminals_from_code(self):
+        """ rebuilds the node's input/output terminals from the current code inputs/outputs """
+        curr_code = self.code()
+        print(f'.rebuild_terminals_from_code():\n{curr_code}')
+
+    def update_code_from_node(self):
+        """ updates the header/footer of the code from the the node's input/output terminals """
+        # curr_code = self.code()
+        curr_terminals = self.terminals
+        print(f'.update_code_from_node():\nself.terminals: {curr_terminals}')
+        
 
     def clear(self):
         """Remove all nodes from this flowchart except the original input/output nodes.
@@ -165,7 +185,7 @@ class PhoPythonEvalNode(Node):
         
 
 
-
+# rebuild_terminals_from_code
 
 
 class PhoPythonEvalNodeCtrlWidget(QtWidgets.QWidget):
@@ -196,6 +216,18 @@ class PhoPythonEvalNodeCtrlWidget(QtWidgets.QWidget):
         self.ui.load_btn.clicked.connect(self.eval_node.loadCustomNodeCode)
         self.ui.save_btn.clicked.connect(self.eval_node.saveAsCustomNode)
         
+        self.ui.reload_from_code_btn.clicked.connect(self.eval_node.rebuild_terminals_from_code)
+        self.ui.update_code_from_node_btn.clicked.connect(self.eval_node.update_code_from_node)
+        
+        
+    def _build_inputs_header_text(self):
+        
+        
+        return "'# Access inputs as args['input_name']"
+    
+    def _build_outputs_return_footer_text(self):
+        return "{'output': None} ## one key per output terminal"
+        # return f"{'output': None} ## one key per output terminal"
 
     def _buildUI(self):
         ## Build UI:
@@ -203,7 +235,10 @@ class PhoPythonEvalNodeCtrlWidget(QtWidgets.QWidget):
         self.layout = QtWidgets.QGridLayout()
         self.ui.text = TextEdit(self.update)
         self.ui.text.setTabStopWidth(30)
-        self.ui.text.setPlainText("# Access inputs as args['input_name']\nreturn {'output': None} ## one key per output terminal")
+        default_fcn_body = ''
+        default_textfield_body = '\n'.join([self._build_inputs_header_text(), default_fcn_body, self._build_outputs_return_footer_text()])
+        # default_textfield_body = "# Access inputs as args['input_name']\nreturn {'output': None} ## one key per output terminal"
+        self.ui.text.setPlainText(default_textfield_body)
         self.layout.addWidget(self.ui.text, 1, 0, 1, 2)        
         # Add load/save button widgets:
         self.ui.loadSaveBtnWidget = QtWidgets.QWidget()
@@ -224,11 +259,25 @@ class PhoPythonEvalNodeCtrlWidget(QtWidgets.QWidget):
         self.ui.save_btn.setObjectName('btnSave')
         # self.ui.save_btn.clicked.connect(self.saveAsCustomNode)
         self.ui.metaBtnLayout.addWidget(self.ui.save_btn)
+        
+        self.ui.reload_from_code_btn = QtWidgets.QPushButton()
+        self.ui.reload_from_code_btn.setMinimumSize(QtCore.QSize(24, 24))
+        self.ui.reload_from_code_btn.setText('Reload from Code')
+        self.ui.reload_from_code_btn.setObjectName('btnReloadFromCode')
+        self.ui.metaBtnLayout.addWidget(self.ui.reload_from_code_btn)
+        
+        self.ui.update_code_from_node_btn = QtWidgets.QPushButton()
+        self.ui.update_code_from_node_btn.setMinimumSize(QtCore.QSize(24, 24))
+        self.ui.update_code_from_node_btn.setText('Code from Node')
+        self.ui.update_code_from_node_btn.setObjectName('btnUpdateCodeFromNode')
+        self.ui.metaBtnLayout.addWidget(self.ui.update_code_from_node_btn)
+        
         # Set the button container layout:
         # self.ui.loadSaveBtnWidget.setLayout(self.ui.metaBtnLayout)
         self.layout.addWidget(self.ui.loadSaveBtnWidget, 2, 0, 1, 2)
         # self.ui.root.setLayout(self.layout)
         self.setLayout(self.layout)
+
         
         # Build custom context menu:
         self.contextMenu = QtWidgets.QMenu()
