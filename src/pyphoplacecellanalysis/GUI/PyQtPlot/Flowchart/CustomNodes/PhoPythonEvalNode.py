@@ -1,6 +1,8 @@
 from pyqtgraph.Qt import QtGui, QtCore, QtWidgets
 from pyqtgraph.flowchart.library.common import Node
 
+
+from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer
 from pyphoplacecellanalysis.GUI.PyQtPlot.Flowchart.CustomNodes.ExtendedCtrlNode import ExtendedCtrlNode
 
 
@@ -32,17 +34,38 @@ class PhoPythonEvalNode(Node):
                 'output': {'io': 'out', 'renamable': True, 'multiable': True},
             },
             allowAddInput=True, allowAddOutput=True)
-        
-        self.ui = QtWidgets.QWidget()
+        self.ui = PhoUIContainer()
+        self.buildUI()
+
+
+    def buildUI(self):
+        ## Build UI:
+        self.ui.root = QtWidgets.QWidget()
         self.layout = QtWidgets.QGridLayout()
-        self.text = TextEdit(self.update)
-        self.text.setTabStopWidth(30)
-        self.text.setPlainText("# Access inputs as args['input_name']\nreturn {'output': None} ## one key per output terminal")
-        self.layout.addWidget(self.text, 1, 0, 1, 2)
-        self.ui.setLayout(self.layout)
+        self.ui.text = TextEdit(self.update)
+        self.ui.text.setTabStopWidth(30)
+        self.ui.text.setPlainText("# Access inputs as args['input_name']\nreturn {'output': None} ## one key per output terminal")
+        self.layout.addWidget(self.ui.text, 1, 0, 1, 2)        
+        # Add load/save button widgets:
+        self.ui.loadSaveBtnWidget = QtWidgets.QWidget()
+        self.ui.metaBtnLayout = QtWidgets.QHBoxLayout()
+        self.ui.metaBtnLayout.setContentsMargins(0, 0, 0, 0)
+        self.ui.metaBtnLayout.setSpacing(2)
+        self.ui.metaBtnLayout.addStretch(0)
+        self.ui.load_btn = QtWidgets.QPushButton('Load')
+        self.ui.load_btn.clicked.connect(self.loadCustomNodeCode)
+        self.ui.metaBtnLayout.addWidget(self.ui.load_btn)
+        self.ui.save_btn = QtWidgets.QPushButton('Save')
+        self.ui.save_btn.clicked.connect(self.saveAsCustomNode)
+        self.ui.metaBtnLayout.addWidget(self.ui.save_btn)
+        # Set the button container layout:
+        self.ui.loadSaveBtnWidget.setLayout(self.ui.metaBtnLayout)
+        # self.layout.addWidget(self.ui.loadSaveBtnWidget, 2, 0, 1, 2)
+        self.ui.root.setLayout(self.layout)
+
         
     def ctrlWidget(self):
-        return self.ui
+        return self.ui.root
         
     def setCode(self, code):
         # unindent code; this allows nicer inline code specification when 
@@ -57,23 +80,43 @@ class PhoPythonEvalNode(Node):
             ind = min(ind)
             code = '\n'.join([line[ind:] for line in lines])
         
-        self.text.clear()
-        self.text.insertPlainText(code)
+        self.ui.text.clear()
+        self.ui.text.insertPlainText(code)
 
     def code(self):
-        return self.text.toPlainText()
+        """ returns the code of this node from the control. """
+        return self.ui.text.toPlainText()
+
+
+    # Adding functions to load/save the current node text:
+    def saveAsCustomNode(self):
+        """ save the current node's code and inputs/outputs to a file for this node. """
+        # Get the node's current state:
+        curr_state = self.saveState()
+        
+        pass
+    
+    
+    def loadCustomNodeCode(self):
+        """ load - get the loaded state from file or whereever """
+        # TODO: get the loaded state from file
+        loaded_state = None
+        # loaded_state = 
+        self.restoreState(loaded_state)
+    
+    
         
     def process(self, display=True, **args):
         l = locals()
         l.update(args)
         ## try eval first, then exec
         try:  
-            text = self.text.toPlainText().replace('\n', ' ')
+            text = self.ui.text.toPlainText().replace('\n', ' ')
             output = eval(text, globals(), l)
         except SyntaxError:
             fn = "def fn(**args):\n"
             run = "\noutput=fn(**args)\n"
-            text = fn + "\n".join(["    "+l for l in self.text.toPlainText().split('\n')]) + run
+            text = fn + "\n".join(["    "+l for l in self.ui.text.toPlainText().split('\n')]) + run
             ldict = locals()
             exec(text, globals(), ldict)
             output = ldict['output']
@@ -84,7 +127,7 @@ class PhoPythonEvalNode(Node):
         
     def saveState(self):
         state = Node.saveState(self)
-        state['text'] = self.text.toPlainText()
+        state['text'] = self.ui.text.toPlainText()
         #state['terminals'] = self.saveTerminals()
         return state
         
