@@ -33,16 +33,13 @@ class PhoPythonEvalNode(Node):
     For expressions, a single value may be evaluated for a single output, or a dict for multiple outputs.
     For a script, the text will be executed as the body of a function."""
     nodeName = 'PhoPythonEval'
-    
-    sigFileLoaded = QtCore.Signal(object)
-    sigFileSaved = QtCore.Signal(object)
-    
+
     
     def __init__(self, name):
         # Setup member variables
         self.filePath = None
         self.currentFileName = None
-        
+        self._widget = None
         Node.__init__(self, name, 
             terminals = {
                 'input': {'io': 'in', 'renamable': True, 'multiable': True},
@@ -50,75 +47,21 @@ class PhoPythonEvalNode(Node):
             },
             allowAddInput=True, allowAddOutput=True)
         
-        self.ui = PhoUIContainer()
-        self.buildUI()
-        # self.sigFileLoaded.connect(self.setCurrentFile)
-        self.sigFileSaved.connect(self.on_file_saved)
-        
+        self.ctrlWidget() # initializes the control widget
 
-
-    def buildUI(self):
-        ## Build UI:
-        self.ui.root = QtWidgets.QWidget()
-        self.layout = QtWidgets.QGridLayout()
-        self.ui.text = TextEdit(self.update)
-        self.ui.text.setTabStopWidth(30)
-        self.ui.text.setPlainText("# Access inputs as args['input_name']\nreturn {'output': None} ## one key per output terminal")
-        self.layout.addWidget(self.ui.text, 1, 0, 1, 2)        
-        # Add load/save button widgets:
-        self.ui.loadSaveBtnWidget = QtWidgets.QWidget()
-        self.ui.loadSaveBtnWidget.setObjectName("loadSaveBtnWidget")
-        self.ui.metaBtnLayout = QtWidgets.QHBoxLayout(self.ui.loadSaveBtnWidget)
-        self.ui.metaBtnLayout.setContentsMargins(0, 0, 0, 0)
-        self.ui.metaBtnLayout.setSpacing(2)
-        # self.ui.metaBtnLayout.addStretch(0)
-        self.ui.load_btn = QtWidgets.QPushButton()
-        self.ui.load_btn.setMinimumSize(QtCore.QSize(24, 24))
-        self.ui.load_btn.setText('Load')
-        self.ui.load_btn.setObjectName('btnLoad')
-        self.ui.load_btn.clicked.connect(self.loadCustomNodeCode)
-        self.ui.metaBtnLayout.addWidget(self.ui.load_btn)
-        self.ui.save_btn = QtWidgets.QPushButton()
-        self.ui.save_btn.setMinimumSize(QtCore.QSize(24, 24))
-        self.ui.save_btn.setText('Save')
-        self.ui.save_btn.setObjectName('btnSave')
-        self.ui.save_btn.clicked.connect(self.saveAsCustomNode)
-        self.ui.metaBtnLayout.addWidget(self.ui.save_btn)
-        # Set the button container layout:
-        # self.ui.loadSaveBtnWidget.setLayout(self.ui.metaBtnLayout)
-        self.layout.addWidget(self.ui.loadSaveBtnWidget, 2, 0, 1, 2)
-        self.ui.root.setLayout(self.layout)
-        
-        # Build custom context menu:
-        self.contextMenu = QtWidgets.QMenu()
-        self.contextMenu.addAction(translate("PhoPythonEval", 'Custom Copy Selection')).triggered.connect(self.copySel)
-        self.contextMenu.addAction(translate("PhoPythonEval", 'Custom Copy All')).triggered.connect(self.copyAll)
-        self.contextMenu.addAction(translate("PhoPythonEval", 'Custom Save Selection')).triggered.connect(self.saveSel)
-        self.contextMenu.addAction(translate("PhoPythonEval", 'Custom Save All')).triggered.connect(self.saveAll)
-
-        
     def ctrlWidget(self):
-        return self.ui.root
+        # return self.ui.root
+        if self._widget is None:
+            self._widget = PhoPythonEvalNodeCtrlWidget(self)
+        return self._widget
         
     def setCode(self, code):
-        # unindent code; this allows nicer inline code specification when 
-        # calling this method.
-        ind = []
-        lines = code.split('\n')
-        for line in lines:
-            stripped = line.lstrip()
-            if len(stripped) > 0:
-                ind.append(len(line) - len(stripped))
-        if len(ind) > 0:
-            ind = min(ind)
-            code = '\n'.join([line[ind:] for line in lines])
-        
-        self.ui.text.clear()
-        self.ui.text.insertPlainText(code)
+        """ unindent code; this allows nicer inline code specification when calling this method. """
+        self.ctrlWidget().setCode(code)
 
     def code(self):
         """ returns the code of this node from the control. """
-        return self.ui.text.toPlainText()
+        return self.ctrlWidget().code()
 
 
     # Adding functions to load/save the current node text:
@@ -129,9 +72,9 @@ class PhoPythonEvalNode(Node):
         # self.save(curr_state)
         try:
             if self.currentFileName is None:
-                newFile = self.saveFile()
+                newFile = self.ctrlWidget().saveFile()
             else:
-                newFile = self.saveFile(suggestedFileName=self.currentFileName)
+                newFile = self.ctrlWidget().saveFile(suggestedFileName=self.currentFileName)
             #self.ui.saveAsBtn.success("Saved.")
             #print "Back to saveAsClicked."
         except:
@@ -145,7 +88,7 @@ class PhoPythonEvalNode(Node):
         # loaded_state = None
         # loaded_state = 
         # self.restoreState(loaded_state)
-        newFile = self.loadFile()
+        newFile = self.ctrlWidget().loadFile()
     
     
     # Node functions:
@@ -173,7 +116,7 @@ class PhoPythonEvalNode(Node):
         """Remove all nodes from this flowchart except the original input/output nodes.
         """
         #self.clearTerminals()
-        self.ui.text.clear()
+        self.ctrlWidget().clear()
     
     def clearTerminals(self):
         Node.clearTerminals(self)
@@ -186,12 +129,12 @@ class PhoPythonEvalNode(Node):
         l.update(args)
         ## try eval first, then exec
         try:  
-            text = self.ui.text.toPlainText().replace('\n', ' ')
+            text = self.ctrlWidget().ui.text.toPlainText().replace('\n', ' ')
             output = eval(text, globals(), l)
         except SyntaxError:
             fn = "def fn(**args):\n"
             run = "\noutput=fn(**args)\n"
-            text = fn + "\n".join(["    "+l for l in self.ui.text.toPlainText().split('\n')]) + run
+            text = fn + "\n".join(["    "+l for l in self.ctrlWidget().ui.text.toPlainText().split('\n')]) + run
             ldict = locals()
             exec(text, globals(), ldict)
             output = ldict['output']
@@ -202,7 +145,7 @@ class PhoPythonEvalNode(Node):
         
     def saveState(self):
         state = Node.saveState(self)
-        state['text'] = self.ui.text.toPlainText()
+        state['text'] = self.ctrlWidget().ui.text.toPlainText() # should be the same as self.ctrlWidget().code()
         #state['terminals'] = self.saveTerminals()
         return state
         
@@ -218,6 +161,108 @@ class PhoPythonEvalNode(Node):
         finally:
             self.blockSignals(False)
         
+        
+    # def _retrieveFileSelection_gui(self):
+    #     curVal = self.param.value()
+    #     if isinstance(curVal, list) and len(curVal):
+    #         # All files should be from the same directory, in principle
+    #         # Since no mechanism exists for preselecting multiple, the most sensible
+    #         # thing is to select nothing in the preview dialog
+    #         curVal = curVal[0]
+    #         if os.path.isfile(curVal):
+    #             curVal = os.path.dirname(curVal)
+    #     opts = self.param.opts.copy()
+    #     useDir = curVal or opts.get('directory') or os.getcwd()
+    #     startDir = os.path.abspath(useDir)
+    #     if os.path.isfile(startDir):
+    #         opts['selectFile'] = os.path.basename(startDir)
+    #         startDir = os.path.dirname(startDir)
+    #     if os.path.exists(startDir):
+    #         opts['directory'] = startDir
+    #     if opts.get('windowTitle') is None:
+    #         opts['windowTitle'] = self.param.title()
+
+    #     fname = popupFilePicker(None, **opts)
+    #     if not fname:
+    #         return
+    #     self.param.setValue(fname)
+        
+
+
+
+
+
+class PhoPythonEvalNodeCtrlWidget(QtWidgets.QWidget):
+    """The widget that contains the list of all the nodes in a flowchart and their controls, as well as buttons for loading/saving flowcharts."""
+        
+    sigFileLoaded = QtCore.Signal(object)
+    sigFileSaved = QtCore.Signal(object)
+    
+    def __init__(self, eval_node):
+        #self.loadDir = loadDir  ## where to look initially for chart files
+        self.currentFileName = None
+        QtWidgets.QWidget.__init__(self)
+        self.eval_node = eval_node # the actual node object
+        
+        self.ui = PhoUIContainer()
+        self._buildUI()
+        # self.ui.loadBtn.clicked.connect(self.loadClicked)
+        # self.ui.saveBtn.clicked.connect(self.saveClicked)
+        # self.ui.saveAsBtn.clicked.connect(self.saveAsClicked)
+        # self.ui.showChartBtn.toggled.connect(self.chartToggled)
+        # self.chart.sigFileLoaded.connect(self.setCurrentFile)
+        # self.ui.reloadBtn.clicked.connect(self.reloadClicked)
+        # self.chart.sigFileSaved.connect(self.fileSaved)
+        
+        self.sigFileLoaded.connect(self.setCurrentFile)
+        self.sigFileSaved.connect(self.on_file_saved)
+        
+        self.ui.load_btn.clicked.connect(self.eval_node.loadCustomNodeCode)
+        self.ui.save_btn.clicked.connect(self.eval_node.saveAsCustomNode)
+        
+
+    def _buildUI(self):
+        ## Build UI:
+        # self.ui.root = QtWidgets.QWidget()
+        self.layout = QtWidgets.QGridLayout()
+        self.ui.text = TextEdit(self.update)
+        self.ui.text.setTabStopWidth(30)
+        self.ui.text.setPlainText("# Access inputs as args['input_name']\nreturn {'output': None} ## one key per output terminal")
+        self.layout.addWidget(self.ui.text, 1, 0, 1, 2)        
+        # Add load/save button widgets:
+        self.ui.loadSaveBtnWidget = QtWidgets.QWidget()
+        self.ui.loadSaveBtnWidget.setObjectName("loadSaveBtnWidget")
+        self.ui.metaBtnLayout = QtWidgets.QHBoxLayout(self.ui.loadSaveBtnWidget)
+        self.ui.metaBtnLayout.setContentsMargins(0, 0, 0, 0)
+        self.ui.metaBtnLayout.setSpacing(2)
+        # self.ui.metaBtnLayout.addStretch(0)
+        self.ui.load_btn = QtWidgets.QPushButton()
+        self.ui.load_btn.setMinimumSize(QtCore.QSize(24, 24))
+        self.ui.load_btn.setText('Load')
+        self.ui.load_btn.setObjectName('btnLoad')
+        # self.ui.load_btn.clicked.connect(self.loadCustomNodeCode)
+        self.ui.metaBtnLayout.addWidget(self.ui.load_btn)
+        self.ui.save_btn = QtWidgets.QPushButton()
+        self.ui.save_btn.setMinimumSize(QtCore.QSize(24, 24))
+        self.ui.save_btn.setText('Save')
+        self.ui.save_btn.setObjectName('btnSave')
+        # self.ui.save_btn.clicked.connect(self.saveAsCustomNode)
+        self.ui.metaBtnLayout.addWidget(self.ui.save_btn)
+        # Set the button container layout:
+        # self.ui.loadSaveBtnWidget.setLayout(self.ui.metaBtnLayout)
+        self.layout.addWidget(self.ui.loadSaveBtnWidget, 2, 0, 1, 2)
+        # self.ui.root.setLayout(self.layout)
+        self.setLayout(self.layout)
+        
+        # Build custom context menu:
+        self.contextMenu = QtWidgets.QMenu()
+        self.contextMenu.addAction(translate("PhoPythonEval", 'Custom Copy Selection')).triggered.connect(self.copySel)
+        self.contextMenu.addAction(translate("PhoPythonEval", 'Custom Copy All')).triggered.connect(self.copyAll)
+        self.contextMenu.addAction(translate("PhoPythonEval", 'Custom Save Selection')).triggered.connect(self.saveSel)
+        self.contextMenu.addAction(translate("PhoPythonEval", 'Custom Save All')).triggered.connect(self.saveAll)
+        
+        # Dialogs:
+        self.fileDialog = None
         
     # UI Handling Functions:
     def contextMenuEvent(self, ev):
@@ -249,8 +294,33 @@ class PhoPythonEvalNode(Node):
         self.save(self.serialize())
         
         
+    # Operations:
+    def clear(self):
+        """Remove all nodes from this flowchart except the original input/output nodes.
+        """
+        self.ui.text.clear()
         
-    # Extended GUI        
+    def setCode(self, code):
+        # unindent code; this allows nicer inline code specification when 
+        # calling this method.
+        ind = []
+        lines = code.split('\n')
+        for line in lines:
+            stripped = line.lstrip()
+            if len(stripped) > 0:
+                ind.append(len(line) - len(stripped))
+        if len(ind) > 0:
+            ind = min(ind)
+            code = '\n'.join([line[ind:] for line in lines])
+        
+        self.ui.text.clear()
+        self.ui.text.insertPlainText(code)
+
+    def code(self):
+        """ returns the code of this node from the control. """
+        return self.ui.text.toPlainText()
+        
+     # Extended GUI        
     # def save(self, data):
     #     """ displays the user save prompt and writes out the file """
     #     # getSaveFileName(parent: QWidget = None, caption: str = '', directory: str = '', filter: str = '', initialFilter: str = '', options: Union[QFileDialog.Options, QFileDialog.Option] = 0)
@@ -273,7 +343,7 @@ class PhoPythonEvalNode(Node):
         """
         if fileName is None:
             if startDir is None:
-                startDir = self.filePath
+                startDir = self.eval_node.filePath
             if startDir is None:
                 startDir = '.'
             self.fileDialog = FileDialog(None, "Load Custom Eval Node..", startDir, "Custom Eval Node (*.pEval)")
@@ -282,7 +352,7 @@ class PhoPythonEvalNode(Node):
             return
             ## NOTE: was previously using a real widget for the file dialog's parent, but this caused weird mouse event bugs..
         state = configfile.readConfigFile(fileName)
-        self.restoreState(state, clear=True)
+        self.eval_node.restoreState(state, clear=True)
         self.sigFileLoaded.emit(fileName)
 
     def saveFile(self, fileName=None, startDir=None, suggestedFileName='custom_node.pEval'):
@@ -290,7 +360,7 @@ class PhoPythonEvalNode(Node):
         """
         if fileName is None:
             if startDir is None:
-                startDir = self.filePath
+                startDir = self.eval_node.filePath
             if startDir is None:
                 startDir = '.'
             self.fileDialog = FileDialog(None, "Save Custom Eval Node..", startDir, "Custom Eval Node (*.pEval)")
@@ -299,52 +369,25 @@ class PhoPythonEvalNode(Node):
             self.fileDialog.show()
             self.fileDialog.fileSelected.connect(self.saveFile)
             return
-        configfile.writeConfigFile(self.saveState(), fileName)
+        configfile.writeConfigFile(self.eval_node.saveState(), fileName)
         self.sigFileSaved.emit(fileName)
 
-        
-            
-    
-    # def _retrieveFileSelection_gui(self):
-    #     curVal = self.param.value()
-    #     if isinstance(curVal, list) and len(curVal):
-    #         # All files should be from the same directory, in principle
-    #         # Since no mechanism exists for preselecting multiple, the most sensible
-    #         # thing is to select nothing in the preview dialog
-    #         curVal = curVal[0]
-    #         if os.path.isfile(curVal):
-    #             curVal = os.path.dirname(curVal)
-    #     opts = self.param.opts.copy()
-    #     useDir = curVal or opts.get('directory') or os.getcwd()
-    #     startDir = os.path.abspath(useDir)
-    #     if os.path.isfile(startDir):
-    #         opts['selectFile'] = os.path.basename(startDir)
-    #         startDir = os.path.dirname(startDir)
-    #     if os.path.exists(startDir):
-    #         opts['directory'] = startDir
-    #     if opts.get('windowTitle') is None:
-    #         opts['windowTitle'] = self.param.title()
 
-    #     fname = popupFilePicker(None, **opts)
-    #     if not fname:
-    #         return
-    #     self.param.setValue(fname)
-        
     # Events
     @QtCore.pyqtSlot(object)
     def setCurrentFile(self, fileName):
         print(f'.setCurrentFile(fileName: {fileName})')
-        self.currentFileName = fileName
+        self.eval_node.currentFileName = fileName
         # if fileName is None:
         #     self.ui.fileNameLabel.setText("<b>[ new ]</b>")
         # else:
         #     self.ui.fileNameLabel.setText("<b>%s</b>" % os.path.split(self.currentFileName)[1])
         # self.resizeEvent(None)
-        return
+        
         
     @QtCore.pyqtSlot(object)
     def on_file_saved(self, fileName):
         print(f'.on_file_saved(fileName: {fileName})')
         self.setCurrentFile(fileName)
         # self.ui.saveBtn.success("Saved.")
-        return
+        
