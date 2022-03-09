@@ -209,9 +209,11 @@ class Spike3DRaster_Vedo(NeuronIdentityAccessingMixin, SpikeRenderingBaseMixin, 
         # glyph = Glyph(pts, cone, vecs, scaleByVectorSize=True, colorByVectorSize=True)
         self.glyph.lighting('ambient') # .cmap('Blues').addScalarBar(title='wind speed')
         
+        
         # show with:
-        # show(glyph, __doc__, axes=True).close()
-                
+        # plt = show(glyph, __doc__, axes=True).close()
+        
+        
         # # Plot each unit one at a time:
         # for i, cell_id in enumerate(self.unit_ids):    
         #     # Filter the dataframe using that column and value from the list
