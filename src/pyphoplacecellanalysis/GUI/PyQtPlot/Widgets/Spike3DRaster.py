@@ -381,7 +381,7 @@ class Spike3DRaster(NeuronIdentityAccessingMixin, SpikeRenderingBaseMixin, Spike
         
         self.ui.gl_line_plots = [] # create an empty array for each GLLinePlotItem, of which there will be one for each unit.
         
-        # y = np.linspace(-self.n_half_cells, self.n_half_cells, self.n_cells) + 0.5 # add 0.5 so they're centered
+        # build the position range for each unit along the y-axis:
         y = DataSeriesToSpatial.build_data_series_range(self.n_cells, center_mode='zero_centered', bin_position_mode='bin_center', side_bin_margins = 0.0)
         
         # Plot each unit one at a time:
@@ -490,8 +490,8 @@ class Spike3DRaster(NeuronIdentityAccessingMixin, SpikeRenderingBaseMixin, Spike
         if self.enable_debug_print:
             print(f'Spike3DRaster._update_plots()')
         assert (len(self.ui.gl_line_plots) == self.n_cells), f"after all operations the length of the plots array should be the same as the n_cells, but len(self.ui.gl_line_plots): {len(self.ui.gl_line_plots)} and self.n_cells: {self.n_cells}!"
-        # y = np.linspace(-self.n_half_cells, self.n_half_cells, self.n_cells) + 0.5 # add 0.5 so they're centered
-        y = np.linspace(-self.n_half_cells, self.n_half_cells, self.n_cells) # add 0.5 so they're centered
+        # build the position range for each unit along the y-axis:
+        y = DataSeriesToSpatial.build_data_series_range(self.n_cells, center_mode='zero_centered', bin_position_mode='bin_center', side_bin_margins = 0.0)
         
         # Plot each unit one at a time:
         for i, cell_id in enumerate(self.unit_ids):    
