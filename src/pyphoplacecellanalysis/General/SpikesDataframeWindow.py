@@ -2,6 +2,22 @@ from pyqtgraph.Qt import QtCore
 import numpy as np
 
 
+
+""" Windowed Spiking Datasource Features
+
+Transforming the events into either 2D or 3D representations for visualization should NOT be part of this class' function.
+Separate 2D and 3D event visualization functions should be made to transform events from this class into appropriate point/datastructure representations for the visualization framework being used.
+
+# Local window properties
+[X] Given by .active_time_window
+    Get (window_start, window_end) times
+
+# Global data properties
+[X] Given by .total_df_start_end_times
+    Get (earliest_datapoint_time, latest_datapoint_time) # globally, for the entire timeseries
+
+
+"""
 class SpikesDataframeWindow(QtCore.QObject):
     """ a zoomable (variable sized) window into a dataframe with a time axis
     Used by Spike3DRaster
@@ -26,7 +42,7 @@ class SpikesDataframeWindow(QtCore.QObject):
     @property
     def active_time_window(self):
         """ a 2-element time window [start_time, end_time]"""
-        return [self.active_window_start_time, self.active_window_end_time]
+        return (self.active_window_start_time, self.active_window_end_time)
         
     @property
     def active_window_end_time(self):
@@ -47,7 +63,7 @@ class SpikesDataframeWindow(QtCore.QObject):
         df_timestamps = self.df[self.df.spikes.time_variable_name].to_numpy()
         earliest_df_time = df_timestamps[0]
         latest_df_time = df_timestamps[-1]
-        return [earliest_df_time, latest_df_time]
+        return (earliest_df_time, latest_df_time)
             
     ##### Get/Set Properties ####:
     @property

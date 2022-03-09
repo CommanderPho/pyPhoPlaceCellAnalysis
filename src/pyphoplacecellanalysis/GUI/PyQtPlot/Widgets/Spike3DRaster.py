@@ -18,8 +18,11 @@ from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer
 # import qdarkstyle
 
 from pyphoplacecellanalysis.General.SpikesDataframeWindow import SpikesDataframeWindow
+from pyphoplacecellanalysis.General.DataSeriesToSpatial import DataSeriesToSpatial
 from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.GLDebugAxisItem import GLDebugAxisItem
 from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.GLViewportOverlayPainterItem import GLViewportOverlayPainterItem
+
+
 
 """ For threading info see:
     https://stackoverflow.com/questions/41526832/pyqt5-qthread-signal-not-working-gui-freeze
@@ -29,6 +32,22 @@ from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.GLViewportOverlayPainterItem im
     https://www.lfd.uci.edu/~gohlke/pythonlibs/#pyopengl
 
     I downloaded PyOpenGL-3.1.3b2-cp37-cp37m-win_amd64.whl and PyOpenGL_accelerate-3.1.3b2-cp37-cp37m-win_amd64.whl. Next, I navigate to my Downloads folder in a Windows terminal and start the installation:
+
+"""
+
+
+""" Windowed Spiking Datasource Features
+
+Transforming the events into either 2D or 3D representations for visualization should NOT be part of this class' function.
+Separate 2D and 3D event visualization functions should be made to transform events from this class into appropriate point/datastructure representations for the visualization framework being used.
+
+# Local window properties
+Get (window_start, window_end) times
+
+# Global data properties
+Get (earliest_datapoint_time, latest_datapoint_time) # globally, for the entire timeseries
+
+
 
 """
 
@@ -362,7 +381,9 @@ class Spike3DRaster(NeuronIdentityAccessingMixin, SpikeRenderingBaseMixin, Spike
         
         self.ui.gl_line_plots = [] # create an empty array for each GLLinePlotItem, of which there will be one for each unit.
         
-        y = np.linspace(-self.n_half_cells, self.n_half_cells, self.n_cells) + 0.5 # add 0.5 so they're centered
+        # y = np.linspace(-self.n_half_cells, self.n_half_cells, self.n_cells) + 0.5 # add 0.5 so they're centered
+        y = DataSeriesToSpatial.build_data_series_range(self.n_cells, center_mode='zero_centered', bin_position_mode='bin_center', side_bin_margins = 0.0)
+        
         # Plot each unit one at a time:
         for i, cell_id in enumerate(self.unit_ids):
             curr_color = pg.mkColor((i, self.n_cells*1.3))
