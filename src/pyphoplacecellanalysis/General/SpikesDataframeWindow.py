@@ -109,4 +109,40 @@ class SpikesDataframeWindow(QtCore.QObject):
     # def on_window_changed(self):
     #     print(f'SpikesDataframeWindow.on_window_changed(): window_changed_signal emitted. self.active_time_window: {self.active_time_window}')
         
-        
+      
+      
+
+class SpikesWindowOwningMixin:
+    """ Implementors own a SpikesWindow and can use it to get the current windowed dataframe
+    
+    Requires:
+        self._spikes_window
+    
+    """    
+    @property
+    def spikes_window(self):
+        """The spikes_window property."""
+        return self._spikes_window
+
+    @property
+    def active_windowed_df(self):
+        """ """
+        return self.spikes_window.active_windowed_df
+    
+    # from SpikesDataframeOwningMixin
+    @property
+    def spikes_df(self):
+        """The spikes_df property."""
+        return self.spikes_window.df
+    
+    
+    @property
+    def render_window_duration(self):
+        """ """
+        return float(self.spikes_window.window_duration)
+    @property
+    def half_render_window_duration(self):
+        """ """
+        return np.ceil(float(self.spikes_window.window_duration)/2.0) # 10 by default 
+    
+    

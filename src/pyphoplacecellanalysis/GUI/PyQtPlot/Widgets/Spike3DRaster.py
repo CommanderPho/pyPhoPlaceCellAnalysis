@@ -17,7 +17,7 @@ from pyphocorehelpers.indexing_helpers import interleave_elements, partition
 from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer
 # import qdarkstyle
 
-from pyphoplacecellanalysis.General.SpikesDataframeWindow import SpikesDataframeWindow
+from pyphoplacecellanalysis.General.SpikesDataframeWindow import SpikesDataframeWindow, SpikesWindowOwningMixin
 from pyphoplacecellanalysis.General.DataSeriesToSpatial import DataSeriesToSpatial
 from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.GLDebugAxisItem import GLDebugAxisItem
 from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.GLViewportOverlayPainterItem import GLViewportOverlayPainterItem
@@ -74,7 +74,7 @@ class SliderRunner(QtCore.QThread):
             
                 
 
-class Spike3DRaster(NeuronIdentityAccessingMixin, SpikeRenderingBaseMixin, SpikesDataframeOwningMixin, QtWidgets.QWidget):
+class Spike3DRaster(NeuronIdentityAccessingMixin, SpikeRenderingBaseMixin, SpikesWindowOwningMixin, SpikesDataframeOwningMixin, QtWidgets.QWidget):
     """ Displays a 3D version of a raster plot with the spikes occuring along a plane. 
     
     Usage:
@@ -85,16 +85,6 @@ class Spike3DRaster(NeuronIdentityAccessingMixin, SpikeRenderingBaseMixin, Spike
         curr_spikes_df = curr_sess.spikes_df
         spike_raster_plt = Spike3DRaster(curr_spikes_df, window_duration=4.0, window_start_time=30.0)
     """
-    
-    @property
-    def spikes_window(self):
-        """The spikes_window property."""
-        return self._spikes_window
-
-    @property
-    def active_windowed_df(self):
-        """ """
-        return self.spikes_window.active_windowed_df
     
     @property
     def unit_ids(self):
@@ -113,15 +103,7 @@ class Spike3DRaster(NeuronIdentityAccessingMixin, SpikeRenderingBaseMixin, Spike
     def n_full_cell_grid(self):
         """ """
         return 2.0 * self.n_half_cells # could be one more than n
-    
-    @property
-    def render_window_duration(self):
-        """ """
-        return float(self.spikes_window.window_duration)
-    @property
-    def half_render_window_duration(self):
-        """ """
-        return np.ceil(float(self.spikes_window.window_duration)/2.0) # 10 by default 
+
 
     @property
     def temporal_axis_length(self):
@@ -151,14 +133,7 @@ class Spike3DRaster(NeuronIdentityAccessingMixin, SpikeRenderingBaseMixin, Spike
         # return self.unit_ids
         return np.unique(self.spikes_window.df['aclu'].to_numpy()) 
     
-    # from SpikesDataframeOwningMixin
-    @property
-    def spikes_df(self):
-        """The spikes_df property."""
-        return self.spikes_window.df
-    
-    
-    
+
     @property
     def overlay_text_lines(self):
         """The lines to be displayed in the overlay."""
@@ -197,9 +172,12 @@ class Spike3DRaster(NeuronIdentityAccessingMixin, SpikeRenderingBaseMixin, Spike
         self.params.spike_start_z = -10.0
         # self.spike_end_z = 0.1
         self.params.spike_end_z = -6.0
-        self.params.side_bin_margins = 1.0 # space to sides of the first and last cell on the y-axis
+        self.params.side_bin_margins = 0.0 # space to sides of the first and last cell on the y-axis
         # by default we want the time axis to approximately span -20 to 20. So we set the temporal_zoom_factor to 
         self._temporal_zoom_factor = 40.0 / float(self.render_window_duration)        
+        
+        
+        
         self.enable_debug_print = False
         self.enable_debug_widgets = False
         
@@ -382,7 +360,7 @@ class Spike3DRaster(NeuronIdentityAccessingMixin, SpikeRenderingBaseMixin, Spike
         self.ui.gl_line_plots = [] # create an empty array for each GLLinePlotItem, of which there will be one for each unit.
         
         # build the position range for each unit along the y-axis:
-        y = DataSeriesToSpatial.build_data_series_range(self.n_cells, center_mode='zero_centered', bin_position_mode='bin_center', side_bin_margins = 0.0)
+        y = DataSeriesToSpatial.build_series_identity_axis(self.n_cells, center_mode='zero_centered', bin_position_mode='bin_center', side_bin_margins = self.params.side_bin_margins)
         
         # Plot each unit one at a time:
         for i, cell_id in enumerate(self.unit_ids):
@@ -491,14 +469,16 @@ class Spike3DRaster(NeuronIdentityAccessingMixin, SpikeRenderingBaseMixin, Spike
             print(f'Spike3DRaster._update_plots()')
         assert (len(self.ui.gl_line_plots) == self.n_cells), f"after all operations the length of the plots array should be the same as the n_cells, but len(self.ui.gl_line_plots): {len(self.ui.gl_line_plots)} and self.n_cells: {self.n_cells}!"
         # build the position range for each unit along the y-axis:
-        y = DataSeriesToSpatial.build_data_series_range(self.n_cells, center_mode='zero_centered', bin_position_mode='bin_center', side_bin_margins = 0.0)
+        y = DataSeriesToSpatial.build_series_identity_axis(self.n_cells, center_mode='zero_centered', bin_position_mode='bin_center', side_bin_margins = self.params.side_bin_margins)
         
         # Plot each unit one at a time:
         for i, cell_id in enumerate(self.unit_ids):    
             # Filter the dataframe using that column and value from the list
-            # curr_cell_df = self.active_windowed_df[self.active_windowed_df['unit_id']==cell_id].copy() # is .copy() needed here since nothing is updated???
             curr_cell_df = self.active_windowed_df[self.active_windowed_df['unit_id']==cell_id]
             curr_spike_t = curr_cell_df[curr_cell_df.spikes.time_variable_name].to_numpy() # this will map
+            # efficiently get curr_spike_t by filtering for unit and column at the same time
+            # curr_spike_t = self.active_windowed_df.loc[self.active_windowed_df.spikes.time_variable_name, (self.active_windowed_df['unit_id']==cell_id)].values # .to_numpy()
+            
             curr_unit_n_spikes = len(curr_spike_t)
             
             yi = y[i] # get the correct y-position for all spikes of this cell
