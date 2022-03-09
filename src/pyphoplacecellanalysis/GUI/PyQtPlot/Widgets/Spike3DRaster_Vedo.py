@@ -117,7 +117,7 @@ class Spike3DRaster_Vedo(NeuronIdentityAccessingMixin, SpikeRenderingBaseMixin, 
         
         # Helper container variables
         self.params = VisualizationParameters('')
-        
+        self.glyph = None
         self.slidebar_val = 0
         self._spikes_window = SpikesDataframeWindow(spikes_df, window_duration=window_duration, window_start_time=window_start_time)
         self.params.spike_start_z = -10.0
@@ -192,7 +192,7 @@ class Spike3DRaster_Vedo(NeuronIdentityAccessingMixin, SpikeRenderingBaseMixin, 
         if self.enable_debug_print:
             print(f'Spike3DRaster_Vedo._update_plots()')
         # build the position range for each unit along the y-axis:
-        y = DataSeriesToSpatial.build_series_identity_axis(self.n_cells, center_mode='zero_centered', bin_position_mode='bin_center', side_bin_margins = self.params.side_bin_margins)
+        # y = DataSeriesToSpatial.build_series_identity_axis(self.n_cells, center_mode='zero_centered', bin_position_mode='bin_center', side_bin_margins = self.params.side_bin_margins)
         
         # All series at once approach:
         # curr_spike_t = self.active_windowed_df[self.active_windowed_df.spikes.time_variable_name].to_numpy() # this will map
@@ -205,12 +205,12 @@ class Spike3DRaster_Vedo(NeuronIdentityAccessingMixin, SpikeRenderingBaseMixin, 
         # Create a mesh to be used like a symbol (a "glyph") to be attached to each point
         cone = Cone().scale(0.3) # make it smaller and orient tip to positive x
         # .rotateY(90) # orient tip to positive x
-        glyph = Glyph(pts, cone)
+        self.glyph = Glyph(pts, cone)
         # glyph = Glyph(pts, cone, vecs, scaleByVectorSize=True, colorByVectorSize=True)
-
-        glyph.lighting('ambient').cmap('Blues').addScalarBar(title='wind speed')
+        self.glyph.lighting('ambient') # .cmap('Blues').addScalarBar(title='wind speed')
+        
         # show with:
-        show(glyph, __doc__, axes=True).close()
+        # show(glyph, __doc__, axes=True).close()
                 
         # # Plot each unit one at a time:
         # for i, cell_id in enumerate(self.unit_ids):    
