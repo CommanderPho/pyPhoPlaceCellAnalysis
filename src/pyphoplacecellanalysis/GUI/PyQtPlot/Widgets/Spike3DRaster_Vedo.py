@@ -109,6 +109,15 @@ class Spike3DRaster_Vedo(NeuronIdentityAccessingMixin, SpikeRenderingBaseMixin, 
     def temporal_zoom_factor(self, value):
         self._temporal_zoom_factor = value
         
+        
+    @property
+    def active_spike_render_points(self):
+        """The set of final, tranformed points at which to render the spikes for the active window.
+        Note that computation might be costly so don't do this too often.
+        """
+        const_z = 0.0
+        curr_x = np.interp(self.active_windowed_df[self.active_windowed_df.spikes.time_variable_name].to_numpy(), (self.spikes_window.active_window_start_time, self.spikes_window.active_window_end_time), (-self.half_temporal_axis_length, +self.half_temporal_axis_length))
+        return np.c_[curr_x, self.active_windowed_df['visualization_raster_y_location'].to_numpy(), np.full_like(curr_x, const_z)] # y-locations are already pre-computed and added to the df
 
 
     def __init__(self, spikes_df, *args, window_duration=15.0, window_start_time=0.0, neuron_colors=None, **kwargs):
@@ -127,8 +136,10 @@ class Spike3DRaster_Vedo(NeuronIdentityAccessingMixin, SpikeRenderingBaseMixin, 
         # by default we want the time axis to approximately span -20 to 20. So we set the temporal_zoom_factor to 
         self._temporal_zoom_factor = 40.0 / float(self.render_window_duration)        
         
-        self.enable_debug_print = False
+        # self.enable_debug_print = False
         self.enable_debug_widgets = False
+        
+        self.enable_debug_print = True
         
         # if neuron_colors is None:
         #     # neuron_colors = [pg.mkColor((i, self.n_cells*1.3)) for i, cell_id in enumerate(self.unit_ids)]
@@ -179,13 +190,13 @@ class Spike3DRaster_Vedo(NeuronIdentityAccessingMixin, SpikeRenderingBaseMixin, 
         
         # build the UI components:
         # self.buildUI()
-        
 
-    def on_window_changed(self):
-        # called when the window is updated
-        if self.enable_debug_print:
-            print(f'Spike3DRaster_Vedo.on_window_changed()')
-        self._update_plots()
+
+    # def on_window_changed(self):
+    #     # called when the window is updated
+    #     if self.enable_debug_print:
+    #         print(f'Spike3DRaster_Vedo.on_window_changed()')
+    #     self._update_plots()
         
             
     def _update_plots(self):
@@ -198,16 +209,16 @@ class Spike3DRaster_Vedo(NeuronIdentityAccessingMixin, SpikeRenderingBaseMixin, 
         # curr_spike_t = self.active_windowed_df[self.active_windowed_df.spikes.time_variable_name].to_numpy() # this will map
         # curr_unit_n_spikes = len(curr_spike_t)
         
-        const_z = 0.0
-        curr_x = np.interp(self.active_windowed_df[self.active_windowed_df.spikes.time_variable_name].to_numpy(), (self.spikes_window.active_window_start_time, self.spikes_window.active_window_end_time), (-self.half_temporal_axis_length, +self.half_temporal_axis_length))
-        pts = np.c_[curr_x, self.active_windowed_df['visualization_raster_y_location'].to_numpy(), np.full_like(curr_x, const_z)] # y-locations are already pre-computed and added to the df
-
-        # Create a mesh to be used like a symbol (a "glyph") to be attached to each point
-        cone = Cone().scale(0.3) # make it smaller and orient tip to positive x
-        # .rotateY(90) # orient tip to positive x
-        self.glyph = Glyph(pts, cone)
-        # glyph = Glyph(pts, cone, vecs, scaleByVectorSize=True, colorByVectorSize=True)
-        self.glyph.lighting('ambient') # .cmap('Blues').addScalarBar(title='wind speed')
+        if self.glyph is None:        
+            # Create a mesh to be used like a symbol (a "glyph") to be attached to each point
+            self.cone = Cone().scale(0.3) # make it smaller and orient tip to positive x
+            # .rotateY(90) # orient tip to positive x
+            self.glyph = Glyph(self.active_spike_render_points, self.cone)
+            # glyph = Glyph(pts, cone, vecs, scaleByVectorSize=True, colorByVectorSize=True)
+            self.glyph.lighting('ambient') # .cmap('Blues').addScalarBar(title='wind speed')
+        else:
+            # already have self.glyph created, just need to update its points
+            self.glyph.points(self.active_spike_render_points)
         
         
         # show with:
@@ -248,4 +259,12 @@ class Spike3DRaster_Vedo(NeuronIdentityAccessingMixin, SpikeRenderingBaseMixin, 
     
         # Update the additional display lines information on the overlay:
         # self.ui.viewport_overlay.additional_overlay_text_lines = self.overlay_text_lines
+        
+    def increase_animation_frame_val(self):
+        self.shift_animation_frame_val(1)
+        
+    def shift_animation_frame_val(self, shift_frames: int):
+        next_start_timestamp = self.spikes_window.active_window_start_time + (self.animation_time_step * float(shift_frames))
+        self.spikes_window.update_window_start(next_start_timestamp)
+        
         

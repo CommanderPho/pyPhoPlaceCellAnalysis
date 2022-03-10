@@ -590,7 +590,6 @@ class Spike3DRaster(NeuronIdentityAccessingMixin, SpikeRenderingBaseMixin, Spike
     def increase_animation_frame_val(self):
         self.shift_animation_frame_val(1)
         
-        
     def shift_animation_frame_val(self, shift_frames: int):
         next_start_timestamp = self.spikes_window.active_window_start_time + (self.animation_time_step * float(shift_frames))
         self.spikes_window.update_window_start(next_start_timestamp)
