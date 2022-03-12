@@ -173,10 +173,14 @@ class Spike3DRaster(NeuronIdentityAccessingMixin, SpikeRenderingBaseMixin, Spike
         # self.spike_end_z = 0.1
         self.params.spike_end_z = -6.0
         self.params.side_bin_margins = 0.0 # space to sides of the first and last cell on the y-axis
+        
+        self.params.center_mode = 'zero_centered'
+        
+        # self.params.bin_position_mode = ''bin_center'
+        self.params.bin_position_mode = 'left_edges'
+        
         # by default we want the time axis to approximately span -20 to 20. So we set the temporal_zoom_factor to 
         self._temporal_zoom_factor = 40.0 / float(self.render_window_duration)        
-        
-        
         
         self.enable_debug_print = False
         self.enable_debug_widgets = False
@@ -211,8 +215,9 @@ class Spike3DRaster(NeuronIdentityAccessingMixin, SpikeRenderingBaseMixin, Spike
         self.params.neuron_colors_hex = [self.params.neuron_qcolors[i].name(QtGui.QColor.HexRgb) for i, cell_id in enumerate(self.unit_ids)] 
         
         # included_cell_INDEXES = np.array([self.get_neuron_id_and_idx(neuron_id=an_included_cell_ID)[0] for an_included_cell_ID in self.spikes_df['aclu'].to_numpy()]) # get the indexes from the cellIDs
+        
         # self.spikes_df['cell_idx'] = included_cell_INDEXES.copy()
-        self.spikes_df['cell_idx'] = self.spikes_df['unit_id'].copy() # TODO: this is bad! The self.get_neuron_id_and_idx(...) function doesn't work!
+        # self.spikes_df['cell_idx'] = self.spikes_df['unit_id'].copy() # TODO: this is bad! The self.get_neuron_id_and_idx(...) function doesn't work!
         
         # self.setup_spike_rendering_mixin() # NeuronIdentityAccessingMixin
         
@@ -360,7 +365,8 @@ class Spike3DRaster(NeuronIdentityAccessingMixin, SpikeRenderingBaseMixin, Spike
         self.ui.gl_line_plots = [] # create an empty array for each GLLinePlotItem, of which there will be one for each unit.
         
         # build the position range for each unit along the y-axis:
-        y = DataSeriesToSpatial.build_series_identity_axis(self.n_cells, center_mode='zero_centered', bin_position_mode='bin_center', side_bin_margins = self.params.side_bin_margins)
+        # y = DataSeriesToSpatial.build_series_identity_axis(self.n_cells, center_mode='zero_centered', bin_position_mode='bin_center', side_bin_margins = self.params.side_bin_margins)
+        y = DataSeriesToSpatial.build_series_identity_axis(self.n_cells, center_mode=self.params.center_mode, bin_position_mode=self.params.bin_position_mode, side_bin_margins = self.params.side_bin_margins)
         
         # Plot each unit one at a time:
         for i, cell_id in enumerate(self.unit_ids):
@@ -469,7 +475,8 @@ class Spike3DRaster(NeuronIdentityAccessingMixin, SpikeRenderingBaseMixin, Spike
             print(f'Spike3DRaster._update_plots()')
         assert (len(self.ui.gl_line_plots) == self.n_cells), f"after all operations the length of the plots array should be the same as the n_cells, but len(self.ui.gl_line_plots): {len(self.ui.gl_line_plots)} and self.n_cells: {self.n_cells}!"
         # build the position range for each unit along the y-axis:
-        y = DataSeriesToSpatial.build_series_identity_axis(self.n_cells, center_mode='zero_centered', bin_position_mode='bin_center', side_bin_margins = self.params.side_bin_margins)
+        # y = DataSeriesToSpatial.build_series_identity_axis(self.n_cells, center_mode='zero_centered', bin_position_mode='bin_center', side_bin_margins = self.params.side_bin_margins)
+        y = DataSeriesToSpatial.build_series_identity_axis(self.n_cells, center_mode=self.params.center_mode, bin_position_mode=self.params.bin_position_mode, side_bin_margins = self.params.side_bin_margins)
         
         # Plot each unit one at a time:
         for i, cell_id in enumerate(self.unit_ids):    
