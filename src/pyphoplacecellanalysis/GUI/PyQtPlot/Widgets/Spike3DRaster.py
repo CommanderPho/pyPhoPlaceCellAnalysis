@@ -117,9 +117,10 @@ class Spike3DRaster(NeuronIdentityAccessingMixin, SpikeRenderingBaseMixin, Spike
     @property
     def animation_time_step(self):
         """ How much to step forward in time at each frame of animation. """
-        # return (self.render_window_duration * 0.02) # each animation timestep is 2% of the render window duration
-        # return 0.05 # each animation timestep is a fixed 50ms
-        return 0.03 # faster then 30fps
+        return self.params.animation_time_step
+    @animation_time_step.setter
+    def animation_time_step(self, value):
+        self.params.animation_time_step = value
 
     # from NeuronIdentityAccessingMixin
     @property
@@ -181,6 +182,10 @@ class Spike3DRaster(NeuronIdentityAccessingMixin, SpikeRenderingBaseMixin, Spike
         
         # by default we want the time axis to approximately span -20 to 20. So we set the temporal_zoom_factor to 
         self._temporal_zoom_factor = 40.0 / float(self.render_window_duration)        
+        
+        # return 0.05 # each animation timestep is a fixed 50ms
+        # return 0.03 # faster then 30fps
+        self.params.animation_time_step = 0.03 
         
         self.enable_debug_print = False
         self.enable_debug_widgets = False
