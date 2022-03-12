@@ -244,6 +244,20 @@ class Spike3DRaster(NeuronIdentityAccessingMixin, SpikeRenderingBaseMixin, Spike
         self.buildUI()
         
 
+    def on_jump_left(self):
+        # Skip back some frames
+        self.shift_animation_frame_val(-5)
+        
+    def on_jump_right(self):
+        # Skip forward some frames
+        self.shift_animation_frame_val(5)
+        
+    def on_reverse_held(self):
+        # Change the direction of playback by changing the sign of the updating.
+        
+        
+        self.shift_animation_frame_val(5)
+        
         
     def buildUI(self):
         self.ui = PhoUIContainer()
@@ -292,7 +306,39 @@ class Spike3DRaster(NeuronIdentityAccessingMixin, SpikeRenderingBaseMixin, Spike
         self.ui.btn_slide_run.clicked.connect(self.btn_slide_run_clicked)
 
         self.ui.layout_slide_bar.addWidget(self.ui.btn_slide_run)
+        
+        
+        # MORE BUTTONS:
+        self.ui.btnReverse = QtWidgets.QPushButton("Reverse")
+        self.ui.btnReverse.setMinimumHeight(25)
+        self.ui.btnReverse.setMinimumWidth(30)
+        self.ui.btnReverse.clicked.connect(self.on_reverse_held)
+        self.ui.layout_slide_bar.addWidget(self.ui.btnReverse)
+        
+        
+        
+        
+        self.ui.btnLeft = QtWidgets.QPushButton("<-")
+        self.ui.btnLeft.setMinimumHeight(25)
+        self.ui.btnLeft.setMinimumWidth(30)
+        self.ui.btnLeft.clicked.connect(self.on_jump_left)
+        self.ui.layout_slide_bar.addWidget(self.ui.btnLeft)
+        
+        self.ui.btnRight = QtWidgets.QPushButton("->")
+        self.ui.btnRight.setMinimumHeight(25)
+        self.ui.btnRight.setMinimumWidth(30)
+        self.ui.btnRight.clicked.connect(self.on_jump_right)
+        self.ui.layout_slide_bar.addWidget(self.ui.btnRight)
+        
+        
+        
+        
+        
         self.ui.layout.addWidget(self.ui.panel_slide_bar, 1, 0) 
+        
+        
+        
+        
         
         self.setLayout(self.ui.layout)
         self.resize(1920, 900)
