@@ -165,6 +165,29 @@ class Spike3DRaster(NeuronIdentityAccessingMixin, SpikeRenderingBaseMixin, Spike
         
 
 
+    @property
+    def axes_walls_z_height(self):
+        """The axes_walls_z_height property."""
+        return self._axes_walls_z_height
+    
+    
+    @property
+    def z_floor(self):
+        """The offset of the floor in the z-axis."""
+        return -10
+    
+    
+    
+
+    # @property
+    # def cell_id_axis_length(self):
+    #     """The cell_id_axis_length property."""
+    #     return self._cell_id_axis_length
+
+
+
+
+
     def __init__(self, spikes_df, *args, window_duration=15.0, window_start_time=0.0, neuron_colors=None, **kwargs):
         super(Spike3DRaster, self).__init__(*args, **kwargs)
         # Initialize member variables:
@@ -192,7 +215,7 @@ class Spike3DRaster(NeuronIdentityAccessingMixin, SpikeRenderingBaseMixin, Spike
         self.params.animation_time_step = 0.03 
         
         self.enable_debug_print = False
-        self.enable_debug_widgets = False
+        self.enable_debug_widgets = True
         
         if neuron_colors is None:
             # neuron_colors = [pg.mkColor((i, self.n_cells*1.3)) for i, cell_id in enumerate(self.unit_ids)]
@@ -453,13 +476,24 @@ class Spike3DRaster(NeuronIdentityAccessingMixin, SpikeRenderingBaseMixin, Spike
         # XY-plane (with normal in z-dir):
         z_color = (155, 155, 255, 76.5)
         self.ui.gz = gl.GLGridItem(color=z_color) # 'z' plane, blue
-        self.ui.gz.translate(0, 0, -10) # Shift down by 10 units in the z-dir
+        self.ui.gz.translate(0, 0, self.z_floor) # Shift down by 10 units in the z-dir
         self.ui.gz.setSize(self.temporal_axis_length, self.n_full_cell_grid)
         self.ui.gz.setSpacing(20.0, 1)
         # gz.setSize(n_full_cell_grid, n_full_cell_grid)
         w.addItem(self.ui.gz)
-        self.ui.z_txtitem = gl.GLTextItem(pos=(-self.half_temporal_axis_length, -self.n_half_cells, 10.5), text='z', color=z_color)  # The axis label text 
+        self.ui.z_txtitem = gl.GLTextItem(pos=(-self.half_temporal_axis_length, -self.n_half_cells, (self.z_floor + 0.5)), text='z', color=z_color)  # The axis label text 
         w.addItem(self.ui.z_txtitem)
+        
+        
+        
+        self.ui.gl_test_points = []
+        md = gl.MeshData.sphere(rows=10, cols=20)
+        m1 = gl.GLMeshItem(meshdata=md, smooth=False, drawFaces=False, drawEdges=True, edgeColor=(1,1,1,1))
+        m1.translate(5, 0, 0)
+        m1.setGLOptions('additive')
+        w.addItem(m1)
+        self.ui.gl_test_points.append(m1)
+        
         
         # Custom 3D raster plot:
         
@@ -472,10 +506,11 @@ class Spike3DRaster(NeuronIdentityAccessingMixin, SpikeRenderingBaseMixin, Spike
         # y = DataSeriesToSpatial.build_series_identity_axis(self.n_cells, center_mode='zero_centered', bin_position_mode='bin_center', side_bin_margins = self.params.side_bin_margins)
         y = DataSeriesToSpatial.build_series_identity_axis(self.n_cells, center_mode=self.params.center_mode, bin_position_mode=self.params.bin_position_mode, side_bin_margins = self.params.side_bin_margins)
         
+        self._build_neuron_id_graphics(w, y)
+        
         # Plot each unit one at a time:
         for i, cell_id in enumerate(self.unit_ids):
             curr_color = pg.mkColor((i, self.n_cells*1.3))
-            # curr_color.SetAlpha(120) # alpha should be between 0-255
             curr_color.setAlphaF(0.5)
             # print(f'cell_id: {cell_id}, curr_color: {curr_color.alpha()}')
             
@@ -511,6 +546,28 @@ class Spike3DRaster(NeuronIdentityAccessingMixin, SpikeRenderingBaseMixin, Spike
             w.addItem(plt)
             self.ui.gl_line_plots.append(plt)
 
+
+    def _build_neuron_id_graphics(self, w, y_pos):
+        # builds the text items to indicate the neuron ID for each neuron in the df.
+        all_cell_ids = self.cell_ids
+        self.ui.glCellIdTextItems = []
+        for i, cell_id in enumerate(all_cell_ids):
+            curr_color = pg.mkColor((i, self.n_cells*1.3))
+            curr_color.setAlphaF(0.5)
+            # print(f'cell_id: {cell_id}, curr_color: {curr_color.alpha()}')
+            curr_id_txtitem = gl.GLTextItem(pos=(-self.half_temporal_axis_length, y_pos[i], (self.z_floor - 0.5)), text=f'{cell_id}', color=curr_color)
+            w.addItem(curr_id_txtitem) # add to the current widget
+            # add to the cell_ids array
+            self.ui.glCellIdTextItems.append(curr_id_txtitem)
+                    
+
+
+    # def _build_axes_arrow_graphics(self, w):
+        
+    #     md = gl.MeshData.cylinder(rows=10, cols=20, radius=[1., 2.0], length=5.)
+        
+        
+        
     ###################################
     #### EVENT HANDLERS
     ##################################
@@ -540,11 +597,11 @@ class Spike3DRaster(NeuronIdentityAccessingMixin, SpikeRenderingBaseMixin, Spike
         self.ui.y_txtitem.translate(self.half_temporal_axis_length+0.5, -self.n_half_cells, 0.0)
         
         self.ui.gz.resetTransform()
-        self.ui.gz.translate(0, 0, -10) # Shift down by 10 units in the z-dir
+        self.ui.gz.translate(0, 0, self.z_floor) # Shift down by 10 units in the z-dir
         self.ui.gz.setSize(self.temporal_axis_length, self.n_full_cell_grid)
         self.ui.z_txtitem.resetTransform()
-        self.ui.z_txtitem.translate(-self.half_temporal_axis_length, -self.n_half_cells, 10.5)
-        
+        self.ui.z_txtitem.translate(-self.half_temporal_axis_length, -self.n_half_cells, (self.z_floor + -0.5))
+
         
         
     def keyPressEvent(self, e):
@@ -693,6 +750,10 @@ class Spike3DRaster(NeuronIdentityAccessingMixin, SpikeRenderingBaseMixin, Spike
         total_spikes_df_duration = latest_t - earliest_t # get the duration of the entire spikes df
         render_window_offset = (total_spikes_df_duration * relative_offset) + earliest_t
         return render_window_offset
+    
+    
+    
+    
     
     def btn_slide_run_clicked(self):
         if self.ui.btn_slide_run.tag == "paused" or self.slidebar_val == 1:
