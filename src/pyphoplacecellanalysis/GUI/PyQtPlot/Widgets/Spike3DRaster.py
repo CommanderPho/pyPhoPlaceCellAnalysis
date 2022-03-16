@@ -18,6 +18,7 @@ from pyphoplacecellanalysis.General.Mixins.SpikesRenderingBaseMixin import Spike
 from pyphocorehelpers.indexing_helpers import interleave_elements, partition
 from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer
 from pyphocorehelpers.gui.Qt.ToggleButton import ToggleButtonModel, ToggleButton
+from pyphocorehelpers.gui.Qt.HighlightedJumpSlider import HighlightedJumpSlider
 
 # import qdarkstyle
 
@@ -269,9 +270,6 @@ class Spike3DRaster(NeuronIdentityAccessingMixin, SpikeRenderingBaseMixin, Spike
         
         self.params.is_playback_reversed = False
         
-        
-        
-        
         self.params.spike_start_z = -10.0
         # self.spike_end_z = 0.1
         self.params.spike_end_z = -6.0
@@ -289,7 +287,7 @@ class Spike3DRaster(NeuronIdentityAccessingMixin, SpikeRenderingBaseMixin, Spike
         # return 0.03 # faster then 30fps
         self.params.animation_time_step = 0.04 
         
-        self.enable_debug_print = False
+        self.enable_debug_print = True
         self.enable_debug_widgets = True
         
         if neuron_colors is None:
@@ -348,6 +346,8 @@ class Spike3DRaster(NeuronIdentityAccessingMixin, SpikeRenderingBaseMixin, Spike
         # Setup Signals:
         self.temporal_mapping_changed.connect(self.on_adjust_temporal_spatial_mapping)
         
+        self.spikes_window.window_duration_changed_signal.connect(self.on_adjust_temporal_spatial_mapping)
+        # self.on_window_duration_changed.connect(self.on_adjust_temporal_spatial_mapping)
 
     def buildUI(self):
         """ for QGridLayout
@@ -418,19 +418,25 @@ class Spike3DRaster(NeuronIdentityAccessingMixin, SpikeRenderingBaseMixin, Spike
         
         
         # Playback Slider:
-        self.ui.slider = QtWidgets.QSlider(QtCore.Qt.Horizontal)
+        # self.ui.slider = QtWidgets.QSlider(QtCore.Qt.Horizontal)
+        # self.ui.slider = HighlightedJumpSlider(QtCore.Qt.Horizontal)
+        self.ui.slider = HighlightedJumpSlider()
         self.ui.slider.setSizePolicy(QtGui.QSizePolicy.Expanding, QtGui.QSizePolicy.Preferred)
         # self.ui.slider.setFocusPolicy(Qt.NoFocus) # removes ugly focus rectangle frm around the slider
         self.ui.slider.setRange(0, 100)
         self.ui.slider.setSingleStep(1)
         # self.ui.slider.setSingleStep(2)
         self.ui.slider.setValue(0)
-        self.ui.slider.setWindowFlags(self.windowFlags() | QtCore.Qt.FramelessWindowHint)
-        self.ui.slider.setAttribute(QtCore.Qt.WA_TranslucentBackground)
-        self.ui.slider.setStyleSheet("background:transparent;")        
+        # self.ui.slider.setWindowFlags(self.windowFlags() | QtCore.Qt.FramelessWindowHint)
+        # self.ui.slider.setAttribute(QtCore.Qt.WA_TranslucentBackground)
+        # self.ui.slider.setStyleSheet("background:transparent;")        
         # self.ui.slider.valueChanged.connect(self.slider_val_changed)
         # sliderMoved vs valueChanged? vs sliderChange?
         self.ui.layout_slide_bar.addWidget(self.ui.slider)
+        
+        
+        
+        
 
         # Button: Play/Pause
         # self.ui.btn_slide_run = QtWidgets.QPushButton(">")
@@ -467,9 +473,39 @@ class Spike3DRaster(NeuronIdentityAccessingMixin, SpikeRenderingBaseMixin, Spike
         
         ####################################################
         ####  Controls Bar Right #######
+        # spins = [
+        #     ("Floating-point spin box, min=0, no maximum.<br>Non-finite values (nan, inf) are permitted.",
+        #     pg.SpinBox(value=5.0, bounds=[0, None], finite=False)),
+        #     ("Integer spin box, dec stepping<br>(1-9, 10-90, 100-900, etc), decimals=4", 
+        #     pg.SpinBox(value=10, int=True, dec=True, minStep=1, step=1, decimals=4)),
+        #     ("Float with SI-prefixed units<br>(n, u, m, k, M, etc)", 
+        #     pg.SpinBox(value=0.9, suffix='V', siPrefix=True)),
+        #     ("Float with SI-prefixed units,<br>dec step=0.1, minStep=0.1", 
+        #     pg.SpinBox(value=1.0, suffix='PSI', siPrefix=True, dec=True, step=0.1, minStep=0.1)),
+        #     ("Float with SI-prefixed units,<br>dec step=0.5, minStep=0.01", 
+        #     pg.SpinBox(value=1.0, suffix='V', siPrefix=True, dec=True, step=0.5, minStep=0.01)),
+        #     ("Float with SI-prefixed units,<br>dec step=1.0, minStep=0.001", 
+        #     pg.SpinBox(value=1.0, suffix='V', siPrefix=True, dec=True, step=1.0, minStep=0.001)),
+        #     ("Float with SI prefix but no suffix",
+        #     pg.SpinBox(value=1e9, siPrefix=True)),
+        #     ("Float with custom formatting", 
+        #     pg.SpinBox(value=23.07, format='${value:0.02f}',
+        #                 regex='\$?(?P<number>(-?\d+(\.\d+)?)|(-?\.\d+))$')),
+        #     ("Int with suffix",
+        #     pg.SpinBox(value=999, step=1, int=True, suffix="V")),
+        #     ("Int with custom formatting", 
+        #     pg.SpinBox(value=4567, step=1, int=True, bounds=[0,None], format='0x{value:X}', 
+        #                 regex='(0x)?(?P<number>[0-9a-fA-F]+)$',
+        #                 evalFunc=lambda s: ast.literal_eval('0x'+s))),
+        #     ("Integer with bounds=[10, 20] and wrapping",
+        #     pg.SpinBox(value=10, bounds=[10, 20], int=True, minStep=1, step=1, wrapping=True)),
+        # ]
+        
+        
+        self.ui.right_controls_labels = []
         self.ui.right_controls_panel = QtWidgets.QWidget()
         self.ui.right_controls_panel.setSizePolicy(QtGui.QSizePolicy.Preferred, QtGui.QSizePolicy.Expanding) # Expands to fill the vertical height, but occupy only the preferred width
-        self.ui.right_controls_panel.setMaximumWidth(50.0)
+        self.ui.right_controls_panel.setMaximumWidth(100.0)
         # Try to make the bottom widget bar transparent:
         self.ui.right_controls_panel.setWindowFlags(self.windowFlags() | QtCore.Qt.FramelessWindowHint)
         self.ui.right_controls_panel.setAttribute(QtCore.Qt.WA_TranslucentBackground)
@@ -477,24 +513,58 @@ class Spike3DRaster(NeuronIdentityAccessingMixin, SpikeRenderingBaseMixin, Spike
         
         # Playback Slider Bottom Bar:
         self.ui.layout_right_bar = QtWidgets.QVBoxLayout()
-        self.ui.layout_right_bar.setContentsMargins(6, 3, 4, 4)
+        self.ui.layout_right_bar.setContentsMargins(10, 4, 4, 4)
         self.ui.right_controls_panel.setLayout(self.ui.layout_right_bar)
+        # self.ui.layout_right_bar.addSpacing(50)
 
         # Playback Slider:
         self.ui.slider_right = QtWidgets.QSlider(QtCore.Qt.Vertical)
-        self.ui.slider_right.setSizePolicy(QtGui.QSizePolicy.Expanding, QtGui.QSizePolicy.Preferred)
+        # self.ui.slider_right.setSizePolicy(QtGui.QSizePolicy.Expanding, QtGui.QSizePolicy.Preferred)
+        self.ui.slider_right.setSizePolicy(QtGui.QSizePolicy.Preferred, QtGui.QSizePolicy.Expanding)
         # self.ui.slider.setFocusPolicy(Qt.NoFocus) # removes ugly focus rectangle frm around the slider
         self.ui.slider_right.setRange(0, 100)
         self.ui.slider_right.setSingleStep(1)
         # self.ui.slider_right.setSingleStep(2)
         self.ui.slider_right.setValue(0)
-        self.ui.slider_right.setWindowFlags(self.windowFlags() | QtCore.Qt.FramelessWindowHint)
-        self.ui.slider_right.setAttribute(QtCore.Qt.WA_TranslucentBackground)
-        self.ui.slider_right.setStyleSheet("background:transparent;")        
+        # self.ui.slider_right.setWindowFlags(self.windowFlags() | QtCore.Qt.FramelessWindowHint)
+        # self.ui.slider_right.setAttribute(QtCore.Qt.WA_TranslucentBackground)
+        # self.ui.slider_right.setStyleSheet("background:transparent;")        
         # self.ui.slider.valueChanged.connect(self.slider_val_changed)
         # sliderMoved vs valueChanged? vs sliderChange?
         self.ui.layout_right_bar.addWidget(self.ui.slider_right)
+        
+        
+        # Animation_time_step:
+        label = QtWidgets.QLabel('animation_time_step')
+        label.setSizePolicy(QtGui.QSizePolicy.Preferred, QtGui.QSizePolicy.Minimum)
+        self.ui.right_controls_labels.append(label)
+        self.ui.layout_right_bar.addWidget(label)
+        self.ui.spinAnimationTimeStep = pg.SpinBox(value=self.animation_time_step, suffix='Sec', siPrefix=True, dec=True, step=0.01, minStep=0.01)
+        self.ui.spinAnimationTimeStep.sigValueChanged.connect(self.animation_time_step_valueChanged)
+        
+        self.ui.layout_right_bar.addWidget(self.ui.spinAnimationTimeStep)
 
+        # temporal_zoom_factor:
+        label = QtWidgets.QLabel('temporal_zoom_factor')
+        label.setSizePolicy(QtGui.QSizePolicy.Preferred, QtGui.QSizePolicy.Minimum)
+        self.ui.right_controls_labels.append(label)
+        self.ui.layout_right_bar.addWidget(label)
+        self.ui.spinTemporalZoomFactor = pg.SpinBox(value=self.temporal_zoom_factor, suffix='x', siPrefix=False, dec=True, step=0.1, minStep=0.1)
+        self.ui.spinTemporalZoomFactor.sigValueChanged.connect(self.temporal_zoom_factor_valueChanged)
+        self.ui.layout_right_bar.addWidget(self.ui.spinTemporalZoomFactor)
+        
+        # render_window_duration:
+        label = QtWidgets.QLabel('render_window_duration')
+        label.setSizePolicy(QtGui.QSizePolicy.Preferred, QtGui.QSizePolicy.Minimum)
+        self.ui.right_controls_labels.append(label)
+        self.ui.layout_right_bar.addWidget(label)
+        self.ui.spinRenderWindowDuration = pg.SpinBox(value=self.render_window_duration, suffix='Sec', siPrefix=True, dec=True, step=0.5, minStep=0.1)
+        self.ui.spinRenderWindowDuration.sigValueChanged.connect(self.render_window_duration_valueChanged)
+        self.ui.layout_right_bar.addWidget(self.ui.spinRenderWindowDuration)
+
+        self.ui.layout_right_bar.addSpacing(50)
+        # verticalSpacer = QtWidgets.QSpacerItem(20, 40, QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Expanding)
+        # self.ui.layout_right_bar.addWidget(verticalSpacer)
         
         
         # addWidget(widget, row, column, rowSpan, columnSpan, Qt.Alignment alignment = 0)
@@ -596,9 +666,9 @@ class Spike3DRaster(NeuronIdentityAccessingMixin, SpikeRenderingBaseMixin, Spike
         
         # build the position range for each unit along the y-axis:
         # y = DataSeriesToSpatial.build_series_identity_axis(self.n_cells, center_mode='zero_centered', bin_position_mode='bin_center', side_bin_margins = self.params.side_bin_margins)
-        y = DataSeriesToSpatial.build_series_identity_axis(self.n_cells, center_mode=self.params.center_mode, bin_position_mode=self.params.bin_position_mode, side_bin_margins = self.params.side_bin_margins)
+        self.y = DataSeriesToSpatial.build_series_identity_axis(self.n_cells, center_mode=self.params.center_mode, bin_position_mode=self.params.bin_position_mode, side_bin_margins = self.params.side_bin_margins)
         
-        self._build_neuron_id_graphics(w, y)
+        self._build_neuron_id_graphics(w, self.y)
         
         # Plot each unit one at a time:
         for i, cell_id in enumerate(self.unit_ids):
@@ -610,7 +680,7 @@ class Spike3DRaster(NeuronIdentityAccessingMixin, SpikeRenderingBaseMixin, Spike
             curr_cell_df = self.active_windowed_df[self.active_windowed_df['unit_id']==cell_id].copy() # is .copy() needed here since nothing is updated???
             # curr_unit_id = curr_cell_df['unit_id'].to_numpy() # this will map to the y position
             curr_spike_t = curr_cell_df[curr_cell_df.spikes.time_variable_name].to_numpy() # this will map 
-            yi = y[i] # get the correct y-position for all spikes of this cell
+            yi = self.y[i] # get the correct y-position for all spikes of this cell
             # print(f'cell_id: {cell_id}, yi: {yi}')
             # map the current spike times back onto the range of the window's (-half_render_window_duration, +half_render_window_duration) so they represent the x coordinate
             curr_x = np.interp(curr_spike_t, (self.spikes_window.active_window_start_time, self.spikes_window.active_window_end_time), (-self.half_temporal_axis_length, +self.half_temporal_axis_length))
@@ -651,9 +721,18 @@ class Spike3DRaster(NeuronIdentityAccessingMixin, SpikeRenderingBaseMixin, Spike
             w.addItem(curr_id_txtitem) # add to the current widget
             # add to the cell_ids array
             self.ui.glCellIdTextItems.append(curr_id_txtitem)
+           
                 
-            
-
+    def _update_neuron_id_graphics(self):
+        """ updates the text items to indicate the neuron ID for each neuron in the df. """
+        all_cell_ids = self.cell_ids
+        assert len(self.ui.glCellIdTextItems) == len(all_cell_ids), f"we should already have correct number of neuron ID text items, but len(self.ui.glCellIdTextItems): {len(self.ui.glCellIdTextItems)} and len(all_cell_ids): {len(all_cell_ids)}!"
+        assert len(self.ui.glCellIdTextItems) == len(self.y), f"we should already have correct number of neuron ID text items, but len(self.ui.glCellIdTextItems): {len(self.ui.glCellIdTextItems)} and len(self.y): {len(self.y)}!"
+        for i, cell_id in enumerate(all_cell_ids):
+            curr_id_txtitem = self.ui.glCellIdTextItems[i]
+            curr_id_txtitem.setData(pos=(-self.half_temporal_axis_length, self.y[i], (self.z_floor - 0.5)))
+            # curr_id_txtitem.resetTransform()
+            # curr_id_txtitem.translate(-self.half_temporal_axis_length, self.y[i], (self.z_floor - 0.5))
 
     # def _build_axes_arrow_graphics(self, w):
         
@@ -664,6 +743,8 @@ class Spike3DRaster(NeuronIdentityAccessingMixin, SpikeRenderingBaseMixin, Spike
     ###################################
     #### EVENT HANDLERS
     ##################################
+    
+    
     
     @QtCore.pyqtSlot()
     def on_adjust_temporal_spatial_mapping(self):
@@ -679,21 +760,26 @@ class Spike3DRaster(NeuronIdentityAccessingMixin, SpikeRenderingBaseMixin, Spike
         self.ui.gx.rotate(90, 0, 1, 0)
         self.ui.gx.translate(-self.half_temporal_axis_length, 0, 0) # shift backwards
         self.ui.gx.setSize(20, self.n_full_cell_grid) # std size in z-dir, n_cell size across
-        self.ui.x_txtitem.resetTransform()
-        self.ui.x_txtitem.translate(-self.half_temporal_axis_length, self.n_half_cells, 0.0)
+        # self.ui.x_txtitem.resetTransform()
+        # self.ui.x_txtitem.translate(-self.half_temporal_axis_length, self.n_half_cells, 0.0)
+        self.ui.x_txtitem.setData(pos=(-self.half_temporal_axis_length, self.n_half_cells, 0.0))
         
         self.ui.gy.resetTransform()
         self.ui.gy.rotate(90, 1, 0, 0)
         self.ui.gy.translate(0, -self.n_half_cells, 0) # offset by half the number of units in the -y direction
         self.ui.gy.setSize(self.temporal_axis_length, 20)
-        self.ui.y_txtitem.resetTransform()
-        self.ui.y_txtitem.translate(self.half_temporal_axis_length+0.5, -self.n_half_cells, 0.0)
+        # self.ui.y_txtitem.resetTransform()
+        # self.ui.y_txtitem.translate(self.half_temporal_axis_length+0.5, -self.n_half_cells, 0.0)
+        self.ui.y_txtitem.setData(pos=(self.half_temporal_axis_length+0.5, -self.n_half_cells, 0.0))
         
         self.ui.gz.resetTransform()
         self.ui.gz.translate(0, 0, self.z_floor) # Shift down by 10 units in the z-dir
         self.ui.gz.setSize(self.temporal_axis_length, self.n_full_cell_grid)
-        self.ui.z_txtitem.resetTransform()
-        self.ui.z_txtitem.translate(-self.half_temporal_axis_length, -self.n_half_cells, (self.z_floor + -0.5))
+        # self.ui.z_txtitem.resetTransform()
+        # self.ui.z_txtitem.translate(-self.half_temporal_axis_length, -self.n_half_cells, (self.z_floor + -0.5))
+        self.ui.z_txtitem.setData(pos=(-self.half_temporal_axis_length, -self.n_half_cells, (self.z_floor + -0.5)))
+        
+        self._update_neuron_id_graphics()
 
         
     # Input Handelers:        
@@ -793,7 +879,7 @@ class Spike3DRaster(NeuronIdentityAccessingMixin, SpikeRenderingBaseMixin, Spike
         assert (len(self.ui.gl_line_plots) == self.n_cells), f"after all operations the length of the plots array should be the same as the n_cells, but len(self.ui.gl_line_plots): {len(self.ui.gl_line_plots)} and self.n_cells: {self.n_cells}!"
         # build the position range for each unit along the y-axis:
         # y = DataSeriesToSpatial.build_series_identity_axis(self.n_cells, center_mode='zero_centered', bin_position_mode='bin_center', side_bin_margins = self.params.side_bin_margins)
-        y = DataSeriesToSpatial.build_series_identity_axis(self.n_cells, center_mode=self.params.center_mode, bin_position_mode=self.params.bin_position_mode, side_bin_margins = self.params.side_bin_margins)
+        self.y = DataSeriesToSpatial.build_series_identity_axis(self.n_cells, center_mode=self.params.center_mode, bin_position_mode=self.params.bin_position_mode, side_bin_margins = self.params.side_bin_margins)
         
         # Plot each unit one at a time:
         for i, cell_id in enumerate(self.unit_ids):    
@@ -805,7 +891,7 @@ class Spike3DRaster(NeuronIdentityAccessingMixin, SpikeRenderingBaseMixin, Spike
             
             curr_unit_n_spikes = len(curr_spike_t)
             
-            yi = y[i] # get the correct y-position for all spikes of this cell
+            yi = self.y[i] # get the correct y-position for all spikes of this cell
             # map the current spike times back onto the range of the window's (-half_render_window_duration, +half_render_window_duration) so they represent the x coordinate
             # curr_x = np.interp(curr_spike_t, (self.spikes_window.active_window_start_time, self.spikes_window.active_window_end_time), (-self.half_render_window_duration, +self.half_render_window_duration))
             curr_x = np.interp(curr_spike_t, (self.spikes_window.active_window_start_time, self.spikes_window.active_window_end_time), (-self.half_temporal_axis_length, +self.half_temporal_axis_length))
@@ -870,7 +956,21 @@ class Spike3DRaster(NeuronIdentityAccessingMixin, SpikeRenderingBaseMixin, Spike
 
 
     
+    def animation_time_step_valueChanged(self, sb):
+        # print(f'sb: {sb}, sb.value(): {str(sb.value())}')
+        old_value = self.animation_time_step
+        self.animation_time_step = sb.value()
+        # changedLabel.setText("Final value: %s" % str(sb.value()))
     
+    def temporal_zoom_factor_valueChanged(self, sb):
+        # print(f'sb: {sb}, sb.value(): {str(sb.value())}')
+        old_value = self.temporal_zoom_factor
+        self.temporal_zoom_factor = sb.value()
+        
+    def render_window_duration_valueChanged(self, sb):
+        # print(f'sb: {sb}, sb.value(): {str(sb.value())}')
+        old_value = self.render_window_duration
+        self.render_window_duration = sb.value()
     
     # Called when the play/pause button is clicked:
     def play_pause(self):
