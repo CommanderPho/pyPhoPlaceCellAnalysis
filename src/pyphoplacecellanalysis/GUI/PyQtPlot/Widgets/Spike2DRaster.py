@@ -246,7 +246,8 @@ class Spike2DRaster(SpikeRasterBase):
         self.ui.main_scroll_window_plot.addItem(self.ui.preview_overview_scatter_plot)
         
         # Add the linear region overlay:
-        self.ui.scroll_window_region = pg.LinearRegionItem(clipItem=self.ui.preview_overview_scatter_plot) # bound the LinearRegionItem to the plotted data
+        self.ui.scroll_window_region = pg.LinearRegionItem(pen=pg.mkPen('#fff'), brush=pg.mkBrush('#f004'), hoverBrush=pg.mkBrush('#fff4'), hoverPen=pg.mkPen('#f00'), clipItem=self.ui.preview_overview_scatter_plot) # bound the LinearRegionItem to the plotted data
+    
         self.ui.scroll_window_region.setZValue(10)
         # Add the LinearRegionItem to the ViewBox, but tell the ViewBox to exclude this item when doing auto-range calculations.
         self.ui.main_scroll_window_plot.addItem(self.ui.scroll_window_region, ignoreBounds=True)
@@ -363,8 +364,11 @@ class Spike2DRaster(SpikeRasterBase):
         # curr_spike_y = self.active_windowed_df['visualization_raster_y_location'].to_numpy() # this will map
         # curr_spike_pens = [self.config_unit_id_map[a_cell_id][2] for a_cell_id in self.active_windowed_df['unit_id'].to_numpy()] # get the pens for each spike from the configs map
         # curr_n = len(curr_spike_t) # curr number of spikes
-        curr_spike_x, curr_spike_y, curr_spike_pens, curr_n = self._build_spikes_data_values(self.active_windowed_df)
-        self.ui.scatter_plot.setData(x=curr_spike_x, y=curr_spike_y, pen=curr_spike_pens)
+        # curr_spike_x, curr_spike_y, curr_spike_pens, curr_n = self._build_spikes_data_values(self.active_windowed_df)
+        # self.ui.scatter_plot.setData(x=curr_spike_x, y=curr_spike_y, pen=curr_spike_pens)
+        
+        # TODO: just scroll since we set all spike data at once.
+        pass
         
 
     @QtCore.pyqtSlot()
@@ -373,6 +377,24 @@ class Spike2DRaster(SpikeRasterBase):
         self.ui.scroll_window_region.setZValue(10)
         min_x, max_x = self.ui.scroll_window_region.getRegion()
         self.ui.main_plot_widget.setXRange(min_x, max_x, padding=0)
+        # self.render_window_duration = (max_x - min_x) # update the render_window_duration from the slider width
+        scroll_window_width = max_x - min_x
+        # print(f'min_x: {min_x}, max_x: {max_x}, scroll_window_width: {scroll_window_width}') # min_x: 59.62061245756003, max_x: 76.83228787177144, scroll_window_width: 17.211675414211413
+
+        # Update the active time window to match the scroll window:
+        # old_time_window = spike_raster_plt.spikes_window.active_time_window # (30.0, 930.0)
+
+        # spike_raster_plt.render_window_duration = 
+        # spike_raster_plt.spikes_window
+        # spike_raster_plt.temporal_zoom_factor
+        # # self.spikes_window.update_window_start(next_start_timestamp)
+
+        self.ui.spinTemporalZoomFactor.setValue(1.0)
+        self.ui.spinRenderWindowDuration.setValue(scroll_window_width)
+        self.spikes_window.update_window_start(min_x)
+                
+        
+        # self.temporal_axis_length
 
     @QtCore.pyqtSlot()
     def update_region(self) -> None:
@@ -382,7 +404,7 @@ class Spike2DRaster(SpikeRasterBase):
         """
         rgn = self.ui.main_plot_widget.viewRange()[0]
         self.ui.scroll_window_region.setRegion(rgn)
-
+        # self.render_window_duration = (max_x - min_x) # update the render_window_duration from the slider width
 
 
     # Slider Functions:

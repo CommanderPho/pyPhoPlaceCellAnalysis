@@ -379,17 +379,17 @@ class SpikeRasterBase(NeuronIdentityAccessingMixin, SpikeRenderingBaseMixin, Spi
         
         
         # Playback Slider:
-        # self.ui.slider = QtWidgets.QSlider(QtCore.Qt.Horizontal)
-        # self.ui.slider = HighlightedJumpSlider(QtCore.Qt.Horizontal)
-        self.ui.slider = HighlightedJumpSlider()
-        self.ui.slider.setSizePolicy(QtGui.QSizePolicy.Expanding, QtGui.QSizePolicy.Preferred)
-        # self.ui.slider.setFocusPolicy(Qt.NoFocus) # removes ugly focus rectangle frm around the slider
-        self.ui.slider.setRange(0, 100)
-        self.ui.slider.setSingleStep(1)
-        self.ui.slider.setValue(0)
-        # self.ui.slider.valueChanged.connect(self.slider_val_changed)
-        # sliderMoved vs valueChanged? vs sliderChange?
-        self.ui.layout_slide_bar.addWidget(self.ui.slider)
+        # # self.ui.slider = QtWidgets.QSlider(QtCore.Qt.Horizontal)
+        # # self.ui.slider = HighlightedJumpSlider(QtCore.Qt.Horizontal)
+        # self.ui.slider = HighlightedJumpSlider()
+        # self.ui.slider.setSizePolicy(QtGui.QSizePolicy.Expanding, QtGui.QSizePolicy.Preferred)
+        # # self.ui.slider.setFocusPolicy(Qt.NoFocus) # removes ugly focus rectangle frm around the slider
+        # self.ui.slider.setRange(0, 100)
+        # self.ui.slider.setSingleStep(1)
+        # self.ui.slider.setValue(0)
+        # # self.ui.slider.valueChanged.connect(self.slider_val_changed)
+        # # sliderMoved vs valueChanged? vs sliderChange?
+        # self.ui.layout_slide_bar.addWidget(self.ui.slider)
         
             
         # Button: Reverse:
@@ -434,18 +434,17 @@ class SpikeRasterBase(NeuronIdentityAccessingMixin, SpikeRenderingBaseMixin, Spi
         # self.ui.layout_right_bar.addSpacing(50)
 
         # Playback Slider:
-        self.ui.slider_right = QtWidgets.QSlider(QtCore.Qt.Vertical)
-        # self.ui.slider_right.setSizePolicy(QtGui.QSizePolicy.Expanding, QtGui.QSizePolicy.Preferred)
-        self.ui.slider_right.setSizePolicy(QtGui.QSizePolicy.Preferred, QtGui.QSizePolicy.Expanding)
-        # self.ui.slider.setFocusPolicy(Qt.NoFocus) # removes ugly focus rectangle frm around the slider
-        self.ui.slider_right.setRange(0, 100)
-        self.ui.slider_right.setSingleStep(1)
-        # self.ui.slider_right.setSingleStep(2)
-        self.ui.slider_right.setValue(0)
-        # self.ui.slider.valueChanged.connect(self.slider_val_changed)
-        # sliderMoved vs valueChanged? vs sliderChange?
-        self.ui.layout_right_bar.addWidget(self.ui.slider_right)
-        
+        # self.ui.slider_right = QtWidgets.QSlider(QtCore.Qt.Vertical)
+        # # self.ui.slider_right.setSizePolicy(QtGui.QSizePolicy.Expanding, QtGui.QSizePolicy.Preferred)
+        # self.ui.slider_right.setSizePolicy(QtGui.QSizePolicy.Preferred, QtGui.QSizePolicy.Expanding)
+        # # self.ui.slider.setFocusPolicy(Qt.NoFocus) # removes ugly focus rectangle frm around the slider
+        # self.ui.slider_right.setRange(0, 100)
+        # self.ui.slider_right.setSingleStep(1)
+        # # self.ui.slider_right.setSingleStep(2)
+        # self.ui.slider_right.setValue(0)
+        # # self.ui.slider.valueChanged.connect(self.slider_val_changed)
+        # # sliderMoved vs valueChanged? vs sliderChange?
+        # self.ui.layout_right_bar.addWidget(self.ui.slider_right)
         
         # Animation_time_step:
         label = QtWidgets.QLabel('animation_time_step')
@@ -642,7 +641,8 @@ class SpikeRasterBase(NeuronIdentityAccessingMixin, SpikeRenderingBaseMixin, Spi
         
         if (not is_playing) or self.slidebar_val == 1:
             if self.slidebar_val == 1:
-                self.ui.slider.setValue(0)
+                # self.ui.slider.setValue(0)
+                pass
             # self.play_pause_model.setState(not is_playing)
             self.animationThread.start()
 
