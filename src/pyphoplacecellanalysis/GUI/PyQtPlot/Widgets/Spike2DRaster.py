@@ -89,53 +89,12 @@ class Spike2DRaster(SpikeRasterBase):
         super(Spike2DRaster, self).__init__(spikes_df, *args, window_duration=window_duration, window_start_time=window_start_time, neuron_colors=neuron_colors, **kwargs)
         # super(Spike2DRaster, self).__init__(*args, **kwargs)
         # Initialize member variables:
-    
-        # if neuron_colors is None:
-        #     # neuron_colors = [pg.mkColor((i, self.n_cells*1.3)) for i, cell_id in enumerate(self.unit_ids)]
-        #     neuron_colors = []
-        #     for i, cell_id in enumerate(self.unit_ids):
-        #         curr_color = pg.mkColor((i, self.n_cells*1.3))
-        #         curr_color.setAlphaF(0.5)
-        #         neuron_colors.append(curr_color)
-    
-        # self.params.neuron_qcolors = deepcopy(neuron_colors)
-
-        # # allocate new neuron_colors array:
-        # self.params.neuron_colors = np.zeros((4, self.n_cells))
-        # for i, curr_qcolor in enumerate(self.params.neuron_qcolors):
-        #     curr_color = curr_qcolor.getRgbF() # (1.0, 0.0, 0.0, 0.5019607843137255)
-        #     self.params.neuron_colors[:, i] = curr_color[:]
-        #     # self.params.neuron_colors[:, i] = curr_color[:]
             
-        # # self.params.neuron_colors = [self.params.neuron_qcolors[i].getRgbF() for i, cell_id in enumerate(self.unit_ids)] 
-        # # self.params.neuron_colors = deepcopy(neuron_colors)
-        # self.params.neuron_colors_hex = None
-        
-        # # spike_raster_plt.params.neuron_colors[0].getRgbF() # (1.0, 0.0, 0.0, 0.5019607843137255)
-        
-        # # get hex colors:
-        # #  getting the name of a QColor with .name(QtGui.QColor.HexRgb) results in a string like '#ff0000'
-        # #  getting the name of a QColor with .name(QtGui.QColor.HexArgb) results in a string like '#80ff0000' 
-        # # self.params.neuron_colors_hex = [to_hex(self.params.neuron_colors[:,i], keep_alpha=False) for i, cell_id in enumerate(self.unit_ids)]
-        # self.params.neuron_colors_hex = [self.params.neuron_qcolors[i].name(QtGui.QColor.HexRgb) for i, cell_id in enumerate(self.unit_ids)] 
-        
-        # included_cell_INDEXES = np.array([self.get_neuron_id_and_idx(neuron_id=an_included_cell_ID)[0] for an_included_cell_ID in self.spikes_df['aclu'].to_numpy()]) # get the indexes from the cellIDs
-        
-        # self.spikes_df['cell_idx'] = included_cell_INDEXES.copy()
-        # self.spikes_df['cell_idx'] = self.spikes_df['unit_id'].copy() # TODO: this is bad! The self.get_neuron_id_and_idx(...) function doesn't work!
-        
-        # self.setup_spike_rendering_mixin() # NeuronIdentityAccessingMixin
-        
-        # build the UI components:
-        # self.buildUI()
-        
-                
         # Setup Signals:
         self.temporal_mapping_changed.connect(self.on_adjust_temporal_spatial_mapping)
         self.spikes_window.window_duration_changed_signal.connect(self.on_adjust_temporal_spatial_mapping)
         # self.on_window_duration_changed.connect(self.on_adjust_temporal_spatial_mapping)
         self.show()
-
 
 
     def setup(self):
@@ -181,6 +140,28 @@ class Spike2DRaster(SpikeRasterBase):
             print('done.')
         # self.spikes_df
         
+    def _build_spikes_data_values(self, spikes_df):
+        # All units at once approach:
+        # Filter the dataframe using that column and value from the list
+        curr_spike_t = spikes_df[spikes_df.spikes.time_variable_name].to_numpy() # this will map
+        curr_spike_x = np.interp(curr_spike_t, (self.spikes_window.active_window_start_time, self.spikes_window.active_window_end_time), (0.0, +self.temporal_axis_length))
+        curr_spike_y = spikes_df['visualization_raster_y_location'].to_numpy() # this will map
+        curr_spike_pens = [self.config_unit_id_map[a_cell_id][2] for a_cell_id in spikes_df['unit_id'].to_numpy()] # get the pens for each spike from the configs map
+        curr_n = len(curr_spike_t) # curr number of spikes
+        return curr_spike_x, curr_spike_y, curr_spike_pens, curr_n
+    
+    
+    def _build_all_spikes_data_values(self):
+        """ build global spikes for entire dataframe (not just the current window) """
+        # All units at once approach:
+        # Filter the dataframe using that column and value from the list
+        curr_spike_t = self.spikes_window.df[self.spikes_window.df.spikes.time_variable_name].to_numpy() # this will map
+        # curr_spike_x = np.interp(curr_spike_t, (self.spikes_window.active_window_start_time, self.spikes_window.active_window_end_time), (0.0, +self.temporal_axis_length))
+        curr_spike_y = self.spikes_window.df['visualization_raster_y_location'].to_numpy() # this will map
+        curr_spike_pens = [self.config_unit_id_map[a_cell_id][2] for a_cell_id in self.spikes_window.df['unit_id'].to_numpy()] # get the pens for each spike from the configs map
+        curr_n = len(curr_spike_t) # curr number of spikes
+        return curr_spike_t, curr_spike_y, curr_spike_pens, curr_n
+    
     
   
     def _buildGraphics(self):
@@ -201,9 +182,9 @@ class Spike2DRaster(SpikeRasterBase):
         # Add debugging widget:
         
         # Custom 2D raster plot:    
-        self.ui.main_plot_widget = self.ui.main_graphics_layout_widget.addPlot(row=0, col=0)
+        self.ui.main_plot_widget = self.ui.main_graphics_layout_widget.addPlot(row=1, col=0)
         # self.ui.main_plot_widget = pg.PlotWidget(name='PlotMainSpikesRaster2D')
-        self.ui.main_plot_widget.resize(1000,600)
+        # self.ui.main_plot_widget.resize(1000,600)
         
         self.ui.plots = [] # create an empty array for each plot, of which there will be one for each unit.
         # # build the position range for each unit along the y-axis:
@@ -252,9 +233,20 @@ class Spike2DRaster(SpikeRasterBase):
         self.ui.main_plot_widget.addItem(self.ui.scatter_plot)
         
         ## Scroll Widget:
-        self.ui.main_scroll_window_plot = self.ui.main_graphics_layout_widget.addPlot(row=1, col=0)
+        self.ui.main_scroll_window_plot = self.ui.main_graphics_layout_widget.addPlot(row=2, col=0)
+        # ALL Spikes in the preview window:
+        # curr_spike_x, curr_spike_y, curr_spike_pens, curr_n = self._build_spikes_data_values(self.spikes_window.df)
+        curr_spike_x, curr_spike_y, curr_spike_pens, curr_n = self._build_all_spikes_data_values()        
+        pos = np.vstack((curr_spike_x, curr_spike_y)) # np.shape(curr_spike_t): (11,), np.shape(curr_spike_x): (11,), np.shape(curr_spike_y): (11,), curr_n: 11
+        all_spots = [{'pos': pos[:,i], 'data': i, 'pen': curr_spike_pens[i]} for i in range(curr_n)]
         
-        self.ui.scroll_window_region = pg.LinearRegionItem()
+        self.ui.preview_overview_scatter_plot = pg.ScatterPlotItem(name='spikeRasterOverviewWindowScatterPlotItem', pxMode=True, symbol=vtick, size=5, pen={'color': 'w', 'width': 1})
+        self.ui.preview_overview_scatter_plot.opts['useCache'] = True
+        self.ui.preview_overview_scatter_plot.addPoints(all_spots)
+        self.ui.main_scroll_window_plot.addItem(self.ui.preview_overview_scatter_plot)
+        
+        # Add the linear region overlay:
+        self.ui.scroll_window_region = pg.LinearRegionItem(clipItem=self.ui.preview_overview_scatter_plot) # bound the LinearRegionItem to the plotted data
         self.ui.scroll_window_region.setZValue(10)
         # Add the LinearRegionItem to the ViewBox, but tell the ViewBox to exclude this 
         # item when doing auto-range calculations.
@@ -262,23 +254,19 @@ class Spike2DRaster(SpikeRasterBase):
         # self.ui.main_plot_widget.addItem(self.ui.scroll_window_region, ignoreBounds=True)
         self.ui.main_scroll_window_plot.addItem(self.ui.scroll_window_region, ignoreBounds=True)
         
-        
-        
-        
+
         # All units at once approach:
         # Filter the dataframe using that column and value from the list
-        curr_spike_t = self.active_windowed_df[self.active_windowed_df.spikes.time_variable_name].to_numpy() # this will map
-        curr_spike_x = np.interp(curr_spike_t, (self.spikes_window.active_window_start_time, self.spikes_window.active_window_end_time), (0.0, +self.temporal_axis_length))
-        curr_spike_y = self.active_windowed_df['visualization_raster_y_location'].to_numpy() # this will map
-        curr_spike_pens = [self.config_unit_id_map[a_cell_id][2] for a_cell_id in self.active_windowed_df['unit_id'].to_numpy()] # get the pens for each spike from the configs map
+        # curr_spike_t = self.active_windowed_df[self.active_windowed_df.spikes.time_variable_name].to_numpy() # this will map
+        # curr_spike_x = np.interp(curr_spike_t, (self.spikes_window.active_window_start_time, self.spikes_window.active_window_end_time), (0.0, +self.temporal_axis_length))
+        # curr_spike_y = self.active_windowed_df['visualization_raster_y_location'].to_numpy() # this will map
+        # curr_spike_pens = [self.config_unit_id_map[a_cell_id][2] for a_cell_id in self.active_windowed_df['unit_id'].to_numpy()] # get the pens for each spike from the configs map
+        # curr_n = len(curr_spike_t) # curr number of spikes
+        curr_spike_x, curr_spike_y, curr_spike_pens, curr_n = self._build_spikes_data_values(self.active_windowed_df)
         
-        curr_n = len(curr_spike_t) # curr number of spikes
-        print(f'np.shape(curr_spike_t): {np.shape(curr_spike_t)}, np.shape(curr_spike_x): {np.shape(curr_spike_x)}, np.shape(curr_spike_y): {np.shape(curr_spike_y)}, curr_n: {curr_n}')
-        pos = np.vstack((curr_spike_x, curr_spike_y))
-        # np.shape(curr_spike_t): (11,), np.shape(curr_spike_x): (11,), np.shape(curr_spike_y): (11,), curr_n: 11
-        # np.shape(pos): (2, 11)
-        print(f'np.shape(pos): {np.shape(pos)}') # should be 2xN
-        # pos = np.random.normal(size=(2,n), scale=1e-5)
+        # print(f'np.shape(curr_spike_t): {np.shape(curr_spike_t)}, np.shape(curr_spike_x): {np.shape(curr_spike_x)}, np.shape(curr_spike_y): {np.shape(curr_spike_y)}, curr_n: {curr_n}')
+        pos = np.vstack((curr_spike_x, curr_spike_y)) # np.shape(curr_spike_t): (11,), np.shape(curr_spike_x): (11,), np.shape(curr_spike_y): (11,), curr_n: 11
+        # print(f'np.shape(pos): {np.shape(pos)}') # should be 2xN # np.shape(pos): (2, 11)
         # spots = [{'pos': pos[:,i], 'data': 1, 'brush':pg.intColor(i, n), 'symbol': i%10, 'size': 5+i/10.} for i in range(n)]
         spots = [{'pos': pos[:,i], 'data': i, 'pen': curr_spike_pens[i]} for i in range(curr_n)]
         self.ui.scatter_plot.addPoints(spots)
@@ -363,28 +351,15 @@ class Spike2DRaster(SpikeRasterBase):
             print(f'Spike2DRaster._update_plots()')
         # assert (len(self.ui.plots) == self.n_cells), f"after all operations the length of the plots array should be the same as the n_cells, but len(self.ui.plots): {len(self.ui.plots)} and self.n_cells: {self.n_cells}!"
         # build the position range for each unit along the y-axis:
-        # y = DataSeriesToSpatial.build_series_identity_axis(self.n_cells, center_mode='zero_centered', bin_position_mode='bin_center', side_bin_margins = self.params.side_bin_margins)
         self.y = DataSeriesToSpatial.build_series_identity_axis(self.n_cells, center_mode=self.params.center_mode, bin_position_mode=self.params.bin_position_mode, side_bin_margins = self.params.side_bin_margins)
-        # self.lower_y = DataSeriesToSpatial.build_series_identity_axis(self.n_cells, center_mode=self.params.center_mode, bin_position_mode='left_edges', side_bin_margins = self.params.side_bin_margins) / self.n_cells
-        # self.upper_y = DataSeriesToSpatial.build_series_identity_axis(self.n_cells, center_mode=self.params.center_mode, bin_position_mode='right_edges', side_bin_margins = self.params.side_bin_margins) / self.n_cells
-        
-        
-        
         # All units at once approach:
         # Filter the dataframe using that column and value from the list
-        curr_spike_t = self.active_windowed_df[self.active_windowed_df.spikes.time_variable_name].to_numpy() # this will map
-        curr_spike_x = np.interp(curr_spike_t, (self.spikes_window.active_window_start_time, self.spikes_window.active_window_end_time), (0.0, +self.temporal_axis_length))
-        curr_spike_y = self.active_windowed_df['visualization_raster_y_location'].to_numpy() # this will map
-        curr_spike_pens = [self.config_unit_id_map[a_cell_id][2] for a_cell_id in self.active_windowed_df['unit_id'].to_numpy()] # get the pens for each spike from the configs map
-        curr_n = len(curr_spike_t) # curr number of spikes
-        # pos = np.vstack((curr_spike_x, curr_spike_y))
-        # print(f'np.shape(pos): {np.shape(pos)}') # should be 2xN
-        # pos = np.random.normal(size=(2,n), scale=1e-5)
-        # spots = [{'pos': pos[:,i], 'data': 1, 'brush':pg.intColor(i, n), 'symbol': i%10, 'size': 5+i/10.} for i in range(n)]
-        # spots = [{'pos': pos[:,i], 'data': i} for i in range(curr_n)]
-        # self.ui.scatter_plot.addPoints(spots)
-        
-        # self.ui.scatter_plot.setData(**getData())        
+        # curr_spike_t = self.active_windowed_df[self.active_windowed_df.spikes.time_variable_name].to_numpy() # this will map
+        # curr_spike_x = np.interp(curr_spike_t, (self.spikes_window.active_window_start_time, self.spikes_window.active_window_end_time), (0.0, +self.temporal_axis_length))
+        # curr_spike_y = self.active_windowed_df['visualization_raster_y_location'].to_numpy() # this will map
+        # curr_spike_pens = [self.config_unit_id_map[a_cell_id][2] for a_cell_id in self.active_windowed_df['unit_id'].to_numpy()] # get the pens for each spike from the configs map
+        # curr_n = len(curr_spike_t) # curr number of spikes
+        curr_spike_x, curr_spike_y, curr_spike_pens, curr_n = self._build_spikes_data_values(self.active_windowed_df)
         self.ui.scatter_plot.setData(x=curr_spike_x, y=curr_spike_y, pen=curr_spike_pens)
         
             
