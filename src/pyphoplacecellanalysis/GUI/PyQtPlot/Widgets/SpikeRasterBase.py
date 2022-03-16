@@ -155,7 +155,6 @@ class SpikeRasterBase(NeuronIdentityAccessingMixin, SpikeRenderingBaseMixin, Spi
         # return self.unit_ids
         return np.unique(self.spikes_window.df['aclu'].to_numpy()) 
     
-    
     @property
     def overlay_text_lines_dict(self):
         """The lines of text to be displayed in the overlay."""
