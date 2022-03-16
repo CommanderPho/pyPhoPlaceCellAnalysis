@@ -236,7 +236,6 @@ class Spike2DRaster(SpikeRasterBase):
         ## Bottom Windowed Scroll Plot/Widget:
         self.ui.main_scroll_window_plot = self.ui.main_graphics_layout_widget.addPlot(row=2, col=0)
         # ALL Spikes in the preview window:
-        # curr_spike_x, curr_spike_y, curr_spike_pens, curr_n = self._build_spikes_data_values(self.spikes_window.df)
         curr_spike_x, curr_spike_y, curr_spike_pens, curr_n = self._build_all_spikes_data_values()        
         pos = np.vstack((curr_spike_x, curr_spike_y)) # np.shape(curr_spike_t): (11,), np.shape(curr_spike_x): (11,), np.shape(curr_spike_y): (11,), curr_n: 11
         all_spots = [{'pos': pos[:,i], 'data': i, 'pen': curr_spike_pens[i]} for i in range(curr_n)]
@@ -265,14 +264,18 @@ class Spike2DRaster(SpikeRasterBase):
         
         
         # All units at once approach:
-        curr_spike_x, curr_spike_y, curr_spike_pens, curr_n = self._build_spikes_data_values(self.active_windowed_df)
-        # print(f'np.shape(curr_spike_t): {np.shape(curr_spike_t)}, np.shape(curr_spike_x): {np.shape(curr_spike_x)}, np.shape(curr_spike_y): {np.shape(curr_spike_y)}, curr_n: {curr_n}')
-        pos = np.vstack((curr_spike_x, curr_spike_y)) # np.shape(curr_spike_t): (11,), np.shape(curr_spike_x): (11,), np.shape(curr_spike_y): (11,), curr_n: 11
-        # print(f'np.shape(pos): {np.shape(pos)}') # should be 2xN # np.shape(pos): (2, 11)
-        # spots = [{'pos': pos[:,i], 'data': 1, 'brush':pg.intColor(i, n), 'symbol': i%10, 'size': 5+i/10.} for i in range(n)]
-        spots = [{'pos': pos[:,i], 'data': i, 'pen': curr_spike_pens[i]} for i in range(curr_n)]
-        self.ui.scatter_plot.addPoints(spots)
+        # curr_spike_x, curr_spike_y, curr_spike_pens, curr_n = self._build_spikes_data_values(self.active_windowed_df)
+        # # print(f'np.shape(curr_spike_t): {np.shape(curr_spike_t)}, np.shape(curr_spike_x): {np.shape(curr_spike_x)}, np.shape(curr_spike_y): {np.shape(curr_spike_y)}, curr_n: {curr_n}')
+        # pos = np.vstack((curr_spike_x, curr_spike_y)) # np.shape(curr_spike_t): (11,), np.shape(curr_spike_x): (11,), np.shape(curr_spike_y): (11,), curr_n: 11
+        # # print(f'np.shape(pos): {np.shape(pos)}') # should be 2xN # np.shape(pos): (2, 11)
+        # # spots = [{'pos': pos[:,i], 'data': 1, 'brush':pg.intColor(i, n), 'symbol': i%10, 'size': 5+i/10.} for i in range(n)]
+        # spots = [{'pos': pos[:,i], 'data': i, 'pen': curr_spike_pens[i]} for i in range(curr_n)]
+        # self.ui.scatter_plot.addPoints(spots)
+        self.ui.scatter_plot.addPoints(all_spots)
 
+        # Connect the signals for the zoom region and the LinearRegionItem
+        self.ui.scroll_window_region.sigRegionChanged.connect(self.update_zoom_plotter)
+        self.ui.main_plot_widget.sigRangeChanged.connect(self.update_region)
         
         
     ###################################
@@ -333,7 +336,6 @@ class Spike2DRaster(SpikeRasterBase):
         pass
 
 
-            
     def _update_plots(self):
         """ performance went:
         FROM:
@@ -364,7 +366,25 @@ class Spike2DRaster(SpikeRasterBase):
         curr_spike_x, curr_spike_y, curr_spike_pens, curr_n = self._build_spikes_data_values(self.active_windowed_df)
         self.ui.scatter_plot.setData(x=curr_spike_x, y=curr_spike_y, pen=curr_spike_pens)
         
-            
+
+    @QtCore.pyqtSlot()
+    def update_zoom_plotter(self) -> None:
+        """self when the region moves.zoom_Change plotter area"""
+        self.ui.scroll_window_region.setZValue(10)
+        min_x, max_x = self.ui.scroll_window_region.getRegion()
+        self.ui.main_plot_widget.setXRange(min_x, max_x, padding=0)
+
+    @QtCore.pyqtSlot()
+    def update_region(self) -> None:
+        """self.zoom_Change the region of the region when the plotter moves
+            viewRange returns the display range of the graph. The type is
+            [[Xmin, Xmax], [Ymin, Ymax]]
+        """
+        rgn = self.ui.main_plot_widget.viewRange()[0]
+        self.ui.scroll_window_region.setRegion(rgn)
+
+
+
     # Slider Functions:
     # def _compute_window_transform(self, relative_offset):
     #     """ computes the transform from 0.0-1.0 as the slider would provide to the offset given the current information. """
