@@ -231,6 +231,8 @@ class Spike2DRaster(SpikeRasterBase):
             # s2 = pg.ScatterPlotItem(pxMode=True, symbol=vtick, size=1, pen=curr_pen)
             # self.ui.main_plot_widget.addItem(s2)
     
+        self.config_unit_id_map = dict(zip(self.unit_ids, self.params.config_items))
+    
         # self.ui.spikes_raster_item_plot = SpikesRasterItem(self.params.config_items)
         self.ui.scatter_plot = pg.ScatterPlotItem(pxMode=True, symbol=vtick, size=10, pen={'color': 'w', 'width': 2})
         self.ui.scatter_plot.opts['useCache'] = True
@@ -242,6 +244,8 @@ class Spike2DRaster(SpikeRasterBase):
         curr_spike_t = self.active_windowed_df[self.active_windowed_df.spikes.time_variable_name].to_numpy() # this will map
         curr_spike_x = np.interp(curr_spike_t, (self.spikes_window.active_window_start_time, self.spikes_window.active_window_end_time), (0.0, +self.temporal_axis_length))
         curr_spike_y = self.active_windowed_df['visualization_raster_y_location'].to_numpy() # this will map
+        curr_spike_pens = [self.config_unit_id_map[a_cell_id][2] for a_cell_id in self.active_windowed_df['unit_id'].to_numpy()] # get the pens for each spike from the configs map
+        
         curr_n = len(curr_spike_t) # curr number of spikes
         print(f'np.shape(curr_spike_t): {np.shape(curr_spike_t)}, np.shape(curr_spike_x): {np.shape(curr_spike_x)}, np.shape(curr_spike_y): {np.shape(curr_spike_y)}, curr_n: {curr_n}')
         pos = np.vstack((curr_spike_x, curr_spike_y))
@@ -250,49 +254,8 @@ class Spike2DRaster(SpikeRasterBase):
         print(f'np.shape(pos): {np.shape(pos)}') # should be 2xN
         # pos = np.random.normal(size=(2,n), scale=1e-5)
         # spots = [{'pos': pos[:,i], 'data': 1, 'brush':pg.intColor(i, n), 'symbol': i%10, 'size': 5+i/10.} for i in range(n)]
-        spots = [{'pos': pos[:,i], 'data': i} for i in range(curr_n)]
+        spots = [{'pos': pos[:,i], 'data': i, 'pen': curr_spike_pens[i]} for i in range(curr_n)]
         self.ui.scatter_plot.addPoints(spots)
-        
-        # # Plot each unit one at a time:
-        # curr_data = []
-        # for i, cell_id in enumerate(self.unit_ids):
-        #     curr_color = pg.mkColor((i, self.n_cells*1.3))
-        #     curr_color.setAlphaF(0.5)
-            
-        #     # curr_config_item = (i, cell_id, pg.mkPen(curr_color), self.lower_y[i], self.upper_y[i])
-            
-        #     # # pLOT MODE:
-        #     # p1 = self.ui.main_plot_widget.plot() # add a new plot to be filled later
-        #     # p1.setPen(curr_color)
-            
-        #     # self.ui.plots.append(p1)
-            
-        #     # print(f'cell_id: {cell_id}, curr_color: {curr_color.alpha()}')
-            
-        #     # Filter the dataframe using that column and value from the list
-        #     curr_cell_df = self.active_windowed_df[self.active_windowed_df['unit_id']==cell_id].copy() # is .copy() needed here since nothing is updated???
-        #     curr_spike_t = curr_cell_df[curr_cell_df.spikes.time_variable_name].to_numpy() # this will map
-            
-        #     # yi = self.y[i] # get the correct y-position for all spikes of this cell
-        #     # print(f'cell_id: {cell_id}, yi: {yi}')
-        #     # map the current spike times back onto the range of the window's (-half_render_window_duration, +half_render_window_duration) so they represent the x coordinate
-        #     curr_x = np.interp(curr_spike_t, (self.spikes_window.active_window_start_time, self.spikes_window.active_window_end_time), (0.0, +self.temporal_axis_length))
-        #     # curr_x = np.interp(curr_spike_t, (self.spikes_window.active_window_start_time, self.spikes_window.active_window_end_time), (-self.half_temporal_axis_length, +self.half_temporal_axis_length))
-        #     # curr_paired_x = np.squeeze(interleave_elements(np.atleast_2d(curr_x).T, np.atleast_2d(curr_x).T))
-        #     # curr_paired_x = curr_x.repeat(2)
-        #     # curr_yd = np.full_like(curr_x, yi)
-        #     # curr_unit_n_spikes = len(curr_spike_t)
-        #     # curr_paired_spike_yds = np.squeeze(np.tile(np.array([self.lower_y[i], self.upper_y[i]]), curr_unit_n_spikes)) # repeat pair of y values once for each spike of this cell. (lower_y[i], upper_y[i])
-            
-        #     # Build lines:
-        #     # self.ui.plots[i].setData(y=curr_yd, x=curr_x)
-        #     # self.ui.plots[i].setData(y=curr_paired_spike_yds, x=curr_paired_x)
-        #     curr_data.append(curr_x)
-        #     # plt.setYRange((-self.n_half_cells - self.side_bin_margins), (self.n_half_cells + self.side_bin_margins))
-        #     # plt.setXRange(-self.half_render_window_duration, +self.half_render_window_duration)
-
-        # self.ui.spikes_raster_item_plot.setData(curr_data)
-        # self.ui.main_plot_widget.addItem(self.ui.spikes_raster_item_plot)
 
         
         
@@ -371,6 +334,7 @@ class Spike2DRaster(SpikeRasterBase):
         curr_spike_t = self.active_windowed_df[self.active_windowed_df.spikes.time_variable_name].to_numpy() # this will map
         curr_spike_x = np.interp(curr_spike_t, (self.spikes_window.active_window_start_time, self.spikes_window.active_window_end_time), (0.0, +self.temporal_axis_length))
         curr_spike_y = self.active_windowed_df['visualization_raster_y_location'].to_numpy() # this will map
+        curr_spike_pens = [self.config_unit_id_map[a_cell_id][2] for a_cell_id in self.active_windowed_df['unit_id'].to_numpy()] # get the pens for each spike from the configs map
         curr_n = len(curr_spike_t) # curr number of spikes
         # pos = np.vstack((curr_spike_x, curr_spike_y))
         # print(f'np.shape(pos): {np.shape(pos)}') # should be 2xN
@@ -380,7 +344,7 @@ class Spike2DRaster(SpikeRasterBase):
         # self.ui.scatter_plot.addPoints(spots)
         
         # self.ui.scatter_plot.setData(**getData())        
-        self.ui.scatter_plot.setData(x=curr_spike_x, y=curr_spike_y)
+        self.ui.scatter_plot.setData(x=curr_spike_x, y=curr_spike_y, pen=curr_spike_pens)
         # self.ui.scatter_plot
         
         # curr_data = []
