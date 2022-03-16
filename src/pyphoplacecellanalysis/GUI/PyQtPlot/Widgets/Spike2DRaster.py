@@ -116,13 +116,13 @@ class Spike2DRaster(SpikeRasterBase):
         # Config
         # self.params.center_mode = 'zero_centered'
         self.params.center_mode = 'starting_at_zero'
-        
         self.params.bin_position_mode = 'bin_center'
         # self.params.bin_position_mode = 'left_edges'
         
         # by default we want the time axis to approximately span -20 to 20. So we set the temporal_zoom_factor to 
-        self.params.temporal_zoom_factor = 40.0 / float(self.render_window_duration)        
-                
+        # self.params.temporal_zoom_factor = 40.0 / float(self.render_window_duration)
+        self.params.temporal_zoom_factor = 1.0        
+        
         self.enable_debug_print = False
         self.enable_debug_widgets = True
         
@@ -139,6 +139,7 @@ class Spike2DRaster(SpikeRasterBase):
             self.spikes_df['visualization_raster_y_location'] = all_y # adds as a column to the dataframe. Only needs to be updated when the number of active units changes
             print('done.')
         # self.spikes_df
+        
         
     def _build_spikes_data_values(self, spikes_df):
         # All units at once approach:
@@ -163,6 +164,58 @@ class Spike2DRaster(SpikeRasterBase):
         return curr_spike_t, curr_spike_y, curr_spike_pens, curr_n
     
     
+    def _buildScrollRasterPreviewWindowGraphics(self):
+        # Common Tick Label
+        vtick = QtGui.QPainterPath()
+        vtick.moveTo(0, -0.5)
+        vtick.lineTo(0, 0.5)
+        
+        # self._build_neuron_id_graphics(self.ui.main_gl_widget, self.y)
+        # self.params.config_items = []
+        # for i, cell_id in enumerate(self.unit_ids):
+        #     curr_color = pg.mkColor((i, self.n_cells*1.3))
+        #     curr_color.setAlphaF(0.5)
+        #     curr_pen = pg.mkPen(curr_color)
+        #     curr_config_item = (i, cell_id, curr_pen, self.lower_y[i], self.upper_y[i])            
+        #     self.params.config_items.append(curr_config_item)    
+        #     # s2 = pg.ScatterPlotItem(pxMode=True, symbol=vtick, size=1, pen=curr_pen)
+        #     # self.ui.main_plot_widget.addItem(s2)
+    
+        # self.config_unit_id_map = dict(zip(self.unit_ids, self.params.config_items))
+    
+        #############################
+        ## Bottom Windowed Scroll Plot/Widget:
+        self.ui.main_scroll_window_plot = self.ui.main_graphics_layout_widget.addPlot(row=2, col=0)
+        # ALL Spikes in the preview window:
+        curr_spike_x, curr_spike_y, curr_spike_pens, curr_n = self._build_all_spikes_data_values()        
+        pos = np.vstack((curr_spike_x, curr_spike_y)) # np.shape(curr_spike_t): (11,), np.shape(curr_spike_x): (11,), np.shape(curr_spike_y): (11,), curr_n: 11
+        self.all_spots = [{'pos': pos[:,i], 'data': i, 'pen': curr_spike_pens[i]} for i in range(curr_n)]
+        
+        self.ui.preview_overview_scatter_plot = pg.ScatterPlotItem(name='spikeRasterOverviewWindowScatterPlotItem', pxMode=True, symbol=vtick, size=5, pen={'color': 'w', 'width': 1})
+        self.ui.preview_overview_scatter_plot.opts['useCache'] = True
+        self.ui.preview_overview_scatter_plot.addPoints(self.all_spots)
+        self.ui.main_scroll_window_plot.addItem(self.ui.preview_overview_scatter_plot)
+        
+        # Add the linear region overlay:
+        self.ui.scroll_window_region = pg.LinearRegionItem(pen=pg.mkPen('#fff'), brush=pg.mkBrush('#f004'), hoverBrush=pg.mkBrush('#fff4'), hoverPen=pg.mkPen('#f00'), clipItem=self.ui.preview_overview_scatter_plot) # bound the LinearRegionItem to the plotted data
+    
+        self.ui.scroll_window_region.setZValue(10)
+        # Add the LinearRegionItem to the ViewBox, but tell the ViewBox to exclude this item when doing auto-range calculations.
+        self.ui.main_scroll_window_plot.addItem(self.ui.scroll_window_region, ignoreBounds=True)
+        
+        # Setup axes bounds for the bottom windowed plot:
+        earliest_t, latest_t = self.spikes_window.total_df_start_end_times
+        self.ui.main_scroll_window_plot.hideAxis('left')
+        self.ui.main_scroll_window_plot.hideAxis('bottom')
+        # self.ui.main_scroll_window_plot.setLabel('bottom', 'Time', units='s')
+        self.ui.main_scroll_window_plot.setMouseEnabled(x=False, y=False)
+        self.ui.main_scroll_window_plot.disableAutoRange('xy')
+        # self.ui.main_scroll_window_plot.enableAutoRange(x=False, y=False)
+        self.ui.main_scroll_window_plot.setAutoVisible(x=False, y=False)
+        self.ui.main_scroll_window_plot.setAutoPan(x=False, y=False)
+        self.ui.main_scroll_window_plot.setXRange(earliest_t, latest_t, padding=0)
+        self.ui.main_scroll_window_plot.setYRange(np.nanmin(curr_spike_y), np.nanmax(curr_spike_y), padding=0)
+        
   
     def _buildGraphics(self):
         ##### Main Raster Plot Content Top ##########
@@ -183,21 +236,14 @@ class Spike2DRaster(SpikeRasterBase):
         
         # Custom 2D raster plot:    
         self.ui.main_plot_widget = self.ui.main_graphics_layout_widget.addPlot(row=1, col=0)
-        # self.ui.main_plot_widget = pg.PlotWidget(name='PlotMainSpikesRaster2D')
-        # self.ui.main_plot_widget.resize(1000,600)
-        
-        self.ui.plots = [] # create an empty array for each plot, of which there will be one for each unit.
+        # self.ui.plots = [] # create an empty array for each plot, of which there will be one for each unit.
         # # build the position range for each unit along the y-axis:
-        # # y = DataSeriesToSpatial.build_series_identity_axis(self.n_cells, center_mode='zero_centered', bin_position_mode='bin_center', side_bin_margins = self.params.side_bin_margins)
         self.y = DataSeriesToSpatial.build_series_identity_axis(self.n_cells, center_mode=self.params.center_mode, bin_position_mode=self.params.bin_position_mode, side_bin_margins = self.params.side_bin_margins)
         self.lower_y = DataSeriesToSpatial.build_series_identity_axis(self.n_cells, center_mode=self.params.center_mode, bin_position_mode='left_edges', side_bin_margins = self.params.side_bin_margins) / self.n_cells
         self.upper_y = DataSeriesToSpatial.build_series_identity_axis(self.n_cells, center_mode=self.params.center_mode, bin_position_mode='right_edges', side_bin_margins = self.params.side_bin_margins) / self.n_cells
        
-        
         # Common Tick Label
         vtick = QtGui.QPainterPath()
-        # vtick.moveTo(0, -0.5)
-        # vtick.lineTo(0, 0.5)
         vtick.moveTo(0, -0.5)
         vtick.lineTo(0, 0.5)
 
@@ -211,59 +257,26 @@ class Spike2DRaster(SpikeRasterBase):
         
         # self.ui.main_plot_widget.disableAutoRange()
         self._update_plot_ranges()
-        
-        
+             
         # self._build_neuron_id_graphics(self.ui.main_gl_widget, self.y)
         self.params.config_items = []
         for i, cell_id in enumerate(self.unit_ids):
             curr_color = pg.mkColor((i, self.n_cells*1.3))
             curr_color.setAlphaF(0.5)
             curr_pen = pg.mkPen(curr_color)
-            curr_config_item = (i, cell_id, curr_pen, self.lower_y[i], self.upper_y[i])            
+            curr_config_item = (i, cell_id, curr_pen, self.lower_y[i], self.upper_y[i])
             self.params.config_items.append(curr_config_item)    
-            # s2 = pg.ScatterPlotItem(pxMode=True, symbol=vtick, size=1, pen=curr_pen)
-            # self.ui.main_plot_widget.addItem(s2)
     
         self.config_unit_id_map = dict(zip(self.unit_ids, self.params.config_items))
     
         # self.ui.spikes_raster_item_plot = SpikesRasterItem(self.params.config_items)
         self.ui.scatter_plot = pg.ScatterPlotItem(name='spikeRasterScatterPlotItem', pxMode=True, symbol=vtick, size=10, pen={'color': 'w', 'width': 2})
         self.ui.scatter_plot.opts['useCache'] = True
-        
         self.ui.main_plot_widget.addItem(self.ui.scatter_plot)
+
         
-        #############################
-        ## Bottom Windowed Scroll Plot/Widget:
-        self.ui.main_scroll_window_plot = self.ui.main_graphics_layout_widget.addPlot(row=2, col=0)
-        # ALL Spikes in the preview window:
-        curr_spike_x, curr_spike_y, curr_spike_pens, curr_n = self._build_all_spikes_data_values()        
-        pos = np.vstack((curr_spike_x, curr_spike_y)) # np.shape(curr_spike_t): (11,), np.shape(curr_spike_x): (11,), np.shape(curr_spike_y): (11,), curr_n: 11
-        all_spots = [{'pos': pos[:,i], 'data': i, 'pen': curr_spike_pens[i]} for i in range(curr_n)]
-        
-        self.ui.preview_overview_scatter_plot = pg.ScatterPlotItem(name='spikeRasterOverviewWindowScatterPlotItem', pxMode=True, symbol=vtick, size=5, pen={'color': 'w', 'width': 1})
-        self.ui.preview_overview_scatter_plot.opts['useCache'] = True
-        self.ui.preview_overview_scatter_plot.addPoints(all_spots)
-        self.ui.main_scroll_window_plot.addItem(self.ui.preview_overview_scatter_plot)
-        
-        # Add the linear region overlay:
-        self.ui.scroll_window_region = pg.LinearRegionItem(pen=pg.mkPen('#fff'), brush=pg.mkBrush('#f004'), hoverBrush=pg.mkBrush('#fff4'), hoverPen=pg.mkPen('#f00'), clipItem=self.ui.preview_overview_scatter_plot) # bound the LinearRegionItem to the plotted data
-    
-        self.ui.scroll_window_region.setZValue(10)
-        # Add the LinearRegionItem to the ViewBox, but tell the ViewBox to exclude this item when doing auto-range calculations.
-        self.ui.main_scroll_window_plot.addItem(self.ui.scroll_window_region, ignoreBounds=True)
-        
-        # Setup axes bounds for the bottom windowed plot:
-        earliest_t, latest_t = self.spikes_window.total_df_start_end_times
-        self.ui.main_scroll_window_plot.setLabel('bottom', 'Time', units='s')
-        self.ui.main_scroll_window_plot.setMouseEnabled(x=False, y=False)
-        self.ui.main_scroll_window_plot.disableAutoRange('xy')
-        # self.ui.main_scroll_window_plot.enableAutoRange(x=False, y=False)
-        self.ui.main_scroll_window_plot.setAutoVisible(x=False, y=False)
-        self.ui.main_scroll_window_plot.setAutoPan(x=False, y=False)
-        self.ui.main_scroll_window_plot.setXRange(earliest_t, latest_t, padding=0)
-        self.ui.main_scroll_window_plot.setYRange(np.nanmin(curr_spike_y), np.nanmax(curr_spike_y), padding=0)
-        
-        
+        self._buildScrollRasterPreviewWindowGraphics()
+                
         # All units at once approach:
         # curr_spike_x, curr_spike_y, curr_spike_pens, curr_n = self._build_spikes_data_values(self.active_windowed_df)
         # # print(f'np.shape(curr_spike_t): {np.shape(curr_spike_t)}, np.shape(curr_spike_x): {np.shape(curr_spike_x)}, np.shape(curr_spike_y): {np.shape(curr_spike_y)}, curr_n: {curr_n}')
@@ -272,7 +285,8 @@ class Spike2DRaster(SpikeRasterBase):
         # # spots = [{'pos': pos[:,i], 'data': 1, 'brush':pg.intColor(i, n), 'symbol': i%10, 'size': 5+i/10.} for i in range(n)]
         # spots = [{'pos': pos[:,i], 'data': i, 'pen': curr_spike_pens[i]} for i in range(curr_n)]
         # self.ui.scatter_plot.addPoints(spots)
-        self.ui.scatter_plot.addPoints(all_spots)
+        self.ui.scatter_plot.addPoints(self.all_spots)
+
 
         # Connect the signals for the zoom region and the LinearRegionItem
         self.ui.scroll_window_region.sigRegionChanged.connect(self.update_zoom_plotter)
@@ -357,6 +371,14 @@ class Spike2DRaster(SpikeRasterBase):
         # assert (len(self.ui.plots) == self.n_cells), f"after all operations the length of the plots array should be the same as the n_cells, but len(self.ui.plots): {len(self.ui.plots)} and self.n_cells: {self.n_cells}!"
         # build the position range for each unit along the y-axis:
         self.y = DataSeriesToSpatial.build_series_identity_axis(self.n_cells, center_mode=self.params.center_mode, bin_position_mode=self.params.bin_position_mode, side_bin_margins = self.params.side_bin_margins)
+        
+        
+        # Get updated time window
+        updated_time_window = self.spikes_window.active_time_window # (30.0, 930.0)
+        # update the current scroll region:
+        # self.ui.scroll_window_region.setRegion(updated_time_window)
+        
+        
         # All units at once approach:
         # Filter the dataframe using that column and value from the list
         # curr_spike_t = self.active_windowed_df[self.active_windowed_df.spikes.time_variable_name].to_numpy() # this will map
@@ -368,7 +390,7 @@ class Spike2DRaster(SpikeRasterBase):
         # self.ui.scatter_plot.setData(x=curr_spike_x, y=curr_spike_y, pen=curr_spike_pens)
         
         # TODO: just scroll since we set all spike data at once.
-        pass
+        # pass
         
 
     @QtCore.pyqtSlot()
