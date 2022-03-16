@@ -206,7 +206,7 @@ class Spike2DRaster(SpikeRasterBase):
         self.y = DataSeriesToSpatial.build_series_identity_axis(self.n_cells, center_mode=self.params.center_mode, bin_position_mode=self.params.bin_position_mode, side_bin_margins = self.params.side_bin_margins)
         self.lower_y = DataSeriesToSpatial.build_series_identity_axis(self.n_cells, center_mode=self.params.center_mode, bin_position_mode='left_edges', side_bin_margins = self.params.side_bin_margins) / self.n_cells
         self.upper_y = DataSeriesToSpatial.build_series_identity_axis(self.n_cells, center_mode=self.params.center_mode, bin_position_mode='right_edges', side_bin_margins = self.params.side_bin_margins) / self.n_cells
-        # print(f'lower_y: {lower_y}\n upper_y: {upper_y}')
+       
         
         # Common Tick Label
         vtick = QtGui.QPainterPath()
@@ -214,7 +214,6 @@ class Spike2DRaster(SpikeRasterBase):
         # vtick.lineTo(0, 0.5)
         vtick.moveTo(0, -0.5)
         vtick.lineTo(0, 0.5)
-
 
         self.ui.main_plot_widget.setLabel('left', 'Cell ID', units='')
         self.ui.main_plot_widget.setLabel('bottom', 'Time', units='s')
@@ -289,6 +288,15 @@ class Spike2DRaster(SpikeRasterBase):
             self.render_window_duration
             
         """
+        # self.y = DataSeriesToSpatial.build_series_identity_axis(self.n_cells, center_mode=self.params.center_mode, bin_position_mode=self.params.bin_position_mode, side_bin_margins = self.params.side_bin_margins)
+        # self.lower_y = DataSeriesToSpatial.build_series_identity_axis(self.n_cells, center_mode=self.params.center_mode, bin_position_mode='left_edges', side_bin_margins = self.params.side_bin_margins) / self.n_cells
+        # self.upper_y = DataSeriesToSpatial.build_series_identity_axis(self.n_cells, center_mode=self.params.center_mode, bin_position_mode='right_edges', side_bin_margins = self.params.side_bin_margins) / self.n_cells
+        # self.y_unit_id_map = dict(zip(self.unit_ids, self.y))
+        # all_y = [self.y_unit_id_map[a_cell_id] for a_cell_id in self.spikes_df['unit_id'].to_numpy()]
+        # self.spikes_df['visualization_raster_y_location'] = all_y # adds as a column to the dataframe. Only needs to be updated when the number of active units changes
+        
+        # print(f'lower_y: {lower_y}\n upper_y: {upper_y}')
+        
         # # Adjust the three axes planes:
         # self.ui.gx.resetTransform()
         # self.ui.gx.rotate(90, 0, 1, 0)
@@ -361,39 +369,6 @@ class Spike2DRaster(SpikeRasterBase):
         # self.ui.scatter_plot.setData(**getData())        
         self.ui.scatter_plot.setData(x=curr_spike_x, y=curr_spike_y, pen=curr_spike_pens)
         
-        
-    # def rebuild_main_gl_line_plots_if_needed(self, debug_print=True):
-    #     """ adds or removes GLLinePlotItems to self.ui.gl_line_plots based on the current number of cells. """
-    #     n_extant_plts = len(self.ui.gl_line_plots)
-    #     if (n_extant_plts < self.n_cells):
-    #         # need to create new plots for the difference
-    #         if debug_print:
-    #             print(f'!! Spike2DRaster.rebuild_main_gl_line_plots_if_needed(): building additional plots: n_extant_plts: {n_extant_plts}, self.n_cells: {self.n_cells}')
-    #         for new_unit_i in np.arange(n_extant_plts-1, self.n_cells, 1):
-    #             cell_id = self.unit_ids[new_unit_i]
-    #             # curr_color = pg.mkColor((cell_id, self.n_cells*1.3))
-    #             # curr_color.setAlphaF(0.5)
-    #             curr_color = self.params.neuron_qcolors[cell_id] # get the pre-build color
-    #             plt = gl.GLLinePlotItem(pos=[], color=curr_color, width=1.0, antialias=True, mode='lines') # mode='lines' means that each pair of vertexes draws a single line segement
-    #             # plt.setYRange((-self.n_half_cells - self.side_bin_margins), (self.n_half_cells + self.side_bin_margins))
-    #             # plt.setXRange(-self.half_render_window_duration, +self.half_render_window_duration)
-    #             self.ui.main_gl_widget.addItem(plt)
-    #             self.ui.gl_line_plots.append(plt) # append to the gl_line_plots array
-                
-    #     elif (n_extant_plts > self.n_cells):
-    #         # excess plots, need to remove (or at least hide) them:              
-    #         if debug_print:
-    #             print(f'!! Spike2DRaster.rebuild_main_gl_line_plots_if_needed(): removing excess plots: n_extant_plts: {n_extant_plts}, self.n_cells: {self.n_cells}')
-    #         for extra_unit_i in np.arange(n_extant_plts, self.n_cells, 1):
-    #             plt = self.ui.gl_line_plots[extra_unit_i] # get the unit to be removed 
-    #             self.ui.main_gl_widget.removeItem(plt)
-    #         # remove from the array
-    #         del self.ui.gl_line_plots[n_extant_plts:] # from n_extant_plts up to the end of the list
-    #     else:
-    #         return # the correct number of items are already in the list
-        
-    #     assert (len(self.ui.gl_line_plots) == self.n_cells), f"after all operations the length of the plots array should be the same as the n_cells, but len(self.ui.gl_line_plots): {len(self.ui.gl_line_plots)} and self.n_cells: {self.n_cells}!"
-
             
     # Slider Functions:
     # def _compute_window_transform(self, relative_offset):
