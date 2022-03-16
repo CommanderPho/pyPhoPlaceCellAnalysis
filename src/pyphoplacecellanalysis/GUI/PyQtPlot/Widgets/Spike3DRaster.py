@@ -29,10 +29,10 @@ from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.GLViewportOverlayPainterItem im
 
 """ 
 FPS     Milliseconds Per Frame
-30      8.335 ms
+20      50.00 ms
+25      40.00 ms
+30      33.34 ms
 60      16.67 ms
-
-
 """
 
 """ For threading info see:
@@ -80,8 +80,10 @@ class SliderRunner(QtCore.QThread):
     def run(self):
         while(True):
             self.update_signal.emit()
+            # probably do a different form of rate limiting instead (like use SignalProxy)? Actually this might be okay because it's on a different thread.
+            time.sleep(0.04) # 40.0 ms = 25 FPS
             # time.sleep(.32) # 320ms
-            time.sleep(0.05) # probably do a different form of rate limiting instead (like use SignalProxy)? Actually this might be okay because it's on a different thread.
+            # time.sleep(0.05) # probably do a different form of rate limiting instead (like use SignalProxy)? Actually this might be okay because it's on a different thread.
             
                 
 
@@ -101,7 +103,6 @@ class Spike3DRaster(NeuronIdentityAccessingMixin, SpikeRenderingBaseMixin, Spike
     close_signal = QtCore.pyqtSignal() # Called when the window is closing. 
     
     SpeedBurstPlaybackRate = 16.0
-    
     
     
     @property
@@ -254,7 +255,7 @@ class Spike3DRaster(NeuronIdentityAccessingMixin, SpikeRenderingBaseMixin, Spike
         
         # return 0.05 # each animation timestep is a fixed 50ms
         # return 0.03 # faster then 30fps
-        self.params.animation_time_step = 0.03 
+        self.params.animation_time_step = 0.04 
         
         self.enable_debug_print = False
         self.enable_debug_widgets = True
@@ -484,9 +485,9 @@ class Spike3DRaster(NeuronIdentityAccessingMixin, SpikeRenderingBaseMixin, Spike
         self.spikes_window.window_changed_signal.connect(self.on_window_changed)
 
         # Slider update thread:        
-        self.sliderThread = SliderRunner()
+        self.animationThread = SliderRunner()
         # self.sliderThread.update_signal.connect(self.increase_slider_val)
-        self.sliderThread.update_signal.connect(self.increase_animation_frame_val)
+        self.animationThread.update_signal.connect(self.increase_animation_frame_val)
         
         self.show()
       
@@ -829,13 +830,7 @@ class Spike3DRaster(NeuronIdentityAccessingMixin, SpikeRenderingBaseMixin, Spike
         
         assert (len(self.ui.gl_line_plots) == self.n_cells), f"after all operations the length of the plots array should be the same as the n_cells, but len(self.ui.gl_line_plots): {len(self.ui.gl_line_plots)} and self.n_cells: {self.n_cells}!"
 
-    def _compute_window_transform(self, relative_offset):
-        """ computes the transform from 0.0-1.0 as the slider would provide to the offset given the current information. """
-        earliest_t, latest_t = self.spikes_window.total_df_start_end_times
-        total_spikes_df_duration = latest_t - earliest_t # get the duration of the entire spikes df
-        render_window_offset = (total_spikes_df_duration * relative_offset) + earliest_t
-        return render_window_offset
-    
+
     
     
     
@@ -870,45 +865,15 @@ class Spike3DRaster(NeuronIdentityAccessingMixin, SpikeRenderingBaseMixin, Spike
             
             self.ui.btn_slide_run.setText("||")
             self.ui.btn_slide_run.tag = "running"
-            self.sliderThread.start()
+            self.animationThread.start()
 
         elif self.ui.btn_slide_run.tag == "running":
             self.ui.btn_slide_run.setText(">")
             self.ui.btn_slide_run.tag = "paused"
-            self.sliderThread.terminate()
+            self.animationThread.terminate()
 
 
-    def increase_slider_val(self):
-        slider_val = self.ui.slider.value() # integer value between 0-100
-        if self.enable_debug_print:
-            print(f'Spike3DRaster.increase_slider_val(): slider_val: {slider_val}')
-        if slider_val < 100:
-            self.ui.slider.setValue(slider_val + 1)
-        else:
-            print("thread ended..")
-            self.ui.btn_slide_run.setText(">")
-            self.ui.btn_slide_run.tag = "paused"
-            self.sliderThread.terminate()
-
-    def slider_val_changed(self, val):
-        self.slidebar_val = val / 100
-        # Gets the transform from relative (0.0 - 1.0) to absolute timestamp offset
-        curr_t = self._compute_window_transform(self.slidebar_val)
-        
-        if self.enable_debug_print:
-            print(f'Spike3DRaster.slider_val_changed(): self.slidebar_val: {self.slidebar_val}, curr_t: {curr_t}')
-            print(f'BEFORE: self.spikes_window.active_time_window: {self.spikes_window.active_time_window}')
-         # set the start time which will trigger the update cascade and result in on_window_changed(...) being called
-        self.spikes_window.update_window_start(curr_t)
-        if self.enable_debug_print:
-            print(f'AFTER: self.spikes_window.active_time_window: {self.spikes_window.active_time_window}')
     
-    
-    # Called from SliderRunner's thread when it emits the update_signal:    
-    def increase_animation_frame_val(self):
-        self.shift_animation_frame_val(1)
-        
-        
     
 
     def on_jump_left(self):
@@ -940,7 +905,50 @@ class Spike3DRaster(NeuronIdentityAccessingMixin, SpikeRenderingBaseMixin, Spike
         self.spikes_window.update_window_start(next_start_timestamp)
         # TODO: doesn't update the slider or interact with the slider in any way.
         
-   
+        
+    # Called from SliderRunner's thread when it emits the update_signal:    
+    def increase_animation_frame_val(self):
+        self.shift_animation_frame_val(1)
+        
+        
+        
+    # Slider Functions:
+    # def _compute_window_transform(self, relative_offset):
+    #     """ computes the transform from 0.0-1.0 as the slider would provide to the offset given the current information. """
+    #     earliest_t, latest_t = self.spikes_window.total_df_start_end_times
+    #     total_spikes_df_duration = latest_t - earliest_t # get the duration of the entire spikes df
+    #     render_window_offset = (total_spikes_df_duration * relative_offset) + earliest_t
+    #     return render_window_offset
+    
+    # def increase_slider_val(self):
+    #     slider_val = self.ui.slider.value() # integer value between 0-100
+    #     if self.enable_debug_print:
+    #         print(f'Spike3DRaster.increase_slider_val(): slider_val: {slider_val}')
+    #     if slider_val < 100:
+    #         self.ui.slider.setValue(slider_val + 1)
+    #     else:
+    #         print("thread ended..")
+    #         self.ui.btn_slide_run.setText(">")
+    #         self.ui.btn_slide_run.tag = "paused"
+    #         self.sliderThread.terminate()
+
+    # def slider_val_changed(self, val):
+    #     self.slidebar_val = val / 100
+    #     # Gets the transform from relative (0.0 - 1.0) to absolute timestamp offset
+    #     curr_t = self._compute_window_transform(self.slidebar_val)
+        
+    #     if self.enable_debug_print:
+    #         print(f'Spike3DRaster.slider_val_changed(): self.slidebar_val: {self.slidebar_val}, curr_t: {curr_t}')
+    #         print(f'BEFORE: self.spikes_window.active_time_window: {self.spikes_window.active_time_window}')
+    #      # set the start time which will trigger the update cascade and result in on_window_changed(...) being called
+    #     self.spikes_window.update_window_start(curr_t)
+    #     if self.enable_debug_print:
+    #         print(f'AFTER: self.spikes_window.active_time_window: {self.spikes_window.active_time_window}')
+    
+    
+
+        
+        
         
     # #### from pyqtgraph_animated3Dplot_pairedLines's animation style ###:
     # def start(self):
