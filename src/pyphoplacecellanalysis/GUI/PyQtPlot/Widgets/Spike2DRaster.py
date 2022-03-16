@@ -158,8 +158,8 @@ class Spike2DRaster(SpikeRasterBase):
         # self.params.center_mode = 'zero_centered'
         self.params.center_mode = 'starting_at_zero'
         
-        # self.params.bin_position_mode = ''bin_center'
-        self.params.bin_position_mode = 'left_edges'
+        self.params.bin_position_mode = 'bin_center'
+        # self.params.bin_position_mode = 'left_edges'
         
         # by default we want the time axis to approximately span -20 to 20. So we set the temporal_zoom_factor to 
         self.params.temporal_zoom_factor = 40.0 / float(self.render_window_duration)        
@@ -210,15 +210,22 @@ class Spike2DRaster(SpikeRasterBase):
         
         # Common Tick Label
         vtick = QtGui.QPainterPath()
+        # vtick.moveTo(0, -0.5)
+        # vtick.lineTo(0, 0.5)
         vtick.moveTo(0, -0.5)
         vtick.lineTo(0, 0.5)
 
+
         self.ui.main_plot_widget.setLabel('left', 'Cell ID', units='')
         self.ui.main_plot_widget.setLabel('bottom', 'Time', units='s')
-        self.ui.main_plot_widget.disableAutoRange()
-        # self.ui.main_plot_widget.setXRange(-self.half_render_window_duration, +self.half_render_window_duration)
-        # self.ui.main_plot_widget.setXRange(0.0, +self.render_window_duration)
-        # self.ui.main_plot_widget.setYRange(self.y[0], self.y[-1])
+        self.ui.main_plot_widget.setMouseEnabled(x=False, y=False)
+        self.ui.main_plot_widget.enableAutoRange(x=False, y=False)
+        self.ui.main_plot_widget.setAutoVisible(x=False, y=False)
+        self.ui.main_plot_widget.setAutoPan(x=False, y=False)
+        
+        # self.ui.main_plot_widget.disableAutoRange()
+        self._update_plot_ranges()
+        
         
         # self._build_neuron_id_graphics(self.ui.main_gl_widget, self.y)
         self.params.config_items = []
@@ -263,7 +270,13 @@ class Spike2DRaster(SpikeRasterBase):
     #### EVENT HANDLERS
     ##################################
     
-    
+    def _update_plot_ranges(self):
+        # self.ui.main_plot_widget.setXRange(-self.half_render_window_duration, +self.half_render_window_duration)
+        # self.ui.main_plot_widget.setXRange(0.0, +self.temporal_axis_length)
+        # self.ui.main_plot_widget.setYRange(self.y[0], self.y[-1])
+        # self.ui.main_plot_widget.disableAutoRange()
+        self.ui.main_plot_widget.disableAutoRange('xy')
+        self.ui.main_plot_widget.setRange(xRange=[0.0, +self.temporal_axis_length], yRange=[self.y[0], self.y[-1]])
     
     @QtCore.pyqtSlot()
     def on_adjust_temporal_spatial_mapping(self):
@@ -345,37 +358,6 @@ class Spike2DRaster(SpikeRasterBase):
         
         # self.ui.scatter_plot.setData(**getData())        
         self.ui.scatter_plot.setData(x=curr_spike_x, y=curr_spike_y, pen=curr_spike_pens)
-        # self.ui.scatter_plot
-        
-        # curr_data = []
-        # # Plot each unit one at a time:
-        # for i, cell_id in enumerate(self.unit_ids):    
-        #     # Filter the dataframe using that column and value from the list
-        #     curr_cell_df = self.active_windowed_df[self.active_windowed_df['unit_id']==cell_id]
-        #     curr_spike_t = curr_cell_df[curr_cell_df.spikes.time_variable_name].to_numpy() # this will map
-        #     # efficiently get curr_spike_t by filtering for unit and column at the same time
-        #     # curr_spike_t = self.active_windowed_df.loc[self.active_windowed_df.spikes.time_variable_name, (self.active_windowed_df['unit_id']==cell_id)].values # .to_numpy()
-            
-        #     # yi = self.y[i] # get the correct y-position for all spikes of this cell
-        #     # map the current spike times back onto the range of the window's (-half_render_window_duration, +half_render_window_duration) so they represent the x coordinate
-        #     # curr_x = np.interp(curr_spike_t, (self.spikes_window.active_window_start_time, self.spikes_window.active_window_end_time), (-self.half_render_window_duration, +self.half_render_window_duration))
-        #     # curr_x = np.interp(curr_spike_t, (self.spikes_window.active_window_start_time, self.spikes_window.active_window_end_time), (-self.half_temporal_axis_length, +self.half_temporal_axis_length))
-        #     curr_x = np.interp(curr_spike_t, (self.spikes_window.active_window_start_time, self.spikes_window.active_window_end_time), (0.0, +self.temporal_axis_length)) # for starting_at_zero
-        #     # curr_paired_x = curr_x.repeat(2)            
-        #     # curr_yd = np.full_like(curr_x, yi)
-        #     # curr_unit_n_spikes = len(curr_spike_t)
-        #     # curr_paired_spike_yds = np.squeeze(np.tile(np.array([self.lower_y[i], self.upper_y[i]]), curr_unit_n_spikes)) # repeat pair of y values once for each spike of this cell. (lower_y[i], upper_y[i])
-            
-        #     # Build lines:
-        #     # self.ui.plots[i].setData(y=curr_yd, x=curr_x)
-        #     # self.ui.plots[i].setData(y=curr_paired_spike_yds, x=curr_paired_x)
-            
-        #     curr_data.append(curr_x)
-        #     # plt.setYRange((-self.n_half_cells - self.side_bin_margins), (self.n_half_cells + self.side_bin_margins))
-        #     # plt.setXRange(-self.half_render_window_duration, +self.half_render_window_duration)
-
-        # self.ui.spikes_raster_item_plot.setData(curr_data)
-            
         
         
     # def rebuild_main_gl_line_plots_if_needed(self, debug_print=True):
