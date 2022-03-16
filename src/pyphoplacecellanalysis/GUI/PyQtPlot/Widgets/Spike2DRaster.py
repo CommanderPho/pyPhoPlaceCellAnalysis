@@ -232,7 +232,8 @@ class Spike2DRaster(SpikeRasterBase):
         
         self.ui.main_plot_widget.addItem(self.ui.scatter_plot)
         
-        ## Scroll Widget:
+        #############################
+        ## Bottom Windowed Scroll Plot/Widget:
         self.ui.main_scroll_window_plot = self.ui.main_graphics_layout_widget.addPlot(row=2, col=0)
         # ALL Spikes in the preview window:
         # curr_spike_x, curr_spike_y, curr_spike_pens, curr_n = self._build_spikes_data_values(self.spikes_window.df)
@@ -254,7 +255,19 @@ class Spike2DRaster(SpikeRasterBase):
         # self.ui.main_plot_widget.addItem(self.ui.scroll_window_region, ignoreBounds=True)
         self.ui.main_scroll_window_plot.addItem(self.ui.scroll_window_region, ignoreBounds=True)
         
-
+        
+        earliest_t, latest_t = self.spikes_window.total_df_start_end_times
+        
+        self.ui.main_scroll_window_plot.setLabel('bottom', 'Time', units='s')
+        self.ui.main_scroll_window_plot.setMouseEnabled(x=False, y=False)
+        self.ui.main_scroll_window_plot.disableAutoRange('xy')
+        # self.ui.main_scroll_window_plot.enableAutoRange(x=False, y=False)
+        self.ui.main_scroll_window_plot.setAutoVisible(x=False, y=False)
+        self.ui.main_scroll_window_plot.setAutoPan(x=False, y=False)
+        self.ui.main_scroll_window_plot.setXRange(earliest_t, latest_t, padding=0)
+        self.ui.main_scroll_window_plot.setYRange(np.nanmin(curr_spike_y), np.nanmax(curr_spike_y), padding=0)
+        
+        
         # All units at once approach:
         # Filter the dataframe using that column and value from the list
         # curr_spike_t = self.active_windowed_df[self.active_windowed_df.spikes.time_variable_name].to_numpy() # this will map
