@@ -167,6 +167,20 @@ class Spike2DRaster(SpikeRasterBase):
         self.enable_debug_print = False
         self.enable_debug_widgets = True
         
+        # Build Required SpikesDf fields:
+        # print(f'unit_ids: {self.unit_ids}, n_cells: {self.n_cells}')
+        self.y = DataSeriesToSpatial.build_series_identity_axis(self.n_cells, center_mode=self.params.center_mode, bin_position_mode=self.params.bin_position_mode, side_bin_margins = self.params.side_bin_margins)
+        self.y_unit_id_map = dict(zip(self.unit_ids, self.y))
+
+        # Compute the y for all windows, not just the current one:
+        if 'visualization_raster_y_location' not in self.spikes_df.columns:
+            print('Spike2DRaster.setup(): adding "visualization_raster_y_location" column to spikes_df...')
+            # all_y = [y[i] for i, a_cell_id in enumerate(curr_spikes_df['unit_id'].to_numpy())]
+            all_y = [self.y_unit_id_map[a_cell_id] for a_cell_id in self.spikes_df['unit_id'].to_numpy()]
+            self.spikes_df['visualization_raster_y_location'] = all_y # adds as a column to the dataframe. Only needs to be updated when the number of active units changes
+            print('done.')
+        # self.spikes_df
+        
     
   
     def _buildGraphics(self):
@@ -190,103 +204,96 @@ class Spike2DRaster(SpikeRasterBase):
         # # build the position range for each unit along the y-axis:
         # # y = DataSeriesToSpatial.build_series_identity_axis(self.n_cells, center_mode='zero_centered', bin_position_mode='bin_center', side_bin_margins = self.params.side_bin_margins)
         self.y = DataSeriesToSpatial.build_series_identity_axis(self.n_cells, center_mode=self.params.center_mode, bin_position_mode=self.params.bin_position_mode, side_bin_margins = self.params.side_bin_margins)
-        
-        
         self.lower_y = DataSeriesToSpatial.build_series_identity_axis(self.n_cells, center_mode=self.params.center_mode, bin_position_mode='left_edges', side_bin_margins = self.params.side_bin_margins) / self.n_cells
         self.upper_y = DataSeriesToSpatial.build_series_identity_axis(self.n_cells, center_mode=self.params.center_mode, bin_position_mode='right_edges', side_bin_margins = self.params.side_bin_margins) / self.n_cells
         # print(f'lower_y: {lower_y}\n upper_y: {upper_y}')
         
+        # Common Tick Label
+        vtick = QtGui.QPainterPath()
+        vtick.moveTo(0, -0.5)
+        vtick.lineTo(0, 0.5)
+
         self.ui.main_plot_widget.setLabel('left', 'Cell ID', units='')
         self.ui.main_plot_widget.setLabel('bottom', 'Time', units='s')
         self.ui.main_plot_widget.disableAutoRange()
         # self.ui.main_plot_widget.setXRange(-self.half_render_window_duration, +self.half_render_window_duration)
-        self.ui.main_plot_widget.setXRange(0.0, +self.render_window_duration)
-        self.ui.main_plot_widget.setYRange(self.y[0], self.y[-1])
+        # self.ui.main_plot_widget.setXRange(0.0, +self.render_window_duration)
+        # self.ui.main_plot_widget.setYRange(self.y[0], self.y[-1])
         
         # self._build_neuron_id_graphics(self.ui.main_gl_widget, self.y)
         self.params.config_items = []
         for i, cell_id in enumerate(self.unit_ids):
             curr_color = pg.mkColor((i, self.n_cells*1.3))
             curr_color.setAlphaF(0.5)
-            curr_config_item = (i, cell_id, pg.mkPen(curr_color), self.lower_y[i], self.upper_y[i])
-            
-            self.params.config_items.append(curr_config_item)
+            curr_pen = pg.mkPen(curr_color)
+            curr_config_item = (i, cell_id, curr_pen, self.lower_y[i], self.upper_y[i])            
+            self.params.config_items.append(curr_config_item)    
+            # s2 = pg.ScatterPlotItem(pxMode=True, symbol=vtick, size=1, pen=curr_pen)
+            # self.ui.main_plot_widget.addItem(s2)
     
-        self.ui.spikes_raster_item_plot = SpikesRasterItem(self.params.config_items)
+        # self.ui.spikes_raster_item_plot = SpikesRasterItem(self.params.config_items)
+        self.ui.scatter_plot = pg.ScatterPlotItem(pxMode=True, symbol=vtick, size=10, pen={'color': 'w', 'width': 2})
+        self.ui.scatter_plot.opts['useCache'] = True
         
-        # Plot each unit one at a time:
-        curr_data = []
-        for i, cell_id in enumerate(self.unit_ids):
-            curr_color = pg.mkColor((i, self.n_cells*1.3))
-            curr_color.setAlphaF(0.5)
+        self.ui.main_plot_widget.addItem(self.ui.scatter_plot)
+        
+        # All units at once approach:
+        # Filter the dataframe using that column and value from the list
+        curr_spike_t = self.active_windowed_df[self.active_windowed_df.spikes.time_variable_name].to_numpy() # this will map
+        curr_spike_x = np.interp(curr_spike_t, (self.spikes_window.active_window_start_time, self.spikes_window.active_window_end_time), (0.0, +self.temporal_axis_length))
+        curr_spike_y = self.active_windowed_df['visualization_raster_y_location'].to_numpy() # this will map
+        curr_n = len(curr_spike_t) # curr number of spikes
+        print(f'np.shape(curr_spike_t): {np.shape(curr_spike_t)}, np.shape(curr_spike_x): {np.shape(curr_spike_x)}, np.shape(curr_spike_y): {np.shape(curr_spike_y)}, curr_n: {curr_n}')
+        pos = np.vstack((curr_spike_x, curr_spike_y))
+        # np.shape(curr_spike_t): (11,), np.shape(curr_spike_x): (11,), np.shape(curr_spike_y): (11,), curr_n: 11
+        # np.shape(pos): (2, 11)
+        print(f'np.shape(pos): {np.shape(pos)}') # should be 2xN
+        # pos = np.random.normal(size=(2,n), scale=1e-5)
+        # spots = [{'pos': pos[:,i], 'data': 1, 'brush':pg.intColor(i, n), 'symbol': i%10, 'size': 5+i/10.} for i in range(n)]
+        spots = [{'pos': pos[:,i], 'data': i} for i in range(curr_n)]
+        self.ui.scatter_plot.addPoints(spots)
+        
+        # # Plot each unit one at a time:
+        # curr_data = []
+        # for i, cell_id in enumerate(self.unit_ids):
+        #     curr_color = pg.mkColor((i, self.n_cells*1.3))
+        #     curr_color.setAlphaF(0.5)
             
-            # curr_config_item = (i, cell_id, pg.mkPen(curr_color), self.lower_y[i], self.upper_y[i])
+        #     # curr_config_item = (i, cell_id, pg.mkPen(curr_color), self.lower_y[i], self.upper_y[i])
             
-            # # pLOT MODE:
-            # p1 = self.ui.main_plot_widget.plot() # add a new plot to be filled later
-            # p1.setPen(curr_color)
+        #     # # pLOT MODE:
+        #     # p1 = self.ui.main_plot_widget.plot() # add a new plot to be filled later
+        #     # p1.setPen(curr_color)
             
-            # self.ui.plots.append(p1)
+        #     # self.ui.plots.append(p1)
             
-            # print(f'cell_id: {cell_id}, curr_color: {curr_color.alpha()}')
+        #     # print(f'cell_id: {cell_id}, curr_color: {curr_color.alpha()}')
             
-            # Filter the dataframe using that column and value from the list
-            curr_cell_df = self.active_windowed_df[self.active_windowed_df['unit_id']==cell_id].copy() # is .copy() needed here since nothing is updated???
-            curr_spike_t = curr_cell_df[curr_cell_df.spikes.time_variable_name].to_numpy() # this will map
+        #     # Filter the dataframe using that column and value from the list
+        #     curr_cell_df = self.active_windowed_df[self.active_windowed_df['unit_id']==cell_id].copy() # is .copy() needed here since nothing is updated???
+        #     curr_spike_t = curr_cell_df[curr_cell_df.spikes.time_variable_name].to_numpy() # this will map
             
-            # yi = self.y[i] # get the correct y-position for all spikes of this cell
-            # print(f'cell_id: {cell_id}, yi: {yi}')
-            # map the current spike times back onto the range of the window's (-half_render_window_duration, +half_render_window_duration) so they represent the x coordinate
-            curr_x = np.interp(curr_spike_t, (self.spikes_window.active_window_start_time, self.spikes_window.active_window_end_time), (0.0, +self.temporal_axis_length))
-            # curr_x = np.interp(curr_spike_t, (self.spikes_window.active_window_start_time, self.spikes_window.active_window_end_time), (-self.half_temporal_axis_length, +self.half_temporal_axis_length))
-            # curr_paired_x = np.squeeze(interleave_elements(np.atleast_2d(curr_x).T, np.atleast_2d(curr_x).T))
-            # curr_paired_x = curr_x.repeat(2)
-            # curr_yd = np.full_like(curr_x, yi)
-            # curr_unit_n_spikes = len(curr_spike_t)
-            # curr_paired_spike_yds = np.squeeze(np.tile(np.array([self.lower_y[i], self.upper_y[i]]), curr_unit_n_spikes)) # repeat pair of y values once for each spike of this cell. (lower_y[i], upper_y[i])
+        #     # yi = self.y[i] # get the correct y-position for all spikes of this cell
+        #     # print(f'cell_id: {cell_id}, yi: {yi}')
+        #     # map the current spike times back onto the range of the window's (-half_render_window_duration, +half_render_window_duration) so they represent the x coordinate
+        #     curr_x = np.interp(curr_spike_t, (self.spikes_window.active_window_start_time, self.spikes_window.active_window_end_time), (0.0, +self.temporal_axis_length))
+        #     # curr_x = np.interp(curr_spike_t, (self.spikes_window.active_window_start_time, self.spikes_window.active_window_end_time), (-self.half_temporal_axis_length, +self.half_temporal_axis_length))
+        #     # curr_paired_x = np.squeeze(interleave_elements(np.atleast_2d(curr_x).T, np.atleast_2d(curr_x).T))
+        #     # curr_paired_x = curr_x.repeat(2)
+        #     # curr_yd = np.full_like(curr_x, yi)
+        #     # curr_unit_n_spikes = len(curr_spike_t)
+        #     # curr_paired_spike_yds = np.squeeze(np.tile(np.array([self.lower_y[i], self.upper_y[i]]), curr_unit_n_spikes)) # repeat pair of y values once for each spike of this cell. (lower_y[i], upper_y[i])
             
-            # Build lines:
-            # self.ui.plots[i].setData(y=curr_yd, x=curr_x)
-            # self.ui.plots[i].setData(y=curr_paired_spike_yds, x=curr_paired_x)
-            curr_data.append(curr_x)
-            # plt.setYRange((-self.n_half_cells - self.side_bin_margins), (self.n_half_cells + self.side_bin_margins))
-            # plt.setXRange(-self.half_render_window_duration, +self.half_render_window_duration)
+        #     # Build lines:
+        #     # self.ui.plots[i].setData(y=curr_yd, x=curr_x)
+        #     # self.ui.plots[i].setData(y=curr_paired_spike_yds, x=curr_paired_x)
+        #     curr_data.append(curr_x)
+        #     # plt.setYRange((-self.n_half_cells - self.side_bin_margins), (self.n_half_cells + self.side_bin_margins))
+        #     # plt.setXRange(-self.half_render_window_duration, +self.half_render_window_duration)
 
-        self.ui.spikes_raster_item_plot.setData(curr_data)
-        self.ui.main_plot_widget.addItem(self.ui.spikes_raster_item_plot)
+        # self.ui.spikes_raster_item_plot.setData(curr_data)
+        # self.ui.main_plot_widget.addItem(self.ui.spikes_raster_item_plot)
 
-    # def _build_neuron_id_graphics(self, w, y_pos):
-    #     """ builds the text items to indicate the neuron ID for each neuron in the df. """
-    #     all_cell_ids = self.cell_ids
-        
-    #     cell_id_text_item_font = QtGui.QFont('Helvetica', 12)
-        
-    #     self.ui.glCellIdTextItems = []
-    #     for i, cell_id in enumerate(all_cell_ids):
-    #         curr_color = pg.mkColor((i, self.n_cells*1.3))
-    #         curr_color.setAlphaF(0.5)
-    #         # print(f'cell_id: {cell_id}, curr_color: {curr_color.alpha()}')
-    #         curr_id_txtitem = gl.GLTextItem(pos=(-self.half_temporal_axis_length, y_pos[i], (self.z_floor - 0.5)), text=f'{cell_id}', color=curr_color, font=cell_id_text_item_font)
-    #         w.addItem(curr_id_txtitem) # add to the current widget
-    #         # add to the cell_ids array
-    #         self.ui.glCellIdTextItems.append(curr_id_txtitem)
-           
-                
-    # def _update_neuron_id_graphics(self):
-    #     """ updates the text items to indicate the neuron ID for each neuron in the df. """
-    #     all_cell_ids = self.cell_ids
-    #     assert len(self.ui.glCellIdTextItems) == len(all_cell_ids), f"we should already have correct number of neuron ID text items, but len(self.ui.glCellIdTextItems): {len(self.ui.glCellIdTextItems)} and len(all_cell_ids): {len(all_cell_ids)}!"
-    #     assert len(self.ui.glCellIdTextItems) == len(self.y), f"we should already have correct number of neuron ID text items, but len(self.ui.glCellIdTextItems): {len(self.ui.glCellIdTextItems)} and len(self.y): {len(self.y)}!"
-    #     for i, cell_id in enumerate(all_cell_ids):
-    #         curr_id_txtitem = self.ui.glCellIdTextItems[i]
-    #         curr_id_txtitem.setData(pos=(-self.half_temporal_axis_length, self.y[i], (self.z_floor - 0.5)))
-    #         # curr_id_txtitem.resetTransform()
-    #         # curr_id_txtitem.translate(-self.half_temporal_axis_length, self.y[i], (self.z_floor - 0.5))
-
-    # def _build_axes_arrow_graphics(self, w):
-        
-    #     md = gl.MeshData.cylinder(rows=10, cols=20, radius=[1., 2.0], length=5.)
-        
         
         
     ###################################
@@ -331,79 +338,7 @@ class Spike2DRaster(SpikeRasterBase):
         # self._update_neuron_id_graphics()
         pass
 
-        
-    # # Input Handelers:        
-    # def keyPressEvent(self, e):
-    #     """ called automatically when a keyboard key is pressed and this widget has focus. 
-    #     TODO: doesn't actually work right now.
-    #     """
-    #     print(f'keyPressEvent(e.key(): {e.key()})')
-    #     if e.key() == QtCore.Qt.Key_Escape:
-    #         self.close()
-    #     elif e.key() == QtCore.Qt.Key_Backspace:
-    #         print('TODO')
-    #     elif e.key() == QtCore.Qt.Key_Left:
-    #         self.shift_animation_frame_val(-1) # jump back one frame
-            
-    #     elif e.key() == QtCore.Qt.Key_Right:
-    #         self.shift_animation_frame_val(1) # jump forward one frame
-            
-    #     elif e.key() == QtCore.Qt.Key_Space:
-    #         self.play_pause()
-    #     elif e.key() == QtCore.Qt.Key_P:
-    #         self.toggle_speed_burst()
-            
-    #     else:
-    #         pass
-            
-            
-    # def key_handler(self, event):
-    #     print("MainVideoPlayerWindow key handler: {0}".format(str(event.key())))
-    #     if event.key() == QtCore.Qt.Key_Escape and self.is_full_screen:
-    #         self.toggle_full_screen()
-    #     if event.key() == QtCore.Qt.Key_F:
-    #         self.toggle_full_screen()
-    #     if event.key() == QtCore.Qt.Key_Space:
-    #         self.play_pause()
-    #     if event.key() == QtCore.Qt.Key_P:
-    #         self.toggle_speed_burst()
 
-
-    # def wheel_handler(self, event):
-    #     print(f'wheel_handler(event.angleDelta().y(): {event.angleDelta().y()})')
-    #     # self.modify_volume(1 if event.angleDelta().y() > 0 else -1)
-    #     # self.set_media_position(1 if event.angleDelta().y() > 0 else -1)
-
-    # def on_spikes_df_changed(self):
-    #     """ changes:
-    #         self.unit_ids
-    #         self.n_full_cell_grid
-    #     """
-    #     if self.enable_debug_print:
-    #         print(f'Spike2DRaster.on_spikes_df_changed()')
-    #     # TODO: these '.translate(...)' instructions might not be right if they're relative to the original transform. May need to translate back to by the inverse of the old value, and then do the fresh transform with the new value. Or compute the difference between the old and new.
-    #     self.ui.gx.setSize(20, self.n_full_cell_grid) # std size in z-dir, n_cell size across
-    #     self.ui.gy.translate(0, -self.n_half_cells, 0) # offset by half the number of units in the -y direction
-    #     self.ui.gz.setSize(self.temporal_axis_length, self.n_full_cell_grid)
-    #     self.rebuild_main_gl_line_plots_if_needed()
-        
-
-    # def on_window_duration_changed(self):
-    #     """ changes self.half_render_window_duration """
-    #     print(f'Spike2DRaster.on_window_duration_changed()')
-    #     self.ui.gx.translate(-self.half_temporal_axis_length, 0, 0) # shift backwards
-    #     self.ui.gy.setSize(self.temporal_axis_length, 20)
-    #     self.ui.gz.setSize(self.temporal_axis_length, self.n_full_cell_grid)
-    #     # update grids. on_window_changed should be triggered separately        
-        
-    # def on_window_changed(self):
-    #     # called when the window is updated
-    #     if self.enable_debug_print:
-    #         print(f'Spike2DRaster.on_window_changed()')
-    #     profiler = pg.debug.Profiler(disabled=True, delayed=True)
-    #     self._update_plots()
-    #     profiler('Finished calling _update_plots()')
-        
             
     def _update_plots(self):
         """ performance went:
@@ -429,34 +364,53 @@ class Spike2DRaster(SpikeRasterBase):
         # self.lower_y = DataSeriesToSpatial.build_series_identity_axis(self.n_cells, center_mode=self.params.center_mode, bin_position_mode='left_edges', side_bin_margins = self.params.side_bin_margins) / self.n_cells
         # self.upper_y = DataSeriesToSpatial.build_series_identity_axis(self.n_cells, center_mode=self.params.center_mode, bin_position_mode='right_edges', side_bin_margins = self.params.side_bin_margins) / self.n_cells
         
-        curr_data = []
-        # Plot each unit one at a time:
-        for i, cell_id in enumerate(self.unit_ids):    
-            # Filter the dataframe using that column and value from the list
-            curr_cell_df = self.active_windowed_df[self.active_windowed_df['unit_id']==cell_id]
-            curr_spike_t = curr_cell_df[curr_cell_df.spikes.time_variable_name].to_numpy() # this will map
-            # efficiently get curr_spike_t by filtering for unit and column at the same time
-            # curr_spike_t = self.active_windowed_df.loc[self.active_windowed_df.spikes.time_variable_name, (self.active_windowed_df['unit_id']==cell_id)].values # .to_numpy()
+        
+        
+        # All units at once approach:
+        # Filter the dataframe using that column and value from the list
+        curr_spike_t = self.active_windowed_df[self.active_windowed_df.spikes.time_variable_name].to_numpy() # this will map
+        curr_spike_x = np.interp(curr_spike_t, (self.spikes_window.active_window_start_time, self.spikes_window.active_window_end_time), (0.0, +self.temporal_axis_length))
+        curr_spike_y = self.active_windowed_df['visualization_raster_y_location'].to_numpy() # this will map
+        curr_n = len(curr_spike_t) # curr number of spikes
+        # pos = np.vstack((curr_spike_x, curr_spike_y))
+        # print(f'np.shape(pos): {np.shape(pos)}') # should be 2xN
+        # pos = np.random.normal(size=(2,n), scale=1e-5)
+        # spots = [{'pos': pos[:,i], 'data': 1, 'brush':pg.intColor(i, n), 'symbol': i%10, 'size': 5+i/10.} for i in range(n)]
+        # spots = [{'pos': pos[:,i], 'data': i} for i in range(curr_n)]
+        # self.ui.scatter_plot.addPoints(spots)
+        
+        # self.ui.scatter_plot.setData(**getData())        
+        self.ui.scatter_plot.setData(x=curr_spike_x, y=curr_spike_y)
+        # self.ui.scatter_plot
+        
+        # curr_data = []
+        # # Plot each unit one at a time:
+        # for i, cell_id in enumerate(self.unit_ids):    
+        #     # Filter the dataframe using that column and value from the list
+        #     curr_cell_df = self.active_windowed_df[self.active_windowed_df['unit_id']==cell_id]
+        #     curr_spike_t = curr_cell_df[curr_cell_df.spikes.time_variable_name].to_numpy() # this will map
+        #     # efficiently get curr_spike_t by filtering for unit and column at the same time
+        #     # curr_spike_t = self.active_windowed_df.loc[self.active_windowed_df.spikes.time_variable_name, (self.active_windowed_df['unit_id']==cell_id)].values # .to_numpy()
             
-            # yi = self.y[i] # get the correct y-position for all spikes of this cell
-            # map the current spike times back onto the range of the window's (-half_render_window_duration, +half_render_window_duration) so they represent the x coordinate
-            # curr_x = np.interp(curr_spike_t, (self.spikes_window.active_window_start_time, self.spikes_window.active_window_end_time), (-self.half_render_window_duration, +self.half_render_window_duration))
-            # curr_x = np.interp(curr_spike_t, (self.spikes_window.active_window_start_time, self.spikes_window.active_window_end_time), (-self.half_temporal_axis_length, +self.half_temporal_axis_length))
-            curr_x = np.interp(curr_spike_t, (self.spikes_window.active_window_start_time, self.spikes_window.active_window_end_time), (0.0, +self.temporal_axis_length)) # for starting_at_zero
-            # curr_paired_x = curr_x.repeat(2)            
-            # curr_yd = np.full_like(curr_x, yi)
-            # curr_unit_n_spikes = len(curr_spike_t)
-            # curr_paired_spike_yds = np.squeeze(np.tile(np.array([self.lower_y[i], self.upper_y[i]]), curr_unit_n_spikes)) # repeat pair of y values once for each spike of this cell. (lower_y[i], upper_y[i])
+        #     # yi = self.y[i] # get the correct y-position for all spikes of this cell
+        #     # map the current spike times back onto the range of the window's (-half_render_window_duration, +half_render_window_duration) so they represent the x coordinate
+        #     # curr_x = np.interp(curr_spike_t, (self.spikes_window.active_window_start_time, self.spikes_window.active_window_end_time), (-self.half_render_window_duration, +self.half_render_window_duration))
+        #     # curr_x = np.interp(curr_spike_t, (self.spikes_window.active_window_start_time, self.spikes_window.active_window_end_time), (-self.half_temporal_axis_length, +self.half_temporal_axis_length))
+        #     curr_x = np.interp(curr_spike_t, (self.spikes_window.active_window_start_time, self.spikes_window.active_window_end_time), (0.0, +self.temporal_axis_length)) # for starting_at_zero
+        #     # curr_paired_x = curr_x.repeat(2)            
+        #     # curr_yd = np.full_like(curr_x, yi)
+        #     # curr_unit_n_spikes = len(curr_spike_t)
+        #     # curr_paired_spike_yds = np.squeeze(np.tile(np.array([self.lower_y[i], self.upper_y[i]]), curr_unit_n_spikes)) # repeat pair of y values once for each spike of this cell. (lower_y[i], upper_y[i])
             
-            # Build lines:
-            # self.ui.plots[i].setData(y=curr_yd, x=curr_x)
-            # self.ui.plots[i].setData(y=curr_paired_spike_yds, x=curr_paired_x)
+        #     # Build lines:
+        #     # self.ui.plots[i].setData(y=curr_yd, x=curr_x)
+        #     # self.ui.plots[i].setData(y=curr_paired_spike_yds, x=curr_paired_x)
             
-            curr_data.append(curr_x)
-            # plt.setYRange((-self.n_half_cells - self.side_bin_margins), (self.n_half_cells + self.side_bin_margins))
-            # plt.setXRange(-self.half_render_window_duration, +self.half_render_window_duration)
+        #     curr_data.append(curr_x)
+        #     # plt.setYRange((-self.n_half_cells - self.side_bin_margins), (self.n_half_cells + self.side_bin_margins))
+        #     # plt.setXRange(-self.half_render_window_duration, +self.half_render_window_duration)
 
-        self.ui.spikes_raster_item_plot.setData(curr_data)
+        # self.ui.spikes_raster_item_plot.setData(curr_data)
             
         
         
