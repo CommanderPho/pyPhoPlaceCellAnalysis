@@ -249,15 +249,11 @@ class Spike2DRaster(SpikeRasterBase):
         # Add the linear region overlay:
         self.ui.scroll_window_region = pg.LinearRegionItem(clipItem=self.ui.preview_overview_scatter_plot) # bound the LinearRegionItem to the plotted data
         self.ui.scroll_window_region.setZValue(10)
-        # Add the LinearRegionItem to the ViewBox, but tell the ViewBox to exclude this 
-        # item when doing auto-range calculations.
-        # p2.addItem(self.ui.scroll_window_region, ignoreBounds=True)
-        # self.ui.main_plot_widget.addItem(self.ui.scroll_window_region, ignoreBounds=True)
+        # Add the LinearRegionItem to the ViewBox, but tell the ViewBox to exclude this item when doing auto-range calculations.
         self.ui.main_scroll_window_plot.addItem(self.ui.scroll_window_region, ignoreBounds=True)
         
-        
+        # Setup axes bounds for the bottom windowed plot:
         earliest_t, latest_t = self.spikes_window.total_df_start_end_times
-        
         self.ui.main_scroll_window_plot.setLabel('bottom', 'Time', units='s')
         self.ui.main_scroll_window_plot.setMouseEnabled(x=False, y=False)
         self.ui.main_scroll_window_plot.disableAutoRange('xy')
