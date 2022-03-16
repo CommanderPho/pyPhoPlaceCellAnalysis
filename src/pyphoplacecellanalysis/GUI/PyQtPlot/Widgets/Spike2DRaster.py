@@ -185,11 +185,12 @@ class Spike2DRaster(SpikeRasterBase):
   
     def _buildGraphics(self):
         ##### Main Raster Plot Content Top ##########
-        self.ui.main_plot_widget = pg.PlotWidget(name='PlotMainSpikesRaster2D')
-        # self.ui.main_gl_widget.show()
-        self.ui.main_plot_widget.resize(1000,600)
+        
+        self.ui.main_graphics_layout_widget = pg.GraphicsLayoutWidget()
+        self.ui.main_graphics_layout_widget.useOpenGL(True)
+        self.ui.main_graphics_layout_widget.resize(1000,600)
         # Add the main widget to the layout in the (0, 0) location:
-        self.ui.layout.addWidget(self.ui.main_plot_widget, 0, 0) # add the GLViewWidget to the layout at 0, 0
+        self.ui.layout.addWidget(self.ui.main_graphics_layout_widget, 0, 0) # add the GLViewWidget to the layout at 0, 0
         
         # self.ui.main_gl_widget.clicked.connect(self.play_pause)
         # self.ui.main_gl_widget.doubleClicked.connect(self.toggle_full_screen)
@@ -200,6 +201,10 @@ class Spike2DRaster(SpikeRasterBase):
         # Add debugging widget:
         
         # Custom 2D raster plot:    
+        self.ui.main_plot_widget = self.ui.main_graphics_layout_widget.addPlot(row=0, col=0)
+        # self.ui.main_plot_widget = pg.PlotWidget(name='PlotMainSpikesRaster2D')
+        self.ui.main_plot_widget.resize(1000,600)
+        
         self.ui.plots = [] # create an empty array for each plot, of which there will be one for each unit.
         # # build the position range for each unit along the y-axis:
         # # y = DataSeriesToSpatial.build_series_identity_axis(self.n_cells, center_mode='zero_centered', bin_position_mode='bin_center', side_bin_margins = self.params.side_bin_margins)
@@ -246,13 +251,17 @@ class Spike2DRaster(SpikeRasterBase):
         
         self.ui.main_plot_widget.addItem(self.ui.scatter_plot)
         
+        ## Scroll Widget:
+        self.ui.main_scroll_window_plot = self.ui.main_graphics_layout_widget.addPlot(row=1, col=0)
         
         self.ui.scroll_window_region = pg.LinearRegionItem()
         self.ui.scroll_window_region.setZValue(10)
         # Add the LinearRegionItem to the ViewBox, but tell the ViewBox to exclude this 
         # item when doing auto-range calculations.
         # p2.addItem(self.ui.scroll_window_region, ignoreBounds=True)
-        self.ui.main_plot_widget.addItem(self.ui.scroll_window_region, ignoreBounds=True)
+        # self.ui.main_plot_widget.addItem(self.ui.scroll_window_region, ignoreBounds=True)
+        self.ui.main_scroll_window_plot.addItem(self.ui.scroll_window_region, ignoreBounds=True)
+        
         
         
         
