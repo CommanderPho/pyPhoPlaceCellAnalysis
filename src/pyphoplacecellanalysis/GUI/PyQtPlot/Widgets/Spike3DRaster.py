@@ -154,18 +154,50 @@ class Spike3DRaster(NeuronIdentityAccessingMixin, SpikeRenderingBaseMixin, Spike
         return np.unique(self.spikes_window.df['aclu'].to_numpy()) 
     
 
+    # @property
+    # def overlay_text_lines(self):
+    #     """The lines of text to be displayed in the overlay."""
+    #     lines = []
+    #     lines.append(f'active_time_window: {self.spikes_window.active_time_window}')
+    #     lines.append(f"n_cells : {self.n_cells}")
+    #     lines.append(f'active num spikes: {self.active_windowed_df.shape[0]}')
+    #     lines.append(f'render_window_duration: {self.render_window_duration}')
+    #     lines.append(f'animation_time_step: {self.animation_time_step}')
+    #     lines.append(f'temporal_axis_length: {self.temporal_axis_length}')
+    #     lines.append(f'temporal_zoom_factor: {self.temporal_zoom_factor}')
+    #     return lines
+    
+    
     @property
-    def overlay_text_lines(self):
+    def overlay_text_lines_dict(self):
         """The lines of text to be displayed in the overlay."""
-        lines = []
-        lines.append(f'active_time_window: {self.spikes_window.active_time_window}')
-        lines.append(f"n_cells : {self.n_cells}")
-        lines.append(f'active num spikes: {self.active_windowed_df.shape[0]}')
-        lines.append(f'render_window_duration: {self.render_window_duration}')
-        lines.append(f'animation_time_step: {self.animation_time_step}')
-        lines.append(f'temporal_axis_length: {self.temporal_axis_length}')
-        lines.append(f'temporal_zoom_factor: {self.temporal_zoom_factor}')
-        return lines
+        
+        af = QtCore.Qt.AlignmentFlag
+
+        lines_dict = dict()
+        
+        lines_dict[af.AlignTop | af.AlignLeft] = ['TL']
+        lines_dict[af.AlignTop | af.AlignRight] = ['TR', 
+                                                   f"n_cells : {self.n_cells}",
+                                                   f'render_window_duration: {self.render_window_duration}',
+                                                   f'animation_time_step: {self.animation_time_step}',
+                                                   f'temporal_axis_length: {self.temporal_axis_length}',
+                                                   f'temporal_zoom_factor: {self.temporal_zoom_factor}']
+        lines_dict[af.AlignBottom | af.AlignLeft] = ['BL', 
+                                                   f'active_time_window: {self.spikes_window.active_time_window}']
+        lines_dict[af.AlignBottom | af.AlignRight] = ['BR']
+        
+        # lines = []
+        # lines.append(f'active_time_window: {self.spikes_window.active_time_window}')
+        # lines.append(f"n_cells : {self.n_cells}")
+        # lines.append(f'active num spikes: {self.active_windowed_df.shape[0]}')
+        # lines.append(f'render_window_duration: {self.render_window_duration}')
+        # lines.append(f'animation_time_step: {self.animation_time_step}')
+        # lines.append(f'temporal_axis_length: {self.temporal_axis_length}')
+        # lines.append(f'temporal_zoom_factor: {self.temporal_zoom_factor}')
+        # return lines
+    
+        return lines_dict
     
     
     ######  Get/Set Properties ######:
@@ -515,7 +547,9 @@ class Spike3DRaster(NeuronIdentityAccessingMixin, SpikeRenderingBaseMixin, Spike
         self.ui.viewport_overlay = GLViewportOverlayPainterItem()
         w.addItem(self.ui.viewport_overlay)
         # Update the additional display lines information on the overlay:
-        self.ui.viewport_overlay.additional_overlay_text_lines = self.overlay_text_lines
+        # self.ui.viewport_overlay.additional_overlay_text_lines = self.overlay_text_lines
+        self.ui.viewport_overlay.additional_overlay_text_dict = self.overlay_text_lines_dict
+
                 
         # Add axes planes:
         # X-plane:
@@ -794,7 +828,11 @@ class Spike3DRaster(NeuronIdentityAccessingMixin, SpikeRenderingBaseMixin, Spike
             
     
         # Update the additional display lines information on the overlay:
-        self.ui.viewport_overlay.additional_overlay_text_lines = self.overlay_text_lines
+        # self.ui.viewport_overlay.additional_overlay_text_lines = self.overlay_text_lines
+        self.ui.viewport_overlay.additional_overlay_text_dict = self.overlay_text_lines_dict
+        
+        
+        
         
         
             
