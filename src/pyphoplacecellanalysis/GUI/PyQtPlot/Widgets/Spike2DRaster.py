@@ -322,32 +322,6 @@ class Spike2DRaster(SpikeRasterBase):
         # self.spikes_df['visualization_raster_y_location'] = all_y # adds as a column to the dataframe. Only needs to be updated when the number of active units changes
         
         # print(f'lower_y: {lower_y}\n upper_y: {upper_y}')
-        
-        # # Adjust the three axes planes:
-        # self.ui.gx.resetTransform()
-        # self.ui.gx.rotate(90, 0, 1, 0)
-        # self.ui.gx.translate(-self.half_temporal_axis_length, 0, 0) # shift backwards
-        # self.ui.gx.setSize(20, self.n_full_cell_grid) # std size in z-dir, n_cell size across
-        # # self.ui.x_txtitem.resetTransform()
-        # # self.ui.x_txtitem.translate(-self.half_temporal_axis_length, self.n_half_cells, 0.0)
-        # self.ui.x_txtitem.setData(pos=(-self.half_temporal_axis_length, self.n_half_cells, 0.0))
-        
-        # self.ui.gy.resetTransform()
-        # self.ui.gy.rotate(90, 1, 0, 0)
-        # self.ui.gy.translate(0, -self.n_half_cells, 0) # offset by half the number of units in the -y direction
-        # self.ui.gy.setSize(self.temporal_axis_length, 20)
-        # # self.ui.y_txtitem.resetTransform()
-        # # self.ui.y_txtitem.translate(self.half_temporal_axis_length+0.5, -self.n_half_cells, 0.0)
-        # self.ui.y_txtitem.setData(pos=(self.half_temporal_axis_length+0.5, -self.n_half_cells, 0.0))
-        
-        # self.ui.gz.resetTransform()
-        # self.ui.gz.translate(0, 0, self.z_floor) # Shift down by 10 units in the z-dir
-        # self.ui.gz.setSize(self.temporal_axis_length, self.n_full_cell_grid)
-        # # self.ui.z_txtitem.resetTransform()
-        # # self.ui.z_txtitem.translate(-self.half_temporal_axis_length, -self.n_half_cells, (self.z_floor + -0.5))
-        # self.ui.z_txtitem.setData(pos=(-self.half_temporal_axis_length, -self.n_half_cells, (self.z_floor + -0.5)))
-        
-        # self._update_neuron_id_graphics()
         pass
 
 
