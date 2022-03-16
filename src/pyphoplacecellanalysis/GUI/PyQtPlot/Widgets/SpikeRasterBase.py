@@ -89,8 +89,8 @@ class UpdateRunner(QtCore.QThread):
             
                 
 
-class Spike3DRaster(NeuronIdentityAccessingMixin, SpikeRenderingBaseMixin, SpikesWindowOwningMixin, SpikesDataframeOwningMixin, QtWidgets.QWidget):
-    """ Displays a 3D version of a raster plot with the spikes occuring along a plane. 
+class SpikeRasterBase(NeuronIdentityAccessingMixin, SpikeRenderingBaseMixin, SpikesWindowOwningMixin, SpikesDataframeOwningMixin, QtWidgets.QWidget):
+    """ Displays a raster plot with the spikes occuring along a plane. 
     
     Usage:
         from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.Spike3DRaster import Spike3DRaster
@@ -274,7 +274,7 @@ class Spike3DRaster(NeuronIdentityAccessingMixin, SpikeRenderingBaseMixin, Spike
 
 
     def __init__(self, spikes_df, *args, window_duration=15.0, window_start_time=0.0, neuron_colors=None, **kwargs):
-        super(Spike3DRaster, self).__init__(*args, **kwargs)
+        super(SpikeRasterBase, self).__init__(*args, **kwargs)
         # Initialize member variables:
         
         # Helper container variables
@@ -284,9 +284,9 @@ class Spike3DRaster(NeuronIdentityAccessingMixin, SpikeRenderingBaseMixin, Spike
         self._spikes_window = SpikesDataframeWindow(spikes_df, window_duration=window_duration, window_start_time=window_start_time)
         
         # Config
-        self._playback_update_frequency = Spike3DRaster.PlaybackUpdateFrequency
+        self._playback_update_frequency = SpikeRasterBase.PlaybackUpdateFrequency
         self.is_speed_burst_mode_active = False
-        self.speedBurstPlaybackRate = Spike3DRaster.SpeedBurstPlaybackRate
+        self.speedBurstPlaybackRate = SpikeRasterBase.SpeedBurstPlaybackRate
         
         self.params.is_playback_reversed = False
         
