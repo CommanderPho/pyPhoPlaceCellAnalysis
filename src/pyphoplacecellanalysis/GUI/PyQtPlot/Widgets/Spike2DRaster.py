@@ -29,6 +29,8 @@ from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.GLViewportOverlayPainterItem im
 
 from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.SpikeRasterBase import SpikeRasterBase
 
+from pyphoplacecellanalysis.Pho2D.PyQtPlots.plot_spikes_raster_2D import SpikesRasterItem
+
 
 def trap_exc_during_debug(*args):
     # when app raises uncaught exception, print info
@@ -202,22 +204,34 @@ class Spike2DRaster(SpikeRasterBase):
         self.ui.main_plot_widget.setYRange(self.y[0], self.y[-1])
         
         # self._build_neuron_id_graphics(self.ui.main_gl_widget, self.y)
+        self.params.config_items = []
+        for i, cell_id in enumerate(self.unit_ids):
+            curr_color = pg.mkColor((i, self.n_cells*1.3))
+            curr_color.setAlphaF(0.5)
+            curr_config_item = (i, cell_id, pg.mkPen(curr_color), self.lower_y[i], self.upper_y[i])
+            
+            self.params.config_items.append(curr_config_item)
+    
+        self.ui.spikes_raster_item_plot = SpikesRasterItem(self.params.config_items)
         
         # Plot each unit one at a time:
+        curr_data = []
         for i, cell_id in enumerate(self.unit_ids):
             curr_color = pg.mkColor((i, self.n_cells*1.3))
             curr_color.setAlphaF(0.5)
             
-            p1 = self.ui.main_plot_widget.plot() # add a new plot to be filled later
-            p1.setPen(curr_color)
+            # curr_config_item = (i, cell_id, pg.mkPen(curr_color), self.lower_y[i], self.upper_y[i])
             
-            self.ui.plots.append(p1)
+            # # pLOT MODE:
+            # p1 = self.ui.main_plot_widget.plot() # add a new plot to be filled later
+            # p1.setPen(curr_color)
+            
+            # self.ui.plots.append(p1)
             
             # print(f'cell_id: {cell_id}, curr_color: {curr_color.alpha()}')
             
             # Filter the dataframe using that column and value from the list
             curr_cell_df = self.active_windowed_df[self.active_windowed_df['unit_id']==cell_id].copy() # is .copy() needed here since nothing is updated???
-            # curr_unit_id = curr_cell_df['unit_id'].to_numpy() # this will map to the y position
             curr_spike_t = curr_cell_df[curr_cell_df.spikes.time_variable_name].to_numpy() # this will map
             
             # yi = self.y[i] # get the correct y-position for all spikes of this cell
@@ -226,21 +240,20 @@ class Spike2DRaster(SpikeRasterBase):
             curr_x = np.interp(curr_spike_t, (self.spikes_window.active_window_start_time, self.spikes_window.active_window_end_time), (0.0, +self.temporal_axis_length))
             # curr_x = np.interp(curr_spike_t, (self.spikes_window.active_window_start_time, self.spikes_window.active_window_end_time), (-self.half_temporal_axis_length, +self.half_temporal_axis_length))
             # curr_paired_x = np.squeeze(interleave_elements(np.atleast_2d(curr_x).T, np.atleast_2d(curr_x).T))
-            curr_paired_x = curr_x.repeat(2)
-            
+            # curr_paired_x = curr_x.repeat(2)
             # curr_yd = np.full_like(curr_x, yi)
-            
-            curr_unit_n_spikes = len(curr_spike_t)
-            curr_paired_spike_yds = np.squeeze(np.tile(np.array([self.lower_y[i], self.upper_y[i]]), curr_unit_n_spikes)) # repeat pair of y values once for each spike of this cell. (lower_y[i], upper_y[i])
+            # curr_unit_n_spikes = len(curr_spike_t)
+            # curr_paired_spike_yds = np.squeeze(np.tile(np.array([self.lower_y[i], self.upper_y[i]]), curr_unit_n_spikes)) # repeat pair of y values once for each spike of this cell. (lower_y[i], upper_y[i])
             
             # Build lines:
             # self.ui.plots[i].setData(y=curr_yd, x=curr_x)
-            self.ui.plots[i].setData(y=curr_paired_spike_yds, x=curr_paired_x)
-
+            # self.ui.plots[i].setData(y=curr_paired_spike_yds, x=curr_paired_x)
+            curr_data.append(curr_x)
             # plt.setYRange((-self.n_half_cells - self.side_bin_margins), (self.n_half_cells + self.side_bin_margins))
             # plt.setXRange(-self.half_render_window_duration, +self.half_render_window_duration)
-            
 
+        self.ui.spikes_raster_item_plot.setData(curr_data)
+        self.ui.main_plot_widget.addItem(self.ui.spikes_raster_item_plot)
 
     # def _build_neuron_id_graphics(self, w, y_pos):
     #     """ builds the text items to indicate the neuron ID for each neuron in the df. """
@@ -409,12 +422,14 @@ class Spike2DRaster(SpikeRasterBase):
         """
         if self.enable_debug_print:
             print(f'Spike2DRaster._update_plots()')
-        assert (len(self.ui.plots) == self.n_cells), f"after all operations the length of the plots array should be the same as the n_cells, but len(self.ui.plots): {len(self.ui.plots)} and self.n_cells: {self.n_cells}!"
+        # assert (len(self.ui.plots) == self.n_cells), f"after all operations the length of the plots array should be the same as the n_cells, but len(self.ui.plots): {len(self.ui.plots)} and self.n_cells: {self.n_cells}!"
         # build the position range for each unit along the y-axis:
         # y = DataSeriesToSpatial.build_series_identity_axis(self.n_cells, center_mode='zero_centered', bin_position_mode='bin_center', side_bin_margins = self.params.side_bin_margins)
         self.y = DataSeriesToSpatial.build_series_identity_axis(self.n_cells, center_mode=self.params.center_mode, bin_position_mode=self.params.bin_position_mode, side_bin_margins = self.params.side_bin_margins)
-        self.lower_y = DataSeriesToSpatial.build_series_identity_axis(self.n_cells, center_mode=self.params.center_mode, bin_position_mode='left_edges', side_bin_margins = self.params.side_bin_margins) / self.n_cells
-        self.upper_y = DataSeriesToSpatial.build_series_identity_axis(self.n_cells, center_mode=self.params.center_mode, bin_position_mode='right_edges', side_bin_margins = self.params.side_bin_margins) / self.n_cells
+        # self.lower_y = DataSeriesToSpatial.build_series_identity_axis(self.n_cells, center_mode=self.params.center_mode, bin_position_mode='left_edges', side_bin_margins = self.params.side_bin_margins) / self.n_cells
+        # self.upper_y = DataSeriesToSpatial.build_series_identity_axis(self.n_cells, center_mode=self.params.center_mode, bin_position_mode='right_edges', side_bin_margins = self.params.side_bin_margins) / self.n_cells
+        
+        curr_data = []
         # Plot each unit one at a time:
         for i, cell_id in enumerate(self.unit_ids):    
             # Filter the dataframe using that column and value from the list
@@ -428,15 +443,20 @@ class Spike2DRaster(SpikeRasterBase):
             # curr_x = np.interp(curr_spike_t, (self.spikes_window.active_window_start_time, self.spikes_window.active_window_end_time), (-self.half_render_window_duration, +self.half_render_window_duration))
             # curr_x = np.interp(curr_spike_t, (self.spikes_window.active_window_start_time, self.spikes_window.active_window_end_time), (-self.half_temporal_axis_length, +self.half_temporal_axis_length))
             curr_x = np.interp(curr_spike_t, (self.spikes_window.active_window_start_time, self.spikes_window.active_window_end_time), (0.0, +self.temporal_axis_length)) # for starting_at_zero
-            curr_paired_x = curr_x.repeat(2)            
+            # curr_paired_x = curr_x.repeat(2)            
             # curr_yd = np.full_like(curr_x, yi)
-            curr_unit_n_spikes = len(curr_spike_t)
-            curr_paired_spike_yds = np.squeeze(np.tile(np.array([self.lower_y[i], self.upper_y[i]]), curr_unit_n_spikes)) # repeat pair of y values once for each spike of this cell. (lower_y[i], upper_y[i])
+            # curr_unit_n_spikes = len(curr_spike_t)
+            # curr_paired_spike_yds = np.squeeze(np.tile(np.array([self.lower_y[i], self.upper_y[i]]), curr_unit_n_spikes)) # repeat pair of y values once for each spike of this cell. (lower_y[i], upper_y[i])
             
             # Build lines:
             # self.ui.plots[i].setData(y=curr_yd, x=curr_x)
-            self.ui.plots[i].setData(y=curr_paired_spike_yds, x=curr_paired_x)
+            # self.ui.plots[i].setData(y=curr_paired_spike_yds, x=curr_paired_x)
             
+            curr_data.append(curr_x)
+            # plt.setYRange((-self.n_half_cells - self.side_bin_margins), (self.n_half_cells + self.side_bin_margins))
+            # plt.setXRange(-self.half_render_window_duration, +self.half_render_window_duration)
+
+        self.ui.spikes_raster_item_plot.setData(curr_data)
             
         
         
