@@ -10,6 +10,9 @@ from pyqtgraph.Qt import QtCore, QtGui
 class GLViewportOverlayPainterItem(GLGraphicsItem.GLGraphicsItem):
     """ Draws simple overlay text on the viewport. 
     
+    Updating self.additional_overlay_text_lines adds items to the top-left by default
+    
+    
     Usage:
         paintitem = GLViewportOverlayPainterItem()
         glv.addItem(paintitem)

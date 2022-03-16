@@ -433,12 +433,12 @@ class Spike3DRaster(NeuronIdentityAccessingMixin, SpikeRenderingBaseMixin, Spike
         self.ui.layout_slide_bar.addWidget(self.ui.slider)
 
         # Button: Play/Pause
-        self.ui.btn_slide_run = QtWidgets.QPushButton(">")
-        self.ui.btn_slide_run.setMinimumHeight(25)
-        self.ui.btn_slide_run.setMinimumWidth(30)
-        self.ui.btn_slide_run.tag = "paused"
-        self.ui.btn_slide_run.clicked.connect(self.play_pause)
-        self.ui.layout_slide_bar.addWidget(self.ui.btn_slide_run)
+        # self.ui.btn_slide_run = QtWidgets.QPushButton(">")
+        # self.ui.btn_slide_run.setMinimumHeight(25)
+        # self.ui.btn_slide_run.setMinimumWidth(30)
+        # self.ui.btn_slide_run.tag = "paused"
+        # self.ui.btn_slide_run.clicked.connect(self.play_pause)
+        # self.ui.layout_slide_bar.addWidget(self.ui.btn_slide_run)
         
             
         # Button: Reverse:
@@ -874,41 +874,37 @@ class Spike3DRaster(NeuronIdentityAccessingMixin, SpikeRenderingBaseMixin, Spike
     
     # Called when the play/pause button is clicked:
     def play_pause(self):
-        # the play_pause_model uses inverted logic, so we negate the current state value to determine if is_playing
-        is_playing = not self.ui.play_pause_model.getState()
-        print(f'is_playing: {is_playing}')
+        # THIS IS NOT TRUE: the play_pause_model uses inverted logic, so we negate the current state value to determine if is_playing
+        is_playing = self.ui.play_pause_model.getState()
+        # print(f'is_playing: {is_playing}')
         
-        # if (not is_playing) or self.slidebar_val == 1:
-        #     if self.slidebar_val == 1:
-        #         self.ui.slider.setValue(0)            
-        #     # self.ui.btn_slide_run.setText("||")
-        #     # self.ui.btn_slide_run.tag = "running"
-        #     # self.play_pause_model.setState(not is_playing)
-        #     self.sliderThread.start()
+        if (not is_playing) or self.slidebar_val == 1:
+            if self.slidebar_val == 1:
+                self.ui.slider.setValue(0)
+            # self.play_pause_model.setState(not is_playing)
+            self.animationThread.start()
 
-        # else:
-        #     # self.ui.btn_slide_run.setText(">")
-        #     # self.ui.btn_slide_run.tag = "paused"
-        #     # self.play_pause_model.setState(not is_playing)
-        #     self.sliderThread.terminate()
+        else:
+            # self.play_pause_model.setState(not is_playing)
+            self.animationThread.terminate()
             
-            
+        
         # self.ui.play_pause_model.blockSignals(True)
         # self.ui.play_pause_model.setState(not is_playing)
         # self.ui.play_pause_model.blockSignals(False)
         
-        if self.ui.btn_slide_run.tag == "paused" or self.slidebar_val == 1:
-            if self.slidebar_val == 1:
-                self.ui.slider.setValue(0)
+        # if self.ui.btn_slide_run.tag == "paused" or self.slidebar_val == 1:
+        #     if self.slidebar_val == 1:
+        #         self.ui.slider.setValue(0)
             
-            self.ui.btn_slide_run.setText("||")
-            self.ui.btn_slide_run.tag = "running"
-            self.animationThread.start()
+        #     self.ui.btn_slide_run.setText("||")
+        #     self.ui.btn_slide_run.tag = "running"
+        #     self.animationThread.start()
 
-        elif self.ui.btn_slide_run.tag == "running":
-            self.ui.btn_slide_run.setText(">")
-            self.ui.btn_slide_run.tag = "paused"
-            self.animationThread.terminate()
+        # elif self.ui.btn_slide_run.tag == "running":
+        #     self.ui.btn_slide_run.setText(">")
+        #     self.ui.btn_slide_run.tag = "paused"
+        #     self.animationThread.terminate()
 
 
     
