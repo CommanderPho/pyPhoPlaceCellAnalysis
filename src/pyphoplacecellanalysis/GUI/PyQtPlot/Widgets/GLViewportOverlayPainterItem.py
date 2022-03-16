@@ -6,7 +6,7 @@ from pyqtgraph.Qt import QtCore, QtGui
 
 
 class GLViewportOverlayPainterItem(GLGraphicsItem.GLGraphicsItem):
-    """ Draws overlay text on the viewport. 
+    """ Draws simple overlay text on the viewport. 
     
     Usage:
         paintitem = GLViewportOverlayPainterItem()
@@ -14,10 +14,11 @@ class GLViewportOverlayPainterItem(GLGraphicsItem.GLGraphicsItem):
 
     """
     def __init__(self, **kwds):
-        super().__init__()
+        super().__init__() # should pass kwargs?
         self.additional_overlay_text_lines = []
         glopts = kwds.pop('glOptions', 'additive')
         self.setGLOptions(glopts)
+
 
     def compute_projection(self):
         modelview = GL.glGetDoublev(GL.GL_MODELVIEW_MATRIX)

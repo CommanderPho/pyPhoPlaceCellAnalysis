@@ -86,6 +86,8 @@ class Spike3DRaster(NeuronIdentityAccessingMixin, SpikeRenderingBaseMixin, Spike
         spike_raster_plt = Spike3DRaster(curr_spikes_df, window_duration=4.0, window_start_time=30.0)
     """
     
+    temporal_mapping_changed = QtCore.pyqtSignal() # signal emitted when the mapping from the temporal window to the spatial layout is changed
+    
     @property
     def unit_ids(self):
         """The unit_ids from the whole df (not just the current window)"""
@@ -137,7 +139,7 @@ class Spike3DRaster(NeuronIdentityAccessingMixin, SpikeRenderingBaseMixin, Spike
 
     @property
     def overlay_text_lines(self):
-        """The lines to be displayed in the overlay."""
+        """The lines of text to be displayed in the overlay."""
         lines = []
         lines.append(f'active_time_window: {self.spikes_window.active_time_window}')
         lines.append(f"n_cells : {self.n_cells}")
@@ -145,19 +147,21 @@ class Spike3DRaster(NeuronIdentityAccessingMixin, SpikeRenderingBaseMixin, Spike
         lines.append(f'render_window_duration: {self.render_window_duration}')
         lines.append(f'animation_time_step: {self.animation_time_step}')
         lines.append(f'temporal_axis_length: {self.temporal_axis_length}')
+        lines.append(f'temporal_zoom_factor: {self.temporal_zoom_factor}')
         return lines
     
     
     ######  Get/Set Properties ######:
     @property
     def temporal_zoom_factor(self):
-        """The time dilation factor that maps spikes in the current window to x-positions along the time axis multiplicatively.
+        """The time dilation factor that maps spikes in the current window to y-positions along the time axis multiplicatively.
             Increasing this factor will result in a more spatially expanded time axis while leaving the visible window unchanged.
         """
-        return self._temporal_zoom_factor
+        return self.params.temporal_zoom_factor
     @temporal_zoom_factor.setter
     def temporal_zoom_factor(self, value):
-        self._temporal_zoom_factor = value
+        self.params.temporal_zoom_factor = value
+        self.temporal_mapping_changed.emit()
         
 
 
@@ -181,7 +185,7 @@ class Spike3DRaster(NeuronIdentityAccessingMixin, SpikeRenderingBaseMixin, Spike
         self.params.bin_position_mode = 'left_edges'
         
         # by default we want the time axis to approximately span -20 to 20. So we set the temporal_zoom_factor to 
-        self._temporal_zoom_factor = 40.0 / float(self.render_window_duration)        
+        self.params.temporal_zoom_factor = 40.0 / float(self.render_window_duration)        
         
         # return 0.05 # each animation timestep is a fixed 50ms
         # return 0.03 # faster then 30fps
@@ -243,6 +247,10 @@ class Spike3DRaster(NeuronIdentityAccessingMixin, SpikeRenderingBaseMixin, Spike
         # build the UI components:
         self.buildUI()
         
+        # Setup Signals:
+        self.temporal_mapping_changed.connect(self.on_adjust_temporal_spatial_mapping)
+        
+
 
     def on_jump_left(self):
         # Skip back some frames
@@ -254,12 +262,16 @@ class Spike3DRaster(NeuronIdentityAccessingMixin, SpikeRenderingBaseMixin, Spike
         
     def on_reverse_held(self):
         # Change the direction of playback by changing the sign of the updating.
-        
-        
         self.shift_animation_frame_val(5)
+        
+    
+    
         
         
     def buildUI(self):
+        """ for QGridLayout
+            addWidget(widget, row, column, rowSpan, columnSpan, Qt.Alignment alignment = 0)
+        """
         self.ui = PhoUIContainer()
         
         self.ui.layout = QtWidgets.QGridLayout()
@@ -274,20 +286,29 @@ class Spike3DRaster(NeuronIdentityAccessingMixin, SpikeRenderingBaseMixin, Spike
         self.ui.main_gl_widget.resize(1000,600)
         # self.ui.main_gl_widget.setWindowTitle('pyqtgraph: 3D Raster Spikes Plotting')
         self.ui.main_gl_widget.setCameraPosition(distance=40)
-        self.ui.layout.addWidget(self.ui.main_gl_widget, 0, 0) # add the GLViewWidget to the layout
+        self.ui.layout.addWidget(self.ui.main_gl_widget, 0, 0) # add the GLViewWidget to the layout at 0, 0
         
         #### Build Graphics Objects #####
         self._buildGraphics(self.ui.main_gl_widget) # pass the GLViewWidget
         
-        ####    Slide Bar Left #######
+        ####################################################
+        ####  Controls Bar Bottom #######
+        ####    Slide Bar Bottom #######
         self.ui.panel_slide_bar = QtWidgets.QWidget()
         self.ui.panel_slide_bar.setSizePolicy(QtGui.QSizePolicy.Expanding, QtGui.QSizePolicy.Preferred)
-        self.ui.panel_slide_bar.setMaximumHeight(50.0)
+        self.ui.panel_slide_bar.setMaximumHeight(50.0) # maximum height
+        
+        # Try to make the bottom widget bar transparent:
+        self.ui.panel_slide_bar.setWindowFlags(self.windowFlags() | QtCore.Qt.FramelessWindowHint)
+        self.ui.panel_slide_bar.setAttribute(QtCore.Qt.WA_TranslucentBackground)
+        self.ui.panel_slide_bar.setStyleSheet("background:transparent;")
+        
+        # Playback Slider Bottom Bar:
         self.ui.layout_slide_bar = QtWidgets.QHBoxLayout()
         self.ui.layout_slide_bar.setContentsMargins(6, 3, 4, 4)
-
         self.ui.panel_slide_bar.setLayout(self.ui.layout_slide_bar)
 
+        # Playback Slider:
         self.ui.slider = QtWidgets.QSlider(QtCore.Qt.Horizontal)
         self.ui.slider.setSizePolicy(QtGui.QSizePolicy.Expanding, QtGui.QSizePolicy.Preferred)
         # self.ui.slider.setFocusPolicy(Qt.NoFocus) # removes ugly focus rectangle frm around the slider
@@ -295,35 +316,36 @@ class Spike3DRaster(NeuronIdentityAccessingMixin, SpikeRenderingBaseMixin, Spike
         self.ui.slider.setSingleStep(1)
         # self.ui.slider.setSingleStep(2)
         self.ui.slider.setValue(0)
+        self.ui.slider.setWindowFlags(self.windowFlags() | QtCore.Qt.FramelessWindowHint)
+        self.ui.slider.setAttribute(QtCore.Qt.WA_TranslucentBackground)
+        self.ui.slider.setStyleSheet("background:transparent;")        
         # self.ui.slider.valueChanged.connect(self.slider_val_changed)
         # sliderMoved vs valueChanged? vs sliderChange?
         self.ui.layout_slide_bar.addWidget(self.ui.slider)
 
+        # Button: Play/Pause
         self.ui.btn_slide_run = QtWidgets.QPushButton(">")
         self.ui.btn_slide_run.setMinimumHeight(25)
         self.ui.btn_slide_run.setMinimumWidth(30)
         self.ui.btn_slide_run.tag = "paused"
         self.ui.btn_slide_run.clicked.connect(self.btn_slide_run_clicked)
-
         self.ui.layout_slide_bar.addWidget(self.ui.btn_slide_run)
         
-        
-        # MORE BUTTONS:
+        # Button: Reverse:
         self.ui.btnReverse = QtWidgets.QPushButton("Reverse")
         self.ui.btnReverse.setMinimumHeight(25)
         self.ui.btnReverse.setMinimumWidth(30)
         self.ui.btnReverse.clicked.connect(self.on_reverse_held)
         self.ui.layout_slide_bar.addWidget(self.ui.btnReverse)
         
-        
-        
-        
+        # Button: Jump Left:
         self.ui.btnLeft = QtWidgets.QPushButton("<-")
         self.ui.btnLeft.setMinimumHeight(25)
         self.ui.btnLeft.setMinimumWidth(30)
         self.ui.btnLeft.clicked.connect(self.on_jump_left)
         self.ui.layout_slide_bar.addWidget(self.ui.btnLeft)
         
+        # Button: Jump Right:
         self.ui.btnRight = QtWidgets.QPushButton("->")
         self.ui.btnRight.setMinimumHeight(25)
         self.ui.btnRight.setMinimumWidth(30)
@@ -331,15 +353,49 @@ class Spike3DRaster(NeuronIdentityAccessingMixin, SpikeRenderingBaseMixin, Spike
         self.ui.layout_slide_bar.addWidget(self.ui.btnRight)
         
         
+        ####################################################
+        ####  Controls Bar Right #######
+        self.ui.right_controls_panel = QtWidgets.QWidget()
+        self.ui.right_controls_panel.setSizePolicy(QtGui.QSizePolicy.Preferred, QtGui.QSizePolicy.Expanding) # Expands to fill the vertical height, but occupy only the preferred width
+        self.ui.right_controls_panel.setMaximumWidth(50.0)
+        # Try to make the bottom widget bar transparent:
+        self.ui.right_controls_panel.setWindowFlags(self.windowFlags() | QtCore.Qt.FramelessWindowHint)
+        self.ui.right_controls_panel.setAttribute(QtCore.Qt.WA_TranslucentBackground)
+        self.ui.right_controls_panel.setStyleSheet("background:transparent;")
+        
+        # Playback Slider Bottom Bar:
+        self.ui.layout_right_bar = QtWidgets.QVBoxLayout()
+        self.ui.layout_right_bar.setContentsMargins(6, 3, 4, 4)
+        self.ui.right_controls_panel.setLayout(self.ui.layout_right_bar)
+
+        # Playback Slider:
+        self.ui.slider_right = QtWidgets.QSlider(QtCore.Qt.Vertical)
+        self.ui.slider_right.setSizePolicy(QtGui.QSizePolicy.Expanding, QtGui.QSizePolicy.Preferred)
+        # self.ui.slider.setFocusPolicy(Qt.NoFocus) # removes ugly focus rectangle frm around the slider
+        self.ui.slider_right.setRange(0, 100)
+        self.ui.slider_right.setSingleStep(1)
+        # self.ui.slider_right.setSingleStep(2)
+        self.ui.slider_right.setValue(0)
+        self.ui.slider_right.setWindowFlags(self.windowFlags() | QtCore.Qt.FramelessWindowHint)
+        self.ui.slider_right.setAttribute(QtCore.Qt.WA_TranslucentBackground)
+        self.ui.slider_right.setStyleSheet("background:transparent;")        
+        # self.ui.slider.valueChanged.connect(self.slider_val_changed)
+        # sliderMoved vs valueChanged? vs sliderChange?
+        self.ui.layout_right_bar.addWidget(self.ui.slider_right)
+
         
         
+        # addWidget(widget, row, column, rowSpan, columnSpan, Qt.Alignment alignment = 0)
         
-        self.ui.layout.addWidget(self.ui.panel_slide_bar, 1, 0) 
+        # Add the bottom bar:
+        self.ui.layout.addWidget(self.ui.panel_slide_bar, 1, 0, 1, 2) # Spans both columns (lays under the right_controls panel)
+        
+        # Add the right controls bar:
+        self.ui.layout.addWidget(self.ui.right_controls_panel, 0, 1, 2, 1) # Span both rows
+         
         
         
-        
-        
-        
+        # Set the root (self) layout properties
         self.setLayout(self.ui.layout)
         self.resize(1920, 900)
         self.setWindowTitle('Spike3DRaster')
@@ -379,8 +435,7 @@ class Spike3DRaster(NeuronIdentityAccessingMixin, SpikeRenderingBaseMixin, Spike
         self.ui.gx.setSize(20, self.n_full_cell_grid) # std size in z-dir, n_cell size across
         self.ui.gx.setSpacing(10.0, 1) 
         w.addItem(self.ui.gx)
-        
-        self.ui.x_txtitem = gl.GLTextItem(pos=(-self.half_temporal_axis_length, self.n_half_cells, 0.0), text='x', color=x_color) # position label 
+        self.ui.x_txtitem = gl.GLTextItem(pos=(-self.half_temporal_axis_length, self.n_half_cells, 0.0), text='x', color=x_color) # The axis label text 
         w.addItem(self.ui.x_txtitem)
 
         # Y-plane:
@@ -392,8 +447,7 @@ class Spike3DRaster(NeuronIdentityAccessingMixin, SpikeRenderingBaseMixin, Spike
         self.ui.gy.setSize(self.temporal_axis_length, 20)
         self.ui.gy.setSpacing(1, 10.0) # unit along the y axis itself, only one subdivision along the z-axis
         w.addItem(self.ui.gy)
-        
-        self.ui.y_txtitem = gl.GLTextItem(pos=(self.half_temporal_axis_length+0.5, -self.n_half_cells, 0.0), text='y', color=y_color)
+        self.ui.y_txtitem = gl.GLTextItem(pos=(self.half_temporal_axis_length+0.5, -self.n_half_cells, 0.0), text='y', color=y_color) # The axis label text 
         w.addItem(self.ui.y_txtitem)
         
         # XY-plane (with normal in z-dir):
@@ -404,8 +458,7 @@ class Spike3DRaster(NeuronIdentityAccessingMixin, SpikeRenderingBaseMixin, Spike
         self.ui.gz.setSpacing(20.0, 1)
         # gz.setSize(n_full_cell_grid, n_full_cell_grid)
         w.addItem(self.ui.gz)
-        
-        self.ui.z_txtitem = gl.GLTextItem(pos=(-self.half_temporal_axis_length, -self.n_half_cells, 10.5), text='z', color=z_color)
+        self.ui.z_txtitem = gl.GLTextItem(pos=(-self.half_temporal_axis_length, -self.n_half_cells, 10.5), text='z', color=z_color)  # The axis label text 
         w.addItem(self.ui.z_txtitem)
         
         # Custom 3D raster plot:
@@ -458,6 +511,42 @@ class Spike3DRaster(NeuronIdentityAccessingMixin, SpikeRenderingBaseMixin, Spike
             w.addItem(plt)
             self.ui.gl_line_plots.append(plt)
 
+    ###################################
+    #### EVENT HANDLERS
+    ##################################
+    
+    @QtCore.pyqtSlot()
+    def on_adjust_temporal_spatial_mapping(self):
+        """ called when the spatio-temporal mapping property is changed.
+        
+        Should change whenever any of the following change:
+            self.temporal_zoom_factor
+            self.render_window_duration
+            
+        """
+        # Adjust the three axes planes:
+        self.ui.gx.resetTransform()
+        self.ui.gx.rotate(90, 0, 1, 0)
+        self.ui.gx.translate(-self.half_temporal_axis_length, 0, 0) # shift backwards
+        self.ui.gx.setSize(20, self.n_full_cell_grid) # std size in z-dir, n_cell size across
+        self.ui.x_txtitem.resetTransform()
+        self.ui.x_txtitem.translate(-self.half_temporal_axis_length, self.n_half_cells, 0.0)
+        
+        self.ui.gy.resetTransform()
+        self.ui.gy.rotate(90, 1, 0, 0)
+        self.ui.gy.translate(0, -self.n_half_cells, 0) # offset by half the number of units in the -y direction
+        self.ui.gy.setSize(self.temporal_axis_length, 20)
+        self.ui.y_txtitem.resetTransform()
+        self.ui.y_txtitem.translate(self.half_temporal_axis_length+0.5, -self.n_half_cells, 0.0)
+        
+        self.ui.gz.resetTransform()
+        self.ui.gz.translate(0, 0, -10) # Shift down by 10 units in the z-dir
+        self.ui.gz.setSize(self.temporal_axis_length, self.n_full_cell_grid)
+        self.ui.z_txtitem.resetTransform()
+        self.ui.z_txtitem.translate(-self.half_temporal_axis_length, -self.n_half_cells, 10.5)
+        
+        
+        
     def keyPressEvent(self, e):
         """ called automatically when a keyboard key is pressed and this widget has focus. 
         TODO: doesn't actually work right now.

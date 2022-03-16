@@ -28,6 +28,8 @@ from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.GLViewportOverlayPainterItem im
 class Spike3DRaster_Vedo(NeuronIdentityAccessingMixin, SpikeRenderingBaseMixin, SpikesWindowOwningMixin, SpikesDataframeOwningMixin, QtWidgets.QWidget):
     """ **Vedo version** - Displays a 3D version of a raster plot with the spikes occuring along a plane. 
     
+    TODO: CURRENTLY UNIMPLEMENTED I THINK. Switched back to Spike3DRaster as it works well and good enough.
+    
     Usage:
         from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.Spike3DRaster_Vedo import Spike3DRaster_Vedo
         curr_epoch_name = 'maze1'

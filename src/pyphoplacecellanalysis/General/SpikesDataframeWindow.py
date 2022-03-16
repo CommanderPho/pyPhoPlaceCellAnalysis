@@ -134,12 +134,16 @@ class SpikesWindowOwningMixin:
     def spikes_df(self):
         """The spikes_df property."""
         return self.spikes_window.df
-    
-    
+  
+      
     @property
     def render_window_duration(self):
-        """ """
+        """The render_window_duration property."""
         return float(self.spikes_window.window_duration)
+    @render_window_duration.setter
+    def render_window_duration(self, value):
+        self.spikes_window.window_duration = value
+    
     @property
     def half_render_window_duration(self):
         """ """
