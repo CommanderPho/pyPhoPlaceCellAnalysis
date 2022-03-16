@@ -269,14 +269,7 @@ class Spike2DRaster(SpikeRasterBase):
         
         
         # All units at once approach:
-        # Filter the dataframe using that column and value from the list
-        # curr_spike_t = self.active_windowed_df[self.active_windowed_df.spikes.time_variable_name].to_numpy() # this will map
-        # curr_spike_x = np.interp(curr_spike_t, (self.spikes_window.active_window_start_time, self.spikes_window.active_window_end_time), (0.0, +self.temporal_axis_length))
-        # curr_spike_y = self.active_windowed_df['visualization_raster_y_location'].to_numpy() # this will map
-        # curr_spike_pens = [self.config_unit_id_map[a_cell_id][2] for a_cell_id in self.active_windowed_df['unit_id'].to_numpy()] # get the pens for each spike from the configs map
-        # curr_n = len(curr_spike_t) # curr number of spikes
         curr_spike_x, curr_spike_y, curr_spike_pens, curr_n = self._build_spikes_data_values(self.active_windowed_df)
-        
         # print(f'np.shape(curr_spike_t): {np.shape(curr_spike_t)}, np.shape(curr_spike_x): {np.shape(curr_spike_x)}, np.shape(curr_spike_y): {np.shape(curr_spike_y)}, curr_n: {curr_n}')
         pos = np.vstack((curr_spike_x, curr_spike_y)) # np.shape(curr_spike_t): (11,), np.shape(curr_spike_x): (11,), np.shape(curr_spike_y): (11,), curr_n: 11
         # print(f'np.shape(pos): {np.shape(pos)}') # should be 2xN # np.shape(pos): (2, 11)
