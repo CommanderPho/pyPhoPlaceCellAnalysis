@@ -222,6 +222,7 @@ class Spike2DRaster(SpikeRasterBase):
         self.ui.main_plot_widget.enableAutoRange(x=False, y=False)
         self.ui.main_plot_widget.setAutoVisible(x=False, y=False)
         self.ui.main_plot_widget.setAutoPan(x=False, y=False)
+        self.ui.main_plot_widget.enableAutoRange('xy', False)  ## stop auto-scaling after the first data set is plotted
         
         # self.ui.main_plot_widget.disableAutoRange()
         self._update_plot_ranges()
@@ -241,10 +242,11 @@ class Spike2DRaster(SpikeRasterBase):
         self.config_unit_id_map = dict(zip(self.unit_ids, self.params.config_items))
     
         # self.ui.spikes_raster_item_plot = SpikesRasterItem(self.params.config_items)
-        self.ui.scatter_plot = pg.ScatterPlotItem(pxMode=True, symbol=vtick, size=10, pen={'color': 'w', 'width': 2})
+        self.ui.scatter_plot = pg.ScatterPlotItem(name='spikeRasterScatterPlotItem', pxMode=True, symbol=vtick, size=10, pen={'color': 'w', 'width': 2})
         self.ui.scatter_plot.opts['useCache'] = True
         
         self.ui.main_plot_widget.addItem(self.ui.scatter_plot)
+        
         
         # All units at once approach:
         # Filter the dataframe using that column and value from the list
@@ -272,8 +274,8 @@ class Spike2DRaster(SpikeRasterBase):
     
     def _update_plot_ranges(self):
         # self.ui.main_plot_widget.setXRange(-self.half_render_window_duration, +self.half_render_window_duration)
-        # self.ui.main_plot_widget.setXRange(0.0, +self.temporal_axis_length)
-        # self.ui.main_plot_widget.setYRange(self.y[0], self.y[-1])
+        # self.ui.main_plot_widget.setXRange(0.0, +self.temporal_axis_length, padding=0)
+        # self.ui.main_plot_widget.setYRange(self.y[0], self.y[-1], padding=0)
         # self.ui.main_plot_widget.disableAutoRange()
         self.ui.main_plot_widget.disableAutoRange('xy')
         self.ui.main_plot_widget.setRange(xRange=[0.0, +self.temporal_axis_length], yRange=[self.y[0], self.y[-1]])
