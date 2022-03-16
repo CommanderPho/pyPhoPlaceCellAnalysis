@@ -27,6 +27,13 @@ from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.GLDebugAxisItem import GLDebugA
 from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.GLViewportOverlayPainterItem import GLViewportOverlayPainterItem
 
 
+""" 
+FPS     Milliseconds Per Frame
+30      8.335 ms
+60      16.67 ms
+
+
+"""
 
 """ For threading info see:
     https://stackoverflow.com/questions/41526832/pyqt5-qthread-signal-not-working-gui-freeze
@@ -912,6 +919,7 @@ class Spike3DRaster(NeuronIdentityAccessingMixin, SpikeRenderingBaseMixin, Spike
         # Skip forward some frames
         self.shift_animation_frame_val(5)
         
+
     def on_reverse_held(self):
         # Change the direction of playback by changing the sign of the updating.
         # if button is checked    
@@ -932,26 +940,29 @@ class Spike3DRaster(NeuronIdentityAccessingMixin, SpikeRenderingBaseMixin, Spike
         self.spikes_window.update_window_start(next_start_timestamp)
         # TODO: doesn't update the slider or interact with the slider in any way.
         
+   
         
-    #### from pyqtgraph_animated3Dplot_pairedLines's animation style ###:
-    def start(self):
-        if (sys.flags.interactive != 1) or not hasattr(QtCore, 'PYQT_VERSION'):
-            QtGui.QApplication.instance().exec_()
+    # #### from pyqtgraph_animated3Dplot_pairedLines's animation style ###:
+    # def start(self):
+    #     if (sys.flags.interactive != 1) or not hasattr(QtCore, 'PYQT_VERSION'):
+    #         QtGui.QApplication.instance().exec_()
+      
             
-    def set_plotdata(self, name, points, color, width):
-        # self.traces in the original
-        self.ui.gl_line_plots[name].setData(pos=points, color=color, width=width, mode='lines', antialias=True)
+    # # def set_plotdata(self, name, points, color, width):
+    # #     # self.traces in the original
+    # #     self.ui.gl_line_plots[name].setData(pos=points, color=color, width=width, mode='lines', antialias=True)
         
-    def update(self):
-        self._update_plots()
-        self.shift_animation_frame_val(1)
+    # def update(self):
+    #     """ called on timer timeout """
+    #     self._update_plots()
+    #     self.shift_animation_frame_val(1)
         
-    def animation(self):
-        timer = QtCore.QTimer()
-        timer.timeout.connect(self.update)
-        # timer.start(20)
-        timer.start(50)
-        self.start()
+    # def animation(self):
+    #     timer = QtCore.QTimer()
+    #     timer.timeout.connect(self.update)
+    #     # timer.start(20)
+    #     timer.start(50)
+    #     self.start()
         
     # def computeTransform(self, x, y, t = None):
     #     if t == None:
