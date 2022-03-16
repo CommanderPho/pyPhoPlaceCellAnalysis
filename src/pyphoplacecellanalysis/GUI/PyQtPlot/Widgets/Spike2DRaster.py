@@ -189,6 +189,11 @@ class Spike2DRaster(SpikeRasterBase):
         # # y = DataSeriesToSpatial.build_series_identity_axis(self.n_cells, center_mode='zero_centered', bin_position_mode='bin_center', side_bin_margins = self.params.side_bin_margins)
         self.y = DataSeriesToSpatial.build_series_identity_axis(self.n_cells, center_mode=self.params.center_mode, bin_position_mode=self.params.bin_position_mode, side_bin_margins = self.params.side_bin_margins)
         
+        
+        self.lower_y = DataSeriesToSpatial.build_series_identity_axis(self.n_cells, center_mode=self.params.center_mode, bin_position_mode='left_edges', side_bin_margins = self.params.side_bin_margins) / self.n_cells
+        self.upper_y = DataSeriesToSpatial.build_series_identity_axis(self.n_cells, center_mode=self.params.center_mode, bin_position_mode='right_edges', side_bin_margins = self.params.side_bin_margins) / self.n_cells
+        # print(f'lower_y: {lower_y}\n upper_y: {upper_y}')
+        
         self.ui.main_plot_widget.setLabel('left', 'Cell ID', units='')
         self.ui.main_plot_widget.setLabel('bottom', 'Time', units='s')
         self.ui.main_plot_widget.disableAutoRange()
@@ -213,16 +218,24 @@ class Spike2DRaster(SpikeRasterBase):
             # Filter the dataframe using that column and value from the list
             curr_cell_df = self.active_windowed_df[self.active_windowed_df['unit_id']==cell_id].copy() # is .copy() needed here since nothing is updated???
             # curr_unit_id = curr_cell_df['unit_id'].to_numpy() # this will map to the y position
-            curr_spike_t = curr_cell_df[curr_cell_df.spikes.time_variable_name].to_numpy() # this will map 
-            yi = self.y[i] # get the correct y-position for all spikes of this cell
+            curr_spike_t = curr_cell_df[curr_cell_df.spikes.time_variable_name].to_numpy() # this will map
+            
+            # yi = self.y[i] # get the correct y-position for all spikes of this cell
             # print(f'cell_id: {cell_id}, yi: {yi}')
             # map the current spike times back onto the range of the window's (-half_render_window_duration, +half_render_window_duration) so they represent the x coordinate
             curr_x = np.interp(curr_spike_t, (self.spikes_window.active_window_start_time, self.spikes_window.active_window_end_time), (0.0, +self.temporal_axis_length))
             # curr_x = np.interp(curr_spike_t, (self.spikes_window.active_window_start_time, self.spikes_window.active_window_end_time), (-self.half_temporal_axis_length, +self.half_temporal_axis_length))
-            # curr_paired_x = np.squeeze(interleave_elements(np.atleast_2d(curr_x).T, np.atleast_2d(curr_x).T))        
-            curr_yd = np.full_like(curr_x, yi)
+            # curr_paired_x = np.squeeze(interleave_elements(np.atleast_2d(curr_x).T, np.atleast_2d(curr_x).T))
+            curr_paired_x = curr_x.repeat(2)
+            
+            # curr_yd = np.full_like(curr_x, yi)
+            
+            curr_unit_n_spikes = len(curr_spike_t)
+            curr_paired_spike_yds = np.squeeze(np.tile(np.array([self.lower_y[i], self.upper_y[i]]), curr_unit_n_spikes)) # repeat pair of y values once for each spike of this cell. (lower_y[i], upper_y[i])
+            
             # Build lines:
-            self.ui.plots[i].setData(y=curr_yd, x=curr_x)
+            # self.ui.plots[i].setData(y=curr_yd, x=curr_x)
+            self.ui.plots[i].setData(y=curr_paired_spike_yds, x=curr_paired_x)
 
             # plt.setYRange((-self.n_half_cells - self.side_bin_margins), (self.n_half_cells + self.side_bin_margins))
             # plt.setXRange(-self.half_render_window_duration, +self.half_render_window_duration)
@@ -400,7 +413,8 @@ class Spike2DRaster(SpikeRasterBase):
         # build the position range for each unit along the y-axis:
         # y = DataSeriesToSpatial.build_series_identity_axis(self.n_cells, center_mode='zero_centered', bin_position_mode='bin_center', side_bin_margins = self.params.side_bin_margins)
         self.y = DataSeriesToSpatial.build_series_identity_axis(self.n_cells, center_mode=self.params.center_mode, bin_position_mode=self.params.bin_position_mode, side_bin_margins = self.params.side_bin_margins)
-        
+        self.lower_y = DataSeriesToSpatial.build_series_identity_axis(self.n_cells, center_mode=self.params.center_mode, bin_position_mode='left_edges', side_bin_margins = self.params.side_bin_margins) / self.n_cells
+        self.upper_y = DataSeriesToSpatial.build_series_identity_axis(self.n_cells, center_mode=self.params.center_mode, bin_position_mode='right_edges', side_bin_margins = self.params.side_bin_margins) / self.n_cells
         # Plot each unit one at a time:
         for i, cell_id in enumerate(self.unit_ids):    
             # Filter the dataframe using that column and value from the list
@@ -408,16 +422,21 @@ class Spike2DRaster(SpikeRasterBase):
             curr_spike_t = curr_cell_df[curr_cell_df.spikes.time_variable_name].to_numpy() # this will map
             # efficiently get curr_spike_t by filtering for unit and column at the same time
             # curr_spike_t = self.active_windowed_df.loc[self.active_windowed_df.spikes.time_variable_name, (self.active_windowed_df['unit_id']==cell_id)].values # .to_numpy()
-            # curr_unit_n_spikes = len(curr_spike_t)
             
-            yi = self.y[i] # get the correct y-position for all spikes of this cell
+            # yi = self.y[i] # get the correct y-position for all spikes of this cell
             # map the current spike times back onto the range of the window's (-half_render_window_duration, +half_render_window_duration) so they represent the x coordinate
             # curr_x = np.interp(curr_spike_t, (self.spikes_window.active_window_start_time, self.spikes_window.active_window_end_time), (-self.half_render_window_duration, +self.half_render_window_duration))
             # curr_x = np.interp(curr_spike_t, (self.spikes_window.active_window_start_time, self.spikes_window.active_window_end_time), (-self.half_temporal_axis_length, +self.half_temporal_axis_length))
             curr_x = np.interp(curr_spike_t, (self.spikes_window.active_window_start_time, self.spikes_window.active_window_end_time), (0.0, +self.temporal_axis_length)) # for starting_at_zero
-            curr_yd = np.full_like(curr_x, yi)
+            curr_paired_x = curr_x.repeat(2)            
+            # curr_yd = np.full_like(curr_x, yi)
+            curr_unit_n_spikes = len(curr_spike_t)
+            curr_paired_spike_yds = np.squeeze(np.tile(np.array([self.lower_y[i], self.upper_y[i]]), curr_unit_n_spikes)) # repeat pair of y values once for each spike of this cell. (lower_y[i], upper_y[i])
+            
             # Build lines:
-            self.ui.plots[i].setData(y=curr_yd, x=curr_x)
+            # self.ui.plots[i].setData(y=curr_yd, x=curr_x)
+            self.ui.plots[i].setData(y=curr_paired_spike_yds, x=curr_paired_x)
+            
             
         
         
