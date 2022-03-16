@@ -404,7 +404,7 @@
            <bool>false</bool>
           </property>
           <property name="tickPosition">
-           <enum>QSlider::TicksBelow</enum>
+           <enum>QSlider::TicksAbove</enum>
           </property>
          </widget>
         </item>

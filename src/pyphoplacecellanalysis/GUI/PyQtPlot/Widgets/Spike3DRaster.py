@@ -8,6 +8,8 @@ import pyqtgraph.opengl as gl # for 3D raster plot
 import numpy as np
 from matplotlib.colors import ListedColormap, to_hex # for neuron colors to_hex
 
+import qtawesome as qta
+
 from neuropy.core.neuron_identities import NeuronIdentityAccessingMixin
 
 from pyphocorehelpers.DataStructure.general_parameter_containers import DebugHelper, VisualizationParameters
@@ -15,6 +17,8 @@ from pyphoplacecellanalysis.General.Mixins.SpikesRenderingBaseMixin import Spike
 
 from pyphocorehelpers.indexing_helpers import interleave_elements, partition
 from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer
+from pyphocorehelpers.gui.Qt.ToggleButton import ToggleButtonModel, ToggleButton
+
 # import qdarkstyle
 
 from pyphoplacecellanalysis.General.SpikesDataframeWindow import SpikesDataframeWindow, SpikesWindowOwningMixin
@@ -87,6 +91,11 @@ class Spike3DRaster(NeuronIdentityAccessingMixin, SpikeRenderingBaseMixin, Spike
     """
     
     temporal_mapping_changed = QtCore.pyqtSignal() # signal emitted when the mapping from the temporal window to the spatial layout is changed
+    close_signal = QtCore.pyqtSignal() # Called when the window is closing. 
+    
+    SpeedBurstPlaybackRate = 16.0
+    
+    
     
     @property
     def unit_ids(self):
@@ -185,6 +194,22 @@ class Spike3DRaster(NeuronIdentityAccessingMixin, SpikeRenderingBaseMixin, Spike
     #     return self._cell_id_axis_length
 
 
+    ## STATE PROPERTIES
+    @property
+    def is_playback_reversed(self):
+        """The is_playback_reversed property."""
+        return self.params.is_playback_reversed
+    @is_playback_reversed.setter
+    def is_playback_reversed(self, value):
+        self.params.is_playback_reversed = value
+        
+    @property
+    def animation_playback_direction_multiplier(self):
+        """The animation_reverse_multiplier property."""
+        if self.params.is_playback_reversed:
+            return -1.0
+        else:
+            return 1.0
 
 
 
@@ -197,6 +222,16 @@ class Spike3DRaster(NeuronIdentityAccessingMixin, SpikeRenderingBaseMixin, Spike
         
         self.slidebar_val = 0
         self._spikes_window = SpikesDataframeWindow(spikes_df, window_duration=window_duration, window_start_time=window_start_time)
+        
+        # Config
+        self.is_speed_burst_mode_active = False
+        self.speedBurstPlaybackRate = Spike3DRaster.SpeedBurstPlaybackRate
+        
+        self.params.is_playback_reversed = False
+        
+        
+        
+        
         self.params.spike_start_z = -10.0
         # self.spike_end_z = 0.1
         self.params.spike_end_z = -6.0
@@ -274,23 +309,6 @@ class Spike3DRaster(NeuronIdentityAccessingMixin, SpikeRenderingBaseMixin, Spike
         self.temporal_mapping_changed.connect(self.on_adjust_temporal_spatial_mapping)
         
 
-
-    def on_jump_left(self):
-        # Skip back some frames
-        self.shift_animation_frame_val(-5)
-        
-    def on_jump_right(self):
-        # Skip forward some frames
-        self.shift_animation_frame_val(5)
-        
-    def on_reverse_held(self):
-        # Change the direction of playback by changing the sign of the updating.
-        self.shift_animation_frame_val(5)
-        
-    
-    
-        
-        
     def buildUI(self):
         """ for QGridLayout
             addWidget(widget, row, column, rowSpan, columnSpan, Qt.Alignment alignment = 0)
@@ -310,6 +328,12 @@ class Spike3DRaster(NeuronIdentityAccessingMixin, SpikeRenderingBaseMixin, Spike
         # self.ui.main_gl_widget.setWindowTitle('pyqtgraph: 3D Raster Spikes Plotting')
         self.ui.main_gl_widget.setCameraPosition(distance=40)
         self.ui.layout.addWidget(self.ui.main_gl_widget, 0, 0) # add the GLViewWidget to the layout at 0, 0
+        
+        # self.ui.main_gl_widget.clicked.connect(self.play_pause)
+        # self.ui.main_gl_widget.doubleClicked.connect(self.toggle_full_screen)
+        # self.ui.main_gl_widget.wheel.connect(self.wheel_handler)
+        # self.ui.main_gl_widget.keyPressed.connect(self.key_handler)
+        
         
         #### Build Graphics Objects #####
         self._buildGraphics(self.ui.main_gl_widget) # pass the GLViewWidget
@@ -331,6 +355,28 @@ class Spike3DRaster(NeuronIdentityAccessingMixin, SpikeRenderingBaseMixin, Spike
         self.ui.layout_slide_bar.setContentsMargins(6, 3, 4, 4)
         self.ui.panel_slide_bar.setLayout(self.ui.layout_slide_bar)
 
+        # New Button: Play/Pause
+        self.ui.button_play_pause = ToggleButton()
+        self.ui.button_play_pause.setMinimumHeight(25)
+        self.ui.button_play_pause.setMinimumWidth(30)
+        self.ui.play_pause_model = ToggleButtonModel(None, self)
+        self.ui.play_pause_model.setStateMap(
+            {
+                True: {
+                    "text": "",
+                    "icon": qta.icon("fa.play", scale_factor=0.7, color='white', color_active='orange')
+                },
+                False: {
+                    "text": "",
+                    "icon": qta.icon("fa.pause", scale_factor=0.7, color='white', color_active='orange')
+                }
+            }
+        )
+        self.ui.button_play_pause.setModel(self.ui.play_pause_model)
+        self.ui.button_play_pause.clicked.connect(self.play_pause)
+        self.ui.layout_slide_bar.addWidget(self.ui.button_play_pause)
+        
+        
         # Playback Slider:
         self.ui.slider = QtWidgets.QSlider(QtCore.Qt.Horizontal)
         self.ui.slider.setSizePolicy(QtGui.QSizePolicy.Expanding, QtGui.QSizePolicy.Preferred)
@@ -351,13 +397,16 @@ class Spike3DRaster(NeuronIdentityAccessingMixin, SpikeRenderingBaseMixin, Spike
         self.ui.btn_slide_run.setMinimumHeight(25)
         self.ui.btn_slide_run.setMinimumWidth(30)
         self.ui.btn_slide_run.tag = "paused"
-        self.ui.btn_slide_run.clicked.connect(self.btn_slide_run_clicked)
+        self.ui.btn_slide_run.clicked.connect(self.play_pause)
         self.ui.layout_slide_bar.addWidget(self.ui.btn_slide_run)
         
+            
         # Button: Reverse:
         self.ui.btnReverse = QtWidgets.QPushButton("Reverse")
+        self.ui.btnReverse.setCheckable(True) # set checkable to make it a toggle button
         self.ui.btnReverse.setMinimumHeight(25)
         self.ui.btnReverse.setMinimumWidth(30)
+        self.ui.btnReverse.setStyleSheet("background-color : lightgrey") # setting default color of button to light-grey
         self.ui.btnReverse.clicked.connect(self.on_reverse_held)
         self.ui.layout_slide_bar.addWidget(self.ui.btnReverse)
         
@@ -605,11 +654,12 @@ class Spike3DRaster(NeuronIdentityAccessingMixin, SpikeRenderingBaseMixin, Spike
         self.ui.z_txtitem.translate(-self.half_temporal_axis_length, -self.n_half_cells, (self.z_floor + -0.5))
 
         
-        
+    # Input Handelers:        
     def keyPressEvent(self, e):
         """ called automatically when a keyboard key is pressed and this widget has focus. 
         TODO: doesn't actually work right now.
         """
+        print(f'keyPressEvent(e.key(): {e.key()})')
         if e.key() == QtCore.Qt.Key_Escape:
             self.close()
         elif e.key() == QtCore.Qt.Key_Backspace:
@@ -619,9 +669,35 @@ class Spike3DRaster(NeuronIdentityAccessingMixin, SpikeRenderingBaseMixin, Spike
             
         elif e.key() == QtCore.Qt.Key_Right:
             self.shift_animation_frame_val(1) # jump forward one frame
+            
+        elif e.key() == QtCore.Qt.Key_Space:
+            self.play_pause()
+        elif e.key() == QtCore.Qt.Key_P:
+            self.toggle_speed_burst()
+            
         else:
             pass
             
+            
+    # def key_handler(self, event):
+    #     print("MainVideoPlayerWindow key handler: {0}".format(str(event.key())))
+    #     if event.key() == QtCore.Qt.Key_Escape and self.is_full_screen:
+    #         self.toggle_full_screen()
+    #     if event.key() == QtCore.Qt.Key_F:
+    #         self.toggle_full_screen()
+    #     if event.key() == QtCore.Qt.Key_Space:
+    #         self.play_pause()
+    #     if event.key() == QtCore.Qt.Key_P:
+    #         self.toggle_speed_burst()
+
+
+    def wheel_handler(self, event):
+        print(f'wheel_handler(event.angleDelta().y(): {event.angleDelta().y()})')
+        # self.modify_volume(1 if event.angleDelta().y() > 0 else -1)
+        # self.set_media_position(1 if event.angleDelta().y() > 0 else -1)
+
+
+
 
     def on_spikes_df_changed(self):
         """ changes:
@@ -756,8 +832,31 @@ class Spike3DRaster(NeuronIdentityAccessingMixin, SpikeRenderingBaseMixin, Spike
     
     
     
-    
-    def btn_slide_run_clicked(self):
+    # Called when the play/pause button is clicked:
+    def play_pause(self):
+        # the play_pause_model uses inverted logic, so we negate the current state value to determine if is_playing
+        is_playing = not self.ui.play_pause_model.getState()
+        print(f'is_playing: {is_playing}')
+        
+        # if (not is_playing) or self.slidebar_val == 1:
+        #     if self.slidebar_val == 1:
+        #         self.ui.slider.setValue(0)            
+        #     # self.ui.btn_slide_run.setText("||")
+        #     # self.ui.btn_slide_run.tag = "running"
+        #     # self.play_pause_model.setState(not is_playing)
+        #     self.sliderThread.start()
+
+        # else:
+        #     # self.ui.btn_slide_run.setText(">")
+        #     # self.ui.btn_slide_run.tag = "paused"
+        #     # self.play_pause_model.setState(not is_playing)
+        #     self.sliderThread.terminate()
+            
+            
+        # self.ui.play_pause_model.blockSignals(True)
+        # self.ui.play_pause_model.setState(not is_playing)
+        # self.ui.play_pause_model.blockSignals(False)
+        
         if self.ui.btn_slide_run.tag == "paused" or self.slidebar_val == 1:
             if self.slidebar_val == 1:
                 self.ui.slider.setValue(0)
@@ -770,6 +869,7 @@ class Spike3DRaster(NeuronIdentityAccessingMixin, SpikeRenderingBaseMixin, Spike
             self.ui.btn_slide_run.setText(">")
             self.ui.btn_slide_run.tag = "paused"
             self.sliderThread.terminate()
+
 
     def increase_slider_val(self):
         slider_val = self.ui.slider.value() # integer value between 0-100
@@ -796,12 +896,39 @@ class Spike3DRaster(NeuronIdentityAccessingMixin, SpikeRenderingBaseMixin, Spike
         if self.enable_debug_print:
             print(f'AFTER: self.spikes_window.active_time_window: {self.spikes_window.active_time_window}')
     
-        
+    
+    # Called from SliderRunner's thread when it emits the update_signal:    
     def increase_animation_frame_val(self):
         self.shift_animation_frame_val(1)
         
+        
+    
+
+    def on_jump_left(self):
+        # Skip back some frames
+        self.shift_animation_frame_val(-5)
+        
+    def on_jump_right(self):
+        # Skip forward some frames
+        self.shift_animation_frame_val(5)
+        
+    def on_reverse_held(self):
+        # Change the direction of playback by changing the sign of the updating.
+        # if button is checked    
+        self.is_playback_reversed = self.ui.btnReverse.isChecked()
+        if self.ui.btnReverse.isChecked():
+            # setting background color to light-blue
+            self.ui.btnReverse.setStyleSheet("background-color : lightblue")
+  
+        # if it is unchecked
+        else:
+            # set background color back to light-grey
+            self.ui.btnReverse.setStyleSheet("background-color : lightgrey")
+    
+    
+    
     def shift_animation_frame_val(self, shift_frames: int):
-        next_start_timestamp = self.spikes_window.active_window_start_time + (self.animation_time_step * float(shift_frames))
+        next_start_timestamp = self.spikes_window.active_window_start_time + (self.animation_playback_direction_multiplier * self.animation_time_step * float(shift_frames))
         self.spikes_window.update_window_start(next_start_timestamp)
         # TODO: doesn't update the slider or interact with the slider in any way.
         
@@ -839,6 +966,49 @@ class Spike3DRaster(NeuronIdentityAccessingMixin, SpikeRenderingBaseMixin, Spike
     #         v2_x = self.v2_x
     #         v2_y = self.v2_y
     #     return ((v1_x * x) + (v2_x * y), (v1_y * x) + (v2_y * y))
+
+
+
+
+
+
+    # Speed Burst Features:
+    def toggle_speed_burst(self):
+        curr_is_speed_burst_enabled = self.is_speed_burst_mode_active
+        updated_speed_burst_enabled = (not curr_is_speed_burst_enabled)
+        if (updated_speed_burst_enabled):
+            self.engage_speed_burst()
+        else:
+            self.disengage_speed_burst()
+
+    # Engages a temporary speed burst 
+    def engage_speed_burst(self):
+        print("Speed burst enabled!")
+        self.is_speed_burst_mode_active = True
+        # Set the playback speed temporarily to the burst speed
+        self.media_player.set_rate(self.speedBurstPlaybackRate)
+
+        self.ui.toolButton_SpeedBurstEnabled.setEnabled(True)
+        self.ui.doubleSpinBoxPlaybackSpeed.setEnabled(False)
+        self.ui.button_slow_down.setEnabled(False)
+        self.ui.button_speed_up.setEnabled(False)
+        
+    def disengage_speed_burst(self):
+        print("Speed burst disabled!")
+        self.is_speed_burst_mode_active = False
+        # restore the user specified playback speed
+        self.media_player.set_rate(self.ui.doubleSpinBoxPlaybackSpeed.value)
+
+        self.ui.toolButton_SpeedBurstEnabled.setEnabled(False)
+        self.ui.doubleSpinBoxPlaybackSpeed.setEnabled(True)
+        self.ui.button_slow_down.setEnabled(True)
+        self.ui.button_speed_up.setEnabled(True)
+
+
+
+
+
+
 
 # Start Qt event loop unless running in interactive mode.
 # if __name__ == '__main__':
