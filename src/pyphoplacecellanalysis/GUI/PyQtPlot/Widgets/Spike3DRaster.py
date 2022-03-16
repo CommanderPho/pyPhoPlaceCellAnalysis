@@ -712,12 +712,15 @@ class Spike3DRaster(NeuronIdentityAccessingMixin, SpikeRenderingBaseMixin, Spike
     def _build_neuron_id_graphics(self, w, y_pos):
         """ builds the text items to indicate the neuron ID for each neuron in the df. """
         all_cell_ids = self.cell_ids
+        
+        cell_id_text_item_font = QtGui.QFont('Helvetica', 12)
+        
         self.ui.glCellIdTextItems = []
         for i, cell_id in enumerate(all_cell_ids):
             curr_color = pg.mkColor((i, self.n_cells*1.3))
             curr_color.setAlphaF(0.5)
             # print(f'cell_id: {cell_id}, curr_color: {curr_color.alpha()}')
-            curr_id_txtitem = gl.GLTextItem(pos=(-self.half_temporal_axis_length, y_pos[i], (self.z_floor - 0.5)), text=f'{cell_id}', color=curr_color)
+            curr_id_txtitem = gl.GLTextItem(pos=(-self.half_temporal_axis_length, y_pos[i], (self.z_floor - 0.5)), text=f'{cell_id}', color=curr_color, font=cell_id_text_item_font)
             w.addItem(curr_id_txtitem) # add to the current widget
             # add to the cell_ids array
             self.ui.glCellIdTextItems.append(curr_id_txtitem)
