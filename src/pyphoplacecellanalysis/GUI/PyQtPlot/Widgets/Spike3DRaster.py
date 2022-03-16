@@ -442,6 +442,17 @@ class Spike3DRaster(NeuronIdentityAccessingMixin, SpikeRenderingBaseMixin, Spike
             self.ui.ref_axes_indicator = GLDebugAxisItem()
             self.ui.ref_axes_indicator.setSize(x=15.0, y=10.0, z=5.0)
             w.addItem(self.ui.ref_axes_indicator)
+            
+            self.ui.gl_test_points = []
+            md = gl.MeshData.sphere(rows=10, cols=20)
+            m1 = gl.GLMeshItem(meshdata=md, smooth=False, drawFaces=False, drawEdges=True, edgeColor=(1,1,1,1))
+            # m1.translate(5, 0, 0)
+            m1.setGLOptions('additive')
+            w.addItem(m1)
+            self.ui.gl_test_points.append(m1)
+            
+            
+        
 
         # The 2D viewport overlay that contains text:
         self.ui.viewport_overlay = GLViewportOverlayPainterItem()
@@ -483,16 +494,6 @@ class Spike3DRaster(NeuronIdentityAccessingMixin, SpikeRenderingBaseMixin, Spike
         w.addItem(self.ui.gz)
         self.ui.z_txtitem = gl.GLTextItem(pos=(-self.half_temporal_axis_length, -self.n_half_cells, (self.z_floor + 0.5)), text='z', color=z_color)  # The axis label text 
         w.addItem(self.ui.z_txtitem)
-        
-        
-        
-        self.ui.gl_test_points = []
-        md = gl.MeshData.sphere(rows=10, cols=20)
-        m1 = gl.GLMeshItem(meshdata=md, smooth=False, drawFaces=False, drawEdges=True, edgeColor=(1,1,1,1))
-        m1.translate(5, 0, 0)
-        m1.setGLOptions('additive')
-        w.addItem(m1)
-        self.ui.gl_test_points.append(m1)
         
         
         # Custom 3D raster plot:
@@ -548,7 +549,7 @@ class Spike3DRaster(NeuronIdentityAccessingMixin, SpikeRenderingBaseMixin, Spike
 
 
     def _build_neuron_id_graphics(self, w, y_pos):
-        # builds the text items to indicate the neuron ID for each neuron in the df.
+        """ builds the text items to indicate the neuron ID for each neuron in the df. """
         all_cell_ids = self.cell_ids
         self.ui.glCellIdTextItems = []
         for i, cell_id in enumerate(all_cell_ids):
@@ -559,7 +560,8 @@ class Spike3DRaster(NeuronIdentityAccessingMixin, SpikeRenderingBaseMixin, Spike
             w.addItem(curr_id_txtitem) # add to the current widget
             # add to the cell_ids array
             self.ui.glCellIdTextItems.append(curr_id_txtitem)
-                    
+                
+            
 
 
     # def _build_axes_arrow_graphics(self, w):
