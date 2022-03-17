@@ -105,6 +105,20 @@ class SpikesDataframeWindow(QtCore.QObject):
     def update_window_start(self, new_value):
         self.active_window_start_time = new_value
 
+
+    @QtCore.pyqtSlot(float, float)
+    def update_window_start_end(self, new_start, new_end):
+        prev_duration = self.window_duration
+        proposed_new_duration = new_end - new_start
+        will_duration_change = not np.isclose(prev_duration, proposed_new_duration)
+        # Set the private variables so the signal isn't emitted on set (we'll emit them at the end)
+        self._active_window_start_time = new_start
+        if will_duration_change:
+            self._window_duration = proposed_new_duration
+            self.window_duration_changed_signal.emit()
+        self.window_changed_signal.emit()
+        
+        
         
     # def on_window_changed(self):
     #     print(f'SpikesDataframeWindow.on_window_changed(): window_changed_signal emitted. self.active_time_window: {self.active_time_window}')
