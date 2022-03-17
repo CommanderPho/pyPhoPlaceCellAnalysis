@@ -29,6 +29,8 @@ from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.GLViewportOverlayPainterItem im
 
 from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.SpikeRasterBase import SpikeRasterBase
 
+from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.Mixins.RenderTimeEpochMeshesMixin import RenderTimeEpochMeshesMixin
+
 
 """ 
 FPS     Milliseconds Per Frame
@@ -73,9 +75,9 @@ def trap_exc_during_debug(*args):
 # install exception hook: without this, uncaught exception would cause application to exit
 sys.excepthook = trap_exc_during_debug
 
-                
 
-class Spike3DRaster(SpikeRasterBase):
+
+class Spike3DRaster(RenderTimeEpochMeshesMixin, SpikeRasterBase):
     """ Displays a 3D version of a raster plot with the spikes occuring along a plane. 
     
     Usage:
