@@ -252,7 +252,10 @@ class RenderWindowControlsMixin:
             
             
             # self.ui.spinAnimationTimeStep.setEnabled(False)
-            self.ui.spinTemporalZoomFactor.setValue(10.0)
+            # self.ui.spinTemporalZoomFactor.setValue(10.0)
+            self.ui.spinTemporalZoomFactor.setValue(1.0)
+            self.temporal_zoom_factor = 1.0
+            
             self.ui.spinRenderWindowDuration.setValue(self.render_window_duration) # set to render window duration
 
             self.ui.spinTemporalZoomFactor.setReadOnly(True)

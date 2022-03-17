@@ -45,6 +45,11 @@ class RenderTimeEpochMeshesMixin:
         half_durations = durations / 2.0
         t_centers = starts_t + half_durations
         
+        
+        # The transform needs to be done here to match the temporal_scale_Factor:
+        # curr_x = np.interp(curr_spike_t, (self.spikes_window.active_window_start_time, self.spikes_window.active_window_end_time), (-self.half_temporal_axis_length, +self.half_temporal_axis_length))
+        
+        
         # pg.gl.GLViewWidget()
         # self.ui.parent_epoch_container_item = gl.GLGraphicsItem.GLGraphicsItem()
         # self.ui.parent_epoch_container_item = pg.GraphicsObject()
@@ -72,7 +77,8 @@ class RenderTimeEpochMeshesMixin:
     def update_epoch_meshes(self, starts_t, durations):
         half_durations = durations / 2.0
         t_centers = starts_t + half_durations
-        t_shifted_centers = t_centers - self.spikes_window.active_time_window[0] # offset by the start of the current window
+        # t_shifted_centers = t_centers - self.spikes_window.active_time_window[0] # offset by the start of the current window
+        t_shifted_centers = t_centers
         for (i, aCube) in enumerate(self.ui.new_cube_objects):
             # aCube.setPos(t_centers[i], self.n_half_cells, 0)
             aCube.resetTransform()
