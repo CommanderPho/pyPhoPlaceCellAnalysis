@@ -244,25 +244,33 @@ class RenderWindowControlsMixin:
         
         
     def disable_render_window_controls(self):
-        self.ui.spinAnimationTimeStep.blockSignals(True)
-        self.ui.spinTemporalZoomFactor.blockSignals(True)
-        self.ui.spinRenderWindowDuration.blockSignals(True)
-        
-        
-        # self.ui.spinAnimationTimeStep.setEnabled(False)
-        self.ui.spinTemporalZoomFactor.setValue(10.0)
-        self.ui.spinRenderWindowDuration.setValue(self.render_window_duration) # set to render window duration
+        # Wrapped in try block so it won't throw an error if these controls were never added (self.setup_render_window_controls() was never called)
+        try:
+            self.ui.spinAnimationTimeStep.blockSignals(True)
+            self.ui.spinTemporalZoomFactor.blockSignals(True)
+            self.ui.spinRenderWindowDuration.blockSignals(True)
+            
+            
+            # self.ui.spinAnimationTimeStep.setEnabled(False)
+            self.ui.spinTemporalZoomFactor.setValue(10.0)
+            self.ui.spinRenderWindowDuration.setValue(self.render_window_duration) # set to render window duration
 
-        self.ui.spinTemporalZoomFactor.setReadOnly(True)
-        self.ui.spinRenderWindowDuration.setReadOnly(True)
+            self.ui.spinTemporalZoomFactor.setReadOnly(True)
+            self.ui.spinRenderWindowDuration.setReadOnly(True)
 
-        # self.ui.spinAnimationTimeStep.setEnabled(False)
-        # self.ui.spinTemporalZoomFactor.setEnabled(False)
-        self.ui.spinRenderWindowDuration.setEnabled(False)
+            # self.ui.spinAnimationTimeStep.setEnabled(False)
+            # self.ui.spinTemporalZoomFactor.setEnabled(False)
+            self.ui.spinRenderWindowDuration.setEnabled(False)
+            
+            self.ui.spinAnimationTimeStep.blockSignals(False)
+            self.ui.spinTemporalZoomFactor.blockSignals(False)
+            self.ui.spinRenderWindowDuration.blockSignals(False)
+
+        except Exception as e:
+            print(f'disable_render_window_controls(): called but do not seem to have RenderWindowControls enabled: err: {e}')
+            # raise e
+            return
         
-        self.ui.spinAnimationTimeStep.blockSignals(False)
-        self.ui.spinTemporalZoomFactor.blockSignals(False)
-        self.ui.spinRenderWindowDuration.blockSignals(False)
         
         
     def animation_time_step_valueChanged(self, sb):
