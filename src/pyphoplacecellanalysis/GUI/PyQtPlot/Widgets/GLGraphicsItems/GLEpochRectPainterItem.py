@@ -17,8 +17,12 @@ from pyphocorehelpers.DataStructure.general_parameter_containers import DebugHel
 SIZE = 32
 
 class GLEpochRectPainterItem(GLGraphicsItem.GLGraphicsItem):
+    """ WARNING: NOT YET IMPLEMENTED 
+    
+    """
     def __init__(self, starts_t=[], durations=[], **kwds):
         super().__init__()
+        raise NotImplementedError
         glopts = kwds.pop('glOptions', 'additive')
         self.setGLOptions(glopts)
         # Helper container variables
