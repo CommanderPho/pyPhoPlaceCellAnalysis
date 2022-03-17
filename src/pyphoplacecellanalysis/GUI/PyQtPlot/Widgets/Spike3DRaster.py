@@ -93,6 +93,10 @@ class Spike3DRaster(SpikeRasterBase):
     SpeedBurstPlaybackRate = 16.0
     PlaybackUpdateFrequency = 0.04 # in seconds
     
+    # GUI Configuration Options:
+    WantsRenderWindowControls = True
+    WantsPlaybackControls = True
+    
 
     @property
     def overlay_text_lines_dict(self):

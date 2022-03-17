@@ -238,8 +238,11 @@ class SpikeRasterBase(NeuronIdentityAccessingMixin, SpikeRenderingBaseMixin, Spi
         self._spikes_window = SpikesDataframeWindow(spikes_df, window_duration=window_duration, window_start_time=window_start_time)
         
         # Config
-        self.params.wantsRenderWindowControls = SpikeRasterBase.WantsRenderWindowControls
-        self.params.wantsPlaybackControls = SpikeRasterBase.WantsPlaybackControls
+        self.params.wantsRenderWindowControls = self.WantsRenderWindowControls
+        self.params.wantsPlaybackControls = self.WantsPlaybackControls
+        
+        # self.params.wantsRenderWindowControls = SpikeRasterBase.WantsRenderWindowControls
+        # self.params.wantsPlaybackControls = SpikeRasterBase.WantsPlaybackControls
         
         
         self._playback_update_frequency = SpikeRasterBase.PlaybackUpdateFrequency

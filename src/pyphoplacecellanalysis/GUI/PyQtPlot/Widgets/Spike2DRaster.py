@@ -60,6 +60,9 @@ class Spike2DRaster(SpikeRasterBase):
     SpeedBurstPlaybackRate = 16.0
     PlaybackUpdateFrequency = 0.04 # in seconds
     
+    # GUI Configuration Options:
+    WantsRenderWindowControls = False
+    WantsPlaybackControls = False
     
     ## Scrollable Window Signals
     window_scrolled = QtCore.pyqtSignal(float, float) # signal is emitted on updating the 2D sliding window, where the first argument is the new start value and the 2nd is the new end value
