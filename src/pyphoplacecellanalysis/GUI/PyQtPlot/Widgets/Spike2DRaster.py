@@ -60,6 +60,10 @@ class Spike2DRaster(SpikeRasterBase):
     SpeedBurstPlaybackRate = 16.0
     PlaybackUpdateFrequency = 0.04 # in seconds
     
+    
+    ## Scrollable Window Signals
+    window_scrolled = QtCore.pyqtSignal(float, float) # signal is emitted on updating the 2D sliding window, where the first argument is the new start value and the 2nd is the new end value
+    
 
     @property
     def overlay_text_lines_dict(self):
@@ -164,25 +168,24 @@ class Spike2DRaster(SpikeRasterBase):
         return curr_spike_t, curr_spike_y, curr_spike_pens, curr_n
     
     
+    def _build_cell_configs(self):
+        # self._build_neuron_id_graphics(self.ui.main_gl_widget, self.y)
+        self.params.config_items = []
+        for i, cell_id in enumerate(self.unit_ids):
+            curr_color = pg.mkColor((i, self.n_cells*1.3))
+            curr_color.setAlphaF(0.5)
+            curr_pen = pg.mkPen(curr_color)
+            curr_config_item = (i, cell_id, curr_pen, self.lower_y[i], self.upper_y[i])
+            self.params.config_items.append(curr_config_item)    
+    
+        self.config_unit_id_map = dict(zip(self.unit_ids, self.params.config_items))
+        
     def _buildScrollRasterPreviewWindowGraphics(self):
         # Common Tick Label
         vtick = QtGui.QPainterPath()
         vtick.moveTo(0, -0.5)
         vtick.lineTo(0, 0.5)
         
-        # self._build_neuron_id_graphics(self.ui.main_gl_widget, self.y)
-        # self.params.config_items = []
-        # for i, cell_id in enumerate(self.unit_ids):
-        #     curr_color = pg.mkColor((i, self.n_cells*1.3))
-        #     curr_color.setAlphaF(0.5)
-        #     curr_pen = pg.mkPen(curr_color)
-        #     curr_config_item = (i, cell_id, curr_pen, self.lower_y[i], self.upper_y[i])            
-        #     self.params.config_items.append(curr_config_item)    
-        #     # s2 = pg.ScatterPlotItem(pxMode=True, symbol=vtick, size=1, pen=curr_pen)
-        #     # self.ui.main_plot_widget.addItem(s2)
-    
-        # self.config_unit_id_map = dict(zip(self.unit_ids, self.params.config_items))
-    
         #############################
         ## Bottom Windowed Scroll Plot/Widget:
         self.ui.main_scroll_window_plot = self.ui.main_graphics_layout_widget.addPlot(row=2, col=0)
@@ -258,16 +261,7 @@ class Spike2DRaster(SpikeRasterBase):
         # self.ui.main_plot_widget.disableAutoRange()
         self._update_plot_ranges()
              
-        # self._build_neuron_id_graphics(self.ui.main_gl_widget, self.y)
-        self.params.config_items = []
-        for i, cell_id in enumerate(self.unit_ids):
-            curr_color = pg.mkColor((i, self.n_cells*1.3))
-            curr_color.setAlphaF(0.5)
-            curr_pen = pg.mkPen(curr_color)
-            curr_config_item = (i, cell_id, curr_pen, self.lower_y[i], self.upper_y[i])
-            self.params.config_items.append(curr_config_item)    
-    
-        self.config_unit_id_map = dict(zip(self.unit_ids, self.params.config_items))
+        self._build_cell_configs()    
     
         # self.ui.spikes_raster_item_plot = SpikesRasterItem(self.params.config_items)
         self.ui.scatter_plot = pg.ScatterPlotItem(name='spikeRasterScatterPlotItem', pxMode=True, symbol=vtick, size=10, pen={'color': 'w', 'width': 2})
@@ -399,7 +393,8 @@ class Spike2DRaster(SpikeRasterBase):
             [[Xmin, Xmax], [Ymin, Ymax]]
         """
         rgn = self.ui.main_plot_widget.viewRange()[0]
-        self.ui.scroll_window_region.setRegion(rgn)
+        self.ui.scroll_window_region.setRegion(rgn) # adjust the top plot
+        self.window_scrolled.emit(rgn[0], rgn[1]) # emit the window_scrolled signal
         # self.render_window_duration = (max_x - min_x) # update the render_window_duration from the slider width
 
 
