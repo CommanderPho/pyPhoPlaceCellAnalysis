@@ -96,47 +96,48 @@ class DataSeriesToSpatial:
 
     
 
-class SpikesDataframeMixin(object):
-    """docstring for SpikesDataframeMixin.
+## TODO: seemingly unused and also unimplemented. The name doesn't make sense as it looks like a temporal to spatial mixin
+# class SpikesDataframeMixin(object):
+#     """docstring for SpikesDataframeMixin.
     
-    Requires:
-        self._temporal_zoom_factor: float
-     """
+#     Requires:
+#         self._temporal_zoom_factor: float
+#      """
      
-    @property
-    def temporal_axis_length(self):
-        """The temporal_axis_length property."""
-        return self.temporal_zoom_factor * self.render_window_duration
-    @property
-    def half_temporal_axis_length(self):
-        """The temporal_axis_length property."""
-        return self.temporal_axis_length / 2.0
+#     @property
+#     def temporal_axis_length(self):
+#         """The temporal_axis_length property."""
+#         return self.temporal_zoom_factor * self.render_window_duration
+#     @property
+#     def half_temporal_axis_length(self):
+#         """The temporal_axis_length property."""
+#         return self.temporal_axis_length / 2.0
     
     
-     ######  Get/Set Properties ######:
-    @property
-    def temporal_zoom_factor(self):
-        """The time dilation factor that maps spikes in the current window to x-positions along the time axis multiplicatively.
-            Increasing this factor will result in a more spatially expanded time axis while leaving the visible window unchanged.
-        """
-        return self._temporal_zoom_factor
-    @temporal_zoom_factor.setter
-    def temporal_zoom_factor(self, value):
-        self._temporal_zoom_factor = value
+#      ######  Get/Set Properties ######:
+#     @property
+#     def temporal_zoom_factor(self):
+#         """The time dilation factor that maps spikes in the current window to x-positions along the time axis multiplicatively.
+#             Increasing this factor will result in a more spatially expanded time axis while leaving the visible window unchanged.
+#         """
+#         return self._temporal_zoom_factor
+#     @temporal_zoom_factor.setter
+#     def temporal_zoom_factor(self, value):
+#         self._temporal_zoom_factor = value
         
         
         
         
-    def __init__(self, spikes_df, *args, window_duration=15.0, window_start_time=0.0, neuron_colors=None, **kwargs):
-        super(SpikesDataframeMixin, self).__init__(*args, **kwargs)
-        self.params = VisualizationParameters('')
-        self._spikes_window = SpikesDataframeWindow(spikes_df, window_duration=window_duration, window_start_time=window_start_time)
-        self.params.spike_start_z = -10.0
-        # self.spike_end_z = 0.1
-        self.params.spike_end_z = -6.0
-        self.params.side_bin_margins = 0.0 # space to sides of the first and last cell on the y-axis
-        # by default we want the time axis to approximately span -20 to 20. So we set the temporal_zoom_factor to 
-        self._temporal_zoom_factor = 40.0 / float(self.render_window_duration)      
+#     def __init__(self, spikes_df, *args, window_duration=15.0, window_start_time=0.0, neuron_colors=None, **kwargs):
+#         super(SpikesDataframeMixin, self).__init__(*args, **kwargs)
+#         self.params = VisualizationParameters('')
+#         self._spikes_window = SpikesDataframeWindow(spikes_df, window_duration=window_duration, window_start_time=window_start_time)
+#         self.params.spike_start_z = -10.0
+#         # self.spike_end_z = 0.1
+#         self.params.spike_end_z = -6.0
+#         self.params.side_bin_margins = 0.0 # space to sides of the first and last cell on the y-axis
+#         # by default we want the time axis to approximately span -20 to 20. So we set the temporal_zoom_factor to 
+#         self._temporal_zoom_factor = 40.0 / float(self.render_window_duration)      
 
 
     
