@@ -3,7 +3,7 @@ import pandas as pd
 
 
 class DataSeriesToSpatial:
-    """ Helper functions for building the mapping from events to (X,Y) or (X,Y,Z):
+    """ Helper functions for building the mapping from temporal events to (X,Y) or (X,Y,Z):
     
     Two of the axes are arbitrarily defined, but fixed lengths:
     
@@ -63,7 +63,7 @@ class DataSeriesToSpatial:
             raise
         
     @classmethod
-    def build_temporal_axis(cls, num_data_series, side_bin_margins = 0.0, center_mode='zero_centered', bin_position_mode='bin_center', enable_debug_print=False):
+    def temporal_to_spatial_map(cls, event_times, active_window_start_time, active_window_end_time, temporal_axis_spatial_length, center_mode='zero_centered', enable_debug_print=False):
         """ Returns the centers of the bins 
         Useful for generating the position data for the axis that represents the number of independent data series, such as neuron_ids
 
@@ -80,34 +80,20 @@ class DataSeriesToSpatial:
             # y = DataSeriesToSpatial.build_series_identity_axis(curr_num_dataseries, center_mode='starting_at_zero', bin_position_mode='left_edges')
 
         """
-        half_side_bin_margin = side_bin_margins / 2.0 # size of a single margin
-        n_half_data_series = np.ceil(float(num_data_series)/2.0)
-        n_full_series_grid = 2.0 * n_half_data_series # could be one more than num_data_series
-        if enable_debug_print:
-            print(f'build_series_identity_axis(num_data_series: {num_data_series}, side_bin_margins: {side_bin_margins}, (center_mode: {center_mode}, bin_position_mode: {bin_position_mode})):\n n_half_data_series: {n_half_data_series}, n_full_series_grid: {n_full_series_grid}')
-        # full_series_axis_range = side_bin_margins + n_full_series_grid
-
-        bin_relative_offset = 0.0
-        if bin_position_mode == 'left_edges':
-            bin_relative_offset = 0.0
-        elif bin_position_mode == 'bin_center':
-            bin_relative_offset = 0.5
-        elif bin_position_mode == 'right_edges':
-            bin_relative_offset = 1.0
-        else:
-            raise
-
-        # Whether the whole series starts at zero, is centered around zero, etc.
+         # Whether the whole series starts at zero, is centered around zero, etc.
         if center_mode == 'zero_centered':
             # zero_centered:
-            return np.linspace(-n_half_data_series, n_half_data_series, num=num_data_series, endpoint=False) + bin_relative_offset + half_side_bin_margin # add half_side_bin_margin so they're centered
+            half_temporal_axis_spatial_length = float(temporal_axis_spatial_length) / 2.0
+            temporal_to_spatial_axis_start_end = (-half_temporal_axis_spatial_length, +half_temporal_axis_spatial_length)
         elif center_mode == 'starting_at_zero':
             # starting_at_zero:
-            return np.linspace(0, n_full_series_grid, num=num_data_series, endpoint=False) + bin_relative_offset + half_side_bin_margin # add half_side_bin_margin so they're centered
+            temporal_to_spatial_axis_start_end = (0.0, temporal_axis_spatial_length)
         else:
             raise
         
-  
+        # map the current spike times back onto the range of the window's (-half_render_window_duration, +half_render_window_duration) so they represent the x coordinate
+        return np.interp(event_times, (active_window_start_time, active_window_end_time), temporal_to_spatial_axis_start_end)
+
     
 
 class SpikesDataframeMixin(object):

@@ -16,6 +16,8 @@ from pyphocorehelpers.DataStructure.general_parameter_containers import DebugHel
 from pyphoplacecellanalysis.General.Mixins.SpikesRenderingBaseMixin import SpikeRenderingBaseMixin, SpikesDataframeOwningMixin
 
 from pyphocorehelpers.indexing_helpers import interleave_elements, partition
+
+
 from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer
 from pyphocorehelpers.gui.Qt.ToggleButton import ToggleButtonModel, ToggleButton
 from pyphocorehelpers.gui.Qt.HighlightedJumpSlider import HighlightedJumpSlider
@@ -54,7 +56,9 @@ FPS     Milliseconds Per Frame
 
 """ Windowed Spiking Datasource Features
 
-Transforming the events into either 2D or 3D representations for visualization should NOT be part of this class' function.
+See ** DataSeriesToSpatial ** class which performs the mapping from the temporal axis to space.
+
+Transforming the events into either 2D or 3D representations for visualization should NOT be part of this class' responsibilities.
 Separate 2D and 3D event visualization functions should be made to transform events from this class into appropriate point/datastructure representations for the visualization framework being used.
 
 # Local window properties
@@ -63,6 +67,11 @@ Get (window_start, window_end) times
 # Global data properties
 Get (earliest_datapoint_time, latest_datapoint_time) # globally, for the entire timeseries
 
+
+# Note that in addition to the above-mentioned mapping, there's an additional mapping that must be performed due to 'temporal_zoom_factor', a visualization property belonging to the RasterPlot class.
+Note that it fires a signal 'temporal_mapping_changed which indicates a change in this scale value
+
+Internally it also performs the on_adjust_temporal_spatial_mapping() function to update anything that needs to be updated.
 
 
 """
@@ -340,8 +349,8 @@ class Spike3DRaster(RenderTimeEpochMeshesMixin, SpikeRasterBase):
             yi = self.y[i] # get the correct y-position for all spikes of this cell
             # print(f'cell_id: {cell_id}, yi: {yi}')
             # map the current spike times back onto the range of the window's (-half_render_window_duration, +half_render_window_duration) so they represent the x coordinate
-            curr_x = np.interp(curr_spike_t, (self.spikes_window.active_window_start_time, self.spikes_window.active_window_end_time), (-self.half_temporal_axis_length, +self.half_temporal_axis_length))
-            curr_paired_x = np.squeeze(interleave_elements(np.atleast_2d(curr_x).T, np.atleast_2d(curr_x).T))        
+            curr_x = DataSeriesToSpatial.temporal_to_spatial_map(curr_spike_t, self.spikes_window.active_window_start_time, self.spikes_window.active_window_end_time, self.temporal_axis_length, center_mode='zero_centered')
+            curr_paired_x = np.squeeze(interleave_elements(np.atleast_2d(curr_x).T, np.atleast_2d(curr_x).T))
             
             # Z-positions:
             # z = curr_spike_t[np.arange(100)] # get the first 20 spikes for each
@@ -549,9 +558,8 @@ class Spike3DRaster(RenderTimeEpochMeshesMixin, SpikeRasterBase):
             
             yi = self.y[i] # get the correct y-position for all spikes of this cell
             # map the current spike times back onto the range of the window's (-half_render_window_duration, +half_render_window_duration) so they represent the x coordinate
-            # curr_x = np.interp(curr_spike_t, (self.spikes_window.active_window_start_time, self.spikes_window.active_window_end_time), (-self.half_render_window_duration, +self.half_render_window_duration))
-            curr_x = np.interp(curr_spike_t, (self.spikes_window.active_window_start_time, self.spikes_window.active_window_end_time), (-self.half_temporal_axis_length, +self.half_temporal_axis_length))
-            # curr_paired_x = np.squeeze(interleave_elements(np.atleast_2d(curr_x).T, np.atleast_2d(curr_x).T))        
+            curr_x = DataSeriesToSpatial.temporal_to_spatial_map(curr_spike_t, self.spikes_window.active_window_start_time, self.spikes_window.active_window_end_time, self.temporal_axis_length, center_mode='zero_centered')
+            # curr_paired_x = np.squeeze(interleave_elements(np.atleast_2d(curr_x).T, np.atleast_2d(curr_x).T))
             curr_paired_x = curr_x.repeat(2)
             
             # Z-positions:

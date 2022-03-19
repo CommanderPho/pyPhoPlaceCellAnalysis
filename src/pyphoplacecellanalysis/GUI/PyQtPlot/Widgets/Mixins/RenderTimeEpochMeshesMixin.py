@@ -5,9 +5,16 @@ import pyqtgraph.opengl as gl # for 3D raster plot
 import numpy as np
 
 
+from pyphocorehelpers.geometry_helpers import find_ranges_in_window
+
+
 class RenderTimeEpochMeshesMixin:
     """ 
         RenderTimeEpochMeshes
+        
+        Renders rectangular meshes to represent periods of time in the current 3D plot
+        
+        
     """
     
     @classmethod
