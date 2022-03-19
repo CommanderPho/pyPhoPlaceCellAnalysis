@@ -13,11 +13,15 @@ from pyqtgraph.Qt import QtCore, QtGui
 
 from pyphocorehelpers.DataStructure.general_parameter_containers import DebugHelper, VisualizationParameters
 
+from pyphocorehelpers.geometry_helpers import find_ranges_in_window
 
 SIZE = 32
 
 class GLEpochRectPainterItem(GLGraphicsItem.GLGraphicsItem):
     """ WARNING: NOT YET IMPLEMENTED 
+    
+    TODO: NEXT_STEPS: Use the new find_ranges_in_window() function (imported above from pyphocorehelpers.geometry_helpers) to compute the relevant rectangles to draw given the active time window.
+    
     
     """
     def __init__(self, starts_t=[], durations=[], **kwds):
