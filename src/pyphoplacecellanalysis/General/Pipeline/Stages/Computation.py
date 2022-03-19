@@ -16,6 +16,7 @@ from pyphoplacecellanalysis.General.ComputationResults import ComputationResult
 
 from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.DefaultComputationFunctions import DefaultComputationFunctions
 from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.ExtendedStats import ExtendedStatsComputations
+from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.SpikeAnalysis import SpikeAnalysisComputations
 
 
 class ComputablePipelineStage:
@@ -65,7 +66,11 @@ class DefaultRegisteredComputations:
     def register_default_known_computation_functions(self):
         # TODO: Note that order matters for the computation functions, unlike the display functions, so they need to be enumerated in the correct order and not sorted alphabetically
         
-        # Register the Ratemap/Placemap display functions: 
+        # Register the neuronal firing analysis computation functions:
+        for (a_computation_fn_name, a_computation_fn) in reversed(SpikeAnalysisComputations.get_all_functions(use_definition_order=True)):
+            self.register_computation(a_computation_fn_name, a_computation_fn)
+            
+        # Register the Ratemap/Placemap computation functions: 
         for (a_computation_fn_name, a_computation_fn) in reversed(ExtendedStatsComputations.get_all_functions(use_definition_order=True)):
             self.register_computation(a_computation_fn_name, a_computation_fn)
             

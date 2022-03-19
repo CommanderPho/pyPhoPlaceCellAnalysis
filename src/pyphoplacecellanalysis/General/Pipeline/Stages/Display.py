@@ -22,6 +22,8 @@ from pyphoplacecellanalysis.General.Pipeline.Stages.BaseNeuropyPipelineStage imp
 from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DefaultDisplayFunctions import DefaultDisplayFunctions
 from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.Ratemaps import DefaultRatemapDisplayFunctions
 from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import DefaultDecoderDisplayFunctions
+from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.SpikeRasters import SpikeRastersDisplayFunctions
+
 
 from neuropy.core.neuron_identities import NeuronIdentity, build_units_colormap, PlotStringBrevityModeEnum
 
@@ -163,6 +165,10 @@ class DefaultRegisteredDisplayFunctions:
             
         # Register the Bayesian decoder display functions: 
         for (a_display_fn_name, a_display_fn) in DefaultDecoderDisplayFunctions.get_all_functions(use_definition_order=False):
+            self.register_display_function(a_display_fn_name, a_display_fn)
+            
+        # Register the spike rasters display functions: 
+        for (a_display_fn_name, a_display_fn) in SpikeRastersDisplayFunctions.get_all_functions(use_definition_order=False):
             self.register_display_function(a_display_fn_name, a_display_fn)
             
   

@@ -62,6 +62,9 @@ Get (earliest_datapoint_time, latest_datapoint_time) # globally, for the entire 
 
 
 
+# Note that in addition to the above-mentioned mapping, there's an additional mapping that must be performed due to 'temporal_zoom_factor', a visualization property belonging to the RasterPlot class.
+
+
 """
 
 def trap_exc_during_debug(*args):
