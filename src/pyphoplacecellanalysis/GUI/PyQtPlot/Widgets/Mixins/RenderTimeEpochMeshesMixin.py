@@ -1,3 +1,4 @@
+import pyphoplacecellanalysis
 import pyqtgraph as pg
 from pyqtgraph.Qt import QtCore, QtGui, QtWidgets
 import pyqtgraph.opengl as gl # for 3D raster plot
@@ -6,6 +7,8 @@ import numpy as np
 
 
 from pyphocorehelpers.geometry_helpers import find_ranges_in_window
+
+from pyphoplacecellanalysis.General.DataSeriesToSpatial import DataSeriesToSpatial
 
 
 class RenderTimeEpochMeshesMixin:
@@ -37,6 +40,9 @@ class RenderTimeEpochMeshesMixin:
         md = gl.MeshData(vertexes=vertexes, faces=faces, edges=None, vertexColors=None, faceColors=colors)
         return md
 
+    def _temporal_to_spatial(self, starts_t):
+        return DataSeriesToSpatial.temporal_to_spatial_map(starts_t, self.spikes_window.active_window_start_time, self.spikes_window.active_window_end_time, self.temporal_axis_length, center_mode='zero_centered')
+        
 
     def _build_epoch_meshes(self, starts_t, durations):
         """ 
@@ -48,14 +54,16 @@ class RenderTimeEpochMeshesMixin:
             curr_sess.pbe.durations
         
         """
-        
-        half_durations = durations / 2.0
-        t_centers = starts_t + half_durations
-        
+        stops_t = starts_t + durations
+        # Compute spatial positions/durations:
+        starts_x = self._temporal_to_spatial(starts_t)
+        stops_x = self._temporal_to_spatial(stops_t)
+        durations_spatial_widths = stops_x - starts_x
+        half_durations_spatial_widths = durations_spatial_widths / 2.0
+        x_centers = starts_x + half_durations_spatial_widths
         
         # The transform needs to be done here to match the temporal_scale_Factor:
         # curr_x = np.interp(curr_spike_t, (self.spikes_window.active_window_start_time, self.spikes_window.active_window_end_time), (-self.half_temporal_axis_length, +self.half_temporal_axis_length))
-        
         
         # pg.gl.GLViewWidget()
         # self.ui.parent_epoch_container_item = gl.GLGraphicsItem.GLGraphicsItem()
@@ -67,12 +75,12 @@ class RenderTimeEpochMeshesMixin:
         # gl.GLBoxItem()
                 
         self.ui.new_cube_objects = []
-        for i in np.arange(len(t_centers)):
+        for i in np.arange(len(x_centers)):
             curr_md = RenderTimeEpochMeshesMixin._build_cube_mesh_data()
             curr_cube = gl.GLMeshItem(meshdata=curr_md, smooth=True, color=(1, 0, 0, 0.2), shader='balloon', glOptions='additive') # , drawEdges=True, edgeColor=(0, 0, 0, 1)
             # new_cube = gl.GLMeshItem(vertexes=vertexes, faces=faces, faceColors=colors, drawEdges=True, edgeColor=(0, 0, 0, 1))
-            curr_cube.translate(t_centers[i], -self.n_half_cells, self.z_floor)
-            curr_cube.scale(durations[i], self.n_full_cell_grid, 0.25)
+            curr_cube.translate(x_centers[i], -self.n_half_cells, self.z_floor)
+            curr_cube.scale(durations_spatial_widths[i], self.n_full_cell_grid, 0.25)
             # curr_cube.setParentItem(self.ui.parent_epoch_container_item)
             self.ui.main_gl_widget.addItem(curr_cube) # add directly
             # self.ui.parent_epoch_container_item.addItem(curr_cube)
@@ -82,15 +90,21 @@ class RenderTimeEpochMeshesMixin:
         # self.ui.main_gl_widget.addItem(self.ui.parent_epoch_container_item)
         
     def update_epoch_meshes(self, starts_t, durations):
-        half_durations = durations / 2.0
-        t_centers = starts_t + half_durations
+        stops_t = starts_t + durations
+        # Compute spatial positions/durations:
+        starts_x = self._temporal_to_spatial(starts_t)
+        stops_x = self._temporal_to_spatial(stops_t)
+        duration_spatial_widths = stops_x - starts_x
+        half_durations_spatial_widths = duration_spatial_widths / 2.0
+        x_centers = starts_x + half_durations_spatial_widths
+        
         # t_shifted_centers = t_centers - self.spikes_window.active_time_window[0] # offset by the start of the current window
-        t_shifted_centers = t_centers
+        x_shifted_centers = x_centers
         for (i, aCube) in enumerate(self.ui.new_cube_objects):
-            # aCube.setPos(t_centers[i], self.n_half_cells, 0)
+            # aCube.setPos(x_centers[i], self.n_half_cells, 0)
             aCube.resetTransform()
-            aCube.translate(t_shifted_centers[i], -self.n_half_cells, self.z_floor)
-            aCube.scale(durations[i], self.n_full_cell_grid, 0.25)
-            # aCube.setData(pos=(t_centers[i], self.n_half_cells, 0))
+            aCube.translate(x_shifted_centers[i], -self.n_half_cells, self.z_floor)
+            aCube.scale(duration_spatial_widths[i], self.n_full_cell_grid, 0.25)
+            # aCube.setData(pos=(x_centers[i], self.n_half_cells, 0))
             # aCube.setParent(None)
             # aCube.deleteLater()
