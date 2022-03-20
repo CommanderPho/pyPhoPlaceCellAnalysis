@@ -95,6 +95,54 @@ class DataSeriesToSpatial:
         return np.interp(event_times, (active_window_start_time, active_window_end_time), temporal_to_spatial_axis_start_end)
 
     
+    @classmethod
+    def temporal_to_spatial_transform_computation(cls, epoch_start_times, epoch_durations, active_window_start_time, active_window_end_time, temporal_axis_spatial_length, center_mode='zero_centered', enable_debug_print=False):
+        """ Returns the centers of the bins 
+        Useful for generating the position data for the axis that represents the number of independent data series, such as neuron_ids
+
+        num_data_series: the number of dataseries to be displayed
+        side_bin_margins: space to sides of the first and last cell on the y-axis
+        center_mode: either 'starting_at_zero' or 'zero_centered'
+        bin_position_mode: whether the 'left_edges', 'bin_center', or 'right_edges' of each bin is returned.
+
+        Usage:
+            curr_num_dataseries = len(curr_active_pipeline.sess.spikes_df.spikes.neuron_ids)
+            y = DataSeriesToSpatial.build_data_series_range(curr_num_dataseries, center_mode='zero_centered', bin_position_mode='bin_center', side_bin_margins = 1.0)
+            # y = DataSeriesToSpatial.build_series_identity_axis(curr_num_dataseries, center_mode='zero_centered', bin_position_mode='left_edges')
+            # y = DataSeriesToSpatial.build_series_identity_axis(curr_num_dataseries, center_mode='starting_at_zero', bin_position_mode='bin_center')
+            # y = DataSeriesToSpatial.build_series_identity_axis(curr_num_dataseries, center_mode='starting_at_zero', bin_position_mode='left_edges')
+
+        """
+        window_duration = active_window_end_time - active_window_start_time
+        temporal_axis_spatial_scale_factor = temporal_axis_spatial_length / window_duration # recover the temporal scale factor to know how much times should be dilated by to get their position equivs.
+        ## TODO: could also return the dilation and translation factors
+        # temporal_axis_spatial_offset = 
+        
+        epoch_spatial_durations = epoch_durations * temporal_axis_spatial_scale_factor
+        epoch_window_relative_start_times = epoch_start_times - active_window_start_time # shift so that it's t=0 is at the start of the window (TODO: should it be the center of the window)?
+        # transforms in to positions:        
+        epoch_window_relative_start_x_positions = (epoch_window_relative_start_times * temporal_axis_spatial_scale_factor)
+        
+        # epoch_start_x_positions = epoch_window_relative_start_times
+        
+         # Whether the whole series starts at zero, is centered around zero, etc.
+        if center_mode == 'zero_centered':
+            # zero_centered:
+            half_temporal_axis_spatial_length = float(temporal_axis_spatial_length) / 2.0
+            # temporal_to_spatial_axis_start_end = (-half_temporal_axis_spatial_length, +half_temporal_axis_spatial_length)
+            epoch_window_relative_start_x_positions = epoch_window_relative_start_x_positions + half_temporal_axis_spatial_length # if zero_centered mode, we previously said that t=active_window_start_time occured at x=0, but in zero_centered mode it actually occurs at x=(-half_temporal_axis_spatial_length). To correct for this, we need to add back (+alf_temporal_axis_spatial_length) to move it to the true zero. 
+            # TODO: if this is the wrong direction of transformation, add (-half_temporal_axis_spatial_length) instead.
+            
+        elif center_mode == 'starting_at_zero':
+            # starting_at_zero:
+            # temporal_to_spatial_axis_start_end = (0.0, temporal_axis_spatial_length)
+            pass
+        else:
+            raise
+            
+        return epoch_window_relative_start_x_positions, epoch_spatial_durations
+
+    
 
 ## TODO: seemingly unused and also unimplemented. The name doesn't make sense as it looks like a temporal to spatial mixin
 # class SpikesDataframeMixin(object):
