@@ -187,6 +187,7 @@ class Spike3DRaster(RenderTimeEpochMeshesMixin, SpikeRasterBase):
         # build the UI components:
         # self.buildUI()
         
+        self.params.render_epochs = None
                 
         # Setup Signals:
         self.temporal_mapping_changed.connect(self.on_adjust_temporal_spatial_mapping)
@@ -550,6 +551,9 @@ class Spike3DRaster(RenderTimeEpochMeshesMixin, SpikeRasterBase):
         # Update the additional display lines information on the overlay:
         # self.ui.viewport_overlay.additional_overlay_text_lines = self.overlay_text_lines
         self.ui.viewport_overlay.additional_overlay_text_dict = self.overlay_text_lines_dict
+        
+        # Update the epochs if we have them:
+        # self.RenderTimeEpochMeshesMixin_on_update_window() 
         
         
     def rebuild_main_gl_line_plots_if_needed(self, debug_print=True):
