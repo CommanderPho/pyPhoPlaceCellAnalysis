@@ -493,36 +493,6 @@ class Spike3DRaster(RenderTimeEpochMeshesMixin, SpikeRasterBase):
     #     # self.modify_volume(1 if event.angleDelta().y() > 0 else -1)
     #     # self.set_media_position(1 if event.angleDelta().y() > 0 else -1)
 
-    # def on_spikes_df_changed(self):
-    #     """ changes:
-    #         self.unit_ids
-    #         self.n_full_cell_grid
-    #     """
-    #     if self.enable_debug_print:
-    #         print(f'Spike3DRaster.on_spikes_df_changed()')
-    #     # TODO: these '.translate(...)' instructions might not be right if they're relative to the original transform. May need to translate back to by the inverse of the old value, and then do the fresh transform with the new value. Or compute the difference between the old and new.
-    #     self.ui.gx.setSize(20, self.n_full_cell_grid) # std size in z-dir, n_cell size across
-    #     self.ui.gy.translate(0, -self.n_half_cells, 0) # offset by half the number of units in the -y direction
-    #     self.ui.gz.setSize(self.temporal_axis_length, self.n_full_cell_grid)
-    #     self.rebuild_main_gl_line_plots_if_needed()
-        
-
-    # def on_window_duration_changed(self):
-    #     """ changes self.half_render_window_duration """
-    #     print(f'Spike3DRaster.on_window_duration_changed()')
-    #     self.ui.gx.translate(-self.half_temporal_axis_length, 0, 0) # shift backwards
-    #     self.ui.gy.setSize(self.temporal_axis_length, 20)
-    #     self.ui.gz.setSize(self.temporal_axis_length, self.n_full_cell_grid)
-    #     # update grids. on_window_changed should be triggered separately        
-        
-    # def on_window_changed(self):
-    #     # called when the window is updated
-    #     if self.enable_debug_print:
-    #         print(f'Spike3DRaster.on_window_changed()')
-    #     profiler = pg.debug.Profiler(disabled=True, delayed=True)
-    #     self._update_plots()
-    #     profiler('Finished calling _update_plots()')
-        
             
     def _update_plots(self):
         """ performance went:
