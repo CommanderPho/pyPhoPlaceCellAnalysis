@@ -142,51 +142,17 @@ class Spike3DRaster(RenderTimeEpochMeshesMixin, SpikeRasterBase):
         """The offset of the floor in the z-axis."""
         return -10
     
+    @property
+    def y_backwall(self):
+        """The y position location of the green back (Y=0) axes wall plane."""
+        return self.n_half_cells
+    
+    
     
     def __init__(self, spikes_df, *args, window_duration=15.0, window_start_time=0.0, neuron_colors=None, **kwargs):
         super(Spike3DRaster, self).__init__(spikes_df, *args, window_duration=window_duration, window_start_time=window_start_time, neuron_colors=neuron_colors, **kwargs)
-        # super(Spike3DRaster, self).__init__(*args, **kwargs)
-        # Initialize member variables:
-    
-        # if neuron_colors is None:
-        #     # neuron_colors = [pg.mkColor((i, self.n_cells*1.3)) for i, cell_id in enumerate(self.unit_ids)]
-        #     neuron_colors = []
-        #     for i, cell_id in enumerate(self.unit_ids):
-        #         curr_color = pg.mkColor((i, self.n_cells*1.3))
-        #         curr_color.setAlphaF(0.5)
-        #         neuron_colors.append(curr_color)
-    
-        # self.params.neuron_qcolors = deepcopy(neuron_colors)
-
-        # # allocate new neuron_colors array:
-        # self.params.neuron_colors = np.zeros((4, self.n_cells))
-        # for i, curr_qcolor in enumerate(self.params.neuron_qcolors):
-        #     curr_color = curr_qcolor.getRgbF() # (1.0, 0.0, 0.0, 0.5019607843137255)
-        #     self.params.neuron_colors[:, i] = curr_color[:]
-        #     # self.params.neuron_colors[:, i] = curr_color[:]
-            
-        # # self.params.neuron_colors = [self.params.neuron_qcolors[i].getRgbF() for i, cell_id in enumerate(self.unit_ids)] 
-        # # self.params.neuron_colors = deepcopy(neuron_colors)
-        # self.params.neuron_colors_hex = None
         
-        # # spike_raster_plt.params.neuron_colors[0].getRgbF() # (1.0, 0.0, 0.0, 0.5019607843137255)
-        
-        # # get hex colors:
-        # #  getting the name of a QColor with .name(QtGui.QColor.HexRgb) results in a string like '#ff0000'
-        # #  getting the name of a QColor with .name(QtGui.QColor.HexArgb) results in a string like '#80ff0000' 
-        # # self.params.neuron_colors_hex = [to_hex(self.params.neuron_colors[:,i], keep_alpha=False) for i, cell_id in enumerate(self.unit_ids)]
-        # self.params.neuron_colors_hex = [self.params.neuron_qcolors[i].name(QtGui.QColor.HexRgb) for i, cell_id in enumerate(self.unit_ids)] 
-        
-        # included_cell_INDEXES = np.array([self.get_neuron_id_and_idx(neuron_id=an_included_cell_ID)[0] for an_included_cell_ID in self.spikes_df['aclu'].to_numpy()]) # get the indexes from the cellIDs
-        
-        # self.spikes_df['cell_idx'] = included_cell_INDEXES.copy()
-        # self.spikes_df['cell_idx'] = self.spikes_df['unit_id'].copy() # TODO: this is bad! The self.get_neuron_id_and_idx(...) function doesn't work!
-        
-        # self.setup_spike_rendering_mixin() # NeuronIdentityAccessingMixin
-        
-        # build the UI components:
-        # self.buildUI()
-        
+        # Setup Specific Member Variables:
         self.params.render_epochs = None
                 
         # Setup Signals:
@@ -451,50 +417,7 @@ class Spike3DRaster(RenderTimeEpochMeshesMixin, SpikeRasterBase):
         
         self._update_neuron_id_graphics()
 
-        
-    # # Input Handelers:        
-    # def keyPressEvent(self, e):
-    #     """ called automatically when a keyboard key is pressed and this widget has focus. 
-    #     TODO: doesn't actually work right now.
-    #     """
-    #     print(f'keyPressEvent(e.key(): {e.key()})')
-    #     if e.key() == QtCore.Qt.Key_Escape:
-    #         self.close()
-    #     elif e.key() == QtCore.Qt.Key_Backspace:
-    #         print('TODO')
-    #     elif e.key() == QtCore.Qt.Key_Left:
-    #         self.shift_animation_frame_val(-1) # jump back one frame
-            
-    #     elif e.key() == QtCore.Qt.Key_Right:
-    #         self.shift_animation_frame_val(1) # jump forward one frame
-            
-    #     elif e.key() == QtCore.Qt.Key_Space:
-    #         self.play_pause()
-    #     elif e.key() == QtCore.Qt.Key_P:
-    #         self.toggle_speed_burst()
-            
-    #     else:
-    #         pass
-            
-            
-    # def key_handler(self, event):
-    #     print("MainVideoPlayerWindow key handler: {0}".format(str(event.key())))
-    #     if event.key() == QtCore.Qt.Key_Escape and self.is_full_screen:
-    #         self.toggle_full_screen()
-    #     if event.key() == QtCore.Qt.Key_F:
-    #         self.toggle_full_screen()
-    #     if event.key() == QtCore.Qt.Key_Space:
-    #         self.play_pause()
-    #     if event.key() == QtCore.Qt.Key_P:
-    #         self.toggle_speed_burst()
 
-
-    # def wheel_handler(self, event):
-    #     print(f'wheel_handler(event.angleDelta().y(): {event.angleDelta().y()})')
-    #     # self.modify_volume(1 if event.angleDelta().y() > 0 else -1)
-    #     # self.set_media_position(1 if event.angleDelta().y() > 0 else -1)
-
-            
     def _update_plots(self):
         """ performance went:
         FROM:
@@ -589,6 +512,14 @@ class Spike3DRaster(RenderTimeEpochMeshesMixin, SpikeRasterBase):
         assert (len(self.ui.gl_line_plots) == self.n_cells), f"after all operations the length of the plots array should be the same as the n_cells, but len(self.ui.gl_line_plots): {len(self.ui.gl_line_plots)} and self.n_cells: {self.n_cells}!"
 
             
+    def dynamic_add_widget(self, widget):
+        """ adds a widget dynamically to the viewport """
+        
+        # Adds the widget with addItem:
+        self.ui.main_gl_widget.addItem(widget)
+            
+            
+
     # Slider Functions:
     # def _compute_window_transform(self, relative_offset):
     #     """ computes the transform from 0.0-1.0 as the slider would provide to the offset given the current information. """

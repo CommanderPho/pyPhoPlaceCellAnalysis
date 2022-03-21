@@ -111,6 +111,10 @@ class GLEpochRectPainterItem(GLGraphicsItem.GLGraphicsItem):
 
 
     def build_epoch_rects(self, starts_t, durations):
+        
+        find_ranges_in_window(starts_t, starts_t + durations, active_window=
+                              
+                              
         half_durations = durations / 2.0
         t_centers = starts_t + half_durations
         # Convert to projected coordinates
@@ -146,6 +150,8 @@ class GLEpochRectPainterItem(GLGraphicsItem.GLGraphicsItem):
             # aCube.setParent(None)
             # aCube.deleteLater()
             
+            
+    
 
 pg.mkQApp("GLEpochRectPainterItem Example")
 glv = GLViewWidget()
