@@ -7,7 +7,7 @@ from neurodsp.plts.time_series import plot_time_series, plot_bursts # for plotti
 
 
 from pyphoplacecellanalysis.General.Mixins.AllFunctionEnumeratingMixin import AllFunctionEnumeratingMixin
-from pyphoplacecellanalysis.General.ComputationResults import ComputationResult
+from pyphoplacecellanalysis.General.Model.ComputationResults import ComputationResult
 from pyphoplacecellanalysis.General.Decoder.decoder_result import build_position_df_resampled_to_time_windows
 
 

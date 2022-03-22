@@ -12,7 +12,7 @@ from pyphocorehelpers.function_helpers import compose_functions
 from pyphoplacecellanalysis.General.Pipeline.Stages.BaseNeuropyPipelineStage import BaseNeuropyPipelineStage, PipelineStage
 from pyphoplacecellanalysis.General.Pipeline.Stages.Filtering import FilterablePipelineStage
 from pyphoplacecellanalysis.General.Pipeline.Stages.Loading import LoadableInput, LoadableSessionInput, LoadedPipelineStage    
-from pyphoplacecellanalysis.General.ComputationResults import ComputationResult
+from pyphoplacecellanalysis.General.Model.ComputationResults import ComputationResult
 
 from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.DefaultComputationFunctions import DefaultComputationFunctions
 from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.ExtendedStats import ExtendedStatsComputations

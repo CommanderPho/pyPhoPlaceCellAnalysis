@@ -21,8 +21,7 @@ from neuropy.core.session.dataSession import DataSession
 from neuropy.analyses.placefields import PlacefieldComputationParameters
 
 
-
-
+## Import with: from pyphoplacecellanalysis.General.Model.ComputationResults import ComputationResult
 
 @dataclass
 class ComputationResult(object):

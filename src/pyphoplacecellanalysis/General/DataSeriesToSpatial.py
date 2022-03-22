@@ -3,7 +3,7 @@ import pandas as pd
 
 
 class DataSeriesToSpatial:
-    """ Helper functions for building the mapping from temporal events to (X,Y) or (X,Y,Z):
+    """ Helper functions for building the mapping from temporal events (t, v0, v1, ...) to (X,Y) or (X,Y,Z):
     
     Two of the axes are arbitrarily defined, but fixed lengths:
     

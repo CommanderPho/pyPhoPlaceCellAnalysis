@@ -9,7 +9,10 @@ from pyqtgraph.Qt import QtCore, QtGui, QtWidgets
 
 @dataclasses.dataclass
 class AddRegionWidget(pg.GraphicsLayoutWidget):
-    """Main screen
+    """ A widget that allows one to drag an adjustable and resizable 2D window around to indicate the current region of the plot you want to look at.
+    
+    Based off of pyqtgraph's LinearRegionItem()
+    
     Attributes #
     ----------
     parent: Optional[QtWidgets.QWidget] default=None

@@ -5,7 +5,7 @@ import pandas as pd
 # NeuroPy (Diba Lab Python Repo) Loading
 from neuropy import core
 from neuropy.analyses.placefields import PlacefieldComputationParameters, perform_compute_placefields
-from pyphoplacecellanalysis.General.ComputationResults import ComputationResult
+from pyphoplacecellanalysis.General.Model.ComputationResults import ComputationResult
 
 
 from pyphoplacecellanalysis.General.Decoder.decoder_result import build_position_df_discretized_binned_positions, build_position_df_resampled_to_time_windows
