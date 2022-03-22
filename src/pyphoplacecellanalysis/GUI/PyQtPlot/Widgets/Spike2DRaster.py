@@ -272,15 +272,7 @@ class Spike2DRaster(SpikeRasterBase):
 
         
         self._buildScrollRasterPreviewWindowGraphics()
-                
-        # All units at once approach:
-        # curr_spike_x, curr_spike_y, curr_spike_pens, curr_n = self._build_spikes_data_values(self.active_windowed_df)
-        # # print(f'np.shape(curr_spike_t): {np.shape(curr_spike_t)}, np.shape(curr_spike_x): {np.shape(curr_spike_x)}, np.shape(curr_spike_y): {np.shape(curr_spike_y)}, curr_n: {curr_n}')
-        # pos = np.vstack((curr_spike_x, curr_spike_y)) # np.shape(curr_spike_t): (11,), np.shape(curr_spike_x): (11,), np.shape(curr_spike_y): (11,), curr_n: 11
-        # # print(f'np.shape(pos): {np.shape(pos)}') # should be 2xN # np.shape(pos): (2, 11)
-        # # spots = [{'pos': pos[:,i], 'data': 1, 'brush':pg.intColor(i, n), 'symbol': i%10, 'size': 5+i/10.} for i in range(n)]
-        # spots = [{'pos': pos[:,i], 'data': i, 'pen': curr_spike_pens[i]} for i in range(curr_n)]
-        # self.ui.scatter_plot.addPoints(spots)
+            
         self.ui.scatter_plot.addPoints(self.all_spots)
 
 
