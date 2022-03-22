@@ -30,6 +30,8 @@ from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.GLGraphicsItems.GLViewportOverl
 
 from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.Mixins.RenderWindowControlsMixin import RenderWindowControlsMixin, RenderPlaybackControlsMixin
 
+from pyphoplacecellanalysis.General.Mixins.TimeWindowPlaybackMixin import TimeWindowPlaybackPropertiesMixin, TimeWindowPlaybackController
+
 
 """ 
 FPS     Milliseconds Per Frame
@@ -91,27 +93,9 @@ class RenderPlots(PrettyPrintable, SimplePrintable, metaclass=OrderedMeta):
     #     # self.__dict__ = (self.__dict__ | kwargs)
     
     
-    
-    
-
-class UpdateRunner(QtCore.QThread):
-    update_signal = QtCore.pyqtSignal()
-
-    def __init__(self, update_frequency=0.04):
-        self.update_frequency = update_frequency
-        QtCore.QThread.__init__(self)
-
-    def run(self):
-        while(True):
-            self.update_signal.emit()
-            # probably do a different form of rate limiting instead (like use SignalProxy)? Actually this might be okay because it's on a different thread.
-            time.sleep(self.update_frequency) # 40.0 ms = 25 FPS
-            # time.sleep(.32) # 320ms
-            # time.sleep(0.05) # probably do a different form of rate limiting instead (like use SignalProxy)? Actually this might be okay because it's on a different thread.
-            
                 
 
-class SpikeRasterBase(NeuronIdentityAccessingMixin, SpikeRenderingBaseMixin, SpikesWindowOwningMixin, SpikesDataframeOwningMixin, RenderPlaybackControlsMixin, RenderWindowControlsMixin, QtWidgets.QWidget):
+class SpikeRasterBase(NeuronIdentityAccessingMixin, SpikeRenderingBaseMixin, SpikesWindowOwningMixin, SpikesDataframeOwningMixin, TimeWindowPlaybackPropertiesMixin, RenderPlaybackControlsMixin, RenderWindowControlsMixin, QtWidgets.QWidget):
     """ Displays a raster plot with the spikes occuring along a plane. 
     
     Usage:
@@ -147,24 +131,6 @@ class SpikeRasterBase(NeuronIdentityAccessingMixin, SpikeRenderingBaseMixin, Spi
         """ """
         return 2.0 * self.n_half_cells # could be one more than n
 
-
-    @property
-    def temporal_axis_length(self):
-        """The temporal_axis_length property."""
-        return self.temporal_zoom_factor * self.render_window_duration
-    @property
-    def half_temporal_axis_length(self):
-        """The temporal_axis_length property."""
-        return self.temporal_axis_length / 2.0
-    
-    @property
-    def animation_time_step(self):
-        """ How much to step forward in time at each frame of animation. """
-        return self.params.animation_time_step
-    @animation_time_step.setter
-    def animation_time_step(self, value):
-        self.params.animation_time_step = value
-
     # from NeuronIdentityAccessingMixin
     @property
     def neuron_ids(self):
@@ -176,27 +142,43 @@ class SpikeRasterBase(NeuronIdentityAccessingMixin, SpikeRenderingBaseMixin, Spi
         """ e.g. the list of valid cell_ids (unique aclu values) """
         # return self.unit_ids
         return np.unique(self.spikes_window.df['aclu'].to_numpy()) 
+
     
     @property
     def overlay_text_lines_dict(self):
         """The lines of text to be displayed in the overlay."""
-        
         af = QtCore.Qt.AlignmentFlag
 
         lines_dict = dict()
         
         lines_dict[af.AlignTop | af.AlignLeft] = ['TL']
         lines_dict[af.AlignTop | af.AlignRight] = ['TR', 
-                                                   f"n_cells : {self.n_cells}",
-                                                   f'render_window_duration: {self.render_window_duration}',
-                                                   f'animation_time_step: {self.animation_time_step}',
-                                                   f'temporal_axis_length: {self.temporal_axis_length}',
-                                                   f'temporal_zoom_factor: {self.temporal_zoom_factor}']
+                                                    f"n_cells : {self.n_cells}",
+                                                    f'render_window_duration: {self.render_window_duration}',
+                                                    f'animation_time_step: {self.animation_time_step}',
+                                                    f'temporal_axis_length: {self.temporal_axis_length}',
+                                                    f'temporal_zoom_factor: {self.temporal_zoom_factor}']
         lines_dict[af.AlignBottom | af.AlignLeft] = ['BL', 
-                                                   f'active_time_window: {self.spikes_window.active_time_window}',
-                                                   f'playback_rate_multiplier: {self.playback_rate_multiplier}']
+                                                    f'active_time_window: {self.spikes_window.active_time_window}',
+                                                    f'playback_rate_multiplier: {self.playback_rate_multiplier}'
+                                                    ]
         lines_dict[af.AlignBottom | af.AlignRight] = ['BR']
         return lines_dict
+
+    @property
+    def temporal_axis_length(self):
+        """The temporal_axis_length property."""
+        return self.temporal_zoom_factor * self.render_window_duration
+    @property
+    def half_temporal_axis_length(self):
+        """The temporal_axis_length property."""
+        return self.temporal_axis_length / 2.0
+        
+    # TimeWindowPlaybackPropertiesMixin requirement:
+    @property
+    def animation_active_time_window(self):
+        """The accessor for the TimeWindowPlaybackPropertiesMixin class for the main active time window that it will animate."""
+        return self._spikes_window
     
     
     ######  Get/Set Properties ######:
@@ -211,42 +193,6 @@ class SpikeRasterBase(NeuronIdentityAccessingMixin, SpikeRenderingBaseMixin, Spi
         self.params.temporal_zoom_factor = value
         self.temporal_mapping_changed.emit()
         
-
-    ## STATE PROPERTIES
-    @property
-    def is_playback_reversed(self):
-        """The is_playback_reversed property."""
-        return self.params.is_playback_reversed
-    @is_playback_reversed.setter
-    def is_playback_reversed(self, value):
-        self.params.is_playback_reversed = value
-        
-    @property
-    def animation_playback_direction_multiplier(self):
-        """The animation_reverse_multiplier property."""
-        if self.params.is_playback_reversed:
-            return -1.0
-        else:
-            return 1.0
-
-
-    @property
-    def playback_update_frequency(self):
-        """The rate at which the separate animation thread attempts to update the interface. ReadOnly."""
-        return self._playback_update_frequency
-
-    @property
-    def playback_rate_multiplier(self):
-        """ 1x playback (real-time) occurs when self.playback_update_frequency == self.animation_time_step. 
-            if self.animation_time_step = 2.0 * self.playback_update_frequency => for each update the window will step double the time_step forward in time than it would be default, meaning a 2.0x playback_rate_multiplier.
-        """
-        return (self.animation_time_step / self.playback_update_frequency)
-    @playback_rate_multiplier.setter
-    def playback_rate_multiplier(self, value):
-        """ since self.playback_update_frequency is fixed, only self.animation_time_step can be adjusted to set the playback_rate_multiplier. """
-        desired_playback_rate_multiplier = value
-        self.animation_time_step = self.playback_update_frequency * desired_playback_rate_multiplier
-
 
     def __init__(self, spikes_df, *args, window_duration=15.0, window_start_time=0.0, neuron_colors=None, **kwargs):
         super(SpikeRasterBase, self).__init__(*args, **kwargs)
@@ -266,11 +212,16 @@ class SpikeRasterBase(NeuronIdentityAccessingMixin, SpikeRenderingBaseMixin, Spi
         # self.params.wantsPlaybackControls = SpikeRasterBase.WantsPlaybackControls
         
         
-        self._playback_update_frequency = SpikeRasterBase.PlaybackUpdateFrequency
-        self.is_speed_burst_mode_active = False
-        self.speedBurstPlaybackRate = SpikeRasterBase.SpeedBurstPlaybackRate
         
-        self.params.is_playback_reversed = False
+        
+        # self._playback_update_frequency = SpikeRasterBase.PlaybackUpdateFrequency
+        # self.speedBurstPlaybackRate = SpikeRasterBase.SpeedBurstPlaybackRate
+        # self.params.is_speed_burst_mode_active = False
+        # self.params.is_playback_reversed = False
+        # self.params.animation_time_step = 0.04 
+        
+        
+        
         self.params.side_bin_margins = 0.0 # space to sides of the first and last cell on the y-axis
         
         self.params.center_mode = 'zero_centered'
@@ -279,7 +230,7 @@ class SpikeRasterBase(NeuronIdentityAccessingMixin, SpikeRenderingBaseMixin, Spi
         
         # by default we want the time axis to approximately span -20 to 20. So we set the temporal_zoom_factor to 
         self.params.temporal_zoom_factor = 40.0 / float(self.render_window_duration)        
-        self.params.animation_time_step = 0.04 
+        
         
         self.enable_debug_print = False
         self.enable_debug_widgets = True
@@ -321,6 +272,12 @@ class SpikeRasterBase(NeuronIdentityAccessingMixin, SpikeRenderingBaseMixin, Spi
         
         # make root container for plots
         self.plots = RenderPlots('')
+        
+        self.playback_controller = TimeWindowPlaybackController()
+        # Setup the animation playback object for the time window:
+        # self.playback_controller = TimeWindowPlaybackController()
+        # self.playback_controller.setup(self._spikes_window)
+        self.playback_controller.setup(self) # pass self to have properties set
         
         self.setup()
         
@@ -379,7 +336,8 @@ class SpikeRasterBase(NeuronIdentityAccessingMixin, SpikeRenderingBaseMixin, Spi
         if self.params.wantsRenderWindowControls:
             # Build the right controls bar:
             self.setup_render_window_controls() # creates self.ui.right_controls_panel
-        
+
+                
         # addWidget(widget, row, column, rowSpan, columnSpan, Qt.Alignment alignment = 0)
          
         # Set the root (self) layout properties
@@ -391,11 +349,8 @@ class SpikeRasterBase(NeuronIdentityAccessingMixin, SpikeRenderingBaseMixin, Spi
         # self.spikes_window.window_duration_changed_signal.connect(self.on_window_duration_changed)
         self.spikes_window.window_changed_signal.connect(self.on_window_changed)
 
-        # Slider update thread:        
-        self.animationThread = UpdateRunner(update_frequency=self.playback_update_frequency)
-        # self.sliderThread.update_signal.connect(self.increase_slider_val)
-        self.animationThread.update_signal.connect(self.increase_animation_frame_val)
         
+                
         # self.show()
       
       
@@ -512,15 +467,14 @@ class SpikeRasterBase(NeuronIdentityAccessingMixin, SpikeRenderingBaseMixin, Spi
         raise NotImplementedError
         
 
-    
-    def shift_animation_frame_val(self, shift_frames: int):
-        next_start_timestamp = self.spikes_window.active_window_start_time + (self.animation_playback_direction_multiplier * self.animation_time_step * float(shift_frames))
-        self.spikes_window.update_window_start(next_start_timestamp)
-        # TODO: doesn't update the slider or interact with the slider in any way.
+    # def shift_animation_frame_val(self, shift_frames: int):
+    #     next_start_timestamp = self.spikes_window.active_window_start_time + (self.animation_playback_direction_multiplier * self.animation_time_step * float(shift_frames))
+    #     self.spikes_window.update_window_start(next_start_timestamp)
+    #     # TODO: doesn't update the slider or interact with the slider in any way.
         
-    # Called from SliderRunner's thread when it emits the update_signal:    
-    def increase_animation_frame_val(self):
-        self.shift_animation_frame_val(1)
+    # # Called from SliderRunner's thread when it emits the update_signal:    
+    # def increase_animation_frame_val(self):
+    #     self.shift_animation_frame_val(1)
         
         
         
@@ -600,40 +554,37 @@ class SpikeRasterBase(NeuronIdentityAccessingMixin, SpikeRenderingBaseMixin, Spi
 
 
 
+    # # Speed Burst Features:
+    # def toggle_speed_burst(self):
+    #     curr_is_speed_burst_enabled = self.params.is_speed_burst_mode_active
+    #     updated_speed_burst_enabled = (not curr_is_speed_burst_enabled)
+    #     if (updated_speed_burst_enabled):
+    #         self.engage_speed_burst()
+    #     else:
+    #         self.disengage_speed_burst()
 
+    # # Engages a temporary speed burst 
+    # def engage_speed_burst(self):
+    #     print("Speed burst enabled!")
+    #     self.params.is_speed_burst_mode_active = True
+    #     # Set the playback speed temporarily to the burst speed
+    #     self.media_player.set_rate(self.speedBurstPlaybackRate)
 
-
-    # Speed Burst Features:
-    def toggle_speed_burst(self):
-        curr_is_speed_burst_enabled = self.is_speed_burst_mode_active
-        updated_speed_burst_enabled = (not curr_is_speed_burst_enabled)
-        if (updated_speed_burst_enabled):
-            self.engage_speed_burst()
-        else:
-            self.disengage_speed_burst()
-
-    # Engages a temporary speed burst 
-    def engage_speed_burst(self):
-        print("Speed burst enabled!")
-        self.is_speed_burst_mode_active = True
-        # Set the playback speed temporarily to the burst speed
-        self.media_player.set_rate(self.speedBurstPlaybackRate)
-
-        self.ui.toolButton_SpeedBurstEnabled.setEnabled(True)
-        self.ui.doubleSpinBoxPlaybackSpeed.setEnabled(False)
-        self.ui.button_slow_down.setEnabled(False)
-        self.ui.button_speed_up.setEnabled(False)
+    #     self.ui.toolButton_SpeedBurstEnabled.setEnabled(True)
+    #     self.ui.doubleSpinBoxPlaybackSpeed.setEnabled(False)
+    #     self.ui.button_slow_down.setEnabled(False)
+    #     self.ui.button_speed_up.setEnabled(False)
         
-    def disengage_speed_burst(self):
-        print("Speed burst disabled!")
-        self.is_speed_burst_mode_active = False
-        # restore the user specified playback speed
-        self.media_player.set_rate(self.ui.doubleSpinBoxPlaybackSpeed.value)
+    # def disengage_speed_burst(self):
+    #     print("Speed burst disabled!")
+    #     self.params.is_speed_burst_mode_active = False
+    #     # restore the user specified playback speed
+    #     self.media_player.set_rate(self.ui.doubleSpinBoxPlaybackSpeed.value)
 
-        self.ui.toolButton_SpeedBurstEnabled.setEnabled(False)
-        self.ui.doubleSpinBoxPlaybackSpeed.setEnabled(True)
-        self.ui.button_slow_down.setEnabled(True)
-        self.ui.button_speed_up.setEnabled(True)
+    #     self.ui.toolButton_SpeedBurstEnabled.setEnabled(False)
+    #     self.ui.doubleSpinBoxPlaybackSpeed.setEnabled(True)
+    #     self.ui.button_slow_down.setEnabled(True)
+    #     self.ui.button_speed_up.setEnabled(True)
 
 
 

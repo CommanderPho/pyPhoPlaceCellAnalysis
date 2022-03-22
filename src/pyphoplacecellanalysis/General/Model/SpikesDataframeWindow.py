@@ -1,7 +1,7 @@
 from pyqtgraph.Qt import QtCore
 import numpy as np
 
-from General.Model.TimeWindow import TimeWindow
+from pyphoplacecellanalysis.General.Model.TimeWindow import TimeWindow
 
 
 
