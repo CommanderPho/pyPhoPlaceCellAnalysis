@@ -30,6 +30,8 @@ from pyphoplacecellanalysis.General.DataSeriesToSpatial import DataSeriesToSpati
 class CurveDatasource(QtCore.QObject):
     """ Provides the list of values, 'v' and the timestamps at which they occur 't'.
     Externally should 
+    
+    Contains a dataframe.
         
     """
     source_data_changed_signal = QtCore.pyqtSignal() # signal emitted when the internal model data has changed.
@@ -52,18 +54,13 @@ class CurveDatasource(QtCore.QObject):
         """The datasource_UID property."""
         return [f'{self.custom_datasource_name}.{col_name}' for col_name in self.data_column_values]
     
-        
-    
-    
+
     def __init__(self, df, datasource_name='default_plot_datasource'):
         # Initialize the datasource as a QObject
         QtCore.QObject.__init__(self)
         assert 't' in df.columns, "dataframe must have a time column with name 't'"
         self.df = df
         self.custom_datasource_name = datasource_name
-        
-        # Sets the dict with the value:
-        # self.__dict__ = (self.__dict__ | kwargs)
         
         
     # @classmethod
