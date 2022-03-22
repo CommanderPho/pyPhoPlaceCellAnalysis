@@ -1,6 +1,8 @@
 from pyqtgraph.Qt import QtCore
 import numpy as np
 
+from General.Model.TimeWindow import TimeWindow
+
 
 
 """ Windowed Spiking Datasource Features
@@ -18,7 +20,8 @@ Separate 2D and 3D event visualization functions should be made to transform eve
 
 
 """
-class SpikesDataframeWindow(QtCore.QObject):
+class SpikesDataframeWindow(TimeWindow):
+# class SpikesDataframeWindow(QtCore.QObject):
     """ a zoomable (variable sized) window into a dataframe with a time axis
     Used by Spike3DRaster
     
@@ -31,24 +34,12 @@ class SpikesDataframeWindow(QtCore.QObject):
 
     """
     spike_dataframe_changed_signal = QtCore.pyqtSignal() # signal emitted when the spike dataframe is changed, which might change the number of units, number of spikes, and other properties.
-    window_duration_changed_signal = QtCore.pyqtSignal(float, float, float) # (start_time, end_time, window_duration) more conservitive singal that only changes when the duration of the window changes.
-    window_changed_signal = QtCore.pyqtSignal(float, float) # (start_time, end_time)
     
     @property
     def active_windowed_df(self):
         """The dataframe sliced to the current time window (active_time_window)"""
         return self.df[self.df[self.df.spikes.time_variable_name].between(self.active_time_window[0], self.active_time_window[1])]
 
-    @property
-    def active_time_window(self):
-        """ a 2-element time window [start_time, end_time]"""
-        return (self.active_window_start_time, self.active_window_end_time)
-        
-    @property
-    def active_window_end_time(self):
-        """The active_window_end_time property."""
-        return (self.active_window_start_time + self.window_duration)
-        
     @property
     def active_window_num_spikes(self):
         """The number of spikes (across all units) in the active window."""
@@ -75,50 +66,12 @@ class SpikesDataframeWindow(QtCore.QObject):
         self._df = value
         self.spike_dataframe_changed_signal.emit()
         
-    @property
-    def window_duration(self):
-        """The window_duration property."""
-        return self._window_duration
-    @window_duration.setter
-    def window_duration(self, value):
-        self._window_duration = value
-        self.window_duration_changed_signal.emit() # emit window duration changed signal
-        self.window_changed_signal.emit(self.active_window_start_time, self.active_window_end_time) # emit window changed signal
-        
-
-    @property
-    def active_window_start_time(self):
-        """The current start time of the sliding time window"""
-        return self._active_window_start_time
-    @active_window_start_time.setter
-    def active_window_start_time(self, value):
-        self._active_window_start_time = value
-        self.window_changed_signal.emit(self._active_window_start_time, self.active_window_end_time) # emit window changed signal
     
+    # Initializer:
     def __init__(self, spikes_df, window_duration=15.0, window_start_time=0.0):
-        QtCore.QObject.__init__(self)
+        TimeWindow.__init__(self, window_duration=window_duration, window_start_time=window_start_time)
         self._df = spikes_df
-        self._window_duration = window_duration
-        self._active_window_start_time = window_start_time
         # self.window_changed_signal.connect(self.on_window_changed)
-        
-    @QtCore.pyqtSlot(float)
-    def update_window_start(self, new_value):
-        self.active_window_start_time = new_value
-
-
-    @QtCore.pyqtSlot(float, float)
-    def update_window_start_end(self, new_start, new_end):
-        prev_duration = self.window_duration
-        proposed_new_duration = new_end - new_start
-        will_duration_change = not np.isclose(prev_duration, proposed_new_duration)
-        # Set the private variables so the signal isn't emitted on set (we'll emit them at the end)
-        self._active_window_start_time = new_start
-        if will_duration_change:
-            self._window_duration = proposed_new_duration
-            self.window_duration_changed_signal.emit(self.active_window_start_time, self.active_window_end_time, self.window_duration)
-        self.window_changed_signal.emit(self.active_window_start_time, self.active_window_end_time)
-        
         
         
     # def on_window_changed(self):
