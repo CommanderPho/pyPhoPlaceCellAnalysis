@@ -314,19 +314,8 @@ class Spike2DRaster(SpikeRasterBase):
 
 
     def _update_plots(self):
-        """ performance went:
-        FROM:
-            > Entering Spike2DRaster.on_window_changed
-            Finished calling _update_plots(): 1179.6892 ms
-            < Exiting Spike2DRaster.on_window_changed, total time: 1179.7600 ms
-
-        TO:
-            > Entering Spike2DRaster.on_window_changed
-            Finished calling _update_plots(): 203.8840 ms
-            < Exiting Spike2DRaster.on_window_changed, total time: 203.9544 ms
-
-        Just by removing the lines that initialized the color. Conclusion is that pg.mkColor((cell_id, self.n_cells*1.3)) must be VERY slow.
-    
+        """
+        
         """
         if self.enable_debug_print:
             print(f'Spike2DRaster._update_plots()')
@@ -360,6 +349,8 @@ class Spike2DRaster(SpikeRasterBase):
         """self when the region moves.zoom_Change plotter area"""
         self.ui.scroll_window_region.setZValue(10)
         min_x, max_x = self.ui.scroll_window_region.getRegion()
+        
+        # Update the main_plot_widget:
         self.ui.main_plot_widget.setXRange(min_x, max_x, padding=0)
         # self.render_window_duration = (max_x - min_x) # update the render_window_duration from the slider width
         scroll_window_width = max_x - min_x
@@ -373,9 +364,15 @@ class Spike2DRaster(SpikeRasterBase):
         # spike_raster_plt.temporal_zoom_factor
         # # self.spikes_window.update_window_start(next_start_timestamp)
 
-        self.ui.spinTemporalZoomFactor.setValue(1.0)
-        self.ui.spinRenderWindowDuration.setValue(scroll_window_width)
+
+        # Update GUI if we have one:
+        if self.WantsRenderWindowControls:
+            self.ui.spinTemporalZoomFactor.setValue(1.0)
+            self.ui.spinRenderWindowDuration.setValue(scroll_window_width)
+            
+        # Finally, update the actual spikes_window. This is the part that updates the 3D Raster plot because we bind to this window's signal
         self.spikes_window.update_window_start(min_x)
+        
                 
         
         # self.temporal_axis_length
@@ -386,13 +383,20 @@ class Spike2DRaster(SpikeRasterBase):
             viewRange returns the display range of the graph. The type is
             [[Xmin, Xmax], [Ymin, Ymax]]
         """
-        rgn = self.ui.main_plot_widget.viewRange()[0]
+        rgn = self.ui.main_plot_widget.viewRange()[0] # This gets the range from the main plot.
         self.ui.scroll_window_region.setRegion(rgn) # adjust the top plot
         self.window_scrolled.emit(rgn[0], rgn[1]) # emit the window_scrolled signal
         # self.render_window_duration = (max_x - min_x) # update the render_window_duration from the slider width
 
 
-
+    @QtCore.pyqtSlot(float, float)
+    def update_scroll_window_region(self, new_start, new_end):
+        """ called to update the interactive scrolling window control """
+        self.ui.scroll_window_region.blockSignals(True) # Block signals so it doesn't recurrsively update
+        self.ui.scroll_window_region.setRegion([new_start, new_end]) # adjust scroll control
+        self.ui.scroll_window_region.blockSignals(False)
+        
+        
 # Start Qt event loop unless running in interactive mode.
 # if __name__ == '__main__':
 #     # v = Visualizer()

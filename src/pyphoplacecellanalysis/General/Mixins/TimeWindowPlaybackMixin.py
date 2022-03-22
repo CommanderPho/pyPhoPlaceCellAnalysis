@@ -63,8 +63,7 @@ class TimeWindowPlaybackPropertiesMixin:
     @QtCore.pyqtSlot(int)
     def shift_animation_frame_val(self, shift_frames: int):
         next_start_timestamp = self.animation_active_time_window.active_window_start_time + (self.animation_playback_direction_multiplier * self.animation_time_step * float(shift_frames))
-        self.animation_active_time_window.update_window_start(next_start_timestamp)
-        # TODO: doesn't update the slider or interact with the slider in any way.
+        self.animation_active_time_window.update_window_start(next_start_timestamp) # calls update_window_start, so any subscribers should be notified.
         
     # Called from SliderRunner's thread when it emits the update_signal:
     @QtCore.pyqtSlot()
