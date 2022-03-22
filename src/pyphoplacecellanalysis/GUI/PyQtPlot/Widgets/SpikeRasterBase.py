@@ -12,6 +12,8 @@ import qtawesome as qta
 
 from neuropy.core.neuron_identities import NeuronIdentityAccessingMixin
 
+from pyphocorehelpers.general_helpers import OrderedMeta
+from pyphocorehelpers.print_helpers import SimplePrintable, PrettyPrintable
 from pyphocorehelpers.DataStructure.general_parameter_containers import DebugHelper, VisualizationParameters
 from pyphoplacecellanalysis.General.Mixins.SpikesRenderingBaseMixin import SpikeRenderingBaseMixin, SpikesDataframeOwningMixin
 
@@ -75,6 +77,22 @@ def trap_exc_during_debug(*args):
 # install exception hook: without this, uncaught exception would cause application to exit
 sys.excepthook = trap_exc_during_debug
 
+
+
+class RenderPlots(PrettyPrintable, SimplePrintable, metaclass=OrderedMeta):
+    def __init__(self, name) -> None:
+        # super(RenderEpochs, self).__init__(**kwargs)
+        self.name = name
+        # self.__dict__ = (self.__dict__ | kwargs)
+        
+    # def __init__(self, name, **kwargs) -> None:
+    #     # super(VisualizationParameters, self).__init__(**kwargs)
+    #     self.name = name
+    #     # self.__dict__ = (self.__dict__ | kwargs)
+    
+    
+    
+    
 
 class UpdateRunner(QtCore.QThread):
     update_signal = QtCore.pyqtSignal()
@@ -299,6 +317,10 @@ class SpikeRasterBase(NeuronIdentityAccessingMixin, SpikeRenderingBaseMixin, Spi
         
         # self.spikes_df['cell_idx'] = included_cell_INDEXES.copy()
         # self.spikes_df['cell_idx'] = self.spikes_df['unit_id'].copy() # TODO: this is bad! The self.get_neuron_id_and_idx(...) function doesn't work!
+        
+        
+        # make root container for plots
+        self.plots = RenderPlots('')
         
         self.setup()
         

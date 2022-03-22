@@ -36,11 +36,31 @@ class CurveDatasource(QtCore.QObject):
     # window_duration_changed_signal = QtCore.pyqtSignal(float) # more conservitive singal that only changes when the duration of the window changes
     # window_changed_signal = QtCore.pyqtSignal(float, float) # new_start, new_end
     
-    def __init__(self, df):
+    @property
+    def data_column_names(self):
+        """ the names of only the non-time columns """
+        return np.setdiff1d(self.df.columns, np.array(['t'])) # get only the non-time columns
+    
+    @property
+    def data_column_values(self):
+        """ The values of only the non-time columns """
+        return self.df[self.data_column_names]
+    
+
+    @property
+    def datasource_UIDs(self):
+        """The datasource_UID property."""
+        return [f'{self.custom_datasource_name}.{col_name}' for col_name in self.data_column_values]
+    
+        
+    
+    
+    def __init__(self, df, datasource_name='default_plot_datasource'):
         # Initialize the datasource as a QObject
         QtCore.QObject.__init__(self)
         assert 't' in df.columns, "dataframe must have a time column with name 't'"
         self.df = df
+        self.custom_datasource_name = datasource_name
         
         # Sets the dict with the value:
         # self.__dict__ = (self.__dict__ | kwargs)
@@ -52,7 +72,7 @@ class CurveDatasource(QtCore.QObject):
 
     #     self._df = df
         
-    
+        
     @classmethod
     def init_from_times_values(cls, times, values):
         plot_df = pd.DataFrame({'t': times, 'v': values})
@@ -64,141 +84,74 @@ class CurveDatasource(QtCore.QObject):
         """ called to get the data that should be displayed for the window starting at new_start and ending at new_end """
         return self.df[self.df['t'].between(new_start, new_end)]
     
+
     
+
+class TimeCurvesViewMixin:
     
-
-class Render3DTimeCurvesMixin:
-    """ 
-        Render3DTimeCurvesMixin
-        
-        Renders 3D curves for the active_window in the current 3D plot
-        
-        
-    """
-    def add_3D_time_curves(self, datasource):
-        self.params.time_curves_datasource = datasource
-        
-        
+    @property
+    def data_z_scaling_factor(self):
+        """ the factor required to scale the data_values_range to fit within the z_max_value """
+        return self.calculate_data_z_scaling_factor()
+    
+    def calculate_data_z_scaling_factor(self):
+        """ Calculate the factor required to scale the data_values_range to fit within the z_max_value """
+        data_values_range = np.ptp(self.params.time_curves_datasource.data_column_values)
+        z_max_value = np.abs(self.z_floor) # get the z-height of the floor so as not to go below it.
+        data_z_scaling_factor = z_max_value / data_values_range
+        return data_z_scaling_factor
 
 
-    def add_render_epochs(self, starts_t, durations, epoch_type_name='PBE'):
-        """ adds the render epochs to be displayed. Stores them internally"""
-        self.params.render_epochs = RenderEpochs(epoch_type_name)
-        self.params.render_epochs.epoch_type_name = epoch_type_name
-        self.params.render_epochs.starts_t = starts_t
-        self.params.render_epochs.durations = durations
-        self._build_epoch_meshes(self.params.render_epochs.starts_t, self.params.render_epochs.durations)
-        
+    def init_TimeCurvesViewMixin(self):
+        self.params.time_curves_datasource = None # initialize datasource variable
+        self.plots.time_curves = dict()
         
 
-    # def _temporal_to_spatial(self, starts_t):
-    #     """ currently this constrains all epochs outside the active window to be aligned with the endpoints of the window, meaning there are a ton of stacked 0-width windows rendered at both endpoints since only a few epochs are visible at a time."""
-    #     return DataSeriesToSpatial.temporal_to_spatial_map(starts_t, self.spikes_window.active_window_start_time, self.spikes_window.active_window_end_time, self.temporal_axis_length, center_mode='zero_centered')
-        
-    def _temporal_to_spatial(self, epoch_start_times, epoch_durations):
-        """ epoch_window_relative_start_x_positions, epoch_spatial_durations = self._temporal_to_spatial()
-        
-        """
-        return DataSeriesToSpatial.temporal_to_spatial_transform_computation(epoch_start_times, epoch_durations, self.spikes_window.active_window_start_time, self.spikes_window.active_window_end_time, self.temporal_axis_length, center_mode='zero_centered')
-        
+    def add_3D_time_curves(self, plot_dataframe):
+        self.params.time_curves_datasource = CurveDatasource(plot_dataframe)
+        self.plots.time_curves = dict()
+        self.update_3D_time_curves()
 
-    def _build_epoch_meshes(self, starts_t, durations):
-        """ 
-        # find center of pbe periods (as this is where the mesh will be positioned.
-        # pbe_half_durations = curr_sess.pbe.durations / 2.0
-        # pbe_t_centers = curr_sess.pbe.starts + pbe_half_durations
 
-        Usage:  
-            curr_sess.pbe.durations
-        
-        """
-        # stops_t = starts_t + durations
-        # # Compute spatial positions/durations:
-        # starts_x = self._temporal_to_spatial(starts_t)
-        # stops_x = self._temporal_to_spatial(stops_t)
-        # durations_spatial_widths = stops_x - starts_x
-        # half_durations_spatial_widths = durations_spatial_widths / 2.0
-        # x_centers = starts_x + half_durations_spatial_widths
-        
-        
-        centers_t = starts_t + (durations / 2.0)
-        x_centers, duration_spatial_widths = self._temporal_to_spatial(centers_t, durations) # actually compute the centers of each epoch rect, not the start
-        
-        
-        
-        # The transform needs to be done here to match the temporal_scale_Factor:
-        # curr_x = np.interp(curr_spike_t, (self.spikes_window.active_window_start_time, self.spikes_window.active_window_end_time), (-self.half_temporal_axis_length, +self.half_temporal_axis_length))
-        
-        # pg.gl.GLViewWidget()
-        # self.ui.parent_epoch_container_item = gl.GLGraphicsItem.GLGraphicsItem()
-        # self.ui.parent_epoch_container_item = pg.GraphicsObject()
-        # self.ui.parent_epoch_container_item.setObjectName('parent_epoch_container')
-        # # self.ui.parent_epoch_container_item.translate(0, 0, 0)
-        # # self.ui.parent_epoch_container_item.scale(1, 1, 1)
-        # self.ui.main_gl_widget.addItem(self.ui.parent_epoch_container_item)
-        # gl.GLBoxItem()
+    # def _build_3D_time_curves(self):
+    def update_3D_time_curves(self):
+        """ initialize the graphics objects if needed, or update them if they already exist. """
+        if self.params.time_curves_datasource is None:
+            return
+        else:
+            curr_plot_column_name = self.params.time_curves_datasource.data_column_names[0]
+            curr_plot_name = self.params.time_curves_datasource.datasource_UIDs[0]
+            
+            # Get current plot items:
+            curr_plot3D_active_window_data = self.params.time_curves_datasource.get_updated_data_window(self.spikes_window.active_window_start_time, self.spikes_window.active_window_end_time) # get updated data for the active window from the datasource
+            curve_y_value = -self.n_half_cells
+            curr_x = DataSeriesToSpatial.temporal_to_spatial_map(curr_plot3D_active_window_data['t'].to_numpy(), self.spikes_window.active_window_start_time, self.spikes_window.active_window_end_time, self.temporal_axis_length, center_mode='zero_centered')
+            pts = np.column_stack([curr_x, np.full_like(curr_x, curve_y_value), curr_plot3D_active_window_data[curr_plot_column_name].to_numpy()])
+            
+            if curr_plot_name in self.plots.time_curves:
+                # Plot already exists, update it instead.
+                plt = self.plots.time_curves[curr_plot_name]
+                plt.setData(pos=pts)
+            else:
+                # plot doesn't exist, built it fresh.
+                plt = gl.GLLinePlotItem(pos=pts, color=pg.mkColor('white'), width=0.5, antialias=True)
+                plt.scale(1.0, 1.0, self.data_z_scaling_factor) # Scale the data_values_range to fit within the z_max_value. Shouldn't need to be adjusted so long as data doesn't change.
+                self.ui.main_gl_widget.addItem(plt)
+                self.plots.time_curves[curr_plot_name] = plt # add it to the dictionary.
                 
-        self.ui.new_cube_objects = []
-        for i in np.arange(len(x_centers)):
-            curr_md = RenderTimeEpochMeshesMixin._build_cube_mesh_data()
-            curr_cube = gl.GLMeshItem(meshdata=curr_md, smooth=True, color=(1, 0, 0, 0.2), shader='balloon', glOptions='additive') # , drawEdges=True, edgeColor=(0, 0, 0, 1)
-            # new_cube = gl.GLMeshItem(vertexes=vertexes, faces=faces, faceColors=colors, drawEdges=True, edgeColor=(0, 0, 0, 1))
-            curr_cube.translate(x_centers[i], -self.n_half_cells, self.z_floor)
-            curr_cube.scale(duration_spatial_widths[i], self.n_full_cell_grid, 0.25)
-            # curr_cube.setParentItem(self.ui.parent_epoch_container_item)
-            self.ui.main_gl_widget.addItem(curr_cube) # add directly
-            # self.ui.parent_epoch_container_item.addItem(curr_cube)
-            self.ui.new_cube_objects.append(curr_cube)
-
-
-        # self.ui.main_gl_widget.addItem(self.ui.parent_epoch_container_item)
-        
-        
-    def _remove_epoch_meshes(self):
-        for (i, aCube) in enumerate(self.ui.new_cube_objects):
-            aCube.setParent(None)
-            aCube.deleteLater()
-        # self.ui.main_gl_widget.
-        self.ui.new_cube_objects.clear()
-        
-        
-
-    def _update_curves_plots(self):
-        
-        curr_spike_t = curr_cell_df[curr_cell_df.spikes.time_variable_name].to_numpy() # this will map
-        curr_x = DataSeriesToSpatial.temporal_to_spatial_map(curr_spike_t, self.spikes_window.active_window_start_time, self.spikes_window.active_window_end_time, self.temporal_axis_length, center_mode='zero_centered')
-
-
-        n = 51
-        y = np.linspace(-10,10,n)
-        x = np.linspace(-10,10,100)
-        for i in range(n):
-            yi = y[i]
-            d = np.hypot(x, yi)
-            z = 10 * np.cos(d) / (d+1)
-            pts = np.column_stack([x, np.full_like(x, yi), z])
-            plt = gl.GLLinePlotItem(pos=pts, color=pg.mkColor((i,n*1.3)), width=(i+1)/10., antialias=True)
-            w.addItem(plt)
-            
     
+    # @QtCore.pyqtSlot(float, float)
+    # def TimeCurvesViewMixin_on_window_update(self, new_start, new_end):
+    #     """ called to get the data that should be displayed for the window starting at new_start and ending at new_end """
+    #     self.update_3D_time_curves()
+    
+    
+    @QtCore.pyqtSlot(float, float)
+    def TimeCurvesViewMixin_on_window_update(self, new_start=None, new_end=None):
+        """ called to get the data that should be displayed for the window starting at new_start and ending at new_end """
+        self.update_3D_time_curves()
         
         
-        
-        # t_shifted_centers = t_centers - self.spikes_window.active_time_window[0] # offset by the start of the current window
-        # x_shifted_centers = x_centers
-        for (i, aCube) in enumerate(self.ui.new_cube_objects):
-            # aCube.setPos(x_centers[i], self.n_half_cells, 0)
-            aCube.resetTransform()
-            aCube.translate(x_shifted_centers[i], -self.n_half_cells, self.z_floor)
-            aCube.scale(duration_spatial_widths[i], self.n_full_cell_grid, 0.25)
-            # aCube.setData(pos=(x_centers[i], self.n_half_cells, 0))
-            # aCube.setParent(None)
-            # aCube.deleteLater()
-            
-    @QtCore.pyqtSlot(float)
-    def Render3DTimeCurvesMixin_on_active_window_offset_changed(self):
-        """ called when the window is updated to update the mesh locations. """
-        if self.params.render_epochs is not None:
-            self.update_epoch_meshes(self.params.render_epochs.starts_t, self.params.render_epochs.durations)
-            
-        
+    
+
+    

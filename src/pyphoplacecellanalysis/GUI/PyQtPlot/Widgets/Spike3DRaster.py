@@ -33,6 +33,8 @@ from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.SpikeRasterBase import SpikeRas
 
 from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.Mixins.RenderTimeEpochMeshesMixin import RenderTimeEpochMeshesMixin
 
+from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.Mixins.Render3DTimeCurvesMixin import TimeCurvesViewMixin
+
 
 """ 
 FPS     Milliseconds Per Frame
@@ -84,9 +86,7 @@ def trap_exc_during_debug(*args):
 # install exception hook: without this, uncaught exception would cause application to exit
 sys.excepthook = trap_exc_during_debug
 
-
-
-class Spike3DRaster(RenderTimeEpochMeshesMixin, SpikeRasterBase):
+class Spike3DRaster(TimeCurvesViewMixin, RenderTimeEpochMeshesMixin, SpikeRasterBase):
     """ Displays a 3D version of a raster plot with the spikes occuring along a plane. 
     
     Usage:
@@ -154,11 +154,17 @@ class Spike3DRaster(RenderTimeEpochMeshesMixin, SpikeRasterBase):
         
         # Setup Specific Member Variables:
         self.params.render_epochs = None
+        
+        # Init the TimeCurvesViewMixin for 3D Line plots:
+        ### No plots will actually be added until self.add_3D_time_curves(plot_dataframe) is called with a valid dataframe.
+        self.init_TimeCurvesViewMixin()
                 
         # Setup Signals:
         self.temporal_mapping_changed.connect(self.on_adjust_temporal_spatial_mapping)
         self.spikes_window.window_duration_changed_signal.connect(self.on_adjust_temporal_spatial_mapping)
         # self.on_window_duration_changed.connect(self.on_adjust_temporal_spatial_mapping)
+        # self.spikes_window.window_changed_signal.connect(self.TimeCurvesViewMixin_on_window_update) # TODO: this is for TimeCurvesViewMixin but currently just call manually.
+        
         self.show()
 
 
@@ -476,7 +482,8 @@ class Spike3DRaster(RenderTimeEpochMeshesMixin, SpikeRasterBase):
         self.ui.viewport_overlay.additional_overlay_text_dict = self.overlay_text_lines_dict
         
         # Update the epochs if we have them:
-        # self.RenderTimeEpochMeshesMixin_on_update_window() 
+        # self.RenderTimeEpochMeshesMixin_on_update_window()
+        self.TimeCurvesViewMixin_on_window_update()
         
         
     def rebuild_main_gl_line_plots_if_needed(self, debug_print=True):
