@@ -88,6 +88,14 @@ class CurveDatasource(QtCore.QObject):
     
 
 class TimeCurvesViewMixin:
+    """ Renders 3D line plots that are dependent on time. 
+    
+    
+    Usage:
+        # plot_data = pd.DataFrame({'t': curr_sess.mua.time, 'mua_firing_rate': curr_sess.mua.firing_rate, 'mua_spike_counts': curr_sess.mua.spike_counts})
+        plot_data = pd.DataFrame({'t': curr_sess.mua.time, 'mua_firing_rate': curr_sess.mua.firing_rate})
+        spike_raster_plt_3d.add_3D_time_curves(plot_data)
+    """
     
     @property
     def data_z_scaling_factor(self):
@@ -104,6 +112,8 @@ class TimeCurvesViewMixin:
 
     def init_TimeCurvesViewMixin(self):
         self.params.time_curves_datasource = None # initialize datasource variable
+        self.params.time_curves_no_update = False # called to disabling updating time curves internally
+        
         self.plots.time_curves = dict()
         
 
@@ -113,10 +123,52 @@ class TimeCurvesViewMixin:
         self.update_3D_time_curves()
 
 
+    def detach_3d_time_curves_datasource(self):
+        """ Called to remove the current time_curves_datasource. Safely removes the plot objects before doing so. """
+        self.params.time_curves_no_update = True # freeze updating
+        self.clear_all_3D_time_curves()
+        self.params.time_curves_datasource = None # clear the datasource, this will prevent plots from being re-added during the self.TimeCurvesViewMixin_on_window_update() call.     
+        self.params.time_curves_no_update = False # safe to re-enable updating.
+        
+        
+    def clear_all_3D_time_curves(self):
+        for (UID, plt) in self.plots.time_curves.items():
+            self.ui.main_gl_widget.removeItem(plt)
+            # plt.delete_later() #?
+        # Clear the dict
+        self.plots.time_curves.clear()
+
+    
+    def remove_3D_time_curves(self, UID=None, original_dataframe=None):
+        """ TODO: unfortunately with this setup they would be recreated again in self.update_3D_time_curves() because the datasource would still be attached but the plot wouldn't exist. """
+        raise NotImplementedError
+    
+        if UID is not None:
+            plot_UIDs = self.params.time_curves_datasource.datasource_UIDs # ['default_plot_datasource.mua_firing_rate']
+            plt = self.plots.time_curves.get(UID, None)
+        elif original_dataframe is not None:
+            self.par
+            raise NotImplementedError
+        else:
+            plt = None
+
+        if plt is not None:
+            # perform remove:
+            print(f'removing 3D time curve with UID: {UID}...')
+            self.ui.main_gl_widget.removeItem(plt)
+            # plt.delete_later() #?
+            del self.plots.time_curves[UID] # delete the dictionary entry, meaning it's valid to do a
+            print('\t done.')
+            
+        
+
     # def _build_3D_time_curves(self):
     def update_3D_time_curves(self):
         """ initialize the graphics objects if needed, or update them if they already exist. """
         if self.params.time_curves_datasource is None:
+            return
+        elif self.params.time_curves_no_update:
+            # don't update because we're in no_update mode
             return
         else:
             curr_plot_column_name = self.params.time_curves_datasource.data_column_names[0]
