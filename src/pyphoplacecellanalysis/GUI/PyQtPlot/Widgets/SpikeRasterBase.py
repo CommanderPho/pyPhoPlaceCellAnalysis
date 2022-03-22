@@ -482,7 +482,7 @@ class SpikeRasterBase(NeuronIdentityAccessingMixin, SpikeRenderingBaseMixin, Spi
         # self.set_media_position(1 if event.angleDelta().y() > 0 else -1)
 
 
-
+    @QtCore.pyqtSlot()
     def on_spikes_df_changed(self):
         """ changes:
             self.unit_ids
@@ -491,17 +491,17 @@ class SpikeRasterBase(NeuronIdentityAccessingMixin, SpikeRenderingBaseMixin, Spi
         if self.enable_debug_print:
             print(f'SpikeRasterBase.on_spikes_df_changed()')
         
-
-    def on_window_duration_changed(self):
+    @QtCore.pyqtSlot(float, float, float)
+    def on_window_duration_changed(self, start_t, end_t, duration):
         """ changes self.half_render_window_duration """
-        print(f'SpikeRasterBase.on_window_duration_changed()')
+        print(f'SpikeRasterBase.on_window_duration_changed(start_t: {start_t}, end_t: {end_t}, duration: {duration})')
 
 
-        
-    def on_window_changed(self):
+    @QtCore.pyqtSlot(float, float)
+    def on_window_changed(self, start_t, end_t):
         # called when the window is updated
         if self.enable_debug_print:
-            print(f'SpikeRasterBase.on_window_changed()')
+            print(f'SpikeRasterBase.on_window_changed(start_t: {start_t}, end_t: {end_t})')
         profiler = pg.debug.Profiler(disabled=True, delayed=True)
         self._update_plots()
         profiler('Finished calling _update_plots()')

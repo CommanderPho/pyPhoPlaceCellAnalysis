@@ -31,8 +31,8 @@ class SpikesDataframeWindow(QtCore.QObject):
 
     """
     spike_dataframe_changed_signal = QtCore.pyqtSignal() # signal emitted when the spike dataframe is changed, which might change the number of units, number of spikes, and other properties.
-    window_duration_changed_signal = QtCore.pyqtSignal() # more conservitive singal that only changes when the duration of the window changes
-    window_changed_signal = QtCore.pyqtSignal()
+    window_duration_changed_signal = QtCore.pyqtSignal(float, float, float) # (start_time, end_time, window_duration) more conservitive singal that only changes when the duration of the window changes.
+    window_changed_signal = QtCore.pyqtSignal(float, float) # (start_time, end_time)
     
     @property
     def active_windowed_df(self):
@@ -83,8 +83,9 @@ class SpikesDataframeWindow(QtCore.QObject):
     def window_duration(self, value):
         self._window_duration = value
         self.window_duration_changed_signal.emit() # emit window duration changed signal
-        self.window_changed_signal.emit() # emit window changed signal
+        self.window_changed_signal.emit(self.active_window_start_time, self.active_window_end_time) # emit window changed signal
         
+
     @property
     def active_window_start_time(self):
         """The current start time of the sliding time window"""
@@ -92,7 +93,7 @@ class SpikesDataframeWindow(QtCore.QObject):
     @active_window_start_time.setter
     def active_window_start_time(self, value):
         self._active_window_start_time = value
-        self.window_changed_signal.emit() # emit window changed signal
+        self.window_changed_signal.emit(self._active_window_start_time, self.active_window_end_time) # emit window changed signal
     
     def __init__(self, spikes_df, window_duration=15.0, window_start_time=0.0):
         QtCore.QObject.__init__(self)
@@ -115,8 +116,8 @@ class SpikesDataframeWindow(QtCore.QObject):
         self._active_window_start_time = new_start
         if will_duration_change:
             self._window_duration = proposed_new_duration
-            self.window_duration_changed_signal.emit()
-        self.window_changed_signal.emit()
+            self.window_duration_changed_signal.emit(self.active_window_start_time, self.active_window_end_time, self.window_duration)
+        self.window_changed_signal.emit(self.active_window_start_time, self.active_window_end_time)
         
         
         
