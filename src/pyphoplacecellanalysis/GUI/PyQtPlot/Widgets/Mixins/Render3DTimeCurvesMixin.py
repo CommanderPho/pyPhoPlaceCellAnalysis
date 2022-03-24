@@ -54,8 +54,8 @@ class TimeCurvesViewMixin:
         data_z_scaling_factor = z_max_value / data_values_range
         return data_z_scaling_factor
 
-
-    def init_TimeCurvesViewMixin(self):
+    @QtCore.pyqtSlot()
+    def TimeCurvesViewMixin_on_init(self):
         self.params.time_curves_datasource = None # initialize datasource variable
         self.params.time_curves_no_update = False # called to disabling updating time curves internally
         
