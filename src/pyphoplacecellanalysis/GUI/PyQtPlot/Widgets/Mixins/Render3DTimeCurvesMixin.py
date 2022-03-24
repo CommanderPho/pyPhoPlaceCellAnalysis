@@ -11,76 +11,24 @@ from pyphocorehelpers.print_helpers import SimplePrintable, PrettyPrintable
 from pyphocorehelpers.geometry_helpers import find_ranges_in_window
 
 from pyphoplacecellanalysis.General.DataSeriesToSpatial import DataSeriesToSpatial
+from pyphoplacecellanalysis.GUI.PyQtPlot.Model.Datasources import DataframeDatasource
 
 
-
-# class RenderEpochs(PrettyPrintable, SimplePrintable, metaclass=OrderedMeta):
-#     def __init__(self, name) -> None:
-#         # super(RenderEpochs, self).__init__(**kwargs)
-#         self.name = name
-#         # self.__dict__ = (self.__dict__ | kwargs)
-        
-#     # def __init__(self, name, **kwargs) -> None:
-#     #     # super(VisualizationParameters, self).__init__(**kwargs)
-#     #     self.name = name
-#     #     # self.__dict__ = (self.__dict__ | kwargs)
-    
-    
-    
-class CurveDatasource(QtCore.QObject):
+class CurveDatasource(DataframeDatasource):
     """ Provides the list of values, 'v' and the timestamps at which they occur 't'.
     Externally should 
     
     Contains a dataframe.
-        
+    
+    Signals:
+    	source_data_changed_signal = QtCore.pyqtSignal() # signal emitted when the internal model data has changed.
     """
-    source_data_changed_signal = QtCore.pyqtSignal() # signal emitted when the internal model data has changed.
-    # window_duration_changed_signal = QtCore.pyqtSignal(float) # more conservitive singal that only changes when the duration of the window changes
-    # window_changed_signal = QtCore.pyqtSignal(float, float) # new_start, new_end
-    
-    @property
-    def data_column_names(self):
-        """ the names of only the non-time columns """
-        return np.setdiff1d(self.df.columns, np.array(['t'])) # get only the non-time columns
-    
-    @property
-    def data_column_values(self):
-        """ The values of only the non-time columns """
-        return self.df[self.data_column_names]
-    
-
-    @property
-    def datasource_UIDs(self):
-        """The datasource_UID property."""
-        return [f'{self.custom_datasource_name}.{col_name}' for col_name in self.data_column_values]
-    
 
     def __init__(self, df, datasource_name='default_plot_datasource'):
         # Initialize the datasource as a QObject
-        QtCore.QObject.__init__(self)
-        assert 't' in df.columns, "dataframe must have a time column with name 't'"
-        self.df = df
-        self.custom_datasource_name = datasource_name
-        
-        
-    # @classmethod
-    # def init_from_dataframe(cls, df):
-    #     assert 't' in df.columns, "dataframe must have a time column with name 't'"
+        DataframeDatasource.__init__(self, df, datasource_name=datasource_name)
+    
 
-    #     self._df = df
-        
-        
-    @classmethod
-    def init_from_times_values(cls, times, values):
-        plot_df = pd.DataFrame({'t': times, 'v': values})
-        return cls(plot_df)
-        
-    
-    @QtCore.pyqtSlot(float, float)
-    def get_updated_data_window(self, new_start, new_end):
-        """ called to get the data that should be displayed for the window starting at new_start and ending at new_end """
-        return self.df[self.df['t'].between(new_start, new_end)]
-    
 
     
 

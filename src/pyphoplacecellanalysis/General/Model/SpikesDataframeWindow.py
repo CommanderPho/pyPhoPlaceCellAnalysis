@@ -43,7 +43,7 @@ class SpikesDataframeWindow(TimeWindow):
     @property
     def active_window_num_spikes(self):
         """The number of spikes (across all units) in the active window."""
-        return self.active_windowed_df.shape[0] 
+        return self.active_windowed_df.shape[0]
     
     @property
     def total_df_start_end_times(self):
