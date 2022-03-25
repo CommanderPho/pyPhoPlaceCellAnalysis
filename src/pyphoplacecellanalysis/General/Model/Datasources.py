@@ -107,7 +107,7 @@ class SpikesDataframeDatasource(DataframeDatasource):
     @property
     def time_column_name(self):
         """ the name of the relevant time column. Gets the values from the spike dataframe """
-        return self.time_column_name
+        return self.df.spikes.time_variable_name
     
     
     def __init__(self, df, datasource_name='default_spikes_datasource'):
