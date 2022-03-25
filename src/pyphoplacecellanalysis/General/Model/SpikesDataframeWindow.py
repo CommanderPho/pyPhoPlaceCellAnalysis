@@ -52,10 +52,28 @@ class SpikesDataframeWindow(LiveWindowedData):
     #     """ The datasource """
     #     return self.active_live_data_window.dataSource
     
+    
+    ## TimeWindow Convenince properties:
     @property
     def active_time_window(self):
         """ the active time window (2 element start, end tuple)"""
-        return self.timeWindow.active_time_window    
+        return self.timeWindow.active_time_window
+    
+    @property
+    def window_duration(self):
+        """The window_duration property."""
+        return self.timeWindow.window_duration
+    
+    @property
+    def active_window_end_time(self):
+        """The active_window_end_time property."""
+        return (self.active_window_start_time + self.window_duration)
+    
+    @property
+    def active_window_start_time(self):
+        """The current start time of the sliding time window"""
+        return self.timeWindow.active_window_start_time
+    
     
     
     # Require TimeWindow and Datasource:
