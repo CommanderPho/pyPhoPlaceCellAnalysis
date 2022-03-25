@@ -28,7 +28,10 @@ class LiveWindowedData(QtCore.QObject):
         # DO store the datasource on the other hand:
         self.dataSource = dataSource
         
-        # Do NOT store an internal reference to time_window. Just connect the signals to receive updates and store the connections:
+        ## TODO: alternative mode, store the time window (hopefully a reference)
+        self.timeWindow = time_window
+        
+        # TODO: Do NOT store an internal reference to time_window. Just connect the signals to receive updates and store the connections:
         self._time_window_duration_connection = time_window.window_duration_changed_signal.connect(self.on_window_duration_changed)
         self._time_window_changed_connection = time_window.window_changed_signal.connect(self.on_window_changed)
         

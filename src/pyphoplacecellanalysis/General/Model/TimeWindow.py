@@ -71,10 +71,9 @@ class TimeWindow(QtCore.QObject):
         QtCore.QObject.__init__(self)
         self._window_duration = window_duration
         self._active_window_start_time = window_start_time
+        self.animationThread = None
         # self.window_changed_signal.connect(self.on_window_changed)
-        
-    
-    
+            
     @QtCore.pyqtSlot(float)
     def update_window_start(self, new_value):
         self.active_window_start_time = new_value
