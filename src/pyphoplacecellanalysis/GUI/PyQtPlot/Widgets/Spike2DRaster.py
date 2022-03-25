@@ -185,43 +185,6 @@ class Spike2DRaster(Render2DScrollWindowPlotMixin, SpikeRasterBase):
     
         self.config_unit_id_map = dict(zip(self.unit_ids, self.params.config_items))
         
-    # def _buildScrollRasterPreviewWindowGraphics(self):
-    #     # Common Tick Label
-    #     vtick = QtGui.QPainterPath()
-    #     vtick.moveTo(0, -0.5)
-    #     vtick.lineTo(0, 0.5)
-        
-    #     #############################
-    #     ## Bottom Windowed Scroll Plot/Widget:
-    #     self.ui.main_scroll_window_plot = self.ui.main_graphics_layout_widget.addPlot(row=2, col=0)
-    #     # ALL Spikes in the preview window:
-    #     curr_spike_x, curr_spike_y, curr_spike_pens, curr_n = self._build_all_spikes_data_values()        
-    #     pos = np.vstack((curr_spike_x, curr_spike_y)) # np.shape(curr_spike_t): (11,), np.shape(curr_spike_x): (11,), np.shape(curr_spike_y): (11,), curr_n: 11
-    #     self.all_spots = [{'pos': pos[:,i], 'data': i, 'pen': curr_spike_pens[i]} for i in range(curr_n)]
-        
-    #     self.ui.preview_overview_scatter_plot = pg.ScatterPlotItem(name='spikeRasterOverviewWindowScatterPlotItem', pxMode=True, symbol=vtick, size=5, pen={'color': 'w', 'width': 1})
-    #     self.ui.preview_overview_scatter_plot.opts['useCache'] = True
-    #     self.ui.preview_overview_scatter_plot.addPoints(self.all_spots)
-    #     self.ui.main_scroll_window_plot.addItem(self.ui.preview_overview_scatter_plot)
-        
-    #     # Add the linear region overlay:
-    #     self.ui.scroll_window_region = pg.LinearRegionItem(pen=pg.mkPen('#fff'), brush=pg.mkBrush('#f004'), hoverBrush=pg.mkBrush('#fff4'), hoverPen=pg.mkPen('#f00'), clipItem=self.ui.preview_overview_scatter_plot) # bound the LinearRegionItem to the plotted data
-    #     self.ui.scroll_window_region.setZValue(10)
-    #     # Add the LinearRegionItem to the ViewBox, but tell the ViewBox to exclude this item when doing auto-range calculations.
-    #     self.ui.main_scroll_window_plot.addItem(self.ui.scroll_window_region, ignoreBounds=True)
-        
-    #     # Setup axes bounds for the bottom windowed plot:
-    #     earliest_t, latest_t = self.spikes_window.total_df_start_end_times
-    #     self.ui.main_scroll_window_plot.hideAxis('left')
-    #     self.ui.main_scroll_window_plot.hideAxis('bottom')
-    #     # self.ui.main_scroll_window_plot.setLabel('bottom', 'Time', units='s')
-    #     self.ui.main_scroll_window_plot.setMouseEnabled(x=False, y=False)
-    #     self.ui.main_scroll_window_plot.disableAutoRange('xy')
-    #     # self.ui.main_scroll_window_plot.enableAutoRange(x=False, y=False)
-    #     self.ui.main_scroll_window_plot.setAutoVisible(x=False, y=False)
-    #     self.ui.main_scroll_window_plot.setAutoPan(x=False, y=False)
-    #     self.ui.main_scroll_window_plot.setXRange(earliest_t, latest_t, padding=0)
-    #     self.ui.main_scroll_window_plot.setYRange(np.nanmin(curr_spike_y), np.nanmax(curr_spike_y), padding=0)
         
   
     def _buildGraphics(self):
@@ -400,16 +363,16 @@ class Spike2DRaster(Render2DScrollWindowPlotMixin, SpikeRasterBase):
         
         
 
-    @QtCore.pyqtSlot()
-    def update_region(self) -> None:
-        """self.zoom_Change the region of the region when the plotter moves
-            viewRange returns the display range of the graph. The type is
-            [[Xmin, Xmax], [Ymin, Ymax]]
-        """
-        rgn = self.ui.main_plot_widget.viewRange()[0] # This gets the range from the main plot.
-        self.ui.scroll_window_region.setRegion(rgn) # adjust the top plot
-        self.window_scrolled.emit(rgn[0], rgn[1]) # emit the window_scrolled signal
-        # self.render_window_duration = (max_x - min_x) # update the render_window_duration from the slider width
+    # @QtCore.pyqtSlot()
+    # def update_region(self) -> None:
+    #     """self.zoom_Change the region of the region when the plotter moves
+    #         viewRange returns the display range of the graph. The type is
+    #         [[Xmin, Xmax], [Ymin, Ymax]]
+    #     """
+    #     rgn = self.ui.main_plot_widget.viewRange()[0] # This gets the range from the main plot.
+    #     self.ui.scroll_window_region.setRegion(rgn) # adjust the top plot
+    #     self.window_scrolled.emit(rgn[0], rgn[1]) # emit the window_scrolled signal
+    #     # self.render_window_duration = (max_x - min_x) # update the render_window_duration from the slider width
 
 
     @QtCore.pyqtSlot(float, float)

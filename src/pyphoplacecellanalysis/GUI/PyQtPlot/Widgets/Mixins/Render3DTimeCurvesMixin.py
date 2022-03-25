@@ -11,7 +11,7 @@ from pyphocorehelpers.print_helpers import SimplePrintable, PrettyPrintable
 from pyphocorehelpers.geometry_helpers import find_ranges_in_window
 
 from pyphoplacecellanalysis.General.DataSeriesToSpatial import DataSeriesToSpatial
-from pyphoplacecellanalysis.GUI.PyQtPlot.Model.Datasources import DataframeDatasource
+from pyphoplacecellanalysis.General.Model.Datasources import DataframeDatasource
 
 
 class CurveDatasource(DataframeDatasource):
@@ -29,8 +29,6 @@ class CurveDatasource(DataframeDatasource):
         DataframeDatasource.__init__(self, df, datasource_name=datasource_name)
     
 
-
-    
 
 class TimeCurvesViewMixin:
     """ Renders 3D line plots that are dependent on time.
@@ -115,6 +113,7 @@ class TimeCurvesViewMixin:
             # don't update because we're in no_update mode
             return
         else:
+            # TODO: currently only gets the first data_column. (doesn't yet support multiple)
             curr_plot_column_name = self.params.time_curves_datasource.data_column_names[0]
             curr_plot_name = self.params.time_curves_datasource.datasource_UIDs[0]
             

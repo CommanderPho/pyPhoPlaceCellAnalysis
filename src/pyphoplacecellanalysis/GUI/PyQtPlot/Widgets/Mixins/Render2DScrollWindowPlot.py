@@ -2,43 +2,11 @@ import pyqtgraph as pg
 from pyqtgraph.Qt import QtCore, QtGui, QtWidgets
 import numpy as np
 
-from pyphoplacecellanalysis.GUI.PyQtPlot.Model.Datasources import DataframeDatasource
+from pyphoplacecellanalysis.General.Model.Datasources import DataframeDatasource
 
 
 
 
-class SpikesDatasource(DataframeDatasource):
-    """ Provides the list of values, 'v' and the timestamps at which they occur 't'.
-    Externally should 
-    
-    Contains a dataframe.
-    
-    Signals:
-    	source_data_changed_signal = QtCore.pyqtSignal() # signal emitted when the internal model data has changed.
-     
-     Slots:
-        @QtCore.pyqtSlot(float, float) 
-        def get_updated_data_window(self, new_start, new_end):
-    """
-
-    @property
-    def time_column_name(self):
-        """ the name of the relevant time column. Gets the values from the spike dataframe """
-        return self.df.spikes.time_variable_name
-    
-    
-    def __init__(self, df, datasource_name='default_spikes_datasource'):
-        # Initialize the datasource as a QObject
-        DataframeDatasource.__init__(self, df, datasource_name=datasource_name)
-
-    """
-        ## It seems the relevant columns are:
-        'visualization_raster_y_location' # for y-offsets in 3D plot
-        'unit_id' # for colors
-        pos = np.vstack((curr_spike_x, curr_spike_y)) # np.shape(curr_spike_t): (11,), np.shape(curr_spike_x): (11,), np.shape(curr_spike_y): (11,), curr_n: 11
-        self.all_spots = [{'pos': pos[:,i], 'data': i, 'pen': curr_spike_pens[i]} for i in range(curr_n)]
-    """ 
-    
 
 
 class Render2DScrollWindowPlotMixin:
