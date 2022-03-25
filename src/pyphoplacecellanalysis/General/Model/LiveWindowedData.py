@@ -22,7 +22,20 @@ class LiveWindowedData(QtCore.QObject):
     window_duration_changed_signal = QtCore.pyqtSignal(float, float, float, object) # (start_time, end_time, window_duration) more conservitive singal that only changes when the duration of the window changes.
     window_updated_signal = QtCore.pyqtSignal(float, float, object) # (start_time, end_time)
     
-
+    
+    # Simple TimeWindow passthrough properties
+    @property
+    def window_duration(self):
+        """The render_window_duration property."""
+        return float(self.timeWindow.window_duration)
+    @window_duration.setter
+    def window_duration(self, value):
+        self.timeWindow.window_duration = value
+    @property
+    def half_window_duration(self):
+        """ """
+        return np.ceil(float(self.timeWindow.window_duration)/2.0) # 10 by default 
+    
     def __init__(self, time_window: TimeWindow, dataSource: DataframeDatasource):
         QtCore.QObject.__init__(self)
         # DO store the datasource on the other hand:

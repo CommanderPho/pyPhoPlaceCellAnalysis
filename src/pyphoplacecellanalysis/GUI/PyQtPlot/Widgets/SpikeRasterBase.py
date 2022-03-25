@@ -229,9 +229,10 @@ class SpikeRasterBase(NeuronIdentityAccessingMixin, SpikeRenderingBaseMixin, Spi
         self.params.bin_position_mode = 'left_edges'
         
         # by default we want the time axis to approximately span -20 to 20. So we set the temporal_zoom_factor to 
-        self.params.temporal_zoom_factor = 40.0 / float(self.render_window_duration)        
+        # self.params.temporal_zoom_factor = 40.0 / float(self.render_window_duration)        
+        self.params.temporal_zoom_factor = 40.0 / float(self.spikes_window.timeWindow.window_duration) 
         
-        
+    
         self.enable_debug_print = False
         self.enable_debug_widgets = True
         
@@ -347,10 +348,9 @@ class SpikeRasterBase(NeuronIdentityAccessingMixin, SpikeRenderingBaseMixin, Spi
         # Connect window update signals
         # self.spikes_window.spike_dataframe_changed_signal.connect(self.on_spikes_df_changed)
         # self.spikes_window.window_duration_changed_signal.connect(self.on_window_duration_changed)
-        self.spikes_window.window_changed_signal.connect(self.on_window_changed)
+        # self.spikes_window.window_changed_signal.connect(self.on_window_changed)
+        self.spikes_window.window_updated_signal.connect(self.on_window_changed)
 
-        
-                
         # self.show()
       
       

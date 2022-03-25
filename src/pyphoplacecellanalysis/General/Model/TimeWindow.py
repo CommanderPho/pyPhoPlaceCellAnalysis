@@ -110,7 +110,6 @@ class TimeWindowOwningMixin:
         """The spikes_window property."""
         return self._time_window
     
-    
     @property
     def render_window_duration(self):
         return float(self.time_window.window_duration)
