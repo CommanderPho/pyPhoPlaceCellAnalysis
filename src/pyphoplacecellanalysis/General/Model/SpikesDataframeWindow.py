@@ -35,6 +35,7 @@ class SpikesDataframeWindow(TimeWindow):
     """
     spike_dataframe_changed_signal = QtCore.pyqtSignal() # signal emitted when the spike dataframe is changed, which might change the number of units, number of spikes, and other properties.
     
+    # Require TimeWindow and Datasource:
     @property
     def active_windowed_df(self):
         """The dataframe sliced to the current time window (active_time_window)"""
@@ -45,6 +46,8 @@ class SpikesDataframeWindow(TimeWindow):
         """The number of spikes (across all units) in the active window."""
         return self.active_windowed_df.shape[0]
     
+    
+    # Properties belonging to DataframeDatasource:
     @property
     def total_df_start_end_times(self):
         """[earliest_df_time, latest_df_time]: The earliest and latest spiketimes in the total df """
@@ -103,7 +106,8 @@ class SpikesWindowOwningMixin:
         """The spikes_df property."""
         return self.spikes_window.df
   
-      
+  
+    # Require TimeWindow
     @property
     def render_window_duration(self):
         """The render_window_duration property."""

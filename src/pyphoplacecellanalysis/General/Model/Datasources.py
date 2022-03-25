@@ -22,9 +22,7 @@ class DataframeDatasource(QtCore.QObject):
      Slots:
         @QtCore.pyqtSlot(float, float) 
         def get_updated_data_window(self, new_start, new_end):
-        
-        
-        
+
     """
     source_data_changed_signal = QtCore.pyqtSignal() # signal emitted when the internal model data has changed.
     
@@ -36,28 +34,49 @@ class DataframeDatasource(QtCore.QObject):
     @property
     def time_column_values(self):
         """ the values of only the relevant time columns """
-        return self.df[self.time_column_name] # get only the relevant time column
+        return self._df[self.time_column_name] # get only the relevant time column
     
     @property
     def data_column_names(self):
         """ the names of only the non-time columns """
-        return np.setdiff1d(self.df.columns, np.array([self.time_column_name])) # get only the non-time columns
+        return np.setdiff1d(self._df.columns, np.array([self.time_column_name])) # get only the non-time columns
     
     @property
     def data_column_values(self):
         """ The values of only the non-time columns """
-        return self.df[self.data_column_names]
+        return self._df[self.data_column_names]
 
     @property
     def datasource_UIDs(self):
         """The datasource_UID property."""
         return [f'{self.custom_datasource_name}.{col_name}' for col_name in self.data_column_values]
     
+    @property
+    def total_df_start_end_times(self):
+        """[earliest_df_time, latest_df_time]: The earliest and latest times in the total df """
+        earliest_df_time = np.nanmin(self.df[self.time_column_name])
+        latest_df_time = np.nanmax(self.df[self.time_column_name])
+        df_timestamps = self.df[self.time_column_name].to_numpy()
+        earliest_df_time = df_timestamps[0]
+        latest_df_time = df_timestamps[-1]
+        return (earliest_df_time, latest_df_time)
+    
+    
+    ##### Get/Set Properties ####:
+    @property
+    def df(self):
+        """The df property."""
+        return self._df
+    @df.setter
+    def df(self, value):
+        self._df = value
+        self.source_data_changed_signal.emit()
+        
 
     def __init__(self, df, datasource_name='default_plot_datasource'):
         # Initialize the datasource as a QObject
         QtCore.QObject.__init__(self)
-        self.df = df
+        self._df = df
         self.custom_datasource_name = datasource_name
         assert self.time_column_name in df.columns, "dataframe must have a time column with name 't'"
         
@@ -74,14 +93,7 @@ class DataframeDatasource(QtCore.QObject):
         return self.df[self.df[self.time_column_name].between(new_start, new_end)]
     
 
-
-
-
-
-
-
-
-class SpikesDatasource(DataframeDatasource):
+class SpikesDataframeDatasource(DataframeDatasource):
     """ Provides neural spiking data for one or more neuron (unit) and the timestamps at which they occur 't'.
     
     Signals:
@@ -95,7 +107,7 @@ class SpikesDatasource(DataframeDatasource):
     @property
     def time_column_name(self):
         """ the name of the relevant time column. Gets the values from the spike dataframe """
-        return self.df.spikes.time_variable_name
+        return self.time_column_name
     
     
     def __init__(self, df, datasource_name='default_spikes_datasource'):

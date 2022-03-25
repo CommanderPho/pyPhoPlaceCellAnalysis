@@ -201,25 +201,6 @@ class Spike3DRaster(TimeCurvesViewMixin, RenderTimeEpochMeshesMixin, SpikeRaster
         self.enable_debug_widgets = True
         
         
-    # def buildUI(self):
-    #     """ for QGridLayout
-    #         addWidget(widget, row, column, rowSpan, columnSpan, Qt.Alignment alignment = 0)
-    #     """
-
-    #     self.resize(1920, 900)
-    #     self.setWindowTitle('Spike3DRaster')
-    #     # Connect window update signals
-    #     # self.spikes_window.spike_dataframe_changed_signal.connect(self.on_spikes_df_changed)
-    #     # self.spikes_window.window_duration_changed_signal.connect(self.on_window_duration_changed)
-    #     self.spikes_window.window_changed_signal.connect(self.on_window_changed)
-
-    #     # Slider update thread:        
-    #     self.animationThread = UpdateRunner(update_frequency=self.playback_update_frequency)
-    #     # self.sliderThread.update_signal.connect(self.increase_slider_val)
-    #     self.animationThread.update_signal.connect(self.increase_animation_frame_val)
-        
-    #     self.show()
-      
     def _buildGraphics(self):
         ##### Main Raster Plot Content Top ##########
         self.ui.main_gl_widget = gl.GLViewWidget()

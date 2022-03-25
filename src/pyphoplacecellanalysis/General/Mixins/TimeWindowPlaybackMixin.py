@@ -72,7 +72,9 @@ class TimeWindowPlaybackPropertiesMixin:
         
 
 class TimeWindowPlaybackController(QtCore.QObject):
-    """docstring for TimeWindowPlaybackController."""
+    """docstring for TimeWindowPlaybackController.
+    
+    """
     SpeedBurstPlaybackRate = 16.0
     PlaybackUpdateFrequency = 0.04 # in seconds
         
@@ -83,6 +85,7 @@ class TimeWindowPlaybackController(QtCore.QObject):
         QtCore.QObject.__init__(self)
         
 
+    
     def setup(self, root_TimeWindowOwner):
         """ sets up the passed root_TimeWindow object's required parameters and state variables. """
         root_TimeWindowOwner._playback_update_frequency = TimeWindowPlaybackController.PlaybackUpdateFrequency
