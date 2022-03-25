@@ -21,8 +21,8 @@ Separate 2D and 3D event visualization functions should be made to transform eve
 
 
 """
-# class SpikesDataframeWindow(LiveWindowedData):
-class SpikesDataframeWindow(QtCore.QObject):
+class SpikesDataframeWindow(LiveWindowedData):
+# class SpikesDataframeWindow(QtCore.QObject):
     """ a zoomable (variable sized) window into a dataframe with a time axis
     Used by Spike3DRaster
     
@@ -37,20 +37,20 @@ class SpikesDataframeWindow(QtCore.QObject):
     spike_dataframe_changed_signal = QtCore.pyqtSignal() # signal emitted when the spike dataframe is changed, which might change the number of units, number of spikes, and other properties.
     
     
-    @property
-    def active_live_data_window(self):
-        """The number of spikes (across all units) in the active window."""
-        return self._liveWindowedData
+    # @property
+    # def active_live_data_window(self):
+    #     """The number of spikes (across all units) in the active window."""
+    #     return self._liveWindowedData
     
-    @property
-    def timeWindow(self):
-        """ the TimeWindow object"""
-        return self.active_live_data_window.timeWindow
+    # @property
+    # def timeWindow(self):
+    #     """ the TimeWindow object"""
+    #     return self.active_live_data_window.timeWindow
 
-    @property
-    def dataSource(self):
-        """ The datasource """
-        return self.active_live_data_window.dataSource
+    # @property
+    # def dataSource(self):
+    #     """ The datasource """
+    #     return self.active_live_data_window.dataSource
     
     @property
     def active_time_window(self):
@@ -92,8 +92,6 @@ class SpikesDataframeWindow(QtCore.QObject):
     # Initializer:
     def __init__(self, spikes_df, window_duration=15.0, window_start_time=0.0):
         # TimeWindow.__init__(self, window_duration=window_duration, window_start_time=window_start_time)
-        
-        
         # self._df = spikes_df
         
         # TODO: Time window needs to be passed in or kept a reference to:
@@ -103,7 +101,7 @@ class SpikesDataframeWindow(QtCore.QObject):
         # self._liveWindowedData = LiveWindowedData(curr_time_window, spikes_dataSource)
 
         # self.spikes_dataSource.source_data_changed_signal.connect(self.spike_dataframe_changed_signal)
-        self.spikes_dataSource.source_data_changed_signal.connect(self.on_general_datasource_changed)
+        self.dataSource.source_data_changed_signal.connect(self.on_general_datasource_changed)
         # self.window_changed_signal.connect(self.on_window_changed)
         
     @QtCore.pyqtSlot()
