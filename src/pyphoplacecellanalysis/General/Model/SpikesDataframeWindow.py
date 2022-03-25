@@ -2,7 +2,8 @@ from pyqtgraph.Qt import QtCore
 import numpy as np
 
 from pyphoplacecellanalysis.General.Model.TimeWindow import TimeWindow
-
+from pyphoplacecellanalysis.General.Model.LiveWindowedData import LiveWindowedData
+from pyphoplacecellanalysis.General.Model.Datasources import DataframeDatasource, SpikesDataframeDatasource
 
 
 """ Windowed Spiking Datasource Features
@@ -20,8 +21,8 @@ Separate 2D and 3D event visualization functions should be made to transform eve
 
 
 """
-class SpikesDataframeWindow(TimeWindow):
-# class SpikesDataframeWindow(QtCore.QObject):
+# class SpikesDataframeWindow(LiveWindowedData):
+class SpikesDataframeWindow(QtCore.QObject):
     """ a zoomable (variable sized) window into a dataframe with a time axis
     Used by Spike3DRaster
     
@@ -35,53 +36,83 @@ class SpikesDataframeWindow(TimeWindow):
     """
     spike_dataframe_changed_signal = QtCore.pyqtSignal() # signal emitted when the spike dataframe is changed, which might change the number of units, number of spikes, and other properties.
     
+    
+    @property
+    def active_live_data_window(self):
+        """The number of spikes (across all units) in the active window."""
+        return self._liveWindowedData
+    
+    @property
+    def timeWindow(self):
+        """ the TimeWindow object"""
+        return self.active_live_data_window.timeWindow
+
+    @property
+    def dataSource(self):
+        """ The datasource """
+        return self.active_live_data_window.dataSource
+    
+    @property
+    def active_time_window(self):
+        """ the active time window (2 element start, end tuple)"""
+        return self.timeWindow.active_time_window    
+    
+    
     # Require TimeWindow and Datasource:
     @property
     def active_windowed_df(self):
         """The dataframe sliced to the current time window (active_time_window)"""
-        return self.df[self.df[self.df.spikes.time_variable_name].between(self.active_time_window[0], self.active_time_window[1])]
+        # return self.df[self.df[self.df.spikes.time_variable_name].between(self.active_time_window[0], self.active_time_window[1])]
+        return self.dataSource.get_updated_data_window(self.active_time_window[0], self.active_time_window[1])
 
     @property
     def active_window_num_spikes(self):
         """The number of spikes (across all units) in the active window."""
         return self.active_windowed_df.shape[0]
     
-    
     # Properties belonging to DataframeDatasource:
     @property
     def total_df_start_end_times(self):
         """[earliest_df_time, latest_df_time]: The earliest and latest spiketimes in the total df """
-        earliest_df_time = np.nanmin(self.df[self.df.spikes.time_variable_name])
-        latest_df_time = np.nanmax(self.df[self.df.spikes.time_variable_name])
-        
-        df_timestamps = self.df[self.df.spikes.time_variable_name].to_numpy()
-        earliest_df_time = df_timestamps[0]
-        latest_df_time = df_timestamps[-1]
-        return (earliest_df_time, latest_df_time)
+        return self.dataSource.total_df_start_end_times
             
     ##### Get/Set Properties ####:
     @property
     def df(self):
         """The df property."""
-        return self._df
+        # return self._df
+        return self.dataSource.df
     @df.setter
     def df(self, value):
-        self._df = value
-        self.spike_dataframe_changed_signal.emit()
+        # self._df = value
+        self.dataSource.df = value
+        # self.spike_dataframe_changed_signal.emit()
         
     
     # Initializer:
     def __init__(self, spikes_df, window_duration=15.0, window_start_time=0.0):
-        TimeWindow.__init__(self, window_duration=window_duration, window_start_time=window_start_time)
-        self._df = spikes_df
+        # TimeWindow.__init__(self, window_duration=window_duration, window_start_time=window_start_time)
+        
+        
+        # self._df = spikes_df
+        
+        # TODO: Time window needs to be passed in or kept a reference to:
+        curr_time_window = TimeWindow(window_duration=window_duration, window_start_time=window_start_time)
+        spikes_dataSource = SpikesDataframeDatasource(spikes_df)
+        LiveWindowedData.__init__(self, curr_time_window, spikes_dataSource)
+        # self._liveWindowedData = LiveWindowedData(curr_time_window, spikes_dataSource)
+
+        # self.spikes_dataSource.source_data_changed_signal.connect(self.spike_dataframe_changed_signal)
+        self.spikes_dataSource.source_data_changed_signal.connect(self.on_general_datasource_changed)
         # self.window_changed_signal.connect(self.on_window_changed)
         
-        
-    # def on_window_changed(self):
-    #     print(f'SpikesDataframeWindow.on_window_changed(): window_changed_signal emitted. self.active_time_window: {self.active_time_window}')
-        
-      
-      
+    @QtCore.pyqtSlot()
+    def on_general_datasource_changed(self):
+        """ emit our own custom signal when the general datasource update method returns """
+        self.spike_dataframe_changed_signal.emit()
+    
+
+
 
 class SpikesWindowOwningMixin:
     """ Implementors own a SpikesWindow and can use it to get the current windowed dataframe
