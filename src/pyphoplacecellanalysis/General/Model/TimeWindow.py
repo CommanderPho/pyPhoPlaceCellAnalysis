@@ -99,3 +99,31 @@ class TimeWindow(QtCore.QObject):
         
       
       
+class TimeWindowOwningMixin:
+    """ Implementors own a TimeWindow and can use it to get the current windowed dataframe
+    
+    Requires:
+        self._time_window
+    
+    """    
+    @property
+    def time_window(self):
+        """The spikes_window property."""
+        return self._time_window
+    
+    
+    @property
+    def render_window_duration(self):
+        return float(self.time_window.window_duration)
+    @render_window_duration.setter
+    def render_window_duration(self, value):
+        self.time_window.window_duration = value
+    
+    @property
+    def half_render_window_duration(self):
+        """ """
+        return np.ceil(float(self.time_window.window_duration)/2.0) # 10 by default 
+    
+    
+    
+    
