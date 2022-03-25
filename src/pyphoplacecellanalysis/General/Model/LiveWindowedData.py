@@ -62,9 +62,23 @@ class LiveWindowedData(QtCore.QObject):
     @QtCore.pyqtSlot(float, float)
     def on_window_changed(self, start_t, end_t):
         # called when the window is updated
-        if self.enable_debug_print:
-            print(f'LiveWindowedData.on_window_changed(start_t: {start_t}, end_t: {end_t})')
+        # if self.enable_debug_print:
+        #     print(f'LiveWindowedData.on_window_changed(start_t: {start_t}, end_t: {end_t})')
         
         # Get the data value from the internal data source
         data_value = self.dataSource.get_updated_data_window(start_t, end_t) # can return any value so long as it's an object
         self.window_updated_signal.emit(start_t, end_t, data_value)
+        
+        
+        
+        
+    ## Called to update its internal TimeWindow
+    @QtCore.pyqtSlot(float)
+    def update_window_start(self, new_value):
+        self.timeWindow.update_window_start(new_value)
+
+    @QtCore.pyqtSlot(float, float)
+    def update_window_start_end(self, new_start, new_end):
+        self.timeWindow.update_window_start_end(new_start, new_end)
+        
+        
