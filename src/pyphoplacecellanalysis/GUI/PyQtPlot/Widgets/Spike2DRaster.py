@@ -245,6 +245,8 @@ class Spike2DRaster(Render2DScrollWindowPlotMixin, SpikeRasterBase):
         self.ui.scatter_plot.addPoints(self.all_spots)
 
 
+
+        # self.Render2DScrollWindowPlot_on_window_update # register with the animation time window for updates for the scroller.
         # Connect the signals for the zoom region and the LinearRegionItem
         # self.ui.scroll_window_region.sigRegionChanged.connect(self.update_zoom_plotter)
         self.window_scrolled.connect(self.update_zoomed_plot)
