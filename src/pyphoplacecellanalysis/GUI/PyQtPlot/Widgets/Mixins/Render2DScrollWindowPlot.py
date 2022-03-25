@@ -165,7 +165,8 @@ class Render2DScrollWindowPlotMixin:
     @QtCore.pyqtSlot(float, float)
     def Render2DScrollWindowPlot_on_window_update(self, new_start=None, new_end=None):
         """ called to perform updates when the active window changes. Redraw, recompute data, etc. """
-        pass
+        # Make sure that the scroller isn't too tiny to grab.
+        self.ui.scroll_window_region.setRegion([new_start, new_end]) # adjust scroll control
     
     
      

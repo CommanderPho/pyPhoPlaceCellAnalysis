@@ -33,8 +33,7 @@ class CurveDatasource(DataframeDatasource):
     
 
 class TimeCurvesViewMixin:
-    """ Renders 3D line plots that are dependent on time. 
-    
+    """ Renders 3D line plots that are dependent on time.
     
     Usage:
         # plot_data = pd.DataFrame({'t': curr_sess.mua.time, 'mua_firing_rate': curr_sess.mua.firing_rate, 'mua_spike_counts': curr_sess.mua.spike_counts})

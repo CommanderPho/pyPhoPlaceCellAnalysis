@@ -158,7 +158,7 @@ class Spike3DRaster(TimeCurvesViewMixin, RenderTimeEpochMeshesMixin, SpikeRaster
         
         # Init the TimeCurvesViewMixin for 3D Line plots:
         ### No plots will actually be added until self.add_3D_time_curves(plot_dataframe) is called with a valid dataframe.
-        self.init_TimeCurvesViewMixin()
+        self.TimeCurvesViewMixin_on_init()
                 
         # Setup Signals:
         self.temporal_mapping_changed.connect(self.on_adjust_temporal_spatial_mapping)
