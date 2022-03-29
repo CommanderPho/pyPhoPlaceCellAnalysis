@@ -13,6 +13,7 @@ from pyphoplacecellanalysis.General.DataSeriesToSpatial import DataSeriesToSpati
 class BaseDatasource(QtCore.QObject):
     """ Provides the list of values, 'v' and the timestamps at which they occur 't'.
         
+        
     Signals:
         source_data_changed_signal = QtCore.pyqtSignal() # signal emitted when the internal model data has changed.
      

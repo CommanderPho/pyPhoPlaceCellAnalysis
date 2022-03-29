@@ -142,8 +142,43 @@ class DataSeriesToSpatial:
             
         return epoch_window_relative_start_x_positions, epoch_spatial_durations
 
+
+
+
+class DataSeriesToSpatialTransformingMixin:
+    """ 
+    Provides parameter independent functions to get spatial values from temporal and unit-identity ones.
+    
+    temporal_to_spatial(temporal_data)
+    
+    requires that conforming class implements:
+    
+    Required Properties:
+        self.temporal_axis_length
+        self.spikes_window.active_window_start_time
+        self.spikes_window.active_window_end_time
+        
+        self.n_cells
+        self.params.center_mode
+        self.params.bin_position_mode
+        self.params.side_bin_margins
+        
+    """    
+    def temporal_to_spatial(self, temporal_data):
+        """ transforms the times in temporal_data to a spatial offset (such as the x-positions for a 3D raster plot) """
+        return DataSeriesToSpatial.temporal_to_spatial_map(temporal_data, self.spikes_window.active_window_start_time, self.spikes_window.active_window_end_time, self.temporal_axis_length, center_mode='zero_centered')
+    
+    def unit_id_to_spatial(self, unit_ids):
+        """ transforms the unit_ids in unit_ids to a spatial offset (such as the y-positions for a 3D raster plot) """
+        raise NotImplementedError
+    
+    def build_series_identity_axis(self):
+        # build the position range for each unit along the y-axis:
+        return DataSeriesToSpatial.build_series_identity_axis(self.n_cells, center_mode=self.params.center_mode, bin_position_mode=self.params.bin_position_mode, side_bin_margins = self.params.side_bin_margins)        
+        # return DataSeriesToSpatial.temporal_to_spatial_map(temporal_data, self.spikes_window.active_window_start_time, self.spikes_window.active_window_end_time, self.temporal_axis_length, center_mode='zero_centered')
     
 
+    
 ## TODO: seemingly unused and also unimplemented. The name doesn't make sense as it looks like a temporal to spatial mixin
 # class SpikesDataframeMixin(object):
 #     """docstring for SpikesDataframeMixin.
@@ -187,5 +222,3 @@ class DataSeriesToSpatial:
 #         # by default we want the time axis to approximately span -20 to 20. So we set the temporal_zoom_factor to 
 #         self._temporal_zoom_factor = 40.0 / float(self.render_window_duration)      
 
-
-    

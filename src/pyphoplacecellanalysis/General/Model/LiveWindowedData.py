@@ -52,7 +52,7 @@ class LiveWindowedData(QtCore.QObject):
     @QtCore.pyqtSlot(float, float, float)
     def on_window_duration_changed(self, start_t, end_t, duration):
         """ changes self.half_render_window_duration """
-        print(f'LiveWindowedData.on_window_duration_changed(start_t: {start_t}, end_t: {end_t}, duration: {duration})')
+        # print(f'LiveWindowedData.on_window_duration_changed(start_t: {start_t}, end_t: {end_t}, duration: {duration})')
         # Get the data value from the internal data source
         data_value = self.dataSource.get_updated_data_window(start_t, end_t) # can return any value so long as it's an object
         self.window_duration_changed_signal.emit(start_t, end_t, duration, data_value)

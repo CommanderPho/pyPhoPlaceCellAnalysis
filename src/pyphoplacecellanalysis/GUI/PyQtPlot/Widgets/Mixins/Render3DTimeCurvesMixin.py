@@ -22,12 +22,26 @@ class CurveDatasource(DataframeDatasource):
     Signals:
     	source_data_changed_signal = QtCore.pyqtSignal() # signal emitted when the internal model data has changed.
     """
+    
+    data_series_specs_changed_signal = QtCore.pyqtSignal() # signal emitted when the data_series_specs have changed.
 
-    def __init__(self, df, datasource_name='default_plot_datasource'):
+    @property
+    def data_series_specs(self):
+        """The data_series_specs property."""
+        return self._data_series_specs
+    @data_series_specs.setter
+    def data_series_specs(self, value):
+        self._data_series_specs = value
+
+    def __init__(self, df, datasource_name='default_plot_datasource', data_series_specs=None):
         # Initialize the datasource as a QObject
         DataframeDatasource.__init__(self, df, datasource_name=datasource_name)
+        self._data_series_specs = data_series_specs
     
 
+
+# An OrderedList of dictionaries of values to be provided by the datasource:
+# {'name':'linear position','x':'t','y':None,'z':'lin_pos'}
 
 class TimeCurvesViewMixin:
     """ Renders 3D line plots that are dependent on time.
@@ -119,7 +133,11 @@ class TimeCurvesViewMixin:
             # Get current plot items:
             curr_plot3D_active_window_data = self.params.time_curves_datasource.get_updated_data_window(self.spikes_window.active_window_start_time, self.spikes_window.active_window_end_time) # get updated data for the active window from the datasource
             curve_y_value = -self.n_half_cells
-            curr_x = DataSeriesToSpatial.temporal_to_spatial_map(curr_plot3D_active_window_data['t'].to_numpy(), self.spikes_window.active_window_start_time, self.spikes_window.active_window_end_time, self.temporal_axis_length, center_mode='zero_centered')
+            
+            # Get y-values:
+            # self.build_series_identity_axis()
+            curr_x = self.temporal_to_spatial(curr_plot3D_active_window_data['t'].to_numpy())
+            # curr_x = DataSeriesToSpatial.temporal_to_spatial_map(curr_plot3D_active_window_data['t'].to_numpy(), self.spikes_window.active_window_start_time, self.spikes_window.active_window_end_time, self.temporal_axis_length, center_mode='zero_centered')
             pts = np.column_stack([curr_x, np.full_like(curr_x, curve_y_value), curr_plot3D_active_window_data[curr_plot_column_name].to_numpy()])
             
             if curr_plot_name in self.plots.time_curves:

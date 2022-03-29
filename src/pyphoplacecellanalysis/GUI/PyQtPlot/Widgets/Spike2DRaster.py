@@ -274,13 +274,6 @@ class Spike2DRaster(Render2DScrollWindowPlotMixin, SpikeRasterBase):
             self.render_window_duration
             
         """
-        # self.y = DataSeriesToSpatial.build_series_identity_axis(self.n_cells, center_mode=self.params.center_mode, bin_position_mode=self.params.bin_position_mode, side_bin_margins = self.params.side_bin_margins)
-        # self.lower_y = DataSeriesToSpatial.build_series_identity_axis(self.n_cells, center_mode=self.params.center_mode, bin_position_mode='left_edges', side_bin_margins = self.params.side_bin_margins) / self.n_cells
-        # self.upper_y = DataSeriesToSpatial.build_series_identity_axis(self.n_cells, center_mode=self.params.center_mode, bin_position_mode='right_edges', side_bin_margins = self.params.side_bin_margins) / self.n_cells
-        # self.y_unit_id_map = dict(zip(self.unit_ids, self.y))
-        # all_y = [self.y_unit_id_map[a_cell_id] for a_cell_id in self.spikes_df['unit_id'].to_numpy()]
-        # self.spikes_df['visualization_raster_y_location'] = all_y # adds as a column to the dataframe. Only needs to be updated when the number of active units changes
-        
         # print(f'lower_y: {lower_y}\n upper_y: {upper_y}')
         pass
 
