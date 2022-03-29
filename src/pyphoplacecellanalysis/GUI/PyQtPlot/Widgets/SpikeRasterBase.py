@@ -24,7 +24,7 @@ from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer
 # import qdarkstyle
 
 from pyphoplacecellanalysis.General.Model.SpikesDataframeWindow import SpikesDataframeWindow, SpikesWindowOwningMixin
-from pyphoplacecellanalysis.General.DataSeriesToSpatial import DataSeriesToSpatial
+from pyphoplacecellanalysis.General.DataSeriesToSpatial import DataSeriesToSpatial, DataSeriesToSpatialTransformingMixin
 from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.GLGraphicsItems.GLDebugAxisItem import GLDebugAxisItem
 from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.GLGraphicsItems.GLViewportOverlayPainterItem import GLViewportOverlayPainterItem
 
@@ -95,7 +95,7 @@ class RenderPlots(PrettyPrintable, SimplePrintable, metaclass=OrderedMeta):
     
                 
 
-class SpikeRasterBase(NeuronIdentityAccessingMixin, SpikeRenderingBaseMixin, SpikesWindowOwningMixin, SpikesDataframeOwningMixin, TimeWindowPlaybackPropertiesMixin, RenderPlaybackControlsMixin, RenderWindowControlsMixin, QtWidgets.QWidget):
+class SpikeRasterBase(DataSeriesToSpatialTransformingMixin, NeuronIdentityAccessingMixin, SpikeRenderingBaseMixin, SpikesWindowOwningMixin, SpikesDataframeOwningMixin, TimeWindowPlaybackPropertiesMixin, RenderPlaybackControlsMixin, RenderWindowControlsMixin, QtWidgets.QWidget):
     """ Displays a raster plot with the spikes occuring along a plane. 
     
     Usage:
