@@ -72,8 +72,20 @@ class TimeCurvesViewMixin:
         self.plots.time_curves = dict()
         
 
-    def add_3D_time_curves(self, plot_dataframe):
-        self.params.time_curves_datasource = CurveDatasource(plot_dataframe)
+    def add_3D_time_curves(self, curve_datasource: CurveDatasource=None, plot_dataframe:pd.DataFrame=None):
+        assert (curve_datasource is not None) or (plot_dataframe is not None), "At least one of curve_datasource or plot_dataframe must be non-None."
+    
+        if self.params.time_curves_datasource is not None:
+            # TODO: detach any extant datasource:
+            self.detach_3d_time_curves_datasource()
+        
+        if curve_datasource is not None:
+            self.params.time_curves_datasource = None
+        else:
+            if plot_dataframe is not None: 
+                # build a new CurveDatasource from the provided dataframe 
+                self.params.time_curves_datasource = CurveDatasource(plot_dataframe)
+                
         self.plots.time_curves = dict()
         self.update_3D_time_curves()
 
