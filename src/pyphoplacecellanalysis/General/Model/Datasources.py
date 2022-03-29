@@ -10,11 +10,8 @@ from pyphoplacecellanalysis.General.DataSeriesToSpatial import DataSeriesToSpati
 
 
 
-class DataframeDatasource(QtCore.QObject):
+class BaseDatasource(QtCore.QObject):
     """ Provides the list of values, 'v' and the timestamps at which they occur 't'.
-    Externally should 
-    
-    Contains a dataframe.
         
     Signals:
         source_data_changed_signal = QtCore.pyqtSignal() # signal emitted when the internal model data has changed.
@@ -25,6 +22,48 @@ class DataframeDatasource(QtCore.QObject):
 
     """
     source_data_changed_signal = QtCore.pyqtSignal() # signal emitted when the internal model data has changed.
+        
+    @property
+    def total_datasource_start_end_times(self):
+        """[earliest_df_time, latest_df_time]: The earliest and latest times in the total df """
+        raise NotImplementedError
+        # return (earliest_df_time, latest_df_time)
+    
+    
+    ##### Get/Set Properties ####:
+        
+
+    def __init__(self, datasource_name='default_base_datasource'):
+        # Initialize the datasource as a QObject
+        QtCore.QObject.__init__(self)
+        # Custom Setup
+        self.custom_datasource_name = datasource_name        
+        
+        
+    @QtCore.pyqtSlot(float, float)
+    def get_updated_data_window(self, new_start, new_end):
+        """ called to get the data that should be displayed for the window starting at new_start and ending at new_end """
+        raise NotImplementedError
+    
+    
+    
+    
+    
+
+
+class DataframeDatasource(BaseDatasource):
+    """ Provides the list of values, 'v' and the timestamps at which they occur 't'.
+   
+    Contains a dataframe.
+        
+    Signals:
+        source_data_changed_signal = QtCore.pyqtSignal() # signal emitted when the internal model data has changed.
+     
+     Slots:
+        @QtCore.pyqtSlot(float, float) 
+        def get_updated_data_window(self, new_start, new_end):
+
+    """
     
     @property
     def time_column_name(self):
@@ -51,6 +90,12 @@ class DataframeDatasource(QtCore.QObject):
         """The datasource_UID property."""
         return [f'{self.custom_datasource_name}.{col_name}' for col_name in self.data_column_values]
     
+    
+    @property
+    def total_datasource_start_end_times(self):
+        """[earliest_df_time, latest_df_time]: The earliest and latest times in the total df """
+        return self.total_df_start_end_times
+        
     @property
     def total_df_start_end_times(self):
         """[earliest_df_time, latest_df_time]: The earliest and latest times in the total df """
@@ -74,10 +119,9 @@ class DataframeDatasource(QtCore.QObject):
         
 
     def __init__(self, df, datasource_name='default_plot_datasource'):
-        # Initialize the datasource as a QObject
-        QtCore.QObject.__init__(self)
+        # Initialize the datasource as a BaseDatasource
+        BaseDatasource.__init__(self, datasource_name=datasource_name)
         self._df = df
-        self.custom_datasource_name = datasource_name
         assert self.time_column_name in df.columns, "dataframe must have a time column with name 't'"
         
         

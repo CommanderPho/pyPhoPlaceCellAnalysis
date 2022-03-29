@@ -16,7 +16,6 @@ from pyphoplacecellanalysis.General.Model.Datasources import DataframeDatasource
 
 class CurveDatasource(DataframeDatasource):
     """ Provides the list of values, 'v' and the timestamps at which they occur 't'.
-    Externally should 
     
     Contains a dataframe.
     
