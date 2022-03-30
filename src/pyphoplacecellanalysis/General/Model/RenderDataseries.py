@@ -8,35 +8,61 @@ from pyphocorehelpers.print_helpers import SimplePrintable, PrettyPrintable
 from pyphoplacecellanalysis.General.DataSeriesToSpatial import DataSeriesToSpatial
 
 
-class RenderDataseries(QtCore.QObject):
+class RenderDataseries(SimplePrintable, PrettyPrintable, QtCore.QObject):
     """ 
-    data_series_pre_spatial_list = [{'name':'linear position','t':'t','v_alt':None,'v_main':'lin_pos'},
-        {'name':'x position','t':'t','v_alt':None,'v_main':'x'},
-        {'name':'y position','t':'t','v_alt':None,'v_main':'y'}
-    ]
+    Usage:
+    
+        from pyphoplacecellanalysis.General.Model.RenderDataseries import RenderDataseries
 
-    # Mappings from the pre-spatial values to the spatial values:
-    x_map_fn = lambda t: spike_raster_plt_3d.temporal_to_spatial(t)
-    y_map_fn = lambda v: np.full_like(v, -spike_raster_plt_3d.n_half_cells)
-    z_map_fn = lambda v_main: v_main
+        data_series_pre_spatial_list = [{'name':'linear position','t':'t','v_alt':None,'v_main':'lin_pos'},
+            {'name':'x position','t':'t','v_alt':None,'v_main':'x'},
+            {'name':'y position','t':'t','v_alt':None,'v_main':'y'}
+        ]
 
-    data_series_pre_spatial_to_spatial_mappings = [{'name':'name','x':'t','y':'v_alt','z':'v_main','x_map_fn':x_map_fn,'y_map_fn':y_map_fn,'z_map_fn':z_map_fn},
-        {'name':'name','x':'t','y':'v_alt','z':'v_main','x_map_fn':x_map_fn,'y_map_fn':y_map_fn,'z_map_fn':z_map_fn},
-        {'name':'name','x':'t','y':'v_alt','z':'v_main','x_map_fn':x_map_fn,'y_map_fn':y_map_fn,'z_map_fn':z_map_fn}
-    ]
+        # Mappings from the pre-spatial values to the spatial values:
+        x_map_fn = lambda t: spike_raster_plt_3d.temporal_to_spatial(t)
+        y_map_fn = lambda v: np.full_like(v, -spike_raster_plt_3d.n_half_cells)
+        z_map_fn = lambda v_main: v_main
+
+        data_series_pre_spatial_to_spatial_mappings = [{'name':'name','x':'t','y':'v_alt','z':'v_main','x_map_fn':x_map_fn,'y_map_fn':y_map_fn,'z_map_fn':z_map_fn},
+            {'name':'name','x':'t','y':'v_alt','z':'v_main','x_map_fn':x_map_fn,'y_map_fn':y_map_fn,'z_map_fn':z_map_fn},
+            {'name':'name','x':'t','y':'v_alt','z':'v_main','x_map_fn':x_map_fn,'y_map_fn':y_map_fn,'z_map_fn':z_map_fn}
+        ]
+
+        active_dataseries = RenderDataseries(data_series_pre_spatial_list, data_series_pre_spatial_to_spatial_mappings)
+        # Creates a separate 3D curve for each specified data-series in data_series_list:
+        curr_windowed_df = position_dataSource.get_updated_data_window(0.0, 100.0)
+        # curr_windowed_df
+        data_series_spaital_values_list = active_dataseries.get_data_series_spatial_values(curr_windowed_df)
+        data_series_spaital_values_list
 
     """
-    def __init__(self, pre_spatial_data_series_list, pre_spatial_to_spatial_mappings):
+    def __init__(self, direct_spatial_data_series_list=None, pre_spatial_data_series_list=None, pre_spatial_to_spatial_mappings=None):
         # Initialize the datasource as a QObject
         QtCore.QObject.__init__(self)
+        self.direct_spatial_data_series_list = direct_spatial_data_series_list
         self.data_series_pre_spatial_list = pre_spatial_data_series_list
         self.data_series_pre_spatial_to_spatial_mappings = pre_spatial_to_spatial_mappings
 
+
+    @classmethod
+    def init_from_pre_spatial_data_series_list(cls, data_series_list, pre_spatial_to_spatial_mappings):
+        return cls(pre_spatial_data_series_list=data_series_list, pre_spatial_to_spatial_mappings=pre_spatial_to_spatial_mappings)
+    
+    @classmethod
+    def init_from_direct_spatial_data_series_list(cls, spatial_data_series_list):
+        return cls(direct_spatial_data_series_list=spatial_data_series_list)
+        
+        
       
     def get_data_series_spatial_values(self, curr_windowed_df):
-        data_series_pre_spatial_values_list = RenderDataseries._get_data_series_pre_spatial_values(curr_windowed_df, self.data_series_pre_spatial_list)
-        # data_series_pre_spatial_values_list
-        data_series_spaital_values_list = RenderDataseries._evaluate_spatial_values_from_pre_spatial_values(data_series_pre_spatial_values_list, self.data_series_pre_spatial_to_spatial_mappings)
+        if self.direct_spatial_data_series_list is not None:
+            # Use direct spatial dataseries list (no mapping needed)
+            data_series_spaital_values_list = RenderDataseries._get_spatial_data_series_values(curr_windowed_df, self.direct_spatial_data_series_list)
+        else:           
+            # perfrom the mapping from pre_spatial_values to spatial_values
+            data_series_pre_spatial_values_list = RenderDataseries._get_data_series_pre_spatial_values(curr_windowed_df, self.data_series_pre_spatial_list)
+            data_series_spaital_values_list = RenderDataseries._evaluate_spatial_values_from_pre_spatial_values(data_series_pre_spatial_values_list, self.data_series_pre_spatial_to_spatial_mappings)
         return data_series_spaital_values_list
     
     
@@ -120,3 +146,48 @@ class RenderDataseries(QtCore.QObject):
             curr_series_z_values = curr_series_z_map_fn(a_series_value_dict[curr_series_pre_to_spatial_mapping_dict['z']])
             data_series_spaital_values_list.append({'name':series_name,'x':curr_series_x_values,'y':curr_series_y_values,'z':curr_series_z_values})
         return data_series_spaital_values_list
+
+
+    @classmethod
+    def _get_spatial_data_series_values(cls, curr_windowed_df, data_series_list, enable_debug_print=False):
+        """ Evaluates the directly spatial values for a list data_series_list of dicts with keys ['name','x','y','z']
+        
+        data_series_spatial_list = [{'name':'linear position','x':'t','y':None,'z':'lin_pos'},
+            {'name':'x position','x':'t','y':None,'z':'x'},
+            {'name':'y position','x':'t','y':None,'z':'y'}
+        ]
+        
+        data_series_values_list = _get_data_series_values(curr_windowed_df, data_series_spatial_list)
+        data_series_values_list
+
+        """
+        # for series_name, series_x, series_y, series_z in data_series_list.items():
+        data_series_values_list = []
+        for a_series_config_dict in data_series_list:
+            # series_name, series_x, series_y, series_z = series_config_dict
+            series_name = a_series_config_dict.get('name', '')
+
+            series_x_column = a_series_config_dict.get('x', None)
+            if series_x_column is not None:
+                curr_series_x_values = curr_windowed_df[series_x_column].to_numpy()
+            else:
+                curr_series_x_values = None
+            series_y_column = a_series_config_dict.get('y', None)
+            if series_y_column is not None:
+                curr_series_y_values = curr_windowed_df[series_y_column].to_numpy()
+            else:
+                curr_series_y_values = None
+
+            series_z_column = a_series_config_dict.get('z', None)
+            if series_z_column is not None:
+                curr_series_z_values = curr_windowed_df[series_z_column].to_numpy()
+            else:
+                curr_series_z_values = None
+
+            if enable_debug_print:
+                print(f"a_series_config_dict: {a_series_config_dict}")
+                # print(f"'name':{series_name},'x':{series_x},'y':{series_y},'z':{series_z}")
+            data_series_values_list.append({'name':series_name,'x':curr_series_x_values,'y':curr_series_y_values,'z':curr_series_z_values})
+
+        return data_series_values_list
+
