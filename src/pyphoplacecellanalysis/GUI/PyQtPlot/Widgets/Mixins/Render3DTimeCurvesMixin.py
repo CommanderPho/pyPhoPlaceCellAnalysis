@@ -203,33 +203,41 @@ class TimeCurvesViewMixin:
             # Common to both:
             # Get current plot items:
             curr_plot3D_active_window_data = self.params.time_curves_datasource.get_updated_data_window(self.spikes_window.active_window_start_time, self.spikes_window.active_window_end_time) # get updated data for the active window from the datasource
-            curr_data_series_index = 0
-            
-            # Data series mode:
-            if self.params.time_curves_datasource.data_series_specs is not None:
+            is_data_series_mode = self.params.time_curves_datasource.has_data_series_specs
+            if is_data_series_mode:
                 data_series_spaital_values_list = self.params.time_curves_datasource.data_series_specs.get_data_series_spatial_values(curr_plot3D_active_window_data)
-                
-                # Get the current series:
-                curr_data_series_dict = data_series_spaital_values_list[curr_data_series_index]
-                
-                curr_plot_column_name = curr_data_series_dict.get('name', f'series[{curr_data_series_index}]')
-                curr_plot_name = self.params.time_curves_datasource.datasource_UIDs[curr_data_series_index]
-                # points for the current plot:
-                pts = np.column_stack([curr_data_series_dict['x'], curr_data_series_dict['y'], curr_data_series_dict['z']])
-                
+                num_data_series = len(data_series_spaital_values_list)
             else:
-                # TODO: currently only gets the first data_column. (doesn't yet support multiple)
-                curr_plot_column_name = self.params.time_curves_datasource.data_column_names[curr_data_series_index]
-                curr_plot_name = self.params.time_curves_datasource.datasource_UIDs[curr_data_series_index]
+                # old compatibility mode:
+                num_data_series = 1
+
+            # curr_data_series_index = 0
+            # Loop through the active data series:                
+            for curr_data_series_index in np.arange(num_data_series):
+                # Data series mode:
+                if is_data_series_mode:
+                    # Get the current series:
+                    curr_data_series_dict = data_series_spaital_values_list[curr_data_series_index]
+                    
+                    curr_plot_column_name = curr_data_series_dict.get('name', f'series[{curr_data_series_index}]')
+                    curr_plot_name = self.params.time_curves_datasource.datasource_UIDs[curr_data_series_index]
+                    # points for the current plot:
+                    pts = np.column_stack([curr_data_series_dict['x'], curr_data_series_dict['y'], curr_data_series_dict['z']])
+                    
+                else:
+                    # TODO: currently only gets the first data_column. (doesn't yet support multiple)
+                    curr_plot_column_name = self.params.time_curves_datasource.data_column_names[curr_data_series_index]
+                    curr_plot_name = self.params.time_curves_datasource.datasource_UIDs[curr_data_series_index]
+                    
+                    curve_y_value = -self.n_half_cells
+                    
+                    # Get y-values:
+                    curr_x = self.temporal_to_spatial(curr_plot3D_active_window_data['t'].to_numpy())
+                    pts = np.column_stack([curr_x, np.full_like(curr_x, curve_y_value), curr_plot3D_active_window_data[curr_plot_column_name].to_numpy()])
                 
-                curve_y_value = -self.n_half_cells
-                
-                # Get y-values:
-                curr_x = self.temporal_to_spatial(curr_plot3D_active_window_data['t'].to_numpy())
-                pts = np.column_stack([curr_x, np.full_like(curr_x, curve_y_value), curr_plot3D_active_window_data[curr_plot_column_name].to_numpy()])
-            
-            
-            self._build_or_update_plot(curr_plot_name, pts)
+                # outputs of either mode are curr_plot_name, pts
+                curr_plt = self._build_or_update_plot(curr_plot_name, pts)
+                # end for curr_data_series_index in np.arange(num_data_series)
     
     # @QtCore.pyqtSlot(float, float)
     # def TimeCurvesViewMixin_on_window_update(self, new_start, new_end):
