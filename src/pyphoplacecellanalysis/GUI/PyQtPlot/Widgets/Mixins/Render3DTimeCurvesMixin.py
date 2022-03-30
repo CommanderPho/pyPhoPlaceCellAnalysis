@@ -14,6 +14,8 @@ from pyphoplacecellanalysis.General.DataSeriesToSpatial import DataSeriesToSpati
 from pyphoplacecellanalysis.General.Model.Datasources import DataframeDatasource
 
 
+from pyphoplacecellanalysis.General.Model.RenderDataseries import RenderDataseries
+
 class CurveDatasource(DataframeDatasource):
     """ Provides the list of values, 'v' and the timestamps at which they occur 't'.
     
@@ -32,7 +34,45 @@ class CurveDatasource(DataframeDatasource):
     @data_series_specs.setter
     def data_series_specs(self, value):
         self._data_series_specs = value
+        
+    
+    @property
+    def has_data_series_specs(self):
+        """The data_series_specs property."""
+        return (self.data_series_specs is not None)
+      
+    @property
+    def datasource_UIDs(self):
+        """The datasource_UID property."""
+        if self.data_series_specs is not None:
+            return [f'{self.custom_datasource_name}.{series_name}' for series_name in self.data_series_specs.data_series_names]
+        else:
+            return [f'{self.custom_datasource_name}.{col_name}' for col_name in self.data_column_values]
 
+
+    ## Active-Only versions of data_column_names, data_column_values, and datasource_UIDs that can be overriden to enable only a subset of the values
+    @property
+    def active_data_column_names(self):
+        """ the names of only the non-time columns """
+        if self.data_series_specs is not None:
+            return self.data_series_specs.data_series_names
+        else:
+            return self.data_column_values
+    
+    @property
+    def active_data_column_values(self):
+        """ The values of only the non-time columns """
+        map(upper, mylis)
+        return self.data_column_values
+    
+    @property
+    def active_datasource_UIDs(self):
+        """The datasource_UID property."""
+        return [f'{self.custom_datasource_name}.{col_name}' for col_name in self.active_data_column_values]
+    
+    
+    
+    
     def __init__(self, df, datasource_name='default_plot_datasource', data_series_specs=None):
         # Initialize the datasource as a QObject
         DataframeDatasource.__init__(self, df, datasource_name=datasource_name)
@@ -59,16 +99,25 @@ class TimeCurvesViewMixin:
     
     def calculate_data_z_scaling_factor(self):
         """ Calculate the factor required to scale the data_values_range to fit within the z_max_value """
-        data_values_range = np.ptp(self.params.time_curves_datasource.data_column_values)
-        z_max_value = np.abs(self.z_floor) # get the z-height of the floor so as not to go below it.
-        data_z_scaling_factor = z_max_value / data_values_range
+        if self.params.time_curves_z_normalization_mode == 'None':
+            return 1.0
+        elif self.params.time_curves_z_normalization_mode == 'global':
+            data_values_range = np.ptp(self.params.time_curves_datasource.data_column_values)
+            z_max_value = np.abs(self.z_floor) # get the z-height of the floor so as not to go below it.
+            data_z_scaling_factor = z_max_value / data_values_range
+        else:
+            raise NotImplementedError
+        
         return data_z_scaling_factor
+    
+    
 
     @QtCore.pyqtSlot()
     def TimeCurvesViewMixin_on_init(self):
         self.params.time_curves_datasource = None # initialize datasource variable
         self.params.time_curves_no_update = False # called to disabling updating time curves internally
-        
+        self.params.time_curves_z_normalization_mode = 'None'
+            
         self.plots.time_curves = dict()
         
 
@@ -80,7 +129,7 @@ class TimeCurvesViewMixin:
             self.detach_3d_time_curves_datasource()
         
         if curve_datasource is not None:
-            self.params.time_curves_datasource = None
+            self.params.time_curves_datasource = curve_datasource
         else:
             if plot_dataframe is not None: 
                 # build a new CurveDatasource from the provided dataframe 
@@ -128,6 +177,19 @@ class TimeCurvesViewMixin:
             print('\t done.')
             
         
+    def _build_or_update_plot(self, plot_name, points):
+        if plot_name in self.plots.time_curves:
+            # Plot already exists, update it instead.
+            plt = self.plots.time_curves[plot_name]
+            plt.setData(pos=points)
+        else:
+            # plot doesn't exist, built it fresh.
+            plt = gl.GLLinePlotItem(pos=points, color=pg.mkColor('white'), width=0.5, antialias=True)
+            plt.scale(1.0, 1.0, self.data_z_scaling_factor) # Scale the data_values_range to fit within the z_max_value. Shouldn't need to be adjusted so long as data doesn't change.
+            self.ui.main_gl_widget.addItem(plt)
+            self.plots.time_curves[plot_name] = plt # add it to the dictionary.
+        return plt
+            
 
     # def _build_3D_time_curves(self):
     def update_3D_time_curves(self):
@@ -138,31 +200,36 @@ class TimeCurvesViewMixin:
             # don't update because we're in no_update mode
             return
         else:
-            # TODO: currently only gets the first data_column. (doesn't yet support multiple)
-            curr_plot_column_name = self.params.time_curves_datasource.data_column_names[0]
-            curr_plot_name = self.params.time_curves_datasource.datasource_UIDs[0]
-            
+            # Common to both:
             # Get current plot items:
             curr_plot3D_active_window_data = self.params.time_curves_datasource.get_updated_data_window(self.spikes_window.active_window_start_time, self.spikes_window.active_window_end_time) # get updated data for the active window from the datasource
-            curve_y_value = -self.n_half_cells
+            curr_data_series_index = 0
             
-            # Get y-values:
-            # self.build_series_identity_axis()
-            curr_x = self.temporal_to_spatial(curr_plot3D_active_window_data['t'].to_numpy())
-            # curr_x = DataSeriesToSpatial.temporal_to_spatial_map(curr_plot3D_active_window_data['t'].to_numpy(), self.spikes_window.active_window_start_time, self.spikes_window.active_window_end_time, self.temporal_axis_length, center_mode='zero_centered')
-            pts = np.column_stack([curr_x, np.full_like(curr_x, curve_y_value), curr_plot3D_active_window_data[curr_plot_column_name].to_numpy()])
-            
-            if curr_plot_name in self.plots.time_curves:
-                # Plot already exists, update it instead.
-                plt = self.plots.time_curves[curr_plot_name]
-                plt.setData(pos=pts)
-            else:
-                # plot doesn't exist, built it fresh.
-                plt = gl.GLLinePlotItem(pos=pts, color=pg.mkColor('white'), width=0.5, antialias=True)
-                plt.scale(1.0, 1.0, self.data_z_scaling_factor) # Scale the data_values_range to fit within the z_max_value. Shouldn't need to be adjusted so long as data doesn't change.
-                self.ui.main_gl_widget.addItem(plt)
-                self.plots.time_curves[curr_plot_name] = plt # add it to the dictionary.
+            # Data series mode:
+            if self.params.time_curves_datasource.data_series_specs is not None:
+                data_series_spaital_values_list = self.params.time_curves_datasource.data_series_specs.get_data_series_spatial_values(curr_plot3D_active_window_data)
                 
+                # Get the current series:
+                curr_data_series_dict = data_series_spaital_values_list[curr_data_series_index]
+                
+                curr_plot_column_name = curr_data_series_dict.get('name', f'series[{curr_data_series_index}]')
+                curr_plot_name = self.params.time_curves_datasource.datasource_UIDs[curr_data_series_index]
+                # points for the current plot:
+                pts = np.column_stack([curr_data_series_dict['x'], curr_data_series_dict['y'], curr_data_series_dict['z']])
+                
+            else:
+                # TODO: currently only gets the first data_column. (doesn't yet support multiple)
+                curr_plot_column_name = self.params.time_curves_datasource.data_column_names[curr_data_series_index]
+                curr_plot_name = self.params.time_curves_datasource.datasource_UIDs[curr_data_series_index]
+                
+                curve_y_value = -self.n_half_cells
+                
+                # Get y-values:
+                curr_x = self.temporal_to_spatial(curr_plot3D_active_window_data['t'].to_numpy())
+                pts = np.column_stack([curr_x, np.full_like(curr_x, curve_y_value), curr_plot3D_active_window_data[curr_plot_column_name].to_numpy()])
+            
+            
+            self._build_or_update_plot(curr_plot_name, pts)
     
     # @QtCore.pyqtSlot(float, float)
     # def TimeCurvesViewMixin_on_window_update(self, new_start, new_end):

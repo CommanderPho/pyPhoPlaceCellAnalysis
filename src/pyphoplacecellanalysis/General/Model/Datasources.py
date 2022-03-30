@@ -85,12 +85,28 @@ class DataframeDatasource(BaseDatasource):
     def data_column_values(self):
         """ The values of only the non-time columns """
         return self._df[self.data_column_names]
-
+    
     @property
     def datasource_UIDs(self):
         """The datasource_UID property."""
         return [f'{self.custom_datasource_name}.{col_name}' for col_name in self.data_column_values]
     
+    
+    ## Active-Only versions of data_column_names, data_column_values, and datasource_UIDs that can be overriden to enable only a subset of the values
+    @property
+    def active_data_column_names(self):
+        """ the names of only the non-time columns """
+        return self.data_column_values
+    
+    @property
+    def active_data_column_values(self):
+        """ The values of only the non-time columns """
+        return self._df[self.active_data_column_names]
+    
+    @property
+    def active_datasource_UIDs(self):
+        """The datasource_UID property."""
+        return [f'{self.custom_datasource_name}.{col_name}' for col_name in self.active_data_column_values]
     
     @property
     def total_datasource_start_end_times(self):

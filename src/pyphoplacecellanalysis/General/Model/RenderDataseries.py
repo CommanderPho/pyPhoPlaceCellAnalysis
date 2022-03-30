@@ -53,7 +53,26 @@ class RenderDataseries(SimplePrintable, PrettyPrintable, QtCore.QObject):
     def init_from_direct_spatial_data_series_list(cls, spatial_data_series_list):
         return cls(direct_spatial_data_series_list=spatial_data_series_list)
         
-        
+    
+    @property
+    def data_series_config_list(self):
+        """The data_series_config_list property."""
+        if self.direct_spatial_data_series_list is not None:
+            return self.direct_spatial_data_series_list
+        else:
+            return self.data_series_pre_spatial_list
+    
+    
+    @property
+    def data_series_names(self):
+        """The data_series_names property."""
+        return [a_series['name'] for a_series in self.data_series_config_list]
+     
+    @property
+    def num_data_series(self):
+        """The number of different data series."""
+        return len(self.data_series_config_list)
+      
       
     def get_data_series_spatial_values(self, curr_windowed_df):
         if self.direct_spatial_data_series_list is not None:
