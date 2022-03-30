@@ -31,7 +31,7 @@ class Spike3DRaster_Vedo(NeuronIdentityAccessingMixin, SpikeRenderingBaseMixin, 
     TODO: CURRENTLY UNIMPLEMENTED I THINK. Switched back to Spike3DRaster as it works well and good enough.
     
     Usage:
-        from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.Spike3DRaster_Vedo import Spike3DRaster_Vedo
+        from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.SpikeRasterWidgets.Spike3DRaster_Vedo import Spike3DRaster_Vedo
         curr_epoch_name = 'maze1'
         curr_epoch = curr_active_pipeline.filtered_epochs[curr_epoch_name] # <NamedTimerange: {'name': 'maze1', 'start_end_times': array([  22.26      , 1739.15336412])};>
         curr_sess = curr_active_pipeline.filtered_sessions[curr_epoch_name]

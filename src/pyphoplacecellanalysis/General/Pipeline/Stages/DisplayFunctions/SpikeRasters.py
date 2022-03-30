@@ -3,9 +3,9 @@ import pandas as pd
 
 from pyphoplacecellanalysis.General.Mixins.AllFunctionEnumeratingMixin import AllFunctionEnumeratingMixin
 
-from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.SpikeRasterBase import SpikeRasterBase
-from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.Spike2DRaster import Spike2DRaster
-from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.Spike3DRaster import Spike3DRaster
+from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.SpikeRasterWidgets.SpikeRasterBase import SpikeRasterBase
+from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.SpikeRasterWidgets.Spike2DRaster import Spike2DRaster
+from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.SpikeRasterWidgets.Spike3DRaster import Spike3DRaster
 
 
 
