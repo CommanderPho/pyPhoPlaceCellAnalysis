@@ -35,8 +35,12 @@ class RenderDataseries(SimplePrintable, PrettyPrintable, QtCore.QObject):
         # curr_windowed_df
         data_series_spaital_values_list = active_dataseries.get_data_series_spatial_values(curr_windowed_df)
         data_series_spaital_values_list
-
     """
+    
+    any_expected_keys = np.array(['name','x','t','y','v_alt','z','v_main','x_map_fn','y_map_fn','z_map_fn'])
+    pre_spatial_expected_keys = np.array(['name','t','v_alt','v_main'])
+    spatial_expected_keys = np.array(['name','x','y','z'])
+    
     def __init__(self, direct_spatial_data_series_list=None, pre_spatial_data_series_list=None, pre_spatial_to_spatial_mappings=None):
         # Initialize the datasource as a QObject
         QtCore.QObject.__init__(self)
@@ -117,14 +121,18 @@ class RenderDataseries(SimplePrintable, PrettyPrintable, QtCore.QObject):
 
             if enable_debug_print:
                 print(f"a_series_config_dict: {a_series_config_dict}")
+                
+            a_series_value_dict_all_keys = np.array(list(a_series_config_dict.keys()))
+            extra_series_keys = np.setdiff1d(a_series_value_dict_all_keys, cls.pre_spatial_expected_keys) # get only the unexpected/unhandled keys,  # ['color_name', 'line_width', 'z_scaling_factor']
+            extra_series_options_dict = {an_extra_key:a_series_config_dict[an_extra_key] for an_extra_key in extra_series_keys} # # {'color_name': 'yellow', 'line_width': 1.25, 'z_scaling_factor': 1.0}
             # print(f"'name':{series_name},'t':{series_t},'v_alt':{series_v_alt},'v_main':{series_v_main}")
-            data_series_values_list.append({'name':series_name,'t':curr_series_t_values,'v_alt':curr_series_v_alt_values,'v_main':curr_series_v_main_values})
+            data_series_values_list.append({'name':series_name,'t':curr_series_t_values,'v_alt':curr_series_v_alt_values,'v_main':curr_series_v_main_values} | extra_series_options_dict)
 
         return data_series_values_list
 
 
     @classmethod
-    def _evaluate_spatial_values_from_pre_spatial_values(cls, data_series_pre_spatial_values_list, data_series_pre_spatial_to_spatial_mappings):
+    def _evaluate_spatial_values_from_pre_spatial_values(cls, data_series_pre_spatial_values_list, data_series_pre_spatial_to_spatial_mappings, enable_debug_print=False):
         """
         data_series_pre_spatial_values_list: Values computed by _get_data_series_pre_spatial_values(curr_windowed_df, data_series_pre_spatial_list)
             Example:
@@ -163,7 +171,13 @@ class RenderDataseries(SimplePrintable, PrettyPrintable, QtCore.QObject):
             else:
                 curr_series_y_values = curr_series_y_map_fn(a_series_value_dict[curr_series_pre_to_spatial_mapping_dict['y']])
             curr_series_z_values = curr_series_z_map_fn(a_series_value_dict[curr_series_pre_to_spatial_mapping_dict['z']])
-            data_series_spaital_values_list.append({'name':series_name,'x':curr_series_x_values,'y':curr_series_y_values,'z':curr_series_z_values})
+            ## Additional (Optional) Unhandled values:
+            a_series_value_dict_all_keys = np.array(list(a_series_value_dict.keys()))
+            extra_series_keys = np.setdiff1d(a_series_value_dict_all_keys, cls.any_expected_keys) # get only the unexpected/unhandled keys,  # ['color_name', 'line_width', 'z_scaling_factor']
+            if enable_debug_print:
+                print(f'for i={i}, a_series_value_dict.keys(): {a_series_value_dict.keys()}, extra_series_keys: {extra_series_keys}')
+            extra_series_options_dict = {an_extra_key:a_series_value_dict[an_extra_key] for an_extra_key in extra_series_keys} # # {'color_name': 'yellow', 'line_width': 1.25, 'z_scaling_factor': 1.0}
+            data_series_spaital_values_list.append({'name':series_name,'x':curr_series_x_values,'y':curr_series_y_values,'z':curr_series_z_values} | extra_series_options_dict)
         return data_series_spaital_values_list
 
 
@@ -205,8 +219,13 @@ class RenderDataseries(SimplePrintable, PrettyPrintable, QtCore.QObject):
 
             if enable_debug_print:
                 print(f"a_series_config_dict: {a_series_config_dict}")
+                
+            a_series_value_dict_all_keys = np.array(list(a_series_config_dict.keys()))
+            extra_series_keys = np.setdiff1d(a_series_value_dict_all_keys, cls.any_expected_keys) # get only the unexpected/unhandled keys,  # ['color_name', 'line_width', 'z_scaling_factor']
+            extra_series_options_dict = {an_extra_key:a_series_config_dict[an_extra_key] for an_extra_key in extra_series_keys} # # {'color_name': 'yellow', 'line_width': 1.25, 'z_scaling_factor': 1.0}
+            
                 # print(f"'name':{series_name},'x':{series_x},'y':{series_y},'z':{series_z}")
-            data_series_values_list.append({'name':series_name,'x':curr_series_x_values,'y':curr_series_y_values,'z':curr_series_z_values})
+            data_series_values_list.append({'name':series_name,'x':curr_series_x_values,'y':curr_series_y_values,'z':curr_series_z_values} | extra_series_options_dict)
 
         return data_series_values_list
 

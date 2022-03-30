@@ -177,15 +177,20 @@ class TimeCurvesViewMixin:
             print('\t done.')
             
         
-    def _build_or_update_plot(self, plot_name, points):
+    def _build_or_update_plot(self, plot_name, points, **kwargs):
+        # build the plot arguments (color, line thickness, etc)        
+        plot_args = ({'color_name':'white','line_width':0.5,'z_scaling_factor':1.0} | kwargs)
+        
         if plot_name in self.plots.time_curves:
             # Plot already exists, update it instead.
             plt = self.plots.time_curves[plot_name]
             plt.setData(pos=points)
         else:
             # plot doesn't exist, built it fresh.
-            plt = gl.GLLinePlotItem(pos=points, color=pg.mkColor('white'), width=0.5, antialias=True)
-            plt.scale(1.0, 1.0, self.data_z_scaling_factor) # Scale the data_values_range to fit within the z_max_value. Shouldn't need to be adjusted so long as data doesn't change.
+            # plt = gl.GLLinePlotItem(pos=points, color=pg.mkColor('white'), width=0.5, antialias=True)
+            plt = gl.GLLinePlotItem(pos=points, color=pg.mkColor(plot_args['color_name']), width=plot_args['line_width'], antialias=True)
+            plt.scale(1.0, 1.0, plot_args['z_scaling_factor']) # Scale the data_values_range to fit within the z_max_value. Shouldn't need to be adjusted so long as data doesn't change.            
+            # plt.scale(1.0, 1.0, self.data_z_scaling_factor) # Scale the data_values_range to fit within the z_max_value. Shouldn't need to be adjusted so long as data doesn't change.
             self.ui.main_gl_widget.addItem(plt)
             self.plots.time_curves[plot_name] = plt # add it to the dictionary.
         return plt
@@ -224,6 +229,12 @@ class TimeCurvesViewMixin:
                     # points for the current plot:
                     pts = np.column_stack([curr_data_series_dict['x'], curr_data_series_dict['y'], curr_data_series_dict['z']])
                     
+                    # Extra options:
+                    # color_name = curr_data_series_dict.get('color_name','white')
+                    extra_plot_options_dict = {'color_name':curr_data_series_dict.get('color_name', 'white'),
+                                               'line_width':curr_data_series_dict.get('line_width', 0.5),
+                                               'z_scaling_factor':curr_data_series_dict.get('z_scaling_factor', 0.5)}
+                    
                 else:
                     # TODO: currently only gets the first data_column. (doesn't yet support multiple)
                     curr_plot_column_name = self.params.time_curves_datasource.data_column_names[curr_data_series_index]
@@ -234,9 +245,11 @@ class TimeCurvesViewMixin:
                     # Get y-values:
                     curr_x = self.temporal_to_spatial(curr_plot3D_active_window_data['t'].to_numpy())
                     pts = np.column_stack([curr_x, np.full_like(curr_x, curve_y_value), curr_plot3D_active_window_data[curr_plot_column_name].to_numpy()])
+                    
+                    extra_plot_options_dict = {}
                 
                 # outputs of either mode are curr_plot_name, pts
-                curr_plt = self._build_or_update_plot(curr_plot_name, pts)
+                curr_plt = self._build_or_update_plot(curr_plot_name, pts, **extra_plot_options_dict)
                 # end for curr_data_series_index in np.arange(num_data_series)
     
     # @QtCore.pyqtSlot(float, float)
