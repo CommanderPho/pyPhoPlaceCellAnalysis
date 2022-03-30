@@ -7,7 +7,7 @@ import pandas as pd
 from neuropy import core
 from neuropy.analyses.placefields import PlacefieldComputationParameters, perform_compute_placefields
 
-from pyphocorehelpers.function_helpers import compose_functions
+from pyphocorehelpers.function_helpers import compose_functions, compose_functions_with_error_handling
 
 from pyphoplacecellanalysis.General.Pipeline.Stages.BaseNeuropyPipelineStage import BaseNeuropyPipelineStage, PipelineStage
 from pyphoplacecellanalysis.General.Pipeline.Stages.Filtering import FilterablePipelineStage
@@ -39,7 +39,9 @@ class ComputablePipelineStage:
         return output_result
 
     def single_computation(self, active_computation_params: PlacefieldComputationParameters=None, enabled_filter_names=None):
-        """ Takes its filtered_session and applies the provided active_computation_params to it. The results are stored in self.computation_results under the same key as the filtered session. """
+        """ 'single' here refers to the fact that it evaluates only one of the active_computation_params
+        
+        Takes its filtered_session and applies the provided active_computation_params to it. The results are stored in self.computation_results under the same key as the filtered session. """
         assert (len(self.filtered_sessions.keys()) > 0), "Must have at least one filtered session before calling single_computation(...). Call self.select_filters(...) first."
         # self.active_computation_results = dict()
         if enabled_filter_names is None:
@@ -182,12 +184,21 @@ class ComputedPipelineStage(LoadableInput, LoadableSessionInput, FilterablePipel
         if (len(self.registered_computation_functions) > 0):
             if debug_print:
                 print(f'Performing perform_registered_computations(...) with {len(self.registered_computation_functions)} registered_computation_functions...')
-            composed_registered_computations_function = compose_functions(*self.registered_computation_functions) # functions are composed left-to-right
+            # composed_registered_computations_function = compose_functions(*self.registered_computation_functions) # functions are composed left-to-right
+            # Use exception-tolerant version of function composition (functions are composed left-to-right):
+            composed_registered_computations_function = compose_functions_with_error_handling(*self.registered_computation_functions) # functions are composed left-to-right
+            
             # if previous_computation_result is None:
             #     assert (self.computation_results is not None), "if no previous_computation_result is passed, one should have been computed previously."
             #     previous_computation_result = self.computation_results # Get the previously computed computation results. Note that if this function is called multiple times and assumes the results are coming in fresh, this can be an error.
             
-            previous_computation_result = composed_registered_computations_function(previous_computation_result)
+            # normal version that fails on any exception:
+            # previous_computation_result = composed_registered_computations_function(previous_computation_result)
+            # exception-tolerant version
+            previous_computation_result, accumulated_errors = composed_registered_computations_function(previous_computation_result)
+            
+            print(f'perform_registered_computations(...): \n\taccumulated_errors: {accumulated_errors}')
+            
             return previous_computation_result
             
         else:
