@@ -173,6 +173,16 @@ class SpikeRasterBase(UnitSortableMixin, DataSeriesToSpatialTransformingMixin, N
         # return self.unit_ids
         return np.unique(self.spikes_window.df['aclu'].to_numpy()) 
 
+    @property
+    def ordered_neuron_ids(self):
+        """ Requires the self.unit_sort_order property implemented in UnitSortableMixin """
+        return self.neuron_ids[self.unit_sort_order]
+    
+    @property
+    def ordered_cell_ids(self):
+        """ Requires the self.unit_sort_order property implemented in UnitSortableMixin """
+        return self.cell_ids[self.unit_sort_order]
+    
     
     @property
     def overlay_text_lines_dict(self):
