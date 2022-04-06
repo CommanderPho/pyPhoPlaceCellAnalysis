@@ -1,6 +1,7 @@
 from copy import deepcopy
 import time
 import sys
+from typing import OrderedDict
 import pyqtgraph as pg
 from pyqtgraph.Qt import QtCore, QtGui, QtWidgets
 import pyqtgraph.opengl as gl # for 3D raster plot
@@ -251,16 +252,11 @@ class SpikeRasterBase(UnitSortableMixin, DataSeriesToSpatialTransformingMixin, N
         # self.params.wantsRenderWindowControls = SpikeRasterBase.WantsRenderWindowControls
         # self.params.wantsPlaybackControls = SpikeRasterBase.WantsPlaybackControls
         
-        
-        
-        
         # self._playback_update_frequency = SpikeRasterBase.PlaybackUpdateFrequency
         # self.speedBurstPlaybackRate = SpikeRasterBase.SpeedBurstPlaybackRate
         # self.params.is_speed_burst_mode_active = False
         # self.params.is_playback_reversed = False
         # self.params.animation_time_step = 0.04 
-        
-        
         
         self.params.side_bin_margins = 0.0 # space to sides of the first and last cell on the y-axis
         
@@ -276,16 +272,21 @@ class SpikeRasterBase(UnitSortableMixin, DataSeriesToSpatialTransformingMixin, N
         self.enable_debug_print = False
         self.enable_debug_widgets = True
         
-        
         # Neurons and sort-orders:
+        
+        # Build important maps between self.unit_ids and self.cell_ids:
+        self.cell_id_to_unit_id_map = OrderedDict(zip(self.cell_ids, self.unit_ids)) # maps cell_ids to unit_ids
+        self.unit_id_to_cell_id_map = OrderedDict(zip(self.unit_ids, self.cell_ids)) # maps unit_ids to cell_ids
+        
         if neuron_sort_order is None:
             neuron_sort_order = np.arange(len(self.unit_ids)) # default sort order is sorted by unit_ids
         self._unit_sort_order = neuron_sort_order
         assert len(self._unit_sort_order) == len(self.unit_ids), f"len(self._unit_sort_order): {len(self._unit_sort_order)} must equal len(self.unit_ids): {len(self.unit_ids)} but it does not!"
         
         
+        
         # Setup Coloring:
-        self._setup_neurons_color_data(neuron_colors, coloring_mode='preserve_unit_ids')
+        self._setup_neurons_color_data(neuron_colors, coloring_mode='color_by_index_order')
         
         # make root container for plots
         self.plots = RenderPlots('')
@@ -307,27 +308,36 @@ class SpikeRasterBase(UnitSortableMixin, DataSeriesToSpatialTransformingMixin, N
 
     """ Cell Coloring functions:
     """
-    def _setup_neurons_color_data(self, neuron_colors, coloring_mode='preserve_unit_ids'):
+    def _setup_neurons_color_data(self, neuron_colors_list, coloring_mode='color_by_index_order'):
         """ 
         neuron_colors: a list of neuron colors
         
         Sets:
             self.params.neuron_qcolors
+            self.params.neuron_qcolors_map
             self.params.neuron_colors
             self.params.neuron_colors_hex
         """
-        if neuron_colors is None:
-            neuron_colors = self._build_cell_color_map(self.unit_ids, mode=coloring_mode)
-            for a_color in neuron_colors:
+        
+        unsorted_unit_ids = self.unit_ids
+        
+        if neuron_colors_list is None:
+            neuron_colors_list = self._build_cell_color_map(unsorted_unit_ids, mode=coloring_mode)
+            for a_color in neuron_colors_list:
                 a_color.setAlphaF(0.5)
                 
+                
+            # neuron_unit_id_to_colors_index_map = OrderedDict(zip(unsorted_unit_ids, neuron_colors_list))
+            neuron_colors_map = OrderedDict(zip(unsorted_unit_ids, neuron_colors_list))
+            
             # neuron_colors = []
             # for i, cell_id in enumerate(self.unit_ids):
             #     curr_color = pg.mkColor((i, self.n_cells*1.3))
             #     curr_color.setAlphaF(0.5)
             #     neuron_colors.append(curr_color)
     
-        self.params.neuron_qcolors = deepcopy(neuron_colors)
+        self.params.neuron_qcolors = deepcopy(neuron_colors_list)
+        self.params.neuron_qcolors_map = deepcopy(neuron_colors_map)
 
         # allocate new neuron_colors array:
         self.params.neuron_colors = np.zeros((4, self.n_cells))
@@ -352,7 +362,7 @@ class SpikeRasterBase(UnitSortableMixin, DataSeriesToSpatialTransformingMixin, N
         
         
     @classmethod
-    def _build_cell_color_map(cls, unit_ids, mode='color_by_index_order'):
+    def _build_cell_color_map(cls, unit_ids, mode='color_by_index_order', debug_print=False):
         """ builds a list of pg.mkColors from the cell index id:     
         Usage:
             # _build_cell_color_map(spike_raster_plt_3d.unit_ids, mode='color_by_index_order')
@@ -363,18 +373,16 @@ class SpikeRasterBase(UnitSortableMixin, DataSeriesToSpatialTransformingMixin, N
         if mode == 'preserve_unit_ids':
             # color is assigned based off of unit_id value, meaning after re-sorting the unit_ids the colors will appear visually different along y but will correspond to the same units as before the sort.
             unit_ids_sort_index = np.argsort(unit_ids) # get the indicies of the sorted ids
-            sorted_unit_ids = np.sort(unit_ids)
+            # sorted_unit_ids = np.sort(unit_ids)
             sorted_unit_ids = np.take_along_axis(unit_ids, unit_ids_sort_index, axis=None)
-            print(f'unit_ids: \t\t{unit_ids}\nunit_ids_sort_index: \t{unit_ids_sort_index}\nsorted_unit_ids: \t{sorted_unit_ids}\n')
+            if debug_print:
+                print(f'unit_ids: \t\t{unit_ids}\nunit_ids_sort_index: \t{unit_ids_sort_index}\nsorted_unit_ids: \t{sorted_unit_ids}\n')
             return [pg.mkColor((cell_id, n_cells*1.3)) for i, cell_id in enumerate(sorted_unit_ids)]
         elif mode == 'color_by_index_order':
             # color is assigned based of the raw index order of the passed-in unit ids. This means after re-sorting the units the colors will appear visually the same along y, but will not correspond to the same units.
             return [pg.mkColor((i, n_cells*1.3)) for i, cell_id in enumerate(unit_ids)]
         else:
             raise NotImplementedError
-        # for i, cell_id in enumerate(self.unit_ids):
-        #         curr_color = pg.mkColor((i, self.n_cells*1.3))
-        #         curr_color.setAlphaF(0.5)
 
 
 

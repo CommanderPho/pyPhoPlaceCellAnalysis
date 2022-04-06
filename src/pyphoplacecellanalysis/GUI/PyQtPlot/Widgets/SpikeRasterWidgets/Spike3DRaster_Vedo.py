@@ -122,8 +122,8 @@ class Spike3DRaster_Vedo(NeuronIdentityAccessingMixin, SpikeRenderingBaseMixin, 
         return np.c_[curr_x, self.active_windowed_df['visualization_raster_y_location'].to_numpy(), np.full_like(curr_x, const_z)] # y-locations are already pre-computed and added to the df
 
 
-    def __init__(self, spikes_df, *args, window_duration=15.0, window_start_time=0.0, neuron_colors=None, **kwargs):
-        super(Spike3DRaster_Vedo, self).__init__(*args, **kwargs)
+    def __init__(self, spikes_df, *args, window_duration=15.0, window_start_time=0.0, neuron_colors=None, neuron_sort_order=None, **kwargs):
+        super(Spike3DRaster_Vedo, self).__init__(*args, window_duration=window_duration, window_start_time=window_start_time, neuron_colors=neuron_colors, neuron_sort_order=neuron_sort_order, **kwargs)
         # Initialize member variables:
         
         # Helper container variables

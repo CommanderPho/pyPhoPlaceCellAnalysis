@@ -150,8 +150,8 @@ class Spike3DRaster(TimeCurvesViewMixin, RenderTimeEpochMeshesMixin, SpikeRaster
     
     
     
-    def __init__(self, spikes_df, *args, window_duration=15.0, window_start_time=0.0, neuron_colors=None, **kwargs):
-        super(Spike3DRaster, self).__init__(spikes_df, *args, window_duration=window_duration, window_start_time=window_start_time, neuron_colors=neuron_colors, **kwargs)
+    def __init__(self, spikes_df, *args, window_duration=15.0, window_start_time=0.0, neuron_colors=None, neuron_sort_order=None, **kwargs):
+        super(Spike3DRaster, self).__init__(spikes_df, *args, window_duration=window_duration, window_start_time=window_start_time, neuron_colors=neuron_colors, neuron_sort_order=neuron_sort_order, **kwargs)
         
         # Setup Specific Member Variables:
         self.params.render_epochs = None
@@ -165,6 +165,7 @@ class Spike3DRaster(TimeCurvesViewMixin, RenderTimeEpochMeshesMixin, SpikeRaster
         self.spikes_window.window_duration_changed_signal.connect(self.on_adjust_temporal_spatial_mapping)
         # self.on_window_duration_changed.connect(self.on_adjust_temporal_spatial_mapping)
         # self.spikes_window.window_changed_signal.connect(self.TimeCurvesViewMixin_on_window_update) # TODO: this is for TimeCurvesViewMixin but currently just call manually.
+        self.unit_sort_order_changed_signal.connect(self.on_unit_sort_order_changed)
         
         self.show()
 
@@ -286,19 +287,21 @@ class Spike3DRaster(TimeCurvesViewMixin, RenderTimeEpochMeshesMixin, SpikeRaster
         self.ui.gl_line_plots = [] # create an empty array for each GLLinePlotItem, of which there will be one for each unit.
         
         # build the position range for each unit along the y-axis:
-        # y = DataSeriesToSpatial.build_series_identity_axis(self.n_cells, center_mode='zero_centered', bin_position_mode='bin_center', side_bin_margins = self.params.side_bin_margins)
+        # rebuild the position range for each unit along the y-axis:
         self.y = DataSeriesToSpatial.build_series_identity_axis(self.n_cells, center_mode=self.params.center_mode, bin_position_mode=self.params.bin_position_mode, side_bin_margins = self.params.side_bin_margins)
+        self.y = self.y[self.unit_sort_order] # re-sort the y-values by the unit_sort_order
         
         self._build_neuron_id_graphics(self.ui.main_gl_widget, self.y)
         
         # Plot each unit one at a time:
-        for i, cell_id in enumerate(self.unit_ids):
-            curr_color = pg.mkColor((i, self.n_cells*1.3))
+        for i, a_unit_id in enumerate(self.unit_ids):
+            # curr_color = pg.mkColor((i, self.n_cells*1.3))
+            curr_color = self.params.neuron_qcolors_map[a_unit_id]
             curr_color.setAlphaF(0.5)
             # print(f'cell_id: {cell_id}, curr_color: {curr_color.alpha()}')
             
             # Filter the dataframe using that column and value from the list
-            curr_cell_df = self.active_windowed_df[self.active_windowed_df['unit_id']==cell_id].copy() # is .copy() needed here since nothing is updated???
+            curr_cell_df = self.active_windowed_df[self.active_windowed_df['unit_id']==a_unit_id].copy() # is .copy() needed here since nothing is updated???
             # curr_unit_id = curr_cell_df['unit_id'].to_numpy() # this will map to the y position
             curr_spike_t = curr_cell_df[curr_cell_df.spikes.time_variable_name].to_numpy() # this will map 
             yi = self.y[i] # get the correct y-position for all spikes of this cell
@@ -333,13 +336,25 @@ class Spike3DRaster(TimeCurvesViewMixin, RenderTimeEpochMeshesMixin, SpikeRaster
     def _build_neuron_id_graphics(self, w, y_pos):
         """ builds the text items to indicate the neuron ID for each neuron in the df. """
         all_cell_ids = self.cell_ids
+        # all_unit_ids = [self.unit_id_to_cell_id_map[a_cell_id] for a_cell_id in all_cell_ids] # get the list of all unit_ids
         
         cell_id_text_item_font = QtGui.QFont('Helvetica', 12)
         
         self.ui.glCellIdTextItems = []
         for i, cell_id in enumerate(all_cell_ids):
-            curr_color = pg.mkColor((i, self.n_cells*1.3))
-            curr_color.setAlphaF(0.5)
+        # for i, a_unit_id in enumerate(all_unit_ids):
+            a_unit_id = self.cell_id_to_unit_id_map[cell_id]
+            # curr_color = pg.mkColor((i, self.n_cells*1.3))
+            try:
+                curr_color = self.params.neuron_qcolors_map[a_unit_id]
+            except KeyError as e:
+                print(f'_build_neuron_id_graphics(...): key error: {e}! i: {i}, cell_id: {cell_id}, a_unit_id: {a_unit_id} not found in {self.params.neuron_qcolors_map.keys()}')
+                curr_color = self.params.neuron_qcolors[i]
+            except Exception as e:
+                raise e
+            
+            # curr_color = self.params.neuron_qcolors[i]
+            curr_color.setAlphaF(1.0)
             # print(f'cell_id: {cell_id}, curr_color: {curr_color.alpha()}')
             curr_id_txtitem = gl.GLTextItem(pos=(-self.half_temporal_axis_length, y_pos[i], (self.z_floor - 0.5)), text=f'{cell_id}', color=curr_color, font=cell_id_text_item_font)
             w.addItem(curr_id_txtitem) # add to the current widget
@@ -352,9 +367,23 @@ class Spike3DRaster(TimeCurvesViewMixin, RenderTimeEpochMeshesMixin, SpikeRaster
         all_cell_ids = self.cell_ids
         assert len(self.ui.glCellIdTextItems) == len(all_cell_ids), f"we should already have correct number of neuron ID text items, but len(self.ui.glCellIdTextItems): {len(self.ui.glCellIdTextItems)} and len(all_cell_ids): {len(all_cell_ids)}!"
         assert len(self.ui.glCellIdTextItems) == len(self.y), f"we should already have correct number of neuron ID text items, but len(self.ui.glCellIdTextItems): {len(self.ui.glCellIdTextItems)} and len(self.y): {len(self.y)}!"
+        # all_unit_ids = [self.unit_id_to_cell_id_map[a_cell_id] for a_cell_id in all_cell_ids] # get the list of all unit_ids
+        
         for i, cell_id in enumerate(all_cell_ids):
+        # for i, a_unit_id in enumerate(all_unit_ids):
+            a_unit_id = self.cell_id_to_unit_id_map[cell_id]
+            # curr_color = self.params.neuron_qcolors[i]
+            try:
+                curr_color = self.params.neuron_qcolors_map[a_unit_id]
+            except KeyError as e:
+                print(f'_build_neuron_id_graphics(...): key error: {e}! i: {i}, cell_id: {cell_id}, a_unit_id: {a_unit_id} not found in {self.params.neuron_qcolors_map.keys()}')
+                curr_color = self.params.neuron_qcolors[i]
+            except Exception as e:
+                raise e
+            
+            curr_color.setAlphaF(1.0)
             curr_id_txtitem = self.ui.glCellIdTextItems[i]
-            curr_id_txtitem.setData(pos=(-self.half_temporal_axis_length, self.y[i], (self.z_floor - 0.5)))
+            curr_id_txtitem.setData(pos=(-self.half_temporal_axis_length, self.y[i], (self.z_floor - 0.5)), color=curr_color) # TODO: could update color as well
             # curr_id_txtitem.resetTransform()
             # curr_id_txtitem.translate(-self.half_temporal_axis_length, self.y[i], (self.z_floor - 0.5))
 
@@ -426,12 +455,12 @@ class Spike3DRaster(TimeCurvesViewMixin, RenderTimeEpochMeshesMixin, SpikeRaster
         assert (len(self.ui.gl_line_plots) == self.n_cells), f"after all operations the length of the plots array should be the same as the n_cells, but len(self.ui.gl_line_plots): {len(self.ui.gl_line_plots)} and self.n_cells: {self.n_cells}!"
         # build the position range for each unit along the y-axis:
         # y = DataSeriesToSpatial.build_series_identity_axis(self.n_cells, center_mode='zero_centered', bin_position_mode='bin_center', side_bin_margins = self.params.side_bin_margins)
-        self.y = DataSeriesToSpatial.build_series_identity_axis(self.n_cells, center_mode=self.params.center_mode, bin_position_mode=self.params.bin_position_mode, side_bin_margins = self.params.side_bin_margins)
+        # self.y = DataSeriesToSpatial.build_series_identity_axis(self.n_cells, center_mode=self.params.center_mode, bin_position_mode=self.params.bin_position_mode, side_bin_margins = self.params.side_bin_margins)
         
         # Plot each unit one at a time:
-        for i, cell_id in enumerate(self.unit_ids):    
+        for i, a_unit_id in enumerate(self.unit_ids):    
             # Filter the dataframe using that column and value from the list
-            curr_cell_df = self.active_windowed_df[self.active_windowed_df['unit_id']==cell_id]
+            curr_cell_df = self.active_windowed_df[self.active_windowed_df['unit_id']==a_unit_id]
             curr_spike_t = curr_cell_df[curr_cell_df.spikes.time_variable_name].to_numpy() # this will map
             # efficiently get curr_spike_t by filtering for unit and column at the same time
             # curr_spike_t = self.active_windowed_df.loc[self.active_windowed_df.spikes.time_variable_name, (self.active_windowed_df['unit_id']==cell_id)].values # .to_numpy()
@@ -508,6 +537,21 @@ class Spike3DRaster(TimeCurvesViewMixin, RenderTimeEpochMeshesMixin, SpikeRaster
         self.ui.main_gl_widget.addItem(widget)
             
             
+    # unit_sort_order_changed_signal
+    @QtCore.pyqtSlot(object)
+    def on_unit_sort_order_changed(self, new_sort_order):
+        print(f'unit_sort_order_changed_signal(new_sort_order: {new_sort_order})')
+        
+        # rebuild the position range for each unit along the y-axis:
+        self.y = DataSeriesToSpatial.build_series_identity_axis(self.n_cells, center_mode=self.params.center_mode, bin_position_mode=self.params.bin_position_mode, side_bin_margins = self.params.side_bin_margins)
+        self.y = self.y[self.unit_sort_order] # re-sort the y-values by the unit_sort_order
+        
+        self._update_neuron_id_graphics() # rebuild the text labels
+        self._update_plots()
+        print('\t done.')
+        
+        
+        
 
     # Slider Functions:
     # def _compute_window_transform(self, relative_offset):
@@ -623,3 +667,5 @@ class Spike3DRaster(TimeCurvesViewMixin, RenderTimeEpochMeshesMixin, SpikeRaster
 #     # v = Visualizer()
 #     v = Spike3DRaster()
 #     v.animation()
+# sfs
+
