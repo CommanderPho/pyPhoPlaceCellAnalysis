@@ -243,9 +243,6 @@ class Spike2DRaster(Render2DScrollWindowPlotMixin, SpikeRasterBase):
         # self._buildScrollRasterPreviewWindowGraphics()
             
         self.ui.scatter_plot.addPoints(self.all_spots)
-
-
-
         # self.Render2DScrollWindowPlot_on_window_update # register with the animation time window for updates for the scroller.
         # Connect the signals for the zoom region and the LinearRegionItem
         # self.ui.scroll_window_region.sigRegionChanged.connect(self.update_zoom_plotter)
@@ -309,37 +306,6 @@ class Spike2DRaster(Render2DScrollWindowPlotMixin, SpikeRasterBase):
         # pass
         
 
-    # @QtCore.pyqtSlot()
-    # def update_zoom_plotter(self) -> None:
-    #     """self when the region moves.zoom_Change plotter area"""
-    #     self.ui.scroll_window_region.setZValue(10)
-    #     min_x, max_x = self.ui.scroll_window_region.getRegion()
-        
-    #     # Update the main_plot_widget:
-    #     self.ui.main_plot_widget.setXRange(min_x, max_x, padding=0)
-    #     # self.render_window_duration = (max_x - min_x) # update the render_window_duration from the slider width
-    #     scroll_window_width = max_x - min_x
-    #     # print(f'min_x: {min_x}, max_x: {max_x}, scroll_window_width: {scroll_window_width}') # min_x: 59.62061245756003, max_x: 76.83228787177144, scroll_window_width: 17.211675414211413
-
-    #     # Update the active time window to match the scroll window:
-    #     # old_time_window = spike_raster_plt.spikes_window.active_time_window # (30.0, 930.0)
-
-    #     # spike_raster_plt.render_window_duration = 
-    #     # spike_raster_plt.spikes_window
-    #     # spike_raster_plt.temporal_zoom_factor
-    #     # # self.spikes_window.update_window_start(next_start_timestamp)
-
-
-    #     # Update GUI if we have one:
-    #     if self.WantsRenderWindowControls:
-    #         self.ui.spinTemporalZoomFactor.setValue(1.0)
-    #         self.ui.spinRenderWindowDuration.setValue(scroll_window_width)
-            
-    #     # Finally, update the actual spikes_window. This is the part that updates the 3D Raster plot because we bind to this window's signal
-    #     self.spikes_window.update_window_start(min_x)
-        
-        
-
     @QtCore.pyqtSlot(float, float)
     def update_zoomed_plot(self, min_t, max_t):
         # Update the main_plot_widget:
@@ -356,20 +322,6 @@ class Spike2DRaster(Render2DScrollWindowPlotMixin, SpikeRasterBase):
         # Finally, update the actual spikes_window. This is the part that updates the 3D Raster plot because we bind to this window's signal
         self.spikes_window.update_window_start(min_t)
         
-        
-
-    # @QtCore.pyqtSlot()
-    # def update_region(self) -> None:
-    #     """self.zoom_Change the region of the region when the plotter moves
-    #         viewRange returns the display range of the graph. The type is
-    #         [[Xmin, Xmax], [Ymin, Ymax]]
-    #     """
-    #     rgn = self.ui.main_plot_widget.viewRange()[0] # This gets the range from the main plot.
-    #     self.ui.scroll_window_region.setRegion(rgn) # adjust the top plot
-    #     self.window_scrolled.emit(rgn[0], rgn[1]) # emit the window_scrolled signal
-    #     # self.render_window_duration = (max_x - min_x) # update the render_window_duration from the slider width
-
-
     @QtCore.pyqtSlot(float, float)
     def update_scroll_window_region(self, new_start, new_end, block_signals: bool=True):
         """ called to update the interactive scrolling window control """
