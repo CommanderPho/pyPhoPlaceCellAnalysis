@@ -93,9 +93,31 @@ class RenderPlots(PrettyPrintable, SimplePrintable, metaclass=OrderedMeta):
     #     # self.__dict__ = (self.__dict__ | kwargs)
     
     
-                
+class UnitSortableMixin:
+    """ Implementor allows changing the sort order of the units (neurons) displayed by setting indicies directly via the self.unit_sort_order property.
+    
+    Requires:
+        self._unit_sort_order
+        self.n_cells
+    """
+    unit_sort_order_changed_signal = QtCore.pyqtSignal(object) # Called when the window is closing. 
+    
+    @property
+    def unit_sort_order(self):
+        """The unit_sort_order property.
+            Requires self._unit_sort_order to be a ndarray of indicies with the same length as self.unit_ids
+        """
+        return self._unit_sort_order
+    @unit_sort_order.setter
+    def unit_sort_order(self, value):
+        assert len(value) == self.n_cells, f"len(self._unit_sort_order): {len(self._unit_sort_order)} must equal self.n_cells: {self.n_cells} but it does not!"
+        self._unit_sort_order = value
+        # Emit the sort order changed signal:
+        self.unit_sort_order_changed_signal.emit(self._unit_sort_order)
+        
+    
 
-class SpikeRasterBase(DataSeriesToSpatialTransformingMixin, NeuronIdentityAccessingMixin, SpikeRenderingBaseMixin, SpikesWindowOwningMixin, SpikesDataframeOwningMixin, TimeWindowPlaybackPropertiesMixin, RenderPlaybackControlsMixin, RenderWindowControlsMixin, QtWidgets.QWidget):
+class SpikeRasterBase(UnitSortableMixin, DataSeriesToSpatialTransformingMixin, NeuronIdentityAccessingMixin, SpikeRenderingBaseMixin, SpikesWindowOwningMixin, SpikesDataframeOwningMixin, TimeWindowPlaybackPropertiesMixin, RenderPlaybackControlsMixin, RenderWindowControlsMixin, QtWidgets.QWidget):
     """ Displays a raster plot with the spikes occuring along a plane. 
     
     Usage:
@@ -110,6 +132,7 @@ class SpikeRasterBase(DataSeriesToSpatialTransformingMixin, NeuronIdentityAccess
     temporal_mapping_changed = QtCore.pyqtSignal() # signal emitted when the mapping from the temporal window to the spatial layout is changed
     close_signal = QtCore.pyqtSignal() # Called when the window is closing. 
     
+
     SpeedBurstPlaybackRate = 16.0
     PlaybackUpdateFrequency = 0.04 # in seconds
     
@@ -194,7 +217,7 @@ class SpikeRasterBase(DataSeriesToSpatialTransformingMixin, NeuronIdentityAccess
         self.temporal_mapping_changed.emit()
         
 
-    def __init__(self, spikes_df, *args, window_duration=15.0, window_start_time=0.0, neuron_colors=None, **kwargs):
+    def __init__(self, spikes_df, *args, window_duration=15.0, window_start_time=0.0, neuron_colors=None, neuron_sort_order=None, **kwargs):
         super(SpikeRasterBase, self).__init__(*args, **kwargs)
         # Initialize member variables:
         
@@ -235,6 +258,13 @@ class SpikeRasterBase(DataSeriesToSpatialTransformingMixin, NeuronIdentityAccess
     
         self.enable_debug_print = False
         self.enable_debug_widgets = True
+        
+        
+        # Neurons and sort-orders:
+        if neuron_sort_order is None:
+            neuron_sort_order = np.arange(len(self.unit_ids)) # default sort order is sorted by unit_ids
+        self._unit_sort_order = neuron_sort_order
+        assert len(self._unit_sort_order) == len(self.unit_ids), f"len(self._unit_sort_order): {len(self._unit_sort_order)} must equal len(self.unit_ids): {len(self.unit_ids)} but it does not!"
         
         if neuron_colors is None:
             # neuron_colors = [pg.mkColor((i, self.n_cells*1.3)) for i, cell_id in enumerate(self.unit_ids)]
