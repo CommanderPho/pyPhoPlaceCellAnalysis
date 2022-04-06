@@ -115,6 +115,8 @@ class UnitSortableMixin:
         # Emit the sort order changed signal:
         self.unit_sort_order_changed_signal.emit(self._unit_sort_order)
         
+        
+        
     
 
 class SpikeRasterBase(UnitSortableMixin, DataSeriesToSpatialTransformingMixin, NeuronIdentityAccessingMixin, SpikeRenderingBaseMixin, SpikesWindowOwningMixin, SpikesDataframeOwningMixin, TimeWindowPlaybackPropertiesMixin, RenderPlaybackControlsMixin, RenderWindowControlsMixin, QtWidgets.QWidget):
@@ -140,6 +142,11 @@ class SpikeRasterBase(UnitSortableMixin, DataSeriesToSpatialTransformingMixin, N
     def unit_ids(self):
         """The unit_ids from the whole df (not just the current window)"""
         return np.unique(self.spikes_window.df['unit_id'].to_numpy())
+    
+    @property
+    def ordered_unit_ids(self):
+        """ Requires the self.unit_sort_order property implemented in UnitSortableMixin """
+        return self.unit_ids[self.unit_sort_order]
     
     @property
     def n_cells(self):
@@ -266,40 +273,9 @@ class SpikeRasterBase(UnitSortableMixin, DataSeriesToSpatialTransformingMixin, N
         self._unit_sort_order = neuron_sort_order
         assert len(self._unit_sort_order) == len(self.unit_ids), f"len(self._unit_sort_order): {len(self._unit_sort_order)} must equal len(self.unit_ids): {len(self.unit_ids)} but it does not!"
         
-        if neuron_colors is None:
-            # neuron_colors = [pg.mkColor((i, self.n_cells*1.3)) for i, cell_id in enumerate(self.unit_ids)]
-            neuron_colors = []
-            for i, cell_id in enumerate(self.unit_ids):
-                curr_color = pg.mkColor((i, self.n_cells*1.3))
-                curr_color.setAlphaF(0.5)
-                neuron_colors.append(curr_color)
-    
-        self.params.neuron_qcolors = deepcopy(neuron_colors)
-
-        # allocate new neuron_colors array:
-        self.params.neuron_colors = np.zeros((4, self.n_cells))
-        for i, curr_qcolor in enumerate(self.params.neuron_qcolors):
-            curr_color = curr_qcolor.getRgbF() # (1.0, 0.0, 0.0, 0.5019607843137255)
-            self.params.neuron_colors[:, i] = curr_color[:]
-            # self.params.neuron_colors[:, i] = curr_color[:]
-            
-        # self.params.neuron_colors = [self.params.neuron_qcolors[i].getRgbF() for i, cell_id in enumerate(self.unit_ids)] 
-        # self.params.neuron_colors = deepcopy(neuron_colors)
-        self.params.neuron_colors_hex = None
         
-        # spike_raster_plt.params.neuron_colors[0].getRgbF() # (1.0, 0.0, 0.0, 0.5019607843137255)
-        
-        # get hex colors:
-        #  getting the name of a QColor with .name(QtGui.QColor.HexRgb) results in a string like '#ff0000'
-        #  getting the name of a QColor with .name(QtGui.QColor.HexArgb) results in a string like '#80ff0000' 
-        # self.params.neuron_colors_hex = [to_hex(self.params.neuron_colors[:,i], keep_alpha=False) for i, cell_id in enumerate(self.unit_ids)]
-        self.params.neuron_colors_hex = [self.params.neuron_qcolors[i].name(QtGui.QColor.HexRgb) for i, cell_id in enumerate(self.unit_ids)] 
-        
-        # included_cell_INDEXES = np.array([self.get_neuron_id_and_idx(neuron_id=an_included_cell_ID)[0] for an_included_cell_ID in self.spikes_df['aclu'].to_numpy()]) # get the indexes from the cellIDs
-        
-        # self.spikes_df['cell_idx'] = included_cell_INDEXES.copy()
-        # self.spikes_df['cell_idx'] = self.spikes_df['unit_id'].copy() # TODO: this is bad! The self.get_neuron_id_and_idx(...) function doesn't work!
-        
+        # Setup Coloring:
+        self._setup_neurons_color_data(neuron_colors, coloring_mode='preserve_unit_ids')
         
         # make root container for plots
         self.plots = RenderPlots('')
@@ -318,6 +294,79 @@ class SpikeRasterBase(UnitSortableMixin, DataSeriesToSpatialTransformingMixin, N
         # Setup Signals:
         # self.temporal_mapping_changed.connect(self.on_adjust_temporal_spatial_mapping)
         # self.spikes_window.window_duration_changed_signal.connect(self.on_adjust_temporal_spatial_mapping)
+
+    """ Cell Coloring functions:
+    """
+    def _setup_neurons_color_data(self, neuron_colors, coloring_mode='preserve_unit_ids'):
+        """ 
+        neuron_colors: a list of neuron colors
+        
+        Sets:
+            self.params.neuron_qcolors
+            self.params.neuron_colors
+            self.params.neuron_colors_hex
+        """
+        if neuron_colors is None:
+            neuron_colors = self._build_cell_color_map(self.unit_ids, mode=coloring_mode)
+            for a_color in neuron_colors:
+                a_color.setAlphaF(0.5)
+                
+            # neuron_colors = []
+            # for i, cell_id in enumerate(self.unit_ids):
+            #     curr_color = pg.mkColor((i, self.n_cells*1.3))
+            #     curr_color.setAlphaF(0.5)
+            #     neuron_colors.append(curr_color)
+    
+        self.params.neuron_qcolors = deepcopy(neuron_colors)
+
+        # allocate new neuron_colors array:
+        self.params.neuron_colors = np.zeros((4, self.n_cells))
+        for i, curr_qcolor in enumerate(self.params.neuron_qcolors):
+            curr_color = curr_qcolor.getRgbF() # (1.0, 0.0, 0.0, 0.5019607843137255)
+            self.params.neuron_colors[:, i] = curr_color[:]
+            # self.params.neuron_colors[:, i] = curr_color[:]
+        
+        self.params.neuron_colors_hex = None
+        
+        # spike_raster_plt.params.neuron_colors[0].getRgbF() # (1.0, 0.0, 0.0, 0.5019607843137255)
+        
+        # get hex colors:
+        #  getting the name of a QColor with .name(QtGui.QColor.HexRgb) results in a string like '#ff0000'
+        #  getting the name of a QColor with .name(QtGui.QColor.HexArgb) results in a string like '#80ff0000'
+        self.params.neuron_colors_hex = [self.params.neuron_qcolors[i].name(QtGui.QColor.HexRgb) for i, cell_id in enumerate(self.unit_ids)] 
+        
+        # included_cell_INDEXES = np.array([self.get_neuron_id_and_idx(neuron_id=an_included_cell_ID)[0] for an_included_cell_ID in self.spikes_df['aclu'].to_numpy()]) # get the indexes from the cellIDs
+        
+        # self.spikes_df['cell_idx'] = included_cell_INDEXES.copy()
+        # self.spikes_df['cell_idx'] = self.spikes_df['unit_id'].copy() # TODO: this is bad! The self.get_neuron_id_and_idx(...) function doesn't work!
+        
+        
+    @classmethod
+    def _build_cell_color_map(cls, unit_ids, mode='color_by_index_order'):
+        """ builds a list of pg.mkColors from the cell index id:     
+        Usage:
+            # _build_cell_color_map(spike_raster_plt_3d.unit_ids, mode='color_by_index_order')
+            _build_cell_color_map(spike_raster_plt_3d.unit_ids, mode='preserve_unit_ids')
+
+        """
+        n_cells = len(unit_ids)
+        if mode == 'preserve_unit_ids':
+            # color is assigned based off of unit_id value, meaning after re-sorting the unit_ids the colors will appear visually different along y but will correspond to the same units as before the sort.
+            unit_ids_sort_index = np.argsort(unit_ids) # get the indicies of the sorted ids
+            sorted_unit_ids = np.sort(unit_ids)
+            sorted_unit_ids = np.take_along_axis(unit_ids, unit_ids_sort_index, axis=None)
+            print(f'unit_ids: \t\t{unit_ids}\nunit_ids_sort_index: \t{unit_ids_sort_index}\nsorted_unit_ids: \t{sorted_unit_ids}\n')
+            return [pg.mkColor((cell_id, n_cells*1.3)) for i, cell_id in enumerate(sorted_unit_ids)]
+        elif mode == 'color_by_index_order':
+            # color is assigned based of the raw index order of the passed-in unit ids. This means after re-sorting the units the colors will appear visually the same along y, but will not correspond to the same units.
+            return [pg.mkColor((i, n_cells*1.3)) for i, cell_id in enumerate(unit_ids)]
+        else:
+            raise NotImplementedError
+        # for i, cell_id in enumerate(self.unit_ids):
+        #         curr_color = pg.mkColor((i, self.n_cells*1.3))
+        #         curr_color.setAlphaF(0.5)
+
+
 
 
 

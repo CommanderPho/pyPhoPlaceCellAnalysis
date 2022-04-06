@@ -143,35 +143,6 @@ class Spike3DRaster_Vedo(NeuronIdentityAccessingMixin, SpikeRenderingBaseMixin, 
         
         self.enable_debug_print = True
         
-        # if neuron_colors is None:
-        #     # neuron_colors = [pg.mkColor((i, self.n_cells*1.3)) for i, cell_id in enumerate(self.unit_ids)]
-        #     neuron_colors = []
-        #     for i, cell_id in enumerate(self.unit_ids):
-        #         curr_color = pg.mkColor((i, self.n_cells*1.3))
-        #         curr_color.setAlphaF(0.5)
-        #         neuron_colors.append(curr_color)
-    
-        # self.params.neuron_qcolors = deepcopy(neuron_colors)
-
-        # # allocate new neuron_colors array:
-        # self.params.neuron_colors = np.zeros((4, self.n_cells))
-        # for i, curr_qcolor in enumerate(self.params.neuron_qcolors):
-        #     curr_color = curr_qcolor.getRgbF() # (1.0, 0.0, 0.0, 0.5019607843137255)
-        #     self.params.neuron_colors[:, i] = curr_color[:]
-        #     # self.params.neuron_colors[:, i] = curr_color[:]
-            
-        # # self.params.neuron_colors = [self.params.neuron_qcolors[i].getRgbF() for i, cell_id in enumerate(self.unit_ids)] 
-        # # self.params.neuron_colors = deepcopy(neuron_colors)
-        # self.params.neuron_colors_hex = None
-        
-        # # spike_raster_plt.params.neuron_colors[0].getRgbF() # (1.0, 0.0, 0.0, 0.5019607843137255)
-        
-        # # get hex colors:
-        # #  getting the name of a QColor with .name(QtGui.QColor.HexRgb) results in a string like '#ff0000'
-        # #  getting the name of a QColor with .name(QtGui.QColor.HexArgb) results in a string like '#80ff0000' 
-        # # self.params.neuron_colors_hex = [to_hex(self.params.neuron_colors[:,i], keep_alpha=False) for i, cell_id in enumerate(self.unit_ids)]
-        # self.params.neuron_colors_hex = [self.params.neuron_qcolors[i].name(QtGui.QColor.HexRgb) for i, cell_id in enumerate(self.unit_ids)] 
-        
        
         if 'cell_idx' not in self.spikes_df.columns:
             # self.spikes_df['cell_idx'] = self.spikes_df['unit_id'].copy() # TODO: this is bad! The self.get_neuron_id_and_idx(...) function doesn't work!
