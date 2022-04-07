@@ -110,7 +110,7 @@ class PipelineInputDataNode(ExtendedCtrlNode):
                 curr_pipeline = None
                 raise Exception("Processing canceled by user")
 
-        return {'known_data_mode': data_mode, 'loaded_pipeline': curr_pipeline}
+            return {'known_data_mode': data_mode, 'loaded_pipeline': curr_pipeline}
 
 
     @classmethod
