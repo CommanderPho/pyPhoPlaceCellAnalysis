@@ -274,12 +274,37 @@ class SpikeRasterBase(UnitSortableMixin, DataSeriesToSpatialTransformingMixin, N
     
         self.enable_debug_print = False
         self.enable_debug_widgets = True
+        self.enable_overwrite_invalid_unit_ids = True
         
         # Neurons and sort-orders:
+        
+        old_neuron_IDXs = self.unit_ids.copy() # backup the old unit_ids
+        print(f'\t\t self.unit_ids: {self.unit_ids} (len: {len(self.unit_ids)})\n \t\t self.cell_ids: {self.cell_ids} (len: {len(self.cell_ids)})')
+        new_neuron_IDXs = self.find_cell_IDXs_from_cell_ids(self.neuron_ids)
+        print(f'\t\t new_neuron_IDXs: {new_neuron_IDXs} (len(new_neuron_IDXs): {len(new_neuron_IDXs)})')
+        # build a map between the old and new neuron_IDXs:
+        old_to_new_map = OrderedDict(zip(old_neuron_IDXs, new_neuron_IDXs))
+        new_to_old_map = OrderedDict(zip(new_neuron_IDXs, old_neuron_IDXs))
+        neuron_id_to_new_IDX_map = OrderedDict(zip(self.neuron_ids, new_neuron_IDXs)) # provides the new_IDX corresponding to any neuron_id (aclu value)
+        
         
         # Build important maps between self.unit_ids and self.cell_ids:
         self.cell_id_to_unit_id_map = OrderedDict(zip(self.cell_ids, self.unit_ids)) # maps cell_ids to unit_ids
         self.unit_id_to_cell_id_map = OrderedDict(zip(self.unit_ids, self.cell_ids)) # maps unit_ids to cell_ids
+        
+        if self.enable_overwrite_invalid_unit_ids:
+            print("WARNING: self.enable_overwrite_invalid_unit_ids is True, so dataframe 'unit_id' and 'cell_idx' will be overwritten!")
+            self.overwrite_invalid_unit_ids(self.spikes_df, neuron_id_to_new_IDX_map)
+            # self.spikes_df['old_unit_id'] = self.spikes_df['unit_id'].copy()
+            # # self.spikes_df['unit_id'] = np.array([self.get_neuron_id_and_idx(neuron_id=an_included_cell_ID)[0] for an_included_cell_ID in self.spikes_df['aclu'].to_numpy()]) # get the indexes from the cellIDs
+            # # self.spikes_df['unit_id'] = np.array(self.find_cell_IDXs_from_cell_ids(self.spikes_df['aclu'].to_numpy()), dtype=int)
+            # # included_cell_INDEXES = np.array([self.get_neuron_id_and_idx(neuron_id=an_included_cell_ID)[0] for an_included_cell_ID in self.spikes_df['aclu'].to_numpy()]) # get the indexes from the cellIDs
+            # included_cell_INDEXES = np.array(self.find_cell_IDXs_from_cell_ids(self.spikes_df['aclu'].to_numpy()), dtype=int)
+            # self.spikes_df['unit_id'] = included_cell_INDEXES.copy()
+            # # self.spikes_df['cell_idx'] = included_cell_INDEXES.copy()
+            # self.spikes_df['cell_idx'] = self.spikes_df['unit_id'].copy() # TODO: this is bad! The self.get_neuron_id_and_idx(...) function doesn't work!
+            # print("\t done updating 'unit_id' and 'cell_idx'.")
+        
         
         if neuron_sort_order is None:
             neuron_sort_order = np.arange(len(self.unit_ids)) # default sort order is sorted by unit_ids
@@ -309,6 +334,27 @@ class SpikeRasterBase(UnitSortableMixin, DataSeriesToSpatialTransformingMixin, N
         # self.temporal_mapping_changed.connect(self.on_adjust_temporal_spatial_mapping)
         # self.spikes_window.window_duration_changed_signal.connect(self.on_adjust_temporal_spatial_mapping)
 
+
+    @classmethod
+    def overwrite_invalid_unit_ids(cls, spikes_df, neuron_id_to_new_IDX_map):
+        # if self.enable_overwrite_invalid_unit_ids:
+        print("WARNING: self.enable_overwrite_invalid_unit_ids is True, so dataframe 'unit_id' and 'cell_idx' will be overwritten!")
+        spikes_df['old_unit_id'] = spikes_df['unit_id'].copy()
+        # self.spikes_df['unit_id'] = np.array([self.get_neuron_id_and_idx(neuron_id=an_included_cell_ID)[0] for an_included_cell_ID in self.spikes_df['aclu'].to_numpy()]) # get the indexes from the cellIDs
+        # self.spikes_df['unit_id'] = np.array(self.find_cell_IDXs_from_cell_ids(self.spikes_df['aclu'].to_numpy()), dtype=int)
+        # included_cell_INDEXES = np.array([self.get_neuron_id_and_idx(neuron_id=an_included_cell_ID)[0] for an_included_cell_ID in self.spikes_df['aclu'].to_numpy()]) # get the indexes from the cellIDs
+        # included_cell_INDEXES = np.array(self.find_cell_IDXs_from_cell_ids(self.spikes_df['aclu'].to_numpy()), dtype=int)
+        included_cell_INDEXES = np.array([neuron_id_to_new_IDX_map[an_included_cell_ID] for an_included_cell_ID in spikes_df['aclu'].to_numpy()], dtype=int) # get the indexes from the cellIDs
+        print('\t computed included_cell_INDEXES.')
+        spikes_df['unit_id'] = included_cell_INDEXES.copy()
+        print("\t set spikes_df['unit_id']")
+        # self.spikes_df['cell_idx'] = included_cell_INDEXES.copy()
+        spikes_df['cell_idx'] = spikes_df['unit_id'].copy() # TODO: this is bad! The self.get_neuron_id_and_idx(...) function doesn't work!
+        print("\t set spikes_df['cell_idx']")
+        print("\t done updating 'unit_id' and 'cell_idx'.")
+        
+    
+    
     """ Cell Coloring functions:
     """
     def _setup_neurons_color_data(self, neuron_colors_list, coloring_mode='color_by_index_order'):
@@ -325,7 +371,7 @@ class SpikeRasterBase(UnitSortableMixin, DataSeriesToSpatialTransformingMixin, N
         unsorted_unit_ids = self.unit_ids
         
         if neuron_colors_list is None:
-            neuron_colors_list = self._build_cell_color_map(unsorted_unit_ids, mode=coloring_mode)
+            neuron_colors_list = DataSeriesColorHelpers._build_cell_color_map(unsorted_unit_ids, mode=coloring_mode)
             for a_color in neuron_colors_list:
                 a_color.setAlphaF(0.5)
                 
@@ -364,29 +410,7 @@ class SpikeRasterBase(UnitSortableMixin, DataSeriesToSpatialTransformingMixin, N
         # self.spikes_df['cell_idx'] = self.spikes_df['unit_id'].copy() # TODO: this is bad! The self.get_neuron_id_and_idx(...) function doesn't work!
         
         
-    @classmethod
-    def _build_cell_color_map(cls, unit_ids, mode='color_by_index_order', debug_print=False):
-        """ builds a list of pg.mkColors from the cell index id:     
-        Usage:
-            # _build_cell_color_map(spike_raster_plt_3d.unit_ids, mode='color_by_index_order')
-            _build_cell_color_map(spike_raster_plt_3d.unit_ids, mode='preserve_unit_ids')
-
-        """
-        n_cells = len(unit_ids)
-        if mode == 'preserve_unit_ids':
-            # color is assigned based off of unit_id value, meaning after re-sorting the unit_ids the colors will appear visually different along y but will correspond to the same units as before the sort.
-            unit_ids_sort_index = np.argsort(unit_ids) # get the indicies of the sorted ids
-            # sorted_unit_ids = np.sort(unit_ids)
-            sorted_unit_ids = np.take_along_axis(unit_ids, unit_ids_sort_index, axis=None)
-            if debug_print:
-                print(f'unit_ids: \t\t{unit_ids}\nunit_ids_sort_index: \t{unit_ids_sort_index}\nsorted_unit_ids: \t{sorted_unit_ids}\n')
-            return [pg.mkColor((cell_id, n_cells*1.3)) for i, cell_id in enumerate(sorted_unit_ids)]
-        elif mode == 'color_by_index_order':
-            # color is assigned based of the raw index order of the passed-in unit ids. This means after re-sorting the units the colors will appear visually the same along y, but will not correspond to the same units.
-            return [pg.mkColor((i, n_cells*1.3)) for i, cell_id in enumerate(unit_ids)]
-        else:
-            raise NotImplementedError
-
+    
 
 
 
