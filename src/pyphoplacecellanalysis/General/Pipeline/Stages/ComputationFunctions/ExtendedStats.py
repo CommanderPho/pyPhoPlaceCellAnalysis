@@ -53,6 +53,10 @@ class ExtendedStatsComputations(AllFunctionEnumeratingMixin):
         # moving_mean_firing_rates_df = active_firing_rates_df.rolling(window=desired_window_length_bins).agg(['mean','var','max'])
         moving_mean_firing_rates_df = active_firing_rates_df.rolling(window=desired_window_length_bins).mean()
 
+        """ TODO: Note that these correspond to:
+            computation_result.computed_data['pf2D_Decoder'].neuron_IDs
+            computation_result.computed_data['pf2D_Decoder'].neuron_IDXs
+        """
         computation_result.computed_data['firing_rate_trends'] = {
          'active_rolling_window_times': active_rolling_window_times,
          'mean_firing_rates': mean_firing_rates,
