@@ -379,9 +379,8 @@ class Spike3DRaster_Vedo(SpikeRasterBase):
     SpeedBurstPlaybackRate = 16.0
     PlaybackUpdateFrequency = 0.04 # in seconds
      # GUI Configuration Options:
-    WantsRenderWindowControls = False
-    WantsPlaybackControls = False
-    
+    WantsRenderWindowControls = True
+    WantsPlaybackControls = True    
 
     @property
     def overlay_text_lines_dict(self):
@@ -495,7 +494,8 @@ class Spike3DRaster_Vedo(SpikeRasterBase):
         # self.params.bin_position_mode = 'left_edges'
         
         # by default we want the time axis to approximately span -20 to 20. So we set the temporal_zoom_factor to 
-        self.params.temporal_zoom_factor = 1.0      
+        # self.params.temporal_zoom_factor = 1.0
+        self.params.temporal_zoom_factor = 1000.0      
         
         self.params.enable_epoch_rectangle_meshes = self.enable_epoch_rectangle_meshes
         self.params.active_cell_colormap_name = 'rainbow'
@@ -798,44 +798,7 @@ class Spike3DRaster_Vedo(SpikeRasterBase):
         #     self.glyph.points(self.active_spike_render_points)
         pass
         
-        # show with:
-        # plt = show(glyph, __doc__, axes=True).close()
         
-        
-        # # Plot each unit one at a time:
-        # for i, cell_id in enumerate(self.unit_ids):    
-        #     # Filter the dataframe using that column and value from the list
-        #     curr_cell_df = self.active_windowed_df[self.active_windowed_df['unit_id']==cell_id]
-        #     curr_spike_t = curr_cell_df[curr_cell_df.spikes.time_variable_name].to_numpy() # this will map
-        #     # efficiently get curr_spike_t by filtering for unit and column at the same time
-        #     # curr_spike_t = self.active_windowed_df.loc[self.active_windowed_df.spikes.time_variable_name, (self.active_windowed_df['unit_id']==cell_id)].values # .to_numpy()
-            
-        #     curr_unit_n_spikes = len(curr_spike_t)
-            
-        #     yi = y[i] # get the correct y-position for all spikes of this cell
-        #     # map the current spike times back onto the range of the window's (-half_render_window_duration, +half_render_window_duration) so they represent the x coordinate
-        #     # curr_x = np.interp(curr_spike_t, (self.spikes_window.active_window_start_time, self.spikes_window.active_window_end_time), (-self.half_render_window_duration, +self.half_render_window_duration))
-        #     curr_x = np.interp(curr_spike_t, (self.spikes_window.active_window_start_time, self.spikes_window.active_window_end_time), (-self.half_temporal_axis_length, +self.half_temporal_axis_length))
-        #     # curr_paired_x = np.squeeze(interleave_elements(np.atleast_2d(curr_x).T, np.atleast_2d(curr_x).T))        
-        #     curr_paired_x = curr_x.repeat(2)
-            
-        #     # Z-positions:
-        #     # spike_bottom_zs = np.full_like(curr_x, self.params.spike_start_z)
-        #     # spike_top_zs = np.full_like(curr_x, self.params.spike_end_z)
-        #     # curr_paired_spike_zs = np.squeeze(interleave_elements(np.atleast_2d(spike_bottom_zs).T, np.atleast_2d(spike_top_zs).T)) # alternating top and bottom z-positions
-        #     curr_paired_spike_zs = np.squeeze(np.tile(np.array([self.params.spike_start_z, self.params.spike_end_z]), curr_unit_n_spikes)) # repeat pair of z values once for each spike
-        
-        #     # Build lines:
-        #     pts = np.column_stack([curr_paired_x, np.full_like(curr_paired_x, yi), curr_paired_spike_zs]) # the middle coordinate is the size of the x array with the value given by yi. yi must be the scalar for this cell.
-        #     # plt = gl.GLLinePlotItem(pos=pts, color=curr_color, width=0.5, antialias=True, mode='lines') # mode='lines' means that each pair of vertexes draws a single line segement
-        #     self.ui.gl_line_plots[i].setData(pos=pts, mode='lines') # update the current data
-            
-        #     # self.ui.main_gl_widget.addItem(plt)
-        #     # self.ui.gl_line_plots.append(plt) # append to the gl_line_plots array
-            
-    
-        # Update the additional display lines information on the overlay:
-        # self.ui.viewport_overlay.additional_overlay_text_lines = self.overlay_text_lines
         
 
     def onMouseClick(self, evt):
