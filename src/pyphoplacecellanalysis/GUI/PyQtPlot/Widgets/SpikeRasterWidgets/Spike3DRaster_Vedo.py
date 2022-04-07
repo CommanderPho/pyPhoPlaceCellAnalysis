@@ -6,26 +6,23 @@ import numpy as np
 import pandas as pd
 from matplotlib.colors import ListedColormap, to_hex # for neuron colors to_hex
 
+import pyqtgraph as pg
 from pyqtgraph.Qt import QtCore, QtGui, QtWidgets # pyqtgraph is only currently used for its Qt imports
-from vedo import Cone, Glyph, show
+from vtk.qt.QVTKRenderWindowInteractor import QVTKRenderWindowInteractor
 
+from vedo import Mesh, Cone, Plotter, printc, Glyph
+from vedo import Volume, ProgressBar, show, settings
 
-from neuropy.core.neuron_identities import NeuronIdentityAccessingMixin
+from pyphocorehelpers.plotting.vedo_qt_helpers import MainVedoPlottingWindow
 
-from pyphocorehelpers.DataStructure.general_parameter_containers import DebugHelper, VisualizationParameters
-from pyphoplacecellanalysis.General.Mixins.SpikesRenderingBaseMixin import SpikeRenderingBaseMixin, SpikesDataframeOwningMixin
-
-from pyphocorehelpers.indexing_helpers import interleave_elements, partition
 from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer
 # import qdarkstyle
 
-from pyphoplacecellanalysis.General.Model.SpikesDataframeWindow import SpikesDataframeWindow, SpikesWindowOwningMixin
 from pyphoplacecellanalysis.General.DataSeriesToSpatial import DataSeriesToSpatial
-from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.GLGraphicsItems.GLDebugAxisItem import GLDebugAxisItem
-from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.GLGraphicsItems.GLViewportOverlayPainterItem import GLViewportOverlayPainterItem
+from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.SpikeRasterWidgets.SpikeRasterBase import SpikeRasterBase
 
 
-class Spike3DRaster_Vedo(NeuronIdentityAccessingMixin, SpikeRenderingBaseMixin, SpikesWindowOwningMixin, SpikesDataframeOwningMixin, QtWidgets.QWidget):
+class Spike3DRaster_Vedo(SpikeRasterBase):
     """ **Vedo version** - Displays a 3D version of a raster plot with the spikes occuring along a plane. 
     
     TODO: CURRENTLY UNIMPLEMENTED I THINK. Switched back to Spike3DRaster as it works well and good enough.
@@ -39,105 +36,62 @@ class Spike3DRaster_Vedo(NeuronIdentityAccessingMixin, SpikeRenderingBaseMixin, 
         spike_raster_plt = Spike3DRaster_Vedo(curr_spikes_df, window_duration=4.0, window_start_time=30.0)
     """
     
-    @property
-    def unit_ids(self):
-        """The unit_ids from the whole df (not just the current window)"""
-        return np.unique(self.spikes_window.df['unit_id'].to_numpy())
+    temporal_mapping_changed = QtCore.pyqtSignal() # signal emitted when the mapping from the temporal window to the spatial layout is changed
+    close_signal = QtCore.pyqtSignal() # Called when the window is closing. 
     
-    @property
-    def n_cells(self):
-        """The number_units property."""
-        return len(self.unit_ids)
-    @property
-    def n_half_cells(self):
-        """ """
-        return np.ceil(float(self.n_cells)/2.0)
-    @property
-    def n_full_cell_grid(self):
-        """ """
-        return 2.0 * self.n_half_cells # could be one more than n
-
-
-    @property
-    def temporal_axis_length(self):
-        """The temporal_axis_length property."""
-        return self.temporal_zoom_factor * self.render_window_duration
-    @property
-    def half_temporal_axis_length(self):
-        """The temporal_axis_length property."""
-        return self.temporal_axis_length / 2.0
-    
-    @property
-    def animation_time_step(self):
-        """ How much to step forward in time at each frame of animation. """
-        # return (self.render_window_duration * 0.02) # each animation timestep is 2% of the render window duration
-        # return 0.05 # each animation timestep is a fixed 50ms
-        return 0.03 # faster then 30fps
-
-    # from NeuronIdentityAccessingMixin
-    @property
-    def neuron_ids(self):
-        """ an alias for self.cell_ids required for NeuronIdentityAccessingMixin """
-        return self.cell_ids
-
-    @property
-    def cell_ids(self):
-        """ e.g. the list of valid cell_ids (unique aclu values) """
-        # return self.unit_ids
-        return np.unique(self.spikes_window.df['aclu'].to_numpy()) 
+    SpeedBurstPlaybackRate = 16.0
+    PlaybackUpdateFrequency = 0.04 # in seconds
+     # GUI Configuration Options:
+    WantsRenderWindowControls = False
+    WantsPlaybackControls = False
     
 
     @property
-    def overlay_text_lines(self):
-        """The lines to be displayed in the overlay."""
-        lines = []
-        lines.append(f'active_time_window: {self.spikes_window.active_time_window}')
-        lines.append(f"n_cells : {self.n_cells}")
-        lines.append(f'active num spikes: {self.active_windowed_df.shape[0]}')
-        lines.append(f'render_window_duration: {self.render_window_duration}')
-        lines.append(f'animation_time_step: {self.animation_time_step}')
-        lines.append(f'temporal_axis_length: {self.temporal_axis_length}')
-        return lines
+    def overlay_text_lines_dict(self):
+        """The lines of text to be displayed in the overlay."""    
+        af = QtCore.Qt.AlignmentFlag
+
+        lines_dict = dict()
+        
+        lines_dict[af.AlignTop | af.AlignLeft] = ['TL']
+        lines_dict[af.AlignTop | af.AlignRight] = ['TR', 
+                                                   f"n_cells : {self.n_cells}",
+                                                   f'render_window_duration: {self.render_window_duration}',
+                                                   f'animation_time_step: {self.animation_time_step}',
+                                                   f'temporal_axis_length: {self.temporal_axis_length}',
+                                                   f'temporal_zoom_factor: {self.temporal_zoom_factor}']
+        lines_dict[af.AlignBottom | af.AlignLeft] = ['BL', 
+                                                   f'active_time_window: {self.spikes_window.active_time_window}',
+                                                   f'playback_rate_multiplier: {self.playback_rate_multiplier}'
+                                                   ]
+        lines_dict[af.AlignBottom | af.AlignRight] = ['BR']    
+        return lines_dict
     
     
     ######  Get/Set Properties ######:
-    @property
-    def temporal_zoom_factor(self):
-        """The time dilation factor that maps spikes in the current window to x-positions along the time axis multiplicatively.
-            Increasing this factor will result in a more spatially expanded time axis while leaving the visible window unchanged.
-        """
-        return self._temporal_zoom_factor
-    @temporal_zoom_factor.setter
-    def temporal_zoom_factor(self, value):
-        self._temporal_zoom_factor = value
-        
-        
-    @property
-    def active_spike_render_points(self):
-        """The set of final, tranformed points at which to render the spikes for the active window.
-        Note that computation might be costly so don't do this too often.
-        """
-        const_z = 0.0
-        curr_x = np.interp(self.active_windowed_df[self.active_windowed_df.spikes.time_variable_name].to_numpy(), (self.spikes_window.active_window_start_time, self.spikes_window.active_window_end_time), (-self.half_temporal_axis_length, +self.half_temporal_axis_length))
-        return np.c_[curr_x, self.active_windowed_df['visualization_raster_y_location'].to_numpy(), np.full_like(curr_x, const_z)] # y-locations are already pre-computed and added to the df
 
+    @property
+    def axes_walls_z_height(self):
+        """The axes_walls_z_height property."""
+        return self._axes_walls_z_height
+    
+    @property
+    def z_floor(self):
+        """The offset of the floor in the z-axis."""
+        return -10
+    
+    @property
+    def y_backwall(self):
+        """The y position location of the green back (Y=0) axes wall plane."""
+        return self.n_half_cells
+    
 
     def __init__(self, spikes_df, *args, window_duration=15.0, window_start_time=0.0, neuron_colors=None, neuron_sort_order=None, **kwargs):
-        super(Spike3DRaster_Vedo, self).__init__(*args, window_duration=window_duration, window_start_time=window_start_time, neuron_colors=neuron_colors, neuron_sort_order=neuron_sort_order, **kwargs)
+        super(Spike3DRaster_Vedo, self).__init__(spikes_df, *args, window_duration=window_duration, window_start_time=window_start_time, neuron_colors=neuron_colors, neuron_sort_order=neuron_sort_order, **kwargs)
+        # SpikeRasterBase.__init__(spikes_df, *args, window_duration=window_duration, window_start_time=window_start_time, neuron_colors=neuron_colors, neuron_sort_order=neuron_sort_order, **kwargs)
         # Initialize member variables:
         
         # Helper container variables
-        self.params = VisualizationParameters('')
-        self.glyph = None
-        self.slidebar_val = 0
-        self._spikes_window = SpikesDataframeWindow(spikes_df, window_duration=window_duration, window_start_time=window_start_time)
-        self.params.spike_start_z = -10.0
-        # self.spike_end_z = 0.1
-        self.params.spike_end_z = -6.0
-        self.params.side_bin_margins = 0.0 # space to sides of the first and last cell on the y-axis
-        # by default we want the time axis to approximately span -20 to 20. So we set the temporal_zoom_factor to 
-        self._temporal_zoom_factor = 40.0 / float(self.render_window_duration)        
-        
         # self.enable_debug_print = False
         self.enable_debug_widgets = False
         
@@ -165,6 +119,97 @@ class Spike3DRaster_Vedo(NeuronIdentityAccessingMixin, SpikeRenderingBaseMixin, 
         # self.buildUI()
 
 
+    def buildUI(self):
+        """ for QGridLayout
+            addWidget(widget, row, column, rowSpan, columnSpan, Qt.Alignment alignment = 0)
+        """
+        self.ui = PhoUIContainer()
+
+        self.ui.frame = QtWidgets.QFrame()
+        self.ui.frame_layout = QtWidgets.QVBoxLayout()
+        
+        self.ui.layout = QtWidgets.QGridLayout()
+        self.ui.layout.setContentsMargins(0, 0, 0, 0)
+        self.ui.layout.setVerticalSpacing(0)
+        self.ui.layout.setHorizontalSpacing(0)
+        self.setStyleSheet("background : #1B1B1B; color : #727272")
+        
+        
+        # Set-up the rest of the Qt window
+        button = QtWidgets.QPushButton("My Button makes the cone red")
+        button.setToolTip('This is an example button')
+        button.clicked.connect(self.onClick)
+ 
+        #### Build Graphics Objects #####
+        self._buildGraphics()
+        
+        # setup self.ui.frame_layout:
+        # self.ui.frame_layout.addWidget(self.ui.vtkWidget)
+        self.ui.frame_layout.addWidget(button)
+        self.ui.frame.setLayout(self.ui.frame_layout)
+        
+        # Add the frame to the root layout
+        self.ui.layout.addWidget(self.ui.frame, 0, 0)
+        
+        # #### Build Graphics Objects #####
+        # self._buildGraphics()
+        
+        # if self.params.wantsPlaybackControls:
+        #     # Build the bottom playback controls bar:
+        #     self.setup_render_playback_controls()
+
+        # if self.params.wantsRenderWindowControls:
+        #     # Build the right controls bar:
+        #     self.setup_render_window_controls() # creates self.ui.right_controls_panel
+
+                
+        # # addWidget(widget, row, column, rowSpan, columnSpan, Qt.Alignment alignment = 0)
+         
+        # Set the root (self) layout properties
+        self.setLayout(self.ui.layout)
+        self.resize(1920, 900)
+        self.setWindowTitle('Spike3DRaster_Vedo')
+        # Connect window update signals
+        # self.spikes_window.spike_dataframe_changed_signal.connect(self.on_spikes_df_changed)
+        # self.spikes_window.window_duration_changed_signal.connect(self.on_window_duration_changed)
+        # self.spikes_window.window_changed_signal.connect(self.on_window_changed)
+        self.spikes_window.window_updated_signal.connect(self.on_window_changed)
+
+
+        self.ui.plt.show()                  # <--- show the vedo rendering
+        self.show()                     # <--- show the Qt Window
+
+    def setup(self):
+        # self.setup_spike_rendering_mixin() # NeuronIdentityAccessingMixin
+        
+    
+        self.app = pg.mkQApp("Spike3DRaster_Vedo")
+        
+        # Configure vedo settings:
+        settings.allowInteraction = True
+        # "depth peeling" may improve the rendering of transparent objects
+        settings.useDepthPeeling = True
+        settings.multiSamples = 2  # needed on OSX vtk9
+            
+        
+        
+    def _buildGraphics(self):
+        """ Implementors must override this method to build the main graphics object and add it at layout position (0, 0)"""
+        # vedo_qt_main_window = MainVedoPlottingWindow() # Create the main window with the vedo plotter
+        self.ui.vtkWidget = QVTKRenderWindowInteractor(self.ui.frame)
+        # Create renderer and add the vedo objects and callbacks
+        self.ui.plt = Plotter(qtWidget=self.ui.vtkWidget)
+        self.id1 = self.ui.plt.addCallback("mouse click", self.onMouseClick)
+        self.id2 = self.ui.plt.addCallback("key press",   self.onKeypress)
+        self.ui.plt += Cone().rotateX(20)
+        # self.ui.plt.show()                  # <--- show the vedo rendering
+
+        # setup self.ui.frame_layout:
+        self.ui.frame_layout.addWidget(self.ui.vtkWidget)
+        # raise NotImplementedError
+    
+    
+    
     # def on_window_changed(self):
     #     # called when the window is updated
     #     if self.enable_debug_print:
@@ -182,17 +227,17 @@ class Spike3DRaster_Vedo(NeuronIdentityAccessingMixin, SpikeRenderingBaseMixin, 
         # curr_spike_t = self.active_windowed_df[self.active_windowed_df.spikes.time_variable_name].to_numpy() # this will map
         # curr_unit_n_spikes = len(curr_spike_t)
         
-        if self.glyph is None:        
-            # Create a mesh to be used like a symbol (a "glyph") to be attached to each point
-            self.cone = Cone().scale(0.3) # make it smaller and orient tip to positive x
-            # .rotateY(90) # orient tip to positive x
-            self.glyph = Glyph(self.active_spike_render_points, self.cone)
-            # glyph = Glyph(pts, cone, vecs, scaleByVectorSize=True, colorByVectorSize=True)
-            self.glyph.lighting('ambient') # .cmap('Blues').addScalarBar(title='wind speed')
-        else:
-            # already have self.glyph created, just need to update its points
-            self.glyph.points(self.active_spike_render_points)
-        
+        # if self.glyph is None:        
+        #     # Create a mesh to be used like a symbol (a "glyph") to be attached to each point
+        #     self.cone = Cone().scale(0.3) # make it smaller and orient tip to positive x
+        #     # .rotateY(90) # orient tip to positive x
+        #     self.glyph = Glyph(self.active_spike_render_points, self.cone)
+        #     # glyph = Glyph(pts, cone, vecs, scaleByVectorSize=True, colorByVectorSize=True)
+        #     self.glyph.lighting('ambient') # .cmap('Blues').addScalarBar(title='wind speed')
+        # else:
+        #     # already have self.glyph created, just need to update its points
+        #     self.glyph.points(self.active_spike_render_points)
+        pass
         
         # show with:
         # plt = show(glyph, __doc__, axes=True).close()
@@ -233,11 +278,24 @@ class Spike3DRaster_Vedo(NeuronIdentityAccessingMixin, SpikeRenderingBaseMixin, 
         # Update the additional display lines information on the overlay:
         # self.ui.viewport_overlay.additional_overlay_text_lines = self.overlay_text_lines
         
-    def increase_animation_frame_val(self):
-        self.shift_animation_frame_val(1)
+
+    def onMouseClick(self, evt):
+        printc("You have clicked your mouse button. Event info:\n", evt, c='y')
+
+    def onKeypress(self, evt):
+        printc("You have pressed key:", evt.keyPressed, c='b')
+
+    @QtCore.pyqtSlot()
+    def onClick(self):
+        printc("..calling onClick")
+        self.ui.plt.actors[0].color('red').rotateZ(40)
+        self.ui.plt.interactor.Render()
+
+    def onClose(self):
+        #Disable the interactor before closing to prevent it
+        #from trying to act on already deleted items
+        printc("..calling onClose")
+        self.ui.vtkWidget.close()
         
-    def shift_animation_frame_val(self, shift_frames: int):
-        next_start_timestamp = self.spikes_window.active_window_start_time + (self.animation_time_step * float(shift_frames))
-        self.spikes_window.update_window_start(next_start_timestamp)
         
-        
+# josfd
