@@ -739,6 +739,29 @@ class Spike3DRaster_Vedo(SpikeRasterBase):
         # build the position range for each unit along the y-axis:
         # y = DataSeriesToSpatial.build_series_identity_axis(self.n_cells, center_mode='zero_centered', bin_position_mode='bin_center', side_bin_margins = self.params.side_bin_margins)
         
+        
+        all_spike_lines = self.plots.meshes.get('all_spike_lines', None)
+        start_bound_plane = self.plots.meshes.get('start_bound_plane', None)
+        end_bound_plane = self.plots.meshes.get('end_bound_plane', None)
+        active_window_only_axes = self.plots.meshes.get('active_window_only_axes', None)
+        
+        prev_x_position = start_bound_plane.x()
+        
+        active_t_start, active_t_end = (self.spikes_window.active_window_start_time, self.spikes_window.active_window_end_time)
+        # active_x_start, active_x_end = DataSeriesToSpatial.temporal_to_spatial_map((active_t_start, active_t_end), self.spikes_window.active_window_start_time, self.spikes_window.active_window_end_time, self.temporal_axis_length, center_mode='zero_centered')
+        # print(f'(active_t_start: {active_t_start}, active_t_end: {active_t_end})')
+        # print(f'(active_x_start: {active_x_start}, active_x_end: {active_x_end})')
+        
+        active_ids, start_bound_plane, end_bound_plane = StaticVedo_3DRasterHelper.update_active_spikes_window(all_spike_lines, x_start=active_t_start, x_end=active_t_end, max_y_pos=self.params.max_y_pos, max_z_pos=self.params.max_z_pos, start_bound_plane=start_bound_plane, end_bound_plane=end_bound_plane)
+        
+        delta_x = start_bound_plane.x() - prev_x_position
+        
+        prev_x_pos = active_window_only_axes.x()
+        active_window_only_axes.x(prev_x_pos + delta_x) # works for positioning but doesn't update numbers
+        
+        self.ui.plt.resetCamera() # resetCamera() updates the camera's position
+        self.ui.plt.render()
+
         # All series at once approach:
         # curr_spike_t = self.active_windowed_df[self.active_windowed_df.spikes.time_variable_name].to_numpy() # this will map
         # curr_unit_n_spikes = len(curr_spike_t)
