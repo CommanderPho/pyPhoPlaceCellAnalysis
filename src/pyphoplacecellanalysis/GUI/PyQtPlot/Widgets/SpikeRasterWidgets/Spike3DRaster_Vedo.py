@@ -165,7 +165,10 @@ class StaticVedo_3DRasterHelper:
         # print(f'curr_cell_rgba_colors: {curr_cell_rgba_colors}')
         # set opacity component to zero for all non-window spikes
         curr_cell_rgba_colors[:,3] = 0.05*255 # np.full((spike_rgb_colors.shape[0], 1), 1.0)
-        curr_cell_rgba_colors[active_ids,3] = 1.0*255 # set alpha for active_ids to an opaque 1.0
+        
+        if len(active_ids) > 0:
+            curr_cell_rgba_colors[active_ids,3] = 1.0*255 # set alpha for active_ids to an opaque 1.0
+        
         active_spikes_lines_mesh.cellIndividualColors(curr_cell_rgba_colors) # needed?
         # Build or update the start/end bounding planes
         active_window_x_length = np.abs((x_end - x_start))
@@ -412,7 +415,8 @@ class Spike3DRaster_Vedo(SpikeRasterBase):
     @property
     def z_floor(self):
         """The offset of the floor in the z-axis."""
-        return -10
+        # return -10
+        return 0
     
     @property
     def y_backwall(self):
@@ -439,33 +443,9 @@ class Spike3DRaster_Vedo(SpikeRasterBase):
         
         self.enable_debug_print = True
         
-        
-        
-        
-        # TODO: Setup self.epochs_df:
-        if not self.enable_epoch_rectangle_meshes:
-            self.epochs_df = None
-        else:
-            raise NotImplementedError
-        
-        
-        if 'cell_idx' not in self.spikes_df.columns:
-            # self.spikes_df['cell_idx'] = self.spikes_df['unit_id'].copy() # TODO: this is bad! The self.get_neuron_id_and_idx(...) function doesn't work!
-            # note that this is very slow, but works:
-            print(f'cell_idx column missing. rebuilding (this might take a minute or two)...')
-            included_cell_INDEXES = np.array([self.get_neuron_id_and_idx(neuron_id=an_included_cell_ID)[0] for an_included_cell_ID in self.spikes_df['aclu'].to_numpy()]) # get the indexes from the cellIDs
-            self.spikes_df['cell_idx'] = included_cell_INDEXES.copy()
 
-        if 'visualization_raster_y_location' not in self.spikes_df.columns:
-            print(f'visualization_raster_y_location column missing. rebuilding (this might take a minute or two)...')
-            # Compute the y for all windows, not just the current one:
-            y = DataSeriesToSpatial.build_series_identity_axis(self.n_cells, center_mode='zero_centered', bin_position_mode='bin_center', side_bin_margins = self.params.side_bin_margins)
-            all_y = [y[a_cell_id] for a_cell_id in self.spikes_df['cell_idx'].to_numpy()]
-            self.spikes_df['visualization_raster_y_location'] = all_y # adds as a column to the dataframe. Only needs to be updated when the number of active units changes
-            # max_y_all_data = np.nanmax(all_y) # self.spikes_df['visualization_raster_y_location'] 
-
-        max_y_all_data = np.nanmax(self.spikes_df['visualization_raster_y_location'].to_numpy()) # self.spikes_df['visualization_raster_y_location'] 
-        self.params.max_y_pos = max(10.0, max_y_all_data)
+        
+       
                     
         # self.setup_spike_rendering_mixin() # NeuronIdentityAccessingMixin
         
@@ -496,8 +476,9 @@ class Spike3DRaster_Vedo(SpikeRasterBase):
         
         
         # Config
-        self.params.spike_start_z = -10.0 # self.z_floor
-        self.params.spike_end_z = -6.0
+        self.params.spike_height_z = 4.0
+        self.params.spike_start_z = self.z_floor # self.z_floor
+        self.params.spike_end_z = self.params.spike_start_z + self.params.spike_height_z
         
         # self.params.max_y_pos = 50.0
         # self.params.max_z_pos = 10.0
@@ -505,21 +486,47 @@ class Spike3DRaster_Vedo(SpikeRasterBase):
         # max_y_all_data = self.spikes_df['visualization_raster_y_location'].nanmax()
         
         self.params.max_y_pos = 10.0
-        self.params.max_z_pos = max(self.params.spike_end_z, (self.z_floor + 10.0))
+        self.params.max_z_pos = max(self.params.spike_end_z, (self.z_floor + 1.0))
         
         
-        self.params.center_mode = 'zero_centered'
-        # self.params.bin_position_mode = ''bin_center'
-        self.params.bin_position_mode = 'left_edges'
+        # self.params.center_mode = 'zero_centered'
+        self.params.center_mode = 'starting_at_zero'
+        self.params.bin_position_mode = 'bin_center'
+        # self.params.bin_position_mode = 'left_edges'
         
         # by default we want the time axis to approximately span -20 to 20. So we set the temporal_zoom_factor to 
-        self.params.temporal_zoom_factor = 40.0 / float(self.render_window_duration)        
+        self.params.temporal_zoom_factor = 1.0      
         
         self.params.enable_epoch_rectangle_meshes = self.enable_epoch_rectangle_meshes
         self.params.active_cell_colormap_name = 'rainbow'
         
         # Plots Structures:
         self.plots.meshes = dict()
+                
+        # TODO: Setup self.epochs_df:
+        if not self.enable_epoch_rectangle_meshes:
+            self.epochs_df = None
+        else:
+            raise NotImplementedError
+        
+        if 'cell_idx' not in self.spikes_df.columns:
+            # self.spikes_df['cell_idx'] = self.spikes_df['unit_id'].copy() # TODO: this is bad! The self.get_neuron_id_and_idx(...) function doesn't work!
+            # note that this is very slow, but works:
+            print(f'cell_idx column missing. rebuilding (this might take a minute or two)...')
+            included_cell_INDEXES = np.array([self.get_neuron_id_and_idx(neuron_id=an_included_cell_ID)[0] for an_included_cell_ID in self.spikes_df['aclu'].to_numpy()]) # get the indexes from the cellIDs
+            self.spikes_df['cell_idx'] = included_cell_INDEXES.copy()
+
+        if 'visualization_raster_y_location' not in self.spikes_df.columns:
+            print(f'visualization_raster_y_location column missing. rebuilding (this might take a minute or two)...')
+            # Compute the y for all windows, not just the current one:
+            y = DataSeriesToSpatial.build_series_identity_axis(self.n_cells, center_mode=self.params.center_mode, bin_position_mode='bin_center', side_bin_margins = self.params.side_bin_margins)
+            all_y = [y[a_cell_id] for a_cell_id in self.spikes_df['cell_idx'].to_numpy()]
+            self.spikes_df['visualization_raster_y_location'] = all_y # adds as a column to the dataframe. Only needs to be updated when the number of active units changes
+            # max_y_all_data = np.nanmax(all_y) # self.spikes_df['visualization_raster_y_location'] 
+
+        max_y_all_data = np.nanmax(self.spikes_df['visualization_raster_y_location'].to_numpy()) # self.spikes_df['visualization_raster_y_location'] 
+        self.params.max_y_pos = max(10.0, max_y_all_data)
+        
         
         
     def buildUI(self):
@@ -611,12 +618,19 @@ class Spike3DRaster_Vedo(SpikeRasterBase):
             
             
         # replaces StaticVedo_3DRasterHelper.build_spikes_lines(...) with a version optimized for Spike3DRaster_Vedo:
-        curr_spike_t = self.spikes_df[self.spikes_df.spikes.time_variable_name].to_numpy() # this will map
-        curr_x = DataSeriesToSpatial.temporal_to_spatial_map(curr_spike_t, self.spikes_window.active_window_start_time, self.spikes_window.active_window_end_time, self.temporal_axis_length, center_mode='zero_centered')
+        all_spike_t = self.spikes_df[self.spikes_df.spikes.time_variable_name].to_numpy() # this will map
+        # all_spike_x = DataSeriesToSpatial.temporal_to_spatial_map(all_spike_t, self.spikes_window.active_window_start_time, self.spikes_window.active_window_end_time, self.temporal_axis_length, center_mode=self.params.center_mode)
+        all_spike_x = DataSeriesToSpatial.temporal_to_spatial_map(all_spike_t, self.spikes_window.total_data_start_time, self.spikes_window.total_data_end_time, self.temporal_axis_length, center_mode=self.params.center_mode)
         curr_spike_y = self.spikes_df['visualization_raster_y_location'].to_numpy() # this will map
 
-        startPoints = np.vstack((curr_spike_t, curr_spike_y, np.full_like(curr_spike_t, self.params.spike_start_z))).T
-        endPoints = np.vstack((curr_spike_t, curr_spike_y, np.full_like(curr_spike_t, self.params.spike_end_z))).T
+        # t-mode:
+        # startPoints = np.vstack((curr_spike_t, curr_spike_y, np.full_like(curr_spike_t, self.params.spike_start_z))).T
+        # endPoints = np.vstack((curr_spike_t, curr_spike_y, np.full_like(curr_spike_t, self.params.spike_end_z))).T
+        
+        # x-mode:
+        startPoints = np.vstack((all_spike_x, curr_spike_y, np.full_like(all_spike_x, self.params.spike_start_z))).T
+        endPoints = np.vstack((all_spike_x, curr_spike_y, np.full_like(all_spike_x, self.params.spike_end_z))).T
+        
         all_spike_lines = Lines(startPoints, endPoints=endPoints, c='k', alpha=0.8, lw=1.0, dotted=False, scale=1, res=1) # curr_spike_alphas
         # let the scalar be the y coordinate of the mesh vertices
         spike_color_ids = curr_spike_y.copy() # one per spike
@@ -653,15 +667,15 @@ class Spike3DRaster_Vedo(SpikeRasterBase):
         """
         
         active_t_start, active_t_end = (self.spikes_window.active_window_start_time, self.spikes_window.active_window_end_time)
-        active_x_start, active_x_end = DataSeriesToSpatial.temporal_to_spatial_map((active_t_start, active_t_end), self.spikes_window.active_window_start_time, self.spikes_window.active_window_end_time, self.temporal_axis_length, center_mode='zero_centered')
+        active_x_start, active_x_end = DataSeriesToSpatial.temporal_to_spatial_map((active_t_start, active_t_end), self.spikes_window.active_window_start_time, self.spikes_window.active_window_end_time, self.temporal_axis_length, center_mode=self.params.center_mode)
         print(f'(active_t_start: {active_t_start}, active_t_end: {active_t_end})')
         print(f'(active_x_start: {active_x_start}, active_x_end: {active_x_end})')
         # (active_t_start: 30.0, active_t_end: 45.0)
         # (active_x_start: -20.0, active_x_end: 20.0)
 
         # Bounding planes:
-        active_ids, start_bound_plane, end_bound_plane = StaticVedo_3DRasterHelper.update_active_spikes_window(all_spike_lines, x_start=active_t_start, x_end=active_t_end, max_y_pos=self.params.max_y_pos, max_z_pos=self.params.max_z_pos)
-        # active_ids, start_bound_plane, end_bound_plane = StaticVedo_3DRasterHelper.update_active_spikes_window(all_spike_lines, x_start=active_x_start, x_end=active_x_end)
+        # active_ids, start_bound_plane, end_bound_plane = StaticVedo_3DRasterHelper.update_active_spikes_window(all_spike_lines, x_start=active_t_start, x_end=active_t_end, max_y_pos=self.params.max_y_pos, max_z_pos=self.params.max_z_pos)
+        active_ids, start_bound_plane, end_bound_plane = StaticVedo_3DRasterHelper.update_active_spikes_window(all_spike_lines, x_start=active_x_start, x_end=active_x_end, max_y_pos=self.params.max_y_pos, max_z_pos=self.params.max_z_pos)
                 
         if rect_meshes is not None:
             active_mesh_args = (all_spike_lines, rect_meshes, start_bound_plane, end_bound_plane)
@@ -705,10 +719,15 @@ class Spike3DRaster_Vedo(SpikeRasterBase):
                     yrange=(0.0, self.params.max_y_pos),
                     zrange=(0.0, self.params.max_z_pos)
         )
+        
+
         self.ui.plt += active_mesh_args
         self.ui.plt += all_data_axes
         self.ui.plt += active_window_only_axes
                 
+        active_window_only_axes.SetVisibility(False)
+        all_data_axes.SetVisibility(True)
+        
         # Set meshes to self.plots.meshes:
         self.plots.meshes['rect_meshes'] = rect_meshes
         self.plots.meshes['all_spike_lines'] = all_spike_lines
@@ -737,7 +756,7 @@ class Spike3DRaster_Vedo(SpikeRasterBase):
         if self.enable_debug_print:
             print(f'Spike3DRaster_Vedo._update_plots()')
         # build the position range for each unit along the y-axis:
-        # y = DataSeriesToSpatial.build_series_identity_axis(self.n_cells, center_mode='zero_centered', bin_position_mode='bin_center', side_bin_margins = self.params.side_bin_margins)
+        # y = DataSeriesToSpatial.build_series_identity_axis(self.n_cells, center_mode=self.params.center_mode, bin_position_mode='bin_center', side_bin_margins = self.params.side_bin_margins)
         
         
         all_spike_lines = self.plots.meshes.get('all_spike_lines', None)
@@ -748,11 +767,12 @@ class Spike3DRaster_Vedo(SpikeRasterBase):
         prev_x_position = start_bound_plane.x()
         
         active_t_start, active_t_end = (self.spikes_window.active_window_start_time, self.spikes_window.active_window_end_time)
-        # active_x_start, active_x_end = DataSeriesToSpatial.temporal_to_spatial_map((active_t_start, active_t_end), self.spikes_window.active_window_start_time, self.spikes_window.active_window_end_time, self.temporal_axis_length, center_mode='zero_centered')
+        active_x_start, active_x_end = DataSeriesToSpatial.temporal_to_spatial_map((active_t_start, active_t_end), self.spikes_window.active_window_start_time, self.spikes_window.active_window_end_time, self.temporal_axis_length, center_mode=self.params.center_mode)
         # print(f'(active_t_start: {active_t_start}, active_t_end: {active_t_end})')
         # print(f'(active_x_start: {active_x_start}, active_x_end: {active_x_end})')
         
-        active_ids, start_bound_plane, end_bound_plane = StaticVedo_3DRasterHelper.update_active_spikes_window(all_spike_lines, x_start=active_t_start, x_end=active_t_end, max_y_pos=self.params.max_y_pos, max_z_pos=self.params.max_z_pos, start_bound_plane=start_bound_plane, end_bound_plane=end_bound_plane)
+        # active_ids, start_bound_plane, end_bound_plane = StaticVedo_3DRasterHelper.update_active_spikes_window(all_spike_lines, x_start=active_t_start, x_end=active_t_end, max_y_pos=self.params.max_y_pos, max_z_pos=self.params.max_z_pos, start_bound_plane=start_bound_plane, end_bound_plane=end_bound_plane)
+        active_ids, start_bound_plane, end_bound_plane = StaticVedo_3DRasterHelper.update_active_spikes_window(all_spike_lines, x_start=active_x_start, x_end=active_x_end, max_y_pos=self.params.max_y_pos, max_z_pos=self.params.max_z_pos, start_bound_plane=start_bound_plane, end_bound_plane=end_bound_plane)
         
         delta_x = start_bound_plane.x() - prev_x_position
         
