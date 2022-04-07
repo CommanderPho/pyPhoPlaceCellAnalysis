@@ -119,6 +119,8 @@ class UnitSortableMixin:
         
         
     
+    
+# NeuronIdentityAccessingMixin
 
 class SpikeRasterBase(UnitSortableMixin, DataSeriesToSpatialTransformingMixin, NeuronIdentityAccessingMixin, SpikeRenderingBaseMixin, SpikesWindowOwningMixin, SpikesDataframeOwningMixin, TimeWindowPlaybackPropertiesMixin, RenderPlaybackControlsMixin, RenderWindowControlsMixin, QtWidgets.QWidget):
     """ Displays a raster plot with the spikes occuring along a plane. 
@@ -310,12 +312,12 @@ class SpikeRasterBase(UnitSortableMixin, DataSeriesToSpatialTransformingMixin, N
     """
     def _setup_neurons_color_data(self, neuron_colors_list, coloring_mode='color_by_index_order'):
         """ 
-        neuron_colors: a list of neuron colors
+        neuron_colors_list: a list of neuron colors
         
         Sets:
             self.params.neuron_qcolors
             self.params.neuron_qcolors_map
-            self.params.neuron_colors
+            self.params.neuron_colors: ndarray of shape (4, self.n_cells)
             self.params.neuron_colors_hex
         """
         

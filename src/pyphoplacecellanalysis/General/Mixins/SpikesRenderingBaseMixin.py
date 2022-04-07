@@ -33,6 +33,10 @@ class SpikesDataframeOwningMixin:
 # Typically requires conformance to SpikesDataframeOwningMixin
 class SpikeRenderingBaseMixin:
     """ Implementors render spikes from neural data in 3D 
+    
+    Requirements:
+        Implementors must conform to NeuronIdentityAccessingMixin or at least have a self.get_neuron_id_and_idx(...) function.
+        self.spikes_df
     """
     
     def _build_flat_color_data(self, fallback_color_rgba = (0, 0, 0, 1.0)):
