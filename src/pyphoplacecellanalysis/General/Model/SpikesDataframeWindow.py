@@ -94,6 +94,16 @@ class SpikesDataframeWindow(LiveWindowedData):
         """[earliest_df_time, latest_df_time]: The earliest and latest spiketimes in the total df """
         return self.dataSource.total_df_start_end_times
             
+    @property
+    def total_data_start_time(self):
+        """returns the earliest_df_time: The earliest spiketimes in the total df """
+        return self.total_df_start_end_times[0]
+    @property
+    def total_data_end_time(self):
+        """returns the latest_df_time: The latest spiketimes in the total df """
+        return self.total_df_start_end_times[1]
+            
+            
     ##### Get/Set Properties ####:
     @property
     def df(self):
