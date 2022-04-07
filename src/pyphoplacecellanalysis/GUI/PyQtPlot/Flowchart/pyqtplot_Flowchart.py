@@ -373,8 +373,9 @@ def _add_pho_pipeline_programmatic_flowchart_nodes(app, fc, on_add_function=None
 
     ## Set the raw data as the input value to the flowchart
     # fc.setInput(dataIn='Bapun')
-    fc.setInput(dataIn='kdiba')
-    
+    # fc.setInput(dataIn='kdiba')
+    fc.setInput(dataIn=None)
+
     pipeline_input_node = fc.createNode('PipelineInputDataNode', pos=(-400, 50))
     # pipeline_input_node.setView(v1, on_remove_function=on_remove_widget_fn) # Sets the view associated with the node. Note that this is the programmatically instantiated node
     
@@ -422,6 +423,7 @@ def _add_pho_pipeline_programmatic_flowchart_nodes(app, fc, on_add_function=None
     
     fc.connectTerminals(pipeline_computation_node['computed_pipeline'], fc['dataOut']) # raw pipeline output from computation node
     
+    fc.setInput(dataIn='kdiba') # finally set the input data
     
     # Display Node Outputs:   
 

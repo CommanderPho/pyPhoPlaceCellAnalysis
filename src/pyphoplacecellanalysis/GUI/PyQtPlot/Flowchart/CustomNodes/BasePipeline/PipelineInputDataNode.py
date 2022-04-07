@@ -57,19 +57,48 @@ class PipelineInputDataNode(ExtendedCtrlNode):
                 
         
         
-    def process(self, known_mode='Bapun', display=True):
+    def process(self, known_mode='', display=True):
+    # def process(self, known_mode='Bapun', display=True):
         # CtrlNode has created self.ctrls, which is a dict containing {ctrlName: widget}
         # data_mode = self.ctrls['data_mode'].value()                
+        
+        # Get the selected data_mode from the dropdown list either way
         s = self.stateGroup.state()
         if s['data_mode'] == 'bapun':
-            data_mode = 'bapun'
+            data_mode_from_combo_list = 'bapun'
         elif s['data_mode'] == 'kdiba':
-            data_mode = 'kdiba'
+            data_mode_from_combo_list = 'kdiba'
         else:
             # raise NotImplementedError
-            data_mode = known_mode
+            data_mode_from_combo_list = known_mode
 
-        print(f'PipelineInputDataNode.data_mode: {data_mode}')
+        print(f'PipelineInputDataNode data_mode from dropdown list: {data_mode_from_combo_list}')
+            
+        # Compare to known_mode from input:
+        if (known_mode is None):
+            print('Warning: known_mode is None.')
+            data_mode = data_mode_from_combo_list
+            # return {'known_data_mode': None, 'loaded_pipeline': None}
+        elif (known_mode == ''):
+            print('Warning: known_mode is the empty string!.')
+            data_mode = data_mode_from_combo_list
+            # return {'known_data_mode': known_mode, 'loaded_pipeline': None}
+        else:
+            print(f'PipelineInputDataNode.process(known_mode: {known_mode}, display: {display})...')
+            
+            if data_mode_from_combo_list != known_mode:
+                print(f'dropdown mode: {data_mode_from_combo_list} and input argument mode: {known_mode} differ. Using input argument mode ({known_mode}) currently.')
+                data_mode = known_mode
+                search_text = known_mode
+                found_desired_index = self.ctrls['data_mode'].findText(search_text)
+                print(f'search_text: {search_text}, found_desired_index: {found_desired_index}')
+
+                self.ctrls['data_mode'].setCurrentIndex(found_desired_index)
+            else:
+                data_mode = data_mode_from_combo_list
+                
+            # self.stateGroup.
+            # raise NotImplementedError
 
         with ProgressDialog("Pipeline Input Loading..", 0, self.num_known_types, parent=None, busyCursor=True, wait=250) as dlg:
             # do stuff
