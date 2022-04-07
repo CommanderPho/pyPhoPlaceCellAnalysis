@@ -404,10 +404,10 @@ class Spike3DRaster_Vedo(SpikeRasterBase):
     
     ######  Get/Set Properties ######:
 
-    @property
-    def axes_walls_z_height(self):
-        """The axes_walls_z_height property."""
-        return self._axes_walls_z_height
+    # @property
+    # def axes_walls_z_height(self):
+    #     """The axes_walls_z_height property."""
+    #     return self._axes_walls_z_height
     
     @property
     def z_floor(self):
@@ -462,7 +462,10 @@ class Spike3DRaster_Vedo(SpikeRasterBase):
             y = DataSeriesToSpatial.build_series_identity_axis(self.n_cells, center_mode='zero_centered', bin_position_mode='bin_center', side_bin_margins = self.params.side_bin_margins)
             all_y = [y[a_cell_id] for a_cell_id in self.spikes_df['cell_idx'].to_numpy()]
             self.spikes_df['visualization_raster_y_location'] = all_y # adds as a column to the dataframe. Only needs to be updated when the number of active units changes
-                    
+            # max_y_all_data = np.nanmax(all_y) # self.spikes_df['visualization_raster_y_location'] 
+
+        max_y_all_data = np.nanmax(self.spikes_df['visualization_raster_y_location'].to_numpy()) # self.spikes_df['visualization_raster_y_location'] 
+        self.params.max_y_pos = max(10.0, max_y_all_data)
                     
         # self.setup_spike_rendering_mixin() # NeuronIdentityAccessingMixin
         
@@ -470,6 +473,55 @@ class Spike3DRaster_Vedo(SpikeRasterBase):
         # self.buildUI()
 
 
+    def setup(self):
+        """ setup() is called before self.buildUI(), etc.
+            self.plots
+        
+        """
+        # self.setup_spike_rendering_mixin() # NeuronIdentityAccessingMixin
+        
+    
+        self.app = pg.mkQApp("Spike3DRaster_Vedo")
+        
+        # Configure vedo settings:
+        settings.allowInteraction = True
+        # "depth peeling" may improve the rendering of transparent objects
+        settings.useDepthPeeling = True
+        settings.multiSamples = 2  # needed on OSX vtk9
+            
+        # Custom Member Variables:
+        self.enable_epoch_rectangle_meshes = False
+        self.enable_debug_print = False
+        self.enable_debug_widgets = True
+        
+        
+        # Config
+        self.params.spike_start_z = -10.0 # self.z_floor
+        self.params.spike_end_z = -6.0
+        
+        # self.params.max_y_pos = 50.0
+        # self.params.max_z_pos = 10.0
+        
+        # max_y_all_data = self.spikes_df['visualization_raster_y_location'].nanmax()
+        
+        self.params.max_y_pos = 10.0
+        self.params.max_z_pos = max(self.params.spike_end_z, (self.z_floor + 10.0))
+        
+        
+        self.params.center_mode = 'zero_centered'
+        # self.params.bin_position_mode = ''bin_center'
+        self.params.bin_position_mode = 'left_edges'
+        
+        # by default we want the time axis to approximately span -20 to 20. So we set the temporal_zoom_factor to 
+        self.params.temporal_zoom_factor = 40.0 / float(self.render_window_duration)        
+        
+        self.params.enable_epoch_rectangle_meshes = self.enable_epoch_rectangle_meshes
+        self.params.active_cell_colormap_name = 'rainbow'
+        
+        # Plots Structures:
+        self.plots.meshes = dict()
+        
+        
     def buildUI(self):
         """ for QGridLayout
             addWidget(widget, row, column, rowSpan, columnSpan, Qt.Alignment alignment = 0)
@@ -530,48 +582,6 @@ class Spike3DRaster_Vedo(SpikeRasterBase):
         self.ui.plt.show()                  # <--- show the vedo rendering
         self.show()                     # <--- show the Qt Window
 
-    def setup(self):
-        """ 
-            self.plots
-        
-        """
-        # self.setup_spike_rendering_mixin() # NeuronIdentityAccessingMixin
-        
-    
-        self.app = pg.mkQApp("Spike3DRaster_Vedo")
-        
-        # Configure vedo settings:
-        settings.allowInteraction = True
-        # "depth peeling" may improve the rendering of transparent objects
-        settings.useDepthPeeling = True
-        settings.multiSamples = 2  # needed on OSX vtk9
-            
-        # Custom Member Variables:
-        self.enable_epoch_rectangle_meshes = False
-        self.enable_debug_print = False
-        self.enable_debug_widgets = True
-        
-        
-        # Config
-        self.params.spike_start_z = -10.0
-        self.params.spike_end_z = -6.0
-        
-        self.params.max_y_pos = 50.0
-        self.params.max_z_pos = 10.0
-        
-        self.params.center_mode = 'zero_centered'
-        # self.params.bin_position_mode = ''bin_center'
-        self.params.bin_position_mode = 'left_edges'
-        
-        # by default we want the time axis to approximately span -20 to 20. So we set the temporal_zoom_factor to 
-        self.params.temporal_zoom_factor = 40.0 / float(self.render_window_duration)        
-        
-        self.params.enable_epoch_rectangle_meshes = self.enable_epoch_rectangle_meshes
-        self.params.active_cell_colormap_name = 'rainbow'
-        
-        # Plots Structures:
-        self.plots.meshes = dict()
-        
     def _buildGraphics(self):
         """ Implementors must override this method to build the main graphics object and add it at layout position (0, 0)"""
         # vedo_qt_main_window = MainVedoPlottingWindow() # Create the main window with the vedo plotter
@@ -593,7 +603,7 @@ class Spike3DRaster_Vedo(SpikeRasterBase):
         
         """
         if self.enable_epoch_rectangle_meshes:
-            rect_meshes = StaticVedo_3DRasterHelper.plot_epoch_rects_vedo(self.epochs_df, should_save=False)
+            rect_meshes = StaticVedo_3DRasterHelper.plot_epoch_rects_vedo(self.epochs_df, max_y_pos=self.params.max_y_pos, max_z_pos=self.params.max_z_pos, should_save=False)
             rect_meshes.useBounds(False) # Says to ignore the bounds of the rect_meshes
             rect_meshes.color(1).lighting('glossy')
         else:
