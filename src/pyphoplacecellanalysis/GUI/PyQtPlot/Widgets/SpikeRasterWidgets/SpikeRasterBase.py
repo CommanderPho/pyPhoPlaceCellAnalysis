@@ -287,31 +287,18 @@ class SpikeRasterBase(UnitSortableMixin, DataSeriesToSpatialTransformingMixin, N
         new_to_old_map = OrderedDict(zip(new_neuron_IDXs, old_neuron_IDXs))
         neuron_id_to_new_IDX_map = OrderedDict(zip(self.neuron_ids, new_neuron_IDXs)) # provides the new_IDX corresponding to any neuron_id (aclu value)
         
+        if self.enable_overwrite_invalid_unit_ids:
+            print("WARNING: self.enable_overwrite_invalid_unit_ids is True, so dataframe 'unit_id' and 'cell_idx' will be overwritten!")
+            self.overwrite_invalid_unit_ids(self.spikes_df, neuron_id_to_new_IDX_map)
         
         # Build important maps between self.unit_ids and self.cell_ids:
         self.cell_id_to_unit_id_map = OrderedDict(zip(self.cell_ids, self.unit_ids)) # maps cell_ids to unit_ids
         self.unit_id_to_cell_id_map = OrderedDict(zip(self.unit_ids, self.cell_ids)) # maps unit_ids to cell_ids
         
-        if self.enable_overwrite_invalid_unit_ids:
-            print("WARNING: self.enable_overwrite_invalid_unit_ids is True, so dataframe 'unit_id' and 'cell_idx' will be overwritten!")
-            self.overwrite_invalid_unit_ids(self.spikes_df, neuron_id_to_new_IDX_map)
-            # self.spikes_df['old_unit_id'] = self.spikes_df['unit_id'].copy()
-            # # self.spikes_df['unit_id'] = np.array([self.get_neuron_id_and_idx(neuron_id=an_included_cell_ID)[0] for an_included_cell_ID in self.spikes_df['aclu'].to_numpy()]) # get the indexes from the cellIDs
-            # # self.spikes_df['unit_id'] = np.array(self.find_cell_IDXs_from_cell_ids(self.spikes_df['aclu'].to_numpy()), dtype=int)
-            # # included_cell_INDEXES = np.array([self.get_neuron_id_and_idx(neuron_id=an_included_cell_ID)[0] for an_included_cell_ID in self.spikes_df['aclu'].to_numpy()]) # get the indexes from the cellIDs
-            # included_cell_INDEXES = np.array(self.find_cell_IDXs_from_cell_ids(self.spikes_df['aclu'].to_numpy()), dtype=int)
-            # self.spikes_df['unit_id'] = included_cell_INDEXES.copy()
-            # # self.spikes_df['cell_idx'] = included_cell_INDEXES.copy()
-            # self.spikes_df['cell_idx'] = self.spikes_df['unit_id'].copy() # TODO: this is bad! The self.get_neuron_id_and_idx(...) function doesn't work!
-            # print("\t done updating 'unit_id' and 'cell_idx'.")
-        
-        
         if neuron_sort_order is None:
             neuron_sort_order = np.arange(len(self.unit_ids)) # default sort order is sorted by unit_ids
         self._unit_sort_order = neuron_sort_order
         assert len(self._unit_sort_order) == len(self.unit_ids), f"len(self._unit_sort_order): {len(self._unit_sort_order)} must equal len(self.unit_ids): {len(self.unit_ids)} but it does not!"
-        
-        
         
         # Setup Coloring:
         self._setup_neurons_color_data(neuron_colors, coloring_mode='color_by_index_order')
@@ -555,3 +542,4 @@ class SpikeRasterBase(UnitSortableMixin, DataSeriesToSpatialTransformingMixin, N
         """ Implementor must override! """
         raise NotImplementedError
         
+# hih
