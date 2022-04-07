@@ -94,9 +94,9 @@ class DataSeriesColorHelpers:
         # spikes_df['cell_idx'] = spikes_df['unit_id'].copy() # TODO: this is bad! The self.get_neuron_id_and_idx(...) function doesn't work!
         
         
-     def setup_neurons_color_data(self, neuron_colors_list, coloring_mode='color_by_index_order'):
+    def setup_neurons_color_data(self, neuron_colors_list, coloring_mode='color_by_index_order'):
         return DataSeriesColorHelpers._setup_neurons_color_data(self.params, self.spikes_df, neuron_colors_list=neuron_colors_list, coloring_mode=coloring_mode)
-            
+        
     @classmethod
     def _build_flat_color_data(cls, params, spikes_df, fallback_color_rgba = (0, 0, 0, 1.0)):
         """ Called only by self.setup_spike_rendering_mixin()
