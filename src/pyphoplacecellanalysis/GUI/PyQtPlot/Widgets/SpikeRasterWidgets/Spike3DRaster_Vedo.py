@@ -667,9 +667,18 @@ class Spike3DRaster_Vedo(SpikeRasterBase):
         """
         
         active_t_start, active_t_end = (self.spikes_window.active_window_start_time, self.spikes_window.active_window_end_time)
-        active_x_start, active_x_end = DataSeriesToSpatial.temporal_to_spatial_map((active_t_start, active_t_end), self.spikes_window.active_window_start_time, self.spikes_window.active_window_end_time, self.temporal_axis_length, center_mode=self.params.center_mode)
-        print(f'(active_t_start: {active_t_start}, active_t_end: {active_t_end})')
-        print(f'(active_x_start: {active_x_start}, active_x_end: {active_x_end})')
+        active_window_t_duration = self.spikes_window.window_duration
+        if self.enable_debug_print:
+            print('debug_print_axes_locations(...): Active Window/Local Properties:')
+            print(f'\t(active_t_start: {active_t_start}, active_t_end: {active_t_end}), active_window_t_duration: {active_window_t_duration}')
+        active_x_start, active_x_end = DataSeriesToSpatial.temporal_to_spatial_map((active_t_start, active_t_end),
+                                                                                self.spikes_window.total_data_start_time, self.spikes_window.total_data_end_time,
+                                                                                self.temporal_axis_length,
+                                                                                center_mode=self.params.center_mode)
+        if self.enable_debug_print:
+            print(f'\t(active_x_start: {active_x_start}, active_x_end: {active_x_end}), active_x_length: {active_x_end - active_x_start}')
+        
+        # active_x_start, active_x_end = DataSeriesToSpatial.temporal_to_spatial_map((active_t_start, active_t_end), self.spikes_window.active_window_start_time, self.spikes_window.active_window_end_time, self.temporal_axis_length, center_mode=self.params.center_mode)
         # (active_t_start: 30.0, active_t_end: 45.0)
         # (active_x_start: -20.0, active_x_end: 20.0)
 
@@ -767,7 +776,19 @@ class Spike3DRaster_Vedo(SpikeRasterBase):
         prev_x_position = start_bound_plane.x()
         
         active_t_start, active_t_end = (self.spikes_window.active_window_start_time, self.spikes_window.active_window_end_time)
-        active_x_start, active_x_end = DataSeriesToSpatial.temporal_to_spatial_map((active_t_start, active_t_end), self.spikes_window.active_window_start_time, self.spikes_window.active_window_end_time, self.temporal_axis_length, center_mode=self.params.center_mode)
+        active_window_t_duration = self.spikes_window.window_duration
+        if self.enable_debug_print:
+            print('debug_print_axes_locations(...): Active Window/Local Properties:')
+            print(f'\t(active_t_start: {active_t_start}, active_t_end: {active_t_end}), active_window_t_duration: {active_window_t_duration}')
+        # active_x_start, active_x_end = DataSeriesToSpatial.temporal_to_spatial_map((active_t_start, active_t_end), self.spikes_window.active_window_start_time, self.spikes_window.active_window_end_time, self.temporal_axis_length, center_mode=self.params.center_mode)
+        active_x_start, active_x_end = DataSeriesToSpatial.temporal_to_spatial_map((active_t_start, active_t_end),
+                                                                                self.spikes_window.total_data_start_time, self.spikes_window.total_data_end_time,
+                                                                                self.temporal_axis_length,
+                                                                                center_mode=self.params.center_mode)
+        if self.enable_debug_print:
+            print(f'\t(active_x_start: {active_x_start}, active_x_end: {active_x_end}), active_x_length: {active_x_end - active_x_start}')
+            
+        
         # print(f'(active_t_start: {active_t_start}, active_t_end: {active_t_end})')
         # print(f'(active_x_start: {active_x_start}, active_x_end: {active_x_end})')
         
