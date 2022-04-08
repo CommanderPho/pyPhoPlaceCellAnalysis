@@ -55,51 +55,6 @@ class CustomFormattingDataTreeWidget(pg.DataTreeWidget):
     """
     def __init__(self, parent=None, data=None):
         pg.DataTreeWidget.__init__(self, parent=parent, data=data)
-        # super(CustomFormattingDataTreeWidget, self).__init__(self, parent, data)
-        
-    # def setData(self, data, hideRoot=False):
-    #     """data should be a dictionary."""
-    #     self.clear()
-    #     self.widgets = []
-    #     self.nodes = {}
-    #     self.buildTree(data, self.invisibleRootItem(), hideRoot=hideRoot)
-    #     self.expandToDepth(3)
-    #     self.resizeColumnToContents(0)
-        
-    # def buildTree(self, data, parent, name='', hideRoot=False, path=()):
-    #     if hideRoot:
-    #         node = parent
-    #     else:
-    #         node = QtWidgets.QTreeWidgetItem([name, "", ""])
-    #         parent.addChild(node)
-        
-    #     # record the path to the node so it can be retrieved later
-    #     # (this is used by DiffTreeWidget)
-    #     self.nodes[path] = node
-
-    #     typeStr, desc, childs, widget = self.parse(data)
-    #     node.setText(1, typeStr)
-    #     node.setText(2, desc)
-            
-    #     # Truncate description and add text box if needed
-    #     if len(desc) > 100:
-    #         desc = desc[:97] + '...'
-    #         if widget is None:
-    #             widget = QtWidgets.QPlainTextEdit(str(data))
-    #             widget.setMaximumHeight(200)
-    #             widget.setReadOnly(True)
-        
-    #     # Add widget to new subnode
-    #     if widget is not None:
-    #         self.widgets.append(widget)
-    #         subnode = QtWidgets.QTreeWidgetItem(["", "", ""])
-    #         node.addChild(subnode)
-    #         self.setItemWidget(subnode, 0, widget)
-    #         subnode.setFirstColumnSpanned(True)
-            
-    #     # recurse to children
-    #     for key, data in childs.items():
-    #         self.buildTree(data, node, str(key), path=path+(key,))
 
     def custom_parse_data_format(self, data):
         """ called by self.parse(data) to get custom info for custom widget types. Should return None if the data isn't specially handled so the default formatting can be applied by the superclass. """
@@ -115,9 +70,9 @@ class CustomFormattingDataTreeWidget(pg.DataTreeWidget):
         # custom type-specific changes
         if isinstance(data, InteractivePlaceCellConfig):
             desc = "PhoCustomFormatting applied! InteractivePlaceCellConfig"
-            # childs = OrderedDict(enumerate(data.__dict__)) ## Convert to an OrderedDict
+            childs = OrderedDict(enumerate(data.__dict__)) ## Convert to an OrderedDict
             # childs = data.__dict__ ## Convert to a regular __dict__
-            # childs = {}
+            # childs = {} # returns no children
         else:
             raise NotImplementedError
         
@@ -138,12 +93,12 @@ class CustomFormattingDataTreeWidget(pg.DataTreeWidget):
 
         try:
             typeStr, desc, childs, widget = self.custom_parse_data_format(data)
-            print('handled by custom formatter')
-            # raise NotImplementedError
+            # print('handled by custom formatter')
+            
         
         except NotImplementedError:
             # this type isn't specially handled by the custom formatter, use the defaults from the parent class:
-            print('not handled by custom formatter')
+            # print('not handled by custom formatter')
             # TODO: in the future actually call super, but for now just re-implement:
         
             # defaults for all objects
@@ -180,17 +135,12 @@ class CustomFormattingDataTreeWidget(pg.DataTreeWidget):
                 widget = table
             elif isinstance(data, types.TracebackType):  ## convert traceback to a list of strings
                 frames = list(map(str.strip, traceback.format_list(traceback.extract_tb(data))))
-                #childs = OrderedDict([
-                    #(i, {'file': child[0], 'line': child[1], 'function': child[2], 'code': child[3]})
-                    #for i, child in enumerate(frames)])
-                #childs = OrderedDict([(i, ch) for i,ch in enumerate(frames)])
                 widget = QtWidgets.QPlainTextEdit('\n'.join(frames))
                 widget.setMaximumHeight(200)
                 widget.setReadOnly(True)
             else:
                 desc = str(data)
-                
-        
+
         # return no matter what
         return typeStr, desc, childs, widget
 
@@ -202,19 +152,6 @@ class CustomFormattingDataTreeWidget(pg.DataTreeWidget):
 
 def plot_dataTreeWidget(data, title='PhoOutputDataTreeApp'):
     app = pg.mkQApp(title)
-    # d = {
-    # 	'a list': [1,2,3,4,5,6, {'nested1': 'aaaaa', 'nested2': 'bbbbb'}, "seven"],
-    # 	'a dict': {
-    # 		'x': 1,
-    # 		'y': 2,
-    # 		'z': 'three'
-    # 	},
-    # 	'an array': np.random.randint(10, size=(40,10)),
-    # 	'a traceback': some_func1(),
-    # 	'a function': some_func1,
-    # 	'a class': pg.DataTreeWidget,
-    # }
-    # tree = pg.DataTreeWidget(data=data)
     tree = CustomFormattingDataTreeWidget(data=data)
     tree.show()
     tree.setWindowTitle(f'PhoOutputDataTreeApp: pyqtgraph DataTreeWidget: {title}')
