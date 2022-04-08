@@ -108,6 +108,8 @@ class CustomFormattingDataTreeWidget(pg.DataTreeWidget):
         # custom type-specific changes
         if isinstance(data, InteractivePlaceCellConfig):
             desc = "PhoCustomFormatting applied! InteractivePlaceCellConfig"
+            childs = OrderedDict(enumerate(data.__dict__)) ## Convert to an OrderedDict
+            
             
         # elif isinstance(data, (list, tuple)):
         #     desc = "length=%d" % len(data)
@@ -139,19 +141,25 @@ class CustomFormattingDataTreeWidget(pg.DataTreeWidget):
 
 
     def parse(self, data):
-        """
+        """ 
         Given any python object, return:
           * type
           * a short string representation
-          * a dict of sub-objects to be parsed
+          * childs: a dict of sub-objects to be parsed
           * optional widget to display as sub-node
+          
+        Note that effectively only OrderedDictionary objects are displayed in the table, and nearly everything else is converted into an OrderedDict and then parsed again (recurrsively).
+        
         """
 
         try:
             typeStr, desc, childs, widget = self.custom_parse_data_format(data)
-        except NotImplementedError as e:
-            # this type isn't specially handled by the custom formatter, use the defaults from the parent class:
+            # print('handled by custom formatter')
+            # raise NotImplementedError
         
+        except NotImplementedError:
+            # this type isn't specially handled by the custom formatter, use the defaults from the parent class:
+            print('not handled by custom formatter')
             # TODO: in the future actually call super, but for now just re-implement:
         
             # defaults for all objects
@@ -174,7 +182,7 @@ class CustomFormattingDataTreeWidget(pg.DataTreeWidget):
                         childs = OrderedDict(data.items())
             elif isinstance(data, (list, tuple)):
                 desc = "length=%d" % len(data)
-                childs = OrderedDict(enumerate(data))
+                childs = OrderedDict(enumerate(data)) # for list-like objects, enumerate their indices/items as an OrderedDict so recurrsion will work.
             elif HAVE_METAARRAY and (hasattr(data, 'implements') and data.implements('MetaArray')):
                 childs = OrderedDict([
                     ('data', data.view(np.ndarray)),
@@ -197,14 +205,15 @@ class CustomFormattingDataTreeWidget(pg.DataTreeWidget):
                 widget.setReadOnly(True)
             else:
                 desc = str(data)
+                
+        # finally:
+        #     # return no matter what
+        #     return typeStr, desc, childs, widget
+    
         
-        except Exception as e:
-            raise e
-        
-        finally:
-            # return no matter what
-            return typeStr, desc, childs, widget
-        
+    # return no matter what
+    return typeStr, desc, childs, widget
+
         
         
 
