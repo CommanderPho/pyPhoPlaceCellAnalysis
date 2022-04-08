@@ -43,7 +43,7 @@ try:
 except:
     HAVE_METAARRAY = False
     
-    
+from pyphocorehelpers.print_helpers import debug_dump_object_member_shapes
 from pyphoplacecellanalysis.General.Configs.DynamicConfigs import PlottingConfig, InteractivePlaceCellConfig
 
 __all__ = ['CustomFormattingDataTreeWidget']
