@@ -34,6 +34,11 @@ import pyqtgraph as pg
 from pyqtgraph.Qt import QtCore, QtGui
 from collections import OrderedDict
 
+
+from pyphoplacecellanalysis.General.Configs.DynamicConfigs import PlottingConfig, InteractivePlaceCellConfig
+
+
+
 __all__ = ['CustomFormattingDataTreeWidget']
 
 class CustomFormattingDataTreeWidget(pg.DataTreeWidget):
@@ -44,7 +49,6 @@ class CustomFormattingDataTreeWidget(pg.DataTreeWidget):
     def __init__(self, parent=None, data=None):
         pg.DataTreeWidget.__init__(self, parent=parent, data=data)
         # super(CustomFormattingDataTreeWidget, self).__init__(self, parent, data)
-        
         
     # def setData(self, data, hideRoot=False):
     #     """data should be a dictionary."""
@@ -90,59 +94,118 @@ class CustomFormattingDataTreeWidget(pg.DataTreeWidget):
     #     for key, data in childs.items():
     #         self.buildTree(data, node, str(key), path=path+(key,))
 
-    # def parse(self, data):
-    #     """
-    #     Given any python object, return:
-    #       * type
-    #       * a short string representation
-    #       * a dict of sub-objects to be parsed
-    #       * optional widget to display as sub-node
-    #     """
-    #     # defaults for all objects
-    #     typeStr = type(data).__name__
-    #     if typeStr == 'instance':
-    #         typeStr += ": " + data.__class__.__name__
-    #     widget = None
-    #     desc = ""
-    #     childs = {}
+    def custom_parse_data_format(self, data):
+        """ called by self.parse(data) to get custom info for custom widget types. Should return None if the data isn't specially handled so the default formatting can be applied by the superclass. """
+        print('CustomFormattingDataTreeWidget.custom_parse_data_format(...) called!')
+        # defaults for all objects
+        typeStr = type(data).__name__
+        if typeStr == 'instance':
+            typeStr += ": " + data.__class__.__name__
+        widget = None
+        desc = ""
+        childs = {}
         
-    #     # type-specific changes
-    #     if isinstance(data, dict):
-    #         desc = "length=%d" % len(data)
-    #         if isinstance(data, OrderedDict):
-    #             childs = data
-    #         else:
-    #             try:
-    #                 childs = OrderedDict(sorted(data.items()))
-    #             except TypeError: # if sorting falls
-    #                 childs = OrderedDict(data.items())
-    #     elif isinstance(data, (list, tuple)):
-    #         desc = "length=%d" % len(data)
-    #         childs = OrderedDict(enumerate(data))
-    #     elif HAVE_METAARRAY and (hasattr(data, 'implements') and data.implements('MetaArray')):
-    #         childs = OrderedDict([
-    #             ('data', data.view(np.ndarray)),
-    #             ('meta', data.infoCopy())
-    #         ])
-    #     elif isinstance(data, np.ndarray):
-    #         desc = "shape=%s dtype=%s" % (data.shape, data.dtype)
-    #         table = TableWidget()
-    #         table.setData(data)
-    #         table.setMaximumHeight(200)
-    #         widget = table
-    #     elif isinstance(data, types.TracebackType):  ## convert traceback to a list of strings
-    #         frames = list(map(str.strip, traceback.format_list(traceback.extract_tb(data))))
-    #         #childs = OrderedDict([
-    #             #(i, {'file': child[0], 'line': child[1], 'function': child[2], 'code': child[3]})
-    #             #for i, child in enumerate(frames)])
-    #         #childs = OrderedDict([(i, ch) for i,ch in enumerate(frames)])
-    #         widget = QtWidgets.QPlainTextEdit('\n'.join(frames))
-    #         widget.setMaximumHeight(200)
-    #         widget.setReadOnly(True)
-    #     else:
-    #         desc = str(data)
+        # custom type-specific changes
+        if isinstance(data, InteractivePlaceCellConfig):
+            desc = "PhoCustomFormatting applied! InteractivePlaceCellConfig"
+            
+        # elif isinstance(data, (list, tuple)):
+        #     desc = "length=%d" % len(data)
+        #     childs = OrderedDict(enumerate(data))
+        # elif HAVE_METAARRAY and (hasattr(data, 'implements') and data.implements('MetaArray')):
+        #     childs = OrderedDict([
+        #         ('data', data.view(np.ndarray)),
+        #         ('meta', data.infoCopy())
+        #     ])
+        # elif isinstance(data, np.ndarray):
+        #     desc = "shape=%s dtype=%s" % (data.shape, data.dtype)
+        #     table = TableWidget()
+        #     table.setData(data)
+        #     table.setMaximumHeight(200)
+        #     widget = table
+        # elif isinstance(data, types.TracebackType):  ## convert traceback to a list of strings
+        #     frames = list(map(str.strip, traceback.format_list(traceback.extract_tb(data))))
+        #     #childs = OrderedDict([
+        #         #(i, {'file': child[0], 'line': child[1], 'function': child[2], 'code': child[3]})
+        #         #for i, child in enumerate(frames)])
+        #     #childs = OrderedDict([(i, ch) for i,ch in enumerate(frames)])
+        #     widget = QtWidgets.QPlainTextEdit('\n'.join(frames))
+        #     widget.setMaximumHeight(200)
+        #     widget.setReadOnly(True)
+        else:
+            raise NotImplementedError
         
-    #     return typeStr, desc, childs, widget
+        return typeStr, desc, childs, widget
+
+
+    def parse(self, data):
+        """
+        Given any python object, return:
+          * type
+          * a short string representation
+          * a dict of sub-objects to be parsed
+          * optional widget to display as sub-node
+        """
+
+        try:
+            typeStr, desc, childs, widget = self.custom_parse_data_format(data)
+        except NotImplementedError as e:
+            # this type isn't specially handled by the custom formatter, use the defaults from the parent class:
+        
+            # TODO: in the future actually call super, but for now just re-implement:
+        
+            # defaults for all objects
+            typeStr = type(data).__name__
+            if typeStr == 'instance':
+                typeStr += ": " + data.__class__.__name__
+            widget = None
+            desc = ""
+            childs = {}
+            
+            # type-specific changes
+            if isinstance(data, dict):
+                desc = "length=%d" % len(data)
+                if isinstance(data, OrderedDict):
+                    childs = data
+                else:
+                    try:
+                        childs = OrderedDict(sorted(data.items()))
+                    except TypeError: # if sorting falls
+                        childs = OrderedDict(data.items())
+            elif isinstance(data, (list, tuple)):
+                desc = "length=%d" % len(data)
+                childs = OrderedDict(enumerate(data))
+            elif HAVE_METAARRAY and (hasattr(data, 'implements') and data.implements('MetaArray')):
+                childs = OrderedDict([
+                    ('data', data.view(np.ndarray)),
+                    ('meta', data.infoCopy())
+                ])
+            elif isinstance(data, np.ndarray):
+                desc = "shape=%s dtype=%s" % (data.shape, data.dtype)
+                table = TableWidget()
+                table.setData(data)
+                table.setMaximumHeight(200)
+                widget = table
+            elif isinstance(data, types.TracebackType):  ## convert traceback to a list of strings
+                frames = list(map(str.strip, traceback.format_list(traceback.extract_tb(data))))
+                #childs = OrderedDict([
+                    #(i, {'file': child[0], 'line': child[1], 'function': child[2], 'code': child[3]})
+                    #for i, child in enumerate(frames)])
+                #childs = OrderedDict([(i, ch) for i,ch in enumerate(frames)])
+                widget = QtWidgets.QPlainTextEdit('\n'.join(frames))
+                widget.setMaximumHeight(200)
+                widget.setReadOnly(True)
+            else:
+                desc = str(data)
+        
+        except Exception as e:
+            raise e
+        
+        finally:
+            # return no matter what
+            return typeStr, desc, childs, widget
+        
+        
         
 
 
