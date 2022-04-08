@@ -4,6 +4,7 @@ import numpy as np
 from pyphocorehelpers.print_helpers import WrappingMessagePrinter
 from pyphocorehelpers.plotting.mixins.figure_param_text_box import add_figure_text_box # for _display_add_computation_param_text_box
 
+from pyphoplacecellanalysis.General.DataSeriesToSpatial import DataSeriesToSpatial # required for debug_print_axes_locations(...)
 
 # Used by _display_2d_placefield_result_plot_ratemaps_2D
 def _save_displayed_figure_if_needed(plotting_config, plot_type_name='plot', active_variant_name=None, active_figures=list(), debug_print=False):
@@ -87,4 +88,59 @@ def debug_print_identity_properties(spikes_df, debug_print=True):
     return n_cells, unit_ids, cell_ids
     
     
+
+from pyphocorehelpers.print_helpers import print_seconds_human_readable # for build_minute_x_tick_labels(...)
+
+
+def debug_print_axes_locations(spike_raster_plt):
+    """ debugs the active and global (data) windows. 
     
+    Requires the passed plotter (spike_raster_plt) has:
+        spike_raster_plt.spikes_window
+        spike_raster_plt.temporal_axis_length
+        spike_raster_plt.params.center_mode
+    
+    Example:
+        debug_print_axes_locations(...): Active Window/Local Properties:
+            (active_t_start: 30.0, active_t_end: 45.0), active_window_t_duration: 15.0
+            (active_x_start: 67.25698654867858, active_x_end: 198.3122106548942)
+        debug_print_axes_locations(...): Global Data Properties:
+             global_start_t: 22.30206346133491, global_end_t: 1739.1355703625595, global_total_data_duration: 1716.8335069012246 (seconds)
+             total_data_duration_minutes: 28.0
+            (global_x_start: 0.0, global_x_end: 15000.0)
+            
+    Example with assigning return values:
+        (active_t_start, active_t_end, active_window_t_duration), (global_start_t, global_end_t, global_total_data_duration), (active_x_start, active_x_end, active_x_duration), (global_x_start, global_x_end, global_x_duration) = debug_print_axes_locations(spike_raster_plt_vedo)
+        print((active_t_start, active_t_end, active_window_t_duration), (global_start_t, global_end_t, global_total_data_duration), (active_x_start, active_x_end, active_x_duration), (global_x_start, global_x_end, global_x_duration))
+
+    """
+    active_t_start, active_t_end = (spike_raster_plt.spikes_window.active_window_start_time, spike_raster_plt.spikes_window.active_window_end_time)
+    active_window_t_duration = spike_raster_plt.spikes_window.window_duration
+    print('debug_print_axes_locations(...): Active Window/Local Properties:')
+    print(f'\t(active_t_start: {active_t_start}, active_t_end: {active_t_end}), active_window_t_duration: {active_window_t_duration}')
+    active_x_start, active_x_end = DataSeriesToSpatial.temporal_to_spatial_map((active_t_start, active_t_end),
+                                                                               spike_raster_plt.spikes_window.total_data_start_time, spike_raster_plt.spikes_window.total_data_end_time,
+                                                                               spike_raster_plt.temporal_axis_length,
+                                                                               center_mode=spike_raster_plt.params.center_mode)
+    print(f'\t(active_x_start: {active_x_start}, active_x_end: {active_x_end}), active_x_length: {active_x_end - active_x_start}')
+
+    # Global (all data)
+    print('debug_print_axes_locations(...): Global Data Properties:')
+    global_start_t, global_end_t = spike_raster_plt.spikes_window.total_df_start_end_times
+    global_total_data_duration = global_end_t - global_start_t
+    print(f'\t(global_start_t: {global_start_t}, global_end_t: {global_end_t}), global_total_data_duration: {global_total_data_duration} (seconds)')
+
+    global_total_data_duration_minutes = np.floor_divide(global_total_data_duration, 60.0)
+    print(f'\ttotal_data_duration_minutes: {global_total_data_duration_minutes}') # 28.0
+
+    global_x_start, global_x_end = DataSeriesToSpatial.temporal_to_spatial_map((global_start_t, global_end_t),
+                                                                               spike_raster_plt.spikes_window.total_data_start_time, spike_raster_plt.spikes_window.total_data_end_time, # spike_raster_plt_vedo.spikes_window.active_window_start_time, spike_raster_plt_vedo.spikes_window.active_window_end_time,
+                                                                               spike_raster_plt.temporal_axis_length,
+                                                                               center_mode=spike_raster_plt.params.center_mode)
+    print(f'\t(global_x_start: {global_x_start}, global_x_end: {global_x_end}), global_total_x_length: {global_x_end - global_x_start}')
+    # Return this complicated but exhaustive tuple of values:
+    return ((active_t_start, active_t_end, active_window_t_duration), (global_start_t, global_end_t, global_total_data_duration), 
+            (active_x_start, active_x_end, (active_x_end - active_x_start)), (global_x_start, global_x_end, (global_x_end - global_x_start)))
+
+
+
