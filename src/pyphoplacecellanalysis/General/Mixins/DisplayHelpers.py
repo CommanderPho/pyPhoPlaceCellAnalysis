@@ -89,9 +89,6 @@ def debug_print_identity_properties(spikes_df, debug_print=True):
     
     
 
-from pyphocorehelpers.print_helpers import print_seconds_human_readable # for build_minute_x_tick_labels(...)
-
-
 def debug_print_axes_locations(spike_raster_plt):
     """ debugs the active and global (data) windows. 
     
@@ -100,14 +97,16 @@ def debug_print_axes_locations(spike_raster_plt):
         spike_raster_plt.temporal_axis_length
         spike_raster_plt.params.center_mode
     
-    Example:
+    Example Output:
         debug_print_axes_locations(...): Active Window/Local Properties:
             (active_t_start: 30.0, active_t_end: 45.0), active_window_t_duration: 15.0
-            (active_x_start: 67.25698654867858, active_x_end: 198.3122106548942)
+            (active_x_start: 67.25698654867858, active_x_end: 198.3122106548942), active_x_length: 131.0552241062156
         debug_print_axes_locations(...): Global Data Properties:
-             global_start_t: 22.30206346133491, global_end_t: 1739.1355703625595, global_total_data_duration: 1716.8335069012246 (seconds)
-             total_data_duration_minutes: 28.0
-            (global_x_start: 0.0, global_x_end: 15000.0)
+            (global_start_t: 22.30206346133491, global_end_t: 1739.1355703625595), global_total_data_duration: 1716.8335069012246 (seconds)
+            total_data_duration_minutes: 28.0
+            (global_x_start: 0.0, global_x_end: 15000.0), global_total_x_length: 15000.0
+        (30.0, 45.0, 15.0) (22.30206346133491, 1739.1355703625595, 1716.8335069012246) (67.25698654867858, 198.3122106548942, 131.0552241062156) (0.0, 15000.0, 15000.0)
+
             
     Example with assigning return values:
         (active_t_start, active_t_end, active_window_t_duration), (global_start_t, global_end_t, global_total_data_duration), (active_x_start, active_x_end, active_x_duration), (global_x_start, global_x_end, global_x_duration) = debug_print_axes_locations(spike_raster_plt_vedo)

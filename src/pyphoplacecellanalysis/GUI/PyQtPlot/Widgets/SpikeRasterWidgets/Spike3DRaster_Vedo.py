@@ -22,6 +22,7 @@ from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer
 # import qdarkstyle
 
 from pyphoplacecellanalysis.General.DataSeriesToSpatial import DataSeriesToSpatial
+from  pyphoplacecellanalysis.General.Mixins.DisplayHelpers import debug_print_axes_locations
 from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.SpikeRasterWidgets.SpikeRasterBase import SpikeRasterBase
 
 
@@ -691,26 +692,42 @@ class Spike3DRaster_Vedo(SpikeRasterBase):
         else:
             active_mesh_args = (all_spike_lines, start_bound_plane, end_bound_plane)
 
+        # New Way of building the axes for all data (displaying evenly-spaced ticks along the x-axis with labels reflecting the corresponding t-value time:
+        
+
+        # Old Way of building the axes for all data:
         # all_data_axes = vedo.Axes([all_spike_lines, rect_meshes, start_bound_plane, end_bound_plane],  # build axes for this set of objects
-        all_data_axes = vedo.Axes(active_mesh_args,  # build axes for this set of objects
-                    xtitle="timestamp (t)",
-                    ytitle="Cell ID",
-                    ztitle="Z",
-                    hTitleColor='white',
-                    zHighlightZero=True,
-                    xyFrameLine=2, yzFrameLine=1, zxFrameLine=1,
-                    xyFrameColor='white',
-                    # xyShift=1.05, # move xy 5% above the top of z-range
-                    yzGrid=True,
-                    zxGrid=True,
-                    yMinorTicks=n_cells,
-                    yLineColor='white',
-                    # xrange=(active_x_start, active_x_end),
-                    # yrange=(0.0, max_y_pos),
-                    # zrange=(0.0, max_z_pos)
-        )
+        # all_data_axes = vedo.Axes(active_mesh_args,  # build axes for this set of objects
+        #             xtitle="timestamp (t)",
+        #             ytitle="Cell ID",
+        #             ztitle="Z",
+        #             hTitleColor='white',
+        #             zHighlightZero=True,
+        #             xyFrameLine=2, yzFrameLine=1, zxFrameLine=1,
+        #             xyFrameColor='white',
+        #             # xyShift=1.05, # move xy 5% above the top of z-range
+        #             yzGrid=True,
+        #             zxGrid=True,
+        #             yMinorTicks=n_cells,
+        #             yLineColor='white',
+        #             # xrange=(active_x_start, active_x_end),
+        #             # yrange=(0.0, max_y_pos),
+        #             # zrange=(0.0, max_z_pos)
+        # )
+        
+        #  xValuesAndLabels: list of custom tick positions and labels [(pos1, label1), …]
+        # Want to add a tick/label at the x-values corresponding to each minute.
+        (active_t_start, active_t_end, active_window_t_duration), (global_start_t, global_end_t, global_total_data_duration), (active_x_start, active_x_end, active_x_duration), (global_x_start, global_x_end, global_x_duration) = debug_print_axes_locations(self)
+        new_axes_x_to_time_labels = DataSeriesToSpatial.build_minute_x_tick_labels(self)
+        print(f'new_axes_x_to_time_labels: {new_axes_x_to_time_labels}, global_x_start: {global_x_start}, global_x_end: {global_x_end}')
+
+        all_data_axes = Axes(all_spike_lines, xrange=[0, 15000], c='red', textScale=0.1, gridLineWidth=0.1, axesLineWidth=0.1, xTickLength=0.005*0.1, xTickThickness=0.0025*0.1,
+                                xValuesAndLabels = new_axes_x_to_time_labels, useGlobal=True)
+        
         all_data_axes.useBounds(False)
         
+        
+        ## The axes only for the active window:
         active_window_only_axes = vedo.Axes([start_bound_plane, end_bound_plane],  # build axes for this set of objects
                     xtitle="window t",
                     ytitle="Cell ID",

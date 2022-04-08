@@ -1,6 +1,8 @@
 import numpy as np
 import pandas as pd
 
+from pyphocorehelpers.print_helpers import print_seconds_human_readable # for build_minute_x_tick_labels(...)
+
 
 class DataSeriesToSpatial:
     """ Helper functions for building the mapping from temporal events (t, v0, v1, ...) to (X,Y) or (X,Y,Z):
@@ -12,8 +14,6 @@ class DataSeriesToSpatial:
     series_identity_axis: the mapping of each series (such as each neuron_id) to spatial position
         fixed length currently hardcoded to be (1.0 * n_cells) + side_bin_margins
         
-        
-    
     
     """
     
@@ -141,6 +141,51 @@ class DataSeriesToSpatial:
             raise
             
         return epoch_window_relative_start_x_positions, epoch_spatial_durations
+
+
+    @classmethod
+    def build_minute_x_tick_labels(cls, spike_raster_plt, enable_debug_print=False):
+        """ 
+        Starts by finding the t-values (times in the global data time frame) that correspond to 60.0 second (1 minute) steps starting from the global window's earliest value.
+            this is global_minute_t_ticks
+        Then it transforms these global times into x-values using the usual global_minute_x_tick_positions = DataSeriesToSpatial.temporal_to_spatial_map(global_minute_t_ticks, ...) approach.
+            this is global_minute_x_tick_positions
+        Finally, it generates an appropraite time label string for each tick t-value to be displayed on the tick. Currently this is just HH:MM:SS.sss format.
+            this is the returned list of (a_tick_x_pos, a_tick_label_str) pairs to be used as the vedo.Axes's xValuesAndLabels argument.
+        
+        should return:
+            xValuesAndLabels: list of custom tick positions and labels [(pos1, label1), …]
+            
+        Example:
+            from pyphoplacecellanalysis.General.DataSeriesToSpatial import DataSeriesToSpatial # for DataSeriesToSpatial.build_minute_x_tick_labels(...) function
+            xValuesAndLabels = DataSeriesToSpatial.build_minute_x_tick_labels(spike_raster_plt_3d_vedo)
+            print(f'xValuesAndLabels: {xValuesAndLabels}')
+
+        """
+        if enable_debug_print:
+            print('build_minute_x_tick_labels(...):')
+        global_start_t, global_end_t = spike_raster_plt.spikes_window.total_df_start_end_times
+        global_total_data_duration = global_end_t - global_start_t
+        if enable_debug_print:
+            print(f'\t(global_start_t: {global_start_t}, global_end_t: {global_end_t}), global_total_data_duration: {global_total_data_duration} (seconds)')
+        # find the maximum integer number of minutes that the global_total_data_duration can be divided into
+        # global_total_data_duration_minutes = np.floor_divide(global_total_data_duration, 60.0)
+        # print(f'\ttotal_data_duration_minutes: {global_total_data_duration_minutes}') # 28.0
+        
+        # Build the time-ticks for each minute over the global data times:
+        # minute_t_ticks = np.linspace(global_start_t, global_end_t, num=global_total_data_duration_minutes)
+        global_minute_t_ticks = np.arange(global_start_t, global_end_t, 60.0) # steps by 60.0 seconds (1 minute) from global_start_t to global_end_t. Doesn't need the explicit minutes calculation.
+        global_minute_x_tick_positions = DataSeriesToSpatial.temporal_to_spatial_map(global_minute_t_ticks,
+                                                                                spike_raster_plt.spikes_window.total_data_start_time, spike_raster_plt.spikes_window.total_data_end_time, # spike_raster_plt_3d_vedo.spikes_window.active_window_start_time, spike_raster_plt_3d_vedo.spikes_window.active_window_end_time,
+                                                                                spike_raster_plt.temporal_axis_length,
+                                                                                center_mode=spike_raster_plt.params.center_mode, enable_debug_print=enable_debug_print)
+        
+        #  xValuesAndLabels: list of custom tick positions and labels [(pos1, label1), …]
+        # Want to add a tick/label at the x-values corresponding to each minute.
+        # Note: that print_seconds_human_readable(tick_t)[-1] is only the formatted string
+        return [(tick_x, print_seconds_human_readable(tick_t)[-1]) for tick_x, tick_t in list(zip(global_minute_x_tick_positions, global_minute_t_ticks))]
+        
+
 
 
 
