@@ -16,6 +16,11 @@ from PyQt5.QtCore import Qt, QPoint, QRect, QObject, QEvent, pyqtSignal, pyqtSlo
 
 from pyphoplacecellanalysis.GUI.Qt.PlaybackControls.Spike3DRasterBottomPlaybackControlBarBase import Ui_RootWidget  # Generated file from .ui
 
+# Custom Widget classes
+from pyphocorehelpers.gui.Qt.HighlightedJumpSlider import HighlightedJumpSlider
+from pyphocorehelpers.gui.Qt.ToggleButton import ToggleButtonModel, ToggleButton
+
+
 class Spike3DRasterBottomPlaybackControlBar(QWidget):
     
     def __init__(self, parent=None):
@@ -28,7 +33,8 @@ class Spike3DRasterBottomPlaybackControlBar(QWidget):
 
 
     def initUI(self):
-        pass
+        self.ui.slider_progress.hide()
+
 
 
     def __str__(self):
@@ -50,8 +56,6 @@ class Spike3DRasterBottomPlaybackControlBar(QWidget):
 if __name__ == "__main__":
     import sys
     app = QtWidgets.QApplication(sys.argv)
-    rootForm = QtWidgets.QWidget()
-    ui = Spike3DRasterBottomPlaybackControlBar()
-    ui.setupUi(rootForm)
-    rootForm.show()
+    testWidget = Spike3DRasterBottomPlaybackControlBar()
+    # testWidget.show()
     sys.exit(app.exec_())

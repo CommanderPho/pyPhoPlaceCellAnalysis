@@ -229,6 +229,9 @@ border-color: rgb(0, 0, 0);</string>
       </item>
       <item row="0" column="0" colspan="20">
        <widget class="HighlightedJumpSlider" name="slider_progress">
+        <property name="enabled">
+         <bool>false</bool>
+        </property>
         <property name="maximum">
          <number>9999</number>
         </property>
@@ -359,12 +362,12 @@ border-color: rgb(0, 0, 0);</string>
   <customwidget>
    <class>HighlightedJumpSlider</class>
    <extends>QSlider</extends>
-   <header>pyphocorehelpers.gui.Qt</header>
+   <header>pyphocorehelpers.gui.Qt.HighlightedJumpSlider</header>
   </customwidget>
   <customwidget>
    <class>ToggleButton</class>
    <extends>QPushButton</extends>
-   <header>pyphocorehelpers.gui.Qt</header>
+   <header>pyphocorehelpers.gui.Qt.ToggleButton</header>
   </customwidget>
  </customwidgets>
  <resources/>
