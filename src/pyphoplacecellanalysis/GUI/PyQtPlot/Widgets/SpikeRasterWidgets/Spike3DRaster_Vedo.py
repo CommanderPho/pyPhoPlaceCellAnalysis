@@ -25,6 +25,7 @@ from pyphoplacecellanalysis.General.DataSeriesToSpatial import DataSeriesToSpati
 from  pyphoplacecellanalysis.General.Mixins.DisplayHelpers import debug_print_axes_locations
 from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.SpikeRasterWidgets.SpikeRasterBase import SpikeRasterBase
 
+from pyphoplacecellanalysis.GUI.Qt.PlaybackControls.Spike3DRasterBottomPlaybackControlBarWidget import Spike3DRasterBottomPlaybackControlBar
 
 class StaticVedo_3DRasterHelper:
     # Plots test_epochs_df

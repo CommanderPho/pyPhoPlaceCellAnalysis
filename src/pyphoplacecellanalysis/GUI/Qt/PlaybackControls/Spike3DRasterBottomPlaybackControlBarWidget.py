@@ -14,20 +14,44 @@ from PyQt5.QtCore import Qt, QPoint, QRect, QObject, QEvent, pyqtSignal, pyqtSlo
 ## IMPORTS:
 # from ...pyPhoPlaceCellAnalysis.src.pyphoplacecellanalysis.GUI.Qt.PlaybackControls import Spike3DRasterBottomPlaybackControlBar
 
+from pyphoplacecellanalysis.GUI.Qt.PlaybackControls.Spike3DRasterBottomPlaybackControlBarBase import Ui_RootWidget  # Generated file from .ui
 
 class Spike3DRasterBottomPlaybackControlBar(QWidget):
-	def __init__(self, parent=None):
-		super().__init__(parent=parent) # Call the inherited classes __init__ method
-		self.ui = uic.loadUi("../pyPhoPlaceCellAnalysis/src/pyphoplacecellanalysis/GUI/Qt/PlaybackControls/Spike3DRasterBottomPlaybackControlBar.ui", self) # Load the .ui file
+    
+    def __init__(self, parent=None):
+        super().__init__(parent=parent) # Call the inherited classes __init__ method
+        self.ui = Ui_RootWidget()
+        self.ui.setupUi(self) # builds the design from the .ui onto this widget.
+        
+        self.initUI()
+        self.show() # Show the GUI
 
 
-		self.initUI()
-		self.show() # Show the GUI
+    def initUI(self):
+        pass
 
 
-	def initUI(self):
-		pass
+    def __str__(self):
+         return 
 
 
-	def __str__(self):
- 		return 
+
+
+
+## Start Qt event loop
+# if __name__ == '__main__':
+#     app = mkQApp("PlacefieldVisualSelectionWidget Example")
+#     widget = PlacefieldVisualSelectionWidget()
+#     widget.show()
+#     pg.exec()
+
+
+
+if __name__ == "__main__":
+    import sys
+    app = QtWidgets.QApplication(sys.argv)
+    rootForm = QtWidgets.QWidget()
+    ui = Spike3DRasterBottomPlaybackControlBar()
+    ui.setupUi(rootForm)
+    rootForm.show()
+    sys.exit(app.exec_())
