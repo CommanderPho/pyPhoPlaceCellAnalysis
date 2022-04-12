@@ -359,8 +359,70 @@ class StaticVedo_3DRasterHelper:
         spikes_df, epochs_df = cls.load_test_data()
         return cls.run_all(spikes_df=spikes_df, epochs_df=epochs_df)
         
+
+class Spike3DRasterBottomFrameControlsMixin:
+    """ renders the UI controls for the Spike3DRaster_Vedo class 
+        Follows Conventions outlined in ModelViewMixin Conventions.md
+    """
+    
+    @QtCore.pyqtSlot()
+    def Spike3DRasterBottomFrameControlsMixin_on_init(self):
+        """ perform any parameters setting/checking during init """
+        pass
+
+    @QtCore.pyqtSlot()
+    def Spike3DRasterBottomFrameControlsMixin_on_setup(self):
+        """ perfrom setup/creation of widget/graphical/data objects. Only the core objects are expected to exist on the implementor (root widget, etc) """
+        pass
+    
+    @QtCore.pyqtSlot()
+    def Spike3DRasterBottomFrameControlsMixin_on_buildUI(self):
+        """ perfrom setup/creation of widget/graphical/data objects. Only the core objects are expected to exist on the implementor (root widget, etc) """
+        # CALLED:
         
-class Spike3DRaster_Vedo(SpikeRasterBase):
+        controls_frame = QtWidgets.QFrame()
+        controls_layout = QtWidgets.QHBoxLayout() # H-box layout
+        
+        # controls_layout = QtWidgets.QGridLayout()
+        # controls_layout.setContentsMargins(0, 0, 0, 0)
+        # controls_layout.setVerticalSpacing(0)
+        # controls_layout.setHorizontalSpacing(0)
+        # controls_layout.setStyleSheet("background : #1B1B1B; color : #727272")
+        
+        # Set-up the rest of the Qt window
+        button = QtWidgets.QPushButton("My Button makes the cone red")
+        button.setToolTip('This is an example button')
+        button.clicked.connect(self.onClick)
+        controls_layout.addWidget(button)
+        
+        button2 = QtWidgets.QPushButton("<")
+        button2.setToolTip('<')
+        # button2.clicked.connect(self.onClick)
+        controls_layout.addWidget(button2)
+        
+        button3 = QtWidgets.QPushButton(">")
+        button3.setToolTip('>')
+        controls_layout.addWidget(button3)
+        
+        # Set Final Layouts:
+        controls_frame.setLayout(controls_layout)
+        
+        return controls_frame, controls_layout
+
+    @QtCore.pyqtSlot()
+    def Spike3DRasterBottomFrameControlsMixin_on_destroy(self):
+        """ perfrom teardown/destruction of anything that needs to be manually removed or released """
+        # TODO: NOT CALLED
+        pass
+
+    @QtCore.pyqtSlot(float, float)
+    def Spike3DRasterBottomFrameControlsMixin_on_window_update(self, new_start=None, new_end=None):
+        """ called to perform updates when the active window changes. Redraw, recompute data, etc. """
+        # TODO: NOT CALLED
+        pass
+    
+    
+class Spike3DRaster_Vedo(Spike3DRasterBottomFrameControlsMixin, SpikeRasterBase):
     """ **Vedo version** - Displays a 3D version of a raster plot with the spikes occuring along a plane. 
     
     TODO: CURRENTLY UNIMPLEMENTED I THINK. Switched back to Spike3DRaster as it works well and good enough.
@@ -442,6 +504,10 @@ class Spike3DRaster_Vedo(SpikeRasterBase):
         self.enable_debug_widgets = False
         
         self.enable_debug_print = True
+        
+        
+        # Helper Mixins: INIT:
+        self.Spike3DRasterBottomFrameControlsMixin_on_init()
         
 
         
@@ -528,6 +594,8 @@ class Spike3DRaster_Vedo(SpikeRasterBase):
         max_y_all_data = np.nanmax(self.spikes_df['visualization_raster_y_location'].to_numpy()) # self.spikes_df['visualization_raster_y_location'] 
         self.params.max_y_pos = max(10.0, max_y_all_data)
         
+        # Helper Mixins: SETUP:
+        self.Spike3DRasterBottomFrameControlsMixin_on_setup()
         
         
     def buildUI(self):
@@ -547,16 +615,24 @@ class Spike3DRaster_Vedo(SpikeRasterBase):
         
         
         # Set-up the rest of the Qt window
-        button = QtWidgets.QPushButton("My Button makes the cone red")
-        button.setToolTip('This is an example button')
-        button.clicked.connect(self.onClick)
+        # button = QtWidgets.QPushButton("My Button makes the cone red")
+        # button.setToolTip('This is an example button')
+        # button.clicked.connect(self.onClick)
  
+               
         #### Build Graphics Objects #####
         self._buildGraphics()
+ 
+        
+        # Helper Mixins: buildUI:
+        self.ui.bottom_controls_frame, self.ui.bottom_controls_layout = self.Spike3DRasterBottomFrameControlsMixin_on_buildUI()
+        
         
         # setup self.ui.frame_layout:
         # self.ui.frame_layout.addWidget(self.ui.vtkWidget)
-        self.ui.frame_layout.addWidget(button)
+        # self.ui.frame_layout.addWidget(button)
+
+        self.ui.frame_layout.addWidget(self.ui.bottom_controls_frame) # add the button controls
         self.ui.frame.setLayout(self.ui.frame_layout)
         
         # Add the frame to the root layout
@@ -586,6 +662,9 @@ class Spike3DRaster_Vedo(SpikeRasterBase):
         # self.spikes_window.window_changed_signal.connect(self.on_window_changed)
         self.spikes_window.window_updated_signal.connect(self.on_window_changed)
 
+
+
+        
 
         self.ui.plt.show()                  # <--- show the vedo rendering
         self.show()                     # <--- show the Qt Window
