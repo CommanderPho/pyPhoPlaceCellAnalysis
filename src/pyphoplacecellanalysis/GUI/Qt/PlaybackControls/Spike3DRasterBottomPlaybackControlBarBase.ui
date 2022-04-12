@@ -56,6 +56,9 @@ border-color: rgb(0, 0, 0);</string>
        <height>70</height>
       </size>
      </property>
+     <property name="styleSheet">
+      <string notr="true">background:transparent;</string>
+     </property>
      <property name="frameShape">
       <enum>QFrame::StyledPanel</enum>
      </property>
@@ -66,66 +69,23 @@ border-color: rgb(0, 0, 0);</string>
       <number>1</number>
      </property>
      <layout class="QGridLayout" name="gridLayout_2">
-      <item row="1" column="19">
-       <widget class="QPushButton" name="btnHelp">
-        <property name="text">
-         <string>Help</string>
+      <item row="1" column="12">
+       <widget class="QPushButton" name="button_full_screen">
+        <property name="sizePolicy">
+         <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+          <horstretch>0</horstretch>
+          <verstretch>0</verstretch>
+         </sizepolicy>
         </property>
-       </widget>
-      </item>
-      <item row="1" column="17">
-       <widget class="QToolButton" name="btnSkipRight">
         <property name="toolTip">
-         <string>Skip Frames Right</string>
+         <string>Set the video to full screen</string>
         </property>
         <property name="text">
-         <string>-&gt;</string>
-        </property>
-        <property name="shortcut">
-         <string>Ctrl+Right</string>
+         <string>Full Screen</string>
         </property>
        </widget>
-      </item>
-      <item row="1" column="10">
-       <spacer name="horizontalSpacer_7">
-        <property name="orientation">
-         <enum>Qt::Horizontal</enum>
-        </property>
-        <property name="sizeHint" stdset="0">
-         <size>
-          <width>40</width>
-          <height>20</height>
-         </size>
-        </property>
-       </spacer>
       </item>
       <item row="1" column="13">
-       <widget class="QToolButton" name="btnSkipLeft">
-        <property name="toolTip">
-         <string>Skip Frames Left</string>
-        </property>
-        <property name="text">
-         <string>&lt;-</string>
-        </property>
-        <property name="shortcut">
-         <string>Ctrl+Left</string>
-        </property>
-       </widget>
-      </item>
-      <item row="1" column="1">
-       <spacer name="horizontalSpacer_5">
-        <property name="orientation">
-         <enum>Qt::Horizontal</enum>
-        </property>
-        <property name="sizeHint" stdset="0">
-         <size>
-          <width>40</width>
-          <height>20</height>
-         </size>
-        </property>
-       </spacer>
-      </item>
-      <item row="1" column="12">
        <spacer name="horizontalSpacer">
         <property name="orientation">
          <enum>Qt::Horizontal</enum>
@@ -138,54 +98,49 @@ border-color: rgb(0, 0, 0);</string>
         </property>
        </spacer>
       </item>
-      <item row="1" column="18">
-       <spacer name="horizontalSpacer_3">
-        <property name="orientation">
-         <enum>Qt::Horizontal</enum>
-        </property>
-        <property name="sizeHint" stdset="0">
-         <size>
-          <width>40</width>
-          <height>20</height>
-         </size>
-        </property>
-       </spacer>
-      </item>
-      <item row="1" column="4">
-       <widget class="QToolButton" name="toolButton_SpeedBurstEnabled">
-        <property name="enabled">
-         <bool>false</bool>
-        </property>
-        <property name="statusTip">
-         <string>Trigger speedburst with the hotkey</string>
-        </property>
-        <property name="whatsThis">
-         <string>Trigger speedburst with the hotkey</string>
-        </property>
+      <item row="1" column="20">
+       <widget class="QPushButton" name="btnHelp">
         <property name="text">
-         <string>SpeedBurst</string>
-        </property>
-        <property name="checkable">
-         <bool>true</bool>
-        </property>
-        <property name="checked">
-         <bool>true</bool>
+         <string>Help</string>
         </property>
        </widget>
       </item>
-      <item row="1" column="16">
-       <widget class="QToolButton" name="btnRight">
+      <item row="1" column="10">
+       <widget class="QPushButton" name="button_mark_end">
         <property name="toolTip">
-         <string>Step Frames Right</string>
+         <string>Mark the end of the entry</string>
         </property>
         <property name="text">
-         <string>&gt;</string>
+         <string>Mark End</string>
+        </property>
+       </widget>
+      </item>
+      <item row="1" column="14">
+       <widget class="QToolButton" name="btnSkipLeft">
+        <property name="toolTip">
+         <string>Skip Frames Left</string>
+        </property>
+        <property name="text">
+         <string>&lt;-</string>
         </property>
         <property name="shortcut">
-         <string>Right</string>
+         <string>Ctrl+Left</string>
+        </property>
+       </widget>
+      </item>
+      <item row="1" column="15">
+       <widget class="QToolButton" name="btnLeft">
+        <property name="toolTip">
+         <string>Step Frames Left</string>
+        </property>
+        <property name="text">
+         <string>&lt;</string>
+        </property>
+        <property name="shortcut">
+         <string>Left</string>
         </property>
         <property name="arrowType">
-         <enum>Qt::RightArrow</enum>
+         <enum>Qt::LeftArrow</enum>
         </property>
        </widget>
       </item>
@@ -208,26 +163,43 @@ border-color: rgb(0, 0, 0);</string>
         </property>
        </widget>
       </item>
-      <item row="1" column="2">
-       <widget class="QPushButton" name="button_slow_down">
-        <property name="sizePolicy">
-         <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
-          <horstretch>0</horstretch>
-          <verstretch>0</verstretch>
-         </sizepolicy>
+      <item row="1" column="4">
+       <widget class="QDoubleSpinBox" name="doubleSpinBoxPlaybackSpeed">
+        <property name="minimum">
+         <double>0.200000000000000</double>
         </property>
-        <property name="toolTip">
-         <string>Slow down the video</string>
+        <property name="maximum">
+         <double>6.000000000000000</double>
         </property>
-        <property name="text">
-         <string>Slow Down</string>
-        </property>
-        <property name="shortcut">
-         <string>Ctrl+S</string>
+        <property name="value">
+         <double>1.000000000000000</double>
         </property>
        </widget>
       </item>
-      <item row="0" column="0" colspan="20">
+      <item row="1" column="9">
+       <widget class="QPushButton" name="button_mark_start">
+        <property name="toolTip">
+         <string>Mark the start of the entry</string>
+        </property>
+        <property name="text">
+         <string>Mark Start</string>
+        </property>
+       </widget>
+      </item>
+      <item row="1" column="11">
+       <spacer name="horizontalSpacer_7">
+        <property name="orientation">
+         <enum>Qt::Horizontal</enum>
+        </property>
+        <property name="sizeHint" stdset="0">
+         <size>
+          <width>40</width>
+          <height>20</height>
+         </size>
+        </property>
+       </spacer>
+      </item>
+      <item row="0" column="0" colspan="21">
        <widget class="HighlightedJumpSlider" name="slider_progress">
         <property name="enabled">
          <bool>false</bool>
@@ -246,41 +218,53 @@ border-color: rgb(0, 0, 0);</string>
         </property>
        </widget>
       </item>
-      <item row="1" column="9">
-       <widget class="QPushButton" name="button_mark_end">
-        <property name="toolTip">
-         <string>Mark the end of the entry</string>
-        </property>
-        <property name="text">
-         <string>Mark End</string>
-        </property>
-       </widget>
-      </item>
-      <item row="1" column="8">
-       <widget class="QPushButton" name="button_mark_start">
-        <property name="toolTip">
-         <string>Mark the start of the entry</string>
-        </property>
-        <property name="text">
-         <string>Mark Start</string>
-        </property>
-       </widget>
-      </item>
       <item row="1" column="3">
-       <widget class="QDoubleSpinBox" name="doubleSpinBoxPlaybackSpeed">
+       <widget class="QPushButton" name="button_slow_down">
+        <property name="sizePolicy">
+         <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+          <horstretch>0</horstretch>
+          <verstretch>0</verstretch>
+         </sizepolicy>
+        </property>
+        <property name="toolTip">
+         <string>Slow down the video</string>
+        </property>
+        <property name="text">
+         <string>Slow Down</string>
+        </property>
+        <property name="shortcut">
+         <string>Ctrl+S</string>
+        </property>
+       </widget>
+      </item>
+      <item row="1" column="16">
+       <widget class="QSpinBox" name="spinBoxFrameJumpMultiplier">
         <property name="minimum">
-         <double>0.200000000000000</double>
+         <number>1</number>
         </property>
         <property name="maximum">
-         <double>6.000000000000000</double>
-        </property>
-        <property name="value">
-         <double>1.000000000000000</double>
+         <number>1000</number>
         </property>
        </widget>
       </item>
-      <item row="1" column="7">
-       <spacer name="horizontalSpacer_6">
+      <item row="1" column="17">
+       <widget class="QToolButton" name="btnRight">
+        <property name="toolTip">
+         <string>Step Frames Right</string>
+        </property>
+        <property name="text">
+         <string>&gt;</string>
+        </property>
+        <property name="shortcut">
+         <string>Right</string>
+        </property>
+        <property name="arrowType">
+         <enum>Qt::RightArrow</enum>
+        </property>
+       </widget>
+      </item>
+      <item row="1" column="2">
+       <spacer name="horizontalSpacer_5">
         <property name="orientation">
          <enum>Qt::Horizontal</enum>
         </property>
@@ -292,23 +276,7 @@ border-color: rgb(0, 0, 0);</string>
         </property>
        </spacer>
       </item>
-      <item row="1" column="14">
-       <widget class="QToolButton" name="btnLeft">
-        <property name="toolTip">
-         <string>Step Frames Left</string>
-        </property>
-        <property name="text">
-         <string>&lt;</string>
-        </property>
-        <property name="shortcut">
-         <string>Left</string>
-        </property>
-        <property name="arrowType">
-         <enum>Qt::LeftArrow</enum>
-        </property>
-       </widget>
-      </item>
-      <item row="1" column="5">
+      <item row="1" column="6">
        <widget class="QPushButton" name="button_speed_up">
         <property name="sizePolicy">
          <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
@@ -327,29 +295,77 @@ border-color: rgb(0, 0, 0);</string>
         </property>
        </widget>
       </item>
-      <item row="1" column="15">
-       <widget class="QSpinBox" name="spinBoxFrameJumpMultiplier">
-        <property name="minimum">
-         <number>1</number>
+      <item row="1" column="8">
+       <spacer name="horizontalSpacer_6">
+        <property name="orientation">
+         <enum>Qt::Horizontal</enum>
         </property>
-        <property name="maximum">
-         <number>1000</number>
+        <property name="sizeHint" stdset="0">
+         <size>
+          <width>40</width>
+          <height>20</height>
+         </size>
+        </property>
+       </spacer>
+      </item>
+      <item row="1" column="18">
+       <widget class="QToolButton" name="btnSkipRight">
+        <property name="toolTip">
+         <string>Skip Frames Right</string>
+        </property>
+        <property name="text">
+         <string>-&gt;</string>
+        </property>
+        <property name="shortcut">
+         <string>Ctrl+Right</string>
         </property>
        </widget>
       </item>
-      <item row="1" column="11">
-       <widget class="QPushButton" name="button_full_screen">
-        <property name="sizePolicy">
-         <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
-          <horstretch>0</horstretch>
-          <verstretch>0</verstretch>
-         </sizepolicy>
+      <item row="1" column="19">
+       <spacer name="horizontalSpacer_3">
+        <property name="orientation">
+         <enum>Qt::Horizontal</enum>
         </property>
-        <property name="toolTip">
-         <string>Set the video to full screen</string>
+        <property name="sizeHint" stdset="0">
+         <size>
+          <width>40</width>
+          <height>20</height>
+         </size>
+        </property>
+       </spacer>
+      </item>
+      <item row="1" column="5">
+       <widget class="QToolButton" name="toolButton_SpeedBurstEnabled">
+        <property name="enabled">
+         <bool>false</bool>
+        </property>
+        <property name="statusTip">
+         <string>Trigger speedburst with the hotkey</string>
+        </property>
+        <property name="whatsThis">
+         <string>Trigger speedburst with the hotkey</string>
         </property>
         <property name="text">
-         <string>Full Screen</string>
+         <string>SpeedBurst</string>
+        </property>
+        <property name="checkable">
+         <bool>true</bool>
+        </property>
+        <property name="checked">
+         <bool>true</bool>
+        </property>
+       </widget>
+      </item>
+      <item row="1" column="1">
+       <widget class="QPushButton" name="button_reverse">
+        <property name="minimumSize">
+         <size>
+          <width>30</width>
+          <height>25</height>
+         </size>
+        </property>
+        <property name="text">
+         <string>Reverse</string>
         </property>
        </widget>
       </item>
