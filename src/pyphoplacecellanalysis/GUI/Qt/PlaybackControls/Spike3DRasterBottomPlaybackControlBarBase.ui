@@ -359,12 +359,12 @@ border-color: rgb(0, 0, 0);</string>
   <customwidget>
    <class>HighlightedJumpSlider</class>
    <extends>QSlider</extends>
-   <header>GUI.Windows.VideoPlayer</header>
+   <header>pyphocorehelpers.gui.Qt</header>
   </customwidget>
   <customwidget>
    <class>ToggleButton</class>
    <extends>QPushButton</extends>
-   <header>GUI.Windows.VideoPlayer</header>
+   <header>pyphocorehelpers.gui.Qt</header>
   </customwidget>
  </customwidgets>
  <resources/>
