@@ -108,7 +108,18 @@ class Spike3DRasterBottomPlaybackControlBar(QWidget):
         # "background: rgb(75, 83, 65);"
         # "}"
         # )
-
+        
+        
+        ## Remove Extra Buttons:
+        self.ui.btnSkipLeft.hide()
+        self.ui.btnSkipRight.hide()
+        
+        # Remove Full Screen Button
+        self.ui.button_full_screen.hide()
+        self.ui.button_mark_start.hide()
+        self.ui.button_mark_end.hide()
+        
+        
         
     def __str__(self):
          return 

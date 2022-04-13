@@ -12,6 +12,7 @@ from PyQt5 import QtCore, QtGui, QtWidgets
 
 
 
+
 class Ui_RootWidget(object):
     def setupUi(self, RootWidget):
         RootWidget.setObjectName("RootWidget")
@@ -20,6 +21,7 @@ class Ui_RootWidget(object):
 "border-color: rgb(207, 207, 207);\n"
 "background-color: rgba(71, 65, 60, 180);\n"
 "color: rgb(244, 244, 244);\n"
+"border : 1px solid black;\n"
 "border-color: rgb(0, 0, 0);\n"
 "alternate-background-color: rgb(255, 0, 0);\n"
 "selection-background-color: rgb(75, 83, 65);\n"
@@ -78,17 +80,21 @@ class Ui_RootWidget(object):
         self.doubleSpinBoxPlaybackSpeed = QtWidgets.QDoubleSpinBox(self.frame_media_control)
         self.doubleSpinBoxPlaybackSpeed.setStyleSheet("QDoubleSpinBox {\n"
 "    background: rgb(62, 57, 52);\n"
+"    border : 1px solid black;\n"
 "};\n"
 "QDoubleSpinBox::hover {\n"
 "    background: rgb(75, 83, 65);\n"
+"    border : 1px solid black;\n"
 "};\n"
 "QDoubleSpinBox::up-arrow {\n"
 "    background: rgb(62, 57, 52);\n"
 "    color: rgb(255, 255, 255);\n"
+"    border :1px solid black;\n"
 "};\n"
 "QDoubleSpinBox::down-arrow {\n"
 "    background: rgb(62, 57, 52);\n"
 "    color: rgb(255, 255, 255);\n"
+"    border : 1px solid black;\n"
 "};")
         self.doubleSpinBoxPlaybackSpeed.setMinimum(0.2)
         self.doubleSpinBoxPlaybackSpeed.setMaximum(6.0)
@@ -119,9 +125,11 @@ class Ui_RootWidget(object):
         self.spinBoxFrameJumpMultiplier = QtWidgets.QSpinBox(self.frame_media_control)
         self.spinBoxFrameJumpMultiplier.setStyleSheet("QSpinBox {\n"
 "    background: rgb(62, 57, 52);\n"
+"    border : 1px solid black;\n"
 "};\n"
 "QSpinBox::hover {\n"
 "    background: rgb(75, 83, 65);\n"
+"    border : 1px solid black;\n"
 "};\n"
 "")
         self.spinBoxFrameJumpMultiplier.setMinimum(1)
@@ -157,6 +165,7 @@ class Ui_RootWidget(object):
         self.gridLayout_2.addWidget(self.toolButton_SpeedBurstEnabled, 1, 5, 1, 1)
         self.button_reverse = QtWidgets.QPushButton(self.frame_media_control)
         self.button_reverse.setMinimumSize(QtCore.QSize(30, 25))
+        self.button_reverse.setChecked(False)
         self.button_reverse.setObjectName("button_reverse")
         self.gridLayout_2.addWidget(self.button_reverse, 1, 1, 1, 1)
         self.gridLayout.addWidget(self.frame_media_control, 0, 0, 1, 1)
