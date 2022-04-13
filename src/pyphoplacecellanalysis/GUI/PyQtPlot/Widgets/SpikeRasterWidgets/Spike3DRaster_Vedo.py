@@ -451,6 +451,14 @@ class Spike3DRaster_Vedo(Spike3DRasterBottomFrameControlsMixin, SpikeRasterBase)
     WantsRenderWindowControls = True
     WantsPlaybackControls = True    
 
+    af = QtCore.Qt.AlignmentFlag
+    # a dict that maps from QtCore.Qt.AlignmentFlag to the strings that Vedo's Text2D function accepts to position text
+    qt_to_vedo_alignment_dict = {(af.AlignTop | af.AlignLeft):'top-left', 
+                                (af.AlignTop | af.AlignRight):'top-right', 
+                                (af.AlignBottom | af.AlignLeft):'bottom-left', 
+                                (af.AlignBottom | af.AlignRight):'bottom-right'}
+    
+        
     @property
     def overlay_text_lines_dict(self):
         """The lines of text to be displayed in the overlay."""    
@@ -472,6 +480,17 @@ class Spike3DRaster_Vedo(Spike3DRasterBottomFrameControlsMixin, SpikeRasterBase)
         lines_dict[af.AlignBottom | af.AlignRight] = ['BR']    
         return lines_dict
     
+    
+    @property
+    def overlay_vedo_text_lines_dict(self):
+        """The overlay_vedo_text_lines_dict property."""
+        # af = QtCore.Qt.AlignmentFlag
+        # # a dict that maps from QtCore.Qt.AlignmentFlag to the strings that Vedo's Text2D function accepts to position text
+        # qt_to_vedo_alignment_dict = {(af.AlignTop | af.AlignLeft):'top-left', 
+        #                             (af.AlignTop | af.AlignRight):'top-right', 
+        #                             (af.AlignBottom | af.AlignLeft):'bottom-left', 
+        #                             (af.AlignBottom | af.AlignRight):'bottom-right'}
+        return {self.qt_to_vedo_alignment_dict[k]:v for (k,v) in self.overlay_text_lines_dict.items()}
     
     ######  Get/Set Properties ######:
 
@@ -689,8 +708,6 @@ class Spike3DRaster_Vedo(Spike3DRasterBottomFrameControlsMixin, SpikeRasterBase)
         self.ui.plt += Cone().rotateX(20)
         # self.ui.plt.show()                  # <--- show the vedo rendering
 
-
-
         # Build All Meshes:
         """ Have:
         self.params.spike_start_z
@@ -854,6 +871,17 @@ class Spike3DRaster_Vedo(Spike3DRasterBottomFrameControlsMixin, SpikeRasterBase)
         # setup self.ui.frame_layout:
         self.ui.frame_layout.addWidget(self.ui.vtkWidget)
         # raise NotImplementedError
+        
+        
+        ## Setup Viewport Overlay Text:
+        self.ui.viewport_overlay  = vedo.CornerAnnotation().font("Kanopus").color('white')
+        self.ui.plt += self.ui.viewport_overlay
+        # self.ui.viewport_overlay.text(vedo.getColorName(self.counter), "top-center")
+        # self.ui.viewport_overlay.text("..press q to quit", "bottom-right")
+        for vedo_pos_key, values in self.overlay_vedo_text_lines_dict.items():
+            # print(f'a_key: {a_key}, values: {values}')
+            self.ui.viewport_overlay.text('\n'.join(values), vedo_pos_key)
+        
     
         self.ui.plt.resetCamera() # resetCamera() updates the camera's position given the ignored components
         # This limits the meshes to just the active window's meshes: [start_bound_plane, end_bound_plane, active_window_only_axes]
@@ -905,6 +933,14 @@ class Spike3DRaster_Vedo(Spike3DRasterBottomFrameControlsMixin, SpikeRasterBase)
         
         prev_x_pos = active_window_only_axes.x()
         active_window_only_axes.x(prev_x_pos + delta_x) # works for positioning but doesn't update numbers
+        
+        
+        # Update the additional display lines information on the overlay:
+        for vedo_pos_key, values in self.overlay_vedo_text_lines_dict.items():
+            # print(f'a_key: {a_key}, values: {values}')
+            self.ui.viewport_overlay.text('\n'.join(values), vedo_pos_key)
+        
+        
         
         self.ui.plt.resetCamera() # resetCamera() updates the camera's position
         self.ui.plt.render()
