@@ -54,7 +54,7 @@ class TimeWindowPlaybackPropertiesMixin:
     @property
     def playback_update_frequency(self):
         """The rate at which the separate animation thread attempts to update the interface. ReadOnly."""
-        return self._playback_update_frequency
+        return self.params.playback_update_frequency
 
     @property
     def playback_rate_multiplier(self):
@@ -106,8 +106,8 @@ class TimeWindowPlaybackController(QtCore.QObject):
 
     def setup(self, root_TimeWindowOwner):
         """ sets up the passed root_TimeWindow object's required parameters and state variables. """
-        root_TimeWindowOwner._playback_update_frequency = TimeWindowPlaybackController.PlaybackUpdateFrequency
-        root_TimeWindowOwner.speedBurstPlaybackRate = TimeWindowPlaybackController.SpeedBurstPlaybackRate
+        root_TimeWindowOwner.params.playback_update_frequency = TimeWindowPlaybackController.PlaybackUpdateFrequency
+        root_TimeWindowOwner.params.speedBurstPlaybackRate = TimeWindowPlaybackController.SpeedBurstPlaybackRate
         root_TimeWindowOwner.params.is_speed_burst_mode_active = False
         root_TimeWindowOwner.params.is_playback_reversed = False
         root_TimeWindowOwner.params.animation_time_step = 0.04

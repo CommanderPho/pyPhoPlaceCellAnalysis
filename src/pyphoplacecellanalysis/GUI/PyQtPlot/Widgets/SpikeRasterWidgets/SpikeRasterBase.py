@@ -247,8 +247,8 @@ class SpikeRasterBase(UnitSortableMixin, DataSeriesToSpatialTransformingMixin, N
         # self.params.wantsRenderWindowControls = SpikeRasterBase.WantsRenderWindowControls
         # self.params.wantsPlaybackControls = SpikeRasterBase.WantsPlaybackControls
         
-        # self._playback_update_frequency = SpikeRasterBase.PlaybackUpdateFrequency
-        # self.speedBurstPlaybackRate = SpikeRasterBase.SpeedBurstPlaybackRate
+        # self.params.playback_update_frequency = SpikeRasterBase.PlaybackUpdateFrequency
+        # self.params.speedBurstPlaybackRate = SpikeRasterBase.SpeedBurstPlaybackRate
         # self.params.is_speed_burst_mode_active = False
         # self.params.is_playback_reversed = False
         # self.params.animation_time_step = 0.04 
