@@ -3,7 +3,7 @@ import numpy as np
 
 from pyphoplacecellanalysis.General.Model.TimeWindow import TimeWindow
 from pyphoplacecellanalysis.General.Model.LiveWindowedData import LiveWindowedData
-from pyphoplacecellanalysis.General.Model.Datasources import DataframeDatasource, SpikesDataframeDatasource
+from pyphoplacecellanalysis.General.Model.Datasources.Datasources import DataframeDatasource, SpikesDataframeDatasource
 
 
 """ Windowed Spiking Datasource Features

@@ -2,12 +2,7 @@ import pyqtgraph as pg
 from pyqtgraph.Qt import QtCore, QtGui, QtWidgets
 import numpy as np
 
-from pyphoplacecellanalysis.General.Model.Datasources import DataframeDatasource
-
-
-
-
-
+from pyphoplacecellanalysis.General.Model.Datasources.Datasources import DataframeDatasource
 
 class Render2DScrollWindowPlotMixin:
     """ 

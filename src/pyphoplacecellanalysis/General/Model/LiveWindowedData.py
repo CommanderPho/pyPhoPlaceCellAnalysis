@@ -3,7 +3,7 @@ from pyqtgraph.Qt import QtCore
 import numpy as np
 import pandas as pd
 
-from pyphoplacecellanalysis.General.Model.Datasources import DataframeDatasource
+from pyphoplacecellanalysis.General.Model.Datasources.Datasources import DataframeDatasource
 from pyphoplacecellanalysis.General.Model.TimeWindow import TimeWindow
 
 
@@ -17,6 +17,9 @@ class LiveWindowedData(QtCore.QObject):
         render_window_duration = 60.0
         curr_spikes_df_window = SpikesDataframeWindow(window_duration=render_window_duration)
         curr_spikes_df_window
+        
+    Known Usages:
+        SpikesDataframeWindow
 
     """
     window_duration_changed_signal = QtCore.pyqtSignal(float, float, float, object) # (start_time, end_time, window_duration) more conservitive singal that only changes when the duration of the window changes.
