@@ -90,7 +90,6 @@ def build_spike_3d_raster_vedo_with_2d_controls(curr_spikes_df, window_duration=
     # Connect the 2D window scrolled signal to the 3D plot's spikes_window.update_window_start_end function
     spike_3d_to_2d_window_connection = None
     spike_3d_to_2d_window_connection = spike_raster_plt_2d.window_scrolled.connect(spike_raster_plt_3d_vedo.spikes_window.update_window_start_end)
-    # spike_3d_to_2d_window_connection = spike_raster_plt_2d.window_scrolled.connect(spike_raster_plt_3d.spikes_window.update_window_start_end)
     
     # Position the Windows As a Stack in the top-left corner:
     WidgetPositioningHelpers.move_widget_to_top_left_corner(spike_raster_plt_3d_vedo, debug_print=False)
