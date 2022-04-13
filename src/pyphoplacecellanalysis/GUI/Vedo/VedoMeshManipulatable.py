@@ -3,13 +3,15 @@ from vedo import Mesh, Cone, Plotter, printc, Glyph
 from vedo import Rectangle, Lines, Plane, Axes, merge, colorMap # for StaticVedo_3DRasterHelper
 from vedo import Volume, ProgressBar, show, settings
 
-# from pyphocorehelpers.plotting.vedo_qt_helpers import MainVedoPlottingWindow
-
-from pyphoplacecellanalysis.GUI.Vedo.VedoMeshManipulatable import VedoPlotterHelpers
-
 
 class VedoPlotterHelpers:
-    """docstring for VedoHelpers."""
+    """docstring for VedoHelpers.
+    
+    Import with:
+    
+        from pyphoplacecellanalysis.GUI.Vedo.VedoMeshManipulatable import VedoPlotterHelpers
+    
+    """
     
     @classmethod
     def vedo_remove_if_exists(cls, plotter, item_key_name, defer_render=False):
