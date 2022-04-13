@@ -874,7 +874,7 @@ class Spike3DRaster_Vedo(Spike3DRasterBottomFrameControlsMixin, SpikeRasterBase)
         
         
         ## Setup Viewport Overlay Text:
-        self.ui.viewport_overlay  = vedo.CornerAnnotation().font("Kanopus").color('white')
+        self.ui.viewport_overlay  = vedo.CornerAnnotation().color('white').alpha(0.85)#.font("Kanopus")
         self.ui.plt += self.ui.viewport_overlay
         # self.ui.viewport_overlay.text(vedo.getColorName(self.counter), "top-center")
         # self.ui.viewport_overlay.text("..press q to quit", "bottom-right")
