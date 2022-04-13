@@ -7,7 +7,13 @@ from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.Mixins.Render3DTimeCurvesMixin 
 
 
 class Specific3DTimeCurvesHelper:
+    """ Static helper methods that build commonly known 3D time curve datasources and add them to the provided plot.
     
+    Provided Curves:
+        MUA
+        position
+    
+    """
     ##########################################
     ## MUA 3D Time Curves
     @staticmethod

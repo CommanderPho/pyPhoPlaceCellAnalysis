@@ -22,7 +22,6 @@ Separate 2D and 3D event visualization functions should be made to transform eve
 
 """
 class SpikesDataframeWindow(LiveWindowedData):
-# class SpikesDataframeWindow(QtCore.QObject):
     """ a zoomable (variable sized) window into a dataframe with a time axis
     Used by Spike3DRaster
     
@@ -32,6 +31,9 @@ class SpikesDataframeWindow(LiveWindowedData):
         render_window_duration = 60.0
         curr_spikes_df_window = SpikesDataframeWindow(curr_spikes_df, window_duration=render_window_duration)
         curr_spikes_df_window
+        
+    Known Uses:
+        SpikeRasterBase
 
     """
     spike_dataframe_changed_signal = QtCore.pyqtSignal() # signal emitted when the spike dataframe is changed, which might change the number of units, number of spikes, and other properties.
@@ -112,7 +114,6 @@ class SpikesDataframeWindow(LiveWindowedData):
         return self.dataSource.df
     @df.setter
     def df(self, value):
-        # self._df = value
         self.dataSource.df = value
         # self.spike_dataframe_changed_signal.emit()
         

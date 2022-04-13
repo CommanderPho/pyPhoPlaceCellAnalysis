@@ -22,6 +22,9 @@ class RenderPlaybackControlsMixin:
         creates self.ui.panel_bottom_bar
         
         """
+        
+        self.slidebar_val = 0
+        
         ####################################################
         ####  Controls Bar Bottom #######
         ####    Slide Bar Bottom #######

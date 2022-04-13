@@ -7,10 +7,16 @@ from pyphoplacecellanalysis.General.Model.Datasources.Datasources import Datafra
 class Render2DScrollWindowPlotMixin:
     """ 
     
+    Known Uses:
+        Implemented by Spike2DRaster
+    
     Requires:
         a Datasource to fetch the spiking data from.
         TimeWindow: a Active Window to synchronize the LinearRegionItem (2D Scroll Widget) with.
     
+    
+    Provides:
+        window_scrolled (float, float) signal is emitted on updating the 2D sliding window, where the first argument is the new start value and the 2nd is the new end value
     """
     
     ## Scrollable Window Signals

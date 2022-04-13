@@ -9,9 +9,13 @@ from pyqtgraph.Qt import QtCore, QtGui, QtWidgets
 
 
 class TimeWindowPlaybackPropertiesMixin:
-    """ 
-        TimeWindowPlaybackPropertiesMixin:
+    """ TimeWindowPlaybackPropertiesMixin: Properties that implementors that want to control time-window playback should implement.
     
+    Implementors must override:
+        animation_active_time_window
+        
+    Required Properties:
+        self.params
     """
     
     @property
@@ -80,6 +84,18 @@ class TimeWindowPlaybackPropertiesMixin:
 class TimeWindowPlaybackController(QtCore.QObject):
     """
         TimeWindowPlaybackController
+        
+    Usage:
+    
+        # Setup the animation playback object for the time window:
+        self.playback_controller = TimeWindowPlaybackController()
+        # self.playback_controller.setup(self._spikes_window)
+        self.playback_controller.setup(self) # pass self to have properties set
+        
+        
+    Known Uses:
+        SpikeRasterBase
+        
     """
     SpeedBurstPlaybackRate = 16.0
     PlaybackUpdateFrequency = 0.04 # in seconds

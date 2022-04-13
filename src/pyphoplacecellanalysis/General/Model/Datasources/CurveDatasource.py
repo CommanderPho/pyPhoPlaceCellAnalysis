@@ -1,3 +1,9 @@
+import numpy as np
+import pandas as pd
+
+from pyqtgraph.Qt import QtCore
+from pyphoplacecellanalysis.General.Model.Datasources.Datasources import DataframeDatasource
+
 
 class CurveDatasource(DataframeDatasource):
     """ Provides the list of values, 'v' and the timestamps at which they occur 't'.

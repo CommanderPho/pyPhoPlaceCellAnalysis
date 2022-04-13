@@ -10,6 +10,12 @@ from pyphoplacecellanalysis.General.DataSeriesToSpatial import DataSeriesToSpati
 
 class RenderDataseries(SimplePrintable, PrettyPrintable, QtCore.QObject):
     """ 
+    
+    Known Usages:
+    
+        Specific3DTimeCurves
+        
+        
     Usage:
     
         from pyphoplacecellanalysis.General.Model.RenderDataseries import RenderDataseries

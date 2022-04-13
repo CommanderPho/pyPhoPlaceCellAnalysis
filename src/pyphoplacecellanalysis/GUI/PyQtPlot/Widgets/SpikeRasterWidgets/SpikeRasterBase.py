@@ -113,10 +113,6 @@ class UnitSortableMixin:
         self.unit_sort_order_changed_signal.emit(self._unit_sort_order)
         
         
-        
-    
-    
-# NeuronIdentityAccessingMixin
 
 class SpikeRasterBase(UnitSortableMixin, DataSeriesToSpatialTransformingMixin, NeuronIdentityAccessingMixin, SpikeRenderingBaseMixin, SpikesWindowOwningMixin, SpikesDataframeOwningMixin, TimeWindowPlaybackPropertiesMixin, RenderPlaybackControlsMixin, RenderWindowControlsMixin, QtWidgets.QWidget):
     """ Displays a raster plot with the spikes occuring along a plane. 
