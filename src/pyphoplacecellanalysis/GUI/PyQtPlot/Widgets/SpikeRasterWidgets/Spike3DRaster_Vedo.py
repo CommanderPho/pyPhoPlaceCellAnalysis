@@ -158,9 +158,6 @@ class Spike3DRaster_Vedo(SimplePlayPauseWithExternalAppMixin, Spike3DRasterBotto
         spike_raster_plt = Spike3DRaster_Vedo(curr_spikes_df, window_duration=4.0, window_start_time=30.0)
     """
     
-    temporal_mapping_changed = QtCore.pyqtSignal() # signal emitted when the mapping from the temporal window to the spatial layout is changed
-    close_signal = QtCore.pyqtSignal() # Called when the window is closing. 
-    
     # Application/Window Configuration Options:
     applicationName = 'Spike3DRaster_Vedo'
     windowName = 'Spike3DRaster_Vedo'
@@ -487,14 +484,14 @@ class Spike3DRaster_Vedo(SimplePlayPauseWithExternalAppMixin, Spike3DRasterBotto
         active_t_start, active_t_end = (self.spikes_window.active_window_start_time, self.spikes_window.active_window_end_time)
         active_window_t_duration = self.spikes_window.window_duration
         if self.enable_debug_print:
-            print('debug_print_axes_locations(...): Active Window/Local Properties:')
-            print(f'\t(active_t_start: {active_t_start}, active_t_end: {active_t_end}), active_window_t_duration: {active_window_t_duration}')
+            printc('debug_print_axes_locations(...): Active Window/Local Properties:')
+            printc(f'\t(active_t_start: {active_t_start}, active_t_end: {active_t_end}), active_window_t_duration: {active_window_t_duration}')
         active_x_start, active_x_end = DataSeriesToSpatial.temporal_to_spatial_map((active_t_start, active_t_end),
                                                                                 self.spikes_window.total_data_start_time, self.spikes_window.total_data_end_time,
                                                                                 self.temporal_axis_length,
                                                                                 center_mode=self.params.center_mode)
         if self.enable_debug_print:
-            print(f'\t(active_x_start: {active_x_start}, active_x_end: {active_x_end}), active_x_length: {active_x_end - active_x_start}')
+            printc(f'\t(active_x_start: {active_x_start}, active_x_end: {active_x_end}), active_x_length: {active_x_end - active_x_start}')
         
         # active_x_start, active_x_end = DataSeriesToSpatial.temporal_to_spatial_map((active_t_start, active_t_end), self.spikes_window.active_window_start_time, self.spikes_window.active_window_end_time, self.temporal_axis_length, center_mode=self.params.center_mode)
         # (active_t_start: 30.0, active_t_end: 45.0)
@@ -538,7 +535,7 @@ class Spike3DRaster_Vedo(SimplePlayPauseWithExternalAppMixin, Spike3DRasterBotto
         new_axes_x_to_time_labels = DataSeriesToSpatial.build_minute_x_tick_labels(self)
         
         if self.enable_debug_print:
-            print(f'new_axes_x_to_time_labels: {new_axes_x_to_time_labels}, global_x_start: {global_x_start}, global_x_end: {global_x_end}')
+            printc(f'new_axes_x_to_time_labels: {new_axes_x_to_time_labels}, global_x_start: {global_x_start}, global_x_end: {global_x_end}')
 
         all_data_axes = Axes(all_spike_lines, xrange=[0, 15000], c='white', textScale=0.1, gridLineWidth=0.1, axesLineWidth=0.1, xTickLength=0.005*0.1, xTickThickness=0.0025*0.1,
                                 xValuesAndLabels = new_axes_x_to_time_labels, useGlobal=True)
@@ -610,7 +607,7 @@ class Spike3DRaster_Vedo(SimplePlayPauseWithExternalAppMixin, Spike3DRasterBotto
             
     def _update_plots(self):
         if self.enable_debug_print:
-            print(f'Spike3DRaster_Vedo._update_plots()')
+            printc(f'Spike3DRaster_Vedo._update_plots()')
         # build the position range for each unit along the y-axis:
         # y = DataSeriesToSpatial.build_series_identity_axis(self.n_cells, center_mode=self.params.center_mode, bin_position_mode='bin_center', side_bin_margins = self.params.side_bin_margins)
         
@@ -625,15 +622,15 @@ class Spike3DRaster_Vedo(SimplePlayPauseWithExternalAppMixin, Spike3DRasterBotto
         active_t_start, active_t_end = (self.spikes_window.active_window_start_time, self.spikes_window.active_window_end_time)
         active_window_t_duration = self.spikes_window.window_duration
         if self.enable_debug_print:
-            print('debug_print_axes_locations(...): Active Window/Local Properties:')
-            print(f'\t(active_t_start: {active_t_start}, active_t_end: {active_t_end}), active_window_t_duration: {active_window_t_duration}')
+            printc('debug_print_axes_locations(...): Active Window/Local Properties:')
+            printc(f'\t(active_t_start: {active_t_start}, active_t_end: {active_t_end}), active_window_t_duration: {active_window_t_duration}')
         # active_x_start, active_x_end = DataSeriesToSpatial.temporal_to_spatial_map((active_t_start, active_t_end), self.spikes_window.active_window_start_time, self.spikes_window.active_window_end_time, self.temporal_axis_length, center_mode=self.params.center_mode)
         active_x_start, active_x_end = DataSeriesToSpatial.temporal_to_spatial_map((active_t_start, active_t_end),
                                                                                 self.spikes_window.total_data_start_time, self.spikes_window.total_data_end_time,
                                                                                 self.temporal_axis_length,
                                                                                 center_mode=self.params.center_mode)
         if self.enable_debug_print:
-            print(f'\t(active_x_start: {active_x_start}, active_x_end: {active_x_end}), active_x_length: {active_x_end - active_x_start}')
+            printc(f'\t(active_x_start: {active_x_start}, active_x_end: {active_x_end}), active_x_length: {active_x_end - active_x_start}')
             
         
         # print(f'(active_t_start: {active_t_start}, active_t_end: {active_t_end})')
@@ -689,11 +686,18 @@ class Spike3DRaster_Vedo(SimplePlayPauseWithExternalAppMixin, Spike3DRasterBotto
         self.ui.plt.actors[0].color('red').rotateZ(40)
         self.ui.plt.interactor.Render()
 
+
+    # Overrides the superclasses' onClose(self) function:
     def onClose(self):
         #Disable the interactor before closing to prevent it
         #from trying to act on already deleted items
+        printc(f'vedo override - onClose()')
+        self.debug_print_instance_info()
         printc("..calling onClose")
         self.ui.vtkWidget.close()
         
-        
+        # Emit the close signal:
+        self.close_signal.emit() # emit to indicate that we're closing this window
+
+
 # josfd

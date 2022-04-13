@@ -501,7 +501,7 @@ class SpikeRasterBase(UnitSortableMixin, DataSeriesToSpatialTransformingMixin, N
     def onClose(self):
         print(f'onClose()')
         self.debug_print_instance_info()
-        
+        self.close_signal.emit() # emit to indicate that we're closing this window
 
     # Input Handelers:        
     def keyPressEvent(self, e):
