@@ -229,15 +229,16 @@ class SpikeRasterBase(UnitSortableMixin, DataSeriesToSpatialTransformingMixin, N
         self.temporal_mapping_changed.emit()
         
 
-    def __init__(self, spikes_df, *args, window_duration=15.0, window_start_time=0.0, neuron_colors=None, neuron_sort_order=None, **kwargs):
-        super(SpikeRasterBase, self).__init__(*args, **kwargs)
+    # def __init__(self, spikes_df, *args, window_duration=15.0, window_start_time=0.0, neuron_colors=None, neuron_sort_order=None, **kwargs):
+    #     super(SpikeRasterBase, self).__init__(*args, **kwargs)
+    
+    def __init__(self, params=None, spikes_window=None, playback_controller=None, neuron_colors=None, neuron_sort_order=None, **kwargs):
+        super(SpikeRasterBase, self).__init__(**kwargs)
         # Initialize member variables:
         
         # Helper container variables
-        self.params = VisualizationParameters('')
-        
-        self.slidebar_val = 0
-        self._spikes_window = SpikesDataframeWindow(spikes_df, window_duration=window_duration, window_start_time=window_start_time)
+        self.params = params
+        self._spikes_window = spikes_window
         
         # Config
         self.params.wantsRenderWindowControls = self.WantsRenderWindowControls
@@ -261,47 +262,21 @@ class SpikeRasterBase(UnitSortableMixin, DataSeriesToSpatialTransformingMixin, N
         # by default we want the time axis to approximately span -20 to 20. So we set the temporal_zoom_factor to 
         # self.params.temporal_zoom_factor = 40.0 / float(self.render_window_duration)        
         self.params.temporal_zoom_factor = 40.0 / float(self.spikes_window.timeWindow.window_duration) 
-        
-    
+            
         self.enable_debug_print = False
         self.enable_debug_widgets = True
         self.enable_overwrite_invalid_unit_ids = True
         
-        # Neurons and sort-orders:
-        
-        old_neuron_IDXs = self.unit_ids.copy() # backup the old unit_ids
-        print(f'\t\t self.unit_ids: {self.unit_ids} (len: {len(self.unit_ids)})\n \t\t self.cell_ids: {self.cell_ids} (len: {len(self.cell_ids)})')
-        new_neuron_IDXs = self.find_cell_IDXs_from_cell_ids(self.neuron_ids)
-        print(f'\t\t new_neuron_IDXs: {new_neuron_IDXs} (len(new_neuron_IDXs): {len(new_neuron_IDXs)})')
-        # build a map between the old and new neuron_IDXs:
-        old_to_new_map = OrderedDict(zip(old_neuron_IDXs, new_neuron_IDXs))
-        new_to_old_map = OrderedDict(zip(new_neuron_IDXs, old_neuron_IDXs))
-        neuron_id_to_new_IDX_map = OrderedDict(zip(self.neuron_ids, new_neuron_IDXs)) # provides the new_IDX corresponding to any neuron_id (aclu value)
-        
-        if self.enable_overwrite_invalid_unit_ids:
-            print("WARNING: self.enable_overwrite_invalid_unit_ids is True, so dataframe 'unit_id' and 'cell_idx' will be overwritten!")
-            self.overwrite_invalid_unit_ids(self.spikes_df, neuron_id_to_new_IDX_map)
-        
-        # Build important maps between self.unit_ids and self.cell_ids:
-        self.cell_id_to_unit_id_map = OrderedDict(zip(self.cell_ids, self.unit_ids)) # maps cell_ids to unit_ids
-        self.unit_id_to_cell_id_map = OrderedDict(zip(self.unit_ids, self.cell_ids)) # maps unit_ids to cell_ids
-        
-        if neuron_sort_order is None:
-            neuron_sort_order = np.arange(len(self.unit_ids)) # default sort order is sorted by unit_ids
-        self._unit_sort_order = neuron_sort_order
-        assert len(self._unit_sort_order) == len(self.unit_ids), f"len(self._unit_sort_order): {len(self._unit_sort_order)} must equal len(self.unit_ids): {len(self.unit_ids)} but it does not!"
-        
-        # Setup Coloring:
-        self._setup_neurons_color_data(neuron_colors, coloring_mode='color_by_index_order')
+        SpikeRasterBase.helper_setup_neuron_colors_and_order(self, neuron_colors=neuron_colors, neuron_sort_order=neuron_sort_order)
         
         # make root container for plots
         self.plots = RenderPlots('')
         
-        self.playback_controller = TimeWindowPlaybackController()
+        self.playback_controller = playback_controller
         # Setup the animation playback object for the time window:
         # self.playback_controller = TimeWindowPlaybackController()
         # self.playback_controller.setup(self._spikes_window)
-        self.playback_controller.setup(self) # pass self to have properties set
+        # self.playback_controller.setup(self) # pass self to have properties set
         
         self.setup()
         
@@ -313,6 +288,76 @@ class SpikeRasterBase(UnitSortableMixin, DataSeriesToSpatialTransformingMixin, N
         # self.spikes_window.window_duration_changed_signal.connect(self.on_adjust_temporal_spatial_mapping)
 
 
+    @classmethod
+    def helper_setup_neuron_colors_and_order(cls, raster_plotter, neuron_colors=None, neuron_sort_order=None):
+        """ 
+        raster_plotter: a raster plotter
+        
+        Requires Properties:
+            .unit_ids, .neuron_ids
+            .spikes_df
+            .enable_overwrite_invalid_unit_ids
+
+        Requires Functions:
+            .find_cell_IDXs_from_cell_ids(...)
+            ._setup_neurons_color_data(...)
+            
+        Sets Properties:
+            ._unit_sort_order
+            .cell_id_to_unit_id_map
+            .unit_id_to_cell_id_map
+        
+        """
+        # Neurons and sort-orders:
+        old_neuron_IDXs = raster_plotter.unit_ids.copy() # backup the old unit_ids
+        print(f'\t\t raster_plotter.unit_ids: {raster_plotter.unit_ids} (len: {len(raster_plotter.unit_ids)})\n \t\t raster_plotter.cell_ids: {raster_plotter.cell_ids} (len: {len(raster_plotter.cell_ids)})')
+        new_neuron_IDXs = raster_plotter.find_cell_IDXs_from_cell_ids(raster_plotter.neuron_ids)
+        print(f'\t\t new_neuron_IDXs: {new_neuron_IDXs} (len(new_neuron_IDXs): {len(new_neuron_IDXs)})')
+        # build a map between the old and new neuron_IDXs:
+        old_to_new_map = OrderedDict(zip(old_neuron_IDXs, new_neuron_IDXs))
+        new_to_old_map = OrderedDict(zip(new_neuron_IDXs, old_neuron_IDXs))
+        neuron_id_to_new_IDX_map = OrderedDict(zip(raster_plotter.neuron_ids, new_neuron_IDXs)) # provides the new_IDX corresponding to any neuron_id (aclu value)
+        
+        if raster_plotter.enable_overwrite_invalid_unit_ids:
+            print("WARNING: raster_plotter.enable_overwrite_invalid_unit_ids is True, so dataframe 'unit_id' and 'cell_idx' will be overwritten!")
+            raster_plotter.overwrite_invalid_unit_ids(raster_plotter.spikes_df, neuron_id_to_new_IDX_map)
+        
+        # Build important maps between raster_plotter.unit_ids and raster_plotter.cell_ids:
+        raster_plotter.cell_id_to_unit_id_map = OrderedDict(zip(raster_plotter.cell_ids, raster_plotter.unit_ids)) # maps cell_ids to unit_ids
+        raster_plotter.unit_id_to_cell_id_map = OrderedDict(zip(raster_plotter.unit_ids, raster_plotter.cell_ids)) # maps unit_ids to cell_ids
+        
+        if neuron_sort_order is None:
+            neuron_sort_order = np.arange(len(raster_plotter.unit_ids)) # default sort order is sorted by unit_ids
+        raster_plotter._unit_sort_order = neuron_sort_order
+        assert len(raster_plotter._unit_sort_order) == len(raster_plotter.unit_ids), f"len(raster_plotter._unit_sort_order): {len(raster_plotter._unit_sort_order)} must equal len(raster_plotter.unit_ids): {len(raster_plotter.unit_ids)} but it does not!"
+        
+        # Setup Coloring:
+        raster_plotter._setup_neurons_color_data(neuron_colors, coloring_mode='color_by_index_order')
+        
+
+    @classmethod
+    def init_from_unified_spike_raster_app(cls, unified_app, **kwargs):
+        """ Helps to create an depdendent instance of the app/window from a master UnifiedSpikeRasterApp 
+        
+        unified_app: UnifiedSpikeRasterApp
+        """
+        return cls(params=unified_app.params, spikes_window=unified_app.spikes_window, playback_controller=unified_app.playback_controller, **kwargs)
+        
+    @classmethod
+    def init_from_independent_data(cls, spikes_df, window_duration=15.0, window_start_time=0.0, neuron_colors=None, neuron_sort_order=None, **kwargs):
+        """ Helps to create an independent master instance of the app/window. """
+        # Helper container variables
+        params = VisualizationParameters('')
+        spikes_window = SpikesDataframeWindow(spikes_df, window_duration=window_duration, window_start_time=window_start_time)
+        playback_controller = TimeWindowPlaybackController()
+        # Setup the animation playback object for the time window:
+        # self.playback_controller = TimeWindowPlaybackController()
+        # self.playback_controller.setup(self._spikes_window)
+        # playback_controller.setup(self) # pass self to have properties set    
+        return cls(params=params, spikes_window=spikes_window, playback_controller=playback_controller, neuron_colors=neuron_colors, neuron_sort_order=neuron_sort_order, **kwargs)
+    
+    
+    
     @classmethod
     def overwrite_invalid_unit_ids(cls, spikes_df, neuron_id_to_new_IDX_map):
         # if self.enable_overwrite_invalid_unit_ids:

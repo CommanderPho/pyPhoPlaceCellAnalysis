@@ -9,6 +9,52 @@ from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.SpikeRasterWidgets.Spike3DRaste
 from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.SpikeRasterWidgets.Spike3DRaster_Vedo import Spike3DRaster_Vedo
 
 
+from pyphocorehelpers.general_helpers import OrderedMeta
+from pyphocorehelpers.print_helpers import SimplePrintable, PrettyPrintable
+from pyphocorehelpers.DataStructure.general_parameter_containers import DebugHelper, VisualizationParameters
+from pyphoplacecellanalysis.General.Mixins.TimeWindowPlaybackMixin import TimeWindowPlaybackPropertiesMixin, TimeWindowPlaybackController
+from pyphoplacecellanalysis.General.Model.SpikesDataframeWindow import SpikesDataframeWindow, SpikesWindowOwningMixin
+
+""" 
+Each separate call to Spikes3DRaster, Spikes2DRaster, etc shouldn't nec. create a whole new app. We want the ability for data such as the spikes_window to be shared between these windows.
+
+TimeWindowPlaybackController
+
+"""
+class UnifiedSpikeRasterApp(TimeWindowPlaybackPropertiesMixin, QtCore.QObject):
+    """docstring for UnifiedSpikeRasterApp."""
+    
+    # TimeWindowPlaybackPropertiesMixin requirement:
+    @property
+    def animation_active_time_window(self):
+        """The accessor for the TimeWindowPlaybackPropertiesMixin class for the main active time window that it will animate."""
+        return self._spikes_window
+    
+    # Get/Set Properties:
+    @property
+    def spikes_window(self):
+        """The spikes_window property."""
+        return self._spikes_window
+    @spikes_window.setter
+    def spikes_window(self, value):
+        self._spikes_window = value
+    
+
+    def __init__(self, curr_spikes_df, core_app_name='UnifiedSpikeRasterApp', window_duration=15.0, window_start_time=30.0, neuron_colors=None, neuron_sort_order=None):
+        super(UnifiedSpikeRasterApp, self).__init__() # QtCore.QObject.__init__(self)
+        
+        # Set app name
+        self.name = core_app_name
+        
+        self.params = VisualizationParameters('')
+        self._spikes_window = SpikesDataframeWindow(curr_spikes_df, window_duration=window_duration, window_start_time=window_start_time)
+        self.playback_controller = TimeWindowPlaybackController()
+        self.playback_controller.setup(self) # pass self to have properties set
+        
+        
+        
+        
+        
 def build_spike_3d_raster_with_2d_controls(curr_spikes_df, window_duration=15.0, window_start_time=30.0, neuron_colors=None, neuron_sort_order=None):
     """ builds a 3D Raster plot for spikes with 2D controls in a separate window
     

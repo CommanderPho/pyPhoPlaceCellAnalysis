@@ -524,24 +524,17 @@ class Spike3DRaster_Vedo(Spike3DRasterBottomFrameControlsMixin, SpikeRasterBase)
         raise NotImplementedError # currently property should be read-only via this accessor
         self.ui.plt = value
 
-    def __init__(self, spikes_df, *args, window_duration=15.0, window_start_time=0.0, neuron_colors=None, neuron_sort_order=None, **kwargs):
-        super(Spike3DRaster_Vedo, self).__init__(spikes_df, *args, window_duration=window_duration, window_start_time=window_start_time, neuron_colors=neuron_colors, neuron_sort_order=neuron_sort_order, **kwargs)
-        # SpikeRasterBase.__init__(spikes_df, *args, window_duration=window_duration, window_start_time=window_start_time, neuron_colors=neuron_colors, neuron_sort_order=neuron_sort_order, **kwargs)
+    def __init__(self, params=None, spikes_window=None, playback_controller=None, neuron_colors=None, neuron_sort_order=None, **kwargs):
+        super(Spike3DRaster_Vedo, self).__init__(params=params, spikes_window=spikes_window, playback_controller=playback_controller, neuron_colors=neuron_colors, neuron_sort_order=neuron_sort_order, **kwargs)
         # Initialize member variables:
         
         # Helper container variables
         # self.enable_debug_print = False
         self.enable_debug_widgets = False
-        
         self.enable_debug_print = True
-        
         
         # Helper Mixins: INIT:
         self.Spike3DRasterBottomFrameControlsMixin_on_init()
-        
-
-        
-       
                     
         # self.setup_spike_rendering_mixin() # NeuronIdentityAccessingMixin
         

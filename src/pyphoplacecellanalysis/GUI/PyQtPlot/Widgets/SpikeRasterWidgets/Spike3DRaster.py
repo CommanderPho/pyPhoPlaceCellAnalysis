@@ -133,9 +133,8 @@ class Spike3DRaster(TimeCurvesViewMixin, RenderTimeEpochMeshesMixin, SpikeRaster
         return self.n_half_cells
     
     
-    
-    def __init__(self, spikes_df, *args, window_duration=15.0, window_start_time=0.0, neuron_colors=None, neuron_sort_order=None, **kwargs):
-        super(Spike3DRaster, self).__init__(spikes_df, *args, window_duration=window_duration, window_start_time=window_start_time, neuron_colors=neuron_colors, neuron_sort_order=neuron_sort_order, **kwargs)
+    def __init__(self, params=None, spikes_window=None, playback_controller=None, neuron_colors=None, neuron_sort_order=None, **kwargs):
+        super(Spike3DRaster, self).__init__(params=params, spikes_window=spikes_window, playback_controller=playback_controller, neuron_colors=neuron_colors, neuron_sort_order=neuron_sort_order, **kwargs)
         
         # Setup Specific Member Variables:
         self.params.render_epochs = None
@@ -152,7 +151,7 @@ class Spike3DRaster(TimeCurvesViewMixin, RenderTimeEpochMeshesMixin, SpikeRaster
         self.unit_sort_order_changed_signal.connect(self.on_unit_sort_order_changed)
         
         self.show()
-
+        
 
 
     def setup(self):
