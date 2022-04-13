@@ -142,10 +142,12 @@ class StaticVedo_3DRasterHelper:
         return all_spike_lines, curr_spike_cmap, curr_spike_alphas, spike_point_color_ids, spike_color_ids
 
     @classmethod
-    def update_active_spikes_window(cls, active_spikes_lines_mesh, x_start=0.0, x_end=10.0, max_y_pos = 50.0, max_z_pos = 10.0, start_bound_plane=None, end_bound_plane=None):
+    def update_active_spikes_window(cls, active_spikes_lines_mesh, x_start=0.0, x_end=10.0, max_y_pos = 50.0, max_z_pos = 10.0, start_bound_plane=None, end_bound_plane=None, debug_print=False):
         # X-version:
         active_ids = active_spikes_lines_mesh.findCellsWithin(xbounds=(x_start, x_end))
-        print(f'update_active_spikes_window(...): active_ids: {active_ids}')
+        
+        if debug_print:
+            print(f'update_active_spikes_window(...): active_ids: {active_ids}')
         # ipts = elli.insidePoints(pts) # select points inside mesh
         # opts = elli.insidePoints(pts, invert=True)
         # plt += Points(ipts, c="g")
@@ -804,7 +806,9 @@ class Spike3DRaster_Vedo(Spike3DRasterBottomFrameControlsMixin, SpikeRasterBase)
         # Want to add a tick/label at the x-values corresponding to each minute.
         (active_t_start, active_t_end, active_window_t_duration), (global_start_t, global_end_t, global_total_data_duration), (active_x_start, active_x_end, active_x_duration), (global_x_start, global_x_end, global_x_duration) = debug_print_axes_locations(self)
         new_axes_x_to_time_labels = DataSeriesToSpatial.build_minute_x_tick_labels(self)
-        print(f'new_axes_x_to_time_labels: {new_axes_x_to_time_labels}, global_x_start: {global_x_start}, global_x_end: {global_x_end}')
+        
+        if self.enable_debug_print:
+            print(f'new_axes_x_to_time_labels: {new_axes_x_to_time_labels}, global_x_start: {global_x_start}, global_x_end: {global_x_end}')
 
         all_data_axes = Axes(all_spike_lines, xrange=[0, 15000], c='white', textScale=0.1, gridLineWidth=0.1, axesLineWidth=0.1, xTickLength=0.005*0.1, xTickThickness=0.0025*0.1,
                                 xValuesAndLabels = new_axes_x_to_time_labels, useGlobal=True)
