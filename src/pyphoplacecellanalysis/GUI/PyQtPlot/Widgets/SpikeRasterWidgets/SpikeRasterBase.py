@@ -16,7 +16,7 @@ from neuropy.core.neuron_identities import NeuronIdentityAccessingMixin
 
 from pyphocorehelpers.general_helpers import OrderedMeta
 from pyphocorehelpers.print_helpers import SimplePrintable, PrettyPrintable
-from pyphocorehelpers.DataStructure.general_parameter_containers import DebugHelper, VisualizationParameters
+from pyphocorehelpers.DataStructure.general_parameter_containers import DebugHelper, VisualizationParameters, RenderPlots
 from pyphoplacecellanalysis.General.Mixins.SpikesRenderingBaseMixin import SpikeRenderingBaseMixin, SpikesDataframeOwningMixin
 
 from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer
@@ -78,17 +78,6 @@ sys.excepthook = trap_exc_during_debug
 
 
 
-class RenderPlots(PrettyPrintable, SimplePrintable, metaclass=OrderedMeta):
-    def __init__(self, name) -> None:
-        # super(RenderEpochs, self).__init__(**kwargs)
-        self.name = name
-        # self.__dict__ = (self.__dict__ | kwargs)
-        
-    # def __init__(self, name, **kwargs) -> None:
-    #     # super(VisualizationParameters, self).__init__(**kwargs)
-    #     self.name = name
-    #     # self.__dict__ = (self.__dict__ | kwargs)
-    
     
 class UnitSortableMixin:
     """ Implementor allows changing the sort order of the units (neurons) displayed by setting indicies directly via the self.unit_sort_order property.
@@ -441,20 +430,7 @@ class SpikeRasterBase(UnitSortableMixin, DataSeriesToSpatialTransformingMixin, N
     def setup(self):
         # self.setup_spike_rendering_mixin() # NeuronIdentityAccessingMixin
         raise NotImplementedError # Inheriting classes must override setup to perform particular setup
-    
         self.app = pg.mkQApp("SpikeRasterBase")
-        
-        # Configure pyqtgraph config:
-        try:
-            import OpenGL
-            pg.setConfigOption('useOpenGL', True)
-            pg.setConfigOption('enableExperimental', True)
-        except Exception as e:
-            print(f"Enabling OpenGL failed with {e}. Will result in slow rendering. Try installing PyOpenGL.")
-            
-        pg.setConfigOptions(antialias = True)
-        pg.setConfigOption('background', "#1B1B1B")
-        pg.setConfigOption('foreground', "#727272")
         
         
     def _buildGraphics(self):

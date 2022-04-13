@@ -365,6 +365,19 @@ class StaticVedo_3DRasterHelper:
         return cls.run_all(spikes_df=spikes_df, epochs_df=epochs_df)
         
 
+class SimplePlayPauseWithExternalAppMixin:
+    
+    # @property
+    # def animationThread(self):
+    #     """The animationThread property."""
+    #     return self.playback_controller
+    
+    @property
+    def animationThread(self):
+        """The animationThread property."""
+        return self.playback_controller.animationThread
+    
+    
 class Spike3DRasterBottomFrameControlsMixin:
     """ renders the UI controls for the Spike3DRaster_Vedo class 
         Follows Conventions outlined in ModelViewMixin Conventions.md
@@ -415,7 +428,13 @@ class Spike3DRasterBottomFrameControlsMixin:
         controls_frame = Spike3DRasterBottomPlaybackControlBar() # Initialize new controls class from the Spike3DRasterBottomPlaybackControlBar class.
         controls_layout = controls_frame.layout() # Get the layout
         
+        controls_frame.play_pause_toggled.connect(self.play_pause)
+        controls_frame.jump_left.connect(self.on_jump_left)
+        controls_frame.jump_right.connect(self.on_jump_right)
+        controls_frame.reverse_toggled.connect(self.on_reverse_held)
+        
         return controls_frame, controls_layout
+
 
     @QtCore.pyqtSlot()
     def Spike3DRasterBottomFrameControlsMixin_on_destroy(self):
@@ -430,7 +449,35 @@ class Spike3DRasterBottomFrameControlsMixin:
         pass
     
     
-class Spike3DRaster_Vedo(Spike3DRasterBottomFrameControlsMixin, SpikeRasterBase):
+    ## Update Functions:
+    @QtCore.pyqtSlot(bool)
+    def play_pause(self, is_playing):
+        print(f'Spike3DRasterBottomFrameControlsMixin.play_pause(is_playing: {is_playing})')
+        if (not is_playing):
+            self.animationThread.start()
+        else:
+            self.animationThread.terminate()
+
+    @QtCore.pyqtSlot()
+    def on_jump_left(self):
+        # Skip back some frames
+        print(f'Spike3DRasterBottomFrameControlsMixin.on_jump_left()')
+        self.shift_animation_frame_val(-5)
+        
+    @QtCore.pyqtSlot()
+    def on_jump_right(self):
+        # Skip forward some frames
+        print(f'Spike3DRasterBottomFrameControlsMixin.on_jump_right()')
+        self.shift_animation_frame_val(5)
+        
+
+    @QtCore.pyqtSlot(bool)
+    def on_reverse_held(self, is_reversed):
+        print(f'Spike3DRasterBottomFrameControlsMixin.on_reverse_held(is_reversed: {is_reversed})')
+        pass
+        
+    
+class Spike3DRaster_Vedo(SimplePlayPauseWithExternalAppMixin, Spike3DRasterBottomFrameControlsMixin, SpikeRasterBase):
     """ **Vedo version** - Displays a 3D version of a raster plot with the spikes occuring along a plane. 
     
     TODO: CURRENTLY UNIMPLEMENTED I THINK. Switched back to Spike3DRaster as it works well and good enough.
@@ -643,6 +690,8 @@ class Spike3DRaster_Vedo(Spike3DRasterBottomFrameControlsMixin, SpikeRasterBase)
         
         # Helper Mixins: buildUI:
         self.ui.bottom_controls_frame, self.ui.bottom_controls_layout = self.Spike3DRasterBottomFrameControlsMixin_on_buildUI()
+        
+        
         
         # TODO: Register Functions:
         # self.ui.bottom_controls_frame.
