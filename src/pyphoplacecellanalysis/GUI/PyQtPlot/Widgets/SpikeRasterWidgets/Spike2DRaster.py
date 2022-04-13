@@ -73,17 +73,6 @@ class Spike2DRaster(Render2DScrollWindowPlotMixin, SpikeRasterBase):
     
     ######  Get/Set Properties ######:
     
-    
-    # def __init__(self, spikes_df, *args, window_duration=15.0, window_start_time=0.0, neuron_colors=None, neuron_sort_order=None, **kwargs):
-    #     super(Spike2DRaster, self).__init__(spikes_df, *args, window_duration=window_duration, window_start_time=window_start_time, neuron_colors=neuron_colors, neuron_sort_order=neuron_sort_order, **kwargs)
-    #     # super(Spike2DRaster, self).__init__(*args, **kwargs)
-    #     # Initialize member variables:
-            
-    #     # Setup Signals:
-    #     self.temporal_mapping_changed.connect(self.on_adjust_temporal_spatial_mapping)
-    #     self.spikes_window.window_duration_changed_signal.connect(self.on_adjust_temporal_spatial_mapping)
-    #     # self.on_window_duration_changed.connect(self.on_adjust_temporal_spatial_mapping)
-    #     self.show()
 
 
     def __init__(self, params=None, spikes_window=None, playback_controller=None, neuron_colors=None, neuron_sort_order=None, **kwargs):

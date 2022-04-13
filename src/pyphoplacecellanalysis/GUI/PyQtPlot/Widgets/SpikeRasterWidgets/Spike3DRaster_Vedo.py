@@ -489,12 +489,6 @@ class Spike3DRaster_Vedo(Spike3DRasterBottomFrameControlsMixin, SpikeRasterBase)
     @property
     def overlay_vedo_text_lines_dict(self):
         """The overlay_vedo_text_lines_dict property."""
-        # af = QtCore.Qt.AlignmentFlag
-        # # a dict that maps from QtCore.Qt.AlignmentFlag to the strings that Vedo's Text2D function accepts to position text
-        # qt_to_vedo_alignment_dict = {(af.AlignTop | af.AlignLeft):'top-left', 
-        #                             (af.AlignTop | af.AlignRight):'top-right', 
-        #                             (af.AlignBottom | af.AlignLeft):'bottom-left', 
-        #                             (af.AlignBottom | af.AlignRight):'bottom-right'}
         return {self.qt_to_vedo_alignment_dict[k]:v for (k,v) in self.overlay_text_lines_dict.items()}
     
     ######  Get/Set Properties ######:

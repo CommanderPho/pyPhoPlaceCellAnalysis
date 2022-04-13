@@ -5,7 +5,7 @@ from datetime import datetime, timezone, timedelta
 import numpy as np
 from enum import Enum
 
-from PyQt5 import QtGui, QtWidgets, uic
+from PyQt5 import QtCore, QtGui, QtWidgets, uic
 from PyQt5.QtWidgets import QMessageBox, QToolTip, QStackedWidget, QHBoxLayout, QVBoxLayout, QSplitter, QFormLayout, QLabel, QFrame, QPushButton, QTableWidget, QTableWidgetItem
 from PyQt5.QtWidgets import QApplication, QFileSystemModel, QTreeView, QWidget, QHeaderView
 from PyQt5.QtGui import QPainter, QBrush, QPen, QColor, QFont, QIcon
@@ -34,6 +34,12 @@ RenderPlaybackControlsMixin
 
 class Spike3DRasterBottomPlaybackControlBar(QWidget):
     """ A playback bar with buttons loaded from a Qt .ui file. """
+    
+    play_pause_toggled = QtCore.pyqtSignal(bool) # returns bool indicating whether is_playing
+    jump_left = QtCore.pyqtSignal()
+    jump_right = QtCore.pyqtSignal()
+    reverse_toggled = QtCore.pyqtSignal(bool) # returns bool indicating whether is_reversed
+    
     
     def __init__(self, parent=None):
         super().__init__(parent=parent) # Call the inherited classes __init__ method
@@ -139,19 +145,20 @@ class Spike3DRasterBottomPlaybackControlBar(QWidget):
         # THIS IS NOT TRUE: the play_pause_model uses inverted logic, so we negate the current state value to determine if is_playing
         is_playing = self.ui.play_pause_model.getState()
         # print(f'is_playing: {is_playing}')
+        self.play_pause_toggled.emit(is_playing)
         
-        if (not is_playing):
-            # if self.slidebar_val == 1:
-            #     # self.ui.slider.setValue(0)
-            #     pass
-            # # self.play_pause_model.setState(not is_playing)
-            # self.animationThread.start()
-            pass
+        # if (not is_playing):
+        #     # if self.slidebar_val == 1:
+        #     #     # self.ui.slider.setValue(0)
+        #     #     pass
+        #     # # self.play_pause_model.setState(not is_playing)
+        #     # self.animationThread.start()
+        #     pass
 
-        else:
-            # self.play_pause_model.setState(not is_playing)
-            # self.animationThread.terminate()
-            pass
+        # else:
+        #     # self.play_pause_model.setState(not is_playing)
+        #     # self.animationThread.terminate()
+        #     pass
                     
         # self.ui.play_pause_model.blockSignals(True)
         # self.ui.play_pause_model.setState(not is_playing)
@@ -175,11 +182,13 @@ class Spike3DRasterBottomPlaybackControlBar(QWidget):
 
     def on_jump_left(self):
         # Skip back some frames
+        self.jump_left.emit()
         # self.shift_animation_frame_val(-5)
         pass
         
     def on_jump_right(self):
         # Skip forward some frames
+        self.jump_right.emit()
         # self.shift_animation_frame_val(5)
         pass        
 
@@ -196,6 +205,7 @@ class Spike3DRasterBottomPlaybackControlBar(QWidget):
             # set background color back to light-grey
             self.ui.button_reverse.setStyleSheet("background-color : lightgrey")
 
+        self.reverse_toggled.emit(self.is_playback_reversed)
 
 
 ## Start Qt event loop
