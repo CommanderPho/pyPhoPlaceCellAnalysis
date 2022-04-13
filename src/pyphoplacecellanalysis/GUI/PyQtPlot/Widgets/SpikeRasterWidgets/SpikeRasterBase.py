@@ -10,6 +10,7 @@ import numpy as np
 from matplotlib.colors import ListedColormap, to_hex # for neuron colors to_hex
 
 import qtawesome as qta
+# import qdarkstyle
 
 from neuropy.core.neuron_identities import NeuronIdentityAccessingMixin
 
@@ -18,16 +19,10 @@ from pyphocorehelpers.print_helpers import SimplePrintable, PrettyPrintable
 from pyphocorehelpers.DataStructure.general_parameter_containers import DebugHelper, VisualizationParameters
 from pyphoplacecellanalysis.General.Mixins.SpikesRenderingBaseMixin import SpikeRenderingBaseMixin, SpikesDataframeOwningMixin
 
-from pyphocorehelpers.indexing_helpers import interleave_elements, partition
 from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer
-
-
-# import qdarkstyle
 
 from pyphoplacecellanalysis.General.Model.SpikesDataframeWindow import SpikesDataframeWindow, SpikesWindowOwningMixin
 from pyphoplacecellanalysis.General.DataSeriesToSpatial import DataSeriesToSpatial, DataSeriesToSpatialTransformingMixin
-from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.GLGraphicsItems.GLDebugAxisItem import GLDebugAxisItem
-from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.GLGraphicsItems.GLViewportOverlayPainterItem import GLViewportOverlayPainterItem
 
 from pyphoplacecellanalysis.GUI.Qt.Mixins.RenderWindowControlsMixin import RenderWindowControlsMixin, RenderPlaybackControlsMixin
 

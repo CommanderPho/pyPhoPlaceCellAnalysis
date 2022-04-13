@@ -9,6 +9,10 @@ from pyqtgraph.Qt import QtCore, QtGui, QtWidgets
 
 
 class TimeWindowPlaybackPropertiesMixin:
+    """ 
+        TimeWindowPlaybackPropertiesMixin:
+    
+    """
     
     @property
     def animation_active_time_window(self):
@@ -71,21 +75,19 @@ class TimeWindowPlaybackPropertiesMixin:
         self.shift_animation_frame_val(1)
         
 
+
+
 class TimeWindowPlaybackController(QtCore.QObject):
-    """docstring for TimeWindowPlaybackController.
-    
+    """
+        TimeWindowPlaybackController
     """
     SpeedBurstPlaybackRate = 16.0
     PlaybackUpdateFrequency = 0.04 # in seconds
-        
-    # def __init__(self):
-    #     super(TimeWindowPlaybackController, self).__init__()
         
     def __init__(self):
         QtCore.QObject.__init__(self)
         
 
-    
     def setup(self, root_TimeWindowOwner):
         """ sets up the passed root_TimeWindow object's required parameters and state variables. """
         root_TimeWindowOwner._playback_update_frequency = TimeWindowPlaybackController.PlaybackUpdateFrequency
@@ -104,6 +106,9 @@ class TimeWindowPlaybackController(QtCore.QObject):
 
 
 class UpdateRunner(QtCore.QThread):
+    """ 
+        A QThread that calls update_signal at a fixed interval determined by update_frequency.
+    """
     update_signal = QtCore.pyqtSignal()
 
     def __init__(self, update_frequency=0.04):
