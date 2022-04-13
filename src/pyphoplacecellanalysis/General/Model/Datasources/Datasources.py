@@ -10,7 +10,7 @@ from pyphoplacecellanalysis.General.DataSeriesToSpatial import DataSeriesToSpati
 
 
 
-class BaseDatasource(QtCore.QObject):
+class BaseDatasource(SimplePrintable, PrettyPrintable, QtCore.QObject):
     """ Provides the list of values, 'v' and the timestamps at which they occur 't'.
         
         

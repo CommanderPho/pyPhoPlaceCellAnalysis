@@ -3,11 +3,12 @@ from pyqtgraph.Qt import QtCore
 import numpy as np
 import pandas as pd
 
+from pyphocorehelpers.print_helpers import SimplePrintable, PrettyPrintable
 from pyphoplacecellanalysis.General.Model.Datasources.Datasources import DataframeDatasource
 from pyphoplacecellanalysis.General.Model.TimeWindow import TimeWindow
 
 
-class LiveWindowedData(QtCore.QObject):
+class LiveWindowedData(SimplePrintable, PrettyPrintable, QtCore.QObject):
     """ an optional adapter between a DataSource and the GUI/graphic that uses it.
     Serves as an intermediate to TimeWindow and Datasource.
     It subscribes to TimeWindow updates, and for each update it fetches the appropriate data from its internally owned DataSource and emits a singal containing this data that can be used to update the GUI/graphic classes that subscribe to it.

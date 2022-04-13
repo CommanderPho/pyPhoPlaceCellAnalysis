@@ -1,7 +1,7 @@
 from pyqtgraph.Qt import QtCore
 import numpy as np
 import pandas as pd
-
+from pyphocorehelpers.print_helpers import SimplePrintable, PrettyPrintable
 
 """ Windowed Datasource Features:
 
@@ -19,7 +19,7 @@ Separate 2D and 3D event visualization functions should be made to transform eve
 
 
 """
-class TimeWindow(QtCore.QObject):
+class TimeWindow(SimplePrintable, PrettyPrintable, QtCore.QObject):
     """ a zoomable (variable sized) window into a dataset with a time axis
     Used by Spike3DRaster
     
