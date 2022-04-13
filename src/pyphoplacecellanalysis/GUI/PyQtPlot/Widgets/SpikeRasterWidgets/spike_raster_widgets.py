@@ -12,7 +12,7 @@ from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.SpikeRasterWidgets.Spike3DRaste
 from pyphocorehelpers.general_helpers import OrderedMeta
 from pyphocorehelpers.print_helpers import SimplePrintable, PrettyPrintable
 from pyphocorehelpers.DataStructure.general_parameter_containers import DebugHelper, VisualizationParameters
-from pyphoplacecellanalysis.General.Mixins.TimeWindowPlaybackMixin import TimeWindowPlaybackPropertiesMixin, TimeWindowPlaybackController
+from pyphoplacecellanalysis.General.Mixins.TimeWindowPlaybackMixin import TimeWindowPlaybackPropertiesMixin, TimeWindowPlaybackController, TimeWindowPlaybackControllerActionsMixin
 from pyphoplacecellanalysis.General.Model.SpikesDataframeWindow import SpikesDataframeWindow, SpikesWindowOwningMixin
 
 """ 
@@ -21,7 +21,7 @@ Each separate call to Spikes3DRaster, Spikes2DRaster, etc shouldn't nec. create 
 TimeWindowPlaybackController
 
 """
-class UnifiedSpikeRasterApp(TimeWindowPlaybackPropertiesMixin, QtCore.QObject):
+class UnifiedSpikeRasterApp(TimeWindowPlaybackControllerActionsMixin, TimeWindowPlaybackPropertiesMixin, QtCore.QObject):
     """docstring for UnifiedSpikeRasterApp."""
     
     # TimeWindowPlaybackPropertiesMixin requirement:
@@ -39,7 +39,6 @@ class UnifiedSpikeRasterApp(TimeWindowPlaybackPropertiesMixin, QtCore.QObject):
     def spikes_window(self, value):
         self._spikes_window = value
     
-
     def __init__(self, curr_spikes_df, core_app_name='UnifiedSpikeRasterApp', window_duration=15.0, window_start_time=30.0, neuron_colors=None, neuron_sort_order=None):
         super(UnifiedSpikeRasterApp, self).__init__() # QtCore.QObject.__init__(self)
         

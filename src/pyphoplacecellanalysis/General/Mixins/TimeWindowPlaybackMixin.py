@@ -119,7 +119,48 @@ class TimeWindowPlaybackController(QtCore.QObject):
 
 
         
+class TimeWindowPlaybackControllerActionsMixin:
+    """ Defines the callback functions to respond to UI events such as play/pause button presses, skip/jumps, etc.
+    
+    Required Properties:
+        .animationThread
+    
+    Required Functions:
+        @QtCore.pyqtSlot(int)
+        shift_animation_frame_val(self, shift_frames: int)
+        
+        @QtCore.pyqtSlot()
+        increase_animation_frame_val(self)
+        
+    """
 
+    ## Update Functions:
+    @QtCore.pyqtSlot(bool)
+    def play_pause(self, is_playing):
+        print(f'TimeWindowPlaybackControllerActionsMixin.play_pause(is_playing: {is_playing})')
+        if (not is_playing):
+            self.animationThread.start()
+        else:
+            self.animationThread.terminate()
+
+    @QtCore.pyqtSlot()
+    def on_jump_left(self):
+        # Skip back some frames
+        print(f'TimeWindowPlaybackControllerActionsMixin.on_jump_left()')
+        self.shift_animation_frame_val(-5)
+        
+    @QtCore.pyqtSlot()
+    def on_jump_right(self):
+        # Skip forward some frames
+        print(f'TimeWindowPlaybackControllerActionsMixin.on_jump_right()')
+        self.shift_animation_frame_val(5)
+        
+
+    @QtCore.pyqtSlot(bool)
+    def on_reverse_held(self, is_reversed):
+        print(f'TimeWindowPlaybackControllerActionsMixin.on_reverse_held(is_reversed: {is_reversed})')
+        pass
+    
 
 class UpdateRunner(QtCore.QThread):
     """ 
