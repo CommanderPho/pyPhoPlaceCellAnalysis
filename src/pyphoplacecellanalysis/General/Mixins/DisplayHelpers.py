@@ -143,3 +143,15 @@ def debug_print_axes_locations(spike_raster_plt):
 
 
 
+def debug_print_app_info(qt_app):
+    print(f'.app - memory address: {hex(id(qt_app))}\n.applicationName(): {qt_app.applicationName()}')
+    if qt_app.objectName() != '':
+        print(f'.objectName(): {qt_app.objectName()}')
+
+
+def debug_print_base_raster_plotter_info(raster_plotter):
+    print(f'raster_plotter:\nmemory address: {hex(id(raster_plotter))}')
+    debug_print_app_info(raster_plotter.app)
+    print(f'.spikes_window address: {hex(id(raster_plotter.spikes_window))}')
+        
+
