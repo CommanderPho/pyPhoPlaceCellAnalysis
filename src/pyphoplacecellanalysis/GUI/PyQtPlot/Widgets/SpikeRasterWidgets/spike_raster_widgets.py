@@ -14,15 +14,15 @@ def build_spike_3d_raster_with_2d_controls(curr_spikes_df, window_duration=15.0,
     
     Usage:
     
-    from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.SpikeRasterWidgets.spike_raster_widgets import build_spike_3d_raster_with_2d_controls
-    curr_epoch_name = 'maze1'
-    curr_epoch = curr_active_pipeline.filtered_epochs[curr_epoch_name] # <NamedTimerange: {'name': 'maze1', 'start_end_times': array([  22.26      , 1739.15336412])};>
-    curr_sess = curr_active_pipeline.filtered_sessions[curr_epoch_name]
-    curr_spikes_df = curr_sess.spikes_df
-    curr_computations_results = curr_active_pipeline.computation_results[curr_epoch_name]
-    # Build the output widget:
-    spike_raster_plt_3d, spike_raster_plt_2d, spike_3d_to_2d_window_connection = build_spike_3d_raster_with_2d_controls(curr_spikes_df)
-    
+        from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.SpikeRasterWidgets.spike_raster_widgets import build_spike_3d_raster_with_2d_controls
+        curr_epoch_name = 'maze1'
+        curr_epoch = curr_active_pipeline.filtered_epochs[curr_epoch_name] # <NamedTimerange: {'name': 'maze1', 'start_end_times': array([  22.26      , 1739.15336412])};>
+        curr_sess = curr_active_pipeline.filtered_sessions[curr_epoch_name]
+        curr_spikes_df = curr_sess.spikes_df
+        curr_computations_results = curr_active_pipeline.computation_results[curr_epoch_name]
+        # Build the output widget:
+        spike_raster_plt_3d, spike_raster_plt_2d, spike_3d_to_2d_window_connection = build_spike_3d_raster_with_2d_controls(curr_spikes_df)
+        
     """
     spike_raster_plt_3d = Spike3DRaster(curr_spikes_df, window_duration=window_duration, window_start_time=window_start_time, neuron_colors=neuron_colors, neuron_sort_order=neuron_sort_order)
     # Connect the 2D window scrolled signal to the 3D plot's spikes_window.update_window_start_end function
@@ -44,17 +44,16 @@ def build_spike_3d_raster_vedo_with_2d_controls(curr_spikes_df, window_duration=
 
     # NOTE: It appears this only works if the 2D Raster plot (pyqtgraph-based) is created before the Spike3DRaster_Vedo (Vedo-based). This is probably due to the pyqtgraph's instancing of the QtApplication.
     
-        
     Usage:
     
-    from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.SpikeRasterWidgets.spike_raster_widgets import build_spike_3d_raster_with_2d_controls
-    curr_epoch_name = 'maze1'
-    curr_epoch = curr_active_pipeline.filtered_epochs[curr_epoch_name] # <NamedTimerange: {'name': 'maze1', 'start_end_times': array([  22.26      , 1739.15336412])};>
-    curr_sess = curr_active_pipeline.filtered_sessions[curr_epoch_name]
-    curr_spikes_df = curr_sess.spikes_df
-    curr_computations_results = curr_active_pipeline.computation_results[curr_epoch_name]
-    # Build the output widget:
-    spike_raster_plt_3d_vedo, spike_raster_plt_2d, spike_3d_to_2d_window_connection = build_spike_3d_raster_vedo_with_2d_controls(curr_spikes_df)
+        from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.SpikeRasterWidgets.spike_raster_widgets import build_spike_3d_raster_with_2d_controls
+        curr_epoch_name = 'maze1'
+        curr_epoch = curr_active_pipeline.filtered_epochs[curr_epoch_name] # <NamedTimerange: {'name': 'maze1', 'start_end_times': array([  22.26      , 1739.15336412])};>
+        curr_sess = curr_active_pipeline.filtered_sessions[curr_epoch_name]
+        curr_spikes_df = curr_sess.spikes_df
+        curr_computations_results = curr_active_pipeline.computation_results[curr_epoch_name]
+        # Build the output widget:
+        spike_raster_plt_3d_vedo, spike_raster_plt_2d, spike_3d_to_2d_window_connection = build_spike_3d_raster_vedo_with_2d_controls(curr_spikes_df)
     
     """
 #     if extant_spike_raster_plt_3d_vedo is not None:

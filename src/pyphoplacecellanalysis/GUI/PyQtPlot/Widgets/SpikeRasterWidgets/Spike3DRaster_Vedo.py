@@ -19,6 +19,8 @@ from vedo import Volume, ProgressBar, show, settings
 from pyphocorehelpers.plotting.vedo_qt_helpers import MainVedoPlottingWindow
 
 from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer
+from pyphocorehelpers.gui.Vedo.vedo_helpers import VedoHelpers # for vedo_get_camera_debug_info
+
 # import qdarkstyle
 
 from pyphoplacecellanalysis.General.DataSeriesToSpatial import DataSeriesToSpatial
@@ -466,7 +468,10 @@ class Spike3DRaster_Vedo(Spike3DRasterBottomFrameControlsMixin, SpikeRasterBase)
 
         lines_dict = dict()
         
-        lines_dict[af.AlignTop | af.AlignLeft] = ['TL']
+        camera_debug_text = VedoHelpers.vedo_get_camera_debug_info(self.ui.plt.camera)
+        
+        lines_dict[af.AlignTop | af.AlignLeft] = ['TL',
+                                                  camera_debug_text]
         lines_dict[af.AlignTop | af.AlignRight] = ['TR', 
                                                    f"n_cells : {self.n_cells}",
                                                    f'render_window_duration: {self.render_window_duration}',
