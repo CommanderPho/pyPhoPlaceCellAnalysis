@@ -262,14 +262,17 @@ class SpikeRasterBase(UnitSortableMixin, DataSeriesToSpatialTransformingMixin, N
         # self.playback_controller.setup(self) # pass self to have properties set
         
         self.setup()
-        
+                
         # build the UI components:
         self.buildUI()
         
         # Setup Signals:
         # self.temporal_mapping_changed.connect(self.on_adjust_temporal_spatial_mapping)
         # self.spikes_window.window_duration_changed_signal.connect(self.on_adjust_temporal_spatial_mapping)
-
+        
+        # Connect app quit to onClose event:
+        self.app.aboutToQuit.connect(self.onClose) # Connect the onClose event
+        
 
     @classmethod
     def init_from_unified_spike_raster_app(cls, unified_app, **kwargs):
@@ -475,6 +478,30 @@ class SpikeRasterBase(UnitSortableMixin, DataSeriesToSpatialTransformingMixin, N
     ###################################
     #### EVENT HANDLERS
     ##################################
+
+    def debug_print_instance_info(self):
+        print('debug_print_instance_info():')
+        print(f'\t.applicationName: {self.applicationName}\n\t.windowName: {self.windowName}\n')
+    
+    
+    
+    def closeEvent(self, event):
+        reply = QtWidgets.QMessageBox.question(self, 'Window Close', 'Are you sure you want to close the window?',
+                QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No, QtWidgets.QMessageBox.No)
+
+        if reply == QtWidgets.QMessageBox.Yes:
+            event.accept()
+            print('Window closed')
+        else:
+            event.ignore()
+
+
+
+    # @QtCore.pyqtSlot()
+    def onClose(self):
+        print(f'onClose()')
+        self.debug_print_instance_info()
+        
 
     # Input Handelers:        
     def keyPressEvent(self, e):
