@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
 
-from pyphoplacecellanalysis.General.Mixins.AllFunctionEnumeratingMixin import AllFunctionEnumeratingMixin
+from pyphocorehelpers.mixins.member_enumerating import AllFunctionEnumeratingMixin
 from pyphoplacecellanalysis.Pho2D.PyQtPlots.plot_placefields import pyqtplot_plot_image_array, pyqtplot_common_setup
 
 

@@ -6,7 +6,7 @@ from neurodsp.burst import detect_bursts_dual_threshold, compute_burst_stats
 from neurodsp.plts.time_series import plot_time_series, plot_bursts # for plotting results
 
 
-from pyphoplacecellanalysis.General.Mixins.AllFunctionEnumeratingMixin import AllFunctionEnumeratingMixin
+from pyphocorehelpers.mixins.member_enumerating import AllFunctionEnumeratingMixin
 from pyphoplacecellanalysis.General.Model.ComputationResults import ComputationResult
 from pyphoplacecellanalysis.General.Decoder.decoder_result import build_position_df_resampled_to_time_windows
 

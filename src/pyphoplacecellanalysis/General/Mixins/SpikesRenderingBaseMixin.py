@@ -5,6 +5,7 @@ import pandas as pd
 # from pyphoplacecellanalysis.PhoPositionalData.plotting.mixins.spikes_mixins import SpikesDataframeOwningMixin, SpikeRenderingMixin, HideShowSpikeRenderingMixin
 from pyphocorehelpers.indexing_helpers import safe_get
 
+
 class SpikesDataframeOwningMixin:
     """ Implementors own a spikes_df object """
     @property
@@ -27,8 +28,7 @@ class SpikesDataframeOwningMixin:
         """
         return np.isin(self.spikes_df['aclu'], cell_ids)
     
-    
-    
+
 
 # Typically requires conformance to SpikesDataframeOwningMixin
 class SpikeRenderingBaseMixin:

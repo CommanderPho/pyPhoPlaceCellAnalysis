@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 import itertools
 
-from pyphoplacecellanalysis.General.Mixins.AllFunctionEnumeratingMixin import AllFunctionEnumeratingMixin
+from pyphocorehelpers.mixins.member_enumerating import AllFunctionEnumeratingMixin
 from pyphoplacecellanalysis.General.Model.ComputationResults import ComputationResult
 from pyphoplacecellanalysis.General.Decoder.decoder_result import build_position_df_resampled_to_time_windows
 

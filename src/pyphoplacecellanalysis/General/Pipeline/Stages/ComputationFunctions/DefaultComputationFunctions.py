@@ -9,7 +9,7 @@ from pyphoplacecellanalysis.General.Model.ComputationResults import ComputationR
 
 
 from pyphoplacecellanalysis.General.Decoder.decoder_result import build_position_df_discretized_binned_positions, build_position_df_resampled_to_time_windows
-from pyphoplacecellanalysis.General.Mixins.AllFunctionEnumeratingMixin import AllFunctionEnumeratingMixin
+from pyphocorehelpers.mixins.member_enumerating import AllFunctionEnumeratingMixin
 from pyphoplacecellanalysis.Analysis.reconstruction import BayesianPlacemapPositionDecoder, Zhang_Two_Step
 
 

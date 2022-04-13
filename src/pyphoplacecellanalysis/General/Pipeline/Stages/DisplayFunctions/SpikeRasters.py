@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
 
-from pyphoplacecellanalysis.General.Mixins.AllFunctionEnumeratingMixin import AllFunctionEnumeratingMixin
+from pyphocorehelpers.mixins.member_enumerating import AllFunctionEnumeratingMixin
 
 from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.SpikeRasterWidgets.SpikeRasterBase import SpikeRasterBase
 from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.SpikeRasterWidgets.Spike2DRaster import Spike2DRaster

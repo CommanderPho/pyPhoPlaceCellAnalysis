@@ -7,7 +7,7 @@ from matplotlib import patheffects
 
 from pyphocorehelpers.gui.interaction_helpers import CallbackWrapper
 
-from pyphoplacecellanalysis.General.Mixins.AllFunctionEnumeratingMixin import AllFunctionEnumeratingMixin
+from pyphocorehelpers.mixins.member_enumerating import AllFunctionEnumeratingMixin
 from pyphoplacecellanalysis.General.Decoder.decoder_result import DecoderResultDisplayingPlot2D
 from pyphoplacecellanalysis.General.Decoder.decoder_result import build_position_df_resampled_to_time_windows, build_position_df_time_window_idx
 
