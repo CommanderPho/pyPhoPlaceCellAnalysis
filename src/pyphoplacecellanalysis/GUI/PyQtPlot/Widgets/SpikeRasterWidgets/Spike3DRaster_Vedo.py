@@ -381,32 +381,35 @@ class Spike3DRasterBottomFrameControlsMixin:
         """ perfrom setup/creation of widget/graphical/data objects. Only the core objects are expected to exist on the implementor (root widget, etc) """
         # CALLED:
         
-        controls_frame = QtWidgets.QFrame()
-        controls_layout = QtWidgets.QHBoxLayout() # H-box layout
+        # controls_frame = QtWidgets.QFrame()
+        # controls_layout = QtWidgets.QHBoxLayout() # H-box layout
         
-        # controls_layout = QtWidgets.QGridLayout()
-        # controls_layout.setContentsMargins(0, 0, 0, 0)
-        # controls_layout.setVerticalSpacing(0)
-        # controls_layout.setHorizontalSpacing(0)
-        # controls_layout.setStyleSheet("background : #1B1B1B; color : #727272")
+        # # controls_layout = QtWidgets.QGridLayout()
+        # # controls_layout.setContentsMargins(0, 0, 0, 0)
+        # # controls_layout.setVerticalSpacing(0)
+        # # controls_layout.setHorizontalSpacing(0)
+        # # controls_layout.setStyleSheet("background : #1B1B1B; color : #727272")
         
-        # Set-up the rest of the Qt window
-        button = QtWidgets.QPushButton("My Button makes the cone red")
-        button.setToolTip('This is an example button')
-        button.clicked.connect(self.onClick)
-        controls_layout.addWidget(button)
+        # # Set-up the rest of the Qt window
+        # button = QtWidgets.QPushButton("My Button makes the cone red")
+        # button.setToolTip('This is an example button')
+        # button.clicked.connect(self.onClick)
+        # controls_layout.addWidget(button)
         
-        button2 = QtWidgets.QPushButton("<")
-        button2.setToolTip('<')
-        # button2.clicked.connect(self.onClick)
-        controls_layout.addWidget(button2)
+        # button2 = QtWidgets.QPushButton("<")
+        # button2.setToolTip('<')
+        # # button2.clicked.connect(self.onClick)
+        # controls_layout.addWidget(button2)
         
-        button3 = QtWidgets.QPushButton(">")
-        button3.setToolTip('>')
-        controls_layout.addWidget(button3)
+        # button3 = QtWidgets.QPushButton(">")
+        # button3.setToolTip('>')
+        # controls_layout.addWidget(button3)
         
-        # Set Final Layouts:
-        controls_frame.setLayout(controls_layout)
+        # # Set Final Layouts:
+        # controls_frame.setLayout(controls_layout)
+        
+        controls_frame = Spike3DRasterBottomPlaybackControlBar() # Initialize new controls class from the Spike3DRasterBottomPlaybackControlBar class.
+        controls_layout = controls_frame.layout() # Get the layout
         
         return controls_frame, controls_layout
 
