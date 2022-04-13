@@ -24,7 +24,16 @@ from pyphocorehelpers.gui.Qt.ToggleButton import ToggleButtonModel, ToggleButton
 import qtawesome as qta
 
 
+""" TODO: Refactor from pyphoplacecellanalysis\GUI\PyQtPlot\Widgets\Mixins\RenderWindowControlsMixin.py
+
+RenderWindowControlsMixin
+RenderPlaybackControlsMixin
+
+"""
+
+
 class Spike3DRasterBottomPlaybackControlBar(QWidget):
+    """ A playback bar with buttons loaded from a Qt .ui file. """
     
     def __init__(self, parent=None):
         super().__init__(parent=parent) # Call the inherited classes __init__ method
