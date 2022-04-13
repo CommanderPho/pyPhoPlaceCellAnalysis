@@ -76,12 +76,12 @@ class Spike3DRaster(TimeCurvesViewMixin, RenderTimeEpochMeshesMixin, SpikeRaster
         lines_dict[af.AlignTop | af.AlignRight] = ['TR', 
                                                    f"n_cells : {self.n_cells}",
                                                    f'render_window_duration: {self.render_window_duration}',
-                                                   f'animation_time_step: {self.animation_time_step}',
+                                                #    f'animation_time_step: {self.animation_time_step}',
                                                    f'temporal_axis_length: {self.temporal_axis_length}',
                                                    f'temporal_zoom_factor: {self.temporal_zoom_factor}']
         lines_dict[af.AlignBottom | af.AlignLeft] = ['BL', 
                                                    f'active_time_window: {self.spikes_window.active_time_window}',
-                                                   f'playback_rate_multiplier: {self.playback_rate_multiplier}'
+                                                #    f'playback_rate_multiplier: {self.playback_rate_multiplier}'
                                                    ]
         lines_dict[af.AlignBottom | af.AlignRight] = ['BR']    
         return lines_dict
