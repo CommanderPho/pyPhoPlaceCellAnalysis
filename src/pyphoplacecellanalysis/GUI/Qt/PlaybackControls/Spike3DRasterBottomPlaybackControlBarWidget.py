@@ -73,9 +73,42 @@ class Spike3DRasterBottomPlaybackControlBar(QWidget):
         self.ui.btnLeft.clicked.connect(self.on_jump_left)
         self.ui.btnRight.clicked.connect(self.on_jump_right)
         
-        self.ui.doubleSpinBoxPlaybackSpeed.setStyleSheet("alternate-background-color: rgb(255, 0, 0); selection-background-color: rgb(75, 83, 65);")
-        self.ui.spinBoxFrameJumpMultiplier.setStyleSheet("alternate-background-color: rgb(255, 0, 0); selection-background-color: rgb(75, 83, 65);")
+        # self.ui.doubleSpinBoxPlaybackSpeed.setStyleSheet("alternate-background-color: rgb(255, 0, 0); selection-background-color: rgb(75, 83, 65);")
+                    
+        # self.ui.doubleSpinBoxPlaybackSpeed.setStyleSheet("QDoubleSpinBox"
+        #                     "{"
+        #                     "border : 2px solid black;"
+        #                     "background : rgb(62, 57, 52);"
+        #                     "}"
+        #                     "QDoubleSpinBox::hover"
+        #                     "{"
+        #                     "border : 2px solid green;"
+        #                     "background : lightgreen;"
+        #                     "}"                            
+        #                     )
+        # "QDoubleSpinBox::up-arrow"
+        #                     "{"
+        #                     "border : 1px solid black;"
+        #                     "background : blue;"
+        #                     "}"
+        #                     "QDoubleSpinBox::down-arrow"
+        #                     "{"
+        #                     "border : 1px solid black;"
+        #                     "background : red;"
+        #                     "}"
+        # rgb(75, 83, 65)
         
+        # self.ui.spinBoxFrameJumpMultiplier.setStyleSheet("alternate-background-color: rgb(255, 0, 0); selection-background-color: rgb(75, 83, 65);")
+        # self.ui.spinBoxFrameJumpMultiplier.setStyleSheet("QSpinBox"
+        # "{"
+        # "background: rgb(62, 57, 52);"
+        # "}"
+        # "QSpinBox::hover"
+        # "{"
+        # "background: rgb(75, 83, 65);"
+        # "}"
+        # )
+
         
     def __str__(self):
          return 

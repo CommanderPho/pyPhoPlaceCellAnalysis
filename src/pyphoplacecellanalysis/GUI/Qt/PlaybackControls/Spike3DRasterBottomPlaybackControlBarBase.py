@@ -11,6 +11,7 @@
 from PyQt5 import QtCore, QtGui, QtWidgets
 
 
+
 class Ui_RootWidget(object):
     def setupUi(self, RootWidget):
         RootWidget.setObjectName("RootWidget")
@@ -19,7 +20,10 @@ class Ui_RootWidget(object):
 "border-color: rgb(207, 207, 207);\n"
 "background-color: rgba(71, 65, 60, 180);\n"
 "color: rgb(244, 244, 244);\n"
-"border-color: rgb(0, 0, 0);")
+"border-color: rgb(0, 0, 0);\n"
+"alternate-background-color: rgb(255, 0, 0);\n"
+"selection-background-color: rgb(75, 83, 65);\n"
+"")
         self.gridLayout = QtWidgets.QGridLayout(RootWidget)
         self.gridLayout.setContentsMargins(0, 0, 0, 0)
         self.gridLayout.setSpacing(0)
@@ -72,6 +76,20 @@ class Ui_RootWidget(object):
         self.button_play_pause.setObjectName("button_play_pause")
         self.gridLayout_2.addWidget(self.button_play_pause, 1, 0, 1, 1)
         self.doubleSpinBoxPlaybackSpeed = QtWidgets.QDoubleSpinBox(self.frame_media_control)
+        self.doubleSpinBoxPlaybackSpeed.setStyleSheet("QDoubleSpinBox {\n"
+"    background: rgb(62, 57, 52);\n"
+"};\n"
+"QDoubleSpinBox::hover {\n"
+"    background: rgb(75, 83, 65);\n"
+"};\n"
+"QDoubleSpinBox::up-arrow {\n"
+"    background: rgb(62, 57, 52);\n"
+"    color: rgb(255, 255, 255);\n"
+"};\n"
+"QDoubleSpinBox::down-arrow {\n"
+"    background: rgb(62, 57, 52);\n"
+"    color: rgb(255, 255, 255);\n"
+"};")
         self.doubleSpinBoxPlaybackSpeed.setMinimum(0.2)
         self.doubleSpinBoxPlaybackSpeed.setMaximum(6.0)
         self.doubleSpinBoxPlaybackSpeed.setProperty("value", 1.0)
@@ -99,6 +117,13 @@ class Ui_RootWidget(object):
         self.button_slow_down.setObjectName("button_slow_down")
         self.gridLayout_2.addWidget(self.button_slow_down, 1, 3, 1, 1)
         self.spinBoxFrameJumpMultiplier = QtWidgets.QSpinBox(self.frame_media_control)
+        self.spinBoxFrameJumpMultiplier.setStyleSheet("QSpinBox {\n"
+"    background: rgb(62, 57, 52);\n"
+"};\n"
+"QSpinBox::hover {\n"
+"    background: rgb(75, 83, 65);\n"
+"};\n"
+"")
         self.spinBoxFrameJumpMultiplier.setMinimum(1)
         self.spinBoxFrameJumpMultiplier.setMaximum(1000)
         self.spinBoxFrameJumpMultiplier.setObjectName("spinBoxFrameJumpMultiplier")
