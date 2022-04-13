@@ -631,6 +631,8 @@ class Spike3DRaster_Vedo(Spike3DRasterBottomFrameControlsMixin, SpikeRasterBase)
         # Helper Mixins: buildUI:
         self.ui.bottom_controls_frame, self.ui.bottom_controls_layout = self.Spike3DRasterBottomFrameControlsMixin_on_buildUI()
         
+        # TODO: Register Functions:
+        # self.ui.bottom_controls_frame.
         
         # setup self.ui.frame_layout:
         # self.ui.frame_layout.addWidget(self.ui.vtkWidget)
@@ -804,7 +806,7 @@ class Spike3DRaster_Vedo(Spike3DRasterBottomFrameControlsMixin, SpikeRasterBase)
         new_axes_x_to_time_labels = DataSeriesToSpatial.build_minute_x_tick_labels(self)
         print(f'new_axes_x_to_time_labels: {new_axes_x_to_time_labels}, global_x_start: {global_x_start}, global_x_end: {global_x_end}')
 
-        all_data_axes = Axes(all_spike_lines, xrange=[0, 15000], c='red', textScale=0.1, gridLineWidth=0.1, axesLineWidth=0.1, xTickLength=0.005*0.1, xTickThickness=0.0025*0.1,
+        all_data_axes = Axes(all_spike_lines, xrange=[0, 15000], c='white', textScale=0.1, gridLineWidth=0.1, axesLineWidth=0.1, xTickLength=0.005*0.1, xTickThickness=0.0025*0.1,
                                 xValuesAndLabels = new_axes_x_to_time_labels, useGlobal=True)
         
         all_data_axes.useBounds(False)
