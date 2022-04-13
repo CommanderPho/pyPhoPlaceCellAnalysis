@@ -20,24 +20,6 @@ from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.Mixins.RenderTimeEpochMeshesMix
 from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.Mixins.Render3DTimeCurvesMixin import TimeCurvesViewMixin
 
 
-""" 
-FPS     Milliseconds Per Frame
-20      50.00 ms
-25      40.00 ms
-30      33.34 ms
-60      16.67 ms
-"""
-
-""" For threading info see:
-    https://stackoverflow.com/questions/41526832/pyqt5-qthread-signal-not-working-gui-freeze
-
-    For PyOpenGL Requirements, see here: https://stackoverflow.com/questions/57971352/pip-install-pyopengl-accelerate-doesnt-work-on-windows-10-python-3-7 and below.
-    I found unofficial Windows builds here:
-    https://www.lfd.uci.edu/~gohlke/pythonlibs/#pyopengl
-
-    I downloaded PyOpenGL-3.1.3b2-cp37-cp37m-win_amd64.whl and PyOpenGL_accelerate-3.1.3b2-cp37-cp37m-win_amd64.whl. Next, I navigate to my Downloads folder in a Windows terminal and start the installation:
-
-"""
 
 
 """ Windowed Spiking Datasource Features
@@ -62,14 +44,6 @@ Internally it also performs the on_adjust_temporal_spatial_mapping() function to
 
 """
 
-def trap_exc_during_debug(*args):
-    # when app raises uncaught exception, print info
-    print(args)
-
-
-# install exception hook: without this, uncaught exception would cause application to exit
-sys.excepthook = trap_exc_during_debug
-
 class Spike3DRaster(TimeCurvesViewMixin, RenderTimeEpochMeshesMixin, SpikeRasterBase):
     """ Displays a 3D version of a raster plot with the spikes occuring along a plane. 
     
@@ -82,17 +56,15 @@ class Spike3DRaster(TimeCurvesViewMixin, RenderTimeEpochMeshesMixin, SpikeRaster
         spike_raster_plt = Spike3DRaster(curr_spikes_df, window_duration=4.0, window_start_time=30.0)
     """
     
-    temporal_mapping_changed = QtCore.pyqtSignal() # signal emitted when the mapping from the temporal window to the spatial layout is changed
-    close_signal = QtCore.pyqtSignal() # Called when the window is closing. 
-    
-    SpeedBurstPlaybackRate = 16.0
-    PlaybackUpdateFrequency = 0.04 # in seconds
-    
     # GUI Configuration Options:
-    WantsRenderWindowControls = True
-    WantsPlaybackControls = True
+    WantsRenderWindowControls = False
+    WantsPlaybackControls = False
     
-
+    # Application/Window Configuration Options:
+    applicationName = 'Spike3DRaster'
+    windowName = 'Spike3DRaster'
+    
+    
     @property
     def overlay_text_lines_dict(self):
         """The lines of text to be displayed in the overlay."""    
@@ -156,7 +128,9 @@ class Spike3DRaster(TimeCurvesViewMixin, RenderTimeEpochMeshesMixin, SpikeRaster
 
     def setup(self):
         # self.setup_spike_rendering_mixin() # NeuronIdentityAccessingMixin
-        self.app = pg.mkQApp("Spike3DRaster")
+        
+        # self.app = pg.mkQApp("Spike3DRaster")
+        self.app = pg.mkQApp(self.applicationName)
         
         # Configure pyqtgraph config:
         try:

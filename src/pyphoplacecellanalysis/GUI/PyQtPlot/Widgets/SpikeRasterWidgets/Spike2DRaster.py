@@ -14,16 +14,6 @@ from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.SpikeRasterWidgets.SpikeRasterB
 from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.Mixins.Render2DScrollWindowPlot import Render2DScrollWindowPlotMixin
 
 
-def trap_exc_during_debug(*args):
-    # when app raises uncaught exception, print info
-    print(args)
-
-
-# install exception hook: without this, uncaught exception would cause application to exit
-sys.excepthook = trap_exc_during_debug
-
-                
-
 class Spike2DRaster(Render2DScrollWindowPlotMixin, SpikeRasterBase):
     """ Displays a 3D version of a raster plot with the spikes occuring along a plane. 
     
@@ -36,11 +26,9 @@ class Spike2DRaster(Render2DScrollWindowPlotMixin, SpikeRasterBase):
         spike_raster_plt = Spike2DRaster(curr_spikes_df, window_duration=4.0, window_start_time=30.0)
     """
     
-    temporal_mapping_changed = QtCore.pyqtSignal() # signal emitted when the mapping from the temporal window to the spatial layout is changed
-    close_signal = QtCore.pyqtSignal() # Called when the window is closing. 
-    
-    SpeedBurstPlaybackRate = 16.0
-    PlaybackUpdateFrequency = 0.04 # in seconds
+    # Application/Window Configuration Options:
+    applicationName = 'Spike2DRaster'
+    windowName = 'Spike2DRaster'
     
     # GUI Configuration Options:
     WantsRenderWindowControls = False
@@ -87,7 +75,8 @@ class Spike2DRaster(Render2DScrollWindowPlotMixin, SpikeRasterBase):
 
     def setup(self):
         # self.setup_spike_rendering_mixin() # NeuronIdentityAccessingMixin
-        self.app = pg.mkQApp("Spike2DRaster")
+        # self.app = pg.mkQApp("Spike2DRaster")
+        self.app = pg.mkQApp(self.applicationName)
         
         # Configure pyqtgraph config:
         try:
@@ -271,18 +260,6 @@ class Spike2DRaster(Render2DScrollWindowPlotMixin, SpikeRasterBase):
         # self.ui.scroll_window_region.setRegion(updated_time_window)
         
         
-        # All units at once approach:
-        # Filter the dataframe using that column and value from the list
-        # curr_spike_t = self.active_windowed_df[self.active_windowed_df.spikes.time_variable_name].to_numpy() # this will map
-        # curr_spike_x = np.interp(curr_spike_t, (self.spikes_window.active_window_start_time, self.spikes_window.active_window_end_time), (0.0, +self.temporal_axis_length))
-        # curr_spike_y = self.active_windowed_df['visualization_raster_y_location'].to_numpy() # this will map
-        # curr_spike_pens = [self.config_unit_id_map[a_cell_id][2] for a_cell_id in self.active_windowed_df['unit_id'].to_numpy()] # get the pens for each spike from the configs map
-        # curr_n = len(curr_spike_t) # curr number of spikes
-        # curr_spike_x, curr_spike_y, curr_spike_pens, curr_n = self._build_spikes_data_values(self.active_windowed_df)
-        # self.ui.scatter_plot.setData(x=curr_spike_x, y=curr_spike_y, pen=curr_spike_pens)
-        
-        # TODO: just scroll since we set all spike data at once.
-        # pass
         
 
     @QtCore.pyqtSlot(float, float)

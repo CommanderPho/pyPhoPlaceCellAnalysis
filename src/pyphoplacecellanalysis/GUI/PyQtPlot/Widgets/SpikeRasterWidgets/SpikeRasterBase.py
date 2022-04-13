@@ -68,6 +68,30 @@ Get (earliest_datapoint_time, latest_datapoint_time) # globally, for the entire 
 
 """
 
+
+""" Initialization/Setup Call Order:
+
+In a subclasses __init__(...) function, it immediately calls its superclass (SpikeRasterBase)'s __init__(...) function. The superclass's __init__ calls the setup functions in the order listed below. The majority of the customization in the subclass should be done by overriding these methods, not doing special stuff elsewhere.
+
+
+__init__(...):
+    self.setup()
+        # In this function any special self.params values that this class needs should be set to defaults or passed-in values.
+    
+    # build the UI components:
+    self.buildUI()
+        # In buildUI() you're free to use anything setup in the self.setup() function, which has now finished executing completely.
+        self._buildGraphics()
+
+
+
+self._update_plots()
+
+
+"""
+
+
+
 def trap_exc_during_debug(*args):
     # when app raises uncaught exception, print info
     print(args)
@@ -118,7 +142,10 @@ class SpikeRasterBase(UnitSortableMixin, DataSeriesToSpatialTransformingMixin, N
     temporal_mapping_changed = QtCore.pyqtSignal() # signal emitted when the mapping from the temporal window to the spatial layout is changed
     close_signal = QtCore.pyqtSignal() # Called when the window is closing. 
     
-
+    # Application/Window Configuration Options:
+    applicationName = 'SpikeRasterBase'
+    windowName = 'SpikeRasterBase'
+    
     SpeedBurstPlaybackRate = 16.0
     PlaybackUpdateFrequency = 0.04 # in seconds
     
@@ -167,28 +194,7 @@ class SpikeRasterBase(UnitSortableMixin, DataSeriesToSpatialTransformingMixin, N
         """ Requires the self.unit_sort_order property implemented in UnitSortableMixin """
         return self.cell_ids[self.unit_sort_order]
     
-    
-    @property
-    def overlay_text_lines_dict(self):
-        """The lines of text to be displayed in the overlay."""
-        af = QtCore.Qt.AlignmentFlag
-
-        lines_dict = dict()
-        
-        lines_dict[af.AlignTop | af.AlignLeft] = ['TL']
-        lines_dict[af.AlignTop | af.AlignRight] = ['TR', 
-                                                    f"n_cells : {self.n_cells}",
-                                                    f'render_window_duration: {self.render_window_duration}',
-                                                    f'animation_time_step: {self.animation_time_step}',
-                                                    f'temporal_axis_length: {self.temporal_axis_length}',
-                                                    f'temporal_zoom_factor: {self.temporal_zoom_factor}']
-        lines_dict[af.AlignBottom | af.AlignLeft] = ['BL', 
-                                                    f'active_time_window: {self.spikes_window.active_time_window}',
-                                                    f'playback_rate_multiplier: {self.playback_rate_multiplier}'
-                                                    ]
-        lines_dict[af.AlignBottom | af.AlignRight] = ['BR']
-        return lines_dict
-
+   
     @property
     def temporal_axis_length(self):
         """The temporal_axis_length property."""
@@ -218,9 +224,6 @@ class SpikeRasterBase(UnitSortableMixin, DataSeriesToSpatialTransformingMixin, N
         self.temporal_mapping_changed.emit()
         
 
-    # def __init__(self, spikes_df, *args, window_duration=15.0, window_start_time=0.0, neuron_colors=None, neuron_sort_order=None, **kwargs):
-    #     super(SpikeRasterBase, self).__init__(*args, **kwargs)
-    
     def __init__(self, params=None, spikes_window=None, playback_controller=None, neuron_colors=None, neuron_sort_order=None, **kwargs):
         super(SpikeRasterBase, self).__init__(**kwargs)
         # Initialize member variables:
@@ -230,20 +233,11 @@ class SpikeRasterBase(UnitSortableMixin, DataSeriesToSpatialTransformingMixin, N
         self._spikes_window = spikes_window
         
         # Config
-        self.params.wantsRenderWindowControls = self.WantsRenderWindowControls
-        self.params.wantsPlaybackControls = self.WantsPlaybackControls
+        self.params.wantsRenderWindowControls = self.WantsRenderWindowControls # from RenderWindowControlsMixin
+        self.params.wantsPlaybackControls = self.WantsPlaybackControls # from RenderPlaybackControlsMixin
         
-        # self.params.wantsRenderWindowControls = SpikeRasterBase.WantsRenderWindowControls
-        # self.params.wantsPlaybackControls = SpikeRasterBase.WantsPlaybackControls
-        
-        # self.params.playback_update_frequency = SpikeRasterBase.PlaybackUpdateFrequency
-        # self.params.speedBurstPlaybackRate = SpikeRasterBase.SpeedBurstPlaybackRate
-        # self.params.is_speed_burst_mode_active = False
-        # self.params.is_playback_reversed = False
-        # self.params.animation_time_step = 0.04 
-        
-        self.params.side_bin_margins = 0.0 # space to sides of the first and last cell on the y-axis
-        
+
+        self.params.side_bin_margins = 0.0 # space to sides of the first and last cell on the y-axis        
         self.params.center_mode = 'zero_centered'
         # self.params.bin_position_mode = ''bin_center'
         self.params.bin_position_mode = 'left_edges'
@@ -277,6 +271,28 @@ class SpikeRasterBase(UnitSortableMixin, DataSeriesToSpatialTransformingMixin, N
         # self.spikes_window.window_duration_changed_signal.connect(self.on_adjust_temporal_spatial_mapping)
 
 
+    @classmethod
+    def init_from_unified_spike_raster_app(cls, unified_app, **kwargs):
+        """ Helps to create an depdendent instance of the app/window from a master UnifiedSpikeRasterApp 
+        
+        unified_app: UnifiedSpikeRasterApp
+        """
+        return cls(params=unified_app.params, spikes_window=unified_app.spikes_window, playback_controller=unified_app.playback_controller, **kwargs)
+        
+    @classmethod
+    def init_from_independent_data(cls, spikes_df, window_duration=15.0, window_start_time=0.0, neuron_colors=None, neuron_sort_order=None, **kwargs):
+        """ Helps to create an independent master instance of the app/window. """
+        # Helper container variables
+        params = VisualizationParameters('')
+        spikes_window = SpikesDataframeWindow(spikes_df, window_duration=window_duration, window_start_time=window_start_time)
+        playback_controller = TimeWindowPlaybackController()
+        # Setup the animation playback object for the time window:
+        # self.playback_controller = TimeWindowPlaybackController()
+        # self.playback_controller.setup(self._spikes_window)
+        # playback_controller.setup(self) # pass self to have properties set    
+        return cls(params=params, spikes_window=spikes_window, playback_controller=playback_controller, neuron_colors=neuron_colors, neuron_sort_order=neuron_sort_order, **kwargs)
+    
+    
     @classmethod
     def helper_setup_neuron_colors_and_order(cls, raster_plotter, neuron_colors=None, neuron_sort_order=None):
         """ 
@@ -323,29 +339,6 @@ class SpikeRasterBase(UnitSortableMixin, DataSeriesToSpatialTransformingMixin, N
         # Setup Coloring:
         raster_plotter._setup_neurons_color_data(neuron_colors, coloring_mode='color_by_index_order')
         
-
-    @classmethod
-    def init_from_unified_spike_raster_app(cls, unified_app, **kwargs):
-        """ Helps to create an depdendent instance of the app/window from a master UnifiedSpikeRasterApp 
-        
-        unified_app: UnifiedSpikeRasterApp
-        """
-        return cls(params=unified_app.params, spikes_window=unified_app.spikes_window, playback_controller=unified_app.playback_controller, **kwargs)
-        
-    @classmethod
-    def init_from_independent_data(cls, spikes_df, window_duration=15.0, window_start_time=0.0, neuron_colors=None, neuron_sort_order=None, **kwargs):
-        """ Helps to create an independent master instance of the app/window. """
-        # Helper container variables
-        params = VisualizationParameters('')
-        spikes_window = SpikesDataframeWindow(spikes_df, window_duration=window_duration, window_start_time=window_start_time)
-        playback_controller = TimeWindowPlaybackController()
-        # Setup the animation playback object for the time window:
-        # self.playback_controller = TimeWindowPlaybackController()
-        # self.playback_controller.setup(self._spikes_window)
-        # playback_controller.setup(self) # pass self to have properties set    
-        return cls(params=params, spikes_window=spikes_window, playback_controller=playback_controller, neuron_colors=neuron_colors, neuron_sort_order=neuron_sort_order, **kwargs)
-    
-    
     
     @classmethod
     def overwrite_invalid_unit_ids(cls, spikes_df, neuron_id_to_new_IDX_map):
@@ -416,27 +409,17 @@ class SpikeRasterBase(UnitSortableMixin, DataSeriesToSpatialTransformingMixin, N
         #  getting the name of a QColor with .name(QtGui.QColor.HexArgb) results in a string like '#80ff0000'
         self.params.neuron_colors_hex = [self.params.neuron_qcolors[i].name(QtGui.QColor.HexRgb) for i, cell_id in enumerate(self.unit_ids)] 
         
-        # included_cell_INDEXES = np.array([self.get_neuron_id_and_idx(neuron_id=an_included_cell_ID)[0] for an_included_cell_ID in self.spikes_df['aclu'].to_numpy()]) # get the indexes from the cellIDs
-        
-        # self.spikes_df['cell_idx'] = included_cell_INDEXES.copy()
-        # self.spikes_df['cell_idx'] = self.spikes_df['unit_id'].copy() # TODO: this is bad! The self.get_neuron_id_and_idx(...) function doesn't work!
-        
-        
-    
-
-
-
+       
 
     def setup(self):
         # self.setup_spike_rendering_mixin() # NeuronIdentityAccessingMixin
         raise NotImplementedError # Inheriting classes must override setup to perform particular setup
-        self.app = pg.mkQApp("SpikeRasterBase")
+        # self.app = pg.mkQApp("SpikeRasterBase")
+        self.app = pg.mkQApp(self.applicationName)
         
         
-    def _buildGraphics(self):
-        """ Implementors must override this method to build the main graphics object and add it at layout position (0, 0)"""
-        raise NotImplementedError
-    
+        
+
     
     def buildUI(self):
         """ for QGridLayout
@@ -467,17 +450,28 @@ class SpikeRasterBase(UnitSortableMixin, DataSeriesToSpatialTransformingMixin, N
         # Set the root (self) layout properties
         self.setLayout(self.ui.layout)
         self.resize(1920, 900)
-        self.setWindowTitle('SpikeRasterBase')
+        
+        self.setWindowTitle(self.windowName)
+        # self.setWindowTitle('SpikeRasterBase')
+        
         # Connect window update signals
         # self.spikes_window.spike_dataframe_changed_signal.connect(self.on_spikes_df_changed)
         # self.spikes_window.window_duration_changed_signal.connect(self.on_window_duration_changed)
         # self.spikes_window.window_changed_signal.connect(self.on_window_changed)
         self.spikes_window.window_updated_signal.connect(self.on_window_changed)
 
-        # self.show()
+        
+    def _buildGraphics(self):
+        """ Implementors must override this method to build the main graphics object and add it at layout position (0, 0)"""
+        raise NotImplementedError
+    
       
-      
-      
+                  
+    def _update_plots(self):
+        """ Implementor must override! """
+        raise NotImplementedError
+    
+    
     ###################################
     #### EVENT HANDLERS
     ##################################
@@ -549,9 +543,6 @@ class SpikeRasterBase(UnitSortableMixin, DataSeriesToSpatialTransformingMixin, N
         self._update_plots()
         profiler('Finished calling _update_plots()')
         
-            
-    def _update_plots(self):
-        """ Implementor must override! """
-        raise NotImplementedError
+
         
 # hih

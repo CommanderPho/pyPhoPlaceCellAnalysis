@@ -494,11 +494,16 @@ class Spike3DRaster_Vedo(SimplePlayPauseWithExternalAppMixin, Spike3DRasterBotto
     temporal_mapping_changed = QtCore.pyqtSignal() # signal emitted when the mapping from the temporal window to the spatial layout is changed
     close_signal = QtCore.pyqtSignal() # Called when the window is closing. 
     
+    # Application/Window Configuration Options:
+    applicationName = 'Spike3DRaster_Vedo'
+    windowName = 'Spike3DRaster_Vedo'
+    
     SpeedBurstPlaybackRate = 16.0
     PlaybackUpdateFrequency = 0.04 # in seconds
+    
      # GUI Configuration Options:
-    WantsRenderWindowControls = True
-    WantsPlaybackControls = True    
+    WantsRenderWindowControls = False
+    WantsPlaybackControls = False    
 
     af = QtCore.Qt.AlignmentFlag
     # a dict that maps from QtCore.Qt.AlignmentFlag to the strings that Vedo's Text2D function accepts to position text
@@ -590,8 +595,8 @@ class Spike3DRaster_Vedo(SimplePlayPauseWithExternalAppMixin, Spike3DRasterBotto
         """
         # self.setup_spike_rendering_mixin() # NeuronIdentityAccessingMixin
         
-    
-        self.app = pg.mkQApp("Spike3DRaster_Vedo")
+        # self.app = pg.mkQApp("Spike3DRaster_Vedo")
+        self.app = pg.mkQApp(self.applicationName)
         
         # Configure vedo settings:
         settings.allowInteraction = True
@@ -723,7 +728,7 @@ class Spike3DRaster_Vedo(SimplePlayPauseWithExternalAppMixin, Spike3DRasterBotto
         # Set the root (self) layout properties
         self.setLayout(self.ui.layout)
         self.resize(1920, 900)
-        self.setWindowTitle('Spike3DRaster_Vedo')
+        self.setWindowTitle(self.windowName)
         # Connect window update signals
         # self.spikes_window.spike_dataframe_changed_signal.connect(self.on_spikes_df_changed)
         # self.spikes_window.window_duration_changed_signal.connect(self.on_window_duration_changed)
