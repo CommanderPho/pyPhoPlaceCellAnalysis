@@ -10,6 +10,9 @@ class CurveDatasource(DataframeDatasource):
     
     Contains a dataframe.
     
+    Note that "data_series_specs" refers to an object of type RenderDataseries
+    
+    
     Signals:
     	source_data_changed_signal = QtCore.pyqtSignal() # signal emitted when the internal model data has changed.
     """
@@ -51,7 +54,7 @@ class CurveDatasource(DataframeDatasource):
     @property
     def active_data_column_values(self):
         """ The values of only the non-time columns """
-        map(upper, mylis)
+        # map(upper, mylis) # WTF is this?
         return self.data_column_values
     
     @property

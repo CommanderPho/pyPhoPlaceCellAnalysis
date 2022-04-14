@@ -153,5 +153,6 @@ class Specific3DTimeCurvesHelper:
         active_test_random_plot_curve_datasource = cls.build_test_3D_time_curves_datasource(active_plot_df, data_series_pre_spatial_to_spatial_mappings)
         # Add the datasource to the actual plotter object: this will cause it to build and add the 3D time curves:
         spike_raster_plt_3d.add_3D_time_curves(curve_datasource=active_test_random_plot_curve_datasource) # Add the curves from the datasource
+                
         return active_test_random_plot_curve_datasource
 

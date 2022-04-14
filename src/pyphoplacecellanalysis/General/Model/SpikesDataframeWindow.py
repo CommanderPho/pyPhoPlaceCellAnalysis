@@ -126,8 +126,7 @@ class SpikesDataframeWindow(LiveWindowedData):
         # TODO: Time window needs to be passed in or kept a reference to:
         curr_time_window = TimeWindow(window_duration=window_duration, window_start_time=window_start_time)
         spikes_dataSource = SpikesDataframeDatasource(spikes_df)
-        LiveWindowedData.__init__(self, curr_time_window, spikes_dataSource)
-        # self._liveWindowedData = LiveWindowedData(curr_time_window, spikes_dataSource)
+        LiveWindowedData.__init__(self, curr_time_window, spikes_dataSource) # Call base class
 
         # self.spikes_dataSource.source_data_changed_signal.connect(self.spike_dataframe_changed_signal)
         self.dataSource.source_data_changed_signal.connect(self.on_general_datasource_changed)

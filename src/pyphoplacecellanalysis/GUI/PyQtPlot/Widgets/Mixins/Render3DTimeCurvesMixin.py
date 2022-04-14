@@ -69,6 +69,13 @@ class TimeCurvesViewMixin:
                 # build a new CurveDatasource from the provided dataframe 
                 self.params.time_curves_datasource = CurveDatasource(plot_dataframe)
                 
+                
+        ## Connect the specs update singnal
+            
+        ## Connect the data_series_specs_changed_signal:
+        self.params.time_curves_datasource.data_series_specs_changed_signal.connect(self.TimeCurvesViewMixin_on_data_series_specs_changed)
+            
+        
         # TODO: should this really be overwritten here? Seems like previous plots should be removed first right?
         #       ## Specifically, it seems like self.clear_all_3D_time_curves() should be called if we are just going to overwrite it
         self.plots.time_curves = dict()
@@ -78,6 +85,11 @@ class TimeCurvesViewMixin:
     def detach_3d_time_curves_datasource(self):
         """ Called to remove the current time_curves_datasource. Safely removes the plot objects before doing so. """
         self.params.time_curves_no_update = True # freeze updating
+        
+        # Disconnect signals?
+        self.params.time_curves_datasource.data_series_specs_changed_signal.disconnect()
+        
+        
         self.clear_all_3D_time_curves()
         self.params.time_curves_datasource = None # clear the datasource, this will prevent plots from being re-added during the self.TimeCurvesViewMixin_on_window_update() call.     
         self.params.time_curves_no_update = False # safe to re-enable updating.
@@ -194,6 +206,12 @@ class TimeCurvesViewMixin:
     #     self.update_3D_time_curves()
     
     
+    @QtCore.pyqtSlot()
+    def TimeCurvesViewMixin_on_data_series_specs_changed(self):
+        """ called when the data series specs are udpated. """
+        self.update_3D_time_curves()
+        
+
     @QtCore.pyqtSlot(float, float)
     def TimeCurvesViewMixin_on_window_update(self, new_start=None, new_end=None):
         """ called to get the data that should be displayed for the window starting at new_start and ending at new_end """

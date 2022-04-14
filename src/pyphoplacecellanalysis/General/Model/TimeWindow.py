@@ -3,7 +3,7 @@ import numpy as np
 import pandas as pd
 from pyphocorehelpers.print_helpers import SimplePrintable, PrettyPrintable
 
-""" Windowed Datasource Features:
+""" Windowing Class Features:
 
 Transforming the events into either 2D or 3D representations for visualization should NOT be part of this class' function.
 Separate 2D and 3D event visualization functions should be made to transform events from this class into appropriate point/datastructure representations for the visualization framework being used.

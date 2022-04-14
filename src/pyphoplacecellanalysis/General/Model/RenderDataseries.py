@@ -12,6 +12,8 @@ class RenderDataseries(SimplePrintable, PrettyPrintable, QtCore.QObject):
     """ Serves as a very flexible mapping between any temporal data values and the final spatial location to render them by storing a list of configs for each series (self.data_series_config_list)
         It uses its internal pre_spatial_to_spatial_mappings (set on initialization) when self.get_data_series_spatial_values(curr_windowed_df) is called to get the spatial_values for each series from its internal non-spatial ones
     
+    NOTE: Referred to throughout the code as a "data_series_specs" object.
+    
     Known Usages:
     
         Specific3DTimeCurves
@@ -47,6 +49,7 @@ class RenderDataseries(SimplePrintable, PrettyPrintable, QtCore.QObject):
     any_expected_keys = np.array(['name','x','t','y','v_alt','z','v_main','x_map_fn','y_map_fn','z_map_fn'])
     pre_spatial_expected_keys = np.array(['name','t','v_alt','v_main'])
     spatial_expected_keys = np.array(['name','x','y','z'])
+    
     
     def __init__(self, direct_spatial_data_series_list=None, pre_spatial_data_series_list=None, pre_spatial_to_spatial_mappings=None):
         # Initialize the datasource as a QObject
