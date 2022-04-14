@@ -69,6 +69,8 @@ class TimeCurvesViewMixin:
                 # build a new CurveDatasource from the provided dataframe 
                 self.params.time_curves_datasource = CurveDatasource(plot_dataframe)
                 
+        # TODO: should this really be overwritten here? Seems like previous plots should be removed first right?
+        #       ## Specifically, it seems like self.clear_all_3D_time_curves() should be called if we are just going to overwrite it
         self.plots.time_curves = dict()
         self.update_3D_time_curves()
 
@@ -82,7 +84,7 @@ class TimeCurvesViewMixin:
         
         
     def clear_all_3D_time_curves(self):
-        for (UID, plt) in self.plots.time_curves.items():
+        for (aUID, plt) in self.plots.time_curves.items():
             self.ui.main_gl_widget.removeItem(plt)
             # plt.delete_later() #?
         # Clear the dict
@@ -122,8 +124,8 @@ class TimeCurvesViewMixin:
         else:
             # plot doesn't exist, built it fresh.
             # plt = gl.GLLinePlotItem(pos=points, color=pg.mkColor('white'), width=0.5, antialias=True)
-            plt = gl.GLLinePlotItem(pos=points, color=pg.mkColor(plot_args['color_name']), width=plot_args['line_width'], antialias=True)
-            plt.scale(1.0, 1.0, plot_args['z_scaling_factor']) # Scale the data_values_range to fit within the z_max_value. Shouldn't need to be adjusted so long as data doesn't change.            
+            plt = gl.GLLinePlotItem(pos=points, color=pg.mkColor(plot_args.setdefault('color_name', 'white')), width=plot_args.setdefault('line_width',0.5), antialias=True)
+            plt.scale(1.0, 1.0, plot_args.setdefault('z_scaling_factor',1.0)) # Scale the data_values_range to fit within the z_max_value. Shouldn't need to be adjusted so long as data doesn't change.            
             # plt.scale(1.0, 1.0, self.data_z_scaling_factor) # Scale the data_values_range to fit within the z_max_value. Shouldn't need to be adjusted so long as data doesn't change.
             self.ui.main_gl_widget.addItem(plt)
             self.plots.time_curves[plot_name] = plt # add it to the dictionary.
@@ -158,7 +160,7 @@ class TimeCurvesViewMixin:
                     # Get the current series:
                     curr_data_series_dict = data_series_spaital_values_list[curr_data_series_index]
                     
-                    curr_plot_column_name = curr_data_series_dict.get('name', f'series[{curr_data_series_index}]')
+                    curr_plot_column_name = curr_data_series_dict.get('name', f'series[{curr_data_series_index}]') # get either the specified name or the generic 'series[i]' name otherwise
                     curr_plot_name = self.params.time_curves_datasource.datasource_UIDs[curr_data_series_index]
                     # points for the current plot:
                     pts = np.column_stack([curr_data_series_dict['x'], curr_data_series_dict['y'], curr_data_series_dict['z']])
