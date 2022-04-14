@@ -9,7 +9,12 @@ from pyphoplacecellanalysis.General.DataSeriesToSpatial import DataSeriesToSpati
 
 
 class RenderDataseries(SimplePrintable, PrettyPrintable, QtCore.QObject):
-    """ 
+    """ Serves as a very flexible mapping between any temporal data values and the final spatial location to render them by storing a list of configs for each series (self.data_series_config_list)
+    
+    
+    It uses its internal pre_spatial_to_spatial_mappings (set on initialization) when self.get_data_series_spatial_values(curr_windowed_df) is called to get the spatial_values for each series from its internal non-spatial ones
+    
+    
     
     Known Usages:
     
@@ -85,12 +90,14 @@ class RenderDataseries(SimplePrintable, PrettyPrintable, QtCore.QObject):
       
       
     def get_data_series_spatial_values(self, curr_windowed_df):
+        """ uses its internal configuration to get the appropriate values for each of its series from the passed in curr_windowed_df, converting them to spatial values if needed. """
         if self.direct_spatial_data_series_list is not None:
             # Use direct spatial dataseries list (no mapping needed)
             data_series_spaital_values_list = RenderDataseries._get_spatial_data_series_values(curr_windowed_df, self.direct_spatial_data_series_list)
         else:           
-            # perfrom the mapping from pre_spatial_values to spatial_values
+            # First get the pre_spatial_values from the curr_windowed_df
             data_series_pre_spatial_values_list = RenderDataseries._get_data_series_pre_spatial_values(curr_windowed_df, self.data_series_pre_spatial_list)
+            # Finally, perfrom the mapping from the pre_spatial_values to spatial_values
             data_series_spaital_values_list = RenderDataseries._evaluate_spatial_values_from_pre_spatial_values(data_series_pre_spatial_values_list, self.data_series_pre_spatial_to_spatial_mappings)
         return data_series_spaital_values_list
     

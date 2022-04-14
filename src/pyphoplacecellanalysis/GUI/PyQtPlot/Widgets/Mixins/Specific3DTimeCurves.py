@@ -37,8 +37,8 @@ class Specific3DTimeCurvesHelper:
         mua_plot_df = pd.DataFrame({'t': curr_sess.mua.time, 'mua_firing_rate': curr_sess.mua.firing_rate, 'mua_spike_counts': curr_sess.mua.spike_counts}).copy()
         # Mappings from the pre-spatial values to the spatial values:
         x_map_fn = lambda t: spike_raster_plt_3d.temporal_to_spatial(t)
-        y_map_fn = lambda v: np.full_like(v, -spike_raster_plt_3d.n_half_cells)
-        z_map_fn = lambda v_main: v_main
+        y_map_fn = lambda v: np.full_like(v, -spike_raster_plt_3d.n_half_cells) # This is what places all values along the back wall
+        z_map_fn = lambda v_main: v_main # returns the un-transformed primary value
         data_series_pre_spatial_to_spatial_mappings = [{'name':'name','x':'t','y':'v_alt','z':'v_main','x_map_fn':x_map_fn,'y_map_fn':y_map_fn,'z_map_fn':z_map_fn},
                                 {'name':'name','x':'t','y':'v_alt','z':'v_main','x_map_fn':x_map_fn,'y_map_fn':y_map_fn,'z_map_fn':z_map_fn}]
         
