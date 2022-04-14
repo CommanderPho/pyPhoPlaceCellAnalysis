@@ -10,11 +10,7 @@ from pyphoplacecellanalysis.General.DataSeriesToSpatial import DataSeriesToSpati
 
 class RenderDataseries(SimplePrintable, PrettyPrintable, QtCore.QObject):
     """ Serves as a very flexible mapping between any temporal data values and the final spatial location to render them by storing a list of configs for each series (self.data_series_config_list)
-    
-    
-    It uses its internal pre_spatial_to_spatial_mappings (set on initialization) when self.get_data_series_spatial_values(curr_windowed_df) is called to get the spatial_values for each series from its internal non-spatial ones
-    
-    
+        It uses its internal pre_spatial_to_spatial_mappings (set on initialization) when self.get_data_series_spatial_values(curr_windowed_df) is called to get the spatial_values for each series from its internal non-spatial ones
     
     Known Usages:
     

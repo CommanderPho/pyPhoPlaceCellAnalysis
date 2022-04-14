@@ -130,6 +130,7 @@ class Specific3DTimeCurvesHelper:
             return test_data_random_df
 
         if test_data_random_df is not None:
+            # If the passed-in argument is valid (not None), use that instead of generating a new random one.
             active_plot_df = test_data_random_df.copy()
         else:
             # otherwise generate a new random dataframe
@@ -137,7 +138,7 @@ class Specific3DTimeCurvesHelper:
             active_plot_df = _generate_sample_random_data_series(test_data_start_t, test_data_end_t, sample_rate_sec = 0.25, n_value_columns = 15)
         
         # Mappings from the pre-spatial values to the spatial values:
-        x_map_fn = lambda t: spike_raster_plt_3d.temporal_to_spatial(t)
+        x_map_fn = lambda t: spike_raster_plt_3d.temporal_to_spatial(t) # returns the x-values, transforming from the times t appropriately.
         # y_map_fn = lambda v: np.full_like(v, -spike_raster_plt_3d.n_half_cells) # This is what places all values along the back wall
         z_map_fn = lambda v_main: v_main # returns the un-transformed primary value
         
