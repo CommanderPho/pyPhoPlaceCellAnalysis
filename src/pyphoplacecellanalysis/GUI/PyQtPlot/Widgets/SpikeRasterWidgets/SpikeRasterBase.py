@@ -270,8 +270,10 @@ class SpikeRasterBase(UnitSortableMixin, DataSeriesToSpatialTransformingMixin, N
         # self.temporal_mapping_changed.connect(self.on_adjust_temporal_spatial_mapping)
         # self.spikes_window.window_duration_changed_signal.connect(self.on_adjust_temporal_spatial_mapping)
         
+        ## TODO: BUG: MAJOR: Since the application instance is being assigned to self.app (for any of the widgets that create it) I think that aboutToQuit is called any time any of the widgets are going to close. Although I guess that doesn't explain the errors.
+        
         # Connect app quit to onClose event:
-        self.app.aboutToQuit.connect(self.onClose) # Connect the onClose event
+        # self.app.aboutToQuit.connect(self.onClose) # Connect the onClose event
         
 
     @classmethod
@@ -486,6 +488,8 @@ class SpikeRasterBase(UnitSortableMixin, DataSeriesToSpatialTransformingMixin, N
     
     
     def closeEvent(self, event):
+        """closeEvent(self, event): pyqt default event, doesn't have to be registered. Called when the widget will close.
+        """
         reply = QtWidgets.QMessageBox.question(self, 'Window Close', 'Are you sure you want to close the window?',
                 QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No, QtWidgets.QMessageBox.No)
 
@@ -499,7 +503,9 @@ class SpikeRasterBase(UnitSortableMixin, DataSeriesToSpatialTransformingMixin, N
 
     # @QtCore.pyqtSlot()
     def onClose(self):
+        ## TODO: this seems to get called excessively, at least for Spike3DRaster. It happens even when accessing invalid properties and stuff. Not sure what's up, something is broken.
         print(f'onClose()')
+        
         self.debug_print_instance_info()
         self.close_signal.emit() # emit to indicate that we're closing this window
 
