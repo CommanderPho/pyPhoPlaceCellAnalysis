@@ -273,11 +273,11 @@ class Spike3DRaster(TimeCurvesViewMixin, RenderTimeEpochMeshesMixin, SpikeRaster
         
         # build the position range for each unit along the y-axis:
         # rebuild the position range for each unit along the y-axis:
-        self.y = DataSeriesToSpatial.build_series_identity_axis(self.n_cells, center_mode=self.params.center_mode, bin_position_mode=self.params.bin_position_mode, side_bin_margins = self.params.side_bin_margins)
-        self.y = self.y[self.unit_sort_order] # re-sort the y-values by the unit_sort_order
+        self.update_series_identity_y_values()
+        # self.series_identity_y_values = self.series_identity_y_values[self.unit_sort_order] # re-sort the y-values by the unit_sort_order
         # TODO: convert to using self.unit_id_to_spatial(...)
         
-        self._build_neuron_id_graphics(self.ui.main_gl_widget, self.y)
+        self._build_neuron_id_graphics(self.ui.main_gl_widget, self.series_identity_y_values)
         
         # Plot each unit one at a time:
         for i, a_unit_id in enumerate(self.unit_ids):
@@ -290,8 +290,12 @@ class Spike3DRaster(TimeCurvesViewMixin, RenderTimeEpochMeshesMixin, SpikeRaster
             curr_cell_df = self.active_windowed_df[self.active_windowed_df['unit_id']==a_unit_id].copy() # is .copy() needed here since nothing is updated???
             # curr_unit_id = curr_cell_df['unit_id'].to_numpy() # this will map to the y position
             curr_spike_t = curr_cell_df[curr_cell_df.spikes.time_variable_name].to_numpy() # this will map 
-            yi = self.y[i] # get the correct y-position for all spikes of this cell
+            
+            # yi = self.series_identity_y_values[i] # get the correct y-position for all spikes of this cell
+            yi = self.unit_id_to_spatial(a_unit_id)
+            # self.unit_ids
             # print(f'cell_id: {cell_id}, yi: {yi}')
+            
             # map the current spike times back onto the range of the window's (-half_render_window_duration, +half_render_window_duration) so they represent the x coordinate
             curr_x = DataSeriesToSpatial.temporal_to_spatial_map(curr_spike_t, self.spikes_window.active_window_start_time, self.spikes_window.active_window_end_time, self.temporal_axis_length, center_mode='zero_centered')
             curr_paired_x = np.squeeze(interleave_elements(np.atleast_2d(curr_x).T, np.atleast_2d(curr_x).T))
@@ -325,9 +329,12 @@ class Spike3DRaster(TimeCurvesViewMixin, RenderTimeEpochMeshesMixin, SpikeRaster
         """ transforms the unit_ids in unit_ids to a spatial offset (such as the y-positions for a 3D raster plot) """
         # build the position range for each unit along the y-axis:
         # rebuild the position range for each unit along the y-axis:
-        self.y = DataSeriesToSpatial.build_series_identity_axis(self.n_cells, center_mode=self.params.center_mode, bin_position_mode=self.params.bin_position_mode, side_bin_margins = self.params.side_bin_margins)
-        self.y = self.y[self.unit_sort_order] # re-sort the y-values by the unit_sort_order
-        return self.y[unit_ids]
+        if self.series_identity_y_values is None:
+            # rebuild self.series_identity_y_values
+            self.update_series_identity_y_values()
+    
+        unit_id_series_indicies = self.unit_sort_order[unit_ids] # get the appropriate series index for each unit_id given their sort order
+        return self.series_identity_y_values[unit_id_series_indicies]
         
 
     def _build_neuron_id_graphics(self, w, y_pos):
@@ -363,7 +370,7 @@ class Spike3DRaster(TimeCurvesViewMixin, RenderTimeEpochMeshesMixin, SpikeRaster
         """ updates the text items to indicate the neuron ID for each neuron in the df. """
         all_cell_ids = self.cell_ids
         assert len(self.ui.glCellIdTextItems) == len(all_cell_ids), f"we should already have correct number of neuron ID text items, but len(self.ui.glCellIdTextItems): {len(self.ui.glCellIdTextItems)} and len(all_cell_ids): {len(all_cell_ids)}!"
-        assert len(self.ui.glCellIdTextItems) == len(self.y), f"we should already have correct number of neuron ID text items, but len(self.ui.glCellIdTextItems): {len(self.ui.glCellIdTextItems)} and len(self.y): {len(self.y)}!"
+        assert len(self.ui.glCellIdTextItems) == len(self.series_identity_y_values), f"we should already have correct number of neuron ID text items, but len(self.ui.glCellIdTextItems): {len(self.ui.glCellIdTextItems)} and len(self.y): {len(self.series_identity_y_values)}!"
         # all_unit_ids = [self.unit_id_to_cell_id_map[a_cell_id] for a_cell_id in all_cell_ids] # get the list of all unit_ids
         
         for i, cell_id in enumerate(all_cell_ids):
@@ -380,7 +387,8 @@ class Spike3DRaster(TimeCurvesViewMixin, RenderTimeEpochMeshesMixin, SpikeRaster
             
             curr_color.setAlphaF(1.0)
             curr_id_txtitem = self.ui.glCellIdTextItems[i]
-            curr_id_txtitem.setData(pos=(self.side_wall_x, self.y[i], (self.floor_z - 0.5)), color=curr_color) # TODO: could update color as well
+            curr_id_txtitem.setData(pos=(self.side_wall_x, self.unit_id_to_spatial(a_unit_id), (self.floor_z - 0.5)), color=curr_color) # TODO: could update color as well
+            
             # curr_id_txtitem.resetTransform()
             # curr_id_txtitem.translate(self.near_wall_x, self.y[i], (self.z_floor - 0.5))
 
@@ -429,6 +437,7 @@ class Spike3DRaster(TimeCurvesViewMixin, RenderTimeEpochMeshesMixin, SpikeRaster
         # self.ui.z_txtitem.translate(self.near_wall_x, -self.n_half_cells, (self.z_floor + -0.5))
         self.ui.z_txtitem.setData(pos=(self.side_wall_x, -self.n_half_cells, (self.floor_z + -0.5)))
         
+        self.update_series_identity_y_values()
         self._update_neuron_id_graphics()
 
 
@@ -464,7 +473,8 @@ class Spike3DRaster(TimeCurvesViewMixin, RenderTimeEpochMeshesMixin, SpikeRaster
             
             curr_unit_n_spikes = len(curr_spike_t)
             
-            yi = self.y[i] # get the correct y-position for all spikes of this cell
+            yi = self.unit_id_to_spatial(a_unit_id)
+            # yi = self.series_identity_y_values[i] # get the correct y-position for all spikes of this cell
             # map the current spike times back onto the range of the window's (-half_render_window_duration, +half_render_window_duration) so they represent the x coordinate
             curr_x = DataSeriesToSpatial.temporal_to_spatial_map(curr_spike_t, self.spikes_window.active_window_start_time, self.spikes_window.active_window_end_time, self.temporal_axis_length, center_mode='zero_centered')
             # curr_paired_x = np.squeeze(interleave_elements(np.atleast_2d(curr_x).T, np.atleast_2d(curr_x).T))
@@ -540,8 +550,8 @@ class Spike3DRaster(TimeCurvesViewMixin, RenderTimeEpochMeshesMixin, SpikeRaster
         print(f'unit_sort_order_changed_signal(new_sort_order: {new_sort_order})')
         
         # rebuild the position range for each unit along the y-axis:
-        self.y = DataSeriesToSpatial.build_series_identity_axis(self.n_cells, center_mode=self.params.center_mode, bin_position_mode=self.params.bin_position_mode, side_bin_margins = self.params.side_bin_margins)
-        self.y = self.y[self.unit_sort_order] # re-sort the y-values by the unit_sort_order
+        self.series_identity_y_values = DataSeriesToSpatial.build_series_identity_axis(self.n_cells, center_mode=self.params.center_mode, bin_position_mode=self.params.bin_position_mode, side_bin_margins = self.params.side_bin_margins)
+        self.series_identity_y_values = self.series_identity_y_values[self.unit_sort_order] # re-sort the y-values by the unit_sort_order
         
         self._update_neuron_id_graphics() # rebuild the text labels
         self._update_plots()
