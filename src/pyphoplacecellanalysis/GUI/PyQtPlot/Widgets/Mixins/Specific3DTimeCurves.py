@@ -106,7 +106,7 @@ class Specific3DTimeCurvesHelper:
         # iterate through the data columns and build the configs from the names with default properties:
         valid_data_values_column_names = test_data_random_df.columns[1:]
         
-        active_data_series_pre_spatial_list = [{'name':data_col_name,'t':'t','v_alt':None,'v_main':data_col_name,'color_name':'white', 'line_width':2.0, 'z_scaling_factor':1.0}                                              
+        active_data_series_pre_spatial_list = [{'name':data_col_name,'t':'t','v_alt':None,'v_main':data_col_name,'color_name':'white', 'line_width': 1.0, 'z_scaling_factor':1.0}                                              
                                                for data_col_name in list(valid_data_values_column_names)]
         if debug_print:
             print(f'pre_spatial_to_spatial_mappings: {len(pre_spatial_to_spatial_mappings)}\nvalid_data_values_column_names: {valid_data_values_column_names}\nlen(active_data_series_pre_spatial_list): {len(active_data_series_pre_spatial_list)}')

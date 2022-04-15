@@ -139,8 +139,15 @@ class TimeCurvesViewMixin:
             plt.setData(pos=points)
         else:
             # plot doesn't exist, built it fresh.
+            
+            line_color = plot_args.get('color', None)
+            if line_color is None:
+                # if no explicit color value is provided, build a new color from the 'color_name' key, or if that's missing just use white.
+                line_color = pg.mkColor(plot_args.setdefault('color_name', 'white'))
+                line_color.setAlphaF(0.8)
+                
             # plt = gl.GLLinePlotItem(pos=points, color=pg.mkColor('white'), width=0.5, antialias=True)
-            plt = gl.GLLinePlotItem(pos=points, color=pg.mkColor(plot_args.setdefault('color_name', 'white')), width=plot_args.setdefault('line_width',0.5), antialias=True)
+            plt = gl.GLLinePlotItem(pos=points, color=line_color, width=plot_args.setdefault('line_width',0.5), antialias=True)
             plt.scale(1.0, 1.0, plot_args.setdefault('z_scaling_factor',1.0)) # Scale the data_values_range to fit within the z_max_value. Shouldn't need to be adjusted so long as data doesn't change.            
             # plt.scale(1.0, 1.0, self.data_z_scaling_factor) # Scale the data_values_range to fit within the z_max_value. Shouldn't need to be adjusted so long as data doesn't change.
             self.ui.main_gl_widget.addItem(plt)
