@@ -140,7 +140,7 @@ class Specific3DTimeCurvesHelper:
         # Mappings from the pre-spatial values to the spatial values:
         x_map_fn = lambda t: spike_raster_plt_3d.temporal_to_spatial(t) # returns the x-values, transforming from the times t appropriately.
         # y_map_fn = lambda v: np.full_like(v, -spike_raster_plt_3d.n_half_cells) # This is what places all values along the back wall
-        z_map_fn = lambda v_main: v_main # returns the un-transformed primary value
+        z_map_fn = lambda v_main: v_main + spike_raster_plt_3d.floor_z # returns the un-transformed primary value
         
         ## we want each test curve to be rendered with a unit_id (series of spikes), so we'll need custom y_map_fn's for each column
         num_t_points = np.shape(active_plot_df)[0]
@@ -149,7 +149,9 @@ class Specific3DTimeCurvesHelper:
         ## want a separate y_map_fn for each data series so it returns the correct index
         # lambda v: np.full_like(v, -spike_raster_plt_3d.n_half_cells)
         # data_series_pre_spatial_to_spatial_mappings = [{'name':'name','x':'t','y':'v_alt','z':'v_main','x_map_fn':x_map_fn,'y_map_fn':y_map_fn,'z_map_fn':z_map_fn} for i in np.arange(1, n_value_columns)]
-        data_series_pre_spatial_to_spatial_mappings = [{'name':'name','x':'t','y':'v_alt','z':'v_main','x_map_fn':x_map_fn,'y_map_fn':(lambda v, bound_i=i: np.full_like(v, bound_i)),'z_map_fn':z_map_fn} for i in np.arange(n_value_columns)]
+        # data_series_pre_spatial_to_spatial_mappings = [{'name':'name','x':'t','y':'v_alt','z':'v_main','x_map_fn':x_map_fn,'y_map_fn':(lambda v, bound_i=i: np.full_like(v, bound_i)),'z_map_fn':z_map_fn} for i in np.arange(n_value_columns)]
+        data_series_pre_spatial_to_spatial_mappings = [{'name':'name','x':'t','y':'v_alt','z':'v_main','x_map_fn':x_map_fn,'y_map_fn':(lambda v, bound_i=i: np.full_like(v, spike_raster_plt_3d.unit_id_to_spatial(bound_i))),'z_map_fn':z_map_fn} for i in np.arange(n_value_columns)]
+        
         active_test_random_plot_curve_datasource = cls.build_test_3D_time_curves_datasource(active_plot_df, data_series_pre_spatial_to_spatial_mappings)
         # Add the datasource to the actual plotter object: this will cause it to build and add the 3D time curves:
         spike_raster_plt_3d.add_3D_time_curves(curve_datasource=active_test_random_plot_curve_datasource) # Add the curves from the datasource
