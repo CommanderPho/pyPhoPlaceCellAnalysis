@@ -95,14 +95,20 @@ class Spike3DRaster(TimeCurvesViewMixin, RenderTimeEpochMeshesMixin, SpikeRaster
         return self._axes_walls_z_height
     
     @property
-    def z_floor(self):
+    def floor_z(self):
         """The offset of the floor in the z-axis."""
         return -10
     
     @property
-    def y_backwall(self):
+    def back_wall_y(self):
         """The y position location of the green back (Y=0) axes wall plane."""
         return self.n_half_cells
+    
+    
+    @property
+    def side_wall_x(self):
+        """The x position of the nearest wall (the side wall, not the back wall) """
+        return -self.half_temporal_axis_length
     
     
     def __init__(self, params=None, spikes_window=None, playback_controller=None, neuron_colors=None, neuron_sort_order=None, **kwargs):
@@ -205,11 +211,11 @@ class Spike3DRaster(TimeCurvesViewMixin, RenderTimeEpochMeshesMixin, SpikeRaster
         x_color = (255, 155, 155, 76.5)
         self.ui.gx = gl.GLGridItem(color=x_color) # 'x' plane, red
         self.ui.gx.rotate(90, 0, 1, 0)
-        self.ui.gx.translate(-self.half_temporal_axis_length, 0, 0) # shift backwards
+        self.ui.gx.translate(self.side_wall_x, 0, 0) # shift backwards
         self.ui.gx.setSize(20, self.n_full_cell_grid) # std size in z-dir, n_cell size across
         self.ui.gx.setSpacing(10.0, 1) 
         self.ui.main_gl_widget.addItem(self.ui.gx)
-        self.ui.x_txtitem = gl.GLTextItem(pos=(-self.half_temporal_axis_length, self.n_half_cells, 0.0), text='x', color=x_color) # The axis label text 
+        self.ui.x_txtitem = gl.GLTextItem(pos=(self.side_wall_x, self.n_half_cells, 0.0), text='x', color=x_color) # The axis label text 
         self.ui.main_gl_widget.addItem(self.ui.x_txtitem)
 
         # Y-plane:
@@ -227,12 +233,12 @@ class Spike3DRaster(TimeCurvesViewMixin, RenderTimeEpochMeshesMixin, SpikeRaster
         # XY-plane (with normal in z-dir):
         z_color = (155, 155, 255, 76.5)
         self.ui.gz = gl.GLGridItem(color=z_color) # 'z' plane, blue
-        self.ui.gz.translate(0, 0, self.z_floor) # Shift down by 10 units in the z-dir
+        self.ui.gz.translate(0, 0, self.floor_z) # Shift down by 10 units in the z-dir
         self.ui.gz.setSize(self.temporal_axis_length, self.n_full_cell_grid)
         self.ui.gz.setSpacing(20.0, 1)
         # gz.setSize(n_full_cell_grid, n_full_cell_grid)
         self.ui.main_gl_widget.addItem(self.ui.gz)
-        self.ui.z_txtitem = gl.GLTextItem(pos=(-self.half_temporal_axis_length, -self.n_half_cells, (self.z_floor + 0.5)), text='z', color=z_color)  # The axis label text 
+        self.ui.z_txtitem = gl.GLTextItem(pos=(self.side_wall_x, -self.n_half_cells, (self.floor_z + 0.5)), text='z', color=z_color)  # The axis label text 
         self.ui.main_gl_widget.addItem(self.ui.z_txtitem)
         
         
@@ -247,6 +253,7 @@ class Spike3DRaster(TimeCurvesViewMixin, RenderTimeEpochMeshesMixin, SpikeRaster
         # rebuild the position range for each unit along the y-axis:
         self.y = DataSeriesToSpatial.build_series_identity_axis(self.n_cells, center_mode=self.params.center_mode, bin_position_mode=self.params.bin_position_mode, side_bin_margins = self.params.side_bin_margins)
         self.y = self.y[self.unit_sort_order] # re-sort the y-values by the unit_sort_order
+        # TODO: convert to using self.unit_id_to_spatial(...)
         
         self._build_neuron_id_graphics(self.ui.main_gl_widget, self.y)
         
@@ -290,6 +297,17 @@ class Spike3DRaster(TimeCurvesViewMixin, RenderTimeEpochMeshesMixin, SpikeRaster
             self.ui.gl_line_plots.append(plt)
 
 
+    ## Required for DataSeriesToSpatialTransformingMixin
+    # TODO: convert all instances of self.y[i], etc into using self.unit_id_to_spatial(...)
+    def unit_id_to_spatial(self, unit_ids):
+        """ transforms the unit_ids in unit_ids to a spatial offset (such as the y-positions for a 3D raster plot) """
+        # build the position range for each unit along the y-axis:
+        # rebuild the position range for each unit along the y-axis:
+        self.y = DataSeriesToSpatial.build_series_identity_axis(self.n_cells, center_mode=self.params.center_mode, bin_position_mode=self.params.bin_position_mode, side_bin_margins = self.params.side_bin_margins)
+        self.y = self.y[self.unit_sort_order] # re-sort the y-values by the unit_sort_order
+        return self.y[unit_ids]
+        
+
     def _build_neuron_id_graphics(self, w, y_pos):
         """ builds the text items to indicate the neuron ID for each neuron in the df. """
         all_cell_ids = self.cell_ids
@@ -313,7 +331,7 @@ class Spike3DRaster(TimeCurvesViewMixin, RenderTimeEpochMeshesMixin, SpikeRaster
             # curr_color = self.params.neuron_qcolors[i]
             curr_color.setAlphaF(1.0)
             # print(f'cell_id: {cell_id}, curr_color: {curr_color.alpha()}')
-            curr_id_txtitem = gl.GLTextItem(pos=(-self.half_temporal_axis_length, y_pos[i], (self.z_floor - 0.5)), text=f'{cell_id}', color=curr_color, font=cell_id_text_item_font)
+            curr_id_txtitem = gl.GLTextItem(pos=(self.side_wall_x, y_pos[i], (self.floor_z - 0.5)), text=f'{cell_id}', color=curr_color, font=cell_id_text_item_font)
             w.addItem(curr_id_txtitem) # add to the current widget
             # add to the cell_ids array
             self.ui.glCellIdTextItems.append(curr_id_txtitem)
@@ -340,9 +358,9 @@ class Spike3DRaster(TimeCurvesViewMixin, RenderTimeEpochMeshesMixin, SpikeRaster
             
             curr_color.setAlphaF(1.0)
             curr_id_txtitem = self.ui.glCellIdTextItems[i]
-            curr_id_txtitem.setData(pos=(-self.half_temporal_axis_length, self.y[i], (self.z_floor - 0.5)), color=curr_color) # TODO: could update color as well
+            curr_id_txtitem.setData(pos=(self.side_wall_x, self.y[i], (self.floor_z - 0.5)), color=curr_color) # TODO: could update color as well
             # curr_id_txtitem.resetTransform()
-            # curr_id_txtitem.translate(-self.half_temporal_axis_length, self.y[i], (self.z_floor - 0.5))
+            # curr_id_txtitem.translate(self.near_wall_x, self.y[i], (self.z_floor - 0.5))
 
     # def _build_axes_arrow_graphics(self, w):
         
@@ -368,11 +386,11 @@ class Spike3DRaster(TimeCurvesViewMixin, RenderTimeEpochMeshesMixin, SpikeRaster
         # Adjust the three axes planes:
         self.ui.gx.resetTransform()
         self.ui.gx.rotate(90, 0, 1, 0)
-        self.ui.gx.translate(-self.half_temporal_axis_length, 0, 0) # shift backwards
+        self.ui.gx.translate(self.side_wall_x, 0, 0) # shift backwards
         self.ui.gx.setSize(20, self.n_full_cell_grid) # std size in z-dir, n_cell size across
         # self.ui.x_txtitem.resetTransform()
-        # self.ui.x_txtitem.translate(-self.half_temporal_axis_length, self.n_half_cells, 0.0)
-        self.ui.x_txtitem.setData(pos=(-self.half_temporal_axis_length, self.n_half_cells, 0.0))
+        # self.ui.x_txtitem.translate(self.near_wall_x, self.n_half_cells, 0.0)
+        self.ui.x_txtitem.setData(pos=(self.side_wall_x, self.n_half_cells, 0.0))
         
         self.ui.gy.resetTransform()
         self.ui.gy.rotate(90, 1, 0, 0)
@@ -383,11 +401,11 @@ class Spike3DRaster(TimeCurvesViewMixin, RenderTimeEpochMeshesMixin, SpikeRaster
         self.ui.y_txtitem.setData(pos=(self.half_temporal_axis_length+0.5, -self.n_half_cells, 0.0))
         
         self.ui.gz.resetTransform()
-        self.ui.gz.translate(0, 0, self.z_floor) # Shift down by 10 units in the z-dir
+        self.ui.gz.translate(0, 0, self.floor_z) # Shift down by 10 units in the z-dir
         self.ui.gz.setSize(self.temporal_axis_length, self.n_full_cell_grid)
         # self.ui.z_txtitem.resetTransform()
-        # self.ui.z_txtitem.translate(-self.half_temporal_axis_length, -self.n_half_cells, (self.z_floor + -0.5))
-        self.ui.z_txtitem.setData(pos=(-self.half_temporal_axis_length, -self.n_half_cells, (self.z_floor + -0.5)))
+        # self.ui.z_txtitem.translate(self.near_wall_x, -self.n_half_cells, (self.z_floor + -0.5))
+        self.ui.z_txtitem.setData(pos=(self.side_wall_x, -self.n_half_cells, (self.floor_z + -0.5)))
         
         self._update_neuron_id_graphics()
 
