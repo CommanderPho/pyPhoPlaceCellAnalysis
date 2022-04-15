@@ -130,6 +130,12 @@ class UnitSortableMixin:
 class SpikeRasterBase(UnitSortableMixin, DataSeriesToSpatialTransformingMixin, NeuronIdentityAccessingMixin, SpikeRenderingBaseMixin, SpikesWindowOwningMixin, SpikesDataframeOwningMixin, TimeWindowPlaybackPropertiesMixin, RenderPlaybackControlsMixin, RenderWindowControlsMixin, QtWidgets.QWidget):
     """ Displays a raster plot with the spikes occuring along a plane. 
     
+    Note: unit_ids: sequentially increasing sequence starting from 0 and going to n_cells - 1. No elements missing:
+    unit_ids: [ 0  1  2  3  4  5  6  7  8  9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39]
+    cell_ids: the actual aclu values:
+    cell_ids: [ 2  3  4  5  7  8  9 10 11 12 14 17 18 21 22 23 24 25 26 27 28 29 33 34 38 39 42 44 45 46 47 48 53 55 57 58 61 62 63 64]
+    neuron_ids: ALIAS for cell_ids
+    
     Usage:
         from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.SpikeRasterWidgets.Spike3DRaster import Spike3DRaster
         curr_epoch_name = 'maze1'
@@ -145,6 +151,8 @@ class SpikeRasterBase(UnitSortableMixin, DataSeriesToSpatialTransformingMixin, N
     # Application/Window Configuration Options:
     applicationName = 'SpikeRasterBase'
     windowName = 'SpikeRasterBase'
+    
+    enable_window_close_confirmation = False
     
     SpeedBurstPlaybackRate = 16.0
     PlaybackUpdateFrequency = 0.04 # in seconds
@@ -490,9 +498,12 @@ class SpikeRasterBase(UnitSortableMixin, DataSeriesToSpatialTransformingMixin, N
     def closeEvent(self, event):
         """closeEvent(self, event): pyqt default event, doesn't have to be registered. Called when the widget will close.
         """
-        reply = QtWidgets.QMessageBox.question(self, 'Window Close', 'Are you sure you want to close the window?',
-                QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No, QtWidgets.QMessageBox.No)
-
+        if self.enable_window_close_confirmation:
+            reply = QtWidgets.QMessageBox.question(self, 'Window Close', 'Are you sure you want to close the window?',
+                    QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No, QtWidgets.QMessageBox.No)
+        else:
+            reply = QtWidgets.QMessageBox.Yes
+            
         if reply == QtWidgets.QMessageBox.Yes:
             event.accept()
             print('Window closed')
