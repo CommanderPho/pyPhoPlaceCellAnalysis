@@ -113,7 +113,7 @@ class Specific3DTimeCurvesHelper:
         return CurveDatasource(test_data_random_df.copy(), data_series_specs=RenderDataseries.init_from_pre_spatial_data_series_list(active_data_series_pre_spatial_list, pre_spatial_to_spatial_mappings))
 
     @classmethod
-    def build_test_3D_time_curves(cls, spike_raster_plt_3d, test_data_random_df=None):
+    def build_test_3D_time_curves(cls, spike_raster_plt_3d, test_data_random_df=None, sample_rate_sec = 0.25, n_value_columns = 15):
         """ builds some randomly-generated 3D Curves for testing/debugging purposes and adds them to the spike_raster_plot
         Usage:
             active_random_test_plot_curve_datasource = build_test_3D_time_curves(test_data_random_df, spike_raster_plt_3d)
@@ -135,7 +135,7 @@ class Specific3DTimeCurvesHelper:
         else:
             # otherwise generate a new random dataframe
             test_data_start_t, test_data_end_t = spike_raster_plt_3d.spikes_window.total_df_start_end_times
-            active_plot_df = _generate_sample_random_data_series(test_data_start_t, test_data_end_t, sample_rate_sec = 0.25, n_value_columns = 15)
+            active_plot_df = _generate_sample_random_data_series(test_data_start_t, test_data_end_t, sample_rate_sec = sample_rate_sec, n_value_columns = n_value_columns)
         
         # Mappings from the pre-spatial values to the spatial values:
         x_map_fn = lambda t: spike_raster_plt_3d.temporal_to_spatial(t) # returns the x-values, transforming from the times t appropriately.
