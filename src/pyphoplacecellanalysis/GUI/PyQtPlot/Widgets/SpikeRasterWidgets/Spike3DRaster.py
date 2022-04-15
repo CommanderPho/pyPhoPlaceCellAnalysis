@@ -111,6 +111,11 @@ class Spike3DRaster(TimeCurvesViewMixin, RenderTimeEpochMeshesMixin, SpikeRaster
         return -self.half_temporal_axis_length
     
     
+    @property
+    def series_identity_y_values(self):
+        """The series_identity_y_values property."""
+        return self._series_identity_y_values
+    
     def __init__(self, params=None, spikes_window=None, playback_controller=None, neuron_colors=None, neuron_sort_order=None, **kwargs):
         super(Spike3DRaster, self).__init__(params=params, spikes_window=spikes_window, playback_controller=playback_controller, neuron_colors=neuron_colors, neuron_sort_order=neuron_sort_order, **kwargs)
         
@@ -164,6 +169,23 @@ class Spike3DRaster(TimeCurvesViewMixin, RenderTimeEpochMeshesMixin, SpikeRaster
         self.enable_debug_print = False
         self.enable_debug_widgets = True
         
+        # Determine the y-values corresponding to the series identity
+        self._series_identity_y_values = None
+        self.update_series_identity_y_values()
+        
+        
+    def update_series_identity_y_values(self):
+        """ updates the fixed self._series_identity_y_values using the DataSeriesToSpatial.build_series_identity_axis(...) function.
+        
+        Should be called whenever:
+        self.n_cells, 
+        self.params.center_mode,
+        self.params.bin_position_mode
+        self.params.side_bin_margins
+        
+        values change.
+        """
+        self._series_identity_y_values = DataSeriesToSpatial.build_series_identity_axis(self.n_cells, center_mode=self.params.center_mode, bin_position_mode=self.params.bin_position_mode, side_bin_margins = self.params.side_bin_margins)
         
     def _buildGraphics(self):
         ##### Main Raster Plot Content Top ##########
