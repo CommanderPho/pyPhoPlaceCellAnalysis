@@ -17,7 +17,7 @@ class CurveDatasource(DataframeDatasource):
     	source_data_changed_signal = QtCore.pyqtSignal() # signal emitted when the internal model data has changed.
     """
     
-    data_series_specs_changed_signal = QtCore.pyqtSignal() # signal emitted when the data_series_specs have changed.
+    data_series_specs_changed_signal = QtCore.pyqtSignal(object) # signal emitted when the data_series_specs have changed.
 
     @property
     def data_series_specs(self):
@@ -26,8 +26,8 @@ class CurveDatasource(DataframeDatasource):
     @data_series_specs.setter
     def data_series_specs(self, value):
         self._data_series_specs = value
+        self.data_series_specs_changed_signal.emit(self._data_series_specs)
         
-    
     @property
     def has_data_series_specs(self):
         """The data_series_specs property."""

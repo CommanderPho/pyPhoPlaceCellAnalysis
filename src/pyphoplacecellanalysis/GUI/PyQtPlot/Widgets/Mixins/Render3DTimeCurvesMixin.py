@@ -87,8 +87,12 @@ class TimeCurvesViewMixin:
         self.params.time_curves_no_update = True # freeze updating
         
         # Disconnect signals?
-        self.params.time_curves_datasource.data_series_specs_changed_signal.disconnect()
-        
+        connected_signal_recievers = self.params.time_curves_datasource.receivers(self.params.time_curves_datasource.data_series_specs_changed_signal)
+        print(f'connected_signal_recievers: {connected_signal_recievers}')
+        if connected_signal_recievers > 0:
+            print(f'disconnecting {connected_signal_recievers} receivers...')
+            self.params.time_curves_datasource.data_series_specs_changed_signal.disconnect()
+            print('\tdone')
         
         self.clear_all_3D_time_curves()
         self.params.time_curves_datasource = None # clear the datasource, this will prevent plots from being re-added during the self.TimeCurvesViewMixin_on_window_update() call.     
@@ -206,10 +210,13 @@ class TimeCurvesViewMixin:
     #     self.update_3D_time_curves()
     
     
-    @QtCore.pyqtSlot()
-    def TimeCurvesViewMixin_on_data_series_specs_changed(self):
+    @QtCore.pyqtSlot(object)
+    def TimeCurvesViewMixin_on_data_series_specs_changed(self, updated_data_series_specs):
         """ called when the data series specs are udpated. """
-        self.update_3D_time_curves()
+        print(f'TimeCurvesViewMixin_on_data_series_specs_changed(...)')
+        # self.clear_all_3D_time_curves()
+        self.add_3D_time_curves(self.params.time_curves_datasource) # Just re-adding the current datasource is sufficient to update. TODO: inefficient?
+        # self.update_3D_time_curves()
         
 
     @QtCore.pyqtSlot(float, float)
