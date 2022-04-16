@@ -140,29 +140,12 @@ class StaticVedo_3DRasterHelper:
         
         if debug_print:
             print(f'update_active_spikes_window(...): active_ids: {active_ids}')
-        # ipts = elli.insidePoints(pts) # select points inside mesh
-        # opts = elli.insidePoints(pts, invert=True)
-        # plt += Points(ipts, c="g")
-        # plt += Points(opts, c="r")
-
-        # Z-version:
-        # z1, z2 = -1.5, -1.0
-        # ids = active_spikes_lines_mesh.findCellsWithin(zbounds=(z1,z2))
-    #     p1 = Plane(normal=(0,0,1), s=[2,2]).z(z1)
-    #     p2 = p1.clone().z(z2)
-        
-        # printc('IDs of cells within bounds:\n', active_ids, c='g')
-        # all_spike_lines.celldata.keys() # ['CellScalars']
-        # print(f"np.shape(active_ids): {np.shape(active_ids)}, np.shape(all_spike_lines.celldata['CellScalars']): {np.shape(active_spikes_lines_mesh.celldata['CellScalars'])}") # np.shape(active_ids): (761,)
-        # active_spikes_lines_mesh.celldata['CellScalars'][active_ids] = 0.0 # zero non-window spikes
         
         ## Get Colors from the celldata
         curr_cell_rgba_colors = active_spikes_lines_mesh.celldata['CellIndividualColors'] # note that the cell colors have components out of 0-255 (not 0.0-1.0)
-        # print(f'curr_cell_rgba_colors: {curr_cell_rgba_colors}')
         # set opacity component to zero for all non-window spikes
         # curr_cell_rgba_colors[:,3] = 0.05*255 # np.full((spike_rgb_colors.shape[0], 1), 1.0)
         curr_cell_rgba_colors[:,3] = 0*255 # np.full((spike_rgb_colors.shape[0], 1), 1.0)
-        
         
         if len(active_ids) > 0:
             curr_cell_rgba_colors[active_ids,3] = 1.0*255 # set alpha for active_ids to an opaque 1.0
