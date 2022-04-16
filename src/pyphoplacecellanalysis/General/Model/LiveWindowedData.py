@@ -23,6 +23,12 @@ class LiveWindowedData(SimplePrintable, PrettyPrintable, QtCore.QObject):
         SpikesDataframeWindow
 
     """
+    
+    # # Basic signals only:
+    # window_duration_changed_signal = QtCore.pyqtSignal(float, float, float) # (start_time, end_time, window_duration) more conservitive singal that only changes when the duration of the window changes.
+    # window_changed_signal = QtCore.pyqtSignal(float, float) # (start_time, end_time)
+
+    # Signals with data:
     windowed_data_window_duration_changed_signal = QtCore.pyqtSignal(float, float, float, object) # (start_time, end_time, window_duration, data_value) more conservitive singal that only changes when the duration of the window changes.
     windowed_data_window_updated_signal = QtCore.pyqtSignal(float, float, object) # (start_time, end_time, data_value)
     
@@ -61,8 +67,6 @@ class LiveWindowedData(SimplePrintable, PrettyPrintable, QtCore.QObject):
         data_value = self.dataSource.get_updated_data_window(start_t, end_t) # can return any value so long as it's an object
         self.windowed_data_window_duration_changed_signal.emit(start_t, end_t, duration, data_value)
         
-
-
     @QtCore.pyqtSlot(float, float)
     def on_window_changed(self, start_t, end_t):
         # called when the window is updated

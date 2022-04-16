@@ -257,7 +257,7 @@ class Spike3DRaster_Vedo(SimplePlayPauseWithExternalAppMixin, Spike3DRasterBotto
                     
         # Connect signals:
         self.temporal_mapping_changed.connect(self.on_adjust_temporal_spatial_mapping)
-        self.spikes_window.window_duration_changed_signal.connect(self.on_adjust_temporal_spatial_mapping) # this signal isn't working
+        self.spikes_window.timeWindow.window_duration_changed_signal.connect(self.on_adjust_temporal_spatial_mapping) # this signal isn't working
         self.unit_sort_order_changed_signal.connect(self.on_unit_sort_order_changed)
 
         # Initialize and start vedo update timer:
@@ -423,11 +423,21 @@ class Spike3DRaster_Vedo(SimplePlayPauseWithExternalAppMixin, Spike3DRasterBotto
         self.resize(1920, 900)
         self.setWindowTitle(self.windowName)
         # Connect window update signals
+        ## NOTE: this doesn't need to be done because the base class does it!
+        
         # self.spikes_window.spike_dataframe_changed_signal.connect(self.on_spikes_df_changed)
         # self.spikes_window.window_duration_changed_signal.connect(self.on_window_duration_changed)
-        # self.spikes_window.window_changed_signal.connect(self.on_window_changed)
-        self.spikes_window.window_updated_signal.connect(self.on_window_changed)
-
+        # self.spikes_window.timeWindow.window_changed_signal.connect(self.on_window_changed)
+        # self.spikes_window.timeWindow.window_updated_signal.connect(self.on_window_changed)
+        
+        # self.spikes_window.spike_dataframe_changed_signal.connect(self.on_spikes_df_changed)
+        # self.spikes_window.time_window.window_duration_changed_signal.connect(self.on_window_duration_changed)
+        # self.spikes_window.time_window.window_changed_signal.connect(self.on_window_changed)
+        
+        # Only subscribe to the more advanced LiveWindowedData-style window update signals that also provide data
+        # self.spikes_window.windowed_data_window_duration_changed_signal.connect(self.on_windowed_data_window_duration_changed)
+        # self.spikes_window.windowed_data_window_updated_signal.connect(self.on_windowed_data_window_changed)
+        
         self.ui.plt.show(mode=self.params.interaction_mode) # , axes=1                  # <--- show the vedo rendering
         self.show()                     # <--- show the Qt Window
 

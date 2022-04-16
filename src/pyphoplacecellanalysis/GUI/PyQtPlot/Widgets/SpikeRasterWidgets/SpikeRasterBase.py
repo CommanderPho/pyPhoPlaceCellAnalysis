@@ -294,7 +294,7 @@ class SpikeRasterBase(UnitSortableMixin, DataSeriesToSpatialTransformingMixin, N
         self.spikes_window.windowed_data_window_updated_signal.connect(self.on_windowed_data_window_changed)
         
         # Old working:
-        # self.spikes_window.window_updated_signal.connect(self.on_window_changed)
+        # self.spikes_window.timeWindow.window_updated_signal.connect(self.on_window_changed)
         
         
         
@@ -489,9 +489,9 @@ class SpikeRasterBase(UnitSortableMixin, DataSeriesToSpatialTransformingMixin, N
         
         # Connect window update signals
         # self.spikes_window.spike_dataframe_changed_signal.connect(self.on_spikes_df_changed)
-        # self.spikes_window.window_duration_changed_signal.connect(self.on_window_duration_changed)
-        # self.spikes_window.window_changed_signal.connect(self.on_window_changed)
-        # self.spikes_window.window_updated_signal.connect(self.on_window_changed)
+        # self.spikes_window.timeWindow.window_duration_changed_signal.connect(self.on_window_duration_changed)
+        # self.spikes_window.timeWindow.window_changed_signal.connect(self.on_window_changed)
+        # self.spikes_window.timeWindow.window_updated_signal.connect(self.on_window_changed)
 
         
     def _buildGraphics(self):

@@ -128,9 +128,9 @@ class Spike3DRaster(PyQtGraphSpecificTimeCurvesMixin, RenderTimeEpochMeshesMixin
                 
         # Setup Signals:
         self.temporal_mapping_changed.connect(self.on_adjust_temporal_spatial_mapping)
-        self.spikes_window.window_duration_changed_signal.connect(self.on_adjust_temporal_spatial_mapping)
+        self.spikes_window.timeWindow.window_duration_changed_signal.connect(self.on_adjust_temporal_spatial_mapping)
         # self.on_window_duration_changed.connect(self.on_adjust_temporal_spatial_mapping)
-        # self.spikes_window.window_changed_signal.connect(self.TimeCurvesViewMixin_on_window_update) # TODO: this is for TimeCurvesViewMixin but currently just call manually.
+        # self.spikes_window.timeWindow.window_changed_signal.connect(self.TimeCurvesViewMixin_on_window_update) # TODO: this is for TimeCurvesViewMixin but currently just call manually.
         self.unit_sort_order_changed_signal.connect(self.on_unit_sort_order_changed)
         
         self.show()
