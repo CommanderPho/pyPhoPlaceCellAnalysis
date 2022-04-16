@@ -233,6 +233,11 @@ class SpikeRasterBase(UnitSortableMixin, DataSeriesToSpatialTransformingMixin, N
         
 
     def __init__(self, params=None, spikes_window=None, playback_controller=None, neuron_colors=None, neuron_sort_order=None, **kwargs):
+        """ 
+        
+        spikes_window: SpikesDataframeWindow
+        
+        """
         super(SpikeRasterBase, self).__init__(**kwargs)
         # Initialize member variables:
         
@@ -277,6 +282,21 @@ class SpikeRasterBase(UnitSortableMixin, DataSeriesToSpatialTransformingMixin, N
         # Setup Signals:
         # self.temporal_mapping_changed.connect(self.on_adjust_temporal_spatial_mapping)
         # self.spikes_window.window_duration_changed_signal.connect(self.on_adjust_temporal_spatial_mapping)
+        
+        
+        # Connect window update signals
+        # self.spikes_window.spike_dataframe_changed_signal.connect(self.on_spikes_df_changed)
+        # self.spikes_window.time_window.window_duration_changed_signal.connect(self.on_window_duration_changed)
+        # self.spikes_window.time_window.window_changed_signal.connect(self.on_window_changed)
+        
+        # Only subscribe to the more advanced LiveWindowedData-style window update signals that also provide data
+        self.spikes_window.windowed_data_window_duration_changed_signal.connect(self.on_windowed_data_window_duration_changed)
+        self.spikes_window.windowed_data_window_updated_signal.connect(self.on_windowed_data_window_changed)
+        
+        # Old working:
+        # self.spikes_window.window_updated_signal.connect(self.on_window_changed)
+        
+        
         
         ## TODO: BUG: MAJOR: Since the application instance is being assigned to self.app (for any of the widgets that create it) I think that aboutToQuit is called any time any of the widgets are going to close. Although I guess that doesn't explain the errors.
         
@@ -471,7 +491,7 @@ class SpikeRasterBase(UnitSortableMixin, DataSeriesToSpatialTransformingMixin, N
         # self.spikes_window.spike_dataframe_changed_signal.connect(self.on_spikes_df_changed)
         # self.spikes_window.window_duration_changed_signal.connect(self.on_window_duration_changed)
         # self.spikes_window.window_changed_signal.connect(self.on_window_changed)
-        self.spikes_window.window_updated_signal.connect(self.on_window_changed)
+        # self.spikes_window.window_updated_signal.connect(self.on_window_changed)
 
         
     def _buildGraphics(self):
@@ -589,6 +609,22 @@ class SpikeRasterBase(UnitSortableMixin, DataSeriesToSpatialTransformingMixin, N
         self._update_plots()
         profiler('Finished calling _update_plots()')
         
+        
+    
+    @QtCore.pyqtSlot(float, float, float, object)
+    def on_windowed_data_window_duration_changed(self, start_t, end_t, duration, updated_data_value):
+        """ changes self.half_render_window_duration """
+        print(f'SpikeRasterBase.on_windowed_data_window_duration_changed(start_t: {start_t}, end_t: {end_t}, duration: {duration}, updated_data_value: ...)')
+
+    @QtCore.pyqtSlot(float, float, object)
+    def on_windowed_data_window_changed(self, start_t, end_t, updated_data_value):
+        # called when the window is updated
+        if self.enable_debug_print:
+            print(f'SpikeRasterBase.on_windowed_data_window_changed(start_t: {start_t}, end_t: {end_t}, updated_data_value: ...)')
+        profiler = pg.debug.Profiler(disabled=True, delayed=True)
+        self._update_plots()
+        profiler('Finished calling _update_plots()')
+    
 
         
 # hih

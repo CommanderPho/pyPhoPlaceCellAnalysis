@@ -35,9 +35,13 @@ class SpikesDataframeWindow(LiveWindowedData):
     Known Uses:
         SpikeRasterBase
 
+    Inherited Signals:
+    
+    windowed_data_window_duration_changed_signal = QtCore.pyqtSignal(float, float, float, object) # (start_time, end_time, window_duration, data_value)
+    windowed_data_window_updated_signal = QtCore.pyqtSignal(float, float, object) # (start_time, end_time, data_value)
+    
     """
     spike_dataframe_changed_signal = QtCore.pyqtSignal() # signal emitted when the spike dataframe is changed, which might change the number of units, number of spikes, and other properties.
-    
     
     # @property
     # def active_live_data_window(self):

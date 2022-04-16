@@ -88,6 +88,7 @@ class TimeWindow(SimplePrintable, PrettyPrintable, QtCore.QObject):
         self._active_window_start_time = new_start
         if will_duration_change:
             self._window_duration = proposed_new_duration
+            
             self.window_duration_changed_signal.emit(self.active_window_start_time, self.active_window_end_time, self.window_duration)
         self.window_changed_signal.emit(self.active_window_start_time, self.active_window_end_time)
         
