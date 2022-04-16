@@ -778,8 +778,8 @@ class Spike3DRaster_Vedo(SimplePlayPauseWithExternalAppMixin, Spike3DRasterBotto
             active_window_only_axes = VedoPlotterHelpers.vedo_create_if_needed(self, 'active_window_only_axes', active_window_only_axes, defer_render=True)
         else:
             # just update the extant one
-            active_window_only_axes.x(active_x_center)
-            
+            # active_window_only_axes.x(x_start)
+            pass
             
         # Active Window End bounding plane:
         end_bound_plane = self.plots.meshes.get('end_bound_plane', None)
