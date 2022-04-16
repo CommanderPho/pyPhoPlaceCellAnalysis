@@ -182,9 +182,8 @@ class DataSeriesToSpatial:
         
         #  xValuesAndLabels: list of custom tick positions and labels [(pos1, label1), …]
         # Want to add a tick/label at the x-values corresponding to each minute.
-        # Note: that print_seconds_human_readable(tick_t)[-1] is only the formatted string
-        return [(tick_x, print_seconds_human_readable(tick_t)[-1]) for tick_x, tick_t in list(zip(global_minute_x_tick_positions, global_minute_t_ticks))]
-        
+        return [(tick_x, format_seconds_human_readable(tick_t)) for tick_x, tick_t in list(zip(global_minute_x_tick_positions, global_minute_t_ticks))]
+
 
 
 
