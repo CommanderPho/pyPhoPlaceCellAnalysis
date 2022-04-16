@@ -539,19 +539,6 @@ class Spike3DRaster_Vedo(SimplePlayPauseWithExternalAppMixin, Spike3DRasterBotto
         if self.enable_debug_print:
             printc(f'\t(active_x_start: {active_x_start}, active_x_end: {active_x_end}), active_x_length: {active_x_end - active_x_start}')
         
-        # active_x_start, active_x_end = DataSeriesToSpatial.temporal_to_spatial_map((active_t_start, active_t_end), self.spikes_window.active_window_start_time, self.spikes_window.active_window_end_time, self.temporal_axis_length, center_mode=self.params.center_mode)
-        # (active_t_start: 30.0, active_t_end: 45.0)
-        # (active_x_start: -20.0, active_x_end: 20.0)
-
-        # Bounding planes:
-        # active_ids, start_bound_plane, end_bound_plane = StaticVedo_3DRasterHelper.update_active_spikes_window(all_spike_lines, x_start=active_t_start, x_end=active_t_end, max_y_pos=self.params.max_y_pos, max_z_pos=self.params.max_z_pos)
-        # active_ids, start_bound_plane, end_bound_plane = StaticVedo_3DRasterHelper.update_active_spikes_window(all_spike_lines, x_start=active_x_start, x_end=active_x_end, max_y_pos=self.params.max_y_pos, max_z_pos=self.params.max_z_pos,
-                                                                                                            #    start_bound_plane=None, end_bound_plane=None)
-        
-        # Set meshes to self.plots.meshes:
-        # self.plots.meshes['start_bound_plane'] = start_bound_plane
-        # self.plots.meshes['end_bound_plane'] = end_bound_plane
-        
         active_ids = self.update_active_spikes_window(x_start=active_x_start, x_end=active_x_end, max_y_pos=self.params.max_y_pos, max_z_pos=self.params.max_z_pos)
         
         if rect_meshes is not None:
@@ -755,7 +742,7 @@ class Spike3DRaster_Vedo(SimplePlayPauseWithExternalAppMixin, Spike3DRasterBotto
         
         active_window_bounding_box = self.plots.meshes.get('active_window_bounding_box', None)
         if active_window_bounding_box is None:
-            active_window_bounding_box = vedo.Box(size=(x_start, x_end, 0.0, y_depth, 0.0, z_height), c='g4', alpha=0.5).lw(2.0).lineColor('#CCFFCC')
+            active_window_bounding_box = vedo.Box(size=(x_start, x_end, 0.0, y_depth, 0.0, z_height), c='g4', alpha=0.2).lw(2.0).lineColor('#CCFFCC')
             active_window_bounding_box = VedoPlotterHelpers.vedo_create_if_needed(self, 'active_window_bounding_box', active_window_bounding_box, defer_render=True)
         else:
             # just update the extant one
