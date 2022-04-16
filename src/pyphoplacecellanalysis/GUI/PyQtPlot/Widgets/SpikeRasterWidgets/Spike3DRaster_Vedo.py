@@ -257,7 +257,7 @@ class Spike3DRaster_Vedo(SimplePlayPauseWithExternalAppMixin, Spike3DRasterBotto
                     
         # Connect signals:
         self.temporal_mapping_changed.connect(self.on_adjust_temporal_spatial_mapping)
-        self.spikes_window.window_duration_changed_signal.connect(self.on_adjust_temporal_spatial_mapping)
+        self.spikes_window.window_duration_changed_signal.connect(self.on_adjust_temporal_spatial_mapping) # this signal isn't working
         self.unit_sort_order_changed_signal.connect(self.on_unit_sort_order_changed)
 
         # Initialize and start vedo update timer:
@@ -575,8 +575,11 @@ class Spike3DRaster_Vedo(SimplePlayPauseWithExternalAppMixin, Spike3DRasterBotto
         
         VedoHelpers.recurrsively_apply_use_bounds(all_data_axes, False)
         
+        active_window_bounding_box = self.plots.meshes.get('active_window_bounding_box', None)
+        
         ## The axes only for the active window:
-        active_window_only_axes = vedo.Axes([self.plots.meshes['start_bound_plane'], self.plots.meshes['end_bound_plane']],  # build axes for this set of objects
+        # active_window_only_axes = vedo.Axes([self.plots.meshes['start_bound_plane'], self.plots.meshes['end_bound_plane']],  # build axes for this set of objects
+        active_window_only_axes = vedo.Axes([active_window_bounding_box],  # build axes for this set of objects
                     xtitle="window t",
                     ytitle="Cell ID",
                     ztitle="",
@@ -595,15 +598,14 @@ class Spike3DRaster_Vedo(SimplePlayPauseWithExternalAppMixin, Spike3DRasterBotto
         )
         
         
+        VedoPlotterHelpers.vedo_remove_if_exists(self, 'active_window_only_axes', defer_render=True)
+        
+        
         # axes1 = Axes(s1, c='r')
         
-        # add the axes meshes to the meshes array:
-        self.plots.meshes['all_data_axes'] = all_data_axes
-        self.plots.meshes['active_window_only_axes'] = active_window_only_axes
-        
-        # add the axes to the plotter:
-        self.ui.plt += all_data_axes
-        self.ui.plt += active_window_only_axes
+        # add the axes meshes to the meshes array and to the plotter if needed:
+        all_data_axes = VedoPlotterHelpers.vedo_create_if_needed(self, 'all_data_axes', all_data_axes, defer_render=True)
+        active_window_only_axes = VedoPlotterHelpers.vedo_create_if_needed(self, 'active_window_only_axes', active_window_only_axes, defer_render=True)
         
         # Set the visibility, useBounds, etc properties                
         active_window_only_axes.SetVisibility(True)
@@ -622,7 +624,8 @@ class Spike3DRaster_Vedo(SimplePlayPauseWithExternalAppMixin, Spike3DRasterBotto
         end_bound_plane = self.plots.meshes.get('end_bound_plane', None)
         active_window_only_axes = self.plots.meshes.get('active_window_only_axes', None)
         
-        prev_x_position = start_bound_plane.x()
+        if start_bound_plane is not None:
+            prev_x_position = start_bound_plane.x()
         
         active_t_start, active_t_end = (self.spikes_window.active_window_start_time, self.spikes_window.active_window_end_time)
         active_window_t_duration = self.spikes_window.window_duration
@@ -646,11 +649,11 @@ class Spike3DRaster_Vedo(SimplePlayPauseWithExternalAppMixin, Spike3DRasterBotto
         active_ids = self.update_active_spikes_window(x_start=active_x_start, x_end=active_x_end, max_y_pos=self.params.max_y_pos, max_z_pos=self.params.max_z_pos)
         
         # Move the active_window_only_axis by the delta_x from the start plane before and after the call to update_active_spikes_window(...)
-        delta_x = start_bound_plane.x() - prev_x_position
-        
-        prev_x_pos = active_window_only_axes.x()
-        active_window_only_axes.x(prev_x_pos + delta_x) # works for positioning but doesn't update numbers
-        
+        if (active_window_only_axes is not None) and (start_bound_plane is not None):
+            delta_x = start_bound_plane.x() - prev_x_position
+            prev_x_pos = active_window_only_axes.x()
+            active_window_only_axes.x(prev_x_pos + delta_x) # works for positioning but doesn't update numbers
+
         ## Update the TimeCurves:
         self.TimeCurvesViewMixin_on_window_update()
         
@@ -674,6 +677,17 @@ class Spike3DRaster_Vedo(SimplePlayPauseWithExternalAppMixin, Spike3DRasterBotto
         #     # already have self.glyph created, just need to update its points
         #     self.glyph.points(self.active_spike_render_points)
         
+    def rebuild_active_spikes_window(self):
+        """ called on resize to rebuild the meshes 
+        The planes don't need to be removed because update works even after window resize. The active_window_only_axes and active_window_bounding_box on the other hand do need to be removed and re-added.
+            These removed meshes will be re-added on the next call to self.update_active_spikes_window(...)
+        """
+        VedoPlotterHelpers.vedo_remove_if_exists(self, 'active_window_only_axes', defer_render=True)
+        # VedoPlotterHelpers.vedo_remove_if_exists(self, 'start_bound_plane', defer_render=True)
+        VedoPlotterHelpers.vedo_remove_if_exists(self, 'active_window_bounding_box', defer_render=True)
+        # VedoPlotterHelpers.vedo_remove_if_exists(self, 'end_bound_plane', defer_render=True)
+        self._update_plots()
+        
     def update_active_spikes_window(self, x_start=0.0, x_end=10.0, max_y_pos = 50.0, max_z_pos = 10.0, debug_print=False):
         active_spikes_lines_mesh = self.plots.meshes.get('all_spike_lines', None)
         
@@ -693,7 +707,6 @@ class Spike3DRaster_Vedo(SimplePlayPauseWithExternalAppMixin, Spike3DRasterBotto
             curr_cell_rgba_colors[active_ids,3] = 1.0*255 # set alpha for active_ids to an opaque 1.0
         
         active_spikes_lines_mesh.cellIndividualColors(curr_cell_rgba_colors) # needed?
-        
         
         # Build or update the start/end bounding planes and bounding box
         active_window_x_length = np.abs((x_end - x_start))
@@ -830,6 +843,8 @@ class Spike3DRaster_Vedo(SimplePlayPauseWithExternalAppMixin, Spike3DRasterBotto
             
         """
         self.update_series_identity_y_values()
+        self.rebuild_active_spikes_window()
+        self._build_axes_objects() # rebuild the axes objects
         self._update_plots()
 
     def onMouseClick(self, evt):
