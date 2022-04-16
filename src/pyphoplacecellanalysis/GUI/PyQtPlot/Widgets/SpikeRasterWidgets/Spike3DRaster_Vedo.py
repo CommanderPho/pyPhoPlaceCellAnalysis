@@ -258,7 +258,8 @@ class Spike3DRaster_Vedo(SimplePlayPauseWithExternalAppMixin, Spike3DRasterBotto
         self.spikes_window.window_duration_changed_signal.connect(self.on_adjust_temporal_spatial_mapping)
         self.unit_sort_order_changed_signal.connect(self.on_unit_sort_order_changed)
 
-
+        # Initialize and start vedo update timer:
+        self.initialize_timer()
 
     def setup(self):
         """ setup() is called before self.buildUI(), etc.
@@ -327,7 +328,6 @@ class Spike3DRaster_Vedo(SimplePlayPauseWithExternalAppMixin, Spike3DRasterBotto
         self._series_identity_y_values = None
         self.update_series_identity_y_values()
         
-        
         if 'visualization_raster_y_location' not in self.spikes_df.columns:
             print(f'visualization_raster_y_location column missing. rebuilding (this might take a minute or two)...')
             # Compute the y for all windows, not just the current one:
@@ -341,6 +341,12 @@ class Spike3DRaster_Vedo(SimplePlayPauseWithExternalAppMixin, Spike3DRasterBotto
         max_y_all_data = np.nanmax(self.spikes_df['visualization_raster_y_location'].to_numpy()) # self.spikes_df['visualization_raster_y_location'] 
         self.params.max_y_pos = max(10.0, max_y_all_data)
         
+        # Vedo-specific Timer Variables:
+        self.params.dt = None # update every dt milliseconds
+        self.timerId = None
+        self.timer_tick_counter = 0
+        self.timerevt = None
+
         # Helper Mixins: SETUP:
         self.Spike3DRasterBottomFrameControlsMixin_on_setup()
         
@@ -373,8 +379,6 @@ class Spike3DRaster_Vedo(SimplePlayPauseWithExternalAppMixin, Spike3DRasterBotto
         
         # Helper Mixins: buildUI:
         self.ui.bottom_controls_frame, self.ui.bottom_controls_layout = self.Spike3DRasterBottomFrameControlsMixin_on_buildUI()
-        
-        
         
         # TODO: Register Functions:
         # self.ui.bottom_controls_frame.
@@ -412,10 +416,6 @@ class Spike3DRaster_Vedo(SimplePlayPauseWithExternalAppMixin, Spike3DRasterBotto
         # self.spikes_window.window_duration_changed_signal.connect(self.on_window_duration_changed)
         # self.spikes_window.window_changed_signal.connect(self.on_window_changed)
         self.spikes_window.window_updated_signal.connect(self.on_window_changed)
-
-
-
-        
 
         self.ui.plt.show()                  # <--- show the vedo rendering
         self.show()                     # <--- show the Qt Window
@@ -537,7 +537,7 @@ class Spike3DRaster_Vedo(SimplePlayPauseWithExternalAppMixin, Spike3DRasterBotto
         all_data_axes = Axes(all_spike_lines, xrange=[0, 15000], c='white', textScale=0.1, gridLineWidth=0.1, axesLineWidth=0.1, xTickLength=0.005*0.1, xTickThickness=0.0025*0.1,
                                 xValuesAndLabels = new_axes_x_to_time_labels, useGlobal=True)
         
-        all_data_axes.useBounds(False)
+        VedoHelpers.recurrsively_apply_use_bounds(all_data_axes, False)
         
         
         ## The axes only for the active window:
@@ -641,12 +641,6 @@ class Spike3DRaster_Vedo(SimplePlayPauseWithExternalAppMixin, Spike3DRasterBotto
         prev_x_pos = active_window_only_axes.x()
         active_window_only_axes.x(prev_x_pos + delta_x) # works for positioning but doesn't update numbers
         
-        
-        # Update the additional display lines information on the overlay:
-        for vedo_pos_key, values in self.overlay_vedo_text_lines_dict.items():
-            # print(f'a_key: {a_key}, values: {values}')
-            self.ui.viewport_overlay.text('\n'.join(values), vedo_pos_key)
-        
         ## Update the TimeCurves:
         self.TimeCurvesViewMixin_on_window_update()
         
@@ -674,6 +668,40 @@ class Spike3DRaster_Vedo(SimplePlayPauseWithExternalAppMixin, Spike3DRasterBotto
     #### EVENT HANDLERS
     ##################################
     
+    def initialize_timer(self, timer_update_duration_milliseconds = 100):
+        """ initializes the vedo timer """        
+        self.params.dt = timer_update_duration_milliseconds # update every dt milliseconds
+        self.timerId = None
+        # self.isplaying = False
+        self.timer_tick_counter = 0 # frame counter
+        # Destroy any extant timer:
+        if self.timerId is not None:
+            print('destroying existing timer.')
+            self.ui.plt.timerCallback("destroy", self.timerId)
+        # Build the new timer:
+        print('building new timer')
+        self.timerevt = self.ui.plt.addCallback('timer', self.handle_timer)
+        # Start the new timer:
+        if self.enable_debug_print:
+            print('starting new timer')
+        self.timerId = self.ui.plt.timerCallback("create", dt=self.params.dt)
+
+    def handle_timer(self, event):
+        #####################################################################
+        ### Animate your stuff here                                       ###
+        #####################################################################
+        #print(event)               # info about what was clicked and more
+        #print(self.plotter.actors) # to access object from the internal list
+        
+        # Update the additional display lines information on the overlay:
+        for vedo_pos_key, values in self.overlay_vedo_text_lines_dict.items():
+            # print(f'a_key: {a_key}, values: {values}')
+            self.ui.viewport_overlay.text('\n'.join(values), vedo_pos_key)
+            
+        self.plt.render() # is this needed?
+        self.timer_tick_counter += 1
+        
+        
     
     
     @QtCore.pyqtSlot()
@@ -708,6 +736,13 @@ class Spike3DRaster_Vedo(SimplePlayPauseWithExternalAppMixin, Spike3DRasterBotto
         printc(f'vedo override - onClose()')
         self.debug_print_instance_info()
         printc("..calling onClose")
+        
+        # Deleting any timer
+        if self.timerId is not None:
+            print('deleting extant timer...')
+            self.plt.timerCallback("destroy", self.timerId)
+            print('\t done.')
+        # Close widget:
         self.ui.vtkWidget.close()
         
         # Emit the close signal:
