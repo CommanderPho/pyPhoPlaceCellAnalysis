@@ -194,12 +194,15 @@ class Spike3DRaster_Vedo(SimplePlayPauseWithExternalAppMixin, Spike3DRasterBotto
                                                   camera_debug_text]
         lines_dict[af.AlignTop | af.AlignRight] = ['TR', 
                                                    f"n_cells : {self.n_cells}",
-                                                   f'render_window_duration: {self.render_window_duration}',
+                                                   f'render_window_duration: {self.render_window_duration} [sec]',
                                                 #    f'animation_time_step: {self.animation_time_step}',
                                                    f'temporal_axis_length: {self.temporal_axis_length}',
+                                                   f'total_data_duration: {self.total_data_duration} [sec]',
+                                                   f'total_data_temporal_axis_length: {self.total_data_temporal_axis_length}',
                                                    f'temporal_zoom_factor: {self.temporal_zoom_factor}']
         lines_dict[af.AlignBottom | af.AlignLeft] = ['BL', 
                                                    f'active_time_window: {self.spikes_window.active_time_window}',
+                                                   f'total_df_start_end_times: {self.spikes_window.total_df_start_end_times}',
                                                 #    f'playback_rate_multiplier: {self.playback_rate_multiplier}'
                                                    ]
         lines_dict[af.AlignBottom | af.AlignRight] = ['BR']    
@@ -210,6 +213,18 @@ class Spike3DRaster_Vedo(SimplePlayPauseWithExternalAppMixin, Spike3DRasterBotto
     def overlay_vedo_text_lines_dict(self):
         """The overlay_vedo_text_lines_dict property."""
         return {self.qt_to_vedo_alignment_dict[k]:v for (k,v) in self.overlay_text_lines_dict.items()}
+    
+    
+    @property
+    def total_data_duration(self):
+        """ The duration (in seconds) of all data in self.spikes_window."""
+        return (self.spikes_window.total_data_end_time - self.spikes_window.total_data_start_time)
+    
+    @property
+    def total_data_temporal_axis_length(self):
+        """The equivalent of self.temporal_axis_length but for all data instead of just the active window."""
+        return self.temporal_zoom_factor * self.total_data_duration
+    
     
     ######  Get/Set Properties ######:
 
@@ -305,7 +320,8 @@ class Spike3DRaster_Vedo(SimplePlayPauseWithExternalAppMixin, Spike3DRasterBotto
         
         # by default we want the time axis to approximately span -20 to 20. So we set the temporal_zoom_factor to 
         # self.params.temporal_zoom_factor = 1.0
-        self.params.temporal_zoom_factor = 1000.0      
+        self.params.temporal_zoom_factor = 40.0 / float(self.render_window_duration)
+        # self.params.temporal_zoom_factor = 1000.0      
         
         self.params.enable_epoch_rectangle_meshes = self.enable_epoch_rectangle_meshes
         self.params.active_cell_colormap_name = 'rainbow'
@@ -424,20 +440,7 @@ class Spike3DRaster_Vedo(SimplePlayPauseWithExternalAppMixin, Spike3DRasterBotto
         self.setWindowTitle(self.windowName)
         # Connect window update signals
         ## NOTE: this doesn't need to be done because the base class does it!
-        
-        # self.spikes_window.spike_dataframe_changed_signal.connect(self.on_spikes_df_changed)
-        # self.spikes_window.window_duration_changed_signal.connect(self.on_window_duration_changed)
-        # self.spikes_window.timeWindow.window_changed_signal.connect(self.on_window_changed)
-        # self.spikes_window.timeWindow.window_updated_signal.connect(self.on_window_changed)
-        
-        # self.spikes_window.spike_dataframe_changed_signal.connect(self.on_spikes_df_changed)
-        # self.spikes_window.time_window.window_duration_changed_signal.connect(self.on_window_duration_changed)
-        # self.spikes_window.time_window.window_changed_signal.connect(self.on_window_changed)
-        
-        # Only subscribe to the more advanced LiveWindowedData-style window update signals that also provide data
-        # self.spikes_window.windowed_data_window_duration_changed_signal.connect(self.on_windowed_data_window_duration_changed)
-        # self.spikes_window.windowed_data_window_updated_signal.connect(self.on_windowed_data_window_changed)
-        
+
         self.ui.plt.show(mode=self.params.interaction_mode) # , axes=1                  # <--- show the vedo rendering
         self.show()                     # <--- show the Qt Window
 
@@ -447,7 +450,8 @@ class Spike3DRaster_Vedo(SimplePlayPauseWithExternalAppMixin, Spike3DRasterBotto
         all_spike_lines = self.plots.meshes.get('all_spike_lines', None)
         if all_spike_lines is not None:
             all_spike_t = self.spikes_df[self.spikes_df.spikes.time_variable_name].to_numpy() # this will map
-            all_spike_x = DataSeriesToSpatial.temporal_to_spatial_map(all_spike_t, self.spikes_window.total_data_start_time, self.spikes_window.total_data_end_time, self.temporal_axis_length, center_mode=self.params.center_mode)
+            # all_spike_x = DataSeriesToSpatial.temporal_to_spatial_map(all_spike_t, self.spikes_window.total_data_start_time, self.spikes_window.total_data_end_time, self.temporal_axis_length, center_mode=self.params.center_mode)
+            all_spike_x = DataSeriesToSpatial.temporal_to_spatial_map(all_spike_t, self.spikes_window.total_data_start_time, self.spikes_window.total_data_end_time, self.total_data_temporal_axis_length, center_mode=self.params.center_mode)
             curr_spike_points = all_spike_lines.points() # get all the points x-points
             curr_spike_points[:, 0] = all_spike_x.repeat(2) # repeat each element twice so that it's of the correct form for .points()
             all_spike_lines.points(curr_spike_points) # update the points
@@ -490,7 +494,10 @@ class Spike3DRaster_Vedo(SimplePlayPauseWithExternalAppMixin, Spike3DRasterBotto
         
         # replaces StaticVedo_3DRasterHelper.build_spikes_lines(...) with a version optimized for Spike3DRaster_Vedo:
         all_spike_t = self.spikes_df[self.spikes_df.spikes.time_variable_name].to_numpy() # this will map
-        all_spike_x = DataSeriesToSpatial.temporal_to_spatial_map(all_spike_t, self.spikes_window.total_data_start_time, self.spikes_window.total_data_end_time, self.temporal_axis_length, center_mode=self.params.center_mode)
+        
+        
+        # all_spike_x = DataSeriesToSpatial.temporal_to_spatial_map(all_spike_t, self.spikes_window.total_data_start_time, self.spikes_window.total_data_end_time, self.temporal_axis_length, center_mode=self.params.center_mode)
+        all_spike_x = DataSeriesToSpatial.temporal_to_spatial_map(all_spike_t, self.spikes_window.total_data_start_time, self.spikes_window.total_data_end_time, self.total_data_temporal_axis_length, center_mode=self.params.center_mode)
         curr_spike_y = self.spikes_df['visualization_raster_y_location'].to_numpy() # this will map
 
         # t-mode:
@@ -643,10 +650,15 @@ class Spike3DRaster_Vedo(SimplePlayPauseWithExternalAppMixin, Spike3DRasterBotto
             printc('debug_print_axes_locations(...): Active Window/Local Properties:')
             printc(f'\t(active_t_start: {active_t_start}, active_t_end: {active_t_end}), active_window_t_duration: {active_window_t_duration}')
         # active_x_start, active_x_end = DataSeriesToSpatial.temporal_to_spatial_map((active_t_start, active_t_end), self.spikes_window.active_window_start_time, self.spikes_window.active_window_end_time, self.temporal_axis_length, center_mode=self.params.center_mode)
+        # active_x_start, active_x_end = DataSeriesToSpatial.temporal_to_spatial_map((active_t_start, active_t_end),
+        #                                                                         self.spikes_window.total_data_start_time, self.spikes_window.total_data_end_time,
+        #                                                                         self.temporal_axis_length,
+        #                                                                         center_mode=self.params.center_mode)
         active_x_start, active_x_end = DataSeriesToSpatial.temporal_to_spatial_map((active_t_start, active_t_end),
-                                                                                self.spikes_window.total_data_start_time, self.spikes_window.total_data_end_time,
-                                                                                self.temporal_axis_length,
-                                                                                center_mode=self.params.center_mode)
+                                                                        self.spikes_window.total_data_start_time, self.spikes_window.total_data_end_time,
+                                                                        self.total_data_temporal_axis_length,
+                                                                        center_mode=self.params.center_mode)
+        
         if self.enable_debug_print:
             printc(f'\t(active_x_start: {active_x_start}, active_x_end: {active_x_end}), active_x_length: {active_x_end - active_x_start}')
             
