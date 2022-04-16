@@ -434,13 +434,13 @@ class Spike3DRaster_Vedo(SimplePlayPauseWithExternalAppMixin, Spike3DRasterBotto
         
     def _update_spike_raster_lines_mesh(self):
         """ requires that the lines raster mesh (all_spike_lines) already exists, in which case it just updates its points without recreating it. """
-        all_spike_lines = self.plots.meshes.get('all_spike_lines',None)
+        all_spike_lines = self.plots.meshes.get('all_spike_lines', None)
         if all_spike_lines is not None:
             all_spike_t = self.spikes_df[self.spikes_df.spikes.time_variable_name].to_numpy() # this will map
             all_spike_x = DataSeriesToSpatial.temporal_to_spatial_map(all_spike_t, self.spikes_window.total_data_start_time, self.spikes_window.total_data_end_time, self.temporal_axis_length, center_mode=self.params.center_mode)
-            curr_spike_point_x = all_spike_lines.points()[:, 0] # get the x-points
-            curr_spike_point_x[:, 0] = all_spike_x.repeat(2) # repeat each element twice so that it's of the correct form for .points()
-            all_spike_lines.points(curr_spike_point_x) # update the points
+            curr_spike_points = all_spike_lines.points() # get all the points x-points
+            curr_spike_points[:, 0] = all_spike_x.repeat(2) # repeat each element twice so that it's of the correct form for .points()
+            all_spike_lines.points(curr_spike_points) # update the points
             
         else:
             raise NotImplementedError        
