@@ -431,6 +431,21 @@ class Spike3DRaster_Vedo(SimplePlayPauseWithExternalAppMixin, Spike3DRasterBotto
         self.ui.plt.show(mode=self.params.interaction_mode) # , axes=1                  # <--- show the vedo rendering
         self.show()                     # <--- show the Qt Window
 
+        
+    def _update_spike_raster_lines_mesh(self):
+        """ requires that the lines raster mesh (all_spike_lines) already exists, in which case it just updates its points without recreating it. """
+        all_spike_lines = self.plots.meshes.get('all_spike_lines',None)
+        if all_spike_lines is not None:
+            all_spike_t = self.spikes_df[self.spikes_df.spikes.time_variable_name].to_numpy() # this will map
+            all_spike_x = DataSeriesToSpatial.temporal_to_spatial_map(all_spike_t, self.spikes_window.total_data_start_time, self.spikes_window.total_data_end_time, self.temporal_axis_length, center_mode=self.params.center_mode)
+            curr_spike_point_x = all_spike_lines.points()[:, 0] # get the x-points
+            curr_spike_point_x[:, 0] = all_spike_x.repeat(2) # repeat each element twice so that it's of the correct form for .points()
+            all_spike_lines.points(curr_spike_point_x) # update the points
+            
+        else:
+            raise NotImplementedError        
+        
+        
     def _buildGraphics(self):
         """ Implementors must override this method to build the main graphics object and add it at layout position (0, 0)"""
         # vedo_qt_main_window = MainVedoPlottingWindow() # Create the main window with the vedo plotter
@@ -830,9 +845,7 @@ class Spike3DRaster_Vedo(SimplePlayPauseWithExternalAppMixin, Spike3DRasterBotto
         self.plt.render() # is this needed?
         self.timer_tick_counter += 1
         
-        
-    
-    
+
     @QtCore.pyqtSlot()
     def on_adjust_temporal_spatial_mapping(self):
         """ called when the spatio-temporal mapping property is changed.
@@ -844,6 +857,7 @@ class Spike3DRaster_Vedo(SimplePlayPauseWithExternalAppMixin, Spike3DRasterBotto
         """
         self.update_series_identity_y_values()
         self.rebuild_active_spikes_window()
+        self._update_spike_raster_lines_mesh() # updates the extant spikes raster lines mesh
         self._build_axes_objects() # rebuild the axes objects
         self._update_plots()
 
