@@ -1,4 +1,5 @@
 ### Complex Dataseries-based CurveDatasource approach:
+from typing import OrderedDict
 import numpy as np
 import pandas as pd
 from sklearn.preprocessing import MinMaxScaler
@@ -184,15 +185,25 @@ class Specific3DTimeCurvesHelper:
         # excluded_neuron_ids = active_curve_plotter_3d.cell_ids[~is_included_in_computation_result_neuron_IDs]
         
         # Data Mapping:
-        test_unit_time_binned_spike_counts_df = pd.DataFrame(np.concatenate((np.atleast_2d(curr_computations_results.computed_data['pf2D_Decoder'].time_window_centers), curr_computations_results.computed_data['pf2D_Decoder'].unit_specific_time_binned_spike_counts)).T)
-        test_unit_time_binned_spike_counts_df.columns = ['t'] + [str(an_id) for an_id in included_neuron_ids]
-        active_plot_df = test_unit_time_binned_spike_counts_df.copy()
-        valid_data_values_column_names = active_plot_df.columns[1:]
-
+        data_values_column_names = [str(an_id) for an_id in included_neuron_ids]
+        active_plot_df = pd.DataFrame(np.concatenate((np.atleast_2d(curr_computations_results.computed_data['pf2D_Decoder'].time_window_centers), curr_computations_results.computed_data['pf2D_Decoder'].unit_specific_time_binned_spike_counts)).T,
+                                                             columns=(['t'] + data_values_column_names))
+        # active_plot_df = test_unit_time_binned_spike_counts_df.copy()
+        
+        # a value scaler for the z-axis
+        z_scaler = MinMaxScaler(feature_range=(0, 10.0), copy=True)
+        columns = active_plot_df.columns.drop('t')
+        active_plot_df[columns] = z_scaler.fit_transform(active_plot_df[columns])
+        
+        print(f'np.shape(active_plot_df[columns]): {np.shape(active_plot_df[columns])}')
+        
+        valid_data_values_column_names = active_plot_df.columns[1:]  # all but the 't' column
+        
         # Mappings from the pre-spatial values to the spatial values:
         x_map_fn = lambda t: active_curve_plotter_3d.temporal_to_spatial(t) # returns the x-values, transforming from the times t appropriately.
         # y_map_fn = lambda v: np.full_like(v, -active_curve_plotter_3d.n_half_cells) # This is what places all values along the back wall
-        z_map_fn = lambda v_main: v_main + active_curve_plotter_3d.floor_z # returns the un-transformed primary value
+        # z_map_fn = lambda v_main: v_main + active_curve_plotter_3d.floor_z + active_curve_plotter_3d.params.spike_end_z # returns the un-transformed primary value
+        z_map_fn = lambda v_main: v_main + active_curve_plotter_3d.params.spike_end_z # returns the un-transformed primary value
 
         ## we want each test curve to be rendered with a unit_id (series of spikes), so we'll need custom y_map_fn's for each column
         n_value_columns = np.shape(active_plot_df)[1] - 1 # get the total num columns, then subtract 1 to account for the 0th ('t') column
@@ -200,10 +211,19 @@ class Specific3DTimeCurvesHelper:
         ## want a separate y_map_fn for each data series so it returns the correct index
         data_series_pre_spatial_to_spatial_mappings = [{'name':'name','x':'t','y':'v_alt','z':'v_main','x_map_fn':x_map_fn,'y_map_fn':(lambda v, bound_i=i: np.full_like(v, active_curve_plotter_3d.unit_id_to_spatial(bound_i))),'z_map_fn':z_map_fn} for i in np.arange(n_value_columns)]
 
+        data_col_name_to_unit_plot_color_rgba_map = dict()
+        for data_col_name in list(valid_data_values_column_names):
+            curr_color = active_curve_plotter_3d.params.neuron_qcolors_map[active_curve_plotter_3d.cell_id_to_unit_id_map[int(data_col_name)]] # a QColor
+            curr_color.setAlphaF(0.2) # set the alpha
+            data_col_name_to_unit_plot_color_rgba_map[data_col_name] = curr_color.getRgbF()
+            
+        # [active_curve_plotter_3d.params.neuron_qcolors_map[active_curve_plotter_3d.cell_id_to_unit_id_map[int(data_col_name)]].getRgbF() for data_col_name in list(valid_data_values_column_names)]
+        
         active_data_series_pre_spatial_list = [{'name':data_col_name,'t':'t','v_alt':None,'v_main':data_col_name,
                                                 # 'color_name':'black', # this will be overriden by the 'color' value below
-                                                'color': active_curve_plotter_3d.params.neuron_qcolors_map[active_curve_plotter_3d.cell_id_to_unit_id_map[int(data_col_name)]].getRgbF(), # gets the color for a specified data_col_name
-                                                'line_width': 1.0, 'z_scaling_factor':1.0}                                              
+                                                # 'color': active_curve_plotter_3d.params.neuron_qcolors_map[active_curve_plotter_3d.cell_id_to_unit_id_map[int(data_col_name)]].getRgbF(), # gets the color for a specified data_col_name
+                                                'color': data_col_name_to_unit_plot_color_rgba_map[data_col_name], # gets the color for a specified data_col_name
+                                                'line_width': 2.0, 'z_scaling_factor':1.0}
                                                     for data_col_name in list(valid_data_values_column_names)]
         # Build the finalized datasource for this object:
         binned_spike_counts_curve_datasource = CurveDatasource(active_plot_df.copy(), data_series_specs=RenderDataseries.init_from_pre_spatial_data_series_list(active_data_series_pre_spatial_list, data_series_pre_spatial_to_spatial_mappings))
