@@ -539,9 +539,8 @@ class Spike3DRaster_Vedo(SimplePlayPauseWithExternalAppMixin, Spike3DRasterBotto
         if self.enable_debug_print and local_enable_debug_print:
             printc('debug_print_axes_locations(...): Active Window/Local Properties:')
             printc(f'\t(active_t_start: {active_t_start}, active_t_end: {active_t_end}), active_window_t_duration: {active_window_t_duration}')
-        active_x_start, active_x_end = DataSeriesToSpatial.temporal_to_spatial_map((active_t_start, active_t_end),
-                                                                                self.spikes_window.total_data_start_time, self.spikes_window.total_data_end_time,
-                                                                                self.temporal_axis_length,
+        active_x_start, active_x_end = DataSeriesToSpatial.temporal_to_spatial_map((active_t_start, active_t_end), self.spikes_window.total_data_start_time, self.spikes_window.total_data_end_time,
+                                                                                self.total_data_temporal_axis_length,
                                                                                 center_mode=self.params.center_mode)
         if self.enable_debug_print:
             printc(f'\t(active_x_start: {active_x_start}, active_x_end: {active_x_end}), active_x_length: {active_x_end - active_x_start}')
@@ -587,7 +586,8 @@ class Spike3DRaster_Vedo(SimplePlayPauseWithExternalAppMixin, Spike3DRasterBotto
         if self.enable_debug_print:
             printc(f'new_axes_x_to_time_labels: {new_axes_x_to_time_labels}, global_x_start: {global_x_start}, global_x_end: {global_x_end}')
 
-        all_data_axes = Axes(self.plots.meshes['all_spike_lines'], xrange=[0, 15000], c='white', textScale=0.1, gridLineWidth=0.1, axesLineWidth=0.1, xTickLength=0.005*0.1, xTickThickness=0.0025*0.1,
+        
+        all_data_axes = Axes(self.plots.meshes['all_spike_lines'], xrange=[0, self.total_data_temporal_axis_length], c='white', textScale=0.1, gridLineWidth=0.1, axesLineWidth=0.1, xTickLength=0.005*0.1, xTickThickness=0.0025*0.1,
                                 xValuesAndLabels = new_axes_x_to_time_labels, useGlobal=True)
         
         VedoHelpers.recurrsively_apply_use_bounds(all_data_axes, False)
@@ -596,36 +596,34 @@ class Spike3DRaster_Vedo(SimplePlayPauseWithExternalAppMixin, Spike3DRasterBotto
         
         ## The axes only for the active window:
         # active_window_only_axes = vedo.Axes([self.plots.meshes['start_bound_plane'], self.plots.meshes['end_bound_plane']],  # build axes for this set of objects
-        active_window_only_axes = vedo.Axes([active_window_bounding_box],  # build axes for this set of objects
-                    xtitle="window t",
-                    ytitle="Cell ID",
-                    ztitle="",
-                    hTitleColor='red',
-                    zHighlightZero=True,
-                    xyFrameLine=2, yzFrameLine=1, zxFrameLine=1,
-                    xyFrameColor='red',
-                    # xyShift=1.05, # move xy 5% above the top of z-range
-                    yzGrid=True,
-                    zxGrid=True,
-                    yMinorTicks=self.n_cells,
-                    yLineColor='red',
-                    xrange=(active_x_start, active_x_end),
-                    yrange=(0.0, self.params.max_y_pos),
-                    zrange=(0.0, self.params.max_z_pos)
-        )
+        # active_window_only_axes = vedo.Axes([active_window_bounding_box],  # build axes for this set of objects
+        #             xtitle="window t",
+        #             ytitle="Cell ID",
+        #             ztitle="",
+        #             hTitleColor='red',
+        #             zHighlightZero=True,
+        #             xyFrameLine=2, yzFrameLine=1, zxFrameLine=1,
+        #             xyFrameColor='red',
+        #             # xyShift=1.05, # move xy 5% above the top of z-range
+        #             yzGrid=True,
+        #             zxGrid=True,
+        #             yMinorTicks=self.n_cells,
+        #             yLineColor='red',
+        #             xrange=(active_x_start, active_x_end),
+        #             yrange=(0.0, self.params.max_y_pos),
+        #             zrange=(0.0, self.params.max_z_pos)
+        # )
         
-        
-        VedoPlotterHelpers.vedo_remove_if_exists(self, 'active_window_only_axes', defer_render=True)
-        
+        # VedoPlotterHelpers.vedo_remove_if_exists(self, 'active_window_only_axes', defer_render=True)
         
         # axes1 = Axes(s1, c='r')
         
         # add the axes meshes to the meshes array and to the plotter if needed:
         all_data_axes = VedoPlotterHelpers.vedo_create_if_needed(self, 'all_data_axes', all_data_axes, defer_render=True)
-        active_window_only_axes = VedoPlotterHelpers.vedo_create_if_needed(self, 'active_window_only_axes', active_window_only_axes, defer_render=True)
+        # active_window_only_axes = VedoPlotterHelpers.vedo_create_if_needed(self, 'active_window_only_axes', active_window_only_axes, defer_render=True)
         
         # Set the visibility, useBounds, etc properties                
-        active_window_only_axes.SetVisibility(True)
+        # active_window_only_axes.SetVisibility(True)
         all_data_axes.SetVisibility(False)
         
 
@@ -649,11 +647,6 @@ class Spike3DRaster_Vedo(SimplePlayPauseWithExternalAppMixin, Spike3DRasterBotto
         if self.enable_debug_print:
             printc('debug_print_axes_locations(...): Active Window/Local Properties:')
             printc(f'\t(active_t_start: {active_t_start}, active_t_end: {active_t_end}), active_window_t_duration: {active_window_t_duration}')
-        # active_x_start, active_x_end = DataSeriesToSpatial.temporal_to_spatial_map((active_t_start, active_t_end), self.spikes_window.active_window_start_time, self.spikes_window.active_window_end_time, self.temporal_axis_length, center_mode=self.params.center_mode)
-        # active_x_start, active_x_end = DataSeriesToSpatial.temporal_to_spatial_map((active_t_start, active_t_end),
-        #                                                                         self.spikes_window.total_data_start_time, self.spikes_window.total_data_end_time,
-        #                                                                         self.temporal_axis_length,
-        #                                                                         center_mode=self.params.center_mode)
         active_x_start, active_x_end = DataSeriesToSpatial.temporal_to_spatial_map((active_t_start, active_t_end),
                                                                         self.spikes_window.total_data_start_time, self.spikes_window.total_data_end_time,
                                                                         self.total_data_temporal_axis_length,
@@ -666,8 +659,6 @@ class Spike3DRaster_Vedo(SimplePlayPauseWithExternalAppMixin, Spike3DRasterBotto
         # print(f'(active_t_start: {active_t_start}, active_t_end: {active_t_end})')
         # print(f'(active_x_start: {active_x_start}, active_x_end: {active_x_end})')
         
-        # active_ids, start_bound_plane, end_bound_plane = StaticVedo_3DRasterHelper.update_active_spikes_window(all_spike_lines, x_start=active_t_start, x_end=active_t_end, max_y_pos=self.params.max_y_pos, max_z_pos=self.params.max_z_pos, start_bound_plane=start_bound_plane, end_bound_plane=end_bound_plane)
-        # active_ids, start_bound_plane, end_bound_plane = StaticVedo_3DRasterHelper.update_active_spikes_window(all_spike_lines, x_start=active_x_start, x_end=active_x_end, max_y_pos=self.params.max_y_pos, max_z_pos=self.params.max_z_pos, start_bound_plane=start_bound_plane, end_bound_plane=end_bound_plane)
         active_ids = self.update_active_spikes_window(x_start=active_x_start, x_end=active_x_end, max_y_pos=self.params.max_y_pos, max_z_pos=self.params.max_z_pos)
         
         # Move the active_window_only_axis by the delta_x from the start plane before and after the call to update_active_spikes_window(...)
@@ -722,8 +713,8 @@ class Spike3DRaster_Vedo(SimplePlayPauseWithExternalAppMixin, Spike3DRasterBotto
         ## Get Colors from the celldata
         curr_cell_rgba_colors = active_spikes_lines_mesh.celldata['CellIndividualColors'] # note that the cell colors have components out of 0-255 (not 0.0-1.0)
         # set opacity component to zero for all non-window spikes
-        # curr_cell_rgba_colors[:,3] = 0.05*255 # np.full((spike_rgb_colors.shape[0], 1), 1.0)
-        curr_cell_rgba_colors[:,3] = 0*255 # np.full((spike_rgb_colors.shape[0], 1), 1.0)
+        curr_cell_rgba_colors[:,3] = 0.05*255 # np.full((spike_rgb_colors.shape[0], 1), 1.0) # Nearly invisible, but very faintly present
+        # curr_cell_rgba_colors[:,3] = 0*255 # np.full((spike_rgb_colors.shape[0], 1), 1.0)
         
         if len(active_ids) > 0:
             curr_cell_rgba_colors[active_ids,3] = 1.0*255 # set alpha for active_ids to an opaque 1.0
@@ -744,6 +735,7 @@ class Spike3DRaster_Vedo(SimplePlayPauseWithExternalAppMixin, Spike3DRasterBotto
         y_center = (y_depth/2.0)
         z_center = (z_height/2.0)
         
+        # Active Window Start bounding plane:
         start_bound_plane = self.plots.meshes.get('start_bound_plane', None)
         if start_bound_plane is None:
             start_bound_plane = Plane(pos=(x_start, y_center, z_center), normal=(1,0,0), sx=z_height, sy=y_depth, alpha=0.5).lw(2.0).lineColor('#CCFFCC') #.x(x_start) # s is the plane size
@@ -752,6 +744,7 @@ class Spike3DRaster_Vedo(SimplePlayPauseWithExternalAppMixin, Spike3DRasterBotto
             # just update the extant one
             start_bound_plane.x(x_start)
         
+        # Active Window Region Bounding Box:
         active_window_bounding_box = self.plots.meshes.get('active_window_bounding_box', None)
         if active_window_bounding_box is None:
             active_window_bounding_box = vedo.Box(size=(x_start, x_end, 0.0, y_depth, 0.0, z_height), c='g4', alpha=0.2).lw(2.0).lineColor('#CCFFCC')
@@ -759,7 +752,36 @@ class Spike3DRaster_Vedo(SimplePlayPauseWithExternalAppMixin, Spike3DRasterBotto
         else:
             # just update the extant one
             active_window_bounding_box.x(active_x_center)
-        
+            
+        # Active Window Region Axes Object:
+        active_window_only_axes = self.plots.meshes.get('active_window_only_axes', None)
+        if active_window_only_axes is None:
+            ## The axes only for the active window:
+            active_window_only_axes = vedo.Axes([active_window_bounding_box],  # build axes for this set of objects
+                        xtitle="window t",
+                        ytitle="Cell ID",
+                        ztitle="",
+                        hTitleColor='red',
+                        zHighlightZero=True,
+                        xyFrameLine=2, yzFrameLine=1, zxFrameLine=1,
+                        xyFrameColor='red',
+                        # xyShift=1.05, # move xy 5% above the top of z-range
+                        yzGrid=True,
+                        zxGrid=True,
+                        yMinorTicks=self.n_cells,
+                        yLineColor='red',
+                        xrange=(x_start, x_end),
+                        yrange=(0.0, self.params.max_y_pos),
+                        zrange=(0.0, self.params.max_z_pos)
+            ) # .x(active_x_center)
+            # Add the axis if needed:
+            active_window_only_axes = VedoPlotterHelpers.vedo_create_if_needed(self, 'active_window_only_axes', active_window_only_axes, defer_render=True)
+        else:
+            # just update the extant one
+            active_window_only_axes.x(active_x_center)
+            
+            
+        # Active Window End bounding plane:
         end_bound_plane = self.plots.meshes.get('end_bound_plane', None)
         if end_bound_plane is None:
             end_bound_plane = start_bound_plane.clone().lineColor('#FFCCCC').x(x_end)
