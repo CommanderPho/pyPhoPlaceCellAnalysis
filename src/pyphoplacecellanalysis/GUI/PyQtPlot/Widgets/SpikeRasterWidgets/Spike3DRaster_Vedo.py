@@ -260,7 +260,7 @@ class Spike3DRaster_Vedo(SimplePlayPauseWithExternalAppMixin, Spike3DRasterBotto
         # Helper container variables
         # self.enable_debug_print = False
         self.enable_debug_widgets = False
-        self.enable_debug_print = True
+        self.enable_debug_print = False
         
         # Helper Mixins: INIT:
         
@@ -465,7 +465,7 @@ class Spike3DRaster_Vedo(SimplePlayPauseWithExternalAppMixin, Spike3DRasterBotto
         # vedo_qt_main_window = MainVedoPlottingWindow() # Create the main window with the vedo plotter
         self.ui.vtkWidget = QVTKRenderWindowInteractor(self.ui.frame)
         # Create renderer and add the vedo objects and callbacks
-        self.ui.plt = Plotter(qtWidget=self.ui.vtkWidget, title='Pho Vedo MainVedoPlottingWindow Test', bg='grey')
+        self.ui.plt = Plotter(qtWidget=self.ui.vtkWidget, title='Pho Vedo MainVedoPlottingWindow Test', bg='#111111', bg2='#222222')
         self.id1 = self.ui.plt.addCallback("mouse click", self.onMouseClick)
         self.id2 = self.ui.plt.addCallback("key press",   self.onKeypress)
 
