@@ -20,6 +20,14 @@ from pyphoplacecellanalysis.General.Model.Datasources.CurveDatasource import Cur
 class TimeCurvesViewMixin:
     """ Renders 3D line plots that are dependent on time.
     
+    
+    Implementors must implement:
+    
+    def _build_or_update_plot(self, plot_name, points, **kwargs):
+    def update_3D_time_curves(self):
+    def clear_all_3D_time_curves(self):
+    
+    
     Usage:
         # plot_data = pd.DataFrame({'t': curr_sess.mua.time, 'mua_firing_rate': curr_sess.mua.firing_rate, 'mua_spike_counts': curr_sess.mua.spike_counts})
         plot_data = pd.DataFrame({'t': curr_sess.mua.time, 'mua_firing_rate': curr_sess.mua.firing_rate})
@@ -100,34 +108,72 @@ class TimeCurvesViewMixin:
         
         
     def clear_all_3D_time_curves(self):
-        for (aUID, plt) in self.plots.time_curves.items():
-            self.ui.main_gl_widget.removeItem(plt)
-            # plt.delete_later() #?
-        # Clear the dict
-        self.plots.time_curves.clear()
+        raise NotImplementedError
+        # for (aUID, plt) in self.plots.time_curves.items():
+        #     self.ui.main_gl_widget.removeItem(plt)
+        #     # plt.delete_later() #?
+        # # Clear the dict
+        # self.plots.time_curves.clear()
 
     
     def remove_3D_time_curves(self, UID=None, original_dataframe=None):
         """ TODO: unfortunately with this setup they would be recreated again in self.update_3D_time_curves() because the datasource would still be attached but the plot wouldn't exist. """
         raise NotImplementedError
-    
-        if UID is not None:
-            plot_UIDs = self.params.time_curves_datasource.datasource_UIDs # ['default_plot_datasource.mua_firing_rate']
-            plt = self.plots.time_curves.get(UID, None)
-        elif original_dataframe is not None:
-            self.par
-            raise NotImplementedError
-        else:
-            plt = None
+        
+    def _build_or_update_plot(self, plot_name, points, **kwargs):
+        # build the plot arguments (color, line thickness, etc)        
+        plot_args = ({'color_name':'white','line_width':0.5,'z_scaling_factor':1.0} | kwargs)
+        raise NotImplementedError
 
-        if plt is not None:
-            # perform remove:
-            print(f'removing 3D time curve with UID: {UID}...')
+            
+
+    def update_3D_time_curves(self):
+        """ initialize the graphics objects if needed, or update them if they already exist. """
+        raise NotImplementedError
+
+    # @QtCore.pyqtSlot(float, float)
+    # def TimeCurvesViewMixin_on_window_update(self, new_start, new_end):
+    #     """ called to get the data that should be displayed for the window starting at new_start and ending at new_end """
+    #     self.update_3D_time_curves()
+    
+    
+    @QtCore.pyqtSlot(object)
+    def TimeCurvesViewMixin_on_data_series_specs_changed(self, updated_data_series_specs):
+        """ called when the data series specs are udpated. """
+        print(f'TimeCurvesViewMixin_on_data_series_specs_changed(...)')
+        # self.clear_all_3D_time_curves()
+        self.add_3D_time_curves(self.params.time_curves_datasource) # Just re-adding the current datasource is sufficient to update. TODO: inefficient?
+        # self.update_3D_time_curves()
+        
+
+    @QtCore.pyqtSlot(float, float)
+    def TimeCurvesViewMixin_on_window_update(self, new_start=None, new_end=None):
+        """ called to get the data that should be displayed for the window starting at new_start and ending at new_end """
+        self.update_3D_time_curves()
+        
+        
+    
+
+
+class PyQtGraphSpecificTimeCurvesMixin(TimeCurvesViewMixin):
+    """ A version of TimeCurvesViewMixin that is specific to pyqtgraph rendering of the curves, as is done in Spike3DRaster
+    
+    Implements:
+        def _build_or_update_plot(self, plot_name, points, **kwargs):
+        def update_3D_time_curves(self):
+        def clear_all_3D_time_curves(self):
+        
+    As required 
+    
+    Known Usages:
+        Spike3DRaster
+    """
+    def clear_all_3D_time_curves(self):
+        for (aUID, plt) in self.plots.time_curves.items():
             self.ui.main_gl_widget.removeItem(plt)
             # plt.delete_later() #?
-            del self.plots.time_curves[UID] # delete the dictionary entry, meaning it's valid to do a
-            print('\t done.')
-            
+        # Clear the dict
+        self.plots.time_curves.clear()
         
     def _build_or_update_plot(self, plot_name, points, **kwargs):
         # build the plot arguments (color, line thickness, etc)        
@@ -146,7 +192,6 @@ class TimeCurvesViewMixin:
                 line_color = pg.mkColor(plot_args.setdefault('color_name', 'white'))
                 line_color.setAlphaF(0.8)
                 
-            # plt = gl.GLLinePlotItem(pos=points, color=pg.mkColor('white'), width=0.5, antialias=True)
             plt = gl.GLLinePlotItem(pos=points, color=line_color, width=plot_args.setdefault('line_width',0.5), antialias=True)
             plt.scale(1.0, 1.0, plot_args.setdefault('z_scaling_factor',1.0)) # Scale the data_values_range to fit within the z_max_value. Shouldn't need to be adjusted so long as data doesn't change.            
             # plt.scale(1.0, 1.0, self.data_z_scaling_factor) # Scale the data_values_range to fit within the z_max_value. Shouldn't need to be adjusted so long as data doesn't change.
@@ -154,8 +199,6 @@ class TimeCurvesViewMixin:
             self.plots.time_curves[plot_name] = plt # add it to the dictionary.
         return plt
             
-
-    # def _build_3D_time_curves(self):
     def update_3D_time_curves(self):
         """ initialize the graphics objects if needed, or update them if they already exist. """
         if self.params.time_curves_datasource is None:
@@ -210,28 +253,3 @@ class TimeCurvesViewMixin:
                 # outputs of either mode are curr_plot_name, pts
                 curr_plt = self._build_or_update_plot(curr_plot_name, pts, **extra_plot_options_dict)
                 # end for curr_data_series_index in np.arange(num_data_series)
-    
-    # @QtCore.pyqtSlot(float, float)
-    # def TimeCurvesViewMixin_on_window_update(self, new_start, new_end):
-    #     """ called to get the data that should be displayed for the window starting at new_start and ending at new_end """
-    #     self.update_3D_time_curves()
-    
-    
-    @QtCore.pyqtSlot(object)
-    def TimeCurvesViewMixin_on_data_series_specs_changed(self, updated_data_series_specs):
-        """ called when the data series specs are udpated. """
-        print(f'TimeCurvesViewMixin_on_data_series_specs_changed(...)')
-        # self.clear_all_3D_time_curves()
-        self.add_3D_time_curves(self.params.time_curves_datasource) # Just re-adding the current datasource is sufficient to update. TODO: inefficient?
-        # self.update_3D_time_curves()
-        
-
-    @QtCore.pyqtSlot(float, float)
-    def TimeCurvesViewMixin_on_window_update(self, new_start=None, new_end=None):
-        """ called to get the data that should be displayed for the window starting at new_start and ending at new_end """
-        self.update_3D_time_curves()
-        
-        
-    
-
-    

@@ -29,6 +29,8 @@ from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.SpikeRasterWidgets.SpikeRasterB
 
 from pyphoplacecellanalysis.GUI.Vedo.Vedo3DStatic import StaticVedo_3DRasterHelper
 
+from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.Mixins.TimeCurves3D.Render3DTimeCurvesMixin import TimeCurvesViewMixin
+
 from pyphoplacecellanalysis.GUI.Qt.PlaybackControls.Spike3DRasterBottomPlaybackControlBarWidget import Spike3DRasterBottomPlaybackControlBar
 
 
@@ -144,7 +146,7 @@ class Spike3DRasterBottomFrameControlsMixin:
         pass
         
     
-class Spike3DRaster_Vedo(SimplePlayPauseWithExternalAppMixin, Spike3DRasterBottomFrameControlsMixin, SpikeRasterBase):
+class Spike3DRaster_Vedo(SimplePlayPauseWithExternalAppMixin, Spike3DRasterBottomFrameControlsMixin, TimeCurvesViewMixin, SpikeRasterBase):
     """ **Vedo version** - Displays a 3D version of a raster plot with the spikes occuring along a plane. 
     
     TODO: CURRENTLY UNIMPLEMENTED I THINK. Switched back to Spike3DRaster as it works well and good enough.

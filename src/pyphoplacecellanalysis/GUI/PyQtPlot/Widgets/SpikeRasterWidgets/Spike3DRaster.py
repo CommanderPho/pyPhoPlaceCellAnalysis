@@ -17,7 +17,7 @@ from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.SpikeRasterWidgets.SpikeRasterB
 
 from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.Mixins.RenderTimeEpochMeshesMixin import RenderTimeEpochMeshesMixin
 
-from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.Mixins.Render3DTimeCurvesMixin import TimeCurvesViewMixin
+from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.Mixins.TimeCurves3D.Render3DTimeCurvesMixin import PyQtGraphSpecificTimeCurvesMixin
 
 
 
@@ -44,7 +44,7 @@ Internally it also performs the on_adjust_temporal_spatial_mapping() function to
 
 """
 
-class Spike3DRaster(TimeCurvesViewMixin, RenderTimeEpochMeshesMixin, SpikeRasterBase):
+class Spike3DRaster(PyQtGraphSpecificTimeCurvesMixin, RenderTimeEpochMeshesMixin, SpikeRasterBase):
     """ Displays a 3D version of a raster plot with the spikes occuring along a plane. 
     
     Usage:
