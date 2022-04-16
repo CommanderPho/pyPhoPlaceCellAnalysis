@@ -29,7 +29,7 @@ from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.SpikeRasterWidgets.SpikeRasterB
 
 from pyphoplacecellanalysis.GUI.Vedo.Vedo3DStatic import StaticVedo_3DRasterHelper
 
-from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.Mixins.TimeCurves3D.Render3DTimeCurvesMixin import TimeCurvesViewMixin
+from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.Mixins.TimeCurves3D.Render3DTimeCurvesMixin import VedoSpecificTimeCurvesMixin
 
 from pyphoplacecellanalysis.GUI.Qt.PlaybackControls.Spike3DRasterBottomPlaybackControlBarWidget import Spike3DRasterBottomPlaybackControlBar
 
@@ -146,7 +146,7 @@ class Spike3DRasterBottomFrameControlsMixin:
         pass
         
     
-class Spike3DRaster_Vedo(SimplePlayPauseWithExternalAppMixin, Spike3DRasterBottomFrameControlsMixin, TimeCurvesViewMixin, SpikeRasterBase):
+class Spike3DRaster_Vedo(SimplePlayPauseWithExternalAppMixin, Spike3DRasterBottomFrameControlsMixin, VedoSpecificTimeCurvesMixin, SpikeRasterBase):
     """ **Vedo version** - Displays a 3D version of a raster plot with the spikes occuring along a plane. 
     
     TODO: CURRENTLY UNIMPLEMENTED I THINK. Switched back to Spike3DRaster as it works well and good enough.
@@ -246,6 +246,11 @@ class Spike3DRaster_Vedo(SimplePlayPauseWithExternalAppMixin, Spike3DRasterBotto
         self.enable_debug_print = True
         
         # Helper Mixins: INIT:
+        
+        # Init the TimeCurvesViewMixin for 3D Line plots:
+        ### No plots will actually be added until self.add_3D_time_curves(plot_dataframe) is called with a valid dataframe.
+        self.TimeCurvesViewMixin_on_init()
+        
         self.Spike3DRasterBottomFrameControlsMixin_on_init()
                     
         # self.setup_spike_rendering_mixin() # NeuronIdentityAccessingMixin

@@ -154,7 +154,7 @@ class TimeCurvesViewMixin:
         
     
 
-
+########## PyQtGraph Specific TimeCurvesMixin (specializes TimeCurvesViewMixin):
 class PyQtGraphSpecificTimeCurvesMixin(TimeCurvesViewMixin):
     """ A version of TimeCurvesViewMixin that is specific to pyqtgraph rendering of the curves, as is done in Spike3DRaster
     
@@ -253,3 +253,103 @@ class PyQtGraphSpecificTimeCurvesMixin(TimeCurvesViewMixin):
                 # outputs of either mode are curr_plot_name, pts
                 curr_plt = self._build_or_update_plot(curr_plot_name, pts, **extra_plot_options_dict)
                 # end for curr_data_series_index in np.arange(num_data_series)
+
+
+
+from vedo import Spline
+
+
+########## Vedo Specific TimeCurvesMixin (specializes TimeCurvesViewMixin):
+class VedoSpecificTimeCurvesMixin(TimeCurvesViewMixin):
+    """ A version of TimeCurvesViewMixin that is specific to vedo rendering of the curves, as is done in Spike3DRaster_Vedo
+    
+    Implements:
+        def _build_or_update_plot(self, plot_name, points, **kwargs):
+        def update_3D_time_curves(self):
+        def clear_all_3D_time_curves(self):
+        
+    As required 
+    
+    Known Usages:
+        Spike3DRaster
+    """
+    def clear_all_3D_time_curves(self):
+        for (aUID, plt) in self.plots.time_curves.items():
+            self.ui.plt -= plt
+            
+            # plt.delete_later() #?
+        # Clear the dict
+        self.plots.time_curves.clear()
+        
+    def _build_or_update_plot(self, plot_name, points, **kwargs):
+        # build the plot arguments (color, line thickness, etc)        
+        plot_args = ({'color_name':'white','line_width':0.5,'z_scaling_factor':1.0} | kwargs)
+        
+        if plot_name in self.plots.time_curves:
+            # Plot already exists, update it instead.
+            plt = self.plots.time_curves[plot_name]
+            plt.points(points) # try to update the points of the spline
+        else:
+            # plot doesn't exist, built it fresh.
+            line_color = plot_args.get('color', None)
+            if line_color is None:
+                # if no explicit color value is provided, build a new color from the 'color_name' key, or if that's missing just use white.
+                line_color = pg.mkColor(plot_args.setdefault('color_name', 'white'))
+                line_color.setAlphaF(0.8)
+                
+            plt = Spline(points).lw(plot_args.setdefault('line_width',0.5)).c(line_color)# .legend('speed')
+            # plt = gl.GLLinePlotItem(pos=points, color=line_color, width=plot_args.setdefault('line_width',0.5), antialias=True)
+            # plt.scale(1.0, 1.0, plot_args.setdefault('z_scaling_factor',1.0)) # Scale the data_values_range to fit within the z_max_value. Shouldn't need to be adjusted so long as data doesn't change.
+            self.ui.plt += plt
+            self.plots.time_curves[plot_name] = plt # add it to the dictionary.
+        return plt
+            
+    def update_3D_time_curves(self):
+        """ initialize the graphics objects if needed, or update them if they already exist. """
+        if self.params.time_curves_datasource is None:
+            return
+        elif self.params.time_curves_no_update:
+            # don't update because we're in no_update mode
+            return
+        else:
+            # Common to both:
+            # Get current plot items:
+            curr_plot3D_active_window_data = self.params.time_curves_datasource.get_updated_data_window(self.spikes_window.active_window_start_time, self.spikes_window.active_window_end_time) # get updated data for the active window from the datasource
+            is_data_series_mode = self.params.time_curves_datasource.has_data_series_specs
+            data_series_spaital_values_list = self.params.time_curves_datasource.data_series_specs.get_data_series_spatial_values(curr_plot3D_active_window_data)
+            num_data_series = len(data_series_spaital_values_list)
+        
+            # curr_data_series_index = 0
+            # Loop through the active data series:                
+            for curr_data_series_index in np.arange(num_data_series):
+                # Data series mode:
+                assert is_data_series_mode, 'is_data_series_mode should always be true for Vedo version!'
+            
+                # Get the current series:
+                curr_data_series_dict = data_series_spaital_values_list[curr_data_series_index]
+                
+                curr_plot_column_name = curr_data_series_dict.get('name', f'series[{curr_data_series_index}]') # get either the specified name or the generic 'series[i]' name otherwise
+                curr_plot_name = self.params.time_curves_datasource.datasource_UIDs[curr_data_series_index]
+                # points for the current plot:
+                
+                # pts = np.c_[curr_data_series_dict['x'], curr_data_series_dict['y']]
+                pts = np.c_[curr_data_series_dict['x'], curr_data_series_dict['y'], curr_data_series_dict['z']]
+                
+                # Extra options:
+                # color_name = curr_data_series_dict.get('color_name','white')
+                extra_plot_options_dict = {'color_name':curr_data_series_dict.get('color_name', 'white'),
+                                            'line_width':curr_data_series_dict.get('line_width', 0.5),
+                                            'z_scaling_factor':curr_data_series_dict.get('z_scaling_factor', 0.5)}
+                
+                
+                
+                # outputs of either mode are curr_plot_name, pts
+                curr_plt = self._build_or_update_plot(curr_plot_name, pts, **extra_plot_options_dict)
+                # end for curr_data_series_index in np.arange(num_data_series)
+        
+        # call render after updating the time curves:
+        # self.ui.plt.render()
+        
+
+
+
