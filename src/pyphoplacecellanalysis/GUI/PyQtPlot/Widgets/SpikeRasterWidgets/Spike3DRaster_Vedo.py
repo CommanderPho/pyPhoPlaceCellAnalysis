@@ -430,9 +430,6 @@ class Spike3DRaster_Vedo(SimplePlayPauseWithExternalAppMixin, Spike3DRasterBotto
         self.id1 = self.ui.plt.addCallback("mouse click", self.onMouseClick)
         self.id2 = self.ui.plt.addCallback("key press",   self.onKeypress)
 
-        self.ui.plt += Cone().rotateX(20)
-        # self.ui.plt.show()                  # <--- show the vedo rendering
-
         # Build All Meshes:
         """ Have:
         self.params.spike_start_z
