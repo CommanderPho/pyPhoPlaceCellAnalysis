@@ -9,6 +9,8 @@ from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.SpikeRasterWidgets.Spike3DRaste
 from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.SpikeRasterWidgets.spike_raster_widgets import build_spike_3d_raster_with_2d_controls
 
 
+## TODO: update these to use the correct format! This format has been invalidated!
+
 class SpikeRastersDisplayFunctions(AllFunctionEnumeratingMixin):
     """ Functions related to visualizing 2D and 3D Spike raster plots. """
     
