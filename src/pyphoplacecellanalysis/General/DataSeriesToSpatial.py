@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
 
-from pyphocorehelpers.print_helpers import print_seconds_human_readable # for build_minute_x_tick_labels(...)
+from pyphocorehelpers.print_helpers import format_seconds_human_readable # for build_minute_x_tick_labels(...)
 
 
 class DataSeriesToSpatial:
