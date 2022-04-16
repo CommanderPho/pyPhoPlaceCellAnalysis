@@ -173,20 +173,7 @@ class Spike3DRaster(PyQtGraphSpecificTimeCurvesMixin, RenderTimeEpochMeshesMixin
         self._series_identity_y_values = None
         self.update_series_identity_y_values()
         
-        
-    def update_series_identity_y_values(self):
-        """ updates the fixed self._series_identity_y_values using the DataSeriesToSpatial.build_series_identity_axis(...) function.
-        
-        Should be called whenever:
-        self.n_cells, 
-        self.params.center_mode,
-        self.params.bin_position_mode
-        self.params.side_bin_margins
-        
-        values change.
-        """
-        self._series_identity_y_values = DataSeriesToSpatial.build_series_identity_axis(self.n_cells, center_mode=self.params.center_mode, bin_position_mode=self.params.bin_position_mode, side_bin_margins = self.params.side_bin_margins)
-        
+   
     def _buildGraphics(self):
         ##### Main Raster Plot Content Top ##########
         self.ui.main_gl_widget = gl.GLViewWidget()
@@ -322,7 +309,20 @@ class Spike3DRaster(PyQtGraphSpecificTimeCurvesMixin, RenderTimeEpochMeshesMixin
             self.ui.main_gl_widget.addItem(plt)
             self.ui.gl_line_plots.append(plt)
 
-
+     
+    def update_series_identity_y_values(self):
+        """ updates the fixed self._series_identity_y_values using the DataSeriesToSpatial.build_series_identity_axis(...) function.
+        
+        Should be called whenever:
+        self.n_cells, 
+        self.params.center_mode,
+        self.params.bin_position_mode
+        self.params.side_bin_margins
+        
+        values change.
+        """
+        self._series_identity_y_values = DataSeriesToSpatial.build_series_identity_axis(self.n_cells, center_mode=self.params.center_mode, bin_position_mode=self.params.bin_position_mode, side_bin_margins = self.params.side_bin_margins)
+        
     ## Required for DataSeriesToSpatialTransformingMixin
     # TODO: convert all instances of self.y[i], etc into using self.unit_id_to_spatial(...)
     def unit_id_to_spatial(self, unit_ids):
@@ -346,7 +346,6 @@ class Spike3DRaster(PyQtGraphSpecificTimeCurvesMixin, RenderTimeEpochMeshesMixin
         
         self.ui.glCellIdTextItems = []
         for i, cell_id in enumerate(all_cell_ids):
-        # for i, a_unit_id in enumerate(all_unit_ids):
             a_unit_id = self.cell_id_to_unit_id_map[cell_id]
             # curr_color = pg.mkColor((i, self.n_cells*1.3))
             try:
@@ -547,12 +546,9 @@ class Spike3DRaster(PyQtGraphSpecificTimeCurvesMixin, RenderTimeEpochMeshesMixin
     # unit_sort_order_changed_signal
     @QtCore.pyqtSlot(object)
     def on_unit_sort_order_changed(self, new_sort_order):
-        print(f'unit_sort_order_changed_signal(new_sort_order: {new_sort_order})')
-        
+        print(f'unit_sort_order_changed_signal(new_sort_order: {new_sort_order})')        
         # rebuild the position range for each unit along the y-axis:
-        self.series_identity_y_values = DataSeriesToSpatial.build_series_identity_axis(self.n_cells, center_mode=self.params.center_mode, bin_position_mode=self.params.bin_position_mode, side_bin_margins = self.params.side_bin_margins)
-        self.series_identity_y_values = self.series_identity_y_values[self.unit_sort_order] # re-sort the y-values by the unit_sort_order
-        
+        self.update_series_identity_y_values()
         self._update_neuron_id_graphics() # rebuild the text labels
         self._update_plots()
         print('\t done.')

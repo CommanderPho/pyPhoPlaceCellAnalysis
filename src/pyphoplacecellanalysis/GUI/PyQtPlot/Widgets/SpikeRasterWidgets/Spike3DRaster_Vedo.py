@@ -217,13 +217,13 @@ class Spike3DRaster_Vedo(SimplePlayPauseWithExternalAppMixin, Spike3DRasterBotto
     #     return self._axes_walls_z_height
     
     @property
-    def z_floor(self):
+    def floor_z(self):
         """The offset of the floor in the z-axis."""
         # return -10
         return 0
     
     @property
-    def y_backwall(self):
+    def back_wall_y(self):
         """The y position location of the green back (Y=0) axes wall plane."""
         return self.n_half_cells
     
@@ -253,10 +253,11 @@ class Spike3DRaster_Vedo(SimplePlayPauseWithExternalAppMixin, Spike3DRasterBotto
         
         self.Spike3DRasterBottomFrameControlsMixin_on_init()
                     
-        # self.setup_spike_rendering_mixin() # NeuronIdentityAccessingMixin
-        
-        # build the UI components:
-        # self.buildUI()
+        # Connect signals:
+        self.temporal_mapping_changed.connect(self.on_adjust_temporal_spatial_mapping)
+        self.spikes_window.window_duration_changed_signal.connect(self.on_adjust_temporal_spatial_mapping)
+        self.unit_sort_order_changed_signal.connect(self.on_unit_sort_order_changed)
+
 
 
     def setup(self):
@@ -283,7 +284,7 @@ class Spike3DRaster_Vedo(SimplePlayPauseWithExternalAppMixin, Spike3DRasterBotto
         
         # Config
         self.params.spike_height_z = 4.0
-        self.params.spike_start_z = self.z_floor # self.z_floor
+        self.params.spike_start_z = self.floor_z # self.z_floor
         self.params.spike_end_z = self.params.spike_start_z + self.params.spike_height_z
         
         # self.params.max_y_pos = 50.0
@@ -292,8 +293,7 @@ class Spike3DRaster_Vedo(SimplePlayPauseWithExternalAppMixin, Spike3DRasterBotto
         # max_y_all_data = self.spikes_df['visualization_raster_y_location'].nanmax()
         
         self.params.max_y_pos = 10.0
-        self.params.max_z_pos = max(self.params.spike_end_z, (self.z_floor + 1.0))
-        
+        self.params.max_z_pos = max(self.params.spike_end_z, (self.floor_z + 1.0))
         
         # self.params.center_mode = 'zero_centered'
         self.params.center_mode = 'starting_at_zero'
@@ -323,11 +323,18 @@ class Spike3DRaster_Vedo(SimplePlayPauseWithExternalAppMixin, Spike3DRasterBotto
             included_cell_INDEXES = np.array([self.get_neuron_id_and_idx(neuron_id=an_included_cell_ID)[0] for an_included_cell_ID in self.spikes_df['aclu'].to_numpy()]) # get the indexes from the cellIDs
             self.spikes_df['cell_idx'] = included_cell_INDEXES.copy()
 
+        # Determine the y-values corresponding to the series identity
+        self._series_identity_y_values = None
+        self.update_series_identity_y_values()
+        
+        
         if 'visualization_raster_y_location' not in self.spikes_df.columns:
             print(f'visualization_raster_y_location column missing. rebuilding (this might take a minute or two)...')
             # Compute the y for all windows, not just the current one:
             y = DataSeriesToSpatial.build_series_identity_axis(self.n_cells, center_mode=self.params.center_mode, bin_position_mode='bin_center', side_bin_margins = self.params.side_bin_margins)
-            all_y = [y[a_cell_id] for a_cell_id in self.spikes_df['cell_idx'].to_numpy()]
+            # all_y = [y[a_cell_id] for a_cell_id in self.spikes_df['cell_idx'].to_numpy()]
+            all_y = [self.unit_id_to_spatial(self.cell_id_to_unit_id_map[a_cell_id]) for a_cell_id in self.spikes_df['cell_idx'].to_numpy()]
+            
             self.spikes_df['visualization_raster_y_location'] = all_y # adds as a column to the dataframe. Only needs to be updated when the number of active units changes
             # max_y_all_data = np.nanmax(all_y) # self.spikes_df['visualization_raster_y_location'] 
 
@@ -438,7 +445,11 @@ class Spike3DRaster_Vedo(SimplePlayPauseWithExternalAppMixin, Spike3DRasterBotto
         else:
             rect_meshes = None
             
-            
+        # rebuild the position range for each unit along the y-axis:
+        self.update_series_identity_y_values()
+        ## TODO: note that this doesn't currently affect self.spikes_df['visualization_raster_y_location'], which is what determines where spikes are placed.
+        
+        
         # replaces StaticVedo_3DRasterHelper.build_spikes_lines(...) with a version optimized for Spike3DRaster_Vedo:
         all_spike_t = self.spikes_df[self.spikes_df.spikes.time_variable_name].to_numpy() # this will map
         # all_spike_x = DataSeriesToSpatial.temporal_to_spatial_map(all_spike_t, self.spikes_window.active_window_start_time, self.spikes_window.active_window_end_time, self.temporal_axis_length, center_mode=self.params.center_mode)
@@ -657,7 +668,8 @@ class Spike3DRaster_Vedo(SimplePlayPauseWithExternalAppMixin, Spike3DRasterBotto
             # print(f'a_key: {a_key}, values: {values}')
             self.ui.viewport_overlay.text('\n'.join(values), vedo_pos_key)
         
-        
+        ## Update the TimeCurves:
+        self.TimeCurvesViewMixin_on_window_update()
         
         self.ui.plt.resetCamera() # resetCamera() updates the camera's position
         self.ui.plt.render()
@@ -678,8 +690,24 @@ class Spike3DRaster_Vedo(SimplePlayPauseWithExternalAppMixin, Spike3DRasterBotto
         #     self.glyph.points(self.active_spike_render_points)
         pass
         
+
+    ###################################
+    #### EVENT HANDLERS
+    ##################################
+    
+    
+    
+    @QtCore.pyqtSlot()
+    def on_adjust_temporal_spatial_mapping(self):
+        """ called when the spatio-temporal mapping property is changed.
         
-        
+        Should change whenever any of the following change:
+            self.temporal_zoom_factor
+            self.render_window_duration
+            
+        """
+        self.update_series_identity_y_values()
+        self._update_plots()
 
     def onMouseClick(self, evt):
         printc("You have clicked your mouse button. Event info:\n", evt, c='y')
@@ -707,4 +735,50 @@ class Spike3DRaster_Vedo(SimplePlayPauseWithExternalAppMixin, Spike3DRasterBotto
         self.close_signal.emit() # emit to indicate that we're closing this window
 
 
+    ## Series Y positions:
+    
+    @property
+    def series_identity_y_values(self):
+        """The series_identity_y_values property."""
+        return self._series_identity_y_values
+    
+    def update_series_identity_y_values(self):
+        """ updates the fixed self._series_identity_y_values using the DataSeriesToSpatial.build_series_identity_axis(...) function.
+        
+        Should be called whenever:
+        self.n_cells, 
+        self.params.center_mode,
+        self.params.bin_position_mode
+        self.params.side_bin_margins
+        
+        values change.
+        """
+        self._series_identity_y_values = DataSeriesToSpatial.build_series_identity_axis(self.n_cells, center_mode=self.params.center_mode, bin_position_mode=self.params.bin_position_mode, side_bin_margins = self.params.side_bin_margins)
+        
+    
+    ## Required for DataSeriesToSpatialTransformingMixin
+    # TODO: convert all instances of self.y[i], etc into using self.unit_id_to_spatial(...)
+    def unit_id_to_spatial(self, unit_ids):
+        """ transforms the unit_ids in unit_ids to a spatial offset (such as the y-positions for a 3D raster plot) """
+        # build the position range for each unit along the y-axis:
+        # rebuild the position range for each unit along the y-axis:
+        if self.series_identity_y_values is None:
+            # rebuild self.series_identity_y_values
+            self.update_series_identity_y_values()
+    
+        unit_id_series_indicies = self.unit_sort_order[unit_ids] # get the appropriate series index for each unit_id given their sort order
+        return self.series_identity_y_values[unit_id_series_indicies]
+    
+    
+    
+    @QtCore.pyqtSlot(object)
+    def on_unit_sort_order_changed(self, new_sort_order):
+        print(f'unit_sort_order_changed_signal(new_sort_order: {new_sort_order})')        
+        # rebuild the position range for each unit along the y-axis:
+        self.update_series_identity_y_values()
+        self._update_plots()
+        print('\t done.')
+        
+        
+        
 # josfd
