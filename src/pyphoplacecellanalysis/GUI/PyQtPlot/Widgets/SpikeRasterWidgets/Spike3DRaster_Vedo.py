@@ -23,8 +23,9 @@ from pyphocorehelpers.gui.Vedo.vedo_helpers import VedoHelpers # for vedo_get_ca
 
 # import qdarkstyle
 
+
 from pyphoplacecellanalysis.General.DataSeriesToSpatial import DataSeriesToSpatial
-from  pyphoplacecellanalysis.General.Mixins.DisplayHelpers import debug_print_axes_locations
+from pyphoplacecellanalysis.General.Mixins.DisplayHelpers import debug_print_axes_locations
 from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.SpikeRasterWidgets.SpikeRasterBase import SpikeRasterBase
 
 from pyphoplacecellanalysis.GUI.Vedo.Vedo3DStatic import StaticVedo_3DRasterHelper
@@ -449,10 +450,8 @@ class Spike3DRaster_Vedo(SimplePlayPauseWithExternalAppMixin, Spike3DRasterBotto
         self.update_series_identity_y_values()
         ## TODO: note that this doesn't currently affect self.spikes_df['visualization_raster_y_location'], which is what determines where spikes are placed.
         
-        
         # replaces StaticVedo_3DRasterHelper.build_spikes_lines(...) with a version optimized for Spike3DRaster_Vedo:
         all_spike_t = self.spikes_df[self.spikes_df.spikes.time_variable_name].to_numpy() # this will map
-        # all_spike_x = DataSeriesToSpatial.temporal_to_spatial_map(all_spike_t, self.spikes_window.active_window_start_time, self.spikes_window.active_window_end_time, self.temporal_axis_length, center_mode=self.params.center_mode)
         all_spike_x = DataSeriesToSpatial.temporal_to_spatial_map(all_spike_t, self.spikes_window.total_data_start_time, self.spikes_window.total_data_end_time, self.temporal_axis_length, center_mode=self.params.center_mode)
         curr_spike_y = self.spikes_df['visualization_raster_y_location'].to_numpy() # this will map
 
@@ -518,7 +517,7 @@ class Spike3DRaster_Vedo(SimplePlayPauseWithExternalAppMixin, Spike3DRasterBotto
         # Bounding planes:
         # active_ids, start_bound_plane, end_bound_plane = StaticVedo_3DRasterHelper.update_active_spikes_window(all_spike_lines, x_start=active_t_start, x_end=active_t_end, max_y_pos=self.params.max_y_pos, max_z_pos=self.params.max_z_pos)
         active_ids, start_bound_plane, end_bound_plane = StaticVedo_3DRasterHelper.update_active_spikes_window(all_spike_lines, x_start=active_x_start, x_end=active_x_end, max_y_pos=self.params.max_y_pos, max_z_pos=self.params.max_z_pos)
-                
+        
         if rect_meshes is not None:
             active_mesh_args = (all_spike_lines, rect_meshes, start_bound_plane, end_bound_plane)
         else:
@@ -663,6 +662,23 @@ class Spike3DRaster_Vedo(SimplePlayPauseWithExternalAppMixin, Spike3DRasterBotto
         #     self.glyph.points(self.active_spike_render_points)
         pass
         
+
+    def center_camera_on_active_timewindow(self, debug_print = False):
+        """ centers the camera on the current time window (in the x-position only) """
+        (active_t_start, active_t_end, active_window_t_duration), (global_start_t, global_end_t, global_total_data_duration), (active_x_start, active_x_end, active_x_duration), (global_x_start, global_x_end, global_x_duration) = debug_print_axes_locations(self)
+        if debug_print:
+            print((active_t_start, active_t_end, active_window_t_duration), (global_start_t, global_end_t, global_total_data_duration), (active_x_start, active_x_end, active_x_duration), (global_x_start, global_x_end, global_x_duration))
+        active_x_center = active_x_start + (active_x_duration/2.0)
+        if debug_print:
+            print(f'active_x_center: {active_x_center}')
+        prev_cam_pos = self.ui.plt.camera.GetPosition() # (1793.4129435152863, 26.484467923780887, 399.31668579161686)
+        if debug_print:
+            print(f'previous camera position: {prev_cam_pos}')
+        self.ui.plt.camera.SetPosition(active_x_center, prev_cam_pos[1], prev_cam_pos[2]) # update the camera's x position to the active_x_center, keep the other positions intact.
+        if debug_print:
+            print(f'updated camera position: {self.ui.plt.camera.GetPosition()}')
+
+
 
     ###################################
     #### EVENT HANDLERS
