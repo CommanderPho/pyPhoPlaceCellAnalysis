@@ -256,7 +256,7 @@ class PyQtGraphSpecificTimeCurvesMixin(TimeCurvesViewMixin):
 
 
 
-from vedo import Spline
+from vedo import Spline, RoundedLine, Tube, Points
 
 
 ########## Vedo Specific TimeCurvesMixin (specializes TimeCurvesViewMixin):
@@ -297,8 +297,17 @@ class VedoSpecificTimeCurvesMixin(TimeCurvesViewMixin):
                 line_color = pg.mkColor(plot_args.setdefault('color_name', 'white'))
                 line_color.setAlphaF(0.8)
                 
-            plt = Spline(points).lw(plot_args.setdefault('line_width',0.5)).c(line_color)# .legend('speed')
-            # plt = gl.GLLinePlotItem(pos=points, color=line_color, width=plot_args.setdefault('line_width',0.5), antialias=True)
+            # tube_radius = plot_args.setdefault('line_width',0.5)
+            tube_radius = 0.1
+            
+            # CSpline
+            
+            # plt = Points(points).lw(plot_args.setdefault('line_width',0.5)).c(line_color).scale((1.0, 1.0, plot_args.setdefault('z_scaling_factor',1.0))).legend(plot_name)
+            plt = RoundedLine(points, lw=tube_radius).c(line_color).scale((1.0, 1.0, plot_args.setdefault('z_scaling_factor',1.0))).legend(plot_name) 
+            
+            # plt = Tube(points, r=tube_radius, c=line_color).scale((1.0, 1.0, plot_args.setdefault('z_scaling_factor',1.0))).legend(plot_name)
+            # plt = Spline(points).lw(plot_args.setdefault('line_width',0.5)).c(line_color).scale((1.0, 1.0, plot_args.setdefault('z_scaling_factor',1.0))).legend(plot_name)
+            plt.useBounds(False) # set not to use bounds so it doesn't zoom the camera all the way out to see all of it.
             # plt.scale(1.0, 1.0, plot_args.setdefault('z_scaling_factor',1.0)) # Scale the data_values_range to fit within the z_max_value. Shouldn't need to be adjusted so long as data doesn't change.
             self.ui.plt += plt
             self.plots.time_curves[plot_name] = plt # add it to the dictionary.
@@ -333,7 +342,7 @@ class VedoSpecificTimeCurvesMixin(TimeCurvesViewMixin):
                 # points for the current plot:
                 
                 # pts = np.c_[curr_data_series_dict['x'], curr_data_series_dict['y']]
-                pts = np.c_[curr_data_series_dict['x'], curr_data_series_dict['y'], curr_data_series_dict['z']]
+                pts = np.c_[curr_data_series_dict['x'], curr_data_series_dict['y'], curr_data_series_dict['z'] * 10.0]
                 
                 # Extra options:
                 # color_name = curr_data_series_dict.get('color_name','white')

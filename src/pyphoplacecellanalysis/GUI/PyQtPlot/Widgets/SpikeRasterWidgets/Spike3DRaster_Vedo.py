@@ -526,27 +526,6 @@ class Spike3DRaster_Vedo(SimplePlayPauseWithExternalAppMixin, Spike3DRasterBotto
 
         # New Way of building the axes for all data (displaying evenly-spaced ticks along the x-axis with labels reflecting the corresponding t-value time:
         
-
-        # Old Way of building the axes for all data:
-        # all_data_axes = vedo.Axes([all_spike_lines, rect_meshes, start_bound_plane, end_bound_plane],  # build axes for this set of objects
-        # all_data_axes = vedo.Axes(active_mesh_args,  # build axes for this set of objects
-        #             xtitle="timestamp (t)",
-        #             ytitle="Cell ID",
-        #             ztitle="Z",
-        #             hTitleColor='white',
-        #             zHighlightZero=True,
-        #             xyFrameLine=2, yzFrameLine=1, zxFrameLine=1,
-        #             xyFrameColor='white',
-        #             # xyShift=1.05, # move xy 5% above the top of z-range
-        #             yzGrid=True,
-        #             zxGrid=True,
-        #             yMinorTicks=n_cells,
-        #             yLineColor='white',
-        #             # xrange=(active_x_start, active_x_end),
-        #             # yrange=(0.0, max_y_pos),
-        #             # zrange=(0.0, max_z_pos)
-        # )
-        
         #  xValuesAndLabels: list of custom tick positions and labels [(pos1, label1), …]
         # Want to add a tick/label at the x-values corresponding to each minute.
         (active_t_start, active_t_end, active_window_t_duration), (global_start_t, global_end_t, global_total_data_duration), (active_x_start, active_x_end, active_x_duration), (global_x_start, global_x_end, global_x_duration) = debug_print_axes_locations(self)
