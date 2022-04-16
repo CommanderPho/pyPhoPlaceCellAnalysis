@@ -505,10 +505,12 @@ class SpikeRasterBase(UnitSortableMixin, DataSeriesToSpatialTransformingMixin, N
             reply = QtWidgets.QMessageBox.Yes
             
         if reply == QtWidgets.QMessageBox.Yes:
+            self.onClose() # ensure onClose() is called
             event.accept()
             print('Window closed')
         else:
             event.ignore()
+            
 
 
 
