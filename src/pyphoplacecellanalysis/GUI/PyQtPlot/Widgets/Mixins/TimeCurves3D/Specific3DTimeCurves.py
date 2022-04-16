@@ -158,3 +158,55 @@ class Specific3DTimeCurvesHelper:
                 
         return active_test_random_plot_curve_datasource
 
+
+    ##########################################
+    ## Time Binned Unit Spike Counts 3D Time Curves
+    @staticmethod
+    def add_unit_time_binned_spike_counts_curves(curr_computations_results, active_curve_plotter_3d):
+        """ Adds a a 3D line plot for each unit that displays the time binned spike rate
+        
+        Gets the result out of curr_computations_results.computed_data['pf2D_Decoder']
+        
+        Usage:
+            ## Adds the binned_spike_counts curves:
+            active_curve_plotter_3d = spike_raster_plt_3d ## PyQtGraph Mode
+            # active_curve_plotter_3d = spike_raster_plt_3d_vedo ## Vedo Mode
+            binned_spike_counts_curve_datasource = add_unit_time_binned_spike_counts_curves(curr_computations_results, active_curve_plotter_3d)
+        """
+
+        # Index Mapping:
+        curr_neuron_IDs = np.array(curr_computations_results.computed_data['pf2D_Decoder'].neuron_IDs)
+        # curr_neuron_IDXs = curr_computations_results.computed_data['pf2D_Decoder'].neuron_IDXs
+
+        # need to filter spike_raster_plt_3d_vedo.cell_ids to only include the ones present in curr_neuron_IDs
+        is_included_in_computation_result_neuron_IDs = np.isin(active_curve_plotter_3d.cell_ids, curr_neuron_IDs)
+        included_neuron_ids = active_curve_plotter_3d.cell_ids[is_included_in_computation_result_neuron_IDs]
+        # excluded_neuron_ids = active_curve_plotter_3d.cell_ids[~is_included_in_computation_result_neuron_IDs]
+        
+        # Data Mapping:
+        test_unit_time_binned_spike_counts_df = pd.DataFrame(np.concatenate((np.atleast_2d(curr_computations_results.computed_data['pf2D_Decoder'].time_window_centers), curr_computations_results.computed_data['pf2D_Decoder'].unit_specific_time_binned_spike_counts)).T)
+        test_unit_time_binned_spike_counts_df.columns = ['t'] + [str(an_id) for an_id in included_neuron_ids]
+        active_plot_df = test_unit_time_binned_spike_counts_df.copy()
+        valid_data_values_column_names = active_plot_df.columns[1:]
+
+        # Mappings from the pre-spatial values to the spatial values:
+        x_map_fn = lambda t: active_curve_plotter_3d.temporal_to_spatial(t) # returns the x-values, transforming from the times t appropriately.
+        # y_map_fn = lambda v: np.full_like(v, -active_curve_plotter_3d.n_half_cells) # This is what places all values along the back wall
+        z_map_fn = lambda v_main: v_main + active_curve_plotter_3d.floor_z # returns the un-transformed primary value
+
+        ## we want each test curve to be rendered with a unit_id (series of spikes), so we'll need custom y_map_fn's for each column
+        n_value_columns = np.shape(active_plot_df)[1] - 1 # get the total num columns, then subtract 1 to account for the 0th ('t') column
+
+        ## want a separate y_map_fn for each data series so it returns the correct index
+        data_series_pre_spatial_to_spatial_mappings = [{'name':'name','x':'t','y':'v_alt','z':'v_main','x_map_fn':x_map_fn,'y_map_fn':(lambda v, bound_i=i: np.full_like(v, active_curve_plotter_3d.unit_id_to_spatial(bound_i))),'z_map_fn':z_map_fn} for i in np.arange(n_value_columns)]
+
+        active_data_series_pre_spatial_list = [{'name':data_col_name,'t':'t','v_alt':None,'v_main':data_col_name,
+                                                # 'color_name':'black', # this will be overriden by the 'color' value below
+                                                'color': active_curve_plotter_3d.params.neuron_qcolors_map[active_curve_plotter_3d.cell_id_to_unit_id_map[int(data_col_name)]].getRgbF(), # gets the color for a specified data_col_name
+                                                'line_width': 1.0, 'z_scaling_factor':1.0}                                              
+                                                    for data_col_name in list(valid_data_values_column_names)]
+        # Build the finalized datasource for this object:
+        binned_spike_counts_curve_datasource = CurveDatasource(active_plot_df.copy(), data_series_specs=RenderDataseries.init_from_pre_spatial_data_series_list(active_data_series_pre_spatial_list, data_series_pre_spatial_to_spatial_mappings))
+        # Add the datasource to the actual plotter object: this will cause it to build and add the 3D time curves:
+        active_curve_plotter_3d.add_3D_time_curves(curve_datasource=binned_spike_counts_curve_datasource) # Add the curves from the datasource
+        return binned_spike_counts_curve_datasource
