@@ -296,8 +296,6 @@ class SpikeRasterBase(UnitSortableMixin, DataSeriesToSpatialTransformingMixin, N
         # Old working:
         # self.spikes_window.timeWindow.window_updated_signal.connect(self.on_window_changed)
         
-        
-        
         ## TODO: BUG: MAJOR: Since the application instance is being assigned to self.app (for any of the widgets that create it) I think that aboutToQuit is called any time any of the widgets are going to close. Although I guess that doesn't explain the errors.
         
         # Connect app quit to onClose event:
@@ -597,7 +595,8 @@ class SpikeRasterBase(UnitSortableMixin, DataSeriesToSpatialTransformingMixin, N
     @QtCore.pyqtSlot(float, float, float)
     def on_window_duration_changed(self, start_t, end_t, duration):
         """ changes self.half_render_window_duration """
-        print(f'SpikeRasterBase.on_window_duration_changed(start_t: {start_t}, end_t: {end_t}, duration: {duration})')
+        if self.enable_debug_print:
+            print(f'SpikeRasterBase.on_window_duration_changed(start_t: {start_t}, end_t: {end_t}, duration: {duration})')
 
 
     @QtCore.pyqtSlot(float, float)
@@ -605,25 +604,30 @@ class SpikeRasterBase(UnitSortableMixin, DataSeriesToSpatialTransformingMixin, N
         # called when the window is updated
         if self.enable_debug_print:
             print(f'SpikeRasterBase.on_window_changed(start_t: {start_t}, end_t: {end_t})')
-        profiler = pg.debug.Profiler(disabled=True, delayed=True)
+        if self.enable_debug_print:
+            profiler = pg.debug.Profiler(disabled=True, delayed=True)
         self._update_plots()
-        profiler('Finished calling _update_plots()')
+        if self.enable_debug_print:
+            profiler('Finished calling _update_plots()')
         
         
     
     @QtCore.pyqtSlot(float, float, float, object)
     def on_windowed_data_window_duration_changed(self, start_t, end_t, duration, updated_data_value):
         """ changes self.half_render_window_duration """
-        print(f'SpikeRasterBase.on_windowed_data_window_duration_changed(start_t: {start_t}, end_t: {end_t}, duration: {duration}, updated_data_value: ...)')
+        if self.enable_debug_print:
+            print(f'SpikeRasterBase.on_windowed_data_window_duration_changed(start_t: {start_t}, end_t: {end_t}, duration: {duration}, updated_data_value: ...)')
 
     @QtCore.pyqtSlot(float, float, object)
     def on_windowed_data_window_changed(self, start_t, end_t, updated_data_value):
         # called when the window is updated
         if self.enable_debug_print:
             print(f'SpikeRasterBase.on_windowed_data_window_changed(start_t: {start_t}, end_t: {end_t}, updated_data_value: ...)')
-        profiler = pg.debug.Profiler(disabled=True, delayed=True)
+        if self.enable_debug_print:
+            profiler = pg.debug.Profiler(disabled=True, delayed=True)
         self._update_plots()
-        profiler('Finished calling _update_plots()')
+        if self.enable_debug_print:
+            profiler('Finished calling _update_plots()')
     
 
         

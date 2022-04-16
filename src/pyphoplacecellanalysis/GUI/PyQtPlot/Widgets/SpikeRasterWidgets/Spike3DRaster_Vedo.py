@@ -456,7 +456,7 @@ class Spike3DRaster_Vedo(SimplePlayPauseWithExternalAppMixin, Spike3DRasterBotto
             raise NotImplementedError        
         
         
-    def _buildGraphics(self):
+    def _buildGraphics(self, local_enable_debug_print=False):
         """ Implementors must override this method to build the main graphics object and add it at layout position (0, 0)"""
         # vedo_qt_main_window = MainVedoPlottingWindow() # Create the main window with the vedo plotter
         self.ui.vtkWidget = QVTKRenderWindowInteractor(self.ui.frame)
@@ -506,9 +506,7 @@ class Spike3DRaster_Vedo(SimplePlayPauseWithExternalAppMixin, Spike3DRasterBotto
         spike_color_ids = curr_spike_y.copy() # one per spike
         spike_point_color_ids = all_spike_lines.points()[:, 1]
         curr_spike_cmap, curr_spike_alphas, spike_point_color_ids = StaticVedo_3DRasterHelper._build_spikes_colormap(spike_point_color_ids)
-        
-        # Uses the old version from StaticVedo_3DRasterHelper.build_spikes_lines: 
-        # all_spike_lines, curr_spike_cmap, curr_spike_alphas, spike_point_color_ids, spike_color_ids = StaticVedo_3DRasterHelper.build_spikes_lines(self.spikes_df, spike_start_z = self.params.spike_start_z, spike_end_z = self.params.spike_end_z)
+
         all_spike_lines.useBounds(False)
         
         y_cells = np.unique(spike_color_ids)
@@ -531,7 +529,7 @@ class Spike3DRaster_Vedo(SimplePlayPauseWithExternalAppMixin, Spike3DRasterBotto
         
         active_t_start, active_t_end = (self.spikes_window.active_window_start_time, self.spikes_window.active_window_end_time)
         active_window_t_duration = self.spikes_window.window_duration
-        if self.enable_debug_print:
+        if self.enable_debug_print and local_enable_debug_print:
             printc('debug_print_axes_locations(...): Active Window/Local Properties:')
             printc(f'\t(active_t_start: {active_t_start}, active_t_end: {active_t_end}), active_window_t_duration: {active_window_t_duration}')
         active_x_start, active_x_end = DataSeriesToSpatial.temporal_to_spatial_map((active_t_start, active_t_end),
