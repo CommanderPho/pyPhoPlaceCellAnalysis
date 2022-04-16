@@ -67,10 +67,10 @@ class DataSeriesToSpatial:
         """ Returns the centers of the bins 
         Useful for generating the position data for the axis that represents the number of independent data series, such as neuron_ids
 
-        num_data_series: the number of dataseries to be displayed
-        side_bin_margins: space to sides of the first and last cell on the y-axis
-        center_mode: either 'starting_at_zero' or 'zero_centered'
-        bin_position_mode: whether the 'left_edges', 'bin_center', or 'right_edges' of each bin is returned.
+        event_times: the number of dataseries to be displayed
+        active_window_start_time: space to sides of the first and last cell on the y-axis
+        active_window_end_time: either 'starting_at_zero' or 'zero_centered'
+        temporal_axis_spatial_length: 
 
         Usage:
             curr_num_dataseries = len(curr_active_pipeline.sess.spikes_df.spikes.neuron_ids)

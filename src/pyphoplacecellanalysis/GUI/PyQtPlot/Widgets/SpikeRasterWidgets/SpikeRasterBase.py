@@ -205,7 +205,7 @@ class SpikeRasterBase(UnitSortableMixin, DataSeriesToSpatialTransformingMixin, N
    
     @property
     def temporal_axis_length(self):
-        """The temporal_axis_length property."""
+        """ NOTE: the temporal_axis_length actually refers to the length of the active_window, as it's used in the pyqtgraph Spike3DRaster class."""
         return self.temporal_zoom_factor * self.render_window_duration
     @property
     def half_temporal_axis_length(self):
