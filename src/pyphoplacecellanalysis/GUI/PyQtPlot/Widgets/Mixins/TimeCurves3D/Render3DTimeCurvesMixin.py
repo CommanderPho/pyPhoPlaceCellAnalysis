@@ -234,6 +234,7 @@ class PyQtGraphSpecificTimeCurvesMixin(TimeCurvesViewMixin):
                     # Extra options:
                     # color_name = curr_data_series_dict.get('color_name','white')
                     extra_plot_options_dict = {'color_name':curr_data_series_dict.get('color_name', 'white'),
+                                               'color':curr_data_series_dict.get('color', None),
                                                'line_width':curr_data_series_dict.get('line_width', 0.5),
                                                'z_scaling_factor':curr_data_series_dict.get('z_scaling_factor', 0.5)}
                     
