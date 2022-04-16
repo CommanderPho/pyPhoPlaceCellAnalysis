@@ -446,6 +446,8 @@ class Spike3DRaster_Vedo(SimplePlayPauseWithExternalAppMixin, Spike3DRasterBotto
         else:
             rect_meshes = None
             
+        self.plots.meshes['rect_meshes'] = rect_meshes
+        
         # rebuild the position range for each unit along the y-axis:
         self.update_series_identity_y_values()
         ## TODO: note that this doesn't currently affect self.spikes_df['visualization_raster_y_location'], which is what determines where spikes are placed.
@@ -483,6 +485,7 @@ class Spike3DRaster_Vedo(SimplePlayPauseWithExternalAppMixin, Spike3DRasterBotto
         all_spike_lines.lighting('default')
         ## Set Colors using explicitly computed spike_rgba_colors:
         all_spike_lines.cellIndividualColors(spike_rgba_colors*255)
+        self.plots.meshes['all_spike_lines'] = all_spike_lines
         
         
         """ 
@@ -512,68 +515,26 @@ class Spike3DRaster_Vedo(SimplePlayPauseWithExternalAppMixin, Spike3DRasterBotto
         active_ids, start_bound_plane, end_bound_plane = StaticVedo_3DRasterHelper.update_active_spikes_window(all_spike_lines, x_start=active_x_start, x_end=active_x_end, max_y_pos=self.params.max_y_pos, max_z_pos=self.params.max_z_pos,
                                                                                                                start_bound_plane=None, end_bound_plane=None)
         
+        # Set meshes to self.plots.meshes:
+        self.plots.meshes['start_bound_plane'] = start_bound_plane
+        self.plots.meshes['end_bound_plane'] = end_bound_plane
+        
         if rect_meshes is not None:
             active_mesh_args = (all_spike_lines, rect_meshes, start_bound_plane, end_bound_plane)
         else:
             active_mesh_args = (all_spike_lines, start_bound_plane, end_bound_plane)
 
-        # New Way of building the axes for all data (displaying evenly-spaced ticks along the x-axis with labels reflecting the corresponding t-value time:
+        # Builds the axes objects:
+        self._build_axes_objects()
         
-        #  xValuesAndLabels: list of custom tick positions and labels [(pos1, label1), …]
-        # Want to add a tick/label at the x-values corresponding to each minute.
-        (active_t_start, active_t_end, active_window_t_duration), (global_start_t, global_end_t, global_total_data_duration), (active_x_start, active_x_end, active_x_duration), (global_x_start, global_x_end, global_x_duration) = debug_print_axes_locations(self)
-        new_axes_x_to_time_labels = DataSeriesToSpatial.build_minute_x_tick_labels(self)
-        
-        if self.enable_debug_print:
-            printc(f'new_axes_x_to_time_labels: {new_axes_x_to_time_labels}, global_x_start: {global_x_start}, global_x_end: {global_x_end}')
-
-        all_data_axes = Axes(all_spike_lines, xrange=[0, 15000], c='white', textScale=0.1, gridLineWidth=0.1, axesLineWidth=0.1, xTickLength=0.005*0.1, xTickThickness=0.0025*0.1,
-                                xValuesAndLabels = new_axes_x_to_time_labels, useGlobal=True)
-        
-        VedoHelpers.recurrsively_apply_use_bounds(all_data_axes, False)
-        
-        
-        ## The axes only for the active window:
-        active_window_only_axes = vedo.Axes([start_bound_plane, end_bound_plane],  # build axes for this set of objects
-                    xtitle="window t",
-                    ytitle="Cell ID",
-                    ztitle="",
-                    hTitleColor='red',
-                    zHighlightZero=True,
-                    xyFrameLine=2, yzFrameLine=1, zxFrameLine=1,
-                    xyFrameColor='red',
-                    # xyShift=1.05, # move xy 5% above the top of z-range
-                    yzGrid=True,
-                    zxGrid=True,
-                    yMinorTicks=n_cells,
-                    yLineColor='red',
-                    xrange=(active_x_start, active_x_end),
-                    yrange=(0.0, self.params.max_y_pos),
-                    zrange=(0.0, self.params.max_z_pos)
-        )
-        
-
         # Add the meshes to the plotter:
         self.ui.plt += active_mesh_args
-        self.ui.plt += all_data_axes
-        self.ui.plt += active_window_only_axes
 
-        # Set the visibility, useBounds, etc properties                
-        active_window_only_axes.SetVisibility(False)
-        all_data_axes.SetVisibility(True)
-        
-        # Set meshes to self.plots.meshes:
-        self.plots.meshes['rect_meshes'] = rect_meshes
-        self.plots.meshes['all_spike_lines'] = all_spike_lines
-        self.plots.meshes['start_bound_plane'] = start_bound_plane
-        self.plots.meshes['end_bound_plane'] = end_bound_plane
-        self.plots.meshes['all_data_axes'] = all_data_axes
-        self.plots.meshes['active_window_only_axes'] = active_window_only_axes
-        
+
+
+                
         # setup self.ui.frame_layout:
         self.ui.frame_layout.addWidget(self.ui.vtkWidget)
-        # raise NotImplementedError
-        
         
         ## Setup Viewport Overlay Text:
         self.ui.viewport_overlay  = vedo.CornerAnnotation().color('white').alpha(0.85)#.font("Kanopus")
@@ -584,7 +545,6 @@ class Spike3DRaster_Vedo(SimplePlayPauseWithExternalAppMixin, Spike3DRasterBotto
             # print(f'a_key: {a_key}, values: {values}')
             self.ui.viewport_overlay.text('\n'.join(values), vedo_pos_key)
         
-                
         ## center_camera_on_active_timewindow(): tries to compute the explicit center of the time window
         self.center_camera_on_active_timewindow()
         
@@ -592,13 +552,56 @@ class Spike3DRaster_Vedo(SimplePlayPauseWithExternalAppMixin, Spike3DRasterBotto
         # self.ui.plt.resetCamera() # resetCamera() updates the camera's position given the ignored components
         # This limits the meshes to just the active window's meshes: [start_bound_plane, end_bound_plane, active_window_only_axes]
 
-    
-    
-    # def on_window_changed(self):
-    #     # called when the window is updated
-    #     if self.enable_debug_print:
-    #         print(f'Spike3DRaster_Vedo.on_window_changed()')
-    #     self._update_plots()
+
+    def _build_axes_objects(self):
+         # New Way of building the axes for all data (displaying evenly-spaced ticks along the x-axis with labels reflecting the corresponding t-value time:
+        
+        #  xValuesAndLabels: list of custom tick positions and labels [(pos1, label1), …]
+        # Want to add a tick/label at the x-values corresponding to each minute.
+        (active_t_start, active_t_end, active_window_t_duration), (global_start_t, global_end_t, global_total_data_duration), (active_x_start, active_x_end, active_x_duration), (global_x_start, global_x_end, global_x_duration) = debug_print_axes_locations(self)
+        new_axes_x_to_time_labels = DataSeriesToSpatial.build_minute_x_tick_labels(self)
+        
+        if self.enable_debug_print:
+            printc(f'new_axes_x_to_time_labels: {new_axes_x_to_time_labels}, global_x_start: {global_x_start}, global_x_end: {global_x_end}')
+
+        all_data_axes = Axes(self.plots.meshes['all_spike_lines'], xrange=[0, 15000], c='white', textScale=0.1, gridLineWidth=0.1, axesLineWidth=0.1, xTickLength=0.005*0.1, xTickThickness=0.0025*0.1,
+                                xValuesAndLabels = new_axes_x_to_time_labels, useGlobal=True)
+        
+        VedoHelpers.recurrsively_apply_use_bounds(all_data_axes, False)
+        
+        ## The axes only for the active window:
+        active_window_only_axes = vedo.Axes([self.plots.meshes['start_bound_plane'], self.plots.meshes['end_bound_plane']],  # build axes for this set of objects
+                    xtitle="window t",
+                    ytitle="Cell ID",
+                    ztitle="",
+                    hTitleColor='red',
+                    zHighlightZero=True,
+                    xyFrameLine=2, yzFrameLine=1, zxFrameLine=1,
+                    xyFrameColor='red',
+                    # xyShift=1.05, # move xy 5% above the top of z-range
+                    yzGrid=True,
+                    zxGrid=True,
+                    yMinorTicks=self.n_cells,
+                    yLineColor='red',
+                    xrange=(active_x_start, active_x_end),
+                    yrange=(0.0, self.params.max_y_pos),
+                    zrange=(0.0, self.params.max_z_pos)
+        )
+        
+        
+        # axes1 = Axes(s1, c='r')
+        
+        # add the axes meshes to the meshes array:
+        self.plots.meshes['all_data_axes'] = all_data_axes
+        self.plots.meshes['active_window_only_axes'] = active_window_only_axes
+        
+        # add the axes to the plotter:
+        self.ui.plt += all_data_axes
+        self.ui.plt += active_window_only_axes
+        
+        # Set the visibility, useBounds, etc properties                
+        active_window_only_axes.SetVisibility(True)
+        all_data_axes.SetVisibility(False)
         
             
     def _update_plots(self):
