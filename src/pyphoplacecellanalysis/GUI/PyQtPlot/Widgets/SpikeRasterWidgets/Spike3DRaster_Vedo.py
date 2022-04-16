@@ -28,6 +28,7 @@ from pyphoplacecellanalysis.General.DataSeriesToSpatial import DataSeriesToSpati
 from pyphoplacecellanalysis.General.Mixins.DisplayHelpers import debug_print_axes_locations
 from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.SpikeRasterWidgets.SpikeRasterBase import SpikeRasterBase
 
+from pyphoplacecellanalysis.GUI.Vedo.VedoMeshManipulatable import VedoPlotterHelpers
 from pyphoplacecellanalysis.GUI.Vedo.Vedo3DStatic import StaticVedo_3DRasterHelper
 
 from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.Mixins.TimeCurves3D.Render3DTimeCurvesMixin import VedoSpecificTimeCurvesMixin
@@ -497,7 +498,6 @@ class Spike3DRaster_Vedo(SimplePlayPauseWithExternalAppMixin, Spike3DRasterBotto
         all_spike_lines.cellIndividualColors(spike_rgba_colors*255)
         self.plots.meshes['all_spike_lines'] = all_spike_lines
         
-        
         """ 
         # self.spikes_window.total_data_start_time
         # self.spikes_window.total_data_end_time
@@ -522,17 +522,19 @@ class Spike3DRaster_Vedo(SimplePlayPauseWithExternalAppMixin, Spike3DRasterBotto
 
         # Bounding planes:
         # active_ids, start_bound_plane, end_bound_plane = StaticVedo_3DRasterHelper.update_active_spikes_window(all_spike_lines, x_start=active_t_start, x_end=active_t_end, max_y_pos=self.params.max_y_pos, max_z_pos=self.params.max_z_pos)
-        active_ids, start_bound_plane, end_bound_plane = StaticVedo_3DRasterHelper.update_active_spikes_window(all_spike_lines, x_start=active_x_start, x_end=active_x_end, max_y_pos=self.params.max_y_pos, max_z_pos=self.params.max_z_pos,
-                                                                                                               start_bound_plane=None, end_bound_plane=None)
+        # active_ids, start_bound_plane, end_bound_plane = StaticVedo_3DRasterHelper.update_active_spikes_window(all_spike_lines, x_start=active_x_start, x_end=active_x_end, max_y_pos=self.params.max_y_pos, max_z_pos=self.params.max_z_pos,
+                                                                                                            #    start_bound_plane=None, end_bound_plane=None)
         
         # Set meshes to self.plots.meshes:
-        self.plots.meshes['start_bound_plane'] = start_bound_plane
-        self.plots.meshes['end_bound_plane'] = end_bound_plane
+        # self.plots.meshes['start_bound_plane'] = start_bound_plane
+        # self.plots.meshes['end_bound_plane'] = end_bound_plane
+        
+        active_ids = self.update_active_spikes_window(x_start=active_x_start, x_end=active_x_end, max_y_pos=self.params.max_y_pos, max_z_pos=self.params.max_z_pos)
         
         if rect_meshes is not None:
-            active_mesh_args = (all_spike_lines, rect_meshes, start_bound_plane, end_bound_plane)
+            active_mesh_args = (all_spike_lines, rect_meshes)
         else:
-            active_mesh_args = (all_spike_lines, start_bound_plane, end_bound_plane)
+            active_mesh_args = (all_spike_lines)
 
         # Builds the axes objects:
         self._build_axes_objects()
@@ -710,6 +712,7 @@ class Spike3DRaster_Vedo(SimplePlayPauseWithExternalAppMixin, Spike3DRasterBotto
         start_bound_plane = self.plots.meshes.get('start_bound_plane', None)
         if start_bound_plane is None:
             start_bound_plane = Plane(pos=(x_start, y_center, z_center), normal=(1,0,0), sx=z_height, sy=y_depth, alpha=0.5).lw(2.0).lineColor('#CCFFCC') #.x(x_start) # s is the plane size
+            start_bound_plane = VedoPlotterHelpers.vedo_create_if_needed(self, 'start_bound_plane', start_bound_plane, defer_render=True)
         else:
             # just update the extant one
             start_bound_plane.x(x_start)
@@ -717,6 +720,7 @@ class Spike3DRaster_Vedo(SimplePlayPauseWithExternalAppMixin, Spike3DRasterBotto
         active_window_bounding_box = self.plots.meshes.get('active_window_bounding_box', None)
         if active_window_bounding_box is None:
             active_window_bounding_box = vedo.Box(size=(x_start, x_end, 0.0, y_depth, 0.0, z_height), c='g4', alpha=0.5).lw(2.0).lineColor('#CCFFCC')
+            active_window_bounding_box = VedoPlotterHelpers.vedo_create_if_needed(self, 'active_window_bounding_box', active_window_bounding_box, defer_render=True)
         else:
             # just update the extant one
             active_window_bounding_box.x(active_x_center)
@@ -724,6 +728,7 @@ class Spike3DRaster_Vedo(SimplePlayPauseWithExternalAppMixin, Spike3DRasterBotto
         end_bound_plane = self.plots.meshes.get('end_bound_plane', None)
         if end_bound_plane is None:
             end_bound_plane = start_bound_plane.clone().lineColor('#FFCCCC').x(x_end)
+            end_bound_plane = VedoPlotterHelpers.vedo_create_if_needed(self, 'end_bound_plane', end_bound_plane, defer_render=True)
         else:
             # just update the extant one
             end_bound_plane.x(x_end)
