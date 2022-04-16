@@ -736,13 +736,20 @@ class Spike3DRaster_Vedo(SimplePlayPauseWithExternalAppMixin, Spike3DRasterBotto
         z_center = (z_height/2.0)
         
         # Active Window Start bounding plane:
-        start_bound_plane = self.plots.meshes.get('start_bound_plane', None)
+        start_bound_plane = self.plots.meshes.get('start_bound_plane', None)        
+        # Store the start_bound_plane's previous x position before updating (if it has one). This allows us to compute the delta between frames and apply relative transforms to active_window_only_axes if that's needed.
+        prev_x_position = None
         if start_bound_plane is None:
             start_bound_plane = Plane(pos=(x_start, y_center, z_center), normal=(1,0,0), sx=z_height, sy=y_depth, alpha=0.5).lw(2.0).lineColor('#CCFFCC') #.x(x_start) # s is the plane size
             start_bound_plane = VedoPlotterHelpers.vedo_create_if_needed(self, 'start_bound_plane', start_bound_plane, defer_render=True)
+            prev_x_position = None
         else:
+            # Backup the previous x_position from the start_bound_plane before adjusting it.
+            prev_x_position = start_bound_plane.x()
+            
             # just update the extant one
             start_bound_plane.x(x_start)
+        
         
         # Active Window Region Bounding Box:
         active_window_bounding_box = self.plots.meshes.get('active_window_bounding_box', None)
@@ -778,8 +785,14 @@ class Spike3DRaster_Vedo(SimplePlayPauseWithExternalAppMixin, Spike3DRasterBotto
             active_window_only_axes = VedoPlotterHelpers.vedo_create_if_needed(self, 'active_window_only_axes', active_window_only_axes, defer_render=True)
         else:
             # just update the extant one
+            if prev_x_position is not None:
+                delta_x = start_bound_plane.x() - prev_x_position
+                prev_x_pos = active_window_only_axes.x() # get its old x() position
+                active_window_only_axes.x(prev_x_pos + delta_x) # works for positioning but doesn't update numbers
+            else:
+                # there was no previous position to change from, so just skip the positioning for now.
+                pass
             # active_window_only_axes.x(x_start)
-            pass
             
         # Active Window End bounding plane:
         end_bound_plane = self.plots.meshes.get('end_bound_plane', None)
