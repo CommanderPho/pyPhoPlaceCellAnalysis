@@ -431,6 +431,9 @@ class Spike3DRaster_Vedo(SimplePlayPauseWithExternalAppMixin, Spike3DRasterBotto
         self.id2 = self.ui.plt.addCallback("key press",   self.onKeypress)
 
         # Build All Meshes:
+        ## CRITICAL: for some reason removing this one line that adds the cone mesh makes the whole thing break, throwing some error about not being able to assign to tuples.
+        self.ui.plt += Cone() # add test cone mesh
+        
         """ Have:
         self.params.spike_start_z
         self.params.spike_end_z
