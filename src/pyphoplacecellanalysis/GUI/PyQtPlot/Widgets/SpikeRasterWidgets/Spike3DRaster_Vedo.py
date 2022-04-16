@@ -923,6 +923,14 @@ class Spike3DRaster_Vedo(SimplePlayPauseWithExternalAppMixin, Spike3DRasterBotto
         self.close_signal.emit() # emit to indicate that we're closing this window
 
 
+    # Overrides for DataSeriesToSpatialTransformingMixin:
+    
+    ## Series X positions:
+    def temporal_to_spatial(self, temporal_data):
+        """ transforms the times in temporal_data to a spatial offset (such as the x-positions for a 3D raster plot) """
+        return DataSeriesToSpatial.temporal_to_spatial_map(temporal_data, self.spikes_window.active_window_start_time, self.spikes_window.active_window_end_time, self.total_data_temporal_axis_length, center_mode=self.params.center_mode)
+
+
     ## Series Y positions:
     
     @property
