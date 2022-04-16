@@ -639,9 +639,6 @@ class Spike3DRaster_Vedo(SimplePlayPauseWithExternalAppMixin, Spike3DRasterBotto
         end_bound_plane = self.plots.meshes.get('end_bound_plane', None)
         # active_window_only_axes = self.plots.meshes.get('active_window_only_axes', None)
         
-        # if start_bound_plane is not None:
-        #     prev_x_position = start_bound_plane.x()
-        
         active_t_start, active_t_end = (self.spikes_window.active_window_start_time, self.spikes_window.active_window_end_time)
         active_window_t_duration = self.spikes_window.window_duration
         if self.enable_debug_print:
@@ -654,19 +651,9 @@ class Spike3DRaster_Vedo(SimplePlayPauseWithExternalAppMixin, Spike3DRasterBotto
         
         if self.enable_debug_print:
             printc(f'\t(active_x_start: {active_x_start}, active_x_end: {active_x_end}), active_x_length: {active_x_end - active_x_start}')
-            
-        
-        # print(f'(active_t_start: {active_t_start}, active_t_end: {active_t_end})')
-        # print(f'(active_x_start: {active_x_start}, active_x_end: {active_x_end})')
         
         active_ids = self.update_active_spikes_window(x_start=active_x_start, x_end=active_x_end, max_y_pos=self.params.max_y_pos, max_z_pos=self.params.max_z_pos)
         
-        # Move the active_window_only_axis by the delta_x from the start plane before and after the call to update_active_spikes_window(...)
-        # if (active_window_only_axes is not None) and (start_bound_plane is not None):
-        #     delta_x = start_bound_plane.x() - prev_x_position
-        #     prev_x_pos = active_window_only_axes.x()
-        #     active_window_only_axes.x(prev_x_pos + delta_x) # works for positioning but doesn't update numbers
-
         ## Update the TimeCurves:
         self.TimeCurvesViewMixin_on_window_update()
         
