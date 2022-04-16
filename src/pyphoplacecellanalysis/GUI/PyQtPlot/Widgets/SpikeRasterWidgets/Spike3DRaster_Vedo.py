@@ -426,7 +426,7 @@ class Spike3DRaster_Vedo(SimplePlayPauseWithExternalAppMixin, Spike3DRasterBotto
         # vedo_qt_main_window = MainVedoPlottingWindow() # Create the main window with the vedo plotter
         self.ui.vtkWidget = QVTKRenderWindowInteractor(self.ui.frame)
         # Create renderer and add the vedo objects and callbacks
-        self.ui.plt = Plotter(qtWidget=self.ui.vtkWidget, title='Pho Vedo MainVedoPlottingWindow Test', bg='black')
+        self.ui.plt = Plotter(qtWidget=self.ui.vtkWidget, title='Pho Vedo MainVedoPlottingWindow Test', bg='grey')
         self.id1 = self.ui.plt.addCallback("mouse click", self.onMouseClick)
         self.id2 = self.ui.plt.addCallback("key press",   self.onKeypress)
 
@@ -483,14 +483,7 @@ class Spike3DRaster_Vedo(SimplePlayPauseWithExternalAppMixin, Spike3DRasterBotto
         all_spike_lines.lighting('default')
         ## Set Colors using explicitly computed spike_rgba_colors:
         all_spike_lines.cellIndividualColors(spike_rgba_colors*255)
-        # ## Get Colors
-        # curr_cell_rgba_colors = all_spike_lines.celldata['CellIndividualColors']
-        # print(f'curr_cell_rgba_colors: {curr_cell_rgba_colors}')
-        # # set opacity component to zero for all non-window spikes
-        # curr_cell_rgba_colors[:,3] = int(0.3*255) # np.full((spike_rgb_colors.shape[0], 1), 1.0)
-        # curr_cell_rgba_colors[active_ids,3] = int(1.0*255) # set alpha for active_ids to an opaque 1.0
-        # all_spike_lines.cellIndividualColors(curr_cell_rgba_colors) # needed?
-
+        
         
         """ 
         # self.spikes_window.total_data_start_time
@@ -516,7 +509,8 @@ class Spike3DRaster_Vedo(SimplePlayPauseWithExternalAppMixin, Spike3DRasterBotto
 
         # Bounding planes:
         # active_ids, start_bound_plane, end_bound_plane = StaticVedo_3DRasterHelper.update_active_spikes_window(all_spike_lines, x_start=active_t_start, x_end=active_t_end, max_y_pos=self.params.max_y_pos, max_z_pos=self.params.max_z_pos)
-        active_ids, start_bound_plane, end_bound_plane = StaticVedo_3DRasterHelper.update_active_spikes_window(all_spike_lines, x_start=active_x_start, x_end=active_x_end, max_y_pos=self.params.max_y_pos, max_z_pos=self.params.max_z_pos)
+        active_ids, start_bound_plane, end_bound_plane = StaticVedo_3DRasterHelper.update_active_spikes_window(all_spike_lines, x_start=active_x_start, x_end=active_x_end, max_y_pos=self.params.max_y_pos, max_z_pos=self.params.max_z_pos,
+                                                                                                               start_bound_plane=None, end_bound_plane=None)
         
         if rect_meshes is not None:
             active_mesh_args = (all_spike_lines, rect_meshes, start_bound_plane, end_bound_plane)
@@ -559,10 +553,12 @@ class Spike3DRaster_Vedo(SimplePlayPauseWithExternalAppMixin, Spike3DRasterBotto
         )
         
 
+        # Add the meshes to the plotter:
         self.ui.plt += active_mesh_args
         self.ui.plt += all_data_axes
         self.ui.plt += active_window_only_axes
-                
+
+        # Set the visibility, useBounds, etc properties                
         active_window_only_axes.SetVisibility(False)
         all_data_axes.SetVisibility(True)
         
@@ -588,8 +584,12 @@ class Spike3DRaster_Vedo(SimplePlayPauseWithExternalAppMixin, Spike3DRasterBotto
             # print(f'a_key: {a_key}, values: {values}')
             self.ui.viewport_overlay.text('\n'.join(values), vedo_pos_key)
         
-    
-        self.ui.plt.resetCamera() # resetCamera() updates the camera's position given the ignored components
+                
+        ## center_camera_on_active_timewindow(): tries to compute the explicit center of the time window
+        self.center_camera_on_active_timewindow()
+        
+        ## resetCamera() method:
+        # self.ui.plt.resetCamera() # resetCamera() updates the camera's position given the ignored components
         # This limits the meshes to just the active window's meshes: [start_bound_plane, end_bound_plane, active_window_only_axes]
 
     
@@ -606,7 +606,6 @@ class Spike3DRaster_Vedo(SimplePlayPauseWithExternalAppMixin, Spike3DRasterBotto
             printc(f'Spike3DRaster_Vedo._update_plots()')
         # build the position range for each unit along the y-axis:
         # y = DataSeriesToSpatial.build_series_identity_axis(self.n_cells, center_mode=self.params.center_mode, bin_position_mode='bin_center', side_bin_margins = self.params.side_bin_margins)
-        
         
         all_spike_lines = self.plots.meshes.get('all_spike_lines', None)
         start_bound_plane = self.plots.meshes.get('start_bound_plane', None)
@@ -643,7 +642,13 @@ class Spike3DRaster_Vedo(SimplePlayPauseWithExternalAppMixin, Spike3DRasterBotto
         ## Update the TimeCurves:
         self.TimeCurvesViewMixin_on_window_update()
         
-        self.ui.plt.resetCamera() # resetCamera() updates the camera's position
+        ## center_camera_on_active_timewindow(): tries to compute the explicit center of the time window
+        self.center_camera_on_active_timewindow()
+        
+        ## resetCamera() method:
+        # self.ui.plt.resetCamera() # resetCamera() updates the camera's position given the ignored components
+        # This limits the meshes to just the active window's meshes: [start_bound_plane, end_bound_plane, active_window_only_axes]
+        
         self.ui.plt.render()
 
         # All series at once approach:
@@ -660,7 +665,6 @@ class Spike3DRaster_Vedo(SimplePlayPauseWithExternalAppMixin, Spike3DRasterBotto
         # else:
         #     # already have self.glyph created, just need to update its points
         #     self.glyph.points(self.active_spike_render_points)
-        pass
         
 
     def center_camera_on_active_timewindow(self, debug_print = False):
