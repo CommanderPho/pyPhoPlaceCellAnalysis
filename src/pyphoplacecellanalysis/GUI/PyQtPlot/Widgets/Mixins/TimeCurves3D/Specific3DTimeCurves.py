@@ -161,18 +161,32 @@ class Specific3DTimeCurvesHelper:
 
 
     ##########################################
-    ## Time Binned Unit Spike Counts 3D Time Curves
+    ## Time Binned Unit Spike Counts/Rates/MovingAveragedRates 3D Time Curves
     @staticmethod
-    def add_unit_time_binned_spike_counts_curves(curr_computations_results, active_curve_plotter_3d):
-        """ Adds a a 3D line plot for each unit that displays the time binned spike rate
-        
+    def add_unit_time_binned_spike_visualization_curves(curr_computations_results, active_curve_plotter_3d, spike_visualization_mode='count', debug_print=False):
+        """ Adds a a 3D line plot for each unit that displays either:
+            1. the time binned spike count (# spikes): spike_visualization_mode == 'count'
+            2. the time binned spike rate (spikes/sec): spike_visualization_mode == 'rate'
+            3. the averaged time binned spike rate (smoothed): spike_visualization_mode == 'mov_average'
+
         Gets the result out of curr_computations_results.computed_data['pf2D_Decoder']
+        
+        Input:
+
+            spike_visualization_mode: str - must be ('count', 'rate', 'mov_average')
         
         Usage:
             ## Adds the binned_spike_counts curves:
             active_curve_plotter_3d = spike_raster_plt_3d ## PyQtGraph Mode
             # active_curve_plotter_3d = spike_raster_plt_3d_vedo ## Vedo Mode
-            binned_spike_counts_curve_datasource = add_unit_time_binned_spike_counts_curves(curr_computations_results, active_curve_plotter_3d)
+            
+            ## Spike Count:
+            binned_spike_counts_curve_datasource = Specific3DTimeCurvesHelper.add_unit_time_binned_spike_visualization_curves(curr_computations_results, active_curve_plotter_3d, spike_visualization_mode='count')
+            ## Spike Rate:
+            binned_spike_rate_curve_datasource = Specific3DTimeCurvesHelper.add_unit_time_binned_spike_visualization_curves(curr_computations_results, active_curve_plotter_3d, spike_visualization_mode='rate')
+            ## Spike Smoothed Moving Average Rate:
+            binned_spike_moving_average_rate_curve_datasource = Specific3DTimeCurvesHelper.add_unit_time_binned_spike_visualization_curves(curr_computations_results, active_curve_plotter_3d, spike_visualization_mode='mov_average')
+            
         """
 
         # Index Mapping:
@@ -186,16 +200,35 @@ class Specific3DTimeCurvesHelper:
         
         # Data Mapping:
         data_values_column_names = [str(an_id) for an_id in included_neuron_ids]
-        active_plot_df = pd.DataFrame(np.concatenate((np.atleast_2d(curr_computations_results.computed_data['pf2D_Decoder'].time_window_centers), curr_computations_results.computed_data['pf2D_Decoder'].unit_specific_time_binned_spike_counts)).T,
+        
+        if spike_visualization_mode == 'count':
+            active_plot_df = pd.DataFrame(np.concatenate((np.atleast_2d(curr_computations_results.computed_data['pf2D_Decoder'].time_window_centers), curr_computations_results.computed_data['pf2D_Decoder'].unit_specific_time_binned_spike_counts)).T,
                                                              columns=(['t'] + data_values_column_names))
-        # active_plot_df = test_unit_time_binned_spike_counts_df.copy()
+        
+        elif spike_visualization_mode == 'rate':
+            ## Convert to spike rates (spike/sec) as a function of the bin and unit:
+            curr_time_bin_size_seconds = curr_computations_results.computed_data['pf2D_Decoder'].time_bin_size # 1.0 (seconds)
+            active_plot_df = pd.DataFrame(np.concatenate((np.atleast_2d(curr_computations_results.computed_data['pf2D_Decoder'].time_window_centers), (curr_computations_results.computed_data['pf2D_Decoder'].unit_specific_time_binned_spike_counts / curr_time_bin_size_seconds))).T,
+                                                             columns=(['t'] + data_values_column_names))
+            
+        elif spike_visualization_mode == 'mov_average':
+            ## Convert to spike rates (spike/sec) as a function of the bin and unit:
+            curr_time_bin_size_seconds = curr_computations_results.computed_data['pf2D_Decoder'].time_bin_size # 1.0 (seconds)
+            active_plot_df = pd.DataFrame(np.concatenate((np.atleast_2d(curr_computations_results.computed_data['pf2D_Decoder'].time_window_centers), (curr_computations_results.computed_data['pf2D_Decoder'].unit_specific_time_binned_spike_counts / curr_time_bin_size_seconds))).T,
+                                                             columns=(['t'] + data_values_column_names))
+            # Compute the time averaging:
+            # REF: see https://www.statology.org/exponential-moving-average-pandas/
+            active_plot_df[data_values_column_names] = active_plot_df[data_values_column_names].ewm(span=4, adjust=False).mean() # 1717 rows × 39 columns
+        else:
+            raise NotImplementedError # "Valid values are: ('count', 'rate', 'average')"
         
         # a value scaler for the z-axis
         z_scaler = MinMaxScaler(feature_range=(0, 10.0), copy=True)
         columns = active_plot_df.columns.drop('t')
         active_plot_df[columns] = z_scaler.fit_transform(active_plot_df[columns])
         
-        print(f'np.shape(active_plot_df[columns]): {np.shape(active_plot_df[columns])}')
+        if debug_print:
+            print(f'np.shape(active_plot_df[columns]): {np.shape(active_plot_df[columns])}')
         
         valid_data_values_column_names = active_plot_df.columns[1:]  # all but the 't' column
         
@@ -208,7 +241,6 @@ class Specific3DTimeCurvesHelper:
         spike_height = active_curve_plotter_3d.params.spike_end_z - active_curve_plotter_3d.params.spike_start_z
         # z_map_fn = lambda v_main: v_main + active_curve_plotter_3d.params.spike_end_z + spike_height # returns the un-transformed primary value
         z_map_fn = lambda v_main: v_main + 5.0 # returns the un-transformed primary value
-        
         
         ## we want each test curve to be rendered with a unit_id (series of spikes), so we'll need custom y_map_fn's for each column
         n_value_columns = np.shape(active_plot_df)[1] - 1 # get the total num columns, then subtract 1 to account for the 0th ('t') column
