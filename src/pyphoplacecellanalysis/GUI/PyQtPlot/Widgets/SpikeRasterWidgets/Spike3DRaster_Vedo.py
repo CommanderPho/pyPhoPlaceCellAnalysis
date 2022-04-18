@@ -701,7 +701,13 @@ class Spike3DRaster_Vedo(SimplePlayPauseWithExternalAppMixin, Spike3DRasterBotto
         # Active Window Region Bounding Box:
         active_window_bounding_box = self.plots.meshes.get('active_window_bounding_box', None)
         if active_window_bounding_box is None:
-            active_window_bounding_box = vedo.Box(size=(x_start, x_end, 0.0, y_depth, 0.0, z_height), c='g4', alpha=0.2).lw(2.0).lineColor('#CCFFCC')
+            # self.params.active_window_fill_color = 'g4'
+            self.params.active_window_fill_color = 'white'
+            self.params.active_window_line_color = '#CCFFCC'
+            self.params.active_window_line_width = 2.0
+            
+            
+            active_window_bounding_box = vedo.Box(size=(x_start, x_end, 0.0, y_depth, 0.0, z_height), c=self.params.active_window_fill_color, alpha=0.2).lw(self.params.active_window_line_width).lineColor(self.params.active_window_line_color)
             active_window_bounding_box = VedoPlotterHelpers.vedo_create_if_needed(self, 'active_window_bounding_box', active_window_bounding_box, defer_render=True)
         else:
             # just update the extant one
