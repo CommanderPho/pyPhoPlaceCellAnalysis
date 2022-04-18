@@ -41,6 +41,10 @@ class ZhangReconstructionImplementation:
         Returns:
             [type]: [description]
             
+            
+        Added Columns to spikes_df:
+            'binned_time': the binned time index
+        
         Usage:
             time_bin_size=0.02
 
