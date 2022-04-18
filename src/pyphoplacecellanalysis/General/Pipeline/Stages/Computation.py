@@ -34,7 +34,7 @@ class ComputablePipelineStage:
         """
         # only requires that active_session has the .spikes_df and .position  properties
         output_result = ComputationResult(active_session, computation_config, computed_data=dict()) # Note that this active_session should be correctly filtered
-        output_result.computed_data['pf1D'], output_result.computed_data['pf2D'] = perform_compute_placefields(active_session.spikes_df, active_session.position, computation_config, None, None, included_epochs=computation_config.computation_epochs, should_force_recompute_placefields=True)
+        # output_result.computed_data['pf1D'], output_result.computed_data['pf2D'] = perform_compute_placefields(active_session.spikes_df, active_session.position, computation_config, None, None, included_epochs=computation_config.computation_epochs, should_force_recompute_placefields=True)
 
         return output_result
 
