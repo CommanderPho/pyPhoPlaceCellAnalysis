@@ -153,57 +153,6 @@ def build_all_placefield_output_panels(ipcDataExplorer):
 
 
 
-
-
-# class SingleEditablePlacefieldDisplayConfiguration(SingleNeuronPlottingExtended, Viewer):
-#     # config = SingleNeuronPlottingExtended()
-    
-#     # value = param.Range(doc="A numeric range.")
-#     # width = param.Integer(default=300)
-    
-#     def __init__(self, **params):
-#         # self._start_input = pn.widgets.FloatInput()
-#         # self._end_input = pn.widgets.FloatInput(align='end')
-#         self._wgt_label_button = pn.widgets.Button(name=f'pf[{self.config.name}]', button_type='default', margin=0, height=20, sizing_mode='stretch_both', width_policy='min')
-#         self._wgt_color_picker = pn.widgets.ColorPicker(value=self.config.color, width=60, height=20, margin=0)
-#         self._wgt_toggle_visible = pn.widgets.Toggle(name='isVisible', value=self.config.isVisible, margin=0)
-#         self._wgt_toggle_spikes = pn.widgets.Toggle(name='SpikesVisible', value=self.config.spikesVisible, margin=0)
-#         super().__init__(**params)
-#         # Output Grid:
-#         self._layout = pn.GridSpec(width=100, height=100, margin=0)
-#         self._layout[0, :3] = self._wgt_label_button
-#         self._layout[1, :] = self._wgt_color_picker
-#         self._layout[2, :] = pn.Row(self._wgt_toggle_visible, margin=0, background='red')
-#         self._layout[3, :] = pn.Row(self._wgt_toggle_spikes, margin=0, background='green')
-
-#         # self._layout = pn.Row(self._start_input, self._end_input)
-#         self._sync_widgets()
-    
-#     def __panel__(self):
-#         return self._layout
-    
-#     # @param.depends('config', watch=True)
-#     # @param.depends('config.name','config.color','config.isVisible','config.spikesVisible', watch=True)
-#     @param.depends('config', watch=True)
-#     def _sync_widgets(self):
-#         self._wgt_label_button.name = f'pf[{self.config.name}]'
-#         self._wgt_color_picker.value = self.config.color
-#         self._wgt_toggle_visible.value = self.config.isVisible
-#         self._wgt_toggle_spikes.value = self.config.spikesVisible
-        
-#     @param.depends('_wgt_color_picker.value', '_wgt_toggle_visible.value', '_wgt_toggle_spikes.value', watch=True)
-#     def _sync_params(self):
-#         self.config.color = self._wgt_color_picker.value
-#         self.config.isVisible = self._wgt_toggle_visible.value
-#         self.config.spikesVisible = self._wgt_toggle_spikes.value
-
-
-
-# single_editable_pf_custom_widget = SingleEditablePlacefieldDisplayConfiguration(config=ipcDataExplorer.active_tuning_curve_render_configs[0])
-# single_editable_pf_custom_widget
-# pn.Row(SingleEditablePlacefieldDisplayConfiguration.param)
-
-
 class PlacefieldBatchActionsEndButtonPanel(object):
     """ A column of buttons that sits at the end of the panel_interactive_placefield_visibility_controls.
         Enables performing batch actions on the placefields, such as hiding all pfs/spikes, etc.

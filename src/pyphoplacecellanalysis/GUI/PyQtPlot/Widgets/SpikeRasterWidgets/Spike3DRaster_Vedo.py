@@ -594,30 +594,6 @@ class Spike3DRaster_Vedo(SimplePlayPauseWithExternalAppMixin, Spike3DRasterBotto
         
         active_window_bounding_box = self.plots.meshes.get('active_window_bounding_box', None)
         
-        ## The axes only for the active window:
-        # active_window_only_axes = vedo.Axes([self.plots.meshes['start_bound_plane'], self.plots.meshes['end_bound_plane']],  # build axes for this set of objects
-        # active_window_only_axes = vedo.Axes([active_window_bounding_box],  # build axes for this set of objects
-        #             xtitle="window t",
-        #             ytitle="Cell ID",
-        #             ztitle="",
-        #             hTitleColor='red',
-        #             zHighlightZero=True,
-        #             xyFrameLine=2, yzFrameLine=1, zxFrameLine=1,
-        #             xyFrameColor='red',
-        #             # xyShift=1.05, # move xy 5% above the top of z-range
-        #             yzGrid=True,
-        #             zxGrid=True,
-        #             yMinorTicks=self.n_cells,
-        #             yLineColor='red',
-        #             xrange=(active_x_start, active_x_end),
-        #             yrange=(0.0, self.params.max_y_pos),
-        #             zrange=(0.0, self.params.max_z_pos)
-        # )
-        
-        # VedoPlotterHelpers.vedo_remove_if_exists(self, 'active_window_only_axes', defer_render=True)
-        
-        # axes1 = Axes(s1, c='r')
-        
         # add the axes meshes to the meshes array and to the plotter if needed:
         all_data_axes = VedoPlotterHelpers.vedo_create_if_needed(self, 'all_data_axes', all_data_axes, defer_render=True)
         # active_window_only_axes = VedoPlotterHelpers.vedo_create_if_needed(self, 'active_window_only_axes', active_window_only_axes, defer_render=True)
@@ -662,20 +638,6 @@ class Spike3DRaster_Vedo(SimplePlayPauseWithExternalAppMixin, Spike3DRasterBotto
         
         self.ui.plt.render()
 
-        # All series at once approach:
-        # curr_spike_t = self.active_windowed_df[self.active_windowed_df.spikes.time_variable_name].to_numpy() # this will map
-        # curr_unit_n_spikes = len(curr_spike_t)
-        
-        # if self.glyph is None:        
-        #     # Create a mesh to be used like a symbol (a "glyph") to be attached to each point
-        #     self.cone = Cone().scale(0.3) # make it smaller and orient tip to positive x
-        #     # .rotateY(90) # orient tip to positive x
-        #     self.glyph = Glyph(self.active_spike_render_points, self.cone)
-        #     # glyph = Glyph(pts, cone, vecs, scaleByVectorSize=True, colorByVectorSize=True)
-        #     self.glyph.lighting('ambient') # .cmap('Blues').addScalarBar(title='wind speed')
-        # else:
-        #     # already have self.glyph created, just need to update its points
-        #     self.glyph.points(self.active_spike_render_points)
         
     def rebuild_active_spikes_window(self):
         """ called on resize to rebuild the meshes 
