@@ -55,7 +55,7 @@ class ComputablePipelineStage:
                 else:
                     # set/update the computation configs:
                     self.active_configs[a_select_config_name].computation_config = active_computation_params #TODO: if more than one computation config is passed in, the active_config should be duplicated for each computation config.
-                self.computation_results[a_select_config_name] = ComputablePipelineStage._perform_single_computation(a_filtered_session, active_computation_params) # returns a computation result. Does this store the computation config used to compute it?
+                self.computation_results[a_select_config_name] = ComputablePipelineStage._perform_single_computation(a_filtered_session, active_computation_params) # returns a computation result. This stores the computation config used to compute it.
                 # call to perform any registered computations:
                 self.computation_results[a_select_config_name] = self.perform_registered_computations(self.computation_results[a_select_config_name], debug_print=True)
             else:
@@ -66,7 +66,7 @@ class ComputablePipelineStage:
 class DefaultRegisteredComputations:
     """ Simply enables specifying the default computation functions that will be defined in this file and automatically registered. """
     def register_default_known_computation_functions(self):
-        # TODO: Note that order matters for the computation functions, unlike the display functions, so they need to be enumerated in the correct order and not sorted alphabetically
+        # Note: execution ORDER MATTERS for the computation functions, unlike the display functions, so they need to be enumerated in the correct order and not sorted alphabetically
         
         # Register the neuronal firing analysis computation functions:
         for (a_computation_fn_name, a_computation_fn) in reversed(SpikeAnalysisComputations.get_all_functions(use_definition_order=True)):
@@ -79,14 +79,6 @@ class DefaultRegisteredComputations:
         for (a_computation_fn_name, a_computation_fn) in reversed(DefaultComputationFunctions.get_all_functions(use_definition_order=True)):
             self.register_computation(a_computation_fn_name, a_computation_fn)
             
-        # # old way:
-        # self.register_computation(ExtendedStatsComputations._perform_placefield_overlap_computation)
-        # self.register_computation(ExtendedStatsComputations._perform_firing_rate_trends_computation)
-        # self.register_computation(ExtendedStatsComputations._perform_extended_statistics_computation)
-        # # self.register_computation(DefaultComputationFunctions._perform_extended_statistics_computation)
-        # self.register_computation(DefaultComputationFunctions._perform_two_step_position_decoding_computation)
-        # self.register_computation(DefaultComputationFunctions._perform_position_decoding_computation)
-        
         
         
         
