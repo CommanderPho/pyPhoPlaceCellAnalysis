@@ -285,7 +285,6 @@ class Spike3DRaster_Vedo(SimplePlayPauseWithExternalAppMixin, Spike3DRasterBotto
         """
         # self.setup_spike_rendering_mixin() # NeuronIdentityAccessingMixin
         
-        # self.app = pg.mkQApp("Spike3DRaster_Vedo")
         self.app = pg.mkQApp(self.applicationName)
         
         # Configure vedo settings:
@@ -400,7 +399,6 @@ class Spike3DRaster_Vedo(SimplePlayPauseWithExternalAppMixin, Spike3DRasterBotto
         # button.setToolTip('This is an example button')
         # button.clicked.connect(self.onClick)
  
-               
         #### Build Graphics Objects #####
         self._buildGraphics()
         
