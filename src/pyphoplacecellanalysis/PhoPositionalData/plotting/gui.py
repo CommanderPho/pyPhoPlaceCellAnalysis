@@ -7,7 +7,7 @@ User Interface Rendering and interactivity helpers
 import numpy as np
 import pyvista as pv
 
-from PhoGui.PhoCustomVtkWidgets import PhoWidgetHelper
+from pyphocorehelpers.gui.PyVista.PhoCustomVtkWidgets import PhoWidgetHelper
 
 def print_controls_helper_text():
     controls_helper_text_strings = ['[f] - Focus and zoom in on the last clicked point',

@@ -10,7 +10,7 @@ from matplotlib.collections import LineCollection, BrokenBarHCollection
 from matplotlib.colors import ListedColormap, BoundaryNorm
 from pyphoplacecellanalysis.PhoPositionalData.plotting.spikeAndPositions import _build_flat_arena_data, build_active_spikes_plot_data, perform_plot_flat_arena
 from PhoGui.InteractivePlotter.Mixins.LapsVisualizationMixin import LapsVisualizationMixin
-from PhoGui.PhoCustomVtkWidgets import PhoWidgetHelper
+from pyphocorehelpers.gui.PyVista.PhoCustomVtkWidgets import PhoWidgetHelper
 import pyvista as pv
 import pyvistaqt as pvqt
 
