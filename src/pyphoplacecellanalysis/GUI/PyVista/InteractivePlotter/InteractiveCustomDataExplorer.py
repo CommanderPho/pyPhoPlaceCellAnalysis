@@ -25,13 +25,14 @@ from numpy.lib.stride_tricks import sliding_window_view
 
 
 class InteractiveCustomDataExplorer(InteractiveDataExplorerBase):
-    """[summary]
+    """ This class is the minimal concrete implementation of the abstract InteractiveDataExplorerBase.
+    
+    This can be used as a very simple class to be extended with custom data.
+    
     """
     def __init__(self, active_config, active_session, extant_plotter=None):
-        # super().__init__(active_config, active_session, extant_plotter)
         super(InteractiveCustomDataExplorer, self).__init__(active_config, active_session, extant_plotter, data_explorer_name='CustomDataExplorer')
         self._setup()
-
     
     def _setup_variables(self):
         pass
@@ -49,7 +50,7 @@ class InteractiveCustomDataExplorer(InteractiveDataExplorerBase):
         ### Build Appropriate Plotter and set it up:
         #####################
         # Only Create a new BackgroundPlotter if it's needed:
-        self.p = InteractiveCustomDataExplorer.build_new_plotter_if_needed(pActivePlotter, shape=self.active_config.plotting_config.subplots_shape, title=self.data_explorer_name,  plotter_type=self.active_config.plotting_config.plotter_type)
+        self.p = InteractiveCustomDataExplorer.build_new_plotter_if_needed(pActivePlotter, shape=self.active_config.plotting_config.subplots_shape, title=self.data_explorer_name, plotter_type=self.active_config.plotting_config.plotter_type)
         # p.background_color = 'black'
         
         # Plot the flat arena

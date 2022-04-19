@@ -240,6 +240,7 @@ class InteractiveDataExplorerBase(InteractivePyvistaPlotterBuildIfNeededMixin, I
         
     
     def plot(self, pActivePlotter=None):
+        """ must be overriden by child class """
         raise NotImplementedError
     
     def perform_plot_location_point(self, plot_name, curr_animal_point, render=True, **kwargs):

@@ -23,7 +23,15 @@ from numpy.lib.stride_tricks import sliding_window_view
 
 
 class InteractivePlaceCellDataExplorer(InteractiveDataExplorerBase):
-    """[summary]
+    """ This 3D Vedo GUI displays a map of the animal's environment alongside animatable behavioral data (animal position on the maze, etc) and neural data (spikes, sleep state, ripple status, etc)
+    
+    It looks like the animation mostly depends on the programmatic slider update function "def on_slider_update_mesh(self, value)"
+        
+    
+    Programmatic or User-defined Updates:
+        def on_programmatic_data_update(self, active_included_all_historical_indicies=None, active_included_recent_only_indicies=None, active_window_sample_indicies=None, curr_animal_point=None)
+    
+    
     """
     def __init__(self, active_config, active_session, extant_plotter=None):
         # super().__init__(active_config, active_session, extant_plotter)

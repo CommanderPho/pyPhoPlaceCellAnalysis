@@ -144,6 +144,12 @@ def debug_print_axes_locations(spike_raster_plt):
 
 
 def debug_print_app_info(qt_app):
+    """ prints the informationa bout the active QtApp. 
+    
+    Usage:
+        debug_print_app_info(spike_raster_plt_3d.app)
+    
+    """
     print(f'.app - memory address: {hex(id(qt_app))}\n.applicationName(): {qt_app.applicationName()}')
     if qt_app.objectName() != '':
         print(f'.objectName(): {qt_app.objectName()}')

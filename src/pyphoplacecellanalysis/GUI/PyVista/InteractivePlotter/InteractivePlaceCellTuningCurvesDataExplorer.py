@@ -33,7 +33,8 @@ from pyphoplacecellanalysis.GUI.PyVista.InteractivePlotter.shared_helpers import
 
 # needs perform_plot_flat_arena
 class InteractivePlaceCellTuningCurvesDataExplorer(OccupancyPlottingMixin, HideShowPlacefieldsRenderingMixin, SpikesDataframeOwningMixin, SpikeRenderingMixin, HideShowSpikeRenderingMixin, InteractiveDataExplorerBase): 
-    """[summary]
+    """ This 3D Vedo GUI displays a map of the animal's environment alongside the computed placefield results (visualizing them as 2D surfaces overlaying the maze) and the neural spiking data that they were produced from.
+        - Does not aim to be animated in time, instead easily configurable to show the user whatever they'd like to look at.
     """
     show_legend = True
 
