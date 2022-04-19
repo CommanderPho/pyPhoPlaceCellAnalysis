@@ -156,8 +156,6 @@ class InteractivePlaceCellTuningCurvesDataExplorer(OccupancyPlottingMixin, HideS
         return self.p
     
     
-    
-    
     def __build_callbacks(self, tuningCurvePlotActors):
         combined_active_pf_update_callbacks = []
         for i, an_actor in enumerate(tuningCurvePlotActors):
