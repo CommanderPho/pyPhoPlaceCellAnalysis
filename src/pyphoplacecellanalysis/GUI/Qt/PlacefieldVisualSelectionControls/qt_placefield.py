@@ -7,7 +7,7 @@ import pyqtgraph as pg
 from pyqtgraph.Qt import QtCore, QtGui, QtWidgets, mkQApp
 
 from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer
-from pyphoplacecellanalysis.GUI.Qt.PlacefieldVisualSelectionControlWidget import PlacefieldVisualSelectionWidget
+from pyphoplacecellanalysis.GUI.Qt.PlacefieldVisualSelectionControls.PlacefieldVisualSelectionControlWidget import PlacefieldVisualSelectionWidget
 
 
 def build_single_placefield_output_widget(render_config):
