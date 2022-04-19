@@ -50,15 +50,23 @@ def build_all_placefield_output_panels(ipcDataExplorer):
     #                                                                                              spikes_config_changed_callback=ipcDataExplorer.change_unit_spikes_included)
     # out_panels = pn.Row(*out_panels, height=120)
 
+    desired_full_panel_width = 800
+    desired_full_panel_height = 200
+
     placefieldControlsContainerWidget = QtWidgets.QWidget()
     placefieldControlsContainerWidget.setObjectName('placefieldControlsContainer')
-    placefieldControlsContainerWidget.resize(800,700)
+    placefieldControlsContainerWidget.resize(desired_full_panel_width, desired_full_panel_height)
+    
+    groupBox = QtWidgets.QGroupBox("Placefield Controls")
+    groupBox.setObjectName('placefieldControlsGroupbox')
+    groupBox.resize(desired_full_panel_width, desired_full_panel_height)
+    
     
     pf_layout = QtWidgets.QHBoxLayout()
     pf_layout.setSpacing(0)
     pf_layout.setObjectName("horizontalLayout")
     
-    placefieldControlsContainerWidget.setLayout(pf_layout)
+    # placefieldControlsContainerWidget.setLayout(pf_layout)
     
     pf_widgets = []
     # the active_tuning_curve_render_configs are an array of SingleNeuronPlottingExtended objects, one for each placefield
@@ -96,7 +104,35 @@ def build_all_placefield_output_panels(ipcDataExplorer):
         pf_layout.addWidget(curr_widget)
         pf_widgets.append(curr_widget)
         
-    return (placefieldControlsContainerWidget, pf_widgets)
+    # done adding widgets
+    ## Simple (no groupbox or scroll area):
+    # placefieldControlsContainerWidget.setLayout(pf_layout)
+
+    ## Groupbox and Scrollarea:
+    # groupBox.setLayout(pf_layout) # set the groupBox's layout to the one containing the widgets
+    placefieldControlsContainerWidget.setLayout(pf_layout)
+
+    # Add a horizontal scroll area (so the placefield controls can be scrolled horizontally:
+    scroll_area = QtWidgets.QScrollArea()
+    scroll_area.resize(desired_full_panel_width, 150)
+    scroll_area.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
+    scroll_area.setSizeAdjustPolicy(QtGui.QAbstractScrollArea.AdjustToContentsOnFirstShow)
+    scroll_area.setWidget(placefieldControlsContainerWidget) # set the contents widget of the scrollarea to be the groupBox
+    # scroll_area.setWidget(groupBox) # set the contents widget of the scrollarea to be the groupBox
+    scroll_area.setWidgetResizable(True)
+    scroll_area.setFixedHeight(150)
+    
+    outer_scroll_layout = QtWidgets.QVBoxLayout()
+    outer_scroll_layout.setSpacing(0)
+    # outer_scroll_layout.setMargins(0,0,0,0)
+    outer_scroll_layout.setObjectName("outerLayout")
+    outer_scroll_layout.addWidget(scroll_area)
+    # Set the root widget's layout to the outer_scroll_layout
+    # placefieldControlsContainerWidget.setLayout(outer_scroll_layout)
+    groupBox.setLayout(outer_scroll_layout)
+    
+    return (groupBox, pf_widgets)
+    # return (placefieldControlsContainerWidget, pf_widgets)
 
 
 
