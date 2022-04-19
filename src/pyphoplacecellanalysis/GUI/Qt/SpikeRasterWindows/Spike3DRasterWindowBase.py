@@ -15,6 +15,9 @@ class Ui_RootWidget(object):
     def setupUi(self, RootWidget):
         RootWidget.setObjectName("RootWidget")
         RootWidget.resize(1663, 1110)
+        icon = QtGui.QIcon()
+        icon.addPixmap(QtGui.QPixmap(":/Icons/Icons/SpikeRaster3DIcon.ico"), QtGui.QIcon.Normal, QtGui.QIcon.Off)
+        RootWidget.setWindowIcon(icon)
         RootWidget.setStyleSheet("background-color: rgb(71, 58, 46);\n"
 "border-color: rgb(207, 207, 207);\n"
 "background-color: rgba(71, 65, 60, 180);\n"
@@ -24,7 +27,7 @@ class Ui_RootWidget(object):
         self.gridLayout.setContentsMargins(0, 2, 0, 0)
         self.gridLayout.setVerticalSpacing(0)
         self.gridLayout.setObjectName("gridLayout")
-        self.leftSideToolbarWidget = Spike3DRasterLeftSidebarControlBarBase(RootWidget)
+        self.leftSideToolbarWidget = Spike3DRasterLeftSidebarControlBar(RootWidget)
         self.leftSideToolbarWidget.setMinimumSize(QtCore.QSize(52, 1040))
         self.leftSideToolbarWidget.setMaximumSize(QtCore.QSize(52, 16777215))
         self.leftSideToolbarWidget.setBaseSize(QtCore.QSize(52, 0))
@@ -56,6 +59,24 @@ class Ui_RootWidget(object):
 
     def retranslateUi(self, RootWidget):
         _translate = QtCore.QCoreApplication.translate
-        RootWidget.setWindowTitle(_translate("RootWidget", "Form"))
+        RootWidget.setWindowTitle(_translate("RootWidget", "Spike 3D Raster Window"))
 from pyphoplacecellanalysis.GUI.Qt.PlaybackControls.Spike3DRasterBottomPlaybackControlBarWidget import Spike3DRasterBottomPlaybackControlBar
-from pyphoplacecellanalysis.GUI.Qt.ZoomAndNavigationSidebarControls.Spike3DRasterLeftSidebarControlBarBase import Ui_leftSideToolbarWidget
+from pyphoplacecellanalysis.GUI.Qt.ZoomAndNavigationSidebarControls.Spike3DRasterLeftSidebarControlBarWidget import Spike3DRasterLeftSidebarControlBar
+# import GuiResources_rc
+# from ....Resources import 
+import pyphoplacecellanalysis.Resources.GuiResources
+
+
+
+
+
+if __name__ == "__main__":
+    import sys
+    app = QtWidgets.QApplication(sys.argv)
+    rootForm = QtWidgets.QWidget()
+    ui = Ui_RootWidget()
+    ui.setupUi(rootForm)
+    rootForm.show()
+    sys.exit(app.exec_())
+
+

@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <ui version="4.0">
+ <author>Pho Hale</author>
  <class>RootWidget</class>
  <widget class="QWidget" name="RootWidget">
   <property name="geometry">
@@ -11,7 +12,11 @@
    </rect>
   </property>
   <property name="windowTitle">
-   <string>Form</string>
+   <string>Spike 3D Raster Window</string>
+  </property>
+  <property name="windowIcon">
+   <iconset resource="../../../Resources/GuiResources.qrc">
+    <normaloff>:/Icons/Icons/SpikeRaster3DIcon.ico</normaloff>:/Icons/Icons/SpikeRaster3DIcon.ico</iconset>
   </property>
   <property name="styleSheet">
    <string notr="true">background-color: rgb(71, 58, 46);
@@ -37,7 +42,7 @@ border-color: rgb(0, 0, 0);</string>
     <number>0</number>
    </property>
    <item row="0" column="0" rowspan="2">
-    <widget class="Ui_leftSideToolbarWidget" name="leftSideToolbarWidget" native="true">
+    <widget class="Spike3DRasterLeftSidebarControlBar" name="leftSideToolbarWidget" native="true">
      <property name="minimumSize">
       <size>
        <width>52</width>
@@ -113,12 +118,14 @@ border-color: rgb(0, 0, 0);</string>
    <container>1</container>
   </customwidget>
   <customwidget>
-   <class>Ui_leftSideToolbarWidget</class>
+   <class>Spike3DRasterLeftSidebarControlBar</class>
    <extends>QWidget</extends>
-   <header location="global">pyphoplacecellanalysis.GUI.Qt.ZoomAndNavigationSidebarControls.Spike3DRasterLeftSidebarControlBarBase</header>
+   <header location="global">pyphoplacecellanalysis.GUI.Qt.ZoomAndNavigationSidebarControls.Spike3DRasterLeftSidebarControlBarWidget</header>
    <container>1</container>
   </customwidget>
  </customwidgets>
- <resources/>
+ <resources>
+  <include location="../../../Resources/GuiResources.qrc"/>
+ </resources>
  <connections/>
 </ui>

@@ -1,5 +1,8 @@
 <RCC>
   <qresource prefix="Icons">
+    <file>Icons/SpikeRaster2DIcon.ico</file>
+    <file>Icons/SpikeRaster3D_VedoIcon.ico</file>
+    <file>Icons/SpikeRaster3DIcon.ico</file>
     <file>Icons/ProcessIcon.ico</file>
   </qresource>
 </RCC>

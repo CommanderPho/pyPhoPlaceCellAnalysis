@@ -74,3 +74,16 @@ class Ui_leftSideToolbarWidget(object):
         self.label_4.setText(_translate("leftSideToolbarWidget", "TextLabel"))
         self.label_5.setText(_translate("leftSideToolbarWidget", "TextLabel"))
         self.label_6.setText(_translate("leftSideToolbarWidget", "TextLabel"))
+
+
+
+if __name__ == "__main__":
+    import sys
+    app = QtWidgets.QApplication(sys.argv)
+    rootForm = QtWidgets.QWidget()
+    ui = Ui_leftSideToolbarWidget()
+    ui.setupUi(rootForm)
+    rootForm.show()
+    sys.exit(app.exec_())
+
+
