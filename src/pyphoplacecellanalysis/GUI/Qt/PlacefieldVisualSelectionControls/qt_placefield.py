@@ -50,20 +50,28 @@ def build_all_placefield_output_panels(ipcDataExplorer):
     #                                                                                              spikes_config_changed_callback=ipcDataExplorer.change_unit_spikes_included)
     # out_panels = pn.Row(*out_panels, height=120)
 
-    desired_full_panel_width = 800
+    desired_full_panel_width = 1200
     desired_full_panel_height = 200
 
     placefieldControlsContainerWidget = QtWidgets.QWidget()
     placefieldControlsContainerWidget.setObjectName('placefieldControlsContainer')
     placefieldControlsContainerWidget.resize(desired_full_panel_width, desired_full_panel_height)
+    placefieldControlsContainerWidget.setContentsMargins(0, 0, 0, 0)
     
     groupBox = QtWidgets.QGroupBox("Placefield Controls")
+    groupBox.setContentsMargins(0, 0, 0, 0)
     groupBox.setObjectName('placefieldControlsGroupbox')
     groupBox.resize(desired_full_panel_width, desired_full_panel_height)
-    
+    sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Preferred)
+    sizePolicy.setHorizontalStretch(0)
+    sizePolicy.setVerticalStretch(0)
+    # sizePolicy.setHeightForWidth(Interface.sizePolicy().hasHeightForWidth())
+    groupBox.setSizePolicy(sizePolicy)
+    groupBox.setWindowTitle('Placefield Controls')
     
     pf_layout = QtWidgets.QHBoxLayout()
     pf_layout.setSpacing(0)
+    pf_layout.setContentsMargins(0, 0, 0, 0)
     pf_layout.setObjectName("horizontalLayout")
     
     # placefieldControlsContainerWidget.setLayout(pf_layout)
@@ -120,11 +128,12 @@ def build_all_placefield_output_panels(ipcDataExplorer):
     scroll_area.setWidget(placefieldControlsContainerWidget) # set the contents widget of the scrollarea to be the groupBox
     # scroll_area.setWidget(groupBox) # set the contents widget of the scrollarea to be the groupBox
     scroll_area.setWidgetResizable(True)
+    # scroll_area.setWidgetResizable(False) # This really breaks it for some reason. Oh, I guess because it's dynamically trying to resize the widget instead of creating more room.
     scroll_area.setFixedHeight(150)
     
     outer_scroll_layout = QtWidgets.QVBoxLayout()
     outer_scroll_layout.setSpacing(0)
-    # outer_scroll_layout.setMargins(0,0,0,0)
+    outer_scroll_layout.setContentsMargins(0, 0, 0, 0)
     outer_scroll_layout.setObjectName("outerLayout")
     outer_scroll_layout.addWidget(scroll_area)
     # Set the root widget's layout to the outer_scroll_layout

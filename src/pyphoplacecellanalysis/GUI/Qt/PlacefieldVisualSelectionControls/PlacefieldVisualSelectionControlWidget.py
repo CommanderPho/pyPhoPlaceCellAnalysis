@@ -36,9 +36,9 @@ class PlacefieldVisualSelectionWidget(QtWidgets.QWidget):
         
         # Setup self.ui.btnColorButton:
         def change(btn):
-            print("change", btn.color())
+            print("btnColorButton change", btn.color())
         def done(btn):
-            print("done", btn.color())
+            print("btnColorButton done", btn.color())
         self.ui.btnColorButton.sigColorChanging.connect(change)
         self.ui.btnColorButton.sigColorChanged.connect(done)
 
