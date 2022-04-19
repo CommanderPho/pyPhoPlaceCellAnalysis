@@ -96,12 +96,6 @@ class InteractivePlaceCellDataExplorer(InteractiveDataExplorerBase):
         # active_trail_size_values[-1] = 6.0 # except for the end (current) point, which has a scale of 1.0
         # active_trail_size_values = sharply_fading_opacity_values.copy()
 
-    # def _setup_pyvista_theme(self):
-    #     customize_default_pyvista_theme() # Sets the default theme values to those specified in my imported file
-    #     # This defines the position of the vertical/horizontal splitting, in this case 40% of the vertical/horizontal dimension of the window
-    #     # pv.global_theme.multi_rendering_splitting_position = 0.40
-    #     pv.global_theme.multi_rendering_splitting_position = 0.80
-
     # legacy compatability properties:
     @property
     def flattened_spike_times(self):
@@ -229,12 +223,6 @@ class InteractivePlaceCellDataExplorer(InteractiveDataExplorerBase):
                                                                                         flattened_spike_positions_list[:, active_included_all_historical_indicies],
                                                                                         spike_geom=spike_geom_box.copy())
 
-        # active_included_all_historical_indicies = self.active_session.flattened_spiketrains.spikes_df.eval('(t_seconds > @historical_t_start) & (t_seconds < @t_stop)') # '@' prefix indicates a local variable. All other variables are
-        # historical_spikes_pdata, historical_spikes_pc = build_active_spikes_plot_data_df(flattened_spike_times[active_included_all_historical_indicies],
-        #                                                                                 flattened_spike_active_unitIdentities[active_included_all_historical_indicies],
-        #                                                                                 flattened_spike_positions_list[:, active_included_all_historical_indicies],
-        #                                                                                 spike_geom=spike_geom_box.copy())
-
         if historical_spikes_pc.n_points >= 1:
             self.plots['spikes_main_historical'] = self.p.add_mesh(historical_spikes_pc, name='historical_spikes_main', scalars='cellID', cmap=self.active_config.plotting_config.pf_listed_colormap, show_scalar_bar=False, lighting=True, render=False)
 
@@ -248,12 +236,6 @@ class InteractivePlaceCellDataExplorer(InteractiveDataExplorerBase):
         recent_only_spikes_pdata, recent_only_spikes_pc = build_active_spikes_plot_data(flattened_spike_active_unitIdentities[active_included_recent_only_indicies],
                                                                                         flattened_spike_positions_list[:, active_included_recent_only_indicies],
                                                                                         spike_geom=spike_geom_cone.copy())
-
-        # active_included_recent_only_indicies = self.active_session.flattened_spiketrains.spikes_df.eval('(t_seconds > @recent_spikes_t_start) & (t_seconds < @t_stop)') # '@' prefix indicates a local variable. All other variables are evaluated as column names
-        # recent_only_spikes_pdata, recent_only_spikes_pc = build_active_spikes_plot_data_df(flattened_spike_times[active_included_recent_only_indicies],
-        #                                                                                 flattened_spike_active_unitIdentities[active_included_recent_only_indicies],
-        #                                                                                 flattened_spike_positions_list[:, active_included_recent_only_indicies],
-        #                                                                                 spike_geom=spike_geom_cone.copy())
 
         if recent_only_spikes_pc.n_points >= 1:
             self.plots['spikes_main_recent_only'] = self.p.add_mesh(recent_only_spikes_pc, name='recent_only_spikes_main', scalars='cellID', cmap=self.active_config.plotting_config.pf_listed_colormap, show_scalar_bar=False, lighting=False, render=False) # color='white'
