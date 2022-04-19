@@ -126,14 +126,14 @@ border-color: rgb(0, 0, 0);</string>
         <widget class="QWidget" name="mainSpike3DRasterWidget" native="true">
          <property name="sizePolicy">
           <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
-           <horstretch>0</horstretch>
-           <verstretch>0</verstretch>
+           <horstretch>1</horstretch>
+           <verstretch>1</verstretch>
           </sizepolicy>
          </property>
          <property name="minimumSize">
           <size>
            <width>400</width>
-           <height>400</height>
+           <height>600</height>
           </size>
          </property>
          <property name="baseSize">
@@ -149,7 +149,7 @@ border-color: rgb(0, 0, 0);</string>
         <widget class="QWidget" name="secondarySpikeRasterControlWidget" native="true">
          <property name="sizePolicy">
           <sizepolicy hsizetype="Expanding" vsizetype="Preferred">
-           <horstretch>0</horstretch>
+           <horstretch>1</horstretch>
            <verstretch>0</verstretch>
           </sizepolicy>
          </property>
