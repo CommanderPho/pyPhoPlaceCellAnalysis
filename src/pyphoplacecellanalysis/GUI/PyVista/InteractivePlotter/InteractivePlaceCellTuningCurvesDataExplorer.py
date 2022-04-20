@@ -28,7 +28,7 @@ from pyphocorehelpers.gui.PyVista.PhoCustomVtkWidgets import MultilineTextConsol
 
 from pyphoplacecellanalysis.PhoPositionalData.plotting.spikeAndPositions import build_active_spikes_plot_data, perform_plot_flat_arena, build_spike_spawn_effect_light_actor, spike_geom_circle, spike_geom_box, spike_geom_cone, animal_location_circle, animal_location_trail_circle
 #
-from pyphoplacecellanalysis.GUI.PyVista.InteractivePlotter.shared_helpers import InteractiveDataExplorerBase
+from pyphoplacecellanalysis.GUI.PyVista.InteractivePlotter.InteractiveDataExplorerBase import InteractiveDataExplorerBase
 
 
 # needs perform_plot_flat_arena
