@@ -142,7 +142,6 @@ class PlacefieldVisualSelectionWidget(QtWidgets.QWidget):
         self.isVisible = config.isVisible
         self.spikesVisible = config.spikesVisible
 
-    fsfsa
     def config_from_state(self):
         """ called to retrieve a valid config from the UI's properties... this means it could have just held a config as its model. """
         # self.color is supposed to be a string, not a QColor
@@ -150,9 +149,14 @@ class PlacefieldVisualSelectionWidget(QtWidgets.QWidget):
         
         print(f'self.color: {self.color} - self.color.name(): {self.color.name()}')
         
-        color_hex_str = to_hex(self.color.rgba(), keep_alpha=False)
-        # name
-        # .rgba()
+        # color_hex_str = to_hex(self.color.rgba(), keep_alpha=False)
+        # How to convert a QColor into a HexRGB String:
+        # get hex colors:
+        #  getting the name of a QColor with .name(QtGui.QColor.HexRgb) results in a string like '#ff0000'
+        #  getting the name of a QColor with .name(QtGui.QColor.HexArgb) results in a string like '#80ff0000'
+        color_hex_str = self.color.name(QtGui.QColor.HexRgb) 
+        print(f'    hex: {color_hex_str}')
+        
         # also I think the original pf name was formed by adding crap...
         ## TODO: see 
         # ```curr_pf_string = f'pf[{render_config.name}]'````
