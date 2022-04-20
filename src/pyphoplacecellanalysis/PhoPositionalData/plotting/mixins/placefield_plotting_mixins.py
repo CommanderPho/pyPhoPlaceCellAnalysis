@@ -150,6 +150,7 @@ class HideShowPlacefieldsRenderingMixin(PlacefieldOwningMixin):
         self.tuning_curve_plot_actors[show_index].SetVisibility(1)
         
     def on_update_tuning_curve_display_config(self, updated_config_indicies, updated_configs):
+        # TODO: NON-EXPLICIT INDEXING
         if self.debug_logging:
             print(f'HideShowPlacefieldsRenderingMixin.on_update_tuning_curve_display_config(updated_config_indicies: {updated_config_indicies}, updated_configs: {updated_configs})')
         assert hasattr(self, 'update_neuron_render_configs'), "self must be of type NeuronConfigOwningMixin to have access to its configs"
@@ -157,7 +158,8 @@ class HideShowPlacefieldsRenderingMixin(PlacefieldOwningMixin):
         for an_updated_config_idx, an_updated_config in zip(updated_config_indicies, updated_configs):
             self.tuning_curve_plot_actors[an_updated_config_idx].SetVisibility(int(self.active_tuning_curve_render_configs[an_updated_config_idx].isVisible)) # update visibility of actor
             
-        
+    
+    ## Change these names, update_* can easily be called and it does the opposite of what we'd expect
     def update_tuning_curve_configs(self):
         """ update the configs from the actual actors' state """
         for i, aTuningCurveActor in enumerate(self.tuning_curve_plot_actors):

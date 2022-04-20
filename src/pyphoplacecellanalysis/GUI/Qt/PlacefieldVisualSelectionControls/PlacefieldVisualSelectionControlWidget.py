@@ -29,6 +29,8 @@ class PlacefieldVisualSelectionWidget(QtWidgets.QWidget):
     
     # update_signal = QtCore.pyqtSignal(list, list, float, float, list, list, list, list)
     # finish_signal = QtCore.pyqtSignal(float, float)
+ 
+    enable_debug_print = False
     
     def __init__(self, *args, **kwargs):
         super(PlacefieldVisualSelectionWidget, self).__init__(*args, **kwargs)
@@ -44,27 +46,28 @@ class PlacefieldVisualSelectionWidget(QtWidgets.QWidget):
         
         # Setup self.ui.btnColorButton:
         def change(btn):
-            print("btnColorButton change", btn.color())
+            if self.enable_debug_print:
+                print("btnColorButton change", btn.color())
             self._color = btn.color()
         def done(btn):
-            print("btnColorButton done", btn.color())
+            if self.enable_debug_print:
+                print("btnColorButton done", btn.color())
             self._color = btn.color()
         
         self.ui.btnColorButton.sigColorChanging.connect(change)
         self.ui.btnColorButton.sigColorChanged.connect(done)
 
         # Setup self.ui.chkbtnPlacefield:
-        # def pf_check_changed(btn):
-        #     print(f'pf_check_changed({btn})')
-        # self.ui.chkbtnPlacefield.toggled.connect(pf_check_changed)
         self.ui.chkbtnPlacefield.toggled.connect(self.togglePlacefieldVisibility)
         self.ui.chkbtnSpikes.toggled.connect(self.toggleSpikeVisibility)
   
+          
+  
     @QtCore.pyqtSlot(bool)
     def togglePlacefieldVisibility(self, value):
-        print(f'_on_toggle_plot_visible_changed(value: {value})')
+        if self.enable_debug_print:
+            print(f'_on_toggle_plot_visible_changed(value: {value})')
         self._isVisible = value
-        
         self.tuning_curve_display_config_changed.emit([self.config_from_state()]) # emit signal
         
         if self._callbacks is not None:
@@ -76,9 +79,9 @@ class PlacefieldVisualSelectionWidget(QtWidgets.QWidget):
     
     @QtCore.pyqtSlot(bool)
     def toggleSpikeVisibility(self, value):
-        print(f'_on_toggle_spikes_visible_changed(value: {value})')
-        self._spikesVisible = bool(value)
-        
+        if self.enable_debug_print:
+            print(f'_on_toggle_spikes_visible_changed(value: {value})')
+        self._spikesVisible = bool(value)        
         self.spike_config_changed.emit(bool(self.spikesVisible)) # emit signal
         
         if self._callbacks is not None:
@@ -144,23 +147,21 @@ class PlacefieldVisualSelectionWidget(QtWidgets.QWidget):
 
     def config_from_state(self):
         """ called to retrieve a valid config from the UI's properties... this means it could have just held a config as its model. """
-        # self.color is supposed to be a string, not a QColor
-        # to_hex(self.params.pf_colors[:,i], keep_alpha=False)
+        if self.debug_print:
+            print(f'self.color: {self.color} - self.color.name(): {self.color.name()}')
         
-        print(f'self.color: {self.color} - self.color.name(): {self.color.name()}')
-        
-        # color_hex_str = to_hex(self.color.rgba(), keep_alpha=False)
         # How to convert a QColor into a HexRGB String:
         # get hex colors:
         #  getting the name of a QColor with .name(QtGui.QColor.HexRgb) results in a string like '#ff0000'
         #  getting the name of a QColor with .name(QtGui.QColor.HexArgb) results in a string like '#80ff0000'
         color_hex_str = self.color.name(QtGui.QColor.HexRgb) 
-        print(f'    hex: {color_hex_str}')
+        if self.debug_print:
+            print(f'    hex: {color_hex_str}')
         
         # also I think the original pf name was formed by adding crap...
-        ## TODO: see 
+        ## see 
         # ```curr_pf_string = f'pf[{render_config.name}]'````
-        
+        ## UPDATE: this doesn't seem to be a problem. The name is successfully set to the ACLU value in the current state.
         return SingleNeuronPlottingExtended(name=self.name, isVisible=self.isVisible, color=color_hex_str, spikesVisible=self.spikesVisible)
 
 
