@@ -70,11 +70,12 @@ class PlacefieldVisualSelectionWidget(QtWidgets.QWidget):
         self._isVisible = value
         self.tuning_curve_display_config_changed.emit([self.config_from_state()]) # emit signal
         
-        if self._callbacks is not None:
-            self._callbacks['pf'](self.config_from_state()) # get the config from the updated state
-            # self._callbacks(self.config_from_state()) # get the config from the updated state
-        else:
-            print('WARNING: no callback defined for pf value changes!')
+        ## TODO: REMOVE: the current implementation doesn't need to use callbacks:
+        # if self._callbacks is not None:
+        #     self._callbacks['pf'](self.config_from_state()) # get the config from the updated state
+        #     # self._callbacks(self.config_from_state()) # get the config from the updated state
+        # else:
+        #     print('WARNING: no callback defined for pf value changes!')
     
     
     @QtCore.pyqtSlot(bool)
@@ -84,12 +85,13 @@ class PlacefieldVisualSelectionWidget(QtWidgets.QWidget):
         self._spikesVisible = bool(value)        
         self.spike_config_changed.emit(bool(self.spikesVisible)) # emit signal
         
-        if self._callbacks is not None:
-            updated_config = self.spikesVisible
-            self._callbacks['spikes'](bool(self.spikesVisible)) # get the config from the updated state
-            # self._callbacks(self.config_from_state()) # get the config from the updated state
-        else:
-            print('WARNING: no callback defined for spikes value changes!')
+        # ## TODO: REMOVE: the current implementation doesn't need to use callbacks:
+        # if self._callbacks is not None:
+        #     updated_config = self.spikesVisible
+        #     self._callbacks['spikes'](bool(self.spikesVisible)) # get the config from the updated state
+        #     # self._callbacks(self.config_from_state()) # get the config from the updated state
+        # else:
+        #     print('WARNING: no callback defined for spikes value changes!')
         
   
   
