@@ -38,6 +38,7 @@ class PlacefieldVisualSelectionWidget(QtWidgets.QWidget):
         self.ui.setupUi(self) # builds the design from the .ui onto this widget.
         
         # initialize member variables
+        self.enable_debug_print = PlacefieldVisualSelectionWidget.enable_debug_print
         self._name = None
         self._color = None
         self._isVisible = None
@@ -149,7 +150,7 @@ class PlacefieldVisualSelectionWidget(QtWidgets.QWidget):
 
     def config_from_state(self):
         """ called to retrieve a valid config from the UI's properties... this means it could have just held a config as its model. """
-        if self.debug_print:
+        if self.enable_debug_print:
             print(f'self.color: {self.color} - self.color.name(): {self.color.name()}')
         
         # How to convert a QColor into a HexRGB String:
@@ -157,7 +158,7 @@ class PlacefieldVisualSelectionWidget(QtWidgets.QWidget):
         #  getting the name of a QColor with .name(QtGui.QColor.HexRgb) results in a string like '#ff0000'
         #  getting the name of a QColor with .name(QtGui.QColor.HexArgb) results in a string like '#80ff0000'
         color_hex_str = self.color.name(QtGui.QColor.HexRgb) 
-        if self.debug_print:
+        if self.enable_debug_print:
             print(f'    hex: {color_hex_str}')
         
         # also I think the original pf name was formed by adding crap...
