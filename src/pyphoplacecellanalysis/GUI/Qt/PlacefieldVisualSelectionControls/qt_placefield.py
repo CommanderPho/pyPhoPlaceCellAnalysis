@@ -45,6 +45,8 @@ def build_single_placefield_output_widget(render_config):
 
 
 
+
+
 def build_all_placefield_output_panels(ipcDataExplorer):
     """ Builds the row of custom SingleEditablePlacefieldDisplayConfiguration widgets for each placecell that allow configuring their display
     

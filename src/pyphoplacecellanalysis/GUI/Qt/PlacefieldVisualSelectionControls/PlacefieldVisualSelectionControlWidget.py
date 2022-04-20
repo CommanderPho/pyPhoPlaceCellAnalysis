@@ -44,7 +44,6 @@ class PlacefieldVisualSelectionWidget(QtWidgets.QWidget):
         self._isVisible = None
         self._spikesVisible = None
         
-        
         # Setup self.ui.btnColorButton:
         def change(btn):
             if self.enable_debug_print:
@@ -70,29 +69,14 @@ class PlacefieldVisualSelectionWidget(QtWidgets.QWidget):
             print(f'_on_toggle_plot_visible_changed(value: {value})')
         self._isVisible = value
         self.tuning_curve_display_config_changed.emit([self.config_from_state()]) # emit signal
-        
-        ## TODO: REMOVE: the current implementation doesn't need to use callbacks:
-        # if self._callbacks is not None:
-        #     self._callbacks['pf'](self.config_from_state()) # get the config from the updated state
-        #     # self._callbacks(self.config_from_state()) # get the config from the updated state
-        # else:
-        #     print('WARNING: no callback defined for pf value changes!')
-    
     
     @QtCore.pyqtSlot(bool)
     def toggleSpikeVisibility(self, value):
         if self.enable_debug_print:
             print(f'_on_toggle_spikes_visible_changed(value: {value})')
-        self._spikesVisible = bool(value)        
+        self._spikesVisible = bool(value)
         self.spike_config_changed.emit(bool(self.spikesVisible)) # emit signal
         
-        # ## TODO: REMOVE: the current implementation doesn't need to use callbacks:
-        # if self._callbacks is not None:
-        #     updated_config = self.spikesVisible
-        #     self._callbacks['spikes'](bool(self.spikesVisible)) # get the config from the updated state
-        #     # self._callbacks(self.config_from_state()) # get the config from the updated state
-        # else:
-        #     print('WARNING: no callback defined for spikes value changes!')
         
   
   
