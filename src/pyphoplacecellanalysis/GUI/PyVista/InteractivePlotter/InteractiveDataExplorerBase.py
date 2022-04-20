@@ -10,6 +10,18 @@ from pyvista.plotting.plotting import Plotter
 from pyvistaqt import BackgroundPlotter
 from pyvistaqt.plotting import MultiPlotter
 
+
+from qtpy import QtCore, QtGui, QtWidgets
+# from qtpy.QtGui import QPalette
+# from qtpy.QtWidgets import QApplication, QPushButton, QLabel
+from qtpy.QtCore import QObject, QRunnable, QThread, QThreadPool, Signal, Slot
+
+
+# from qtpy.QtCore import Qt
+# from qtpy.QtGui import QPalette
+# from qtpy.QtWidgets import QApplication, QPushButton, QLabel
+
+
 from pyphocorehelpers.DataStructure.general_parameter_containers import DebugHelper, VisualizationParameters
 
 from pyphoplacecellanalysis.PhoPositionalData.plotting.gui import customize_default_pyvista_theme, print_controls_helper_text
@@ -157,11 +169,11 @@ class InteractivePyvistaPlotter_ObjectManipulationMixin:
         
         
 
-class InteractiveDataExplorerBase(InteractivePyvistaPlotterBuildIfNeededMixin, InteractivePyvistaPlotter_ObjectManipulationMixin):
+class InteractiveDataExplorerBase(InteractivePyvistaPlotterBuildIfNeededMixin, InteractivePyvistaPlotter_ObjectManipulationMixin, QtCore.QObject):
     """The common base class for building an interactive PyVistaQT BackgroundPlotter with extra GUI components and controls.
     """
-    def __init__(self, active_config, active_session, extant_plotter=None, data_explorer_name='InteractiveDataExplorerBase'):
-        # active_session: Neuropy.core.Session
+    def __init__(self, active_config, active_session, extant_plotter=None, data_explorer_name='InteractiveDataExplorerBase', **kwargs):
+        QtCore.QObject.__init__(self, **kwargs) # Initialize the QObject
         self.active_config = active_config
         self.active_session = active_session
         self.p = extant_plotter
