@@ -3,6 +3,13 @@ import panel as pn
 from panel.viewable import Viewer
 from pyphoplacecellanalysis.PhoPositionalData.plotting.mixins.general_plotting_mixins import SingleNeuronPlottingExtended
 
+""" 
+
+Primary Function: build_panel_interactive_placefield_visibility_controls(...)
+    Internally calls build_all_placefield_output_panels(...) to build the output panel widgets.
+
+
+"""
 
 def build_single_placefield_output_panel(render_config):
     """ An alternative to the whole SingleEditablePlacefieldDisplayConfiguration implementation """
@@ -207,6 +214,9 @@ class PlacefieldBatchActionsEndButtonPanel(object):
 def build_panel_interactive_placefield_visibility_controls(ipcDataExplorer, debug_logging=False):
     """Builds a panel containing a series of widgets that control the spike/placemap/etc visibility for each placecell
 
+        Internally calls build_all_placefield_output_panels(...) to build the output panel widgets.
+        
+        
     Args:
         ipcDataExplorer ([type]): [description]
 

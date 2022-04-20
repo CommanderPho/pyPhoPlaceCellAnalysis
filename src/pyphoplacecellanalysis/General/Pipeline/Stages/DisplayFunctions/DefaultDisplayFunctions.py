@@ -22,7 +22,6 @@ from neuropy.plotting.ratemaps import enumTuningMap2DPlotVariables # for getting
 
 from pyphoplacecellanalysis.GUI.PyVista.InteractivePlotter.Mixins.ImagePlaneRendering import ImagePlaneRendering
 
-import PhoGui
 from pyphoplacecellanalysis.GUI.PyVista.InteractivePlotter.PhoInteractivePlotter import PhoInteractivePlotter
 from pyphoplacecellanalysis.GUI.PyVista.InteractivePlotter.shared_helpers import InteractivePyvistaPlotterBuildIfNeededMixin
 from pyphoplacecellanalysis.GUI.PyVista.InteractivePlotter.InteractivePlaceCellDataExplorer import InteractivePlaceCellDataExplorer

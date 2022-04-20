@@ -7,8 +7,10 @@ import numpy as np
 import pyqtgraph as pg
 from pyqtgraph.Qt import QtCore, QtGui, QtWidgets, mkQApp
 
+from matplotlib.colors import to_hex # required for QColor conversion to hex
 
-from .PlacefieldVisualSelectionWidgetBase import Ui_rootForm # Generated file from .ui
+
+from pyphoplacecellanalysis.GUI.Qt.PlacefieldVisualSelectionControls.PlacefieldVisualSelectionWidgetBase import Ui_rootForm # Generated file from .ui
 
 # For compatibility with the panel ui version:
 # from pyphoplacecellanalysis.PhoPositionalData.plotting.mixins.general_plotting_mixins import SingleNeuronPlottingExtended
@@ -32,13 +34,22 @@ class PlacefieldVisualSelectionWidget(QtWidgets.QWidget):
         super(PlacefieldVisualSelectionWidget, self).__init__(*args, **kwargs)
         self.ui = Ui_rootForm()
         self.ui.setupUi(self) # builds the design from the .ui onto this widget.
-        # self.show() # Show the GUI
+        
+        # initialize member variables
+        self._name = None
+        self._color = None
+        self._isVisible = None
+        self._spikesVisible = None
+        
         
         # Setup self.ui.btnColorButton:
         def change(btn):
             print("btnColorButton change", btn.color())
+            self._color = btn.color()
         def done(btn):
             print("btnColorButton done", btn.color())
+            self._color = btn.color()
+        
         self.ui.btnColorButton.sigColorChanging.connect(change)
         self.ui.btnColorButton.sigColorChanged.connect(done)
 
@@ -52,6 +63,8 @@ class PlacefieldVisualSelectionWidget(QtWidgets.QWidget):
     @QtCore.pyqtSlot(bool)
     def togglePlacefieldVisibility(self, value):
         print(f'_on_toggle_plot_visible_changed(value: {value})')
+        self._isVisible = value
+        
         self.tuning_curve_display_config_changed.emit([self.config_from_state()]) # emit signal
         
         if self._callbacks is not None:
@@ -64,6 +77,8 @@ class PlacefieldVisualSelectionWidget(QtWidgets.QWidget):
     @QtCore.pyqtSlot(bool)
     def toggleSpikeVisibility(self, value):
         print(f'_on_toggle_spikes_visible_changed(value: {value})')
+        self._spikesVisible = bool(value)
+        
         self.spike_config_changed.emit(bool(self.spikesVisible)) # emit signal
         
         if self._callbacks is not None:
@@ -78,47 +93,71 @@ class PlacefieldVisualSelectionWidget(QtWidgets.QWidget):
     @property
     def name(self):
         """The name property."""
-        return self.ui.btnTitle.text
+        if self._name is None:
+            self._name = self.ui.btnTitle.text
+        return self._name 
     @name.setter
     def name(self, value):
-        self.ui.groupBox.setTitle(value) # set a new value like "pf[i]"
-        self.ui.btnTitle.setText(value)
+        self._name = value
+        self.ui.groupBox.setTitle(self._name) # set a new value like "pf[i]"
+        self.ui.btnTitle.setText(self._name)
   
     @property
     def spikesVisible(self):
         """The spikesVisible property."""
-        return self.ui.chkbtnSpikes.checked
+        if self._spikesVisible is None:
+            self._spikesVisible = self.ui.chkbtnSpikes.checked
+        return self._spikesVisible
     @spikesVisible.setter
     def spikesVisible(self, value):
-        self.ui.chkbtnSpikes.setChecked(value)
-        
+        self._spikesVisible = value
+        self.ui.chkbtnSpikes.setChecked(self._spikesVisible)
     @property
     def isVisible(self):
         """The isVisible property."""
-        return self.ui.chkbtnPlacefield.checked
+        if self._isVisible is None:
+            self._isVisible = self.ui.chkbtnPlacefield.checked
+        return self._isVisible 
     @isVisible.setter
     def isVisible(self, value):
-        self.ui.chkbtnPlacefield.setChecked(value)
-        
+        self._isVisible = value
+        self.ui.chkbtnPlacefield.setChecked(self._isVisible)
     @property
     def color(self):
         """The color property."""
-        return self.ui.btnColorButton.color()
+        if self._color is None:
+            self._color = self.ui.btnColorButton.color()
+        return self._color
     @color.setter
     def color(self, value):
-        self.ui.btnColorButton.setColor(value, finished=True)
+        self._color = value
+        self.ui.btnColorButton.setColor(self._color, finished=True)
 
 
- 
+    ## Programmatic Update/Retrieval:    
     def update_from_config(self, config):
+        """ called to programmatically update the config """
         self.name = config.name
         self.color = config.color
         self.isVisible = config.isVisible
         self.spikesVisible = config.spikesVisible
 
-    
+    fsfsa
     def config_from_state(self):
-        return SingleNeuronPlottingExtended(name=self.name, isVisible=self.isVisible, color=self.color, spikesVisible=self.spikesVisible)
+        """ called to retrieve a valid config from the UI's properties... this means it could have just held a config as its model. """
+        # self.color is supposed to be a string, not a QColor
+        # to_hex(self.params.pf_colors[:,i], keep_alpha=False)
+        
+        print(f'self.color: {self.color} - self.color.name(): {self.color.name()}')
+        
+        color_hex_str = to_hex(self.color.rgba(), keep_alpha=False)
+        # name
+        # .rgba()
+        # also I think the original pf name was formed by adding crap...
+        ## TODO: see 
+        # ```curr_pf_string = f'pf[{render_config.name}]'````
+        
+        return SingleNeuronPlottingExtended(name=self.name, isVisible=self.isVisible, color=color_hex_str, spikesVisible=self.spikesVisible)
 
 
 

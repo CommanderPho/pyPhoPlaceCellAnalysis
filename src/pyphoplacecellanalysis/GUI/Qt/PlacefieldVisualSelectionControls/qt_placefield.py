@@ -10,32 +10,39 @@ from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer
 from pyphoplacecellanalysis.GUI.Qt.PlacefieldVisualSelectionControls.PlacefieldVisualSelectionControlWidget import PlacefieldVisualSelectionWidget
 
 
+""" 
+
+This whole file serves to emulate the structure of panel_placefield.py, which does the exact same thing (renders interactive placefield toggle controls) but using the Panel library instead of Qt.
+
+Primary Function: build_qt_interactive_placefield_visibility_controls(...)
+     Internally calls build_all_placefield_output_panels(...) to build the output widgets.
+
+
+"""
+
+
 def build_single_placefield_output_widget(render_config):
-    """ An alternative to the whole SingleEditablePlacefieldDisplayConfiguration implementation """
+    """ An alternative to the whole SingleEditablePlacefieldDisplayConfiguration implementation 
+    
+    Called in build_all_placefield_output_panels(...) down below.
+    
+    """
     # wgt_label_button = pn.widgets.Button(name=f'pf[{render_config.name}]', button_type='default', margin=0, height=20, sizing_mode='stretch_both', width_policy='min')
     # wgt_color_picker = pn.widgets.ColorPicker(value=render_config.color, width=60, height=20, margin=0)
     # wgt_toggle_visible = pn.widgets.Toggle(name='isVisible', value=render_config.isVisible, margin=0)
     # wgt_toggle_spikes = pn.widgets.Toggle(name='SpikesVisible', value=render_config.spikesVisible, margin=0)    
     curr_pf_string = f'pf[{render_config.name}]'
-    curr_widget = PlacefieldVisualSelectionWidget()
+    curr_widget = PlacefieldVisualSelectionWidget() # new widget type
     curr_widget.setObjectName(curr_pf_string)
     curr_widget.name = curr_pf_string # be sure to set the name
     # set the color and such too
     curr_widget.color = render_config.color
     curr_widget.isVisible = render_config.isVisible
     curr_widget.spikesVisible = render_config.spikesVisible
+    
+    curr_widget.update_from_config(render_config) # is this the right type of config? I think it is.
     return curr_widget
 
-
-# 	PlacefieldVisualSelectionWidget(
-#     # gspec = pn.GridSpec(sizing_mode='stretch_both', max_height=800)
-#     # Output Grid:
-#     gspec = pn.GridSpec(width=100, height=100, margin=0)
-#     gspec[0, :3] = wgt_label_button
-#     gspec[1, :] = wgt_color_picker
-#     gspec[2, :] = pn.Row(wgt_toggle_visible, margin=0, background='red')
-#     gspec[3, :] = pn.Row(wgt_toggle_spikes, margin=0, background='green')
-#     return gspec
 
 
 def build_all_placefield_output_panels(ipcDataExplorer):
