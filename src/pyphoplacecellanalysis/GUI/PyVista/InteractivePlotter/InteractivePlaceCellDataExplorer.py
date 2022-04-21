@@ -8,6 +8,10 @@
 import numpy as np
 import pyvista as pv
 
+
+from qtpy import QtCore # for Slot
+# Signal
+
 from pyphoplacecellanalysis.PhoPositionalData.plotting.animations import make_mp4_from_plotter
 
 from pyphoplacecellanalysis.GUI.PyVista.InteractivePlotter.PhoInteractivePlotter import PhoInteractivePlotter
@@ -188,7 +192,14 @@ class InteractivePlaceCellDataExplorer(InteractiveDataExplorerBase):
             self.p.render() # renders to ensure it's updated after changing the ScalarVisibility above
             # self.p.update()
 
-    
+
+    @QtCore.Slot(float, float)
+    def update_window_start_end(self, new_start, new_end):
+        """ 
+            Called to externally update the displayed window.
+        """
+        self.on_active_window_update_mesh(new_start, new_end, enable_position_mesh_updates=True, render=True, debug_print=False)
+
 
     ######################
     # General Plotting Method:
