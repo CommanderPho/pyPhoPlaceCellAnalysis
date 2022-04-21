@@ -113,21 +113,6 @@ def build_spike_3d_raster_vedo_with_2d_controls(curr_spikes_df, window_duration=
         spike_raster_plt_3d_vedo, spike_raster_plt_2d, spike_3d_to_2d_window_connection = build_spike_3d_raster_vedo_with_2d_controls(curr_spikes_df)
     
     """
-#     if extant_spike_raster_plt_3d_vedo is not None:
-#         spike_raster_plt_3d = extant_spike_raster_plt_3d_vedo
-#         curr_spikes_df = spike_raster_plt_3d.spikes_df
-        
-# #         temp_window_duration = (spike_raster_plt_3d.spikes_window.active_window_end_time - spike_raster_plt_3d.spikes_window.active_window_start_time)
-# #         temp_window_start_time = spike_raster_plt_3d.spikes_window.active_window_start_time
-# #         temp_neuron_colors = None
-# #         temp_neuron_sort_order = None
-
-# #         print(f'window_duration={temp_window_duration}, window_start_time={temp_window_start_time}, neuron_colors=None, neuron_sort_order=None')
-
-#     else:
-#         spike_raster_plt_3d = Spike3DRaster_Vedo(curr_spikes_df, window_duration=window_duration, window_start_time=window_start_time, neuron_colors=neuron_colors, neuron_sort_order=neuron_sort_order)
-    
-
     # Build the 2D Raster Plotter
     spike_raster_plt_2d = Spike2DRaster.init_from_independent_data(curr_spikes_df, window_duration=window_duration, window_start_time=window_start_time, neuron_colors=neuron_colors, neuron_sort_order=neuron_sort_order, parent=None) # setting , parent=spike_raster_plt_3d makes a single window
     spike_raster_plt_2d.setWindowTitle('2D Raster Control Window')
@@ -154,7 +139,9 @@ def build_spike_3d_raster_vedo_with_2d_controls(curr_spikes_df, window_duration=
     # Update the scroll position programmatically with block_signals=False to ensure the 3D plot is synced:
     spike_raster_plt_2d.update_scroll_window_region(window_start_time, window_start_time+window_duration, block_signals=False)
     
-    return spike_raster_plt_3d_vedo, spike_raster_plt_2d, spike_3d_to_2d_window_connection
+    # Stand-in for future return value:
+    spike_raster_window = None
+    return spike_raster_plt_3d_vedo, spike_raster_plt_2d, spike_3d_to_2d_window_connection, spike_raster_window
 
 
 
