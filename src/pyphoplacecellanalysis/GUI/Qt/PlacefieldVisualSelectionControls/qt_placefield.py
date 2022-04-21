@@ -101,15 +101,15 @@ def build_all_placefield_output_panels(ipcDataExplorer):
                 a_widget.spike_config_changed.connect(_on_spike_config_changed)
                 a_widget.tuning_curve_display_config_changed.connect(_on_tuning_curve_display_config_changed)
         """
-        print(f'_on_tuning_curve_display_config_changed(new_configs: {new_configs})')
+        # print(f'_on_tuning_curve_display_config_changed(new_configs: {new_configs})')
         # new_config: [SingleNeuronPlottingExtended(color='#843c39', extended_values_dictionary={}, isVisible=True, name='2', spikesVisible=False)]
         # recover cell_ids by parsing the name field:
         extracted_cell_ids = [int(a_config.name) for a_config in new_configs]
-        print(f'\t extracted_cell_ids: {extracted_cell_ids}')
-        # convert to cell_IDXs, which are what the configs are indexed by:
-        # extracted_config_indicies = ipcDataExplorer.find_cell_IDXs_from_cell_ids(cell_ids=extracted_cell_ids)
-        extracted_config_indicies = [ipcDataExplorer.params.reverse_cellID_to_tuning_curve_idx_lookup_map[a_cell_id] for a_cell_id in extracted_cell_ids]
-        print(f'\t extracted_config_indicies: {extracted_config_indicies}')
+        # print(f'\t extracted_cell_ids: {extracted_cell_ids}')
+        # convert to config indicies, which are what the configs are indexed by:
+        # extracted_config_indicies = [ipcDataExplorer.params.reverse_cellID_to_tuning_curve_idx_lookup_map[a_cell_id] for a_cell_id in extracted_cell_ids]
+        extracted_config_indicies = ipcDataExplorer.find_tuning_curve_IDXs_from_cell_ids(extracted_cell_ids)
+        # print(f'\t extracted_config_indicies: {extracted_config_indicies}')
         # The actual update function:
         ipcDataExplorer.on_update_tuning_curve_display_config(updated_configs=new_configs, updated_config_indicies=extracted_config_indicies) # could just update function to look at .name of each config? Or change indicies to map?
         # Is this required?
@@ -119,7 +119,11 @@ def build_all_placefield_output_panels(ipcDataExplorer):
     ## Build the Placefield Control Widgets:
     pf_widgets = []
     # the active_tuning_curve_render_configs are an array of SingleNeuronPlottingExtended objects, one for each placefield
-    for (idx, a_config) in enumerate(ipcDataExplorer.active_tuning_curve_render_configs):
+    # for (idx, a_config) in enumerate(ipcDataExplorer.active_tuning_curve_render_configs):
+    
+    valid_cell_ids = ipcDataExplorer.tuning_curves_valid_cell_ids
+    for (idx, cell_id) in enumerate(valid_cell_ids):
+        a_config = ipcDataExplorer.active_tuning_curve_render_configs[idx]
         curr_widget = build_single_placefield_output_widget(a_config)
         # TODO: Set the signals here:
         """ 
@@ -133,8 +137,9 @@ def build_all_placefield_output_panels(ipcDataExplorer):
             arg1, arg2, ...: are the extra parameters that you want to spend
 
         """
-        curr_widget.spike_config_changed.connect(lambda are_included, spikes_config_changed_callback=ipcDataExplorer.change_unit_spikes_included, i_copy=idx: spikes_config_changed_callback(cell_IDXs=[i_copy], cell_IDs=None, are_included=are_included))
-        # curr_widget.tuning_curve_display_config_changed.connect(lambda updated_config_copy=a_config, i_copy=idx, tuning_curve_config_changed_callback=ipcDataExplorer.on_update_tuning_curve_display_config: tuning_curve_config_changed_callback([i_copy], [updated_config_copy]))
+        curr_widget.spike_config_changed.connect(lambda are_included, spikes_config_changed_callback=ipcDataExplorer.change_unit_spikes_included, cell_id_copy=cell_id: spikes_config_changed_callback(cell_IDXs=None, cell_IDs=[cell_id_copy], are_included=are_included))
+        
+        # curr_widget.spike_config_changed.connect(lambda are_included, spikes_config_changed_callback=ipcDataExplorer.change_unit_spikes_included, i_copy=idx: spikes_config_changed_callback(cell_IDXs=[i_copy], cell_IDs=None, are_included=are_included))
         
         # Connect the signals to the debugging slots:
         # curr_widget.spike_config_changed.connect(_on_spike_config_changed)

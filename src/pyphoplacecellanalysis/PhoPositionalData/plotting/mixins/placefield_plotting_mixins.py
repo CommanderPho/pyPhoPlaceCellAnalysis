@@ -75,7 +75,16 @@ class PlacefieldOwningMixin(NeuronIdentityAccessingMixin, NeuronConfigOwningMixi
         # call the parent function
         self.build_neuron_render_configs()
         # do any addition setup needed
-            
+
+    def find_tuning_curve_IDXs_from_cell_ids(self, cell_ids):
+        """Finds the tuning curve IDXs from the cell original IDs (cell_ids)
+        Args:
+            cell_ids ([type]): [description]
+        """
+        return np.array([self.params.reverse_cellID_to_tuning_curve_idx_lookup_map.get(a_cell_id, None) for a_cell_id in cell_ids])
+    
+    
+                
     # @property
     # def active_tuning_curve_render_configs(self):
     #     """The active_tuning_curve_render_configs property."""

@@ -128,7 +128,19 @@ class InteractivePlaceCellTuningCurvesDataExplorer(OccupancyPlottingMixin, HideS
             # self._compute_z_position_spike_offsets()
             pass
 
-        self.params.pf_colors_hex = [to_hex(self.params.pf_colors[:,i], keep_alpha=False) for i in self.tuning_curve_indicies]
+
+        # TODO: notice that self.tuning_curve_indicies is of length 39 (one less than self.cell_ids)
+        """ 
+        # UPDATE: there has to be, as np.shape(ipcDataExplorer.params.pf_colors) # (4, 39)
+        # 
+        # (39,)
+        
+        
+        
+        """
+        self.params.pf_colors_hex = [to_hex(self.params.pf_colors[:,i], keep_alpha=False) for i in self.tuning_curve_indicies] 
+        
+        
         self.setup_spike_rendering_mixin()
         self.build_tuning_curve_configs()
         self.setup_occupancy_plotting_mixin()
