@@ -118,8 +118,7 @@ class DefaultDisplayFunctions(AllFunctionEnumeratingMixin):
         # Qt-based Placefield controls:
         from pyphoplacecellanalysis.GUI.Qt.PlacefieldVisualSelectionControls.qt_placefield import build_all_placefield_output_panels
         
-        panel_controls_mode = kwargs.get('panel_controls_mode', 'Qt') # valid options are 'Qt', 'Panel', or None
-        
+        panel_controls_mode = kwargs.pop('panel_controls_mode', 'Qt') # valid options are 'Qt', 'Panel', or None
         pActiveTuningCurvesPlotter = kwargs.get('extant_plotter', None)
         ipcDataExplorer = InteractivePlaceCellTuningCurvesDataExplorer(active_config, computation_result.sess, computation_result.computed_data['pf2D'], active_config.plotting_config.pf_colors, **({'extant_plotter':None} | kwargs))
         pActiveTuningCurvesPlotter = ipcDataExplorer.plot(pActiveTuningCurvesPlotter) # [2, 17449]
