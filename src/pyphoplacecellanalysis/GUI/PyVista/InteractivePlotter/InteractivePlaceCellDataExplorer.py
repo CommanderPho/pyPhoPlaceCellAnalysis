@@ -201,6 +201,14 @@ class InteractivePlaceCellDataExplorer(InteractiveDataExplorerBase):
         self.on_active_window_update_mesh(new_start, new_end, enable_position_mesh_updates=True, render=True, debug_print=False)
 
 
+    def disable_ui_window_updating_controls(self):
+        # disables the slider/play button so the user can't modify the displayed window using those GUI controls.
+        # ideal for driving the displayed window programmatically or by connecting the self.update_window_start_end(...) slot to an external signal.
+        # Removes all slider widgets:
+        self.p.clear_slider_widgets()
+        self.p.clear_button_widgets() # removes the play/pause toggle checkbox so that it can be driven externally
+
+
     ######################
     # General Plotting Method:
     # pre_computed_window_sample_indicies, longer_spikes_window,

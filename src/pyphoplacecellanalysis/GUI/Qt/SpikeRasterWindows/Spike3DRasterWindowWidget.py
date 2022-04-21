@@ -32,6 +32,7 @@ class Spike3DRasterWindowWidget(SpikeRasterBottomFrameControlsMixin, QtWidgets.Q
     applicationName = 'Spike3DRasterWindow'
     windowName = 'Spike3DRasterWindow'
     
+    enable_debug_print = False
     
     # TODO: add signals here:
     
@@ -136,6 +137,10 @@ class Spike3DRasterWindowWidget(SpikeRasterBottomFrameControlsMixin, QtWidgets.Q
             self.applicationName = application_name
         # else:
         #     self.applicationName = Spike3DRasterWindowWidget.applicationName
+        
+        
+        self.enable_debug_print = Spike3DRasterWindowWidget.enable_debug_print
+        
         
         self.params = VisualizationParameters(self.applicationName)
         self.params.type_of_3d_plotter = type_of_3d_plotter
@@ -254,14 +259,18 @@ class Spike3DRasterWindowWidget(SpikeRasterBottomFrameControlsMixin, QtWidgets.Q
     ##################################
     @QtCore.Slot(int)
     def shift_animation_frame_val(self, shift_frames: int):
-        print(f'Spike3DRasterWindowWidget.shift_animation_frame_val(shift_frames: {shift_frames})')
+        if self.enable_debug_print:
+            print(f'Spike3DRasterWindowWidget.shift_animation_frame_val(shift_frames: {shift_frames})')
         # if self.spike_raster_plt_2d is not None:
         #     self.spike_raster_plt_2d.shift_an
         next_start_timestamp = self.animation_active_time_window.active_window_start_time + (self.animation_playback_direction_multiplier * self.animation_time_step * float(shift_frames))
         # self.animation_active_time_window.update_window_start(next_start_timestamp) # calls update_window_start, so any subscribers should be notified.
         # Update the windows once before showing the UI:
-        self.spike_raster_plt_2d.update_scroll_window_region(next_start_timestamp, next_start_timestamp+self.animation_active_time_window.window_duration, block_signals=False) # self.spike_raster_plt_2d.window_scrolled should be emitted
+        self.spike_raster_plt_2d.update_scroll_window_region(next_start_timestamp, next_start_timestamp+self.animation_active_time_window.window_duration, block_signals=True) # self.spike_raster_plt_2d.window_scrolled should be emitted
         
+        # signal emit:
+        # self.spike_raster_plt_2d.window_scrolled.emit(next_start_timestamp, next_start_timestamp+self.animation_active_time_window.window_duration)
+
         # update_scroll_window_region
         # self.ui.spike_raster_plt_3d.spikes_window.update_window_start_end(self.ui.spike_raster_plt_2d.spikes_window.active_time_window[0], self.ui.spike_raster_plt_2d.spikes_window.active_time_window[1])
         
@@ -270,14 +279,16 @@ class Spike3DRasterWindowWidget(SpikeRasterBottomFrameControlsMixin, QtWidgets.Q
     # Called from SliderRunner's thread when it emits the update_signal:        
     @QtCore.Slot()
     def increase_animation_frame_val(self):
-        print(f'Spike3DRasterWindowWidget.increase_animation_frame_val()')
+        if self.enable_debug_print:
+            print(f'Spike3DRasterWindowWidget.increase_animation_frame_val()')
         self.shift_animation_frame_val(1)
         
         
     ## Update Functions:
     @QtCore.Slot(bool)
     def play_pause(self, is_playing):
-        print(f'Spike3DRasterWindowWidget.play_pause(is_playing: {is_playing})')
+        if self.enable_debug_print:
+            print(f'Spike3DRasterWindowWidget.play_pause(is_playing: {is_playing})')
         if (not is_playing):
             self.animationThread.start()
         else:
@@ -287,13 +298,15 @@ class Spike3DRasterWindowWidget(SpikeRasterBottomFrameControlsMixin, QtWidgets.Q
     @QtCore.Slot()
     def on_jump_left(self):
         # Skip back some frames
-        print(f'Spike3DRasterWindowWidget.on_jump_left()')
+        if self.enable_debug_print:
+            print(f'Spike3DRasterWindowWidget.on_jump_left()')
         self.shift_animation_frame_val(-5)
         
     @QtCore.Slot()
     def on_jump_right(self):
         # Skip forward some frames
-        print(f'Spike3DRasterWindowWidget.on_jump_right()')
+        if self.enable_debug_print:
+            print(f'Spike3DRasterWindowWidget.on_jump_right()')
         self.shift_animation_frame_val(5)
         
 
