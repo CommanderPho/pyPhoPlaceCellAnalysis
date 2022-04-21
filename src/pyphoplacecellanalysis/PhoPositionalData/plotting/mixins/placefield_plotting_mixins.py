@@ -23,7 +23,7 @@ class RenderItemsConfiguration(QtCore.QObject):
 class PlacefieldOwningMixin(NeuronIdentityAccessingMixin, NeuronConfigOwningMixin):
     """ Implementor owns placefields and has access to their data and configuration objects
     
-    TODO: remember that Placefields should be a subset of the neuron identities.
+    NOTE: remember that Placefields should be a subset of the neuron identities (that would be present in the filtered set of neurons that the ratemap/placefields are based on for example).
     
     Requires:
         self.params.active_epoch_placefields
@@ -84,21 +84,6 @@ class PlacefieldOwningMixin(NeuronIdentityAccessingMixin, NeuronConfigOwningMixi
         return np.array([self.params.reverse_cellID_to_tuning_curve_idx_lookup_map.get(a_cell_id, None) for a_cell_id in cell_ids])
     
     
-                
-    # @property
-    # def active_tuning_curve_render_configs(self):
-    #     """The active_tuning_curve_render_configs property."""
-    #     return self.params.pf_active_configs
-    # @active_tuning_curve_render_configs.setter
-    # def active_tuning_curve_render_configs(self, value):
-    #     self.params.pf_active_configs = value
-        
-    # def build_tuning_curve_configs(self):
-    #     # Get the cell IDs that have a good place field mapping:
-    #     good_placefield_neuronIDs = np.array(self.ratemap.neuron_ids) # in order of ascending ID
-    #     unit_labels = [f'{good_placefield_neuronIDs[i]}' for i in np.arange(self.num_tuning_curves)]
-    #     self.active_tuning_curve_render_configs = [SingleNeuronPlottingExtended(name=unit_labels[i], isVisible=False, color=self.params.pf_colors_hex[i], spikesVisible=False) for i in self.tuning_curve_indicies]
-
 
 
     

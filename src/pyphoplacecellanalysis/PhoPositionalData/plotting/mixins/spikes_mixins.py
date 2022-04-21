@@ -53,6 +53,7 @@ class SpikeRenderingMixin:
     debug_logging = True
     spike_geom_cone = pv.Cone(direction=(0.0, 0.0, -1.0), height=10.0, radius=0.2) # The spike geometry that is only displayed for a short while after the spike occurs
     
+    ## Below seems to be specific to the PyVista (InteractivePlaceCell*DataExplorer) classes:
     def plot_spikes(self):
         historical_spikes_pdata, historical_spikes_pc = build_active_spikes_plot_data_df(self.spikes_df, spike_geom=SpikeRenderingMixin.spike_geom_cone.copy())        
         self.plots_data['spikes_pf_active'] = {'historical_spikes_pdata':historical_spikes_pdata, 'historical_spikes_pc':historical_spikes_pc}

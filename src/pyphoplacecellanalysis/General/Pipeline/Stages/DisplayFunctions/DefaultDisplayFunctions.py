@@ -7,6 +7,7 @@ import matplotlib.pyplot as plt
 import pyvista as pv
 import pyvistaqt as pvqt
 
+from pyphocorehelpers.gui.Qt.widget_positioning_helpers import WidgetPositioningHelpers
 
 from pyphoplacecellanalysis.General.Pipeline.Stages.Computation import ComputedPipelineStage
 from pyphoplacecellanalysis.General.Configs.DynamicConfigs import PlottingConfig, InteractivePlaceCellConfig
@@ -15,6 +16,8 @@ from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.Ratemaps im
 from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import DefaultDecoderDisplayFunctions
 from pyphocorehelpers.mixins.member_enumerating import AllFunctionEnumeratingMixin
 from pyphoplacecellanalysis.General.Mixins.DisplayHelpers import _display_add_computation_param_text_box, _save_displayed_figure_if_needed
+
+
 
 from neuropy.core.neuron_identities import NeuronIdentity, build_units_colormap, PlotStringBrevityModeEnum
 from neuropy.plotting.placemaps import plot_all_placefields
