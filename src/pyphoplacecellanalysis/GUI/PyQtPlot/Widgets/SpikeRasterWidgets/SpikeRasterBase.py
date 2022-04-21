@@ -232,7 +232,7 @@ class SpikeRasterBase(UnitSortableMixin, DataSeriesToSpatialTransformingMixin, N
         self.temporal_mapping_changed.emit()
         
 
-    def __init__(self, params=None, spikes_window=None, playback_controller=None, neuron_colors=None, neuron_sort_order=None, **kwargs):
+    def __init__(self, params=None, spikes_window=None, playback_controller=None, neuron_colors=None, neuron_sort_order=None, application_name=None, **kwargs):
         """ 
         
         spikes_window: SpikesDataframeWindow
@@ -244,6 +244,10 @@ class SpikeRasterBase(UnitSortableMixin, DataSeriesToSpatialTransformingMixin, N
         # Helper container variables
         self.params = params
         self._spikes_window = spikes_window
+        
+        
+        if application_name is not None:
+            self.applicationName = application_name # set instance application name if it isn't None. Otherwise just use the class value.
         
         # Config
         self.params.wantsRenderWindowControls = self.WantsRenderWindowControls # from RenderWindowControlsMixin
