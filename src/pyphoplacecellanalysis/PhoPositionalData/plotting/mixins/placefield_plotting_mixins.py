@@ -52,6 +52,16 @@ class PlacefieldOwningMixin(NeuronIdentityAccessingMixin, NeuronConfigOwningMixi
     @property
     def tuning_curve_indicies(self):
         return np.arange(self.num_tuning_curves)
+
+    @property
+    def tuning_curves_neuron_extended_ids(self):
+        """ the neuron_extended_id the corresponds to each placefield/ratemap """
+        return self.ratemap.neuron_extended_ids
+    @property
+    def tuning_curves_valid_cell_ids(self):
+        """ the valid cell_ids (a.k.a aclu values, neuron_ids, etc) corresponding to each tuning curve """
+        return self.ratemap.neuron_ids
+
     
     @property
     def active_tuning_curve_render_configs(self):

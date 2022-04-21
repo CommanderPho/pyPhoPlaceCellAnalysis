@@ -196,7 +196,6 @@ class SpikeRenderingMixin:
         self.spikes_df['cell_idx'] = included_cell_INDEXES.copy()
         # flat_spike_hex_colors = np.array(flat_spike_hex_colors)
         
-        
         self._build_flat_color_data()
         
     
