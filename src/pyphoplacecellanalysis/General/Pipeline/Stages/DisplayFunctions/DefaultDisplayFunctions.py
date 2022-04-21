@@ -127,10 +127,13 @@ class DefaultDisplayFunctions(AllFunctionEnumeratingMixin):
         pActiveTuningCurvesPlotter = ipcDataExplorer.plot(pActiveTuningCurvesPlotter) # [2, 17449]
         
         # build the output panels if desired:
-        if panel_controls_mode:
+        if panel_controls_mode == 'Qt':
             # pane: (placefieldControlsContainerWidget, pf_widgets)
-            pane = build_all_placefield_output_panels(ipcDataExplorer)
-            pane[0].show()
+            placefieldControlsContainerWidget, pf_widgets = build_all_placefield_output_panels(ipcDataExplorer)
+            placefieldControlsContainerWidget.show()
+            # Visually align the widgets:
+            WidgetPositioningHelpers.align_window_edges(ipcDataExplorer.p, placefieldControlsContainerWidget, relative_position = 'above', resize_to_main=(1.0, None))
+            pane = (placefieldControlsContainerWidget, pf_widgets)
         elif panel_controls_mode == 'Panel':        
             ### Build Dynamic Panel Interactive Controls for configuring Placefields:
             pane = build_panel_interactive_placefield_visibility_controls(ipcDataExplorer)
