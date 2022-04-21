@@ -198,7 +198,7 @@ class InteractivePlaceCellDataExplorer(InteractiveDataExplorerBase):
     # recent_spikes_window
     # z_fixed,
     # active_trail_opacity_values, active_trail_size_values
-    def on_active_window_update_mesh(self, t_start, t_stop, render=True):
+    def on_active_window_update_mesh(self, t_start, t_stop, enable_position_mesh_updates=False, render=True, debug_print=False):
         """ called to update the meshs with t_start, t_stop times representing the start and end of the new active window:
         
         """
@@ -243,10 +243,53 @@ class InteractivePlaceCellDataExplorer(InteractiveDataExplorerBase):
         if recent_only_spikes_pc.n_points >= 1:
             self.plots['spikes_main_recent_only'] = self.p.add_mesh(recent_only_spikes_pc, name='recent_only_spikes_main', scalars='cellID', cmap=self.active_config.plotting_config.pf_listed_colormap, show_scalar_bar=False, lighting=False, render=False) # color='white'
 
+        ## Position Updates:
+        if enable_position_mesh_updates:
+            ## A new method of updating the location trail and animal location that doesn't require precomputed indicies.
+            #### The purpose is to make these components updatable from the on_active_window_update_mesh(...) and not reliant on the indices.
+            
+            # active_window_sample_indicies
+            active_included_all_window_position_indicies = ((self.t > t_start) & (self.t < t_stop)) # Two Sided Range Mode
+            # active_included_all_window_position_indicies
+            if debug_print:
+                print(f'np.shape(active_included_all_window_position_indicies): {np.shape(active_included_all_window_position_indicies)}') # (51455,)
+
+            active_included_all_window_position_indicies = np.squeeze(active_included_all_window_position_indicies.nonzero()) # was a boolean area, but get the indices where true instead.  (1106,)
+            if debug_print:
+                print(f'np.shape(active_included_all_window_position_indicies): {np.shape(active_included_all_window_position_indicies)}; active_included_all_window_position_indicies: {active_included_all_window_position_indicies}')
+
+            active_num_samples = len(active_included_all_window_position_indicies)
+
+            ## NOTE: active_included_all_window_position_indicies better be the same length as .params.active_trail_opacity_values and .params.active_trail_size_values. These lengths are given by .params.curr_view_window_length_samples
+            max_num_samples = self.params.curr_view_window_length_samples # 299
+            if active_num_samples > max_num_samples:
+                if debug_print:
+                    print(f'len(active_included_all_window_position_indicies) ({active_num_samples}) > max_num_samples ({max_num_samples}). Cutting.')
+                active_included_all_window_position_indicies = active_included_all_window_position_indicies[-max_num_samples:] # get only the last (meaning most recent) max_num_samples samples from the indicies that should be displayed
+                active_num_samples = max_num_samples # cut down to the max number of samples
+                
+            if debug_print:
+                print(f'np.shape(active_included_all_window_position_indicies): {np.shape(active_included_all_window_position_indicies)}, active_num_samples: {active_num_samples}') # np.shape(active_included_all_window_position_indicies): (1, 1106), active_num_samples: 1    
+
+            # print(f'np.shape(active_included_all_window_position_indicies): {np.shape(active_included_all_window_position_indicies)}, active_num_samples: {active_num_samples}')    
+            # self.x[active_included_all_window_position_indicies], self.y[active_included_all_window_position_indicies], self.z_fixed[-active_num_samples:]
+
+            ## Animal Position and Location Trail Plotting:
+            self.perform_plot_location_trail('animal_location_trail', self.x[active_included_all_window_position_indicies], self.y[active_included_all_window_position_indicies], self.z_fixed[-active_num_samples:],
+                                                trail_fade_values=self.params.active_trail_opacity_values, trail_point_size_values=self.params.active_trail_size_values,
+                                                render=False)
+
+            ## Animal Current Position:
+            curr_animal_point = [self.x[active_included_all_window_position_indicies[-1]], self.y[active_included_all_window_position_indicies[-1]], self.z_fixed[-1]]
+            self.perform_plot_location_point('animal_current_location_point', curr_animal_point, render=False)
+
+
 
         if render:
             self.p.render() # renders to ensure it's updated after changing the ScalarVisibility above
 
+    
+    
     
     def on_slider_update_mesh(self, value):
         """ called to update the current active time window from an integer index (such as that produced by the slider's update function or the class responsible for making videos) """
@@ -263,17 +306,20 @@ class InteractivePlaceCellDataExplorer(InteractiveDataExplorerBase):
         # print('Constraining to curr_time_fixedSegments with times (start: {}, end: {})'.format(t_start, t_stop))
         # print('curr_time_fixedSegments: {}'.format(curr_time_fixedSegments))
         
-        self.on_active_window_update_mesh(t_start=t_start, t_stop=t_stop, render=False)
+        enable_time_only_position_mesh_updates=True
         
-        ## Animal Position and Location Trail Plotting:
-        self.perform_plot_location_trail('animal_location_trail', self.x[active_window_sample_indicies], self.y[active_window_sample_indicies], self.z_fixed,
-                                             trail_fade_values=self.params.active_trail_opacity_values, trail_point_size_values=self.params.active_trail_size_values,
-                                             render=False)
+        self.on_active_window_update_mesh(t_start=t_start, t_stop=t_stop, enable_position_mesh_updates=enable_time_only_position_mesh_updates, render=False)
         
+        if not enable_time_only_position_mesh_updates:
+            ## Animal Position and Location Trail Plotting:
+            self.perform_plot_location_trail('animal_location_trail', self.x[active_window_sample_indicies], self.y[active_window_sample_indicies], self.z_fixed,
+                                                trail_fade_values=self.params.active_trail_opacity_values, trail_point_size_values=self.params.active_trail_size_values,
+                                                render=False)
+            
 
-        ## Animal Current Position:
-        curr_animal_point = [self.x[active_window_sample_indicies[-1]], self.y[active_window_sample_indicies[-1]], self.z_fixed[-1]]
-        self.perform_plot_location_point('animal_current_location_point', curr_animal_point, render=False)
+            ## Animal Current Position:
+            curr_animal_point = [self.x[active_window_sample_indicies[-1]], self.y[active_window_sample_indicies[-1]], self.z_fixed[-1]]
+            self.perform_plot_location_point('animal_current_location_point', curr_animal_point, render=False)
         
         self.p.render() # renders to ensure it's updated after changing the ScalarVisibility above
         # self.p.update()
