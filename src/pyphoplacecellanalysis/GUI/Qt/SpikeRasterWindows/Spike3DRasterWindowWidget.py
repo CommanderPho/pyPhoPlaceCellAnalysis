@@ -94,6 +94,7 @@ class Spike3DRasterWindowWidget(QtWidgets.QWidget):
             
             # Build the 3D Vedo Raster plotter
             self.ui.spike_raster_plt_3d = Spike3DRaster_Vedo.init_from_independent_data(curr_spikes_df, window_duration=window_duration, window_start_time=window_start_time, neuron_colors=neuron_colors, neuron_sort_order=neuron_sort_order, application_name=self.applicationName, parent=None)
+            self.ui.spike_raster_plt_3d.disable_render_window_controls()
             
             # Set the 3D Vedo plots' window to the current values of the 2d plot:
             self.ui.spike_raster_plt_3d.spikes_window.update_window_start_end(self.ui.spike_raster_plt_2d.spikes_window.active_time_window[0], self.ui.spike_raster_plt_2d.spikes_window.active_time_window[1])
