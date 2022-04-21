@@ -5,6 +5,7 @@
 
 
 """
+from collections import OrderedDict
 from copy import deepcopy
 import numpy as np
 import pandas as pd
@@ -64,6 +65,34 @@ class InteractivePlaceCellTuningCurvesDataExplorer(OccupancyPlottingMixin, HideS
     
     def _setup_variables(self):
         num_cells, spike_list, self.params.cell_ids, self.params.flattened_spike_identities, self.params.flattened_spike_times, flattened_sort_indicies, t_start, self.params.reverse_cellID_idx_lookup_map, t, x, y, linear_pos, speeds, self.params.flattened_spike_positions_list = InteractiveDataExplorerBase._unpack_variables(self.active_session)
+        
+        ## IMPORTANT: the placefields' may have less cells than those set in self.params.cell_ids, which comes from the neurons of the active_session
+        
+        
+        
+        # the valid cell_ids from the ratemap/tuning curves
+        valid_cell_ids = self.tuning_curves_valid_cell_ids
+        
+        differing_elements_ids = np.setdiff1d(self.params.cell_ids, valid_cell_ids)
+        num_differing_ids = len(differing_elements_ids)
+        if (num_differing_ids > 0):
+            print(f'{differing_elements_ids} are not present in for the placefields. A map (self.params.reverse_cellID_to_tuning_curve_idx_lookup_map) will be built.')
+            # self.params.cell_ids = valid_cell_ids.copy()
+        else:
+            print(f'the valid cell_ids for the placefields are the same as self.cell_ids... Great!')
+
+        ## TODO: need to update self.params.reverse_cellID_idx_lookup_map (just rebuild it):
+        # self.params.reverse_cellID_idx_lookup_map # TODO: note that this is kidna wrong for placefields and should not be used.
+        self.params.reverse_cellID_to_tuning_curve_idx_lookup_map = OrderedDict(zip(self.tuning_curves_valid_cell_ids, self.tuning_curve_indicies)) # maps cell_ids to unit_ids
+        # NOTE: note that the forward map cannot be built, because there's not a placefield for every self.cell_id (some cell_ids have an invalid placefield).
+        
+        
+        ## TODO: need to watch out for any refereences to access active_session.neurons.*, as this still will have the invalid IDs. Could re-filter I suppose??
+        
+        ## TODO: would need to rebuild: spikes_df['cell_idx'] as well, as these will be wrong after refresh and the lookup functions will thus be wrong as well.
+            
+            
+        
         ## Ensure we have the 'unit_id' property
         if self.use_unit_id_as_cell_id:
             try:

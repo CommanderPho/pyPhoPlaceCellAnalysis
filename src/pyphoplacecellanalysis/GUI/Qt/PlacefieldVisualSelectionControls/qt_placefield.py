@@ -107,10 +107,11 @@ def build_all_placefield_output_panels(ipcDataExplorer):
         extracted_cell_ids = [int(a_config.name) for a_config in new_configs]
         print(f'\t extracted_cell_ids: {extracted_cell_ids}')
         # convert to cell_IDXs, which are what the configs are indexed by:
-        extracted_cell_IDXs = ipcDataExplorer.find_cell_IDXs_from_cell_ids(cell_ids=extracted_cell_ids)
-        print(f'\t extracted_cell_IDXs: {extracted_cell_IDXs}')
+        # extracted_config_indicies = ipcDataExplorer.find_cell_IDXs_from_cell_ids(cell_ids=extracted_cell_ids)
+        extracted_config_indicies = [ipcDataExplorer.params.reverse_cellID_to_tuning_curve_idx_lookup_map[a_cell_id] for a_cell_id in extracted_cell_ids]
+        print(f'\t extracted_config_indicies: {extracted_config_indicies}')
         # The actual update function:
-        ipcDataExplorer.on_update_tuning_curve_display_config(updated_configs=new_configs, updated_config_indicies=extracted_cell_IDXs) # could just update function to look at .name of each config? Or change indicies to map?
+        ipcDataExplorer.on_update_tuning_curve_display_config(updated_configs=new_configs, updated_config_indicies=extracted_config_indicies) # could just update function to look at .name of each config? Or change indicies to map?
         # Is this required?
         ipcDataExplorer.apply_tuning_curve_configs() # works (seemingly)
 
