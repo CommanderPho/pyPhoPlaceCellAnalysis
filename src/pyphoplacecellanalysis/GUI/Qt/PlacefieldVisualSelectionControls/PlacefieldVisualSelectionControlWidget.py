@@ -37,6 +37,9 @@ class PlacefieldVisualSelectionWidget(QtWidgets.QWidget):
         self.ui = Ui_rootForm()
         self.ui.setupUi(self) # builds the design from the .ui onto this widget.
         
+        # Final UI Refinements:
+        self.initUI()
+        
         # initialize member variables
         self.enable_debug_print = PlacefieldVisualSelectionWidget.enable_debug_print
         self._name = None
@@ -61,7 +64,10 @@ class PlacefieldVisualSelectionWidget(QtWidgets.QWidget):
         self.ui.chkbtnPlacefield.toggled.connect(self.togglePlacefieldVisibility)
         self.ui.chkbtnSpikes.toggled.connect(self.toggleSpikeVisibility)
   
-          
+    def initUI(self):
+        self.ui.btnTitle.hide() # set the title button as hidden, since it's redundent
+        # Disable Changing the color button:
+        # self.ui.btnColorButton.SetEnabled
   
     @QtCore.pyqtSlot(bool)
     def togglePlacefieldVisibility(self, value):
