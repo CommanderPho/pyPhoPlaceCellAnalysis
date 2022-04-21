@@ -223,13 +223,14 @@ class InteractiveDataExplorerBase(InteractivePyvistaPlotterBuildIfNeededMixin, I
         Updates the existing plot if the same plot_name is reused. """
         point_cloud_fixedSegements_positionTrail = np.column_stack((arr_x, arr_y, arr_z))
         pdata_positionTrail = pv.PolyData(point_cloud_fixedSegements_positionTrail.copy()) # a mesh
+        active_num_samples = len(arr_x) # get the number of samples to be plotted so that the trail_fade_values and trail_point_size_values may be cut down to only the most recent (the last active_num_samples values) if there are fewer points than maximum
         if trail_fade_values is not None:
-            pdata_positionTrail.point_data['pho_fade_values'] = trail_fade_values
+            pdata_positionTrail.point_data['pho_fade_values'] = trail_fade_values[-active_num_samples:]
             scalars_arg = 'pho_fade_values'
         else:
             scalars_arg = None
         if trail_point_size_values is not None:
-            pdata_positionTrail.point_data['pho_size_values'] = trail_point_size_values
+            pdata_positionTrail.point_data['pho_size_values'] = trail_point_size_values[-active_num_samples:]
             point_size_scale_arg = 'pho_size_values'
         else:
             point_size_scale_arg = None
