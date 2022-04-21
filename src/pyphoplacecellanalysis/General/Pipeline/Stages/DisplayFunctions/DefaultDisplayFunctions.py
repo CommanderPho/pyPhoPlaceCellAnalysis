@@ -28,7 +28,8 @@ from pyphoplacecellanalysis.GUI.PyVista.InteractivePlotter.InteractivePlaceCellD
 
 from pyphoplacecellanalysis.GUI.PyVista.InteractivePlotter.InteractiveCustomDataExplorer import InteractiveCustomDataExplorer
 
-from pyphoplacecellanalysis.GUI.Panel.panel_placefield import build_panel_interactive_placefield_visibility_controls, build_all_placefield_output_panels, SingleEditablePlacefieldDisplayConfiguration
+
+
 from pyphoplacecellanalysis.GUI.PyVista.InteractivePlotter.InteractivePlaceCellTuningCurvesDataExplorer import InteractivePlaceCellTuningCurvesDataExplorer
 
 from pyphoplacecellanalysis.PhoPositionalData.plotting.placefield import plot_1d_placecell_validations
@@ -112,19 +113,29 @@ class DefaultDisplayFunctions(AllFunctionEnumeratingMixin):
         Inputs: {'extant_plotter': None} 
         Outputs: {'ipcDataExplorer', 'plotter', 'pane'}
         """
-        # try: pActiveTuningCurvesPlotter
-        # except NameError: pActiveTuningCurvesPlotter = None # Checks variable p's existance, and sets its value to None if it doesn't exist so it can be checked in the next step
-
+        # Panel library based Placefield controls
+        from pyphoplacecellanalysis.GUI.Panel.panel_placefield import build_panel_interactive_placefield_visibility_controls
+        # Qt-based Placefield controls:
+        from pyphoplacecellanalysis.GUI.Qt.PlacefieldVisualSelectionControls.qt_placefield import build_all_placefield_output_panels
+        
+        panel_controls_mode = kwargs.get('panel_controls_mode', 'Qt') # valid options are 'Qt', 'Panel', or None
+        
         pActiveTuningCurvesPlotter = kwargs.get('extant_plotter', None)
-        # if pActiveTuningCurvesPlotter is None:
-        #     print('_display_3d_interactive_tuning_curves_plotter: No extant plotter provided!')
-        # else:
-        #     print(f"_display_3d_interactive_tuning_curves_plotter: extant_plotter: {kwargs['extant_plotter']}")
-
         ipcDataExplorer = InteractivePlaceCellTuningCurvesDataExplorer(active_config, computation_result.sess, computation_result.computed_data['pf2D'], active_config.plotting_config.pf_colors, **({'extant_plotter':None} | kwargs))
         pActiveTuningCurvesPlotter = ipcDataExplorer.plot(pActiveTuningCurvesPlotter) # [2, 17449]
-        ### Build Dynamic Panel Interactive Controls for configuring Placefields:
-        pane = build_panel_interactive_placefield_visibility_controls(ipcDataExplorer)
+        
+        # build the output panels if desired:
+        if panel_controls_mode:
+            # pane: (placefieldControlsContainerWidget, pf_widgets)
+            pane = build_all_placefield_output_panels(ipcDataExplorer)
+            pane[0].show()
+        elif panel_controls_mode == 'Panel':        
+            ### Build Dynamic Panel Interactive Controls for configuring Placefields:
+            pane = build_panel_interactive_placefield_visibility_controls(ipcDataExplorer)
+        else:
+            # no controls
+            pane = None
+        
         # return pane
         return {'ipcDataExplorer': ipcDataExplorer, 'plotter': pActiveTuningCurvesPlotter, 'pane': pane}
             
