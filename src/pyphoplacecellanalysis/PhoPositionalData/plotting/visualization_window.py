@@ -5,7 +5,30 @@ from dataclasses import dataclass
 
 @dataclass
 class VisualizationWindow(object):
-    """Docstring for VisualizationWindow."""
+    """
+
+    Used in:
+        InteractivePlaceCellDataExplorer: to hold the fixed-duration time windows for each path
+    
+    Usage:
+        ## Simplified with just two windows:
+        self.params.longer_spikes_window = VisualizationWindow(duration_seconds=1024.0, sampling_rate=self.active_session.position.sampling_rate) # have it start clearing spikes more than 30 seconds old
+        self.params.curr_view_window_length_samples = self.params.longer_spikes_window.duration_num_frames # number of samples the window should last
+        print('longer_spikes_window - curr_view_window_length_samples - {}'.format(self.params.curr_view_window_length_samples))
+
+        self.params.recent_spikes_window = VisualizationWindow(duration_seconds=10.0, sampling_rate=self.active_session.position.sampling_rate) # increasing this increases the length of the position tail
+        self.params.curr_view_window_length_samples = self.params.recent_spikes_window.duration_num_frames # number of samples the window should last
+        print('recent_spikes_window - curr_view_window_length_samples - {}'.format(self.params.curr_view_window_length_samples))
+
+        ## Build the sliding windows:
+
+        # build a sliding window to be able to retreive the correct flattened indicies for any given timestep
+        self.params.active_epoch_position_linear_indicies = np.arange(np.size(self.active_session.position.time))
+        self.params.pre_computed_window_sample_indicies = self.params.recent_spikes_window.build_sliding_windows(self.params.active_epoch_position_linear_indicies)
+        # print('pre_computed_window_sample_indicies: {}\n shape: {}'.format(pre_computed_window_sample_indicies, np.shape(pre_computed_window_sample_indicies)))
+
+
+    """
     duration_seconds: float = None
     sampling_rate: float = None
     duration_num_frames: int = None
