@@ -198,21 +198,16 @@ class InteractivePlaceCellDataExplorer(InteractiveDataExplorerBase):
     # recent_spikes_window
     # z_fixed,
     # active_trail_opacity_values, active_trail_size_values
-    def on_slider_update_mesh(self, value):
-        curr_i = int(value)
-        active_window_sample_indicies = np.squeeze(self.params.pre_computed_window_sample_indicies[curr_i,:]) # Get the current precomputed indicies for this curr_i
-
-        ## Spike Plotting:
-        # Get the times that fall within the current plot window:
-        curr_time_fixedSegments = self.t[active_window_sample_indicies] # New Way
-        # I think there's a problem here, because self.t contains the sampled position value timestamps if I'm not mistaken....
-
-        t_start = curr_time_fixedSegments[0]
-        t_stop = curr_time_fixedSegments[-1]
-        # print('Constraining to curr_time_fixedSegments with times (start: {}, end: {})'.format(t_start, t_stop))
-        # print('curr_time_fixedSegments: {}'.format(curr_time_fixedSegments))
-        curr_text_rendering_string = 'curr_i: {:d}; (t_start: {:.2f}, t_stop: {:.2f})'.format(curr_i, t_start, t_stop) # :.3f
+    def on_active_window_update_mesh(self, t_start, t_stop, render=True):
+        """ called to update the meshs with t_start, t_stop times representing the start and end of the new active window:
+        
+        """
+        # curr_text_rendering_string = 'curr_i: {:d}; (t_start: {:.2f}, t_stop: {:.2f})'.format(curr_i, t_start, t_stop) # :.3f
+        # self.p.add_text(curr_text_rendering_string, name='lblCurrent_spike_range', position='lower_right', color='white', shadow=True, font_size=10)
+        
+        curr_text_rendering_string = '(t_start: {:.2f}, t_stop: {:.2f})'.format(t_start, t_stop) # :.3f
         self.p.add_text(curr_text_rendering_string, name='lblCurrent_spike_range', position='lower_right', color='white', shadow=True, font_size=10)
+        
 
         ## Historical Spikes:
         # active_included_all_historical_indicies = (flattened_spikes.flattened_spike_times < t_stop) # Accumulate Spikes mode. All spikes occuring prior to the end of the frame (meaning the current time) are plotted
@@ -248,6 +243,28 @@ class InteractivePlaceCellDataExplorer(InteractiveDataExplorerBase):
         if recent_only_spikes_pc.n_points >= 1:
             self.plots['spikes_main_recent_only'] = self.p.add_mesh(recent_only_spikes_pc, name='recent_only_spikes_main', scalars='cellID', cmap=self.active_config.plotting_config.pf_listed_colormap, show_scalar_bar=False, lighting=False, render=False) # color='white'
 
+
+        if render:
+            self.p.render() # renders to ensure it's updated after changing the ScalarVisibility above
+
+    
+    def on_slider_update_mesh(self, value):
+        """ called to update the current active time window from an integer index (such as that produced by the slider's update function or the class responsible for making videos) """
+        curr_i = int(value)
+        active_window_sample_indicies = np.squeeze(self.params.pre_computed_window_sample_indicies[curr_i,:]) # Get the current precomputed indicies for this curr_i
+
+        ## Spike Plotting:
+        # Get the times that fall within the current plot window:
+        curr_time_fixedSegments = self.t[active_window_sample_indicies] # New Way
+        # I think there's a problem here, because self.t contains the sampled position value timestamps if I'm not mistaken....
+
+        t_start = curr_time_fixedSegments[0]
+        t_stop = curr_time_fixedSegments[-1]
+        # print('Constraining to curr_time_fixedSegments with times (start: {}, end: {})'.format(t_start, t_stop))
+        # print('curr_time_fixedSegments: {}'.format(curr_time_fixedSegments))
+        
+        self.on_active_window_update_mesh(t_start=t_start, t_stop=t_stop, render=False)
+        
         ## Animal Position and Location Trail Plotting:
         self.perform_plot_location_trail('animal_location_trail', self.x[active_window_sample_indicies], self.y[active_window_sample_indicies], self.z_fixed,
                                              trail_fade_values=self.params.active_trail_opacity_values, trail_point_size_values=self.params.active_trail_size_values,
