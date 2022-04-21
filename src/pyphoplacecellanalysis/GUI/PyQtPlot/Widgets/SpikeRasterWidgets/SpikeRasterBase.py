@@ -127,7 +127,9 @@ class UnitSortableMixin:
         
         
 
-class SpikeRasterBase(UnitSortableMixin, DataSeriesToSpatialTransformingMixin, NeuronIdentityAccessingMixin, SpikeRenderingBaseMixin, SpikesWindowOwningMixin, SpikesDataframeOwningMixin, TimeWindowPlaybackPropertiesMixin, RenderPlaybackControlsMixin, RenderWindowControlsMixin, QtWidgets.QWidget):
+# class SpikeRasterBase(UnitSortableMixin, DataSeriesToSpatialTransformingMixin, NeuronIdentityAccessingMixin, SpikeRenderingBaseMixin, SpikesWindowOwningMixin, SpikesDataframeOwningMixin, TimeWindowPlaybackPropertiesMixin, RenderPlaybackControlsMixin, RenderWindowControlsMixin, QtWidgets.QWidget):
+class SpikeRasterBase(UnitSortableMixin, DataSeriesToSpatialTransformingMixin, NeuronIdentityAccessingMixin, SpikeRenderingBaseMixin, SpikesWindowOwningMixin, SpikesDataframeOwningMixin, RenderPlaybackControlsMixin, RenderWindowControlsMixin, QtWidgets.QWidget):
+    
     """ Displays a raster plot with the spikes occuring along a plane. 
     
     Note: unit_ids: sequentially increasing sequence starting from 0 and going to n_cells - 1. No elements missing:
@@ -315,12 +317,18 @@ class SpikeRasterBase(UnitSortableMixin, DataSeriesToSpatialTransformingMixin, N
         return cls(params=unified_app.params, spikes_window=unified_app.spikes_window, playback_controller=unified_app.playback_controller, **kwargs)
         
     @classmethod
-    def init_from_independent_data(cls, spikes_df, window_duration=15.0, window_start_time=0.0, neuron_colors=None, neuron_sort_order=None, **kwargs):
+    def init_from_independent_data(cls, spikes_df, window_duration=15.0, window_start_time=0.0, neuron_colors=None, neuron_sort_order=None, enable_independent_playback_controller=False, **kwargs):
         """ Helps to create an independent master instance of the app/window. """
         # Helper container variables
         params = VisualizationParameters('')
         spikes_window = SpikesDataframeWindow(spikes_df, window_duration=window_duration, window_start_time=window_start_time)
-        playback_controller = TimeWindowPlaybackController()
+        
+        if enable_independent_playback_controller:
+            playback_controller = TimeWindowPlaybackController()
+        else:
+            # don't allow playback controller.
+            playback_controller = None
+        
         # Setup the animation playback object for the time window:
         # self.playback_controller = TimeWindowPlaybackController()
         # self.playback_controller.setup(self._spikes_window)

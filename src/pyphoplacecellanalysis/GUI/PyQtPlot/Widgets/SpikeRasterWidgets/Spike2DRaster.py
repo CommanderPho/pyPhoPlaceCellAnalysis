@@ -49,7 +49,7 @@ class Spike2DRaster(Render2DScrollWindowPlotMixin, SpikeRasterBase):
         lines_dict[af.AlignTop | af.AlignRight] = ['TR', 
                                                    f"n_cells : {self.n_cells}",
                                                    f'render_window_duration: {self.render_window_duration}',
-                                                   f'animation_time_step: {self.animation_time_step}',
+                                                #    f'animation_time_step: {self.animation_time_step}',
                                                    f'temporal_axis_length: {self.temporal_axis_length}',
                                                    f'temporal_zoom_factor: {self.temporal_zoom_factor}']
         lines_dict[af.AlignBottom | af.AlignLeft] = ['BL', 

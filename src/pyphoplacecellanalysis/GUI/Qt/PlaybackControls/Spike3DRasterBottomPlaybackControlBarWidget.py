@@ -208,6 +208,122 @@ class Spike3DRasterBottomPlaybackControlBar(QWidget):
         self.reverse_toggled.emit(self.is_playback_reversed)
 
 
+
+
+    
+class SpikeRasterBottomFrameControlsMixin:
+    """ renders the UI controls for the Spike3DRaster_Vedo class 
+        Follows Conventions outlined in ModelViewMixin Conventions.md
+        
+        Currently Unused after being removed from Spike3DRaster_Vedo
+    """
+    
+    @QtCore.pyqtSlot()
+    def SpikeRasterBottomFrameControlsMixin_on_init(self):
+        """ perform any parameters setting/checking during init """
+        pass
+
+    @QtCore.pyqtSlot()
+    def SpikeRasterBottomFrameControlsMixin_on_setup(self):
+        """ perfrom setup/creation of widget/graphical/data objects. Only the core objects are expected to exist on the implementor (root widget, etc) """
+        pass
+    
+    @QtCore.pyqtSlot()
+    def SpikeRasterBottomFrameControlsMixin_connectSignals(self, bottom_bar_controls):
+        """ perfrom setup/creation of widget/graphical/data objects. Only the core objects are expected to exist on the implementor (root widget, etc) """
+        bottom_bar_connections = []
+        bottom_bar_connections.append(bottom_bar_controls.play_pause_toggled.connect(self.play_pause))
+        bottom_bar_connections.append(bottom_bar_controls.jump_left.connect(self.on_jump_left))
+        bottom_bar_connections.append(bottom_bar_controls.jump_right.connect(self.on_jump_right))
+        bottom_bar_connections.append(bottom_bar_controls.reverse_toggled.connect(self.on_reverse_held))
+        return bottom_bar_connections
+        
+            
+    @QtCore.pyqtSlot()
+    def SpikeRasterBottomFrameControlsMixin_on_buildUI(self):
+        """ perfrom setup/creation of widget/graphical/data objects. Only the core objects are expected to exist on the implementor (root widget, etc) """
+        # CALLED:
+        
+        # controls_frame = QtWidgets.QFrame()
+        # controls_layout = QtWidgets.QHBoxLayout() # H-box layout
+        
+        # # controls_layout = QtWidgets.QGridLayout()
+        # # controls_layout.setContentsMargins(0, 0, 0, 0)
+        # # controls_layout.setVerticalSpacing(0)
+        # # controls_layout.setHorizontalSpacing(0)
+        # # controls_layout.setStyleSheet("background : #1B1B1B; color : #727272")
+        
+        # # Set-up the rest of the Qt window
+        # button = QtWidgets.QPushButton("My Button makes the cone red")
+        # button.setToolTip('This is an example button')
+        # button.clicked.connect(self.onClick)
+        # controls_layout.addWidget(button)
+        
+        # button2 = QtWidgets.QPushButton("<")
+        # button2.setToolTip('<')
+        # # button2.clicked.connect(self.onClick)
+        # controls_layout.addWidget(button2)
+        
+        # button3 = QtWidgets.QPushButton(">")
+        # button3.setToolTip('>')
+        # controls_layout.addWidget(button3)
+        
+        # # Set Final Layouts:
+        # controls_frame.setLayout(controls_layout)
+        
+        controls_frame = Spike3DRasterBottomPlaybackControlBar() # Initialize new controls class from the Spike3DRasterBottomPlaybackControlBar class.
+        controls_layout = controls_frame.layout() # Get the layout
+        
+        self.SpikeRasterBottomFrameControlsMixin_connectSignals(controls_frame)
+
+        
+        return controls_frame, controls_layout
+
+
+    @QtCore.pyqtSlot()
+    def SpikeRasterBottomFrameControlsMixin_on_destroy(self):
+        """ perfrom teardown/destruction of anything that needs to be manually removed or released """
+        # TODO: NOT CALLED
+        pass
+
+    @QtCore.pyqtSlot(float, float)
+    def SpikeRasterBottomFrameControlsMixin_on_window_update(self, new_start=None, new_end=None):
+        """ called to perform updates when the active window changes. Redraw, recompute data, etc. """
+        # TODO: NOT CALLED
+        pass
+    
+    
+    # ## Update Functions:
+    # @QtCore.pyqtSlot(bool)
+    # def play_pause(self, is_playing):
+    #     print(f'SpikeRasterBottomFrameControlsMixin.play_pause(is_playing: {is_playing})')
+    #     if (not is_playing):
+    #         self.animationThread.start()
+    #     else:
+    #         self.animationThread.terminate()
+
+    # @QtCore.pyqtSlot()
+    # def on_jump_left(self):
+    #     # Skip back some frames
+    #     print(f'SpikeRasterBottomFrameControlsMixin.on_jump_left()')
+    #     self.shift_animation_frame_val(-5)
+        
+    # @QtCore.pyqtSlot()
+    # def on_jump_right(self):
+    #     # Skip forward some frames
+    #     print(f'SpikeRasterBottomFrameControlsMixin.on_jump_right()')
+    #     self.shift_animation_frame_val(5)
+        
+
+    # @QtCore.pyqtSlot(bool)
+    # def on_reverse_held(self, is_reversed):
+    #     print(f'SpikeRasterBottomFrameControlsMixin.on_reverse_held(is_reversed: {is_reversed})')
+    #     pass
+
+
+
+
+
 ## Start Qt event loop
 # if __name__ == '__main__':
 #     app = mkQApp("PlacefieldVisualSelectionWidget Example")

@@ -10,8 +10,13 @@ from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.SpikeRasterWidgets.Spike2DRaste
 from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.SpikeRasterWidgets.Spike3DRaster import Spike3DRaster
 from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.SpikeRasterWidgets.Spike3DRaster_Vedo import Spike3DRaster_Vedo
 
+from pyphoplacecellanalysis.General.Mixins.TimeWindowPlaybackMixin import TimeWindowPlaybackPropertiesMixin, TimeWindowPlaybackController, TimeWindowPlaybackControllerActionsMixin
 
-class Spike3DRasterWindowWidget(QtWidgets.QWidget):
+from pyphoplacecellanalysis.GUI.Qt.PlaybackControls.Spike3DRasterBottomPlaybackControlBarWidget import SpikeRasterBottomFrameControlsMixin
+
+# remove TimeWindowPlaybackControllerActionsMixin
+# class Spike3DRasterWindowWidget(SpikeRasterBottomFrameControlsMixin, TimeWindowPlaybackControllerActionsMixin, TimeWindowPlaybackPropertiesMixin, QtWidgets.QWidget):
+class Spike3DRasterWindowWidget(SpikeRasterBottomFrameControlsMixin, QtWidgets.QWidget):
     """ A main raster window loaded from a Qt .ui file. 
     
     Usage:
@@ -30,6 +35,72 @@ class Spike3DRasterWindowWidget(QtWidgets.QWidget):
     
     # TODO: add signals here:
     
+    
+    ######## TimeWindowPlaybackPropertiesMixin requirement:
+    @property
+    def animation_active_time_window(self):
+        """The accessor for the TimeWindowPlaybackPropertiesMixin class for the main active time window that it will animate."""
+        return self.spikes_window
+    @animation_active_time_window.setter
+    def animation_active_time_window(self, value):
+        self.spikes_window = value
+    @property
+    def spikes_window(self):
+        """ Just wraps its embedded spike_raster_plt_2d widget's spikes_window property."""
+        return self.spike_raster_plt_2d.spikes_window
+    @spikes_window.setter
+    def spikes_window(self, value):
+        self.spike_raster_plt_2d.spikes_window = value
+
+    ######## TimeWindowPlaybackPropertiesMixin requirement:
+        
+    @property
+    def animation_time_step(self):
+        """ How much to step forward in time at each frame of animation. """
+        return self.params.animation_time_step
+    @animation_time_step.setter
+    def animation_time_step(self, value):
+        self.params.animation_time_step = value
+        
+        
+    ## STATE PROPERTIES
+    @property
+    def is_playback_reversed(self):
+        """The is_playback_reversed property."""
+        return self.params.is_playback_reversed
+    @is_playback_reversed.setter
+    def is_playback_reversed(self, value):
+        self.params.is_playback_reversed = value
+        
+    @property
+    def animation_playback_direction_multiplier(self):
+        """The animation_reverse_multiplier property."""
+        if self.params.is_playback_reversed:
+            return -1.0
+        else:
+            return 1.0
+
+    @property
+    def playback_update_frequency(self):
+        """The rate at which the separate animation thread attempts to update the interface. ReadOnly."""
+        return self.params.playback_update_frequency
+
+    @property
+    def playback_rate_multiplier(self):
+        """ 1x playback (real-time) occurs when self.playback_update_frequency == self.animation_time_step. 
+            if self.animation_time_step = 2.0 * self.playback_update_frequency => for each update the window will step double the time_step forward in time than it would be default, meaning a 2.0x playback_rate_multiplier.
+        """
+        return (self.animation_time_step / self.playback_update_frequency)
+    @playback_rate_multiplier.setter
+    def playback_rate_multiplier(self, value):
+        """ since self.playback_update_frequency is fixed, only self.animation_time_step can be adjusted to set the playback_rate_multiplier. """
+        desired_playback_rate_multiplier = value
+        self.animation_time_step = self.playback_update_frequency * desired_playback_rate_multiplier
+
+    
+        
+        
+    ## Other Properties:
     
     @property
     def spike_raster_plt_2d(self):
@@ -69,6 +140,12 @@ class Spike3DRasterWindowWidget(QtWidgets.QWidget):
         self.params = VisualizationParameters(self.applicationName)
         self.params.type_of_3d_plotter = type_of_3d_plotter
         
+        # Helper Mixins: INIT:
+        self.SpikeRasterBottomFrameControlsMixin_on_init()
+        
+        # Helper Mixins: SETUP:
+        self.SpikeRasterBottomFrameControlsMixin_on_setup()
+        
         self.initUI(curr_spikes_df, core_app_name=application_name, window_duration=window_duration, window_start_time=window_start_time, neuron_colors=neuron_colors, neuron_sort_order=neuron_sort_order, type_of_3d_plotter=self.params.type_of_3d_plotter)
         
         # Update the windows once before showing the UI:
@@ -79,21 +156,21 @@ class Spike3DRasterWindowWidget(QtWidgets.QWidget):
 
     def initUI(self, curr_spikes_df, core_app_name='UnifiedSpikeRasterApp', window_duration=15.0, window_start_time=30.0, neuron_colors=None, neuron_sort_order=None, type_of_3d_plotter='pyqtgraph'):
         # 
-        self.ui.spike_raster_plt_2d = Spike2DRaster.init_from_independent_data(curr_spikes_df, window_duration=window_duration, window_start_time=window_start_time, neuron_colors=neuron_colors, neuron_sort_order=neuron_sort_order, application_name=self.applicationName, parent=None) # setting , parent=spike_raster_plt_3d makes a single window
+        self.ui.spike_raster_plt_2d = Spike2DRaster.init_from_independent_data(curr_spikes_df, window_duration=window_duration, window_start_time=window_start_time, neuron_colors=neuron_colors, neuron_sort_order=neuron_sort_order, application_name=self.applicationName, enable_independent_playback_controller=False, parent=None) # setting , parent=spike_raster_plt_3d makes a single window
         
         if type_of_3d_plotter is None:
             # No 3D plotter:
             self.ui.spike_raster_plt_3d = None 
             
         elif type_of_3d_plotter == 'pyqtgraph':
-            self.ui.spike_raster_plt_3d = Spike3DRaster.init_from_independent_data(curr_spikes_df, window_duration=window_duration, window_start_time=window_start_time, neuron_colors=neuron_colors, neuron_sort_order=neuron_sort_order, application_name=self.applicationName, parent=None)
+            self.ui.spike_raster_plt_3d = Spike3DRaster.init_from_independent_data(curr_spikes_df, window_duration=window_duration, window_start_time=window_start_time, neuron_colors=neuron_colors, neuron_sort_order=neuron_sort_order, application_name=self.applicationName, enable_independent_playback_controller=False, parent=None)
             # Connect the 2D window scrolled signal to the 3D plot's spikes_window.update_window_start_end function
         elif type_of_3d_plotter == 'vedo':
             # To work around a bug with the vedo plotter with the pyqtgraph 2D controls: we must update the 2D Scroll Region to the initial value, since it only works if the 2D Raster plot (pyqtgraph-based) is created before the Spike3DRaster_Vedo (Vedo-based). This is probably due to the pyqtgraph's instancing of the QtApplication. 
             self.ui.spike_raster_plt_2d.update_scroll_window_region(window_start_time, window_start_time+window_duration, block_signals=False)
             
             # Build the 3D Vedo Raster plotter
-            self.ui.spike_raster_plt_3d = Spike3DRaster_Vedo.init_from_independent_data(curr_spikes_df, window_duration=window_duration, window_start_time=window_start_time, neuron_colors=neuron_colors, neuron_sort_order=neuron_sort_order, application_name=self.applicationName, parent=None)
+            self.ui.spike_raster_plt_3d = Spike3DRaster_Vedo.init_from_independent_data(curr_spikes_df, window_duration=window_duration, window_start_time=window_start_time, neuron_colors=neuron_colors, neuron_sort_order=neuron_sort_order, application_name=self.applicationName, enable_independent_playback_controller=False, parent=None)
             self.ui.spike_raster_plt_3d.disable_render_window_controls()
             
             # Set the 3D Vedo plots' window to the current values of the 2d plot:
@@ -126,6 +203,21 @@ class Spike3DRasterWindowWidget(QtWidgets.QWidget):
         # spike_raster_plt_3d.setWindowTitle('3D Raster with 2D Control Window')
         # self.spike_raster_plt_3d.setWindowTitle('Main 3D Raster Window')
         
+        ## Create the animation properties:
+        self.playback_controller = TimeWindowPlaybackController()
+        self.playback_controller.setup(self) # pass self to have properties set
+        
+        
+        ## Connect the UI Controls:
+        # Helper Mixins: buildUI:
+        # self.ui.bottom_controls_frame, self.ui.bottom_controls_layout = self.SpikeRasterBottomFrameControlsMixin_on_buildUI() # NOTE: do not call for the window as it already has a valid bottom bar widget
+        # Connect the signals:
+        self.ui.bottom_bar_connections = None 
+        self.ui.bottom_bar_connections = self.SpikeRasterBottomFrameControlsMixin_connectSignals(self.ui.bottomPlaybackControlBarWidget)
+        
+        
+        
+
     def connect_plotter_time_windows(self):
          self.spike_3d_to_2d_window_connection = self.spike_raster_plt_2d.window_scrolled.connect(self.spike_raster_plt_3d.spikes_window.update_window_start_end)
          
@@ -157,6 +249,112 @@ class Spike3DRasterWindowWidget(QtWidgets.QWidget):
         else:
             event.ignore()
    
+    ###################################
+    #### EVENT HANDLERS
+    ##################################
+    @QtCore.Slot(int)
+    def shift_animation_frame_val(self, shift_frames: int):
+        print(f'Spike3DRasterWindowWidget.shift_animation_frame_val(shift_frames: {shift_frames})')
+        # if self.spike_raster_plt_2d is not None:
+        #     self.spike_raster_plt_2d.shift_an
+        next_start_timestamp = self.animation_active_time_window.active_window_start_time + (self.animation_playback_direction_multiplier * self.animation_time_step * float(shift_frames))
+        # self.animation_active_time_window.update_window_start(next_start_timestamp) # calls update_window_start, so any subscribers should be notified.
+        # Update the windows once before showing the UI:
+        self.spike_raster_plt_2d.update_scroll_window_region(next_start_timestamp, next_start_timestamp+self.animation_active_time_window.window_duration, block_signals=False) # self.spike_raster_plt_2d.window_scrolled should be emitted
+        
+        # update_scroll_window_region
+        # self.ui.spike_raster_plt_3d.spikes_window.update_window_start_end(self.ui.spike_raster_plt_2d.spikes_window.active_time_window[0], self.ui.spike_raster_plt_2d.spikes_window.active_time_window[1])
+        
+        
+
+    # Called from SliderRunner's thread when it emits the update_signal:        
+    @QtCore.Slot()
+    def increase_animation_frame_val(self):
+        print(f'Spike3DRasterWindowWidget.increase_animation_frame_val()')
+        self.shift_animation_frame_val(1)
+        
+        
+    ## Update Functions:
+    @QtCore.Slot(bool)
+    def play_pause(self, is_playing):
+        print(f'Spike3DRasterWindowWidget.play_pause(is_playing: {is_playing})')
+        if (not is_playing):
+            self.animationThread.start()
+        else:
+            self.animationThread.terminate()
+            
+
+    @QtCore.Slot()
+    def on_jump_left(self):
+        # Skip back some frames
+        print(f'Spike3DRasterWindowWidget.on_jump_left()')
+        self.shift_animation_frame_val(-5)
+        
+    @QtCore.Slot()
+    def on_jump_right(self):
+        # Skip forward some frames
+        print(f'Spike3DRasterWindowWidget.on_jump_right()')
+        self.shift_animation_frame_val(5)
+        
+
+    @QtCore.Slot(bool)
+    def on_reverse_held(self, is_reversed):
+        print(f'Spike3DRasterWindowWidget.on_reverse_held(is_reversed: {is_reversed})')
+        pass
+    
+    
+        
+        
+    @QtCore.Slot()
+    def on_spikes_df_changed(self):
+        """ changes:
+            self.unit_ids
+            self.n_full_cell_grid
+        """
+        if self.enable_debug_print:
+            print(f'Spike3DRasterWindowWidget.on_spikes_df_changed()')
+        
+    @QtCore.Slot(float, float, float)
+    def on_window_duration_changed(self, start_t, end_t, duration):
+        """ changes self.half_render_window_duration """
+        if self.enable_debug_print:
+            print(f'Spike3DRasterWindowWidget.on_window_duration_changed(start_t: {start_t}, end_t: {end_t}, duration: {duration})')
+
+
+    @QtCore.Slot(float, float)
+    def on_window_changed(self, start_t, end_t):
+        # called when the window is updated
+        if self.enable_debug_print:
+            print(f'Spike3DRasterWindowWidget.on_window_changed(start_t: {start_t}, end_t: {end_t})')
+        if self.enable_debug_print:
+            profiler = pg.debug.Profiler(disabled=True, delayed=True)
+        self._update_plots()
+        if self.enable_debug_print:
+            profiler('Finished calling _update_plots()')
+        
+        
+    
+    @QtCore.Slot(float, float, float, object)
+    def on_windowed_data_window_duration_changed(self, start_t, end_t, duration, updated_data_value):
+        """ changes self.half_render_window_duration """
+        if self.enable_debug_print:
+            print(f'Spike3DRasterWindowWidget.on_windowed_data_window_duration_changed(start_t: {start_t}, end_t: {end_t}, duration: {duration}, updated_data_value: ...)')
+
+    @QtCore.Slot(float, float, object)
+    def on_windowed_data_window_changed(self, start_t, end_t, updated_data_value):
+        # called when the window is updated
+        if self.enable_debug_print:
+            print(f'Spike3DRasterWindowWidget.on_windowed_data_window_changed(start_t: {start_t}, end_t: {end_t}, updated_data_value: ...)')
+        if self.enable_debug_print:
+            profiler = pg.debug.Profiler(disabled=True, delayed=True)
+        self._update_plots()
+        if self.enable_debug_print:
+            profiler('Finished calling _update_plots()')
+    
+
+
+
+
 
      
 if __name__ == "__main__":

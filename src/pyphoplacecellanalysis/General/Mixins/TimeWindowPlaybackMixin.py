@@ -8,6 +8,20 @@ from pyqtgraph.Qt import QtCore, QtGui, QtWidgets
 
 
 
+# class SimplePlayPauseWithExternalAppMixin:
+    
+#     # @property
+#     # def animationThread(self):
+#     #     """The animationThread property."""
+#     #     return self.playback_controller
+    
+#     @property
+#     def animationThread(self):
+#         """The animationThread property."""
+#         return self.playback_controller.animationThread
+    
+
+
 class TimeWindowPlaybackPropertiesMixin:
     """ TimeWindowPlaybackPropertiesMixin: Properties that implementors that want to control time-window playback should implement.
     
@@ -25,58 +39,58 @@ class TimeWindowPlaybackPropertiesMixin:
         """
         raise NotImplementedError
     
-    @property
-    def animation_time_step(self):
-        """ How much to step forward in time at each frame of animation. """
-        return self.params.animation_time_step
-    @animation_time_step.setter
-    def animation_time_step(self, value):
-        self.params.animation_time_step = value
+#     @property
+#     def animation_time_step(self):
+#         """ How much to step forward in time at each frame of animation. """
+#         return self.params.animation_time_step
+#     @animation_time_step.setter
+#     def animation_time_step(self, value):
+#         self.params.animation_time_step = value
         
         
-    ## STATE PROPERTIES
-    @property
-    def is_playback_reversed(self):
-        """The is_playback_reversed property."""
-        return self.params.is_playback_reversed
-    @is_playback_reversed.setter
-    def is_playback_reversed(self, value):
-        self.params.is_playback_reversed = value
+#     ## STATE PROPERTIES
+#     @property
+#     def is_playback_reversed(self):
+#         """The is_playback_reversed property."""
+#         return self.params.is_playback_reversed
+#     @is_playback_reversed.setter
+#     def is_playback_reversed(self, value):
+#         self.params.is_playback_reversed = value
         
-    @property
-    def animation_playback_direction_multiplier(self):
-        """The animation_reverse_multiplier property."""
-        if self.params.is_playback_reversed:
-            return -1.0
-        else:
-            return 1.0
+#     @property
+#     def animation_playback_direction_multiplier(self):
+#         """The animation_reverse_multiplier property."""
+#         if self.params.is_playback_reversed:
+#             return -1.0
+#         else:
+#             return 1.0
 
-    @property
-    def playback_update_frequency(self):
-        """The rate at which the separate animation thread attempts to update the interface. ReadOnly."""
-        return self.params.playback_update_frequency
+#     @property
+#     def playback_update_frequency(self):
+#         """The rate at which the separate animation thread attempts to update the interface. ReadOnly."""
+#         return self.params.playback_update_frequency
 
-    @property
-    def playback_rate_multiplier(self):
-        """ 1x playback (real-time) occurs when self.playback_update_frequency == self.animation_time_step. 
-            if self.animation_time_step = 2.0 * self.playback_update_frequency => for each update the window will step double the time_step forward in time than it would be default, meaning a 2.0x playback_rate_multiplier.
-        """
-        return (self.animation_time_step / self.playback_update_frequency)
-    @playback_rate_multiplier.setter
-    def playback_rate_multiplier(self, value):
-        """ since self.playback_update_frequency is fixed, only self.animation_time_step can be adjusted to set the playback_rate_multiplier. """
-        desired_playback_rate_multiplier = value
-        self.animation_time_step = self.playback_update_frequency * desired_playback_rate_multiplier
+#     @property
+#     def playback_rate_multiplier(self):
+#         """ 1x playback (real-time) occurs when self.playback_update_frequency == self.animation_time_step. 
+#             if self.animation_time_step = 2.0 * self.playback_update_frequency => for each update the window will step double the time_step forward in time than it would be default, meaning a 2.0x playback_rate_multiplier.
+#         """
+#         return (self.animation_time_step / self.playback_update_frequency)
+#     @playback_rate_multiplier.setter
+#     def playback_rate_multiplier(self, value):
+#         """ since self.playback_update_frequency is fixed, only self.animation_time_step can be adjusted to set the playback_rate_multiplier. """
+#         desired_playback_rate_multiplier = value
+#         self.animation_time_step = self.playback_update_frequency * desired_playback_rate_multiplier
 
-    @QtCore.pyqtSlot(int)
-    def shift_animation_frame_val(self, shift_frames: int):
-        next_start_timestamp = self.animation_active_time_window.active_window_start_time + (self.animation_playback_direction_multiplier * self.animation_time_step * float(shift_frames))
-        self.animation_active_time_window.update_window_start(next_start_timestamp) # calls update_window_start, so any subscribers should be notified.
+#     @QtCore.pyqtSlot(int)
+#     def shift_animation_frame_val(self, shift_frames: int):
+#         next_start_timestamp = self.animation_active_time_window.active_window_start_time + (self.animation_playback_direction_multiplier * self.animation_time_step * float(shift_frames))
+#         self.animation_active_time_window.update_window_start(next_start_timestamp) # calls update_window_start, so any subscribers should be notified.
         
-    # Called from SliderRunner's thread when it emits the update_signal:
-    @QtCore.pyqtSlot()
-    def increase_animation_frame_val(self):
-        self.shift_animation_frame_val(1)
+#     # Called from SliderRunner's thread when it emits the update_signal:
+#     @QtCore.pyqtSlot()
+#     def increase_animation_frame_val(self):
+#         self.shift_animation_frame_val(1)
         
 
 
@@ -133,33 +147,34 @@ class TimeWindowPlaybackControllerActionsMixin:
         increase_animation_frame_val(self)
         
     """
+    pass
 
-    ## Update Functions:
-    @QtCore.pyqtSlot(bool)
-    def play_pause(self, is_playing):
-        print(f'TimeWindowPlaybackControllerActionsMixin.play_pause(is_playing: {is_playing})')
-        if (not is_playing):
-            self.animationThread.start()
-        else:
-            self.animationThread.terminate()
+#     ## Update Functions:
+#     @QtCore.pyqtSlot(bool)
+#     def play_pause(self, is_playing):
+#         print(f'TimeWindowPlaybackControllerActionsMixin.play_pause(is_playing: {is_playing})')
+#         if (not is_playing):
+#             self.animationThread.start()
+#         else:
+#             self.animationThread.terminate()
 
-    @QtCore.pyqtSlot()
-    def on_jump_left(self):
-        # Skip back some frames
-        print(f'TimeWindowPlaybackControllerActionsMixin.on_jump_left()')
-        self.shift_animation_frame_val(-5)
+#     @QtCore.pyqtSlot()
+#     def on_jump_left(self):
+#         # Skip back some frames
+#         print(f'TimeWindowPlaybackControllerActionsMixin.on_jump_left()')
+#         self.shift_animation_frame_val(-5)
         
-    @QtCore.pyqtSlot()
-    def on_jump_right(self):
-        # Skip forward some frames
-        print(f'TimeWindowPlaybackControllerActionsMixin.on_jump_right()')
-        self.shift_animation_frame_val(5)
+#     @QtCore.pyqtSlot()
+#     def on_jump_right(self):
+#         # Skip forward some frames
+#         print(f'TimeWindowPlaybackControllerActionsMixin.on_jump_right()')
+#         self.shift_animation_frame_val(5)
         
 
-    @QtCore.pyqtSlot(bool)
-    def on_reverse_held(self, is_reversed):
-        print(f'TimeWindowPlaybackControllerActionsMixin.on_reverse_held(is_reversed: {is_reversed})')
-        pass
+#     @QtCore.pyqtSlot(bool)
+#     def on_reverse_held(self, is_reversed):
+#         print(f'TimeWindowPlaybackControllerActionsMixin.on_reverse_held(is_reversed: {is_reversed})')
+#         pass
     
 
 class UpdateRunner(QtCore.QThread):
