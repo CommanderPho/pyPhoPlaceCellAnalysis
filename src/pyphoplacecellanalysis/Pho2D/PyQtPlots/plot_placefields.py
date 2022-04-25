@@ -13,6 +13,44 @@ from pyphocorehelpers.indexing_helpers import compute_paginated_grid_config
 from pyphocorehelpers.plotting.pyqtplot_basic import pyqtplot_common_setup
 
 
+# class PlotLocationIdentifier(object):
+#     """docstring for PlotLocationIdentifier."""
+#     def __init__(self, arg):
+#         super(PlotLocationIdentifier, self).__init__()
+#     arg
+
+
+
+def _pyqtplot_build_image_bounds_extent(xbin_edges, ybin_edges, margin = 2.0, debug_print=False):
+    """ Returns the proper bounds for the image, and the proper x_range and y_range given the margin.
+    Used by pyqtplot_plot_image_array(...) to plot binned data.
+
+    Usage:
+
+        # curr_plot.setXRange(global_min_x-margin, global_max_x+margin)
+        # curr_plot.setYRange(global_min_y-margin, global_max_y+margin)
+    
+    """
+    global_min_x = np.nanmin(xbin_edges)
+    global_max_x = np.nanmax(xbin_edges)
+
+    global_min_y = np.nanmin(ybin_edges)
+    global_max_y = np.nanmax(ybin_edges)
+
+    global_width = global_max_x - global_min_x
+    global_height = global_max_y - global_min_y
+
+    if debug_print:
+        print(f'global_min_x: {global_min_x}, global_max_x: {global_max_x}, global_min_y: {global_min_y}, global_max_y: {global_max_y}\nglobal_width: {global_width}, global_height: {global_height}')
+    # Get rect image extent in the form [x, y, w, h]:
+    image_bounds_extent = [global_min_x, global_min_y, global_width, global_height]
+
+    x_range = (global_min_x-margin, global_max_x+margin)
+    y_range = (global_min_y-margin, global_max_y+margin)
+
+    return image_bounds_extent, x_range, y_range
+    
+
 def pyqtplot_plot_image_array(xbin_edges, ybin_edges, images, occupancy, max_num_columns = 5, drop_below_threshold: float=0.0000001, enable_LUT_Histogram=False, app=None, parent_root_widget=None, root_render_widget=None, debug_print=False):
     """ Plots an array of images provided in 'images' argument
     images should be an nd.array with dimensions like: (10, 63, 63), where (N_Images, X_Dim, Y_Dim)
@@ -32,20 +70,8 @@ def pyqtplot_plot_image_array(xbin_edges, ybin_edges, images, occupancy, max_num
     # cmap = pg.ColorMap(pos=np.linspace(0.0, 1.0, 6), color=colors)
     cmap = pg.colormap.get('jet','matplotlib') # prepare a linear color map
 
-    global_min_x = np.nanmin(xbin_edges)
-    global_max_x = np.nanmax(xbin_edges)
-
-    global_min_y = np.nanmin(ybin_edges)
-    global_max_y = np.nanmax(ybin_edges)
-
-    global_width = global_max_x - global_min_x
-    global_height = global_max_y - global_min_y
-
-    if debug_print:
-        print(f'global_min_x: {global_min_x}, global_max_x: {global_max_x}, global_min_y: {global_min_y}, global_max_y: {global_max_y}\nglobal_width: {global_width}, global_height: {global_height}')
-    # Get rect image extent in the form [x, y, w, h]:
-    image_bounds_extent = [global_min_x, global_min_y, global_width, global_height]
-
+    image_bounds_extent, x_range, y_range = _pyqtplot_build_image_bounds_extent(xbin_edges, ybin_edges, margin=2.0, debug_print=debug_print)
+    
     # Compute Images:
     included_unit_indicies = np.arange(np.shape(images)[0]) # include all unless otherwise specified
     nMapsToShow = len(included_unit_indicies)
@@ -99,11 +125,11 @@ def pyqtplot_plot_image_array(xbin_edges, ybin_edges, images, occupancy, max_num
         img_item.setImage(image, rect=image_bounds_extent)
         img_item.setLookupTable(cmap.getLookupTable(nPts=256))
 
-        margin = 2.0
-        # curr_plot.setXRange(np.min(geometry[:, 0])-margin, np.max(geometry[:, 0])+margin)
-        # curr_plot.setYRange(np.min(geometry[:, 1])-margin, np.max(geometry[:, 1])+margin)
-        curr_plot.setXRange(global_min_x-margin, global_max_x+margin)
-        curr_plot.setYRange(global_min_y-margin, global_max_y+margin)
+        # margin = 2.0
+        # curr_plot.setXRange(global_min_x-margin, global_max_x+margin)
+        # curr_plot.setYRange(global_min_y-margin, global_max_y+margin)
+        curr_plot.setXRange(*x_range)
+        curr_plot.setYRange(*y_range)
 
         # Interactive Color Bar:
         bar = pg.ColorBarItem(values= (0, 1), colorMap=cmap) # prepare interactive color bar
@@ -137,7 +163,7 @@ def pyqtplot_plot_image(xbin_edges, ybin_edges, image, enable_LUT_Histogram=Fals
     # Interpret image data as row-major instead of col-major
     pg.setConfigOptions(imageAxisOrder='row-major')
     if app is None:
-        app = pg.mkQApp("Gradiant Layout Example")
+        app = pg.mkQApp("pyqtplot_plot_image Figure")
         
     if root_render_widget is None:
         if parent_root_widget is None:
