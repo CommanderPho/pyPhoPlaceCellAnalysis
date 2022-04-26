@@ -24,28 +24,27 @@ class Render2DScrollWindowPlotMixin:
     
     
     # def _buildScrollRasterPreviewWindowGraphics(self, graphics_layout_widget: pg.GraphicsLayoutWidget=None, layout_row=0, layout_col=0):
-    def _buildScrollRasterPreviewWindowGraphics(self, main_scroll_window_plot):
+    def _buildScrollRasterPreviewWindowGraphics(self, background_static_scroll_window_plot):
         """ Note that this doesn't need to update because the background is static (it shows all time) 
         
         Inputs:
         
-        main_scroll_window_plot: the plot to add to. For example created with `graphics_layout_widget.addPlot(row=layout_row, col=layout_col)`
+        background_static_scroll_window_plot: the plot to add to. For example created with `graphics_layout_widget.addPlot(row=layout_row, col=layout_col)`
          
         Requires:
         
             self.plots
             self.ui
-        
+
+            self.spikes_window.total_df_start_end_times # to get the current start/end times to set the linear region to
         Creates:
-        
-        self.ui.scroll_window_region
-        
-        
-        self.plots.preview_overview_scatter_plot
+            self.all_spots # data for all spikes to be rendered on a scatter plot
+            self.ui.scroll_window_region # a pg.LinearRegionItem                        
+            self.plots.preview_overview_scatter_plot # a pg.ScatterPlotItem
         
         Usage:
-            self.ui.main_scroll_window_plot = self.ui.main_graphics_layout_widget.addPlot(row=2, col=0)
-            self.ui.main_scroll_window_plot = self._buildScrollRasterPreviewWindowGraphics(self.ui.main_scroll_window_plot)
+            self.ui.background_static_scroll_window_plot = self.ui.main_graphics_layout_widget.addPlot(row=2, col=0)
+            self.ui.background_static_scroll_window_plot = self._buildScrollRasterPreviewWindowGraphics(self.ui.background_static_scroll_window_plot)
         
         
         """
@@ -75,38 +74,38 @@ class Render2DScrollWindowPlotMixin:
         self.plots.preview_overview_scatter_plot = pg.ScatterPlotItem(name='spikeRasterOverviewWindowScatterPlotItem', pxMode=True, symbol=vtick, size=5, pen={'color': 'w', 'width': 1})
         self.plots.preview_overview_scatter_plot.opts['useCache'] = True
         self.plots.preview_overview_scatter_plot.addPoints(self.all_spots)
-        main_scroll_window_plot.addItem(self.plots.preview_overview_scatter_plot)
+        background_static_scroll_window_plot.addItem(self.plots.preview_overview_scatter_plot)
         
         # Add the linear region overlay:
         self.ui.scroll_window_region = pg.LinearRegionItem(pen=pg.mkPen('#fff'), brush=pg.mkBrush('#f004'), hoverBrush=pg.mkBrush('#fff4'), hoverPen=pg.mkPen('#f00'), clipItem=self.plots.preview_overview_scatter_plot) # bound the LinearRegionItem to the plotted data
         self.ui.scroll_window_region.setZValue(10)
         # Add the LinearRegionItem to the ViewBox, but tell the ViewBox to exclude this item when doing auto-range calculations.
-        main_scroll_window_plot.addItem(self.ui.scroll_window_region, ignoreBounds=True)
+        background_static_scroll_window_plot.addItem(self.ui.scroll_window_region, ignoreBounds=True)
         self.ui.scroll_window_region.sigRegionChanged.connect(self._Render2DScrollWindowPlot_on_linear_region_item_update)
 
         
         # Setup axes bounds for the bottom windowed plot:
-        main_scroll_window_plot.hideAxis('left')
-        main_scroll_window_plot.hideAxis('bottom')
-        # main_scroll_window_plot.setLabel('bottom', 'Time', units='s')
-        main_scroll_window_plot.setMouseEnabled(x=False, y=False)
-        main_scroll_window_plot.disableAutoRange('xy')
-        # main_scroll_window_plot.enableAutoRange(x=False, y=False)
-        main_scroll_window_plot.setAutoVisible(x=False, y=False)
-        main_scroll_window_plot.setAutoPan(x=False, y=False)
+        background_static_scroll_window_plot.hideAxis('left')
+        background_static_scroll_window_plot.hideAxis('bottom')
+        # background_static_scroll_window_plot.setLabel('bottom', 'Time', units='s')
+        background_static_scroll_window_plot.setMouseEnabled(x=False, y=False)
+        background_static_scroll_window_plot.disableAutoRange('xy')
+        # background_static_scroll_window_plot.enableAutoRange(x=False, y=False)
+        background_static_scroll_window_plot.setAutoVisible(x=False, y=False)
+        background_static_scroll_window_plot.setAutoPan(x=False, y=False)
         
         # Setup range for plot:
         earliest_t, latest_t = self.spikes_window.total_df_start_end_times
-        main_scroll_window_plot.setXRange(earliest_t, latest_t, padding=0)
-        main_scroll_window_plot.setYRange(np.nanmin(curr_spike_y), np.nanmax(curr_spike_y), padding=0)
+        background_static_scroll_window_plot.setXRange(earliest_t, latest_t, padding=0)
+        background_static_scroll_window_plot.setYRange(np.nanmin(curr_spike_y), np.nanmax(curr_spike_y), padding=0)
         
-        return main_scroll_window_plot
+        return background_static_scroll_window_plot
 
 
     @QtCore.pyqtSlot()
     def _Render2DScrollWindowPlot_on_linear_region_item_update(self) -> None:
         """self when the region moves.zoom_Change plotter area"""
-        self.ui.scroll_window_region.setZValue(10) # bring to the front
+        # self.ui.scroll_window_region.setZValue(10) # bring to the front
         min_x, max_x = self.ui.scroll_window_region.getRegion() # get the current region
         self.window_scrolled.emit(min_x, max_x) # emit this mixin's own window_scrolled function
         
@@ -147,7 +146,7 @@ class Render2DScrollWindowPlotMixin:
         
     #     #############################
     #     ## Bottom Windowed Scroll Plot/Widget:
-    #     self.ui.main_scroll_window_plot = self.ui.main_graphics_layout_widget.addPlot(row=2, col=0)
+    #     self.ui.background_static_scroll_window_plot = self.ui.main_graphics_layout_widget.addPlot(row=2, col=0)
     #     # ALL Spikes in the preview window:
     #     curr_spike_x, curr_spike_y, curr_spike_pens, curr_n = self._build_all_spikes_data_values()        
     #     pos = np.vstack((curr_spike_x, curr_spike_y)) # np.shape(curr_spike_t): (11,), np.shape(curr_spike_x): (11,), np.shape(curr_spike_y): (11,), curr_n: 11
@@ -156,23 +155,23 @@ class Render2DScrollWindowPlotMixin:
     #     self.plots.preview_overview_scatter_plot = pg.ScatterPlotItem(name='spikeRasterOverviewWindowScatterPlotItem', pxMode=True, symbol=vtick, size=5, pen={'color': 'w', 'width': 1})
     #     self.plots.preview_overview_scatter_plot.opts['useCache'] = True
     #     self.plots.preview_overview_scatter_plot.addPoints(self.all_spots)
-    #     self.ui.main_scroll_window_plot.addItem(self.plots.preview_overview_scatter_plot)
+    #     self.ui.background_static_scroll_window_plot.addItem(self.plots.preview_overview_scatter_plot)
         
     #     # Add the linear region overlay:
     #     self.ui.scroll_window_region = pg.LinearRegionItem(pen=pg.mkPen('#fff'), brush=pg.mkBrush('#f004'), hoverBrush=pg.mkBrush('#fff4'), hoverPen=pg.mkPen('#f00'), clipItem=self.plots.preview_overview_scatter_plot) # bound the LinearRegionItem to the plotted data
     #     self.ui.scroll_window_region.setZValue(10)
     #     # Add the LinearRegionItem to the ViewBox, but tell the ViewBox to exclude this item when doing auto-range calculations.
-    #     self.ui.main_scroll_window_plot.addItem(self.ui.scroll_window_region, ignoreBounds=True)
+    #     self.ui.background_static_scroll_window_plot.addItem(self.ui.scroll_window_region, ignoreBounds=True)
         
     #     # Setup axes bounds for the bottom windowed plot:
     #     earliest_t, latest_t = self.spikes_window.total_df_start_end_times
-    #     self.ui.main_scroll_window_plot.hideAxis('left')
-    #     self.ui.main_scroll_window_plot.hideAxis('bottom')
-    #     # self.ui.main_scroll_window_plot.setLabel('bottom', 'Time', units='s')
-    #     self.ui.main_scroll_window_plot.setMouseEnabled(x=False, y=False)
-    #     self.ui.main_scroll_window_plot.disableAutoRange('xy')
-    #     # self.ui.main_scroll_window_plot.enableAutoRange(x=False, y=False)
-    #     self.ui.main_scroll_window_plot.setAutoVisible(x=False, y=False)
-    #     self.ui.main_scroll_window_plot.setAutoPan(x=False, y=False)
-    #     self.ui.main_scroll_window_plot.setXRange(earliest_t, latest_t, padding=0)
-    #     self.ui.main_scroll_window_plot.setYRange(np.nanmin(curr_spike_y), np.nanmax(curr_spike_y), padding=0)
+    #     self.ui.background_static_scroll_window_plot.hideAxis('left')
+    #     self.ui.background_static_scroll_window_plot.hideAxis('bottom')
+    #     # self.ui.background_static_scroll_window_plot.setLabel('bottom', 'Time', units='s')
+    #     self.ui.background_static_scroll_window_plot.setMouseEnabled(x=False, y=False)
+    #     self.ui.background_static_scroll_window_plot.disableAutoRange('xy')
+    #     # self.ui.background_static_scroll_window_plot.enableAutoRange(x=False, y=False)
+    #     self.ui.background_static_scroll_window_plot.setAutoVisible(x=False, y=False)
+    #     self.ui.background_static_scroll_window_plot.setAutoPan(x=False, y=False)
+    #     self.ui.background_static_scroll_window_plot.setXRange(earliest_t, latest_t, padding=0)
+    #     self.ui.background_static_scroll_window_plot.setYRange(np.nanmin(curr_spike_y), np.nanmax(curr_spike_y), padding=0)

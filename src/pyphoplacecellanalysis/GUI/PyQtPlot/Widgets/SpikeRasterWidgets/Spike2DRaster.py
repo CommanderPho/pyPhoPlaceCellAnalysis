@@ -33,6 +33,7 @@ class Spike2DRaster(Render2DScrollWindowPlotMixin, SpikeRasterBase):
     # GUI Configuration Options:
     WantsRenderWindowControls = False
     WantsPlaybackControls = False
+    Includes2DActiveWindowScatter = False # Includes2DActiveWindowScatter: if True, it displays the main scatter plot for the active window.
     
     ## Scrollable Window Signals
     # window_scrolled = QtCore.pyqtSignal(float, float) # signal is emitted on updating the 2D sliding window, where the first argument is the new start value and the 2nd is the new end value
@@ -156,6 +157,15 @@ class Spike2DRaster(Render2DScrollWindowPlotMixin, SpikeRasterBase):
         
   
     def _buildGraphics(self):
+        """ 
+        ui.main_plot_widget: 2D display 
+            self.ui.scatter_plot: the active 2D display of the current window
+        
+        ui.background_static_scroll_window_plot: the static plot of the entire data (always shows the entire time range)
+            Presents a linear scroll region over the top to allow the user to select the active window.
+            
+            
+        """
         ##### Main Raster Plot Content Top ##########
         
         self.ui.main_graphics_layout_widget = pg.GraphicsLayoutWidget()
@@ -171,46 +181,51 @@ class Spike2DRaster(Render2DScrollWindowPlotMixin, SpikeRasterBase):
         
         #### Build Graphics Objects ##### 
         # Add debugging widget:
-        
-        # Custom 2D raster plot:    
-        self.ui.main_plot_widget = self.ui.main_graphics_layout_widget.addPlot(row=1, col=0)
-        # self.ui.plots = [] # create an empty array for each plot, of which there will be one for each unit.
-        # # build the position range for each unit along the y-axis:
         self.y = DataSeriesToSpatial.build_series_identity_axis(self.n_cells, center_mode=self.params.center_mode, bin_position_mode=self.params.bin_position_mode, side_bin_margins = self.params.side_bin_margins)
         self.lower_y = DataSeriesToSpatial.build_series_identity_axis(self.n_cells, center_mode=self.params.center_mode, bin_position_mode='left_edges', side_bin_margins = self.params.side_bin_margins) / self.n_cells
         self.upper_y = DataSeriesToSpatial.build_series_identity_axis(self.n_cells, center_mode=self.params.center_mode, bin_position_mode='right_edges', side_bin_margins = self.params.side_bin_margins) / self.n_cells
-       
-        # Common Tick Label
-        vtick = QtGui.QPainterPath()
-        vtick.moveTo(0, -0.5)
-        vtick.lineTo(0, 0.5)
-
-        self.ui.main_plot_widget.setLabel('left', 'Cell ID', units='')
-        self.ui.main_plot_widget.setLabel('bottom', 'Time', units='s')
-        self.ui.main_plot_widget.setMouseEnabled(x=False, y=False)
-        self.ui.main_plot_widget.enableAutoRange(x=False, y=False)
-        self.ui.main_plot_widget.setAutoVisible(x=False, y=False)
-        self.ui.main_plot_widget.setAutoPan(x=False, y=False)
-        self.ui.main_plot_widget.enableAutoRange('xy', False)  ## stop auto-scaling after the first data set is plotted
+        self._build_cell_configs()   
         
-        # self.ui.main_plot_widget.disableAutoRange()
-        self._update_plot_ranges()
-             
-        self._build_cell_configs()    
-    
-        # self.ui.spikes_raster_item_plot = SpikesRasterItem(self.params.config_items)
-        self.ui.scatter_plot = pg.ScatterPlotItem(name='spikeRasterScatterPlotItem', pxMode=True, symbol=vtick, size=10, pen={'color': 'w', 'width': 2})
-        self.ui.scatter_plot.opts['useCache'] = True
-        self.ui.main_plot_widget.addItem(self.ui.scatter_plot)
+        # Custom 2D raster plot:
+        curr_plot_row = 1
+        if self.Includes2DActiveWindowScatter:
+            self.ui.main_plot_widget = self.ui.main_graphics_layout_widget.addPlot(row=curr_plot_row, col=0)
+            curr_plot_row += 1
+            # self.ui.plots = [] # create an empty array for each plot, of which there will be one for each unit.
+            # # build the position range for each unit along the y-axis:
+            
+            # Common Tick Label
+            vtick = QtGui.QPainterPath()
+            vtick.moveTo(0, -0.5)
+            vtick.lineTo(0, 0.5)
+
+            self.ui.main_plot_widget.setLabel('left', 'Cell ID', units='')
+            self.ui.main_plot_widget.setLabel('bottom', 'Time', units='s')
+            self.ui.main_plot_widget.setMouseEnabled(x=False, y=False)
+            self.ui.main_plot_widget.enableAutoRange(x=False, y=False)
+            self.ui.main_plot_widget.setAutoVisible(x=False, y=False)
+            self.ui.main_plot_widget.setAutoPan(x=False, y=False)
+            self.ui.main_plot_widget.enableAutoRange('xy', False)  ## stop auto-scaling after the first data set is plotted
+            
+            # self.ui.main_plot_widget.disableAutoRange()
+            self._update_plot_ranges()
+            
+            self.ui.scatter_plot = pg.ScatterPlotItem(name='spikeRasterScatterPlotItem', pxMode=True, symbol=vtick, size=10, pen={'color': 'w', 'width': 2})
+            self.ui.scatter_plot.opts['useCache'] = True
+            self.ui.main_plot_widget.addItem(self.ui.scatter_plot)
+        else:
+            self.ui.main_plot_widget = None
+            self.ui.main_plot_widget = None
 
         
         # From Render2DScrollWindowPlotMixin:
-        self.ui.main_scroll_window_plot = self.ui.main_graphics_layout_widget.addPlot(row=2, col=0)
-        self.ui.main_scroll_window_plot = self._buildScrollRasterPreviewWindowGraphics(self.ui.main_scroll_window_plot)
+        self.ui.background_static_scroll_window_plot = self.ui.main_graphics_layout_widget.addPlot(row=curr_plot_row, col=0) # curr_plot_row: 2 if  self.Includes2DActiveWindowScatter
+        self.ui.background_static_scroll_window_plot = self._buildScrollRasterPreviewWindowGraphics(self.ui.background_static_scroll_window_plot)
 
         # self._buildScrollRasterPreviewWindowGraphics()
-            
-        self.ui.scatter_plot.addPoints(self.all_spots)
+        if self.Includes2DActiveWindowScatter:
+            self.ui.scatter_plot.addPoints(self.all_spots)
+    
         # self.Render2DScrollWindowPlot_on_window_update # register with the animation time window for updates for the scroller.
         # Connect the signals for the zoom region and the LinearRegionItem
         # self.ui.scroll_window_region.sigRegionChanged.connect(self.update_zoom_plotter)
@@ -227,8 +242,9 @@ class Spike2DRaster(Render2DScrollWindowPlotMixin, SpikeRasterBase):
         # self.ui.main_plot_widget.setXRange(0.0, +self.temporal_axis_length, padding=0)
         # self.ui.main_plot_widget.setYRange(self.y[0], self.y[-1], padding=0)
         # self.ui.main_plot_widget.disableAutoRange()
-        self.ui.main_plot_widget.disableAutoRange('xy')
-        self.ui.main_plot_widget.setRange(xRange=[0.0, +self.temporal_axis_length], yRange=[self.y[0], self.y[-1]])
+        if self.Includes2DActiveWindowScatter:
+            self.ui.main_plot_widget.disableAutoRange('xy')
+            self.ui.main_plot_widget.setRange(xRange=[0.0, +self.temporal_axis_length], yRange=[self.y[0], self.y[-1]])
     
     @QtCore.pyqtSlot()
     def on_adjust_temporal_spatial_mapping(self):
@@ -265,7 +281,9 @@ class Spike2DRaster(Render2DScrollWindowPlotMixin, SpikeRasterBase):
     @QtCore.pyqtSlot(float, float)
     def update_zoomed_plot(self, min_t, max_t):
         # Update the main_plot_widget:
-        self.ui.main_plot_widget.setXRange(min_t, max_t, padding=0)
+        if self.Includes2DActiveWindowScatter:
+            self.ui.main_plot_widget.setXRange(min_t, max_t, padding=0)
+
         # self.render_window_duration = (max_x - min_x) # update the render_window_duration from the slider width
         scroll_window_width = max_t - min_t
         # print(f'min_x: {min_x}, max_x: {max_x}, scroll_window_width: {scroll_window_width}') # min_x: 59.62061245756003, max_x: 76.83228787177144, scroll_window_width: 17.211675414211413

@@ -3,6 +3,7 @@ import numpy as np
 from qtpy import QtCore, QtWidgets
 
 from pyphocorehelpers.DataStructure.general_parameter_containers import VisualizationParameters
+from pyphocorehelpers.gui.Qt.SyncedTimelineWindowLink import connect_additional_controlled_plotter
 
 from pyphoplacecellanalysis.GUI.Qt.SpikeRasterWindows.Spike3DRasterWindowBase import Ui_RootWidget # Generated file from .ui
 
@@ -185,8 +186,6 @@ class Spike3DRasterWindowWidget(SpikeRasterBottomFrameControlsMixin, QtWidgets.Q
             # unrecognized command for 3D plotter
             raise NotImplementedError
         
-        
-        
         # Add the plotter widgets to the UI:
         self.ui.v_layout = QtWidgets.QVBoxLayout()
         self.ui.v_layout.setContentsMargins(0,0,0,0)
@@ -201,6 +200,8 @@ class Spike3DRasterWindowWidget(SpikeRasterBottomFrameControlsMixin, QtWidgets.Q
         
         if self.ui.spike_raster_plt_3d is not None:
             self.connect_plotter_time_windows()
+        
+        self.ui.additional_connections = {}
         
         # self.spike_raster_plt_2d.setWindowTitle('2D Raster Control Window')
         # self.spike_3d_to_2d_window_connection = self.spike_raster_plt_2d.window_scrolled.connect(self.spike_raster_plt_3d.spikes_window.update_window_start_end)
@@ -224,10 +225,21 @@ class Spike3DRasterWindowWidget(SpikeRasterBottomFrameControlsMixin, QtWidgets.Q
         
 
     def connect_plotter_time_windows(self):
-         self.spike_3d_to_2d_window_connection = self.spike_raster_plt_2d.window_scrolled.connect(self.spike_raster_plt_3d.spikes_window.update_window_start_end)
+        """ connects the controlled plotter (usually the 3D plotter) to the 2D plotter that controls it. """
+        self.spike_3d_to_2d_window_connection = self.spike_raster_plt_2d.window_scrolled.connect(self.spike_raster_plt_3d.spikes_window.update_window_start_end)
          
-        
-                
+    def connect_additional_controlled_plotter(self, controlled_plt):
+        """ try to connect the controlled_plt to the current controller (usually the 2D plot). """
+        extant_connection = self.ui.additional_connections.get(controlled_plt, None)
+        if extant_connection is None:
+            new_connection_obj = connect_additional_controlled_plotter(self.spike_raster_plt_2d, controlled_plt=controlled_plt)
+            self.ui.additional_connections[controlled_plt] = new_connection_obj # add the connection object to the self.ui.additional_connections array
+            return self.ui.additional_connections[controlled_plt]
+        else:
+            print(f'connection already existed!')
+            return extant_connection
+    
+            
     def __str__(self):
          return
      
