@@ -149,12 +149,13 @@ class SpikesWindowOwningMixin:
     
     Requires:
         self._spikes_window
-    
-    """    
+        
+    """
     @property
     def spikes_window(self):
         """The spikes_window property."""
-        return self._spikes_window
+        raise NotImplementedError
+        # return self._spikes_window
 
     @property
     def active_windowed_df(self):

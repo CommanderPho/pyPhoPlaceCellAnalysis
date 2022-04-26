@@ -159,6 +159,12 @@ class SpikeRasterBase(UnitSortableMixin, DataSeriesToSpatialTransformingMixin, N
     SpeedBurstPlaybackRate = 16.0
     PlaybackUpdateFrequency = 0.04 # in seconds
     
+    # Required for SpikesWindowOwningMixin:
+    @property
+    def spikes_window(self):
+        """The spikes_window property."""
+        return self._spikes_window
+    
     @property
     def unit_ids(self):
         """The unit_ids from the whole df (not just the current window)"""

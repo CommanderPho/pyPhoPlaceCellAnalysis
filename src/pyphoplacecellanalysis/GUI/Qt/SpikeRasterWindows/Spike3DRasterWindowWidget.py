@@ -16,9 +16,11 @@ from pyphoplacecellanalysis.General.Mixins.TimeWindowPlaybackMixin import TimeWi
 from pyphoplacecellanalysis.GUI.Qt.PlaybackControls.Spike3DRasterBottomPlaybackControlBarWidget import SpikeRasterBottomFrameControlsMixin
 from pyphoplacecellanalysis.GUI.Qt.ZoomAndNavigationSidebarControls.Spike3DRasterLeftSidebarControlBarWidget import Spike3DRasterLeftSidebarControlBar, SpikeRasterLeftSidebarControlsMixin
 
+from pyphoplacecellanalysis.General.Model.SpikesDataframeWindow import SpikesDataframeWindow, SpikesWindowOwningMixin
+
 # remove TimeWindowPlaybackControllerActionsMixin
 # class Spike3DRasterWindowWidget(SpikeRasterBottomFrameControlsMixin, TimeWindowPlaybackControllerActionsMixin, TimeWindowPlaybackPropertiesMixin, QtWidgets.QWidget):
-class Spike3DRasterWindowWidget(SpikeRasterLeftSidebarControlsMixin, SpikeRasterBottomFrameControlsMixin, QtWidgets.QWidget):
+class Spike3DRasterWindowWidget(SpikeRasterLeftSidebarControlsMixin, SpikeRasterBottomFrameControlsMixin, SpikesWindowOwningMixin, QtWidgets.QWidget):
     """ A main raster window loaded from a Qt .ui file. 
     
     Usage:
@@ -55,6 +57,34 @@ class Spike3DRasterWindowWidget(SpikeRasterLeftSidebarControlsMixin, SpikeRaster
     def spikes_window(self, value):
         self.spike_raster_plt_2d.spikes_window = value
 
+
+
+
+
+    @property
+    def temporal_zoom_factor(self):
+        """The time dilation factor that maps spikes in the current window to y-positions along the time axis multiplicatively.
+            Increasing this factor will result in a more spatially expanded time axis while leaving the visible window unchanged.
+        """
+        if self.spike_raster_plt_3d is not None:
+            return self.spike_raster_plt_3d.temporal_zoom_factor
+        elif self.spike_raster_plt_2d is not None:
+            return self.spike_raster_plt_2d.temporal_zoom_factor
+        else:
+            return self.params.temporal_zoom_factor
+    @temporal_zoom_factor.setter
+    def temporal_zoom_factor(self, value):
+        if self.spike_raster_plt_3d is not None:
+            self.spike_raster_plt_3d.temporal_zoom_factor = value
+        elif self.spike_raster_plt_2d is not None:
+            self.spike_raster_plt_2d.temporal_zoom_factor = value
+        else:
+            self.params.temporal_zoom_factor = value
+            # this is the no plotter case.
+        # TODO: should this update the temporal_zoom_factor for both the 2D AND the 3D plotter?
+        
+        
+        
     ######## TimeWindowPlaybackPropertiesMixin requirement:
         
     @property
@@ -219,12 +249,13 @@ class Spike3DRasterWindowWidget(SpikeRasterLeftSidebarControlsMixin, SpikeRaster
         
         ## Connect the UI Controls:
         # Helper Mixins: buildUI:
+        self.SpikeRasterLeftSidebarControlsMixin_on_buildUI() # Call this to set the initial values for the UI before signals are connected.
         # self.ui.bottom_controls_frame, self.ui.bottom_controls_layout = self.SpikeRasterBottomFrameControlsMixin_on_buildUI() # NOTE: do not call for the window as it already has a valid bottom bar widget
         # Connect the signals:
         self.ui.bottom_bar_connections = None 
         self.ui.bottom_bar_connections = self.SpikeRasterBottomFrameControlsMixin_connectSignals(self.ui.bottomPlaybackControlBarWidget)
         
-        self.ui.left_side_bar_connections = None
+        
         self.ui.left_side_bar_connections = self.SpikeRasterLeftSidebarControlsMixin_connectSignals(self.ui.leftSideToolbarWidget)
         
         
@@ -332,9 +363,32 @@ class Spike3DRasterWindowWidget(SpikeRasterLeftSidebarControlsMixin, SpikeRaster
         print(f'Spike3DRasterWindowWidget.on_reverse_held(is_reversed: {is_reversed})')
         pass
     
-    
+    ########################################################
+    ## For SpikeRasterLeftSidebarControlsMixin conformance:
+    ########################################################
+    @QtCore.Slot(float)
+    def on_animation_timestep_valueChanged(self, updated_val):
+        old_value = self.animation_time_step
+        self.animation_time_step = updated_val
+        
+    @QtCore.Slot(float)
+    def on_temporal_zoom_factor_valueChanged(self, updated_val):
+        old_value = self.temporal_zoom_factor        
+        self.temporal_zoom_factor = updated_val
+                
+    @QtCore.Slot(float)
+    def on_render_window_duration_valueChanged(self, updated_val):
+        old_value = self.render_window_duration
+        self.render_window_duration = updated_val
+        
+
         
         
+        
+        
+    ########################################################
+    ## For Other conformances:
+    ########################################################
     @QtCore.Slot()
     def on_spikes_df_changed(self):
         """ changes:
