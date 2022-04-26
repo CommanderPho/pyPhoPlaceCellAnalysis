@@ -1,8 +1,17 @@
+import sys
 import numpy as np
 
 from qtpy import QtCore, QtWidgets
 from pyphoplacecellanalysis.GUI.Qt.ZoomAndNavigationSidebarControls.Spike3DRasterLeftSidebarControlBarBase import Ui_leftSideToolbarWidget # Generated file from .ui
 
+
+def trap_exc_during_debug(*args):
+    # when app raises uncaught exception, print info
+    print(args)
+
+
+# install exception hook: without this, uncaught exception would cause application to exit
+sys.excepthook = trap_exc_during_debug
 
 
 class Spike3DRasterLeftSidebarControlBar(QtWidgets.QWidget):
@@ -27,7 +36,7 @@ class Spike3DRasterLeftSidebarControlBar(QtWidgets.QWidget):
         # self.ui.verticalSliderZoom
 
         # Connect Signals:
-        self.ui.verticalSliderZoom.valueChanged.connect(self.temporal_zoom_slider_valueChanged)
+        # self.ui.verticalSliderZoom.valueChanged.connect(self.temporal_zoom_slider_valueChanged)
         self.ui.spinAnimationTimeStep.sigValueChanged.connect(self.animation_time_step_valueChanged)
         self.ui.spinTemporalZoomFactor.sigValueChanged.connect(self.temporal_zoom_factor_valueChanged)
         self.ui.spinRenderWindowDuration.sigValueChanged.connect(self.render_window_duration_valueChanged)
@@ -48,12 +57,12 @@ class Spike3DRasterLeftSidebarControlBar(QtWidgets.QWidget):
         # old_value = self.temporal_zoom_factor
         updated_val = sb.value()
         
-        self.ui.verticalSliderZoom.blockSignals(True)
+        # self.ui.verticalSliderZoom.blockSignals(True)
         self.temporal_zoom_factor_changed.emit(updated_val)
         # update slider
-        slider_int_val = (updated_val * 1000.0)+0.0
-        self.ui.verticalSliderZoom.setValue(slider_int_val)
-        self.ui.verticalSliderZoom.blockSignals(False) # done
+        # slider_int_val = (updated_val * 1000.0)+0.0
+        # self.ui.verticalSliderZoom.setValue(slider_int_val)
+        # self.ui.verticalSliderZoom.blockSignals(False) # done
                 
     @QtCore.Slot(object)
     def render_window_duration_valueChanged(self, sb):
@@ -71,35 +80,37 @@ class Spike3DRasterLeftSidebarControlBar(QtWidgets.QWidget):
         # TODO: emit the temporal changed signal:    
         # self.temporal_zoom_factor_changed.emit(float_slider_val)
         
-    def disable_render_window_controls(self):
-        # Wrapped in try block so it won't throw an error if these controls were never added (self.setup_render_window_controls() was never called)
-        try:
-            self.ui.spinAnimationTimeStep.blockSignals(True)
-            self.ui.spinTemporalZoomFactor.blockSignals(True)
-            self.ui.spinRenderWindowDuration.blockSignals(True)
+    # def disable_render_window_controls(self):
+    #     # Wrapped in try block so it won't throw an error if these controls were never added (self.setup_render_window_controls() was never called)
+    #     try:
+    #         self.ui.verticalSliderZoom.blockSignals(True)
+    #         self.ui.spinAnimationTimeStep.blockSignals(True)
+    #         self.ui.spinTemporalZoomFactor.blockSignals(True)
+    #         self.ui.spinRenderWindowDuration.blockSignals(True)
             
-            # self.ui.spinAnimationTimeStep.setEnabled(False)
-            # self.ui.spinTemporalZoomFactor.setValue(10.0)
-            self.ui.spinTemporalZoomFactor.setValue(1.0)
-            self.temporal_zoom_factor = 1.0
+    #         # self.ui.spinAnimationTimeStep.setEnabled(False)
+    #         # self.ui.spinTemporalZoomFactor.setValue(10.0)
+    #         self.ui.spinTemporalZoomFactor.setValue(1.0)
+    #         self.temporal_zoom_factor = 1.0
             
-            self.ui.spinRenderWindowDuration.setValue(self.render_window_duration) # set to render window duration
+    #         self.ui.spinRenderWindowDuration.setValue(self.render_window_duration) # set to render window duration
 
-            self.ui.spinTemporalZoomFactor.setReadOnly(True)
-            self.ui.spinRenderWindowDuration.setReadOnly(True)
+    #         self.ui.spinTemporalZoomFactor.setReadOnly(True)
+    #         self.ui.spinRenderWindowDuration.setReadOnly(True)
 
-            # self.ui.spinAnimationTimeStep.setEnabled(False)
-            # self.ui.spinTemporalZoomFactor.setEnabled(False)
-            self.ui.spinRenderWindowDuration.setEnabled(False)
+    #         # self.ui.spinAnimationTimeStep.setEnabled(False)
+    #         # self.ui.spinTemporalZoomFactor.setEnabled(False)
+    #         self.ui.spinRenderWindowDuration.setEnabled(False)
             
-            self.ui.spinAnimationTimeStep.blockSignals(False)
-            self.ui.spinTemporalZoomFactor.blockSignals(False)
-            self.ui.spinRenderWindowDuration.blockSignals(False)
+    #         self.ui.spinAnimationTimeStep.blockSignals(False)
+    #         self.ui.spinTemporalZoomFactor.blockSignals(False)
+    #         self.ui.spinRenderWindowDuration.blockSignals(False)
+    #         self.ui.verticalSliderZoom.blockSignals(False)
 
-        except Exception as e:
-            print(f'disable_render_window_controls(): called but do not seem to have RenderWindowControls enabled: err: {e}')
-            # raise e
-            return
+    #     except Exception as e:
+    #         print(f'disable_render_window_controls(): called but do not seem to have RenderWindowControls enabled: err: {e}')
+    #         # raise e
+    #         return
                         
     def __str__(self):
          return
@@ -132,7 +143,7 @@ class SpikeRasterLeftSidebarControlsMixin:
     @QtCore.Slot()
     def SpikeRasterLeftSidebarControlsMixin_on_setup(self):
         """ perfrom setup/creation of widget/graphical/data objects. Only the core objects are expected to exist on the implementor (root widget, etc) """
-        self.ui.left_side_bar_connections = None
+        pass
     
     @QtCore.Slot()
     def SpikeRasterLeftSidebarControlsMixin_connectSignals(self, left_side_bar_controls):
@@ -151,12 +162,22 @@ class SpikeRasterLeftSidebarControlsMixin:
          # Set Initial values:
         left_side_bar_controls = self.ui.leftSideToolbarWidget
         
+        left_side_bar_controls.ui.verticalSliderZoom.blockSignals(True)
+        left_side_bar_controls.ui.spinAnimationTimeStep.blockSignals(True)
+        left_side_bar_controls.ui.spinTemporalZoomFactor.blockSignals(True)
+        left_side_bar_controls.ui.spinRenderWindowDuration.blockSignals(True)
+        
         left_side_bar_controls.ui.verticalSliderZoom.setValue(self.temporal_zoom_factor)
         left_side_bar_controls.ui.spinAnimationTimeStep.setValue(self.animation_time_step)
         left_side_bar_controls.ui.spinTemporalZoomFactor.setValue(self.temporal_zoom_factor)
         left_side_bar_controls.ui.spinRenderWindowDuration.setValue(self.render_window_duration)
 
-
+        left_side_bar_controls.ui.verticalSliderZoom.blockSignals(False)
+        left_side_bar_controls.ui.spinAnimationTimeStep.blockSignals(False)
+        left_side_bar_controls.ui.spinTemporalZoomFactor.blockSignals(False)
+        left_side_bar_controls.ui.spinRenderWindowDuration.blockSignals(False)
+        
+        
     @QtCore.Slot()
     def SpikeRasterLeftSidebarControlsMixin_on_destroy(self):
         """ perfrom teardown/destruction of anything that needs to be manually removed or released """
