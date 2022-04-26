@@ -10,8 +10,7 @@ import pyphoplacecellanalysis.External.pyqtgraph as pg
 from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtCore, QtGui
 
 from pyphocorehelpers.indexing_helpers import compute_paginated_grid_config
-from pyphocorehelpers.plotting.pyqtplot_basic import pyqtplot_common_setup
-
+from pyphoplacecellanalysis.GUI.PyQtPlot.pyqtplot_basic import pyqtplot_common_setup
 
 # class PlotLocationIdentifier(object):
 #     """docstring for PlotLocationIdentifier."""
