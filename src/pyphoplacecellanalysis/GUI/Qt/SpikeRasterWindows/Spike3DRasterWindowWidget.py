@@ -173,9 +173,9 @@ class Spike3DRasterWindowWidget(SpikeRasterLeftSidebarControlsMixin, SpikeRaster
         
         self.enable_debug_print = Spike3DRasterWindowWidget.enable_debug_print
         
-        
-        self.ui.splitter.setStretchFactor(0, 3) # have the top widget by 3x the height as the bottom widget
-        self.ui.splitter.setStretchFactor(1, 1) # have the top widget by 3x the height as the bottom widget        
+        # self.ui.splitter.setSizes([900, 200])
+        # self.ui.splitter.setStretchFactor(0, 5) # have the top widget by 3x the height as the bottom widget
+        # self.ui.splitter.setStretchFactor(1, 1) # have the top widget by 3x the height as the bottom widget        
         
         
         self.params = VisualizationParameters(self.applicationName)
