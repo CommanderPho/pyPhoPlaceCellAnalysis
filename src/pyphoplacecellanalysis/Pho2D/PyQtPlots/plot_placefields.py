@@ -61,7 +61,7 @@ def pyqtplot_plot_image_array(xbin_edges, ybin_edges, images, occupancy, max_num
         # images = active_one_step_decoder.ratemap.normalized_tuning_curves[0:40,:,:] # (43, 63, 63)
         occupancy = active_one_step_decoder.ratemap.occupancy
 
-        app, win = pyqtplot_plot_image_array(active_one_step_decoder.xbin, active_one_step_decoder.ybin, images, occupancy)
+        app, win, plot_array, img_item_array = pyqtplot_plot_image_array(active_one_step_decoder.xbin, active_one_step_decoder.ybin, images, occupancy)
         win.show()
     """
     root_render_widget, parent_root_widget, app = pyqtplot_common_setup(f'pyqtplot_plot_image_array: {np.shape(images)}', app=app, parent_root_widget=parent_root_widget, root_render_widget=root_render_widget)
@@ -78,6 +78,9 @@ def pyqtplot_plot_image_array(xbin_edges, ybin_edges, images, occupancy, max_num
     # Paging Management: Constrain the subplots values to just those that you need
     subplot_no_pagination_configuration, included_combined_indicies_pages, page_grid_sizes = compute_paginated_grid_config(nMapsToShow, max_num_columns=max_num_columns, max_subplots_per_page=None, data_indicies=included_unit_indicies, last_figure_subplots_same_layout=True)
     page_idx = 0 # page_idx is zero here because we only have one page:
+    
+    img_item_array = []
+    plot_array = []
 
     for (a_linear_index, curr_row, curr_col, curr_included_unit_index) in included_combined_indicies_pages[page_idx]:
         # Need to convert to page specific:
@@ -135,6 +138,9 @@ def pyqtplot_plot_image_array(xbin_edges, ybin_edges, images, occupancy, max_num
         # Have ColorBarItem control colors of img and appear in 'plot':
         bar.setImageItem(img_item, insert_in=curr_plot)
 
+        img_item_array.append(img_item)
+        plot_array.append(curr_plot)
+        
     # Post images loop:
     
     enable_show = False
@@ -146,7 +152,7 @@ def pyqtplot_plot_image_array(xbin_edges, ybin_edges, images, occupancy, max_num
         parent_root_widget.setWindowTitle('pyqtplot image array')
 
     # pg.exec()
-    return app, parent_root_widget, root_render_widget
+    return app, parent_root_widget, root_render_widget, plot_array, img_item_array
 
 
 
