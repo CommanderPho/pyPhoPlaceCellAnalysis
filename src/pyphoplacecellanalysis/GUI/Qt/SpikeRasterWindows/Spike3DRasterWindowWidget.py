@@ -236,10 +236,6 @@ class Spike3DRasterWindowWidget(SpikeRasterLeftSidebarControlsMixin, SpikeRaster
         self.ui.secondarySpikeRasterControlWidget.setLayout(self.ui.v_layout_secondary)
         
         
-        
-        # setStretchFactor
-        
-        
         if self.ui.spike_raster_plt_3d is not None:
             self.connect_plotter_time_windows()
         
@@ -264,7 +260,7 @@ class Spike3DRasterWindowWidget(SpikeRasterLeftSidebarControlsMixin, SpikeRaster
         self.ui.bottom_bar_connections = None 
         self.ui.bottom_bar_connections = self.SpikeRasterBottomFrameControlsMixin_connectSignals(self.ui.bottomPlaybackControlBarWidget)
         
-        
+        self.ui.left_side_bar_connections = None
         self.ui.left_side_bar_connections = self.SpikeRasterLeftSidebarControlsMixin_connectSignals(self.ui.leftSideToolbarWidget)
         
         
