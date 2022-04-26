@@ -2,13 +2,13 @@
 from typing import OrderedDict
 from PyQt5 import QtWidgets, uic
 
-from pyqtgraph.flowchart import Flowchart, Node
-import pyqtgraph.flowchart.library as fclib
-from pyqtgraph.Qt import QtGui, QtCore
-from pyqtgraph.console import ConsoleWidget
-from pyqtgraph.widgets.MatplotlibWidget import MatplotlibWidget
-from pyqtgraph import PlotWidget, plot
-import pyqtgraph as pg
+from pyphoplacecellanalysis.External.pyqtgraph.flowchart import Flowchart, Node
+import pyphoplacecellanalysis.External.pyqtgraph.flowchart.library as fclib
+from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtGui, QtCore
+from pyphoplacecellanalysis.External.pyqtgraph.console import ConsoleWidget
+from pyphoplacecellanalysis.External.pyqtgraph.widgets.MatplotlibWidget import MatplotlibWidget
+from pyphoplacecellanalysis.External.pyqtgraph import PlotWidget, plot
+import pyphoplacecellanalysis.External.pyqtgraph as pg
 import sys  # We need sys so that we can pass argv to QApplication
 import os
 

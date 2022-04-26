@@ -1,12 +1,12 @@
 # DisplayNodeViewHelpers.py
 from collections import OrderedDict
 from enum import Enum
-from pyqtgraph.Qt import QtGui, QtCore, QtWidgets
-from pyqtgraph.console import ConsoleWidget
-from pyqtgraph.widgets.MatplotlibWidget import MatplotlibWidget
-from pyqtgraph.dockarea.Dock import Dock
-from pyqtgraph.dockarea.DockArea import DockArea
-import pyqtgraph as pg
+from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtGui, QtCore, QtWidgets
+from pyphoplacecellanalysis.External.pyqtgraph.console import ConsoleWidget
+from pyphoplacecellanalysis.External.pyqtgraph.widgets.MatplotlibWidget import MatplotlibWidget
+from pyphoplacecellanalysis.External.pyqtgraph.dockarea.Dock import Dock
+from pyphoplacecellanalysis.External.pyqtgraph.dockarea.DockArea import DockArea
+import pyphoplacecellanalysis.External.pyqtgraph as pg
 import numpy as np
 
 # For 3D Plotter Windows:

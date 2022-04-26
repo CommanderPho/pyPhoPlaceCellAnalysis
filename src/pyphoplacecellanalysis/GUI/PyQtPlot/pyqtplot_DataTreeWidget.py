@@ -33,8 +33,8 @@ Example:
 import traceback
 import types
 import numpy as np
-import pyqtgraph as pg
-from pyqtgraph.Qt import QtCore, QtGui
+import pyphoplacecellanalysis.External.pyqtgraph as pg
+from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtCore, QtGui
 from collections import OrderedDict
 
 try:

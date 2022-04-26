@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
 
-from pyqtgraph.Qt import QtCore
+from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtCore
 from pyphoplacecellanalysis.General.Model.Datasources.Datasources import DataframeDatasource
 
 

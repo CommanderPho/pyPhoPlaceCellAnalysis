@@ -3,8 +3,8 @@ from typing import Optional
 import sys
 
 import numpy as np
-import pyqtgraph as pg
-from pyqtgraph.Qt import QtCore, QtGui, QtWidgets
+import pyphoplacecellanalysis.External.pyqtgraph as pg
+from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtCore, QtGui, QtWidgets
 
 
 @dataclasses.dataclass

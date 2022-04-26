@@ -3,8 +3,8 @@
 from functools import partial
 import numpy as np
 
-import pyqtgraph as pg
-from pyqtgraph.Qt import QtCore, QtGui, QtWidgets, mkQApp
+import pyphoplacecellanalysis.External.pyqtgraph as pg
+from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtCore, QtGui, QtWidgets, mkQApp
 
 from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer
 from pyphoplacecellanalysis.GUI.Qt.PlacefieldVisualSelectionControls.PlacefieldVisualSelectionControlWidget import PlacefieldVisualSelectionWidget

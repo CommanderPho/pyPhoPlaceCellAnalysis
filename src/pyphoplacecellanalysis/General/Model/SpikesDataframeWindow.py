@@ -1,4 +1,4 @@
-from pyqtgraph.Qt import QtCore
+from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtCore
 import numpy as np
 
 from pyphoplacecellanalysis.General.Model.TimeWindow import TimeWindow

@@ -1,8 +1,8 @@
 from typing import OrderedDict
 import numpy as np
-from pyqtgraph.Qt import QtGui, QtCore, QtWidgets
-import pyqtgraph as pg
-from pyqtgraph.widgets.CheckTable import CheckTable
+from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtGui, QtCore, QtWidgets
+import pyphoplacecellanalysis.External.pyqtgraph as pg
+from pyphoplacecellanalysis.External.pyqtgraph.widgets.CheckTable import CheckTable
 
 __all__ = ['ExtendedCheckTable']
 

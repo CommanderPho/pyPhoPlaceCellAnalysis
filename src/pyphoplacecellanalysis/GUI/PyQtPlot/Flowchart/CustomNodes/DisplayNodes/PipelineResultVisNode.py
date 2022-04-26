@@ -1,8 +1,8 @@
 import sys
 import importlib
-from pyqtgraph.flowchart import Flowchart, Node
-from pyqtgraph.flowchart.library.common import CtrlNode, PlottingCtrlNode
-import pyqtgraph as pg
+from pyphoplacecellanalysis.External.pyqtgraph.flowchart import Flowchart, Node
+from pyphoplacecellanalysis.External.pyqtgraph.flowchart.library.common import CtrlNode, PlottingCtrlNode
+import pyphoplacecellanalysis.External.pyqtgraph as pg
 import numpy as np
 
 

@@ -67,7 +67,7 @@ class Ui_rootForm(object):
         self.btnTitle.setText(_translate("rootForm", "pf[i]"))
         self.chkbtnPlacefield.setText(_translate("rootForm", "pf"))
         self.chkbtnSpikes.setText(_translate("rootForm", "spikes"))
-from pyqtgraph.widgets.ColorButton import ColorButton
+from pyphoplacecellanalysis.External.pyqtgraph.widgets.ColorButton import ColorButton
 
 
 if __name__ == "__main__":

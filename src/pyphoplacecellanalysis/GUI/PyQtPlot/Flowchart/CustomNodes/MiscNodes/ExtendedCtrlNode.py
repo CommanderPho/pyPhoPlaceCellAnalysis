@@ -1,7 +1,7 @@
-from pyqtgraph.flowchart.library.common import generateUi, CtrlNode
-# from pyqtgraph.Node import Node
-from pyqtgraph.widgets.FeedbackButton import FeedbackButton
-from pyqtgraph.widgets.CheckTable import CheckTable
+from pyphoplacecellanalysis.External.pyqtgraph.flowchart.library.common import generateUi, CtrlNode
+# from pyphoplacecellanalysis.External.pyqtgraph.Node import Node
+from pyphoplacecellanalysis.External.pyqtgraph.widgets.FeedbackButton import FeedbackButton
+from pyphoplacecellanalysis.External.pyqtgraph.widgets.CheckTable import CheckTable
 
 from pyphoplacecellanalysis.GUI.PyQtPlot.Flowchart.CustomNodes.CustomControlWidgets.ExtendedCheckTable import ExtendedCheckTable
 

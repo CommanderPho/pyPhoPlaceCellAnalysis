@@ -12,9 +12,9 @@ remote case is much faster.
 """
 
 
-from pyqtgraph.Qt import QtGui, QtCore
-import pyqtgraph as pg
-import pyqtgraph.widgets.RemoteGraphicsView
+from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtGui, QtCore
+import pyphoplacecellanalysis.External.pyqtgraph as pg
+import pyphoplacecellanalysis.External.pyqtgraph.widgets.RemoteGraphicsView
 import numpy as np
 
 

@@ -1,5 +1,5 @@
-from pyqtgraph.Qt import QtCore, QtGui
-import pyqtgraph as pg
+from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtCore, QtGui
+import pyphoplacecellanalysis.External.pyqtgraph as pg
 
 
 class RectItem(pg.GraphicsObject):

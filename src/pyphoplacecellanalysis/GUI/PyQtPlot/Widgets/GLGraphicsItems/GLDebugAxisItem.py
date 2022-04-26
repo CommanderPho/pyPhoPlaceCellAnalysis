@@ -1,7 +1,7 @@
 from OpenGL.GL import *  # noqa
-import pyqtgraph.opengl as gl
-from pyqtgraph.Qt import QtCore, QtGui
-from pyqtgraph.opengl.GLGraphicsItem import GLGraphicsItem
+import pyphoplacecellanalysis.External.pyqtgraph.opengl as gl
+from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtCore, QtGui
+from pyphoplacecellanalysis.External.pyqtgraph.opengl.GLGraphicsItem import GLGraphicsItem
 
 
 __all__ = ['GLDebugAxisItem']

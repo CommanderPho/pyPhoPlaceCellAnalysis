@@ -1,6 +1,6 @@
 # .SpikeRasterWidgets
 
-from pyqtgraph.Qt import QtCore, QtGui, QtWidgets
+from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtCore, QtGui, QtWidgets
 from pyphocorehelpers.gui.Qt.widget_positioning_helpers import WidgetPositioningHelpers
 
 from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.SpikeRasterWidgets.SpikeRasterBase import SpikeRasterBase

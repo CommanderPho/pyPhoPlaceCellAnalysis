@@ -5,8 +5,8 @@ import numpy as np
 import pandas as pd
 
 # from PyQt5 import Qt, QtWidgets
-# import pyqtgraph as pg
-# from pyqtgraph.Qt import QtCore, QtGui, QtWidgets # pyqtgraph is only currently used for its Qt imports
+# import pyphoplacecellanalysis.External.pyqtgraph as pg
+# from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtCore, QtGui, QtWidgets # pyqtgraph is only currently used for its Qt imports
 
 import vedo
 from vedo import Mesh, Cone, Plotter, printc, Glyph

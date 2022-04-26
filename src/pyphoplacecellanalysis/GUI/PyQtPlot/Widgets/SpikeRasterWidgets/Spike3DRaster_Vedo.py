@@ -7,8 +7,8 @@ import numpy as np
 import pandas as pd
 from matplotlib.colors import ListedColormap, to_hex # for neuron colors to_hex
 
-import pyqtgraph as pg
-from pyqtgraph.Qt import QtCore, QtGui, QtWidgets # pyqtgraph is only currently used for its Qt imports
+import pyphoplacecellanalysis.External.pyqtgraph as pg
+from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtCore, QtGui, QtWidgets # pyqtgraph is only currently used for its Qt imports
 from vtk.qt.QVTKRenderWindowInteractor import QVTKRenderWindowInteractor
 
 import vedo

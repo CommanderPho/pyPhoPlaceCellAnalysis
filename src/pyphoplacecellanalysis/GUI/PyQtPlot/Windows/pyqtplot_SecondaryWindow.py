@@ -1,4 +1,4 @@
-from pyqtgraph.Qt import QtGui, QtCore
+from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtGui, QtCore
 
 class PhoPipelineSecondaryWindow(QtGui.QWidget):
     """

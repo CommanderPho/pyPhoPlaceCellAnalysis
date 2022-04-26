@@ -1,13 +1,13 @@
 import os
 import re
 from typing import final
-from pyqtgraph.Qt import QtGui, QtCore, QtWidgets
+from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtGui, QtCore, QtWidgets
 translate = QtCore.QCoreApplication.translate
 
-from pyqtgraph.flowchart.library.common import Node
-from pyqtgraph.parametertree.parameterTypes.file import popupFilePicker
-from pyqtgraph.widgets.FileDialog import FileDialog
-from pyqtgraph import configfile
+from pyphoplacecellanalysis.External.pyqtgraph.flowchart.library.common import Node
+from pyphoplacecellanalysis.External.pyqtgraph.parametertree.parameterTypes.file import popupFilePicker
+from pyphoplacecellanalysis.External.pyqtgraph.widgets.FileDialog import FileDialog
+from pyphoplacecellanalysis.External.pyqtgraph import configfile
 
 from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer
 from pyphoplacecellanalysis.GUI.PyQtPlot.Flowchart.CustomNodes.MiscNodes.ExtendedCtrlNode import ExtendedCtrlNode

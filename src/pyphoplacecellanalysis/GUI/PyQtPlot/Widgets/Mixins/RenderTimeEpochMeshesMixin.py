@@ -1,7 +1,7 @@
 import pyphoplacecellanalysis
-import pyqtgraph as pg
-from pyqtgraph.Qt import QtCore, QtGui, QtWidgets
-import pyqtgraph.opengl as gl # for 3D raster plot
+import pyphoplacecellanalysis.External.pyqtgraph as pg
+from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtCore, QtGui, QtWidgets
+import pyphoplacecellanalysis.External.pyqtgraph.opengl as gl # for 3D raster plot
 
 import numpy as np
 

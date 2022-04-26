@@ -6,8 +6,8 @@
 #     _instance = QApplication([])
 # app = _instance
 import numpy as np
-import pyqtgraph as pg
-from pyqtgraph.Qt import QtCore, QtGui
+import pyphoplacecellanalysis.External.pyqtgraph as pg
+from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtCore, QtGui
 
 from pyphocorehelpers.indexing_helpers import compute_paginated_grid_config
 from pyphocorehelpers.plotting.pyqtplot_basic import pyqtplot_common_setup

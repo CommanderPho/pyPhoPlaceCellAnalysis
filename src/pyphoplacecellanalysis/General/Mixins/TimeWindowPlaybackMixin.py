@@ -4,7 +4,7 @@ Extends a TimeWindow to support realtime playback capabilities.
 
 """
 import time
-from pyqtgraph.Qt import QtCore, QtGui, QtWidgets
+from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtCore, QtGui, QtWidgets
 
 
 

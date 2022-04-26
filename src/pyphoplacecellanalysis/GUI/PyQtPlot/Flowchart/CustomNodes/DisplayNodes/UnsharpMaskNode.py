@@ -1,8 +1,8 @@
-from pyqtgraph.flowchart import Flowchart, Node
-import pyqtgraph.flowchart.library as fclib
-from pyqtgraph.flowchart.library.common import CtrlNode
-from pyqtgraph.Qt import QtGui, QtCore
-import pyqtgraph as pg
+from pyphoplacecellanalysis.External.pyqtgraph.flowchart import Flowchart, Node
+import pyphoplacecellanalysis.External.pyqtgraph.flowchart.library as fclib
+from pyphoplacecellanalysis.External.pyqtgraph.flowchart.library.common import CtrlNode
+from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtGui, QtCore
+import pyphoplacecellanalysis.External.pyqtgraph as pg
 import numpy as np
         
 ## We will define an unsharp masking filter node as a subclass of CtrlNode.

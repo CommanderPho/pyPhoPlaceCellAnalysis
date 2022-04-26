@@ -1,5 +1,5 @@
 import importlib
-from pyqtgraph.flowchart.NodeLibrary import NodeLibrary
+from pyphoplacecellanalysis.External.pyqtgraph.flowchart.NodeLibrary import NodeLibrary
 
 
 class ReloadableNodeLibrary(NodeLibrary):

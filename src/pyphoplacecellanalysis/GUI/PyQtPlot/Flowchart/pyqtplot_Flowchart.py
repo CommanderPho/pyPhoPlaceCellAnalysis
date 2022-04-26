@@ -1,22 +1,22 @@
-from pyqtgraph.flowchart import Flowchart, Node
-import pyqtgraph.flowchart.library as fclib
+from pyphoplacecellanalysis.External.pyqtgraph.flowchart import Flowchart, Node
+import pyphoplacecellanalysis.External.pyqtgraph.flowchart.library as fclib
 
 from pyphoplacecellanalysis.GUI.PyQtPlot.Flowchart.ReloadableNodeLibrary import ReloadableNodeLibrary
 
 
-from pyqtgraph.Qt import QtGui, QtCore, QtWidgets
+from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtGui, QtCore, QtWidgets
 
 # Must be called before any figures are created:
 import matplotlib
 matplotlib.use('qtagg')
 
-from pyqtgraph.console import ConsoleWidget
-from pyqtgraph.widgets.MatplotlibWidget import MatplotlibWidget
-from pyqtgraph.dockarea.Dock import Dock
-from pyqtgraph.dockarea.DockArea import DockArea
+from pyphoplacecellanalysis.External.pyqtgraph.console import ConsoleWidget
+from pyphoplacecellanalysis.External.pyqtgraph.widgets.MatplotlibWidget import MatplotlibWidget
+from pyphoplacecellanalysis.External.pyqtgraph.dockarea.Dock import Dock
+from pyphoplacecellanalysis.External.pyqtgraph.dockarea.DockArea import DockArea
 
 
-import pyqtgraph as pg
+import pyphoplacecellanalysis.External.pyqtgraph as pg
 import numpy as np
 
 from pyphoplacecellanalysis.GUI.PyQtPlot.Windows.pyqtplot_MainWindow import PhoPipelineMainWindow
@@ -39,7 +39,7 @@ from pyphoplacecellanalysis.GUI.PyQtPlot.Flowchart.CustomNodes.Mixins.DisplayNod
 TODO:
 It looks like CheckTable is what I want in terms of a checkbox list.
 
-from pyqtgraph.widgets.CheckTable import CheckTable
+from pyphoplacecellanalysis.External.pyqtgraph.widgets.CheckTable import CheckTable
 
 
 

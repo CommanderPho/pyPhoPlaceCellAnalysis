@@ -7,9 +7,9 @@ from turtle import st # for loading pandas dataframe from literal string
 import OpenGL.GL as GL
 import numpy as np
 import pandas as pd
-import pyqtgraph as pg
-from pyqtgraph.opengl import GLAxisItem, GLGraphicsItem, GLGridItem, GLViewWidget
-from pyqtgraph.Qt import QtCore, QtGui
+import pyphoplacecellanalysis.External.pyqtgraph as pg
+from pyphoplacecellanalysis.External.pyqtgraph.opengl import GLAxisItem, GLGraphicsItem, GLGridItem, GLViewWidget
+from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtCore, QtGui
 
 from pyphocorehelpers.DataStructure.general_parameter_containers import DebugHelper, VisualizationParameters
 

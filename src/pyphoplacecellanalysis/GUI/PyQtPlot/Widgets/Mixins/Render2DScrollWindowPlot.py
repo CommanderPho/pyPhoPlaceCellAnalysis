@@ -1,5 +1,5 @@
-import pyqtgraph as pg
-from pyqtgraph.Qt import QtCore, QtGui, QtWidgets
+import pyphoplacecellanalysis.External.pyqtgraph as pg
+from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtCore, QtGui, QtWidgets
 import numpy as np
 
 from pyphoplacecellanalysis.General.Model.Datasources.Datasources import DataframeDatasource

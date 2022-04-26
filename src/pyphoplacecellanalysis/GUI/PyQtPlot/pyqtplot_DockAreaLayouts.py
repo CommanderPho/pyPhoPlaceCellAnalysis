@@ -1,9 +1,9 @@
-import pyqtgraph as pg
-from pyqtgraph.Qt import QtCore, QtGui
-import pyqtgraph.console
+import pyphoplacecellanalysis.External.pyqtgraph as pg
+from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtCore, QtGui
+import pyphoplacecellanalysis.External.pyqtgraph.console
 import numpy as np
 
-from pyqtgraph.dockarea import *
+from pyphoplacecellanalysis.External.pyqtgraph.dockarea import *
 
 
 def plot_dockAreaWidget(title='PhoDockAreaWidgetApp'):

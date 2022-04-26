@@ -2,8 +2,8 @@ from typing import OrderedDict
 from copy import deepcopy
 import numpy as np
 import pandas as pd
-import pyqtgraph as pg
-from pyqtgraph.Qt import QtCore, QtGui
+import pyphoplacecellanalysis.External.pyqtgraph as pg
+from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtCore, QtGui
 
 class DataSeriesColorHelpers:
     """ Implementors render spikes from neural data in 3D 

@@ -1,11 +1,11 @@
 import importlib
 import sys
 from pathlib import Path
-import pyqtgraph as pg
-from pyqtgraph.Qt import QtCore, QtGui, QtWidgets
+import pyphoplacecellanalysis.External.pyqtgraph as pg
+from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtCore, QtGui, QtWidgets
 import numpy as np
 
-from pyqtgraph.widgets.FeedbackButton import FeedbackButton
+from pyphoplacecellanalysis.External.pyqtgraph.widgets.FeedbackButton import FeedbackButton
 
 # NeuroPy (Diba Lab Python Repo) Loading
 try:

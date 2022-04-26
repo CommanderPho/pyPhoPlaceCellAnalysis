@@ -1,5 +1,5 @@
 # LiveWindowedData.py
-from pyqtgraph.Qt import QtCore
+from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtCore
 import numpy as np
 import pandas as pd
 

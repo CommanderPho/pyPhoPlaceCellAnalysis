@@ -1,6 +1,6 @@
 import numpy as np
-import pyqtgraph as pg
-from pyqtgraph.Qt import QtWidgets, mkQApp, QtGui
+import pyphoplacecellanalysis.External.pyqtgraph as pg
+from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtWidgets, mkQApp, QtGui
 
 
 """ https://www.geeksforgeeks.org/pyqtgraph-getting-histogram-object-for-image-view/?ref=rp

@@ -1,9 +1,9 @@
 from pathlib import Path
-import pyqtgraph.flowchart.library as fclib
-from pyqtgraph.flowchart.library.common import CtrlNode
-from pyqtgraph.Qt import QtGui, QtCore
-from pyqtgraph.widgets.ProgressDialog import ProgressDialog
-import pyqtgraph as pg
+import pyphoplacecellanalysis.External.pyqtgraph.flowchart.library as fclib
+from pyphoplacecellanalysis.External.pyqtgraph.flowchart.library.common import CtrlNode
+from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtGui, QtCore
+from pyphoplacecellanalysis.External.pyqtgraph.widgets.ProgressDialog import ProgressDialog
+import pyphoplacecellanalysis.External.pyqtgraph as pg
 import numpy as np
 
 # pyPhoPlaceCellAnalysis:

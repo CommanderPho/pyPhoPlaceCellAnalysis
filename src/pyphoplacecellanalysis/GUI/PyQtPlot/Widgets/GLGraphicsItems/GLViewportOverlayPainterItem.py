@@ -2,9 +2,9 @@ from copy import deepcopy
 from typing import OrderedDict
 import OpenGL.GL as GL
 
-import pyqtgraph as pg
-from pyqtgraph.opengl import GLAxisItem, GLGraphicsItem, GLGridItem, GLViewWidget
-from pyqtgraph.Qt import QtCore, QtGui
+import pyphoplacecellanalysis.External.pyqtgraph as pg
+from pyphoplacecellanalysis.External.pyqtgraph.opengl import GLAxisItem, GLGraphicsItem, GLGridItem, GLViewWidget
+from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtCore, QtGui
 
 
 class GLViewportOverlayPainterItem(GLGraphicsItem.GLGraphicsItem):
