@@ -174,6 +174,10 @@ class Spike3DRasterWindowWidget(SpikeRasterLeftSidebarControlsMixin, SpikeRaster
         self.enable_debug_print = Spike3DRasterWindowWidget.enable_debug_print
         
         
+        self.ui.splitter.setStretchFactor(0, 3) # have the top widget by 3x the height as the bottom widget
+        self.ui.splitter.setStretchFactor(1, 1) # have the top widget by 3x the height as the bottom widget        
+        
+        
         self.params = VisualizationParameters(self.applicationName)
         self.params.type_of_3d_plotter = type_of_3d_plotter
         
@@ -230,6 +234,11 @@ class Spike3DRasterWindowWidget(SpikeRasterLeftSidebarControlsMixin, SpikeRaster
         self.ui.v_layout_secondary.setContentsMargins(0,0,0,0)
         self.ui.v_layout_secondary.addWidget(self.ui.spike_raster_plt_2d)
         self.ui.secondarySpikeRasterControlWidget.setLayout(self.ui.v_layout_secondary)
+        
+        
+        
+        # setStretchFactor
+        
         
         if self.ui.spike_raster_plt_3d is not None:
             self.connect_plotter_time_windows()

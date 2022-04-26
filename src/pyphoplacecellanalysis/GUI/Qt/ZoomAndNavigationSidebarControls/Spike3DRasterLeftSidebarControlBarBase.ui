@@ -6,12 +6,27 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>121</width>
+    <width>100</width>
     <height>840</height>
    </rect>
   </property>
-  <property name="windowTitle">
-   <string>Form</string>
+  <property name="sizePolicy">
+   <sizepolicy hsizetype="Preferred" vsizetype="Expanding">
+    <horstretch>0</horstretch>
+    <verstretch>1</verstretch>
+   </sizepolicy>
+  </property>
+  <property name="minimumSize">
+   <size>
+    <width>100</width>
+    <height>0</height>
+   </size>
+  </property>
+  <property name="baseSize">
+   <size>
+    <width>100</width>
+    <height>0</height>
+   </size>
   </property>
   <property name="styleSheet">
    <string notr="true">background-color: rgb(71, 58, 46);
@@ -38,6 +53,15 @@ border-color: rgb(0, 0, 0);</string>
    </property>
    <item>
     <layout class="QVBoxLayout" name="verticalLayout" stretch="0,0,0,0,0,0,0,0,1">
+     <property name="leftMargin">
+      <number>2</number>
+     </property>
+     <property name="topMargin">
+      <number>4</number>
+     </property>
+     <property name="rightMargin">
+      <number>2</number>
+     </property>
      <property name="bottomMargin">
       <number>4</number>
      </property>
@@ -51,17 +75,20 @@ border-color: rgb(0, 0, 0);</string>
      <item>
       <widget class="SpinBox" name="spinAnimationTimeStep">
        <property name="suffix">
-        <string>Sec</string>
+        <string>s</string>
        </property>
        <property name="singleStep">
         <double>0.010000000000000</double>
+       </property>
+       <property name="value">
+        <double>0.100000000000000</double>
        </property>
       </widget>
      </item>
      <item>
       <widget class="QLabel" name="label_5">
        <property name="text">
-        <string>temporal_zoom_factor</string>
+        <string>zoom factor</string>
        </property>
       </widget>
      </item>
@@ -79,22 +106,37 @@ border-color: rgb(0, 0, 0);</string>
        <property name="singleStep">
         <double>0.100000000000000</double>
        </property>
+       <property name="value">
+        <double>1.000000000000000</double>
+       </property>
       </widget>
      </item>
      <item>
       <widget class="QLabel" name="label_6">
        <property name="text">
-        <string>render win. dur.</string>
+        <string>win. dur.</string>
        </property>
       </widget>
      </item>
      <item>
       <widget class="SpinBox" name="spinRenderWindowDuration">
+       <property name="readOnly">
+        <bool>true</bool>
+       </property>
+       <property name="buttonSymbols">
+        <enum>QAbstractSpinBox::NoButtons</enum>
+       </property>
+       <property name="keyboardTracking">
+        <bool>false</bool>
+       </property>
        <property name="suffix">
-        <string>Sec</string>
+        <string>s</string>
        </property>
        <property name="singleStep">
         <double>0.500000000000000</double>
+       </property>
+       <property name="value">
+        <double>1.000000000000000</double>
        </property>
       </widget>
      </item>

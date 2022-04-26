@@ -10,6 +10,7 @@
 
 from PyQt5 import QtCore, QtGui, QtWidgets
 
+
 class Ui_RootWidget(object):
     def setupUi(self, RootWidget):
         RootWidget.setObjectName("RootWidget")
@@ -48,16 +49,14 @@ class Ui_RootWidget(object):
         sizePolicy.setVerticalStretch(0)
         sizePolicy.setHeightForWidth(self.mainContentFrame.sizePolicy().hasHeightForWidth())
         self.mainContentFrame.setSizePolicy(sizePolicy)
-        self.mainContentFrame.setFrameShape(QtWidgets.QFrame.StyledPanel)
-        self.mainContentFrame.setFrameShadow(QtWidgets.QFrame.Sunken)
         self.mainContentFrame.setObjectName("mainContentFrame")
         self.gridLayout_2 = QtWidgets.QGridLayout(self.mainContentFrame)
-        self.gridLayout_2.setContentsMargins(0, 0, 0, 2)
+        self.gridLayout_2.setContentsMargins(0, 0, 0, 0)
         self.gridLayout_2.setSpacing(0)
         self.gridLayout_2.setObjectName("gridLayout_2")
         self.splitter = QtWidgets.QSplitter(self.mainContentFrame)
-        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Preferred, QtWidgets.QSizePolicy.Expanding)
-        sizePolicy.setHorizontalStretch(0)
+        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)
+        sizePolicy.setHorizontalStretch(1)
         sizePolicy.setVerticalStretch(1)
         sizePolicy.setHeightForWidth(self.splitter.sizePolicy().hasHeightForWidth())
         self.splitter.setSizePolicy(sizePolicy)
@@ -65,23 +64,9 @@ class Ui_RootWidget(object):
         self.splitter.setHandleWidth(10)
         self.splitter.setObjectName("splitter")
         self.mainSpike3DRasterWidget = QtWidgets.QWidget(self.splitter)
-        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)
-        sizePolicy.setHorizontalStretch(1)
-        sizePolicy.setVerticalStretch(1)
-        sizePolicy.setHeightForWidth(self.mainSpike3DRasterWidget.sizePolicy().hasHeightForWidth())
-        self.mainSpike3DRasterWidget.setSizePolicy(sizePolicy)
-        self.mainSpike3DRasterWidget.setMinimumSize(QtCore.QSize(400, 600))
-        self.mainSpike3DRasterWidget.setBaseSize(QtCore.QSize(0, 600))
         self.mainSpike3DRasterWidget.setStyleSheet("background-color: rgb(0, 0, 0);")
         self.mainSpike3DRasterWidget.setObjectName("mainSpike3DRasterWidget")
         self.secondarySpikeRasterControlWidget = QtWidgets.QWidget(self.splitter)
-        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Preferred)
-        sizePolicy.setHorizontalStretch(1)
-        sizePolicy.setVerticalStretch(0)
-        sizePolicy.setHeightForWidth(self.secondarySpikeRasterControlWidget.sizePolicy().hasHeightForWidth())
-        self.secondarySpikeRasterControlWidget.setSizePolicy(sizePolicy)
-        self.secondarySpikeRasterControlWidget.setMinimumSize(QtCore.QSize(0, 256))
-        self.secondarySpikeRasterControlWidget.setBaseSize(QtCore.QSize(0, 200))
         self.secondarySpikeRasterControlWidget.setObjectName("secondarySpikeRasterControlWidget")
         self.gridLayout_2.addWidget(self.splitter, 0, 0, 1, 1)
         self.gridLayout.addWidget(self.mainContentFrame, 0, 1, 1, 2)
@@ -95,21 +80,4 @@ class Ui_RootWidget(object):
         RootWidget.setWindowTitle(_translate("RootWidget", "Spike 3D Raster Window"))
 from pyphoplacecellanalysis.GUI.Qt.PlaybackControls.Spike3DRasterBottomPlaybackControlBarWidget import Spike3DRasterBottomPlaybackControlBar
 from pyphoplacecellanalysis.GUI.Qt.ZoomAndNavigationSidebarControls.Spike3DRasterLeftSidebarControlBarWidget import Spike3DRasterLeftSidebarControlBar
-
-## CUSTOM: DO NOT OVERWRITE:
-import pyphoplacecellanalysis.Resources.GuiResources
-
-
-
-
-
-if __name__ == "__main__":
-    import sys
-    app = QtWidgets.QApplication(sys.argv)
-    rootForm = QtWidgets.QWidget()
-    ui = Ui_RootWidget()
-    ui.setupUi(rootForm)
-    rootForm.show()
-    sys.exit(app.exec_())
-
-
+import GuiResources_rc
