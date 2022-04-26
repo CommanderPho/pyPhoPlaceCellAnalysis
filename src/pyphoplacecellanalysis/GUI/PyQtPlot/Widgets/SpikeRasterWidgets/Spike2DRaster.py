@@ -33,7 +33,7 @@ class Spike2DRaster(Render2DScrollWindowPlotMixin, SpikeRasterBase):
     # GUI Configuration Options:
     WantsRenderWindowControls = False
     WantsPlaybackControls = False
-    Includes2DActiveWindowScatter = False # Includes2DActiveWindowScatter: if True, it displays the main scatter plot for the active window.
+    Includes2DActiveWindowScatter = True # Includes2DActiveWindowScatter: if True, it displays the main scatter plot for the active window.
     
     ## Scrollable Window Signals
     # window_scrolled = QtCore.pyqtSignal(float, float) # signal is emitted on updating the 2D sliding window, where the first argument is the new start value and the 2nd is the new end value
