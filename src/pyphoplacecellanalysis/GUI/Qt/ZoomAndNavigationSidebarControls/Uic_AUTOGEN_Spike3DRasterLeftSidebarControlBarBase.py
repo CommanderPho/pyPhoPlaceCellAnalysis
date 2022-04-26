@@ -30,21 +30,23 @@ class Ui_leftSideToolbarWidget(object):
         self.label_4 = QtWidgets.QLabel(leftSideToolbarWidget)
         self.label_4.setObjectName("label_4")
         self.verticalLayout.addWidget(self.label_4)
-        self.spinAnimationTimeStep = SpinBox(leftSideToolbarWidget, siPrefix=True, dec=True, minStep=0.01)
+        self.spinAnimationTimeStep = SpinBox(leftSideToolbarWidget)
         self.spinAnimationTimeStep.setSingleStep(0.01)
         self.spinAnimationTimeStep.setObjectName("spinAnimationTimeStep")
         self.verticalLayout.addWidget(self.spinAnimationTimeStep)
         self.label_5 = QtWidgets.QLabel(leftSideToolbarWidget)
         self.label_5.setObjectName("label_5")
         self.verticalLayout.addWidget(self.label_5)
-        self.spinTemporalZoomFactor = SpinBox(leftSideToolbarWidget, siPrefix=False, dec=True, step=0.1, minStep=0.1)
+        self.spinTemporalZoomFactor = SpinBox(leftSideToolbarWidget)
+        self.spinTemporalZoomFactor.setMinimum(0.1)
+        self.spinTemporalZoomFactor.setMaximum(100.0)
         self.spinTemporalZoomFactor.setSingleStep(0.1)
         self.spinTemporalZoomFactor.setObjectName("spinTemporalZoomFactor")
         self.verticalLayout.addWidget(self.spinTemporalZoomFactor)
         self.label_6 = QtWidgets.QLabel(leftSideToolbarWidget)
         self.label_6.setObjectName("label_6")
         self.verticalLayout.addWidget(self.label_6)
-        self.spinRenderWindowDuration = SpinBox(leftSideToolbarWidget, siPrefix=True, dec=True, step=0.5, minStep=0.1)
+        self.spinRenderWindowDuration = SpinBox(leftSideToolbarWidget)
         self.spinRenderWindowDuration.setSingleStep(0.5)
         self.spinRenderWindowDuration.setObjectName("spinRenderWindowDuration")
         self.verticalLayout.addWidget(self.spinRenderWindowDuration)
@@ -87,16 +89,3 @@ class Ui_leftSideToolbarWidget(object):
         self.label_6.setText(_translate("leftSideToolbarWidget", "render win. dur."))
         self.spinRenderWindowDuration.setSuffix(_translate("leftSideToolbarWidget", "Sec"))
 from pyphoplacecellanalysis.External.pyqtgraph.widgets.SpinBox import SpinBox
-
-
-
-if __name__ == "__main__":
-    import sys
-    app = QtWidgets.QApplication(sys.argv)
-    rootForm = QtWidgets.QWidget()
-    ui = Ui_leftSideToolbarWidget()
-    ui.setupUi(rootForm)
-    rootForm.show()
-    sys.exit(app.exec_())
-
-

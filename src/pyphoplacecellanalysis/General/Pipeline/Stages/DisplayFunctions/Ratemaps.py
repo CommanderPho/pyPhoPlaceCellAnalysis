@@ -18,7 +18,7 @@ class DefaultRatemapDisplayFunctions(AllFunctionEnumeratingMixin):
         images = active_one_step_decoder.ratemap.normalized_tuning_curves # (43, 63, 63)
         # images = active_one_step_decoder.ratemap.normalized_tuning_curves[0:40,:,:] # (43, 63, 63)
         occupancy = active_one_step_decoder.ratemap.occupancy
-        app, parent_root_widget, root_render_widget, plot_array, img_item_array = pyqtplot_plot_image_array(active_one_step_decoder.xbin, active_one_step_decoder.ybin, images, occupancy, 
+        app, parent_root_widget, root_render_widget, plot_array, img_item_array, other_components_array = pyqtplot_plot_image_array(active_one_step_decoder.xbin, active_one_step_decoder.ybin, images, occupancy, 
                                                                                 app=kwargs.get('app',None), parent_root_widget=kwargs.get('parent_root_widget',None), root_render_widget=kwargs.get('root_render_widget',None))
         # win.show()
         return app, parent_root_widget, root_render_widget

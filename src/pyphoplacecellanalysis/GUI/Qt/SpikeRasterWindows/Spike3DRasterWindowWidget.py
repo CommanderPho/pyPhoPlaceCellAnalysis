@@ -14,10 +14,11 @@ from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.SpikeRasterWidgets.Spike3DRaste
 from pyphoplacecellanalysis.General.Mixins.TimeWindowPlaybackMixin import TimeWindowPlaybackPropertiesMixin, TimeWindowPlaybackController, TimeWindowPlaybackControllerActionsMixin
 
 from pyphoplacecellanalysis.GUI.Qt.PlaybackControls.Spike3DRasterBottomPlaybackControlBarWidget import SpikeRasterBottomFrameControlsMixin
+from pyphoplacecellanalysis.GUI.Qt.ZoomAndNavigationSidebarControls.Spike3DRasterLeftSidebarControlBarWidget import Spike3DRasterLeftSidebarControlBar, SpikeRasterLeftSidebarControlsMixin
 
 # remove TimeWindowPlaybackControllerActionsMixin
 # class Spike3DRasterWindowWidget(SpikeRasterBottomFrameControlsMixin, TimeWindowPlaybackControllerActionsMixin, TimeWindowPlaybackPropertiesMixin, QtWidgets.QWidget):
-class Spike3DRasterWindowWidget(SpikeRasterBottomFrameControlsMixin, QtWidgets.QWidget):
+class Spike3DRasterWindowWidget(SpikeRasterLeftSidebarControlsMixin, SpikeRasterBottomFrameControlsMixin, QtWidgets.QWidget):
     """ A main raster window loaded from a Qt .ui file. 
     
     Usage:
@@ -148,9 +149,11 @@ class Spike3DRasterWindowWidget(SpikeRasterBottomFrameControlsMixin, QtWidgets.Q
         
         # Helper Mixins: INIT:
         self.SpikeRasterBottomFrameControlsMixin_on_init()
+        self.SpikeRasterLeftSidebarControlsMixin_on_init()
         
         # Helper Mixins: SETUP:
         self.SpikeRasterBottomFrameControlsMixin_on_setup()
+        self.SpikeRasterLeftSidebarControlsMixin_on_setup()
         
         self.initUI(curr_spikes_df, core_app_name=application_name, window_duration=window_duration, window_start_time=window_start_time, neuron_colors=neuron_colors, neuron_sort_order=neuron_sort_order, type_of_3d_plotter=self.params.type_of_3d_plotter)
         
@@ -221,6 +224,8 @@ class Spike3DRasterWindowWidget(SpikeRasterBottomFrameControlsMixin, QtWidgets.Q
         self.ui.bottom_bar_connections = None 
         self.ui.bottom_bar_connections = self.SpikeRasterBottomFrameControlsMixin_connectSignals(self.ui.bottomPlaybackControlBarWidget)
         
+        self.ui.left_side_bar_connections = None
+        self.ui.left_side_bar_connections = self.SpikeRasterLeftSidebarControlsMixin_connectSignals(self.ui.leftSideToolbarWidget)
         
         
 
