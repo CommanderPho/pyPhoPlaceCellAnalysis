@@ -71,7 +71,7 @@ class Ui_RootWidget(object):
         self.secondarySpikeRasterControlWidget.setStyleSheet("background-color: rgb(0, 85, 0);")
         self.secondarySpikeRasterControlWidget.setObjectName("secondarySpikeRasterControlWidget")
         self.gridLayout_2.addWidget(self.splitter, 0, 0, 1, 1)
-        self.gridLayout.addWidget(self.mainContentFrame, 0, 1, 1, 2)
+        self.gridLayout.addWidget(self.mainContentFrame, 0, 1, 2, 2)
         self.gridLayout.setRowStretch(0, 1)
 
         self.retranslateUi(RootWidget)

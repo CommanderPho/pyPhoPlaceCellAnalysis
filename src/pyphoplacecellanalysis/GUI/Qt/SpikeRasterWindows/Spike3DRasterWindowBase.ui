@@ -25,7 +25,7 @@ background-color: rgba(71, 65, 60, 180);
 color: rgb(244, 244, 244);
 border-color: rgb(0, 0, 0);</string>
   </property>
-  <layout class="QGridLayout" name="gridLayout" rowstretch="1,0,0">
+  <layout class="QGridLayout" name="gridLayout" rowstretch="1,1,0">
    <property name="leftMargin">
     <number>0</number>
    </property>
@@ -85,7 +85,7 @@ border-color: rgb(0, 0, 0);</string>
      </property>
     </widget>
    </item>
-   <item row="0" column="1" colspan="2">
+   <item row="0" column="1" rowspan="2" colspan="2">
     <widget class="QFrame" name="mainContentFrame">
      <property name="sizePolicy">
       <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
@@ -130,6 +130,12 @@ border-color: rgb(0, 0, 0);</string>
          <number>10</number>
         </property>
         <widget class="QWidget" name="mainSpike3DRasterWidget" native="true">
+         <property name="minimumSize">
+          <size>
+           <width>0</width>
+           <height>500</height>
+          </size>
+         </property>
          <property name="styleSheet">
           <string notr="true">background-color: rgb(0, 0, 0);</string>
          </property>
