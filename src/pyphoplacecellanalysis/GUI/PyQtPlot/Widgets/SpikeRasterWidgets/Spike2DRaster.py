@@ -231,7 +231,9 @@ class Spike2DRaster(Render2DScrollWindowPlotMixin, SpikeRasterBase):
         # self.Render2DScrollWindowPlot_on_window_update # register with the animation time window for updates for the scroller.
         # Connect the signals for the zoom region and the LinearRegionItem
         # self.ui.scroll_window_region.sigRegionChanged.connect(self.update_zoom_plotter)
-        self.window_scrolled.connect(self.update_zoomed_plot)
+        
+        self.rate_limited_signal_scrolled_proxy = pg.SignalProxy(self.window_scrolled, rateLimit=60, slot=self.update_zoomed_plot_rate_limited) # Limit updates to 60 Signals/Second
+        # self.window_scrolled.connect(self.update_zoomed_plot)
         # self.ui.main_plot_widget.sigRangeChanged.connect(self.update_region)
         
         
@@ -277,8 +279,12 @@ class Spike2DRaster(Render2DScrollWindowPlotMixin, SpikeRasterBase):
         # update the current scroll region:
         # self.ui.scroll_window_region.setRegion(updated_time_window)
         
-        
-        
+
+    @QtCore.pyqtSlot(object)
+    def update_zoomed_plot_rate_limited(self, evt):        
+        min_t, max_t = evt ## using signal proxy turns original arguments into a tuple
+        self.update_zoomed_plot(min_t, max_t)
+
 
     @QtCore.pyqtSlot(float, float)
     def update_zoomed_plot(self, min_t, max_t):
