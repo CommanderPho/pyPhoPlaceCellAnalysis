@@ -93,6 +93,19 @@ class TimeWindow(SimplePrintable, PrettyPrintable, QtCore.QObject):
         self.window_changed_signal.emit(self.active_window_start_time, self.active_window_end_time)
         
         
+    ############### Rate-Limited SLots ###############:
+    ##################################################
+    ## For use with pg.SignalProxy
+    # using signal proxy turns original arguments into a tuple
+    @QtCore.pyqtSlot(object)
+    def update_window_start_rate_limited(self, evt):
+        self.update_window_start(*evt)
+    
+    @QtCore.pyqtSlot(object)
+    def update_window_start_end_rate_limited(self, evt):
+        self.update_window_start_end(*evt)
+        
+
         
     # def on_window_changed(self):
     #     print(f'SpikesDataframeWindow.on_window_changed(): window_changed_signal emitted. self.active_time_window: {self.active_time_window}')
