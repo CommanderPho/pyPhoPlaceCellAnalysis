@@ -95,13 +95,13 @@ border-color: rgb(0, 0, 0);</string>
      </property>
      <layout class="QGridLayout" name="gridLayout_2" rowstretch="0" columnstretch="0">
       <property name="leftMargin">
-       <number>2</number>
+       <number>0</number>
       </property>
       <property name="topMargin">
-       <number>2</number>
+       <number>0</number>
       </property>
       <property name="rightMargin">
-       <number>2</number>
+       <number>0</number>
       </property>
       <property name="bottomMargin">
        <number>4</number>
@@ -130,10 +130,22 @@ border-color: rgb(0, 0, 0);</string>
          <number>10</number>
         </property>
         <widget class="QWidget" name="mainSpike3DRasterWidget" native="true">
+         <property name="sizePolicy">
+          <sizepolicy hsizetype="Preferred" vsizetype="Expanding">
+           <horstretch>0</horstretch>
+           <verstretch>1</verstretch>
+          </sizepolicy>
+         </property>
          <property name="minimumSize">
           <size>
            <width>0</width>
            <height>500</height>
+          </size>
+         </property>
+         <property name="baseSize">
+          <size>
+           <width>0</width>
+           <height>800</height>
           </size>
          </property>
          <property name="styleSheet">
@@ -141,6 +153,18 @@ border-color: rgb(0, 0, 0);</string>
          </property>
         </widget>
         <widget class="QWidget" name="secondarySpikeRasterControlWidget" native="true">
+         <property name="minimumSize">
+          <size>
+           <width>0</width>
+           <height>200</height>
+          </size>
+         </property>
+         <property name="baseSize">
+          <size>
+           <width>0</width>
+           <height>200</height>
+          </size>
+         </property>
          <property name="styleSheet">
           <string notr="true">background-color: rgb(0, 85, 0);</string>
          </property>
