@@ -66,6 +66,7 @@ class Ui_RootWidget(object):
         self.splitter.setHandleWidth(10)
         self.splitter.setObjectName("splitter")
         self.mainSpike3DRasterWidget = QtWidgets.QWidget(self.splitter)
+        self.mainSpike3DRasterWidget.setMinimumSize(QtCore.QSize(0, 500))
         self.mainSpike3DRasterWidget.setStyleSheet("background-color: rgb(0, 0, 0);")
         self.mainSpike3DRasterWidget.setObjectName("mainSpike3DRasterWidget")
         self.secondarySpikeRasterControlWidget = QtWidgets.QWidget(self.splitter)
@@ -74,6 +75,7 @@ class Ui_RootWidget(object):
         self.gridLayout_2.addWidget(self.splitter, 0, 0, 1, 1)
         self.gridLayout.addWidget(self.mainContentFrame, 0, 1, 2, 2)
         self.gridLayout.setRowStretch(0, 1)
+        self.gridLayout.setRowStretch(1, 1)
 
         self.retranslateUi(RootWidget)
         QtCore.QMetaObject.connectSlotsByName(RootWidget)
