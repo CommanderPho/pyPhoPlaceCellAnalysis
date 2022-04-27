@@ -240,7 +240,7 @@ class SpikeRasterBase(UnitSortableMixin, DataSeriesToSpatialTransformingMixin, N
         self.temporal_mapping_changed.emit()
         
 
-    def __init__(self, params=None, spikes_window=None, playback_controller=None, neuron_colors=None, neuron_sort_order=None, application_name=None, **kwargs):
+    def __init__(self, params=None, spikes_window=None, playback_controller=None, neuron_colors=None, neuron_sort_order=None, application_name=None, should_show=True, **kwargs):
         """ 
         
         spikes_window: SpikesDataframeWindow
@@ -274,6 +274,8 @@ class SpikeRasterBase(UnitSortableMixin, DataSeriesToSpatialTransformingMixin, N
         self.enable_debug_print = False
         self.enable_debug_widgets = True
         self.enable_overwrite_invalid_unit_ids = True
+        
+        self.enable_show_on_init = should_show
         
         SpikeRasterBase.helper_setup_neuron_colors_and_order(self, neuron_colors=neuron_colors, neuron_sort_order=neuron_sort_order)
         

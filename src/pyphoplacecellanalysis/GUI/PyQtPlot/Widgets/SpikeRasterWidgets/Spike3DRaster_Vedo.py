@@ -333,7 +333,9 @@ class Spike3DRaster_Vedo(VedoSpecificTimeCurvesMixin, SpikeRasterBase):
         ## NOTE: this doesn't need to be done because the base class does it!
 
         self.ui.plt.show(mode=self.params.interaction_mode) # , axes=1                  # <--- show the vedo rendering
-        self.show()                     # <--- show the Qt Window
+        
+        if self.enable_show_on_init:
+            self.show() # <--- show the Qt Window
 
         
     def _update_spike_raster_lines_mesh(self):

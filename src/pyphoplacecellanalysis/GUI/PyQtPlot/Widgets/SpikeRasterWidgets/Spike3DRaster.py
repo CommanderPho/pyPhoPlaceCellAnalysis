@@ -133,7 +133,9 @@ class Spike3DRaster(PyQtGraphSpecificTimeCurvesMixin, RenderTimeEpochMeshesMixin
         # self.spikes_window.timeWindow.window_changed_signal.connect(self.TimeCurvesViewMixin_on_window_update) # TODO: this is for TimeCurvesViewMixin but currently just call manually.
         self.unit_sort_order_changed_signal.connect(self.on_unit_sort_order_changed)
         
-        self.show()
+        if self.enable_show_on_init:
+            self.show()
+    
         
 
 
