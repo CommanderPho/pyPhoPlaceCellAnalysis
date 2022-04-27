@@ -1,6 +1,7 @@
 import numpy as np
 
 from qtpy import QtCore, QtWidgets
+import pyphoplacecellanalysis.External.pyqtgraph as pg
 
 from pyphocorehelpers.DataStructure.general_parameter_containers import VisualizationParameters
 from pyphocorehelpers.gui.Qt.SyncedTimelineWindowLink import connect_additional_controlled_plotter
@@ -267,7 +268,10 @@ class Spike3DRasterWindowWidget(SpikeRasterLeftSidebarControlsMixin, SpikeRaster
 
     def connect_plotter_time_windows(self):
         """ connects the controlled plotter (usually the 3D plotter) to the 2D plotter that controls it. """
-        self.spike_3d_to_2d_window_connection = self.spike_raster_plt_2d.window_scrolled.connect(self.spike_raster_plt_3d.spikes_window.update_window_start_end)
+        # self.spike_3d_to_2d_window_connection = self.spike_raster_plt_2d.window_scrolled.connect(self.spike_raster_plt_3d.spikes_window.update_window_start_end)        
+        # Rate limited version:
+        self.spike_3d_to_2d_window_connection = pg.SignalProxy(self.spike_raster_plt_2d.window_scrolled, delay=0.2, rateLimit=60, slot=self.spike_raster_plt_3d.spikes_window.update_window_start_end_rate_limited) # Limit updates to 60 Signals/Second
+        
          
     def connect_additional_controlled_plotter(self, controlled_plt):
         """ try to connect the controlled_plt to the current controller (usually the 2D plot). """
