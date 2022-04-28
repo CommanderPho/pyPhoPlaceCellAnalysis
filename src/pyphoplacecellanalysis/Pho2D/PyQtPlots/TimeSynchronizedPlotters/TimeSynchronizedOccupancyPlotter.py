@@ -57,7 +57,7 @@ class TimeSynchronizedOccupancyPlotter(TimeSynchronizedPlotterBase):
         ## Build the colormap to be used:
         # self.params.cmap = pg.ColorMap(pos=np.linspace(0.0, 1.0, 6), color=colors)
         self.params.cmap = pg.colormap.get('jet','matplotlib') # prepare a linear color map
-        self.params.image_margins = 2.0
+        self.params.image_margins = 0.0
         self.params.image_bounds_extent, self.params.x_range, self.params.y_range = _pyqtplot_build_image_bounds_extent(self.active_time_dependent_placefields.xbin, self.active_time_dependent_placefields.ybin, margin=self.params.image_margins, debug_print=self.enable_debug_print)
         
         
@@ -87,23 +87,35 @@ class TimeSynchronizedOccupancyPlotter(TimeSynchronizedPlotterBase):
         
         ## More Involved Mode:
         self.ui.root_graphics_layout_widget = pg.GraphicsLayoutWidget()
-        self.ui.root_view = self.ui.root_graphics_layout_widget.addViewBox()
+        # self.ui.root_view = self.ui.root_graphics_layout_widget.addViewBox()
         ## lock the aspect ratio so pixels are always square
-        self.ui.root_view.setAspectLocked(True)
+        # self.ui.root_view.setAspectLocked(True)
 
         ## Create image item
+        
         self.ui.imv = pg.ImageItem(border='w')
-        self.ui.root_view.addItem(self.ui.imv)
+        # self.ui.root_view.addItem(self.ui.imv)
+        # self.ui.root_view.setRange(QtCore.QRectF(*self.params.image_bounds_extent))
 
-        # curr_plot = self.ui.root_graphics_layout_widget.addPlot(row=curr_row, col=curr_col, name=curr_plot_identifier_string, title=curr_cell_identifier_string)
-        # curr_plot.addItem(self.ui.imv)  # add ImageItem to PlotItem
-        # curr_plot.showAxes(True)
+        self.ui.root_plot = self.ui.root_graphics_layout_widget.addPlot(row=0, col=0, name=f'Occupancy', title=f'Occupancy -  t = {self.active_time_dependent_placefields.last_t}')
+        self.ui.root_plot.addItem(self.ui.imv)  # add ImageItem to PlotItem
+        self.ui.root_plot.showAxes(True)
+        self.ui.root_plot.setXRange(*self.params.x_range)
+        self.ui.root_plot.setYRange(*self.params.y_range)
+            
+            
+        # ## Optional Interactive Color Bar:
+        # bar = pg.ColorBarItem(values= (0, 1), colorMap=self.params.cmap, width=5, interactive=False) # prepare interactive color bar
+        # # Have ColorBarItem control colors of img and appear in 'plot':
+        # bar.setImageItem(self.ui.imv, insert_in=self.ui.root_plot)
         
         self.ui.layout.addWidget(self.ui.root_graphics_layout_widget, 0, 0) # add the GLViewWidget to the layout at 0, 0
         
         # Set the color map:
         self.ui.imv.setColorMap(self.params.cmap)
-    
+        ## Set initial view bounds
+        # self.ui.root_view.setRange(QtCore.QRectF(0, 0, 600, 600))
+
     
     def update(self, t):
         # Compute the updated placefields/occupancy for the time t:
@@ -136,7 +148,9 @@ class TimeSynchronizedOccupancyPlotter(TimeSynchronizedPlotterBase):
             # image[np.where(occupancy < self.params.drop_below_threshold)] = np.nan # null out the occupancy
             image[np.where(image < self.params.drop_below_threshold)] = np.nan # null out the occupancy
         
-        self.ui.imv.setImage(image, xvals=self.active_time_dependent_placefields.xbin)
+        # self.ui.imv.setImage(image, xvals=self.active_time_dependent_placefields.xbin)
+        
+        self.ui.imv.setImage(image, rect=self.params.image_bounds_extent)
         self.setWindowTitle(f'{self.windowName} - {image_title} t = {curr_t}')
     
     
