@@ -9,7 +9,9 @@ import pyphoplacecellanalysis.External.pyqtgraph as pg
 from pyphocorehelpers.DataStructure.general_parameter_containers import VisualizationParameters
 from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer
 
-class TimeSynchronizedOccupancyPlotter(QtWidgets.QWidget):
+from pyphoplacecellanalysis.Pho2D.PyQtPlots.TimeSynchronizedPlotters.TimeSynchronizedPlotterBase import TimeSynchronizedPlotterBase
+
+class TimeSynchronizedOccupancyPlotter(TimeSynchronizedPlotterBase):
     """
     
     Usage:
@@ -36,22 +38,14 @@ class TimeSynchronizedOccupancyPlotter(QtWidgets.QWidget):
     def __init__(self, active_time_dependent_placefields2D, drop_below_threshold: float=0.0000001, application_name=None, parent=None):
         """_summary_
         """
-        super().__init__(parent=parent) # Call the inherited classes __init__ method
+        super().__init__(application_name=application_name, parent=parent) # Call the inherited classes __init__ method
         
-        if application_name is not None:
-            self.applicationName = application_name
-        else:
-            self.applicationName = TimeSynchronizedOccupancyPlotter.applicationName
-        
-        self.windowName = TimeSynchronizedOccupancyPlotter.windowName
-        self.enable_debug_print = TimeSynchronizedOccupancyPlotter.enable_debug_print
-        self.setup()
         self.active_time_dependent_placefields = active_time_dependent_placefields2D
+        
+        self.setup()
         self.params.drop_below_threshold = drop_below_threshold
         
         self.buildUI()
-        self.resize(800,800)
-        self.setWindowTitle(self.windowName)
         # self.show()
         
     def setup(self):
@@ -76,6 +70,8 @@ class TimeSynchronizedOccupancyPlotter(QtWidgets.QWidget):
         #### Build Graphics Objects #####
         self._buildGraphics()        
         self.setLayout(self.ui.layout)
+        self.resize(800,800)
+        self.setWindowTitle(self.windowName)
         
     def _buildGraphics(self):
         # Build a single image view to display the image:
@@ -118,7 +114,8 @@ class TimeSynchronizedOccupancyPlotter(QtWidgets.QWidget):
         
         self.ui.imv.setImage(image, xvals=self.active_time_dependent_placefields.xbin)
         self.setWindowTitle(f'{self.windowName} - {image_title} t = {curr_t}')
-        
+    
+    
     @QtCore.Slot(float, float)
     def on_window_changed(self, start_t, end_t):
         # called when the window is updated
