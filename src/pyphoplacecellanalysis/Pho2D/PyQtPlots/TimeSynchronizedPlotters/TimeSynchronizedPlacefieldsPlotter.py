@@ -8,6 +8,8 @@ import pyphoplacecellanalysis.External.pyqtgraph as pg
 # from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtCore, QtGui
 from pyphocorehelpers.DataStructure.general_parameter_containers import VisualizationParameters
 from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer
+from pyphocorehelpers.indexing_helpers import compute_paginated_grid_config
+
 
 from pyphoplacecellanalysis.Pho2D.PyQtPlots.TimeSynchronizedPlotters.TimeSynchronizedPlotterBase import TimeSynchronizedPlotterBase
 from pyphoplacecellanalysis.Pho2D.PyQtPlots.plot_placefields import _pyqtplot_build_image_bounds_extent
@@ -36,7 +38,7 @@ class TimeSynchronizedPlacefieldsPlotter(TimeSynchronizedPlotterBase):
     
     enable_debug_print = False
     
-    def __init__(self, active_time_dependent_placefields2D, drop_below_threshold: float=0.0000001, application_name=None, parent=None):
+    def __init__(self, active_time_dependent_placefields2D, drop_below_threshold: float=0.0000001, max_num_columns = 5, application_name=None, parent=None):
         """_summary_
         """
         super().__init__(application_name=application_name, parent=parent) # Call the inherited classes __init__ method
@@ -45,7 +47,7 @@ class TimeSynchronizedPlacefieldsPlotter(TimeSynchronizedPlotterBase):
         
         self.setup()
         self.params.drop_below_threshold = drop_below_threshold
-        
+        self.params.max_num_columns = max_num_columns
         
         self.buildUI()
         # self.show()
@@ -62,7 +64,6 @@ class TimeSynchronizedPlacefieldsPlotter(TimeSynchronizedPlotterBase):
         self.params.image_bounds_extent, self.params.x_range, self.params.y_range = _pyqtplot_build_image_bounds_extent(self.active_time_dependent_placefields.xbin, self.active_time_dependent_placefields.ybin, margin=self.params.image_margins, debug_print=self.enable_debug_print)
         
         self.params.nMapsToShow = self.active_time_dependent_placefields.ratemap.n_neurons
-        
         
     # def buildUI(self):
     #     """ for QGridLayout
@@ -82,28 +83,50 @@ class TimeSynchronizedPlacefieldsPlotter(TimeSynchronizedPlotterBase):
     #     self.setWindowTitle(self.windowName)
         
     def _buildGraphics(self):
+        self.ui.img_item_array = []
+        self.ui.other_components_array = []
+        self.ui.plot_array = []
         
         # root_render_widget
         self.ui.root_graphics_layout_widget = pg.GraphicsLayoutWidget()
-        
-        
         
         curr_ratemap = self.active_time_dependent_placefields.ratemap
         images = curr_ratemap.tuning_curves # (43, 63, 63)
         occupancy = curr_ratemap.occupancy
         
-        for i, curr_included_cell_ID in enumerate(self.active_time_dependent_placefields.ratemap.neuron_ids):            
-            cell_ID = curr_included_cell_ID
+        # Compute Images:
+        included_unit_indicies = np.arange(np.shape(images)[0]) # include all unless otherwise specified
+        nMapsToShow = len(included_unit_indicies)
+
+        # Paging Management: Constrain the subplots values to just those that you need
+        subplot_no_pagination_configuration, included_combined_indicies_pages, page_grid_sizes = compute_paginated_grid_config(nMapsToShow, max_num_columns=self.params.max_num_columns, max_subplots_per_page=None, data_indicies=included_unit_indicies, last_figure_subplots_same_layout=True)
+        page_idx = 0 # page_idx is zero here because we only have one page:
+        
+
+            
+        # for i, curr_included_cell_ID in enumerate(self.active_time_dependent_placefields.ratemap.neuron_ids):
+        
+        for (a_linear_index, curr_row, curr_col, curr_included_unit_index) in included_combined_indicies_pages[page_idx]:
+            # Need to convert to page specific:
+            curr_page_relative_linear_index = np.mod(a_linear_index, int(page_grid_sizes[page_idx].num_rows * page_grid_sizes[page_idx].num_columns))
+            curr_page_relative_row = np.mod(curr_row, page_grid_sizes[page_idx].num_rows)
+            curr_page_relative_col = np.mod(curr_col, page_grid_sizes[page_idx].num_columns)
+            if self.enable_debug_print:
+                print(f'a_linear_index: {a_linear_index}, curr_page_relative_linear_index: {curr_page_relative_linear_index}, curr_row: {curr_row}, curr_col: {curr_col}, curr_page_relative_row: {curr_page_relative_row}, curr_page_relative_col: {curr_page_relative_col}, curr_included_unit_index: {curr_included_unit_index}')
+                
+            cell_IDX = curr_included_unit_index
+            cell_ID = self.active_time_dependent_placefields.ratemap.neuron_ids[cell_IDX]
             curr_cell_identifier_string = f'Cell[{cell_ID}]'
             curr_plot_identifier_string = f'pyqtplot_plot_image_array.{curr_cell_identifier_string}'
 
-            image = np.squeeze(images[i,:,:])
-            # Pre-filter the data:
-            image = np.array(image.copy()) / np.nanmax(image) # note scaling by maximum here!
-            if self.params.drop_below_threshold is not None:
-                image[np.where(occupancy < self.params.drop_below_threshold)] = np.nan # null out the occupancy
-
             # Build the image item:
+            # Update the image:
+            image = np.squeeze(images[a_linear_index,:,:])
+            # Pre-filter the data:
+            with np.errstate(divide='ignore', invalid='ignore'):
+                image = np.array(image.copy()) / np.nanmax(image) # note scaling by maximum here!
+                if self.params.drop_below_threshold is not None:
+                    image[np.where(occupancy < self.params.drop_below_threshold)] = np.nan # null out the occupancy
             img_item = pg.ImageItem(image=image, levels=(0,1))
                 
             curr_plot = self.ui.root_graphics_layout_widget.addPlot(row=curr_row, col=curr_col, name=curr_plot_identifier_string, title=curr_cell_identifier_string)
@@ -124,27 +147,20 @@ class TimeSynchronizedPlacefieldsPlotter(TimeSynchronizedPlotterBase):
             # Have ColorBarItem control colors of img and appear in 'plot':
             bar.setImageItem(img_item, insert_in=curr_plot)
 
-            img_item_array.append(img_item)
-            plot_array.append(curr_plot)
-            other_components_array.append({'color_bar':bar})
+            self.ui.img_item_array.append(img_item)
+            self.ui.plot_array.append(curr_plot)
+            self.ui.other_components_array.append({'color_bar':bar})
         
 
-        
-        
-        
-        # Build a single image view to display the image:
-        self.ui.imv = pg.ImageView()
-        self.ui.layout.addWidget(self.ui.imv, 0, 0) # add the GLViewWidget to the layout at 0, 0
-        # Set the color map:
-        self.ui.imv.setColorMap(self.params.cmap)
+        # add the root_graphics_layout_widget to the main layout:
+        self.ui.layout.addWidget(self.ui.root_graphics_layout_widget, 0, 0) # add the GLViewWidget to the layout at 0, 0
     
     
     def update(self, t):
         # Compute the updated placefields/occupancy for the time t:
         with np.errstate(divide='ignore', invalid='ignore'):
             self.active_time_dependent_placefields.update(t)
-        # # Update the plots:
-        # self._update_plots()
+
 
     def _update_plots(self):
         """
@@ -158,19 +174,25 @@ class TimeSynchronizedPlacefieldsPlotter(TimeSynchronizedPlotterBase):
         # Update the plots:
         curr_t = self.active_time_dependent_placefields.last_t
         curr_ratemap = self.active_time_dependent_placefields.ratemap
-        
+        images = curr_ratemap.tuning_curves.copy() # (43, 63, 63)
+        occupancy = curr_ratemap.occupancy
         # image = curr_ratemap.occupancy
         # image = self.active_time_dependent_placefields.curr_normalized_occupancy
         # image_title = 'curr_normalized_occupancy'
+        image_title = 'tuning_curves'
         
-        image = self.active_time_dependent_placefields.curr_seconds_occupancy.copy()
-        image_title = 'curr_seconds_occupancy'
-        
-        if self.params.drop_below_threshold is not None:
-            # image[np.where(occupancy < self.params.drop_below_threshold)] = np.nan # null out the occupancy
-            image[np.where(image < self.params.drop_below_threshold)] = np.nan # null out the occupancy
-        
-        self.ui.imv.setImage(image, xvals=self.active_time_dependent_placefields.xbin)
+        # Update the placefields plot if needed:
+        for i, an_img_item in enumerate(self.ui.img_item_array):
+            image = np.squeeze(images[i,:,:])
+            # Pre-filter the data:
+            with np.errstate(divide='ignore', invalid='ignore'):
+                # image = np.array(image.copy()) / np.nanmax(image) # note scaling by maximum here!
+                if self.params.drop_below_threshold is not None:
+                    image[np.where(occupancy < self.params.drop_below_threshold)] = np.nan # null out the occupancy
+            # an_img_item.setImage(np.squeeze(images[i,:,:]))
+            an_img_item.setImage(image)
+            
+
         self.setWindowTitle(f'{self.windowName} - {image_title} t = {curr_t}')
     
     
