@@ -10,6 +10,8 @@ from pyphocorehelpers.DataStructure.general_parameter_containers import Visualiz
 from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer
 
 from pyphoplacecellanalysis.Pho2D.PyQtPlots.TimeSynchronizedPlotters.TimeSynchronizedPlotterBase import TimeSynchronizedPlotterBase
+from pyphoplacecellanalysis.Pho2D.PyQtPlots.plot_placefields import _pyqtplot_build_image_bounds_extent
+
 
 class TimeSynchronizedOccupancyPlotter(TimeSynchronizedPlotterBase):
     """
@@ -55,6 +57,10 @@ class TimeSynchronizedOccupancyPlotter(TimeSynchronizedPlotterBase):
         ## Build the colormap to be used:
         # self.params.cmap = pg.ColorMap(pos=np.linspace(0.0, 1.0, 6), color=colors)
         self.params.cmap = pg.colormap.get('jet','matplotlib') # prepare a linear color map
+        self.params.image_margins = 2.0
+        self.params.image_bounds_extent, self.params.x_range, self.params.y_range = _pyqtplot_build_image_bounds_extent(self.active_time_dependent_placefields.xbin, self.active_time_dependent_placefields.ybin, margin=self.params.image_margins, debug_print=self.enable_debug_print)
+        
+        
         
     # def buildUI(self):
     #     """ for QGridLayout
@@ -75,8 +81,26 @@ class TimeSynchronizedOccupancyPlotter(TimeSynchronizedPlotterBase):
         
     def _buildGraphics(self):
         # Build a single image view to display the image:
-        self.ui.imv = pg.ImageView()
-        self.ui.layout.addWidget(self.ui.imv, 0, 0) # add the GLViewWidget to the layout at 0, 0
+        # ## Single pg.ImageView Mode:
+        # self.ui.imv = pg.ImageView()
+        # self.ui.layout.addWidget(self.ui.imv, 0, 0) # add the GLViewWidget to the layout at 0, 0
+        
+        ## More Involved Mode:
+        self.ui.root_graphics_layout_widget = pg.GraphicsLayoutWidget()
+        self.ui.root_view = self.ui.root_graphics_layout_widget.addViewBox()
+        ## lock the aspect ratio so pixels are always square
+        self.ui.root_view.setAspectLocked(True)
+
+        ## Create image item
+        self.ui.imv = pg.ImageItem(border='w')
+        self.ui.root_view.addItem(self.ui.imv)
+
+        # curr_plot = self.ui.root_graphics_layout_widget.addPlot(row=curr_row, col=curr_col, name=curr_plot_identifier_string, title=curr_cell_identifier_string)
+        # curr_plot.addItem(self.ui.imv)  # add ImageItem to PlotItem
+        # curr_plot.showAxes(True)
+        
+        self.ui.layout.addWidget(self.ui.root_graphics_layout_widget, 0, 0) # add the GLViewWidget to the layout at 0, 0
+        
         # Set the color map:
         self.ui.imv.setColorMap(self.params.cmap)
     
