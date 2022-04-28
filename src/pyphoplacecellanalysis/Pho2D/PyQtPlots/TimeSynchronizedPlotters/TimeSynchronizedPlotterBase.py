@@ -72,7 +72,6 @@ class TimeSynchronizedPlotterBase(QtWidgets.QWidget):
         self.setLayout(self.ui.layout)
         self.resize(800,800)
         self.setWindowTitle(self.windowName)
-
         
     def _buildGraphics(self):
         """ Implementors must override this method to build the main graphics object and add it at layout position (0, 0)"""

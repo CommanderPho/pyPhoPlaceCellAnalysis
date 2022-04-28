@@ -50,7 +50,7 @@ class TimeSynchronizedPlacefieldsPlotter(TimeSynchronizedPlotterBase):
         self.params.max_num_columns = max_num_columns
         
         self.buildUI()
-        # self.show()
+        self._update_plots()
         
     def setup(self):
         # self.setup_spike_rendering_mixin() # NeuronIdentityAccessingMixin
@@ -64,24 +64,7 @@ class TimeSynchronizedPlacefieldsPlotter(TimeSynchronizedPlotterBase):
         self.params.image_bounds_extent, self.params.x_range, self.params.y_range = _pyqtplot_build_image_bounds_extent(self.active_time_dependent_placefields.xbin, self.active_time_dependent_placefields.ybin, margin=self.params.image_margins, debug_print=self.enable_debug_print)
         
         self.params.nMapsToShow = self.active_time_dependent_placefields.ratemap.n_neurons
-        
-    # def buildUI(self):
-    #     """ for QGridLayout
-    #         addWidget(widget, row, column, rowSpan, columnSpan, Qt.Alignment alignment = 0)
-    #     """
-    #     self.ui = PhoUIContainer()
-        
-    #     self.ui.layout = QtWidgets.QGridLayout()
-    #     self.ui.layout.setContentsMargins(0, 0, 0, 0)
-    #     self.ui.layout.setVerticalSpacing(0)
-    #     self.ui.layout.setHorizontalSpacing(0)
-    #     # self.setStyleSheet("background : #1B1B1B; color : #727272")
-    #     #### Build Graphics Objects #####
-    #     self._buildGraphics()        
-    #     self.setLayout(self.ui.layout)
-    #     self.resize(800,800)
-    #     self.setWindowTitle(self.windowName)
-        
+                
     def _buildGraphics(self):
         self.ui.img_item_array = []
         self.ui.other_components_array = []
@@ -162,9 +145,6 @@ class TimeSynchronizedPlacefieldsPlotter(TimeSynchronizedPlotterBase):
 
 
     def _update_plots(self):
-        """
-        
-        """
         if self.enable_debug_print:
             print(f'TimeSynchronizedPlacefieldsPlotter._update_plots()')
             

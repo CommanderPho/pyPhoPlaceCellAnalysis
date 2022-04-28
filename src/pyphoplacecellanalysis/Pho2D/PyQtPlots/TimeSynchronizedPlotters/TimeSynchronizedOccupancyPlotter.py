@@ -48,7 +48,7 @@ class TimeSynchronizedOccupancyPlotter(TimeSynchronizedPlotterBase):
         self.params.drop_below_threshold = drop_below_threshold
         
         self.buildUI()
-        # self.show()
+        self._update_plots()
         
     def setup(self):
         # self.setup_spike_rendering_mixin() # NeuronIdentityAccessingMixin
@@ -62,23 +62,6 @@ class TimeSynchronizedOccupancyPlotter(TimeSynchronizedPlotterBase):
         
         self.params.recent_position_trajectory_max_seconds_ago = 7.0
         
-        
-    # def buildUI(self):
-    #     """ for QGridLayout
-    #         addWidget(widget, row, column, rowSpan, columnSpan, Qt.Alignment alignment = 0)
-    #     """
-    #     self.ui = PhoUIContainer()
-        
-    #     self.ui.layout = QtWidgets.QGridLayout()
-    #     self.ui.layout.setContentsMargins(0, 0, 0, 0)
-    #     self.ui.layout.setVerticalSpacing(0)
-    #     self.ui.layout.setHorizontalSpacing(0)
-    #     # self.setStyleSheet("background : #1B1B1B; color : #727272")
-    #     #### Build Graphics Objects #####
-    #     self._buildGraphics()        
-    #     self.setLayout(self.ui.layout)
-    #     self.resize(800,800)
-    #     self.setWindowTitle(self.windowName)
         
     def _buildGraphics(self):
         # Build a single image view to display the image:
@@ -106,10 +89,11 @@ class TimeSynchronizedOccupancyPlotter(TimeSynchronizedPlotterBase):
 
         ## Optional Animal Trajectory Path Plot:            
         # Note that pg.PlotDataItem is a combination of pg.PlotCurveItem and pg.ScatterPlotItem
-        self.ui.trajectory_curve = pg.PlotDataItem(pen=({'color': 'white', 'width': 1}), symbol='o', symbolBrush=(250,250,250), symbolSize=0.01, skipFiniteCheck=True, downsample=10, clipToView=True, name='recent trajectory') # , autoDownsample=True
+        self.ui.trajectory_curve = pg.PlotDataItem(pen=({'color': 'white', 'width': 2}), symbol='o', symbolBrush=(50,50,50), pxMode=True, symbolSize=6.0, antialias=True, name='recent trajectory') #downsample=20, downsampleMethod='peak', autoDownsample=True, skipFiniteCheck=True, clipToView=True
+        
+        
         # curr_occupancy_plotter.ui.trajectory_curve = pg.PlotCurveItem(pen=({'color': 'white', 'width': 3}), skipFiniteCheck=True)
         self.ui.root_plot.addItem(self.ui.trajectory_curve)
-
 
         # ## Optional Interactive Color Bar:
         # bar = pg.ColorBarItem(values= (0, 1), colorMap=self.params.cmap, width=5, interactive=False) # prepare interactive color bar
@@ -134,9 +118,6 @@ class TimeSynchronizedOccupancyPlotter(TimeSynchronizedPlotterBase):
 
 
     def _update_plots(self):
-        """
-        
-        """
         if self.enable_debug_print:
             print(f'TimeSynchronizedOccupancyPlotter._update_plots()')
             
