@@ -83,7 +83,7 @@ class TimeSynchronizedPlotterBase(QtWidgets.QWidget):
         # self.ui.imv.setColorMap(self.params.cmap)
     
     
-    def update(self, t):
+    def update(self, t, defer_render=False):
         raise NotImplementedError
 
     def _update_plots(self):
@@ -105,3 +105,9 @@ class TimeSynchronizedPlotterBase(QtWidgets.QWidget):
         if self.enable_debug_print:
             profiler('Finished calling _update_plots()')
             
+
+    @property
+    def last_t(self):
+        """Convinence accessor to active_time_dependent_placefields's last_t property."""
+        return self.active_time_dependent_placefields.last_t
+    

@@ -60,6 +60,7 @@ class TimeSynchronizedOccupancyPlotter(TimeSynchronizedPlotterBase):
         self.params.image_margins = 0.0
         self.params.image_bounds_extent, self.params.x_range, self.params.y_range = _pyqtplot_build_image_bounds_extent(self.active_time_dependent_placefields.xbin, self.active_time_dependent_placefields.ybin, margin=self.params.image_margins, debug_print=self.enable_debug_print)
         
+        self.params.recent_position_trajectory_max_seconds_ago = 7.0
         
         
     # def buildUI(self):
@@ -102,8 +103,14 @@ class TimeSynchronizedOccupancyPlotter(TimeSynchronizedPlotterBase):
         self.ui.root_plot.showAxes(True)
         self.ui.root_plot.setXRange(*self.params.x_range)
         self.ui.root_plot.setYRange(*self.params.y_range)
-            
-            
+
+        ## Optional Animal Trajectory Path Plot:            
+        # Note that pg.PlotDataItem is a combination of pg.PlotCurveItem and pg.ScatterPlotItem
+        self.ui.trajectory_curve = pg.PlotDataItem(pen=({'color': 'white', 'width': 1}), symbol='o', symbolBrush=(250,250,250), symbolSize=0.01, skipFiniteCheck=True, downsample=10, clipToView=True, name='recent trajectory') # , autoDownsample=True
+        # curr_occupancy_plotter.ui.trajectory_curve = pg.PlotCurveItem(pen=({'color': 'white', 'width': 3}), skipFiniteCheck=True)
+        self.ui.root_plot.addItem(self.ui.trajectory_curve)
+
+
         # ## Optional Interactive Color Bar:
         # bar = pg.ColorBarItem(values= (0, 1), colorMap=self.params.cmap, width=5, interactive=False) # prepare interactive color bar
         # # Have ColorBarItem control colors of img and appear in 'plot':
@@ -117,12 +124,14 @@ class TimeSynchronizedOccupancyPlotter(TimeSynchronizedPlotterBase):
         # self.ui.root_view.setRange(QtCore.QRectF(0, 0, 600, 600))
 
     
-    def update(self, t):
+    def update(self, t, defer_render=False):
         # Compute the updated placefields/occupancy for the time t:
         with np.errstate(divide='ignore', invalid='ignore'):
             self.active_time_dependent_placefields.update(t)
-        # # Update the plots:
-        # self._update_plots()
+        # Update the plots:
+        if not defer_render:
+            self._update_plots()
+
 
     def _update_plots(self):
         """
@@ -135,7 +144,6 @@ class TimeSynchronizedOccupancyPlotter(TimeSynchronizedPlotterBase):
         
         # Update the plots:
         curr_t = self.active_time_dependent_placefields.last_t
-        curr_ratemap = self.active_time_dependent_placefields.ratemap
         
         # image = curr_ratemap.occupancy
         # image = self.active_time_dependent_placefields.curr_normalized_occupancy
@@ -151,6 +159,11 @@ class TimeSynchronizedOccupancyPlotter(TimeSynchronizedPlotterBase):
         # self.ui.imv.setImage(image, xvals=self.active_time_dependent_placefields.xbin)
         
         self.ui.imv.setImage(image, rect=self.params.image_bounds_extent)
+        
+        # Update most recent trajectory plot:
+        curr_trajectory_rows = self.curr_recent_trajectory
+        self.ui.trajectory_curve.setData(x=curr_trajectory_rows.x.to_numpy(), y=curr_trajectory_rows.y.to_numpy()) 
+        
         self.setWindowTitle(f'{self.windowName} - {image_title} t = {curr_t}')
     
     
@@ -168,6 +181,14 @@ class TimeSynchronizedOccupancyPlotter(TimeSynchronizedPlotterBase):
     #     if self.enable_debug_print:
     #         profiler('Finished calling _update_plots()')
             
+            
+    @property
+    def curr_recent_trajectory(self):
+        """The animal's most recent trajectory preceding self.active_time_dependent_placefields.last_t"""
+        # Fixed time ago backward:
+        earliest_trajectory_start_time = self.last_t - self.params.recent_position_trajectory_max_seconds_ago # gets the earliest start time for the current trajectory to display
+        return self.active_time_dependent_placefields.filtered_pos_df.position.time_sliced(earliest_trajectory_start_time, self.last_t)[['t','x','y']] # Get all rows within the most recent time
+
             
 # included_epochs = None
 # computation_config = active_session_computation_configs[0]

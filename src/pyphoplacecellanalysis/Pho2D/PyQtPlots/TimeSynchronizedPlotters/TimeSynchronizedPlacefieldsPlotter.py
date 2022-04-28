@@ -102,10 +102,6 @@ class TimeSynchronizedPlacefieldsPlotter(TimeSynchronizedPlotterBase):
         subplot_no_pagination_configuration, included_combined_indicies_pages, page_grid_sizes = compute_paginated_grid_config(nMapsToShow, max_num_columns=self.params.max_num_columns, max_subplots_per_page=None, data_indicies=included_unit_indicies, last_figure_subplots_same_layout=True)
         page_idx = 0 # page_idx is zero here because we only have one page:
         
-
-            
-        # for i, curr_included_cell_ID in enumerate(self.active_time_dependent_placefields.ratemap.neuron_ids):
-        
         for (a_linear_index, curr_row, curr_col, curr_included_unit_index) in included_combined_indicies_pages[page_idx]:
             # Need to convert to page specific:
             curr_page_relative_linear_index = np.mod(a_linear_index, int(page_grid_sizes[page_idx].num_rows * page_grid_sizes[page_idx].num_columns))
@@ -156,10 +152,13 @@ class TimeSynchronizedPlacefieldsPlotter(TimeSynchronizedPlotterBase):
         self.ui.layout.addWidget(self.ui.root_graphics_layout_widget, 0, 0) # add the GLViewWidget to the layout at 0, 0
     
     
-    def update(self, t):
+    def update(self, t, defer_render=False):
         # Compute the updated placefields/occupancy for the time t:
         with np.errstate(divide='ignore', invalid='ignore'):
             self.active_time_dependent_placefields.update(t)
+
+        if not defer_render:
+            self._update_plots()
 
 
     def _update_plots(self):
