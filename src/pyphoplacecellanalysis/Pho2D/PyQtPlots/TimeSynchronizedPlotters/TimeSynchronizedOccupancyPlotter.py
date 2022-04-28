@@ -56,22 +56,22 @@ class TimeSynchronizedOccupancyPlotter(TimeSynchronizedPlotterBase):
         # self.params.cmap = pg.ColorMap(pos=np.linspace(0.0, 1.0, 6), color=colors)
         self.params.cmap = pg.colormap.get('jet','matplotlib') # prepare a linear color map
         
-    def buildUI(self):
-        """ for QGridLayout
-            addWidget(widget, row, column, rowSpan, columnSpan, Qt.Alignment alignment = 0)
-        """
-        self.ui = PhoUIContainer()
+    # def buildUI(self):
+    #     """ for QGridLayout
+    #         addWidget(widget, row, column, rowSpan, columnSpan, Qt.Alignment alignment = 0)
+    #     """
+    #     self.ui = PhoUIContainer()
         
-        self.ui.layout = QtWidgets.QGridLayout()
-        self.ui.layout.setContentsMargins(0, 0, 0, 0)
-        self.ui.layout.setVerticalSpacing(0)
-        self.ui.layout.setHorizontalSpacing(0)
-        # self.setStyleSheet("background : #1B1B1B; color : #727272")
-        #### Build Graphics Objects #####
-        self._buildGraphics()        
-        self.setLayout(self.ui.layout)
-        self.resize(800,800)
-        self.setWindowTitle(self.windowName)
+    #     self.ui.layout = QtWidgets.QGridLayout()
+    #     self.ui.layout.setContentsMargins(0, 0, 0, 0)
+    #     self.ui.layout.setVerticalSpacing(0)
+    #     self.ui.layout.setHorizontalSpacing(0)
+    #     # self.setStyleSheet("background : #1B1B1B; color : #727272")
+    #     #### Build Graphics Objects #####
+    #     self._buildGraphics()        
+    #     self.setLayout(self.ui.layout)
+    #     self.resize(800,800)
+    #     self.setWindowTitle(self.windowName)
         
     def _buildGraphics(self):
         # Build a single image view to display the image:
@@ -116,19 +116,19 @@ class TimeSynchronizedOccupancyPlotter(TimeSynchronizedPlotterBase):
         self.setWindowTitle(f'{self.windowName} - {image_title} t = {curr_t}')
     
     
-    @QtCore.Slot(float, float)
-    def on_window_changed(self, start_t, end_t):
-        # called when the window is updated
-        if self.enable_debug_print:
-            print(f'TimeSynchronizedOccupancyPlotter.on_window_changed(start_t: {start_t}, end_t: {end_t})')
-        if self.enable_debug_print:
-            profiler = pg.debug.Profiler(disabled=True, delayed=True)
+    # @QtCore.Slot(float, float)
+    # def on_window_changed(self, start_t, end_t):
+    #     # called when the window is updated
+    #     if self.enable_debug_print:
+    #         print(f'TimeSynchronizedOccupancyPlotter.on_window_changed(start_t: {start_t}, end_t: {end_t})')
+    #     if self.enable_debug_print:
+    #         profiler = pg.debug.Profiler(disabled=True, delayed=True)
             
-        self.update(end_t)
-        self._update_plots()
+    #     self.update(end_t)
+    #     self._update_plots()
         
-        if self.enable_debug_print:
-            profiler('Finished calling _update_plots()')
+    #     if self.enable_debug_print:
+    #         profiler('Finished calling _update_plots()')
             
             
 # included_epochs = None
