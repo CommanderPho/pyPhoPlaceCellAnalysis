@@ -91,7 +91,7 @@ class TimeSynchronizedPlacefieldsPlotter(TimeSynchronizedPlotterBase):
         self.ui.root_graphics_layout_widget = pg.GraphicsLayoutWidget()
         
         curr_ratemap = self.active_time_dependent_placefields.ratemap
-        images = curr_ratemap.tuning_curves # (43, 63, 63)
+        images = curr_ratemap.tuning_curves.copy() # (43, 63, 63)
         occupancy = curr_ratemap.occupancy
         
         # Compute Images:
@@ -124,7 +124,7 @@ class TimeSynchronizedPlacefieldsPlotter(TimeSynchronizedPlotterBase):
             image = np.squeeze(images[a_linear_index,:,:])
             # Pre-filter the data:
             with np.errstate(divide='ignore', invalid='ignore'):
-                image = np.array(image.copy()) / np.nanmax(image) # note scaling by maximum here!
+                image = np.array(image) / np.nanmax(image) # note scaling by maximum here!
                 if self.params.drop_below_threshold is not None:
                     image[np.where(occupancy < self.params.drop_below_threshold)] = np.nan # null out the occupancy
             img_item = pg.ImageItem(image=image, levels=(0,1))
@@ -134,7 +134,7 @@ class TimeSynchronizedPlacefieldsPlotter(TimeSynchronizedPlotterBase):
             curr_plot.showAxes(True)
    
             # Update the image:
-            img_item.setImage(image, rect=self.params.image_bounds_extent)
+            img_item.setImage(image, rect=self.params.image_bounds_extent, autoLevels=False)
             img_item.setLookupTable(self.params.cmap.getLookupTable(nPts=256))
 
             # curr_plot.setXRange(global_min_x-margin, global_max_x+margin)
@@ -186,11 +186,11 @@ class TimeSynchronizedPlacefieldsPlotter(TimeSynchronizedPlotterBase):
             image = np.squeeze(images[i,:,:])
             # Pre-filter the data:
             with np.errstate(divide='ignore', invalid='ignore'):
-                # image = np.array(image.copy()) / np.nanmax(image) # note scaling by maximum here!
+                image = np.array(image) / np.nanmax(image) # note scaling by maximum here!
                 if self.params.drop_below_threshold is not None:
                     image[np.where(occupancy < self.params.drop_below_threshold)] = np.nan # null out the occupancy
             # an_img_item.setImage(np.squeeze(images[i,:,:]))
-            an_img_item.setImage(image)
+            an_img_item.setImage(image, autoLevels=False)
             
 
         self.setWindowTitle(f'{self.windowName} - {image_title} t = {curr_t}')
