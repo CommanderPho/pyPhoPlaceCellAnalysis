@@ -47,5 +47,5 @@ if (sys.flags.interactive != 1):
 proc = mp.QtProcess()
 d1 = proc.transfer(np.random.normal(size=1000))
 d2 = proc.transfer(np.random.normal(size=1000))
-rpg = proc._import('pyqtgraph')
+rpg = proc._import('pyphoplacecellanalysis.External.pyqtgraph')
 plt = rpg.plot(d1+d2)

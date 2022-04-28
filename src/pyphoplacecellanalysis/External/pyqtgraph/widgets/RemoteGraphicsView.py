@@ -156,9 +156,10 @@ class RemoteGraphicsView(QtWidgets.QWidget):
                 remoteKwds[kwd] = kwds.pop(kwd)
 
         self._proc = mp.QtProcess(**kwds)
-        self.pg = self._proc._import('pyqtgraph')
+        # self.pg = self._proc._import('pyqtgraph')
+        self.pg = self._proc._import('pyphoplacecellanalysis.External.pyqtgraph')
         self.pg.setConfigOptions(**CONFIG_OPTIONS)
-        rpgRemote = self._proc._import('pyqtgraph.widgets.RemoteGraphicsView')
+        rpgRemote = self._proc._import('pyphoplacecellanalysis.External.pyqtgraph.widgets.RemoteGraphicsView')
         self._view = rpgRemote.Renderer(*args, **remoteKwds)
         self._view._setProxyOptions(deferGetattr=True)
         
