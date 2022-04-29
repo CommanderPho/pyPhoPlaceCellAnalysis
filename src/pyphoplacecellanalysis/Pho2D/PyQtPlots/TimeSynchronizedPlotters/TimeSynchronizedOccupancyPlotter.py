@@ -14,7 +14,8 @@ from pyphoplacecellanalysis.Pho2D.PyQtPlots.plot_placefields import _pyqtplot_bu
 
 
 class TimeSynchronizedOccupancyPlotter(TimeSynchronizedPlotterBase):
-    """
+    """ Plots the time-dependent occupancy.
+    
     
     Usage:
     
@@ -64,11 +65,6 @@ class TimeSynchronizedOccupancyPlotter(TimeSynchronizedPlotterBase):
         
         
     def _buildGraphics(self):
-        # Build a single image view to display the image:
-        # ## Single pg.ImageView Mode:
-        # self.ui.imv = pg.ImageView()
-        # self.ui.layout.addWidget(self.ui.imv, 0, 0) # add the GLViewWidget to the layout at 0, 0
-        
         ## More Involved Mode:
         self.ui.root_graphics_layout_widget = pg.GraphicsLayoutWidget()
         # self.ui.root_view = self.ui.root_graphics_layout_widget.addViewBox()
@@ -149,21 +145,6 @@ class TimeSynchronizedOccupancyPlotter(TimeSynchronizedPlotterBase):
         
         self.setWindowTitle(f'{self.windowName} - {image_title} t = {curr_t}')
     
-    
-    # @QtCore.Slot(float, float)
-    # def on_window_changed(self, start_t, end_t):
-    #     # called when the window is updated
-    #     if self.enable_debug_print:
-    #         print(f'TimeSynchronizedOccupancyPlotter.on_window_changed(start_t: {start_t}, end_t: {end_t})')
-    #     if self.enable_debug_print:
-    #         profiler = pg.debug.Profiler(disabled=True, delayed=True)
-            
-    #     self.update(end_t)
-    #     self._update_plots()
-        
-    #     if self.enable_debug_print:
-    #         profiler('Finished calling _update_plots()')
-            
             
     @property
     def curr_recent_trajectory(self):
