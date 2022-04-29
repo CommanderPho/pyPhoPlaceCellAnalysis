@@ -14,9 +14,11 @@ from pyphoplacecellanalysis.General.Pipeline.Stages.Filtering import FilterableP
 from pyphoplacecellanalysis.General.Pipeline.Stages.Loading import LoadableInput, LoadableSessionInput, LoadedPipelineStage    
 from pyphoplacecellanalysis.General.Model.ComputationResults import ComputationResult
 
+from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.PlacefieldComputations import PlacefieldComputations
 from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.DefaultComputationFunctions import DefaultComputationFunctions
 from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.ExtendedStats import ExtendedStatsComputations
 from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.SpikeAnalysis import SpikeAnalysisComputations
+
 
 
 class ComputablePipelineStage:
@@ -77,6 +79,9 @@ class DefaultRegisteredComputations:
             self.register_computation(a_computation_fn_name, a_computation_fn)
             
         for (a_computation_fn_name, a_computation_fn) in reversed(DefaultComputationFunctions.get_all_functions(use_definition_order=True)):
+            self.register_computation(a_computation_fn_name, a_computation_fn)
+            
+        for (a_computation_fn_name, a_computation_fn) in reversed(PlacefieldComputations.get_all_functions(use_definition_order=True)):
             self.register_computation(a_computation_fn_name, a_computation_fn)
             
         
