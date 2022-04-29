@@ -126,6 +126,8 @@ class TimeSynchronizedOccupancyPlotter(TimeSynchronizedPlotterBase):
         # Update the plots:
         curr_t = self.active_time_dependent_placefields.last_t
         
+        ## TODO: allow toggling between the various computed occupancies: such as raw counts,  normalized location, and seconds_occupancy
+        
         # image = curr_ratemap.occupancy
         # image = self.active_time_dependent_placefields.curr_normalized_occupancy
         # image_title = 'curr_normalized_occupancy'
