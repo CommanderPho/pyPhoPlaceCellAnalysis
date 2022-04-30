@@ -143,7 +143,8 @@ class TimeSynchronizedOccupancyPlotter(TimeSynchronizedPlotterBase):
         curr_trajectory_rows = self.curr_recent_trajectory
         self.ui.trajectory_curve.setData(x=curr_trajectory_rows.x.to_numpy(), y=curr_trajectory_rows.y.to_numpy()) 
         
-        self.setWindowTitle(f'{self.windowName} - {image_title} t = {curr_t}')
+        # self.setWindowTitle(f'{self.windowName} - {image_title} t = {curr_t}')
+        self.setWindowTitle(f'{image_title} t = {curr_t}')
     
             
     @property

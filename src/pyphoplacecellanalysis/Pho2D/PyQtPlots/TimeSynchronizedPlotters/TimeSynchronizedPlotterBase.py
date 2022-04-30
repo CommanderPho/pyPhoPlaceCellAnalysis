@@ -98,8 +98,7 @@ class TimeSynchronizedPlotterBase(QtWidgets.QWidget):
         if self.enable_debug_print:
             profiler = pg.debug.Profiler(disabled=True, delayed=True)
             
-        self.update(end_t)
-        self._update_plots()
+        self.update(end_t, defer_render=False)
         
         if self.enable_debug_print:
             profiler('Finished calling _update_plots()')

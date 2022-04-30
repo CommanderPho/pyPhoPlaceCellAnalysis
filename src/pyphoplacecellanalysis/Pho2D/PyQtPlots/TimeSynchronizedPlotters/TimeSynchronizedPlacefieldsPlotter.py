@@ -172,8 +172,8 @@ class TimeSynchronizedPlacefieldsPlotter(TimeSynchronizedPlotterBase):
             an_img_item.setImage(image, autoLevels=False)
             
 
-        self.setWindowTitle(f'{self.windowName} - {image_title} t = {curr_t}')
-    
+        # self.setWindowTitle(f'{self.windowName} - {image_title} t = {curr_t}')
+        self.setWindowTitle(f'{image_title} t = {curr_t}')
     
     # @QtCore.Slot(float, float)
     # def on_window_changed(self, start_t, end_t):
