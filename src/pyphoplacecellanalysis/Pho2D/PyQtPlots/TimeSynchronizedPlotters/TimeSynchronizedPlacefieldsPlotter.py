@@ -129,9 +129,10 @@ class TimeSynchronizedPlacefieldsPlotter(AnimalTrajectoryPlottingMixin, TimeSync
             curr_plot.setYRange(*self.params.y_range)
 
             # Interactive Color Bar:
-            bar = pg.ColorBarItem(values= (0, 1), colorMap=self.params.cmap, width=5, interactive=False) # prepare interactive color bar
-            # Have ColorBarItem control colors of img and appear in 'plot':
-            bar.setImageItem(img_item, insert_in=curr_plot)
+            # bar = pg.ColorBarItem(values= (0, 1), colorMap=self.params.cmap, width=5, interactive=False) # prepare interactive color bar
+            # # Have ColorBarItem control colors of img and appear in 'plot':
+            # bar.setImageItem(img_item, insert_in=curr_plot)
+            bar = None
 
             self.ui.img_item_array.append(img_item)
             self.ui.plot_array.append(curr_plot)
@@ -188,19 +189,7 @@ class TimeSynchronizedPlacefieldsPlotter(AnimalTrajectoryPlottingMixin, TimeSync
         # self.setWindowTitle(f'{self.windowName} - {image_title} t = {curr_t}')
         self.setWindowTitle(f'{image_title} t = {curr_t}')
     
-    # @QtCore.Slot(float, float)
-    # def on_window_changed(self, start_t, end_t):
-    #     # called when the window is updated
-    #     if self.enable_debug_print:
-    #         print(f'TimeSynchronizedPlacefieldsPlotter.on_window_changed(start_t: {start_t}, end_t: {end_t})')
-    #     if self.enable_debug_print:
-    #         profiler = pg.debug.Profiler(disabled=True, delayed=True)
-            
-    #     self.update(end_t)
-    #     self._update_plots()
-        
-    #     if self.enable_debug_print:
-    #         profiler('Finished calling _update_plots()')
+
             
             
 # included_epochs = None
