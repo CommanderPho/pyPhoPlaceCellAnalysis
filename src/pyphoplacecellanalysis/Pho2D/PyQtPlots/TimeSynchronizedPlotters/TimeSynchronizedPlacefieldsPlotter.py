@@ -61,13 +61,17 @@ class TimeSynchronizedPlacefieldsPlotter(AnimalTrajectoryPlottingMixin, TimeSync
         ## Build the colormap to be used:
         # self.params.cmap = pg.ColorMap(pos=np.linspace(0.0, 1.0, 6), color=colors)
         self.params.cmap = pg.colormap.get('jet','matplotlib') # prepare a linear color map
-        self.params.image_margins = 2.0
+        self.params.image_margins = 0.0
         
         self.params.image_bounds_extent, self.params.x_range, self.params.y_range = _pyqtplot_build_image_bounds_extent(self.active_time_dependent_placefields.xbin, self.active_time_dependent_placefields.ybin, margin=self.params.image_margins, debug_print=self.enable_debug_print)
         
         self.params.nMapsToShow = self.active_time_dependent_placefields.ratemap.n_neurons
         self.AnimalTrajectoryPlottingMixin_on_setup()
-        
+        self.params.trajectory_path_current_position_marker_size = 4.0
+        # self.params.trajectory_path_marker_max_fill_opacity = 255
+        self.params.trajectory_path_marker_max_fill_opacity = 150
+        self.params.trajectory_path_current_position_marker_brush = pg.mkBrush(0, 255, 0, self.params.trajectory_path_marker_max_fill_opacity)
+        self.params.recent_position_trajectory_symbol_pen = pg.mkPen({'color': [10, 120, 10, 200], 'width': 1}) # Dark Green
                 
     def _buildGraphics(self):
         self.ui.img_item_array = []
@@ -116,7 +120,7 @@ class TimeSynchronizedPlacefieldsPlotter(AnimalTrajectoryPlottingMixin, TimeSync
             curr_plot.addItem(img_item)  # add ImageItem to PlotItem
             curr_plot.showAxes(True)
             
-            curr_trajectory_curve = pg.PlotDataItem(pen=None, shadowPen=None, symbol='o', pxMode=False, symbolSize=self.params.trajectory_path_current_position_marker_size, symbolPen=self.params.recent_position_trajectory_symbol_pen, symbolBrush=self.params.trajectory_path_current_position_marker_brush, antialias=True, name=f'animal position - {curr_cell_identifier_string}') #downsample=20, downsampleMethod='peak', autoDownsample=True, skipFiniteCheck=True, clipToView=True
+            curr_trajectory_curve = pg.PlotDataItem(pen=None, shadowPen=None, symbol='crosshair', pxMode=False, symbolSize=self.params.trajectory_path_current_position_marker_size, symbolPen=self.params.recent_position_trajectory_symbol_pen, symbolBrush=self.params.trajectory_path_current_position_marker_brush, antialias=True, name=f'animal position - {curr_cell_identifier_string}') #downsample=20, downsampleMethod='peak', autoDownsample=True, skipFiniteCheck=True, clipToView=True
             curr_plot.addItem(curr_trajectory_curve)
    
             # Update the image:
