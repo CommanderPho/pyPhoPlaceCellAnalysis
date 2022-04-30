@@ -58,7 +58,7 @@ class InteractiveCustomDataExplorer(InteractiveDataExplorerBase):
             if isinstance(self.p, MultiPlotter):
                 # for p in self.p:
                 p = self.p[0,0] # the first plotter
-                self.plots['maze_bg'] = perform_plot_flat_arena(p, self.x, self.y, bShowSequenceTraversalGradient=False)
+                self.plots['maze_bg'] = perform_plot_flat_arena(p, self.x, self.y, bShowSequenceTraversalGradient=False, smoothing=self.active_config.plotting_config.use_smoothed_maze_rendering)
                 p.hide_axes()
                 # self.p.camera_position = 'xy' # Overhead (top) view
                 # apply_close_overhead_zoomed_camera_view(self.p)
@@ -67,7 +67,7 @@ class InteractiveCustomDataExplorer(InteractiveDataExplorerBase):
                     
             else:
                 p = self.p
-                self.plots['maze_bg'] = perform_plot_flat_arena(p, self.x, self.y, bShowSequenceTraversalGradient=False)
+                self.plots['maze_bg'] = perform_plot_flat_arena(p, self.x, self.y, bShowSequenceTraversalGradient=False, smoothing=self.active_config.plotting_config.use_smoothed_maze_rendering)
 
                 p.hide_axes()
                 # self.p.camera_position = 'xy' # Overhead (top) view

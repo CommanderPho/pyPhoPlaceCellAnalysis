@@ -27,7 +27,7 @@ from numpy.lib.stride_tricks import sliding_window_view
 
 
 class InteractivePlaceCellDataExplorer(InteractiveDataExplorerBase):
-    """ This 3D Vedo GUI displays a map of the animal's environment alongside animatable behavioral data (animal position on the maze, etc) and neural data (spikes, sleep state, ripple status, etc)
+    """ This 3D PyVista GUI displays a map of the animal's environment alongside animatable behavioral data (animal position on the maze, etc) and neural data (spikes, sleep state, ripple status, etc)
     
     It looks like the animation mostly depends on the programmatic slider update function "def on_slider_update_mesh(self, value)"
         
@@ -375,7 +375,7 @@ class InteractivePlaceCellDataExplorer(InteractiveDataExplorerBase):
             # debug_console_widget.add_line_to_buffer('test log 2')
 
         # Plot the flat arena
-        self.plots['maze_bg'] = perform_plot_flat_arena(self.p, self.x, self.y, bShowSequenceTraversalGradient=False)
+        self.plots['maze_bg'] = perform_plot_flat_arena(self.p, self.x, self.y, bShowSequenceTraversalGradient=False, smoothing=self.active_config.plotting_config.use_smoothed_maze_rendering)
 
         # Legend:
         

@@ -86,7 +86,10 @@ def add_neuron_identity_info_if_needed(computation_result, active_config):
         print(f'Unexpected exception e: {e}')
         raise
     return active_config
-    
+
+def add_custom_plotting_options_if_needed(active_config, should_smooth_maze):
+    active_config.plotting_config.use_smoothed_maze_rendering = should_smooth_maze
+    return active_config
 
 def update_figure_files_output_Format(computation_result, active_config, root_output_dir='output', debug_print=False):
     def _set_figure_save_root_day_computed_mode(plotting_config, active_session_name, active_epoch_name, root_output_dir='output', debug_print=False):
@@ -207,7 +210,7 @@ class PipelineWithDisplayPipelineStageMixin:
         # assert (self.can_display), "Current self.stage must already be a ComputedPipelineStage. Call self.filter_sessions with filter configs to reach this step."
         self.stage.register_display_function(registered_name, display_function)
         
-    def prepare_for_display(self, root_output_dir=r'R:\data\Output'):
+    def prepare_for_display(self, root_output_dir=r'R:\data\Output', should_smooth_maze=True):
         assert (self.is_computed), "Current self.is_computed must be true. Call self.perform_computations to reach this step."
         self.stage = DisplayPipelineStage(self.stage)  # build the Display stage
         # Loops through all the configs and ensure that they have the neuron identity info if they need it.
@@ -215,6 +218,8 @@ class PipelineWithDisplayPipelineStageMixin:
             # Note that there may be different numbers of neurons included in the different configs (which include different epochs/filters) so a single one-size-fits-all approach to assigning color identities won't work here.
             if an_active_config_name in self.computation_results:
                 self.active_configs[an_active_config_name] = add_neuron_identity_info_if_needed(self.computation_results[an_active_config_name], self.active_configs[an_active_config_name])
+                
+                self.active_configs[an_active_config_name] = add_custom_plotting_options_if_needed(self.active_configs[an_active_config_name], should_smooth_maze=should_smooth_maze)
                 self.active_configs[an_active_config_name] = update_figure_files_output_Format(self.computation_results[an_active_config_name], self.active_configs[an_active_config_name], root_output_dir=root_output_dir)
 
                     
