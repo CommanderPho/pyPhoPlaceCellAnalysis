@@ -81,6 +81,7 @@ def perform_plot_flat_arena(p, *args, z=-0.01, bShowSequenceTraversalGradient=Fa
     """ Upgraded to render a much better looking 3D extruded maze surface.
     
         smoothing: whether or not to perform delaunay_2d() triangulation and output. Won't work on Z or N shaped mazes for example because it would close them.
+        
     """
     # Call with:
     # pdata_maze, pc_maze = build_flat_map_plot_data() # Plot the flat arena
@@ -185,11 +186,18 @@ def build_active_spikes_plot_pointdata(active_flattened_spike_identities, active
     return spike_history_pdata
 
 ## compatability with pre 2021-11-28 implementations
-def build_active_spikes_plot_data(active_flattened_spike_identities, active_flattened_spike_positions_list, spike_geom):
+def build_active_spikes_plot_data(active_flattened_spike_identities, active_flattened_spike_positions_list, spike_geom, scale_factors_list=None):
     # spike_series_times = active_flattened_spike_times # currently unused
     spike_history_pdata = build_active_spikes_plot_pointdata(active_flattened_spike_identities, active_flattened_spike_positions_list)
     # create many spheres from the point cloud
-    spike_history_pc = spike_history_pdata.glyph(scale=False, geom=spike_geom.copy())
+    if scale_factors_list is None:
+        scale_variable_name = False
+    else:
+        # Add the scalars provided as scale factors:
+        scale_variable_name = 'age_scale_factors'
+        spike_history_pdata[scale_variable_name] = scale_factors_list
+        
+    spike_history_pc = spike_history_pdata.glyph(scale=scale_variable_name, geom=spike_geom.copy())
     return spike_history_pdata, spike_history_pc
 
 

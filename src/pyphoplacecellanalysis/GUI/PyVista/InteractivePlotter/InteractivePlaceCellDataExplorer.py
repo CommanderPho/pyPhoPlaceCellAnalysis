@@ -239,6 +239,9 @@ class InteractivePlaceCellDataExplorer(InteractiveDataExplorerBase):
         # flattened_spike_positions_list = self.active_session.flattened_spiketrains.spikes_df[["x", "y"]].to_numpy().T
         flattened_spike_positions_list = self.params.flattened_spike_positions_list
 
+
+         
+        
         # evaluated as column names
         active_included_all_historical_indicies = ((flattened_spike_times > historical_t_start) & (flattened_spike_times < t_stop)) # Two Sided Range Mode
         historical_spikes_pdata, historical_spikes_pc = build_active_spikes_plot_data(flattened_spike_active_unitIdentities[active_included_all_historical_indicies],
@@ -253,10 +256,21 @@ class InteractivePlaceCellDataExplorer(InteractiveDataExplorerBase):
         recent_spikes_t_start = (t_stop - self.params.recent_spikes_window.duration_seconds) # Get the earliest time that will be included in the recent spikes
         # print('recent_spikes_t_start: {}; t_start: {}'.format(recent_spikes_t_start, t_start))
 
+        
+
         active_included_recent_only_indicies = ((flattened_spike_times > recent_spikes_t_start) & (flattened_spike_times < t_stop)) # Two Sided Range Mode
+        
+        active_recent_only_times = flattened_spike_times[active_included_recent_only_indicies] # the times of the recent spikes
+        
+        active_recent_only_times_offsets = ((active_recent_only_times - t_stop)/self.params.recent_spikes_window.duration_seconds) # Output is the time that's elapsed since the current time (which is the end of the current window). Number will be somewhere between 
+        # by dividing by self.params.recent_spikes_window.duration_seconds it means the output will be between -1.0 (for the oldest spikes about to exit the recent window) and 0.0 (for the newest spikes that just entered the window. 
+        active_recent_only_times_offsets += 1.0 # add one to make them scale factors instead of offsets.
+        
+        
         # active_included_recent_only_indicies = ((flattened_spikes.flattened_spike_times > t_start) & (flattened_spikes.flattened_spike_times < t_stop)) # Two Sided Range Mode
         recent_only_spikes_pdata, recent_only_spikes_pc = build_active_spikes_plot_data(flattened_spike_active_unitIdentities[active_included_recent_only_indicies],
                                                                                         flattened_spike_positions_list[:, active_included_recent_only_indicies],
+                                                                                        scale_factors_list=active_recent_only_times_offsets,
                                                                                         spike_geom=spike_geom_cone.copy())
 
         if recent_only_spikes_pc.n_points >= 1:
