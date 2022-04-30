@@ -78,7 +78,10 @@ def _build_flat_arena_data(x, y, z=-0.01, smoothing=True, extrude_height=-5):
         
 
 def perform_plot_flat_arena(p, *args, z=-0.01, bShowSequenceTraversalGradient=False, smoothing=True, extrude_height=-5, **kwargs):
-    """ Upgraded to render a much better looking 3D extruded maze surface. """
+    """ Upgraded to render a much better looking 3D extruded maze surface.
+    
+        smoothing: whether or not to perform delaunay_2d() triangulation and output. Won't work on Z or N shaped mazes for example because it would close them.
+    """
     # Call with:
     # pdata_maze, pc_maze = build_flat_map_plot_data() # Plot the flat arena
     # p.add_mesh(pc_maze, name='maze_bg', color="black", render=False)
