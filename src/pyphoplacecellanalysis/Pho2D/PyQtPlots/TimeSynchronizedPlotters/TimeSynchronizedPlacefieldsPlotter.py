@@ -13,8 +13,10 @@ from pyphocorehelpers.indexing_helpers import compute_paginated_grid_config
 
 from pyphoplacecellanalysis.Pho2D.PyQtPlots.TimeSynchronizedPlotters.TimeSynchronizedPlotterBase import TimeSynchronizedPlotterBase
 from pyphoplacecellanalysis.Pho2D.PyQtPlots.plot_placefields import _pyqtplot_build_image_bounds_extent
+from pyphoplacecellanalysis.Pho2D.PyQtPlots.TimeSynchronizedPlotters.Mixins.AnimalTrajectoryPlottingMixin import AnimalTrajectoryPlottingMixin
 
-class TimeSynchronizedPlacefieldsPlotter(TimeSynchronizedPlotterBase):
+
+class TimeSynchronizedPlacefieldsPlotter(AnimalTrajectoryPlottingMixin, TimeSynchronizedPlotterBase):
     """
     
     Usage:
@@ -64,6 +66,8 @@ class TimeSynchronizedPlacefieldsPlotter(TimeSynchronizedPlotterBase):
         self.params.image_bounds_extent, self.params.x_range, self.params.y_range = _pyqtplot_build_image_bounds_extent(self.active_time_dependent_placefields.xbin, self.active_time_dependent_placefields.ybin, margin=self.params.image_margins, debug_print=self.enable_debug_print)
         
         self.params.nMapsToShow = self.active_time_dependent_placefields.ratemap.n_neurons
+        self.AnimalTrajectoryPlottingMixin_on_setup()
+        
                 
     def _buildGraphics(self):
         self.ui.img_item_array = []
@@ -111,6 +115,9 @@ class TimeSynchronizedPlacefieldsPlotter(TimeSynchronizedPlotterBase):
             curr_plot = self.ui.root_graphics_layout_widget.addPlot(row=curr_row, col=curr_col, name=curr_plot_identifier_string, title=curr_cell_identifier_string)
             curr_plot.addItem(img_item)  # add ImageItem to PlotItem
             curr_plot.showAxes(True)
+            
+            curr_trajectory_curve = pg.PlotDataItem(pen=None, shadowPen=None, symbol='o', pxMode=False, symbolSize=self.params.trajectory_path_current_position_marker_size, symbolPen=self.params.recent_position_trajectory_symbol_pen, symbolBrush=self.params.trajectory_path_current_position_marker_brush, antialias=True, name=f'animal position - {curr_cell_identifier_string}') #downsample=20, downsampleMethod='peak', autoDownsample=True, skipFiniteCheck=True, clipToView=True
+            curr_plot.addItem(curr_trajectory_curve)
    
             # Update the image:
             img_item.setImage(image, rect=self.params.image_bounds_extent, autoLevels=False)
@@ -128,7 +135,7 @@ class TimeSynchronizedPlacefieldsPlotter(TimeSynchronizedPlotterBase):
 
             self.ui.img_item_array.append(img_item)
             self.ui.plot_array.append(curr_plot)
-            self.ui.other_components_array.append({'color_bar':bar})
+            self.ui.other_components_array.append({'color_bar':bar, 'trajectory_curve': curr_trajectory_curve})
         
 
         # add the root_graphics_layout_widget to the main layout:
@@ -171,7 +178,13 @@ class TimeSynchronizedPlacefieldsPlotter(TimeSynchronizedPlotterBase):
             # an_img_item.setImage(np.squeeze(images[i,:,:]))
             an_img_item.setImage(image, autoLevels=False)
             
-
+            ## Update the current position dot on the figure:
+            curr_trajectory_curve = self.ui.other_components_array[i].get('trajectory_curve', None)
+            if curr_trajectory_curve is not None:
+                curr_position_row = self.curr_position
+                curr_trajectory_curve.setData(x=curr_position_row.x.to_numpy(), y=curr_position_row.y.to_numpy()) 
+            
+            
         # self.setWindowTitle(f'{self.windowName} - {image_title} t = {curr_t}')
         self.setWindowTitle(f'{image_title} t = {curr_t}')
     
