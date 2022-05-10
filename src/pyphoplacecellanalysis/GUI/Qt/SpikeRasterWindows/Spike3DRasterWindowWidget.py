@@ -461,11 +461,50 @@ class Spike3DRasterWindowWidget(SpikeRasterLeftSidebarControlsMixin, SpikeRaster
             profiler('Finished calling _update_plots()')
     
 
+    ########################################################
+    ## For Key Press Events:
+    ########################################################
+
+    ##-----------------------------------------
+    def keyPressEvent(self, event):
+        print(f'pressed from Spike3DRasterWindowWidget.keyPressEvent(event): {event.key()}')
+        print(f'\t event.modifiers(): {event.modifiers()}')
+        # e.Modifiers()
+        print('event received @ Spike3DRasterWindowWidget')
+        super(Spike3DRasterWindowWidget, self).keyPressEvent(event)
+        if event.key() == Qt.Key_Space:
+            print(f'\t detected event: {event.key()}')
+        elif event.key() == QtCore.Qt.Key_0:
+            print(f'\t detected event: {event.key()}')
+        else:
+            print(f'\t undetected event')
+        # self.keyPressed.emit(event)
+
+    ##-----------------------------------------
+    def eventFilter(self, watched, event):
+        """ Install using: 
+        
+        self.top_left.installEventFilter(self)
+        
+        """
+        print(f'Spike3DRasterWindowWidget.eventFilter(self, watched, event)')
+        if event.type() == QtCore.QEvent.GraphicsSceneWheel:
+            return True
+        # If not a particularlly handled case, do the default thing.
+        return super().eventFilter(watched, event)
+    
+    
+    ##-----------------------------------------
+    def wheelEvent(self, event):
+        super(Spike3DRasterWindowWidget, self).wheelEvent(event)
+        print(f'Spike3DRasterWindowWidget.wheelEvent(...)')
+        # self.x = self.x + event.delta()/120
+        # print self.x
+        # self.label.setText("Total Steps: "+QString.number(self.x))        
+        print(f'\t wheelEvent(event: {event}')
+    
 
 
-
-
-     
 if __name__ == "__main__":
     import sys
     app = QtWidgets.QApplication(sys.argv)
