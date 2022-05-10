@@ -216,57 +216,90 @@ class PlacefieldVisualSelectionWidget(QtWidgets.QWidget):
     
     @staticmethod
     def css_toolButton():
-        css = '''
-                QToolButton {
-                                font-size: 10px;
-                                background-color: green;
-                                color: black;
-                                border: 2px green;
-                                border-radius: 22px;
-                                border-style: outset;
-                                    }
-                QToolButton:hover {
-                                background: qradialgradient(
-                                    cx: 0.3, cy: -0.4, fx: 0.3, fy: -0.4,
-                                    radius: 1.35, stop: 0 grey, stop: 1 lightgray
-                                    );
-                                }
-                QToolButton:enabled{
-                                color: black;
-                                font:  10px;
-                                background: green;
-                                background-color: red;
-                                border: 1px black;
-                                border-style: outset;
-                                }
-                QToolButton:pressed {
-                                color: white;
-                                background: yellow;
-                                }
-                QToolButton:disabled {
-                                color: gray;
-                                background-color: gray;
-                                border: 1px black;
-                                border-style: outset;                
-                            }
-                QToolButton:checked{
-                            color: black; 
-                            font:  12px;   
-                            font: bold;
-                            background-color: red;
-                            border: 1px black;
-                            border-style: outset;
-                            }
-                QToolButton:!checked{
-                            color: black; 
-                            font:  12px;   
-                            font: bold;
-                            background-color: green;
-                            border: 1px black;
-                            border-style: outset;
-                }
-
-                    '''
+        
+        css = ''' 
+        QToolButton {
+            /*font-size: 10px;
+            background-color: green;
+            color: rgb(244, 244, 244);
+            border: 2px green;
+            border-radius: 22px;
+            border-style: outset;*/
+        }
+        QToolButton:disabled {
+            color: gray;
+            background-color: gray;
+            border: 1px black;
+            border-style: outset;                
+        }
+        QToolButton:checked{
+            color: rgb(255, 170, 0); 
+            /*font:  12px; */  
+            font: bold;
+            /*background-color: red;*/
+            border: 1px white;
+            border-style: outset;
+        }
+        QToolButton:!checked{
+            /*color: black; 
+            font:  12px;   
+            font: bold;
+            background-color: green;
+            border: 1px black;
+            border-style: outset;*/
+        }
+        
+        '''
+        # css_full = '''
+        #         QToolButton {
+        #                         font-size: 10px;
+        #                         background-color: green;
+        #                         color: black;
+        #                         border: 2px green;
+        #                         border-radius: 22px;
+        #                         border-style: outset;
+        #                             }
+        #         QToolButton:hover {
+        #                         background: qradialgradient(
+        #                             cx: 0.3, cy: -0.4, fx: 0.3, fy: -0.4,
+        #                             radius: 1.35, stop: 0 grey, stop: 1 lightgray
+        #                             );
+        #                         }
+        #         QToolButton:enabled{
+        #                         color: black;
+        #                         font:  10px;
+        #                         background: green;
+        #                         background-color: red;
+        #                         border: 1px black;
+        #                         border-style: outset;
+        #                         }
+        #         QToolButton:pressed {
+        #                         color: white;
+        #                         background: yellow;
+        #                         }
+        #         QToolButton:disabled {
+        #                         color: gray;
+        #                         background-color: gray;
+        #                         border: 1px black;
+        #                         border-style: outset;                
+        #                     }
+        #         QToolButton:checked{
+        #                     color: black; 
+        #                     font:  12px;   
+        #                     font: bold;
+        #                     background-color: red;
+        #                     border: 1px black;
+        #                     border-style: outset;
+        #                     }
+        #         QToolButton:!checked{
+        #                     color: black; 
+        #                     font:  12px;   
+        #                     font: bold;
+        #                     background-color: green;
+        #                     border: 1px black;
+        #                     border-style: outset;
+        #         }
+        # '''
         return css
 
 
