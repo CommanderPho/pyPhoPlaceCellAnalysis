@@ -238,16 +238,23 @@ def force_plot_ignore_scalar_as_color(plot_mesh_actor, lookup_table):
 
 
 def plot_placefields2D(pTuningCurves, active_placefields, pf_colors: np.ndarray, zScalingFactor=10.0, show_legend=False):
-    """ Plots 2D Placefields in a 3D PyVista plot """
+    """ Plots 2D (as opposed to linearized/1D) Placefields in a 3D PyVista plot """
     # active_placefields: Pf2D    
     should_force_placefield_custom_color = True
     should_use_normalized_tuning_curves = True
     should_pdf_normalize_manually = False
+    should_nan_non_visited_elements = False
+    
     
     if should_use_normalized_tuning_curves:
         curr_tuning_curves = active_placefields.ratemap.normalized_tuning_curves.copy()
     else:
         curr_tuning_curves = active_placefields.ratemap.tuning_curves.copy()
+        
+        
+    if should_nan_non_visited_elements:
+        non_visited_mask = active_placefields.never_visited_occupancy_mask
+        curr_tuning_curves[:, non_visited_mask] = np.nan # set all non-visited elements to NaN
 
 
     if np.shape(pf_colors)[1] > 3:
