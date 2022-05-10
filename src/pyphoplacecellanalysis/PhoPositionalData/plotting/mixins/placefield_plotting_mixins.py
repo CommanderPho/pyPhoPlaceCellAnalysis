@@ -72,7 +72,7 @@ class PlacefieldOwningMixin(NeuronIdentityAccessingMixin, NeuronConfigOwningMixi
         self.active_neuron_render_configs = value
         
     def build_tuning_curve_configs(self):
-        # call the parent function
+        # call the parent function from NeuronConfigOwningMixin.build_neuron_render_configs():
         self.build_neuron_render_configs()
         # do any addition setup needed
 
