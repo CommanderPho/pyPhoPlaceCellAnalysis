@@ -274,6 +274,8 @@ def plot_placefields2D(pTuningCurves, active_placefields, pf_colors: np.ndarray,
     tuningCurvePlotActors = []
     tuningCurvePlotData = []
     for i in np.arange(num_curr_tuning_curves):
+        #TODO: BUG: CRITICAL: Very clearly makes sense how the indexing gets off here:
+        
         curr_active_neuron_ID = good_placefield_neuronIDs[i]
         curr_active_neuron_color = pf_colors[:, i]
         curr_active_neuron_opaque_color = opaque_pf_colors[:,i]
