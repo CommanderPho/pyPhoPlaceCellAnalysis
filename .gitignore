@@ -51,3 +51,4 @@ MANIFEST
 # Per-project virtualenvs
 .venv*/
 .conda*/
+Uic_AUTOGEN_*.py
