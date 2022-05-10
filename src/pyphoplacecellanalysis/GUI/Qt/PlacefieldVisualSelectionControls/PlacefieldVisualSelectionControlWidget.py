@@ -66,6 +66,10 @@ class PlacefieldVisualSelectionWidget(QtWidgets.QWidget):
   
     def initUI(self):
         self.ui.btnTitle.hide() # set the title button as hidden, since it's redundent
+        
+        # Setup the button style properties:
+        # self.ui.chkbtnPlacefield.setStyleSheet(PlacefieldVisualSelectionWidget.css_toolButton())
+        # self.ui.chkbtnSpikes.setStyleSheet(PlacefieldVisualSelectionWidget.css_toolButton())
         # Disable Changing the color button:
         # self.ui.btnColorButton.SetEnabled
   
@@ -83,9 +87,6 @@ class PlacefieldVisualSelectionWidget(QtWidgets.QWidget):
         self._spikesVisible = bool(value)
         self.spike_config_changed.emit(bool(self.spikesVisible)) # emit signal
         
-        
-  
-  
     @property
     def name(self):
         """The name property."""
@@ -158,6 +159,116 @@ class PlacefieldVisualSelectionWidget(QtWidgets.QWidget):
         return SingleNeuronPlottingExtended(name=self.name, isVisible=self.isVisible, color=color_hex_str, spikesVisible=self.spikesVisible)
 
 
+    @staticmethod
+    def css_pushButton():
+        css = '''
+                QPushButton {
+                                font-size: 10px;
+                                background-color: green;
+                                color: black;
+                                border: 2px green;
+                                border-radius: 22px;
+                                border-style: outset;
+                                    }
+                QPushButton:hover {
+                                background: qradialgradient(
+                                    cx: 0.3, cy: -0.4, fx: 0.3, fy: -0.4,
+                                    radius: 1.35, stop: 0 grey, stop: 1 lightgray
+                                    );
+                                }
+                QPushButton:enabled{
+                                color: black;
+                                font:  10px;
+                                background: green;
+                                background-color: red;
+                                border: 1px black;
+                                border-style: outset;
+                                }
+                QPushButton:pressed {
+                                color: white;
+                                background: yellow;
+                                }
+                QPushButton:disabled {
+                                color: gray;
+                                background-color: gray;
+                                border: 1px black;
+                                border-style: outset;                
+                            }
+                QPushButton:checked{
+                            color: black; 
+                            font:  12px;   
+                            font: bold;
+                            background-color: red;
+                            border: 1px black;
+                            border-style: outset;
+                            }
+                QPushButton:!checked{
+                            color: black; 
+                            font:  12px;   
+                            font: bold;
+                            background-color: green;
+                            border: 1px black;
+                            border-style: outset;
+                }
+                
+                    '''
+        return css
+    
+    @staticmethod
+    def css_toolButton():
+        css = '''
+                QToolButton {
+                                font-size: 10px;
+                                background-color: green;
+                                color: black;
+                                border: 2px green;
+                                border-radius: 22px;
+                                border-style: outset;
+                                    }
+                QToolButton:hover {
+                                background: qradialgradient(
+                                    cx: 0.3, cy: -0.4, fx: 0.3, fy: -0.4,
+                                    radius: 1.35, stop: 0 grey, stop: 1 lightgray
+                                    );
+                                }
+                QToolButton:enabled{
+                                color: black;
+                                font:  10px;
+                                background: green;
+                                background-color: red;
+                                border: 1px black;
+                                border-style: outset;
+                                }
+                QToolButton:pressed {
+                                color: white;
+                                background: yellow;
+                                }
+                QToolButton:disabled {
+                                color: gray;
+                                background-color: gray;
+                                border: 1px black;
+                                border-style: outset;                
+                            }
+                QToolButton:checked{
+                            color: black; 
+                            font:  12px;   
+                            font: bold;
+                            background-color: red;
+                            border: 1px black;
+                            border-style: outset;
+                            }
+                QToolButton:!checked{
+                            color: black; 
+                            font:  12px;   
+                            font: bold;
+                            background-color: green;
+                            border: 1px black;
+                            border-style: outset;
+                }
+
+                    '''
+        return css
+
 
 ## Start Qt event loop
 if __name__ == '__main__':
@@ -167,3 +278,53 @@ if __name__ == '__main__':
     pg.exec()
 
 
+# hjhg
+
+# QToolButton {
+#     font-size: 10px;
+#     background-color: green;
+#     color: black;
+#     border: 2px green;
+#     border-radius: 22px;
+#     border-style: outset;
+# }
+# QToolButton:hover {
+#     background: qradialgradient(
+#         cx: 0.3, cy: -0.4, fx: 0.3, fy: -0.4,
+#         radius: 1.35, stop: 0 grey, stop: 1 lightgray
+#         );
+# }
+# QToolButton:enabled{
+#     color: black;
+#     font:  10px;
+#     background: green;
+#     background-color: red;
+#     border: 1px black;
+#     border-style: outset;
+# }
+# QToolButton:pressed {
+#     color: white;
+#     background: yellow;
+# }
+# QToolButton:disabled {
+#     color: gray;
+#     background-color: gray;
+#     border: 1px black;
+#     border-style: outset;                
+# }
+# QToolButton:checked{
+#     color: black; 
+#     font:  12px;   
+#     font: bold;
+#     background-color: red;
+#     border: 1px black;
+#     border-style: outset;
+# }
+# QToolButton:!checked{
+#     color: black; 
+#     font:  12px;   
+#     font: bold;
+#     background-color: green;
+#     border: 1px black;
+#     border-style: outset;
+# }
