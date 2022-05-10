@@ -324,10 +324,15 @@ def plot_placefields2D(pTuningCurves, active_placefields, pf_colors: np.ndarray,
             # Is NOT Sufficient, as it disables any opacity at all seemingly
             # lut = build_custom_placefield_maps_lookup_table(curr_active_neuron_color.copy(), 2, [0.2, 0.8])
             
-            lut = build_custom_placefield_maps_lookup_table(curr_active_neuron_color.copy(), 1, [1.0])
+            # lut = build_custom_placefield_maps_lookup_table(curr_active_neuron_color.copy(), 1, [1.0]) # DFEFAULT: Full fill opacity
             
-            # lut = build_custom_placefield_maps_lookup_table(curr_active_neuron_color.copy(), 3, [0.2, 0.6, 1.0])
-            # lut = build_custom_placefield_maps_lookup_table(curr_active_neuron_color.copy(), 3, [0.0, 0.6, 1.0])
+            # lut = build_custom_placefield_maps_lookup_table(curr_active_neuron_color.copy(), 1, [0.5]) # ALT: reduce fill opacity
+            
+            
+            # lut = build_custom_placefield_maps_lookup_table(curr_active_neuron_color.copy(), 3, [0.2, 0.6, 1.0]) # Looks great
+            
+            
+            lut = build_custom_placefield_maps_lookup_table(curr_active_neuron_color.copy(), 3, [0.0, 0.6, 1.0])
             # lut = build_custom_placefield_maps_lookup_table(curr_active_neuron_color.copy(), 5, [0.0, 0.0, 0.3, 0.5, 0.1])
             curr_active_neuron_plot_data['lut'] = lut
             force_plot_ignore_scalar_as_color(pdata_currActiveNeuronTuningCurve_plotActor, lut)
