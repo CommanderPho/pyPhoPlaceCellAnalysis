@@ -315,7 +315,7 @@ def plot_placefields2D(pTuningCurves, active_placefields, pf_colors: np.ndarray,
         # print(f'curr_active_neuron_color: {curr_active_neuron_color} for i: {i}')
         
         pdata_currActiveNeuronTuningCurve_plotActor = pTuningCurves.add_mesh(pdata_currActiveNeuronTuningCurve, label=curr_active_neuron_pf_identifier, name=curr_active_neuron_pf_identifier,
-                                                                            show_edges=True, edge_color=curr_active_neuron_opaque_color, nan_opacity=0.0, scalars='Elevation', opacity=curr_opacity, use_transparency=False, smooth_shading=curr_smooth_shading, show_scalar_bar=False, render=False)                                                                     
+                                                                            show_edges=True, edge_color=curr_active_neuron_opaque_color, nan_opacity=0.0, scalars='Elevation', opacity=curr_opacity, use_transparency=True, smooth_shading=curr_smooth_shading, show_scalar_bar=False, render=False)                                                                     
         
         # Force custom colors:
         if should_force_placefield_custom_color:
