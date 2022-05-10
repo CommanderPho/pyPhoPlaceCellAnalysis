@@ -14,7 +14,14 @@ from PyQt5 import QtCore, QtGui, QtWidgets
 class Ui_rootForm(object):
     def setupUi(self, rootForm):
         rootForm.setObjectName("rootForm")
-        rootForm.resize(100, 116)
+        rootForm.resize(94, 126)
+        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Fixed)
+        sizePolicy.setHorizontalStretch(0)
+        sizePolicy.setVerticalStretch(0)
+        sizePolicy.setHeightForWidth(rootForm.sizePolicy().hasHeightForWidth())
+        rootForm.setSizePolicy(sizePolicy)
+        rootForm.setMinimumSize(QtCore.QSize(50, 0))
+        rootForm.setBaseSize(QtCore.QSize(50, 126))
         rootForm.setStyleSheet("background-color: rgb(71, 58, 46);\n"
 "border-color: rgb(207, 207, 207);\n"
 "background-color: rgba(71, 65, 60, 180);\n"
@@ -25,7 +32,9 @@ class Ui_rootForm(object):
         self.gridLayout.setSpacing(0)
         self.gridLayout.setObjectName("gridLayout")
         self.groupBox = QtWidgets.QGroupBox(rootForm)
+        self.groupBox.setMinimumSize(QtCore.QSize(50, 0))
         self.groupBox.setMaximumSize(QtCore.QSize(160, 160))
+        self.groupBox.setBaseSize(QtCore.QSize(50, 0))
         self.groupBox.setAlignment(QtCore.Qt.AlignHCenter|QtCore.Qt.AlignTop)
         self.groupBox.setFlat(False)
         self.groupBox.setObjectName("groupBox")
@@ -37,29 +46,90 @@ class Ui_rootForm(object):
         self.btnTitle.setObjectName("btnTitle")
         self.verticalLayout_2.addWidget(self.btnTitle)
         self.btnColorButton = ColorButton(self.groupBox)
+        self.btnColorButton.setEnabled(False)
         self.btnColorButton.setMinimumSize(QtCore.QSize(24, 24))
         self.btnColorButton.setText("")
         self.btnColorButton.setObjectName("btnColorButton")
         self.verticalLayout_2.addWidget(self.btnColorButton)
         self.chkbtnPlacefield = QtWidgets.QToolButton(self.groupBox)
+        self.chkbtnPlacefield.setMinimumSize(QtCore.QSize(48, 25))
+        self.chkbtnPlacefield.setStyleSheet("QToolButton {\n"
+"    /*background-color: green;*/\n"
+"    color: rgb(244, 244, 244);\n"
+"    /*border: 2px green;*/\n"
+"    /*border-radius: 22px;*/\n"
+"    /*border-style: outset;*/\n"
+"    /*border-style: inset;*/\n"
+"}\n"
+"QToolButton:disabled {\n"
+"    color: gray;\n"
+"    background-color: gray;\n"
+"    border: 1px black;\n"
+"    border-style: outset;                \n"
+"}\n"
+"QToolButton:checked{\n"
+"    color: rgb(255, 170, 0); \n"
+"    /*font:  12px; */  \n"
+"    font: bold;\n"
+"    /*background-color: red;*/\n"
+"    border: 1px white;\n"
+"    border-style: outset;\n"
+"}\n"
+"QToolButton:!checked{\n"
+"    /*color: black; */\n"
+"    /*background-color: green;*/\n"
+"    /*border: 1px black;*/\n"
+"    /*border-style: outset;*/\n"
+"    /*border: 1px black;*/\n"
+"    /*border-style: dashed;*/\n"
+"}")
         self.chkbtnPlacefield.setCheckable(True)
-        self.chkbtnPlacefield.setChecked(False)
         self.chkbtnPlacefield.setPopupMode(QtWidgets.QToolButton.DelayedPopup)
         self.chkbtnPlacefield.setToolButtonStyle(QtCore.Qt.ToolButtonTextBesideIcon)
         self.chkbtnPlacefield.setObjectName("chkbtnPlacefield")
         self.verticalLayout_2.addWidget(self.chkbtnPlacefield)
         self.chkbtnSpikes = QtWidgets.QToolButton(self.groupBox)
+        self.chkbtnSpikes.setMinimumSize(QtCore.QSize(48, 25))
+        self.chkbtnSpikes.setStyleSheet("QToolButton {\n"
+"    /*background-color: green;*/\n"
+"    color: rgb(244, 244, 244);\n"
+"    /*border: 2px green;*/\n"
+"    /*border-radius: 22px;*/\n"
+"    /*border-style: outset;*/\n"
+"    /*border-style: inset;*/\n"
+"}\n"
+"QToolButton:disabled {\n"
+"    color: gray;\n"
+"    background-color: gray;\n"
+"    border: 1px black;\n"
+"    border-style: outset;                \n"
+"}\n"
+"QToolButton:checked{\n"
+"    color: rgb(255, 170, 0); \n"
+"    /*font:  12px; */  \n"
+"    font: bold;\n"
+"    /*background-color: red;*/\n"
+"    border: 1px white;\n"
+"    border-style: outset;\n"
+"}\n"
+"QToolButton:!checked{\n"
+"    /*color: black; */\n"
+"    /*background-color: green;*/\n"
+"    /*border: 1px black;*/\n"
+"    /*border-style: outset;*/\n"
+"    /*border-style: dashed;*/\n"
+"}")
         self.chkbtnSpikes.setCheckable(True)
         self.chkbtnSpikes.setChecked(False)
         self.chkbtnSpikes.setPopupMode(QtWidgets.QToolButton.DelayedPopup)
-        self.chkbtnSpikes.setToolButtonStyle(QtCore.Qt.ToolButtonTextBesideIcon)
+        self.chkbtnSpikes.setToolButtonStyle(QtCore.Qt.ToolButtonTextOnly)
         self.chkbtnSpikes.setObjectName("chkbtnSpikes")
         self.verticalLayout_2.addWidget(self.chkbtnSpikes)
         self.gridLayout.addWidget(self.groupBox, 0, 0, 1, 1)
 
         self.retranslateUi(rootForm)
         QtCore.QMetaObject.connectSlotsByName(rootForm)
-
+    
     def retranslateUi(self, rootForm):
         _translate = QtCore.QCoreApplication.translate
         rootForm.setWindowTitle(_translate("rootForm", "Form"))

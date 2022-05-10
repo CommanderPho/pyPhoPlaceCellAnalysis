@@ -125,14 +125,49 @@ border-color: rgb(0, 0, 0);</string>
       </item>
       <item>
        <widget class="QToolButton" name="chkbtnPlacefield">
+        <property name="minimumSize">
+         <size>
+          <width>48</width>
+          <height>25</height>
+         </size>
+        </property>
+        <property name="styleSheet">
+         <string notr="true">QToolButton {
+    /*background-color: green;*/
+    color: rgb(244, 244, 244);
+    /*border: 2px green;*/
+    /*border-radius: 22px;*/
+    /*border-style: outset;*/
+	/*border-style: inset;*/
+}
+QToolButton:disabled {
+    color: gray;
+    background-color: gray;
+    border: 1px black;
+    border-style: outset;                
+}
+QToolButton:checked{
+    color: rgb(255, 170, 0); 
+    /*font:  12px; */  
+    font: bold;
+    /*background-color: red;*/
+    border: 1px white;
+    border-style: outset;
+}
+QToolButton:!checked{
+    /*color: black; */
+    /*background-color: green;*/
+    /*border: 1px black;*/
+    /*border-style: outset;*/
+	/*border: 1px black;*/
+    /*border-style: dashed;*/
+}</string>
+        </property>
         <property name="text">
          <string>pf</string>
         </property>
         <property name="checkable">
          <bool>true</bool>
-        </property>
-        <property name="checked">
-         <bool>false</bool>
         </property>
         <property name="popupMode">
          <enum>QToolButton::DelayedPopup</enum>
@@ -144,6 +179,43 @@ border-color: rgb(0, 0, 0);</string>
       </item>
       <item>
        <widget class="QToolButton" name="chkbtnSpikes">
+        <property name="minimumSize">
+         <size>
+          <width>48</width>
+          <height>25</height>
+         </size>
+        </property>
+        <property name="styleSheet">
+         <string notr="true">QToolButton {
+    /*background-color: green;*/
+    color: rgb(244, 244, 244);
+    /*border: 2px green;*/
+    /*border-radius: 22px;*/
+    /*border-style: outset;*/
+	/*border-style: inset;*/
+}
+QToolButton:disabled {
+    color: gray;
+    background-color: gray;
+    border: 1px black;
+    border-style: outset;                
+}
+QToolButton:checked{
+    color: rgb(255, 170, 0); 
+    /*font:  12px; */  
+    font: bold;
+    /*background-color: red;*/
+    border: 1px white;
+    border-style: outset;
+}
+QToolButton:!checked{
+    /*color: black; */
+    /*background-color: green;*/
+    /*border: 1px black;*/
+    /*border-style: outset;*/
+	/*border-style: dashed;*/
+}</string>
+        </property>
         <property name="text">
          <string>spikes</string>
         </property>
@@ -157,7 +229,7 @@ border-color: rgb(0, 0, 0);</string>
          <enum>QToolButton::DelayedPopup</enum>
         </property>
         <property name="toolButtonStyle">
-         <enum>Qt::ToolButtonTextBesideIcon</enum>
+         <enum>Qt::ToolButtonTextOnly</enum>
         </property>
        </widget>
       </item>
