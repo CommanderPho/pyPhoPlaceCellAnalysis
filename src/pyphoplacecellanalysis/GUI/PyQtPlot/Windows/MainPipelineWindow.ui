@@ -17,6 +17,13 @@
    <iconset resource="../../../Resources/GuiResources.qrc">
     <normaloff>:/Icons/Icons/ProcessIcon.ico</normaloff>:/Icons/Icons/ProcessIcon.ico</iconset>
   </property>
+  <property name="styleSheet">
+   <string notr="true">background-color: rgb(71, 58, 46);
+border-color: rgb(207, 207, 207);
+background-color: rgba(71, 65, 60, 180);
+color: rgb(244, 244, 244);
+border-color: rgb(0, 0, 0);</string>
+  </property>
   <property name="iconSize">
    <size>
     <width>32</width>
