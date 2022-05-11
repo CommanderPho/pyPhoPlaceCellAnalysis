@@ -417,6 +417,10 @@ class SpikeRasterBase(UnitSortableMixin, DataSeriesToSpatialTransformingMixin, N
         """ 
         neuron_colors_list: a list of neuron colors
         
+        Requires:
+            self.unit_ids
+            self.n_cells
+        
         Sets:
             self.params.neuron_qcolors
             self.params.neuron_qcolors_map
