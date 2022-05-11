@@ -169,7 +169,7 @@ class Spike3DRaster(PyQtGraphSpecificTimeCurvesMixin, RenderTimeEpochMeshesMixin
         self.params.temporal_zoom_factor = 40.0 / float(self.render_window_duration)        
                 
         self.enable_debug_print = False
-        self.enable_debug_widgets = True
+        self.enable_debug_widgets = False # Default: False, If True displays a white wireframe sphere at the origin and some helper x,y,z axes arrows to see the coordinate system.
         
         # Determine the y-values corresponding to the series identity
         self._series_identity_y_values = None
