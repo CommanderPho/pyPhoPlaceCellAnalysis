@@ -78,7 +78,9 @@ class CustomLinearRegionItem(LinearRegionItem):
         ## Add the custom mouse event criteria as arguments to the CustomInfiniteLine's
         lineKwds['custom_mouse_drag_criteria_fn'] = lambda an_evt: (an_evt.button() == QtCore.Qt.MouseButton.LeftButton) # Original/Default Condition
         # lineKwds['custom_mouse_drag_criteria_fn'] = lambda an_evt: (an_evt.button() == QtCore.Qt.MouseButton.RightButton) or (an_evt.button() == QtCore.Qt.MouseButton.MiddleButton)
-        lineKwds['custom_mouse_hover_criteria_fn'] = lambda an_evt: (an_evt.acceptDrags(QtCore.Qt.MouseButton.LeftButton) and ((an_evt.modifiers() == QtCore.Qt.ControlModifier) or (an_evt.modifiers() == QtCore.Qt.AltModifier) or (an_evt.modifiers() == QtCore.Qt.ShiftModifier)))
+        
+        lineKwds['custom_mouse_hover_criteria_fn'] = lambda an_evt: (an_evt.acceptDrags(QtCore.Qt.MouseButton.LeftButton)) # Original/Default Condition
+        # lineKwds['custom_mouse_hover_criteria_fn'] = lambda an_evt: (an_evt.acceptDrags(QtCore.Qt.MouseButton.LeftButton) and ((an_evt.modifiers() == QtCore.Qt.ControlModifier) or (an_evt.modifiers() == QtCore.Qt.AltModifier) or (an_evt.modifiers() == QtCore.Qt.ShiftModifier)))
         lineKwds['custom_mouse_click_criteria_fn'] = lambda an_evt: (an_evt.button() == QtCore.Qt.MouseButton.RightButton) # Original/Default Condition
         
         # custom_mouse_drag_criteria_fn=None, custom_mouse_hover_criteria_fn=None, custom_mouse_click_criteria_fn=None

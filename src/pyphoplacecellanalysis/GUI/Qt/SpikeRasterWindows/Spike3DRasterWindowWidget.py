@@ -265,6 +265,19 @@ class Spike3DRasterWindowWidget(SpikeRasterLeftSidebarControlsMixin, SpikeRaster
         self.ui.left_side_bar_connections = self.SpikeRasterLeftSidebarControlsMixin_connectSignals(self.ui.leftSideToolbarWidget)
         
         
+        ## Install the event filter in the 2D View to enable scroll wheel events:
+        if self.ui.spike_raster_plt_2d is not None:
+            # self.ui.spike_raster_plt_2d.installEventFilter(self) # Kinda works, but doesn't show when scrolling over plots
+            # self.ui.spike_raster_plt_2d.ui.background_static_scroll_window_plot.installEventFilter(self) # background_static_scroll_window_plot is a PlotItem 
+            # if self.ui.spike_raster_plt_2d.ui.main_plot_widget is not None:
+            #     # This doesn't work
+            #     self.ui.spike_raster_plt_2d.ui.main_plot_widget.installEventFilter(self) # main_plot_widget is a PlotItem 
+            if self.ui.spike_raster_plt_2d.ui.scatter_plot is not None:
+                # This is the first thing that produces detected event.type() == QtCore.QEvent.GraphicsSceneWheel when the scrolling is done over the 2D active widnow raster plot 
+                self.ui.spike_raster_plt_2d.ui.scatter_plot.installEventFilter(self) # scatter_plot is a ScatterPlotItem 
+            if self.ui.spike_raster_plt_2d.plots.preview_overview_scatter_plot is not None:
+                # This is the first thing that produces detected event.type() == QtCore.QEvent.GraphicsSceneWheel when the scrolling is done over the 2D active widnow raster plot 
+                self.ui.spike_raster_plt_2d.plots.preview_overview_scatter_plot.installEventFilter(self) # plots.preview_overview_scatter_plot is a ScatterPlotItem
 
     def connect_plotter_time_windows(self):
         """ connects the controlled plotter (usually the 3D plotter) to the 2D plotter that controls it. """
@@ -482,14 +495,18 @@ class Spike3DRasterWindowWidget(SpikeRasterLeftSidebarControlsMixin, SpikeRaster
 
     ##-----------------------------------------
     def eventFilter(self, watched, event):
-        """ Install using: 
-        
-        self.top_left.installEventFilter(self)
+        """  has to be installed on an item like:
+            self.grid = pg.GraphicsLayoutWidget()
+            self.top_left = self.grid.addViewBox(row=1, col=1)
+            self.top_left.installEventFilter(self)
         
         """
         print(f'Spike3DRasterWindowWidget.eventFilter(self, watched, event)')
         if event.type() == QtCore.QEvent.GraphicsSceneWheel:
+            print(f'\t detected event.type() == QtCore.QEvent.GraphicsSceneWheel')
             return True
+        else:
+            print(f'\t unknown event.type(): {event.type()}')
         # If not a particularlly handled case, do the default thing.
         return super().eventFilter(watched, event)
     
@@ -504,6 +521,8 @@ class Spike3DRasterWindowWidget(SpikeRasterLeftSidebarControlsMixin, SpikeRaster
         print(f'\t wheelEvent(event: {event}')
     
 
+    
+    
 
 if __name__ == "__main__":
     import sys
