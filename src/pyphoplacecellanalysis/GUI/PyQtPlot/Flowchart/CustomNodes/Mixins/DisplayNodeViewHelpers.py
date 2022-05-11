@@ -52,6 +52,7 @@ class PipelineDynamicDockDisplayAreaMixin:
     def _build_dynamic_display_dockarea(self):
         dItem = Dock("Display Outputs - Dynamic", size=(600,900), closable=True)
         self.area.addDock(dItem, 'right')
+        # Makes a nested DockArea for contents:
         self.displayDockArea = DockArea()
         dItem.addWidget(self.displayDockArea) # add the dynamic nested Dock area to the dItem widget
         self._dynamic_display_output_dict = OrderedDict() # for PipelineDynamicDockDisplayAreaMixin

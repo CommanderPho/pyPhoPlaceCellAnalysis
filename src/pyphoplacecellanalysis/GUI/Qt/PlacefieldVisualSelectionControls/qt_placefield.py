@@ -117,7 +117,6 @@ def build_batch_interactive_placefield_visibility_controls(rootControlsBarWidget
             print('EndButtonPanel.btn_hide_all_callback(...)')
         ipcDataExplorer.clear_all_spikes_included()
         ipcDataExplorer.update_active_placefields([])
-        ipcDataExplorer.
         # self.on_hide_all_placefields()
   
     def _btn_show_all_callback():
