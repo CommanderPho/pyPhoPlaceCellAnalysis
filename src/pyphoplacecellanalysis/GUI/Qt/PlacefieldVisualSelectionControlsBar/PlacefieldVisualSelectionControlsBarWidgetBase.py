@@ -10,6 +10,7 @@
 
 from PyQt5 import QtCore, QtGui, QtWidgets
 
+
 class Ui_rootForm(object):
     def setupUi(self, rootForm):
         rootForm.setObjectName("rootForm")
@@ -117,9 +118,9 @@ class Ui_rootForm(object):
         self.toolButton = QtWidgets.QToolButton(self.batchControlPanel)
         self.toolButton.setObjectName("toolButton")
         self.horizontalLayout.addWidget(self.toolButton)
-        self.pushButton = QtWidgets.QPushButton(self.batchControlPanel)
-        self.pushButton.setObjectName("pushButton")
-        self.horizontalLayout.addWidget(self.pushButton)
+        self.btnRefresh = QtWidgets.QPushButton(self.batchControlPanel)
+        self.btnRefresh.setObjectName("btnRefresh")
+        self.horizontalLayout.addWidget(self.btnRefresh)
         self.outerLayout.addWidget(self.batchControlPanel)
         self.scroll_area = QtWidgets.QScrollArea(self.placefieldControlsGroupbox)
         sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.MinimumExpanding)
@@ -170,9 +171,10 @@ class Ui_rootForm(object):
         self.btnHideAll_Both.setText(_translate("rootForm", "Hide All Both"))
         self.toolButton_2.setText(_translate("rootForm", "..."))
         self.toolButton.setText(_translate("rootForm", "..."))
-        self.pushButton.setToolTip(_translate("rootForm", "Refresh"))
-        self.pushButton.setAccessibleDescription(_translate("rootForm", "Refresh"))
-        self.pushButton.setText(_translate("rootForm", "Refresh"))
+        self.btnRefresh.setToolTip(_translate("rootForm", "Refresh"))
+        self.btnRefresh.setAccessibleDescription(_translate("rootForm", "Refresh"))
+        self.btnRefresh.setText(_translate("rootForm", "Refresh"))
+
 
 
 if __name__ == "__main__":
