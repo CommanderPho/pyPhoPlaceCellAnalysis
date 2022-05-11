@@ -10,6 +10,8 @@ import numpy as np
 import pandas as pd
 from pathlib import Path
 
+from pyphocorehelpers.gui.PyVista.CascadingDynamicPlotsList import CascadingDynamicPlotsList
+
 
 # Fixed Geometry objects:
 animal_location_sphere = pv.Sphere(radius=2.3)
@@ -243,7 +245,7 @@ def plot_placefields2D(pTuningCurves, active_placefields, pf_colors: np.ndarray,
     should_force_placefield_custom_color = True
     should_use_normalized_tuning_curves = True
     should_pdf_normalize_manually = False
-    should_nan_non_visited_elements = False
+    should_nan_non_visited_elements = True # Default False
     
     
     if should_use_normalized_tuning_curves:
@@ -292,9 +294,14 @@ def plot_placefields2D(pTuningCurves, active_placefields, pf_colors: np.ndarray,
         pdata_currActiveNeuronTuningCurve = pv.StructuredGrid(tuningCurvePlot_x, tuningCurvePlot_y, curr_active_neuron_tuning_Curve)
         pdata_currActiveNeuronTuningCurve["Elevation"] = (curr_active_neuron_tuning_Curve.ravel(order="F") * zScalingFactor)
         
+        
+        # Extracting Points from recently built StructuredGrid pdata:
+        pdata_currActiveNeuronTuningCurve_Points = pdata_currActiveNeuronTuningCurve.extract_points(pdata_currActiveNeuronTuningCurve.points[:, 2] > 0)  # UnstructuredGrid
+
         curr_active_neuron_plot_data = {'curr_active_neuron_ID':curr_active_neuron_ID,
                                          'curr_active_neuron_pf_identifier':curr_active_neuron_pf_identifier,
-                                         'curr_active_neuron_tuning_Curve':curr_active_neuron_tuning_Curve,'pdata_currActiveNeuronTuningCurve':pdata_currActiveNeuronTuningCurve}
+                                         'curr_active_neuron_tuning_Curve':curr_active_neuron_tuning_Curve,
+                                         'pdata_currActiveNeuronTuningCurve':pdata_currActiveNeuronTuningCurve, 'pdata_currActiveNeuronTuningCurve_Points':pdata_currActiveNeuronTuningCurve_Points}
         
         # contours_currActiveNeuronTuningCurve = pdata_currActiveNeuronTuningCurve.contour()
         # pdata_currActiveNeuronTuningCurve.plot(show_edges=True, show_grid=True, cpos='xy', scalars=curr_active_neuron_tuning_Curve.T)        
@@ -310,12 +317,14 @@ def plot_placefields2D(pTuningCurves, active_placefields, pf_colors: np.ndarray,
             curr_smooth_shading = False
             
         # curr_opacity = None
-        # curr_smooth_shading = False
+        curr_smooth_shading = False
         
         # print(f'curr_active_neuron_color: {curr_active_neuron_color} for i: {i}')
         
         pdata_currActiveNeuronTuningCurve_plotActor = pTuningCurves.add_mesh(pdata_currActiveNeuronTuningCurve, label=curr_active_neuron_pf_identifier, name=curr_active_neuron_pf_identifier,
-                                                                            show_edges=True, edge_color=curr_active_neuron_opaque_color, nan_opacity=0.0, scalars='Elevation', opacity=curr_opacity, use_transparency=True, smooth_shading=curr_smooth_shading, show_scalar_bar=False, render=False)                                                                     
+                                                                            show_edges=True, edge_color=curr_active_neuron_opaque_color, nan_opacity=0.0, scalars='Elevation', 
+                                                                            # show_points=True, render_points_as_spheres=True,
+                                                                            opacity=curr_opacity, use_transparency=True, smooth_shading=curr_smooth_shading, show_scalar_bar=False, pickable=True, render=False)                                                                     
         
         # Force custom colors:
         if should_force_placefield_custom_color:
@@ -326,19 +335,42 @@ def plot_placefields2D(pTuningCurves, active_placefields, pf_colors: np.ndarray,
             
             # lut = build_custom_placefield_maps_lookup_table(curr_active_neuron_color.copy(), 1, [1.0]) # DFEFAULT: Full fill opacity
             
-            # lut = build_custom_placefield_maps_lookup_table(curr_active_neuron_color.copy(), 1, [0.5]) # ALT: reduce fill opacity
-            
-            
+            lut = build_custom_placefield_maps_lookup_table(curr_active_neuron_color.copy(), 1, [0.5]) # ALT: reduce fill opacity
+                
             # lut = build_custom_placefield_maps_lookup_table(curr_active_neuron_color.copy(), 3, [0.2, 0.6, 1.0]) # Looks great
             
             
-            lut = build_custom_placefield_maps_lookup_table(curr_active_neuron_color.copy(), 3, [0.0, 0.6, 1.0])
+            # lut = build_custom_placefield_maps_lookup_table(curr_active_neuron_color.copy(), 3, [0.0, 0.6, 1.0])
             # lut = build_custom_placefield_maps_lookup_table(curr_active_neuron_color.copy(), 5, [0.0, 0.0, 0.3, 0.5, 0.1])
             curr_active_neuron_plot_data['lut'] = lut
             force_plot_ignore_scalar_as_color(pdata_currActiveNeuronTuningCurve_plotActor, lut)
+            
+            
+        ## Add points:
+        pdata_currActiveNeuronTuningCurve_Points_plotActor = pTuningCurves.add_points(pdata_currActiveNeuronTuningCurve_Points, label=f'{curr_active_neuron_pf_identifier}_points', name=f'{curr_active_neuron_pf_identifier}_points',
+                                                                                render_points_as_spheres=True, point_size=2.0, color=curr_active_neuron_opaque_color, render=False)    
+        
+        
+        ## Build CascadingDynamicPlotsList Wrapper:
+        
+        currActiveNeuronTuningCurve_plotActors = CascadingDynamicPlotsList(active_main_plotActor=pdata_currActiveNeuronTuningCurve_plotActor, active_points_plotActor=pdata_currActiveNeuronTuningCurve_Points_plotActor)
+        
+        
+        ## Built Multiplotter Wrapper:
+        # data = [pv.Sphere(center=(2, 0, 0)), pv.Cube(center=(0, 2, 0)), pv.Cone()]
+
+        # blocks = pv.MultiBlock(data)
+
+
+        # Merge the two actors together:
+        # merged = pdata_currActiveNeuronTuningCurve.merge([pdata_currActiveNeuronTuningCurve_Points])
+        
         
         # pTuningCurves.add_mesh(contours_currActiveNeuronTuningCurve, color=curr_active_neuron_color, line_width=1, name='{}_contours'.format(curr_active_neuron_pf_identifier))
-        tuningCurvePlotActors.append(pdata_currActiveNeuronTuningCurve_plotActor)
+        
+        tuningCurvePlotActors.append(currActiveNeuronTuningCurve_plotActors)
+        
+        # tuningCurvePlotActors.append(pdata_currActiveNeuronTuningCurve_plotActor)
         tuningCurvePlotData.append(curr_active_neuron_plot_data)
         
     # Legend:
