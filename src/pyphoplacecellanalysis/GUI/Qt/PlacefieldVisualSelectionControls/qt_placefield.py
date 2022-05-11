@@ -48,7 +48,11 @@ def build_single_placefield_output_widget(render_config):
 
 
 class BatchActionsEndButtonPanelHelper(object):
-    
+    """ Enables performing batch actions on the placefields, such as hiding all pfs/spikes, etc.
+        Analagous to PlacefieldBatchActionsEndButtonPanel 
+        
+        Used only within build_batch_interactive_placefield_visibility_controls(...)
+    """
     debug_logging = True
     
     def __init__(self, update_included_cell_Indicies_callback=None, hide_all_callback=None, show_all_callback=None):
@@ -88,9 +92,6 @@ class BatchActionsEndButtonPanelHelper(object):
     def btn_update_active_placefields(self, event):
         if self.debug_logging:
             print('BatchActionsEndButtonPanelHelper.btn_update_active_placefields(...)')
-        # updated_pf_options_list_ints = ActivePlacefieldsPlottingPanel.options_to_int(self.cross_selector.value) # convert to ints
-        # self.on_update_active_placefields(updated_pf_options_list_ints)   
-
 
 def build_batch_interactive_placefield_visibility_controls(rootControlsBarWidget, ipcDataExplorer, debug_logging=False):
     """Builds a panel containing a series of widgets that control the spike/placemap/etc visibility for each placecell
@@ -116,6 +117,7 @@ def build_batch_interactive_placefield_visibility_controls(rootControlsBarWidget
             print('EndButtonPanel.btn_hide_all_callback(...)')
         ipcDataExplorer.clear_all_spikes_included()
         ipcDataExplorer.update_active_placefields([])
+        ipcDataExplorer.
         # self.on_hide_all_placefields()
   
     def _btn_show_all_callback():
@@ -158,55 +160,12 @@ def build_all_placefield_output_panels(ipcDataExplorer):
     TODO: can't get signals working unfortunately. https://stackoverflow.com/questions/45090982/passing-extra-arguments-through-connect
     https://eli.thegreenplace.net/2011/04/25/passing-extra-arguments-to-pyqt-slot
     
-    """
-    # out_panels = SingleEditablePlacefieldDisplayConfiguration.build_all_placefield_output_panels(ipcDataExplorer.active_tuning_curve_render_configs,
-    #                                                                                              tuning_curve_config_changed_callback=ipcDataExplorer.on_update_tuning_curve_display_config,
-    #                                                                                              spikes_config_changed_callback=ipcDataExplorer.change_unit_spikes_included)
-    # out_panels = pn.Row(*out_panels, height=120)
-
-    desired_full_panel_width = 1200
-    desired_full_panel_height = 200
-
-    # # ## Programmatic Version:
-    # placefieldControlsContainerWidget = QtWidgets.QWidget()
-    # placefieldControlsContainerWidget.setObjectName('placefieldControlsContainer')
-    # placefieldControlsContainerWidget.resize(desired_full_panel_width, desired_full_panel_height)
-    # placefieldControlsContainerWidget.setContentsMargins(0, 0, 0, 0)
-    
-    # groupBox = QtWidgets.QGroupBox("Placefield Controls")
-    # groupBox.setContentsMargins(0, 0, 0, 0)
-    # groupBox.setObjectName('placefieldControlsGroupbox')
-    # groupBox.resize(desired_full_panel_width, desired_full_panel_height)
-    # sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Preferred)
-    # sizePolicy.setHorizontalStretch(0)
-    # sizePolicy.setVerticalStretch(0)
-    # # sizePolicy.setHeightForWidth(Interface.sizePolicy().hasHeightForWidth())
-    # groupBox.setSizePolicy(sizePolicy)
-    # groupBox.setWindowTitle('Placefield Controls')
-    
-    # pf_layout = QtWidgets.QHBoxLayout()
-    # pf_layout.setSpacing(0)
-    # pf_layout.setContentsMargins(0, 0, 0, 0)
-    # pf_layout.setObjectName("horizontalLayout")
-    
-    # rootControlsBarWidget = groupBox
-    
+    """ 
     ## UI Designer Version:    
     rootControlsBarWidget = PlacefieldVisualSelectionControlsBarWidget()
-    
-    # placefieldControlsContainerWidget.setObjectName('placefieldControlsContainer')
-    # placefieldControlsContainerWidget.resize(desired_full_panel_width, desired_full_panel_height)
-    
-    groupBox = rootControlsBarWidget.ui.placefieldControlsGroupbox
+    # groupBox = rootControlsBarWidget.ui.placefieldControlsGroupbox
     pf_layout = rootControlsBarWidget.ui.pf_layout
     
-    # placefieldControlsContainerWidget.setLayout(pf_layout)
-
-    # # @QtCore.pyqtSlot(bool)
-    # def _on_spike_config_changed(is_visible):
-    #     print(f'_on_spike_config_changed(is_visible: {is_visible})')
-
-
     # @QtCore.pyqtSlot(list)
     def _on_tuning_curve_display_config_changed(new_configs):
         """
@@ -266,33 +225,8 @@ def build_all_placefield_output_panels(ipcDataExplorer):
         pf_widgets.append(curr_widget)
         
     # done adding widgets
-    ## Simple (no groupbox or scroll area):
-    # placefieldControlsContainerWidget.setLayout(pf_layout)
-
-    ## Groupbox and Scrollarea:
-    # # groupBox.setLayout(pf_layout) # set the groupBox's layout to the one containing the widgets
-    # placefieldControlsContainerWidget.setLayout(pf_layout)
-
-    # # Add a horizontal scroll area (so the placefield controls can be scrolled horizontally:
-    # scroll_area = QtWidgets.QScrollArea()
-    # scroll_area.resize(desired_full_panel_width, 150)
-    # scroll_area.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
-    # scroll_area.setSizeAdjustPolicy(QtGui.QAbstractScrollArea.AdjustToContentsOnFirstShow)
-    # scroll_area.setWidget(placefieldControlsContainerWidget) # set the contents widget of the scrollarea to be the groupBox
-    # # scroll_area.setWidget(groupBox) # set the contents widget of the scrollarea to be the groupBox
-    # scroll_area.setWidgetResizable(True)
-    # # scroll_area.setWidgetResizable(False) # This really breaks it for some reason. Oh, I guess because it's dynamically trying to resize the widget instead of creating more room.
-    # scroll_area.setFixedHeight(150)
     
-    # outer_scroll_layout = QtWidgets.QVBoxLayout()
-    # outer_scroll_layout.setSpacing(0)
-    # outer_scroll_layout.setContentsMargins(0, 0, 0, 0)
-    # outer_scroll_layout.setObjectName("outerLayout")
-    # outer_scroll_layout.addWidget(scroll_area)
-    # # Set the root widget's layout to the outer_scroll_layout
-    # # placefieldControlsContainerWidget.setLayout(outer_scroll_layout)
-    # groupBox.setLayout(outer_scroll_layout)
-    
+    ## Batch Action (Show/Hide All * Buttons):
     end_button_helper_obj, connections = build_batch_interactive_placefield_visibility_controls(rootControlsBarWidget=rootControlsBarWidget, ipcDataExplorer=ipcDataExplorer)
     ipcDataExplorer.params.end_button_helper_obj = end_button_helper_obj
     ipcDataExplorer.params.end_button_helper_connections = connections
@@ -303,46 +237,46 @@ def build_all_placefield_output_panels(ipcDataExplorer):
 
 
 
-def build_qt_interactive_placefield_visibility_controls(ipcDataExplorer, debug_logging=False):
-    """Builds a panel containing a series of widgets that control the spike/placemap/etc visibility for each placecell
+# def build_qt_interactive_placefield_visibility_controls(ipcDataExplorer, debug_logging=False):
+#     """Builds a panel containing a series of widgets that control the spike/placemap/etc visibility for each placecell
 
-    Args:
-        ipcDataExplorer ([type]): [description]
+#     Args:
+#         ipcDataExplorer ([type]): [description]
 
-    Returns:
-        [type]: [description]
+#     Returns:
+#         [type]: [description]
         
-    Usage:
-        pane = build_panel_interactive_placefield_visibility_controls(ipcDataExplorer)
-        pane
-    """
-    def _btn_hide_all_callback(event):
-        if debug_logging:
-            print('EndButtonPanel.btn_hide_all_callback(...)')
-        ipcDataExplorer.clear_all_spikes_included()
-        ipcDataExplorer.update_active_placefields([])
-        # self.on_hide_all_placefields()
+#     Usage:
+#         pane = build_panel_interactive_placefield_visibility_controls(ipcDataExplorer)
+#         pane
+#     """
+#     def _btn_hide_all_callback(event):
+#         if debug_logging:
+#             print('EndButtonPanel.btn_hide_all_callback(...)')
+#         ipcDataExplorer.clear_all_spikes_included()
+#         ipcDataExplorer.update_active_placefields([])
+#         # self.on_hide_all_placefields()
   
-    def _btn_show_all_callback(event):
-        if debug_logging:
-            print('EndButtonPanel.btn_show_all_callback(...)')
-        ipcDataExplorer._show_all_tuning_curves()
-        ipcDataExplorer.update_active_placefields([])
-        # self.on_hide_all_placefields()      
+#     def _btn_show_all_callback(event):
+#         if debug_logging:
+#             print('EndButtonPanel.btn_show_all_callback(...)')
+#         ipcDataExplorer._show_all_tuning_curves()
+#         ipcDataExplorer.update_active_placefields([])
+#         # self.on_hide_all_placefields()      
         
-    out_panels = build_all_placefield_output_panels(ipcDataExplorer)
-    end_button_panel_obj = PlacefieldBatchActionsEndButtonPanel(hide_all_callback=_btn_hide_all_callback, show_all_callback=_btn_show_all_callback)
-    end_cap_buttons = end_button_panel_obj.panel()
-    out_row = pn.Row(*out_panels, end_cap_buttons, height=120)
-    # btn_occupancy_map_visibility = pn.widgets.Button(name='Occupancy Map Visibility', width_policy='min')
-    # # btn_occupancy_map_visibility = pn.widgets.Toggle(name='Occupancy Map Visibility', value=ipcDataExplorer.occupancy_plotting_config.isVisible, margin=0, width_policy='min')
-    # # btn_occupancy_map_visibility.on_clicks
-    # btn_occupancy_map_visibility.on_click(ipcDataExplorer.on_occupancy_plot_update_visibility)
-    # # btn_occupancy_map_visibility.on_click(ipcDataExplorer.on_occupancy_plot_config_updated)
-    # occupancy_widget = btn_occupancy_map_visibility
+#     out_panels = build_all_placefield_output_panels(ipcDataExplorer)
+#     end_button_panel_obj = PlacefieldBatchActionsEndButtonPanel(hide_all_callback=_btn_hide_all_callback, show_all_callback=_btn_show_all_callback)
+#     end_cap_buttons = end_button_panel_obj.panel()
+#     out_row = pn.Row(*out_panels, end_cap_buttons, height=120)
+#     # btn_occupancy_map_visibility = pn.widgets.Button(name='Occupancy Map Visibility', width_policy='min')
+#     # # btn_occupancy_map_visibility = pn.widgets.Toggle(name='Occupancy Map Visibility', value=ipcDataExplorer.occupancy_plotting_config.isVisible, margin=0, width_policy='min')
+#     # # btn_occupancy_map_visibility.on_clicks
+#     # btn_occupancy_map_visibility.on_click(ipcDataExplorer.on_occupancy_plot_update_visibility)
+#     # # btn_occupancy_map_visibility.on_click(ipcDataExplorer.on_occupancy_plot_config_updated)
+#     # occupancy_widget = btn_occupancy_map_visibility
     
-    occupancy_widget = ipcDataExplorer.occupancy_plotting_config.param
-    return pn.panel(pn.Column(out_row, pn.Row(occupancy_widget)))
+#     occupancy_widget = ipcDataExplorer.occupancy_plotting_config.param
+#     return pn.panel(pn.Column(out_row, pn.Row(occupancy_widget)))
 
 
 

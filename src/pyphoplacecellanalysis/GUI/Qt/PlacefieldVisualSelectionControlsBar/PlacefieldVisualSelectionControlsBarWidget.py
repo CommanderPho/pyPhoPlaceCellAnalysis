@@ -67,36 +67,9 @@ class PlacefieldVisualSelectionControlsBarWidget(QtWidgets.QWidget):
         # self.setObjectName('placefieldControlsContainer')
         
         # self.ui.batchControlPanel.hide()
-         
-        
         self.resize(self.desired_full_panel_width, self.desired_full_panel_height)
         
-        # self.ui.placefieldControlsGroupbox = self.ui.placefieldControlsGroupbox
-        # self.ui.horizontalLayout = self.ui.horizontalLayout
-        
-        ## Groupbox and Scrollarea:
-        # groupBox.setLayout(pf_layout) # set the groupBox's layout to the one containing the widgets
-        # self.setLayout(self.ui.horizontalLayout)
-
-        # # Add a horizontal scroll area (so the placefield controls can be scrolled horizontally:
-        # self.ui.scroll_area = QtWidgets.QScrollArea()
-        # self.ui.scroll_area.resize(self.desired_full_panel_width, 150)
-        # self.ui.scroll_area.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
-        # self.ui.scroll_area.setSizeAdjustPolicy(QtGui.QAbstractScrollArea.AdjustToContentsOnFirstShow)
-        # self.ui.scroll_area.setWidget(self) # set the contents widget of the scrollarea to be the groupBox
-        # # scroll_area.setWidget(groupBox) # set the contents widget of the scrollarea to be the groupBox
-        # self.ui.scroll_area.setWidgetResizable(True)
-        # scroll_area.setWidgetResizable(False) # This really breaks it for some reason. Oh, I guess because it's dynamically trying to resize the widget instead of creating more room.
         self.ui.scroll_area.setFixedHeight(150)
-        
-        # self.ui.outer_scroll_layout = QtWidgets.QVBoxLayout()
-        # self.ui.outer_scroll_layout.setSpacing(0)
-        # self.ui.outer_scroll_layout.setContentsMargins(0, 0, 0, 0)
-        # self.ui.outer_scroll_layout.setObjectName("outerLayout")
-        # self.ui.outer_scroll_layout.addWidget(self.ui.scroll_area)
-        # Set the root widget's layout to the outer_scroll_layout
-        # placefieldControlsContainerWidget.setLayout(outer_scroll_layout)
-        # self.ui.placefieldControlsGroupbox.setLayout(self.ui.outer_scroll_layout)
         
         # Create a new layout to add the widgets to:
         self.ui.pf_layout = QtWidgets.QHBoxLayout()
