@@ -15,12 +15,13 @@ class Ui_rootForm(object):
     def setupUi(self, rootForm):
         rootForm.setObjectName("rootForm")
         rootForm.resize(1200, 200)
-        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Fixed)
+        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.MinimumExpanding)
         sizePolicy.setHorizontalStretch(0)
         sizePolicy.setVerticalStretch(0)
         sizePolicy.setHeightForWidth(rootForm.sizePolicy().hasHeightForWidth())
         rootForm.setSizePolicy(sizePolicy)
         rootForm.setMinimumSize(QtCore.QSize(50, 0))
+        rootForm.setMaximumSize(QtCore.QSize(16777215, 220))
         rootForm.setBaseSize(QtCore.QSize(1200, 200))
         rootForm.setStyleSheet("background-color: rgb(71, 58, 46);\n"
 "border-color: rgb(207, 207, 207);\n"

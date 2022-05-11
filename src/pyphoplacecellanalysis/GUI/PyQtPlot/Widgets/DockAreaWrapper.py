@@ -104,16 +104,43 @@ class DynamicDockDisplayAreaContentMixin:
         # **({'title':'Trajectory Timestep', 'pass_widget':False, 'event_type':'always', 'style':'modern', 'pointa':(0.025, 0.1), 'pointb':(0.98, 0.1), 'fmt':'%0.2f'} | kwargs)
         # **({'title':'Trajectory Timestep', 'pass_widget':False, 'event_type':'always', 'style':'modern', 'pointa':(0.025, 0.1), 'pointb':(0.98, 0.1), 'fmt':'%0.2f'} | kwargs)
         
+
+        
+        
+        dDisplayItem = Dock(unique_identifier, size=dockSize, closable=dockIsClosable, widget=widget) # add the new display item
+        
         if len(dockAddLocationOpts) < 1:
-            dockAddLocationOpts = ['bottom']
+            dockAddLocationOpts = [dDisplayItem, 'bottom']
+        elif len(dockAddLocationOpts) == 1:
+            if isinstance(dockAddLocationOpts[0], str):
+               relative_string = dockAddLocationOpts[0]
+               dockAddLocationOpts = [dDisplayItem, relative_string]
+            else:
+                raise NotImplementedError            
+            
+        elif len(dockAddLocationOpts) == 2:
+            if isinstance(dockAddLocationOpts[0], Dock):
+               # starts with the Dock item, add current dock item to the end of the list
+               relative_string = dockAddLocationOpts[1]
+               relative_dock_item = dockAddLocationOpts[0]
+               dockAddLocationOpts = [relative_dock_item, relative_string, dDisplayItem]
+            elif isinstance(dockAddLocationOpts[1], Dock):
+                relative_string = dockAddLocationOpts[0]
+                relative_dock_item = dockAddLocationOpts[1]
+                dockAddLocationOpts = [dDisplayItem, relative_string, relative_dock_item]
+            else:
+                raise NotImplementedError
+        else:
+            raise NotImplementedError
         
+        print(f'dockAddLocationOpts: {dockAddLocationOpts}')
         
-        dDisplayItem = Dock(unique_identifier, size=dockSize, closable=dockIsClosable) # add the new display item
-        display_dock_area.addDock(dDisplayItem, *dockAddLocationOpts)
+        # display_dock_area.addDock(dDisplayItem, *dockAddLocationOpts)
+        display_dock_area.addDock(*dockAddLocationOpts)
         
         # Set the dock item's widget to the new_view_widget
-        if widget is not None:
-            dDisplayItem.addWidget(widget)
+        # if widget is not None:
+        #     dDisplayItem.addWidget(widget)
         
         if extant_group_items is not None:
             # Item was found with this identifier, implement one of the strategies
@@ -254,11 +281,12 @@ class DockAreaWrapper(object):
         
         
         # Build Using 
-        _, dDisplayItem1 = win.add_display_dock("Dock1 - Controls", dockSize=(secondary_width, secondary_height), dockIsClosable=False, widget=auxilary_controls_window, dockAddLocationOpts=['bottom'])
         _, dDisplayItem2 = win.add_display_dock("Dock2 - Content", dockSize=(main_width, main_height), dockIsClosable=False, widget=main_window, dockAddLocationOpts=['bottom'])
+        _, dDisplayItem1 = win.add_display_dock("Dock1 - Controls", dockSize=(secondary_width, secondary_height), dockIsClosable=False, widget=auxilary_controls_window, dockAddLocationOpts=['top', dDisplayItem2])
+        # _, dDisplayItem1 = win.add_display_dock("Dock1 - Controls", dockSize=(secondary_width, secondary_height), dockIsClosable=False, widget=auxilary_controls_window, dockAddLocationOpts=['bottom'])
         
-
-        win.area.moveDock(dDisplayItem1, 'top', dDisplayItem2)     ## move d4 to top edge of d2
+        # win.area.moveDock(dDisplayItem2, 'bottom')     ## move d4 to top edge of d2
+        # win.area.moveDock(dDisplayItem1, 'top', dDisplayItem2)     ## move d4 to top edge of d2
         
         
         # # Old way:
@@ -350,5 +378,8 @@ class DockAreaWrapper(object):
 
         win.show()
 
+        win.area.moveDock(dDisplayItem1, 'top', dDisplayItem2)     ## move d4 to top edge of d2
+        
+        
         return win, app
 
