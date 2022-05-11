@@ -55,9 +55,20 @@ class PlacefieldVisualSelectionControlsBarWidget(QtWidgets.QWidget):
     def pf_layout(self):
         return self.ui.pf_layout
     
+    @property
+    def show_all_buttons_list(self):
+        return (self.ui.btnShowAll_Pfs, self.ui.btnShowAll_Spikes, self.ui.btnShowAll_Both)
+    @property
+    def hide_all_buttons_list(self):
+        return (self.ui.btnHideAll_Pfs, self.ui.btnHideAll_Spikes, self.ui.btnHideAll_Both)
+        
         
     def initUI(self):
         # self.setObjectName('placefieldControlsContainer')
+        
+        # self.ui.batchControlPanel.hide()
+         
+        
         self.resize(self.desired_full_panel_width, self.desired_full_panel_height)
         
         # self.ui.placefieldControlsGroupbox = self.ui.placefieldControlsGroupbox

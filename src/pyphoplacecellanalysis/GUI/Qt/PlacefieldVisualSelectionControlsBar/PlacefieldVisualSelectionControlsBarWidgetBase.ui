@@ -66,7 +66,7 @@ border-color: rgb(0, 0, 0);</string>
      <property name="title">
       <string>Placefield Controls</string>
      </property>
-     <layout class="QVBoxLayout" name="outerLayout">
+     <layout class="QVBoxLayout" name="outerLayout" stretch="0,1">
       <property name="spacing">
        <number>0</number>
       </property>
@@ -83,9 +83,268 @@ border-color: rgb(0, 0, 0);</string>
        <number>0</number>
       </property>
       <item>
+       <widget class="QWidget" name="batchControlPanel" native="true">
+        <property name="sizePolicy">
+         <sizepolicy hsizetype="Preferred" vsizetype="Minimum">
+          <horstretch>0</horstretch>
+          <verstretch>0</verstretch>
+         </sizepolicy>
+        </property>
+        <property name="maximumSize">
+         <size>
+          <width>16777215</width>
+          <height>60</height>
+         </size>
+        </property>
+        <property name="baseSize">
+         <size>
+          <width>0</width>
+          <height>30</height>
+         </size>
+        </property>
+        <layout class="QHBoxLayout" name="horizontalLayout">
+         <property name="leftMargin">
+          <number>4</number>
+         </property>
+         <property name="topMargin">
+          <number>2</number>
+         </property>
+         <property name="rightMargin">
+          <number>4</number>
+         </property>
+         <property name="bottomMargin">
+          <number>2</number>
+         </property>
+         <item>
+          <widget class="QGroupBox" name="groupBox_2">
+           <property name="title">
+            <string>Show All</string>
+           </property>
+           <property name="alignment">
+            <set>Qt::AlignLeading|Qt::AlignLeft|Qt::AlignTop</set>
+           </property>
+           <layout class="QHBoxLayout" name="horizontalLayout_4">
+            <property name="leftMargin">
+             <number>2</number>
+            </property>
+            <property name="topMargin">
+             <number>0</number>
+            </property>
+            <property name="rightMargin">
+             <number>2</number>
+            </property>
+            <property name="bottomMargin">
+             <number>2</number>
+            </property>
+            <item>
+             <widget class="QPushButton" name="btnShowAll_Pfs">
+              <property name="toolTip">
+               <string>Show All Placefields</string>
+              </property>
+              <property name="accessibleDescription">
+               <string>Show All Placefields</string>
+              </property>
+              <property name="text">
+               <string>Show All Placefields</string>
+              </property>
+              <attribute name="buttonGroup">
+               <string notr="true">buttonGroup</string>
+              </attribute>
+             </widget>
+            </item>
+            <item>
+             <widget class="QPushButton" name="btnShowAll_Spikes">
+              <property name="toolTip">
+               <string>Show All Spikes</string>
+              </property>
+              <property name="accessibleDescription">
+               <string>Show All Spikes</string>
+              </property>
+              <property name="text">
+               <string>Show All Spikes</string>
+              </property>
+              <attribute name="buttonGroup">
+               <string notr="true">buttonGroup</string>
+              </attribute>
+             </widget>
+            </item>
+            <item>
+             <widget class="QPushButton" name="btnShowAll_Both">
+              <property name="toolTip">
+               <string>Show All Both</string>
+              </property>
+              <property name="accessibleDescription">
+               <string>Show All Both</string>
+              </property>
+              <property name="text">
+               <string>Show All Both</string>
+              </property>
+              <attribute name="buttonGroup">
+               <string notr="true">buttonGroup</string>
+              </attribute>
+             </widget>
+            </item>
+           </layout>
+          </widget>
+         </item>
+         <item>
+          <spacer name="horizontalSpacer_2">
+           <property name="orientation">
+            <enum>Qt::Horizontal</enum>
+           </property>
+           <property name="sizeType">
+            <enum>QSizePolicy::Maximum</enum>
+           </property>
+           <property name="sizeHint" stdset="0">
+            <size>
+             <width>20</width>
+             <height>20</height>
+            </size>
+           </property>
+          </spacer>
+         </item>
+         <item>
+          <widget class="QGroupBox" name="groupBox">
+           <property name="sizePolicy">
+            <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
+             <horstretch>0</horstretch>
+             <verstretch>0</verstretch>
+            </sizepolicy>
+           </property>
+           <property name="title">
+            <string>Hide All</string>
+           </property>
+           <property name="alignment">
+            <set>Qt::AlignLeading|Qt::AlignLeft|Qt::AlignTop</set>
+           </property>
+           <layout class="QHBoxLayout" name="horizontalLayout_3">
+            <property name="leftMargin">
+             <number>2</number>
+            </property>
+            <property name="topMargin">
+             <number>2</number>
+            </property>
+            <property name="rightMargin">
+             <number>2</number>
+            </property>
+            <property name="bottomMargin">
+             <number>2</number>
+            </property>
+            <item>
+             <widget class="QPushButton" name="btnHideAll_Pfs">
+              <property name="minimumSize">
+               <size>
+                <width>0</width>
+                <height>20</height>
+               </size>
+              </property>
+              <property name="baseSize">
+               <size>
+                <width>0</width>
+                <height>24</height>
+               </size>
+              </property>
+              <property name="toolTip">
+               <string>Hide All Placefields</string>
+              </property>
+              <property name="accessibleDescription">
+               <string>Hide All Placefields</string>
+              </property>
+              <property name="text">
+               <string>Hide All Placefields</string>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QPushButton" name="btnHideAll_Spikes">
+              <property name="toolTip">
+               <string>Hide All Spikes</string>
+              </property>
+              <property name="accessibleDescription">
+               <string>Hide All Spikes</string>
+              </property>
+              <property name="text">
+               <string>Hide All Spikes</string>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QPushButton" name="btnHideAll_Both">
+              <property name="toolTip">
+               <string>Hide All Both</string>
+              </property>
+              <property name="accessibleDescription">
+               <string>Hide All Both</string>
+              </property>
+              <property name="text">
+               <string>Hide All Both</string>
+              </property>
+             </widget>
+            </item>
+           </layout>
+          </widget>
+         </item>
+         <item>
+          <widget class="Line" name="line_2">
+           <property name="orientation">
+            <enum>Qt::Vertical</enum>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <spacer name="horizontalSpacer">
+           <property name="orientation">
+            <enum>Qt::Horizontal</enum>
+           </property>
+           <property name="sizeHint" stdset="0">
+            <size>
+             <width>40</width>
+             <height>20</height>
+            </size>
+           </property>
+          </spacer>
+         </item>
+         <item>
+          <widget class="Line" name="line">
+           <property name="orientation">
+            <enum>Qt::Vertical</enum>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QToolButton" name="toolButton_2">
+           <property name="text">
+            <string>...</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QToolButton" name="toolButton">
+           <property name="text">
+            <string>...</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QPushButton" name="btnRefresh">
+           <property name="toolTip">
+            <string>Refresh</string>
+           </property>
+           <property name="accessibleDescription">
+            <string>Refresh</string>
+           </property>
+           <property name="text">
+            <string>Refresh</string>
+           </property>
+          </widget>
+         </item>
+        </layout>
+       </widget>
+      </item>
+      <item>
        <widget class="QScrollArea" name="scroll_area">
         <property name="sizePolicy">
-         <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
+         <sizepolicy hsizetype="Expanding" vsizetype="MinimumExpanding">
           <horstretch>0</horstretch>
           <verstretch>0</verstretch>
          </sizepolicy>
@@ -111,7 +370,7 @@ border-color: rgb(0, 0, 0);</string>
            <x>0</x>
            <y>0</y>
            <width>1192</width>
-           <height>69</height>
+           <height>130</height>
           </rect>
          </property>
          <property name="baseSize">
@@ -130,4 +389,7 @@ border-color: rgb(0, 0, 0);</string>
  </widget>
  <resources/>
  <connections/>
+ <buttongroups>
+  <buttongroup name="buttonGroup"/>
+ </buttongroups>
 </ui>

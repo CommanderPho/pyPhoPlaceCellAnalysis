@@ -47,6 +47,109 @@ def build_single_placefield_output_widget(render_config):
 
 
 
+class BatchActionsEndButtonPanelHelper(object):
+    
+    debug_logging = True
+    
+    def __init__(self, update_included_cell_Indicies_callback=None, hide_all_callback=None, show_all_callback=None):
+        # super(BatchActionsEndButtonPanelHelper, self).__init__()
+        self.final_update_included_cell_Indicies_callback = None
+        self.hide_all_callback = None
+        self.show_all_callback = None
+        self.setup_BatchActionsEndButtonPanelHelper(update_included_cell_Indicies_callback=update_included_cell_Indicies_callback, hide_all_callback=hide_all_callback, show_all_callback=show_all_callback)
+        
+        
+    def setup_BatchActionsEndButtonPanelHelper(self, update_included_cell_Indicies_callback=None, hide_all_callback=None, show_all_callback=None):
+        self.final_update_included_cell_Indicies_callback = None
+        if update_included_cell_Indicies_callback is not None:
+            if callable(update_included_cell_Indicies_callback):
+                self.final_update_included_cell_Indicies_callback = update_included_cell_Indicies_callback
+
+        self.hide_all_callback = hide_all_callback
+        self.show_all_callback = show_all_callback
+        
+    # @QtCore.pyqtSlot(bool)
+    def btn_hide_all_callback(self, event):
+        if self.debug_logging:
+            print('BatchActionsEndButtonPanelHelper.btn_hide_all_callback(...)')
+        if self.hide_all_callback is not None:
+            if callable(self.hide_all_callback):
+                self.hide_all_callback()
+
+    # @QtCore.pyqtSlot(bool)
+    def btn_show_all_callback(self, event):
+        if self.debug_logging:
+            print('BatchActionsEndButtonPanelHelper.btn_show_all_callback(...)')
+        if self.show_all_callback is not None:
+            if callable(self.show_all_callback):
+                self.show_all_callback()
+
+    # @QtCore.pyqtSlot(bool)
+    def btn_update_active_placefields(self, event):
+        if self.debug_logging:
+            print('BatchActionsEndButtonPanelHelper.btn_update_active_placefields(...)')
+        # updated_pf_options_list_ints = ActivePlacefieldsPlottingPanel.options_to_int(self.cross_selector.value) # convert to ints
+        # self.on_update_active_placefields(updated_pf_options_list_ints)   
+
+
+def build_batch_interactive_placefield_visibility_controls(rootControlsBarWidget, ipcDataExplorer, debug_logging=False):
+    """Builds a panel containing a series of widgets that control the spike/placemap/etc visibility for each placecell
+
+        Internally calls build_all_placefield_output_panels(...) to build the output panel widgets.
+        
+        
+    Args:
+        ipcDataExplorer ([type]): [description]
+
+    Returns:
+        [type]: [description]
+        
+    Usage:
+        pane = build_panel_interactive_placefield_visibility_controls(ipcDataExplorer)
+        pane
+    """
+    
+    
+    
+    def _btn_hide_all_callback():
+        if debug_logging:
+            print('EndButtonPanel.btn_hide_all_callback(...)')
+        ipcDataExplorer.clear_all_spikes_included()
+        ipcDataExplorer.update_active_placefields([])
+        # self.on_hide_all_placefields()
+  
+    def _btn_show_all_callback():
+        if debug_logging:
+            print('EndButtonPanel.btn_show_all_callback(...)')
+        ipcDataExplorer._show_all_tuning_curves()
+        ipcDataExplorer.update_active_placefields([])
+        # self.on_hide_all_placefields()      
+
+    end_button_helper_obj = BatchActionsEndButtonPanelHelper(hide_all_callback=_btn_hide_all_callback, show_all_callback=_btn_show_all_callback)
+    
+
+    btnShowAll_Pfs, btnShowAll_Spikes, btnShowAll_Both = rootControlsBarWidget.show_all_buttons_list
+    btnHideAll_Pfs, btnHideAll_Spikes, btnHideAll_Both = rootControlsBarWidget.hide_all_buttons_list 
+    
+    connections = []
+    buttons = [btnShowAll_Pfs, btnShowAll_Spikes, btnShowAll_Both, btnHideAll_Pfs, btnHideAll_Spikes, btnHideAll_Both]
+    
+    connections.append(btnShowAll_Both.clicked.connect(end_button_helper_obj.btn_show_all_callback))
+    connections.append(btnHideAll_Both.clicked.connect(end_button_helper_obj.btn_hide_all_callback))
+    
+    # out_panels = build_all_placefield_output_panels(ipcDataExplorer)
+    # end_button_panel_obj = BatchActionsEndButtonPanelHelper(hide_all_callback=_btn_hide_all_callback, show_all_callback=_btn_show_all_callback)
+    # end_cap_buttons = end_button_panel_obj.panel()
+    # out_row = pn.Row(*out_panels, end_cap_buttons, height=120)
+    # btn_occupancy_map_visibility = pn.widgets.Button(name='Occupancy Map Visibility', width_policy='min')
+    # # btn_occupancy_map_visibility = pn.widgets.Toggle(name='Occupancy Map Visibility', value=ipcDataExplorer.occupancy_plotting_config.isVisible, margin=0, width_policy='min')
+    # # btn_occupancy_map_visibility.on_clicks
+    # btn_occupancy_map_visibility.on_click(ipcDataExplorer.on_occupancy_plot_update_visibility)
+    # # btn_occupancy_map_visibility.on_click(ipcDataExplorer.on_occupancy_plot_config_updated)
+    # occupancy_widget = btn_occupancy_map_visibility
+    
+    return end_button_helper_obj, connections
+
 
 
 def build_all_placefield_output_panels(ipcDataExplorer):
@@ -189,6 +292,10 @@ def build_all_placefield_output_panels(ipcDataExplorer):
     # # Set the root widget's layout to the outer_scroll_layout
     # # placefieldControlsContainerWidget.setLayout(outer_scroll_layout)
     # groupBox.setLayout(outer_scroll_layout)
+    
+    end_button_helper_obj, connections = build_batch_interactive_placefield_visibility_controls(rootControlsBarWidget=rootControlsBarWidget, ipcDataExplorer=ipcDataExplorer)
+    ipcDataExplorer.params.end_button_helper_obj = end_button_helper_obj
+    ipcDataExplorer.params.end_button_helper_connections = connections
     
     return (rootControlsBarWidget, pf_widgets)
     # return (placefieldControlsContainerWidget, pf_widgets)
