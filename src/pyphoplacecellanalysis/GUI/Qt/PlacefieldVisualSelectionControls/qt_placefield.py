@@ -9,6 +9,8 @@ from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtCore, QtGui, QtWidget
 from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer
 from pyphoplacecellanalysis.GUI.Qt.PlacefieldVisualSelectionControls.PlacefieldVisualSelectionControlWidget import PlacefieldVisualSelectionWidget
 
+from pyphoplacecellanalysis.GUI.Qt.PlacefieldVisualSelectionControlsBar.PlacefieldVisualSelectionControlsBarWidget import PlacefieldVisualSelectionControlsBarWidget
+
 
 """ 
 
@@ -62,26 +64,38 @@ def build_all_placefield_output_panels(ipcDataExplorer):
     desired_full_panel_width = 1200
     desired_full_panel_height = 200
 
-    placefieldControlsContainerWidget = QtWidgets.QWidget()
-    placefieldControlsContainerWidget.setObjectName('placefieldControlsContainer')
-    placefieldControlsContainerWidget.resize(desired_full_panel_width, desired_full_panel_height)
-    placefieldControlsContainerWidget.setContentsMargins(0, 0, 0, 0)
+    # # ## Programmatic Version:
+    # placefieldControlsContainerWidget = QtWidgets.QWidget()
+    # placefieldControlsContainerWidget.setObjectName('placefieldControlsContainer')
+    # placefieldControlsContainerWidget.resize(desired_full_panel_width, desired_full_panel_height)
+    # placefieldControlsContainerWidget.setContentsMargins(0, 0, 0, 0)
     
-    groupBox = QtWidgets.QGroupBox("Placefield Controls")
-    groupBox.setContentsMargins(0, 0, 0, 0)
-    groupBox.setObjectName('placefieldControlsGroupbox')
-    groupBox.resize(desired_full_panel_width, desired_full_panel_height)
-    sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Preferred)
-    sizePolicy.setHorizontalStretch(0)
-    sizePolicy.setVerticalStretch(0)
-    # sizePolicy.setHeightForWidth(Interface.sizePolicy().hasHeightForWidth())
-    groupBox.setSizePolicy(sizePolicy)
-    groupBox.setWindowTitle('Placefield Controls')
+    # groupBox = QtWidgets.QGroupBox("Placefield Controls")
+    # groupBox.setContentsMargins(0, 0, 0, 0)
+    # groupBox.setObjectName('placefieldControlsGroupbox')
+    # groupBox.resize(desired_full_panel_width, desired_full_panel_height)
+    # sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Preferred)
+    # sizePolicy.setHorizontalStretch(0)
+    # sizePolicy.setVerticalStretch(0)
+    # # sizePolicy.setHeightForWidth(Interface.sizePolicy().hasHeightForWidth())
+    # groupBox.setSizePolicy(sizePolicy)
+    # groupBox.setWindowTitle('Placefield Controls')
     
-    pf_layout = QtWidgets.QHBoxLayout()
-    pf_layout.setSpacing(0)
-    pf_layout.setContentsMargins(0, 0, 0, 0)
-    pf_layout.setObjectName("horizontalLayout")
+    # pf_layout = QtWidgets.QHBoxLayout()
+    # pf_layout.setSpacing(0)
+    # pf_layout.setContentsMargins(0, 0, 0, 0)
+    # pf_layout.setObjectName("horizontalLayout")
+    
+    # rootControlsBarWidget = groupBox
+    
+    ## UI Designer Version:    
+    rootControlsBarWidget = PlacefieldVisualSelectionControlsBarWidget()
+    
+    # placefieldControlsContainerWidget.setObjectName('placefieldControlsContainer')
+    # placefieldControlsContainerWidget.resize(desired_full_panel_width, desired_full_panel_height)
+    
+    groupBox = rootControlsBarWidget.ui.placefieldControlsGroupbox
+    pf_layout = rootControlsBarWidget.ui.pf_layout
     
     # placefieldControlsContainerWidget.setLayout(pf_layout)
 
@@ -153,30 +167,30 @@ def build_all_placefield_output_panels(ipcDataExplorer):
     # placefieldControlsContainerWidget.setLayout(pf_layout)
 
     ## Groupbox and Scrollarea:
-    # groupBox.setLayout(pf_layout) # set the groupBox's layout to the one containing the widgets
-    placefieldControlsContainerWidget.setLayout(pf_layout)
+    # # groupBox.setLayout(pf_layout) # set the groupBox's layout to the one containing the widgets
+    # placefieldControlsContainerWidget.setLayout(pf_layout)
 
-    # Add a horizontal scroll area (so the placefield controls can be scrolled horizontally:
-    scroll_area = QtWidgets.QScrollArea()
-    scroll_area.resize(desired_full_panel_width, 150)
-    scroll_area.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
-    scroll_area.setSizeAdjustPolicy(QtGui.QAbstractScrollArea.AdjustToContentsOnFirstShow)
-    scroll_area.setWidget(placefieldControlsContainerWidget) # set the contents widget of the scrollarea to be the groupBox
-    # scroll_area.setWidget(groupBox) # set the contents widget of the scrollarea to be the groupBox
-    scroll_area.setWidgetResizable(True)
-    # scroll_area.setWidgetResizable(False) # This really breaks it for some reason. Oh, I guess because it's dynamically trying to resize the widget instead of creating more room.
-    scroll_area.setFixedHeight(150)
+    # # Add a horizontal scroll area (so the placefield controls can be scrolled horizontally:
+    # scroll_area = QtWidgets.QScrollArea()
+    # scroll_area.resize(desired_full_panel_width, 150)
+    # scroll_area.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
+    # scroll_area.setSizeAdjustPolicy(QtGui.QAbstractScrollArea.AdjustToContentsOnFirstShow)
+    # scroll_area.setWidget(placefieldControlsContainerWidget) # set the contents widget of the scrollarea to be the groupBox
+    # # scroll_area.setWidget(groupBox) # set the contents widget of the scrollarea to be the groupBox
+    # scroll_area.setWidgetResizable(True)
+    # # scroll_area.setWidgetResizable(False) # This really breaks it for some reason. Oh, I guess because it's dynamically trying to resize the widget instead of creating more room.
+    # scroll_area.setFixedHeight(150)
     
-    outer_scroll_layout = QtWidgets.QVBoxLayout()
-    outer_scroll_layout.setSpacing(0)
-    outer_scroll_layout.setContentsMargins(0, 0, 0, 0)
-    outer_scroll_layout.setObjectName("outerLayout")
-    outer_scroll_layout.addWidget(scroll_area)
-    # Set the root widget's layout to the outer_scroll_layout
-    # placefieldControlsContainerWidget.setLayout(outer_scroll_layout)
-    groupBox.setLayout(outer_scroll_layout)
+    # outer_scroll_layout = QtWidgets.QVBoxLayout()
+    # outer_scroll_layout.setSpacing(0)
+    # outer_scroll_layout.setContentsMargins(0, 0, 0, 0)
+    # outer_scroll_layout.setObjectName("outerLayout")
+    # outer_scroll_layout.addWidget(scroll_area)
+    # # Set the root widget's layout to the outer_scroll_layout
+    # # placefieldControlsContainerWidget.setLayout(outer_scroll_layout)
+    # groupBox.setLayout(outer_scroll_layout)
     
-    return (groupBox, pf_widgets)
+    return (rootControlsBarWidget, pf_widgets)
     # return (placefieldControlsContainerWidget, pf_widgets)
 
 
