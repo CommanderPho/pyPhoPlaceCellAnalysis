@@ -5,6 +5,7 @@ import pyphoplacecellanalysis.External.pyqtgraph as pg
 
 from pyphocorehelpers.DataStructure.general_parameter_containers import VisualizationParameters
 from pyphocorehelpers.gui.Qt.SyncedTimelineWindowLink import connect_additional_controlled_plotter, connect_controlled_time_synchornized_plotter
+from pyphocorehelpers.gui.Qt.qevent_lookup_helpers import QEventLookupHelpers
 
 from pyphoplacecellanalysis.GUI.Qt.SpikeRasterWindows.Spike3DRasterWindowBase import Ui_RootWidget # Generated file from .ui
 
@@ -501,12 +502,13 @@ class Spike3DRasterWindowWidget(SpikeRasterLeftSidebarControlsMixin, SpikeRaster
             self.top_left.installEventFilter(self)
         
         """
-        print(f'Spike3DRasterWindowWidget.eventFilter(self, watched, event)')
+        # print(f'Spike3DRasterWindowWidget.eventFilter(self, watched, event)')
         if event.type() == QtCore.QEvent.GraphicsSceneWheel:
-            print(f'\t detected event.type() == QtCore.QEvent.GraphicsSceneWheel')
+            # QtCore.QEvent.GraphicsSceneWheel
+            print(f'Spike3DRasterWindowWidget.eventFilter(...)\n\t detected event.type() == QtCore.QEvent.GraphicsSceneWheel')
             return True
         else:
-            print(f'\t unknown event.type(): {event.type()}')
+            print(f'\t unhandled event {QEventLookupHelpers.get_event_string(event)}')
         # If not a particularlly handled case, do the default thing.
         return super().eventFilter(watched, event)
     
