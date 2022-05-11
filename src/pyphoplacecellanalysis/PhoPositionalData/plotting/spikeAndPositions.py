@@ -242,10 +242,14 @@ def force_plot_ignore_scalar_as_color(plot_mesh_actor, lookup_table):
 def plot_placefields2D(pTuningCurves, active_placefields, pf_colors: np.ndarray, zScalingFactor=10.0, show_legend=False):
     """ Plots 2D (as opposed to linearized/1D) Placefields in a 3D PyVista plot """
     # active_placefields: Pf2D    
-    should_force_placefield_custom_color = True
-    should_use_normalized_tuning_curves = True
-    should_pdf_normalize_manually = False
-    should_nan_non_visited_elements = True # Default False
+
+    should_use_normalized_tuning_curves = True # Default True
+    should_pdf_normalize_manually = False # Default False.
+    should_nan_non_visited_elements = True # Default False. If True, sets the non-visited portions of the placefield to np.NaN before plotting.
+   
+    # Rendering/Display Preferences:
+    should_force_placefield_custom_color = True # Default True    
+    should_display_placefield_points = True # Default True, whether to redner the individual points of the placefield
     
     
     if should_use_normalized_tuning_curves:
@@ -296,7 +300,11 @@ def plot_placefields2D(pTuningCurves, active_placefields, pf_colors: np.ndarray,
         
         
         # Extracting Points from recently built StructuredGrid pdata:
-        pdata_currActiveNeuronTuningCurve_Points = pdata_currActiveNeuronTuningCurve.extract_points(pdata_currActiveNeuronTuningCurve.points[:, 2] > 0)  # UnstructuredGrid
+        if should_display_placefield_points:
+            pdata_currActiveNeuronTuningCurve_Points = pdata_currActiveNeuronTuningCurve.extract_points(pdata_currActiveNeuronTuningCurve.points[:, 2] > 0)  # UnstructuredGrid
+        
+        else:
+            pdata_currActiveNeuronTuningCurve_Points = None
 
         curr_active_neuron_plot_data = {'curr_active_neuron_ID':curr_active_neuron_ID,
                                          'curr_active_neuron_pf_identifier':curr_active_neuron_pf_identifier,
@@ -317,7 +325,10 @@ def plot_placefields2D(pTuningCurves, active_placefields, pf_colors: np.ndarray,
             curr_smooth_shading = False
             
         # curr_opacity = None
-        curr_smooth_shading = False
+        
+        if should_nan_non_visited_elements:
+            # To prevent artifacts after NaNing non-visited elements (black rendering faces around the edges that connect the NaN and non-NaN points that result from averaging the two faces, we must disable smooth_shading in this mode:
+            curr_smooth_shading = False
         
         # print(f'curr_active_neuron_color: {curr_active_neuron_color} for i: {i}')
         
@@ -347,9 +358,13 @@ def plot_placefields2D(pTuningCurves, active_placefields, pf_colors: np.ndarray,
             
             
         ## Add points:
-        pdata_currActiveNeuronTuningCurve_Points_plotActor = pTuningCurves.add_points(pdata_currActiveNeuronTuningCurve_Points, label=f'{curr_active_neuron_pf_identifier}_points', name=f'{curr_active_neuron_pf_identifier}_points',
-                                                                                render_points_as_spheres=True, point_size=2.0, color=curr_active_neuron_opaque_color, render=False)    
         
+        if should_display_placefield_points:
+            pdata_currActiveNeuronTuningCurve_Points_plotActor = pTuningCurves.add_points(pdata_currActiveNeuronTuningCurve_Points, label=f'{curr_active_neuron_pf_identifier}_points', name=f'{curr_active_neuron_pf_identifier}_points',
+                                                                                    render_points_as_spheres=True, point_size=4.0, color=curr_active_neuron_opaque_color, render=False)    
+        
+        else:
+            pdata_currActiveNeuronTuningCurve_Points_plotActor = None
         
         ## Build CascadingDynamicPlotsList Wrapper:
         
