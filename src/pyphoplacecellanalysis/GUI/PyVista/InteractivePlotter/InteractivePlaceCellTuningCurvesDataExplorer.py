@@ -19,7 +19,7 @@ from pyphoplacecellanalysis.GUI.PyVista.InteractivePlotter.PhoInteractivePlotter
 # from pyphoplacecellanalysis.PhoPositionalData.plotting.mixins.general_plotting_mixins
 from pyphoplacecellanalysis.PhoPositionalData.plotting.mixins.occupancy_plotting_mixins import OccupancyPlottingMixin
 from pyphoplacecellanalysis.PhoPositionalData.plotting.mixins.placefield_plotting_mixins import HideShowPlacefieldsRenderingMixin
-from pyphoplacecellanalysis.PhoPositionalData.plotting.mixins.spikes_mixins import SpikesDataframeOwningMixin, SpikeRenderingMixin, HideShowSpikeRenderingMixin
+from pyphoplacecellanalysis.PhoPositionalData.plotting.mixins.spikes_mixins import SpikesDataframeOwningFromSessionMixin, SpikeRenderingPyVistaMixin, HideShowSpikeRenderingMixin
 
 from pyphoplacecellanalysis.PhoPositionalData.plotting.spikeAndPositions import build_active_spikes_plot_data_df, plot_placefields2D, update_plotVisiblePlacefields2D, build_custom_placefield_maps_lookup_table
 from pyphoplacecellanalysis.PhoPositionalData.plotting.gui import CallbackSequence, SetVisibilityCallback, MutuallyExclusiveRadioButtonGroup, add_placemap_toggle_checkboxes, add_placemap_toggle_mutually_exclusive_checkboxes
@@ -33,7 +33,7 @@ from pyphoplacecellanalysis.GUI.PyVista.InteractivePlotter.InteractiveDataExplor
 
 
 # needs perform_plot_flat_arena
-class InteractivePlaceCellTuningCurvesDataExplorer(OccupancyPlottingMixin, HideShowPlacefieldsRenderingMixin, SpikesDataframeOwningMixin, SpikeRenderingMixin, HideShowSpikeRenderingMixin, InteractiveDataExplorerBase): 
+class InteractivePlaceCellTuningCurvesDataExplorer(OccupancyPlottingMixin, HideShowPlacefieldsRenderingMixin, SpikesDataframeOwningFromSessionMixin, SpikeRenderingPyVistaMixin, HideShowSpikeRenderingMixin, InteractiveDataExplorerBase): 
     """ This 3D Vedo GUI displays a map of the animal's environment alongside the computed placefield results (visualizing them as 2D surfaces overlaying the maze) and the neural spiking data that they were produced from.
         - Does not aim to be animated in time, instead easily configurable to show the user whatever they'd like to look at.
     """
