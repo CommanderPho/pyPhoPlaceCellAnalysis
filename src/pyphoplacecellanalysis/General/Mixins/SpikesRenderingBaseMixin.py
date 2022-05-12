@@ -53,6 +53,8 @@ class SpikeRenderingBaseMixin:
         # Adds columns to self.spikes_df:
             'rgb_hex','R','G','B'
         
+        
+        Seems to use self.params.neuron_colors instead of self.params.pf_colors
         """
         # adds the color information to the self.spikes_df using params.neuron_colors. Adds ['R','G','B'] columns and creates a self.params.flat_spike_colors_array with one color for each spike.
         # fallback_color_rgb: the default value to use for colors that aren't present in the neuron_colors array

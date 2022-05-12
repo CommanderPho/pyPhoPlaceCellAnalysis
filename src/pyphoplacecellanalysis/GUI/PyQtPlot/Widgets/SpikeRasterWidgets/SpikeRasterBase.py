@@ -402,10 +402,10 @@ class SpikeRasterBase(UnitSortableMixin, DataSeriesToSpatialTransformingMixin, N
         # included_cell_INDEXES = np.array(self.find_cell_IDXs_from_cell_ids(self.spikes_df['aclu'].to_numpy()), dtype=int)
         included_cell_INDEXES = np.array([neuron_id_to_new_IDX_map[an_included_cell_ID] for an_included_cell_ID in spikes_df['aclu'].to_numpy()], dtype=int) # get the indexes from the cellIDs
         print('\t computed included_cell_INDEXES.')
-        spikes_df['unit_id'] = included_cell_INDEXES.copy()
+        spikes_df['unit_id'] = included_cell_INDEXES.copy() # TODO: CRITICAL: why are IDXs being assigned to a property named *_id (unit_id here)??? the _id suffix should always mean that it's the ACLU value, right??
         print("\t set spikes_df['unit_id']")
         # self.spikes_df['cell_idx'] = included_cell_INDEXES.copy()
-        spikes_df['cell_idx'] = spikes_df['unit_id'].copy() # TODO: this is bad! The self.get_neuron_id_and_idx(...) function doesn't work!
+        spikes_df['cell_idx'] = spikes_df['unit_id'].copy()
         print("\t set spikes_df['cell_idx']")
         print("\t done updating 'unit_id' and 'cell_idx'.")
         
@@ -434,16 +434,9 @@ class SpikeRasterBase(UnitSortableMixin, DataSeriesToSpatialTransformingMixin, N
             neuron_colors_list = DataSeriesColorHelpers._build_cell_color_map(unsorted_unit_ids, mode=coloring_mode)
             for a_color in neuron_colors_list:
                 a_color.setAlphaF(0.5)
-                
-                
+                                
             # neuron_unit_id_to_colors_index_map = OrderedDict(zip(unsorted_unit_ids, neuron_colors_list))
             neuron_colors_map = OrderedDict(zip(unsorted_unit_ids, neuron_colors_list))
-            
-            # neuron_colors = []
-            # for i, cell_id in enumerate(self.unit_ids):
-            #     curr_color = pg.mkColor((i, self.n_cells*1.3))
-            #     curr_color.setAlphaF(0.5)
-            #     neuron_colors.append(curr_color)
     
         self.params.neuron_qcolors = deepcopy(neuron_colors_list)
         self.params.neuron_qcolors_map = deepcopy(neuron_colors_map)
@@ -456,8 +449,6 @@ class SpikeRasterBase(UnitSortableMixin, DataSeriesToSpatialTransformingMixin, N
             # self.params.neuron_colors[:, i] = curr_color[:]
         
         self.params.neuron_colors_hex = None
-        
-        # spike_raster_plt.params.neuron_colors[0].getRgbF() # (1.0, 0.0, 0.0, 0.5019607843137255)
         
         # get hex colors:
         #  getting the name of a QColor with .name(QtGui.QColor.HexRgb) results in a string like '#ff0000'

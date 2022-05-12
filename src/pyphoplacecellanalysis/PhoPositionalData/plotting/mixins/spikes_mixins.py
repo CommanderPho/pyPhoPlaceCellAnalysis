@@ -130,7 +130,7 @@ class SpikeRenderingMixin:
         
         # TODO: could also add in 'render_exclusion_mask'
         # RGB Version:
-        self.params.opaque_pf_colors = self.params.pf_colors[:-1, :].copy() # Drop the opacity component, so we only have RGB values
+        self.params.opaque_neuron_colors = self.params.pf_colors[:-1, :].copy() # Drop the opacity component, so we only have RGB values
         
         # Build flat hex colors, creating the self.spikes_df['rgb_hex'] column:
         flat_spike_hex_colors = np.array([safe_get(self.params.pf_colors_hex, cell_IDX, '#000000') for cell_IDX in self.spikes_df['cell_idx'].to_numpy()])        
@@ -156,13 +156,12 @@ class SpikeRenderingMixin:
             if cell_IDX in valid_pf_colors_indicies:
                 # if we have a color for it, use it
                 self.params.cell_spike_colors_dict[cell_IDX] = self.params.pf_colors[:, cell_IDX]
-                self.params.cell_spike_opaque_colors_dict[cell_IDX] = self.params.opaque_pf_colors[:, cell_IDX]
+                self.params.cell_spike_opaque_colors_dict[cell_IDX] = self.params.opaque_neuron_colors[:, cell_IDX]
             else:
                 # Otherwise use the fallbacks:
                 self.params.cell_spike_colors_dict[cell_IDX] = fallback_color_rgba
                 self.params.cell_spike_opaque_colors_dict[cell_IDX] = fallback_color_rgb
         
-        # self.params.flat_spike_colors_array = np.array([safe_get(self.params.opaque_pf_colors, idx, fallback_color) for idx in self.spikes_df['cell_idx'].to_numpy()]) # Drop the opacity component, so we only have RGB values. np.shape(flat_spike_colors) # (77726, 3)
         
         self.params.flat_spike_colors_array = np.array([self.params.cell_spike_opaque_colors_dict.get(idx, fallback_color_rgb) for idx in self.spikes_df['cell_idx'].to_numpy()]) # Drop the opacity component, so we only have RGB values. np.shape(flat_spike_colors) # (77726, 3)
         
