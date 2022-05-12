@@ -41,7 +41,7 @@ class DataSeriesColorHelpers:
     """ Cell Coloring functions:
     """
     @classmethod
-    def _setup_neurons_color_data(cls, params, spikes_df, neuron_colors_list, coloring_mode='color_by_index_order'):
+    def _setup_neurons_color_data(cls, params, spikes_df, neuron_colors_list=None, coloring_mode='color_by_index_order'):
         """ 
         neuron_colors_list: a list of neuron colors
         
@@ -52,48 +52,51 @@ class DataSeriesColorHelpers:
             params.neuron_colors_hex
         """
         
-        unsorted_unit_ids = self.unit_ids
+        raise NotImplementedError
+        ## TODO: FATAL: this is a classmethod that has references to self.... clearly has never been used.
+        # unsorted_unit_ids = self.unit_ids
         
-        if neuron_colors_list is None:
-            neuron_colors_list = cls._build_cell_color_map(unsorted_unit_ids, mode=coloring_mode)
-            for a_color in neuron_colors_list:
-                a_color.setAlphaF(0.5)
-                
-                
-            # neuron_unit_id_to_colors_index_map = OrderedDict(zip(unsorted_unit_ids, neuron_colors_list))
-            neuron_colors_map = OrderedDict(zip(unsorted_unit_ids, neuron_colors_list))
+        # # if neuron_colors_list is None:
+        # neuron_qcolors_list = cls._build_cell_color_map(unsorted_unit_ids, mode=coloring_mode, provided_cell_colors=neuron_colors_list)
             
-            # neuron_colors = []
-            # for i, cell_id in enumerate(self.unit_ids):
-            #     curr_color = pg.mkColor((i, self.n_cells*1.3))
-            #     curr_color.setAlphaF(0.5)
-            #     neuron_colors.append(curr_color)
+        # for a_color in neuron_qcolors_list:
+        #     a_color.setAlphaF(0.5)
+            
+        # # neuron_unit_id_to_colors_index_map = OrderedDict(zip(unsorted_unit_ids, neuron_colors_list))
+        # neuron_qcolors_map = OrderedDict(zip(unsorted_unit_ids, neuron_qcolors_list))
+        
+        # # neuron_colors = []
+        # # for i, cell_id in enumerate(self.unit_ids):
+        # #     curr_color = pg.mkColor((i, self.n_cells*1.3))
+        # #     curr_color.setAlphaF(0.5)
+        # #     neuron_colors.append(curr_color)
     
-        params.neuron_qcolors = deepcopy(neuron_colors_list)
-        params.neuron_qcolors_map = deepcopy(neuron_colors_map)
+        # params.neuron_qcolors = deepcopy(neuron_qcolors_list)
+        # params.neuron_qcolors_map = deepcopy(neuron_qcolors_map)
 
-        # allocate new neuron_colors array:
-        params.neuron_colors = np.zeros((4, self.n_cells))
-        for i, curr_qcolor in enumerate(params.neuron_qcolors):
-            curr_color = curr_qcolor.getRgbF() # (1.0, 0.0, 0.0, 0.5019607843137255)
-            params.neuron_colors[:, i] = curr_color[:]
-            # params.neuron_colors[:, i] = curr_color[:]
+        # # allocate new neuron_colors array:
+        # params.neuron_colors = np.zeros((4, self.n_cells))
+        # for i, curr_qcolor in enumerate(params.neuron_qcolors):
+        #     curr_color = curr_qcolor.getRgbF() # (1.0, 0.0, 0.0, 0.5019607843137255)
+        #     params.neuron_colors[:, i] = curr_color[:]
+        #     # params.neuron_colors[:, i] = curr_color[:]
         
-        params.neuron_colors_hex = None
+        # params.neuron_colors_hex = None
         
-        # spike_raster_plt.params.neuron_colors[0].getRgbF() # (1.0, 0.0, 0.0, 0.5019607843137255)
+        # # spike_raster_plt.params.neuron_colors[0].getRgbF() # (1.0, 0.0, 0.0, 0.5019607843137255)
         
-        # get hex colors:
-        #  getting the name of a QColor with .name(QtGui.QColor.HexRgb) results in a string like '#ff0000'
-        #  getting the name of a QColor with .name(QtGui.QColor.HexArgb) results in a string like '#80ff0000'
-        params.neuron_colors_hex = [params.neuron_qcolors[i].name(QtGui.QColor.HexRgb) for i, cell_id in enumerate(self.unit_ids)] 
+        # # get hex colors:
+        # #  getting the name of a QColor with .name(QtGui.QColor.HexRgb) results in a string like '#ff0000'
+        # #  getting the name of a QColor with .name(QtGui.QColor.HexArgb) results in a string like '#80ff0000'
+        # params.neuron_colors_hex = [params.neuron_qcolors[i].name(QtGui.QColor.HexRgb) for i, cell_id in enumerate(self.unit_ids)] 
         
-        # included_cell_INDEXES = np.array([self.get_neuron_id_and_idx(neuron_id=an_included_cell_ID)[0] for an_included_cell_ID in spikes_df['aclu'].to_numpy()]) # get the indexes from the cellIDs
+        # # included_cell_INDEXES = np.array([self.get_neuron_id_and_idx(neuron_id=an_included_cell_ID)[0] for an_included_cell_ID in spikes_df['aclu'].to_numpy()]) # get the indexes from the cellIDs
         
-        # spikes_df['cell_idx'] = included_cell_INDEXES.copy()
-        # spikes_df['cell_idx'] = spikes_df['unit_id'].copy() # TODO: this is bad! The self.get_neuron_id_and_idx(...) function doesn't work!
-        # TODO: Note that the self.get_neuron_id_and_idx(...) fcn depends on having a self.neuron_ids consistent with whatever is trying ot be passed in as the neuron_ids.
+        # # spikes_df['cell_idx'] = included_cell_INDEXES.copy()
+        # # spikes_df['cell_idx'] = spikes_df['unit_id'].copy() # TODO: this is bad! The self.get_neuron_id_and_idx(...) function doesn't work!
+        # # TODO: Note that the self.get_neuron_id_and_idx(...) fcn depends on having a self.neuron_ids consistent with whatever is trying ot be passed in as the neuron_ids.
         
+    
     def setup_neurons_color_data(self, neuron_colors_list, coloring_mode='color_by_index_order'):
         return DataSeriesColorHelpers._setup_neurons_color_data(self.params, self.spikes_df, neuron_colors_list=neuron_colors_list, coloring_mode=coloring_mode)
         
