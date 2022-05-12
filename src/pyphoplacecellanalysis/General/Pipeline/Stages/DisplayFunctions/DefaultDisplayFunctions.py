@@ -23,6 +23,8 @@ from neuropy.core.neuron_identities import NeuronIdentity, build_units_colormap,
 from neuropy.plotting.placemaps import plot_all_placefields
 from neuropy.plotting.ratemaps import enumTuningMap2DPlotVariables # for getting the variant name from the dict
 
+from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.DockAreaWrapper import DockAreaWrapper
+
 from pyphoplacecellanalysis.GUI.PyVista.InteractivePlotter.Mixins.ImagePlaneRendering import ImagePlaneRendering
 
 from pyphoplacecellanalysis.GUI.PyVista.InteractivePlotter.PhoInteractivePlotter import PhoInteractivePlotter
@@ -133,7 +135,14 @@ class DefaultDisplayFunctions(AllFunctionEnumeratingMixin):
             placefieldControlsContainerWidget.show()
             # Visually align the widgets:
             WidgetPositioningHelpers.align_window_edges(ipcDataExplorer.p, placefieldControlsContainerWidget, relative_position = 'above', resize_to_main=(1.0, None))
-            pane = (placefieldControlsContainerWidget, pf_widgets)
+            # pane = (placefieldControlsContainerWidget, pf_widgets)
+            
+            # Wrap:
+            # active_root_main_widget = ipcDataExplorer.p.parentWidget()
+            active_root_main_widget = ipcDataExplorer.p.window()
+            root_dockAreaWindow, app = DockAreaWrapper.wrap_with_dockAreaWindow(active_root_main_widget, placefieldControlsContainerWidget, title=ipcDataExplorer.data_explorer_name)
+            pane = (root_dockAreaWindow, placefieldControlsContainerWidget, pf_widgets)
+            
         elif panel_controls_mode == 'Panel':        
             ### Build Dynamic Panel Interactive Controls for configuring Placefields:
             pane = build_panel_interactive_placefield_visibility_controls(ipcDataExplorer)

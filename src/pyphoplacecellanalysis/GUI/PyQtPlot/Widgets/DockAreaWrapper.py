@@ -12,7 +12,7 @@ from pyphoplacecellanalysis.External.pyqtgraph.console import ConsoleWidget
 
 
 class DynamicDockDisplayAreaContentMixin:
-    """ PhoPipelineMainWindow only right now 
+    """ Conformers are able to dynamically add/remove Dock items and their widgets to the root self.area (a DockArea) item.
     
     Requires at minimum:
         'self.area': a pg.Dock(...) object containing the root items
@@ -20,6 +20,8 @@ class DynamicDockDisplayAreaContentMixin:
     Creates: 
         self.displayDockArea: a pg.Dock(...) object containing dynamically created Docks/Widgets for display of display nodes.
         
+    Usage:
+        PhoDockAreaContainingWindow only right now 
     
     """
     
@@ -43,7 +45,6 @@ class DynamicDockDisplayAreaContentMixin:
     def DynamicDockDisplayAreaContentMixin_on_init(self):
         """ perform any parameters setting/checking during init """
         self._dynamic_display_output_dict = OrderedDict() # for DynamicDockDisplayAreaContentMixin
-        pass
 
     @QtCore.pyqtSlot()
     def DynamicDockDisplayAreaContentMixin_on_setup(self):
@@ -59,23 +60,9 @@ class DynamicDockDisplayAreaContentMixin:
     @QtCore.pyqtSlot()
     def DynamicDockDisplayAreaContentMixin_on_destroy(self):
         """ perfrom teardown/destruction of anything that needs to be manually removed or released """
-        pass
+        self.clear_all_display_docks()
 
-    @QtCore.pyqtSlot(float, float)
-    def DynamicDockDisplayAreaContentMixin_on_window_update(self, new_start=None, new_end=None):
-        """ called to perform updates when the active window changes. Redraw, recompute data, etc. """
-        pass
-    
-    
-    # def _build_dynamic_display_dockarea(self):
-    #     dItem = Dock("Display Outputs - Dynamic", size=(600,900), closable=True)
-    #     self.area.addDock(dItem, 'right')
-    #     # Makes a nested DockArea for contents:
-    #     self.displayDockArea = DockArea()
-    #     dItem.addWidget(self.displayDockArea) # add the dynamic nested Dock area to the dItem widget
-    #     self._dynamic_display_output_dict = OrderedDict() # for DynamicDockDisplayAreaContentMixin
-    #     return dItem
-    
+
     
     def add_display_dock(self, identifier = None, widget = None, dockSize=(300,200), dockIsClosable=True, dockAddLocationOpts=['bottom']):
         """ adds a dynamic display dock with an appropriate widget of type 'viewContentsType' to the dock area container on the main window. """
@@ -96,17 +83,7 @@ class DynamicDockDisplayAreaContentMixin:
             # no extant items found
             unique_identifier = identifier
 
-        # if identifier is None:
-        #     identifier = f'Display Subdock Item {curr_num_display_dock_items}'
-        # else:
-        #     identifier = f'{identifier}-{curr_num_display_dock_items}'        
-        
-        # **({'title':'Trajectory Timestep', 'pass_widget':False, 'event_type':'always', 'style':'modern', 'pointa':(0.025, 0.1), 'pointb':(0.98, 0.1), 'fmt':'%0.2f'} | kwargs)
-        # **({'title':'Trajectory Timestep', 'pass_widget':False, 'event_type':'always', 'style':'modern', 'pointa':(0.025, 0.1), 'pointb':(0.98, 0.1), 'fmt':'%0.2f'} | kwargs)
-        
-
-        
-        
+        # Build the new dock item:        
         dDisplayItem = Dock(unique_identifier, size=dockSize, closable=dockIsClosable, widget=widget) # add the new display item
         
         if len(dockAddLocationOpts) < 1:
@@ -181,6 +158,14 @@ class DynamicDockDisplayAreaContentMixin:
             print(f'No extant groups/items found with name {identifier}')
             return
         
+        
+    def clear_all_display_docks(self):
+        """ removes all display docks """
+        for unique_identifier in extant_group_items.keys():
+            self.remove_display_dock(unique_identifier)
+        
+        
+        
     # TODO: Persistance:
     # self.plotDict[name] = {"dock":dock, "widget":widget, "view":view}
     
@@ -188,7 +173,9 @@ class DynamicDockDisplayAreaContentMixin:
     
 
 class PhoDockAreaContainingWindow(DynamicDockDisplayAreaContentMixin, QtWidgets.QMainWindow):
+    """ a custom QMainWindow subclass that contains a DockArea as its central view.
     
+    """
     @property
     def app(self):
         """The app property."""
@@ -234,20 +221,21 @@ class PhoDockAreaContainingWindow(DynamicDockDisplayAreaContentMixin, QtWidgets.
     
     def closeEvent(self, event):
         # Enables closing all secondary windows when this (main) window is closed.
+        self.DynamicDockDisplayAreaContentMixin_on_destroy()
+        
         for window in QtWidgets.QApplication.topLevelWidgets():
             window.close()
             
             
     
 class DockAreaWrapper(object):
-    """ Responsible for wrapping several children in Dock items and installing them in a central DockArea """
+    """ Responsible for wrapping several children in Dock items and installing them in a central DockArea
+    Primary method is DockAreaWrapper.wrap_with_dockAreaWindow(...):
+    """
 
     @classmethod
     def _build_default_dockAreaWindow(cls, title='_test_PhoDockAreaWidgetApp', defer_show=False):
-        # app = pg.mkQApp(title)
-        # win = QtGui.QMainWindow()
-        # area = DockArea()
-        # win.setCentralWidget(area)        
+        """ builds a simple PhoDockAreaContainingWindow """
         win = PhoDockAreaContainingWindow(title=title)
         win.setWindowTitle(f'{title}: dockAreaWindow')
         app = win.app
@@ -261,8 +249,17 @@ class DockAreaWrapper(object):
         
     @classmethod
     def wrap_with_dockAreaWindow(cls, main_window, auxilary_controls_window, title='_test_PhoDockAreaWidgetApp'):
-        ## Combine The Separate Windows into a common DockArea window:
+        """ Combine The Separate Windows into a common DockArea window:
         
+        
+        Usage:
+            from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.DockAreaWrapper import DockAreaWrapper
+
+            # active_root_main_widget = ipcDataExplorer.p.parentWidget()
+            active_root_main_widget = ipcDataExplorer.p.window()
+            win, app = DockAreaWrapper.wrap_with_dockAreaWindow(active_root_main_widget, placefieldControlsContainerWidget)
+
+        """        
         # build a win of type PhoDockAreaContainingWindow
         win, app = cls._build_default_dockAreaWindow(title=title, defer_show=True)
         
@@ -379,7 +376,8 @@ class DockAreaWrapper(object):
         win.show()
 
         win.area.moveDock(dDisplayItem1, 'top', dDisplayItem2)     ## move d4 to top edge of d2
-        
+        # dDisplayItem1.hideTitleBar()
+        # dDisplayItem2.hideTitleBar()
         
         return win, app
 
