@@ -366,15 +366,18 @@ class SpikeRasterBase(UnitSortableMixin, DataSeriesToSpatialTransformingMixin, N
         unsorted_unit_ids = self.unit_ids
         
         if neuron_colors_list is None:
-            neuron_colors_list = DataSeriesColorHelpers._build_cell_color_map(unsorted_unit_ids, mode=coloring_mode)
-            for a_color in neuron_colors_list:
+            neuron_qcolors_list = DataSeriesColorHelpers._build_cell_color_map(unsorted_unit_ids, mode=coloring_mode, provided_cell_colors=None)
+            for a_color in neuron_qcolors_list:
                 a_color.setAlphaF(0.5)
+        else:
+            ## TODO: otherwise we have some provided colors that we should convert into the correct format
+            neuron_qcolors_list = DataSeriesColorHelpers._build_cell_color_map(unsorted_unit_ids, mode=coloring_mode, provided_cell_colors=neuron_colors_list.copy()) # builts a list of qcolors
                                 
-            # neuron_unit_id_to_colors_index_map = OrderedDict(zip(unsorted_unit_ids, neuron_colors_list))
-            neuron_colors_map = OrderedDict(zip(unsorted_unit_ids, neuron_colors_list))
+        # neuron_unit_id_to_colors_index_map = OrderedDict(zip(unsorted_unit_ids, neuron_colors_list))
+        neuron_qcolors_map = OrderedDict(zip(unsorted_unit_ids, neuron_qcolors_list))
     
-        self.params.neuron_qcolors = deepcopy(neuron_colors_list)
-        self.params.neuron_qcolors_map = deepcopy(neuron_colors_map)
+        self.params.neuron_qcolors = deepcopy(neuron_qcolors_list)
+        self.params.neuron_qcolors_map = deepcopy(neuron_qcolors_map)
 
         # allocate new neuron_colors array:
         self.params.neuron_colors = np.zeros((4, self.n_cells))
