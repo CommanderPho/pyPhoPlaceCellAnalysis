@@ -9,6 +9,7 @@ from pyphocorehelpers.indexing_helpers import safe_get
 from pyphoplacecellanalysis.PhoPositionalData.analysis.helpers import partition
 from pyphoplacecellanalysis.PhoPositionalData.plotting.mixins.general_plotting_mixins import NeuronConfigOwningMixin
 from pyphoplacecellanalysis.PhoPositionalData.plotting.spikeAndPositions import build_active_spikes_plot_data_df
+from pyphoplacecellanalysis.General.Mixins.SpikesRenderingBaseMixin import SpikeRenderingBaseMixin
 
 # class SingleCellSpikePlotData(param.Parameterized):
 #     point_data = param.Array(doc='spike_history_pdata')
@@ -42,7 +43,7 @@ class SpikesDataframeOwningMixin:
 
 
 # Typically requires conformance to SpikesDataframeOwningMixin
-class SpikeRenderingMixin:
+class SpikeRenderingMixin(SpikeRenderingBaseMixin):
     """ Implementors render spikes from neural data in 3D 
         Requires:
             From SpikesDataframeOwningMixin:
