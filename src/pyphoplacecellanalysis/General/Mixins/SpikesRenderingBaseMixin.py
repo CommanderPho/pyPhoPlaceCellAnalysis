@@ -43,6 +43,7 @@ class SpikeRenderingBaseMixin:
     Used by:
         SpikeRasterBase (and all of its subclasses)
         
+    TODO: why does this seem to duplicate nearly all the functionality in DataSeriesColorHelpers???
     """
     
     def _build_flat_color_data(self, fallback_color_rgba = (0, 0, 0, 1.0)):
