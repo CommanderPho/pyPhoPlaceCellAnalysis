@@ -4,11 +4,11 @@ import numpy as np
 import pandas as pd
 import pyvista as pv
 
+from pyphocorehelpers.indexing_helpers import safe_get
+
 from pyphoplacecellanalysis.PhoPositionalData.analysis.helpers import partition
 from pyphoplacecellanalysis.PhoPositionalData.plotting.mixins.general_plotting_mixins import NeuronConfigOwningMixin
 from pyphoplacecellanalysis.PhoPositionalData.plotting.spikeAndPositions import build_active_spikes_plot_data_df
-
-from pyphocorehelpers.indexing_helpers import safe_get
 
 # class SingleCellSpikePlotData(param.Parameterized):
 #     point_data = param.Array(doc='spike_history_pdata')
@@ -49,6 +49,9 @@ class SpikeRenderingMixin:
                 self.spikes_df
                 self.find_rows_matching_cell_IDXs(self, cell_IDXs)
                 self.find_rows_matching_cell_ids(self, cell_ids)
+                
+        Known Uses:
+            InteractivePlaceCellTuningCurvesDataExplorer
     """
     debug_logging = True
     spike_geom_cone = pv.Cone(direction=(0.0, 0.0, -1.0), height=10.0, radius=0.2) # The spike geometry that is only displayed for a short while after the spike occurs
