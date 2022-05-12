@@ -27,6 +27,18 @@ path = os.path.dirname(os.path.abspath(__file__))
 # uiFile = os.path.join(path, 'MainPipelineWindow.ui')
 uiFile = os.path.join(path, 'MainPipelineWindowWithDockArea.ui') # mostly empty
 
+# For BreezeStylesheets support:
+from qtpy import QtWidgets
+from qtpy.QtCore import QFile, QTextStream
+import pyphoplacecellanalysis.External.breeze_style_sheets.breeze_resources
+# set stylesheet:
+stylesheet_qss_file = QFile(":/dark/stylesheet.qss")
+stylesheet_qss_file.open(QFile.ReadOnly | QFile.Text)
+stylesheet_data_stream = QTextStream(stylesheet_qss_file)
+# app.setStyleSheet(stylesheet_data_stream.readAll())
+
+
+
 class PhoPipelineMainWindow(PipelineDynamicDockDisplayAreaMixin, QtWidgets.QMainWindow):
     
     @property
@@ -102,6 +114,9 @@ class PhoPipelineMainWindow(PipelineDynamicDockDisplayAreaMixin, QtWidgets.QMain
 
     def __init__(self, title='PhoFlowchartApp', *args, **kwargs):
         self._app = pg.mkQApp(title) # makes a new QApplication or gets the reference to an existing one.
+        # Load Stylesheet:
+        self._app.setStyleSheet(stylesheet_data_stream.readAll())
+        
         self._initialize_data()
         
         super(PhoPipelineMainWindow, self).__init__(*args, **kwargs)
@@ -146,6 +161,13 @@ class PhoPipelineMainWindow(PipelineDynamicDockDisplayAreaMixin, QtWidgets.QMain
 
 def main():
     app = QtWidgets.QApplication(sys.argv)
+
+    # set stylesheet:
+    stylesheet_qss_file = QFile(":/dark/stylesheet.qss")
+    stylesheet_qss_file.open(QFile.ReadOnly | QFile.Text)
+    stylesheet_data_stream = QTextStream(stylesheet_qss_file)
+    app.setStyleSheet(stylesheet_data_stream.readAll())
+
     main = PhoPipelineMainWindow()
     main.show()
     sys.exit(app.exec())
