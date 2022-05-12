@@ -144,6 +144,7 @@ class SpikeRenderingBaseMixin:
         """
             Ensures that all the unit_ids are valid.
         
+        Called by helper_setup_neuron_colors_and_order(...)
         
         """
         # if self.enable_overwrite_invalid_unit_ids:
@@ -180,7 +181,7 @@ class SpikeRenderingBaseMixin:
             
             
         Uses:
-            SpikeRasterBase
+            SpikeRasterBase's __init__(...) function
         
         """
         # Neurons and sort-orders:

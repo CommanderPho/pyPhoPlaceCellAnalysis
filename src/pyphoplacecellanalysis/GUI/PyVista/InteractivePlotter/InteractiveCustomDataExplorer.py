@@ -44,7 +44,6 @@ class InteractiveCustomDataExplorer(InteractiveDataExplorerBase):
     ######################
     # General Plotting Method:
    
-    # pf_colors, active_config
     def plot(self, pActivePlotter=None, default_plotting=True):
         ################################################
         ### Build Appropriate Plotter and set it up:

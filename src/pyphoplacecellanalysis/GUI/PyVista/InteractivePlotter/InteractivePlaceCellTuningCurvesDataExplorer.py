@@ -62,6 +62,11 @@ class InteractivePlaceCellTuningCurvesDataExplorer(OccupancyPlottingMixin, HideS
         """ e.g. the list of valid cell_ids (unique aclu values) """
         return np.array(self.params.cell_ids) 
     
+    @property
+    def pf_names(self):
+        return self.params.cell_ids
+        # return self.active_session.neurons.neuron_ids
+            
     
     def _setup_variables(self):
         num_cells, spike_list, self.params.cell_ids, self.params.flattened_spike_identities, self.params.flattened_spike_times, flattened_sort_indicies, t_start, self.params.reverse_cellID_idx_lookup_map, t, x, y, linear_pos, speeds, self.params.flattened_spike_positions_list = InteractiveDataExplorerBase._unpack_variables(self.active_session)
@@ -145,11 +150,7 @@ class InteractivePlaceCellTuningCurvesDataExplorer(OccupancyPlottingMixin, HideS
         self.build_tuning_curve_configs()
         self.setup_occupancy_plotting_mixin()
     
-    @property
-    def pf_names(self):
-        return self.params.cell_ids
-        # return self.active_session.neurons.neuron_ids
-            
+
         
     def plot(self, pActivePlotter=None):
         ## Build the new BackgroundPlotter:
