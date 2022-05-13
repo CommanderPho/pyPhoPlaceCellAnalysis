@@ -225,7 +225,7 @@ class Spike3DRaster_Vedo(VedoSpecificTimeCurvesMixin, SpikeRasterBase):
             raise NotImplementedError
         
         if 'neuron_IDX' not in self.spikes_df.columns:
-            # self.spikes_df['neuron_IDX'] = self.spikes_df['unit_id'].copy() # TODO: this is bad! The self.get_neuron_id_and_idx(...) function doesn't work!
+            # self.spikes_df['neuron_IDX'] = self.spikes_df['fragile_linear_neuron_IDX'].copy() # TODO: this is bad! The self.get_neuron_id_and_idx(...) function doesn't work!
             # note that this is very slow, but works:
             print(f'neuron_IDX column missing. rebuilding (this might take a minute or two)...')
             included_cell_INDEXES = np.array([self.get_neuron_id_and_idx(neuron_id=an_included_cell_ID)[0] for an_included_cell_ID in self.spikes_df['aclu'].to_numpy()]) # get the indexes from the cellIDs
@@ -240,7 +240,7 @@ class Spike3DRaster_Vedo(VedoSpecificTimeCurvesMixin, SpikeRasterBase):
             # Compute the y for all windows, not just the current one:
             y = DataSeriesToSpatial.build_series_identity_axis(self.n_cells, center_mode=self.params.center_mode, bin_position_mode='bin_center', side_bin_margins = self.params.side_bin_margins)
             # all_y = [y[a_cell_id] for a_cell_id in self.spikes_df['neuron_IDX'].to_numpy()]
-            all_y = [self.unit_id_to_spatial(self.cell_id_to_unit_id_map[a_cell_id]) for a_cell_id in self.spikes_df['neuron_IDX'].to_numpy()]
+            all_y = [self.fragile_linear_neuron_IDX_to_spatial(self.cell_id_to_fragile_linear_neuron_IDX_map[a_cell_id]) for a_cell_id in self.spikes_df['neuron_IDX'].to_numpy()]
             
             self.spikes_df['visualization_raster_y_location'] = all_y # adds as a column to the dataframe. Only needs to be updated when the number of active units changes
             # max_y_all_data = np.nanmax(all_y) # self.spikes_df['visualization_raster_y_location'] 
@@ -814,17 +814,17 @@ class Spike3DRaster_Vedo(VedoSpecificTimeCurvesMixin, SpikeRasterBase):
         
     
     ## Required for DataSeriesToSpatialTransformingMixin
-    # TODO: convert all instances of self.y[i], etc into using self.unit_id_to_spatial(...)
-    def unit_id_to_spatial(self, unit_ids):
-        """ transforms the unit_ids in unit_ids to a spatial offset (such as the y-positions for a 3D raster plot) """
+    # TODO: convert all instances of self.y[i], etc into using self.fragile_linear_neuron_IDX_to_spatial(...)
+    def fragile_linear_neuron_IDX_to_spatial(self, fragile_linear_neuron_IDXs):
+        """ transforms the fragile_linear_neuron_IDXs in fragile_linear_neuron_IDXs to a spatial offset (such as the y-positions for a 3D raster plot) """
         # build the position range for each unit along the y-axis:
         # rebuild the position range for each unit along the y-axis:
         if self.series_identity_y_values is None:
             # rebuild self.series_identity_y_values
             self.update_series_identity_y_values()
     
-        unit_id_series_indicies = self.unit_sort_order[unit_ids] # get the appropriate series index for each unit_id given their sort order
-        return self.series_identity_y_values[unit_id_series_indicies]
+        fragile_linear_neuron_IDX_series_indicies = self.unit_sort_order[fragile_linear_neuron_IDXs] # get the appropriate series index for each fragile_linear_neuron_IDX given their sort order
+        return self.series_identity_y_values[fragile_linear_neuron_IDX_series_indicies]
     
     
     

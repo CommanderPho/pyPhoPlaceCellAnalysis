@@ -431,7 +431,7 @@ class Spike3DRasterWindowWidget(SpikeRasterLeftSidebarControlsMixin, SpikeRaster
     @QtCore.Slot()
     def on_spikes_df_changed(self):
         """ changes:
-            self.unit_ids
+            self.fragile_linear_neuron_IDXs
             self.n_full_cell_grid
         """
         if self.enable_debug_print:

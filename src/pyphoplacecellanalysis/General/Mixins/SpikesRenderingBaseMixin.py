@@ -141,24 +141,24 @@ class SpikeRenderingBaseMixin:
     # ---- factored out of SpikeRasterBase
     
     @classmethod
-    def overwrite_invalid_unit_ids(cls, spikes_df, neuron_id_to_new_IDX_map):
+    def overwrite_invalid_fragile_linear_neuron_IDXs(cls, spikes_df, neuron_id_to_new_IDX_map):
         """
-            Ensures that all the unit_ids are valid.
+            Ensures that all the fragile_linear_neuron_IDXs are valid.
         
         Called by helper_setup_neuron_colors_and_order(...)
         
         """
-        # if self.enable_overwrite_invalid_unit_ids:
-        print("WARNING: self.enable_overwrite_invalid_unit_ids is True, so dataframe 'unit_id' and 'neuron_IDX' will be overwritten!")
-        spikes_df['old_unit_id'] = spikes_df['unit_id'].copy()
+        # if self.enable_overwrite_invalid_fragile_linear_neuron_IDXs:
+        print("WARNING: self.enable_overwrite_invalid_fragile_linear_neuron_IDXs is True, so dataframe 'fragile_linear_neuron_IDX' and 'neuron_IDX' will be overwritten!")
+        spikes_df['old_fragile_linear_neuron_IDX'] = spikes_df['fragile_linear_neuron_IDX'].copy()
         included_cell_INDEXES = np.array([neuron_id_to_new_IDX_map[an_included_cell_ID] for an_included_cell_ID in spikes_df['aclu'].to_numpy()], dtype=int) # get the indexes from the cellIDs
         print('\t computed included_cell_INDEXES.')
-        spikes_df['unit_id'] = included_cell_INDEXES.copy() # TODO: CRITICAL: why are IDXs being assigned to a property named *_id (unit_id here)??? the _id suffix should always mean that it's the ACLU value, right??
-        print("\t set spikes_df['unit_id']")
+        spikes_df['fragile_linear_neuron_IDX'] = included_cell_INDEXES.copy() # TODO: CRITICAL: why are IDXs being assigned to a property named *_id (fragile_linear_neuron_IDX here)??? the _id suffix should always mean that it's the ACLU value, right??
+        print("\t set spikes_df['fragile_linear_neuron_IDX']")
         # self.spikes_df['neuron_IDX'] = included_cell_INDEXES.copy()
-        spikes_df['neuron_IDX'] = spikes_df['unit_id'].copy()
+        spikes_df['neuron_IDX'] = spikes_df['fragile_linear_neuron_IDX'].copy()
         print("\t set spikes_df['neuron_IDX']")
-        print("\t done updating 'unit_id' and 'neuron_IDX'.")
+        print("\t done updating 'fragile_linear_neuron_IDX' and 'neuron_IDX'.")
         
 
     @classmethod
@@ -167,9 +167,9 @@ class SpikeRenderingBaseMixin:
         raster_plotter: a raster plotter
         
         Requires Properties:
-            .unit_ids, .neuron_ids
+            .fragile_linear_neuron_IDXs, .neuron_ids
             .spikes_df
-            .enable_overwrite_invalid_unit_ids
+            .enable_overwrite_invalid_fragile_linear_neuron_IDXs
 
         Requires Functions:
             .find_neuron_IDXs_from_cell_ids(...)
@@ -177,8 +177,8 @@ class SpikeRenderingBaseMixin:
             
         Sets Properties:
             ._unit_sort_order
-            .cell_id_to_unit_id_map
-            .unit_id_to_cell_id_map
+            .cell_id_to_fragile_linear_neuron_IDX_map
+            .fragile_linear_neuron_IDX_to_cell_id_map
             
             
         Uses:
@@ -186,8 +186,8 @@ class SpikeRenderingBaseMixin:
         
         """
         # Neurons and sort-orders:
-        old_neuron_IDXs = raster_plotter.unit_ids.copy() # backup the old unit_ids
-        print(f'\t\t raster_plotter.unit_ids: {raster_plotter.unit_ids} (len: {len(raster_plotter.unit_ids)})\n \t\t raster_plotter.cell_ids: {raster_plotter.cell_ids} (len: {len(raster_plotter.cell_ids)})')
+        old_neuron_IDXs = raster_plotter.fragile_linear_neuron_IDXs.copy() # backup the old fragile_linear_neuron_IDXs
+        print(f'\t\t raster_plotter.fragile_linear_neuron_IDXs: {raster_plotter.fragile_linear_neuron_IDXs} (len: {len(raster_plotter.fragile_linear_neuron_IDXs)})\n \t\t raster_plotter.cell_ids: {raster_plotter.cell_ids} (len: {len(raster_plotter.cell_ids)})')
         new_neuron_IDXs = raster_plotter.find_neuron_IDXs_from_cell_ids(raster_plotter.neuron_ids)
         print(f'\t\t new_neuron_IDXs: {new_neuron_IDXs} (len(new_neuron_IDXs): {len(new_neuron_IDXs)})')
         # build a map between the old and new neuron_IDXs:
@@ -195,18 +195,18 @@ class SpikeRenderingBaseMixin:
         new_to_old_map = OrderedDict(zip(new_neuron_IDXs, old_neuron_IDXs))
         neuron_id_to_new_IDX_map = OrderedDict(zip(raster_plotter.neuron_ids, new_neuron_IDXs)) # provides the new_IDX corresponding to any neuron_id (aclu value)
         
-        if raster_plotter.enable_overwrite_invalid_unit_ids:
-            print("WARNING: raster_plotter.enable_overwrite_invalid_unit_ids is True, so dataframe 'unit_id' and 'neuron_IDX' will be overwritten!")
-            cls.overwrite_invalid_unit_ids(raster_plotter.spikes_df, neuron_id_to_new_IDX_map)
+        if raster_plotter.enable_overwrite_invalid_fragile_linear_neuron_IDXs:
+            print("WARNING: raster_plotter.enable_overwrite_invalid_fragile_linear_neuron_IDXs is True, so dataframe 'fragile_linear_neuron_IDX' and 'neuron_IDX' will be overwritten!")
+            cls.overwrite_invalid_fragile_linear_neuron_IDXs(raster_plotter.spikes_df, neuron_id_to_new_IDX_map)
         
-        # Build important maps between raster_plotter.unit_ids and raster_plotter.cell_ids:
-        raster_plotter.cell_id_to_unit_id_map = OrderedDict(zip(raster_plotter.cell_ids, raster_plotter.unit_ids)) # maps cell_ids to unit_ids
-        raster_plotter.unit_id_to_cell_id_map = OrderedDict(zip(raster_plotter.unit_ids, raster_plotter.cell_ids)) # maps unit_ids to cell_ids
+        # Build important maps between raster_plotter.fragile_linear_neuron_IDXs and raster_plotter.cell_ids:
+        raster_plotter.cell_id_to_fragile_linear_neuron_IDX_map = OrderedDict(zip(raster_plotter.cell_ids, raster_plotter.fragile_linear_neuron_IDXs)) # maps cell_ids to fragile_linear_neuron_IDXs
+        raster_plotter.fragile_linear_neuron_IDX_to_cell_id_map = OrderedDict(zip(raster_plotter.fragile_linear_neuron_IDXs, raster_plotter.cell_ids)) # maps fragile_linear_neuron_IDXs to cell_ids
         
         if neuron_sort_order is None:
-            neuron_sort_order = np.arange(len(raster_plotter.unit_ids)) # default sort order is sorted by unit_ids
+            neuron_sort_order = np.arange(len(raster_plotter.fragile_linear_neuron_IDXs)) # default sort order is sorted by fragile_linear_neuron_IDXs
         raster_plotter._unit_sort_order = neuron_sort_order
-        assert len(raster_plotter._unit_sort_order) == len(raster_plotter.unit_ids), f"len(raster_plotter._unit_sort_order): {len(raster_plotter._unit_sort_order)} must equal len(raster_plotter.unit_ids): {len(raster_plotter.unit_ids)} but it does not!"
+        assert len(raster_plotter._unit_sort_order) == len(raster_plotter.fragile_linear_neuron_IDXs), f"len(raster_plotter._unit_sort_order): {len(raster_plotter._unit_sort_order)} must equal len(raster_plotter.fragile_linear_neuron_IDXs): {len(raster_plotter.fragile_linear_neuron_IDXs)} but it does not!"
         
         # Setup Coloring:
         raster_plotter._setup_neurons_color_data(neuron_colors, coloring_mode='color_by_index_order')

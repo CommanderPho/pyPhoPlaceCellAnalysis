@@ -74,18 +74,18 @@ def debug_print_identity_properties(spikes_df, debug_print=True):
         
         >> OUTPUT >>:
             debug_print_identity_properties(spikes_df, ...): n_cells=40
-                unit_ids: [ 0  1  2  3  5  6  7  8  9 10 12 15 16 19 20 21 22 23 24 25 26 27 31 32 36 37 40 42 43 44 45 46 51 53 55 56 59 60 61 62]
+                fragile_linear_neuron_IDXs: [ 0  1  2  3  5  6  7  8  9 10 12 15 16 19 20 21 22 23 24 25 26 27 31 32 36 37 40 42 43 44 45 46 51 53 55 56 59 60 61 62]
                 cell_ids: [ 2  3  4  5  7  8  9 10 11 12 14 17 18 21 22 23 24 25 26 27 28 29 33 34 38 39 42 44 45 46 47 48 53 55 57 58 61 62 63 64]
             
     """
     
-    unit_ids = np.unique(spikes_df['unit_id'].to_numpy())
+    fragile_linear_neuron_IDXs = np.unique(spikes_df['fragile_linear_neuron_IDX'].to_numpy())
     cell_ids = np.unique(spikes_df['aclu'].to_numpy())
-    n_cells = len(unit_ids)
+    n_cells = len(fragile_linear_neuron_IDXs)
     if debug_print:
         print(f'debug_print_identity_properties(spikes_df, ...): n_cells={n_cells}')
-        print(f'\t\t unit_ids: {unit_ids}\n \t\t cell_ids: {cell_ids}')
-    return n_cells, unit_ids, cell_ids
+        print(f'\t\t fragile_linear_neuron_IDXs: {fragile_linear_neuron_IDXs}\n \t\t cell_ids: {cell_ids}')
+    return n_cells, fragile_linear_neuron_IDXs, cell_ids
     
     
 

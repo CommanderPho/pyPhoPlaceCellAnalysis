@@ -143,7 +143,7 @@ class Specific3DTimeCurvesHelper:
         # y_map_fn = lambda v: np.full_like(v, -spike_raster_plt_3d.n_half_cells) # This is what places all values along the back wall
         z_map_fn = lambda v_main: v_main + spike_raster_plt_3d.floor_z # returns the un-transformed primary value
         
-        ## we want each test curve to be rendered with a unit_id (series of spikes), so we'll need custom y_map_fn's for each column
+        ## we want each test curve to be rendered with a fragile_linear_neuron_IDX (series of spikes), so we'll need custom y_map_fn's for each column
         num_t_points = np.shape(active_plot_df)[0]
         n_value_columns = np.shape(active_plot_df)[1] - 1 # get the total num columns, then subtract 1 to account for the 0th ('t') column
 
@@ -151,7 +151,7 @@ class Specific3DTimeCurvesHelper:
         # lambda v: np.full_like(v, -spike_raster_plt_3d.n_half_cells)
         # data_series_pre_spatial_to_spatial_mappings = [{'name':'name','x':'t','y':'v_alt','z':'v_main','x_map_fn':x_map_fn,'y_map_fn':y_map_fn,'z_map_fn':z_map_fn} for i in np.arange(1, n_value_columns)]
         # data_series_pre_spatial_to_spatial_mappings = [{'name':'name','x':'t','y':'v_alt','z':'v_main','x_map_fn':x_map_fn,'y_map_fn':(lambda v, bound_i=i: np.full_like(v, bound_i)),'z_map_fn':z_map_fn} for i in np.arange(n_value_columns)]
-        data_series_pre_spatial_to_spatial_mappings = [{'name':'name','x':'t','y':'v_alt','z':'v_main','x_map_fn':x_map_fn,'y_map_fn':(lambda v, bound_i=i: np.full_like(v, spike_raster_plt_3d.unit_id_to_spatial(bound_i))),'z_map_fn':z_map_fn} for i in np.arange(n_value_columns)]
+        data_series_pre_spatial_to_spatial_mappings = [{'name':'name','x':'t','y':'v_alt','z':'v_main','x_map_fn':x_map_fn,'y_map_fn':(lambda v, bound_i=i: np.full_like(v, spike_raster_plt_3d.fragile_linear_neuron_IDX_to_spatial(bound_i))),'z_map_fn':z_map_fn} for i in np.arange(n_value_columns)]
         
         active_test_random_plot_curve_datasource = cls.build_test_3D_time_curves_datasource(active_plot_df, data_series_pre_spatial_to_spatial_mappings)
         # Add the datasource to the actual plotter object: this will cause it to build and add the 3D time curves:
@@ -242,23 +242,23 @@ class Specific3DTimeCurvesHelper:
         # z_map_fn = lambda v_main: v_main + active_curve_plotter_3d.params.spike_end_z + spike_height # returns the un-transformed primary value
         z_map_fn = lambda v_main: v_main + 5.0 # returns the un-transformed primary value
         
-        ## we want each test curve to be rendered with a unit_id (series of spikes), so we'll need custom y_map_fn's for each column
+        ## we want each test curve to be rendered with a fragile_linear_neuron_IDX (series of spikes), so we'll need custom y_map_fn's for each column
         n_value_columns = np.shape(active_plot_df)[1] - 1 # get the total num columns, then subtract 1 to account for the 0th ('t') column
 
         ## want a separate y_map_fn for each data series so it returns the correct index
-        data_series_pre_spatial_to_spatial_mappings = [{'name':'name','x':'t','y':'v_alt','z':'v_main','x_map_fn':x_map_fn,'y_map_fn':(lambda v, bound_i=i: np.full_like(v, active_curve_plotter_3d.unit_id_to_spatial(bound_i))),'z_map_fn':z_map_fn} for i in np.arange(n_value_columns)]
+        data_series_pre_spatial_to_spatial_mappings = [{'name':'name','x':'t','y':'v_alt','z':'v_main','x_map_fn':x_map_fn,'y_map_fn':(lambda v, bound_i=i: np.full_like(v, active_curve_plotter_3d.fragile_linear_neuron_IDX_to_spatial(bound_i))),'z_map_fn':z_map_fn} for i in np.arange(n_value_columns)]
 
         data_col_name_to_unit_plot_color_rgba_map = dict()
         for data_col_name in list(valid_data_values_column_names):
-            curr_color = active_curve_plotter_3d.params.neuron_qcolors_map[active_curve_plotter_3d.cell_id_to_unit_id_map[int(data_col_name)]] # a QColor
+            curr_color = active_curve_plotter_3d.params.neuron_qcolors_map[active_curve_plotter_3d.cell_id_to_fragile_linear_neuron_IDX_map[int(data_col_name)]] # a QColor
             curr_color.setAlphaF(0.2) # set the alpha
             data_col_name_to_unit_plot_color_rgba_map[data_col_name] = curr_color.getRgbF()
             
-        # [active_curve_plotter_3d.params.neuron_qcolors_map[active_curve_plotter_3d.cell_id_to_unit_id_map[int(data_col_name)]].getRgbF() for data_col_name in list(valid_data_values_column_names)]
+        # [active_curve_plotter_3d.params.neuron_qcolors_map[active_curve_plotter_3d.cell_id_to_fragile_linear_neuron_IDX_map[int(data_col_name)]].getRgbF() for data_col_name in list(valid_data_values_column_names)]
         
         active_data_series_pre_spatial_list = [{'name':data_col_name,'t':'t','v_alt':None,'v_main':data_col_name,
                                                 # 'color_name':'black', # this will be overriden by the 'color' value below
-                                                # 'color': active_curve_plotter_3d.params.neuron_qcolors_map[active_curve_plotter_3d.cell_id_to_unit_id_map[int(data_col_name)]].getRgbF(), # gets the color for a specified data_col_name
+                                                # 'color': active_curve_plotter_3d.params.neuron_qcolors_map[active_curve_plotter_3d.cell_id_to_fragile_linear_neuron_IDX_map[int(data_col_name)]].getRgbF(), # gets the color for a specified data_col_name
                                                 'color': data_col_name_to_unit_plot_color_rgba_map[data_col_name], # gets the color for a specified data_col_name
                                                 'line_width': 2.0, 'z_scaling_factor':1.0}
                                                     for data_col_name in list(valid_data_values_column_names)]

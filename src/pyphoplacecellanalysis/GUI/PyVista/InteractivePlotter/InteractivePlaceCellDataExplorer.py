@@ -234,7 +234,7 @@ class InteractivePlaceCellDataExplorer(InteractiveDataExplorerBase):
 
         # TODO: replace with properties that I implemented
         flattened_spike_times = self.active_session.flattened_spiketrains.flattened_spike_times
-        # flattened_spike_active_unitIdentities = self.active_session.flattened_spiketrains.spikes_df['unit_id'].values()
+        # flattened_spike_active_unitIdentities = self.active_session.flattened_spiketrains.spikes_df['fragile_linear_neuron_IDX'].values()
         flattened_spike_active_unitIdentities = self.active_session.flattened_spiketrains.flattened_spike_identities
         # flattened_spike_positions_list = self.active_session.flattened_spiketrains.spikes_df[["x", "y"]].to_numpy().T
         flattened_spike_positions_list = self.params.flattened_spike_positions_list

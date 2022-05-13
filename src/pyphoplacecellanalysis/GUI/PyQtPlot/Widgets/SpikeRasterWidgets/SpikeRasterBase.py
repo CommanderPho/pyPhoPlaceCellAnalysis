@@ -115,7 +115,7 @@ class UnitSortableMixin:
     @property
     def unit_sort_order(self):
         """The unit_sort_order property.
-            Requires self._unit_sort_order to be a ndarray of indicies with the same length as self.unit_ids
+            Requires self._unit_sort_order to be a ndarray of indicies with the same length as self.fragile_linear_neuron_IDXs
         """
         return self._unit_sort_order
     @unit_sort_order.setter
@@ -132,8 +132,8 @@ class SpikeRasterBase(UnitSortableMixin, DataSeriesToSpatialTransformingMixin, N
     
     """ Displays a raster plot with the spikes occuring along a plane. 
     
-    Note: unit_ids: sequentially increasing sequence starting from 0 and going to n_cells - 1. No elements missing:
-    unit_ids: [ 0  1  2  3  4  5  6  7  8  9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39]
+    Note: fragile_linear_neuron_IDXs: sequentially increasing sequence starting from 0 and going to n_cells - 1. No elements missing:
+    fragile_linear_neuron_IDXs: [ 0  1  2  3  4  5  6  7  8  9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39]
     cell_ids: the actual aclu values:
     cell_ids: [ 2  3  4  5  7  8  9 10 11 12 14 17 18 21 22 23 24 25 26 27 28 29 33 34 38 39 42 44 45 46 47 48 53 55 57 58 61 62 63 64]
     neuron_ids: ALIAS for cell_ids
@@ -166,19 +166,19 @@ class SpikeRasterBase(UnitSortableMixin, DataSeriesToSpatialTransformingMixin, N
         return self._spikes_window
     
     @property
-    def unit_ids(self):
-        """The unit_ids from the whole df (not just the current window)"""
-        return np.unique(self.spikes_window.df['unit_id'].to_numpy())
+    def fragile_linear_neuron_IDXs(self):
+        """The fragile_linear_neuron_IDXs from the whole df (not just the current window)"""
+        return np.unique(self.spikes_window.df['fragile_linear_neuron_IDX'].to_numpy())
     
     @property
-    def ordered_unit_ids(self):
+    def ordered_fragile_linear_neuron_IDXs(self):
         """ Requires the self.unit_sort_order property implemented in UnitSortableMixin """
-        return self.unit_ids[self.unit_sort_order]
+        return self.fragile_linear_neuron_IDXs[self.unit_sort_order]
     
     @property
     def n_cells(self):
         """The number_units property."""
-        return len(self.unit_ids)
+        return len(self.fragile_linear_neuron_IDXs)
     @property
     def n_half_cells(self):
         """ """
@@ -197,7 +197,7 @@ class SpikeRasterBase(UnitSortableMixin, DataSeriesToSpatialTransformingMixin, N
     @property
     def cell_ids(self):
         """ e.g. the list of valid cell_ids (unique aclu values) """
-        # return self.unit_ids
+        # return self.fragile_linear_neuron_IDXs
         return np.unique(self.spikes_window.df['aclu'].to_numpy()) 
 
     @property
@@ -273,7 +273,7 @@ class SpikeRasterBase(UnitSortableMixin, DataSeriesToSpatialTransformingMixin, N
             
         self.enable_debug_print = False
         self.enable_debug_widgets = True
-        self.enable_overwrite_invalid_unit_ids = True
+        self.enable_overwrite_invalid_fragile_linear_neuron_IDXs = True
         
         self.enable_show_on_init = should_show
         
@@ -353,7 +353,7 @@ class SpikeRasterBase(UnitSortableMixin, DataSeriesToSpatialTransformingMixin, N
         neuron_colors_list: a list of neuron colors
         
         Requires:
-            self.unit_ids
+            self.fragile_linear_neuron_IDXs
             self.n_cells
         
         Sets:
@@ -363,18 +363,18 @@ class SpikeRasterBase(UnitSortableMixin, DataSeriesToSpatialTransformingMixin, N
             self.params.neuron_colors_hex
         """
         
-        unsorted_unit_ids = self.unit_ids
+        unsorted_fragile_linear_neuron_IDXs = self.fragile_linear_neuron_IDXs
         
         if neuron_colors_list is None:
-            neuron_qcolors_list = DataSeriesColorHelpers._build_cell_color_map(unsorted_unit_ids, mode=coloring_mode, provided_cell_colors=None)
+            neuron_qcolors_list = DataSeriesColorHelpers._build_cell_color_map(unsorted_fragile_linear_neuron_IDXs, mode=coloring_mode, provided_cell_colors=None)
             for a_color in neuron_qcolors_list:
                 a_color.setAlphaF(0.5)
         else:
             ## TODO: otherwise we have some provided colors that we should convert into the correct format
-            neuron_qcolors_list = DataSeriesColorHelpers._build_cell_color_map(unsorted_unit_ids, mode=coloring_mode, provided_cell_colors=neuron_colors_list.copy()) # builts a list of qcolors
+            neuron_qcolors_list = DataSeriesColorHelpers._build_cell_color_map(unsorted_fragile_linear_neuron_IDXs, mode=coloring_mode, provided_cell_colors=neuron_colors_list.copy()) # builts a list of qcolors
                                 
-        # neuron_unit_id_to_colors_index_map = OrderedDict(zip(unsorted_unit_ids, neuron_colors_list))
-        neuron_qcolors_map = OrderedDict(zip(unsorted_unit_ids, neuron_qcolors_list))
+        # neuron_fragile_linear_neuron_IDX_to_colors_index_map = OrderedDict(zip(unsorted_fragile_linear_neuron_IDXs, neuron_colors_list))
+        neuron_qcolors_map = OrderedDict(zip(unsorted_fragile_linear_neuron_IDXs, neuron_qcolors_list))
     
         self.params.neuron_qcolors = deepcopy(neuron_qcolors_list)
         self.params.neuron_qcolors_map = deepcopy(neuron_qcolors_map)
@@ -391,7 +391,7 @@ class SpikeRasterBase(UnitSortableMixin, DataSeriesToSpatialTransformingMixin, N
         # get hex colors:
         #  getting the name of a QColor with .name(QtGui.QColor.HexRgb) results in a string like '#ff0000'
         #  getting the name of a QColor with .name(QtGui.QColor.HexArgb) results in a string like '#80ff0000'
-        self.params.neuron_colors_hex = [self.params.neuron_qcolors[i].name(QtGui.QColor.HexRgb) for i, cell_id in enumerate(self.unit_ids)] 
+        self.params.neuron_colors_hex = [self.params.neuron_qcolors[i].name(QtGui.QColor.HexRgb) for i, cell_id in enumerate(self.fragile_linear_neuron_IDXs)] 
         
        
 
@@ -539,7 +539,7 @@ class SpikeRasterBase(UnitSortableMixin, DataSeriesToSpatialTransformingMixin, N
     @QtCore.pyqtSlot()
     def on_spikes_df_changed(self):
         """ changes:
-            self.unit_ids
+            self.fragile_linear_neuron_IDXs
             self.n_full_cell_grid
         """
         if self.enable_debug_print:

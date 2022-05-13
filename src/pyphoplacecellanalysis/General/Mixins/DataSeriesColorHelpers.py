@@ -16,25 +16,25 @@ class DataSeriesColorHelpers:
     debug_logging = True
     
     @classmethod
-    def _build_cell_color_map(cls, unit_ids, mode='color_by_index_order', debug_print=False):
+    def _build_cell_color_map(cls, fragile_linear_neuron_IDXs, mode='color_by_index_order', debug_print=False):
         """ builds a list of pg.mkColors from the cell index id:     
         Usage:
-            # _build_cell_color_map(spike_raster_plt_3d.unit_ids, mode='color_by_index_order')
-            _build_cell_color_map(spike_raster_plt_3d.unit_ids, mode='preserve_unit_ids')
+            # _build_cell_color_map(spike_raster_plt_3d.fragile_linear_neuron_IDXs, mode='color_by_index_order')
+            _build_cell_color_map(spike_raster_plt_3d.fragile_linear_neuron_IDXs, mode='preserve_fragile_linear_neuron_IDXs')
 
         """
-        n_cells = len(unit_ids)
-        if mode == 'preserve_unit_ids':
-            # color is assigned based off of unit_id value, meaning after re-sorting the unit_ids the colors will appear visually different along y but will correspond to the same units as before the sort.
-            unit_ids_sort_index = np.argsort(unit_ids) # get the indicies of the sorted ids
-            # sorted_unit_ids = np.sort(unit_ids)
-            sorted_unit_ids = np.take_along_axis(unit_ids, unit_ids_sort_index, axis=None)
+        n_cells = len(fragile_linear_neuron_IDXs)
+        if mode == 'preserve_fragile_linear_neuron_IDXs':
+            # color is assigned based off of fragile_linear_neuron_IDX value, meaning after re-sorting the fragile_linear_neuron_IDXs the colors will appear visually different along y but will correspond to the same units as before the sort.
+            fragile_linear_neuron_IDXs_sort_index = np.argsort(fragile_linear_neuron_IDXs) # get the indicies of the sorted ids
+            # sorted_fragile_linear_neuron_IDXs = np.sort(fragile_linear_neuron_IDXs)
+            sorted_fragile_linear_neuron_IDXs = np.take_along_axis(fragile_linear_neuron_IDXs, fragile_linear_neuron_IDXs_sort_index, axis=None)
             if debug_print:
-                print(f'unit_ids: \t\t{unit_ids}\nunit_ids_sort_index: \t{unit_ids_sort_index}\nsorted_unit_ids: \t{sorted_unit_ids}\n')
-            return [pg.mkColor((cell_id, n_cells*1.3)) for i, cell_id in enumerate(sorted_unit_ids)]
+                print(f'fragile_linear_neuron_IDXs: \t\t{fragile_linear_neuron_IDXs}\nfragile_linear_neuron_IDXs_sort_index: \t{fragile_linear_neuron_IDXs_sort_index}\nsorted_fragile_linear_neuron_IDXs: \t{sorted_fragile_linear_neuron_IDXs}\n')
+            return [pg.mkColor((cell_id, n_cells*1.3)) for i, cell_id in enumerate(sorted_fragile_linear_neuron_IDXs)]
         elif mode == 'color_by_index_order':
             # color is assigned based of the raw index order of the passed-in unit ids. This means after re-sorting the units the colors will appear visually the same along y, but will not correspond to the same units.
-            return [pg.mkColor((i, n_cells*1.3)) for i, cell_id in enumerate(unit_ids)]
+            return [pg.mkColor((i, n_cells*1.3)) for i, cell_id in enumerate(fragile_linear_neuron_IDXs)]
         else:
             raise NotImplementedError
 
@@ -54,19 +54,19 @@ class DataSeriesColorHelpers:
         
         raise NotImplementedError
         ## TODO: FATAL: this is a classmethod that has references to self.... clearly has never been used.
-        # unsorted_unit_ids = self.unit_ids
+        # unsorted_fragile_linear_neuron_IDXs = self.fragile_linear_neuron_IDXs
         
         # # if neuron_colors_list is None:
-        # neuron_qcolors_list = cls._build_cell_color_map(unsorted_unit_ids, mode=coloring_mode, provided_cell_colors=neuron_colors_list)
+        # neuron_qcolors_list = cls._build_cell_color_map(unsorted_fragile_linear_neuron_IDXs, mode=coloring_mode, provided_cell_colors=neuron_colors_list)
             
         # for a_color in neuron_qcolors_list:
         #     a_color.setAlphaF(0.5)
             
-        # # neuron_unit_id_to_colors_index_map = OrderedDict(zip(unsorted_unit_ids, neuron_colors_list))
-        # neuron_qcolors_map = OrderedDict(zip(unsorted_unit_ids, neuron_qcolors_list))
+        # # neuron_fragile_linear_neuron_IDX_to_colors_index_map = OrderedDict(zip(unsorted_fragile_linear_neuron_IDXs, neuron_colors_list))
+        # neuron_qcolors_map = OrderedDict(zip(unsorted_fragile_linear_neuron_IDXs, neuron_qcolors_list))
         
         # # neuron_colors = []
-        # # for i, cell_id in enumerate(self.unit_ids):
+        # # for i, cell_id in enumerate(self.fragile_linear_neuron_IDXs):
         # #     curr_color = pg.mkColor((i, self.n_cells*1.3))
         # #     curr_color.setAlphaF(0.5)
         # #     neuron_colors.append(curr_color)
@@ -88,12 +88,12 @@ class DataSeriesColorHelpers:
         # # get hex colors:
         # #  getting the name of a QColor with .name(QtGui.QColor.HexRgb) results in a string like '#ff0000'
         # #  getting the name of a QColor with .name(QtGui.QColor.HexArgb) results in a string like '#80ff0000'
-        # params.neuron_colors_hex = [params.neuron_qcolors[i].name(QtGui.QColor.HexRgb) for i, cell_id in enumerate(self.unit_ids)] 
+        # params.neuron_colors_hex = [params.neuron_qcolors[i].name(QtGui.QColor.HexRgb) for i, cell_id in enumerate(self.fragile_linear_neuron_IDXs)] 
         
         # # included_cell_INDEXES = np.array([self.get_neuron_id_and_idx(neuron_id=an_included_cell_ID)[0] for an_included_cell_ID in spikes_df['aclu'].to_numpy()]) # get the indexes from the cellIDs
         
         # # spikes_df['neuron_IDX'] = included_cell_INDEXES.copy()
-        # # spikes_df['neuron_IDX'] = spikes_df['unit_id'].copy() # TODO: this is bad! The self.get_neuron_id_and_idx(...) function doesn't work!
+        # # spikes_df['neuron_IDX'] = spikes_df['fragile_linear_neuron_IDX'].copy() # TODO: this is bad! The self.get_neuron_id_and_idx(...) function doesn't work!
         # # TODO: Note that the self.get_neuron_id_and_idx(...) fcn depends on having a self.neuron_ids consistent with whatever is trying ot be passed in as the neuron_ids.
         
     
