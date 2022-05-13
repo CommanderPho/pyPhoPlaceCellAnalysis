@@ -241,17 +241,3 @@ class HideShowSpikeRenderingMixin:
         self.spike_exclusion_mask = False # all are included (not in the exclusion mask) to begin.
         self.update_spikes()
 
-    # def change_active_spikes_exclusion_mask(self, included_cell_ids, is_visible):        
-    #     self.spikes_df['render_opacity']
-        
-    # # DEPRICATED:
-    # def hide_placefield_spikes(self, active_original_cell_unit_ids, should_invert=True):
-    #     # print('hide_placefield_spikes(active_index: {}, should_invert: {})'.format(active_original_cell_unit_ids, should_invert))
-    #     mesh = self.plots_data['spikes_pf_active']['historical_spikes_pc'].cast_to_unstructured_grid()
-    #     num_mesh_cells = mesh.n_cells
-    #     ghosts = np.argwhere(np.isin(mesh["cellID"], active_original_cell_unit_ids, invert=should_invert))
-    #     num_ghosts = len(ghosts)
-    #     # print('\t num_mesh_cells: {}, num_ghosts: {}'.format(num_mesh_cells, num_ghosts))
-    #     # This will act on the mesh inplace to mark those cell indices as ghosts
-    #     mesh.remove_cells(ghosts)
-    #     return mesh

@@ -137,8 +137,6 @@ def build_active_spikes_plot_pointdata_df(active_flat_df: pd.DataFrame):
     # spike_history_point_cloud = np.vstack((spike_series_positions[0,:], spike_series_positions[1,:], z_fixed)).T
     spike_history_pdata = pv.PolyData(spike_history_point_cloud)
     # spike_history_pdata['times'] = spike_series_times
-    # spike_history_pdata['cellID'] = active_flat_df['unit_id'].values
-    # spike_history_pdata['cellID'] = active_flat_df['unit_id'].values
     spike_history_pdata['cellID'] = active_flat_df['aclu'].values
     
     if 'render_opacity' in active_flat_df.columns:
