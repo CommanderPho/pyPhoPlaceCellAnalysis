@@ -94,7 +94,7 @@ class InteractivePlaceCellTuningCurvesDataExplorer(OccupancyPlottingMixin, HideS
         
         ## TODO: need to watch out for any refereences to access active_session.neurons.*, as this still will have the invalid IDs. Could re-filter I suppose??
         
-        ## TODO: would need to rebuild: spikes_df['cell_idx'] as well, as these will be wrong after refresh and the lookup functions will thus be wrong as well.
+        ## TODO: would need to rebuild: spikes_df['neuron_IDX'] as well, as these will be wrong after refresh and the lookup functions will thus be wrong as well.
             
             
         

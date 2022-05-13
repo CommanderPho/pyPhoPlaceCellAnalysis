@@ -39,7 +39,7 @@ class SpikeRenderingPyVistaMixin(SpikeRenderingBaseMixin):
         Requires:
             From SpikesDataframeOwningMixin:
                 self.spikes_df
-                self.find_rows_matching_cell_IDXs(self, cell_IDXs)
+                self.find_rows_matching_neuron_IDXs(self, neuron_IDXs)
                 self.find_rows_matching_cell_ids(self, cell_ids)
                 
         Known Uses:
@@ -169,26 +169,26 @@ class HideShowSpikeRenderingMixin:
             self.spikes_df['render_opacity'] = spike_opacity_mask
         self.update_spikes()
             
-    def change_unit_spikes_included(self, cell_IDXs=None, cell_IDs=None, are_included=True):
+    def change_unit_spikes_included(self, neuron_IDXs=None, cell_IDs=None, are_included=True):
         """ Called to update the set of visible spikes for specified cell indicies or IDs
         Args:
             cell_ids ([type]): [description]
             are_included ([type]): [description]
         """
-        assert (cell_IDXs is not None) or (cell_IDs is not None), "You must specify either cell_IDXs or cell_IDs, but not both"
+        assert (neuron_IDXs is not None) or (cell_IDs is not None), "You must specify either neuron_IDXs or cell_IDs, but not both"
         # TODO: could use the NeuronIdentityAccessingMixin helper class
-            # self.get_neuron_id_and_idx(neuron_i=cell_IDXs, cell_ids=cell_ids)
-        if cell_IDXs is not None:
+            # self.get_neuron_id_and_idx(neuron_i=neuron_IDXs, cell_ids=cell_ids)
+        if neuron_IDXs is not None:
             # IDXs mode, preferred.
             if self.debug_logging:
-                print(f'HideShowSpikeRenderingMixin.change_unit_spikes_included(cell_IDXs: {cell_IDXs}, are_included: {are_included}): (note use of Index mode)')            
-            matching_rows = self.find_rows_matching_cell_IDXs(cell_IDXs)
+                print(f'HideShowSpikeRenderingMixin.change_unit_spikes_included(neuron_IDXs: {neuron_IDXs}, are_included: {are_included}): (note use of Index mode)')            
+            matching_rows = self.find_rows_matching_neuron_IDXs(neuron_IDXs)
         else:
             # IDs mode.
             if self.debug_logging:
                 print(f'HideShowSpikeRenderingMixin.change_unit_spikes_included(cell_IDs: {cell_IDs}, are_included: {are_included}): WARNING: cell_ID mode. Indexes are preferred.')
-            # convert cell_IDs to to cell_IDXs for use later in updating the configs
-            cell_IDXs = self.find_cell_IDXs_from_cell_ids(cell_IDs)
+            # convert cell_IDs to to neuron_IDXs for use later in updating the configs
+            neuron_IDXs = self.find_neuron_IDXs_from_cell_ids(cell_IDs)
             matching_rows = self.find_rows_matching_cell_ids(cell_IDs)
 
         # Update the specific rows:
@@ -197,18 +197,18 @@ class HideShowSpikeRenderingMixin:
         # update the configs for these changed neurons:
         assert hasattr(self, 'update_neuron_render_configs'), "self must be of type NeuronConfigOwningMixin to have access to its configs"
         updated_configs = []
-        for an_updated_config_idx in cell_IDXs:
+        for an_updated_config_idx in neuron_IDXs:
             self.active_neuron_render_configs[an_updated_config_idx].spikesVisible = are_included # update the config
             updated_configs.append(self.active_neuron_render_configs[an_updated_config_idx])
         # call the parent (NeuronConfigOwningMixin) function to ensure the configs are updated.
-        self.update_neuron_render_configs(cell_IDXs, updated_configs) # update configs
+        self.update_neuron_render_configs(neuron_IDXs, updated_configs) # update configs
         
 
     def clear_all_spikes_included(self):
         # removes all spikes from inclusion
         if self.debug_logging:
             print(f'HideShowSpikeRenderingMixin.clear_spikes_included(): clearing all spikes.')     
-        self.change_unit_spikes_included(cell_IDXs=self.neuron_config_indicies, are_included=False) # get all indicies, and set them all to excluded
+        self.change_unit_spikes_included(neuron_IDXs=self.neuron_config_indicies, are_included=False) # get all indicies, and set them all to excluded
            
 
     def change_spike_rows_included(self, row_specifier_mask, are_included):

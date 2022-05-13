@@ -21,10 +21,10 @@ from pyphoplacecellanalysis.PhoPositionalData.plotting.mixins.general_plotting_m
 class PlacefieldVisualSelectionWidget(QtWidgets.QWidget):
     """docstring for PlacefieldVisualSelectionWidget."""
  
-    # spike_config_changed = QtCore.pyqtSignal(list, list, bool) # change_unit_spikes_included(self, cell_IDXs=None, cell_IDs=None, are_included=True)
+    # spike_config_changed = QtCore.pyqtSignal(list, list, bool) # change_unit_spikes_included(self, neuron_IDXs=None, cell_IDs=None, are_included=True)
     # tuning_curve_display_config_changed = QtCore.pyqtSignal(list, list) # on_update_tuning_curve_display_config(self, updated_config_indicies, updated_configs)
     
-    spike_config_changed = QtCore.pyqtSignal(bool) # change_unit_spikes_included(self, cell_IDXs=None, cell_IDs=None, are_included=True)
+    spike_config_changed = QtCore.pyqtSignal(bool) # change_unit_spikes_included(self, neuron_IDXs=None, cell_IDs=None, are_included=True)
     tuning_curve_display_config_changed = QtCore.pyqtSignal(list) # on_update_tuning_curve_display_config(self, updated_config_indicies, updated_configs)
     
     # update_signal = QtCore.pyqtSignal(list, list, float, float, list, list, list, list)

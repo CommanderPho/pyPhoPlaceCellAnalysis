@@ -54,10 +54,10 @@ def compute_lap_to_lap_reliability(active_pf, filtered_spikes_df, lap_ids, celli
         sess = curr_kdiba_pipeline.filtered_sessions[curr_result_label]
         # sess = curr_kdiba_pipeline.sess
 
-        curr_cell_idx = 2 
-        # curr_cell_idx = 3 # good for end platform analysis
-        curr_cell_ID = sess.spikes_df.spikes.neuron_ids[curr_cell_idx]
-        print(f'curr_cell_idx: {curr_cell_idx}, curr_cell_ID: {curr_cell_ID}')
+        curr_neuron_IDX = 2 
+        # curr_neuron_IDX = 3 # good for end platform analysis
+        curr_cell_ID = sess.spikes_df.spikes.neuron_ids[curr_neuron_IDX]
+        print(f'curr_neuron_IDX: {curr_neuron_IDX}, curr_cell_ID: {curr_cell_ID}')
 
         # pre-filter by spikes that occur in one of the included laps for the filtered_spikes_df
         filtered_spikes_df = sess.spikes_df.copy()
@@ -66,7 +66,7 @@ def compute_lap_to_lap_reliability(active_pf, filtered_spikes_df, lap_ids, celli
         lap_ids = sess.laps.lap_id
         # lap_flat_idxs = sess.laps.get_lap_flat_indicies(lap_ids)
 
-        out_indicies, out_digitized_position_bins, out, all_laps_reliability = compute_lap_to_lap_reliability(curr_kdiba_pipeline.computation_results[curr_result_label].computed_data['pf2D'], filtered_spikes_df, lap_ids, curr_cell_idx, debug_print=False);
+        out_indicies, out_digitized_position_bins, out, all_laps_reliability = compute_lap_to_lap_reliability(curr_kdiba_pipeline.computation_results[curr_result_label].computed_data['pf2D'], filtered_spikes_df, lap_ids, curr_neuron_IDX, debug_print=False);
 
 
     """

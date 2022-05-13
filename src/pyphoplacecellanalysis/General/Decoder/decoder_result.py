@@ -246,7 +246,7 @@ class DecoderResultDisplayingPlot2D(DecoderResultDisplayingBaseClass):
             print(f'active_window: {active_window}, active_p_x_given_n: {active_p_x_given_n}, active_most_likely_x_position: {active_most_likely_x_position}, active_nearest_measured_position: {active_nearest_measured_position}')
 
         # Plot the main heatmap for this pfmap:
-        # im = plot_single_tuning_map_2D(self.xbin, self.ybin, active_p_x_given_n, self.occupancy, neuron_extended_id=self.ratemap.neuron_extended_ids[cell_idx], drop_below_threshold=drop_below_threshold, brev_mode=brev_mode, plot_mode=plot_mode, ax=curr_ax)
+        # im = plot_single_tuning_map_2D(self.xbin, self.ybin, active_p_x_given_n, self.occupancy, neuron_extended_id=self.ratemap.neuron_extended_ids[neuron_IDX], drop_below_threshold=drop_below_threshold, brev_mode=brev_mode, plot_mode=plot_mode, ax=curr_ax)
         # self.active_im = plot_single_tuning_map_2D(self.xbin, self.ybin, active_p_x_given_n, self.occupancy, drop_below_threshold=None, ax=self.axs)
         # self.active_im = DecoderResultDisplayingPlot2D.plot_single_decoder_result(self.xbin, self.ybin, active_p_x_given_n, drop_below_threshold=None, final_string_components=[f'Decoder Result[i: {self.index}]: time window: {active_window}'], ax=self.axs);
         

@@ -14,12 +14,12 @@ class SpikesDataframeOwningMixin:
         raise NotImplementedError
 
 
-    def find_rows_matching_cell_IDXs(self, cell_IDXs):
+    def find_rows_matching_neuron_IDXs(self, neuron_IDXs):
         """Finds the cell IDXs (not IDs) in the self.spikes_df's appropriate column
         Args:
-            cell_IDXs ([type]): [description]
+            neuron_IDXs ([type]): [description]
         """
-        return np.isin(self.spikes_df['cell_idx'], cell_IDXs)
+        return np.isin(self.spikes_df['neuron_IDX'], neuron_IDXs)
     
     def find_rows_matching_cell_ids(self, cell_ids):
         """Finds the cell original ID in the self.spikes_df's appropriate column
@@ -72,18 +72,18 @@ class SpikeRenderingBaseMixin:
         self.params.opaque_neuron_colors = self.params.neuron_colors[:-1, :].copy() # Drop the opacity component, so we only have RGB values
         
         # Build flat hex colors, creating the self.spikes_df['rgb_hex'] column:
-        flat_spike_hex_colors = np.array([safe_get(self.params.neuron_colors_hex, cell_IDX, '#000000') for cell_IDX in self.spikes_df['cell_idx'].to_numpy()])        
-        # flat_spike_hex_colors = np.array([self.params.neuron_colors_hex[cell_IDX] for cell_IDX in self.spikes_df['cell_idx'].to_numpy()])
+        flat_spike_hex_colors = np.array([safe_get(self.params.neuron_colors_hex, neuron_IDX, '#000000') for neuron_IDX in self.spikes_df['neuron_IDX'].to_numpy()])        
+        # flat_spike_hex_colors = np.array([self.params.neuron_colors_hex[neuron_IDX] for neuron_IDX in self.spikes_df['neuron_IDX'].to_numpy()])
         self.spikes_df['rgb_hex'] = flat_spike_hex_colors.copy()
 
         # if type(self.params.neuron_colors is np.array):
-        unique_cell_indicies = np.unique(self.spikes_df['cell_idx'].to_numpy())
-        max_cell_idx = np.max(unique_cell_indicies)
+        unique_cell_indicies = np.unique(self.spikes_df['neuron_IDX'].to_numpy())
+        max_neuron_IDX = np.max(unique_cell_indicies)
         num_unique_spikes_df_cell_indicies = len(unique_cell_indicies)
         
         # generate a dict of colors with an entry
-        # neuron_colors_dict = {cell_IDX: fallback_color_rgba for cell_IDX in unique_cell_indicies}
-        # pf_opaque_colors_dict = {cell_IDX: fallback_color_rgb for cell_IDX in unique_cell_indicies}
+        # neuron_colors_dict = {neuron_IDX: fallback_color_rgba for neuron_IDX in unique_cell_indicies}
+        # pf_opaque_colors_dict = {neuron_IDX: fallback_color_rgb for neuron_IDX in unique_cell_indicies}
 
         # Flat version:
         self.params.cell_spike_colors_dict = OrderedDict(zip(unique_cell_indicies, num_unique_spikes_df_cell_indicies*[fallback_color_rgba]))
@@ -91,26 +91,26 @@ class SpikeRenderingBaseMixin:
         
         num_neuron_colors = np.shape(self.params.neuron_colors)[0]
         valid_neuron_colors_indicies = np.arange(num_neuron_colors)
-        for cell_IDX in unique_cell_indicies:
-            if cell_IDX in valid_neuron_colors_indicies:
+        for neuron_IDX in unique_cell_indicies:
+            if neuron_IDX in valid_neuron_colors_indicies:
                 # if we have a color for it, use it
-                self.params.cell_spike_colors_dict[cell_IDX] = self.params.neuron_colors[:, cell_IDX]
-                self.params.cell_spike_opaque_colors_dict[cell_IDX] = self.params.opaque_neuron_colors[:, cell_IDX]
+                self.params.cell_spike_colors_dict[neuron_IDX] = self.params.neuron_colors[:, neuron_IDX]
+                self.params.cell_spike_opaque_colors_dict[neuron_IDX] = self.params.opaque_neuron_colors[:, neuron_IDX]
             else:
                 # Otherwise use the fallbacks:
-                self.params.cell_spike_colors_dict[cell_IDX] = fallback_color_rgba
-                self.params.cell_spike_opaque_colors_dict[cell_IDX] = fallback_color_rgb
+                self.params.cell_spike_colors_dict[neuron_IDX] = fallback_color_rgba
+                self.params.cell_spike_opaque_colors_dict[neuron_IDX] = fallback_color_rgb
         
-        # self.params.flat_spike_colors_array = np.array([safe_get(self.params.opaque_neuron_colors, idx, fallback_color) for idx in self.spikes_df['cell_idx'].to_numpy()]) # Drop the opacity component, so we only have RGB values. np.shape(flat_spike_colors) # (77726, 3)
+        # self.params.flat_spike_colors_array = np.array([safe_get(self.params.opaque_neuron_colors, idx, fallback_color) for idx in self.spikes_df['neuron_IDX'].to_numpy()]) # Drop the opacity component, so we only have RGB values. np.shape(flat_spike_colors) # (77726, 3)
         
-        self.params.flat_spike_colors_array = np.array([self.params.cell_spike_opaque_colors_dict.get(idx, fallback_color_rgb) for idx in self.spikes_df['cell_idx'].to_numpy()]) # Drop the opacity component, so we only have RGB values. np.shape(flat_spike_colors) # (77726, 3)
+        self.params.flat_spike_colors_array = np.array([self.params.cell_spike_opaque_colors_dict.get(idx, fallback_color_rgb) for idx in self.spikes_df['neuron_IDX'].to_numpy()]) # Drop the opacity component, so we only have RGB values. np.shape(flat_spike_colors) # (77726, 3)
         
         # if self.debug_logging:
         #     print(f'SpikeRenderingBaseMixin.build_flat_color_data(): built rgb array from neuron_colors, droppping the alpha components: np.shape(self.params.flat_spike_colors_array): {np.shape(self.params.flat_spike_colors_array)}')
         # Add the split RGB columns to the DataFrame
         self.spikes_df[['R','G','B']] = self.params.flat_spike_colors_array
         # RGBA version:
-        # self.params.flat_spike_colors_array = np.array([self.params.neuron_colors[:, idx] for idx in self.spikes_df['cell_idx'].to_numpy()]) # np.shape(flat_spike_colors) # (77726, 4)
+        # self.params.flat_spike_colors_array = np.array([self.params.neuron_colors[:, idx] for idx in self.spikes_df['neuron_IDX'].to_numpy()]) # np.shape(flat_spike_colors) # (77726, 4)
         # self.params.flat_spike_colors_array = np.array([pv.parse_color(spike_color_info.rgb_hex, opacity=spike_color_info.render_opacity) for spike_color_info in self.spikes_df[['rgb_hex', 'render_opacity']].itertuples()])
         # print(f'SpikeRenderMixin.build_flat_color_data(): built combined rgba array from rgb_hex and render_opacity: np.shape(self.params.flat_spike_colors_array): {np.shape(self.params.flat_spike_colors_array)}')
         return self.params.flat_spike_colors_array
@@ -127,11 +127,11 @@ class SpikeRenderingBaseMixin:
                 cell_spike_opaque_colors_dict
             
             # Adds columns to self.spikes_df:
-                'cell_idx', 'rgb_hex','R','G','B'
+                'neuron_IDX', 'rgb_hex','R','G','B'
             
         """
         included_cell_INDEXES = np.array([self.get_neuron_id_and_idx(neuron_id=an_included_cell_ID)[0] for an_included_cell_ID in self.spikes_df['aclu'].to_numpy()]) # get the indexes from the cellIDs
-        self.spikes_df['cell_idx'] = included_cell_INDEXES.copy()
+        self.spikes_df['neuron_IDX'] = included_cell_INDEXES.copy()
         # flat_spike_hex_colors = np.array(flat_spike_hex_colors)
         
         self._build_flat_color_data()
@@ -149,16 +149,16 @@ class SpikeRenderingBaseMixin:
         
         """
         # if self.enable_overwrite_invalid_unit_ids:
-        print("WARNING: self.enable_overwrite_invalid_unit_ids is True, so dataframe 'unit_id' and 'cell_idx' will be overwritten!")
+        print("WARNING: self.enable_overwrite_invalid_unit_ids is True, so dataframe 'unit_id' and 'neuron_IDX' will be overwritten!")
         spikes_df['old_unit_id'] = spikes_df['unit_id'].copy()
         included_cell_INDEXES = np.array([neuron_id_to_new_IDX_map[an_included_cell_ID] for an_included_cell_ID in spikes_df['aclu'].to_numpy()], dtype=int) # get the indexes from the cellIDs
         print('\t computed included_cell_INDEXES.')
         spikes_df['unit_id'] = included_cell_INDEXES.copy() # TODO: CRITICAL: why are IDXs being assigned to a property named *_id (unit_id here)??? the _id suffix should always mean that it's the ACLU value, right??
         print("\t set spikes_df['unit_id']")
-        # self.spikes_df['cell_idx'] = included_cell_INDEXES.copy()
-        spikes_df['cell_idx'] = spikes_df['unit_id'].copy()
-        print("\t set spikes_df['cell_idx']")
-        print("\t done updating 'unit_id' and 'cell_idx'.")
+        # self.spikes_df['neuron_IDX'] = included_cell_INDEXES.copy()
+        spikes_df['neuron_IDX'] = spikes_df['unit_id'].copy()
+        print("\t set spikes_df['neuron_IDX']")
+        print("\t done updating 'unit_id' and 'neuron_IDX'.")
         
 
     @classmethod
@@ -172,7 +172,7 @@ class SpikeRenderingBaseMixin:
             .enable_overwrite_invalid_unit_ids
 
         Requires Functions:
-            .find_cell_IDXs_from_cell_ids(...)
+            .find_neuron_IDXs_from_cell_ids(...)
             ._setup_neurons_color_data(...)
             
         Sets Properties:
@@ -188,7 +188,7 @@ class SpikeRenderingBaseMixin:
         # Neurons and sort-orders:
         old_neuron_IDXs = raster_plotter.unit_ids.copy() # backup the old unit_ids
         print(f'\t\t raster_plotter.unit_ids: {raster_plotter.unit_ids} (len: {len(raster_plotter.unit_ids)})\n \t\t raster_plotter.cell_ids: {raster_plotter.cell_ids} (len: {len(raster_plotter.cell_ids)})')
-        new_neuron_IDXs = raster_plotter.find_cell_IDXs_from_cell_ids(raster_plotter.neuron_ids)
+        new_neuron_IDXs = raster_plotter.find_neuron_IDXs_from_cell_ids(raster_plotter.neuron_ids)
         print(f'\t\t new_neuron_IDXs: {new_neuron_IDXs} (len(new_neuron_IDXs): {len(new_neuron_IDXs)})')
         # build a map between the old and new neuron_IDXs:
         old_to_new_map = OrderedDict(zip(old_neuron_IDXs, new_neuron_IDXs))
@@ -196,7 +196,7 @@ class SpikeRenderingBaseMixin:
         neuron_id_to_new_IDX_map = OrderedDict(zip(raster_plotter.neuron_ids, new_neuron_IDXs)) # provides the new_IDX corresponding to any neuron_id (aclu value)
         
         if raster_plotter.enable_overwrite_invalid_unit_ids:
-            print("WARNING: raster_plotter.enable_overwrite_invalid_unit_ids is True, so dataframe 'unit_id' and 'cell_idx' will be overwritten!")
+            print("WARNING: raster_plotter.enable_overwrite_invalid_unit_ids is True, so dataframe 'unit_id' and 'neuron_IDX' will be overwritten!")
             cls.overwrite_invalid_unit_ids(raster_plotter.spikes_df, neuron_id_to_new_IDX_map)
         
         # Build important maps between raster_plotter.unit_ids and raster_plotter.cell_ids:

@@ -101,8 +101,8 @@ class TimeSynchronizedPlacefieldsPlotter(AnimalTrajectoryPlottingMixin, TimeSync
             if self.enable_debug_print:
                 print(f'a_linear_index: {a_linear_index}, curr_page_relative_linear_index: {curr_page_relative_linear_index}, curr_row: {curr_row}, curr_col: {curr_col}, curr_page_relative_row: {curr_page_relative_row}, curr_page_relative_col: {curr_page_relative_col}, curr_included_unit_index: {curr_included_unit_index}')
                 
-            cell_IDX = curr_included_unit_index
-            cell_ID = self.active_time_dependent_placefields.ratemap.neuron_ids[cell_IDX]
+            neuron_IDX = curr_included_unit_index
+            cell_ID = self.active_time_dependent_placefields.ratemap.neuron_ids[neuron_IDX]
             curr_cell_identifier_string = f'Cell[{cell_ID}]'
             curr_plot_identifier_string = f'pyqtplot_plot_image_array.{curr_cell_identifier_string}'
 

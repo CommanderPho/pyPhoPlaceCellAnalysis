@@ -224,12 +224,12 @@ class Spike3DRaster_Vedo(VedoSpecificTimeCurvesMixin, SpikeRasterBase):
         else:
             raise NotImplementedError
         
-        if 'cell_idx' not in self.spikes_df.columns:
-            # self.spikes_df['cell_idx'] = self.spikes_df['unit_id'].copy() # TODO: this is bad! The self.get_neuron_id_and_idx(...) function doesn't work!
+        if 'neuron_IDX' not in self.spikes_df.columns:
+            # self.spikes_df['neuron_IDX'] = self.spikes_df['unit_id'].copy() # TODO: this is bad! The self.get_neuron_id_and_idx(...) function doesn't work!
             # note that this is very slow, but works:
-            print(f'cell_idx column missing. rebuilding (this might take a minute or two)...')
+            print(f'neuron_IDX column missing. rebuilding (this might take a minute or two)...')
             included_cell_INDEXES = np.array([self.get_neuron_id_and_idx(neuron_id=an_included_cell_ID)[0] for an_included_cell_ID in self.spikes_df['aclu'].to_numpy()]) # get the indexes from the cellIDs
-            self.spikes_df['cell_idx'] = included_cell_INDEXES.copy()
+            self.spikes_df['neuron_IDX'] = included_cell_INDEXES.copy()
 
         # Determine the y-values corresponding to the series identity
         self._series_identity_y_values = None
@@ -239,8 +239,8 @@ class Spike3DRaster_Vedo(VedoSpecificTimeCurvesMixin, SpikeRasterBase):
             print(f'visualization_raster_y_location column missing. rebuilding (this might take a minute or two)...')
             # Compute the y for all windows, not just the current one:
             y = DataSeriesToSpatial.build_series_identity_axis(self.n_cells, center_mode=self.params.center_mode, bin_position_mode='bin_center', side_bin_margins = self.params.side_bin_margins)
-            # all_y = [y[a_cell_id] for a_cell_id in self.spikes_df['cell_idx'].to_numpy()]
-            all_y = [self.unit_id_to_spatial(self.cell_id_to_unit_id_map[a_cell_id]) for a_cell_id in self.spikes_df['cell_idx'].to_numpy()]
+            # all_y = [y[a_cell_id] for a_cell_id in self.spikes_df['neuron_IDX'].to_numpy()]
+            all_y = [self.unit_id_to_spatial(self.cell_id_to_unit_id_map[a_cell_id]) for a_cell_id in self.spikes_df['neuron_IDX'].to_numpy()]
             
             self.spikes_df['visualization_raster_y_location'] = all_y # adds as a column to the dataframe. Only needs to be updated when the number of active units changes
             # max_y_all_data = np.nanmax(all_y) # self.spikes_df['visualization_raster_y_location'] 

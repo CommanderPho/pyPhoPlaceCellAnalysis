@@ -91,8 +91,8 @@ def pyqtplot_plot_image_array(xbin_edges, ybin_edges, images, occupancy, max_num
         if debug_print:
             print(f'a_linear_index: {a_linear_index}, curr_page_relative_linear_index: {curr_page_relative_linear_index}, curr_row: {curr_row}, curr_col: {curr_col}, curr_page_relative_row: {curr_page_relative_row}, curr_page_relative_col: {curr_page_relative_col}, curr_included_unit_index: {curr_included_unit_index}')
 
-        cell_idx = curr_included_unit_index
-        curr_cell_identifier_string = f'Cell[{cell_idx}]'
+        neuron_IDX = curr_included_unit_index
+        curr_cell_identifier_string = f'Cell[{neuron_IDX}]'
         curr_plot_identifier_string = f'pyqtplot_plot_image_array.{curr_cell_identifier_string}'
 
         image = np.squeeze(images[a_linear_index,:,:])
@@ -118,7 +118,7 @@ def pyqtplot_plot_image_array(xbin_edges, ybin_edges, images, occupancy, max_num
         # curr_plot.setLabel('bottom', "Label to test offset")
         
         # # Overlay cell identifier text:
-        # curr_label = pg.TextItem(f'Cell[{cell_idx}]', color=(230, 230, 230))
+        # curr_label = pg.TextItem(f'Cell[{neuron_IDX}]', color=(230, 230, 230))
         # curr_label.setPos(30, 60)
         # curr_label.setParentItem(img_item)
         # # curr_plot.addItem(curr_label, ignoreBounds=True)

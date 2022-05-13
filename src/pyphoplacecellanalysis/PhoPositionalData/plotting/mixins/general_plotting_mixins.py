@@ -45,7 +45,7 @@ class NeuronConfigOwningMixin:
         return np.arange(self.num_neuron_configs)
     
         
-    # , cell_IDXs=None, cell_IDs=None
+    # , neuron_IDXs=None, cell_IDs=None
     def update_neuron_render_configs(self, updated_config_indicies, updated_configs):
         # TODO: NON-EXPLICIT INDEXING
         """Updates the configs for the cells with the specified updated_config_indicies
