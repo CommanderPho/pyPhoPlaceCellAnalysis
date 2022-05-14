@@ -153,21 +153,12 @@ class SpikeRenderingBaseMixin:
         Called by helper_setup_neuron_colors_and_order(...)
         
         """
-        # if self.enable_overwrite_invalid_fragile_linear_neuron_IDXs:
         print("WARNING: self.enable_overwrite_invalid_fragile_linear_neuron_IDXs is True, so dataframe 'fragile_linear_neuron_IDX' and 'neuron_IDX' will be overwritten!")
-        spikes_df['old_fragile_linear_neuron_IDX'] = spikes_df['fragile_linear_neuron_IDX'].copy()
-        included_cell_INDEXES = np.array([neuron_id_to_new_IDX_map[an_included_cell_ID] for an_included_cell_ID in spikes_df['aclu'].to_numpy()], dtype=int) # get the indexes from the cellIDs
-        print('\t computed included_cell_INDEXES.')
-        spikes_df['fragile_linear_neuron_IDX'] = included_cell_INDEXES.copy() # TODO: CRITICAL: why are IDXs being assigned to a property named *_id (fragile_linear_neuron_IDX here)??? the _id suffix should always mean that it's the ACLU value, right??
-        print("\t set spikes_df['fragile_linear_neuron_IDX']")
-        # self.spikes_df['neuron_IDX'] = included_cell_INDEXES.copy()
-        spikes_df['neuron_IDX'] = spikes_df['fragile_linear_neuron_IDX'].copy()
-        print("\t set spikes_df['neuron_IDX']")
-        print("\t done updating 'fragile_linear_neuron_IDX' and 'neuron_IDX'.")
+        return spikes_df.spikes.overwrite_invalid_fragile_linear_neuron_IDXs(neuron_id_to_new_IDX_map)
         
 
     @classmethod
-    def helper_setup_neuron_colors_and_order(cls, raster_plotter, neuron_colors=None, neuron_sort_order=None):
+    def helper_setup_neuron_colors_and_order(cls, raster_plotter, neuron_colors=None, neuron_sort_order=None, debug_print=False):
         """ 
         raster_plotter: a raster plotter
         
@@ -192,17 +183,26 @@ class SpikeRenderingBaseMixin:
         """
         # Neurons and sort-orders:
         old_neuron_IDXs = raster_plotter.fragile_linear_neuron_IDXs.copy() # backup the old fragile_linear_neuron_IDXs
-        print(f'\t\t raster_plotter.fragile_linear_neuron_IDXs: {raster_plotter.fragile_linear_neuron_IDXs} (len: {len(raster_plotter.fragile_linear_neuron_IDXs)})\n \t\t raster_plotter.cell_ids: {raster_plotter.cell_ids} (len: {len(raster_plotter.cell_ids)})')
+        if debug_print:
+            print(f'\t\t raster_plotter.fragile_linear_neuron_IDXs: {raster_plotter.fragile_linear_neuron_IDXs} (len: {len(raster_plotter.fragile_linear_neuron_IDXs)})\n \t\t raster_plotter.cell_ids: {raster_plotter.cell_ids} (len: {len(raster_plotter.cell_ids)})')
         new_neuron_IDXs = raster_plotter.find_neuron_IDXs_from_cell_ids(raster_plotter.neuron_ids) # Why "find"? Can't they just be defined/built?
-        print(f'\t\t new_neuron_IDXs: {new_neuron_IDXs} (len(new_neuron_IDXs): {len(new_neuron_IDXs)})')
+        if debug_print:
+            print(f'\t\t new_neuron_IDXs: {new_neuron_IDXs} (len(new_neuron_IDXs): {len(new_neuron_IDXs)})')
         # build a map between the old and new neuron_IDXs:
-        # old_to_new_map = OrderedDict(zip(old_neuron_IDXs, new_neuron_IDXs))
-        # new_to_old_map = OrderedDict(zip(new_neuron_IDXs, old_neuron_IDXs))
         neuron_id_to_new_IDX_map = OrderedDict(zip(raster_plotter.neuron_ids, new_neuron_IDXs)) # provides the new_IDX corresponding to any neuron_id (aclu value)
         
         if raster_plotter.enable_overwrite_invalid_fragile_linear_neuron_IDXs:
-            print("WARNING: raster_plotter.enable_overwrite_invalid_fragile_linear_neuron_IDXs is True, so dataframe 'fragile_linear_neuron_IDX' and 'neuron_IDX' will be overwritten!")
-            cls.overwrite_invalid_fragile_linear_neuron_IDXs(raster_plotter.spikes_df, neuron_id_to_new_IDX_map)
+            if debug_print:
+                print("WARNING: raster_plotter.enable_overwrite_invalid_fragile_linear_neuron_IDXs is True, so dataframe 'fragile_linear_neuron_IDX' and 'neuron_IDX' will be overwritten!")
+            # cls.overwrite_invalid_fragile_linear_neuron_IDXs(raster_plotter.spikes_df, neuron_id_to_new_IDX_map)
+            ## Identical way:
+            # raster_plotter.spikes_df.spikes.overwrite_invalid_fragile_linear_neuron_IDXs(neuron_id_to_new_IDX_map)
+            ## Potentially Better Way:
+            raster_plotter.spikes_df.spikes._obj, neuron_id_to_new_IDX_map_new_method = raster_plotter.spikes_df.spikes.rebuild_fragile_linear_neuron_IDXs(debug_print=debug_print)
+
+            ## TODO: check that are completely equal:
+            assert (list(neuron_id_to_new_IDX_map.values()) == list(neuron_id_to_new_IDX_map_new_method.values())), f"list(neuron_id_to_new_IDX_map.values()): {list(neuron_id_to_new_IDX_map.values())}\nlist(neuron_id_to_new_IDX_map_new_method.values()): {list(neuron_id_to_new_IDX_map_new_method.values())} should be equal but are NOT!"
+        
         
         # Build important maps between raster_plotter.fragile_linear_neuron_IDXs and raster_plotter.cell_ids:
         raster_plotter.cell_id_to_fragile_linear_neuron_IDX_map = OrderedDict(zip(raster_plotter.cell_ids, raster_plotter.fragile_linear_neuron_IDXs)) # maps cell_ids to fragile_linear_neuron_IDXs

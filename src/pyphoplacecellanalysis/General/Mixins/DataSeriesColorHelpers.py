@@ -94,8 +94,9 @@ class DataSeriesColorHelpers:
         # # TODO: Note that the self.get_neuron_id_and_idx(...) fcn depends on having a self.neuron_ids consistent with whatever is trying ot be passed in as the neuron_ids.
         
     
-    def setup_neurons_color_data(self, neuron_colors_list, coloring_mode='color_by_index_order'):
-        return DataSeriesColorHelpers._setup_neurons_color_data(self.params, self.spikes_df, neuron_colors_list=neuron_colors_list, coloring_mode=coloring_mode)
+    
+    # def setup_neurons_color_data(self, neuron_colors_list, coloring_mode='color_by_index_order'):
+    #     return DataSeriesColorHelpers._setup_neurons_color_data(self.params, self.spikes_df, neuron_colors_list=neuron_colors_list, coloring_mode=coloring_mode)
         
     @classmethod
     def _build_flat_color_data(cls, params, spikes_df, fallback_color_rgba = (0, 0, 0, 1.0)):
@@ -167,7 +168,7 @@ class DataSeriesColorHelpers:
     
     
     
-    def build_flat_color_data(self, fallback_color_rgba = (0, 0, 0, 1.0)):
-        return DataSeriesColorHelpers._build_flat_color_data(self.params, self.spikes_df, fallback_color_rgba=fallback_color_rgba)
+    # def build_flat_color_data(self, fallback_color_rgba = (0, 0, 0, 1.0)):
+    #     return DataSeriesColorHelpers._build_flat_color_data(self.params, self.spikes_df, fallback_color_rgba=fallback_color_rgba)
         
         
