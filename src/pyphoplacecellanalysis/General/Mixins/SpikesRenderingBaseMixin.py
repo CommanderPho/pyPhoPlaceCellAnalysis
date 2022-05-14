@@ -44,6 +44,7 @@ class SpikeRenderingBaseMixin:
         SpikeRasterBase (and all of its subclasses)
         
     TODO: why does this seem to duplicate nearly all the functionality in DataSeriesColorHelpers???
+        I think the answer is because this mixin existed first, and DataSeriesColorHelpers was created in an attempt to generalize and centralize this functionality. 
     """
     
     def _build_flat_color_data(self, fallback_color_rgba = (0, 0, 0, 1.0)):
@@ -130,6 +131,10 @@ class SpikeRenderingBaseMixin:
                 'neuron_IDX', 'rgb_hex','R','G','B'
             
         """
+        
+        ## TODO: IMPORTANT: I think we should overwrite_invalid_fragile_linear_neuron_IDXs before doing this, as correct results from self.get_neuron_id_and_idx(...) depend on valid values for self.fragile_linear_neuron_IDXs and self.neuron_ids
+
+        
         included_cell_INDEXES = np.array([self.get_neuron_id_and_idx(neuron_id=an_included_cell_ID)[0] for an_included_cell_ID in self.spikes_df['aclu'].to_numpy()]) # get the indexes from the cellIDs
         self.spikes_df['neuron_IDX'] = included_cell_INDEXES.copy()
         # flat_spike_hex_colors = np.array(flat_spike_hex_colors)
@@ -191,8 +196,8 @@ class SpikeRenderingBaseMixin:
         new_neuron_IDXs = raster_plotter.find_neuron_IDXs_from_cell_ids(raster_plotter.neuron_ids) # Why "find"? Can't they just be defined/built?
         print(f'\t\t new_neuron_IDXs: {new_neuron_IDXs} (len(new_neuron_IDXs): {len(new_neuron_IDXs)})')
         # build a map between the old and new neuron_IDXs:
-        old_to_new_map = OrderedDict(zip(old_neuron_IDXs, new_neuron_IDXs))
-        new_to_old_map = OrderedDict(zip(new_neuron_IDXs, old_neuron_IDXs))
+        # old_to_new_map = OrderedDict(zip(old_neuron_IDXs, new_neuron_IDXs))
+        # new_to_old_map = OrderedDict(zip(new_neuron_IDXs, old_neuron_IDXs))
         neuron_id_to_new_IDX_map = OrderedDict(zip(raster_plotter.neuron_ids, new_neuron_IDXs)) # provides the new_IDX corresponding to any neuron_id (aclu value)
         
         if raster_plotter.enable_overwrite_invalid_fragile_linear_neuron_IDXs:

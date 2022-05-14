@@ -348,9 +348,10 @@ class SpikeRasterBase(UnitSortableMixin, DataSeriesToSpatialTransformingMixin, N
     
     """ Cell Coloring functions:
     """
-    def _setup_neurons_color_data(self, neuron_colors_list, coloring_mode='color_by_index_order'):
+    def _setup_neurons_color_data(self, neuron_colors_list=None, coloring_mode='color_by_index_order'):
         """ 
         neuron_colors_list: a list of neuron colors
+            if None provided will call DataSeriesColorHelpers._build_cell_color_map(...) to build them.
         
         Requires:
             self.fragile_linear_neuron_IDXs
@@ -361,6 +362,10 @@ class SpikeRasterBase(UnitSortableMixin, DataSeriesToSpatialTransformingMixin, N
             self.params.neuron_qcolors_map
             self.params.neuron_colors: ndarray of shape (4, self.n_cells)
             self.params.neuron_colors_hex
+            
+
+        Known Calls: Seemingly only called from:
+            SpikesRenderingBaseMixin.helper_setup_neuron_colors_and_order(...)
         """
         
         unsorted_fragile_linear_neuron_IDXs = self.fragile_linear_neuron_IDXs
