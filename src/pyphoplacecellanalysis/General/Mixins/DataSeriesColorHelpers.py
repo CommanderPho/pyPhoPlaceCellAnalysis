@@ -16,7 +16,7 @@ class DataSeriesColorHelpers:
     debug_logging = True
     
     @classmethod
-    def _build_cell_color_map(cls, fragile_linear_neuron_IDXs, mode='color_by_index_order', debug_print=False):
+    def _build_cell_color_map(cls, fragile_linear_neuron_IDXs, mode='color_by_index_order', provided_cell_colors=None, debug_print=False):
         """ builds a list of pg.mkColors from the cell index id:     
         Usage:
             # _build_cell_color_map(spike_raster_plt_3d.fragile_linear_neuron_IDXs, mode='color_by_index_order')
