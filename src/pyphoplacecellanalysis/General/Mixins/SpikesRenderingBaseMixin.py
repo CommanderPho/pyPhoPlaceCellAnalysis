@@ -188,7 +188,7 @@ class SpikeRenderingBaseMixin:
         # Neurons and sort-orders:
         old_neuron_IDXs = raster_plotter.fragile_linear_neuron_IDXs.copy() # backup the old fragile_linear_neuron_IDXs
         print(f'\t\t raster_plotter.fragile_linear_neuron_IDXs: {raster_plotter.fragile_linear_neuron_IDXs} (len: {len(raster_plotter.fragile_linear_neuron_IDXs)})\n \t\t raster_plotter.cell_ids: {raster_plotter.cell_ids} (len: {len(raster_plotter.cell_ids)})')
-        new_neuron_IDXs = raster_plotter.find_neuron_IDXs_from_cell_ids(raster_plotter.neuron_ids)
+        new_neuron_IDXs = raster_plotter.find_neuron_IDXs_from_cell_ids(raster_plotter.neuron_ids) # Why "find"? Can't they just be defined/built?
         print(f'\t\t new_neuron_IDXs: {new_neuron_IDXs} (len(new_neuron_IDXs): {len(new_neuron_IDXs)})')
         # build a map between the old and new neuron_IDXs:
         old_to_new_map = OrderedDict(zip(old_neuron_IDXs, new_neuron_IDXs))

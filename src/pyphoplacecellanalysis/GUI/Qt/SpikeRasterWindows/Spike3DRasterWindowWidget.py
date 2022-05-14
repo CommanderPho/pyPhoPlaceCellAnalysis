@@ -39,6 +39,7 @@ class Spike3DRasterWindowWidget(SpikeRasterLeftSidebarControlsMixin, SpikeRaster
     windowName = 'Spike3DRasterWindow'
     
     enable_debug_print = False
+    enable_interaction_events_debug_print = False
     
     # TODO: add signals here:
     
@@ -59,7 +60,11 @@ class Spike3DRasterWindowWidget(SpikeRasterLeftSidebarControlsMixin, SpikeRaster
     def spikes_window(self, value):
         self.spike_raster_plt_2d.spikes_window = value
 
-
+    @property
+    def should_debug_print_interaction_events(self):
+        """ Whether to debug print user interaction events like mouse clicks, mouse wheel, key presses, etc. """
+        return (self.enable_debug_print and Spike3DRasterWindowWidget.enable_interaction_events_debug_print)
+    
 
 
 
@@ -481,17 +486,19 @@ class Spike3DRasterWindowWidget(SpikeRasterLeftSidebarControlsMixin, SpikeRaster
 
     ##-----------------------------------------
     def keyPressEvent(self, event):
-        print(f'pressed from Spike3DRasterWindowWidget.keyPressEvent(event): {event.key()}')
-        print(f'\t event.modifiers(): {event.modifiers()}')
-        # e.Modifiers()
-        print('event received @ Spike3DRasterWindowWidget')
+        if self.should_debug_print_interaction_events:
+            print(f'pressed from Spike3DRasterWindowWidget.keyPressEvent(event): {event.key()}')
+            print(f'\t event.modifiers(): {event.modifiers()}')
+            # e.Modifiers()
+            print('event received @ Spike3DRasterWindowWidget')
         super(Spike3DRasterWindowWidget, self).keyPressEvent(event)
-        if event.key() == Qt.Key_Space:
-            print(f'\t detected event: {event.key()}')
-        elif event.key() == QtCore.Qt.Key_0:
-            print(f'\t detected event: {event.key()}')
-        else:
-            print(f'\t undetected event')
+        if self.should_debug_print_interaction_events:
+            if event.key() == Qt.Key_Space:
+                print(f'\t detected event: {event.key()}')
+            elif event.key() == QtCore.Qt.Key_0:
+                print(f'\t detected event: {event.key()}')
+            else:
+                print(f'\t undetected event')
         # self.keyPressed.emit(event)
 
     ##-----------------------------------------
@@ -505,10 +512,12 @@ class Spike3DRasterWindowWidget(SpikeRasterLeftSidebarControlsMixin, SpikeRaster
         # print(f'Spike3DRasterWindowWidget.eventFilter(self, watched, event)')
         if event.type() == QtCore.QEvent.GraphicsSceneWheel:
             # QtCore.QEvent.GraphicsSceneWheel
-            print(f'Spike3DRasterWindowWidget.eventFilter(...)\n\t detected event.type() == QtCore.QEvent.GraphicsSceneWheel')
+            if self.should_debug_print_interaction_events:
+                print(f'Spike3DRasterWindowWidget.eventFilter(...)\n\t detected event.type() == QtCore.QEvent.GraphicsSceneWheel')
             return True
         else:
-            print(f'\t unhandled event {QEventLookupHelpers.get_event_string(event)}')
+            if self.should_debug_print_interaction_events:
+                print(f'\t unhandled event {QEventLookupHelpers.get_event_string(event)}')
         # If not a particularlly handled case, do the default thing.
         return super().eventFilter(watched, event)
     
@@ -516,11 +525,12 @@ class Spike3DRasterWindowWidget(SpikeRasterLeftSidebarControlsMixin, SpikeRaster
     ##-----------------------------------------
     def wheelEvent(self, event):
         super(Spike3DRasterWindowWidget, self).wheelEvent(event)
-        print(f'Spike3DRasterWindowWidget.wheelEvent(...)')
-        # self.x = self.x + event.delta()/120
-        # print self.x
-        # self.label.setText("Total Steps: "+QString.number(self.x))        
-        print(f'\t wheelEvent(event: {event}')
+        if self.should_debug_print_interaction_events:
+            print(f'Spike3DRasterWindowWidget.wheelEvent(...)')
+            # self.x = self.x + event.delta()/120
+            # print self.x
+            # self.label.setText("Total Steps: "+QString.number(self.x))        
+            print(f'\t wheelEvent(event: {event}')
     
 
     
