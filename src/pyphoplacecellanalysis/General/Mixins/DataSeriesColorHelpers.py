@@ -6,12 +6,9 @@ import pyphoplacecellanalysis.External.pyqtgraph as pg
 from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtCore, QtGui
 
 class DataSeriesColorHelpers:
-    """ Implementors render spikes from neural data in 3D 
-        Requires:
-            From SpikesDataframeOwningMixin:
-                self.spikes_df
-                self.find_rows_matching_neuron_IDXs(self, neuron_IDXs)
-                self.find_rows_matching_cell_ids(self, cell_ids)
+    """ An attempt to factor out the common color-related functionality from SpikeRenderingBaseMixin since this functionality is not specific to spike visualizations, for example it's needed to properly color placefields or indicate neuron identities in general.
+        
+        OBJECTIVE: Implement only @classmethod functions on this class.
     """
     debug_logging = True
     
@@ -102,7 +99,7 @@ class DataSeriesColorHelpers:
         
     @classmethod
     def _build_flat_color_data(cls, params, spikes_df, fallback_color_rgba = (0, 0, 0, 1.0)):
-        """ Called only by self.setup_spike_rendering_mixin()
+        """ Refactored from SpikeRenderingBaseMixin
         
         # Adds to params:
             opaque_pf_colors
