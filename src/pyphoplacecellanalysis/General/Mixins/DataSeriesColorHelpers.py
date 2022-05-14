@@ -40,61 +40,61 @@ class DataSeriesColorHelpers:
 
     """ Cell Coloring functions:
     """
-    @classmethod
-    def _setup_neurons_color_data(cls, params, spikes_df, neuron_colors_list=None, coloring_mode='color_by_index_order'):
-        """ 
-        neuron_colors_list: a list of neuron colors
+    # @classmethod
+    # def _setup_neurons_color_data(cls, params, spikes_df, neuron_colors_list=None, coloring_mode='color_by_index_order'):
+    #     """ 
+    #     neuron_colors_list: a list of neuron colors
         
-        Sets:
-            params.neuron_qcolors
-            params.neuron_qcolors_map
-            params.neuron_colors: ndarray of shape (4, self.n_cells)
-            params.neuron_colors_hex
-        """
+    #     Sets:
+    #         params.neuron_qcolors
+    #         params.neuron_qcolors_map
+    #         params.neuron_colors: ndarray of shape (4, self.n_cells)
+    #         params.neuron_colors_hex
+    #     """
         
-        raise NotImplementedError
-        ## TODO: FATAL: this is a classmethod that has references to self.... clearly has never been used.
-        # unsorted_fragile_linear_neuron_IDXs = self.fragile_linear_neuron_IDXs
+    #     raise NotImplementedError
+    #     ## TODO: FATAL: this is a classmethod that has references to self.... clearly has never been used.
+    #     # unsorted_fragile_linear_neuron_IDXs = self.fragile_linear_neuron_IDXs
         
-        # # if neuron_colors_list is None:
-        # neuron_qcolors_list = cls._build_cell_color_map(unsorted_fragile_linear_neuron_IDXs, mode=coloring_mode, provided_cell_colors=neuron_colors_list)
+    #     # # if neuron_colors_list is None:
+    #     # neuron_qcolors_list = cls._build_cell_color_map(unsorted_fragile_linear_neuron_IDXs, mode=coloring_mode, provided_cell_colors=neuron_colors_list)
             
-        # for a_color in neuron_qcolors_list:
-        #     a_color.setAlphaF(0.5)
+    #     # for a_color in neuron_qcolors_list:
+    #     #     a_color.setAlphaF(0.5)
             
-        # # neuron_fragile_linear_neuron_IDX_to_colors_index_map = OrderedDict(zip(unsorted_fragile_linear_neuron_IDXs, neuron_colors_list))
-        # neuron_qcolors_map = OrderedDict(zip(unsorted_fragile_linear_neuron_IDXs, neuron_qcolors_list))
+    #     # # neuron_fragile_linear_neuron_IDX_to_colors_index_map = OrderedDict(zip(unsorted_fragile_linear_neuron_IDXs, neuron_colors_list))
+    #     # neuron_qcolors_map = OrderedDict(zip(unsorted_fragile_linear_neuron_IDXs, neuron_qcolors_list))
         
-        # # neuron_colors = []
-        # # for i, cell_id in enumerate(self.fragile_linear_neuron_IDXs):
-        # #     curr_color = pg.mkColor((i, self.n_cells*1.3))
-        # #     curr_color.setAlphaF(0.5)
-        # #     neuron_colors.append(curr_color)
+    #     # # neuron_colors = []
+    #     # # for i, cell_id in enumerate(self.fragile_linear_neuron_IDXs):
+    #     # #     curr_color = pg.mkColor((i, self.n_cells*1.3))
+    #     # #     curr_color.setAlphaF(0.5)
+    #     # #     neuron_colors.append(curr_color)
     
-        # params.neuron_qcolors = deepcopy(neuron_qcolors_list)
-        # params.neuron_qcolors_map = deepcopy(neuron_qcolors_map)
+    #     # params.neuron_qcolors = deepcopy(neuron_qcolors_list)
+    #     # params.neuron_qcolors_map = deepcopy(neuron_qcolors_map)
 
-        # # allocate new neuron_colors array:
-        # params.neuron_colors = np.zeros((4, self.n_cells))
-        # for i, curr_qcolor in enumerate(params.neuron_qcolors):
-        #     curr_color = curr_qcolor.getRgbF() # (1.0, 0.0, 0.0, 0.5019607843137255)
-        #     params.neuron_colors[:, i] = curr_color[:]
+    #     # # allocate new neuron_colors array:
+    #     # params.neuron_colors = np.zeros((4, self.n_cells))
+    #     # for i, curr_qcolor in enumerate(params.neuron_qcolors):
+    #     #     curr_color = curr_qcolor.getRgbF() # (1.0, 0.0, 0.0, 0.5019607843137255)
         #     # params.neuron_colors[:, i] = curr_color[:]
+    #     #     # params.neuron_colors[:, i] = curr_color[:]
         
-        # params.neuron_colors_hex = None
+    #     # params.neuron_colors_hex = None
         
-        # # spike_raster_plt.params.neuron_colors[0].getRgbF() # (1.0, 0.0, 0.0, 0.5019607843137255)
+    #     # # spike_raster_plt.params.neuron_colors[0].getRgbF() # (1.0, 0.0, 0.0, 0.5019607843137255)
         
-        # # get hex colors:
-        # #  getting the name of a QColor with .name(QtGui.QColor.HexRgb) results in a string like '#ff0000'
-        # #  getting the name of a QColor with .name(QtGui.QColor.HexArgb) results in a string like '#80ff0000'
-        # params.neuron_colors_hex = [params.neuron_qcolors[i].name(QtGui.QColor.HexRgb) for i, cell_id in enumerate(self.fragile_linear_neuron_IDXs)] 
+    #     # # get hex colors:
+    #     # #  getting the name of a QColor with .name(QtGui.QColor.HexRgb) results in a string like '#ff0000'
+    #     # #  getting the name of a QColor with .name(QtGui.QColor.HexArgb) results in a string like '#80ff0000'
+    #     # params.neuron_colors_hex = [params.neuron_qcolors[i].name(QtGui.QColor.HexRgb) for i, cell_id in enumerate(self.fragile_linear_neuron_IDXs)] 
         
-        # # included_cell_INDEXES = np.array([self.get_neuron_id_and_idx(neuron_id=an_included_cell_ID)[0] for an_included_cell_ID in spikes_df['aclu'].to_numpy()]) # get the indexes from the cellIDs
+    #     # # included_cell_INDEXES = np.array([self.get_neuron_id_and_idx(neuron_id=an_included_cell_ID)[0] for an_included_cell_ID in spikes_df['aclu'].to_numpy()]) # get the indexes from the cellIDs
         
-        # # spikes_df['neuron_IDX'] = included_cell_INDEXES.copy()
-        # # spikes_df['neuron_IDX'] = spikes_df['fragile_linear_neuron_IDX'].copy() # TODO: this is bad! The self.get_neuron_id_and_idx(...) function doesn't work!
-        # # TODO: Note that the self.get_neuron_id_and_idx(...) fcn depends on having a self.neuron_ids consistent with whatever is trying ot be passed in as the neuron_ids.
+    #     # # spikes_df['neuron_IDX'] = included_cell_INDEXES.copy()
+    #     # # spikes_df['neuron_IDX'] = spikes_df['fragile_linear_neuron_IDX'].copy() # TODO: this is bad! The self.get_neuron_id_and_idx(...) function doesn't work!
+    #     # # TODO: Note that the self.get_neuron_id_and_idx(...) fcn depends on having a self.neuron_ids consistent with whatever is trying ot be passed in as the neuron_ids.
         
     
     
