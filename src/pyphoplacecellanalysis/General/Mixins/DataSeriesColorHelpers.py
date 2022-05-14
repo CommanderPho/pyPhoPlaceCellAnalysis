@@ -31,10 +31,19 @@ class DataSeriesColorHelpers:
             sorted_fragile_linear_neuron_IDXs = np.take_along_axis(fragile_linear_neuron_IDXs, fragile_linear_neuron_IDXs_sort_index, axis=None)
             if debug_print:
                 print(f'fragile_linear_neuron_IDXs: \t\t{fragile_linear_neuron_IDXs}\nfragile_linear_neuron_IDXs_sort_index: \t{fragile_linear_neuron_IDXs_sort_index}\nsorted_fragile_linear_neuron_IDXs: \t{sorted_fragile_linear_neuron_IDXs}\n')
-            return [pg.mkColor((cell_id, n_cells*1.3)) for i, cell_id in enumerate(sorted_fragile_linear_neuron_IDXs)]
+            
+            if provided_cell_colors is not None:
+                return [pg.mkColor(provided_cell_colors[:, fragile_linear_neuron_IDX]) for i, fragile_linear_neuron_IDX in enumerate(sorted_fragile_linear_neuron_IDXs)]
+            else:
+                return [pg.mkColor((fragile_linear_neuron_IDX, n_cells*1.3)) for i, fragile_linear_neuron_IDX in enumerate(sorted_fragile_linear_neuron_IDXs)]
+            
         elif mode == 'color_by_index_order':
             # color is assigned based of the raw index order of the passed-in unit ids. This means after re-sorting the units the colors will appear visually the same along y, but will not correspond to the same units.
-            return [pg.mkColor((i, n_cells*1.3)) for i, cell_id in enumerate(fragile_linear_neuron_IDXs)]
+            if provided_cell_colors is not None:
+                return [pg.mkColor(provided_cell_colors[:, i]) for i, fragile_linear_neuron_IDX in enumerate(fragile_linear_neuron_IDXs)]
+            else:
+                return [pg.mkColor((i, n_cells*1.3)) for i, fragile_linear_neuron_IDX in enumerate(fragile_linear_neuron_IDXs)]
+            
         else:
             raise NotImplementedError
 
@@ -78,7 +87,7 @@ class DataSeriesColorHelpers:
     #     # params.neuron_colors = np.zeros((4, self.n_cells))
     #     # for i, curr_qcolor in enumerate(params.neuron_qcolors):
     #     #     curr_color = curr_qcolor.getRgbF() # (1.0, 0.0, 0.0, 0.5019607843137255)
-        #     # params.neuron_colors[:, i] = curr_color[:]
+    #     #     params.neuron_colors[:, i] = curr_color[:]
     #     #     # params.neuron_colors[:, i] = curr_color[:]
         
     #     # params.neuron_colors_hex = None
