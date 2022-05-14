@@ -24,6 +24,11 @@ class Spike2DRaster(Render2DScrollWindowPlotMixin, SpikeRasterBase):
         curr_sess = curr_active_pipeline.filtered_sessions[curr_epoch_name]
         curr_spikes_df = curr_sess.spikes_df
         spike_raster_plt = Spike2DRaster(curr_spikes_df, window_duration=4.0, window_start_time=30.0)
+        
+        
+    TODO: FATAL: The Spike3DRaster doesn't make use of the colors set in params or anything where the 3D does! Instead it's unique in that it stores a list of configs for each neuron. While this is a neat idea, it should be scrapped entirely for consistency.
+    # self.params.config_items and self._build_cell_configs(...) called from self._buildGraphics(...)
+    
     """
     
     # Application/Window Configuration Options:
@@ -144,14 +149,18 @@ class Spike2DRaster(Render2DScrollWindowPlotMixin, SpikeRasterBase):
         return curr_spike_t, curr_spike_y, curr_spike_pens, curr_n
     
     
+        
+    
     def _build_cell_configs(self):
         # self._build_neuron_id_graphics(self.ui.main_gl_widget, self.y)
         self.params.config_items = []
-        for i, cell_id in enumerate(self.fragile_linear_neuron_IDXs):
-            curr_color = pg.mkColor((i, self.n_cells*1.3))
+        for i, fragile_linear_neuron_IDX in enumerate(self.fragile_linear_neuron_IDXs):
+            # curr_color = pg.mkColor((i, self.n_cells*1.3))                
+            # curr_color = self.params.neuron_qcolors[i]
+            curr_color = self.params.neuron_qcolors_map[fragile_linear_neuron_IDX]
             curr_color.setAlphaF(0.5)
             curr_pen = pg.mkPen(curr_color)
-            curr_config_item = (i, cell_id, curr_pen, self.lower_y[i], self.upper_y[i])
+            curr_config_item = (i, fragile_linear_neuron_IDX, curr_pen, self.lower_y[i], self.upper_y[i])
             self.params.config_items.append(curr_config_item)    
     
         self.config_fragile_linear_neuron_IDX_map = dict(zip(self.fragile_linear_neuron_IDXs, self.params.config_items))
