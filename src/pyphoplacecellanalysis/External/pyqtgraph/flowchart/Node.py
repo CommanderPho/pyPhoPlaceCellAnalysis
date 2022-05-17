@@ -684,6 +684,9 @@ class NodeGraphicsItem(GraphicsObject):
         a = self.menu.addAction(translate("Context Menu", "Remove node"), self.node.close)
         if not self.node._allowRemove:
             a.setEnabled(False)
+        a = self.menu.addAction(translate("Context Menu", "Resize node"), self.resizeNodeFromMenu)
+            
+        
         
     def addInputFromMenu(self):  ## called when add input is clicked in context menu
         self.node.addInput(renamable=True, removable=True, multiable=True)
@@ -691,3 +694,5 @@ class NodeGraphicsItem(GraphicsObject):
     def addOutputFromMenu(self):  ## called when add output is clicked in context menu
         self.node.addOutput(renamable=True, removable=True, multiable=False)
         
+    def resizeNodeFromMenu(self):  ## called when add output is clicked in context menu
+        self.updateTerminals()
