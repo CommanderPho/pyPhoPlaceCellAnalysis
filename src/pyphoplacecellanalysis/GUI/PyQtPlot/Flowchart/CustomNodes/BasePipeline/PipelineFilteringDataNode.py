@@ -50,7 +50,7 @@ class PipelineFilteringDataNode(ExtendedCtrlNode):
         return enabled_filter_names                
     
     def ui_build(self):
-        # Setup the recompute button:
+        # Setup the refilter button:
         self.ctrls['refilter'].setText('refilter')
         def click():
             self.ctrls['refilter'].processing("Hold on..")
