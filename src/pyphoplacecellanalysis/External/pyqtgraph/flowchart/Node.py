@@ -540,7 +540,7 @@ class NodeGraphicsItem(GraphicsObject):
         out = self.node.outputs()
         for i, t in inp.items():
             item = t.graphicsItem() # t: Terminal, item: TerminalGraphicsItem
-            widest_input_terminal = max(widest_output_terminal, item.boundingRect().width())
+            widest_input_terminal = max(widest_input_terminal, item.boundingRect().width())
         for i, t in out.items():
             item = t.graphicsItem() # t: Terminal, item: TerminalGraphicsItem
             widest_output_terminal = max(widest_output_terminal, item.boundingRect().width())
@@ -557,10 +557,10 @@ class NodeGraphicsItem(GraphicsObject):
         
         maxNode = max(len(inp), len(out))
         titleOffset = 25 # the title is 25 px tall
-        nodeOffset = 12 # the height per node
+        terminalOffset = 12 # the height per node
         
         # calculate new height
-        newHeight = titleOffset+maxNode*nodeOffset
+        newHeight = titleOffset + maxNode*terminalOffset
         newWidth = self._determine_minimum_fitting_width()
         
         needs_update = False
@@ -586,7 +586,7 @@ class NodeGraphicsItem(GraphicsObject):
             #item.setZValue(self.zValue()+1)
             item.setAnchor(0, y)
             self.terminals[i] = (t, item)
-            y += nodeOffset
+            y += terminalOffset
         
         # Populate inputs
         y = titleOffset
@@ -596,7 +596,7 @@ class NodeGraphicsItem(GraphicsObject):
             item.setZValue(self.zValue())
             item.setAnchor(self.bounds.width(), y)
             self.terminals[i] = (t, item)
-            y += nodeOffset
+            y += terminalOffset
         
         #self.buildMenu()
         
