@@ -159,7 +159,6 @@ def plot_flowchartWidget(title='PhoFlowchartApp'):
     # new_dynamic_node_view_container_widget, new_wrapper_container_layout = _build_static_display_widget(mainAppWindow)
     
     # New nested Dock area widget way:
-    # dItem = _build_dynamic_display_dockarea(mainAppWindow)
     dItem = mainAppWindow._build_dynamic_display_dockarea()
     
     display_dock_area = mainAppWindow.displayDockArea
@@ -376,22 +375,24 @@ def _add_pho_pipeline_programmatic_flowchart_nodes(app, fc, on_add_function=None
         
     #     return new_view_widget, new_widget_window
     
-
+    # pipeline_start_x = -400
+    pipeline_start_x = 500
+    
     ## Set the raw data as the input value to the flowchart
     # fc.setInput(dataIn='Bapun')
     # fc.setInput(dataIn='kdiba')
     fc.setInput(dataIn=None)
 
-    pipeline_input_node = fc.createNode('PipelineInputDataNode', pos=(-400, 50))
+    pipeline_input_node = fc.createNode('PipelineInputDataNode', pos=(pipeline_start_x-400, 50))
     # pipeline_input_node.setView(v1, on_remove_function=on_remove_widget_fn) # Sets the view associated with the node. Note that this is the programmatically instantiated node
     
-    pipeline_filter_node = fc.createNode('PipelineFilteringDataNode', pos=(-26, 50))
+    pipeline_filter_node = fc.createNode('PipelineFilteringDataNode', pos=(pipeline_start_x-26, 50))
     # pipeline_filter_node.setView(v2, on_remove_function=on_remove_widget_fn)
     
-    pipeline_computation_node = fc.createNode('PipelineComputationsNode', pos=(154, 50))
+    pipeline_computation_node = fc.createNode('PipelineComputationsNode', pos=(pipeline_start_x+154, 50))
     
 
-    pipeline_display_node = fc.createNode('PipelineDisplayNode', pos=(280, 120))
+    pipeline_display_node = fc.createNode('PipelineDisplayNode', pos=(pipeline_start_x+280, 120))
     # pipeline_display_node.setApp(app) # Sets the shared singleton app instance
     # pipeline_display_node.setView(new_root_render_widget, on_remove_function=on_remove_widget_fn) # Sets the view associated with the node. Note that this is the 
     # for direct matploblib widget mode:
@@ -402,7 +403,7 @@ def _add_pho_pipeline_programmatic_flowchart_nodes(app, fc, on_add_function=None
     
     
     # Pipeline Result Visualization Node:
-    pipeline_result_viz_node = fc.createNode('PipelineResultVisNode', pos=(280, 220))
+    pipeline_result_viz_node = fc.createNode('PipelineResultVisNode', pos=(pipeline_start_x+280, 220))
     pipeline_result_viz_node.on_add_function = on_add_function
     pipeline_result_viz_node.on_remove_function = on_remove_function
     
@@ -429,7 +430,8 @@ def _add_pho_pipeline_programmatic_flowchart_nodes(app, fc, on_add_function=None
     
     fc.connectTerminals(pipeline_computation_node['computed_pipeline'], fc['dataOut']) # raw pipeline output from computation node
     
-    fc.setInput(dataIn='kdiba') # finally set the input data
+    # fc.setInput(dataIn='kdiba') # finally set the input data
+    
     
     # Display Node Outputs:   
 
