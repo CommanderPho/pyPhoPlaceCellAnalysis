@@ -94,7 +94,6 @@ class SpikeRenderingBaseMixin:
         self.params.cell_spike_colors_dict = OrderedDict(zip(unique_cell_indicies, num_unique_spikes_df_cell_indicies*[fallback_color_rgba]))
         self.params.cell_spike_opaque_colors_dict = OrderedDict(zip(unique_cell_indicies, num_unique_spikes_df_cell_indicies*[fallback_color_rgb]))
         
-        ## MAJOR BUG DISCOVERED: np.shape(ipcDataExplorer.params.neuron_colors) # (4, 39), so we were only getting 4 for num_neuron_colors
         num_neuron_colors = np.shape(self.params.neuron_colors)[1]
         valid_neuron_colors_indicies = np.arange(num_neuron_colors)
         for neuron_IDX in unique_cell_indicies:
@@ -123,7 +122,7 @@ class SpikeRenderingBaseMixin:
         return self.params.flat_spike_colors_array
               
     def setup_spike_rendering_mixin(self):
-        """ Add the required spike colors built from the self.neuron_colors. Spikes that do not contribute to a cell with a placefield are assigned a black color by default
+        """ Add the required spike colors built from the self.neuron_colors. Spikes from cells that do not contribute to a placefield are assigned a black color by default
         By Calling self._build_flat_color_data():
             # Adds to self.params:
                 opaque_neuron_colors

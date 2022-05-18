@@ -126,7 +126,7 @@ def build_batch_interactive_placefield_visibility_controls(rootControlsBarWidget
         ipcDataExplorer.update_active_placefields([])
         # self.on_hide_all_placefields()      
         
-    def _btn_perform_refesh_callback():
+    def _btn_perform_refresh_callback():
         if debug_logging:
             print('EndButtonPanel._btn_perform_refesh_callback(...)')
         ipcDataExplorer._show_all_tuning_curves()
@@ -157,7 +157,7 @@ def build_batch_interactive_placefield_visibility_controls(rootControlsBarWidget
     
     
     # Connect any extra signals:
-    connections.append(rootControlsBarWidget.sigRefresh.connect(_btn_perform_refesh_callback))
+    connections.append(rootControlsBarWidget.sigRefresh.connect(_btn_perform_refresh_callback))
     
     return end_button_helper_obj, connections
 
