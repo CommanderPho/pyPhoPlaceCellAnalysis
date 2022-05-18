@@ -50,6 +50,10 @@ class SpikeRenderingBaseMixin:
     def _build_flat_color_data(self, fallback_color_rgba = (0, 0, 0, 1.0)):
         """ Called only by self.setup_spike_rendering_mixin()
         
+        # Inputs:
+            Relies on self.spikes_df['neuron_IDX'] which was just updated prior to the call.
+        
+        
         # Adds to self.params:
             opaque_neuron_colors
             
@@ -90,7 +94,8 @@ class SpikeRenderingBaseMixin:
         self.params.cell_spike_colors_dict = OrderedDict(zip(unique_cell_indicies, num_unique_spikes_df_cell_indicies*[fallback_color_rgba]))
         self.params.cell_spike_opaque_colors_dict = OrderedDict(zip(unique_cell_indicies, num_unique_spikes_df_cell_indicies*[fallback_color_rgb]))
         
-        num_neuron_colors = np.shape(self.params.neuron_colors)[0]
+        ## MAJOR BUG DISCOVERED: np.shape(ipcDataExplorer.params.neuron_colors) # (4, 39), so we were only getting 4 for num_neuron_colors
+        num_neuron_colors = np.shape(self.params.neuron_colors)[1]
         valid_neuron_colors_indicies = np.arange(num_neuron_colors)
         for neuron_IDX in unique_cell_indicies:
             if neuron_IDX in valid_neuron_colors_indicies:
@@ -99,6 +104,7 @@ class SpikeRenderingBaseMixin:
                 self.params.cell_spike_opaque_colors_dict[neuron_IDX] = self.params.opaque_neuron_colors[:, neuron_IDX]
             else:
                 # Otherwise use the fallbacks:
+                print(f'WARNING: neuron_IDX: {neuron_IDX} was not found in valid_neuron_colors_indicies: {valid_neuron_colors_indicies}... USING FALLBACK COLOR.')
                 self.params.cell_spike_colors_dict[neuron_IDX] = fallback_color_rgba
                 self.params.cell_spike_opaque_colors_dict[neuron_IDX] = fallback_color_rgb
         
@@ -134,7 +140,12 @@ class SpikeRenderingBaseMixin:
         
         ## TODO: IMPORTANT: I think we should overwrite_invalid_fragile_linear_neuron_IDXs before doing this, as correct results from self.get_neuron_id_and_idx(...) depend on valid values for self.fragile_linear_neuron_IDXs and self.neuron_ids
 
+        ## Rebuild the IDXs
+        self.spikes_df.spikes._obj, neuron_id_to_new_IDX_map_new_method = self.spikes_df.spikes.rebuild_fragile_linear_neuron_IDXs(debug_print=True)
+        # new_neuron_IDXs = list(neuron_id_to_new_IDX_map_new_method.values())
+
         
+        ## This should work now, but is it even needed if self.spikes_df['neuron_IDX'] was just updated in rebuild_fragile_linear_neuron_IDXs(...)??
         included_cell_INDEXES = np.array([self.get_neuron_id_and_idx(neuron_id=an_included_cell_ID)[0] for an_included_cell_ID in self.spikes_df['aclu'].to_numpy()]) # get the indexes from the cellIDs
         self.spikes_df['neuron_IDX'] = included_cell_INDEXES.copy()
         # flat_spike_hex_colors = np.array(flat_spike_hex_colors)

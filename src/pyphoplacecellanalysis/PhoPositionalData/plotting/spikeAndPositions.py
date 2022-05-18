@@ -33,8 +33,7 @@ from vtkmodules.vtkCommonCore import vtkLookupTable # required for build_custom_
 
 
 def build_repeated_spikes_color_array(spikes_df):
-    
-    spike_color_info.render_opacity
+    # spike_color_info.render_opacity
     flat_spike_colors_array = np.array([pv.parse_color(spike_color_info.rgb_hex, opacity=spike_color_info.render_opacity) for spike_color_info in spikes_df[['rgb_hex', 'render_opacity']].itertuples()])
     return flat_spike_colors_array
     
