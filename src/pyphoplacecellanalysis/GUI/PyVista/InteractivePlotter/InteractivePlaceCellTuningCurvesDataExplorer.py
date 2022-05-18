@@ -76,7 +76,7 @@ class InteractivePlaceCellTuningCurvesDataExplorer(OccupancyPlottingMixin, HideS
         
         
         # the valid cell_ids from the ratemap/tuning curves
-        valid_cell_ids = self.tuning_curves_valid_cell_ids
+        valid_cell_ids = self.tuning_curves_valid_neuron_ids
         
         differing_elements_ids = np.setdiff1d(self.params.cell_ids, valid_cell_ids)
         num_differing_ids = len(differing_elements_ids)
@@ -86,9 +86,13 @@ class InteractivePlaceCellTuningCurvesDataExplorer(OccupancyPlottingMixin, HideS
         else:
             print(f'the valid cell_ids for the placefields are the same as self.cell_ids... Great!')
 
+        # Note that params.reverse_cellID_idx_lookup_map will still include the elements that are not in valid_cell_ids (if any), so the mapping will be wrong after that element.
+        
+        
+
         ## TODO: need to update self.params.reverse_cellID_idx_lookup_map (just rebuild it):
         # self.params.reverse_cellID_idx_lookup_map # TODO: note that this is kidna wrong for placefields and should not be used.
-        self.params.reverse_cellID_to_tuning_curve_idx_lookup_map = OrderedDict(zip(self.tuning_curves_valid_cell_ids, self.tuning_curve_indicies)) # maps cell_ids to fragile_linear_neuron_IDXs
+        self.params.reverse_cellID_to_tuning_curve_idx_lookup_map = OrderedDict(zip(self.tuning_curves_valid_neuron_ids, self.tuning_curve_indicies)) # maps cell_ids to fragile_linear_neuron_IDXs
         # NOTE: note that the forward map cannot be built, because there's not a placefield for every self.cell_id (some cell_ids have an invalid placefield).
         
         
@@ -104,6 +108,7 @@ class InteractivePlaceCellTuningCurvesDataExplorer(OccupancyPlottingMixin, HideS
                 test = self.active_session.spikes_df['fragile_linear_neuron_IDX']
             except KeyError as e:
                 # build the valid key:
+                ## OBSERVATION: This map is invalid once things are removed until it is rebuilt, which is why the 'fragile_linear_neuron_IDX' column was coming in all messed-up.
                 self.active_session.spikes_df['fragile_linear_neuron_IDX'] = np.array([int(self.active_session.neurons.reverse_cellID_index_map[original_cellID]) for original_cellID in self.active_session.spikes_df['aclu'].values])
         else:
             assert ('aclu' in self.active_session.spikes_df.columns), "self.active_session.spikes_df must contain the 'aclu' column! Something is wrong!"     
