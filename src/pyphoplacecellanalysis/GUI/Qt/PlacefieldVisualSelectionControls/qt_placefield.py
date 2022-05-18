@@ -125,6 +125,12 @@ def build_batch_interactive_placefield_visibility_controls(rootControlsBarWidget
         ipcDataExplorer._show_all_tuning_curves()
         ipcDataExplorer.update_active_placefields([])
         # self.on_hide_all_placefields()      
+        
+    def _btn_perform_refesh_callback():
+        if debug_logging:
+            print('EndButtonPanel._btn_perform_refesh_callback(...)')
+        ipcDataExplorer._show_all_tuning_curves()
+        ipcDataExplorer.update_active_placefi        
 
     end_button_helper_obj = BatchActionsEndButtonPanelHelper(hide_all_callback=_btn_hide_all_callback, show_all_callback=_btn_show_all_callback)
     
@@ -149,6 +155,10 @@ def build_batch_interactive_placefield_visibility_controls(rootControlsBarWidget
     # # btn_occupancy_map_visibility.on_click(ipcDataExplorer.on_occupancy_plot_config_updated)
     # occupancy_widget = btn_occupancy_map_visibility
     
+    
+    # Connect any extra signals:
+    connections.append(rootControlsBarWidget.sigRefresh.connect(_btn_perform_refesh_callback))
+    
     return end_button_helper_obj, connections
 
 
@@ -164,7 +174,7 @@ def build_all_placefield_output_panels(ipcDataExplorer):
     rootControlsBarWidget = PlacefieldVisualSelectionControlsBarWidget()
     # groupBox = rootControlsBarWidget.ui.placefieldControlsGroupbox
     pf_layout = rootControlsBarWidget.ui.pf_layout
-    
+        
     # @QtCore.pyqtSlot(list)
     def _on_tuning_curve_display_config_changed(new_configs):
         """
@@ -229,7 +239,7 @@ def build_all_placefield_output_panels(ipcDataExplorer):
     end_button_helper_obj, connections = build_batch_interactive_placefield_visibility_controls(rootControlsBarWidget=rootControlsBarWidget, ipcDataExplorer=ipcDataExplorer)
     ipcDataExplorer.params.end_button_helper_obj = end_button_helper_obj
     ipcDataExplorer.params.end_button_helper_connections = connections
-    
+        
     return (rootControlsBarWidget, pf_widgets)
     # return (placefieldControlsContainerWidget, pf_widgets)
 
