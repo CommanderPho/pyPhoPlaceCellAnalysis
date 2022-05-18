@@ -76,7 +76,7 @@ class InteractivePlaceCellTuningCurvesDataExplorer(OccupancyPlottingMixin, HideS
         
         
         # the valid cell_ids from the ratemap/tuning curves
-        valid_cell_ids = self.tuning_curves_valid_neuron_ids
+        valid_cell_ids = self.tuning_curves_valid_neuron_ids.copy()
         
         differing_elements_ids = np.setdiff1d(self.params.cell_ids, valid_cell_ids)
         num_differing_ids = len(differing_elements_ids)
@@ -149,7 +149,6 @@ class InteractivePlaceCellTuningCurvesDataExplorer(OccupancyPlottingMixin, HideS
         
         """
         self.params.pf_colors_hex = [to_hex(self.params.pf_colors[:,i], keep_alpha=False) for i in self.tuning_curve_indicies] 
-        
         
         self.setup_spike_rendering_mixin()
         self.build_tuning_curve_configs()
