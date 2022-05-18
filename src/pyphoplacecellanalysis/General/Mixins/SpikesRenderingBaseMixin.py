@@ -84,13 +84,13 @@ class SpikeRenderingBaseMixin:
         # if type(self.params.neuron_colors is np.array):
         unique_cell_indicies = np.unique(self.spikes_df['neuron_IDX'].to_numpy())
         max_neuron_IDX = np.max(unique_cell_indicies)
-        num_unique_spikes_df_cell_indicies = len(unique_cell_indicies)
+        num_unique_spikes_df_cell_indicies = len(unique_cell_indicies) ## NOTE: num_unique_spikes_df_cell_indicies can be larger than the number of placefields, because some spikes may be in the dataframe from cells that aren't placecells
         
         # generate a dict of colors with an entry
         # neuron_colors_dict = {neuron_IDX: fallback_color_rgba for neuron_IDX in unique_cell_indicies}
         # pf_opaque_colors_dict = {neuron_IDX: fallback_color_rgb for neuron_IDX in unique_cell_indicies}
 
-        # Flat version:
+        # Flat version: We need a color for every neuron, whether it is a placecell or not:
         self.params.cell_spike_colors_dict = OrderedDict(zip(unique_cell_indicies, num_unique_spikes_df_cell_indicies*[fallback_color_rgba]))
         self.params.cell_spike_opaque_colors_dict = OrderedDict(zip(unique_cell_indicies, num_unique_spikes_df_cell_indicies*[fallback_color_rgb]))
         
