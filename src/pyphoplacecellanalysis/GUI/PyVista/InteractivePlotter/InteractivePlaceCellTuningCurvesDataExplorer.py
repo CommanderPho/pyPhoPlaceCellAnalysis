@@ -107,9 +107,12 @@ class InteractivePlaceCellTuningCurvesDataExplorer(OccupancyPlottingMixin, HideS
             try:
                 test = self.active_session.spikes_df['fragile_linear_neuron_IDX']
             except KeyError as e:
-                # build the valid key:
+                ## Rebuild the IDXs and add the valid key:
+                self.active_session.spikes_df.spikes._obj, neuron_id_to_new_IDX_map_new_method = self.active_session.spikes_df.spikes.rebuild_fragile_linear_neuron_IDXs(debug_print=True)
+                print(f'neuron_id_to_new_IDX_map_new_method: {neuron_id_to_new_IDX_map_new_method}')
+        
                 ## OBSERVATION: This map is invalid once things are removed until it is rebuilt, which is why the 'fragile_linear_neuron_IDX' column was coming in all messed-up.
-                self.active_session.spikes_df['fragile_linear_neuron_IDX'] = np.array([int(self.active_session.neurons.reverse_cellID_index_map[original_cellID]) for original_cellID in self.active_session.spikes_df['aclu'].values])
+                # self.active_session.spikes_df['fragile_linear_neuron_IDX'] = np.array([int(self.active_session.neurons.reverse_cellID_index_map[original_cellID]) for original_cellID in self.active_session.spikes_df['aclu'].values])
         else:
             assert ('aclu' in self.active_session.spikes_df.columns), "self.active_session.spikes_df must contain the 'aclu' column! Something is wrong!"     
 
