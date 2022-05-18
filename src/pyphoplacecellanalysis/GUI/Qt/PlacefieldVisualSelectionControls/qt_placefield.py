@@ -183,7 +183,7 @@ def build_all_placefield_output_panels(ipcDataExplorer):
         # print(f'\t extracted_cell_ids: {extracted_cell_ids}')
         # convert to config indicies, which are what the configs are indexed by:
         # extracted_config_indicies = [ipcDataExplorer.params.reverse_cellID_to_tuning_curve_idx_lookup_map[a_cell_id] for a_cell_id in extracted_cell_ids]
-        extracted_config_indicies = ipcDataExplorer.find_tuning_curve_IDXs_from_cell_ids(extracted_cell_ids)
+        extracted_config_indicies = ipcDataExplorer.find_tuning_curve_IDXs_from_neuron_ids(extracted_cell_ids)
         # print(f'\t extracted_config_indicies: {extracted_config_indicies}')
         # The actual update function:
         ipcDataExplorer.on_update_tuning_curve_display_config(updated_configs=new_configs, updated_config_indicies=extracted_config_indicies) # could just update function to look at .name of each config? Or change indicies to map?
@@ -196,7 +196,7 @@ def build_all_placefield_output_panels(ipcDataExplorer):
     # the active_tuning_curve_render_configs are an array of SingleNeuronPlottingExtended objects, one for each placefield
     # for (idx, a_config) in enumerate(ipcDataExplorer.active_tuning_curve_render_configs):
     
-    valid_cell_ids = ipcDataExplorer.tuning_curves_valid_cell_ids
+    valid_cell_ids = ipcDataExplorer.tuning_curves_valid_neuron_ids
     for (idx, cell_id) in enumerate(valid_cell_ids):
         a_config = ipcDataExplorer.active_tuning_curve_render_configs[idx]
         curr_widget = build_single_placefield_output_widget(a_config)
