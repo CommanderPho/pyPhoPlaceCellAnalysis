@@ -129,8 +129,11 @@ def build_batch_interactive_placefield_visibility_controls(rootControlsBarWidget
     def _btn_perform_refresh_callback():
         if debug_logging:
             print('EndButtonPanel._btn_perform_refesh_callback(...)')
-        ipcDataExplorer._show_all_tuning_curves()
-        ipcDataExplorer.update_active_placefi        
+
+        ## TODO: perform update
+        ipcDataExplorer.update_spikes()
+        # ipcDataExplorer._show_all_tuning_curves()
+        # ipcDataExplorer.update_active_placefi        
 
     end_button_helper_obj = BatchActionsEndButtonPanelHelper(hide_all_callback=_btn_hide_all_callback, show_all_callback=_btn_show_all_callback)
     
