@@ -190,6 +190,7 @@ class HideShowSpikeRenderingMixin:
             # convert cell_IDs to to neuron_IDXs for use later in updating the configs
             neuron_IDXs = self.find_neuron_IDXs_from_cell_ids(cell_IDs)
             matching_rows = self.find_rows_matching_cell_ids(cell_IDs)
+            
 
         # Update the specific rows:
         self.change_spike_rows_included(matching_rows, are_included)

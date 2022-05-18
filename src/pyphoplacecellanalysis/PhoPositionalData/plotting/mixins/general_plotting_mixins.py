@@ -66,6 +66,7 @@ class NeuronConfigOwningMixin:
         unit_labels = [f'{good_placefield_neuronIDs[i]}' for i in np.arange(num_neurons)]
         self.active_neuron_render_configs = [SingleNeuronPlottingExtended(name=unit_labels[i], isVisible=False, color=self.params.pf_colors_hex[i], spikesVisible=False) for i in np.arange(num_neurons)]
         
+        ## TODO: POTENTIAL ERROR: This only builds configs for good neurons, but we should be building them for all neurons right?
            
 
 # def __build_callbacks(self, tuningCurvePlotActors):
