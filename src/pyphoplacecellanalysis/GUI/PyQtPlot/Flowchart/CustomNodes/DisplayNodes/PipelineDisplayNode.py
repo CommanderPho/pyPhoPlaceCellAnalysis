@@ -47,6 +47,8 @@ class PipelineDisplayNode(DisplayMatplotlibWidgetMixin, AssociatedOutputWidgetNo
     ]
     # TODO: currently hardcoded:
     plotter_widget_fcns = ['_display_3d_image_plotter', '_display_3d_interactive_custom_data_explorer','_display_3d_interactive_spike_and_behavior_browser','_display_3d_interactive_tuning_curves_plotter']
+    external_independent_widget_fcns = ['_display_spike_rasters_pyqtplot_2D', '_display_spike_rasters_pyqtplot_3D', '_display_spike_rasters_vedo_3D', '_display_spike_rasters_pyqtplot_3D_with_2D_controls', '_display_spike_rasters_vedo_3D_with_2D_controls', '_display_spike_rasters_window']
+    
     
     def __init__(self, name, on_add_function=None, on_remove_function=None):
         # Initialize the associated app
@@ -183,14 +185,17 @@ class PipelineDisplayNode(DisplayMatplotlibWidgetMixin, AssociatedOutputWidgetNo
             # active_pf_2D_figures = pipeline.display(curr_display_fcn, active_config_name, enable_spike_overlay=False, plot_variable=enumTuningMap2DPlotVariables.TUNING_MAPS, fignum=active_fig_num, fig=active_fig, max_screen_figure_size=(None, 1868), debug_print=False, enable_saving_to_disk=enable_saving_to_disk)
             
             is_plotter_widget_fcn = (self.selected_display_function_name in PipelineDisplayNode.plotter_widget_fcns)
-            is_matplotlib_widget_fcn = (self.selected_display_function_name not in self.plotter_widget_fcns)
+            is_external_widget_fcn = (self.selected_display_function_name in PipelineDisplayNode.external_independent_widget_fcns)
+            is_matplotlib_widget_fcn = ((self.selected_display_function_name not in self.plotter_widget_fcns) and (self.selected_display_function_name not in self.external_independent_widget_fcns))
             if is_plotter_widget_fcn:
+                pass
+            elif is_external_widget_fcn:
                 pass
             elif is_matplotlib_widget_fcn:
                 # raise
                 self.display_results['kwargs'] = self.display_widget() # provided by DisplayMatplotlibWidgetMixin. Returns a dict like {'fignum':active_fig_num, 'fig':active_fig}
             else:
-                raise
+                raise NotImplementedError
                 pass 
             
             # curr_kdiba_pipeline.display(DefaultDisplayFunctions._display_2d_placefield_result_plot_ratemaps_2D, filter_name, enable_spike_overlay=False, plot_variable=enumTuningMap2DPlotVariables.FIRING_MAPS, fignum=0, max_screen_figure_size=(None, 1868), debug_print=False, enable_saving_to_disk=enable_saving_to_disk) # works!
