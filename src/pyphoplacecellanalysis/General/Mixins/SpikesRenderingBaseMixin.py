@@ -5,6 +5,8 @@ import pandas as pd
 # from pyphoplacecellanalysis.PhoPositionalData.plotting.mixins.spikes_mixins import SpikesDataframeOwningMixin, SpikeRenderingMixin, HideShowSpikeRenderingMixin
 from pyphocorehelpers.indexing_helpers import safe_get
 
+from qtpy import QtGui # for QColor
+
 
 class SpikesDataframeOwningMixin:
     """ Implementors own a spikes_df object """
@@ -91,6 +93,7 @@ class SpikeRenderingBaseMixin:
         num_unique_spikes_df_cell_indicies = len(unique_cell_indicies) ## NOTE: num_unique_spikes_df_cell_indicies can be larger than the number of placefields, because some spikes may be in the dataframe from cells that aren't placecells
         
         # Flat version: We need a color for every neuron, whether it is a placecell or not:
+        ## TODO: these aren't used anywhere outside of this function, so they can be safely removed. Also these are strangely indexed by neuron_IDXs instead of neuron_ids which I'm trying to get away from.
         self.params.cell_spike_colors_dict = OrderedDict(zip(unique_cell_indicies, num_unique_spikes_df_cell_indicies*[fallback_color_rgba]))
         self.params.cell_spike_opaque_colors_dict = OrderedDict(zip(unique_cell_indicies, num_unique_spikes_df_cell_indicies*[fallback_color_rgb]))
         
@@ -116,6 +119,49 @@ class SpikeRenderingBaseMixin:
         # self.params.flat_spike_colors_array = np.array([self.params.neuron_colors[:, idx] for idx in self.spikes_df['neuron_IDX'].to_numpy()]) # np.shape(flat_spike_colors) # (77726, 4)
         # self.params.flat_spike_colors_array = np.array([pv.parse_color(spike_color_info.rgb_hex, opacity=spike_color_info.render_opacity) for spike_color_info in self.spikes_df[['rgb_hex', 'render_opacity']].itertuples()])
         return self.params.flat_spike_colors_array
+    
+    
+    def update_spikes_df_color_columns(self, neuron_id_color_update_dict):
+        """ Updates self.spikes_df's 'R','G','B', and 'rgb_hex' columns only for rows that changed (indicated by having an 'aclu' value that matches the keys passed in, which are treated as neuron_ids
+        Requires:
+            self.spikes_df
+        Inputs:
+            neuron_id_color_update_dict: a dictionary with keys of neuron_id and values of type QColor
+            
+        TODO:
+            The following are still invalid (not updated by this function):
+            
+                self.params.neuron_colors
+                self.params.opaque_neuron_colors
+
+            
+                self.params.cell_spike_colors_dict
+                self.params.cell_spike_opaque_colors_dict
+                self.params.flat_spike_colors_array
+            
+        """
+        for neuron_id, color in neuron_id_color_update_dict.items():
+            ## Convert color to a QColor for generality:    
+            if isinstance(color, QtGui.QColor):
+                # already a QColor, just pass
+                converted_color = color
+            elif isinstance(color, str):
+                # if it's a string, convert it to QColor
+                converted_color = QtGui.QColor(color)
+            elif isinstance(color, [tuple, list, np.array]):
+                # try to convert it, hope it's the right size and stuff
+                converted_color = QtGui.QColor(color)
+            else:
+                print(f'ERROR: Color is of unknown type: {color}, type: {type(color)}')
+                raise NotImplementedError
+
+            # Set the 'R','G','B' values
+            print(f'neuron_id: {neuron_id}: converted_color.getRgbF(): {converted_color.getRgbF()}, converted_color.name(QtGui.QColor.HexRgb): {converted_color.name(QtGui.QColor.HexRgb)}')
+            self.spikes_df.loc[self.spikes_df['aclu'] == neuron_id, ['R','G','B']] = converted_color.getRgbF()[:-1] # converted_color.getRgbF(): (0.2, 0.2, 0.2, 1.0), so we need to get rid of the last elements. (alternatively we could set ,'render_opacity' if we wanted.
+            self.spikes_df.loc[self.spikes_df['aclu'] == neuron_id, ['rgb_hex']] = converted_color.name(QtGui.QColor.HexRgb) #  getting the name of a QColor with .name(QtGui.QColor.HexRgb) results in a string like '#ff0000' 
+            
+
+    
               
     def setup_spike_rendering_mixin(self):
         """ Add the required spike colors built from the self.neuron_colors. Spikes from cells that do not contribute to a placefield are assigned a black color by default
