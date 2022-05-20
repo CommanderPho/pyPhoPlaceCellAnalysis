@@ -27,6 +27,13 @@ class NeuronConfigOwningMixin:
         self.params.pf_active_configs
         self.params.pf_colors_hex
         
+        Functions:
+            self.update_spikes(): to apply the changes visually
+        
+    Provides:
+        self.active_neuron_render_configs
+    
+        
     """
     debug_logging = False
     
@@ -48,7 +55,7 @@ class NeuronConfigOwningMixin:
     
         
     # , neuron_IDXs=None, cell_IDs=None
-    def update_neuron_render_configs(self, updated_config_indicies, updated_configs):
+    def update_neuron_render_configs(self, updated_config_indicies, updated_configs, defer_render=False):
         # TODO: NON-EXPLICIT INDEXING
         """Updates the configs for the cells with the specified updated_config_indicies
         Args:
@@ -71,7 +78,8 @@ class NeuronConfigOwningMixin:
         #     self.active_neuron_render_configs[an_updated_config_idx] = an_updated_config # update the config with the new values:
         
         ## Apply the changes visually:
-        self.update_spikes()
+        if not defer_render:
+            self.update_spikes()
         
         
             

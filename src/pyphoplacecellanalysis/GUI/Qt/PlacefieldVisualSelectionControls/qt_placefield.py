@@ -172,6 +172,11 @@ def build_all_placefield_output_panels(ipcDataExplorer):
     TODO: can't get signals working unfortunately. https://stackoverflow.com/questions/45090982/passing-extra-arguments-through-connect
     https://eli.thegreenplace.net/2011/04/25/passing-extra-arguments-to-pyqt-slot
     
+    
+    Adds:
+        ipcDataExplorer.params.end_button_helper_obj
+        ipcDataExplorer.params.end_button_helper_connections
+    
     """ 
     ## UI Designer Version:    
     rootControlsBarWidget = PlacefieldVisualSelectionControlsBarWidget()
@@ -246,49 +251,6 @@ def build_all_placefield_output_panels(ipcDataExplorer):
     return (rootControlsBarWidget, pf_widgets)
     # return (placefieldControlsContainerWidget, pf_widgets)
 
-
-
-
-# def build_qt_interactive_placefield_visibility_controls(ipcDataExplorer, debug_logging=False):
-#     """Builds a panel containing a series of widgets that control the spike/placemap/etc visibility for each placecell
-
-#     Args:
-#         ipcDataExplorer ([type]): [description]
-
-#     Returns:
-#         [type]: [description]
-        
-#     Usage:
-#         pane = build_panel_interactive_placefield_visibility_controls(ipcDataExplorer)
-#         pane
-#     """
-#     def _btn_hide_all_callback(event):
-#         if debug_logging:
-#             print('EndButtonPanel.btn_hide_all_callback(...)')
-#         ipcDataExplorer.clear_all_spikes_included()
-#         ipcDataExplorer.update_active_placefields([])
-#         # self.on_hide_all_placefields()
-  
-#     def _btn_show_all_callback(event):
-#         if debug_logging:
-#             print('EndButtonPanel.btn_show_all_callback(...)')
-#         ipcDataExplorer._show_all_tuning_curves()
-#         ipcDataExplorer.update_active_placefields([])
-#         # self.on_hide_all_placefields()      
-        
-#     out_panels = build_all_placefield_output_panels(ipcDataExplorer)
-#     end_button_panel_obj = PlacefieldBatchActionsEndButtonPanel(hide_all_callback=_btn_hide_all_callback, show_all_callback=_btn_show_all_callback)
-#     end_cap_buttons = end_button_panel_obj.panel()
-#     out_row = pn.Row(*out_panels, end_cap_buttons, height=120)
-#     # btn_occupancy_map_visibility = pn.widgets.Button(name='Occupancy Map Visibility', width_policy='min')
-#     # # btn_occupancy_map_visibility = pn.widgets.Toggle(name='Occupancy Map Visibility', value=ipcDataExplorer.occupancy_plotting_config.isVisible, margin=0, width_policy='min')
-#     # # btn_occupancy_map_visibility.on_clicks
-#     # btn_occupancy_map_visibility.on_click(ipcDataExplorer.on_occupancy_plot_update_visibility)
-#     # # btn_occupancy_map_visibility.on_click(ipcDataExplorer.on_occupancy_plot_config_updated)
-#     # occupancy_widget = btn_occupancy_map_visibility
-    
-#     occupancy_widget = ipcDataExplorer.occupancy_plotting_config.param
-#     return pn.panel(pn.Column(out_row, pn.Row(occupancy_widget)))
 
 
 

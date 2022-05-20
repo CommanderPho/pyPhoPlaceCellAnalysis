@@ -91,16 +91,6 @@ class SpikeRenderingPyVistaMixin(SpikeRenderingBaseMixin):
         self.update_active_spikes(np.isin(self.spikes_df['aclu'], included_cell_ids))
       
         
-    # Testing: Split spikes plot
-    def build_active_unit_split_spikes_data(self, active_flat_df: pd.DataFrame):
-        """ 
-        TODO: Unused. 
-        """
-        cell_split_df = partition(active_flat_df, 'aclu')
-        for a_split_df in cell_split_df:
-            spike_history_pdata, spike_history_pc = build_active_spikes_plot_data_df(a_split_df, SpikeRenderingPyVistaMixin.spike_geom_cone.copy())
-            # SingleCellSpikePlotData(point_data=spike_history_pdata, glyph_data=spike_history_pc)
-      
                   
     """
         Originally used self.pf_colors instead of self.neuron_colors in the base class. The base class was better.

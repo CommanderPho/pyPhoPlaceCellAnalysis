@@ -112,8 +112,11 @@ class SpikeRenderingBaseMixin:
         self.spikes_df[['R','G','B']] = np.array([self.params.cell_spike_opaque_colors_dict.get(idx, fallback_color_rgb) for idx in self.spikes_df['neuron_IDX'].to_numpy()]) # Drop the opacity component, so we only have RGB values. np.shape(flat_spike_colors) # (77726, 3)
         
     
+    def on_update_spikes_colors(self, neuron_id_color_update_dict, debug_print=False):
+        """ called when the color changes for a spike to update the colors. Internally calls self._update_spikes_df_color_columns(...) """
+        self._update_spikes_df_color_columns(neuron_id_color_update_dict, debug_print=debug_print)
     
-    def update_spikes_df_color_columns(self, neuron_id_color_update_dict, debug_print=False):
+    def _update_spikes_df_color_columns(self, neuron_id_color_update_dict, debug_print=False):
         """ Updates self.spikes_df's 'R','G','B', and 'rgb_hex' columns only for rows that changed (indicated by having an 'aclu' value that matches the keys passed in, which are treated as neuron_ids
         Requires:
             self.spikes_df

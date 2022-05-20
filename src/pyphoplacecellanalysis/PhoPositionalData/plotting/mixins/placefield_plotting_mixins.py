@@ -182,6 +182,9 @@ class HideShowPlacefieldsRenderingMixin(PlacefieldOwningMixin):
         self.tuning_curve_plot_actors.values()[show_index].SetVisibility(1)
         
     def on_update_tuning_curve_display_config(self, updated_config_indicies, updated_configs):
+        """ 
+        Wraps self.update_neuron_render_configs(...) internally to update the configs
+        """
         # TODO: NON-EXPLICIT INDEXING
         if self.debug_logging:
             print(f'HideShowPlacefieldsRenderingMixin.on_update_tuning_curve_display_config(updated_config_indicies: {updated_config_indicies}, updated_configs: {updated_configs})')
