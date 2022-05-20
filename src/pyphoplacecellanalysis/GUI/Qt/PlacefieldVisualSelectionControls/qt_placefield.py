@@ -172,11 +172,42 @@ def build_all_placefield_output_panels(ipcDataExplorer):
     TODO: can't get signals working unfortunately. https://stackoverflow.com/questions/45090982/passing-extra-arguments-through-connect
     https://eli.thegreenplace.net/2011/04/25/passing-extra-arguments-to-pyqt-slot
     
+    
+    Adds:
+        ipcDataExplorer.params.end_button_helper_obj
+        ipcDataExplorer.params.end_button_helper_connections
+    
     """ 
     ## UI Designer Version:    
     rootControlsBarWidget = PlacefieldVisualSelectionControlsBarWidget()
     # groupBox = rootControlsBarWidget.ui.placefieldControlsGroupbox
     pf_layout = rootControlsBarWidget.ui.pf_layout
+        
+    def _on_neuron_color_display_config_changed(new_configs):
+        """
+        Implicitly captures ipcDataExplorer
+        
+        Usage:
+            for a_widget in pf_widgets:
+                # Connect the signals to the debugging slots:
+                a_widget.spike_config_changed.connect(_on_spike_config_changed)
+                a_widget.tuning_curve_display_config_changed.connect(_on_tuning_curve_display_config_changed)
+        """
+        print(f'_on_neuron_color_display_config_changed(new_configs: {new_configs})')
+        
+        
+        # Need to rebuild the spikes colors and such upon updating the configs. 
+        # should take a config and produce the changes needed to recolor the neurons.
+
+        # test_updated_colors_map = {3: '#999999'}
+
+        extracted_neuron_id_updated_colors_map = {int(a_config.name):a_config.color for a_config in new_configs}
+        
+        # Apply the updated map using the update functions:
+        ipcDataExplorer.on_update_spikes_colors(extracted_neuron_id_updated_colors_map)
+        ipcDataExplorer.update_rendered_placefields(extracted_neuron_id_updated_colors_map)
+        
+        
         
     # @QtCore.pyqtSlot(list)
     def _on_tuning_curve_display_config_changed(new_configs):
@@ -233,6 +264,9 @@ def build_all_placefield_output_panels(ipcDataExplorer):
         # curr_widget.spike_config_changed.connect(_on_spike_config_changed)
         curr_widget.tuning_curve_display_config_changed.connect(_on_tuning_curve_display_config_changed)
         
+        curr_widget.sig_neuron_color_changed.connect(_on_neuron_color_display_config_changed)
+        
+        
         pf_layout.addWidget(curr_widget)
         pf_widgets.append(curr_widget)
         
@@ -246,49 +280,6 @@ def build_all_placefield_output_panels(ipcDataExplorer):
     return (rootControlsBarWidget, pf_widgets)
     # return (placefieldControlsContainerWidget, pf_widgets)
 
-
-
-
-# def build_qt_interactive_placefield_visibility_controls(ipcDataExplorer, debug_logging=False):
-#     """Builds a panel containing a series of widgets that control the spike/placemap/etc visibility for each placecell
-
-#     Args:
-#         ipcDataExplorer ([type]): [description]
-
-#     Returns:
-#         [type]: [description]
-        
-#     Usage:
-#         pane = build_panel_interactive_placefield_visibility_controls(ipcDataExplorer)
-#         pane
-#     """
-#     def _btn_hide_all_callback(event):
-#         if debug_logging:
-#             print('EndButtonPanel.btn_hide_all_callback(...)')
-#         ipcDataExplorer.clear_all_spikes_included()
-#         ipcDataExplorer.update_active_placefields([])
-#         # self.on_hide_all_placefields()
-  
-#     def _btn_show_all_callback(event):
-#         if debug_logging:
-#             print('EndButtonPanel.btn_show_all_callback(...)')
-#         ipcDataExplorer._show_all_tuning_curves()
-#         ipcDataExplorer.update_active_placefields([])
-#         # self.on_hide_all_placefields()      
-        
-#     out_panels = build_all_placefield_output_panels(ipcDataExplorer)
-#     end_button_panel_obj = PlacefieldBatchActionsEndButtonPanel(hide_all_callback=_btn_hide_all_callback, show_all_callback=_btn_show_all_callback)
-#     end_cap_buttons = end_button_panel_obj.panel()
-#     out_row = pn.Row(*out_panels, end_cap_buttons, height=120)
-#     # btn_occupancy_map_visibility = pn.widgets.Button(name='Occupancy Map Visibility', width_policy='min')
-#     # # btn_occupancy_map_visibility = pn.widgets.Toggle(name='Occupancy Map Visibility', value=ipcDataExplorer.occupancy_plotting_config.isVisible, margin=0, width_policy='min')
-#     # # btn_occupancy_map_visibility.on_clicks
-#     # btn_occupancy_map_visibility.on_click(ipcDataExplorer.on_occupancy_plot_update_visibility)
-#     # # btn_occupancy_map_visibility.on_click(ipcDataExplorer.on_occupancy_plot_config_updated)
-#     # occupancy_widget = btn_occupancy_map_visibility
-    
-#     occupancy_widget = ipcDataExplorer.occupancy_plotting_config.param
-#     return pn.panel(pn.Column(out_row, pn.Row(occupancy_widget)))
 
 
 

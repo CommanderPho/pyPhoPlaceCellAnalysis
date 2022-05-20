@@ -5,6 +5,8 @@ import pandas as pd
 # from pyphoplacecellanalysis.PhoPositionalData.plotting.mixins.spikes_mixins import SpikesDataframeOwningMixin, SpikeRenderingMixin, HideShowSpikeRenderingMixin
 from pyphocorehelpers.indexing_helpers import safe_get
 
+from qtpy import QtGui # for QColor
+
 
 class SpikesDataframeOwningMixin:
     """ Implementors own a spikes_df object """
@@ -50,7 +52,7 @@ class SpikeRenderingBaseMixin:
     def _build_flat_color_data(self, fallback_color_rgba = (0, 0, 0, 1.0)):
         """ Called only by self.setup_spike_rendering_mixin()
         
-        # Inputs:
+        # Requirements:
             self.params.neuron_colors
             self.params.neuron_colors_hex
             
@@ -61,8 +63,6 @@ class SpikeRenderingBaseMixin:
         # Adds to self.params:
             opaque_neuron_colors
             
-            flat_spike_colors_array # for some reason. Length of spikes_df
-            
             cell_spike_colors_dict
             cell_spike_opaque_colors_dict
         
@@ -72,7 +72,7 @@ class SpikeRenderingBaseMixin:
         
         Seems to use self.params.neuron_colors instead of self.params.pf_colors
         """
-        # adds the color information to the self.spikes_df using params.neuron_colors. Adds ['R','G','B'] columns and creates a self.params.flat_spike_colors_array with one color for each spike.
+        # adds the color information to the self.spikes_df using params.neuron_colors. Adds ['R','G','B'] columns
         # fallback_color_rgb: the default value to use for colors that aren't present in the neuron_colors array
         fallback_color_rgb = fallback_color_rgba[:-1] # Drop the opacity component, so we only have RGB values
         
@@ -81,8 +81,7 @@ class SpikeRenderingBaseMixin:
         self.params.opaque_neuron_colors = self.params.neuron_colors[:-1, :].copy() # Drop the opacity component, so we only have RGB values
         
         # Build flat hex colors, creating the self.spikes_df['rgb_hex'] column:
-        flat_spike_hex_colors = np.array([safe_get(self.params.neuron_colors_hex, neuron_IDX, '#000000') for neuron_IDX in self.spikes_df['neuron_IDX'].to_numpy()])        
-        # flat_spike_hex_colors = np.array([self.params.neuron_colors_hex[neuron_IDX] for neuron_IDX in self.spikes_df['neuron_IDX'].to_numpy()])
+        flat_spike_hex_colors = np.array([safe_get(self.params.neuron_colors_hex, neuron_IDX, '#000000') for neuron_IDX in self.spikes_df['neuron_IDX'].to_numpy()])
         self.spikes_df['rgb_hex'] = flat_spike_hex_colors.copy()
 
         # if type(self.params.neuron_colors is np.array):
@@ -91,8 +90,10 @@ class SpikeRenderingBaseMixin:
         num_unique_spikes_df_cell_indicies = len(unique_cell_indicies) ## NOTE: num_unique_spikes_df_cell_indicies can be larger than the number of placefields, because some spikes may be in the dataframe from cells that aren't placecells
         
         # Flat version: We need a color for every neuron, whether it is a placecell or not:
+        ## TODO: these aren't used anywhere outside of this function, so they can be safely removed. Also these are strangely indexed by neuron_IDXs instead of neuron_ids which I'm trying to get away from.
         self.params.cell_spike_colors_dict = OrderedDict(zip(unique_cell_indicies, num_unique_spikes_df_cell_indicies*[fallback_color_rgba]))
         self.params.cell_spike_opaque_colors_dict = OrderedDict(zip(unique_cell_indicies, num_unique_spikes_df_cell_indicies*[fallback_color_rgb]))
+        
         
         num_neuron_colors = np.shape(self.params.neuron_colors)[1]
         valid_neuron_colors_indicies = np.arange(num_neuron_colors)
@@ -107,23 +108,65 @@ class SpikeRenderingBaseMixin:
                 self.params.cell_spike_colors_dict[neuron_IDX] = fallback_color_rgba
                 self.params.cell_spike_opaque_colors_dict[neuron_IDX] = fallback_color_rgb
         
-        self.params.flat_spike_colors_array = np.array([self.params.cell_spike_opaque_colors_dict.get(idx, fallback_color_rgb) for idx in self.spikes_df['neuron_IDX'].to_numpy()]) # Drop the opacity component, so we only have RGB values. np.shape(flat_spike_colors) # (77726, 3)
-        
-       
         # Add the split RGB columns to the DataFrame
-        self.spikes_df[['R','G','B']] = self.params.flat_spike_colors_array
-        # RGBA version:
-        # self.params.flat_spike_colors_array = np.array([self.params.neuron_colors[:, idx] for idx in self.spikes_df['neuron_IDX'].to_numpy()]) # np.shape(flat_spike_colors) # (77726, 4)
-        # self.params.flat_spike_colors_array = np.array([pv.parse_color(spike_color_info.rgb_hex, opacity=spike_color_info.render_opacity) for spike_color_info in self.spikes_df[['rgb_hex', 'render_opacity']].itertuples()])
-        return self.params.flat_spike_colors_array
+        self.spikes_df[['R','G','B']] = np.array([self.params.cell_spike_opaque_colors_dict.get(idx, fallback_color_rgb) for idx in self.spikes_df['neuron_IDX'].to_numpy()]) # Drop the opacity component, so we only have RGB values. np.shape(flat_spike_colors) # (77726, 3)
+        
+    
+    def on_update_spikes_colors(self, neuron_id_color_update_dict, debug_print=False):
+        """ called when the color changes for a spike to update the colors. Internally calls self._update_spikes_df_color_columns(...) """
+        self._update_spikes_df_color_columns(neuron_id_color_update_dict, debug_print=debug_print)
+    
+    def _update_spikes_df_color_columns(self, neuron_id_color_update_dict, debug_print=False):
+        """ Updates self.spikes_df's 'R','G','B', and 'rgb_hex' columns only for rows that changed (indicated by having an 'aclu' value that matches the keys passed in, which are treated as neuron_ids
+        Requires:
+            self.spikes_df
+        Inputs:
+            neuron_id_color_update_dict: a dictionary with keys of neuron_id and values of type QColor
+            
+        TODO:
+            The following are still invalid (not updated by this function):
+            
+                self.params.neuron_colors
+                self.params.opaque_neuron_colors
+
+            
+                self.params.cell_spike_colors_dict
+                self.params.cell_spike_opaque_colors_dict
+            
+        Usage:
+            test_updated_colors_map = {3: '#333333', 6:'#666666'}
+            ipcDataExplorer.update_spikes_df_color_columns(test_updated_colors_map)
+
+        """
+        for neuron_id, color in neuron_id_color_update_dict.items():
+            ## Convert color to a QColor for generality:    
+            if isinstance(color, QtGui.QColor):
+                # already a QColor, just pass
+                converted_color = color
+            elif isinstance(color, str):
+                # if it's a string, convert it to QColor
+                converted_color = QtGui.QColor(color)
+            elif isinstance(color, [tuple, list, np.array]):
+                # try to convert it, hope it's the right size and stuff
+                converted_color = QtGui.QColor(color)
+            else:
+                print(f'ERROR: Color is of unknown type: {color}, type: {type(color)}')
+                raise NotImplementedError
+
+            # Set the 'R','G','B' values
+            if debug_print:
+                print(f'neuron_id: {neuron_id}: converted_color.getRgbF(): {converted_color.getRgbF()}, converted_color.name(QtGui.QColor.HexRgb): {converted_color.name(QtGui.QColor.HexRgb)}')
+            self.spikes_df.loc[self.spikes_df['aclu'] == neuron_id, ['R','G','B']] = converted_color.getRgbF()[:-1] # converted_color.getRgbF(): (0.2, 0.2, 0.2, 1.0), so we need to get rid of the last elements. (alternatively we could set ,'render_opacity' if we wanted.
+            self.spikes_df.loc[self.spikes_df['aclu'] == neuron_id, ['rgb_hex']] = converted_color.name(QtGui.QColor.HexRgb) #  getting the name of a QColor with .name(QtGui.QColor.HexRgb) results in a string like '#ff0000' 
+            
+
+    
               
     def setup_spike_rendering_mixin(self):
         """ Add the required spike colors built from the self.neuron_colors. Spikes from cells that do not contribute to a placefield are assigned a black color by default
         By Calling self._build_flat_color_data():
             # Adds to self.params:
                 opaque_neuron_colors
-                
-                flat_spike_colors_array # for some reason. Length of spikes_df
                 
                 cell_spike_colors_dict
                 cell_spike_opaque_colors_dict

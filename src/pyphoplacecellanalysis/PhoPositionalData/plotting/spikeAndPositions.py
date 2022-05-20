@@ -3,12 +3,14 @@
 """
 @author: pho
 """
+from indexed import IndexedOrderedDict
 import sys
 import pyvista as pv
 import pyvistaqt as pvqt
 import numpy as np
 import pandas as pd
 from pathlib import Path
+from qtpy import QtGui # for QColor
 
 from pyphocorehelpers.gui.PyVista.CascadingDynamicPlotsList import CascadingDynamicPlotsList
 
@@ -32,19 +34,21 @@ from vtkmodules.vtkCommonCore import vtkLookupTable # required for build_custom_
 
 
 
-def build_repeated_spikes_color_array(spikes_df):
-    # spike_color_info.render_opacity
-    flat_spike_colors_array = np.array([pv.parse_color(spike_color_info.rgb_hex, opacity=spike_color_info.render_opacity) for spike_color_info in spikes_df[['rgb_hex', 'render_opacity']].itertuples()])
-    return flat_spike_colors_array
-    
     
 def build_custom_placefield_maps_lookup_table(curr_active_neuron_color, num_opacity_tiers, opacity_tier_values):
     """
+    Inputs:
+        curr_active_neuron_color: an RGBA value
     Usage:
+        
         build_custom_placefield_maps_lookup_table(curr_active_neuron_color, 3, [0.0, 0.6, 1.0])
     """
     # opacity_tier_values: [0.0, 0.6, 1.0]
     # Build a simple lookup table of the curr_active_neuron_color with varying opacities
+    
+    if isinstance(curr_active_neuron_color, (tuple, list)):
+        curr_active_neuron_color = np.array(curr_active_neuron_color)
+    
     lut = vtkLookupTable()
     lut.SetNumberOfTableValues(num_opacity_tiers)
     for i in np.arange(num_opacity_tiers):
@@ -274,8 +278,8 @@ def plot_placefields2D(pTuningCurves, active_placefields, pf_colors: np.ndarray,
     tuningCurvePlot_x, tuningCurvePlot_y = np.meshgrid(active_placefields.ratemap.xbin_centers, active_placefields.ratemap.ybin_centers)
     # Loop through the tuning curves and plot them:
     print('num_curr_tuning_curves: {}'.format(num_curr_tuning_curves))
-    tuningCurvePlotActors = []
-    tuningCurvePlotData = []
+    tuningCurvePlotActors = IndexedOrderedDict({})
+    tuningCurvePlotData = IndexedOrderedDict({}) # TODO: try to convert to an ordered dict indexed by neuron_IDs
     for i in np.arange(num_curr_tuning_curves):
         #TODO: BUG: CRITICAL: Very clearly makes sense how the indexing gets off here:
         
@@ -306,7 +310,8 @@ def plot_placefields2D(pTuningCurves, active_placefields, pf_colors: np.ndarray,
         curr_active_neuron_plot_data = {'curr_active_neuron_ID':curr_active_neuron_ID,
                                          'curr_active_neuron_pf_identifier':curr_active_neuron_pf_identifier,
                                          'curr_active_neuron_tuning_Curve':curr_active_neuron_tuning_Curve,
-                                         'pdata_currActiveNeuronTuningCurve':pdata_currActiveNeuronTuningCurve, 'pdata_currActiveNeuronTuningCurve_Points':pdata_currActiveNeuronTuningCurve_Points}
+                                         'pdata_currActiveNeuronTuningCurve':pdata_currActiveNeuronTuningCurve, 'pdata_currActiveNeuronTuningCurve_Points':pdata_currActiveNeuronTuningCurve_Points,
+                                         'lut':None}
         
         # contours_currActiveNeuronTuningCurve = pdata_currActiveNeuronTuningCurve.contour()
         # pdata_currActiveNeuronTuningCurve.plot(show_edges=True, show_grid=True, cpos='xy', scalars=curr_active_neuron_tuning_Curve.T)        
@@ -378,12 +383,8 @@ def plot_placefields2D(pTuningCurves, active_placefields, pf_colors: np.ndarray,
         # merged = pdata_currActiveNeuronTuningCurve.merge([pdata_currActiveNeuronTuningCurve_Points])
         
         
-        # pTuningCurves.add_mesh(contours_currActiveNeuronTuningCurve, color=curr_active_neuron_color, line_width=1, name='{}_contours'.format(curr_active_neuron_pf_identifier))
-        
-        tuningCurvePlotActors.append(currActiveNeuronTuningCurve_plotActors)
-        
-        # tuningCurvePlotActors.append(pdata_currActiveNeuronTuningCurve_plotActor)
-        tuningCurvePlotData.append(curr_active_neuron_plot_data)
+        tuningCurvePlotActors[curr_active_neuron_ID] = currActiveNeuronTuningCurve_plotActors
+        tuningCurvePlotData[curr_active_neuron_ID] = curr_active_neuron_plot_data
         
     # Legend:
     plots_data = {'good_placefield_neuronIDs': good_placefield_neuronIDs,
@@ -411,6 +412,47 @@ def plot_placefields2D(pTuningCurves, active_placefields, pf_colors: np.ndarray,
     # pTuningCurves.enable_3_lights()
     # pTuningCurves.enable_shadows()
     return pTuningCurves, tuningCurvePlotActors, tuningCurvePlotData, legendActor, plots_data
+
+
+
+def update_plotColorsPlacefield2D(tuningCurvePlotActors, tuningCurvePlotData, neuron_id_color_update_dict):
+    """ Updates the colors of the placefields plots from the neuron_id_color_update_dict
+    
+    Inputs:
+        tuningCurvePlotData: IndexedOrderedDict of neuron_id, plot data dict
+    """
+    for neuron_id, color in neuron_id_color_update_dict.items():
+        ## Convert color to a QColor for generality:    
+        if isinstance(color, QtGui.QColor):
+            # already a QColor, just pass
+            converted_color = color
+        elif isinstance(color, str):
+            # if it's a string, convert it to QColor
+            converted_color = QtGui.QColor(color)
+        elif isinstance(color, (tuple, list, np.array)):
+            # try to convert it, hope it's the right size and stuff
+            converted_color = QtGui.QColor(color)
+        else:
+            print(f'ERROR: Color is of unknown type: {color}, type: {type(color)}')
+            raise NotImplementedError
+        
+        rgba_color = converted_color.getRgbF()
+        rgb_color = rgba_color[:3]
+        
+        # Update the surface color itself:
+        tuningCurvePlotData[neuron_id]['lut'] = build_custom_placefield_maps_lookup_table(rgba_color, 1, [0.5]) # ALT: reduce fill opacity
+        pdata_currActiveNeuronTuningCurve_plotActor = tuningCurvePlotActors[neuron_id]['main'] # get the main plot actor from the CascadingDynamicPlotsList
+        force_plot_ignore_scalar_as_color(pdata_currActiveNeuronTuningCurve_plotActor, tuningCurvePlotData[neuron_id]['lut'])
+        
+        ## Set color of the edges on the placefield surface (edge_color)
+        pdata_currActiveNeuronTuningCurve_plotActor.GetProperty().SetEdgeColor(rgb_color)
+        
+        # set the color of the points on the placefield surface:
+        pdata_currActiveNeuronTuningCurve_Points_plotActor = tuningCurvePlotActors[neuron_id]['points']
+        pdata_currActiveNeuronTuningCurve_Points_plotActor.GetProperty().SetColor(rgb_color)
+        
+        
+
 
 def update_plotVisiblePlacefields2D(tuningCurvePlotActors, isTuningCurveVisible):
     # Updates the visible placefields. Complements plot_placefields2D

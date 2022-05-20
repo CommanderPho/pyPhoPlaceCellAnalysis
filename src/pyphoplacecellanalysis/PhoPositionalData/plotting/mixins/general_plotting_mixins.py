@@ -1,6 +1,8 @@
 import param
 import numpy as np
 import pandas as pd
+from qtpy import QtGui # for QColor
+
 
 class OptionsListMixin:
     @staticmethod
@@ -25,6 +27,13 @@ class NeuronConfigOwningMixin:
         self.params.pf_active_configs
         self.params.pf_colors_hex
         
+        Functions:
+            self.update_spikes(): to apply the changes visually
+        
+    Provides:
+        self.active_neuron_render_configs
+    
+        
     """
     debug_logging = False
     
@@ -46,7 +55,7 @@ class NeuronConfigOwningMixin:
     
         
     # , neuron_IDXs=None, cell_IDs=None
-    def update_neuron_render_configs(self, updated_config_indicies, updated_configs):
+    def update_neuron_render_configs(self, updated_config_indicies, updated_configs, defer_render=False):
         # TODO: NON-EXPLICIT INDEXING
         """Updates the configs for the cells with the specified updated_config_indicies
         Args:
@@ -69,7 +78,8 @@ class NeuronConfigOwningMixin:
         #     self.active_neuron_render_configs[an_updated_config_idx] = an_updated_config # update the config with the new values:
         
         ## Apply the changes visually:
-        self.update_spikes()
+        if not defer_render:
+            self.update_spikes()
         
         
             
@@ -122,6 +132,25 @@ class ExampleExtended(BasePlotDataParams):
 
 class SingleNeuronPlottingExtended(ExtendedPlotDataParams):
     spikesVisible = param.Boolean(default=False, doc="Whether the spikes are visible")
+    
+    @property
+    def neuron_id(self):
+        """The neuron_id <int> property."""
+        return int(self.name)
+    
+
+    @property
+    def qcolor(self):
+        """The qcolor property."""
+        return QtGui.QColor(self.color)
+    @qcolor.setter
+    def qcolor(self, value):
+        if isinstance(value, QtGui.QColor):
+            self.color = value.name(QtGui.QColor.HexRgb) #  getting the name of a QColor with .name(QtGui.QColor.HexRgb) results in a string like '#ff0000' 
+        else:
+            print(f'ERROR: qcolor setter is being passed a value that is not a QtGui.QColor! Instead, it is of unknown type: {value}, type: {type(value)}')
+            raise NotImplementedError
+        
     
     # @param.depends(c.param.country, d.param.i, watch=True)
     # def g(country, i):

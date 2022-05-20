@@ -2,10 +2,11 @@ import param
 import numpy as np
 import pandas as pd
 
-from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtCore
-
-from pyphoplacecellanalysis.PhoPositionalData.plotting.mixins.general_plotting_mixins import NeuronConfigOwningMixin, OptionsListMixin
 from neuropy.core.neuron_identities import NeuronIdentityAccessingMixin
+
+from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtCore
+from pyphoplacecellanalysis.PhoPositionalData.plotting.mixins.general_plotting_mixins import NeuronConfigOwningMixin, OptionsListMixin
+from pyphoplacecellanalysis.PhoPositionalData.plotting.spikeAndPositions import plot_placefields2D, update_plotColorsPlacefield2D
 
 
 
@@ -84,7 +85,34 @@ class PlacefieldOwningMixin(NeuronIdentityAccessingMixin, NeuronConfigOwningMixi
         return np.array([self.params.reverse_cellID_to_tuning_curve_idx_lookup_map.get(a_cell_id, None) for a_cell_id in neuron_ids])
     
     
+    
+    
+class PlacefieldRenderingPyVistaMixin:
+    """ Implementors render placefields with PyVista 
+    
+    
+    Adds:
+        self.params.unit_labels
+        self.params.pf_fragile_linear_neuron_IDXs
+        ... More?
+    """
+    def plot_placefields(self):
+        self.p, self.plots['tuningCurvePlotActors'], self.plots_data['tuningCurvePlotData'], self.plots['tuningCurvePlotLegendActor'], temp_plots_data = plot_placefields2D(self.p, self.params.active_epoch_placefields, self.params.pf_colors, zScalingFactor=self.params.zScalingFactor, show_legend=self.params.show_legend)
+         # Build the widget labels:
+        self.params.unit_labels = temp_plots_data['unit_labels'] # fetch the unit labels from the extra data dict.
+        self.params.pf_fragile_linear_neuron_IDXs = temp_plots_data['good_placefield_neuronIDs'] # fetch the unit labels from the extra data dict.
+        ## TODO: For these, we actually want the placefield value as the Z-positions, will need to unwrap them or something (maybe .ravel(...)?)
+        ## TODO: also need to add in the checkbox functionality to hide/show only the spikes for the highlighted units
+        # .threshold().elevation()
+        
+        ## Legend data:
+        self.plots_data['tuningCurvePlotLegendData'] = temp_plots_data['legend_entries']
+        
+        
 
+    def update_rendered_placefields(self, neuron_id_color_update_dict):
+        """ updates the placefields """
+        update_plotColorsPlacefield2D(self.plots['tuningCurvePlotActors'], self.plots_data['tuningCurvePlotData'], neuron_id_color_update_dict=neuron_id_color_update_dict)
 
     
 class HideShowPlacefieldsRenderingMixin(PlacefieldOwningMixin):
@@ -110,11 +138,11 @@ class HideShowPlacefieldsRenderingMixin(PlacefieldOwningMixin):
     
     @property
     def tuning_curve_is_visible(self):
-        return np.array([bool(an_actor.GetVisibility()) for an_actor in self.tuning_curve_plot_actors], dtype=bool)
+        return np.array([bool(an_actor.GetVisibility()) for an_actor in self.tuning_curve_plot_actors.values()], dtype=bool)
         
     @property
     def tuning_curve_visibilities(self):
-        return np.array([int(an_actor.GetVisibility()) for an_actor in self.tuning_curve_plot_actors], dtype=int)
+        return np.array([int(an_actor.GetVisibility()) for an_actor in self.tuning_curve_plot_actors.values()], dtype=int)
 
     @property
     def visible_tuning_curve_indicies(self):
@@ -134,7 +162,7 @@ class HideShowPlacefieldsRenderingMixin(PlacefieldOwningMixin):
         
     def _hide_all_tuning_curves(self):
         # Works to hide all turning curve plots:
-        for aTuningCurveActor in self.tuning_curve_plot_actors:
+        for aTuningCurveActor in self.tuning_curve_plot_actors.values():
             aTuningCurveActor.SetVisibility(0)
 
     def _show_all_tuning_curves(self):
@@ -151,27 +179,30 @@ class HideShowPlacefieldsRenderingMixin(PlacefieldOwningMixin):
             
     def _show_tuning_curve(self, show_index):
         # Works to show the specified tuning curve plots:
-        self.tuning_curve_plot_actors[show_index].SetVisibility(1)
+        self.tuning_curve_plot_actors.values()[show_index].SetVisibility(1)
         
     def on_update_tuning_curve_display_config(self, updated_config_indicies, updated_configs):
+        """ 
+        Wraps self.update_neuron_render_configs(...) internally to update the configs
+        """
         # TODO: NON-EXPLICIT INDEXING
         if self.debug_logging:
             print(f'HideShowPlacefieldsRenderingMixin.on_update_tuning_curve_display_config(updated_config_indicies: {updated_config_indicies}, updated_configs: {updated_configs})')
         assert hasattr(self, 'update_neuron_render_configs'), "self must be of type NeuronConfigOwningMixin to have access to its configs"
         self.update_neuron_render_configs(updated_config_indicies, updated_configs) # update the config with the new values:
         for an_updated_config_idx, an_updated_config in zip(updated_config_indicies, updated_configs):
-            self.tuning_curve_plot_actors[an_updated_config_idx].SetVisibility(int(self.active_tuning_curve_render_configs[an_updated_config_idx].isVisible)) # update visibility of actor
+            self.tuning_curve_plot_actors.values()[an_updated_config_idx].SetVisibility(int(self.active_tuning_curve_render_configs[an_updated_config_idx].isVisible)) # update visibility of actor
             
     
     ## Change these names, update_* can easily be called and it does the opposite of what we'd expect
     def update_tuning_curve_configs(self):
         """ update the configs from the actual actors' state """
-        for i, aTuningCurveActor in enumerate(self.tuning_curve_plot_actors):
+        for i, aTuningCurveActor in enumerate(self.tuning_curve_plot_actors.values()):
             self.active_tuning_curve_render_configs[i].isVisible = bool(aTuningCurveActor.GetVisibility())
             
     def apply_tuning_curve_configs(self):
         """ update the actual actors from the configs """
-        for i, aTuningCurveActor in enumerate(self.tuning_curve_plot_actors):
+        for i, aTuningCurveActor in enumerate(self.tuning_curve_plot_actors.values()):
             aTuningCurveActor.SetVisibility(int(self.active_tuning_curve_render_configs[i].isVisible))
 
 

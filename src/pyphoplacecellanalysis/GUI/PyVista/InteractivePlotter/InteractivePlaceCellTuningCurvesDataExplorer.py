@@ -18,7 +18,7 @@ from scipy.interpolate import RectBivariateSpline # for 2D spline interpolation
 from pyphoplacecellanalysis.GUI.PyVista.InteractivePlotter.PhoInteractivePlotter import PhoInteractivePlotter
 # from pyphoplacecellanalysis.PhoPositionalData.plotting.mixins.general_plotting_mixins
 from pyphoplacecellanalysis.PhoPositionalData.plotting.mixins.occupancy_plotting_mixins import OccupancyPlottingMixin
-from pyphoplacecellanalysis.PhoPositionalData.plotting.mixins.placefield_plotting_mixins import HideShowPlacefieldsRenderingMixin
+from pyphoplacecellanalysis.PhoPositionalData.plotting.mixins.placefield_plotting_mixins import HideShowPlacefieldsRenderingMixin, PlacefieldRenderingPyVistaMixin
 from pyphoplacecellanalysis.PhoPositionalData.plotting.mixins.spikes_mixins import SpikesDataframeOwningFromSessionMixin, SpikeRenderingPyVistaMixin, HideShowSpikeRenderingMixin
 
 from pyphoplacecellanalysis.PhoPositionalData.plotting.spikeAndPositions import build_active_spikes_plot_data_df, plot_placefields2D, update_plotVisiblePlacefields2D, build_custom_placefield_maps_lookup_table
@@ -33,7 +33,7 @@ from pyphoplacecellanalysis.GUI.PyVista.InteractivePlotter.InteractiveDataExplor
 
 
 # needs perform_plot_flat_arena
-class InteractivePlaceCellTuningCurvesDataExplorer(OccupancyPlottingMixin, HideShowPlacefieldsRenderingMixin, SpikesDataframeOwningFromSessionMixin, SpikeRenderingPyVistaMixin, HideShowSpikeRenderingMixin, InteractiveDataExplorerBase): 
+class InteractivePlaceCellTuningCurvesDataExplorer(OccupancyPlottingMixin, PlacefieldRenderingPyVistaMixin, HideShowPlacefieldsRenderingMixin, SpikesDataframeOwningFromSessionMixin, SpikeRenderingPyVistaMixin, HideShowSpikeRenderingMixin, InteractiveDataExplorerBase): 
     """ This 3D Vedo GUI displays a map of the animal's environment alongside the computed placefield results (visualizing them as 2D surfaces overlaying the maze) and the neural spiking data that they were produced from.
         - Does not aim to be animated in time, instead easily configurable to show the user whatever they'd like to look at.
     """
@@ -165,13 +165,11 @@ class InteractivePlaceCellTuningCurvesDataExplorer(OccupancyPlottingMixin, HideS
         # Plot the flat arena
         self.plots['maze_bg'] = perform_plot_flat_arena(self.p, self.x, self.y, bShowSequenceTraversalGradient=False, smoothing=self.active_config.plotting_config.use_smoothed_maze_rendering)
         
-        self.p, self.plots['tuningCurvePlotActors'], self.plots_data['tuningCurvePlotData'], self.plots['tuningCurvePlotLegendActor'], temp_plots_data = plot_placefields2D(self.p, self.params.active_epoch_placefields, self.params.pf_colors, zScalingFactor=self.params.zScalingFactor, show_legend=self.params.show_legend) 
-        # Build the widget labels:
-        self.params.unit_labels = temp_plots_data['unit_labels'] # fetch the unit labels from the extra data dict.
-        self.params.pf_fragile_linear_neuron_IDXs = temp_plots_data['good_placefield_neuronIDs'] # fetch the unit labels from the extra data dict.
-        ## TODO: For these, we actually want the placefield value as the Z-positions, will need to unwrap them or something (maybe .ravel(...)?)
-        ## TODO: also need to add in the checkbox functionality to hide/show only the spikes for the highlighted units
-        # .threshold().elevation()
+                
+        if self.plot_placefields():
+            needs_render = True
+        
+       
         
         # hide the tuning curves automatically on startup (they don't render correctly anyway):
         self._hide_all_tuning_curves()
@@ -259,4 +257,9 @@ class InteractivePlaceCellTuningCurvesDataExplorer(OccupancyPlottingMixin, HideS
 
         # when finished, self.active_session.spikes_df is modified with the updated 'z' values
 
+    ## Config Updating:
+    def on_config_update(self):
+        test_updated_colors_map = {3: '#999999'}
 
+        self.update_spikes_df_color_columns(test_updated_colors_map)
+        self.update_rendered_placefields(test_updated_colors_map)
