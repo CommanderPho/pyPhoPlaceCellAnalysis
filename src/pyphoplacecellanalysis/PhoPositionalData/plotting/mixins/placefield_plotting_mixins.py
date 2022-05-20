@@ -2,10 +2,11 @@ import param
 import numpy as np
 import pandas as pd
 
-from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtCore
-
-from pyphoplacecellanalysis.PhoPositionalData.plotting.mixins.general_plotting_mixins import NeuronConfigOwningMixin, OptionsListMixin
 from neuropy.core.neuron_identities import NeuronIdentityAccessingMixin
+
+from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtCore
+from pyphoplacecellanalysis.PhoPositionalData.plotting.mixins.general_plotting_mixins import NeuronConfigOwningMixin, OptionsListMixin
+from pyphoplacecellanalysis.PhoPositionalData.plotting.spikeAndPositions import plot_placefields2D, update_plotColorsPlacefield2D
 
 
 
@@ -84,7 +85,34 @@ class PlacefieldOwningMixin(NeuronIdentityAccessingMixin, NeuronConfigOwningMixi
         return np.array([self.params.reverse_cellID_to_tuning_curve_idx_lookup_map.get(a_cell_id, None) for a_cell_id in neuron_ids])
     
     
+    
+    
+class PlacefieldRenderingPyVistaMixin:
+    """ Implementors render placefields with PyVista 
+    
+    
+    Adds:
+        self.params.unit_labels
+        self.params.pf_fragile_linear_neuron_IDXs
+        ... More?
+    """
+    def plot_placefields(self):
+        self.p, self.plots['tuningCurvePlotActors'], self.plots_data['tuningCurvePlotData'], self.plots['tuningCurvePlotLegendActor'], temp_plots_data = plot_placefields2D(self.p, self.params.active_epoch_placefields, self.params.pf_colors, zScalingFactor=self.params.zScalingFactor, show_legend=self.params.show_legend)
+         # Build the widget labels:
+        self.params.unit_labels = temp_plots_data['unit_labels'] # fetch the unit labels from the extra data dict.
+        self.params.pf_fragile_linear_neuron_IDXs = temp_plots_data['good_placefield_neuronIDs'] # fetch the unit labels from the extra data dict.
+        ## TODO: For these, we actually want the placefield value as the Z-positions, will need to unwrap them or something (maybe .ravel(...)?)
+        ## TODO: also need to add in the checkbox functionality to hide/show only the spikes for the highlighted units
+        # .threshold().elevation()
+        
+        ## Legend data:
+        self.plots_data['tuningCurvePlotLegendData'] = temp_plots_data['legend_entries']
+        
+        
 
+    def update_rendered_placefields(self, neuron_id_color_update_dict):
+        """ updates the placefields """
+        update_plotColorsPlacefield2D(self.plots['tuningCurvePlotActors'], self.plots_data['tuningCurvePlotData'], neuron_id_color_update_dict=neuron_id_color_update_dict)
 
     
 class HideShowPlacefieldsRenderingMixin(PlacefieldOwningMixin):
