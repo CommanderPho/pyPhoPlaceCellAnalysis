@@ -45,7 +45,7 @@ class InteractivePlaceCellTuningCurvesDataExplorer(OccupancyPlottingMixin, Place
         self.params.pf_colors = deepcopy(pf_colors)
         self.params.pf_colors_hex = None
         self.params.pf_active_configs = None
-        self.gui = dict()
+        self.ui = dict()
         
         self.use_fragile_linear_neuron_IDX_as_cell_id = False # if False, uses the normal 'aclu' value as the cell id (which I think is correct)
         
@@ -182,15 +182,15 @@ class InteractivePlaceCellTuningCurvesDataExplorer(OccupancyPlottingMixin, Place
             self.p.render()
 
         # Adds a multi-line debug console to the GUI for output logging:        
-        self.gui['debug_console_widget'] = MultilineTextConsoleWidget(self.p)
-        self.gui['debug_console_widget'].add_line_to_buffer('test log')
+        self.ui['debug_console_widget'] = MultilineTextConsoleWidget(self.p)
+        self.ui['debug_console_widget'].add_line_to_buffer('test log')
         # debug_console_widget.add_line_to_buffer('test log 2')
         # Adds a list of toggle checkboxe widgets to turn on and off each placemap
         # self.setup_visibility_checkboxes(self.plots['tuningCurvePlotActors'])
         
         if not self.params.debug_disable_all_gui_controls:
             # build the visibility callbacks that will be used to update the meshes from the UI elements:
-            self.gui['tuningCurveCombinedAllPlotActorsVisibilityCallbacks'] = self.__build_callbacks(self.plots['tuningCurvePlotActors'])
+            self.ui['tuningCurveCombinedAllPlotActorsVisibilityCallbacks'] = self.__build_callbacks(self.plots['tuningCurvePlotActors'])
             
             if self.params.use_fragile_linear_neuron_IDX_slider_instead_of_checkboxes:
                 # use the discrete slider widget instead of the checkboxes
@@ -221,19 +221,19 @@ class InteractivePlaceCellTuningCurvesDataExplorer(OccupancyPlottingMixin, Place
         # self.gui['tuningCurveSpikeVisibilityCallbacks'] = [lambda is_visible, i_copy=i: self._update_placefield_spike_visibility([i_copy], is_visible) for i in np.arange(len(tuningCurvePlotActors))]
         
         if self.params.use_mutually_exclusive_placefield_checkboxes:
-            self.gui['checkboxWidgetActors'], self.gui['tuningCurveCombinedAllPlotActorsVisibilityCallbacks'], self.gui['mutually_exclusive_radiobutton_group'] = add_placemap_toggle_mutually_exclusive_checkboxes(self.p, self.gui['tuningCurveCombinedAllPlotActorsVisibilityCallbacks'], self.params.pf_colors, active_element_idx=4, require_active_selection=False, is_debug=False, additional_callback_actions=None, labels=self.params.unit_labels)
+            self.ui['checkboxWidgetActors'], self.ui['tuningCurveCombinedAllPlotActorsVisibilityCallbacks'], self.ui['mutually_exclusive_radiobutton_group'] = add_placemap_toggle_mutually_exclusive_checkboxes(self.p, self.ui['tuningCurveCombinedAllPlotActorsVisibilityCallbacks'], self.params.pf_colors, active_element_idx=4, require_active_selection=False, is_debug=False, additional_callback_actions=None, labels=self.params.unit_labels)
         else:
-            self.gui['mutually_exclusive_radiobutton_group'] = None           
-            self.gui['checkboxWidgetActors'], self.gui['tuningCurveCombinedAllPlotActorsVisibilityCallbacks'] = add_placemap_toggle_checkboxes(self.p, self.gui['tuningCurveCombinedAllPlotActorsVisibilityCallbacks'], self.params.pf_colors, widget_check_states=False, additional_callback_actions=None, labels=self.params.unit_labels)
+            self.ui['mutually_exclusive_radiobutton_group'] = None           
+            self.ui['checkboxWidgetActors'], self.ui['tuningCurveCombinedAllPlotActorsVisibilityCallbacks'] = add_placemap_toggle_checkboxes(self.p, self.ui['tuningCurveCombinedAllPlotActorsVisibilityCallbacks'], self.params.pf_colors, widget_check_states=False, additional_callback_actions=None, labels=self.params.unit_labels)
         
 
        
     def __setup_visibility_slider_widget(self):
         # safe_integer_wrapper = lambda integer_local_idx: self._update_placefield_spike_visibility([int(integer_local_idx)])
-        safe_integer_wrapper = lambda integer_local_idx: self.gui['tuningCurveCombinedAllPlotActorsVisibilityCallbacks']([int(integer_local_idx)])
-        self.gui['interactive_unitID_slider_actor'] = PhoWidgetHelper.add_discrete_slider_widget(self.p, safe_integer_wrapper, [0, (len(self.gui['tuningCurveCombinedAllPlotActorsVisibilityCallbacks'])-1)], value=0, title='Selected Unit',event_type='end')
+        safe_integer_wrapper = lambda integer_local_idx: self.ui['tuningCurveCombinedAllPlotActorsVisibilityCallbacks']([int(integer_local_idx)])
+        self.ui['interactive_unitID_slider_actor'] = PhoWidgetHelper.add_discrete_slider_widget(self.p, safe_integer_wrapper, [0, (len(self.ui['tuningCurveCombinedAllPlotActorsVisibilityCallbacks'])-1)], value=0, title='Selected Unit',event_type='end')
         ## I don't think this does anything:
-        interactive_plotter = PhoInteractivePlotter(pyvista_plotter=self.p, interactive_timestamp_slider_actor=self.gui['interactive_unitID_slider_actor'])
+        interactive_plotter = PhoInteractivePlotter(pyvista_plotter=self.p, interactive_timestamp_slider_actor=self.ui['interactive_unitID_slider_actor'])
         
         
         
