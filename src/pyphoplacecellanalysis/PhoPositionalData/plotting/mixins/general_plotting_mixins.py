@@ -99,13 +99,6 @@ class NeuronConfigOwningMixin:
         ## TODO: POTENTIAL ERROR: This only builds configs for good neurons, but we should be building them for all neurons right?
            
 
-# def __build_callbacks(self, tuningCurvePlotActors):
-#         combined_active_pf_update_callbacks = []
-#         for i, an_actor in enumerate(tuningCurvePlotActors):
-#             # Make a separate callback for each widget
-#             curr_visibility_callback = SetVisibilityCallback(an_actor)
-#             curr_spikes_update_callback = (lambda is_visible, i_copy=i: self._update_placefield_spike_visibility([i_copy], is_visible))
-#             combined_active_pf_update_callbacks.append(CallbackSequence([curr_visibility_callback, curr_spikes_update_callback]))
 #         return combined_active_pf_update_callbacks
     
         
