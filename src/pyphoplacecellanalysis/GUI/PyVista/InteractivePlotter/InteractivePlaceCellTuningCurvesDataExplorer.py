@@ -261,6 +261,9 @@ class InteractivePlaceCellTuningCurvesDataExplorer(OccupancyPlottingMixin, Place
     def on_config_update(self, updated_colors_map):
         # test_updated_colors_map = {3: '#999999'}
         # # self.on_config_update(test_updated_colors_map)
+        print(f'on_config_update(updated_colors_map: {updated_colors_map})')    
+        self.ui['debug_console_widget'].add_line_to_buffer(f'on_config_update(updated_colors_map: {updated_colors_map})')
         
-        self.update_spikes_df_color_columns(updated_colors_map)
+        
+        self.on_update_spikes_colors(updated_colors_map)
         self.update_rendered_placefields(updated_colors_map)

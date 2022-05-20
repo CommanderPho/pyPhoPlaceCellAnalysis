@@ -133,6 +133,11 @@ class DefaultDisplayFunctions(AllFunctionEnumeratingMixin):
             # pane: (placefieldControlsContainerWidget, pf_widgets)
             placefieldControlsContainerWidget, pf_widgets = build_all_placefield_output_panels(ipcDataExplorer)
             placefieldControlsContainerWidget.show()
+            
+            # Adds the placefield controls container widget and each individual pf widget to the ipcDataExplorer.ui in case it needs to reference them later:
+            ipcDataExplorer.ui['placefieldControlsContainerWidget'] = placefieldControlsContainerWidget
+            ipcDataExplorer.ui['pf_widgets'] = pf_widgets
+            
             # Visually align the widgets:
             WidgetPositioningHelpers.align_window_edges(ipcDataExplorer.p, placefieldControlsContainerWidget, relative_position = 'above', resize_to_main=(1.0, None))
             # pane = (placefieldControlsContainerWidget, pf_widgets)
