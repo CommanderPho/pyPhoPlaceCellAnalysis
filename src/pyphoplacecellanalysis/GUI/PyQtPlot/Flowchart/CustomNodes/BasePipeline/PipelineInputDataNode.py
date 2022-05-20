@@ -41,7 +41,11 @@ class PipelineInputDataNode(ExtendedCtrlNode):
         self.num_known_types = len(self.active_known_data_session_type_dict.keys())
         print(f'num_known_types: {self.num_known_types}')
         ExtendedCtrlNode.__init__(self, name, terminals=terminals)
-
+        self.ui_build()
+        
+                
+        
+    def ui_build(self):
         # Setup the reload button:
         self.ctrls['reload'].setText('Reload')
         def click():
@@ -55,8 +59,9 @@ class PipelineInputDataNode(ExtendedCtrlNode):
             else:
                 self.ctrls['reload'].success(message="Bueno!")
                 
+        # self.ctrls['reload'].clicked.connect(click)
         
-        
+
     def process(self, known_mode='', display=True):
     # def process(self, known_mode='Bapun', display=True):
         # CtrlNode has created self.ctrls, which is a dict containing {ctrlName: widget}
@@ -70,6 +75,7 @@ class PipelineInputDataNode(ExtendedCtrlNode):
             data_mode_from_combo_list = 'kdiba'
         else:
             # raise NotImplementedError
+            # Data mode from input terminal:
             data_mode_from_combo_list = known_mode
 
         print(f'PipelineInputDataNode data_mode from dropdown list: {data_mode_from_combo_list}')

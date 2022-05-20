@@ -45,7 +45,7 @@ class NeuronConfigOwningMixin:
         return np.arange(self.num_neuron_configs)
     
         
-    # , cell_IDXs=None, cell_IDs=None
+    # , neuron_IDXs=None, cell_IDs=None
     def update_neuron_render_configs(self, updated_config_indicies, updated_configs):
         # TODO: NON-EXPLICIT INDEXING
         """Updates the configs for the cells with the specified updated_config_indicies
@@ -55,8 +55,23 @@ class NeuronConfigOwningMixin:
         """
         if self.debug_logging:
             print(f'NeuronConfigOwningMixin.update_cell_configs(updated_config_indicies: {updated_config_indicies}, updated_configs: {updated_configs})')
-        for an_updated_config_idx, an_updated_config in zip(updated_config_indicies, updated_configs):
+            
+        ## Improved tuning_curve_display_config_changed(...) style:
+        # recover cell_ids by parsing the name field:
+        extracted_cell_ids = [int(a_config.name) for a_config in updated_configs]
+        extracted_config_indicies = self.find_tuning_curve_IDXs_from_neuron_ids(extracted_cell_ids)
+         # Sets the configs:
+        for an_updated_config_idx, an_updated_config in zip(extracted_config_indicies, updated_configs):
             self.active_neuron_render_configs[an_updated_config_idx] = an_updated_config # update the config with the new values:
+            
+        # # Sets the configs:
+        # for an_updated_config_idx, an_updated_config in zip(updated_config_indicies, updated_configs):
+        #     self.active_neuron_render_configs[an_updated_config_idx] = an_updated_config # update the config with the new values:
+        
+        ## Apply the changes visually:
+        self.update_spikes()
+        
+        
             
     def build_neuron_render_configs(self):
         ## TODO: should have code here that ensures this is only done once, so values don't get overwritten
@@ -66,6 +81,7 @@ class NeuronConfigOwningMixin:
         unit_labels = [f'{good_placefield_neuronIDs[i]}' for i in np.arange(num_neurons)]
         self.active_neuron_render_configs = [SingleNeuronPlottingExtended(name=unit_labels[i], isVisible=False, color=self.params.pf_colors_hex[i], spikesVisible=False) for i in np.arange(num_neurons)]
         
+        ## TODO: POTENTIAL ERROR: This only builds configs for good neurons, but we should be building them for all neurons right?
            
 
 # def __build_callbacks(self, tuningCurvePlotActors):

@@ -47,7 +47,7 @@ class InteractivePlaceCellTuningCurvesDataExplorer(OccupancyPlottingMixin, HideS
         self.params.pf_active_configs = None
         self.gui = dict()
         
-        self.use_unit_id_as_cell_id = False # if False, uses the normal 'aclu' value as the cell id (which I think is correct)
+        self.use_fragile_linear_neuron_IDX_as_cell_id = False # if False, uses the normal 'aclu' value as the cell id (which I think is correct)
         
         self._setup()
 
@@ -76,7 +76,7 @@ class InteractivePlaceCellTuningCurvesDataExplorer(OccupancyPlottingMixin, HideS
         
         
         # the valid cell_ids from the ratemap/tuning curves
-        valid_cell_ids = self.tuning_curves_valid_cell_ids
+        valid_cell_ids = self.tuning_curves_valid_neuron_ids.copy()
         
         differing_elements_ids = np.setdiff1d(self.params.cell_ids, valid_cell_ids)
         num_differing_ids = len(differing_elements_ids)
@@ -86,25 +86,33 @@ class InteractivePlaceCellTuningCurvesDataExplorer(OccupancyPlottingMixin, HideS
         else:
             print(f'the valid cell_ids for the placefields are the same as self.cell_ids... Great!')
 
+        # Note that params.reverse_cellID_idx_lookup_map will still include the elements that are not in valid_cell_ids (if any), so the mapping will be wrong after that element.
+        
+        
+
         ## TODO: need to update self.params.reverse_cellID_idx_lookup_map (just rebuild it):
         # self.params.reverse_cellID_idx_lookup_map # TODO: note that this is kidna wrong for placefields and should not be used.
-        self.params.reverse_cellID_to_tuning_curve_idx_lookup_map = OrderedDict(zip(self.tuning_curves_valid_cell_ids, self.tuning_curve_indicies)) # maps cell_ids to unit_ids
+        self.params.reverse_cellID_to_tuning_curve_idx_lookup_map = OrderedDict(zip(self.tuning_curves_valid_neuron_ids, self.tuning_curve_indicies)) # maps cell_ids to fragile_linear_neuron_IDXs
         # NOTE: note that the forward map cannot be built, because there's not a placefield for every self.cell_id (some cell_ids have an invalid placefield).
         
         
         ## TODO: need to watch out for any refereences to access active_session.neurons.*, as this still will have the invalid IDs. Could re-filter I suppose??
         
-        ## TODO: would need to rebuild: spikes_df['cell_idx'] as well, as these will be wrong after refresh and the lookup functions will thus be wrong as well.
+        ## TODO: would need to rebuild: spikes_df['neuron_IDX'] as well, as these will be wrong after refresh and the lookup functions will thus be wrong as well.
             
             
         
-        ## Ensure we have the 'unit_id' property
-        if self.use_unit_id_as_cell_id:
+        ## Ensure we have the 'fragile_linear_neuron_IDX' property
+        if self.use_fragile_linear_neuron_IDX_as_cell_id:
             try:
-                test = self.active_session.spikes_df['unit_id']
+                test = self.active_session.spikes_df['fragile_linear_neuron_IDX']
             except KeyError as e:
-                # build the valid key:
-                self.active_session.spikes_df['unit_id'] = np.array([int(self.active_session.neurons.reverse_cellID_index_map[original_cellID]) for original_cellID in self.active_session.spikes_df['aclu'].values])
+                ## Rebuild the IDXs and add the valid key:
+                self.active_session.spikes_df.spikes._obj, neuron_id_to_new_IDX_map_new_method = self.active_session.spikes_df.spikes.rebuild_fragile_linear_neuron_IDXs(debug_print=True)
+                print(f'neuron_id_to_new_IDX_map_new_method: {neuron_id_to_new_IDX_map_new_method}')
+        
+                ## OBSERVATION: This map is invalid once things are removed until it is rebuilt, which is why the 'fragile_linear_neuron_IDX' column was coming in all messed-up.
+                # self.active_session.spikes_df['fragile_linear_neuron_IDX'] = np.array([int(self.active_session.neurons.reverse_cellID_index_map[original_cellID]) for original_cellID in self.active_session.spikes_df['aclu'].values])
         else:
             assert ('aclu' in self.active_session.spikes_df.columns), "self.active_session.spikes_df must contain the 'aclu' column! Something is wrong!"     
 
@@ -119,8 +127,8 @@ class InteractivePlaceCellTuningCurvesDataExplorer(OccupancyPlottingMixin, HideS
         self.params.use_mutually_exclusive_placefield_checkboxes = True       
         self.params.show_legend = True
         
-        # self.params.use_unit_id_slider_instead_of_checkboxes = True
-        self.params.use_unit_id_slider_instead_of_checkboxes = False
+        # self.params.use_fragile_linear_neuron_IDX_slider_instead_of_checkboxes = True
+        self.params.use_fragile_linear_neuron_IDX_slider_instead_of_checkboxes = False
     
         self.params.use_dynamic_spike_opacity_for_hiding = True
         
@@ -145,7 +153,6 @@ class InteractivePlaceCellTuningCurvesDataExplorer(OccupancyPlottingMixin, HideS
         """
         self.params.pf_colors_hex = [to_hex(self.params.pf_colors[:,i], keep_alpha=False) for i in self.tuning_curve_indicies] 
         
-        
         self.setup_spike_rendering_mixin()
         self.build_tuning_curve_configs()
         self.setup_occupancy_plotting_mixin()
@@ -161,7 +168,7 @@ class InteractivePlaceCellTuningCurvesDataExplorer(OccupancyPlottingMixin, HideS
         self.p, self.plots['tuningCurvePlotActors'], self.plots_data['tuningCurvePlotData'], self.plots['tuningCurvePlotLegendActor'], temp_plots_data = plot_placefields2D(self.p, self.params.active_epoch_placefields, self.params.pf_colors, zScalingFactor=self.params.zScalingFactor, show_legend=self.params.show_legend) 
         # Build the widget labels:
         self.params.unit_labels = temp_plots_data['unit_labels'] # fetch the unit labels from the extra data dict.
-        self.params.pf_unit_ids = temp_plots_data['good_placefield_neuronIDs'] # fetch the unit labels from the extra data dict.
+        self.params.pf_fragile_linear_neuron_IDXs = temp_plots_data['good_placefield_neuronIDs'] # fetch the unit labels from the extra data dict.
         ## TODO: For these, we actually want the placefield value as the Z-positions, will need to unwrap them or something (maybe .ravel(...)?)
         ## TODO: also need to add in the checkbox functionality to hide/show only the spikes for the highlighted units
         # .threshold().elevation()
@@ -170,7 +177,7 @@ class InteractivePlaceCellTuningCurvesDataExplorer(OccupancyPlottingMixin, HideS
         self._hide_all_tuning_curves()
         
         # active_spike_index = 4
-        # active_included_place_cell_spikes_indicies = self.active_session.spikes_df.eval('(unit_id == @active_spike_index)') # '@' prefix indicates a local variable. All other variables are evaluated as column names
+        # active_included_place_cell_spikes_indicies = self.active_session.spikes_df.eval('(fragile_linear_neuron_IDX == @active_spike_index)') # '@' prefix indicates a local variable. All other variables are evaluated as column names
         needs_render = self.plot_spikes()
 
         if needs_render:
@@ -187,7 +194,7 @@ class InteractivePlaceCellTuningCurvesDataExplorer(OccupancyPlottingMixin, HideS
             # build the visibility callbacks that will be used to update the meshes from the UI elements:
             self.gui['tuningCurveCombinedAllPlotActorsVisibilityCallbacks'] = self.__build_callbacks(self.plots['tuningCurvePlotActors'])
             
-            if self.params.use_unit_id_slider_instead_of_checkboxes:
+            if self.params.use_fragile_linear_neuron_IDX_slider_instead_of_checkboxes:
                 # use the discrete slider widget instead of the checkboxes
                 self.__setup_visibility_slider_widget()
             else:

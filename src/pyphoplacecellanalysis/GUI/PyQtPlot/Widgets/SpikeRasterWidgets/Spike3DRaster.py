@@ -264,25 +264,25 @@ class Spike3DRaster(PyQtGraphSpecificTimeCurvesMixin, RenderTimeEpochMeshesMixin
         # rebuild the position range for each unit along the y-axis:
         self.update_series_identity_y_values()
         # self.series_identity_y_values = self.series_identity_y_values[self.unit_sort_order] # re-sort the y-values by the unit_sort_order
-        # TODO: convert to using self.unit_id_to_spatial(...)
+        # TODO: convert to using self.fragile_linear_neuron_IDX_to_spatial(...)
         
         self._build_neuron_id_graphics(self.ui.main_gl_widget, self.series_identity_y_values)
         
         # Plot each unit one at a time:
-        for i, a_unit_id in enumerate(self.unit_ids):
+        for i, a_fragile_linear_neuron_IDX in enumerate(self.fragile_linear_neuron_IDXs):
             # curr_color = pg.mkColor((i, self.n_cells*1.3))
-            curr_color = self.params.neuron_qcolors_map[a_unit_id]
+            curr_color = self.params.neuron_qcolors_map[a_fragile_linear_neuron_IDX]
             curr_color.setAlphaF(0.5)
             # print(f'cell_id: {cell_id}, curr_color: {curr_color.alpha()}')
             
             # Filter the dataframe using that column and value from the list
-            curr_cell_df = self.active_windowed_df[self.active_windowed_df['unit_id']==a_unit_id].copy() # is .copy() needed here since nothing is updated???
-            # curr_unit_id = curr_cell_df['unit_id'].to_numpy() # this will map to the y position
+            curr_cell_df = self.active_windowed_df[self.active_windowed_df['fragile_linear_neuron_IDX']==a_fragile_linear_neuron_IDX].copy() # is .copy() needed here since nothing is updated???
+            # curr_fragile_linear_neuron_IDX = curr_cell_df['fragile_linear_neuron_IDX'].to_numpy() # this will map to the y position
             curr_spike_t = curr_cell_df[curr_cell_df.spikes.time_variable_name].to_numpy() # this will map 
             
             # yi = self.series_identity_y_values[i] # get the correct y-position for all spikes of this cell
-            yi = self.unit_id_to_spatial(a_unit_id)
-            # self.unit_ids
+            yi = self.fragile_linear_neuron_IDX_to_spatial(a_fragile_linear_neuron_IDX)
+            # self.fragile_linear_neuron_IDXs
             # print(f'cell_id: {cell_id}, yi: {yi}')
             
             # map the current spike times back onto the range of the window's (-half_render_window_duration, +half_render_window_duration) so they represent the x coordinate
@@ -326,34 +326,34 @@ class Spike3DRaster(PyQtGraphSpecificTimeCurvesMixin, RenderTimeEpochMeshesMixin
         self._series_identity_y_values = DataSeriesToSpatial.build_series_identity_axis(self.n_cells, center_mode=self.params.center_mode, bin_position_mode=self.params.bin_position_mode, side_bin_margins = self.params.side_bin_margins)
         
     ## Required for DataSeriesToSpatialTransformingMixin
-    # TODO: convert all instances of self.y[i], etc into using self.unit_id_to_spatial(...)
-    def unit_id_to_spatial(self, unit_ids):
-        """ transforms the unit_ids in unit_ids to a spatial offset (such as the y-positions for a 3D raster plot) """
+    # TODO: convert all instances of self.y[i], etc into using self.fragile_linear_neuron_IDX_to_spatial(...)
+    def fragile_linear_neuron_IDX_to_spatial(self, fragile_linear_neuron_IDXs):
+        """ transforms the fragile_linear_neuron_IDXs in fragile_linear_neuron_IDXs to a spatial offset (such as the y-positions for a 3D raster plot) """
         # build the position range for each unit along the y-axis:
         # rebuild the position range for each unit along the y-axis:
         if self.series_identity_y_values is None:
             # rebuild self.series_identity_y_values
             self.update_series_identity_y_values()
     
-        unit_id_series_indicies = self.unit_sort_order[unit_ids] # get the appropriate series index for each unit_id given their sort order
-        return self.series_identity_y_values[unit_id_series_indicies]
+        fragile_linear_neuron_IDX_series_indicies = self.unit_sort_order[fragile_linear_neuron_IDXs] # get the appropriate series index for each fragile_linear_neuron_IDX given their sort order
+        return self.series_identity_y_values[fragile_linear_neuron_IDX_series_indicies]
         
 
     def _build_neuron_id_graphics(self, w, y_pos):
         """ builds the text items to indicate the neuron ID for each neuron in the df. """
         all_cell_ids = self.cell_ids
-        # all_unit_ids = [self.unit_id_to_cell_id_map[a_cell_id] for a_cell_id in all_cell_ids] # get the list of all unit_ids
+        # all_fragile_linear_neuron_IDXs = [self.fragile_linear_neuron_IDX_to_cell_id_map[a_cell_id] for a_cell_id in all_cell_ids] # get the list of all fragile_linear_neuron_IDXs
         
         cell_id_text_item_font = QtGui.QFont('Helvetica', 12)
         
         self.ui.glCellIdTextItems = []
         for i, cell_id in enumerate(all_cell_ids):
-            a_unit_id = self.cell_id_to_unit_id_map[cell_id]
+            a_fragile_linear_neuron_IDX = self.cell_id_to_fragile_linear_neuron_IDX_map[cell_id]
             # curr_color = pg.mkColor((i, self.n_cells*1.3))
             try:
-                curr_color = self.params.neuron_qcolors_map[a_unit_id]
+                curr_color = self.params.neuron_qcolors_map[a_fragile_linear_neuron_IDX]
             except KeyError as e:
-                print(f'_build_neuron_id_graphics(...): key error: {e}! i: {i}, cell_id: {cell_id}, a_unit_id: {a_unit_id} not found in {self.params.neuron_qcolors_map.keys()}')
+                print(f'_build_neuron_id_graphics(...): key error: {e}! i: {i}, cell_id: {cell_id}, a_fragile_linear_neuron_IDX: {a_fragile_linear_neuron_IDX} not found in {self.params.neuron_qcolors_map.keys()}')
                 curr_color = self.params.neuron_qcolors[i]
             except Exception as e:
                 raise e
@@ -372,23 +372,23 @@ class Spike3DRaster(PyQtGraphSpecificTimeCurvesMixin, RenderTimeEpochMeshesMixin
         all_cell_ids = self.cell_ids
         assert len(self.ui.glCellIdTextItems) == len(all_cell_ids), f"we should already have correct number of neuron ID text items, but len(self.ui.glCellIdTextItems): {len(self.ui.glCellIdTextItems)} and len(all_cell_ids): {len(all_cell_ids)}!"
         assert len(self.ui.glCellIdTextItems) == len(self.series_identity_y_values), f"we should already have correct number of neuron ID text items, but len(self.ui.glCellIdTextItems): {len(self.ui.glCellIdTextItems)} and len(self.y): {len(self.series_identity_y_values)}!"
-        # all_unit_ids = [self.unit_id_to_cell_id_map[a_cell_id] for a_cell_id in all_cell_ids] # get the list of all unit_ids
+        # all_fragile_linear_neuron_IDXs = [self.fragile_linear_neuron_IDX_to_cell_id_map[a_cell_id] for a_cell_id in all_cell_ids] # get the list of all fragile_linear_neuron_IDXs
         
         for i, cell_id in enumerate(all_cell_ids):
-        # for i, a_unit_id in enumerate(all_unit_ids):
-            a_unit_id = self.cell_id_to_unit_id_map[cell_id]
+        # for i, a_fragile_linear_neuron_IDX in enumerate(all_fragile_linear_neuron_IDXs):
+            a_fragile_linear_neuron_IDX = self.cell_id_to_fragile_linear_neuron_IDX_map[cell_id]
             # curr_color = self.params.neuron_qcolors[i]
             try:
-                curr_color = self.params.neuron_qcolors_map[a_unit_id]
+                curr_color = self.params.neuron_qcolors_map[a_fragile_linear_neuron_IDX]
             except KeyError as e:
-                print(f'_build_neuron_id_graphics(...): key error: {e}! i: {i}, cell_id: {cell_id}, a_unit_id: {a_unit_id} not found in {self.params.neuron_qcolors_map.keys()}')
+                print(f'_build_neuron_id_graphics(...): key error: {e}! i: {i}, cell_id: {cell_id}, a_fragile_linear_neuron_IDX: {a_fragile_linear_neuron_IDX} not found in {self.params.neuron_qcolors_map.keys()}')
                 curr_color = self.params.neuron_qcolors[i]
             except Exception as e:
                 raise e
             
             curr_color.setAlphaF(1.0)
             curr_id_txtitem = self.ui.glCellIdTextItems[i]
-            curr_id_txtitem.setData(pos=(self.side_wall_x, self.unit_id_to_spatial(a_unit_id), (self.floor_z - 0.5)), color=curr_color) # TODO: could update color as well
+            curr_id_txtitem.setData(pos=(self.side_wall_x, self.fragile_linear_neuron_IDX_to_spatial(a_fragile_linear_neuron_IDX), (self.floor_z - 0.5)), color=curr_color) # TODO: could update color as well
             
             # curr_id_txtitem.resetTransform()
             # curr_id_txtitem.translate(self.near_wall_x, self.y[i], (self.z_floor - 0.5))
@@ -465,16 +465,16 @@ class Spike3DRaster(PyQtGraphSpecificTimeCurvesMixin, RenderTimeEpochMeshesMixin
         # self.y = DataSeriesToSpatial.build_series_identity_axis(self.n_cells, center_mode=self.params.center_mode, bin_position_mode=self.params.bin_position_mode, side_bin_margins = self.params.side_bin_margins)
         
         # Plot each unit one at a time:
-        for i, a_unit_id in enumerate(self.unit_ids):    
+        for i, a_fragile_linear_neuron_IDX in enumerate(self.fragile_linear_neuron_IDXs):    
             # Filter the dataframe using that column and value from the list
-            curr_cell_df = self.active_windowed_df[self.active_windowed_df['unit_id']==a_unit_id]
+            curr_cell_df = self.active_windowed_df[self.active_windowed_df['fragile_linear_neuron_IDX']==a_fragile_linear_neuron_IDX]
             curr_spike_t = curr_cell_df[curr_cell_df.spikes.time_variable_name].to_numpy() # this will map
             # efficiently get curr_spike_t by filtering for unit and column at the same time
-            # curr_spike_t = self.active_windowed_df.loc[self.active_windowed_df.spikes.time_variable_name, (self.active_windowed_df['unit_id']==cell_id)].values # .to_numpy()
+            # curr_spike_t = self.active_windowed_df.loc[self.active_windowed_df.spikes.time_variable_name, (self.active_windowed_df['fragile_linear_neuron_IDX']==cell_id)].values # .to_numpy()
             
             curr_unit_n_spikes = len(curr_spike_t)
             
-            yi = self.unit_id_to_spatial(a_unit_id)
+            yi = self.fragile_linear_neuron_IDX_to_spatial(a_fragile_linear_neuron_IDX)
             # yi = self.series_identity_y_values[i] # get the correct y-position for all spikes of this cell
             # map the current spike times back onto the range of the window's (-half_render_window_duration, +half_render_window_duration) so they represent the x coordinate
             curr_x = DataSeriesToSpatial.temporal_to_spatial_map(curr_spike_t, self.spikes_window.active_window_start_time, self.spikes_window.active_window_end_time, self.temporal_axis_length, center_mode='zero_centered')
@@ -513,7 +513,7 @@ class Spike3DRaster(PyQtGraphSpecificTimeCurvesMixin, RenderTimeEpochMeshesMixin
             if debug_print:
                 print(f'!! Spike3DRaster.rebuild_main_gl_line_plots_if_needed(): building additional plots: n_extant_plts: {n_extant_plts}, self.n_cells: {self.n_cells}')
             for new_unit_i in np.arange(n_extant_plts-1, self.n_cells, 1):
-                cell_id = self.unit_ids[new_unit_i]
+                cell_id = self.fragile_linear_neuron_IDXs[new_unit_i]
                 # curr_color = pg.mkColor((cell_id, self.n_cells*1.3))
                 # curr_color.setAlphaF(0.5)
                 curr_color = self.params.neuron_qcolors[cell_id] # get the pre-build color

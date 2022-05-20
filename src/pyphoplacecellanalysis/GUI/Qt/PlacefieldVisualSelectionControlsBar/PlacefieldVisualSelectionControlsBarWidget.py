@@ -21,12 +21,14 @@ from pyphoplacecellanalysis.PhoPositionalData.plotting.mixins.general_plotting_m
 class PlacefieldVisualSelectionControlsBarWidget(QtWidgets.QWidget):
     """docstring for PlacefieldVisualSelectionControlsBarWidget."""
  
-    # spike_config_changed = QtCore.pyqtSignal(list, list, bool) # change_unit_spikes_included(self, cell_IDXs=None, cell_IDs=None, are_included=True)
+    # spike_config_changed = QtCore.pyqtSignal(list, list, bool) # change_unit_spikes_included(self, neuron_IDXs=None, cell_IDs=None, are_included=True)
     # tuning_curve_display_config_changed = QtCore.pyqtSignal(list, list) # on_update_tuning_curve_display_config(self, updated_config_indicies, updated_configs)
     
     # update_signal = QtCore.pyqtSignal(list, list, float, float, list, list, list, list)
     # finish_signal = QtCore.pyqtSignal(float, float)
  
+    sigRefresh = QtCore.pyqtSignal(object)
+    
     desired_full_panel_width = 1200
     desired_full_panel_height = 200
     
@@ -83,6 +85,15 @@ class PlacefieldVisualSelectionControlsBarWidget(QtWidgets.QWidget):
         ## Once the widgets are added to pf_layout, set the container to the layout:
         self.ui.placefieldControlsContainer.setLayout(self.ui.pf_layout)
 
+        # Configure the "Refresh" Button:
+        self.ui.btnRefresh.clicked.connect(self.onRefreshAction)
+
+
+    @QtCore.pyqtSlot()
+    def onRefreshAction(self):
+        print(f'PlacefieldVisualSelectionControlsBarWidget.onRefreshAction()')
+        self.sigRefresh.emit(self)
+        # self.done(QtCore.Qt.WA_DeleteOnClose)
 
 
 ## Start Qt event loop

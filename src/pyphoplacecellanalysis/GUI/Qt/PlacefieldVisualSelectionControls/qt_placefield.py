@@ -125,6 +125,15 @@ def build_batch_interactive_placefield_visibility_controls(rootControlsBarWidget
         ipcDataExplorer._show_all_tuning_curves()
         ipcDataExplorer.update_active_placefields([])
         # self.on_hide_all_placefields()      
+        
+    def _btn_perform_refresh_callback():
+        if debug_logging:
+            print('EndButtonPanel._btn_perform_refesh_callback(...)')
+
+        ## TODO: perform update
+        ipcDataExplorer.update_spikes()
+        # ipcDataExplorer._show_all_tuning_curves()
+        # ipcDataExplorer.update_active_placefi        
 
     end_button_helper_obj = BatchActionsEndButtonPanelHelper(hide_all_callback=_btn_hide_all_callback, show_all_callback=_btn_show_all_callback)
     
@@ -149,6 +158,10 @@ def build_batch_interactive_placefield_visibility_controls(rootControlsBarWidget
     # # btn_occupancy_map_visibility.on_click(ipcDataExplorer.on_occupancy_plot_config_updated)
     # occupancy_widget = btn_occupancy_map_visibility
     
+    
+    # Connect any extra signals:
+    connections.append(rootControlsBarWidget.sigRefresh.connect(_btn_perform_refresh_callback))
+    
     return end_button_helper_obj, connections
 
 
@@ -164,7 +177,7 @@ def build_all_placefield_output_panels(ipcDataExplorer):
     rootControlsBarWidget = PlacefieldVisualSelectionControlsBarWidget()
     # groupBox = rootControlsBarWidget.ui.placefieldControlsGroupbox
     pf_layout = rootControlsBarWidget.ui.pf_layout
-    
+        
     # @QtCore.pyqtSlot(list)
     def _on_tuning_curve_display_config_changed(new_configs):
         """
@@ -183,7 +196,7 @@ def build_all_placefield_output_panels(ipcDataExplorer):
         # print(f'\t extracted_cell_ids: {extracted_cell_ids}')
         # convert to config indicies, which are what the configs are indexed by:
         # extracted_config_indicies = [ipcDataExplorer.params.reverse_cellID_to_tuning_curve_idx_lookup_map[a_cell_id] for a_cell_id in extracted_cell_ids]
-        extracted_config_indicies = ipcDataExplorer.find_tuning_curve_IDXs_from_cell_ids(extracted_cell_ids)
+        extracted_config_indicies = ipcDataExplorer.find_tuning_curve_IDXs_from_neuron_ids(extracted_cell_ids)
         # print(f'\t extracted_config_indicies: {extracted_config_indicies}')
         # The actual update function:
         ipcDataExplorer.on_update_tuning_curve_display_config(updated_configs=new_configs, updated_config_indicies=extracted_config_indicies) # could just update function to look at .name of each config? Or change indicies to map?
@@ -196,7 +209,7 @@ def build_all_placefield_output_panels(ipcDataExplorer):
     # the active_tuning_curve_render_configs are an array of SingleNeuronPlottingExtended objects, one for each placefield
     # for (idx, a_config) in enumerate(ipcDataExplorer.active_tuning_curve_render_configs):
     
-    valid_cell_ids = ipcDataExplorer.tuning_curves_valid_cell_ids
+    valid_cell_ids = ipcDataExplorer.tuning_curves_valid_neuron_ids
     for (idx, cell_id) in enumerate(valid_cell_ids):
         a_config = ipcDataExplorer.active_tuning_curve_render_configs[idx]
         curr_widget = build_single_placefield_output_widget(a_config)
@@ -212,9 +225,9 @@ def build_all_placefield_output_panels(ipcDataExplorer):
             arg1, arg2, ...: are the extra parameters that you want to spend
 
         """
-        curr_widget.spike_config_changed.connect(lambda are_included, spikes_config_changed_callback=ipcDataExplorer.change_unit_spikes_included, cell_id_copy=cell_id: spikes_config_changed_callback(cell_IDXs=None, cell_IDs=[cell_id_copy], are_included=are_included))
+        curr_widget.spike_config_changed.connect(lambda are_included, spikes_config_changed_callback=ipcDataExplorer.change_unit_spikes_included, cell_id_copy=cell_id: spikes_config_changed_callback(neuron_IDXs=None, cell_IDs=[cell_id_copy], are_included=are_included))
         
-        # curr_widget.spike_config_changed.connect(lambda are_included, spikes_config_changed_callback=ipcDataExplorer.change_unit_spikes_included, i_copy=idx: spikes_config_changed_callback(cell_IDXs=[i_copy], cell_IDs=None, are_included=are_included))
+        # curr_widget.spike_config_changed.connect(lambda are_included, spikes_config_changed_callback=ipcDataExplorer.change_unit_spikes_included, i_copy=idx: spikes_config_changed_callback(neuron_IDXs=[i_copy], cell_IDs=None, are_included=are_included))
         
         # Connect the signals to the debugging slots:
         # curr_widget.spike_config_changed.connect(_on_spike_config_changed)
@@ -229,7 +242,7 @@ def build_all_placefield_output_panels(ipcDataExplorer):
     end_button_helper_obj, connections = build_batch_interactive_placefield_visibility_controls(rootControlsBarWidget=rootControlsBarWidget, ipcDataExplorer=ipcDataExplorer)
     ipcDataExplorer.params.end_button_helper_obj = end_button_helper_obj
     ipcDataExplorer.params.end_button_helper_connections = connections
-    
+        
     return (rootControlsBarWidget, pf_widgets)
     # return (placefieldControlsContainerWidget, pf_widgets)
 

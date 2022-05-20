@@ -178,7 +178,7 @@ class SpikesDataframeDatasource(DataframeDatasource):
     """
         ## It seems the relevant columns are:
         'visualization_raster_y_location' # for y-offsets in 3D plot
-        'unit_id' # for colors
+        'fragile_linear_neuron_IDX' # for colors
         pos = np.vstack((curr_spike_x, curr_spike_y)) # np.shape(curr_spike_t): (11,), np.shape(curr_spike_x): (11,), np.shape(curr_spike_y): (11,), curr_n: 11
         self.all_spots = [{'pos': pos[:,i], 'data': i, 'pen': curr_spike_pens[i]} for i in range(curr_n)]
     """ 

@@ -189,7 +189,7 @@ class PhoPythonEvalNode(Node):
 
 
 class PhoPythonEvalNodeCtrlWidget(QtWidgets.QWidget):
-    """The widget that contains the list of all the nodes in a flowchart and their controls, as well as buttons for loading/saving flowcharts."""
+    """The widget that allows the user to enter/load/save custom Python code using the PhoPythonEvalNode."""
         
     sigFileLoaded = QtCore.Signal(object)
     sigFileSaved = QtCore.Signal(object)

@@ -6,12 +6,10 @@ NeuropyPipeline.py
 """
 import importlib
 import sys
-import dataclasses
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable, List
 
-from pyphocorehelpers.function_helpers import compose_functions
+# from pyphocorehelpers.function_helpers import compose_functions
 
 import numpy as np
 import pandas as pd
@@ -20,7 +18,7 @@ from pyphoplacecellanalysis.General.Pipeline.Stages.Display import PipelineWithD
 from pyphoplacecellanalysis.General.Pipeline.Stages.Filtering import FilteredPipelineMixin
 from pyphoplacecellanalysis.General.Pipeline.Stages.Loading import PipelineWithInputStage, PipelineWithLoadableStage
 
-from pyphoplacecellanalysis.General.SessionSelectionAndFiltering import batch_filter_session
+# from pyphoplacecellanalysis.General.SessionSelectionAndFiltering import batch_filter_session
 
 from pyphoplacecellanalysis.General.KnownDataSessionTypeProperties import KnownDataSessionTypeProperties
 from pyphoplacecellanalysis.General.Pipeline.Stages.BaseNeuropyPipelineStage import PipelineStage
@@ -37,18 +35,6 @@ except ImportError:
     # sys.path.append(r'/Users/pho/repo/Python Projects/NeuroPy') # MacOS
     print("neuropy module not found, adding directory to sys.path. \n >> Updated sys.path.")
     from neuropy import core
-
-
-# known_data_session_type_dict = {'kdiba':KnownDataSessionTypeProperties(load_function=(lambda a_base_dir: DataSessionLoader.kdiba_old_format_session(a_base_dir)),
-#                                basedir=Path(r'R:\data\KDIBA\gor01\one\2006-6-07_11-26-53')),
-#                 'bapun':KnownDataSessionTypeProperties(load_function=(lambda a_base_dir: DataSessionLoader.bapun_data_session(a_base_dir)),
-#                                basedir=Path('R:\data\Bapun\Day5TwoNovel'))
-#                }
-
-
-# load_fn_dict = {'kdiba':(lambda a_base_dir: DataSessionLoader.kdiba_old_format_session(a_base_dir)),
-#                 'bapun':(lambda a_base_dir: DataSessionLoader.bapun_data_session(a_base_dir))
-#                }
 
 
 

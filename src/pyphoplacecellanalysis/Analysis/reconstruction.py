@@ -351,11 +351,11 @@ class BayesianPlacemapPositionDecoder(PlacemapPositionDecoder):
         super(BayesianPlacemapPositionDecoder, self).__init__(time_bin_size, pf, spikes_df, setup_on_init=setup_on_init, post_load_on_init=post_load_on_init, debug_print=debug_print)
         
     
-    # def n_i(cell_idx_i, time_window):
+    # def n_i(neuron_IDX_i, time_window):
     #     """ number of spikes fired by cell i within the time window """
     #     pass
     
-    # def phi_i(cell_idx_i, x):
+    # def phi_i(neuron_IDX_i, x):
     #     """ an arbitrary basis function or template function associated with this cell """
     #     pass
 

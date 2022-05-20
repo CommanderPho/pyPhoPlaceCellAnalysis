@@ -55,18 +55,18 @@ def _display_pyqtgraph_raster_plot(curr_spikes_df, debug_print=False):
     _display_pyqtgraph_raster_plot(curr_spikes_df)
     
     """
-    curr_unit_id = curr_spikes_df['unit_id'].to_numpy() # this will map to the y position
+    curr_fragile_linear_neuron_IDX = curr_spikes_df['fragile_linear_neuron_IDX'].to_numpy() # this will map to the y position
     curr_spike_t = curr_spikes_df[curr_spikes_df.spikes.time_variable_name].to_numpy() # this will map to the depth dimension in 3D or x-pos in 2D
 
     if debug_print:
-        print(f'_test_display_pyqtgraph_raster_plot(np.shape(curr_unit_id): {np.shape(curr_unit_id)}, np.shape(curr_spike_t): {np.shape(curr_spike_t)})')
-        print(f'\t curr_unit_id: {curr_unit_id}\n curr_spike_t: {curr_spike_t}')
+        print(f'_test_display_pyqtgraph_raster_plot(np.shape(curr_fragile_linear_neuron_IDX): {np.shape(curr_fragile_linear_neuron_IDX)}, np.shape(curr_spike_t): {np.shape(curr_spike_t)})')
+        print(f'\t curr_fragile_linear_neuron_IDX: {curr_fragile_linear_neuron_IDX}\n curr_spike_t: {curr_spike_t}')
     
     # For the unit Ids, perform a transformation:
-    normalized_unit_ids = curr_unit_id / np.max(curr_unit_id)
-    upper_unit_bounds = (normalized_unit_ids*0.9) + 0.05 # 0.05 to 0.95
+    normalized_fragile_linear_neuron_IDXs = curr_fragile_linear_neuron_IDX / np.max(curr_fragile_linear_neuron_IDX)
+    upper_unit_bounds = (normalized_fragile_linear_neuron_IDXs*0.9) + 0.05 # 0.05 to 0.95
     lower_unit_bounds = upper_unit_bounds - 0.05 # 0.00 to 0.90
-    # curr_unit_id_repeats = curr_unit_id.copy()
+    # curr_fragile_linear_neuron_IDX_repeats = curr_fragile_linear_neuron_IDX.copy()
     # curr_spike_t_repeats = curr_spike_t.copy()
     curr_spike_t_repeats = np.atleast_2d(curr_spike_t.copy())
     lower_unit_bounds = np.atleast_2d(lower_unit_bounds)
@@ -75,19 +75,19 @@ def _display_pyqtgraph_raster_plot(curr_spikes_df, debug_print=False):
         print(f'np.atleast_2d(lower_unit_bounds): {np.shape(np.atleast_2d(lower_unit_bounds))}') # (1, 819170)
     
     # the paired arrays should be twice as long as the original arrays and are to be used with the connected='pair' argument
-    # curr_paired_unit_id = interleave_elements(curr_unit_id, curr_unit_id_repeats)
-    curr_paired_unit_id = np.squeeze(interleave_elements(lower_unit_bounds.T, upper_unit_bounds.T)) # use the computed ranges instead
+    # curr_paired_fragile_linear_neuron_IDX = interleave_elements(curr_fragile_linear_neuron_IDX, curr_fragile_linear_neuron_IDX_repeats)
+    curr_paired_fragile_linear_neuron_IDX = np.squeeze(interleave_elements(lower_unit_bounds.T, upper_unit_bounds.T)) # use the computed ranges instead
     curr_paired_spike_t = np.squeeze(interleave_elements(curr_spike_t_repeats.T, curr_spike_t_repeats.T))
     if debug_print:
-        print(f'curr_paired_unit_id: {np.shape(curr_paired_unit_id)}, curr_paired_spike_t: {np.shape(curr_paired_spike_t)}')
+        print(f'curr_paired_fragile_linear_neuron_IDX: {np.shape(curr_paired_fragile_linear_neuron_IDX)}, curr_paired_spike_t: {np.shape(curr_paired_spike_t)}')
     
-    # out_q_path = pg.arrayToQPath(curr_paired_spike_t, curr_paired_unit_id, connect='pairs', finiteCheck=True) # connect='pairs' details how to connect points in the path
+    # out_q_path = pg.arrayToQPath(curr_paired_spike_t, curr_paired_fragile_linear_neuron_IDX, connect='pairs', finiteCheck=True) # connect='pairs' details how to connect points in the path
     
-    return plot_raster_plot(x=curr_paired_spike_t, y=curr_paired_unit_id)    
+    return plot_raster_plot(x=curr_paired_spike_t, y=curr_paired_fragile_linear_neuron_IDX)    
     
-    # return plot_raster_plot(curr_spike_t, curr_unit_id)
+    # return plot_raster_plot(curr_spike_t, curr_fragile_linear_neuron_IDX)
  
-    # np.unique(curr_unit_id) # np.arange(62) (0-62)
+    # np.unique(curr_fragile_linear_neuron_IDX) # np.arange(62) (0-62)
     # curr_spike_t
 
     # app = pg.mkQApp()
@@ -139,7 +139,7 @@ def _compute_windowed_spikes_raster(curr_spikes_df, render_window_duration=6.0):
     
         
     
-    unit_split_spikes_df = partition(curr_spikes_df, 'unit_id') # split on the unitID
+    unit_split_spikes_df = partition(curr_spikes_df, 'fragile_linear_neuron_IDX') # split on the unitID
     
     
 

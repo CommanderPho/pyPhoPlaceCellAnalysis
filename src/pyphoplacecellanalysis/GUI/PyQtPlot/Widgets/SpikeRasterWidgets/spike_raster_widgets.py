@@ -61,6 +61,9 @@ class UnifiedSpikeRasterApp(TimeWindowPlaybackControllerActionsMixin, TimeWindow
 def build_spike_3d_raster_with_2d_controls(curr_spikes_df, window_duration=15.0, window_start_time=30.0, neuron_colors=None, neuron_sort_order=None, separate_windows=False, application_name=None):
     """ builds a 3D Raster plot for spikes with 2D controls in a separate window
     
+    Inputs:
+        separate_windows: bool - If True, the 3d plotter and its 2d controls are rendered in separate windows. Otherwise they're rendered in a single Spike3DRasterWindowWidget
+    
     Usage:
     
         from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.SpikeRasterWidgets.spike_raster_widgets import build_spike_3d_raster_with_2d_controls

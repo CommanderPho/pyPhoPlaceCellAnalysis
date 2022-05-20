@@ -50,7 +50,7 @@ class PipelineFilteringDataNode(ExtendedCtrlNode):
         return enabled_filter_names                
     
     def ui_build(self):
-        # Setup the recompute button:
+        # Setup the refilter button:
         self.ctrls['refilter'].setText('refilter')
         def click():
             self.ctrls['refilter'].processing("Hold on..")
@@ -141,34 +141,6 @@ class PipelineFilteringDataNode(ExtendedCtrlNode):
         # Update the self.keys value:
         self.configRows = keys
         
-        
-    # def updateKeys(self, data):
-    #     if isinstance(data, dict):
-    #         keys = list(data.keys())
-    #     elif isinstance(data, list) or isinstance(data, tuple):
-    #         keys = data
-    #     elif isinstance(data, np.ndarray) or isinstance(data, np.void):
-    #         keys = data.dtype.names
-    #     else:
-    #         print("Unknown data type:", type(data), data)
-    #         return
-            
-    #     for c in self.ctrls.values():
-    #         c.blockSignals(True)
-    #     #for c in [self.ctrls['included_configs'], self.ctrls['y'], self.ctrls['size']]:
-    #     for c in [self.ctrls['included_configs']]:
-    #         cur = str(c.currentText())
-    #         c.clear()
-    #         for k in keys:
-    #             c.addItem(k)
-    #             if k == cur:
-    #                 c.setCurrentIndex(c.count()-1)
-    #     # for c in [self.ctrls['color'], self.ctrls['border']]:
-    #     #     c.setArgList(keys)
-    #     for c in self.ctrls.values():
-    #         c.blockSignals(False)
-    #     # Update the self.keys value:
-    #     self.keys = keys
         
 
     def saveState(self):

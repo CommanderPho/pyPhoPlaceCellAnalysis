@@ -212,8 +212,8 @@ class DataSeriesToSpatialTransformingMixin:
         """ transforms the times in temporal_data to a spatial offset (such as the x-positions for a 3D raster plot) """
         return DataSeriesToSpatial.temporal_to_spatial_map(temporal_data, self.spikes_window.active_window_start_time, self.spikes_window.active_window_end_time, self.temporal_axis_length, center_mode='zero_centered')
     
-    def unit_id_to_spatial(self, unit_ids):
-        """ transforms the unit_ids in unit_ids to a spatial offset (such as the y-positions for a 3D raster plot) """
+    def fragile_linear_neuron_IDX_to_spatial(self, fragile_linear_neuron_IDXs):
+        """ transforms the fragile_linear_neuron_IDXs in fragile_linear_neuron_IDXs to a spatial offset (such as the y-positions for a 3D raster plot) """
         raise NotImplementedError
     
     def build_series_identity_axis(self):

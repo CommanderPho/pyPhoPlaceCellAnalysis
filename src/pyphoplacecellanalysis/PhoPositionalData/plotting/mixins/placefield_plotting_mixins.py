@@ -58,8 +58,8 @@ class PlacefieldOwningMixin(NeuronIdentityAccessingMixin, NeuronConfigOwningMixi
         """ the neuron_extended_id the corresponds to each placefield/ratemap """
         return self.ratemap.neuron_extended_ids
     @property
-    def tuning_curves_valid_cell_ids(self):
-        """ the valid cell_ids (a.k.a aclu values, neuron_ids, etc) corresponding to each tuning curve """
+    def tuning_curves_valid_neuron_ids(self):
+        """ the valid neuron_ids (a.k.a aclu values, neuron_ids, etc) corresponding to each tuning curve """
         return self.ratemap.neuron_ids
 
     
@@ -74,14 +74,14 @@ class PlacefieldOwningMixin(NeuronIdentityAccessingMixin, NeuronConfigOwningMixi
     def build_tuning_curve_configs(self):
         # call the parent function from NeuronConfigOwningMixin.build_neuron_render_configs():
         self.build_neuron_render_configs()
-        # do any addition setup needed
+        # do any additional setup needed
 
-    def find_tuning_curve_IDXs_from_cell_ids(self, cell_ids):
-        """Finds the tuning curve IDXs from the cell original IDs (cell_ids)
+    def find_tuning_curve_IDXs_from_neuron_ids(self, neuron_ids):
+        """Finds the tuning curve IDXs from the cell original IDs (neuron_ids)
         Args:
             cell_ids ([type]): [description]
         """
-        return np.array([self.params.reverse_cellID_to_tuning_curve_idx_lookup_map.get(a_cell_id, None) for a_cell_id in cell_ids])
+        return np.array([self.params.reverse_cellID_to_tuning_curve_idx_lookup_map.get(a_cell_id, None) for a_cell_id in neuron_ids])
     
     
 
