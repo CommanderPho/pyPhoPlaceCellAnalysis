@@ -84,6 +84,11 @@ class NeuronConfigOwningMixin:
         
             
     def build_neuron_render_configs(self):
+        """ 
+        
+        Requires:
+            self.params.pf_colors_hex: this should have one entry per num_neurons, which is the length of self.ratemap.neuron_ids
+        """
         ## TODO: should have code here that ensures this is only done once, so values don't get overwritten
         # Get the cell IDs that have a good place field mapping:
         good_placefield_neuronIDs = np.array(self.ratemap.neuron_ids) # in order of ascending ID

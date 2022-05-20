@@ -165,12 +165,10 @@ class InteractivePlaceCellTuningCurvesDataExplorer(OccupancyPlottingMixin, Place
         # Plot the flat arena
         self.plots['maze_bg'] = perform_plot_flat_arena(self.p, self.x, self.y, bShowSequenceTraversalGradient=False, smoothing=self.active_config.plotting_config.use_smoothed_maze_rendering)
         
-                
         if self.plot_placefields():
             needs_render = True
         
-       
-        
+
         # hide the tuning curves automatically on startup (they don't render correctly anyway):
         self._hide_all_tuning_curves()
         
