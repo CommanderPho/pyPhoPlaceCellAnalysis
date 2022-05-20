@@ -258,8 +258,9 @@ class InteractivePlaceCellTuningCurvesDataExplorer(OccupancyPlottingMixin, Place
         # when finished, self.active_session.spikes_df is modified with the updated 'z' values
 
     ## Config Updating:
-    def on_config_update(self):
-        test_updated_colors_map = {3: '#999999'}
-
-        self.update_spikes_df_color_columns(test_updated_colors_map)
-        self.update_rendered_placefields(test_updated_colors_map)
+    def on_config_update(self, updated_colors_map):
+        # test_updated_colors_map = {3: '#999999'}
+        # # self.on_config_update(test_updated_colors_map)
+        
+        self.update_spikes_df_color_columns(updated_colors_map)
+        self.update_rendered_placefields(updated_colors_map)
