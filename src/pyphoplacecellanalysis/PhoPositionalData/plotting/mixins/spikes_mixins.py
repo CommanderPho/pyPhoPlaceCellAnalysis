@@ -112,8 +112,6 @@ class SpikeRenderingPyVistaMixin(SpikeRenderingBaseMixin):
         # Adds to self.params:
             opaque_neuron_colors
             
-            flat_spike_colors_array # for some reason. Length of spikes_df
-            
             cell_spike_colors_dict
             cell_spike_opaque_colors_dict
         

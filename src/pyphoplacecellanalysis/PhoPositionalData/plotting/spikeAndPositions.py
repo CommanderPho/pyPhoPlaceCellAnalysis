@@ -3,6 +3,7 @@
 """
 @author: pho
 """
+from indexed import IndexedOrderedDict
 import sys
 import pyvista as pv
 import pyvistaqt as pvqt
@@ -274,8 +275,8 @@ def plot_placefields2D(pTuningCurves, active_placefields, pf_colors: np.ndarray,
     tuningCurvePlot_x, tuningCurvePlot_y = np.meshgrid(active_placefields.ratemap.xbin_centers, active_placefields.ratemap.ybin_centers)
     # Loop through the tuning curves and plot them:
     print('num_curr_tuning_curves: {}'.format(num_curr_tuning_curves))
-    tuningCurvePlotActors = []
-    tuningCurvePlotData = []
+    tuningCurvePlotActors = IndexedOrderedDict({})
+    tuningCurvePlotData = IndexedOrderedDict({}) # TODO: try to convert to an ordered dict indexed by neuron_IDs
     for i in np.arange(num_curr_tuning_curves):
         #TODO: BUG: CRITICAL: Very clearly makes sense how the indexing gets off here:
         
@@ -306,7 +307,8 @@ def plot_placefields2D(pTuningCurves, active_placefields, pf_colors: np.ndarray,
         curr_active_neuron_plot_data = {'curr_active_neuron_ID':curr_active_neuron_ID,
                                          'curr_active_neuron_pf_identifier':curr_active_neuron_pf_identifier,
                                          'curr_active_neuron_tuning_Curve':curr_active_neuron_tuning_Curve,
-                                         'pdata_currActiveNeuronTuningCurve':pdata_currActiveNeuronTuningCurve, 'pdata_currActiveNeuronTuningCurve_Points':pdata_currActiveNeuronTuningCurve_Points}
+                                         'pdata_currActiveNeuronTuningCurve':pdata_currActiveNeuronTuningCurve, 'pdata_currActiveNeuronTuningCurve_Points':pdata_currActiveNeuronTuningCurve_Points,
+                                         'lut':None}
         
         # contours_currActiveNeuronTuningCurve = pdata_currActiveNeuronTuningCurve.contour()
         # pdata_currActiveNeuronTuningCurve.plot(show_edges=True, show_grid=True, cpos='xy', scalars=curr_active_neuron_tuning_Curve.T)        
@@ -378,12 +380,8 @@ def plot_placefields2D(pTuningCurves, active_placefields, pf_colors: np.ndarray,
         # merged = pdata_currActiveNeuronTuningCurve.merge([pdata_currActiveNeuronTuningCurve_Points])
         
         
-        # pTuningCurves.add_mesh(contours_currActiveNeuronTuningCurve, color=curr_active_neuron_color, line_width=1, name='{}_contours'.format(curr_active_neuron_pf_identifier))
-        
-        tuningCurvePlotActors.append(currActiveNeuronTuningCurve_plotActors)
-        
-        # tuningCurvePlotActors.append(pdata_currActiveNeuronTuningCurve_plotActor)
-        tuningCurvePlotData.append(curr_active_neuron_plot_data)
+        tuningCurvePlotActors[curr_active_neuron_ID] = currActiveNeuronTuningCurve_plotActors
+        tuningCurvePlotData[curr_active_neuron_ID] = curr_active_neuron_plot_data
         
     # Legend:
     plots_data = {'good_placefield_neuronIDs': good_placefield_neuronIDs,

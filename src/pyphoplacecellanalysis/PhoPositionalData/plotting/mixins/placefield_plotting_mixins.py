@@ -110,11 +110,11 @@ class HideShowPlacefieldsRenderingMixin(PlacefieldOwningMixin):
     
     @property
     def tuning_curve_is_visible(self):
-        return np.array([bool(an_actor.GetVisibility()) for an_actor in self.tuning_curve_plot_actors], dtype=bool)
+        return np.array([bool(an_actor.GetVisibility()) for an_actor in self.tuning_curve_plot_actors.values()], dtype=bool)
         
     @property
     def tuning_curve_visibilities(self):
-        return np.array([int(an_actor.GetVisibility()) for an_actor in self.tuning_curve_plot_actors], dtype=int)
+        return np.array([int(an_actor.GetVisibility()) for an_actor in self.tuning_curve_plot_actors.values()], dtype=int)
 
     @property
     def visible_tuning_curve_indicies(self):
@@ -134,7 +134,7 @@ class HideShowPlacefieldsRenderingMixin(PlacefieldOwningMixin):
         
     def _hide_all_tuning_curves(self):
         # Works to hide all turning curve plots:
-        for aTuningCurveActor in self.tuning_curve_plot_actors:
+        for aTuningCurveActor in self.tuning_curve_plot_actors.values():
             aTuningCurveActor.SetVisibility(0)
 
     def _show_all_tuning_curves(self):
@@ -151,7 +151,7 @@ class HideShowPlacefieldsRenderingMixin(PlacefieldOwningMixin):
             
     def _show_tuning_curve(self, show_index):
         # Works to show the specified tuning curve plots:
-        self.tuning_curve_plot_actors[show_index].SetVisibility(1)
+        self.tuning_curve_plot_actors.values()[show_index].SetVisibility(1)
         
     def on_update_tuning_curve_display_config(self, updated_config_indicies, updated_configs):
         # TODO: NON-EXPLICIT INDEXING
@@ -160,18 +160,18 @@ class HideShowPlacefieldsRenderingMixin(PlacefieldOwningMixin):
         assert hasattr(self, 'update_neuron_render_configs'), "self must be of type NeuronConfigOwningMixin to have access to its configs"
         self.update_neuron_render_configs(updated_config_indicies, updated_configs) # update the config with the new values:
         for an_updated_config_idx, an_updated_config in zip(updated_config_indicies, updated_configs):
-            self.tuning_curve_plot_actors[an_updated_config_idx].SetVisibility(int(self.active_tuning_curve_render_configs[an_updated_config_idx].isVisible)) # update visibility of actor
+            self.tuning_curve_plot_actors.values()[an_updated_config_idx].SetVisibility(int(self.active_tuning_curve_render_configs[an_updated_config_idx].isVisible)) # update visibility of actor
             
     
     ## Change these names, update_* can easily be called and it does the opposite of what we'd expect
     def update_tuning_curve_configs(self):
         """ update the configs from the actual actors' state """
-        for i, aTuningCurveActor in enumerate(self.tuning_curve_plot_actors):
+        for i, aTuningCurveActor in enumerate(self.tuning_curve_plot_actors.values()):
             self.active_tuning_curve_render_configs[i].isVisible = bool(aTuningCurveActor.GetVisibility())
             
     def apply_tuning_curve_configs(self):
         """ update the actual actors from the configs """
-        for i, aTuningCurveActor in enumerate(self.tuning_curve_plot_actors):
+        for i, aTuningCurveActor in enumerate(self.tuning_curve_plot_actors.values()):
             aTuningCurveActor.SetVisibility(int(self.active_tuning_curve_render_configs[i].isVisible))
 
 
