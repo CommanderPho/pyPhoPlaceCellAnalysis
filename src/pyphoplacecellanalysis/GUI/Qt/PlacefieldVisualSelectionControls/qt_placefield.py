@@ -183,6 +183,32 @@ def build_all_placefield_output_panels(ipcDataExplorer):
     # groupBox = rootControlsBarWidget.ui.placefieldControlsGroupbox
     pf_layout = rootControlsBarWidget.ui.pf_layout
         
+    def _on_neuron_color_display_config_changed(new_configs):
+        """
+        Implicitly captures ipcDataExplorer
+        
+        Usage:
+            for a_widget in pf_widgets:
+                # Connect the signals to the debugging slots:
+                a_widget.spike_config_changed.connect(_on_spike_config_changed)
+                a_widget.tuning_curve_display_config_changed.connect(_on_tuning_curve_display_config_changed)
+        """
+        print(f'_on_neuron_color_display_config_changed(new_configs: {new_configs})')
+        
+        
+        # Need to rebuild the spikes colors and such upon updating the configs. 
+        # should take a config and produce the changes needed to recolor the neurons.
+
+        # test_updated_colors_map = {3: '#999999'}
+
+        extracted_neuron_id_updated_colors_map = {int(a_config.name):a_config.color for a_config in new_configs}
+        
+        # Apply the updated map using the update functions:
+        ipcDataExplorer.on_update_spikes_colors(extracted_neuron_id_updated_colors_map)
+        ipcDataExplorer.update_rendered_placefields(extracted_neuron_id_updated_colors_map)
+        
+        
+        
     # @QtCore.pyqtSlot(list)
     def _on_tuning_curve_display_config_changed(new_configs):
         """
@@ -237,6 +263,9 @@ def build_all_placefield_output_panels(ipcDataExplorer):
         # Connect the signals to the debugging slots:
         # curr_widget.spike_config_changed.connect(_on_spike_config_changed)
         curr_widget.tuning_curve_display_config_changed.connect(_on_tuning_curve_display_config_changed)
+        
+        curr_widget.sig_neuron_color_changed.connect(_on_neuron_color_display_config_changed)
+        
         
         pf_layout.addWidget(curr_widget)
         pf_widgets.append(curr_widget)

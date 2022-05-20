@@ -27,6 +27,9 @@ class PlacefieldVisualSelectionWidget(QtWidgets.QWidget):
     spike_config_changed = QtCore.pyqtSignal(bool) # change_unit_spikes_included(self, neuron_IDXs=None, cell_IDs=None, are_included=True)
     tuning_curve_display_config_changed = QtCore.pyqtSignal(list) # on_update_tuning_curve_display_config(self, updated_config_indicies, updated_configs)
     
+    
+    sig_neuron_color_changed = QtCore.pyqtSignal(object) # send the updated color as a QtGui.QColor
+    
     # update_signal = QtCore.pyqtSignal(list, list, float, float, list, list, list, list)
     # finish_signal = QtCore.pyqtSignal(float, float)
  
@@ -56,9 +59,11 @@ class PlacefieldVisualSelectionWidget(QtWidgets.QWidget):
             if self.enable_debug_print:
                 print("btnColorButton done", btn.color())
             self._color = btn.color()
+            self.sig_neuron_color_changed.emit(btn.color()) # Only call when done with selecting color.
         
         self.ui.btnColorButton.sigColorChanging.connect(change)
         self.ui.btnColorButton.sigColorChanged.connect(done)
+        self.ui.btnColorButton.setEnabled(True)
 
         # Setup self.ui.chkbtnPlacefield:
         self.ui.chkbtnPlacefield.toggled.connect(self.togglePlacefieldVisibility)
