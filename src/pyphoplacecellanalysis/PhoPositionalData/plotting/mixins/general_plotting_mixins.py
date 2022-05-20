@@ -1,6 +1,8 @@
 import param
 import numpy as np
 import pandas as pd
+from qtpy import QtGui # for QColor
+
 
 class OptionsListMixin:
     @staticmethod
@@ -122,6 +124,25 @@ class ExampleExtended(BasePlotDataParams):
 
 class SingleNeuronPlottingExtended(ExtendedPlotDataParams):
     spikesVisible = param.Boolean(default=False, doc="Whether the spikes are visible")
+    
+    @property
+    def neuron_id(self):
+        """The neuron_id <int> property."""
+        return int(self.name)
+    
+
+    @property
+    def qcolor(self):
+        """The qcolor property."""
+        return QtGui.QColor(self.color)
+    @qcolor.setter
+    def qcolor(self, value):
+        if isinstance(value, QtGui.QColor):
+            self.color = value.name(QtGui.QColor.HexRgb) #  getting the name of a QColor with .name(QtGui.QColor.HexRgb) results in a string like '#ff0000' 
+        else:
+            print(f'ERROR: qcolor setter is being passed a value that is not a QtGui.QColor! Instead, it is of unknown type: {value}, type: {type(value)}')
+            raise NotImplementedError
+        
     
     # @param.depends(c.param.country, d.param.i, watch=True)
     # def g(country, i):
