@@ -146,7 +146,7 @@ class SpikeRenderingBaseMixin:
             elif isinstance(color, str):
                 # if it's a string, convert it to QColor
                 converted_color = QtGui.QColor(color)
-            elif isinstance(color, [tuple, list, np.array]):
+            elif isinstance(color, (tuple, list, np.array)):
                 # try to convert it, hope it's the right size and stuff
                 converted_color = QtGui.QColor(color)
             else:
