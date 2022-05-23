@@ -164,10 +164,7 @@ def build_all_placefield_output_panels(ipcDataExplorer):
     # groupBox = rootControlsBarWidget.ui.placefieldControlsGroupbox
     pf_layout = rootControlsBarWidget.ui.pf_layout
         
-        
-    
-        
-    
+    ## Nested Callback Functions:
     def _on_neuron_color_display_config_changed(new_config):
         """ The function called when the neuron color is changed.
         Implicitly captures ipcDataExplorer
