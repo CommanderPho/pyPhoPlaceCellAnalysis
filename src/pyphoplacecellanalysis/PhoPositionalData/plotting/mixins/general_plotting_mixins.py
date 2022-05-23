@@ -54,8 +54,10 @@ class NeuronConfigOwningMixin:
         return np.arange(self.num_neuron_configs)
     
         
+    ### Original Set of Functions:
+    
     # , neuron_IDXs=None, cell_IDs=None
-    def update_neuron_render_configs(self, updated_config_indicies, updated_configs, defer_render=False):
+    def update_neuron_render_configs_from_indicies(self, updated_config_indicies, updated_configs, defer_render=False):
         # TODO: NON-EXPLICIT INDEXING
         """Updates the configs for the cells with the specified updated_config_indicies
         Args:
@@ -81,13 +83,45 @@ class NeuronConfigOwningMixin:
         if not defer_render:
             self.update_spikes()
         
+    
+    def update_neuron_render_configs(self, updated_configs, defer_render=False):
+        """ 
+            Actually performs updating the self.active_neuron_render_configs_map with the updated values provided in updated_configs
         
+        Inputs:
+            updated_configs: dict<neuron_id (int), config>
+        Requires:
+            self.active_neuron_render_configs_map
+        Returns:
+            Returns a list of the values that actually changed.
+            updated_ids_list, updated_configs_list
+        """
+        # self.active_neuron_render_configs_map[updated_configs
+        updated_ids_list = []
+        updated_configs_list = []
+        
+        for neuron_id, updated_config in updated_configs.items():
+            # didValueChange = (self.active_neuron_render_configs_map[neuron_id].color != updated_config)
+            didValueChange = (self.active_neuron_render_configs_map[neuron_id] != updated_config)
+            if didValueChange:
+                self.active_neuron_render_configs_map[neuron_id] = updated_config # get the config from the self.active_neuron_render_configs_map and set its color value
+                # add to list that tracks which items changed:
+                updated_ids_list.append(neuron_id)
+                updated_configs_list.append(self.active_neuron_render_configs_map[neuron_id])
+        
+        return updated_ids_list, updated_configs_list
+
+
+
             
     def build_neuron_render_configs(self):
-        """ 
-        
+        """ Builds the render config models that are used to control the displayed settings for each cell
         Requires:
             self.params.pf_colors_hex: this should have one entry per num_neurons, which is the length of self.ratemap.neuron_ids
+            
+        Sets:
+            self.active_neuron_render_configs: a list of configs
+            self.active_neuron_render_configs_map: a Dict<neuron_id (int), config> mapping
         """
         ## TODO: should have code here that ensures this is only done once, so values don't get overwritten
         # Get the cell IDs that have a good place field mapping:
@@ -95,6 +129,8 @@ class NeuronConfigOwningMixin:
         num_neurons = len(good_placefield_neuronIDs)
         unit_labels = [f'{good_placefield_neuronIDs[i]}' for i in np.arange(num_neurons)]
         self.active_neuron_render_configs = [SingleNeuronPlottingExtended(name=unit_labels[i], isVisible=False, color=self.params.pf_colors_hex[i], spikesVisible=False) for i in np.arange(num_neurons)]
+        self.active_neuron_render_configs_map = NeuronConfigOwningMixin._build_id_index_configs_dict(self.active_neuron_render_configs)
+        
         
         ## TODO: POTENTIAL ERROR: This only builds configs for good neurons, but we should be building them for all neurons right?
            
@@ -102,6 +138,52 @@ class NeuronConfigOwningMixin:
 #         return combined_active_pf_update_callbacks
     
         
+    ### Modern Dict-based method (with neuron_id keys):
+    @classmethod
+    def _build_id_index_configs_dict(cls, configs):
+        """ Returns a dict of the configs passed in indexed by their name as the key """
+        return {int(a_config.name):a_config for a_config in configs}
+
+    @classmethod
+    def build_updated_colors_map_from_configs(cls, configs):
+        """ extracts a dictionary with keys of the neuron_ID (as an int) and values of the corresponding neuron's color as a hex string."""
+        # return {a_neuron_id:color for a_neuron_id, color in configs.items()}
+        return {int(a_config.name):a_config.color for a_config in configs}
+        
+    @classmethod
+    def apply_updated_colors_map_to_configs(cls, configs, updated_colors_map):
+        """ Updates the **configs** from the updated_colors_map
+        
+        Checks for which values are actually changing and returns the updated_ids_list, updated_configs_list
+        
+        Inputs:
+            updated_colors_map: a dictionary with keys of neuron_id and values of the hex_color to use.
+        
+        Outputs:
+            updated_ids_list, updated_configs_list: the neuron_ids and configs that actually changed as a result of this function.
+        
+        """
+        if isinstance(configs, dict):
+            # already a config map:
+            configs_map = configs
+        else:
+            # make into a config map
+            configs_map = cls._build_id_index_configs_dict(configs)
+        
+        updated_ids_list = []
+        updated_configs_list = []
+        
+        for neuron_id, updated_value in updated_colors_map.items():
+            didValueChange = (configs_map[neuron_id].color != updated_value)
+            if didValueChange:
+                configs_map[neuron_id].color = updated_value # get the config from the configs_map and set its color value
+                # add to list that tracks which items changed:
+                updated_ids_list.append(neuron_id)
+                updated_configs_list.append(configs_map[neuron_id])
+        
+        return configs_map, updated_ids_list, updated_configs_list
+
+
 
 
 ## Parameters (Param):
