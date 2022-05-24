@@ -110,7 +110,7 @@ class DynamicDockDisplayAreaContentMixin:
         else:
             raise NotImplementedError
         
-        print(f'dockAddLocationOpts: {dockAddLocationOpts}')
+        # print(f'dockAddLocationOpts: {dockAddLocationOpts}')
         
         # display_dock_area.addDock(dDisplayItem, *dockAddLocationOpts)
         display_dock_area.addDock(*dockAddLocationOpts)
