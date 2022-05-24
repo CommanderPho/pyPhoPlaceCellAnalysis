@@ -479,6 +479,18 @@ class Spike3DRasterWindowWidget(SpikeRasterLeftSidebarControlsMixin, SpikeRaster
         if self.enable_debug_print:
             profiler('Finished calling _update_plots()')
     
+    
+    
+    def update_neurons_color_data(self, updated_neuron_render_configs):
+        """ Propagates the neuron color updates to any valid children that need these updates.
+        """
+        if self.spike_raster_plt_2d is not None:
+            self.spike_raster_plt_2d.update_neurons_color_data(updated_neuron_render_configs)
+            
+        if self.spike_raster_plt_3d is not None:
+            self.spike_raster_plt_3d.update_neurons_color_data(updated_neuron_render_configs)
+        
+        
 
     ########################################################
     ## For Key Press Events:
@@ -533,6 +545,8 @@ class Spike3DRasterWindowWidget(SpikeRasterLeftSidebarControlsMixin, SpikeRaster
             print(f'\t wheelEvent(event: {event}')
     
 
+    
+    
     
     
 
