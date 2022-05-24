@@ -137,7 +137,7 @@ class PlacefieldVisualSelectionControlsBarWidget(QtWidgets.QWidget):
         for neuron_id, updated_config in active_configs_map.items():
             """ Update the placefield selection GUI widgets from the updated configs using the .update_from_config(render_config) fcn """
             # update the widget:
-            neuron_id_pf_widgets_map[neuron_id].update_from_config(updated_config)
+            self.neuron_id_pf_widgets_map[neuron_id].update_from_config(updated_config)
 
 
     def configsFromStates(self):

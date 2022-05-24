@@ -102,19 +102,95 @@ def build_batch_interactive_placefield_visibility_controls(rootControlsBarWidget
         pane = build_panel_interactive_placefield_visibility_controls(ipcDataExplorer)
         pane
     """
+   
+    
+    
+    ################################################
+    ####### Spikes Visibility callbacks
+    def _update_all_spikes_visibility(new_is_visible, apply_changes_on_finish=False):
+        if debug_logging:
+            print(f'EndButtonPanel._update_all_spikes_visibility(new_is_visible: {new_is_visible}, apply_changes_on_finish={apply_changes_on_finish})')
+            
+        rootConfigControlsWidget = ipcDataExplorer.ui['placefieldControlsContainerWidget']
+        # rootConfigControlsWidget = rootControlsBarWidget
+        changed_configs = {}
+        for neuron_id, a_config in ipcDataExplorer.active_neuron_render_configs_map.items():
+            did_change = (a_config.spikesVisible != new_is_visible)
+            if did_change:
+                a_config.spikesVisible = new_is_visible
+                rootConfigControlsWidget.neuron_id_pf_widgets_map[neuron_id].blockSignals(True)
+                rootConfigControlsWidget.neuron_id_pf_widgets_map[neuron_id].update_from_config(a_config) # update it since it changed
+                rootConfigControlsWidget.neuron_id_pf_widgets_map[neuron_id].blockSignals(False)
+                changed_configs[neuron_id] = a_config
+        if apply_changes_on_finish:
+            # rootConfigControlsWidget.applyUpdatedConfigs(active_configs_map=changed_configs)
+            changed_neuron_ids = np.array(list(changed_configs.keys()))
+            if debug_logging:
+                print(f'changed_neuron_ids: {changed_neuron_ids}')
+            ipcDataExplorer.change_unit_spikes_included(cell_IDs=changed_neuron_ids, are_included=new_is_visible)
+            # ipcDataExplorer.change_unit_spikes_included(cell_IDs=self.tuning_curves_valid_neuron_ids, are_included=new_is_visible)
+
+    def _btn_hide_all_spikes_callback():
+        if debug_logging:
+            print('EndButtonPanel._btn_hide_all_spikes_callback(...)')
+        _update_all_spikes_visibility(False, apply_changes_on_finish=True) # make all visibile
+  
+    def _btn_show_all_spikes_callback():
+        if debug_logging:
+            print('EndButtonPanel._btn_show_all_spikes_callback(...)')
+        _update_all_spikes_visibility(True, apply_changes_on_finish=True) # make all visibile
+
+    ################################################
+    ####### Placefields visibility callbacks
+    def _update_all_placefields_visibility(new_is_visible, apply_changes_on_finish=False):
+        if debug_logging:
+            print(f'EndButtonPanel._update_all_placefields_visibility(new_is_visible: {new_is_visible}, apply_changes_on_finish={apply_changes_on_finish})')
+        rootConfigControlsWidget = ipcDataExplorer.ui['placefieldControlsContainerWidget']
+        changed_configs = {}
+        for neuron_id, a_config in ipcDataExplorer.active_neuron_render_configs_map.items():
+            did_change = (a_config.isVisible != new_is_visible)
+            if did_change:
+                a_config.isVisible = new_is_visible
+                rootConfigControlsWidget.neuron_id_pf_widgets_map[neuron_id].blockSignals(True)
+                rootConfigControlsWidget.neuron_id_pf_widgets_map[neuron_id].update_from_config(a_config) # update it since it changed
+                rootConfigControlsWidget.neuron_id_pf_widgets_map[neuron_id].blockSignals(False)
+                changed_configs[neuron_id] = a_config
+        if apply_changes_on_finish:
+            changed_neuron_ids = np.array(list(changed_configs.keys()))
+            if debug_logging:
+                print(f'changed_neuron_ids: {changed_neuron_ids}')
+            # rootConfigControlsWidget.applyUpdatedConfigs(active_configs_map=changed_configs)
+            # ipcDataExplorer.update_active_placefields(placefield_indicies=[])
+            ipcDataExplorer.apply_tuning_curve_configs()
+            
+    def _btn_hide_all_pfs_callback():
+        if debug_logging:
+            print('EndButtonPanel._btn_hide_all_pfs_callback(...)')
+        _update_all_placefields_visibility(False, apply_changes_on_finish=True) # make all visibile
+  
+    def _btn_show_all_pfs_callback():
+        if debug_logging:
+            print('EndButtonPanel._btn_show_all_pfs_callback(...)')
+        _update_all_placefields_visibility(True, apply_changes_on_finish=True) # make all visibile
+
+    ################################################
+    ####### Both/All visibility callbacks
     def _btn_hide_all_callback():
         if debug_logging:
             print('EndButtonPanel.btn_hide_all_callback(...)')
-        ipcDataExplorer.clear_all_spikes_included()
-        ipcDataExplorer.update_active_placefields([])
-        # self.on_hide_all_placefields()
-  
+        # ipcDataExplorer.clear_all_spikes_included()
+        # ipcDataExplorer.update_active_placefields([])
+        _btn_hide_all_pfs_callback()
+        _btn_hide_all_spikes_callback()
+        
     def _btn_show_all_callback():
         if debug_logging:
             print('EndButtonPanel.btn_show_all_callback(...)')
-        ipcDataExplorer._show_all_tuning_curves()
-        ipcDataExplorer.update_active_placefields([])
-        # self.on_hide_all_placefields()      
+        # ipcDataExplorer._show_all_tuning_curves()
+        # ipcDataExplorer.update_active_placefields([])
+        _btn_show_all_pfs_callback()
+        _btn_show_all_spikes_callback()
+
         
     def _btn_perform_refresh_callback():
         if debug_logging:
@@ -124,7 +200,9 @@ def build_batch_interactive_placefield_visibility_controls(rootControlsBarWidget
         ipcDataExplorer.update_spikes()
         # ipcDataExplorer._show_all_tuning_curves()
         # ipcDataExplorer.update_active_placefi        
-
+        
+                
+        
     end_button_helper_obj = BatchActionsEndButtonPanelHelper(hide_all_callback=_btn_hide_all_callback, show_all_callback=_btn_show_all_callback)
     
     btnShowAll_Pfs, btnShowAll_Spikes, btnShowAll_Both = rootControlsBarWidget.show_all_buttons_list
@@ -135,6 +213,12 @@ def build_batch_interactive_placefield_visibility_controls(rootControlsBarWidget
     
     connections.append(btnShowAll_Both.clicked.connect(end_button_helper_obj.btn_show_all_callback))
     connections.append(btnHideAll_Both.clicked.connect(end_button_helper_obj.btn_hide_all_callback))
+    
+    connections.append(btnHideAll_Pfs.clicked.connect(_btn_hide_all_pfs_callback))
+    connections.append(btnShowAll_Pfs.clicked.connect(_btn_show_all_pfs_callback))
+    
+    connections.append(btnHideAll_Spikes.clicked.connect(_btn_hide_all_spikes_callback))
+    connections.append(btnShowAll_Spikes.clicked.connect(_btn_show_all_spikes_callback))
     
     # Connect any extra signals:
     connections.append(rootControlsBarWidget.sigRefresh.connect(_btn_perform_refresh_callback))

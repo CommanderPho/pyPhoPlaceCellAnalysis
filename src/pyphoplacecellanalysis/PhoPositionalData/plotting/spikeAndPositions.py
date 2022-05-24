@@ -115,7 +115,7 @@ def perform_plot_flat_arena(p, *args, z=-0.01, bShowSequenceTraversalGradient=Fa
 
 
 # dataframe version of the build_active_spikes_plot_pointdata(...) function
-def build_active_spikes_plot_pointdata_df(active_flat_df: pd.DataFrame):
+def build_active_spikes_plot_pointdata_df(active_flat_df: pd.DataFrame, enable_debug_print=False):
     """Builds the pv.PolyData pointcloud from the spikes dataframe points.
 
     Args:
@@ -135,16 +135,11 @@ def build_active_spikes_plot_pointdata_df(active_flat_df: pd.DataFrame):
         spike_history_point_cloud = active_flat_df[['x','y','z_fixed']].to_numpy()
         
     ## Old way:
-    # spike_series_positions = active_flattened_spike_positions_list
-    # z_fixed = np.full_like(spike_series_positions[0,:], 1.1) # Offset a little bit in the z-direction so we can see it
-    # spike_history_point_cloud = np.vstack((spike_series_positions[0,:], spike_series_positions[1,:], z_fixed)).T
     spike_history_pdata = pv.PolyData(spike_history_point_cloud)
-    # spike_history_pdata['times'] = spike_series_times
     spike_history_pdata['cellID'] = active_flat_df['aclu'].values
     
     if 'render_opacity' in active_flat_df.columns:
         spike_history_pdata['render_opacity'] = active_flat_df['render_opacity'].values
-        # spike_history_pdata['render_opacity'] = np.expand_dims(active_flat_df['render_opacity'].values, axis=1)
         # alternative might be repeating 4 times along the second dimension for no reason.
     else:
         print('no custom render_opacity set on dataframe.')
@@ -152,11 +147,11 @@ def build_active_spikes_plot_pointdata_df(active_flat_df: pd.DataFrame):
     # rebuild the RGB data from the dataframe:
     if (np.isin(['R','G','B','render_opacity'], active_flat_df.columns).all()):
         # RGB Only:
-        # spike_history_pdata['rgb'] = active_flat_df[['R','G','B']].to_numpy()
         # TODO: could easily add the spike_history_pdata['render_opacity'] here as RGBA if we wanted.
         # RGB+A:
         spike_history_pdata['rgb'] = active_flat_df[['R','G','B','render_opacity']].to_numpy()
-        print('successfully set custom rgb key from separate R, G, B columns in dataframe.')
+        if enable_debug_print:
+            print('successfully set custom rgb key from separate R, G, B columns in dataframe.')
     else:
         print('WARNING: DATAFRAME LACKS RGB VALUES!')
 
@@ -164,12 +159,12 @@ def build_active_spikes_plot_pointdata_df(active_flat_df: pd.DataFrame):
 
 
 # dataframe versions of the build_active_spikes_plot_data(...) function
-def build_active_spikes_plot_data_df(active_flat_df: pd.DataFrame, spike_geom):
+def build_active_spikes_plot_data_df(active_flat_df: pd.DataFrame, spike_geom, enable_debug_print=False):
     """ 
     Usage:
         spike_history_pdata, spike_history_pc = build_active_spikes_plot_data_df(active_flat_df, spike_geom)
     """
-    spike_history_pdata = build_active_spikes_plot_pointdata_df(active_flat_df)
+    spike_history_pdata = build_active_spikes_plot_pointdata_df(active_flat_df, enable_debug_print=enable_debug_print)
     spike_history_pc = spike_history_pdata.glyph(scale=False, geom=spike_geom.copy()) # create many glyphs from the point cloud
     return spike_history_pdata, spike_history_pc
 
@@ -240,7 +235,7 @@ def force_plot_ignore_scalar_as_color(plot_mesh_actor, lookup_table):
         plot_mesh_actor.GetMapper().SetScalarModeToUsePointData()
 
 
-def plot_placefields2D(pTuningCurves, active_placefields, pf_colors: np.ndarray, zScalingFactor=10.0, show_legend=False):
+def plot_placefields2D(pTuningCurves, active_placefields, pf_colors: np.ndarray, zScalingFactor=10.0, show_legend=False, enable_debug_print=False):
     """ Plots 2D (as opposed to linearized/1D) Placefields in a 3D PyVista plot """
     # active_placefields: Pf2D    
 
@@ -277,12 +272,13 @@ def plot_placefields2D(pTuningCurves, active_placefields, pf_colors: np.ndarray,
     good_placefield_neuronIDs = np.array(active_placefields.ratemap.neuron_ids) # in order of ascending ID
     tuningCurvePlot_x, tuningCurvePlot_y = np.meshgrid(active_placefields.ratemap.xbin_centers, active_placefields.ratemap.ybin_centers)
     # Loop through the tuning curves and plot them:
-    print('num_curr_tuning_curves: {}'.format(num_curr_tuning_curves))
+    if enable_debug_print:
+        print('num_curr_tuning_curves: {}'.format(num_curr_tuning_curves))
+        
     tuningCurvePlotActors = IndexedOrderedDict({})
     tuningCurvePlotData = IndexedOrderedDict({}) # TODO: try to convert to an ordered dict indexed by neuron_IDs
     for i in np.arange(num_curr_tuning_curves):
         #TODO: BUG: CRITICAL: Very clearly makes sense how the indexing gets off here:
-        
         curr_active_neuron_ID = good_placefield_neuronIDs[i]
         curr_active_neuron_color = pf_colors[:, i]
         curr_active_neuron_opaque_color = opaque_pf_colors[:,i]
