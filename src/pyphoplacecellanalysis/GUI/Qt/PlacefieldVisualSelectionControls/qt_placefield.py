@@ -30,10 +30,6 @@ def build_single_placefield_output_widget(render_config):
     Called in build_all_placefield_output_panels(...) down below.
     
     """
-    # wgt_label_button = pn.widgets.Button(name=f'pf[{render_config.name}]', button_type='default', margin=0, height=20, sizing_mode='stretch_both', width_policy='min')
-    # wgt_color_picker = pn.widgets.ColorPicker(value=render_config.color, width=60, height=20, margin=0)
-    # wgt_toggle_visible = pn.widgets.Toggle(name='isVisible', value=render_config.isVisible, margin=0)
-    # wgt_toggle_spikes = pn.widgets.Toggle(name='SpikesVisible', value=render_config.spikesVisible, margin=0)    
     curr_pf_string = f'pf[{render_config.name}]'
     curr_widget = PlacefieldVisualSelectionWidget(config=render_config) # new widget type
     curr_widget.setObjectName(curr_pf_string)
@@ -196,8 +192,7 @@ def build_all_placefield_output_panels(ipcDataExplorer):
         # ipcDataExplorer.on_update_spikes_colors(extracted_neuron_id_updated_colors_map)
         # ipcDataExplorer.update_rendered_placefields(extracted_neuron_id_updated_colors_map)
         # print(f'\t _on_neuron_color_display_config_changed(...): done!')
-        
-        
+                
     # @QtCore.pyqtSlot(list)
     def _on_tuning_curve_display_config_changed(new_configs):
         """ The function called when the non-color tuning curve display changed.
@@ -223,17 +218,13 @@ def build_all_placefield_output_panels(ipcDataExplorer):
         # Is this required?
         ipcDataExplorer.apply_tuning_curve_configs() # works (seemingly)
 
-
     ## Build the Placefield Control Widgets:
     pf_widgets = []
-    # the active_tuning_curve_render_configs are an array of SingleNeuronPlottingExtended objects, one for each placefield
-    # for (idx, a_config) in enumerate(ipcDataExplorer.active_tuning_curve_render_configs):
-    
     valid_neuron_ids = ipcDataExplorer.tuning_curves_valid_neuron_ids
     for (idx, neuron_id) in enumerate(valid_neuron_ids):
         a_config = ipcDataExplorer.active_tuning_curve_render_configs[idx]
         curr_widget = build_single_placefield_output_widget(a_config)
-        # TODO: Set the signals here:
+        ## Set the signals here:
         """ 
         obj.signal.connect(lambda param1, param2, ..., arg1=val1, arg2= value2, ... : fun(param1, param2,... , arg1, arg2, ....))
         
@@ -247,14 +238,9 @@ def build_all_placefield_output_panels(ipcDataExplorer):
         """
         curr_widget.spike_config_changed.connect(lambda are_included, spikes_config_changed_callback=ipcDataExplorer.change_unit_spikes_included, cell_id_copy=neuron_id: spikes_config_changed_callback(neuron_IDXs=None, cell_IDs=[cell_id_copy], are_included=are_included))
         
-        # curr_widget.spike_config_changed.connect(lambda are_included, spikes_config_changed_callback=ipcDataExplorer.change_unit_spikes_included, i_copy=idx: spikes_config_changed_callback(neuron_IDXs=[i_copy], cell_IDs=None, are_included=are_included))
-        
         # Connect the signals to the debugging slots:
         # curr_widget.spike_config_changed.connect(_on_spike_config_changed)
         curr_widget.tuning_curve_display_config_changed.connect(_on_tuning_curve_display_config_changed)
-        
-        
-        
         curr_widget.sig_neuron_color_changed.connect(_on_neuron_color_display_config_changed)
         
         
@@ -269,7 +255,6 @@ def build_all_placefield_output_panels(ipcDataExplorer):
     ipcDataExplorer.params.end_button_helper_connections = connections
         
     return (rootControlsBarWidget, pf_widgets)
-    # return (placefieldControlsContainerWidget, pf_widgets)
 
 
 
