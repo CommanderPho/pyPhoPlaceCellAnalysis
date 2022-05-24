@@ -127,6 +127,9 @@ class DefaultDisplayFunctions(AllFunctionEnumeratingMixin):
         pActiveTuningCurvesPlotter = kwargs.get('extant_plotter', None)
         ipcDataExplorer = InteractivePlaceCellTuningCurvesDataExplorer(active_config, computation_result.sess, computation_result.computed_data['pf2D'], active_config.plotting_config.pf_colors, **({'extant_plotter':None} | kwargs))
         pActiveTuningCurvesPlotter = ipcDataExplorer.plot(pActiveTuningCurvesPlotter) # [2, 17449]
+        # Update the ipcDataExplorer's colors for spikes and placefields from its configs on init:
+        ipcDataExplorer.on_config_update({neuron_id:a_config.color for neuron_id, a_config in ipcDataExplorer.active_neuron_render_configs_map.items()}, defer_update=False)
+
         
         # build the output panels if desired:
         if panel_controls_mode == 'Qt':
@@ -140,10 +143,8 @@ class DefaultDisplayFunctions(AllFunctionEnumeratingMixin):
             
             # Visually align the widgets:
             WidgetPositioningHelpers.align_window_edges(ipcDataExplorer.p, placefieldControlsContainerWidget, relative_position = 'above', resize_to_main=(1.0, None))
-            # pane = (placefieldControlsContainerWidget, pf_widgets)
             
             # Wrap:
-            # active_root_main_widget = ipcDataExplorer.p.parentWidget()
             active_root_main_widget = ipcDataExplorer.p.window()
             root_dockAreaWindow, app = DockAreaWrapper.wrap_with_dockAreaWindow(active_root_main_widget, placefieldControlsContainerWidget, title=ipcDataExplorer.data_explorer_name)
             pane = (root_dockAreaWindow, placefieldControlsContainerWidget, pf_widgets)

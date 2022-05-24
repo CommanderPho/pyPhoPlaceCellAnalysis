@@ -50,7 +50,7 @@ class InteractivePlaceCellTuningCurvesDataExplorer(OccupancyPlottingMixin, Place
         self.use_fragile_linear_neuron_IDX_as_cell_id = False # if False, uses the normal 'aclu' value as the cell id (which I think is correct)
         
         self._setup()
-
+        
     # from NeuronIdentityAccessingMixin
     @property
     def neuron_ids(self):
@@ -72,8 +72,6 @@ class InteractivePlaceCellTuningCurvesDataExplorer(OccupancyPlottingMixin, Place
         num_cells, spike_list, self.params.cell_ids, self.params.flattened_spike_identities, self.params.flattened_spike_times, flattened_sort_indicies, t_start, self.params.reverse_cellID_idx_lookup_map, t, x, y, linear_pos, speeds, self.params.flattened_spike_positions_list = InteractiveDataExplorerBase._unpack_variables(self.active_session)
         
         ## IMPORTANT: the placefields' may have less cells than those set in self.params.cell_ids, which comes from the neurons of the active_session
-        
-        
         
         # the valid cell_ids from the ratemap/tuning curves
         valid_cell_ids = self.tuning_curves_valid_neuron_ids.copy()
@@ -199,6 +197,11 @@ class InteractivePlaceCellTuningCurvesDataExplorer(OccupancyPlottingMixin, Place
         else:
             print('self.params.debug_disable_all_gui_controls is True, so no gui controls will be built.')
         
+        
+        # # Apply configs on startup:
+        # # Update the ipcDataExplorer's colors for spikes and placefields from its configs on init:
+        # self.on_config_update({neuron_id:a_config.color for neuron_id, a_config in self.active_neuron_render_configs_map.items()}, defer_update=False)
+
         return self.p
     
     
@@ -257,10 +260,14 @@ class InteractivePlaceCellTuningCurvesDataExplorer(OccupancyPlottingMixin, Place
 
     ## Config Updating:
     def on_config_update(self, updated_colors_map, defer_update=False):
+        """ 
+            Called to update the placefields and spikes after a config has been changed, particularly its color.
+        
+        """
         # test_updated_colors_map = {3: '#999999'}
         # # self.on_config_update(test_updated_colors_map)
-        print(f'on_config_update(updated_colors_map: {updated_colors_map})')    
-        self.ui['debug_console_widget'].add_line_to_buffer(f'on_config_update(updated_colors_map: {updated_colors_map})')
+        # print(f'on_config_update(updated_colors_map: {updated_colors_map})')
+        # self.ui['debug_console_widget'].add_line_to_buffer(f'on_config_update(updated_colors_map: {updated_colors_map})')
         
         self.on_update_spikes_colors(updated_colors_map)
         self.update_rendered_placefields(updated_colors_map)
