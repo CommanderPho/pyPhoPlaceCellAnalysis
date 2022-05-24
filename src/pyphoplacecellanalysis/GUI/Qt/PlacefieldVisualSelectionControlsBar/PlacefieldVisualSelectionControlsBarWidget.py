@@ -95,6 +95,24 @@ class PlacefieldVisualSelectionControlsBarWidget(QtWidgets.QWidget):
         self.sigRefresh.emit(self)
         # self.done(QtCore.Qt.WA_DeleteOnClose)
 
+    @QtCore.pyqtSlot(object)
+    def applyUpdatedConfigs(self, active_configs_map):
+        """ Updates the placefield Qt widgets provided in the neuron_id_pf_widgets_map from the active_configs_map
+        
+        Inputs:
+            Both maps should have keys of neuron_id <int>
+        
+        Usage:
+            ipcDataExplorer.neuron_id_pf_widgets_map = _build_id_index_configs_dict(pf_widgets)
+            apply_updated_configs_to_pf_widgets(ipcDataExplorer.neuron_id_pf_widgets_map, active_configs_map)
+        """
+        print(f'PlacefieldVisualSelectionControlsBarWidget.applyUpdatedConfigs(active_configs_map: {active_configs_map})')
+        ## Update placefield selection GUI widgets from updated configs:
+        for neuron_id, updated_config in active_configs_map.items():
+            """ Update the placefield selection GUI widgets from the updated configs using the .update_from_config(render_config) fcn """
+            # update the widget:
+            neuron_id_pf_widgets_map[neuron_id].update_from_config(updated_config)
+
 
     @classmethod
     def apply_updated_configs_to_pf_widgets(cls, neuron_id_pf_widgets_map, active_configs_map):
