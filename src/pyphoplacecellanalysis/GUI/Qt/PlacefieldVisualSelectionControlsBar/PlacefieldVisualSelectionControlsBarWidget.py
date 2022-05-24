@@ -80,14 +80,40 @@ class PlacefieldVisualSelectionControlsBarWidget(QtWidgets.QWidget):
         self.ui.pf_layout.setObjectName("horizontalLayout")
         
         ## TODO: add the widgets here:
-        
+        self.ui.pf_widgets = [] # the list of embedded child widgets
         
         ## Once the widgets are added to pf_layout, set the container to the layout:
         self.ui.placefieldControlsContainer.setLayout(self.ui.pf_layout)
 
         # Configure the "Refresh" Button:
         self.ui.btnRefresh.clicked.connect(self.onRefreshAction)
-
+        self.rebuild_neuron_id_to_widget_map()
+        
+        
+    @property
+    def pf_widgets(self):
+        """The pf_widgets property."""
+        return self.ui.pf_widgets
+    @pf_widgets.setter
+    def pf_widgets(self, value):
+        self.ui.pf_widgets = value
+        self.rebuild_neuron_id_to_widget_map()
+        
+    @property
+    def neuron_id_pf_widgets_map(self):
+        """The neuron_id_pf_widgets_map property."""
+        return self._neuron_id_pf_widgets_map
+    @neuron_id_pf_widgets_map.setter
+    def neuron_id_pf_widgets_map(self, value):
+        self._neuron_id_pf_widgets_map = value
+    
+    def rebuild_neuron_id_to_widget_map(self):
+        """ must be called after changing self.ui.pf_widgets """
+        self._neuron_id_pf_widgets_map = dict()
+        for a_widget in self.ui.pf_widgets:
+            curr_widget_config = a_widget.config_from_state()
+            self._neuron_id_pf_widgets_map[curr_widget_config.neuron_id] = a_widget 
+        
 
     @QtCore.pyqtSlot()
     def onRefreshAction(self):
@@ -112,6 +138,16 @@ class PlacefieldVisualSelectionControlsBarWidget(QtWidgets.QWidget):
             """ Update the placefield selection GUI widgets from the updated configs using the .update_from_config(render_config) fcn """
             # update the widget:
             neuron_id_pf_widgets_map[neuron_id].update_from_config(updated_config)
+
+
+    def configsFromStates(self):
+        """ gets the current config from the state of each child pf_widget (a list of SingleNeuronPlottingExtended) """
+        return [a_widget.config_from_state() for a_widget in self.ui.pf_widgets]
+        
+    def configMapFromChildrenWidgets(self):
+        """ returns a map with keys of neuron_id and values of type SingleNeuronPlottingExtended """
+        return {a_config.neuron_id:a_config for a_config in self.configsFromStates()}
+
 
 
     @classmethod

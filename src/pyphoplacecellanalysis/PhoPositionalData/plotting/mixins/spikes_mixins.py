@@ -204,7 +204,7 @@ class HideShowSpikeRenderingMixin:
         if self.debug_logging:
             print(f'HideShowSpikeRenderingMixin.clear_spikes_included(): clearing all spikes.')     
         # self.change_unit_spikes_included(neuron_IDXs=self.neuron_config_indicies, are_included=False) # get all indicies, and set them all to excluded
-        self.change_unit_spikes_included(neuron_IDXs=self.neu, are_included=False) # get all indicies, and set them all to excluded
+        self.change_unit_spikes_included(neuron_IDXs=self.neuron_config_indicies, are_included=False) # get all indicies, and set them all to excluded
         
            
 
