@@ -150,9 +150,10 @@ def build_all_placefield_output_panels(ipcDataExplorer):
     https://eli.thegreenplace.net/2011/04/25/passing-extra-arguments-to-pyqt-slot
     
     
-    Adds:
-        ipcDataExplorer.params.end_button_helper_obj
-        ipcDataExplorer.params.end_button_helper_connections
+    Adds:        
+        rootControlsBarWidget.ui.pf_widgets
+        rootControlsBarWidget.ui.end_button_helper_obj
+        rootControlsBarWidget.ui.end_button_helper_connections
     
     """ 
     ## UI Designer Version:    
@@ -219,7 +220,8 @@ def build_all_placefield_output_panels(ipcDataExplorer):
         ipcDataExplorer.apply_tuning_curve_configs() # works (seemingly)
 
     ## Build the Placefield Control Widgets:
-    pf_widgets = []
+    # pf_widgets = []
+    rootControlsBarWidget.ui.pf_widgets = []
     valid_neuron_ids = ipcDataExplorer.tuning_curves_valid_neuron_ids
     for (idx, neuron_id) in enumerate(valid_neuron_ids):
         a_config = ipcDataExplorer.active_tuning_curve_render_configs[idx]
@@ -245,16 +247,19 @@ def build_all_placefield_output_panels(ipcDataExplorer):
         
         
         pf_layout.addWidget(curr_widget)
-        pf_widgets.append(curr_widget)
+        # pf_widgets.append(curr_widget)
+        rootControlsBarWidget.ui.pf_widgets.append(curr_widget)
         
     # done adding widgets
+    rootControlsBarWidget.rebuild_neuron_id_to_widget_map()
     
     ## Batch Action (Show/Hide All * Buttons):
     end_button_helper_obj, connections = build_batch_interactive_placefield_visibility_controls(rootControlsBarWidget=rootControlsBarWidget, ipcDataExplorer=ipcDataExplorer)
-    ipcDataExplorer.params.end_button_helper_obj = end_button_helper_obj
-    ipcDataExplorer.params.end_button_helper_connections = connections
+    rootControlsBarWidget.ui.end_button_helper_obj = end_button_helper_obj
+    rootControlsBarWidget.ui.end_button_helper_connections = connections
+    
         
-    return (rootControlsBarWidget, pf_widgets)
+    return (rootControlsBarWidget, rootControlsBarWidget.ui.pf_widgets)
 
 
 
