@@ -256,12 +256,18 @@ class InteractivePlaceCellTuningCurvesDataExplorer(OccupancyPlottingMixin, Place
         # when finished, self.active_session.spikes_df is modified with the updated 'z' values
 
     ## Config Updating:
-    def on_config_update(self, updated_colors_map):
+    def on_config_update(self, updated_colors_map, defer_update=False):
         # test_updated_colors_map = {3: '#999999'}
         # # self.on_config_update(test_updated_colors_map)
         print(f'on_config_update(updated_colors_map: {updated_colors_map})')    
         self.ui['debug_console_widget'].add_line_to_buffer(f'on_config_update(updated_colors_map: {updated_colors_map})')
         
-        
         self.on_update_spikes_colors(updated_colors_map)
         self.update_rendered_placefields(updated_colors_map)
+        
+        ## TODO: should change the visibility of either the spikes or placefield as well?
+        
+        if not defer_update:
+            self.update_spikes() # called to actually update the spikes color after setting it:
+        
+        
