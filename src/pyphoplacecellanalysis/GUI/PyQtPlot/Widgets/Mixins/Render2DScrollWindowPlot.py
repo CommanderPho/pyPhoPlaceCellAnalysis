@@ -103,7 +103,7 @@ class Render2DScrollWindowPlotMixin:
         
         self.plots.preview_overview_scatter_plot = pg.ScatterPlotItem(name='spikeRasterOverviewWindowScatterPlotItem', pxMode=True, symbol=vtick, size=5, pen={'color': 'w', 'width': 1})
         self.plots.preview_overview_scatter_plot.opts['useCache'] = True
-        self.plots.preview_overview_scatter_plot.addPoints(self.all_spots)
+        self.plots.preview_overview_scatter_plot.addPoints(self.all_spots) # , hoverable=True
         background_static_scroll_window_plot.addItem(self.plots.preview_overview_scatter_plot)
         
         # Add the linear region overlay:

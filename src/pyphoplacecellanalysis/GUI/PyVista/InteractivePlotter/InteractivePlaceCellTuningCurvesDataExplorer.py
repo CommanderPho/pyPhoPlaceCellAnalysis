@@ -149,6 +149,13 @@ class InteractivePlaceCellTuningCurvesDataExplorer(OccupancyPlottingMixin, Place
         
         
         """
+        
+        
+        ## Placefield Rendering Options:
+        self.params.should_nan_non_visited_elements = False
+        self.params.should_display_placefield_points = True
+        
+        
         self.params.pf_colors_hex = [to_hex(self.params.pf_colors[:,i], keep_alpha=False) for i in self.tuning_curve_indicies] 
         
         self.setup_spike_rendering_mixin()

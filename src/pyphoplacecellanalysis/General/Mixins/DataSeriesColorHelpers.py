@@ -10,7 +10,7 @@ class DataSeriesColorHelpers:
         
         OBJECTIVE: Implement only @classmethod functions on this class.
     """
-    debug_logging = True
+    debug_logging = False
     
     @classmethod
     def _build_cell_color_map(cls, fragile_linear_neuron_IDXs, mode='color_by_index_order', provided_cell_colors=None, debug_print=False):
