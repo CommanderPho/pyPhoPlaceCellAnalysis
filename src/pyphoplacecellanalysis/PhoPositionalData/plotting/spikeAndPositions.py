@@ -341,14 +341,9 @@ def plot_placefields2D(pTuningCurves, active_placefields, pf_colors: np.ndarray,
                 #   pdata_currActiveNeuronTuningCurve_plotActor.GetMapper().ScalarVisibilityOff() # Scalars not used to color objects
             # Is NOT Sufficient, as it disables any opacity at all seemingly
             # lut = build_custom_placefield_maps_lookup_table(curr_active_neuron_color.copy(), 2, [0.2, 0.8])
-            
             # lut = build_custom_placefield_maps_lookup_table(curr_active_neuron_color.copy(), 1, [1.0]) # DFEFAULT: Full fill opacity
-            
             lut = build_custom_placefield_maps_lookup_table(curr_active_neuron_color.copy(), 1, [0.5]) # ALT: reduce fill opacity
-                
             # lut = build_custom_placefield_maps_lookup_table(curr_active_neuron_color.copy(), 3, [0.2, 0.6, 1.0]) # Looks great
-            
-            
             # lut = build_custom_placefield_maps_lookup_table(curr_active_neuron_color.copy(), 3, [0.0, 0.6, 1.0])
             # lut = build_custom_placefield_maps_lookup_table(curr_active_neuron_color.copy(), 5, [0.0, 0.0, 0.3, 0.5, 0.1])
             curr_active_neuron_plot_data['lut'] = lut
@@ -365,20 +360,14 @@ def plot_placefields2D(pTuningCurves, active_placefields, pf_colors: np.ndarray,
             pdata_currActiveNeuronTuningCurve_Points_plotActor = None
         
         ## Build CascadingDynamicPlotsList Wrapper:
-        
         currActiveNeuronTuningCurve_plotActors = CascadingDynamicPlotsList(active_main_plotActor=pdata_currActiveNeuronTuningCurve_plotActor, active_points_plotActor=pdata_currActiveNeuronTuningCurve_Points_plotActor)
-        
         
         ## Built Multiplotter Wrapper:
         # data = [pv.Sphere(center=(2, 0, 0)), pv.Cube(center=(0, 2, 0)), pv.Cone()]
-
         # blocks = pv.MultiBlock(data)
-
 
         # Merge the two actors together:
         # merged = pdata_currActiveNeuronTuningCurve.merge([pdata_currActiveNeuronTuningCurve_Points])
-        
-        
         tuningCurvePlotActors[curr_active_neuron_ID] = currActiveNeuronTuningCurve_plotActors
         tuningCurvePlotData[curr_active_neuron_ID] = curr_active_neuron_plot_data
         

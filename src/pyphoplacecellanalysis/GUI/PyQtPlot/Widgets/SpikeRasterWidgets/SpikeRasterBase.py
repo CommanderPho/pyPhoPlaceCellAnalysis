@@ -197,7 +197,6 @@ class SpikeRasterBase(UnitSortableMixin, DataSeriesToSpatialTransformingMixin, N
     @property
     def cell_ids(self):
         """ e.g. the list of valid cell_ids (unique aclu values) """
-        # return self.fragile_linear_neuron_IDXs
         return np.unique(self.spikes_window.df['aclu'].to_numpy()) 
 
     @property
@@ -299,16 +298,10 @@ class SpikeRasterBase(UnitSortableMixin, DataSeriesToSpatialTransformingMixin, N
         
         
         # Connect window update signals
-        # self.spikes_window.spike_dataframe_changed_signal.connect(self.on_spikes_df_changed)
-        # self.spikes_window.time_window.window_duration_changed_signal.connect(self.on_window_duration_changed)
-        # self.spikes_window.time_window.window_changed_signal.connect(self.on_window_changed)
-        
         # Only subscribe to the more advanced LiveWindowedData-style window update signals that also provide data
         self.spikes_window.windowed_data_window_duration_changed_signal.connect(self.on_windowed_data_window_duration_changed)
         self.spikes_window.windowed_data_window_updated_signal.connect(self.on_windowed_data_window_changed)
         
-        # Old working:
-        # self.spikes_window.timeWindow.window_updated_signal.connect(self.on_window_changed)
         
         ## TODO: BUG: MAJOR: Since the application instance is being assigned to self.app (for any of the widgets that create it) I think that aboutToQuit is called any time any of the widgets are going to close. Although I guess that doesn't explain the errors.
         
@@ -410,9 +403,6 @@ class SpikeRasterBase(UnitSortableMixin, DataSeriesToSpatialTransformingMixin, N
         Updates:
 
         """
-        
-        
-        
         # updated_color_dict = {cell_id:cell_config.color for cell_id, cell_config in updated_neuron_render_configs.items()} ## TODO: efficiency: pass only the colors that changed instead of all the colors:
         updated_color_dict = {}
         
@@ -434,7 +424,6 @@ class SpikeRasterBase(UnitSortableMixin, DataSeriesToSpatialTransformingMixin, N
             if did_color_change:
                 # If the color changed, add it to the changed array:
                 updated_color_dict[cell_id] = cell_config.color
-        
         
         self.on_neuron_colors_changed(updated_color_dict)
 
