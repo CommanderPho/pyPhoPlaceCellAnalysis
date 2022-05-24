@@ -194,8 +194,9 @@ class HideShowSpikeRenderingMixin:
             self.active_neuron_render_configs[an_updated_config_idx].spikesVisible = are_included # update the config
             updated_configs.append(self.active_neuron_render_configs[an_updated_config_idx])
         # call the parent (NeuronConfigOwningMixin) function to ensure the configs are updated.
-        # self.update_neuron_render_configs(neuron_IDXs, updated_configs) # update configs
-        self.update_neuron_render_configs(config_IDXs, updated_configs) # update configs
+        # self.update_neuron_render_configs(neuron_IDXs, updated_configs) # update configs (never worked)
+        # self.update_neuron_render_configs(config_IDXs, updated_configs) # TODO: previously was self.update_neuron_render_configs(config_IDXs, updated_configs) but had to change to self.update_neuron_render_configs_from_indicies(config_IDXs, updated_configs)
+        self.update_neuron_render_configs_from_indicies(config_IDXs, updated_configs) # update the config with the new values:
         
 
     def clear_all_spikes_included(self):
