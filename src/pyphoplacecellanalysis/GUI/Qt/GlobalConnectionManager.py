@@ -51,14 +51,12 @@ class GlobalConnectionManager(QtCore.QObject):
     
     def disambiguate_driver_name(self, extant_name):
         """ attempts to create a unique name for the driver that doesn't already exist in the dict and return it """
-        matching_names_with_prefix = filter(lambda x: x.startswith(extant_name), list(self._registered_available_drivers.keys()))
-        itr_index = len(matching_names_with_prefix) # get the next number after the previous matching names to build a string like # "RasterPlot2D_1"
-        proposed_driver_identifier = f'{extant_name}_{itr_index}'
-        # Proposed name shouldn't exist:
-        extant_driver_with_identifier = self._registered_available_drivers.get(proposed_driver_identifier, None)
-        assert extant_driver_with_identifier is None, f"Driver with new name {extant_driver_with_identifier} already exists too!"
-        # return the new name
-        return proposed_driver_identifier
+        return GlobalConnectionManager.disambiguate_registered_name(self._registered_available_drivers, extant_name)
+    
+    def disambiguate_drivable_name(self, extant_name):
+        """ attempts to create a unique name for the drivable that doesn't already exist in the dict and return it """
+        return GlobalConnectionManager.disambiguate_registered_name(self._registered_available_drivables, extant_name)
+    
         
 
     def register_driver(self, driver, driver_identifier=None):
@@ -106,12 +104,12 @@ class GlobalConnectionManager(QtCore.QObject):
     
     @classmethod
     def disambiguate_registered_name(cls, registraction_dict, extant_name):
-        """ attempts to create a unique name for the driver that doesn't already exist in the dict and return it """
-        matching_names_with_prefix = filter(lambda x: x.startswith(extant_name), list(self._registered_available_drivers.keys()))
+        """ attempts to create a unique name for the driver/drivee that doesn't already exist in the dict and return it """
+        matching_names_with_prefix = filter(lambda x: x.startswith(extant_name), list(registraction_dict.keys()))
         itr_index = len(matching_names_with_prefix) # get the next number after the previous matching names to build a string like # "RasterPlot2D_1"
         proposed_driver_identifier = f'{extant_name}_{itr_index}'
         # Proposed name shouldn't exist:
-        extant_driver_with_identifier = self._registered_available_drivers.get(proposed_driver_identifier, None)
+        extant_driver_with_identifier = registraction_dict.get(proposed_driver_identifier, None)
         assert extant_driver_with_identifier is None, f"Driver with new name {extant_driver_with_identifier} already exists too!"
         # return the new name
         return proposed_driver_identifier
