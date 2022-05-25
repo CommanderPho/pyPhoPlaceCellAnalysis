@@ -66,10 +66,45 @@ class GlobalConnectionManager(QtCore.QObject):
         # For Drivable List:
         found_drivable_key, found_object = GlobalConnectionManager._unregister_object(self._registered_available_drivables, control_object=control_object)
         if found_drivable_key is not None:
-            print(f'removed object with key {found_drivable_key} from drivers list.')
+            print(f'removed object with key {found_drivable_key} from drivers list.')    
         
         return found_driver_key, found_drivable_key
         
+    def connect_drivable_to_driver(self, drivable, driver):
+        """ attempts to connect the drivable to the driver. 
+        drivable/driver can either be a key for a drivable/driver already registered or the drivable/driver itself.
+        """
+        # Get key for drivable:
+        if isinstance(drivable, str):
+            drivable_key = drivable
+            drivable = self.registered_available_drivables[drivable_key]
+        else:
+            # already have the object, just find the key:
+            drivable_key = GlobalConnectionManager._try_find_object_key(self.registered_available_drivables, control_object=drivable)
+        
+        # Get Key for driver:
+        if isinstance(driver, str):
+            driver_key = driver
+            driver = self.registered_available_drivers[driver_key]
+        else:
+            # already have the object, just find the key:
+            driver_key = GlobalConnectionManager._try_find_object_key(self.registered_available_drivers, control_object=driver)
+
+        ## Make sure the connection doesn't already exist:
+        extant_connection = self.active_connections.get(drivable, None)
+        if extant_connection is None:
+            new_connection_obj = connect_additional_controlled_plotter(self.spike_raster_plt_2d, controlled_plt=drivable)
+            self.active_connections[drivable] = new_connection_obj # add the connection object to the self.active_connections array
+            return self.active_connections[drivable]
+        else:
+            print(f'connection already existed!')
+            return extant_connection
+                
+        ## Make the connection:
+        ## Sync ipspikesDataExplorer to raster window:
+        extra_interactive_spike_behavior_browser_sync_connection = spike_raster_window.connect_additional_controlled_plotter(controlled_plt=ipspikesDataExplorer)
+        # extra_interactive_spike_behavior_browser_sync_connection = _connect_additional_controlled_plotter(spike_raster_window.spike_raster_plt_2d, ipspikesDataExplorer)
+
     
         #### ================ Access Methods:
     def get_available_drivers(self):
@@ -153,25 +188,111 @@ class GlobalConnectionManager(QtCore.QObject):
     
     
     @classmethod
-    def _unregister_object(cls, registraction_dict, control_object):
-        # unregisters object from both drivers and drivables
+    def _try_find_object_key(cls, registraction_dict, control_object):
+        # tries to find the key of the object in the provided registration_dict
         found_key = None
-        found_object = None
         try:
             extant_item_index = list(registraction_dict.values()).index(control_object)
-            # print(f'extant_item_index: {extant_item_index }')
             found_key = registraction_dict.keys()[extant_item_index]
-            # print(f'found_key: {found_key }')
-            found_object = registraction_dict.pop(found_key) # pop the key
-            return found_key, found_object
-            ## TODO: tear down any connections that use it.             
+            return found_key
         except ValueError as e:
-            # driver doesn't exist anywhere in the registered drivers:
             pass
         except KeyError as e:
             pass
+        return found_key
+    
+    
+    @classmethod
+    def _unregister_object(cls, registraction_dict, control_object):
+        # unregisters object from both drivers and drivables
+        found_key = cls._try_find_object_key(registraction_dict, control_object=control_object)
+        found_object = None
+        if found_key is not None:
+            found_object = registraction_dict.pop(found_key) # pop the key
+            ## TODO: tear down any connections that use it.             
         return found_key, found_object
          
+         
+    #### ================ Static Methods factored out of SyncedTimelineWindowLink.py on 2022-05-25
+    @classmethod
+    def connect_additional_controlled_plotter(cls, source_spike_raster_plt, controlled_plt):
+        """ allow the window to control InteractivePlaceCellDataExplorer (ipspikesDataExplorer) objects;
+        source_spike_raster_plt: the spike raster plotter to connect to as the source
+        controlled_plt: should be a InteractivePlaceCellDataExplorer object (ipspikesDataExplorer), but can be any function with a valid update_window_start_end @QtCore.Slot(float, float) slot.
+        
+        Requirements:
+            source_spike_raster_plt:
+                .spikes_window.active_time_window
+                .window_scrolled
+            
+            controlled_plt:
+                .disable_ui_window_updating_controls()
+                .update_window_start_end(float, float)
+        
+        
+        Usage:
+        
+            from pyphoplacecellanalysis.GUI.Qt.SpikeRasterWindows.Spike3DRasterWindowWidget import Spike3DRasterWindowWidget
+
+            # Build the controlled ipspikesDataExplorer:
+            display_output = dict()
+            pActiveSpikesBehaviorPlotter = None
+            display_output = display_output | curr_active_pipeline.display(DefaultDisplayFunctions._display_3d_interactive_spike_and_behavior_browser, active_config_name, extant_plotter=display_output.get('pActiveSpikesBehaviorPlotter', None)) # Works now!
+            ipspikesDataExplorer = display_output['ipspikesDataExplorer']
+            display_output['pActiveSpikesBehaviorPlotter'] = display_output.pop('plotter') # rename the key from the generic "plotter" to "pActiveSpikesBehaviorPlotter" to avoid collisions with others
+            pActiveSpikesBehaviorPlotter = display_output['pActiveSpikesBehaviorPlotter']
+
+            # Build the contolling raster window:
+            spike_raster_window = Spike3DRasterWindowWidget(curr_spikes_df)
+            # Call this function to connect them:
+            extra_interactive_spike_behavior_browser_sync_connection = connect_additional_controlled_plotter(spike_raster_window.spike_raster_plt_2d, ipspikesDataExplorer)
+        
+        """
+        # Perform Initial (one-time) update from source -> controlled:
+        controlled_plt.disable_ui_window_updating_controls() # disable the GUI for manual updates.
+        controlled_plt.update_window_start_end(source_spike_raster_plt.spikes_window.active_time_window[0], source_spike_raster_plt.spikes_window.active_time_window[1])
+        # Connect to update self when video window playback position changes
+        sync_connection = source_spike_raster_plt.window_scrolled.connect(controlled_plt.update_window_start_end)
+        return sync_connection
+
+    @classmethod
+    def connect_controlled_time_synchornized_plotter(cls, source_spike_raster_plt, controlled_plt):
+        """ 
+        source_spike_raster_plt: TimeSynchronizedPlotterBase
+        
+        spike_raster_window.spike_raster_plt_2d
+        """
+        controlled_plt.on_window_changed(source_spike_raster_plt.spikes_window.active_time_window[0], source_spike_raster_plt.spikes_window.active_time_window[1])
+        sync_connection = source_spike_raster_plt.window_scrolled.connect(controlled_plt.on_window_changed) # connect the window_scrolled event to the _on_window_updated function
+        return sync_connection
+
+
+    # Perform Initial (one-time) update from source -> controlled:
+    @classmethod
+    def connect_additional_controlled_spike_raster_plotter(cls, spike_raster_plt_2d, controlled_spike_raster_plt):
+        """ Connect an additional plotter to a source that's driving the update of the data-window:
+        
+        Requirements:
+            source_spike_raster_plt:
+                .spikes_window.active_time_window
+                .window_scrolled
+            
+            controlled_spike_raster_plt:
+                .spikes_window.update_window_start_end(float, float)
+            
+        Usage:
+            
+            spike_raster_plt_3d, spike_raster_plt_2d, spike_3d_to_2d_window_connection = build_spike_3d_raster_with_2d_controls(curr_spikes_df)
+            spike_raster_plt_3d_vedo = Spike3DRaster_Vedo(curr_spikes_df, window_duration=15.0, window_start_time=30.0, neuron_colors=None, neuron_sort_order=None)
+            extra_vedo_sync_connection = connect_additional_controlled_spike_raster_plotter(spike_raster_plt_2d, spike_raster_plt_3d_vedo)
+        
+        """
+        controlled_spike_raster_plt.spikes_window.update_window_start_end(spike_raster_plt_2d.spikes_window.active_time_window[0], spike_raster_plt_2d.spikes_window.active_time_window[1])
+        # Connect to update self when video window playback position changes
+        sync_connection = spike_raster_plt_2d.window_scrolled.connect(controlled_spike_raster_plt.spikes_window.update_window_start_end)
+        return sync_connection
+
+
 ### Usesful Examples:
 
 
