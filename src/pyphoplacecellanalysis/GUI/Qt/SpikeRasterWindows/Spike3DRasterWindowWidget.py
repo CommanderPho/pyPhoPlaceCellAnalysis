@@ -4,7 +4,8 @@ from qtpy import QtCore, QtWidgets
 import pyphoplacecellanalysis.External.pyqtgraph as pg
 
 from pyphocorehelpers.DataStructure.general_parameter_containers import VisualizationParameters
-from pyphocorehelpers.gui.Qt.SyncedTimelineWindowLink import connect_additional_controlled_plotter, connect_controlled_time_synchornized_plotter
+# from pyphocorehelpers.gui.Qt.SyncedTimelineWindowLink import connect_additional_controlled_plotter, connect_controlled_time_synchornized_plotter
+from pyphocorehelpers.gui.Qt.GlobalConnectionManager import GlobalConnectionManager, GlobalConnectionManagerAccessingMixin
 from pyphocorehelpers.gui.Qt.qevent_lookup_helpers import QEventLookupHelpers
 
 from pyphoplacecellanalysis.GUI.Qt.SpikeRasterWindows.Spike3DRasterWindowBase import Ui_RootWidget # Generated file from .ui
@@ -22,7 +23,7 @@ from pyphoplacecellanalysis.General.Model.SpikesDataframeWindow import SpikesDat
 
 # remove TimeWindowPlaybackControllerActionsMixin
 # class Spike3DRasterWindowWidget(SpikeRasterBottomFrameControlsMixin, TimeWindowPlaybackControllerActionsMixin, TimeWindowPlaybackPropertiesMixin, QtWidgets.QWidget):
-class Spike3DRasterWindowWidget(SpikeRasterLeftSidebarControlsMixin, SpikeRasterBottomFrameControlsMixin, SpikesWindowOwningMixin, QtWidgets.QWidget):
+class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRasterLeftSidebarControlsMixin, SpikeRasterBottomFrameControlsMixin, SpikesWindowOwningMixin, QtWidgets.QWidget):
     """ A main raster window loaded from a Qt .ui file. 
     
     Usage:
@@ -180,6 +181,10 @@ class Spike3DRasterWindowWidget(SpikeRasterLeftSidebarControlsMixin, SpikeRaster
         
         self.enable_debug_print = Spike3DRasterWindowWidget.enable_debug_print
         
+        app = pg.mkQApp(self.applicationName) # <PyQt5.QtWidgets.QApplication at 0x1d44a4891f0>
+        self.GlobalConnectionManagerAccessingMixin_on_init(owning_application=app) # initializes self._connection_man
+        
+        
         # self.ui.splitter.setSizes([900, 200])
         # self.ui.splitter.setStretchFactor(0, 5) # have the top widget by 3x the height as the bottom widget
         # self.ui.splitter.setStretchFactor(1, 1) # have the top widget by 3x the height as the bottom widget        
@@ -243,10 +248,12 @@ class Spike3DRasterWindowWidget(SpikeRasterLeftSidebarControlsMixin, SpikeRaster
         self.ui.secondarySpikeRasterControlWidget.setLayout(self.ui.v_layout_secondary)
         
         
-        if self.ui.spike_raster_plt_3d is not None:
-            self.connect_plotter_time_windows()
+        self.GlobalConnectionManagerAccessingMixin_on_setup()
         
-        self.ui.additional_connections = {}
+        
+        
+        # self.ui.additional_connections = {}
+        # NOTE: self.ui.additional_connections has been removed in favor of self.connection_man
         
         # self.spike_raster_plt_2d.setWindowTitle('2D Raster Control Window')
         # self.spike_3d_to_2d_window_connection = self.spike_raster_plt_2d.window_scrolled.connect(self.spike_raster_plt_3d.spikes_window.update_window_start_end)
@@ -289,32 +296,37 @@ class Spike3DRasterWindowWidget(SpikeRasterLeftSidebarControlsMixin, SpikeRaster
         """ connects the controlled plotter (usually the 3D plotter) to the 2D plotter that controls it. """
         # self.spike_3d_to_2d_window_connection = self.spike_raster_plt_2d.window_scrolled.connect(self.spike_raster_plt_3d.spikes_window.update_window_start_end)        
         # Rate limited version:
-        self.spike_3d_to_2d_window_connection = pg.SignalProxy(self.spike_raster_plt_2d.window_scrolled, delay=0.2, rateLimit=60, slot=self.spike_raster_plt_3d.spikes_window.update_window_start_end_rate_limited) # Limit updates to 60 Signals/Second
+        self.spike_3d_to_2d_window_connection = self.connection_man.connect_drivable_to_driver(drivable=self.spike_raster_plt_3d, driver=self.spike_raster_plt_2d,
+                                                       custom_connect_function=(lambda driver, drivable: pg.SignalProxy(driver.window_scrolled, delay=0.2, rateLimit=60, slot=drivable.spikes_window.update_window_start_end_rate_limited)))
+                                                       
+        # self.spike_3d_to_2d_window_connection = pg.SignalProxy(self.spike_raster_plt_2d.window_scrolled, delay=0.2, rateLimit=60, slot=self.spike_raster_plt_3d.spikes_window.update_window_start_end_rate_limited) # Limit updates to 60 Signals/Second
         
          
     def connect_additional_controlled_plotter(self, controlled_plt):
         """ try to connect the controlled_plt to the current controller (usually the 2D plot). """
-        extant_connection = self.ui.additional_connections.get(controlled_plt, None)
-        if extant_connection is None:
-            new_connection_obj = connect_additional_controlled_plotter(self.spike_raster_plt_2d, controlled_plt=controlled_plt)
-            self.ui.additional_connections[controlled_plt] = new_connection_obj # add the connection object to the self.ui.additional_connections array
-            return self.ui.additional_connections[controlled_plt]
-        else:
-            print(f'connection already existed!')
-            return extant_connection
+        return self.connection_man.connect_drivable_to_driver(drivable=controlled_plt, driver=self.spike_raster_plt_2d)
+        # extant_connection = self.ui.additional_connections.get(controlled_plt, None)
+        # if extant_connection is None:
+        #     new_connection_obj = connect_additional_controlled_plotter(self.spike_raster_plt_2d, controlled_plt=controlled_plt)
+        #     self.ui.additional_connections[controlled_plt] = new_connection_obj # add the connection object to the self.ui.additional_connections array
+        #     return self.ui.additional_connections[controlled_plt]
+        # else:
+        #     print(f'connection already existed!')
+        #     return extant_connection
         
         
         
     def connect_controlled_time_synchronized_plotter(self, controlled_plt):
         """ try to connect the controlled_plt to the current controller (usually the 2D plot). """
-        extant_connection = self.ui.additional_connections.get(controlled_plt, None)
-        if extant_connection is None:
-            new_connection_obj = connect_controlled_time_synchornized_plotter(self.spike_raster_plt_2d, controlled_plt=controlled_plt)
-            self.ui.additional_connections[controlled_plt] = new_connection_obj # add the connection object to the self.ui.additional_connections array
-            return self.ui.additional_connections[controlled_plt]
-        else:
-            print(f'connect_controlled_time_synchronized_plotter(...): connection already existed!')
-            return extant_connection
+        return self.connection_man.connect_drivable_to_driver(drivable=controlled_plt, driver=self.spike_raster_plt_2d)
+        # extant_connection = self.ui.additional_connections.get(controlled_plt, None)
+        # if extant_connection is None:
+        #     new_connection_obj = connect_controlled_time_synchornized_plotter(self.spike_raster_plt_2d, controlled_plt=controlled_plt)
+        #     self.ui.additional_connections[controlled_plt] = new_connection_obj # add the connection object to the self.ui.additional_connections array
+        #     return self.ui.additional_connections[controlled_plt]
+        # else:
+        #     print(f'connect_controlled_time_synchronized_plotter(...): connection already existed!')
+        #     return extant_connection
         
 
           
@@ -426,6 +438,34 @@ class Spike3DRasterWindowWidget(SpikeRasterLeftSidebarControlsMixin, SpikeRaster
         self.render_window_duration = updated_val
         
 
+    ########################################################
+    ## For GlobalConnectionManagerAccessingMixin conformance:
+    ########################################################
+    
+    # @QtCore.pyqtSlot()
+    def GlobalConnectionManagerAccessingMixin_on_setup(self):
+        """ perfrom registration of drivers/drivables:"""
+        ## register children:
+        
+        # Register the 2D plotter as both drivable and a driver:
+        self.connection_man.register_driver(self.ui.spike_raster_plt_2d)
+        self.connection_man.register_drivable(self.ui.spike_raster_plt_2d)
+        
+        if self.ui.spike_raster_plt_3d is not None:
+            self.connection_man.register_drivable(self.ui.spike_raster_plt_3d)
+            self.connect_plotter_time_windows()
+
+    # @QtCore.pyqtSlot()
+    def GlobalConnectionManagerAccessingMixin_on_destroy(self):
+        """ perfrom teardown/destruction of anything that needs to be manually removed or released
+        
+        TODO: call this at some point
+        """
+        ## unregister children:
+        self.connection_man.unregister_object(self.ui.spike_raster_plt_2d)
+        if self.ui.spike_raster_plt_3d is not None:
+            self.connection_man.unregister_object(self.ui.spike_raster_plt_3d)
+        
         
         
         
@@ -490,7 +530,7 @@ class Spike3DRasterWindowWidget(SpikeRasterLeftSidebarControlsMixin, SpikeRaster
         if self.spike_raster_plt_3d is not None:
             self.spike_raster_plt_3d.update_neurons_color_data(updated_neuron_render_configs)
         
-        
+    
 
     ########################################################
     ## For Key Press Events:
