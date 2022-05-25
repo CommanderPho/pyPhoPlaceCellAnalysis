@@ -174,6 +174,8 @@ class DynamicDockDisplayAreaContentMixin:
 class PhoDockAreaContainingWindow(DynamicDockDisplayAreaContentMixin, QtWidgets.QMainWindow):
     """ a custom QMainWindow subclass that contains a DockArea as its central view.
     
+        Can be used to dynamically create windows composed of multiple separate widgets programmatically.
+    
     """
     @property
     def app(self):
