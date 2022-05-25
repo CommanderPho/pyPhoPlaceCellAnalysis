@@ -10,7 +10,8 @@ class GlobalConnectionManager(QtCore.QObject):
     def __init__(self, owning_application: QtWidgets.QApplication):
         if GlobalConnectionManager._currentInstance is not None:
             print(f'GlobalConnectionManager already exists! Returning extant instance!')
-            return GlobalConnectionManager._currentInstance
+            self = GlobalConnectionManager._currentInstance
+            return
         else:
             print(f'GlobalConnectionManager: does not already exist, creating new instance!')
         
@@ -26,11 +27,8 @@ class GlobalConnectionManager(QtCore.QObject):
   
         self._active_connections = IndexedOrderedDict({})
         
-#   items
-
-
         # Setup internal connections:
-        owning_application.aboutToQuit.connect(self.on_application_quit)
+        # owning_application.aboutToQuit.connect(self.on_application_quit)
 
         # Set the class variable to this newly created instance
         GlobalConnectionManager._currentInstance = self
@@ -49,6 +47,41 @@ class GlobalConnectionManager(QtCore.QObject):
         """ an IndexedOrderedDict of widgets/objects that can be driven by a driver."""
         return self._active_connections
     
+
+    #### ================ Registration Methods:
+    def register_driver(self, driver, driver_identifier=None):
+        """Registers a new driver object/widget """
+        return GlobalConnectionManager.register_control_object(self._registered_available_drivers, driver, driver_identifier) # return the new identifier            
+                
+    def register_drivable(self, drivable, drivable_identifier=None):
+        return GlobalConnectionManager.register_control_object(self._registered_available_drivables, drivable, drivable_identifier) # return the new identifier 
+    
+    
+    def unregister_object(self, control_object, debug_print=True):
+        # unregisters object from both drivers and drivables
+        # For Driver list:
+        found_driver_key, found_object = GlobalConnectionManager.unregister_object(self._registered_available_drivers, control_object=control_object)
+        if found_driver_key is not None:
+            print(f'removed object with key {found_driver_key} from drivers list.')
+        
+        # For Drivable List:
+        found_drivable_key, found_object = GlobalConnectionManager.unregister_object(self._registered_available_drivables, control_object=control_object)
+        if found_drivable_key is not None:
+            print(f'removed object with key {found_drivable_key} from drivers list.')
+        
+        return found_driver_key, found_drivable_key
+        
+    
+        #### ================ Access Methods:
+    def get_available_drivers(self):
+        """ gets a list of the available widgets that could be used to drive a time widget. """
+        return self.registered_available_drivers
+    
+    def get_available_drivables(self):
+        """ gets a list of the available widgets that could be driven via a time widget. """
+        return self.registered_available_drivables
+
+    #### ================ Utility Methods:
     def disambiguate_driver_name(self, extant_name):
         """ attempts to create a unique name for the driver that doesn't already exist in the dict and return it """
         return GlobalConnectionManager.disambiguate_registered_name(self._registered_available_drivers, extant_name)
@@ -57,51 +90,14 @@ class GlobalConnectionManager(QtCore.QObject):
         """ attempts to create a unique name for the drivable that doesn't already exist in the dict and return it """
         return GlobalConnectionManager.disambiguate_registered_name(self._registered_available_drivables, extant_name)
     
+    #### ================ Slots Methods:
+    # @QtCore.Slot()
+    # def on_application_quit(self):
+    #     print(f'GlobalConnectionManager.on_application_quit')
+    #     GlobalConnectionManager._currentInstance = None
         
 
-    def register_driver(self, driver, driver_identifier=None):
-        """Registers a new driver object/widget
-
-        Args:
-            driver (_type_): _description_
-            driver_identifier (_type_, optional): _description_. Defaults to None.
-
-        Returns:
-            _type_: _description_
-        """
-        if driver_identifier is None:
-            driver_identifier = driver.windowName # 'Spike3DRasterWindow'
-            
-        try:
-            extant_driver_index = list(self._registered_available_drivers.values()).index(driver)
-            # Driver already exists somewhere in the registered drivers:
-            return self._registered_available_drivers.keys()[extant_driver_index] # return its key
-        except ValueError as e:
-            # driver doesn't exist anywhere in the registered drivers:
-            pass
-        
-        extant_driver_with_identifier = self._registered_available_drivers.get(driver_identifier, None)
-        if extant_driver_with_identifier is not None:
-            # driver already exists with this identifier:
-            # check and see if it's the same object
-            if extant_driver_with_identifier == driver:
-                # driver with this key already exists, but it's the same driver, so it's just attempting to be re-registered for some reason. No problem.
-                return
-            else:
-                print(f'driver with key {driver_identifier} already exists and is a different object. Disambiguating name...')
-                driver_identifier = self.disambiguate_driver_name(driver_identifier)
-                print(f'\t proposed_driver_name is now {driver_identifier}')
-                # now has a unique driver identifier
-                
-        # register the driver provided:
-        self._registered_available_drivers[driver_identifier] = driver
-        return driver_identifier # return the new identifier            
-        
-        
-    def register_drivable(self, drivable):
-        self._registered_available_drivables.append(drivable)
-        
-    
+    #### ================ Static Methods:
     @classmethod
     def disambiguate_registered_name(cls, registraction_dict, extant_name):
         """ attempts to create a unique name for the driver/drivee that doesn't already exist in the dict and return it """
@@ -114,23 +110,67 @@ class GlobalConnectionManager(QtCore.QObject):
         # return the new name
         return proposed_driver_identifier
     
+
+
+    @classmethod
+    def register_control_object(cls, registraction_dict, control_object, control_identifier=None):
+        """Registers a new driver or driven object/widget
+
+        Args:
+            control_object (_type_): _description_
+            control_identifier (_type_, optional): _description_. Defaults to None.
+
+        Returns:
+            _type_: _description_
+        """
+        if control_identifier is None:
+            control_identifier = control_object.windowName # 'Spike3DRasterWindow'
+            
+        try:
+            extant_driver_index = list(registraction_dict.values()).index(control_object)
+            # Driver already exists somewhere in the registered drivers:
+            return registraction_dict.keys()[extant_driver_index] # return its key
+        except ValueError as e:
+            # driver doesn't exist anywhere in the registered drivers:
+            pass
+        
+        extant_driver_with_identifier = registraction_dict.get(control_identifier, None)
+        if extant_driver_with_identifier is not None:
+            # driver already exists with this identifier:
+            # check and see if it's the same object
+            if extant_driver_with_identifier == control_object:
+                # driver with this key already exists, but it's the same driver, so it's just attempting to be re-registered for some reason. No problem.
+                return
+            else:
+                print(f'driver with key {control_identifier} already exists and is a different object. Disambiguating name...')
+                # control_identifier = self.disambiguate_driver_name(control_identifier)
+                control_identifier = GlobalConnectionManager.disambiguate_registered_name(registraction_dict, control_identifier)
+                print(f'\t proposed_driver_name is now {control_identifier}')
+                # now has a unique driver identifier
+                
+        # register the driver provided:
+        registraction_dict[control_identifier] = control_object
+        return control_identifier # return the new identifier           
     
-    def get_available_drivers(self):
-        """ gets a list of the available widgets that could be used to drive a time widget. """
-        return self.registered_available_drivers
     
-    def get_available_drivables(self):
-        """ gets a list of the available widgets that could be driven via a time widget. """
-        return self.registered_available_drivables
-
-
-    @QtCore.Slot()
-    def on_application_quit(self):
-        print(f'GlobalConnectionManager.on_application_quit')
-        GlobalConnectionManager._currentInstance = None
-
-
-
+    @classmethod
+    def _unregister_object(cls, registraction_dict, control_object):
+        # unregisters object from both drivers and drivables
+        found_key = None
+        found_object = None
+        try:
+            extant_item_index = list(registraction_dict.values()).index(control_object)
+            found_key = registraction_dict.keys()[extant_item_index]
+            found_key, found_object = registraction_dict.pop(found_key) # pop the key
+            return found_key, found_object
+            ## TODO: tear down any connections that use it.             
+        except ValueError as e:
+            # driver doesn't exist anywhere in the registered drivers:
+            pass
+        except KeyError as e:
+            pass
+        return found_key, found_object
+         
 ### Usesful Examples:
 
 
