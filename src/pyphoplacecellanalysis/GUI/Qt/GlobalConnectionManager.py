@@ -56,16 +56,15 @@ class GlobalConnectionManager(QtCore.QObject):
     def register_drivable(self, drivable, drivable_identifier=None):
         return GlobalConnectionManager.register_control_object(self._registered_available_drivables, drivable, drivable_identifier) # return the new identifier 
     
-    
     def unregister_object(self, control_object, debug_print=True):
         # unregisters object from both drivers and drivables
         # For Driver list:
-        found_driver_key, found_object = GlobalConnectionManager.unregister_object(self._registered_available_drivers, control_object=control_object)
+        found_driver_key, found_object = GlobalConnectionManager._unregister_object(self._registered_available_drivers, control_object=control_object)
         if found_driver_key is not None:
             print(f'removed object with key {found_driver_key} from drivers list.')
         
         # For Drivable List:
-        found_drivable_key, found_object = GlobalConnectionManager.unregister_object(self._registered_available_drivables, control_object=control_object)
+        found_drivable_key, found_object = GlobalConnectionManager._unregister_object(self._registered_available_drivables, control_object=control_object)
         if found_drivable_key is not None:
             print(f'removed object with key {found_drivable_key} from drivers list.')
         
@@ -160,8 +159,10 @@ class GlobalConnectionManager(QtCore.QObject):
         found_object = None
         try:
             extant_item_index = list(registraction_dict.values()).index(control_object)
+            # print(f'extant_item_index: {extant_item_index }')
             found_key = registraction_dict.keys()[extant_item_index]
-            found_key, found_object = registraction_dict.pop(found_key) # pop the key
+            # print(f'found_key: {found_key }')
+            found_object = registraction_dict.pop(found_key) # pop the key
             return found_key, found_object
             ## TODO: tear down any connections that use it.             
         except ValueError as e:
