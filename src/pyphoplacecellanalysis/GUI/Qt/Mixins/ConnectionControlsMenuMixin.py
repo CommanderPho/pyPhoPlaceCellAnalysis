@@ -1,4 +1,5 @@
 from qtpy import QtCore, QtGui, QtWidgets
+from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer
 from pyphoplacecellanalysis.GUI.Qt.MainWindowWrapper import PhoBaseMainWindow
 from pyphoplacecellanalysis.Resources import GuiResources, ActionIcons
 # GuiResources_rc
@@ -56,7 +57,11 @@ class ConnectionControlsMenuMixin(object):
         else:
             # already has a valid QMainWindow window
             curr_window = curr_content_widget
-        
+            # Make sure curr_window has a .ui property:
+            if not hasattr(curr_window, 'ui'):
+                # if the window has no .ui property, create one:
+                setattr(curr_window, 'ui', PhoUIContainer())
+            
         menuConnections, actions_dict = ConnectionControlsMenuMixin._build_connections_menu(curr_window)
         
         return curr_window, menuConnections, actions_dict
