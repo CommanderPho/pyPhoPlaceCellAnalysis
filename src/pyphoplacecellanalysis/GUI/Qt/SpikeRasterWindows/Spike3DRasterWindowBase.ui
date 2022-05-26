@@ -175,6 +175,14 @@ border-color: rgb(0, 0, 0);</string>
     </widget>
    </item>
   </layout>
+  <action name="actionConnect">
+   <property name="text">
+    <string>Connect</string>
+   </property>
+   <property name="toolTip">
+    <string>Connect this window's timeline to another window</string>
+   </property>
+  </action>
  </widget>
  <customwidgets>
   <customwidget>

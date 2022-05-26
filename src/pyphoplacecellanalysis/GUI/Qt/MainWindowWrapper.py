@@ -11,6 +11,12 @@ class PhoBaseMainWindow(QtWidgets.QMainWindow):
     
         Can be used to dynamically create windows composed of multiple separate widgets programmatically.
     
+    Usage:
+        from pyphoplacecellanalysis.GUI.Qt.MainWindowWrapper import PhoBaseMainWindow
+
+        curr_content_widget = spike_raster_window.window()
+        curr_window = PhoBaseMainWindow(content_widget=curr_content_widget)
+    
     """
     @property
     def app(self):
