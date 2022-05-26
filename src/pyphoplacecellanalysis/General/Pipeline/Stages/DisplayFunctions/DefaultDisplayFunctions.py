@@ -33,9 +33,9 @@ from pyphoplacecellanalysis.GUI.PyVista.InteractivePlotter.InteractivePlaceCellD
 
 from pyphoplacecellanalysis.GUI.PyVista.InteractivePlotter.InteractiveCustomDataExplorer import InteractiveCustomDataExplorer
 
-
-
 from pyphoplacecellanalysis.GUI.PyVista.InteractivePlotter.InteractivePlaceCellTuningCurvesDataExplorer import InteractivePlaceCellTuningCurvesDataExplorer
+from pyphoplacecellanalysis.GUI.Qt.Mixins.ConnectionControlsMenuMixin import ConnectionControlsMenuMixin
+
 
 from pyphoplacecellanalysis.PhoPositionalData.plotting.placefield import plot_1d_placecell_validations
 
@@ -175,6 +175,12 @@ class DefaultDisplayFunctions(AllFunctionEnumeratingMixin):
         pActiveInteractivePlaceSpikesPlotter = kwargs.get('extant_plotter', None)
         ipspikesDataExplorer = InteractivePlaceCellDataExplorer(active_config, computation_result.sess, **({'extant_plotter':None} | kwargs))
         pActiveInteractivePlaceSpikesPlotter = ipspikesDataExplorer.plot(pActivePlotter=pActiveInteractivePlaceSpikesPlotter)
+        # Add Connection Controls to the window:
+        
+        # Setup Connections Menu:
+        root_window, menuConnections, actions_dict = ConnectionControlsMenuMixin.try_add_connections_menu(ipspikesDataExplorer.p.app_window) # none of these properties need to be saved directly, as they're accessible via ipspikesDataExplorer.p.app_window.window()
+        
+        
         return {'ipspikesDataExplorer': ipspikesDataExplorer, 'plotter': pActiveInteractivePlaceSpikesPlotter}
 
     ## CustomDataExplorer 3D Plotter:
