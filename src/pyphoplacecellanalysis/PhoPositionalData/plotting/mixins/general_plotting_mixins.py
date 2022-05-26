@@ -119,6 +119,8 @@ class NeuronConfigOwningMixin:
         Requires:
             self.params.pf_colors_hex: this should have one entry per num_neurons, which is the length of self.ratemap.neuron_ids
             
+            self.ratemap.neuron_ids: for some reason it also requires self.ratemap.neuron_ids, which it ultimately shouldn't if it's to be general.
+            
         Sets:
             self.active_neuron_render_configs: a list of configs
             self.active_neuron_render_configs_map: a Dict<neuron_id (int), config> mapping
