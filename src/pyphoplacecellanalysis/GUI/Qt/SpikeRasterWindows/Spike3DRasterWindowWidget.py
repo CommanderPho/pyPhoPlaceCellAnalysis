@@ -265,7 +265,6 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
         self.playback_controller = TimeWindowPlaybackController()
         self.playback_controller.setup(self) # pass self to have properties set
         
-        
         ## Connect the UI Controls:
         # Helper Mixins: buildUI:
         self.SpikeRasterLeftSidebarControlsMixin_on_buildUI() # Call this to set the initial values for the UI before signals are connected.
@@ -291,6 +290,12 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
             if self.ui.spike_raster_plt_2d.plots.preview_overview_scatter_plot is not None:
                 # This is the first thing that produces detected event.type() == QtCore.QEvent.GraphicsSceneWheel when the scrolling is done over the 2D active widnow raster plot 
                 self.ui.spike_raster_plt_2d.plots.preview_overview_scatter_plot.installEventFilter(self) # plots.preview_overview_scatter_plot is a ScatterPlotItem
+
+        # Set Window Title Options:
+        if self.applicationName is not None:
+            # self.setWindowFilePath(str(sess.filePrefix.resolve()))
+            self.setWindowTitle(f'{self.applicationName}') # f'Spike Raster Window - {secondary_active_config_name} - {str(sess.filePrefix.resolve())}'
+
 
     def connect_plotter_time_windows(self):
         """ connects the controlled plotter (usually the 3D plotter) to the 2D plotter that controls it. """
