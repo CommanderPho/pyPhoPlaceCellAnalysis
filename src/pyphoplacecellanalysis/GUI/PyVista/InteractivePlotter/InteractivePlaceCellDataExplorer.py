@@ -212,6 +212,13 @@ class InteractivePlaceCellDataExplorer(GlobalConnectionManagerAccessingMixin, In
         self.p.clear_slider_widgets()
         self.p.clear_button_widgets() # removes the play/pause toggle checkbox so that it can be driven externally
 
+    
+    def on_drive_state_changed(self):
+        """ called when the widget/object becomes either driven or independent """
+        # TODO: implement
+        pass
+
+
 
     ######################
     # General Plotting Method:
@@ -453,7 +460,7 @@ class InteractivePlaceCellDataExplorer(GlobalConnectionManagerAccessingMixin, In
         TODO: call this at some point
         """
         ## unregister children:
-        self.connection_man.unregister_object(self)        
+        self.connection_man.unregister_object(self)
         
         
         
