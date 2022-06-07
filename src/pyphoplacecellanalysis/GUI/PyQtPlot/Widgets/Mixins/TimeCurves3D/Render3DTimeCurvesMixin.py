@@ -59,10 +59,23 @@ class TimeCurvesViewMixin:
     
 
     @QtCore.pyqtSlot()
-    def TimeCurvesViewMixin_on_init(self):
-        self.params.time_curves_datasource = None # initialize datasource variable
-        self.params.time_curves_no_update = False # called to disabling updating time curves internally
-        self.params.time_curves_z_normalization_mode = 'None'
+    def TimeCurvesViewMixin_on_init(self):        
+        """ time_curves properties:
+            time_curves_datasource (default None): 
+            time_curves_no_update (default False): called to disabling updating time curves internally
+            time_curves_z_normalization_mode (default 'None'): specifies how the 3D curves' z-axis is normalized.
+            time_curves_z_baseline (default 5.0): the z-position at which to start 3D curves.
+            time_curves_z_scaling_max (default 10.0): the max relative z-position for the maximal 3D curve value to be scaled to. The maximum absolute curve value will be (time_curves_z_baseline + time_curves_z_scaling_max).
+            time_curves_main_alpha (default 0.2): the alpha (opacity) for each line of the 3D curve
+            time_curves_enable_baseline_grid (default: True): whether to enable drawing a grid at the baseline of the 3D curves that helps visually align each curve with its neuron/spikes.
+        """
+        self.params.setdefault('time_curves_datasource', None)
+        self.params.setdefault('time_curves_no_update', False)
+        self.params.setdefault('time_curves_z_normalization_mode', 'None')
+        self.params.setdefault('time_curves_enable_baseline_grid', True)
+        self.params.setdefault('time_curves_z_baseline', 5.0)
+        self.params.setdefault('time_curves_z_scaling_max', 10.0)
+        self.params.setdefault('time_curves_main_alpha', 0.2)
             
         self.plots.time_curves = dict()
         
