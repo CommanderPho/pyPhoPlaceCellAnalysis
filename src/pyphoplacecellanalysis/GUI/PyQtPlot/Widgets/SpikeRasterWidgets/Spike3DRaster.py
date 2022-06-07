@@ -182,7 +182,7 @@ class Spike3DRaster(PyQtGraphSpecificTimeCurvesMixin, RenderTimeEpochMeshesMixin
         self.params.setdefault('center_mode', 'zero_centered')
         self.params.setdefault('bin_position_mode', 'left_edges')
         # Axes Planes Variables:
-        self.params.setdefault('axes_walls_z_height', 30.0)
+        self.params.setdefault('axes_walls_z_height', 20.0)
         self.params.setdefault('axes_planes_floor_fixed_y_spacing', 10.0)
 
         # by default we want the time axis to approximately span -20 to 20. So we set the temporal_zoom_factor to 

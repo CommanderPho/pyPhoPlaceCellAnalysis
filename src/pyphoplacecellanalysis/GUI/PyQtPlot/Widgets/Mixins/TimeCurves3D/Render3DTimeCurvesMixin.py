@@ -13,11 +13,13 @@ from pyphocorehelpers.geometry_helpers import find_ranges_in_window
 from pyphoplacecellanalysis.General.DataSeriesToSpatial import DataSeriesToSpatial
 from pyphoplacecellanalysis.General.Model.Datasources.CurveDatasource import CurveDatasource
 
+from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.Mixins.TimeCurves3D.Render3DTimeCurvesBaseGridMixin import BaseGrid3DTimeCurvesHelper, Render3DTimeCurvesBaseGridMixin
+
 
 # An OrderedList of dictionaries of values to be provided by the datasource:
 # {'name':'linear position','x':'t','y':None,'z':'lin_pos'}
 
-class TimeCurvesViewMixin:
+class TimeCurvesViewMixin(Render3DTimeCurvesBaseGridMixin):
     """ Renders 3D line plots that are dependent on time.
     
     Implementors Require:
@@ -68,14 +70,19 @@ class TimeCurvesViewMixin:
             time_curves_z_scaling_max (default 10.0): the max relative z-position for the maximal 3D curve value to be scaled to. The maximum absolute curve value will be (time_curves_z_baseline + time_curves_z_scaling_max).
             time_curves_main_alpha (default 0.2): the alpha (opacity) for each line of the 3D curve
             time_curves_enable_baseline_grid (default: True): whether to enable drawing a grid at the baseline of the 3D curves that helps visually align each curve with its neuron/spikes.
+            time_curves_baseline_grid_color (default:'White'): the color of the baseline grid.
+            time_curves_baseline_grid_alpha (default: 0.5): the alpha (opacity) of the baseline grid.
         """
         self.params.setdefault('time_curves_datasource', None)
         self.params.setdefault('time_curves_no_update', False)
         self.params.setdefault('time_curves_z_normalization_mode', 'None')
-        self.params.setdefault('time_curves_enable_baseline_grid', True)
+
+        # BaseGrid3DTimeCurvesHelper.init_3D_time_curves_baseline_grid_mesh(self)
+        self.init_3D_time_curves_baseline_grid_mesh() # from Render3DTimeCurvesBaseGridMixin
+        
         self.params.setdefault('time_curves_z_baseline', 5.0)
         self.params.setdefault('time_curves_z_scaling_max', 10.0)
-        self.params.setdefault('time_curves_main_alpha', 0.2)
+        self.params.setdefault('time_curves_main_alpha', 0.5)
             
         self.plots.time_curves = dict()
         
@@ -142,18 +149,10 @@ class TimeCurvesViewMixin:
         plot_args = ({'color_name':'white','line_width':0.5,'z_scaling_factor':1.0} | kwargs)
         raise NotImplementedError
 
-            
-
     def update_3D_time_curves(self):
         """ initialize the graphics objects if needed, or update them if they already exist. """
         raise NotImplementedError
-
-    # @QtCore.pyqtSlot(float, float)
-    # def TimeCurvesViewMixin_on_window_update(self, new_start, new_end):
-    #     """ called to get the data that should be displayed for the window starting at new_start and ending at new_end """
-    #     self.update_3D_time_curves()
-    
-    
+ 
     @QtCore.pyqtSlot(object)
     def TimeCurvesViewMixin_on_data_series_specs_changed(self, updated_data_series_specs):
         """ called when the data series specs are udpated. """
@@ -191,6 +190,7 @@ class PyQtGraphSpecificTimeCurvesMixin(TimeCurvesViewMixin):
             # plt.delete_later() #?
         # Clear the dict
         self.plots.time_curves.clear()
+        self.remove_3D_time_curves_baseline_grid_mesh() # from Render3DTimeCurvesBaseGridMixin
         
     def _build_or_update_plot(self, plot_name, points, **kwargs):
         # build the plot arguments (color, line thickness, etc)        
@@ -272,6 +272,7 @@ class PyQtGraphSpecificTimeCurvesMixin(TimeCurvesViewMixin):
                 curr_plt = self._build_or_update_plot(curr_plot_name, pts, **extra_plot_options_dict)
                 # end for curr_data_series_index in np.arange(num_data_series)
 
+            self.add_3D_time_curves_baseline_grid_mesh() # from Render3DTimeCurvesBaseGridMixin
 
 
 from vedo import Spline, RoundedLine, Tube, Points

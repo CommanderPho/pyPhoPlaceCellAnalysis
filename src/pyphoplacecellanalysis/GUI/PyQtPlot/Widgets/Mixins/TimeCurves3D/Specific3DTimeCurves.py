@@ -261,7 +261,8 @@ class Specific3DTimeCurvesHelper:
             
             
         # [active_curve_plotter_3d.params.neuron_qcolors_map[active_curve_plotter_3d.cell_id_to_fragile_linear_neuron_IDX_map[int(data_col_name)]].getRgbF() for data_col_name in list(valid_data_values_column_names)]
-        
+        active_curve_plotter_3d.params.time_curves_enable_baseline_grid = True # override the default        
+                
         active_data_series_pre_spatial_list = [{'name':data_col_name,'t':'t','v_alt':None,'v_main':data_col_name,
                                                 # 'color_name':'black', # this will be overriden by the 'color' value below
                                                 # 'color': active_curve_plotter_3d.params.neuron_qcolors_map[active_curve_plotter_3d.cell_id_to_fragile_linear_neuron_IDX_map[int(data_col_name)]].getRgbF(), # gets the color for a specified data_col_name
