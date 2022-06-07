@@ -20,12 +20,16 @@ from pyphoplacecellanalysis.General.Model.Datasources.CurveDatasource import Cur
 class TimeCurvesViewMixin:
     """ Renders 3D line plots that are dependent on time.
     
+    Implementors Require:
+        self.params.time_curves_z_normalization_mode: ['None', 'global']: Used in .calculate_data_z_scaling_factor() to determine the data_z_scaling_factor for the 3D time curves
+        self.z_floor
+        self.params.time_curves_datasource.data_column_values
     
     Implementors must implement:
     
-    def _build_or_update_plot(self, plot_name, points, **kwargs):
-    def update_3D_time_curves(self):
-    def clear_all_3D_time_curves(self):
+        def _build_or_update_plot(self, plot_name, points, **kwargs)
+        def update_3D_time_curves(self)
+        def clear_all_3D_time_curves(self)
     
     
     Usage:
