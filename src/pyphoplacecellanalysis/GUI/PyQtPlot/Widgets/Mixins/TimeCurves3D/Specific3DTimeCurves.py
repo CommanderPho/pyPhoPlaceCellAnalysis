@@ -241,9 +241,9 @@ class Specific3DTimeCurvesHelper:
         # z_map_fn = lambda v_main: v_main + active_curve_plotter_3d.floor_z + active_curve_plotter_3d.params.spike_end_z # returns the un-transformed primary value
         # z_map_fn = lambda v_main: v_main + active_curve_plotter_3d.params.spike_end_z # returns the un-transformed primary value
         
-        spike_height = active_curve_plotter_3d.params.spike_end_z - active_curve_plotter_3d.params.spike_start_z
+        # spike_height = active_curve_plotter_3d.params.spike_end_z - active_curve_plotter_3d.params.spike_start_z
         # z_map_fn = lambda v_main: v_main + active_curve_plotter_3d.params.spike_end_z + spike_height # returns the un-transformed primary value
-        z_map_fn = lambda v_main: v_main + 5.0 # returns the un-transformed primary value
+        z_map_fn = lambda v_main: v_main + active_curve_plotter_3d.params.setdefault('time_curves_z_baseline', 5.0) # returns the un-transformed primary value
         
         ## we want each test curve to be rendered with a fragile_linear_neuron_IDX (series of spikes), so we'll need custom y_map_fn's for each column
         n_value_columns = np.shape(active_plot_df)[1] - 1 # get the total num columns, then subtract 1 to account for the 0th ('t') column
