@@ -190,7 +190,18 @@ class Spike3DRaster_Vedo(VedoSpecificTimeCurvesMixin, SpikeRasterBase):
         
         
         # Config
-        self.params.spike_height_z = 4.0
+        """ Adds required params to self.params:
+            spike_height_z (default 4.0): the z height of the spikes
+            center_mode (allowed: ['starting_at_zero', 'zero_centered']), (default 'zero_centered'): I believe how everything is layed out relative to the origin
+            bin_position_mode (allowed: ['bin_center', 'left_edges']), (default 'bin_center'): specifies how the bins are positioned??
+        """
+        self.params.setdefault('spike_height_z', 4.0)
+        # self.params.setdefault('spike_start_z', self.floor_z) # spike_start_z should be overriden with computed value.
+        # self.params.setdefault('spike_end_z', -6.0) # spike_end_z should be overriden with computed value.
+        self.params.setdefault('center_mode', 'starting_at_zero')
+        self.params.setdefault('bin_position_mode', 'bin_center')
+        
+        # self.params.spike_height_z = 4.0
         self.params.spike_start_z = self.floor_z # self.z_floor
         self.params.spike_end_z = self.params.spike_start_z + self.params.spike_height_z
         
@@ -203,8 +214,8 @@ class Spike3DRaster_Vedo(VedoSpecificTimeCurvesMixin, SpikeRasterBase):
         self.params.max_z_pos = max(self.params.spike_end_z, (self.floor_z + 1.0))
         
         # self.params.center_mode = 'zero_centered'
-        self.params.center_mode = 'starting_at_zero'
-        self.params.bin_position_mode = 'bin_center'
+        # self.params.center_mode = 'starting_at_zero'
+        # self.params.bin_position_mode = 'bin_center'
         # self.params.bin_position_mode = 'left_edges'
         
         # by default we want the time axis to approximately span -20 to 20. So we set the temporal_zoom_factor to 

@@ -92,7 +92,7 @@ class Spike3DRaster(PyQtGraphSpecificTimeCurvesMixin, RenderTimeEpochMeshesMixin
     @property
     def axes_walls_z_height(self):
         """The axes_walls_z_height property."""
-        return self._axes_walls_z_height
+        return self.params.axes_walls_z_height
     
     @property
     def floor_z(self):
@@ -109,6 +109,15 @@ class Spike3DRaster(PyQtGraphSpecificTimeCurvesMixin, RenderTimeEpochMeshesMixin
     def side_wall_x(self):
         """The x position of the nearest wall (the side wall, not the back wall) """
         return -self.half_temporal_axis_length
+    
+    
+    @property
+    def axes_walls_floor_alignment_offset_z(self):
+        """The z offset to align the bottom of the two walls with the floor """
+        # To determine the translation required to align the axes walls with the floor:
+        pre_translated_wall_z_bottom = -(self.params.axes_walls_z_height/2.0)
+        # print(f'pre_translated_wall_z_bottom: {pre_translated_wall_z_bottom}, floor_z: {self.floor_z}')
+        return self.floor_z - pre_translated_wall_z_bottom # required z-shift to align the bottom of the walls with the floors
     
     
     @property
@@ -157,14 +166,25 @@ class Spike3DRaster(PyQtGraphSpecificTimeCurvesMixin, RenderTimeEpochMeshesMixin
         pg.setConfigOption('background', "#1B1B1B")
         pg.setConfigOption('foreground', "#727272")
     
-        # Config
-        self.params.spike_start_z = -10.0
-        self.params.spike_end_z = -6.0
+        # Config        
+        """ Adds required params to self.params:
+            spike_start_z (default -10.0): the z-offset of the start of the spikes
+            spike_end_z (default -6.0): the z-offset of the end of the spikes
+            center_mode (allowed: ['starting_at_zero', 'zero_centered']), (default 'zero_centered'): I believe how everything is layed out relative to the origin
+            bin_position_mode (allowed: ['bin_center', 'left_edges']), (default 'left_edges'): specifies how the bins are positioned??
+            
+            axes_walls_z_height (default 20.0): the z-height of the axes plane box that frames the data
+            axes_planes_floor_fixed_y_spacing (default 10.0): the spacing of grid lines along the y-axis that subdivide the floor axes plane (blue z-plane)
         
-        self.params.center_mode = 'zero_centered'
-        # self.params.bin_position_mode = ''bin_center'
-        self.params.bin_position_mode = 'left_edges'
-        
+        """
+        self.params.setdefault('spike_start_z', -10.0)
+        self.params.setdefault('spike_end_z', -6.0)
+        self.params.setdefault('center_mode', 'zero_centered')
+        self.params.setdefault('bin_position_mode', 'left_edges')
+        # Axes Planes Variables:
+        self.params.setdefault('axes_walls_z_height', 30.0)
+        self.params.setdefault('axes_planes_floor_fixed_y_spacing', 10.0)
+
         # by default we want the time axis to approximately span -20 to 20. So we set the temporal_zoom_factor to 
         self.params.temporal_zoom_factor = 40.0 / float(self.render_window_duration)        
                 
@@ -218,39 +238,7 @@ class Spike3DRaster(PyQtGraphSpecificTimeCurvesMixin, RenderTimeEpochMeshesMixin
 
                 
         # Add axes planes:
-        # X-plane:
-        x_color = (255, 155, 155, 76.5)
-        self.ui.gx = gl.GLGridItem(color=x_color) # 'x' plane, red
-        self.ui.gx.rotate(90, 0, 1, 0)
-        self.ui.gx.translate(self.side_wall_x, 0, 0) # shift backwards
-        self.ui.gx.setSize(20, self.n_full_cell_grid) # std size in z-dir, n_cell size across
-        self.ui.gx.setSpacing(10.0, 1) 
-        self.ui.main_gl_widget.addItem(self.ui.gx)
-        self.ui.x_txtitem = gl.GLTextItem(pos=(self.side_wall_x, self.n_half_cells, 0.0), text='x', color=x_color) # The axis label text 
-        self.ui.main_gl_widget.addItem(self.ui.x_txtitem)
-
-        # Y-plane:
-        y_color = (155, 255, 155, 76.5)
-        self.ui.gy = gl.GLGridItem(color=y_color) # 'y' plane, green
-        self.ui.gy.rotate(90, 1, 0, 0)
-        # gy.translate(0, -10, 0)
-        self.ui.gy.translate(0, -self.n_half_cells, 0) # offset by half the number of units in the -y direction
-        self.ui.gy.setSize(self.temporal_axis_length, 20)
-        self.ui.gy.setSpacing(1, 10.0) # unit along the y axis itself, only one subdivision along the z-axis
-        self.ui.main_gl_widget.addItem(self.ui.gy)
-        self.ui.y_txtitem = gl.GLTextItem(pos=(self.half_temporal_axis_length+0.5, -self.n_half_cells, 0.0), text='y', color=y_color) # The axis label text 
-        self.ui.main_gl_widget.addItem(self.ui.y_txtitem)
-        
-        # XY-plane (with normal in z-dir):
-        z_color = (155, 155, 255, 76.5)
-        self.ui.gz = gl.GLGridItem(color=z_color) # 'z' plane, blue
-        self.ui.gz.translate(0, 0, self.floor_z) # Shift down by 10 units in the z-dir
-        self.ui.gz.setSize(self.temporal_axis_length, self.n_full_cell_grid)
-        self.ui.gz.setSpacing(20.0, 1)
-        # gz.setSize(n_full_cell_grid, n_full_cell_grid)
-        self.ui.main_gl_widget.addItem(self.ui.gz)
-        self.ui.z_txtitem = gl.GLTextItem(pos=(self.side_wall_x, -self.n_half_cells, (self.floor_z + 0.5)), text='z', color=z_color)  # The axis label text 
-        self.ui.main_gl_widget.addItem(self.ui.z_txtitem)
+        self._build_axes_plane_graphics()
         
         
         # Custom 3D raster plot:
@@ -337,7 +325,72 @@ class Spike3DRaster(PyQtGraphSpecificTimeCurvesMixin, RenderTimeEpochMeshesMixin
     
         fragile_linear_neuron_IDX_series_indicies = self.unit_sort_order[fragile_linear_neuron_IDXs] # get the appropriate series index for each fragile_linear_neuron_IDX given their sort order
         return self.series_identity_y_values[fragile_linear_neuron_IDX_series_indicies]
+
+
+    def _build_axes_plane_graphics(self):
+        # Add axes planes:
+        # X-plane:
+        x_color = (255, 155, 155, 76.5)
+        self.ui.gx = gl.GLGridItem(color=x_color) # 'x' plane, red
+        self.ui.gx.rotate(90, 0, 1, 0)
+        self.ui.gx.translate(self.side_wall_x, 0, self.axes_walls_floor_alignment_offset_z) # shift backwards
+        self.ui.gx.setSize(self.params.axes_walls_z_height, self.n_full_cell_grid) # (z-axis, x-axis) # std size in z-dir, n_cell size across
+        self.ui.gx.setSpacing((self.params.axes_walls_z_height/2.0), 1) # (z-axis, x-axis) # want two subidivisions in the non-axis direction (z-axis), and one line per neuron in the axis dimenion (x-axis)
+        self.ui.main_gl_widget.addItem(self.ui.gx)
+        self.ui.x_txtitem = gl.GLTextItem(pos=(self.side_wall_x, self.n_half_cells, self.axes_walls_floor_alignment_offset_z), text='x', color=x_color) # The axis label text 
+        self.ui.main_gl_widget.addItem(self.ui.x_txtitem)
+
+        # Y-plane:
+        y_color = (155, 255, 155, 76.5)
+        self.ui.gy = gl.GLGridItem(color=y_color) # 'y' plane, green
+        self.ui.gy.rotate(90, 1, 0, 0)
+        self.ui.gy.translate(0, -self.n_half_cells, self.axes_walls_floor_alignment_offset_z) # offset by half the number of units in the -y direction
+        self.ui.gy.setSize(self.temporal_axis_length, self.params.axes_walls_z_height) # (y-axis, z-axis) # temporal_axis_length along its main direction (y-axis), 20 along its secondary (z-axis)
+        self.ui.gy.setSpacing(1, (self.params.axes_walls_z_height/2.0)) # (y-axis, z-axis) # unit along the (y-axis) itself, only one subdivision along the (z-axis)
+        self.ui.main_gl_widget.addItem(self.ui.gy)
+        self.ui.y_txtitem = gl.GLTextItem(pos=(self.half_temporal_axis_length+0.5, -self.n_half_cells, self.axes_walls_floor_alignment_offset_z), text='y', color=y_color) # The axis label text 
+        self.ui.main_gl_widget.addItem(self.ui.y_txtitem)
         
+        # XY-plane (with normal in z-dir):
+        z_color = (155, 155, 255, 76.5)
+        self.ui.gz = gl.GLGridItem(color=z_color) # 'z' plane, blue
+        self.ui.gz.translate(0, 0, self.floor_z) # Shift down by 10 units in the z-dir
+        self.ui.gz.setSize(self.temporal_axis_length, self.n_full_cell_grid) # (y-axis, x-axis)
+        self.ui.gz.setSpacing(self.params.axes_planes_floor_fixed_y_spacing, 1) # (y-axis, x-axis)
+        # gz.setSize(n_full_cell_grid, n_full_cell_grid)
+        self.ui.main_gl_widget.addItem(self.ui.gz)
+        self.ui.z_txtitem = gl.GLTextItem(pos=(self.side_wall_x, -self.n_half_cells, (self.floor_z + 0.5)), text='z', color=z_color)  # The axis label text 
+        self.ui.main_gl_widget.addItem(self.ui.z_txtitem)
+
+    def _update_axes_plane_graphics(self):
+        """ updates the axes planes 
+        Requires:
+            self.ui.gx
+            self.ui.gy
+            self.ui.gz
+            
+            self.ui.x_txtitem
+            self.ui.y_txtitem
+            self.ui.z_txtitem
+        """
+         # Adjust the three axes planes:
+        self.ui.gx.resetTransform()
+        self.ui.gx.rotate(90, 0, 1, 0)
+        self.ui.gx.translate(self.side_wall_x, 0, self.axes_walls_floor_alignment_offset_z) # shift backwards
+        self.ui.gx.setSize(self.params.axes_walls_z_height, self.n_full_cell_grid) # (z-axis, x-axis) # std size in z-dir, n_cell size across
+        self.ui.x_txtitem.setData(pos=(self.side_wall_x, self.n_half_cells, self.axes_walls_floor_alignment_offset_z))
+        
+        self.ui.gy.resetTransform()
+        self.ui.gy.rotate(90, 1, 0, 0)
+        self.ui.gy.translate(0, -self.n_half_cells, self.axes_walls_floor_alignment_offset_z) # offset by half the number of units in the -y direction
+        self.ui.gy.setSize(self.temporal_axis_length, self.params.axes_walls_z_height) # (y-axis, z-axis) # temporal_axis_length along its main direction (y-axis), 20 along its secondary (z-axis)
+        self.ui.y_txtitem.setData(pos=(self.half_temporal_axis_length+0.5, -self.n_half_cells, self.axes_walls_floor_alignment_offset_z))
+        
+        self.ui.gz.resetTransform()
+        self.ui.gz.translate(0, 0, self.floor_z) # Shift down by 10 units in the z-dir
+        self.ui.gz.setSize(self.temporal_axis_length, self.n_full_cell_grid) # (y-axis, x-axis)
+        self.ui.z_txtitem.setData(pos=(self.side_wall_x, -self.n_half_cells, (self.floor_z + 0.5)))
+
 
     def _build_neuron_id_graphics(self, w, y_pos):
         """ builds the text items to indicate the neuron ID for each neuron in the df. """
@@ -414,30 +467,7 @@ class Spike3DRaster(PyQtGraphSpecificTimeCurvesMixin, RenderTimeEpochMeshesMixin
             self.render_window_duration
             
         """
-        # Adjust the three axes planes:
-        self.ui.gx.resetTransform()
-        self.ui.gx.rotate(90, 0, 1, 0)
-        self.ui.gx.translate(self.side_wall_x, 0, 0) # shift backwards
-        self.ui.gx.setSize(20, self.n_full_cell_grid) # std size in z-dir, n_cell size across
-        # self.ui.x_txtitem.resetTransform()
-        # self.ui.x_txtitem.translate(self.near_wall_x, self.n_half_cells, 0.0)
-        self.ui.x_txtitem.setData(pos=(self.side_wall_x, self.n_half_cells, 0.0))
-        
-        self.ui.gy.resetTransform()
-        self.ui.gy.rotate(90, 1, 0, 0)
-        self.ui.gy.translate(0, -self.n_half_cells, 0) # offset by half the number of units in the -y direction
-        self.ui.gy.setSize(self.temporal_axis_length, 20)
-        # self.ui.y_txtitem.resetTransform()
-        # self.ui.y_txtitem.translate(self.half_temporal_axis_length+0.5, -self.n_half_cells, 0.0)
-        self.ui.y_txtitem.setData(pos=(self.half_temporal_axis_length+0.5, -self.n_half_cells, 0.0))
-        
-        self.ui.gz.resetTransform()
-        self.ui.gz.translate(0, 0, self.floor_z) # Shift down by 10 units in the z-dir
-        self.ui.gz.setSize(self.temporal_axis_length, self.n_full_cell_grid)
-        # self.ui.z_txtitem.resetTransform()
-        # self.ui.z_txtitem.translate(self.near_wall_x, -self.n_half_cells, (self.z_floor + -0.5))
-        self.ui.z_txtitem.setData(pos=(self.side_wall_x, -self.n_half_cells, (self.floor_z + -0.5)))
-        
+        self._update_axes_plane_graphics() # Adjust the three axes planes: 
         self.update_series_identity_y_values()
         self._update_neuron_id_graphics()
 
