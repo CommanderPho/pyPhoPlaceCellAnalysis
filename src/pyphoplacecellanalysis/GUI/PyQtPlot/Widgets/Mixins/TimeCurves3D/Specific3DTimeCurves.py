@@ -254,8 +254,11 @@ class Specific3DTimeCurvesHelper:
         data_col_name_to_unit_plot_color_rgba_map = dict()
         for data_col_name in list(valid_data_values_column_names):
             curr_color = active_curve_plotter_3d.params.neuron_qcolors_map[active_curve_plotter_3d.cell_id_to_fragile_linear_neuron_IDX_map[int(data_col_name)]] # a QColor
-            curr_color.setAlphaF(0.2) # set the alpha
-            data_col_name_to_unit_plot_color_rgba_map[data_col_name] = curr_color.getRgbF()
+            curr_color_copy = list(curr_color.getRgbF()) # getRgbF gets a copy of the color
+            curr_color_copy[-1] = active_curve_plotter_3d.params.setdefault('time_curves_main_alpha', 0.2) # set the alpha
+            data_col_name_to_unit_plot_color_rgba_map[data_col_name] = tuple(curr_color_copy)
+
+            
             
         # [active_curve_plotter_3d.params.neuron_qcolors_map[active_curve_plotter_3d.cell_id_to_fragile_linear_neuron_IDX_map[int(data_col_name)]].getRgbF() for data_col_name in list(valid_data_values_column_names)]
         
