@@ -226,7 +226,7 @@ class Specific3DTimeCurvesHelper:
             raise NotImplementedError # "Valid values are: ('count', 'rate', 'average')"
         
         # a value scaler for the z-axis
-        z_scaler = MinMaxScaler(feature_range=(0, 10.0), copy=True)
+        z_scaler = MinMaxScaler(feature_range=(0, active_curve_plotter_3d.params.setdefault('time_curves_z_scaling_max', 10.0)), copy=True)
         columns = active_plot_df.columns.drop('t')
         active_plot_df[columns] = z_scaler.fit_transform(active_plot_df[columns])
         
