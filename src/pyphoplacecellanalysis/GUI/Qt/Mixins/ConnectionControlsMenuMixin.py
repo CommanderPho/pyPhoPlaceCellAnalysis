@@ -80,25 +80,16 @@ class ConnectionControlsMenuMixin(object):
             # a_main_window.ui.menuConnections.setIcon(icon1)
             a_main_window.ui.menuConnections.setObjectName("menuConnections")
             a_main_window.ui.menuConnections.setTitle("Connections")
-            # a_main_window.setMenuBar(menubar)
-
+            
             a_main_window.ui.connectionsMenuActionsDict = {'actionMenuConnections': a_main_window.ui.actionMenuConnections}
                                                
-            # # Define actions
-            # curr_action = QtWidgets.QAction(a_main_window)
-            # curr_action_key = PhoMenuHelper.setup_menu_item(curr_action, "Connect Child...", name="actionConnect_Child", tooltip="Connect a child widget to another widget", icon_path=":/Icons/chain--arrow.png")
-            # a_main_window.ui[curr_action_key] = curr_action # add the action to the main window's .ui:
-            # a_main_window.ui.menuConnections.addAction(a_main_window.ui[curr_action_key]) # Add to menu
-            # a_main_window.ui.connectionsMenuActionsDict[curr_action_key] = a_main_window.ui[curr_action_key] # add to actions dictionary
+            # Define actions/menu items:
+            # if want the item added can do:
+            #   curr_action = a_main_window.ui[curr_action_key]
             
+            # Connect Child Item:
             curr_action_key = PhoMenuHelper.add_menu_item(a_main_window, "Connect Child...", name="actionConnect_Child", tooltip="Connect a child widget to another widget", icon_path=":/Icons/chain--arrow.png", parent_menu=a_main_window.ui.menuConnections, menu_actions_dict=a_main_window.ui.connectionsMenuActionsDict)
-            
-            # curr_action = QtWidgets.QAction(a_main_window)
-            # curr_action_key = PhoMenuHelper.setup_menu_item(curr_action, "Disconnect from driver", name="actionDisconnect_from_driver", tooltip="Disconnects the item from the current driver", icon_path=":/Icons/chain--minus.png")            
-            # a_main_window.ui[curr_action_key] = curr_action # add the action to the main window's .ui:
-            # a_main_window.ui.menuConnections.addAction(a_main_window.ui[curr_action_key]) # Add to menu
-            # a_main_window.ui.connectionsMenuActionsDict[curr_action_key] = a_main_window.ui[curr_action_key] # add to actions dictionary
-            
+            # Disconnect from Driver item:
             curr_action_key = PhoMenuHelper.add_menu_item(a_main_window, "Disconnect from driver", name="actionDisconnect_from_driver", tooltip="Disconnects the item from the current driver", icon_path=":/Icons/chain--minus.png", parent_menu=a_main_window.ui.menuConnections, menu_actions_dict=a_main_window.ui.connectionsMenuActionsDict)
 
             return a_main_window.ui.menuConnections, a_main_window.ui.connectionsMenuActionsDict
