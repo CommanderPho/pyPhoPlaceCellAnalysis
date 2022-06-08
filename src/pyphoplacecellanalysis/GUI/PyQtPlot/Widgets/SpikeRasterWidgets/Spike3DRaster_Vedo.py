@@ -192,7 +192,7 @@ class Spike3DRaster_Vedo(VedoSpecificTimeCurvesMixin, SpikeRasterBase):
         # Config
         """ Adds required params to self.params:
             spike_height_z (default 4.0): the z height of the spikes
-            center_mode (allowed: ['starting_at_zero', 'zero_centered']), (default 'zero_centered'): I believe how everything is layed out relative to the origin
+            center_mode (allowed: ['starting_at_zero', 'zero_centered']), (default 'starting_at_zero'): I believe how everything is layed out relative to the origin
             bin_position_mode (allowed: ['bin_center', 'left_edges']), (default 'bin_center'): specifies how the bins are positioned??
         """
         self.params.setdefault('spike_height_z', 4.0)

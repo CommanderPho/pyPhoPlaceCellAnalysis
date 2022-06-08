@@ -4,7 +4,7 @@ import pyphoplacecellanalysis.External.pyqtgraph.opengl as gl # for 3D raster pl
 
 class BaseGrid3DTimeCurvesHelper:
     """ 
-        2022-06-07: Add the 3D Curves baseline axes (straight lines below each time series to make it easier to see what value they represent:
+        2022-06-07: Add the 3D Curves baseline grid axes (straight lines below each time series to make it easier to see what value they represent:
         TODO: only works for PyQtGraph-type plotters (no vedo support)
     """
 
