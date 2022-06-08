@@ -218,12 +218,14 @@ class Spike3DRaster(PyQtGraphSpecificTimeCurvesMixin, RenderTimeEpochMeshesMixin
         # Adds a helper widget that displays the x/y/z vector at the origin:
         if self.enable_debug_widgets:
             self.ui.ref_axes_indicator = GLDebugAxisItem()
+            self.ui.ref_axes_indicator.setObjectName('debug_ref_axes_indicator')
             self.ui.ref_axes_indicator.setSize(x=15.0, y=10.0, z=5.0)
             self.ui.main_gl_widget.addItem(self.ui.ref_axes_indicator)
             
             self.ui.gl_test_points = []
             md = gl.MeshData.sphere(rows=10, cols=20)
             m1 = gl.GLMeshItem(meshdata=md, smooth=False, drawFaces=False, drawEdges=True, edgeColor=(1,1,1,1))
+            m1.setObjectName('debug_test_points_origin_sphere')
             # m1.translate(5, 0, 0)
             m1.setGLOptions('additive')
             self.ui.main_gl_widget.addItem(m1)
@@ -231,6 +233,7 @@ class Spike3DRaster(PyQtGraphSpecificTimeCurvesMixin, RenderTimeEpochMeshesMixin
             
         # The 2D viewport overlay that contains text:
         self.ui.viewport_overlay = GLViewportOverlayPainterItem()
+        self.ui.viewport_overlay.setObjectName('viewport_overlay')
         self.ui.main_gl_widget.addItem(self.ui.viewport_overlay)
         # Update the additional display lines information on the overlay:
         # self.ui.viewport_overlay.additional_overlay_text_lines = self.overlay_text_lines
@@ -332,34 +335,40 @@ class Spike3DRaster(PyQtGraphSpecificTimeCurvesMixin, RenderTimeEpochMeshesMixin
         # X-plane:
         x_color = (255, 155, 155, 76.5)
         self.ui.gx = gl.GLGridItem(color=x_color) # 'x' plane, red
+        self.ui.gx.setObjectName('axes_plane_gx')
         self.ui.gx.rotate(90, 0, 1, 0)
         self.ui.gx.translate(self.side_wall_x, 0, self.axes_walls_floor_alignment_offset_z) # shift backwards
         self.ui.gx.setSize(self.params.axes_walls_z_height, self.n_full_cell_grid) # (z-axis, x-axis) # std size in z-dir, n_cell size across
         self.ui.gx.setSpacing((self.params.axes_walls_z_height/2.0), 1) # (z-axis, x-axis) # want two subidivisions in the non-axis direction (z-axis), and one line per neuron in the axis dimenion (x-axis)
         self.ui.main_gl_widget.addItem(self.ui.gx)
         self.ui.x_txtitem = gl.GLTextItem(pos=(self.side_wall_x, self.n_half_cells, self.axes_walls_floor_alignment_offset_z), text='x', color=x_color) # The axis label text 
+        self.ui.x_txtitem.setObjectName('axes_plane_x_txtitem')
         self.ui.main_gl_widget.addItem(self.ui.x_txtitem)
 
         # Y-plane:
         y_color = (155, 255, 155, 76.5)
         self.ui.gy = gl.GLGridItem(color=y_color) # 'y' plane, green
+        self.ui.gy.setObjectName('axes_plane_gy')
         self.ui.gy.rotate(90, 1, 0, 0)
         self.ui.gy.translate(0, -self.n_half_cells, self.axes_walls_floor_alignment_offset_z) # offset by half the number of units in the -y direction
         self.ui.gy.setSize(self.temporal_axis_length, self.params.axes_walls_z_height) # (y-axis, z-axis) # temporal_axis_length along its main direction (y-axis), 20 along its secondary (z-axis)
         self.ui.gy.setSpacing(1, (self.params.axes_walls_z_height/2.0)) # (y-axis, z-axis) # unit along the (y-axis) itself, only one subdivision along the (z-axis)
         self.ui.main_gl_widget.addItem(self.ui.gy)
         self.ui.y_txtitem = gl.GLTextItem(pos=(self.half_temporal_axis_length+0.5, -self.n_half_cells, self.axes_walls_floor_alignment_offset_z), text='y', color=y_color) # The axis label text 
+        self.ui.y_txtitem.setObjectName('axes_plane_y_txtitem')
         self.ui.main_gl_widget.addItem(self.ui.y_txtitem)
         
         # XY-plane (with normal in z-dir):
         z_color = (155, 155, 255, 76.5)
         self.ui.gz = gl.GLGridItem(color=z_color) # 'z' plane, blue
+        self.ui.gz.setObjectName('axes_plane_gz')
         self.ui.gz.translate(0, 0, self.floor_z) # Shift down by 10 units in the z-dir
         self.ui.gz.setSize(self.temporal_axis_length, self.n_full_cell_grid) # (y-axis, x-axis)
         self.ui.gz.setSpacing(self.params.axes_planes_floor_fixed_y_spacing, 1) # (y-axis, x-axis)
         # gz.setSize(n_full_cell_grid, n_full_cell_grid)
         self.ui.main_gl_widget.addItem(self.ui.gz)
         self.ui.z_txtitem = gl.GLTextItem(pos=(self.side_wall_x, -self.n_half_cells, (self.floor_z + 0.5)), text='z', color=z_color)  # The axis label text 
+        self.ui.z_txtitem.setObjectName('axes_plane_z_txtitem')
         self.ui.main_gl_widget.addItem(self.ui.z_txtitem)
 
     def _update_axes_plane_graphics(self):
@@ -415,6 +424,7 @@ class Spike3DRaster(PyQtGraphSpecificTimeCurvesMixin, RenderTimeEpochMeshesMixin
             curr_color.setAlphaF(1.0)
             # print(f'cell_id: {cell_id}, curr_color: {curr_color.alpha()}')
             curr_id_txtitem = gl.GLTextItem(pos=(self.side_wall_x, y_pos[i], (self.floor_z - 0.5)), text=f'{cell_id}', color=curr_color, font=cell_id_text_item_font)
+            curr_id_txtitem.setObjectName(f'neuron_id_txtitem_aclu_{cell_id}')
             w.addItem(curr_id_txtitem) # add to the current widget
             # add to the cell_ids array
             self.ui.glCellIdTextItems.append(curr_id_txtitem)
@@ -441,6 +451,7 @@ class Spike3DRaster(PyQtGraphSpecificTimeCurvesMixin, RenderTimeEpochMeshesMixin
             
             curr_color.setAlphaF(1.0)
             curr_id_txtitem = self.ui.glCellIdTextItems[i]
+            curr_id_txtitem.setObjectName(f'neuron_id_txtitem_aclu_{cell_id}')
             curr_id_txtitem.setData(pos=(self.side_wall_x, self.fragile_linear_neuron_IDX_to_spatial(a_fragile_linear_neuron_IDX), (self.floor_z - 0.5)), color=curr_color) # TODO: could update color as well
             
             # curr_id_txtitem.resetTransform()
@@ -521,10 +532,8 @@ class Spike3DRaster(PyQtGraphSpecificTimeCurvesMixin, RenderTimeEpochMeshesMixin
             pts = np.column_stack([curr_paired_x, np.full_like(curr_paired_x, yi), curr_paired_spike_zs]) # the middle coordinate is the size of the x array with the value given by yi. yi must be the scalar for this cell.
             # plt = gl.GLLinePlotItem(pos=pts, color=curr_color, width=0.5, antialias=True, mode='lines') # mode='lines' means that each pair of vertexes draws a single line segement
             self.ui.gl_line_plots[i].setData(pos=pts, mode='lines') # update the current data
-            
-            # self.ui.main_gl_widget.addItem(plt)
-            # self.ui.gl_line_plots.append(plt) # append to the gl_line_plots array
-            
+            self.ui.gl_line_plots[i].setObjectName(f'main_line_plots_fragile_IDX_{a_fragile_linear_neuron_IDX}') # shouldn't be needed
+           
     
         # Update the additional display lines information on the overlay:
         # self.ui.viewport_overlay.additional_overlay_text_lines = self.overlay_text_lines
@@ -548,6 +557,7 @@ class Spike3DRaster(PyQtGraphSpecificTimeCurvesMixin, RenderTimeEpochMeshesMixin
                 # curr_color.setAlphaF(0.5)
                 curr_color = self.params.neuron_qcolors[cell_id] # get the pre-build color
                 plt = gl.GLLinePlotItem(pos=[], color=curr_color, width=1.0, antialias=True, mode='lines') # mode='lines' means that each pair of vertexes draws a single line segement
+                plt.setObjectName(f'main_line_plots_fragile_IDX_{cell_id}')
                 # plt.setYRange((-self.n_half_cells - self.side_bin_margins), (self.n_half_cells + self.side_bin_margins))
                 # plt.setXRange(-self.half_render_window_duration, +self.half_render_window_duration)
                 self.ui.main_gl_widget.addItem(plt)

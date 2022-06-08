@@ -290,6 +290,7 @@ class Spike3DRaster_Vedo(VedoSpecificTimeCurvesMixin, SpikeRasterBase):
         self.ui.frame_layout = QtWidgets.QVBoxLayout()
         
         self.ui.layout = QtWidgets.QGridLayout()
+        self.ui.layout.setObjectName('root_layout')
         self.ui.layout.setContentsMargins(0, 0, 0, 0)
         self.ui.layout.setVerticalSpacing(0)
         self.ui.layout.setHorizontalSpacing(0)
