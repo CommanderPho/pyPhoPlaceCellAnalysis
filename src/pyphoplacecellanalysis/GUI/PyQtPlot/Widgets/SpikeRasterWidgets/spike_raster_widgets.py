@@ -26,7 +26,9 @@ TimeWindowPlaybackController
 
 """
 class UnifiedSpikeRasterApp(TimeWindowPlaybackControllerActionsMixin, TimeWindowPlaybackPropertiesMixin, QtCore.QObject):
-    """docstring for UnifiedSpikeRasterApp."""
+    """ An attempt to make a singleton global app instance to hold the main window and synchronized playback controls and other global properties.
+        Currently Unused!
+    """
     
     # TimeWindowPlaybackPropertiesMixin requirement:
     @property

@@ -20,8 +20,8 @@ class DynamicDockDisplayAreaContentMixin:
     Creates: 
         self.displayDockArea: a pg.Dock(...) object containing dynamically created Docks/Widgets for display of display nodes.
         
-    Usage:
-        PhoDockAreaContainingWindow only right now 
+    Known Usages:
+        PhoDockAreaContainingWindow **ONLY** right now 
     
     """
     
@@ -198,20 +198,9 @@ class PhoDockAreaContainingWindow(DynamicDockDisplayAreaContentMixin, QtWidgets.
         
 
     def setup(self):
-        # get central widget:
-        # cw = mainAppWindow.flowchart_controls
-
         self.ui.area = DockArea()
-    
-        # # Use existing central widget:
-        # cw = self.centralwidget
-        # self.ui.layout = QtGui.QVBoxLayout()
-        # cw.setLayout(self.ui.layout)        
-        # self.ui.layout.addWidget(self.ui.area) # start at 1 since the console is available at 0
-        
         # Use self.ui.area as central widget:        
-        self.setCentralWidget(self.ui.area)
-        
+        self.setCentralWidget(self.ui.area)    
         self.DynamicDockDisplayAreaContentMixin_on_setup()
         
         
@@ -231,7 +220,16 @@ class PhoDockAreaContainingWindow(DynamicDockDisplayAreaContentMixin, QtWidgets.
     
 class DockAreaWrapper(object):
     """ Responsible for wrapping several children in Dock items and installing them in a central DockArea
-    Primary method is DockAreaWrapper.wrap_with_dockAreaWindow(...):
+    Primary method is DockAreaWrapper.wrap_with_dockAreaWindow(...)
+    
+    Known Usage:
+        ## In DefaultDisplayFunctions._display_3d_interactive_tuning_curves_plotter(...): to combine the ipcDataExplorer and its controlling placefieldControlsContainerWidget into a single window with each widget wrapped in a dock.
+            from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.DockAreaWrapper import DockAreaWrapper
+            # Wrap:
+            active_root_main_widget = ipcDataExplorer.p.window()
+            root_dockAreaWindow, app = DockAreaWrapper.wrap_with_dockAreaWindow(active_root_main_widget, placefieldControlsContainerWidget, title=ipcDataExplorer.data_explorer_name)
+            pane = (root_dockAreaWindow, placefieldControlsContainerWidget, pf_widgets)
+        
     """
 
     @classmethod

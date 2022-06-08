@@ -332,9 +332,6 @@ class InteractivePlaceCellDataExplorer(GlobalConnectionManagerAccessingMixin, In
         if render:
             self.p.render() # renders to ensure it's updated after changing the ScalarVisibility above
 
-    
-    
-    
     def on_slider_update_mesh(self, value):
         """ called to update the current active time window from an integer index (such as that produced by the slider's update function or the class responsible for making videos) """
         curr_i = int(value)
