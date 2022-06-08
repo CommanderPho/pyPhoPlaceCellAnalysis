@@ -3,7 +3,7 @@ import pyphoplacecellanalysis.External.pyqtgraph as pg
 import pyphoplacecellanalysis.External.pyqtgraph.opengl as gl # for 3D raster plot
 
 class BaseGrid3DTimeCurvesHelper:
-    """ 
+    """ Adds a grid below the 3D Curves to make it easier to see what neuron they correspond to.
         2022-06-07: Add the 3D Curves baseline grid axes (straight lines below each time series to make it easier to see what value they represent:
         TODO: only works for PyQtGraph-type plotters (no vedo support)
     """
