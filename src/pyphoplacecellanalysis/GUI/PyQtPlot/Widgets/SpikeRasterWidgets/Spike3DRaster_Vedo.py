@@ -850,6 +850,18 @@ class Spike3DRaster_Vedo(VedoSpecificTimeCurvesMixin, SpikeRasterBase):
         self._update_plots()
         print('\t done.')
         
-        
+
+    @QtCore.pyqtSlot(object)
+    def on_neuron_colors_changed(self, neuron_id_color_update_dict):
+        """ Called when the neuron colors have finished changing (changed) to update the rendered elements.
+        """
+        print(f'Spike3DRaster_Vedo.neuron_id_color_update_dict: {neuron_id_color_update_dict}')
+        # TODO: Impplement for Vedo version:
+        # self.rebuild_main_gl_line_plots_if_needed()
+        # for i, a_fragile_linear_neuron_IDX in enumerate(self.fragile_linear_neuron_IDXs):
+        #     # color= (N,4) array of floats (0.0-1.0) or tuple of floats specifying a single color for the entire item.
+        #     curr_color = self.params.neuron_qcolors[a_fragile_linear_neuron_IDX] # get the pre-build color
+        #     self.ui.gl_line_plots[i].setData(color=curr_color) # update the current data        
+        self._update_plots()
         
 # josfd
