@@ -92,6 +92,14 @@ class CreateNewConnectedWidgetMenuMixin(object):
             if debug_print:
                 print(f'curr_action_key: {curr_action_key}')
             
+            
+            curr_action_key = PhoMenuHelper.add_menu_action_item(a_main_window, "New Connected Tuning Curves Explorer (ipcDataExplorer)", name="actionNewConnectedDataExplorer_ipc", tooltip="Create a new 3D Interactive Tuning Curve Data Explorer Plotter and connect it to this window", icon_path=":/Icons/Icons/InteractivePlaceCellDataExplorerIconWithLabel.ico",
+                                                        parent_menu=a_main_window.ui.menuCreateNewConnectedWidget, menu_actions_dict=a_main_window.ui.createNewConnectedWidgetMenuActionsDict)
+            
+            curr_action_key = PhoMenuHelper.add_menu_action_item(a_main_window, "New Connected Spikes+Behavior Explorer (ipspikesDataExplorer)", name="actionNewConnectedDataExplorer_ipspikes", tooltip="Create a new 3D Interactive Spike and Behavior Plotter and connect it to this window", icon_path=":/Icons/Icons/TuningMapDataExplorerIconWithLabel.ico",
+                                                        parent_menu=a_main_window.ui.menuCreateNewConnectedWidget, menu_actions_dict=a_main_window.ui.createNewConnectedWidgetMenuActionsDict)
+            
+            
             return a_main_window.ui.menuCreateNewConnectedWidget, a_main_window.ui.createNewConnectedWidgetMenuActionsDict
 
 
