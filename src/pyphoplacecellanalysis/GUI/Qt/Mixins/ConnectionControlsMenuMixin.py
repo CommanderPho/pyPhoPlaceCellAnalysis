@@ -2,11 +2,13 @@ from qtpy import QtCore, QtGui, QtWidgets
 from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer
 from pyphoplacecellanalysis.GUI.Qt.MainWindowWrapper import PhoBaseMainWindow
 from pyphoplacecellanalysis.Resources import GuiResources, ActionIcons
+
+from pyphoplacecellanalysis.GUI.Qt.Mixins.PhoMenuHelper import PhoMenuHelper
 # GuiResources_rc
 
 
 class ConnectionControlsMenuMixin(object):
-    """docstring for ConnectionControlsMenuMixin.
+    """Adds a dynamically generated menubar to a QMainWindow for the purpose of connecting various separate windows
     
     Requirements:
         Implementor must be a QWidget class with:
@@ -36,19 +38,8 @@ class ConnectionControlsMenuMixin(object):
     @classmethod
     def try_add_connections_menu(cls, a_content_widget):
         curr_content_widget = a_content_widget.window()
-        if not isinstance(curr_content_widget, QtWidgets.QMainWindow):
-            # doesn't have a valid QMainWindow window, so wrap it in one using PhoBaseMainWindow(...)
-            curr_window = PhoBaseMainWindow(content_widget=curr_content_widget)
-        else:
-            # already has a valid QMainWindow window
-            curr_window = curr_content_widget
-            # Make sure curr_window has a .ui property:
-            if not hasattr(curr_window, 'ui'):
-                # if the window has no .ui property, create one:
-                setattr(curr_window, 'ui', PhoUIContainer())
-            
+        curr_window = PhoMenuHelper.try_get_menu_window(curr_content_widget)    
         menuConnections, actions_dict = ConnectionControlsMenuMixin._build_connections_menu(curr_window)
-        
         return curr_window, menuConnections, actions_dict
 
     @classmethod
@@ -91,27 +82,42 @@ class ConnectionControlsMenuMixin(object):
             a_main_window.ui.menuConnections.setTitle("Connections")
             # a_main_window.setMenuBar(menubar)
 
-            # Define actions
-            a_main_window.ui.actionConnect_Child = QtWidgets.QAction(a_main_window)
-            icon2 = QtGui.QIcon()
-            icon2.addPixmap(QtGui.QPixmap(":/Icons/chain--arrow.png"), QtGui.QIcon.Normal, QtGui.QIcon.Off)
-            a_main_window.ui.actionConnect_Child.setIcon(icon2)
-            a_main_window.ui.actionConnect_Child.setObjectName("actionConnect_Child")
-            a_main_window.ui.actionConnect_Child.setText("Connect Child...")
-            a_main_window.ui.actionConnect_Child.setToolTip("Connect a child widget to another widget")
+            a_main_window.ui.connectionsMenuActionsDict = {'actionMenuConnections': a_main_window.ui.actionMenuConnections}
+                                               
+            # # Define actions
+            # a_main_window.ui.actionConnect_Child = QtWidgets.QAction(a_main_window)
+            # icon2 = QtGui.QIcon()
+            # icon2.addPixmap(QtGui.QPixmap(":/Icons/chain--arrow.png"), QtGui.QIcon.Normal, QtGui.QIcon.Off)
+            # a_main_window.ui.actionConnect_Child.setIcon(icon2)
+            # a_main_window.ui.actionConnect_Child.setObjectName("actionConnect_Child")
+            # a_main_window.ui.actionConnect_Child.setText("Connect Child...")
+            # a_main_window.ui.actionConnect_Child.setToolTip("Connect a child widget to another widget")
 
-            a_main_window.ui.actionDisconnect_from_driver = QtWidgets.QAction(a_main_window)
-            icon3 = QtGui.QIcon()
-            icon3.addPixmap(QtGui.QPixmap(":/Icons/chain--minus.png"), QtGui.QIcon.Normal, QtGui.QIcon.Off)
-            a_main_window.ui.actionDisconnect_from_driver.setIcon(icon3)
-            a_main_window.ui.actionDisconnect_from_driver.setObjectName("actionDisconnect_from_driver")
-            a_main_window.ui.actionDisconnect_from_driver.setText("Disconnect from driver")
-            a_main_window.ui.actionDisconnect_from_driver.setToolTip("Disconnects the item from the current driver")
+            # a_main_window.ui.actionDisconnect_from_driver = QtWidgets.QAction(a_main_window)
+            # icon3 = QtGui.QIcon()
+            # icon3.addPixmap(QtGui.QPixmap(":/Icons/chain--minus.png"), QtGui.QIcon.Normal, QtGui.QIcon.Off)
+            # a_main_window.ui.actionDisconnect_from_driver.setIcon(icon3)
+            # a_main_window.ui.actionDisconnect_from_driver.setObjectName("actionDisconnect_from_driver")
+            # a_main_window.ui.actionDisconnect_from_driver.setText("Disconnect from driver")
+            # a_main_window.ui.actionDisconnect_from_driver.setToolTip("Disconnects the item from the current driver")
 
-            # Add to connections menu:
-            a_main_window.ui.menuConnections.addAction(a_main_window.ui.actionConnect_Child)
-            a_main_window.ui.menuConnections.addAction(a_main_window.ui.actionDisconnect_from_driver)
+            # # Add to connections menu:
+            # a_main_window.ui.menuConnections.addAction(a_main_window.ui.actionConnect_Child)
+            # a_main_window.ui.menuConnections.addAction(a_main_window.ui.actionDisconnect_from_driver)
 
-            a_main_window.ui.connectionsMenuActionsDict = {'actionMenuConnections':a_main_window.ui.actionMenuConnections, 'actionConnect_Child':a_main_window.ui.actionConnect_Child, 'actionDisconnect_from_driver':a_main_window.ui.actionDisconnect_from_driver}
+            # a_main_window.ui.connectionsMenuActionsDict = {'actionMenuConnections':a_main_window.ui.actionMenuConnections, 'actionConnect_Child':a_main_window.ui.actionConnect_Child, 'actionDisconnect_from_driver':a_main_window.ui.actionDisconnect_from_driver}
             
+            
+            curr_action = QtWidgets.QAction(a_main_window)
+            curr_action_key = PhoMenuHelper.setup_menu_item(curr_action, "Connect Child...", name="actionConnect_Child", tooltip="Connect a child widget to another widget", icon_path=":/Icons/chain--arrow.png")
+            a_main_window.ui[curr_action_key] = curr_action # add the action to the main window's .ui:
+            a_main_window.ui.menuConnections.addAction(a_main_window.ui[curr_action_key]) # Add to menu
+            a_main_window.ui.connectionsMenuActionsDict[curr_action_key] = a_main_window.ui[curr_action_key] # add to actions dictionary
+
+            curr_action = QtWidgets.QAction(a_main_window)
+            curr_action_key = PhoMenuHelper.setup_menu_item(curr_action, "Disconnect from driver", name="actionDisconnect_from_driver", tooltip="Disconnects the item from the current driver", icon_path=":/Icons/chain--minus.png")            
+            a_main_window.ui[curr_action_key] = curr_action # add the action to the main window's .ui:
+            a_main_window.ui.menuConnections.addAction(a_main_window.ui[curr_action_key]) # Add to menu
+            a_main_window.ui.connectionsMenuActionsDict[curr_action_key] = a_main_window.ui[curr_action_key] # add to actions dictionary
+
             return a_main_window.ui.menuConnections, a_main_window.ui.connectionsMenuActionsDict
