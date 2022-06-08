@@ -90,8 +90,8 @@ class ConnectionControlsMenuMixin(object):
             #   curr_action = a_main_window.ui[curr_action_key]
             
             # Connect Child Item:
-            curr_action_key = PhoMenuHelper.add_menu_item(a_main_window, "Connect Child...", name="actionConnect_Child", tooltip="Connect a child widget to another widget", icon_path=":/Icons/chain--arrow.png", parent_menu=a_main_window.ui.menuConnections, menu_actions_dict=a_main_window.ui.connectionsMenuActionsDict)
+            curr_action_key = PhoMenuHelper.add_menu_action_item(a_main_window, "Connect Child...", name="actionConnect_Child", tooltip="Connect a child widget to another widget", icon_path=":/Icons/chain--arrow.png", parent_menu=a_main_window.ui.menuConnections, menu_actions_dict=a_main_window.ui.connectionsMenuActionsDict)
             # Disconnect from Driver item:
-            curr_action_key = PhoMenuHelper.add_menu_item(a_main_window, "Disconnect from driver", name="actionDisconnect_from_driver", tooltip="Disconnects the item from the current driver", icon_path=":/Icons/chain--minus.png", parent_menu=a_main_window.ui.menuConnections, menu_actions_dict=a_main_window.ui.connectionsMenuActionsDict)
+            curr_action_key = PhoMenuHelper.add_menu_action_item(a_main_window, "Disconnect from driver", name="actionDisconnect_from_driver", tooltip="Disconnects the item from the current driver", icon_path=":/Icons/chain--minus.png", parent_menu=a_main_window.ui.menuConnections, menu_actions_dict=a_main_window.ui.connectionsMenuActionsDict)
 
             return a_main_window.ui.menuConnections, a_main_window.ui.connectionsMenuActionsDict

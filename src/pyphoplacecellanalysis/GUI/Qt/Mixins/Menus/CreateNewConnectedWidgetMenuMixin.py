@@ -83,11 +83,11 @@ class CreateNewConnectedWidgetMenuMixin(object):
                 # if want the item added can do:
                 #   curr_action = a_main_window.ui[curr_action_key]
             
-            curr_action_key = PhoMenuHelper.add_menu_item(a_main_window, "New Connected 3D Raster (PyQtGraph)", name="actionNewConnected3DRaster_PyQtGraph", tooltip="Create a new PyQtGraph 3D Raster plotter and connect it to this window", icon_path=":/Icons/Icons/SpikeRaster3DIcon.ico",
+            curr_action_key = PhoMenuHelper.add_menu_action_item(a_main_window, "New Connected 3D Raster (PyQtGraph)", name="actionNewConnected3DRaster_PyQtGraph", tooltip="Create a new PyQtGraph 3D Raster plotter and connect it to this window", icon_path=":/Icons/Icons/SpikeRaster3DIcon.ico",
                                                         parent_menu=a_main_window.ui.menuCreateNewConnectedWidget, menu_actions_dict=a_main_window.ui.createNewConnectedWidgetMenuActionsDict)
             if debug_print:
                 print(f'curr_action_key: {curr_action_key}')
-            curr_action_key = PhoMenuHelper.add_menu_item(a_main_window, "New Connected 3D Raster (Vedo)", name="actionNewConnected3DRaster_Vedo", tooltip="Create a new Vedo 3D Raster plotter and connect it to this window", icon_path=":/Icons/Icons/SpikeRaster3D_VedoIcon.ico",
+            curr_action_key = PhoMenuHelper.add_menu_action_item(a_main_window, "New Connected 3D Raster (Vedo)", name="actionNewConnected3DRaster_Vedo", tooltip="Create a new Vedo 3D Raster plotter and connect it to this window", icon_path=":/Icons/Icons/SpikeRaster3D_VedoIcon.ico",
                                                         parent_menu=a_main_window.ui.menuCreateNewConnectedWidget, menu_actions_dict=a_main_window.ui.createNewConnectedWidgetMenuActionsDict)
             if debug_print:
                 print(f'curr_action_key: {curr_action_key}')

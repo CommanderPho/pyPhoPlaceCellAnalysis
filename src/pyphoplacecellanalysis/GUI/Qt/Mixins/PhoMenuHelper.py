@@ -46,12 +46,12 @@ class PhoMenuHelper(object):
             menu_item.setIcon(icon)
 
         if tooltip is not None:
-            menu_item.setToolTip("Connect a child widget to another widget")
+            menu_item.setToolTip(tooltip)
             
         return name # return the object name
     
     @classmethod
-    def add_menu_item(cls, a_main_window, text, name=None, tooltip=None, icon_path=None, parent_menu=None, menu_actions_dict=None):
+    def add_menu_action_item(cls, a_main_window, text, name=None, tooltip=None, icon_path=None, parent_menu=None, menu_actions_dict=None):
         """Builds a new QAction
 
         Internally calls cls.setup_menu_item(...) to configure the action before adding it.
@@ -76,6 +76,33 @@ class PhoMenuHelper(object):
         return curr_action_key
         
     @classmethod
+    def add_menu(cls, a_main_window, text, name=None, parent_menu=None, tooltip=None, icon_path=None, menu_actions_dict=None):
+        """ 
+        
+        a_main_window.ui.menuCreateNewConnectedWidget
+        
+        parent_menu: a QMenu parent or the root menuBar
+        """
+        # menuCreateNewConnectedWidget = menubar.addMenu('&Connections')
+        curr_menu = QtWidgets.QMenu(parent_menu) # A QMenu
+        curr_menu.setTitle(text)
+        if name is None:
+            # if no name is provided, build it from the text
+            # text: "Create Connected Widget"
+            # name: "menuCreateNewConnectedWidget"
+            name = f'menu{PhoMenuHelper.try_get_menu_object_name_from_text(text)}' #.replace(" ", "_")
+        # curr_menu.setTearOffEnabled(True)
+        curr_menu.setObjectName(name)
+        if tooltip is not None:
+            curr_menu.setToolTip(tooltip)
+            
+        a_main_window.ui[name] = parent_menu.addMenu(curr_menu) # Used to remove the menu, a QAction
+        if menu_actions_dict is None:
+            raise NotImplementedError
+        menu_actions_dict[name] = a_main_window.ui[name] # add to actions dictionary
+        return name, curr_menu
+            
+    @classmethod
     def try_get_menu_window(cls, a_content_widget):
         curr_content_widget = a_content_widget.window()
         if not isinstance(curr_content_widget, QtWidgets.QMainWindow):
@@ -89,8 +116,7 @@ class PhoMenuHelper(object):
                 # if the window has no .ui property, create one:
                 setattr(curr_window, 'ui', PhoUIContainer())
         return curr_window
-    
-    
+     
     @classmethod
     def try_get_menu_bar(cls, a_content_widget):
         """ Returns the main window's root menuBar
@@ -101,9 +127,6 @@ class PhoMenuHelper(object):
         curr_window = cls.try_get_menu_window(a_content_widget)
         menubar = curr_window.menuBar()
         return menubar    
-    
-    
-    
     
     @classmethod
     def set_menu_default_stylesheet(cls, root_menu_bar):
