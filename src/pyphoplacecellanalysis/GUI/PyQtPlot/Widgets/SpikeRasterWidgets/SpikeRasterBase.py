@@ -14,8 +14,6 @@ import qtawesome as qta
 
 from neuropy.core.neuron_identities import NeuronIdentityAccessingMixin
 
-from pyphocorehelpers.general_helpers import OrderedMeta
-from pyphocorehelpers.print_helpers import SimplePrintable, PrettyPrintable
 from pyphocorehelpers.DataStructure.general_parameter_containers import DebugHelper, VisualizationParameters, RenderPlots
 from pyphoplacecellanalysis.General.Mixins.SpikesRenderingBaseMixin import SpikeRenderingBaseMixin, SpikesDataframeOwningMixin
 
