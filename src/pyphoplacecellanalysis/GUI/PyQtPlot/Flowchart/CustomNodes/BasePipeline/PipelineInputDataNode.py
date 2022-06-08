@@ -79,7 +79,7 @@ class PipelineInputDataNode(ExtendedCtrlNode):
             data_mode_from_combo_list = known_mode
 
         print(f'PipelineInputDataNode data_mode from dropdown list: {data_mode_from_combo_list}')
-            
+        
         # Compare to known_mode from input:
         if (known_mode is None):
             print('Warning: known_mode is None.')

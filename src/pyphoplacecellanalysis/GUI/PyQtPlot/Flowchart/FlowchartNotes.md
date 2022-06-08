@@ -55,6 +55,20 @@ setPos
 
 # Adding Controls to Nodes:
 
+## Adding to WidgetGroup:
+From the definintion of `WidgetGroup`:
+`Custom widgets not in this list can be made to work with WidgetGroup by giving them a 'widgetGroupInterface' method which returns the tuple.`
+```python
+QtWidgets.QComboBox: (
+            lambda w: w.currentIndexChanged,
+            comboState,
+            setComboState
+        ),
+        
+
+```
+
+
 # 'combo': Combo Box with Dynamic Keys:
 ```python
 	uiTemplate = [
