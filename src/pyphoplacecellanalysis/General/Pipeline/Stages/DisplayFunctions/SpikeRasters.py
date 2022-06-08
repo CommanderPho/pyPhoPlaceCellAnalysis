@@ -66,16 +66,26 @@ class SpikeRastersDisplayFunctions(AllFunctionEnumeratingMixin):
         """
         use_separate_windows = kwargs.get('separate_windows', False)
         type_of_3d_plotter = kwargs.get('type_of_3d_plotter', 'pyqtgraph')
+        active_plotting_config = active_config.plotting_config
+        active_config_name = kwargs.get('active_config_name', 'Unknown')
+        # active_config_name = active_config.
         
         
         # spike_raster_window = Spike3DRasterWindowWidget(computation_result.sess.spikes_df)
-        spike_raster_window = Spike3DRasterWindowWidget(curr_spikes_df, neuron_colors=provided_neuron_id_to_color_map, neuron_sort_order=None, type_of_3d_plotter=type_of_3d_plotter)
+        # spike_raster_window = Spike3DRasterWindowWidget(computation_result.sess.spikes_df, neuron_colors=provided_neuron_id_to_color_map, neuron_sort_order=None, type_of_3d_plotter=type_of_3d_plotter, application_name=f'Spike Raster Window - {active_config_name}')
+        spike_raster_window = Spike3DRasterWindowWidget(computation_result.sess.spikes_df, type_of_3d_plotter=type_of_3d_plotter, application_name=f'Spike Raster Window - {active_config_name}')
         
+        # Set Window Title Options:
+        spike_raster_window.setWindowFilePath(str(computation_result.sess.filePrefix.resolve()))
+        spike_raster_window.setWindowTitle(f'Spike Raster Window - {active_config_name} - {str(computation_result.sess.filePrefix.resolve())}')
         
-        spike_raster_plt_3d_vedo, spike_raster_plt_2d, spike_3d_to_2d_window_connection, spike_raster_window = build_spike_3d_raster_vedo_with_2d_controls(computation_result.sess.spikes_df, window_duration=1.0, window_start_time=30.0, neuron_colors=None, neuron_sort_order=None, separate_windows=use_separate_windows)
+        # spike_raster_plt_3d_vedo, spike_raster_plt_2d, spike_3d_to_2d_window_connection, spike_raster_window = build_spike_3d_raster_vedo_with_2d_controls(computation_result.sess.spikes_df, window_duration=1.0, window_start_time=30.0, neuron_colors=None, neuron_sort_order=None, separate_windows=use_separate_windows)
         # Setup Connections Menu:
-        root_window, menuConnections, actions_dict = ConnectionControlsMenuMixin.try_add_connections_menu(spike_raster_window) # none of these properties need to be saved directly, as they're accessible via spike_raster_window.window()
-        return {'spike_raster_plt_2d':spike_raster_plt_2d, 'spike_raster_plt_3d_vedo':spike_raster_plt_3d_vedo, 'spike_3d_to_2d_window_connection':spike_3d_to_2d_window_connection, 'spike_raster_window': spike_raster_window}
+        # root_window, menuConnections, actions_dict = ConnectionControlsMenuMixin.try_add_connections_menu(spike_raster_window) # none of these properties need to be saved directly, as they're accessible via spike_raster_window.window()
+        
+        return {'spike_raster_plt_2d':spike_raster_window.spike_raster_plt_2d, 'spike_raster_plt_3d':spike_raster_window.spike_raster_plt_3d, 'spike_raster_window': spike_raster_window}
+    
+        # return {'spike_raster_plt_2d':spike_raster_plt_2d, 'spike_raster_plt_3d_vedo':spike_raster_plt_3d_vedo, 'spike_3d_to_2d_window_connection':spike_3d_to_2d_window_connection, 'spike_raster_window': spike_raster_window}
     
 
 
