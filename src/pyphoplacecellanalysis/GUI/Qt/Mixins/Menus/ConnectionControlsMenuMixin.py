@@ -1,6 +1,5 @@
 from qtpy import QtCore, QtGui, QtWidgets
 from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer
-from pyphoplacecellanalysis.GUI.Qt.MainWindowWrapper import PhoBaseMainWindow
 from pyphoplacecellanalysis.Resources import GuiResources, ActionIcons
 
 from pyphoplacecellanalysis.GUI.Qt.Mixins.PhoMenuHelper import PhoMenuHelper
@@ -25,6 +24,9 @@ class ConnectionControlsMenuMixin(object):
         curr_window = PhoBaseMainWindow(content_widget=curr_content_widget)
         menuConnections, actions_dict = build_menu(curr_window)
     
+        from pyphoplacecellanalysis.GUI.Qt.Mixins.ConnectionControlsMenuMixin import ConnectionControlsMenuMixin
+        curr_window, menuConnections, actions_dict = ConnectionControlsMenuMixin.try_add_connections_menu(spike_raster_window)
+        
     """
     def build_connections_menu(self):
         return ConnectionControlsMenuMixin.try_add_connections_menu(self)
