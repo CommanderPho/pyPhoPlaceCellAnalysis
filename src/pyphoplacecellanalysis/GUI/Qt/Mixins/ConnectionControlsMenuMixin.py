@@ -25,26 +25,11 @@ class ConnectionControlsMenuMixin(object):
     
     """
     def build_connections_menu(self):
-        # curr_content_widget = self.window()
-        # if not isinstance(curr_content_widget, QtWidgets.QMainWindow):
-        #     # doesn't have a valid QMainWindow window, so wrap it in one using PhoBaseMainWindow(...)
-        #     curr_window = PhoBaseMainWindow(content_widget=curr_content_widget)
-        # else:
-        #     # already has a valid QMainWindow window
-        #     curr_window = curr_content_widget
-        
-        # menuConnections, actions_dict = ConnectionControlsMenuMixin._build_connections_menu(curr_window)
-        # return curr_window, menuConnections, actions_dict
         return ConnectionControlsMenuMixin.try_add_connections_menu(self)
 
 
     def remove_connections_menu(self):
         """ Works to remove the menu created with menuConnections, actions_dict = build_menu(curr_window) """
-        # curr_window = self.window()
-        # curr_actions_dict = curr_window.ui.connectionsMenuActionsDict
-        # curr_menubar = curr_window.menuBar()
-        # # remove the menu:
-        # curr_menubar.removeAction(curr_actions_dict['actionMenuConnections'])
         return ConnectionControlsMenuMixin.try_remove_connections_menu(self)
 
 
@@ -98,7 +83,6 @@ class ConnectionControlsMenuMixin(object):
             # menuConnections = menubar.addMenu('&Connections')
             a_main_window.ui.menuConnections = QtWidgets.QMenu(a_main_window.ui.menubar) # A QMenu
             a_main_window.ui.actionMenuConnections = a_main_window.ui.menubar.addMenu(a_main_window.ui.menuConnections) # Used to remove the menu, a QAction
-
             # a_main_window.ui.menuConnections.setTearOffEnabled(True)
             # icon1 = QtGui.QIcon()
             # icon1.addPixmap(QtGui.QPixmap(":/Icons/Icons/chain.png"), QtGui.QIcon.Normal, QtGui.QIcon.Off)

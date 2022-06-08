@@ -250,10 +250,7 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
         
         self.GlobalConnectionManagerAccessingMixin_on_setup()
         
-        
-        
-        # self.ui.additional_connections = {}
-        # NOTE: self.ui.additional_connections has been removed in favor of self.connection_man
+        # self.ui.additional_connections = {} # NOTE: self.ui.additional_connections has been removed in favor of self.connection_man
         
         # self.spike_raster_plt_2d.setWindowTitle('2D Raster Control Window')
         # self.spike_3d_to_2d_window_connection = self.spike_raster_plt_2d.window_scrolled.connect(self.spike_raster_plt_3d.spikes_window.update_window_start_end)
@@ -310,31 +307,10 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
     def connect_additional_controlled_plotter(self, controlled_plt):
         """ try to connect the controlled_plt to the current controller (usually the 2D plot). """
         return self.connection_man.connect_drivable_to_driver(drivable=controlled_plt, driver=self.spike_raster_plt_2d)
-        # extant_connection = self.ui.additional_connections.get(controlled_plt, None)
-        # if extant_connection is None:
-        #     new_connection_obj = connect_additional_controlled_plotter(self.spike_raster_plt_2d, controlled_plt=controlled_plt)
-        #     self.ui.additional_connections[controlled_plt] = new_connection_obj # add the connection object to the self.ui.additional_connections array
-        #     return self.ui.additional_connections[controlled_plt]
-        # else:
-        #     print(f'connection already existed!')
-        #     return extant_connection
-        
-        
         
     def connect_controlled_time_synchronized_plotter(self, controlled_plt):
         """ try to connect the controlled_plt to the current controller (usually the 2D plot). """
         return self.connection_man.connect_drivable_to_driver(drivable=controlled_plt, driver=self.spike_raster_plt_2d)
-        # extant_connection = self.ui.additional_connections.get(controlled_plt, None)
-        # if extant_connection is None:
-        #     new_connection_obj = connect_controlled_time_synchornized_plotter(self.spike_raster_plt_2d, controlled_plt=controlled_plt)
-        #     self.ui.additional_connections[controlled_plt] = new_connection_obj # add the connection object to the self.ui.additional_connections array
-        #     return self.ui.additional_connections[controlled_plt]
-        # else:
-        #     print(f'connect_controlled_time_synchronized_plotter(...): connection already existed!')
-        #     return extant_connection
-        
-
-          
           
       
     def __str__(self):
