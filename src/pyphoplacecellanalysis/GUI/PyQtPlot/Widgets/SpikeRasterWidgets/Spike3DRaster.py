@@ -424,7 +424,7 @@ class Spike3DRaster(PyQtGraphSpecificTimeCurvesMixin, RenderTimeEpochMeshesMixin
             curr_color.setAlphaF(1.0)
             # print(f'cell_id: {cell_id}, curr_color: {curr_color.alpha()}')
             curr_id_txtitem = gl.GLTextItem(pos=(self.side_wall_x, y_pos[i], (self.floor_z - 0.5)), text=f'{cell_id}', color=curr_color, font=cell_id_text_item_font)
-            curr_id_txtitem.setObjectName(f'neuron_id_txtitem_aclu_{cell_id}')
+            curr_id_txtitem.setObjectName(f'neuron_id_txtitem_fragile_IDX_{a_fragile_linear_neuron_IDX}_aclu_{cell_id}')
             w.addItem(curr_id_txtitem) # add to the current widget
             # add to the cell_ids array
             self.ui.glCellIdTextItems.append(curr_id_txtitem)
@@ -451,7 +451,7 @@ class Spike3DRaster(PyQtGraphSpecificTimeCurvesMixin, RenderTimeEpochMeshesMixin
             
             curr_color.setAlphaF(1.0)
             curr_id_txtitem = self.ui.glCellIdTextItems[i]
-            curr_id_txtitem.setObjectName(f'neuron_id_txtitem_aclu_{cell_id}')
+            curr_id_txtitem.setObjectName(f'neuron_id_txtitem_fragile_IDX_{a_fragile_linear_neuron_IDX}_aclu_{cell_id}')
             curr_id_txtitem.setData(pos=(self.side_wall_x, self.fragile_linear_neuron_IDX_to_spatial(a_fragile_linear_neuron_IDX), (self.floor_z - 0.5)), color=curr_color) # TODO: could update color as well
             
             # curr_id_txtitem.resetTransform()

@@ -287,7 +287,9 @@ class Spike3DRaster_Vedo(VedoSpecificTimeCurvesMixin, SpikeRasterBase):
         self.ui = PhoUIContainer()
 
         self.ui.frame = QtWidgets.QFrame()
+        self.ui.frame.setObjectName('root_frame')
         self.ui.frame_layout = QtWidgets.QVBoxLayout()
+        self.ui.frame_layout.setObjectName('root_frame_layout')
         
         self.ui.layout = QtWidgets.QGridLayout()
         self.ui.layout.setObjectName('root_layout')
@@ -413,7 +415,7 @@ class Spike3DRaster_Vedo(VedoSpecificTimeCurvesMixin, SpikeRasterBase):
         startPoints = np.vstack((all_spike_x, curr_spike_y, np.full_like(all_spike_x, self.params.spike_start_z))).T
         endPoints = np.vstack((all_spike_x, curr_spike_y, np.full_like(all_spike_x, self.params.spike_end_z))).T
         
-        all_spike_lines = Lines(startPoints, endPoints=endPoints, c='k', alpha=0.8, lw=1.0, dotted=False, scale=1, res=1) # curr_spike_alphas
+        all_spike_lines = Lines(startPoints, endPoints=endPoints, c='k', alpha=0.8, lw=1, dotted=False, scale=1, res=1) # curr_spike_alphas
         # let the scalar be the y coordinate of the mesh vertices
         spike_color_ids = curr_spike_y.copy() # one per spike
         spike_point_color_ids = all_spike_lines.points()[:, 1]
