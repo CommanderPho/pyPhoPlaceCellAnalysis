@@ -102,3 +102,181 @@ class PhoMenuHelper(object):
         menubar = curr_window.menuBar()
         return menubar    
     
+    
+    
+    
+    @classmethod
+    def set_menu_default_stylesheet(cls, root_menu_bar):
+        custom_theme_multiline_string = """QMenuBar
+        {
+            background-color: #31363b;
+            color: #eff0f1;
+        }
+
+        QMenuBar::item
+        {
+            background: transparent;
+        }
+
+        QMenuBar::item:selected
+        {
+            background: transparent;
+        }
+
+        QMenuBar::item:disabled
+        {
+            color: #76797c;
+        }
+
+        QMenuBar::item:pressed
+        {
+            background-color: #3daee9;
+            color: #eff0f1;
+            margin-bottom: -0.09em;
+            padding-bottom: 0.09em;
+        }
+
+        QMenu
+        {
+            color: #eff0f1;
+            margin: 0.09em;
+        }
+
+        QMenu::icon
+        {
+            margin: 0.23em;
+        }
+
+        QMenu::item
+        {
+            /* Add extra padding on the right for the QMenu arrow */
+            padding: 0.23em 1.5em 0.23em 1.3em;
+            border: 0.09em solid transparent;
+            background: transparent;
+        }
+
+        QMenu::item:selected
+        {
+            color: #eff0f1;
+            background-color: #3daee9;
+        }
+
+        QMenu::item:selected:disabled
+        {
+            background-color: #31363b;
+        }
+
+        QMenu::item:disabled
+        {
+            color: #76797c;
+        }
+
+        QMenu::indicator
+        {
+            width: 0.8em;
+            height: 0.8em;
+            /* To align with QMenu::icon, which has a 0.23em margin. */
+            margin-left: 0.3em;
+            subcontrol-position: center left;
+        }
+
+        QMenu::indicator:non-exclusive:unchecked
+        {
+            border-image: url(:/dark/checkbox_unchecked_disabled.svg);
+        }
+
+        QMenu::indicator:non-exclusive:unchecked:selected
+        {
+            border-image: url(:/dark/checkbox_unchecked_disabled.svg);
+        }
+
+        QMenu::indicator:non-exclusive:checked
+        {
+            border-image: url(:/dark/checkbox_checked.svg);
+        }
+
+        QMenu::indicator:non-exclusive:checked:selected
+        {
+            border-image: url(:/dark/checkbox_checked.svg);
+        }
+
+        QMenu::indicator:exclusive:unchecked
+        {
+            border-image: url(:/dark/radio_unchecked_disabled.svg);
+        }
+
+        QMenu::indicator:exclusive:unchecked:selected
+        {
+            border-image: url(:/dark/radio_unchecked_disabled.svg);
+        }
+
+        QMenu::indicator:exclusive:checked
+        {
+            border-image: url(:/dark/radio_checked.svg);
+        }
+
+        QMenu::indicator:exclusive:checked:selected
+        {
+            border-image: url(:/dark/radio_checked.svg);
+        }
+
+        QMenu::right-arrow
+        {
+            margin: 0.23em;
+            border-image: url(:/dark/right_arrow.svg);
+            width: 0.5em;
+            height: 0.8em;
+        }
+
+        QMenu::right-arrow:disabled
+        {
+            border-image: url(:/dark/right_arrow_disabled.svg);
+        }
+        QAbstractItemView
+        {
+            alternate-background-color: #31363b;
+            color: #eff0f1;
+            border: 0.09em solid #31363b;
+            border-radius: 0.09em;
+        }
+
+        QMenuBar::item:focus:!disabled
+        {
+            border: 0.04em solid #3daee9;
+        }
+        QMenu::separator
+        {
+            height: 0.09em;
+            background-color: #76797c;
+            padding-left: 0.2em;
+            margin-top: 0.2em;
+            margin-bottom: 0.2em;
+            margin-left: 0.41em;
+            margin-right: 0.41em;
+        }
+        """
+    
+        old_custom_theme_multiline_string = """QMenuBar {
+        background-color: transparent;
+        }
+
+        QMenuBar::item {
+        color : white;
+        margin-top:4px;
+        spacing: 3px;
+        padding: 1px 10px;
+        background: transparent;
+        border-radius: 4px;
+        }
+
+        QMenuBar::item:selected { /* when selected using mouse or keyboard */
+        background: #a8a8a8;
+        }
+
+        QMenuBar::item:pressed {
+        background: #888888;
+        }
+        """
+        # Set the stylesheet:
+        root_menu_bar.setStyleSheet(custom_theme_multiline_string)
+        
