@@ -361,8 +361,6 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
     ###################################
     #### EVENT HANDLERS
     ##################################
-
-    
     def closeEvent(self, event):
         """closeEvent(self, event): pyqt default event, doesn't have to be registered. Called when the widget will close.
         """
@@ -373,7 +371,7 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
             reply = QtWidgets.QMessageBox.Yes
             
         if reply == QtWidgets.QMessageBox.Yes:
-            self.onClose() # ensure onClose() is called
+            self.GlobalConnectionManagerAccessingMixin_on_destroy() # call destroy to tear down the registered children for the global connection mannager
             event.accept()
             print('Window closed')
         else:
@@ -482,6 +480,7 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
         
         TODO: call this at some point
         """
+        print(f'GlobalConnectionManagerAccessingMixin_on_destroy()')
         ## unregister children:
         self.connection_man.unregister_object(self.ui.spike_raster_plt_2d)
         if self.ui.spike_raster_plt_3d is not None:

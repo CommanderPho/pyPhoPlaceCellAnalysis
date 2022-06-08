@@ -379,6 +379,14 @@ class InteractivePlaceCellDataExplorer(GlobalConnectionManagerAccessingMixin, In
         else:
             self.p = InteractivePlaceCellDataExplorer.build_new_plotter_if_needed(pActivePlotter, shape=self.active_config.plotting_config.subplots_shape, title=self.data_explorer_name)
 
+        ## Make sure self.GlobalConnectionManagerAccessingMixin_on_destroy() is called to un-register self
+        # TODO: does this work when self.p is a regular pv.Plotter (and not a background plotter)? What about a MultiPlotter?
+        self.p.app_window.signal_close.connect(self.GlobalConnectionManagerAccessingMixin_on_destroy)
+        # self.p.closeEvent
+        # self.signal_close.connect(self.plotter.close)        
+        # self.p._before_close_callback = 
+        
+        
         # p.background_color = 'black'
 
         if (not self.active_config.video_output_config.active_is_video_output_mode):
