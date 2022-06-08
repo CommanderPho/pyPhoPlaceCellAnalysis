@@ -208,7 +208,6 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
         
         self.show() # Show the GUI
 
-
     def initUI(self, curr_spikes_df, core_app_name='UnifiedSpikeRasterApp', window_duration=15.0, window_start_time=30.0, neuron_colors=None, neuron_sort_order=None, type_of_3d_plotter='pyqtgraph'):
         # 
         self.ui.spike_raster_plt_2d = Spike2DRaster.init_from_independent_data(curr_spikes_df, window_duration=window_duration, window_start_time=window_start_time, neuron_colors=neuron_colors, neuron_sort_order=neuron_sort_order, application_name=self.applicationName, enable_independent_playback_controller=False, should_show=False, parent=None) # setting , parent=spike_raster_plt_3d makes a single window
@@ -310,13 +309,54 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
         
     def connect_controlled_time_synchronized_plotter(self, controlled_plt):
         """ try to connect the controlled_plt to the current controller (usually the 2D plot). """
-        return self.connection_man.connect_drivable_to_driver(drivable=controlled_plt, driver=self.spike_raster_plt_2d)
-          
+        return self.connection_man.connect_drivable_to_driver(drivable=controlled_plt, driver=self.spike_raster_plt_2d,
+                                                       custom_connect_function=(lambda driver, drivable: pg.SignalProxy(driver.window_scrolled, delay=0.2, rateLimit=60, slot=drivable.spikes_window.update_window_start_end_rate_limited)))
+        
       
     def __str__(self):
          return
      
      
+    def create_new_connected_widget(self, type_of_3d_plotter='vedo'):
+        """ called to create a new/independent widget instance that's connected to this window's driver. """
+        
+        # self.neuron_colors
+        # window_duration = self.render_window_duration
+        window_duration = self.spikes_window.window_duration
+        window_start_time = self.spikes_window.active_window_start_time
+        # window_end_time = self.spikes_window.active_window_end_time
+        
+        neuron_colors = None
+        neuron_sort_order = None
+        
+        if type_of_3d_plotter is None:
+            # No 3D plotter:
+            output_widget = None 
+            
+        elif type_of_3d_plotter == 'pyqtgraph':
+            output_widget = Spike3DRaster.init_from_independent_data(self.spikes_df, window_duration=window_duration, window_start_time=window_start_time, neuron_colors=neuron_colors, neuron_sort_order=neuron_sort_order, application_name=self.applicationName, enable_independent_playback_controller=False, should_show=False, parent=None)
+            # Connect the 2D window scrolled signal to the 3D plot's spikes_window.update_window_start_end function
+        elif type_of_3d_plotter == 'vedo':
+            # To work around a bug with the vedo plotter with the pyqtgraph 2D controls: we must update the 2D Scroll Region to the initial value, since it only works if the 2D Raster plot (pyqtgraph-based) is created before the Spike3DRaster_Vedo (Vedo-based). This is probably due to the pyqtgraph's instancing of the QtApplication. 
+            # self.ui.spike_raster_plt_2d.update_scroll_window_region(window_start_time, window_start_time+window_duration, block_signals=False)
+            
+            # Build the 3D Vedo Raster plotter
+            output_widget = Spike3DRaster_Vedo.init_from_independent_data(self.spikes_df, window_duration=window_duration, window_start_time=window_start_time, neuron_colors=neuron_colors, neuron_sort_order=neuron_sort_order, application_name=self.applicationName, enable_independent_playback_controller=False, should_show=False, parent=None)
+            output_widget.disable_render_window_controls()
+            
+            # Set the 3D Vedo plots' window to the current values of the 2d plot:
+            # output_widget.spikes_window.update_window_start_end(self.ui.spike_raster_plt_2d.spikes_window.active_time_window[0], self.ui.spike_raster_plt_2d.spikes_window.active_time_window[1])
+        
+        else:
+            # unrecognized command for 3D plotter
+            raise NotImplementedError
+
+        # Connect the output_widget:
+        # self.connect_additional_controlled_plotter(output_widget)
+        self.connect_controlled_time_synchronized_plotter(output_widget)
+        
+        return output_widget
+        
     
     ###################################
     #### EVENT HANDLERS
