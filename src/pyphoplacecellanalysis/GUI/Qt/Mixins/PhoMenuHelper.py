@@ -16,9 +16,9 @@ class PhoMenuHelper(object):
         return menu_text
 
     @staticmethod
-    def setup_menu_item(menu_item, text, name=None, tooltip=None, icon_path=None):
+    def setup_action_item(action_item, text, name=None, tooltip=None, icon_path=None):
         """
-        menu_item: a QtWidgets.QAction
+        action_item: a QtWidgets.QAction
         text (str): this is required, and is the text to display for the menu item
         name (str, Optional):
         tooltip (str, Optional): a string for the tooltip like "Connect a child widget to another widget"
@@ -30,7 +30,7 @@ class PhoMenuHelper(object):
             a_main_window.ui.menuCreateNewConnectedWidget.addAction(a_main_window.ui.actionConnect_Child)
 
         """
-        menu_item.setText(text)
+        action_item.setText(text)
         
         if name is None:
             # if no name is provided, build it from the text
@@ -38,24 +38,24 @@ class PhoMenuHelper(object):
             # name: "actionConnect_Child"
             name = f'action{PhoMenuHelper.try_get_menu_object_name_from_text(text)}' #.replace(" ", "_")
             
-        menu_item.setObjectName(name)
+        action_item.setObjectName(name)
         
         if icon_path is not None:
             icon = QtGui.QIcon()
             icon.addPixmap(QtGui.QPixmap(icon_path), QtGui.QIcon.Normal, QtGui.QIcon.Off)
-            menu_item.setIcon(icon)
+            action_item.setIcon(icon)
 
         if tooltip is not None:
-            menu_item.setToolTip(tooltip)
+            action_item.setToolTip(tooltip)
             
         return name # return the object name
     
     @classmethod
-    def add_menu_action_item(cls, a_main_window, text, name=None, tooltip=None, icon_path=None, parent_menu=None, menu_actions_dict=None):
-        """Builds a new QAction
-
-        Internally calls cls.setup_menu_item(...) to configure the action before adding it.
-        
+    def add_action_item(cls, a_main_window, text, name=None, tooltip=None, icon_path=None, actions_dict=None):
+        """Builds a new QAction and adds it to the provided actions_dict and sets a_main_window.ui.{curr_action_key} to the action.
+            Internally calls cls.setup_action_item(...) to configure the action before adding it.    
+            
+            NOTE: this does not create/add the Menu, only the QAction
         Args:
             a_main_window (_type_): _description_
             text (_type_): _description_
@@ -64,16 +64,33 @@ class PhoMenuHelper(object):
             icon_path (_type_, optional): _description_. Defaults to None.
         """
         curr_action = QtWidgets.QAction(a_main_window)
-        curr_action_key = cls.setup_menu_item(curr_action, text, name=name, tooltip=tooltip, icon_path=icon_path)
+        curr_action_key = cls.setup_action_item(curr_action, text, name=name, tooltip=tooltip, icon_path=icon_path)
         a_main_window.ui[curr_action_key] = curr_action # add the action to the main window's .ui:
+        # add to actions dictionary:
+        if actions_dict is None:
+            raise NotImplementedError
+        actions_dict[curr_action_key] = a_main_window.ui[curr_action_key] # add to actions dictionary
+        return curr_action_key
         
+
+    @classmethod
+    def add_menu_action(cls, a_main_window, text, name=None, tooltip=None, icon_path=None, parent_menu=None, actions_dict=None):
+        """Builds a new QAction and adds it to the provided actions_dict and sets a_main_window.ui.{curr_action_key} to the action.
+            Internally calls cls.setup_menu_item(...) to configure the action before adding it.    
+        Args:
+            a_main_window (_type_): _description_
+            text (_type_): _description_
+            name (_type_, optional): _description_. Defaults to None.
+            tooltip (_type_, optional): _description_. Defaults to None.
+            icon_path (_type_, optional): _description_. Defaults to None.
+        """
         if parent_menu is None:
             raise NotImplementedError
         parent_menu.addAction(a_main_window.ui[curr_action_key]) # Add to menu
-        if menu_actions_dict is None:
-            raise NotImplementedError
-        menu_actions_dict[curr_action_key] = a_main_window.ui[curr_action_key] # add to actions dictionary
-        return curr_action_key
+        
+        
+    
+        
         
     @classmethod
     def add_menu(cls, a_main_window, text, name=None, parent_menu=None, tooltip=None, icon_path=None, menu_actions_dict=None):
@@ -279,27 +296,27 @@ class PhoMenuHelper(object):
         }
         """
     
-        old_custom_theme_multiline_string = """QMenuBar {
-        background-color: transparent;
-        }
+        # old_custom_theme_multiline_string = """QMenuBar {
+        # background-color: transparent;
+        # }
 
-        QMenuBar::item {
-        color : white;
-        margin-top:4px;
-        spacing: 3px;
-        padding: 1px 10px;
-        background: transparent;
-        border-radius: 4px;
-        }
+        # QMenuBar::item {
+        # color : white;
+        # margin-top:4px;
+        # spacing: 3px;
+        # padding: 1px 10px;
+        # background: transparent;
+        # border-radius: 4px;
+        # }
 
-        QMenuBar::item:selected { /* when selected using mouse or keyboard */
-        background: #a8a8a8;
-        }
+        # QMenuBar::item:selected { /* when selected using mouse or keyboard */
+        # background: #a8a8a8;
+        # }
 
-        QMenuBar::item:pressed {
-        background: #888888;
-        }
-        """
+        # QMenuBar::item:pressed {
+        # background: #888888;
+        # }
+        # """
         # Set the stylesheet:
         root_menu_bar.setStyleSheet(custom_theme_multiline_string)
         
