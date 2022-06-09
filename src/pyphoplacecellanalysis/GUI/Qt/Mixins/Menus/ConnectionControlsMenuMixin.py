@@ -73,6 +73,18 @@ class ConnectionControlsMenuMixin(object):
             # a_main_window.ui.menuConnections = None
             # a_main_window.ui.connectionsMenuActionsDict = {} # Empty the dict of actions:
         else:
+            PhoMenuHelper.set_menu_default_stylesheet(a_main_window.ui.menubar) # Sets the default menu stylesheet
+            
+            ## Only creates the QActions now, no QMenus:
+            # Define dictionary for actions:
+            a_main_window.ui.connectionsMenuActionsDict = {} 
+            
+            # Connect Child Item:
+            curr_action_key = PhoMenuHelper.add_action_item(a_main_window, "Connect Child...", name="actionConnect_Child", tooltip="Connect a child widget to another widget", icon_path=":/Icons/chain--arrow.png", actions_dict=a_main_window.ui.connectionsMenuActionsDict)
+            # Disconnect from Driver item:
+            curr_action_key = PhoMenuHelper.add_action_item(a_main_window, "Disconnect from driver", name="actionDisconnect_from_driver", tooltip="Disconnects the item from the current driver", icon_path=":/Icons/chain--minus.png", actions_dict=a_main_window.ui.connectionsMenuActionsDict)
+
+            ## Now Create the Menus for each QAction:
             # menuConnections = menubar.addMenu('&Connections')
             a_main_window.ui.menuConnections = QtWidgets.QMenu(a_main_window.ui.menubar) # A QMenu
             a_main_window.ui.actionMenuConnections = a_main_window.ui.menubar.addMenu(a_main_window.ui.menuConnections) # Used to remove the menu, a QAction
@@ -83,15 +95,10 @@ class ConnectionControlsMenuMixin(object):
             a_main_window.ui.menuConnections.setObjectName("menuConnections")
             a_main_window.ui.menuConnections.setTitle("Connections")
             
-            a_main_window.ui.connectionsMenuActionsDict = {'actionMenuConnections': a_main_window.ui.actionMenuConnections}
-                                               
-            # Define actions/menu items:
-            # if want the item added can do:
-            #   curr_action = a_main_window.ui[curr_action_key]
+            ## Add the actions to the QMenu item:
+            a_main_window.ui.menuConnections.addActions(a_main_window.ui.connectionsMenuActionsDict.values())
+                        
+            ## TODO: is this even needed? I think it's done to remove it, but can't I just use a_main_window.ui.actionMenuConnections directly?
+            a_main_window.ui.connectionsMenuActionsDict['actionMenuConnections'] = a_main_window.ui.actionMenuConnections
             
-            # Connect Child Item:
-            curr_action_key = PhoMenuHelper.add_action_item(a_main_window, "Connect Child...", name="actionConnect_Child", tooltip="Connect a child widget to another widget", icon_path=":/Icons/chain--arrow.png", parent_menu=a_main_window.ui.menuConnections, actions_dict=a_main_window.ui.connectionsMenuActionsDict)
-            # Disconnect from Driver item:
-            curr_action_key = PhoMenuHelper.add_action_item(a_main_window, "Disconnect from driver", name="actionDisconnect_from_driver", tooltip="Disconnects the item from the current driver", icon_path=":/Icons/chain--minus.png", parent_menu=a_main_window.ui.menuConnections, actions_dict=a_main_window.ui.connectionsMenuActionsDict)
-
             return a_main_window.ui.menuConnections, a_main_window.ui.connectionsMenuActionsDict

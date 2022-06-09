@@ -76,7 +76,7 @@ class CreateNewConnectedWidgetMenuMixin(object):
                 print(f'existing create new connected widget menu found. Returning without creating.')
             return a_main_window.ui.menuCreateNewConnectedWidget, a_main_window.ui.createNewConnectedWidgetMenuActionsDict
         else:
-            
+            PhoMenuHelper.set_menu_default_stylesheet(a_main_window.ui.menubar) # Sets the default menu stylesheet
             ## Only creates the QActions now, no QMenus:
             # Define dictionary for actions:
             a_main_window.ui.createNewConnectedWidgetMenuActionsDict = {}            
