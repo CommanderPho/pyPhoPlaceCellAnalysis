@@ -51,7 +51,7 @@ class SpikeRenderingPyVistaMixin(SpikeRenderingBaseMixin):
     spike_geom_cone = pv.Cone(direction=(0.0, 0.0, -1.0), height=10.0, radius=0.2) # The spike geometry that is only displayed for a short while after the spike occurs
     
     def plot_spikes(self):
-        historical_spikes_pdata, historical_spikes_pc = build_active_spikes_plot_data_df(self.spikes_df, spike_geom=SpikeRenderingPyVistaMixin.spike_geom_cone.copy())        
+        historical_spikes_pdata, historical_spikes_pc = build_active_spikes_plot_data_df(self.spikes_df, spike_geom=SpikeRenderingPyVistaMixin.spike_geom_cone.copy(), enable_debug_print=self.debug_logging)        
         self.plots_data['spikes_pf_active'] = {'historical_spikes_pdata':historical_spikes_pdata, 'historical_spikes_pc':historical_spikes_pc}
         if historical_spikes_pc.n_points >= 1:
             # self.plots['spikes_pf_active'] = self.p.add_mesh(historical_spikes_pc, name='spikes_pf_active', scalars='cellID', cmap=self.active_config.plotting_config.active_cells_listed_colormap, show_scalar_bar=False, lighting=True, render=False)
@@ -67,7 +67,7 @@ class SpikeRenderingPyVistaMixin(SpikeRenderingBaseMixin):
     def update_spikes(self):
         """ Called to programmatically update the rendered spikes by replotting after changing their visibility/opacity/postion/etc """
         # full rebuild (to be safe):
-        historical_spikes_pdata, historical_spikes_pc = build_active_spikes_plot_data_df(self.spikes_df, spike_geom=SpikeRenderingPyVistaMixin.spike_geom_cone.copy())
+        historical_spikes_pdata, historical_spikes_pc = build_active_spikes_plot_data_df(self.spikes_df, spike_geom=SpikeRenderingPyVistaMixin.spike_geom_cone.copy(), enable_debug_print=self.debug_logging)
         self.plots_data['spikes_pf_active'] = {'historical_spikes_pdata':historical_spikes_pdata, 'historical_spikes_pc':historical_spikes_pc}
         
         # Update just the values that could change:
@@ -194,8 +194,9 @@ class HideShowSpikeRenderingMixin:
             self.active_neuron_render_configs[an_updated_config_idx].spikesVisible = are_included # update the config
             updated_configs.append(self.active_neuron_render_configs[an_updated_config_idx])
         # call the parent (NeuronConfigOwningMixin) function to ensure the configs are updated.
-        # self.update_neuron_render_configs(neuron_IDXs, updated_configs) # update configs
-        self.update_neuron_render_configs(config_IDXs, updated_configs) # update configs
+        # self.update_neuron_render_configs(neuron_IDXs, updated_configs) # update configs (never worked)
+        # self.update_neuron_render_configs(config_IDXs, updated_configs) # TODO: previously was self.update_neuron_render_configs(config_IDXs, updated_configs) but had to change to self.update_neuron_render_configs_from_indicies(config_IDXs, updated_configs)
+        self.update_neuron_render_configs_from_indicies(config_IDXs, updated_configs) # update the config with the new values:
         
 
     def clear_all_spikes_included(self):
@@ -203,8 +204,8 @@ class HideShowSpikeRenderingMixin:
         if self.debug_logging:
             print(f'HideShowSpikeRenderingMixin.clear_spikes_included(): clearing all spikes.')     
         # self.change_unit_spikes_included(neuron_IDXs=self.neuron_config_indicies, are_included=False) # get all indicies, and set them all to excluded
-        self.change_unit_spikes_included(neuron_IDXs=self.neu, are_included=False) # get all indicies, and set them all to excluded
-        
+        # self.change_unit_spikes_included(neuron_IDXs=self.neuron_config_indicies, are_included=False) # get all indicies, and set them all to excluded
+        self.change_unit_spikes_included(cell_IDs=self.tuning_curves_valid_neuron_ids, are_included=False)
            
 
     def change_spike_rows_included(self, row_specifier_mask, are_included):

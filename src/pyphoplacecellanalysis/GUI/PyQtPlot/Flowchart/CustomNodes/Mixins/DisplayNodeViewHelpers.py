@@ -29,7 +29,10 @@ class ProducedViewType(Enum):
  
  
 class PipelineDynamicDockDisplayAreaMixin:
-    """ PhoPipelineMainWindow only right now 
+    """ Adds the ability to add/remove dock areas dynamically to a window or widget
+    
+    Usage:
+        PhoPipelineMainWindow only right now 
     
     Requires at minimum:
         'self.area': a pg.Dock(...) object containing the root items

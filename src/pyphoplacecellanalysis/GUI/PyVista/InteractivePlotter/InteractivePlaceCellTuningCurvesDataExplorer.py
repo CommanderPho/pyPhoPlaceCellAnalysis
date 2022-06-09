@@ -45,12 +45,12 @@ class InteractivePlaceCellTuningCurvesDataExplorer(OccupancyPlottingMixin, Place
         self.params.pf_colors = deepcopy(pf_colors)
         self.params.pf_colors_hex = None
         self.params.pf_active_configs = None
-        self.gui = dict()
+        self.ui = dict()
         
         self.use_fragile_linear_neuron_IDX_as_cell_id = False # if False, uses the normal 'aclu' value as the cell id (which I think is correct)
         
         self._setup()
-
+        
     # from NeuronIdentityAccessingMixin
     @property
     def neuron_ids(self):
@@ -72,8 +72,6 @@ class InteractivePlaceCellTuningCurvesDataExplorer(OccupancyPlottingMixin, Place
         num_cells, spike_list, self.params.cell_ids, self.params.flattened_spike_identities, self.params.flattened_spike_times, flattened_sort_indicies, t_start, self.params.reverse_cellID_idx_lookup_map, t, x, y, linear_pos, speeds, self.params.flattened_spike_positions_list = InteractiveDataExplorerBase._unpack_variables(self.active_session)
         
         ## IMPORTANT: the placefields' may have less cells than those set in self.params.cell_ids, which comes from the neurons of the active_session
-        
-        
         
         # the valid cell_ids from the ratemap/tuning curves
         valid_cell_ids = self.tuning_curves_valid_neuron_ids.copy()
@@ -151,6 +149,13 @@ class InteractivePlaceCellTuningCurvesDataExplorer(OccupancyPlottingMixin, Place
         
         
         """
+        
+        
+        ## Placefield Rendering Options:
+        self.params.should_nan_non_visited_elements = False
+        self.params.should_display_placefield_points = True
+        
+        
         self.params.pf_colors_hex = [to_hex(self.params.pf_colors[:,i], keep_alpha=False) for i in self.tuning_curve_indicies] 
         
         self.setup_spike_rendering_mixin()
@@ -165,12 +170,10 @@ class InteractivePlaceCellTuningCurvesDataExplorer(OccupancyPlottingMixin, Place
         # Plot the flat arena
         self.plots['maze_bg'] = perform_plot_flat_arena(self.p, self.x, self.y, bShowSequenceTraversalGradient=False, smoothing=self.active_config.plotting_config.use_smoothed_maze_rendering)
         
-                
         if self.plot_placefields():
             needs_render = True
         
-       
-        
+
         # hide the tuning curves automatically on startup (they don't render correctly anyway):
         self._hide_all_tuning_curves()
         
@@ -182,15 +185,15 @@ class InteractivePlaceCellTuningCurvesDataExplorer(OccupancyPlottingMixin, Place
             self.p.render()
 
         # Adds a multi-line debug console to the GUI for output logging:        
-        self.gui['debug_console_widget'] = MultilineTextConsoleWidget(self.p)
-        self.gui['debug_console_widget'].add_line_to_buffer('test log')
+        self.ui['debug_console_widget'] = MultilineTextConsoleWidget(self.p)
+        self.ui['debug_console_widget'].add_line_to_buffer('test log')
         # debug_console_widget.add_line_to_buffer('test log 2')
         # Adds a list of toggle checkboxe widgets to turn on and off each placemap
         # self.setup_visibility_checkboxes(self.plots['tuningCurvePlotActors'])
         
         if not self.params.debug_disable_all_gui_controls:
             # build the visibility callbacks that will be used to update the meshes from the UI elements:
-            self.gui['tuningCurveCombinedAllPlotActorsVisibilityCallbacks'] = self.__build_callbacks(self.plots['tuningCurvePlotActors'])
+            self.ui['tuningCurveCombinedAllPlotActorsVisibilityCallbacks'] = self.__build_callbacks(self.plots['tuningCurvePlotActors'])
             
             if self.params.use_fragile_linear_neuron_IDX_slider_instead_of_checkboxes:
                 # use the discrete slider widget instead of the checkboxes
@@ -201,6 +204,11 @@ class InteractivePlaceCellTuningCurvesDataExplorer(OccupancyPlottingMixin, Place
         else:
             print('self.params.debug_disable_all_gui_controls is True, so no gui controls will be built.')
         
+        
+        # # Apply configs on startup:
+        # # Update the ipcDataExplorer's colors for spikes and placefields from its configs on init:
+        # self.on_config_update({neuron_id:a_config.color for neuron_id, a_config in self.active_neuron_render_configs_map.items()}, defer_update=False)
+
         return self.p
     
     
@@ -221,19 +229,19 @@ class InteractivePlaceCellTuningCurvesDataExplorer(OccupancyPlottingMixin, Place
         # self.gui['tuningCurveSpikeVisibilityCallbacks'] = [lambda is_visible, i_copy=i: self._update_placefield_spike_visibility([i_copy], is_visible) for i in np.arange(len(tuningCurvePlotActors))]
         
         if self.params.use_mutually_exclusive_placefield_checkboxes:
-            self.gui['checkboxWidgetActors'], self.gui['tuningCurveCombinedAllPlotActorsVisibilityCallbacks'], self.gui['mutually_exclusive_radiobutton_group'] = add_placemap_toggle_mutually_exclusive_checkboxes(self.p, self.gui['tuningCurveCombinedAllPlotActorsVisibilityCallbacks'], self.params.pf_colors, active_element_idx=4, require_active_selection=False, is_debug=False, additional_callback_actions=None, labels=self.params.unit_labels)
+            self.ui['checkboxWidgetActors'], self.ui['tuningCurveCombinedAllPlotActorsVisibilityCallbacks'], self.ui['mutually_exclusive_radiobutton_group'] = add_placemap_toggle_mutually_exclusive_checkboxes(self.p, self.ui['tuningCurveCombinedAllPlotActorsVisibilityCallbacks'], self.params.pf_colors, active_element_idx=4, require_active_selection=False, is_debug=False, additional_callback_actions=None, labels=self.params.unit_labels)
         else:
-            self.gui['mutually_exclusive_radiobutton_group'] = None           
-            self.gui['checkboxWidgetActors'], self.gui['tuningCurveCombinedAllPlotActorsVisibilityCallbacks'] = add_placemap_toggle_checkboxes(self.p, self.gui['tuningCurveCombinedAllPlotActorsVisibilityCallbacks'], self.params.pf_colors, widget_check_states=False, additional_callback_actions=None, labels=self.params.unit_labels)
+            self.ui['mutually_exclusive_radiobutton_group'] = None           
+            self.ui['checkboxWidgetActors'], self.ui['tuningCurveCombinedAllPlotActorsVisibilityCallbacks'] = add_placemap_toggle_checkboxes(self.p, self.ui['tuningCurveCombinedAllPlotActorsVisibilityCallbacks'], self.params.pf_colors, widget_check_states=False, additional_callback_actions=None, labels=self.params.unit_labels)
         
 
        
     def __setup_visibility_slider_widget(self):
         # safe_integer_wrapper = lambda integer_local_idx: self._update_placefield_spike_visibility([int(integer_local_idx)])
-        safe_integer_wrapper = lambda integer_local_idx: self.gui['tuningCurveCombinedAllPlotActorsVisibilityCallbacks']([int(integer_local_idx)])
-        self.gui['interactive_unitID_slider_actor'] = PhoWidgetHelper.add_discrete_slider_widget(self.p, safe_integer_wrapper, [0, (len(self.gui['tuningCurveCombinedAllPlotActorsVisibilityCallbacks'])-1)], value=0, title='Selected Unit',event_type='end')
+        safe_integer_wrapper = lambda integer_local_idx: self.ui['tuningCurveCombinedAllPlotActorsVisibilityCallbacks']([int(integer_local_idx)])
+        self.ui['interactive_unitID_slider_actor'] = PhoWidgetHelper.add_discrete_slider_widget(self.p, safe_integer_wrapper, [0, (len(self.ui['tuningCurveCombinedAllPlotActorsVisibilityCallbacks'])-1)], value=0, title='Selected Unit',event_type='end')
         ## I don't think this does anything:
-        interactive_plotter = PhoInteractivePlotter(pyvista_plotter=self.p, interactive_timestamp_slider_actor=self.gui['interactive_unitID_slider_actor'])
+        interactive_plotter = PhoInteractivePlotter(pyvista_plotter=self.p, interactive_timestamp_slider_actor=self.ui['interactive_unitID_slider_actor'])
         
         
         
@@ -258,8 +266,22 @@ class InteractivePlaceCellTuningCurvesDataExplorer(OccupancyPlottingMixin, Place
         # when finished, self.active_session.spikes_df is modified with the updated 'z' values
 
     ## Config Updating:
-    def on_config_update(self):
-        test_updated_colors_map = {3: '#999999'}
-
-        self.update_spikes_df_color_columns(test_updated_colors_map)
-        self.update_rendered_placefields(test_updated_colors_map)
+    def on_config_update(self, updated_colors_map, defer_update=False):
+        """ 
+            Called to update the placefields and spikes after a config has been changed, particularly its color.
+        
+        """
+        # test_updated_colors_map = {3: '#999999'}
+        # # self.on_config_update(test_updated_colors_map)
+        # print(f'on_config_update(updated_colors_map: {updated_colors_map})')
+        # self.ui['debug_console_widget'].add_line_to_buffer(f'on_config_update(updated_colors_map: {updated_colors_map})')
+        
+        self.on_update_spikes_colors(updated_colors_map)
+        self.update_rendered_placefields(updated_colors_map)
+        
+        ## TODO: should change the visibility of either the spikes or placefield as well?
+        
+        if not defer_update:
+            self.update_spikes() # called to actually update the spikes color after setting it:
+        
+        

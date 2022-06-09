@@ -33,9 +33,9 @@ from pyphoplacecellanalysis.GUI.PyVista.InteractivePlotter.InteractivePlaceCellD
 
 from pyphoplacecellanalysis.GUI.PyVista.InteractivePlotter.InteractiveCustomDataExplorer import InteractiveCustomDataExplorer
 
-
-
 from pyphoplacecellanalysis.GUI.PyVista.InteractivePlotter.InteractivePlaceCellTuningCurvesDataExplorer import InteractivePlaceCellTuningCurvesDataExplorer
+from pyphoplacecellanalysis.GUI.Qt.Mixins.Menus.ConnectionControlsMenuMixin import ConnectionControlsMenuMixin
+
 
 from pyphoplacecellanalysis.PhoPositionalData.plotting.placefield import plot_1d_placecell_validations
 
@@ -127,18 +127,23 @@ class DefaultDisplayFunctions(AllFunctionEnumeratingMixin):
         pActiveTuningCurvesPlotter = kwargs.get('extant_plotter', None)
         ipcDataExplorer = InteractivePlaceCellTuningCurvesDataExplorer(active_config, computation_result.sess, computation_result.computed_data['pf2D'], active_config.plotting_config.pf_colors, **({'extant_plotter':None} | kwargs))
         pActiveTuningCurvesPlotter = ipcDataExplorer.plot(pActiveTuningCurvesPlotter) # [2, 17449]
+        # Update the ipcDataExplorer's colors for spikes and placefields from its configs on init:
+        ipcDataExplorer.on_config_update({neuron_id:a_config.color for neuron_id, a_config in ipcDataExplorer.active_neuron_render_configs_map.items()}, defer_update=False)
+
         
         # build the output panels if desired:
         if panel_controls_mode == 'Qt':
             # pane: (placefieldControlsContainerWidget, pf_widgets)
             placefieldControlsContainerWidget, pf_widgets = build_all_placefield_output_panels(ipcDataExplorer)
             placefieldControlsContainerWidget.show()
+            
+            # Adds the placefield controls container widget and each individual pf widget to the ipcDataExplorer.ui in case it needs to reference them later:
+            ipcDataExplorer.ui['placefieldControlsContainerWidget'] = placefieldControlsContainerWidget
+            
             # Visually align the widgets:
             WidgetPositioningHelpers.align_window_edges(ipcDataExplorer.p, placefieldControlsContainerWidget, relative_position = 'above', resize_to_main=(1.0, None))
-            # pane = (placefieldControlsContainerWidget, pf_widgets)
             
             # Wrap:
-            # active_root_main_widget = ipcDataExplorer.p.parentWidget()
             active_root_main_widget = ipcDataExplorer.p.window()
             root_dockAreaWindow, app = DockAreaWrapper.wrap_with_dockAreaWindow(active_root_main_widget, placefieldControlsContainerWidget, title=ipcDataExplorer.data_explorer_name)
             pane = (root_dockAreaWindow, placefieldControlsContainerWidget, pf_widgets)
@@ -170,6 +175,12 @@ class DefaultDisplayFunctions(AllFunctionEnumeratingMixin):
         pActiveInteractivePlaceSpikesPlotter = kwargs.get('extant_plotter', None)
         ipspikesDataExplorer = InteractivePlaceCellDataExplorer(active_config, computation_result.sess, **({'extant_plotter':None} | kwargs))
         pActiveInteractivePlaceSpikesPlotter = ipspikesDataExplorer.plot(pActivePlotter=pActiveInteractivePlaceSpikesPlotter)
+        # Add Connection Controls to the window:
+        
+        # Setup Connections Menu:
+        root_window, menuConnections, actions_dict = ConnectionControlsMenuMixin.try_add_connections_menu(ipspikesDataExplorer.p.app_window) # none of these properties need to be saved directly, as they're accessible via ipspikesDataExplorer.p.app_window.window()
+        
+        
         return {'ipspikesDataExplorer': ipspikesDataExplorer, 'plotter': pActiveInteractivePlaceSpikesPlotter}
 
     ## CustomDataExplorer 3D Plotter:

@@ -94,9 +94,21 @@
      <string>Help</string>
     </property>
    </widget>
+   <widget class="QMenu" name="menuConnections">
+    <property name="title">
+     <string notr="true">Connections</string>
+    </property>
+    <property name="icon">
+     <iconset resource="../../../Resources/ActionIcons.qrc">
+      <normaloff>:/Icons/Icons/chain.png</normaloff>:/Icons/Icons/chain.png</iconset>
+    </property>
+    <addaction name="actionConnect_Child"/>
+    <addaction name="actionDisconnect_from_driver"/>
+   </widget>
    <addaction name="menuFile"/>
    <addaction name="menuAnalyses"/>
    <addaction name="menuHelp"/>
+   <addaction name="menuConnections"/>
   </widget>
   <widget class="QStatusBar" name="statusbar"/>
   <widget class="QToolBar" name="toolBar">
@@ -125,17 +137,42 @@
     <string>Save As..</string>
    </property>
   </action>
+  <action name="actionConnect_Child">
+   <property name="icon">
+    <iconset resource="../../../Resources/ActionIcons.qrc">
+     <normaloff>:/Icons/chain--arrow.png</normaloff>:/Icons/chain--arrow.png</iconset>
+   </property>
+   <property name="text">
+    <string>Connect Child...</string>
+   </property>
+   <property name="toolTip">
+    <string>Connect a child widget to another widget</string>
+   </property>
+  </action>
+  <action name="actionDisconnect_from_driver">
+   <property name="icon">
+    <iconset resource="../../../Resources/ActionIcons.qrc">
+     <normaloff>:/Icons/chain--minus.png</normaloff>:/Icons/chain--minus.png</iconset>
+   </property>
+   <property name="text">
+    <string>Disconnect from driver</string>
+   </property>
+   <property name="toolTip">
+    <string>Disconnects the item from the current driver</string>
+   </property>
+  </action>
  </widget>
  <customwidgets>
   <customwidget>
    <class>ConsoleWidget</class>
    <extends>QWidget</extends>
-   <header location="global">pyqtgraph.console</header>
+   <header location="global">pyphoplacecellanalysis.External.pyqtgraph.console</header>
    <container>1</container>
   </customwidget>
  </customwidgets>
  <resources>
   <include location="../../../Resources/GuiResources.qrc"/>
+  <include location="../../../Resources/ActionIcons.qrc"/>
  </resources>
  <connections/>
 </ui>

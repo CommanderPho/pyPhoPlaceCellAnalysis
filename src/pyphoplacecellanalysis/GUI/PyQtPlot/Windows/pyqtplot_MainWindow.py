@@ -40,6 +40,7 @@ stylesheet_data_stream = QTextStream(stylesheet_qss_file)
 
 
 class PhoPipelineMainWindow(PipelineDynamicDockDisplayAreaMixin, QtWidgets.QMainWindow):
+    """ Note that this loads from 'MainPipelineWindowWithDockArea.ui' """
     
     @property
     def app(self):
@@ -69,7 +70,6 @@ class PhoPipelineMainWindow(PipelineDynamicDockDisplayAreaMixin, QtWidgets.QMain
         """ The window that the flowchart is displayed in. Not the one with the controls by default. """
         return self.flowchart_controls_widget.cwWin
     
-    
     ## Specific Flowchart Nodes:
     @property
     def flowchart_nodes(self):
@@ -87,30 +87,11 @@ class PhoPipelineMainWindow(PipelineDynamicDockDisplayAreaMixin, QtWidgets.QMain
     @property
     def flowchart_input_node(self):
         return self.flowchart_nodes.get('Input', None) # Node or None
-    
-    
+        
     @property
     def flowchart_output_node(self):
         return self.flowchart_nodes.get('Output', None) # Node or None
     
-    
-    
-    
-    
-
-
-
-# # curr_node = pipeline_flowchart_nodes['Input']
-# # curr_node = pipeline_flowchart_nodes['PipelineFilteringDataNode.0']
-# curr_node = pipeline_flowchart_nodes['PipelineComputationsNode.0']
-
-# curr_check_table = curr_node.ctrls['included_configs_table']
-# curr_check_table.checked_state # OrderedDict([('maze1', [False, False]), ('maze2', [False, False])])
-# curr_check_table.checked_state['maze1']
-
-# curr_check_table.saveState()
-
-
 
     def __init__(self, title='PhoFlowchartApp', *args, **kwargs):
         self._app = pg.mkQApp(title) # makes a new QApplication or gets the reference to an existing one.
@@ -145,7 +126,6 @@ class PhoPipelineMainWindow(PipelineDynamicDockDisplayAreaMixin, QtWidgets.QMain
     def _initialize_data(self):
         self._flowchart = None
         self._pipeline = None
-        
         
         self._dynamic_display_output_dict = OrderedDict() # for PipelineDynamicDockDisplayAreaMixin
         # ## later on, process data through the node

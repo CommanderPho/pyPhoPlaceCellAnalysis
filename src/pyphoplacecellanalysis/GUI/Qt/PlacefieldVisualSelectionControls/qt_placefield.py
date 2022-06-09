@@ -10,6 +10,7 @@ from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer
 from pyphoplacecellanalysis.GUI.Qt.PlacefieldVisualSelectionControls.PlacefieldVisualSelectionControlWidget import PlacefieldVisualSelectionWidget
 
 from pyphoplacecellanalysis.GUI.Qt.PlacefieldVisualSelectionControlsBar.PlacefieldVisualSelectionControlsBarWidget import PlacefieldVisualSelectionControlsBarWidget
+from pyphoplacecellanalysis.PhoPositionalData.plotting.mixins.general_plotting_mixins import SingleNeuronPlottingExtended
 
 
 """ 
@@ -29,20 +30,12 @@ def build_single_placefield_output_widget(render_config):
     Called in build_all_placefield_output_panels(...) down below.
     
     """
-    # wgt_label_button = pn.widgets.Button(name=f'pf[{render_config.name}]', button_type='default', margin=0, height=20, sizing_mode='stretch_both', width_policy='min')
-    # wgt_color_picker = pn.widgets.ColorPicker(value=render_config.color, width=60, height=20, margin=0)
-    # wgt_toggle_visible = pn.widgets.Toggle(name='isVisible', value=render_config.isVisible, margin=0)
-    # wgt_toggle_spikes = pn.widgets.Toggle(name='SpikesVisible', value=render_config.spikesVisible, margin=0)    
     curr_pf_string = f'pf[{render_config.name}]'
-    curr_widget = PlacefieldVisualSelectionWidget() # new widget type
+    curr_widget = PlacefieldVisualSelectionWidget(config=render_config) # new widget type
     curr_widget.setObjectName(curr_pf_string)
-    curr_widget.name = curr_pf_string # be sure to set the name
-    # set the color and such too
-    curr_widget.color = render_config.color
-    curr_widget.isVisible = render_config.isVisible
-    curr_widget.spikesVisible = render_config.spikesVisible
     
     curr_widget.update_from_config(render_config) # is this the right type of config? I think it is.
+
     return curr_widget
 
 
@@ -109,22 +102,95 @@ def build_batch_interactive_placefield_visibility_controls(rootControlsBarWidget
         pane = build_panel_interactive_placefield_visibility_controls(ipcDataExplorer)
         pane
     """
+   
     
     
-    
+    ################################################
+    ####### Spikes Visibility callbacks
+    def _update_all_spikes_visibility(new_is_visible, apply_changes_on_finish=False):
+        if debug_logging:
+            print(f'EndButtonPanel._update_all_spikes_visibility(new_is_visible: {new_is_visible}, apply_changes_on_finish={apply_changes_on_finish})')
+            
+        rootConfigControlsWidget = ipcDataExplorer.ui['placefieldControlsContainerWidget']
+        # rootConfigControlsWidget = rootControlsBarWidget
+        changed_configs = {}
+        for neuron_id, a_config in ipcDataExplorer.active_neuron_render_configs_map.items():
+            did_change = (a_config.spikesVisible != new_is_visible)
+            if did_change:
+                a_config.spikesVisible = new_is_visible
+                rootConfigControlsWidget.neuron_id_pf_widgets_map[neuron_id].blockSignals(True)
+                rootConfigControlsWidget.neuron_id_pf_widgets_map[neuron_id].update_from_config(a_config) # update it since it changed
+                rootConfigControlsWidget.neuron_id_pf_widgets_map[neuron_id].blockSignals(False)
+                changed_configs[neuron_id] = a_config
+        if apply_changes_on_finish:
+            # rootConfigControlsWidget.applyUpdatedConfigs(active_configs_map=changed_configs)
+            changed_neuron_ids = np.array(list(changed_configs.keys()))
+            if debug_logging:
+                print(f'changed_neuron_ids: {changed_neuron_ids}')
+            ipcDataExplorer.change_unit_spikes_included(cell_IDs=changed_neuron_ids, are_included=new_is_visible)
+            # ipcDataExplorer.change_unit_spikes_included(cell_IDs=self.tuning_curves_valid_neuron_ids, are_included=new_is_visible)
+
+    def _btn_hide_all_spikes_callback():
+        if debug_logging:
+            print('EndButtonPanel._btn_hide_all_spikes_callback(...)')
+        _update_all_spikes_visibility(False, apply_changes_on_finish=True) # make all visibile
+  
+    def _btn_show_all_spikes_callback():
+        if debug_logging:
+            print('EndButtonPanel._btn_show_all_spikes_callback(...)')
+        _update_all_spikes_visibility(True, apply_changes_on_finish=True) # make all visibile
+
+    ################################################
+    ####### Placefields visibility callbacks
+    def _update_all_placefields_visibility(new_is_visible, apply_changes_on_finish=False):
+        if debug_logging:
+            print(f'EndButtonPanel._update_all_placefields_visibility(new_is_visible: {new_is_visible}, apply_changes_on_finish={apply_changes_on_finish})')
+        rootConfigControlsWidget = ipcDataExplorer.ui['placefieldControlsContainerWidget']
+        changed_configs = {}
+        for neuron_id, a_config in ipcDataExplorer.active_neuron_render_configs_map.items():
+            did_change = (a_config.isVisible != new_is_visible)
+            if did_change:
+                a_config.isVisible = new_is_visible
+                rootConfigControlsWidget.neuron_id_pf_widgets_map[neuron_id].blockSignals(True)
+                rootConfigControlsWidget.neuron_id_pf_widgets_map[neuron_id].update_from_config(a_config) # update it since it changed
+                rootConfigControlsWidget.neuron_id_pf_widgets_map[neuron_id].blockSignals(False)
+                changed_configs[neuron_id] = a_config
+        if apply_changes_on_finish:
+            changed_neuron_ids = np.array(list(changed_configs.keys()))
+            if debug_logging:
+                print(f'changed_neuron_ids: {changed_neuron_ids}')
+            # rootConfigControlsWidget.applyUpdatedConfigs(active_configs_map=changed_configs)
+            # ipcDataExplorer.update_active_placefields(placefield_indicies=[])
+            ipcDataExplorer.apply_tuning_curve_configs()
+            
+    def _btn_hide_all_pfs_callback():
+        if debug_logging:
+            print('EndButtonPanel._btn_hide_all_pfs_callback(...)')
+        _update_all_placefields_visibility(False, apply_changes_on_finish=True) # make all visibile
+  
+    def _btn_show_all_pfs_callback():
+        if debug_logging:
+            print('EndButtonPanel._btn_show_all_pfs_callback(...)')
+        _update_all_placefields_visibility(True, apply_changes_on_finish=True) # make all visibile
+
+    ################################################
+    ####### Both/All visibility callbacks
     def _btn_hide_all_callback():
         if debug_logging:
             print('EndButtonPanel.btn_hide_all_callback(...)')
-        ipcDataExplorer.clear_all_spikes_included()
-        ipcDataExplorer.update_active_placefields([])
-        # self.on_hide_all_placefields()
-  
+        # ipcDataExplorer.clear_all_spikes_included()
+        # ipcDataExplorer.update_active_placefields([])
+        _btn_hide_all_pfs_callback()
+        _btn_hide_all_spikes_callback()
+        
     def _btn_show_all_callback():
         if debug_logging:
             print('EndButtonPanel.btn_show_all_callback(...)')
-        ipcDataExplorer._show_all_tuning_curves()
-        ipcDataExplorer.update_active_placefields([])
-        # self.on_hide_all_placefields()      
+        # ipcDataExplorer._show_all_tuning_curves()
+        # ipcDataExplorer.update_active_placefields([])
+        _btn_show_all_pfs_callback()
+        _btn_show_all_spikes_callback()
+
         
     def _btn_perform_refresh_callback():
         if debug_logging:
@@ -134,10 +200,11 @@ def build_batch_interactive_placefield_visibility_controls(rootControlsBarWidget
         ipcDataExplorer.update_spikes()
         # ipcDataExplorer._show_all_tuning_curves()
         # ipcDataExplorer.update_active_placefi        
-
+        
+                
+        
     end_button_helper_obj = BatchActionsEndButtonPanelHelper(hide_all_callback=_btn_hide_all_callback, show_all_callback=_btn_show_all_callback)
     
-
     btnShowAll_Pfs, btnShowAll_Spikes, btnShowAll_Both = rootControlsBarWidget.show_all_buttons_list
     btnHideAll_Pfs, btnHideAll_Spikes, btnHideAll_Both = rootControlsBarWidget.hide_all_buttons_list 
     
@@ -147,17 +214,11 @@ def build_batch_interactive_placefield_visibility_controls(rootControlsBarWidget
     connections.append(btnShowAll_Both.clicked.connect(end_button_helper_obj.btn_show_all_callback))
     connections.append(btnHideAll_Both.clicked.connect(end_button_helper_obj.btn_hide_all_callback))
     
-    # out_panels = build_all_placefield_output_panels(ipcDataExplorer)
-    # end_button_panel_obj = BatchActionsEndButtonPanelHelper(hide_all_callback=_btn_hide_all_callback, show_all_callback=_btn_show_all_callback)
-    # end_cap_buttons = end_button_panel_obj.panel()
-    # out_row = pn.Row(*out_panels, end_cap_buttons, height=120)
-    # btn_occupancy_map_visibility = pn.widgets.Button(name='Occupancy Map Visibility', width_policy='min')
-    # # btn_occupancy_map_visibility = pn.widgets.Toggle(name='Occupancy Map Visibility', value=ipcDataExplorer.occupancy_plotting_config.isVisible, margin=0, width_policy='min')
-    # # btn_occupancy_map_visibility.on_clicks
-    # btn_occupancy_map_visibility.on_click(ipcDataExplorer.on_occupancy_plot_update_visibility)
-    # # btn_occupancy_map_visibility.on_click(ipcDataExplorer.on_occupancy_plot_config_updated)
-    # occupancy_widget = btn_occupancy_map_visibility
+    connections.append(btnHideAll_Pfs.clicked.connect(_btn_hide_all_pfs_callback))
+    connections.append(btnShowAll_Pfs.clicked.connect(_btn_show_all_pfs_callback))
     
+    connections.append(btnHideAll_Spikes.clicked.connect(_btn_hide_all_spikes_callback))
+    connections.append(btnShowAll_Spikes.clicked.connect(_btn_show_all_spikes_callback))
     
     # Connect any extra signals:
     connections.append(rootControlsBarWidget.sigRefresh.connect(_btn_perform_refresh_callback))
@@ -173,9 +234,10 @@ def build_all_placefield_output_panels(ipcDataExplorer):
     https://eli.thegreenplace.net/2011/04/25/passing-extra-arguments-to-pyqt-slot
     
     
-    Adds:
-        ipcDataExplorer.params.end_button_helper_obj
-        ipcDataExplorer.params.end_button_helper_connections
+    Adds:        
+        rootControlsBarWidget.ui.pf_widgets
+        rootControlsBarWidget.ui.end_button_helper_obj
+        rootControlsBarWidget.ui.end_button_helper_connections
     
     """ 
     ## UI Designer Version:    
@@ -183,9 +245,12 @@ def build_all_placefield_output_panels(ipcDataExplorer):
     # groupBox = rootControlsBarWidget.ui.placefieldControlsGroupbox
     pf_layout = rootControlsBarWidget.ui.pf_layout
         
-    def _on_neuron_color_display_config_changed(new_configs):
-        """
+    ## Nested Callback Functions:
+    def _on_neuron_color_display_config_changed(new_config):
+        """ The function called when the neuron color is changed.
         Implicitly captures ipcDataExplorer
+        
+        Recieves a SingleNeuronPlottingExtended config
         
         Usage:
             for a_widget in pf_widgets:
@@ -193,25 +258,29 @@ def build_all_placefield_output_panels(ipcDataExplorer):
                 a_widget.spike_config_changed.connect(_on_spike_config_changed)
                 a_widget.tuning_curve_display_config_changed.connect(_on_tuning_curve_display_config_changed)
         """
-        print(f'_on_neuron_color_display_config_changed(new_configs: {new_configs})')
-        
+        # print(f'_on_neuron_color_display_config_changed(new_config: {new_config})')
         
         # Need to rebuild the spikes colors and such upon updating the configs. 
         # should take a config and produce the changes needed to recolor the neurons.
 
         # test_updated_colors_map = {3: '#999999'}
 
-        extracted_neuron_id_updated_colors_map = {int(a_config.name):a_config.color for a_config in new_configs}
+        if isinstance(new_config, SingleNeuronPlottingExtended):
+            # wrap it in a single-element list before passing:
+            new_config = [new_config]
+
+        extracted_neuron_id_updated_colors_map = {int(a_config.name):a_config.color for a_config in new_config}
         
+        # ipcDataExplorer.
         # Apply the updated map using the update functions:
-        ipcDataExplorer.on_update_spikes_colors(extracted_neuron_id_updated_colors_map)
-        ipcDataExplorer.update_rendered_placefields(extracted_neuron_id_updated_colors_map)
-        
-        
-        
+        ipcDataExplorer.on_config_update(extracted_neuron_id_updated_colors_map)
+        # ipcDataExplorer.on_update_spikes_colors(extracted_neuron_id_updated_colors_map)
+        # ipcDataExplorer.update_rendered_placefields(extracted_neuron_id_updated_colors_map)
+        # print(f'\t _on_neuron_color_display_config_changed(...): done!')
+                
     # @QtCore.pyqtSlot(list)
     def _on_tuning_curve_display_config_changed(new_configs):
-        """
+        """ The function called when the non-color tuning curve display changed.
         Implicitly captures ipcDataExplorer
         
         Usage:
@@ -234,17 +303,14 @@ def build_all_placefield_output_panels(ipcDataExplorer):
         # Is this required?
         ipcDataExplorer.apply_tuning_curve_configs() # works (seemingly)
 
-
     ## Build the Placefield Control Widgets:
-    pf_widgets = []
-    # the active_tuning_curve_render_configs are an array of SingleNeuronPlottingExtended objects, one for each placefield
-    # for (idx, a_config) in enumerate(ipcDataExplorer.active_tuning_curve_render_configs):
-    
-    valid_cell_ids = ipcDataExplorer.tuning_curves_valid_neuron_ids
-    for (idx, cell_id) in enumerate(valid_cell_ids):
+    # pf_widgets = []
+    rootControlsBarWidget.ui.pf_widgets = []
+    valid_neuron_ids = ipcDataExplorer.tuning_curves_valid_neuron_ids
+    for (idx, neuron_id) in enumerate(valid_neuron_ids):
         a_config = ipcDataExplorer.active_tuning_curve_render_configs[idx]
         curr_widget = build_single_placefield_output_widget(a_config)
-        # TODO: Set the signals here:
+        ## Set the signals here:
         """ 
         obj.signal.connect(lambda param1, param2, ..., arg1=val1, arg2= value2, ... : fun(param1, param2,... , arg1, arg2, ....))
         
@@ -256,29 +322,28 @@ def build_all_placefield_output_panels(ipcDataExplorer):
             arg1, arg2, ...: are the extra parameters that you want to spend
 
         """
-        curr_widget.spike_config_changed.connect(lambda are_included, spikes_config_changed_callback=ipcDataExplorer.change_unit_spikes_included, cell_id_copy=cell_id: spikes_config_changed_callback(neuron_IDXs=None, cell_IDs=[cell_id_copy], are_included=are_included))
-        
-        # curr_widget.spike_config_changed.connect(lambda are_included, spikes_config_changed_callback=ipcDataExplorer.change_unit_spikes_included, i_copy=idx: spikes_config_changed_callback(neuron_IDXs=[i_copy], cell_IDs=None, are_included=are_included))
+        curr_widget.spike_config_changed.connect(lambda are_included, spikes_config_changed_callback=ipcDataExplorer.change_unit_spikes_included, cell_id_copy=neuron_id: spikes_config_changed_callback(neuron_IDXs=None, cell_IDs=[cell_id_copy], are_included=are_included))
         
         # Connect the signals to the debugging slots:
         # curr_widget.spike_config_changed.connect(_on_spike_config_changed)
         curr_widget.tuning_curve_display_config_changed.connect(_on_tuning_curve_display_config_changed)
-        
         curr_widget.sig_neuron_color_changed.connect(_on_neuron_color_display_config_changed)
         
         
         pf_layout.addWidget(curr_widget)
-        pf_widgets.append(curr_widget)
+        # pf_widgets.append(curr_widget)
+        rootControlsBarWidget.ui.pf_widgets.append(curr_widget)
         
     # done adding widgets
+    rootControlsBarWidget.rebuild_neuron_id_to_widget_map()
     
     ## Batch Action (Show/Hide All * Buttons):
     end_button_helper_obj, connections = build_batch_interactive_placefield_visibility_controls(rootControlsBarWidget=rootControlsBarWidget, ipcDataExplorer=ipcDataExplorer)
-    ipcDataExplorer.params.end_button_helper_obj = end_button_helper_obj
-    ipcDataExplorer.params.end_button_helper_connections = connections
+    rootControlsBarWidget.ui.end_button_helper_obj = end_button_helper_obj
+    rootControlsBarWidget.ui.end_button_helper_connections = connections
+    
         
-    return (rootControlsBarWidget, pf_widgets)
-    # return (placefieldControlsContainerWidget, pf_widgets)
+    return (rootControlsBarWidget, rootControlsBarWidget.ui.pf_widgets)
 
 
 

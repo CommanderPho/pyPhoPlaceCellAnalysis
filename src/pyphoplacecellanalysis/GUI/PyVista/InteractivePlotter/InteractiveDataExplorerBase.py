@@ -139,7 +139,7 @@ class InteractiveDataExplorerBase(InteractivePyvistaPlotterBuildIfNeededMixin, I
 
         self.plots_data = dict()
         self.plots = dict()
-        self.gui = dict()
+        self.ui = dict()
         
     @staticmethod
     def _unpack_variables(active_session):
@@ -242,54 +242,3 @@ class InteractiveDataExplorerBase(InteractivePyvistaPlotterBuildIfNeededMixin, I
         return self.plots[plot_name], self.plots_data[plot_name]
             
             
-
-######### UNUSED #############
-##############################
-# class PlotGroupWrapper(InteractivePyvistaPlotter_ObjectManipulationMixin):
-    
-#     def __init__(self, name, plots_dict=dict(), gui_dict=dict()):
-#         self.name = name
-#         self.plots = plots_dict
-#         # self.plots_data = dict()
-#         self.gui_dict = gui_dict
-        
-
-#     def GetVisibility(self):
-#         item_visibilities = np.array([a_plot.GetVisibility() for a_plot in self.plots.values()], dtype=int)
-#         return np.any(item_visibilities)
-
-#     def SetVisibility(self, value):
-#         for a_plot_name, a_plot in self.plots.items():
-#             a_plot.SetVisibility(value)
-
-# class PlotGroup:
-#     """
-#         # can plot all at once using:
-#         blocks.plot()
-            
-#         for name in blocks.keys():
-#             block = blocks[name]
-
-#         for block in blocks:
-#             surf = block.extract_surface()  # Do something with each dataset
-#     """
-#     def __init__(self, name, plots):
-#         self.name = name
-#         self.plots = plots
-#         self.blocks = pv.MultiBlock(self.plots)
-
-        
-#         # # Make a tree.
-#         # root = vtkMultiBlockDataSet()
-#         # # make the default branch:
-#         # branch = vtkMultiBlockDataSet()        
-#         # root.SetBlock(0, branch)
-        
-#         # # apply the list objects as leaves
-#         # for i, a_plot in enumerate(plots_list):
-#         #     # Make some leaves.
-#         #     a_leaf = a_plot
-#         #     a_leaf.SetCenter(0, 0, 0)
-#         #     a_leaf.Update()
-#         #     branch.SetBlock(0, a_leaf.GetOutput())
-        

@@ -1,0 +1,12 @@
+<RCC>
+  <qresource prefix="Icons">
+    <file>Icons/chain.png</file>
+    <file>chain--arrow.png</file>
+    <file>chain--exclamation.png</file>
+    <file>chain--minus.png</file>
+    <file>chain--pencil.png</file>
+    <file>chain--plus.png</file>
+    <file>chain-small.png</file>
+    <file>chain-unchain.png</file>
+  </qresource>
+</RCC>

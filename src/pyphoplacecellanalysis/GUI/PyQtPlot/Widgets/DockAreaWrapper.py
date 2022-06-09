@@ -20,8 +20,8 @@ class DynamicDockDisplayAreaContentMixin:
     Creates: 
         self.displayDockArea: a pg.Dock(...) object containing dynamically created Docks/Widgets for display of display nodes.
         
-    Usage:
-        PhoDockAreaContainingWindow only right now 
+    Known Usages:
+        PhoDockAreaContainingWindow **ONLY** right now 
     
     """
     
@@ -110,7 +110,7 @@ class DynamicDockDisplayAreaContentMixin:
         else:
             raise NotImplementedError
         
-        print(f'dockAddLocationOpts: {dockAddLocationOpts}')
+        # print(f'dockAddLocationOpts: {dockAddLocationOpts}')
         
         # display_dock_area.addDock(dDisplayItem, *dockAddLocationOpts)
         display_dock_area.addDock(*dockAddLocationOpts)
@@ -161,19 +161,20 @@ class DynamicDockDisplayAreaContentMixin:
         
     def clear_all_display_docks(self):
         """ removes all display docks """
-        for unique_identifier in extant_group_items.keys():
-            self.remove_display_dock(unique_identifier)
-        
-        
-        
-    # TODO: Persistance:
-    # self.plotDict[name] = {"dock":dock, "widget":widget, "view":view}
+        for group_identifier, extant_group_items in self.dynamic_display_dict.items():
+            self.remove_display_dock(group_identifier)
+            # for unique_identifier in extant_group_items.keys():
+            #     self.remove_display_dock(unique_identifier)
+        # TODO: Persistance:
+        # self.plotDict[name] = {"dock":dock, "widget":widget, "view":view}
     
     
     
 
 class PhoDockAreaContainingWindow(DynamicDockDisplayAreaContentMixin, QtWidgets.QMainWindow):
     """ a custom QMainWindow subclass that contains a DockArea as its central view.
+    
+        Can be used to dynamically create windows composed of multiple separate widgets programmatically.
     
     """
     @property
@@ -197,20 +198,9 @@ class PhoDockAreaContainingWindow(DynamicDockDisplayAreaContentMixin, QtWidgets.
         
 
     def setup(self):
-        # get central widget:
-        # cw = mainAppWindow.flowchart_controls
-
         self.ui.area = DockArea()
-    
-        # # Use existing central widget:
-        # cw = self.centralwidget
-        # self.ui.layout = QtGui.QVBoxLayout()
-        # cw.setLayout(self.ui.layout)        
-        # self.ui.layout.addWidget(self.ui.area) # start at 1 since the console is available at 0
-        
         # Use self.ui.area as central widget:        
-        self.setCentralWidget(self.ui.area)
-        
+        self.setCentralWidget(self.ui.area)    
         self.DynamicDockDisplayAreaContentMixin_on_setup()
         
         
@@ -230,7 +220,16 @@ class PhoDockAreaContainingWindow(DynamicDockDisplayAreaContentMixin, QtWidgets.
     
 class DockAreaWrapper(object):
     """ Responsible for wrapping several children in Dock items and installing them in a central DockArea
-    Primary method is DockAreaWrapper.wrap_with_dockAreaWindow(...):
+    Primary method is DockAreaWrapper.wrap_with_dockAreaWindow(...)
+    
+    Known Usage:
+        ## In DefaultDisplayFunctions._display_3d_interactive_tuning_curves_plotter(...): to combine the ipcDataExplorer and its controlling placefieldControlsContainerWidget into a single window with each widget wrapped in a dock.
+            from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.DockAreaWrapper import DockAreaWrapper
+            # Wrap:
+            active_root_main_widget = ipcDataExplorer.p.window()
+            root_dockAreaWindow, app = DockAreaWrapper.wrap_with_dockAreaWindow(active_root_main_widget, placefieldControlsContainerWidget, title=ipcDataExplorer.data_explorer_name)
+            pane = (root_dockAreaWindow, placefieldControlsContainerWidget, pf_widgets)
+        
     """
 
     @classmethod
@@ -281,97 +280,6 @@ class DockAreaWrapper(object):
         _, dDisplayItem2 = win.add_display_dock("Dock2 - Content", dockSize=(main_width, main_height), dockIsClosable=False, widget=main_window, dockAddLocationOpts=['bottom'])
         _, dDisplayItem1 = win.add_display_dock("Dock1 - Controls", dockSize=(secondary_width, secondary_height), dockIsClosable=False, widget=auxilary_controls_window, dockAddLocationOpts=['top', dDisplayItem2])
         # _, dDisplayItem1 = win.add_display_dock("Dock1 - Controls", dockSize=(secondary_width, secondary_height), dockIsClosable=False, widget=auxilary_controls_window, dockAddLocationOpts=['bottom'])
-        
-        # win.area.moveDock(dDisplayItem2, 'bottom')     ## move d4 to top edge of d2
-        # win.area.moveDock(dDisplayItem1, 'top', dDisplayItem2)     ## move d4 to top edge of d2
-        
-        
-        # # Old way:
-        # d1 = Dock("Dock1 - Controls", size=(secondary_width, secondary_height), closable=False, widget=auxilary_controls_window)
-        # d2 = Dock("Dock2 - Content", size=(main_width, main_height), closable=False, widget=main_window)
-
-        # # Add d2 first so it fills the entire dock area:
-        # area.addDock(d2, 'bottom')     ## place d2 at bottom edge of dock area
-        # # area.addDock(d1, 'top')     ## place d1 at top edge of dock area
-        # area.addDock(d1, 'top', d2)   ## place d5 at top edge of d4
-        
-        ## Add widgets into each dock
-        # d1.addWidget(auxilary_controls_window)
-        # d2.addWidget(main_window)
-        
-    #     ## Create docks, place them into the window one at a time.
-    #     ## Note that size arguments are only a suggestion; docks will still have to
-    #     ## fill the entire dock area and obey the limits of their internal widgets.
-    #     d1 = Dock("Dock1", size=(1, 1))     ## give this dock the minimum possible size
-    #     d2 = Dock("Dock2 - Console", size=(500,300), closable=True)
-    #     d3 = Dock("Dock3", size=(500,400))
-    #     d4 = Dock("Dock4 (tabbed) - Plot", size=(500,200))
-    #     d5 = Dock("Dock5 - Image", size=(500,200))
-    #     d6 = Dock("Dock6 (tabbed) - Plot", size=(500,200))
-    #     area.addDock(d1, 'left')      ## place d1 at left edge of dock area (it will fill the whole space since there are no other docks yet)
-    #     area.addDock(d2, 'right')     ## place d2 at right edge of dock area
-    #     area.addDock(d3, 'bottom', d1)## place d3 at bottom edge of d1
-    #     area.addDock(d4, 'right')     ## place d4 at right edge of dock area
-    #     area.addDock(d5, 'left', d1)  ## place d5 at left edge of d1
-    #     area.addDock(d6, 'top', d4)   ## place d5 at top edge of d4
-
-    #     ## Test ability to move docks programatically after they have been placed
-    #     area.moveDock(d4, 'top', d2)     ## move d4 to top edge of d2
-    #     area.moveDock(d6, 'above', d4)   ## move d6 to stack on top of d4
-    #     area.moveDock(d5, 'top', d2)     ## move d5 to top edge of d2
-
-
-    #     ## Add widgets into each dock
-
-    #     ## first dock gets save/restore buttons
-    #     w1 = pg.LayoutWidget()
-    #     label = QtGui.QLabel(""" -- DockArea Example -- 
-    #     This window has 6 Dock widgets in it. Each dock can be dragged
-    #     by its title bar to occupy a different space within the window 
-    #     but note that one dock has its title bar hidden). Additionally,
-    #     the borders between docks may be dragged to resize. Docks that are dragged on top
-    #     of one another are stacked in a tabbed layout. Double-click a dock title
-    #     bar to place it in its own window.
-    #     """)
-    #     saveBtn = QtGui.QPushButton('Save dock state')
-    #     restoreBtn = QtGui.QPushButton('Restore dock state')
-    #     restoreBtn.setEnabled(False)
-    #     w1.addWidget(label, row=0, col=0)
-    #     w1.addWidget(saveBtn, row=1, col=0)
-    #     w1.addWidget(restoreBtn, row=2, col=0)
-    #     d1.addWidget(w1)
-    #     state = None
-    #     def save():
-    #         global state
-    #         state = area.saveState()
-    #         restoreBtn.setEnabled(True)
-    #     def load():
-    #         global state
-    #         area.restoreState(state)
-    #     saveBtn.clicked.connect(save)
-    #     restoreBtn.clicked.connect(load)
-
-
-    #     w2 = pg.console.ConsoleWidget()
-    #     d2.addWidget(w2)
-
-    #     ## Hide title bar on dock 3
-    #     d3.hideTitleBar()
-    #     w3 = pg.PlotWidget(title="Plot inside dock with no title bar")
-    #     w3.plot(np.random.normal(size=100))
-    #     d3.addWidget(w3)
-
-    #     w4 = pg.PlotWidget(title="Dock 4 plot")
-    #     w4.plot(np.random.normal(size=100))
-    #     d4.addWidget(w4)
-
-    #     w5 = pg.ImageView()
-    #     w5.setImage(np.random.normal(size=(100,100)))
-    #     d5.addWidget(w5)
-
-    #     w6 = pg.PlotWidget(title="Dock 6 plot")
-    #     w6.plot(np.random.normal(size=100))
-    #     d6.addWidget(w6)
 
         win.show()
 

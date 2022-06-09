@@ -176,8 +176,11 @@ class Specific3DTimeCurvesHelper:
             spike_visualization_mode: str - must be ('count', 'rate', 'mov_average')
         
         Usage:
-            ## Adds the binned_spike_counts curves:
-            active_curve_plotter_3d = spike_raster_plt_3d ## PyQtGraph Mode
+            from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.Mixins.TimeCurves3D.Specific3DTimeCurves import Specific3DTimeCurvesHelper
+            curr_computations_results = curr_active_pipeline.computation_results[active_config_name]
+            
+            active_curve_plotter_3d = spike_raster_window.spike_raster_plt_3d # from a spike_raster_window
+            # active_curve_plotter_3d = spike_raster_plt_3d ## PyQtGraph Mode
             # active_curve_plotter_3d = spike_raster_plt_3d_vedo ## Vedo Mode
             
             ## Spike Count:
@@ -223,7 +226,7 @@ class Specific3DTimeCurvesHelper:
             raise NotImplementedError # "Valid values are: ('count', 'rate', 'average')"
         
         # a value scaler for the z-axis
-        z_scaler = MinMaxScaler(feature_range=(0, 10.0), copy=True)
+        z_scaler = MinMaxScaler(feature_range=(0, active_curve_plotter_3d.params.setdefault('time_curves_z_scaling_max', 10.0)), copy=True)
         columns = active_plot_df.columns.drop('t')
         active_plot_df[columns] = z_scaler.fit_transform(active_plot_df[columns])
         
@@ -238,9 +241,9 @@ class Specific3DTimeCurvesHelper:
         # z_map_fn = lambda v_main: v_main + active_curve_plotter_3d.floor_z + active_curve_plotter_3d.params.spike_end_z # returns the un-transformed primary value
         # z_map_fn = lambda v_main: v_main + active_curve_plotter_3d.params.spike_end_z # returns the un-transformed primary value
         
-        spike_height = active_curve_plotter_3d.params.spike_end_z - active_curve_plotter_3d.params.spike_start_z
+        # spike_height = active_curve_plotter_3d.params.spike_end_z - active_curve_plotter_3d.params.spike_start_z
         # z_map_fn = lambda v_main: v_main + active_curve_plotter_3d.params.spike_end_z + spike_height # returns the un-transformed primary value
-        z_map_fn = lambda v_main: v_main + 5.0 # returns the un-transformed primary value
+        z_map_fn = lambda v_main: v_main + active_curve_plotter_3d.params.setdefault('time_curves_z_baseline', 5.0) # returns the un-transformed primary value
         
         ## we want each test curve to be rendered with a fragile_linear_neuron_IDX (series of spikes), so we'll need custom y_map_fn's for each column
         n_value_columns = np.shape(active_plot_df)[1] - 1 # get the total num columns, then subtract 1 to account for the 0th ('t') column
@@ -251,11 +254,15 @@ class Specific3DTimeCurvesHelper:
         data_col_name_to_unit_plot_color_rgba_map = dict()
         for data_col_name in list(valid_data_values_column_names):
             curr_color = active_curve_plotter_3d.params.neuron_qcolors_map[active_curve_plotter_3d.cell_id_to_fragile_linear_neuron_IDX_map[int(data_col_name)]] # a QColor
-            curr_color.setAlphaF(0.2) # set the alpha
-            data_col_name_to_unit_plot_color_rgba_map[data_col_name] = curr_color.getRgbF()
+            curr_color_copy = list(curr_color.getRgbF()) # getRgbF gets a copy of the color
+            curr_color_copy[-1] = active_curve_plotter_3d.params.setdefault('time_curves_main_alpha', 0.2) # set the alpha
+            data_col_name_to_unit_plot_color_rgba_map[data_col_name] = tuple(curr_color_copy)
+
+            
             
         # [active_curve_plotter_3d.params.neuron_qcolors_map[active_curve_plotter_3d.cell_id_to_fragile_linear_neuron_IDX_map[int(data_col_name)]].getRgbF() for data_col_name in list(valid_data_values_column_names)]
-        
+        active_curve_plotter_3d.params.time_curves_enable_baseline_grid = True # override the default        
+                
         active_data_series_pre_spatial_list = [{'name':data_col_name,'t':'t','v_alt':None,'v_main':data_col_name,
                                                 # 'color_name':'black', # this will be overriden by the 'color' value below
                                                 # 'color': active_curve_plotter_3d.params.neuron_qcolors_map[active_curve_plotter_3d.cell_id_to_fragile_linear_neuron_IDX_map[int(data_col_name)]].getRgbF(), # gets the color for a specified data_col_name

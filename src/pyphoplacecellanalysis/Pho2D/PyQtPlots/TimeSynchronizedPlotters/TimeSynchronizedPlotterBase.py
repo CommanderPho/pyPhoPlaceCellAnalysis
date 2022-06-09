@@ -63,6 +63,7 @@ class TimeSynchronizedPlotterBase(QtWidgets.QWidget):
         self.ui = PhoUIContainer()
         
         self.ui.layout = QtWidgets.QGridLayout()
+        self.ui.layout.setObjectName('root_layout')
         self.ui.layout.setContentsMargins(0, 0, 0, 0)
         self.ui.layout.setVerticalSpacing(0)
         self.ui.layout.setHorizontalSpacing(0)

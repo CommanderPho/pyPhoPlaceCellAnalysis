@@ -126,37 +126,24 @@ class Spike2DRaster(Render2DScrollWindowPlotMixin, SpikeRasterBase):
         # self.spikes_df
         
         
-    def _build_spikes_data_values(self, spikes_df):
-        # All units at once approach:
-        # Filter the dataframe using that column and value from the list
-        curr_spike_t = spikes_df[spikes_df.spikes.time_variable_name].to_numpy() # this will map
-        curr_spike_x = np.interp(curr_spike_t, (self.spikes_window.active_window_start_time, self.spikes_window.active_window_end_time), (0.0, +self.temporal_axis_length))
-        curr_spike_y = spikes_df['visualization_raster_y_location'].to_numpy() # this will map
-        curr_spike_pens = [self.config_fragile_linear_neuron_IDX_map[a_cell_id][2] for a_cell_id in spikes_df['fragile_linear_neuron_IDX'].to_numpy()] # get the pens for each spike from the configs map
-        curr_n = len(curr_spike_t) # curr number of spikes
-        return curr_spike_x, curr_spike_y, curr_spike_pens, curr_n
+
     
-    
-    def _build_all_spikes_data_values(self):
-        """ build global spikes for entire dataframe (not just the current window) """
-        # All units at once approach:
-        # Filter the dataframe using that column and value from the list
-        curr_spike_t = self.spikes_window.df[self.spikes_window.df.spikes.time_variable_name].to_numpy() # this will map
-        # curr_spike_x = np.interp(curr_spike_t, (self.spikes_window.active_window_start_time, self.spikes_window.active_window_end_time), (0.0, +self.temporal_axis_length))
-        curr_spike_y = self.spikes_window.df['visualization_raster_y_location'].to_numpy() # this will map
-        curr_spike_pens = [self.config_fragile_linear_neuron_IDX_map[a_cell_id][2] for a_cell_id in self.spikes_window.df['fragile_linear_neuron_IDX'].to_numpy()] # get the pens for each spike from the configs map
-        curr_n = len(curr_spike_t) # curr number of spikes
-        return curr_spike_t, curr_spike_y, curr_spike_pens, curr_n
-    
+
     
         
     
     def _build_cell_configs(self):
+        """ Adds the neuron/cell configurations that are used to color and format the scatterplot spikes and such. 
+        Adds:
+            self.params.config_items: list
+            self.config_fragile_linear_neuron_IDX_map: dict<self.fragile_linear_neuron_IDXs, self.params.config_items>
+        
+        Known Calls:
+            From self._buildGraphics()
+        """
         # self._build_neuron_id_graphics(self.ui.main_gl_widget, self.y)
         self.params.config_items = []
         for i, fragile_linear_neuron_IDX in enumerate(self.fragile_linear_neuron_IDXs):
-            # curr_color = pg.mkColor((i, self.n_cells*1.3))                
-            # curr_color = self.params.neuron_qcolors[i]
             curr_color = self.params.neuron_qcolors_map[fragile_linear_neuron_IDX]
             curr_color.setAlphaF(0.5)
             curr_pen = pg.mkPen(curr_color)
@@ -226,7 +213,7 @@ class Spike2DRaster(Render2DScrollWindowPlotMixin, SpikeRasterBase):
             self.ui.main_plot_widget.addItem(self.ui.scatter_plot)
         else:
             self.ui.main_plot_widget = None
-            self.ui.main_plot_widget = None
+            self.ui.scatter_plot = None
 
         
         # From Render2DScrollWindowPlotMixin:
@@ -323,6 +310,24 @@ class Spike2DRaster(Render2DScrollWindowPlotMixin, SpikeRasterBase):
             self.ui.scroll_window_region.blockSignals(False)
         
         
+    @QtCore.pyqtSlot(object)
+    def on_neuron_colors_changed(self, neuron_id_color_update_dict):
+        """ Called when the neuron colors have finished changing (changed) to update the rendered elements.
+        """
+        print(f'Spike2DRaster.neuron_id_color_update_dict: {neuron_id_color_update_dict}')
+        ## Rebuild Raster Plot Points:
+        self._build_cell_configs()
+
+        # ALL Spikes in the preview window:
+        curr_spike_x, curr_spike_y, curr_spike_pens, curr_n = self._build_all_spikes_data_values()        
+        pos = np.vstack((curr_spike_x, curr_spike_y)) # np.shape(curr_spike_t): (11,), np.shape(curr_spike_x): (11,), np.shape(curr_spike_y): (11,), curr_n: 11
+        self.all_spots = [{'pos': pos[:,i], 'data': i, 'pen': curr_spike_pens[i]} for i in range(curr_n)] # update self.all_spots
+        # Update preview_overview_scatter_plot
+        self.plots.preview_overview_scatter_plot.setData(self.all_spots)
+        if self.Includes2DActiveWindowScatter:
+            self.ui.scatter_plot.setData(self.all_spots)
+        
+    
 # Start Qt event loop unless running in interactive mode.
 # if __name__ == '__main__':
 #     # v = Visualizer()

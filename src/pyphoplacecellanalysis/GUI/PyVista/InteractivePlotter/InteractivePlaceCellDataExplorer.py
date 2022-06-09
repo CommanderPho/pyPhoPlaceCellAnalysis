@@ -9,15 +9,16 @@ import numpy as np
 import pyvista as pv
 
 
-from qtpy import QtCore # for Slot
+from qtpy import QtCore, QtGui # for Slot
 # Signal
 
-from pyphoplacecellanalysis.PhoPositionalData.plotting.animations import make_mp4_from_plotter
-
-from pyphoplacecellanalysis.GUI.PyVista.InteractivePlotter.PhoInteractivePlotter import PhoInteractivePlotter
-
+from pyphocorehelpers.gui.Qt.GlobalConnectionManager import GlobalConnectionManager, GlobalConnectionManagerAccessingMixin
 from pyphocorehelpers.gui.PyVista.PhoCustomVtkWidgets import PhoWidgetHelper
 from pyphocorehelpers.gui.PyVista.PhoCustomVtkWidgets import MultilineTextConsoleWidget
+
+import pyphoplacecellanalysis.External.pyqtgraph as pg
+from pyphoplacecellanalysis.PhoPositionalData.plotting.animations import make_mp4_from_plotter
+from pyphoplacecellanalysis.GUI.PyVista.InteractivePlotter.PhoInteractivePlotter import PhoInteractivePlotter
 
 from pyphoplacecellanalysis.PhoPositionalData.plotting.gui import customize_default_pyvista_theme, print_controls_helper_text
 from pyphoplacecellanalysis.PhoPositionalData.plotting.spikeAndPositions import build_active_spikes_plot_data, perform_plot_flat_arena, build_spike_spawn_effect_light_actor, spike_geom_circle, spike_geom_box, spike_geom_cone, animal_location_circle, animal_location_trail_circle
@@ -26,7 +27,7 @@ from pyphoplacecellanalysis.PhoPositionalData.plotting.visualization_window impo
 from numpy.lib.stride_tricks import sliding_window_view
 
 
-class InteractivePlaceCellDataExplorer(InteractiveDataExplorerBase):
+class InteractivePlaceCellDataExplorer(GlobalConnectionManagerAccessingMixin, InteractiveDataExplorerBase):
     """ This 3D PyVista GUI displays a map of the animal's environment alongside animatable behavioral data (animal position on the maze, etc) and neural data (spikes, sleep state, ripple status, etc)
     
     It looks like the animation mostly depends on the programmatic slider update function "def on_slider_update_mesh(self, value)"
@@ -41,7 +42,10 @@ class InteractivePlaceCellDataExplorer(InteractiveDataExplorerBase):
         # super().__init__(active_config, active_session, extant_plotter)
         super(InteractivePlaceCellDataExplorer, self).__init__(active_config, active_session, extant_plotter, data_explorer_name='CellSpikePositionDataExplorer')
         self._setup()
-
+        
+        app = pg.mkQApp() # <PyQt5.QtWidgets.QApplication at 0x1d44a4891f0>
+        self.GlobalConnectionManagerAccessingMixin_on_init(owning_application=app) # initializes self._connection_man
+        
     
     def _setup_variables(self):
         num_cells, spike_list, cell_ids, flattened_spike_identities, flattened_spike_times, flattened_sort_indicies, t_start, reverse_cellID_idx_lookup_map, t, x, y, linear_pos, speeds, self.params.flattened_spike_positions_list = InteractiveDataExplorerBase._unpack_variables(self.active_session)
@@ -208,6 +212,13 @@ class InteractivePlaceCellDataExplorer(InteractiveDataExplorerBase):
         self.p.clear_slider_widgets()
         self.p.clear_button_widgets() # removes the play/pause toggle checkbox so that it can be driven externally
 
+    
+    def on_drive_state_changed(self):
+        """ called when the widget/object becomes either driven or independent """
+        # TODO: implement
+        pass
+
+
 
     ######################
     # General Plotting Method:
@@ -321,9 +332,6 @@ class InteractivePlaceCellDataExplorer(InteractiveDataExplorerBase):
         if render:
             self.p.render() # renders to ensure it's updated after changing the ScalarVisibility above
 
-    
-    
-    
     def on_slider_update_mesh(self, value):
         """ called to update the current active time window from an integer index (such as that produced by the slider's update function or the class responsible for making videos) """
         curr_i = int(value)
@@ -371,6 +379,14 @@ class InteractivePlaceCellDataExplorer(InteractiveDataExplorerBase):
         else:
             self.p = InteractivePlaceCellDataExplorer.build_new_plotter_if_needed(pActivePlotter, shape=self.active_config.plotting_config.subplots_shape, title=self.data_explorer_name)
 
+        ## Make sure self.GlobalConnectionManagerAccessingMixin_on_destroy() is called to un-register self
+        # TODO: does this work when self.p is a regular pv.Plotter (and not a background plotter)? What about a MultiPlotter?
+        self.p.app_window.signal_close.connect(self.GlobalConnectionManagerAccessingMixin_on_destroy)
+        # self.p.closeEvent
+        # self.signal_close.connect(self.plotter.close)        
+        # self.p._before_close_callback = 
+        
+        
         # p.background_color = 'black'
 
         if (not self.active_config.video_output_config.active_is_video_output_mode):
@@ -428,4 +444,28 @@ class InteractivePlaceCellDataExplorer(InteractiveDataExplorerBase):
             self.p.close()
             self.p = None
 
+        self.GlobalConnectionManagerAccessingMixin_on_setup()
+
         return self.p
+
+    ########################################################
+    ## For GlobalConnectionManagerAccessingMixin conformance:
+    ########################################################
+    
+    # @QtCore.pyqtSlot()
+    def GlobalConnectionManagerAccessingMixin_on_setup(self):
+        """ perfrom registration of drivers/drivables:"""
+        ## register children:
+        self.connection_man.register_drivable(self, drivable_identifier=self.data_explorer_name)
+        
+    # @QtCore.pyqtSlot()
+    def GlobalConnectionManagerAccessingMixin_on_destroy(self):
+        """ perfrom teardown/destruction of anything that needs to be manually removed or released
+        
+        TODO: call this at some point
+        """
+        ## unregister children:
+        self.connection_man.unregister_object(self)
+        
+        
+        

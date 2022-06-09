@@ -10,13 +10,13 @@ class DataSeriesColorHelpers:
         
         OBJECTIVE: Implement only @classmethod functions on this class.
     """
-    debug_logging = True
+    debug_logging = False
     
     @classmethod
     def _build_cell_color_map(cls, fragile_linear_neuron_IDXs, mode='color_by_index_order', provided_cell_colors=None, debug_print=False):
         """ builds a list of pg.mkColors from the cell index id:     
         
-        provided_cell_colors: usually None, in which case a rainbow of colors is built. If not None it better by an np.array of shape (4, n_cells)
+        provided_cell_colors: usually None, in which case a rainbow of colors is built. If not None it better be an np.array of shape (4, n_cells)
         
         Usage:
             # _build_cell_color_map(spike_raster_plt_3d.fragile_linear_neuron_IDXs, mode='color_by_index_order')

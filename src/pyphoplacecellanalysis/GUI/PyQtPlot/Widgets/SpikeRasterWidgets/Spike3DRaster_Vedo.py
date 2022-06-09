@@ -190,7 +190,18 @@ class Spike3DRaster_Vedo(VedoSpecificTimeCurvesMixin, SpikeRasterBase):
         
         
         # Config
-        self.params.spike_height_z = 4.0
+        """ Adds required params to self.params:
+            spike_height_z (default 4.0): the z height of the spikes
+            center_mode (allowed: ['starting_at_zero', 'zero_centered']), (default 'starting_at_zero'): I believe how everything is layed out relative to the origin
+            bin_position_mode (allowed: ['bin_center', 'left_edges']), (default 'bin_center'): specifies how the bins are positioned??
+        """
+        self.params.setdefault('spike_height_z', 4.0)
+        # self.params.setdefault('spike_start_z', self.floor_z) # spike_start_z should be overriden with computed value.
+        # self.params.setdefault('spike_end_z', -6.0) # spike_end_z should be overriden with computed value.
+        self.params.setdefault('center_mode', 'starting_at_zero')
+        self.params.setdefault('bin_position_mode', 'bin_center')
+        
+        # self.params.spike_height_z = 4.0
         self.params.spike_start_z = self.floor_z # self.z_floor
         self.params.spike_end_z = self.params.spike_start_z + self.params.spike_height_z
         
@@ -203,8 +214,8 @@ class Spike3DRaster_Vedo(VedoSpecificTimeCurvesMixin, SpikeRasterBase):
         self.params.max_z_pos = max(self.params.spike_end_z, (self.floor_z + 1.0))
         
         # self.params.center_mode = 'zero_centered'
-        self.params.center_mode = 'starting_at_zero'
-        self.params.bin_position_mode = 'bin_center'
+        # self.params.center_mode = 'starting_at_zero'
+        # self.params.bin_position_mode = 'bin_center'
         # self.params.bin_position_mode = 'left_edges'
         
         # by default we want the time axis to approximately span -20 to 20. So we set the temporal_zoom_factor to 
@@ -276,9 +287,12 @@ class Spike3DRaster_Vedo(VedoSpecificTimeCurvesMixin, SpikeRasterBase):
         self.ui = PhoUIContainer()
 
         self.ui.frame = QtWidgets.QFrame()
+        self.ui.frame.setObjectName('root_frame')
         self.ui.frame_layout = QtWidgets.QVBoxLayout()
+        self.ui.frame_layout.setObjectName('root_frame_layout')
         
         self.ui.layout = QtWidgets.QGridLayout()
+        self.ui.layout.setObjectName('root_layout')
         self.ui.layout.setContentsMargins(0, 0, 0, 0)
         self.ui.layout.setVerticalSpacing(0)
         self.ui.layout.setHorizontalSpacing(0)
@@ -401,7 +415,7 @@ class Spike3DRaster_Vedo(VedoSpecificTimeCurvesMixin, SpikeRasterBase):
         startPoints = np.vstack((all_spike_x, curr_spike_y, np.full_like(all_spike_x, self.params.spike_start_z))).T
         endPoints = np.vstack((all_spike_x, curr_spike_y, np.full_like(all_spike_x, self.params.spike_end_z))).T
         
-        all_spike_lines = Lines(startPoints, endPoints=endPoints, c='k', alpha=0.8, lw=1.0, dotted=False, scale=1, res=1) # curr_spike_alphas
+        all_spike_lines = Lines(startPoints, endPoints=endPoints, c='k', alpha=0.8, lw=1, dotted=False, scale=1, res=1) # curr_spike_alphas
         # let the scalar be the y coordinate of the mesh vertices
         spike_color_ids = curr_spike_y.copy() # one per spike
         spike_point_color_ids = all_spike_lines.points()[:, 1]
@@ -836,6 +850,18 @@ class Spike3DRaster_Vedo(VedoSpecificTimeCurvesMixin, SpikeRasterBase):
         self._update_plots()
         print('\t done.')
         
-        
+
+    @QtCore.pyqtSlot(object)
+    def on_neuron_colors_changed(self, neuron_id_color_update_dict):
+        """ Called when the neuron colors have finished changing (changed) to update the rendered elements.
+        """
+        print(f'Spike3DRaster_Vedo.neuron_id_color_update_dict: {neuron_id_color_update_dict}')
+        # TODO: Impplement for Vedo version:
+        # self.rebuild_main_gl_line_plots_if_needed()
+        # for i, a_fragile_linear_neuron_IDX in enumerate(self.fragile_linear_neuron_IDXs):
+        #     # color= (N,4) array of floats (0.0-1.0) or tuple of floats specifying a single color for the entire item.
+        #     curr_color = self.params.neuron_qcolors[a_fragile_linear_neuron_IDX] # get the pre-build color
+        #     self.ui.gl_line_plots[i].setData(color=curr_color) # update the current data        
+        self._update_plots()
         
 # josfd

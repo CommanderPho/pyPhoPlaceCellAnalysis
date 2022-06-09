@@ -152,12 +152,18 @@ def update_figure_files_output_Format(computation_result, active_config, root_ou
 
 
 class DefaultRegisteredDisplayFunctions:
-    """ TODO: This doesn't seem to do anything rn, or even ever be called. 
-        Unlike the computation functions its not ever called.
-        Simply enables specifying the default computation functions that will be defined in this file and automatically registered. """
+    """ Simply enables specifying the default computation functions that will be defined in this file and automatically registered. 
+    
+    Known Uses:
+        DisplayPipelineStage conforms to DefaultRegisteredDisplayFunctions to allow it to call self.register_default_known_display_functions() during its .__init__(...)
+    """
     
     def register_default_known_display_functions(self):
-        """ Registers all known display functions """
+        """ Registers all known display functions 
+        
+        Called in:
+            DisplayPipelineStage.__init__(...): to register display functions
+        """
         # Register the Ratemap/Placemap display functions: 
         for (a_display_fn_name, a_display_fn) in DefaultDisplayFunctions.get_all_functions(use_definition_order=False):
             self.register_display_function(a_display_fn_name, a_display_fn)
@@ -225,12 +231,19 @@ class PipelineWithDisplayPipelineStageMixin:
                     
     def display(self, display_function, active_session_filter_configuration: str, **kwargs):
         """ Called to actually perform the display. Should output a figure/widget/graphic of some kind. 
-        
-        active_session_filter_configuration: the string that's a key into the computation results like 'maze1' or 'maze2'.
+        Inputs:
+            display_function: either a Callable display function (e.g. DefaultDisplayFunctions._display_1d_placefield_validations) or a str containing the name of a registered display function (e.g. '_display_1d_placefield_validations')
+            active_session_filter_configuration: the string that's a key into the computation results like 'maze1' or 'maze2'.
         """
         assert self.can_display, "Current self.stage must already be a DisplayPipelineStage. Call self.prepare_for_display to reach this step."
         if display_function is None:
             display_function = DefaultDisplayFunctions._display_normal
+        
+        if isinstance(display_function, (str)):
+            # if the display_function is a str (name of the function) instead of a callable, try to get the actual callable
+            assert (display_function in self.registered_display_function_names), f"ERROR: The display function with the name {display_function} could not be found! Is it registered?"
+            display_function = self.registered_display_function_dict[display_function] # find the actual function from the name
+            
         assert (active_session_filter_configuration in self.computation_results), f"self.computation_results doesn't contain a key for the provided active_session_filter_configuration ('{active_session_filter_configuration}'). Did you only enable computation with enabled_filter_names in perform_computation that didn't include this key?"
         return display_function(self.computation_results[active_session_filter_configuration], self.active_configs[active_session_filter_configuration], **kwargs)
 
@@ -270,5 +283,6 @@ class DisplayPipelineStage(DefaultRegisteredDisplayFunctions, ComputedPipelineSt
     
     
     def register_display_function(self, registered_name, display_function):
+        """ registers a new custom display function"""
         self.registered_display_function_dict[registered_name] = display_function
         

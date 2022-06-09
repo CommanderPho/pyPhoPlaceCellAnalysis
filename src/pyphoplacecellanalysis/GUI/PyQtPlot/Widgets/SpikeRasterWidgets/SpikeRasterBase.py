@@ -14,8 +14,6 @@ import qtawesome as qta
 
 from neuropy.core.neuron_identities import NeuronIdentityAccessingMixin
 
-from pyphocorehelpers.general_helpers import OrderedMeta
-from pyphocorehelpers.print_helpers import SimplePrintable, PrettyPrintable
 from pyphocorehelpers.DataStructure.general_parameter_containers import DebugHelper, VisualizationParameters, RenderPlots
 from pyphoplacecellanalysis.General.Mixins.SpikesRenderingBaseMixin import SpikeRenderingBaseMixin, SpikesDataframeOwningMixin
 
@@ -197,7 +195,6 @@ class SpikeRasterBase(UnitSortableMixin, DataSeriesToSpatialTransformingMixin, N
     @property
     def cell_ids(self):
         """ e.g. the list of valid cell_ids (unique aclu values) """
-        # return self.fragile_linear_neuron_IDXs
         return np.unique(self.spikes_window.df['aclu'].to_numpy()) 
 
     @property
@@ -299,16 +296,10 @@ class SpikeRasterBase(UnitSortableMixin, DataSeriesToSpatialTransformingMixin, N
         
         
         # Connect window update signals
-        # self.spikes_window.spike_dataframe_changed_signal.connect(self.on_spikes_df_changed)
-        # self.spikes_window.time_window.window_duration_changed_signal.connect(self.on_window_duration_changed)
-        # self.spikes_window.time_window.window_changed_signal.connect(self.on_window_changed)
-        
         # Only subscribe to the more advanced LiveWindowedData-style window update signals that also provide data
         self.spikes_window.windowed_data_window_duration_changed_signal.connect(self.on_windowed_data_window_duration_changed)
         self.spikes_window.windowed_data_window_updated_signal.connect(self.on_windowed_data_window_changed)
         
-        # Old working:
-        # self.spikes_window.timeWindow.window_updated_signal.connect(self.on_window_changed)
         
         ## TODO: BUG: MAJOR: Since the application instance is being assigned to self.app (for any of the widgets that create it) I think that aboutToQuit is called any time any of the widgets are going to close. Although I guess that doesn't explain the errors.
         
@@ -399,7 +390,50 @@ class SpikeRasterBase(UnitSortableMixin, DataSeriesToSpatialTransformingMixin, N
         self.params.neuron_colors_hex = [self.params.neuron_qcolors[i].name(QtGui.QColor.HexRgb) for i, cell_id in enumerate(self.fragile_linear_neuron_IDXs)] 
         
        
+       
+       
+    def update_neurons_color_data(self, updated_neuron_render_configs):
+        """updates the colors for each neuron/cell given the updated_neuron_render_configs map
 
+        Args:
+            updated_neuron_render_configs (_type_): _description_
+            
+        Updates:
+
+        """
+        # updated_color_dict = {cell_id:cell_config.color for cell_id, cell_config in updated_neuron_render_configs.items()} ## TODO: efficiency: pass only the colors that changed instead of all the colors:
+        updated_color_dict = {}
+        
+        for cell_id, cell_config in updated_neuron_render_configs.items():
+            a_fragile_linear_neuron_IDX = self.cell_id_to_fragile_linear_neuron_IDX_map[cell_id]
+            curr_qcolor = cell_config.qcolor
+            
+            # Determine if the color changed: Easiest to compare the hex value string:
+            did_color_change = (self.params.neuron_colors_hex[a_fragile_linear_neuron_IDX] != cell_config.color) # the hex color
+            
+            # Overwrite the old colors:
+            self.params.neuron_qcolors_map[a_fragile_linear_neuron_IDX] = curr_qcolor
+            self.params.neuron_qcolors[a_fragile_linear_neuron_IDX] = curr_qcolor
+            # Overwrite the old secondary/derived colors:
+            curr_rgbf_color = curr_qcolor.getRgbF() # (1.0, 0.0, 0.0, 0.5019607843137255)
+            self.params.neuron_colors[:, a_fragile_linear_neuron_IDX] = curr_rgbf_color[:]
+            self.params.neuron_colors_hex[a_fragile_linear_neuron_IDX] = cell_config.color # the hex color
+            
+            if did_color_change:
+                # If the color changed, add it to the changed array:
+                updated_color_dict[cell_id] = cell_config.color
+        
+        self.on_neuron_colors_changed(updated_color_dict)
+
+    
+    @QtCore.pyqtSlot(object)
+    def on_neuron_colors_changed(self, neuron_id_color_update_dict):
+        """ Called when the neuron colors have finished changing (changed) to update the rendered elements.
+        """
+        pass
+    
+    
+    
     def setup(self):
         # self.setup_spike_rendering_mixin() # NeuronIdentityAccessingMixin
         raise NotImplementedError # Inheriting classes must override setup to perform particular setup
@@ -417,6 +451,7 @@ class SpikeRasterBase(UnitSortableMixin, DataSeriesToSpatialTransformingMixin, N
         self.ui = PhoUIContainer()
         
         self.ui.layout = QtWidgets.QGridLayout()
+        self.ui.layout.setObjectName('root_layout')
         self.ui.layout.setContentsMargins(0, 0, 0, 0)
         self.ui.layout.setVerticalSpacing(0)
         self.ui.layout.setHorizontalSpacing(0)
@@ -539,6 +574,9 @@ class SpikeRasterBase(UnitSortableMixin, DataSeriesToSpatialTransformingMixin, N
         print(f'wheel_handler(event.angleDelta().y(): {event.angleDelta().y()})')
         # self.modify_volume(1 if event.angleDelta().y() > 0 else -1)
         # self.set_media_position(1 if event.angleDelta().y() > 0 else -1)
+
+
+
 
 
     @QtCore.pyqtSlot()

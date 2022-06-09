@@ -4,7 +4,8 @@ from qtpy import QtCore, QtWidgets
 import pyphoplacecellanalysis.External.pyqtgraph as pg
 
 from pyphocorehelpers.DataStructure.general_parameter_containers import VisualizationParameters
-from pyphocorehelpers.gui.Qt.SyncedTimelineWindowLink import connect_additional_controlled_plotter, connect_controlled_time_synchornized_plotter
+# from pyphocorehelpers.gui.Qt.SyncedTimelineWindowLink import connect_additional_controlled_plotter, connect_controlled_time_synchornized_plotter
+from pyphocorehelpers.gui.Qt.GlobalConnectionManager import GlobalConnectionManager, GlobalConnectionManagerAccessingMixin
 from pyphocorehelpers.gui.Qt.qevent_lookup_helpers import QEventLookupHelpers
 
 from pyphoplacecellanalysis.GUI.Qt.SpikeRasterWindows.Spike3DRasterWindowBase import Ui_RootWidget # Generated file from .ui
@@ -22,7 +23,7 @@ from pyphoplacecellanalysis.General.Model.SpikesDataframeWindow import SpikesDat
 
 # remove TimeWindowPlaybackControllerActionsMixin
 # class Spike3DRasterWindowWidget(SpikeRasterBottomFrameControlsMixin, TimeWindowPlaybackControllerActionsMixin, TimeWindowPlaybackPropertiesMixin, QtWidgets.QWidget):
-class Spike3DRasterWindowWidget(SpikeRasterLeftSidebarControlsMixin, SpikeRasterBottomFrameControlsMixin, SpikesWindowOwningMixin, QtWidgets.QWidget):
+class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRasterLeftSidebarControlsMixin, SpikeRasterBottomFrameControlsMixin, SpikesWindowOwningMixin, QtWidgets.QWidget):
     """ A main raster window loaded from a Qt .ui file. 
     
     Usage:
@@ -180,6 +181,10 @@ class Spike3DRasterWindowWidget(SpikeRasterLeftSidebarControlsMixin, SpikeRaster
         
         self.enable_debug_print = Spike3DRasterWindowWidget.enable_debug_print
         
+        app = pg.mkQApp(self.applicationName) # <PyQt5.QtWidgets.QApplication at 0x1d44a4891f0>
+        self.GlobalConnectionManagerAccessingMixin_on_init(owning_application=app) # initializes self._connection_man
+        
+        
         # self.ui.splitter.setSizes([900, 200])
         # self.ui.splitter.setStretchFactor(0, 5) # have the top widget by 3x the height as the bottom widget
         # self.ui.splitter.setStretchFactor(1, 1) # have the top widget by 3x the height as the bottom widget        
@@ -202,7 +207,6 @@ class Spike3DRasterWindowWidget(SpikeRasterLeftSidebarControlsMixin, SpikeRaster
         self.spike_raster_plt_2d.update_scroll_window_region(window_start_time, window_start_time+window_duration, block_signals=False)
         
         self.show() # Show the GUI
-
 
     def initUI(self, curr_spikes_df, core_app_name='UnifiedSpikeRasterApp', window_duration=15.0, window_start_time=30.0, neuron_colors=None, neuron_sort_order=None, type_of_3d_plotter='pyqtgraph'):
         # 
@@ -243,10 +247,9 @@ class Spike3DRasterWindowWidget(SpikeRasterLeftSidebarControlsMixin, SpikeRaster
         self.ui.secondarySpikeRasterControlWidget.setLayout(self.ui.v_layout_secondary)
         
         
-        if self.ui.spike_raster_plt_3d is not None:
-            self.connect_plotter_time_windows()
+        self.GlobalConnectionManagerAccessingMixin_on_setup()
         
-        self.ui.additional_connections = {}
+        # self.ui.additional_connections = {} # NOTE: self.ui.additional_connections has been removed in favor of self.connection_man
         
         # self.spike_raster_plt_2d.setWindowTitle('2D Raster Control Window')
         # self.spike_3d_to_2d_window_connection = self.spike_raster_plt_2d.window_scrolled.connect(self.spike_raster_plt_3d.spikes_window.update_window_start_end)
@@ -257,7 +260,6 @@ class Spike3DRasterWindowWidget(SpikeRasterLeftSidebarControlsMixin, SpikeRaster
         ## Create the animation properties:
         self.playback_controller = TimeWindowPlaybackController()
         self.playback_controller.setup(self) # pass self to have properties set
-        
         
         ## Connect the UI Controls:
         # Helper Mixins: buildUI:
@@ -285,51 +287,80 @@ class Spike3DRasterWindowWidget(SpikeRasterLeftSidebarControlsMixin, SpikeRaster
                 # This is the first thing that produces detected event.type() == QtCore.QEvent.GraphicsSceneWheel when the scrolling is done over the 2D active widnow raster plot 
                 self.ui.spike_raster_plt_2d.plots.preview_overview_scatter_plot.installEventFilter(self) # plots.preview_overview_scatter_plot is a ScatterPlotItem
 
+        # Set Window Title Options:
+        if self.applicationName is not None:
+            # self.setWindowFilePath(str(sess.filePrefix.resolve()))
+            self.setWindowTitle(f'{self.applicationName}') # f'Spike Raster Window - {secondary_active_config_name} - {str(sess.filePrefix.resolve())}'
+
+
     def connect_plotter_time_windows(self):
         """ connects the controlled plotter (usually the 3D plotter) to the 2D plotter that controls it. """
         # self.spike_3d_to_2d_window_connection = self.spike_raster_plt_2d.window_scrolled.connect(self.spike_raster_plt_3d.spikes_window.update_window_start_end)        
         # Rate limited version:
-        self.spike_3d_to_2d_window_connection = pg.SignalProxy(self.spike_raster_plt_2d.window_scrolled, delay=0.2, rateLimit=60, slot=self.spike_raster_plt_3d.spikes_window.update_window_start_end_rate_limited) # Limit updates to 60 Signals/Second
+        self.spike_3d_to_2d_window_connection = self.connection_man.connect_drivable_to_driver(drivable=self.spike_raster_plt_3d, driver=self.spike_raster_plt_2d,
+                                                       custom_connect_function=(lambda driver, drivable: pg.SignalProxy(driver.window_scrolled, delay=0.2, rateLimit=60, slot=drivable.spikes_window.update_window_start_end_rate_limited)))
+                                                       
+        # self.spike_3d_to_2d_window_connection = pg.SignalProxy(self.spike_raster_plt_2d.window_scrolled, delay=0.2, rateLimit=60, slot=self.spike_raster_plt_3d.spikes_window.update_window_start_end_rate_limited) # Limit updates to 60 Signals/Second
         
          
     def connect_additional_controlled_plotter(self, controlled_plt):
         """ try to connect the controlled_plt to the current controller (usually the 2D plot). """
-        extant_connection = self.ui.additional_connections.get(controlled_plt, None)
-        if extant_connection is None:
-            new_connection_obj = connect_additional_controlled_plotter(self.spike_raster_plt_2d, controlled_plt=controlled_plt)
-            self.ui.additional_connections[controlled_plt] = new_connection_obj # add the connection object to the self.ui.additional_connections array
-            return self.ui.additional_connections[controlled_plt]
-        else:
-            print(f'connection already existed!')
-            return extant_connection
-        
-        
+        return self.connection_man.connect_drivable_to_driver(drivable=controlled_plt, driver=self.spike_raster_plt_2d)
         
     def connect_controlled_time_synchronized_plotter(self, controlled_plt):
         """ try to connect the controlled_plt to the current controller (usually the 2D plot). """
-        extant_connection = self.ui.additional_connections.get(controlled_plt, None)
-        if extant_connection is None:
-            new_connection_obj = connect_controlled_time_synchornized_plotter(self.spike_raster_plt_2d, controlled_plt=controlled_plt)
-            self.ui.additional_connections[controlled_plt] = new_connection_obj # add the connection object to the self.ui.additional_connections array
-            return self.ui.additional_connections[controlled_plt]
-        else:
-            print(f'connect_controlled_time_synchronized_plotter(...): connection already existed!')
-            return extant_connection
+        return self.connection_man.connect_drivable_to_driver(drivable=controlled_plt, driver=self.spike_raster_plt_2d,
+                                                       custom_connect_function=(lambda driver, drivable: pg.SignalProxy(driver.window_scrolled, delay=0.2, rateLimit=60, slot=drivable.spikes_window.update_window_start_end_rate_limited)))
         
-
-          
-          
       
     def __str__(self):
          return
      
      
+    def create_new_connected_widget(self, type_of_3d_plotter='vedo'):
+        """ called to create a new/independent widget instance that's connected to this window's driver. """
+        
+        # self.neuron_colors
+        # window_duration = self.render_window_duration
+        window_duration = self.spikes_window.window_duration
+        window_start_time = self.spikes_window.active_window_start_time
+        # window_end_time = self.spikes_window.active_window_end_time
+        
+        neuron_colors = None
+        neuron_sort_order = None
+        
+        if type_of_3d_plotter is None:
+            # No 3D plotter:
+            output_widget = None 
+            
+        elif type_of_3d_plotter == 'pyqtgraph':
+            output_widget = Spike3DRaster.init_from_independent_data(self.spikes_df, window_duration=window_duration, window_start_time=window_start_time, neuron_colors=neuron_colors, neuron_sort_order=neuron_sort_order, application_name=self.applicationName, enable_independent_playback_controller=False, should_show=False, parent=None)
+            # Connect the 2D window scrolled signal to the 3D plot's spikes_window.update_window_start_end function
+        elif type_of_3d_plotter == 'vedo':
+            # To work around a bug with the vedo plotter with the pyqtgraph 2D controls: we must update the 2D Scroll Region to the initial value, since it only works if the 2D Raster plot (pyqtgraph-based) is created before the Spike3DRaster_Vedo (Vedo-based). This is probably due to the pyqtgraph's instancing of the QtApplication. 
+            # self.ui.spike_raster_plt_2d.update_scroll_window_region(window_start_time, window_start_time+window_duration, block_signals=False)
+            
+            # Build the 3D Vedo Raster plotter
+            output_widget = Spike3DRaster_Vedo.init_from_independent_data(self.spikes_df, window_duration=window_duration, window_start_time=window_start_time, neuron_colors=neuron_colors, neuron_sort_order=neuron_sort_order, application_name=self.applicationName, enable_independent_playback_controller=False, should_show=False, parent=None)
+            output_widget.disable_render_window_controls()
+            
+            # Set the 3D Vedo plots' window to the current values of the 2d plot:
+            # output_widget.spikes_window.update_window_start_end(self.ui.spike_raster_plt_2d.spikes_window.active_time_window[0], self.ui.spike_raster_plt_2d.spikes_window.active_time_window[1])
+        
+        else:
+            # unrecognized command for 3D plotter
+            raise NotImplementedError
+
+        # Connect the output_widget:
+        # self.connect_additional_controlled_plotter(output_widget)
+        self.connect_controlled_time_synchronized_plotter(output_widget)
+        
+        return output_widget
+        
     
     ###################################
     #### EVENT HANDLERS
     ##################################
-
-    
     def closeEvent(self, event):
         """closeEvent(self, event): pyqt default event, doesn't have to be registered. Called when the widget will close.
         """
@@ -340,7 +371,7 @@ class Spike3DRasterWindowWidget(SpikeRasterLeftSidebarControlsMixin, SpikeRaster
             reply = QtWidgets.QMessageBox.Yes
             
         if reply == QtWidgets.QMessageBox.Yes:
-            self.onClose() # ensure onClose() is called
+            self.GlobalConnectionManagerAccessingMixin_on_destroy() # call destroy to tear down the registered children for the global connection mannager
             event.accept()
             print('Window closed')
         else:
@@ -426,6 +457,35 @@ class Spike3DRasterWindowWidget(SpikeRasterLeftSidebarControlsMixin, SpikeRaster
         self.render_window_duration = updated_val
         
 
+    ########################################################
+    ## For GlobalConnectionManagerAccessingMixin conformance:
+    ########################################################
+    
+    # @QtCore.pyqtSlot()
+    def GlobalConnectionManagerAccessingMixin_on_setup(self):
+        """ perfrom registration of drivers/drivables:"""
+        ## register children:
+        
+        # Register the 2D plotter as both drivable and a driver:
+        self.connection_man.register_driver(self.ui.spike_raster_plt_2d)
+        self.connection_man.register_drivable(self.ui.spike_raster_plt_2d)
+        
+        if self.ui.spike_raster_plt_3d is not None:
+            self.connection_man.register_drivable(self.ui.spike_raster_plt_3d)
+            self.connect_plotter_time_windows()
+
+    # @QtCore.pyqtSlot()
+    def GlobalConnectionManagerAccessingMixin_on_destroy(self):
+        """ perfrom teardown/destruction of anything that needs to be manually removed or released
+        
+        TODO: call this at some point
+        """
+        print(f'GlobalConnectionManagerAccessingMixin_on_destroy()')
+        ## unregister children:
+        self.connection_man.unregister_object(self.ui.spike_raster_plt_2d)
+        if self.ui.spike_raster_plt_3d is not None:
+            self.connection_man.unregister_object(self.ui.spike_raster_plt_3d)
+        
         
         
         
@@ -478,6 +538,18 @@ class Spike3DRasterWindowWidget(SpikeRasterLeftSidebarControlsMixin, SpikeRaster
         self._update_plots()
         if self.enable_debug_print:
             profiler('Finished calling _update_plots()')
+    
+    
+    
+    def update_neurons_color_data(self, updated_neuron_render_configs):
+        """ Propagates the neuron color updates to any valid children that need these updates.
+        """
+        if self.spike_raster_plt_2d is not None:
+            self.spike_raster_plt_2d.update_neurons_color_data(updated_neuron_render_configs)
+            
+        if self.spike_raster_plt_3d is not None:
+            self.spike_raster_plt_3d.update_neurons_color_data(updated_neuron_render_configs)
+        
     
 
     ########################################################
@@ -533,6 +605,8 @@ class Spike3DRasterWindowWidget(SpikeRasterLeftSidebarControlsMixin, SpikeRaster
             print(f'\t wheelEvent(event: {event}')
     
 
+    
+    
     
     
 
