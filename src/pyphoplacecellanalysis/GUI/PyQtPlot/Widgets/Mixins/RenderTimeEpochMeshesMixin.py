@@ -83,8 +83,8 @@ class RenderTimeEpochMeshesMixin:
     def RenderTimeEpochMeshesMixin_on_setup(self):
         """ perfrom setup/creation of widget/graphical/data objects. Only the core objects are expected to exist on the implementor (root widget, etc) """
         self.close_signal.connect(self.RenderTimeEpochMeshesMixin_on_destroy) # Connect the *_on_destroy function to the close_signal
-        self.epoch_connection = pg.SignalProxy(self.window_scrolled, delay=0.2, rateLimit=60, slot=self.RenderTimeEpochMeshesMixin_on_window_update_rate_limited)
-        self.epoch_connection.blockSignals(True) # block signals by default so it isn't calling update needlessly
+        # self.epoch_connection = pg.SignalProxy(self.window_scrolled, delay=0.2, rateLimit=60, slot=self.RenderTimeEpochMeshesMixin_on_window_update_rate_limited)
+        # self.epoch_connection.blockSignals(True) # block signals by default so it isn't calling update needlessly
 
     @QtCore.pyqtSlot()
     def RenderTimeEpochMeshesMixin_on_buildUI(self):
@@ -94,8 +94,9 @@ class RenderTimeEpochMeshesMixin:
     @QtCore.pyqtSlot()
     def RenderTimeEpochMeshesMixin_on_destroy(self):
         """ perfrom teardown/destruction of anything that needs to be manually removed or released """
-        self.epoch_connection.disconnect()
-        self.epoch_connection = None
+        # self.epoch_connection.disconnect()
+        # self.epoch_connection = None
+        pass
 
     @QtCore.pyqtSlot(float, float)
     def RenderTimeEpochMeshesMixin_on_window_update(self, new_start=None, new_end=None):
@@ -173,7 +174,7 @@ class RenderTimeEpochMeshesMixin:
         self.params.render_epochs.starts_t = starts_t
         self.params.render_epochs.durations = durations
         self._build_epoch_meshes(self.params.render_epochs.starts_t, self.params.render_epochs.durations)
-        self.epoch_connection.blockSignals(False) # Disabling blocking the signals so it can update
+        # self.epoch_connection.blockSignals(False) # Disabling blocking the signals so it can update
         
     def update_epoch_meshes(self, starts_t, durations):
         """ Modifies both the position and scale of the existing self.plots.new_cube_objects
@@ -200,8 +201,8 @@ class RenderTimeEpochMeshesMixin:
             aCube.setParent(None) # Set parent None is just as good as removing from self.ui.main_gl_widget I think
             aCube.deleteLater()
         self.plots.new_cube_objects.clear()
-        if not self.has_render_epoch_meshes:
-            # if there are no epoch meshes left to render, block the update signal.
-            self.epoch_connection.blockSignals(True)
+        # if not self.has_render_epoch_meshes:
+        #     # if there are no epoch meshes left to render, block the update signal.
+        #     self.epoch_connection.blockSignals(True)
         
 
