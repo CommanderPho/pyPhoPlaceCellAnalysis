@@ -516,6 +516,7 @@ class SpikeRasterBase(UnitSortableMixin, DataSeriesToSpatialTransformingMixin, N
             reply = QtWidgets.QMessageBox.Yes
             
         if reply == QtWidgets.QMessageBox.Yes:
+            self.close_signal.emit() # emit to indicate that we're closing this window
             self.onClose() # ensure onClose() is called
             event.accept()
             print('Window closed')
@@ -529,9 +530,8 @@ class SpikeRasterBase(UnitSortableMixin, DataSeriesToSpatialTransformingMixin, N
     def onClose(self):
         ## TODO: this seems to get called excessively, at least for Spike3DRaster. It happens even when accessing invalid properties and stuff. Not sure what's up, something is broken.
         print(f'onClose()')
-        
         self.debug_print_instance_info()
-        self.close_signal.emit() # emit to indicate that we're closing this window
+        
 
     # Input Handelers:        
     def keyPressEvent(self, e):

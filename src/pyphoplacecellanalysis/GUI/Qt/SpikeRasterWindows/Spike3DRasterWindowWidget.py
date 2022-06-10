@@ -251,12 +251,6 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
         
         # self.ui.additional_connections = {} # NOTE: self.ui.additional_connections has been removed in favor of self.connection_man
         
-        # self.spike_raster_plt_2d.setWindowTitle('2D Raster Control Window')
-        # self.spike_3d_to_2d_window_connection = self.spike_raster_plt_2d.window_scrolled.connect(self.spike_raster_plt_3d.spikes_window.update_window_start_end)
-        # self.spike_raster_plt_3d.disable_render_window_controls()
-        # spike_raster_plt_3d.setWindowTitle('3D Raster with 2D Control Window')
-        # self.spike_raster_plt_3d.setWindowTitle('Main 3D Raster Window')
-        
         ## Create the animation properties:
         self.playback_controller = TimeWindowPlaybackController()
         self.playback_controller.setup(self) # pass self to have properties set

@@ -229,8 +229,6 @@ class Spike2DRaster(Render2DScrollWindowPlotMixin, SpikeRasterBase):
         # self.ui.scroll_window_region.sigRegionChanged.connect(self.update_zoom_plotter)
         
         self.rate_limited_signal_scrolled_proxy = pg.SignalProxy(self.window_scrolled, rateLimit=60, slot=self.update_zoomed_plot_rate_limited) # Limit updates to 60 Signals/Second
-        # self.window_scrolled.connect(self.update_zoomed_plot)
-        # self.ui.main_plot_widget.sigRangeChanged.connect(self.update_region)
         
         
     ###################################
