@@ -36,64 +36,71 @@ class RenderTimeEpochMeshesMixin:
         
             Functions:
                 ._temporal_to_spatial(...)
+                
+            Signals:
+                .window_scrolled
+                .close_signal
+                
             Variables:
-                self.n_half_cells 
-                self.floor_z
-                self.n_full_cell_grid
-                self.ui.main_gl_widget
-                self.plots
+                .n_half_cells 
+                .floor_z
+                .n_full_cell_grid
+                .ui.main_gl_widget
+                .plots
         
         
         Provides:
-            self.params.render_epochs
-            self.plots.new_cube_objects
+            .params.render_epochs
+            .plots.new_cube_objects
+            .epoch_connection
+            
         
-            add_render_epochs(starts_t, durations, epoch_type_name='PBE')
-            update_epoch_meshes(starts_t, durations)
+            .add_render_epochs(starts_t, durations, epoch_type_name='PBE')
+            .update_epoch_meshes(starts_t, durations)
             
             @QtCore.pyqtSlot()
             def RenderTimeEpochMeshesMixin_on_update_window(self)
     
     """
     
+    @property
+    def has_render_epoch_meshes(self):
+        """ True if epoch meshes to render have been added. """
+        if self.params.render_epochs is None:
+            return False        
+        if self.plots.new_cube_objects is None:
+            return False
+        else:
+            return (len(self.plots.new_cube_objects) > 0)
+        
+
     @QtCore.pyqtSlot()
     def RenderTimeEpochMeshesMixin_on_init(self):
         """ perform any parameters setting/checking during init """
-        """ properties:
-            time_curves_datasource (default None): 
-            time_curves_no_update (default False): called to disabling updating time curves internally
-            time_curves_z_normalization_mode (default 'None'): specifies how the 3D curves' z-axis is normalized.
-            time_curves_z_baseline (default 5.0): the z-position at which to start 3D curves.
-            time_curves_z_scaling_max (default 10.0): the max relative z-position for the maximal 3D curve value to be scaled to. The maximum absolute curve value will be (time_curves_z_baseline + time_curves_z_scaling_max).
-            time_curves_main_alpha (default 0.2): the alpha (opacity) for each line of the 3D curve
-            time_curves_enable_baseline_grid (default: True): whether to enable drawing a grid at the baseline of the 3D curves that helps visually align each curve with its neuron/spikes.
-            time_curves_baseline_grid_color (default:'White'): the color of the baseline grid.
-            time_curves_baseline_grid_alpha (default: 0.5): the alpha (opacity) of the baseline grid.
-        """
-        self.params.setdefault('render_epochs', None)
-        
+        self.params.setdefault('render_epochs', None)        
 
     @QtCore.pyqtSlot()
     def RenderTimeEpochMeshesMixin_on_setup(self):
         """ perfrom setup/creation of widget/graphical/data objects. Only the core objects are expected to exist on the implementor (root widget, etc) """
-        pass
-
+        self.close_signal.connect(self.RenderTimeEpochMeshesMixin_on_destroy) # Connect the *_on_destroy function to the close_signal
+        self.epoch_connection = pg.SignalProxy(self.window_scrolled, delay=0.2, rateLimit=60, slot=self.RenderTimeEpochMeshesMixin_on_window_update_rate_limited)
+        self.epoch_connection.blockSignals(True) # block signals by default so it isn't calling update needlessly
 
     @QtCore.pyqtSlot()
     def RenderTimeEpochMeshesMixin_on_buildUI(self):
         """ perfrom setup/creation of widget/graphical/data objects. Only the core objects are expected to exist on the implementor (root widget, etc) """
         self.plots.setdefault('new_cube_objects', None)
 
-
     @QtCore.pyqtSlot()
     def RenderTimeEpochMeshesMixin_on_destroy(self):
         """ perfrom teardown/destruction of anything that needs to be manually removed or released """
-        pass
+        self.epoch_connection.disconnect()
+        self.epoch_connection = None
 
     @QtCore.pyqtSlot(float, float)
     def RenderTimeEpochMeshesMixin_on_window_update(self, new_start=None, new_end=None):
         """ called when the window is updated to update the mesh locations. """
-        if self.params.render_epochs is not None:
+        if self.has_render_epoch_meshes is not None:
             self.update_epoch_meshes(self.params.render_epochs.starts_t, self.params.render_epochs.durations)
 
     ############### Rate-Limited SLots ###############:
@@ -104,14 +111,8 @@ class RenderTimeEpochMeshesMixin:
     def RenderTimeEpochMeshesMixin_on_window_update_rate_limited(self, evt):
         self.RenderTimeEpochMeshesMixin_on_window_update(*evt)
 
-        
-        
-    
-   
-        
-        
-    
-    
+    ############### Internal Methods #################:
+    ##################################################
     @classmethod
     def _build_cube_mesh_data(cls):
         vertexes = np.array([[1, 0, 0], #0
@@ -133,20 +134,6 @@ class RenderTimeEpochMeshesMixin:
         return md
 
 
-    def add_render_epochs(self, starts_t, durations, epoch_type_name='PBE'):
-        """ adds the render epochs to be displayed. Stores them internally"""
-        self.params.render_epochs = RenderEpochs(epoch_type_name)
-        self.params.render_epochs.epoch_type_name = epoch_type_name
-        self.params.render_epochs.starts_t = starts_t
-        self.params.render_epochs.durations = durations
-        self._build_epoch_meshes(self.params.render_epochs.starts_t, self.params.render_epochs.durations)
-        
-        
-
-    # def _temporal_to_spatial(self, starts_t):
-    #     """ currently this constrains all epochs outside the active window to be aligned with the endpoints of the window, meaning there are a ton of stacked 0-width windows rendered at both endpoints since only a few epochs are visible at a time."""
-    #     return DataSeriesToSpatial.temporal_to_spatial_map(starts_t, self.spikes_window.active_window_start_time, self.spikes_window.active_window_end_time, self.temporal_axis_length, center_mode='zero_centered')
-        
     def _temporal_to_spatial(self, epoch_start_times, epoch_durations):
         """ epoch_window_relative_start_x_positions, epoch_spatial_durations = self._temporal_to_spatial()
         
@@ -163,62 +150,33 @@ class RenderTimeEpochMeshesMixin:
         Usage:  
             curr_sess.pbe.durations
         
-        """
-        # stops_t = starts_t + durations
-        # # Compute spatial positions/durations:
-        # starts_x = self._temporal_to_spatial(starts_t)
-        # stops_x = self._temporal_to_spatial(stops_t)
-        # durations_spatial_widths = stops_x - starts_x
-        # half_durations_spatial_widths = durations_spatial_widths / 2.0
-        # x_centers = starts_x + half_durations_spatial_widths
-        
-        
+        """        
         centers_t = starts_t + (durations / 2.0)
         x_centers, duration_spatial_widths = self._temporal_to_spatial(centers_t, durations) # actually compute the centers of each epoch rect, not the start
-        
-        
-        
-        # The transform needs to be done here to match the temporal_scale_Factor:
-        # curr_x = np.interp(curr_spike_t, (self.spikes_window.active_window_start_time, self.spikes_window.active_window_end_time), (-self.half_temporal_axis_length, +self.half_temporal_axis_length))
-        
-        # pg.gl.GLViewWidget()
-        # self.ui.parent_epoch_container_item = gl.GLGraphicsItem.GLGraphicsItem()
-        # self.ui.parent_epoch_container_item = pg.GraphicsObject()
-        # self.ui.parent_epoch_container_item.setObjectName('parent_epoch_container')
-        # # self.ui.parent_epoch_container_item.translate(0, 0, 0)
-        # # self.ui.parent_epoch_container_item.scale(1, 1, 1)
-        # self.ui.main_gl_widget.addItem(self.ui.parent_epoch_container_item)
-        # gl.GLBoxItem()
                 
         self.plots.new_cube_objects = []
         for i in np.arange(len(x_centers)):
             curr_md = RenderTimeEpochMeshesMixin._build_cube_mesh_data()
             curr_cube = gl.GLMeshItem(meshdata=curr_md, smooth=True, color=(1, 0, 0, 0.2), shader='balloon', glOptions='additive') # , drawEdges=True, edgeColor=(0, 0, 0, 1)
-            # new_cube = gl.GLMeshItem(vertexes=vertexes, faces=faces, faceColors=colors, drawEdges=True, edgeColor=(0, 0, 0, 1))
             curr_cube.translate(x_centers[i], -self.n_half_cells, self.floor_z)
             curr_cube.scale(duration_spatial_widths[i], self.n_full_cell_grid, 0.25)
             # curr_cube.setParentItem(self.ui.parent_epoch_container_item)
             self.ui.main_gl_widget.addItem(curr_cube) # add directly
-            # self.ui.parent_epoch_container_item.addItem(curr_cube)
             self.plots.new_cube_objects.append(curr_cube)
 
-
-        # self.ui.main_gl_widget.addItem(self.ui.parent_epoch_container_item)
-        
-        
-    def _remove_epoch_meshes(self):
-        for (i, aCube) in enumerate(self.plots.new_cube_objects):
-            aCube.setParent(None)
-            aCube.deleteLater()
-        # self.ui.main_gl_widget.
-        self.plots.new_cube_objects.clear()
-        
-        
-
-
+    ############### Public Methods ###################:
+    ##################################################
+    def add_render_epochs(self, starts_t, durations, epoch_type_name='PBE'):
+        """ adds the render epochs to be displayed. Stores them internally"""
+        self.params.render_epochs = RenderEpochs(epoch_type_name)
+        self.params.render_epochs.epoch_type_name = epoch_type_name
+        self.params.render_epochs.starts_t = starts_t
+        self.params.render_epochs.durations = durations
+        self._build_epoch_meshes(self.params.render_epochs.starts_t, self.params.render_epochs.durations)
+        self.epoch_connection.blockSignals(False) # Disabling blocking the signals so it can update
         
     def update_epoch_meshes(self, starts_t, durations):
-        """ 
+        """ Modifies both the position and scale of the existing self.plots.new_cube_objects
         Requires Implementors:
         
         Functions:
@@ -228,25 +186,22 @@ class RenderTimeEpochMeshesMixin:
             self.floor_z
             self.n_full_cell_grid
         """
-        # stops_t = starts_t + durations
-        # # Compute spatial positions/durations:
-        # starts_x = self._temporal_to_spatial(starts_t)
-        # stops_x = self._temporal_to_spatial(stops_t)
-        # duration_spatial_widths = stops_x - starts_x
-        # half_durations_spatial_widths = duration_spatial_widths / 2.0
-        # x_centers = starts_x + half_durations_spatial_widths
-        
         centers_t = starts_t + (durations / 2.0)
         x_shifted_centers, duration_spatial_widths = self._temporal_to_spatial(centers_t, durations) # actually compute the centers of each epoch rect, not the start
         
-        # t_shifted_centers = t_centers - self.spikes_window.active_time_window[0] # offset by the start of the current window
-        # x_shifted_centers = x_centers
         for (i, aCube) in enumerate(self.plots.new_cube_objects):
-            # aCube.setPos(x_centers[i], self.n_half_cells, 0)
             aCube.resetTransform()
             aCube.translate(x_shifted_centers[i], -self.n_half_cells, self.floor_z)
             aCube.scale(duration_spatial_widths[i], self.n_full_cell_grid, 0.25)
-            # aCube.setData(pos=(x_centers[i], self.n_half_cells, 0))
-            # aCube.setParent(None)
-            # aCube.deleteLater()
+           
             
+    def remove_epoch_meshes(self):
+        for (i, aCube) in enumerate(self.plots.new_cube_objects):
+            aCube.setParent(None) # Set parent None is just as good as removing from self.ui.main_gl_widget I think
+            aCube.deleteLater()
+        self.plots.new_cube_objects.clear()
+        if not self.has_render_epoch_meshes:
+            # if there are no epoch meshes left to render, block the update signal.
+            self.epoch_connection.blockSignals(True)
+        
+

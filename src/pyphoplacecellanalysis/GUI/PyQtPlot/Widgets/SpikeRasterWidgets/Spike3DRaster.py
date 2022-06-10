@@ -545,7 +545,8 @@ class Spike3DRaster(PyQtGraphSpecificTimeCurvesMixin, RenderTimeEpochMeshesMixin
         self.ui.viewport_overlay.additional_overlay_text_dict = self.overlay_text_lines_dict
         
         # Update the epochs if we have them:
-        # self.RenderTimeEpochMeshesMixin_on_update_window()
+        self.RenderTimeEpochMeshesMixin_on_window_update()
+        # Update 3D Curves if we have them:
         self.TimeCurvesViewMixin_on_window_update()
         
         
