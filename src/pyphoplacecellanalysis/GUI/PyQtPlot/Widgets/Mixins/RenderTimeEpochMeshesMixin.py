@@ -32,8 +32,85 @@ class RenderTimeEpochMeshesMixin:
         
         Renders rectangular meshes to represent periods of time in the current 3D plot
         
+        Requires Implementors have:
         
+            Functions:
+                ._temporal_to_spatial(...)
+            Variables:
+                self.n_half_cells 
+                self.floor_z
+                self.n_full_cell_grid
+                self.ui.main_gl_widget
+                self.plots
+        
+        
+        Provides:
+            self.params.render_epochs
+            self.plots.new_cube_objects
+        
+            add_render_epochs(starts_t, durations, epoch_type_name='PBE')
+            update_epoch_meshes(starts_t, durations)
+            
+            @QtCore.pyqtSlot()
+            def RenderTimeEpochMeshesMixin_on_update_window(self)
+    
     """
+    
+    @QtCore.pyqtSlot()
+    def RenderTimeEpochMeshesMixin_on_init(self):
+        """ perform any parameters setting/checking during init """
+        """ properties:
+            time_curves_datasource (default None): 
+            time_curves_no_update (default False): called to disabling updating time curves internally
+            time_curves_z_normalization_mode (default 'None'): specifies how the 3D curves' z-axis is normalized.
+            time_curves_z_baseline (default 5.0): the z-position at which to start 3D curves.
+            time_curves_z_scaling_max (default 10.0): the max relative z-position for the maximal 3D curve value to be scaled to. The maximum absolute curve value will be (time_curves_z_baseline + time_curves_z_scaling_max).
+            time_curves_main_alpha (default 0.2): the alpha (opacity) for each line of the 3D curve
+            time_curves_enable_baseline_grid (default: True): whether to enable drawing a grid at the baseline of the 3D curves that helps visually align each curve with its neuron/spikes.
+            time_curves_baseline_grid_color (default:'White'): the color of the baseline grid.
+            time_curves_baseline_grid_alpha (default: 0.5): the alpha (opacity) of the baseline grid.
+        """
+        self.params.setdefault('render_epochs', None)
+        
+
+    @QtCore.pyqtSlot()
+    def RenderTimeEpochMeshesMixin_on_setup(self):
+        """ perfrom setup/creation of widget/graphical/data objects. Only the core objects are expected to exist on the implementor (root widget, etc) """
+        pass
+
+
+    @QtCore.pyqtSlot()
+    def RenderTimeEpochMeshesMixin_on_buildUI(self):
+        """ perfrom setup/creation of widget/graphical/data objects. Only the core objects are expected to exist on the implementor (root widget, etc) """
+        self.plots.setdefault('new_cube_objects', None)
+
+
+    @QtCore.pyqtSlot()
+    def RenderTimeEpochMeshesMixin_on_destroy(self):
+        """ perfrom teardown/destruction of anything that needs to be manually removed or released """
+        pass
+
+    @QtCore.pyqtSlot(float, float)
+    def RenderTimeEpochMeshesMixin_on_window_update(self, new_start=None, new_end=None):
+        """ called when the window is updated to update the mesh locations. """
+        if self.params.render_epochs is not None:
+            self.update_epoch_meshes(self.params.render_epochs.starts_t, self.params.render_epochs.durations)
+
+    ############### Rate-Limited SLots ###############:
+    ##################################################
+    ## For use with pg.SignalProxy
+    # using signal proxy turns original arguments into a tuple
+    @QtCore.pyqtSlot(object)
+    def RenderTimeEpochMeshesMixin_on_window_update_rate_limited(self, evt):
+        self.RenderTimeEpochMeshesMixin_on_window_update(*evt)
+
+        
+        
+    
+   
+        
+        
+    
     
     @classmethod
     def _build_cube_mesh_data(cls):
@@ -113,34 +190,44 @@ class RenderTimeEpochMeshesMixin:
         # self.ui.main_gl_widget.addItem(self.ui.parent_epoch_container_item)
         # gl.GLBoxItem()
                 
-        self.ui.new_cube_objects = []
+        self.plots.new_cube_objects = []
         for i in np.arange(len(x_centers)):
             curr_md = RenderTimeEpochMeshesMixin._build_cube_mesh_data()
             curr_cube = gl.GLMeshItem(meshdata=curr_md, smooth=True, color=(1, 0, 0, 0.2), shader='balloon', glOptions='additive') # , drawEdges=True, edgeColor=(0, 0, 0, 1)
             # new_cube = gl.GLMeshItem(vertexes=vertexes, faces=faces, faceColors=colors, drawEdges=True, edgeColor=(0, 0, 0, 1))
-            curr_cube.translate(x_centers[i], -self.n_half_cells, self.z_floor)
+            curr_cube.translate(x_centers[i], -self.n_half_cells, self.floor_z)
             curr_cube.scale(duration_spatial_widths[i], self.n_full_cell_grid, 0.25)
             # curr_cube.setParentItem(self.ui.parent_epoch_container_item)
             self.ui.main_gl_widget.addItem(curr_cube) # add directly
             # self.ui.parent_epoch_container_item.addItem(curr_cube)
-            self.ui.new_cube_objects.append(curr_cube)
+            self.plots.new_cube_objects.append(curr_cube)
 
 
         # self.ui.main_gl_widget.addItem(self.ui.parent_epoch_container_item)
         
         
     def _remove_epoch_meshes(self):
-        for (i, aCube) in enumerate(self.ui.new_cube_objects):
+        for (i, aCube) in enumerate(self.plots.new_cube_objects):
             aCube.setParent(None)
             aCube.deleteLater()
         # self.ui.main_gl_widget.
-        self.ui.new_cube_objects.clear()
+        self.plots.new_cube_objects.clear()
         
         
 
 
         
     def update_epoch_meshes(self, starts_t, durations):
+        """ 
+        Requires Implementors:
+        
+        Functions:
+           ._temporal_to_spatial(...)
+        Variables:
+            self.n_half_cells 
+            self.floor_z
+            self.n_full_cell_grid
+        """
         # stops_t = starts_t + durations
         # # Compute spatial positions/durations:
         # starts_x = self._temporal_to_spatial(starts_t)
@@ -154,19 +241,12 @@ class RenderTimeEpochMeshesMixin:
         
         # t_shifted_centers = t_centers - self.spikes_window.active_time_window[0] # offset by the start of the current window
         # x_shifted_centers = x_centers
-        for (i, aCube) in enumerate(self.ui.new_cube_objects):
+        for (i, aCube) in enumerate(self.plots.new_cube_objects):
             # aCube.setPos(x_centers[i], self.n_half_cells, 0)
             aCube.resetTransform()
-            aCube.translate(x_shifted_centers[i], -self.n_half_cells, self.z_floor)
+            aCube.translate(x_shifted_centers[i], -self.n_half_cells, self.floor_z)
             aCube.scale(duration_spatial_widths[i], self.n_full_cell_grid, 0.25)
             # aCube.setData(pos=(x_centers[i], self.n_half_cells, 0))
             # aCube.setParent(None)
             # aCube.deleteLater()
             
-    @QtCore.pyqtSlot()
-    def RenderTimeEpochMeshesMixin_on_update_window(self):
-        """ called when the window is updated to update the mesh locations. """
-        if self.params.render_epochs is not None:
-            self.update_epoch_meshes(self.params.render_epochs.starts_t, self.params.render_epochs.durations)
-            
-        

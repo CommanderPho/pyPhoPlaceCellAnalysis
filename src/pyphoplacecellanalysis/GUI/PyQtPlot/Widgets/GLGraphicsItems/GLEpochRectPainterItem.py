@@ -141,7 +141,7 @@ class GLEpochRectPainterItem(GLGraphicsItem.GLGraphicsItem):
         
         # t_shifted_centers = t_centers - self.spikes_window.active_time_window[0] # offset by the start of the current window
         t_shifted_centers = t_centers
-        for (i, aCube) in enumerate(self.ui.new_cube_objects):
+        for (i, aCube) in enumerate(self.plots.new_cube_objects):
             # aCube.setPos(t_centers[i], self.n_half_cells, 0)
             aCube.resetTransform()
             aCube.translate(t_shifted_centers[i], -self.n_half_cells, self.z_floor)

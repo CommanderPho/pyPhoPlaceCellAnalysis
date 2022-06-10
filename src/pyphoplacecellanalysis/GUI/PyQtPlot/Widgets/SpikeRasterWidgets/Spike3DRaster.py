@@ -134,7 +134,8 @@ class Spike3DRaster(PyQtGraphSpecificTimeCurvesMixin, RenderTimeEpochMeshesMixin
         # Init the TimeCurvesViewMixin for 3D Line plots:
         ### No plots will actually be added until self.add_3D_time_curves(plot_dataframe) is called with a valid dataframe.
         self.TimeCurvesViewMixin_on_init()
-                
+        self.RenderTimeEpochMeshesMixin_on_init()
+        
         # Setup Signals:
         self.temporal_mapping_changed.connect(self.on_adjust_temporal_spatial_mapping)
         self.spikes_window.timeWindow.window_duration_changed_signal.connect(self.on_adjust_temporal_spatial_mapping)
@@ -194,6 +195,8 @@ class Spike3DRaster(PyQtGraphSpecificTimeCurvesMixin, RenderTimeEpochMeshesMixin
         # Determine the y-values corresponding to the series identity
         self._series_identity_y_values = None
         self.update_series_identity_y_values()
+        
+        self.RenderTimeEpochMeshesMixin_on_setup()
         
    
     def _buildGraphics(self):
@@ -301,6 +304,8 @@ class Spike3DRaster(PyQtGraphSpecificTimeCurvesMixin, RenderTimeEpochMeshesMixin
             
             self.ui.main_gl_widget.addItem(plt)
             self.ui.gl_line_plots.append(plt)
+            
+        self.RenderTimeEpochMeshesMixin_on_buildUI()
 
      
     def update_series_identity_y_values(self):

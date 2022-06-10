@@ -35,4 +35,12 @@ def MixinClassName:
         """ called to perform updates when the active window changes. Redraw, recompute data, etc. """
         pass
 
+    ############### Rate-Limited SLots ###############:
+    ##################################################
+    ## For use with pg.SignalProxy
+    # using signal proxy turns original arguments into a tuple
+    @QtCore.pyqtSlot(object)
+    def MixinClassName_on_window_update_rate_limited(self, evt):
+        self.MixinClassName_on_window_update(*evt)
+        
 ```
