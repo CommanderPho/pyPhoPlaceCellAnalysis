@@ -198,7 +198,8 @@ class RenderTimeEpochMeshesMixin:
             
     def remove_epoch_meshes(self):
         for (i, aCube) in enumerate(self.plots.new_cube_objects):
-            aCube.setParent(None) # Set parent None is just as good as removing from self.ui.main_gl_widget I think
+            # aCube.setParent(None) # Set parent None is just as good as removing from self.ui.main_gl_widget I think
+            self.ui.main_gl_widget.removeItem(aCube)
             aCube.deleteLater()
         self.plots.new_cube_objects.clear()
         # if not self.has_render_epoch_meshes:
