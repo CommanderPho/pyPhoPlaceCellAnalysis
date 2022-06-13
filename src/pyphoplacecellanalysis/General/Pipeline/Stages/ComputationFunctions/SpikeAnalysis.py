@@ -100,6 +100,9 @@ class SpikeAnalysisComputations(AllFunctionEnumeratingMixin):
         active_spike_analysis_config = computation_result.computation_config.get('spike_analysis', default_spike_analysis_config)
         active_spike_analysis_config = (default_spike_analysis_config | active_spike_analysis_config) # augment the actual values of the analysis config with the defaults if they're unavailable. This allows the user to pass only partially complete parameters in .spike_analysis
         
+        ## Set the config values from the defaults to ensure we have access to them later:
+        computation_result.computation_config['spike_analysis'] = active_spike_analysis_config
+        
         # print(f'computation_result.computation_config: {computation_result.computation_config.}')
         
         # # Get sampling rate:
