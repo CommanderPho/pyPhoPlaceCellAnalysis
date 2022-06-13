@@ -43,22 +43,16 @@ def save_some_pipeline_data_to_h5(active_pipeline, finalized_output_cache_file='
         pos_df.to_hdf(finalized_output_cache_file, key=f'{sess_identifier_key}/pos_df', format='table')
         return sess_identifier_key, local_output_keys
 
-
     output_structure = DynamicParameters(finalized_output_cache_file=finalized_output_cache_file)
     
     local_sess_identifier_key, local_output_keys = _perform_save_cache_pipeline_data_to_h5(active_pipeline.sess.spikes_df, active_pipeline.sess.position.to_dataframe(), sess_identifier_key='sess', finalized_output_cache_file=finalized_output_cache_file)
     output_structure[local_sess_identifier_key] = local_output_keys
     
-    # active_pipeline.sess.spikes_df.to_hdf(finalized_output_cache_file, key='sess/spikes_df')
-    # active_pipeline.sess.position.to_dataframe().to_hdf(finalized_output_cache_file, key='sess/pos_df')
-
     for (a_key, a_filtered_session) in active_pipeline.filtered_sessions.items():
         print(f'a_filtered_session: {a_filtered_session}')
         local_sess_identifier_key, local_output_keys = _perform_save_cache_pipeline_data_to_h5(a_filtered_session.spikes_df, a_filtered_session.position.to_dataframe(), sess_identifier_key=f'filtered_sessions/{a_key}', finalized_output_cache_file=finalized_output_cache_file)
         output_structure[local_sess_identifier_key] = local_output_keys 
-        # a_filtered_session.spikes_df.to_hdf(finalized_output_cache_file, key=f'filtered_sessions/{a_key}/spikes_df')
-        # a_filtered_session.position.to_dataframe().to_hdf(finalized_output_cache_file, key=f'filtered_sessions/{a_key}/pos_df')
-
+    
     return output_structure
 
 
