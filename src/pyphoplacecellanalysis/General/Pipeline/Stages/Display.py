@@ -137,7 +137,7 @@ def update_figure_files_output_Format(computation_result, active_config, root_ou
     # Now convert the computation parameters for filename display:
     if debug_print:
         print(f'active_config.computation_config: {active_config.computation_config}')
-    curr_computation_config_output_dir_name = active_config.computation_config.str_for_filename(False)
+    curr_computation_config_output_dir_name = active_config.computation_config.pf_params.str_for_filename(False)
     if debug_print:
         print(f'curr_computation_config_output_dir_name: {curr_computation_config_output_dir_name}')
     out_figure_save_current_computation_dir = active_config.plotting_config.get_figure_save_path(curr_computation_config_output_dir_name)
