@@ -37,7 +37,6 @@ class ComputablePipelineStage:
         # only requires that active_session has the .spikes_df and .position  properties
         output_result = ComputationResult(active_session, computation_config, computed_data=dict()) # Note that this active_session should be correctly filtered
         
-
         return output_result
 
     def single_computation(self, active_computation_params: PlacefieldComputationParameters=None, enabled_filter_names=None):
