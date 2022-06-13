@@ -12,15 +12,6 @@ from pyphocorehelpers.print_helpers import SimplePrintable
 # refactored to pyphoplacecellanalysis.General.Configs.DynamicConfigs
 from pyphoplacecellanalysis.General.Configs.DynamicConfigs import VideoOutputModeConfig, PlottingConfig, InteractivePlaceCellConfig
 
-# refactored to neuropy.analyses.placefields
-# class PlacefieldComputationParameters(SimplePrintable, metaclass=OrderedMeta):
-#     def __init__(self, speed_thresh=3, grid_bin=2, smooth=2):
-#         self.speed_thresh = speed_thresh
-#         self.grid_bin = grid_bin
-#         self.smooth = smooth   
-
-
-
 
 ## For building the configs used to filter the session by epoch: 
 def build_configs(session_config, active_epoch, active_subplots_shape = (1,1)):
