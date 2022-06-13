@@ -82,15 +82,25 @@ class SpikeAnalysisComputations(AllFunctionEnumeratingMixin):
         
         """
         
+        # computation_config = computation_result.computation_config.spike_analysis
+        # {
+        #     'max_num_spikes_per_neuron': 20000,
+        #     'kleinberg_parameters': DynamicParameters(s=2, gamma=0.1),
+        #     'use_progress_bar': False,
+        #     'debug_print': False
+        # }
+        # max_num_spikes_per_neuron = 20000 # the number of spikes to truncate each neuron's timeseries to
+        # kleinberg_parameters = DynamicParameters(s=2, gamma=0.1)
+        # use_progress_bar = False # whether to use a tqdm progress bar
+        # debug_print = False # whether to print debug-level progress using traditional print(...) statements
+
+
+        default_spike_analysis_config = DynamicParameters(max_num_spikes_per_neuron=20000, kleinberg_parameters=DynamicParameters(s=2, gamma=0.1), use_progress_bar=False, debug_print=False)
         
-        {
-            'max_num_spikes_per_neuron': 20000,
-            'kleinberg_parameters': DynamicParameters(s=2, gamma=0.1),
-            'use_progress_bar': False,
-            'debug_print': False
-        }
+        active_spike_analysis_config = computation_result.computation_config.get('spike_analysis', default_spike_analysis_config)
+        active_spike_analysis_config = (default_spike_analysis_config | active_spike_analysis_config) # augment the actual values of the analysis config with the defaults if they're unavailable. This allows the user to pass only partially complete parameters in .spike_analysis
         
-        
+        # print(f'computation_result.computation_config: {computation_result.computation_config.}')
         
         # # Get sampling rate:
         # sampling_rate = computation_result.sess.recinfo.dat_sampling_rate # 32552
@@ -102,22 +112,8 @@ class SpikeAnalysisComputations(AllFunctionEnumeratingMixin):
         #  'is_burst': is_burst
         # }
         
-        
-        max_num_spikes_per_neuron = 20000 # the number of spikes to truncate each neuron's timeseries to
-        kleinberg_parameters = DynamicParameters(s=2, gamma=0.1)
-        use_progress_bar = False # whether to use a tqdm progress bar
-        debug_print = False # whether to print debug-level progress using traditional print(...) statements
-
-
-    
-        max_num_spikes_per_neuron = 20000 # the number of spikes to truncate each neuron's timeseries to
-        kleinberg_parameters = DynamicParameters(s=2, gamma=0.1)
-        use_progress_bar = False # whether to use a tqdm progress bar
-        debug_print = False # whether to print debug-level progress using traditional print(...) statements
-
-
-        
-        out_pyburst_intervals = _compute_pybursts_burst_interval_detection(computation_result.sess)        
+                
+        out_pyburst_intervals = _compute_pybursts_burst_interval_detection(computation_result.sess, **active_spike_analysis_config)        
         computation_result.computed_data[SpikeAnalysisComputations._computationGroupName] = {'burst_intervals': out_pyburst_intervals}
             
         """ 
