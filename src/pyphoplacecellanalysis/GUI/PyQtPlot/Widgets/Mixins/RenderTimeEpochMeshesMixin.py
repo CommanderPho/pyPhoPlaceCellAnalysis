@@ -101,7 +101,7 @@ class RenderTimeEpochMeshesMixin:
     @QtCore.pyqtSlot(float, float)
     def RenderTimeEpochMeshesMixin_on_window_update(self, new_start=None, new_end=None):
         """ called when the window is updated to update the mesh locations. """
-        if self.has_render_epoch_meshes is not None:
+        if self.has_render_epoch_meshes:
             self.update_epoch_meshes(self.params.render_epochs.starts_t, self.params.render_epochs.durations)
 
     ############### Rate-Limited SLots ###############:
