@@ -19,18 +19,19 @@ class DefaultComputationFunctions(AllFunctionEnumeratingMixin):
 
     def _perform_position_decoding_computation(computation_result: ComputationResult):
         """ Builds the 2D Placefield Decoder """
-        def position_decoding_computation(active_session, computation_config, prev_output_result: ComputationResult):
-            prev_output_result.computed_data['pf2D_Decoder'] = BayesianPlacemapPositionDecoder(computation_config.time_bin_size, prev_output_result.computed_data['pf2D'], active_session.spikes_df.copy(), debug_print=False)
+        def position_decoding_computation(active_session, pf_computation_config, prev_output_result: ComputationResult):
+            prev_output_result.computed_data['pf2D_Decoder'] = BayesianPlacemapPositionDecoder(pf_computation_config.time_bin_size, prev_output_result.computed_data['pf2D'], active_session.spikes_df.copy(), debug_print=False)
             # %timeit pho_custom_decoder.compute_all():  18.8 s ± 149 ms per loop (mean ± std. dev. of 7 runs, 1 loop each)
             prev_output_result.computed_data['pf2D_Decoder'].compute_all() #  --> n = self.
             return prev_output_result
 
-        return position_decoding_computation(computation_result.sess, computation_result.computation_config, computation_result)
+        placefield_computation_config = computation_result.computation_config.pf_params # should be a PlacefieldComputationParameters
+        return position_decoding_computation(computation_result.sess, placefield_computation_config, computation_result)
     
     
     def _perform_two_step_position_decoding_computation(computation_result: ComputationResult, debug_print=False):
         """ Builds the Zhang Velocity/Position For 2-step Bayesian Decoder for 2D Placefields """
-        def _compute_avg_speed_at_each_position_bin(active_position_df, active_computation_config, xbin, ybin, show_plots=False, debug_print=False):
+        def _compute_avg_speed_at_each_position_bin(active_position_df, active_pf_computation_config, xbin, ybin, show_plots=False, debug_print=False):
             """ compute the average speed at each position x: """
             ## Non-working attempt to use edges instead of bins:
             # xbin_edges = xbin + [(xbin[-1] + (xbin[1] - xbin[0]))] # add an additional (right) edge to the end of the xbin array for use with pd.cut
@@ -67,9 +68,8 @@ class DefaultComputationFunctions(AllFunctionEnumeratingMixin):
 
 
         prev_one_step_bayesian_decoder = computation_result.computed_data['pf2D_Decoder']
-        
         # makes sure to use the xbin_center and ybin_center from the previous one_step decoder to bin the positions:
-        computation_result.sess.position.df, xbin, ybin, bin_info = build_position_df_discretized_binned_positions(computation_result.sess.position.df, computation_result.computation_config, xbin_values=prev_one_step_bayesian_decoder.xbin_centers, ybin_values=prev_one_step_bayesian_decoder.ybin_centers, debug_print=debug_print) # update the session's position dataframe with the new columns.
+        computation_result.sess.position.df, xbin, ybin, bin_info = build_position_df_discretized_binned_positions(computation_result.sess.position.df, computation_result.computation_config.pf_params, xbin_values=prev_one_step_bayesian_decoder.xbin_centers, ybin_values=prev_one_step_bayesian_decoder.ybin_centers, debug_print=debug_print) # update the session's position dataframe with the new columns.
         
         active_xbins = xbin
         active_ybins = ybin      
@@ -176,5 +176,4 @@ class DefaultComputationFunctions(AllFunctionEnumeratingMixin):
         computation_result.computed_data['pf2D_TwoStepDecoder']['most_likely_positions'][0, :] = prev_one_step_bayesian_decoder.xbin_centers[computation_result.computed_data['pf2D_TwoStepDecoder']['most_likely_position_indicies'][0, :]]
         computation_result.computed_data['pf2D_TwoStepDecoder']['most_likely_positions'][1, :] = prev_one_step_bayesian_decoder.ybin_centers[computation_result.computed_data['pf2D_TwoStepDecoder']['most_likely_position_indicies'][1, :]]
         # computation_result.computed_data['pf2D_TwoStepDecoder']['sigma_t_all'] = sigma_t_all # set sigma_t_all                
-        # return position_decoding_second_order_computation(computation_result.sess, computation_result.computation_config, computation_result)
         return computation_result

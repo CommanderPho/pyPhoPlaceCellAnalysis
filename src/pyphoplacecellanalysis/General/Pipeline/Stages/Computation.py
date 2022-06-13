@@ -7,6 +7,7 @@ import pandas as pd
 from neuropy import core
 from neuropy.analyses.placefields import PlacefieldComputationParameters, perform_compute_placefields
 
+from pyphocorehelpers.DataStructure.dynamic_parameters import DynamicParameters # to replace simple PlacefieldComputationParameters
 from pyphocorehelpers.function_helpers import compose_functions, compose_functions_with_error_handling
 
 from pyphoplacecellanalysis.General.Pipeline.Stages.BaseNeuropyPipelineStage import BaseNeuropyPipelineStage, PipelineStage
@@ -39,7 +40,7 @@ class ComputablePipelineStage:
         
         return output_result
 
-    def single_computation(self, active_computation_params: PlacefieldComputationParameters=None, enabled_filter_names=None):
+    def single_computation(self, active_computation_params: DynamicParameters=None, enabled_filter_names=None):
         """ 'single' here refers to the fact that it evaluates only one of the active_computation_params
         
         Takes its filtered_session and applies the provided active_computation_params to it. The results are stored in self.computation_results under the same key as the filtered session. """
@@ -120,7 +121,7 @@ class PipelineWithComputedPipelineStageMixin:
     
     
     ## Computation Helpers: 
-    def perform_computations(self, active_computation_params: PlacefieldComputationParameters=None, enabled_filter_names=None):
+    def perform_computations(self, active_computation_params: DynamicParameters=None, enabled_filter_names=None):
         assert (self.can_compute), "Current self.stage must already be a ComputedPipelineStage. Call self.filter_sessions with filter configs to reach this step."
         self.stage.single_computation(active_computation_params, enabled_filter_names=enabled_filter_names)
         

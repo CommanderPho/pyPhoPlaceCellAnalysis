@@ -18,8 +18,8 @@ class PlacefieldComputations(AllFunctionEnumeratingMixin):
         Provides 
         
         """
-        def initial_placefield_computation(active_session, computation_config, prev_output_result: ComputationResult):
-            prev_output_result.computed_data['pf1D'], prev_output_result.computed_data['pf2D'] = perform_compute_placefields(active_session.spikes_df, active_session.position, computation_config, None, None, included_epochs=computation_config.computation_epochs, should_force_recompute_placefields=True)
+        def initial_placefield_computation(active_session, pf_computation_config, prev_output_result: ComputationResult):
+            prev_output_result.computed_data['pf1D'], prev_output_result.computed_data['pf2D'] = perform_compute_placefields(active_session.spikes_df, active_session.position, pf_computation_config, None, None, included_epochs=pf_computation_config.computation_epochs, should_force_recompute_placefields=True)
             return prev_output_result
         
         """ 
@@ -33,7 +33,7 @@ class PlacefieldComputations(AllFunctionEnumeratingMixin):
             
             active_pf_2D
         """
-        return initial_placefield_computation(computation_result.sess, computation_result.computation_config, computation_result)
+        return initial_placefield_computation(computation_result.sess, computation_result.computation_config.pf_params, computation_result)
     
     
 
@@ -48,8 +48,8 @@ class PlacefieldComputations(AllFunctionEnumeratingMixin):
         Provides 
         
         """
-        def initial_time_dependent_placefield_computation(active_session, computation_config, prev_output_result: ComputationResult):
-            prev_output_result.computed_data['pf1D_dt'], prev_output_result.computed_data['pf2D_dt'] = perform_compute_time_dependent_placefields(active_session.spikes_df, active_session.position, computation_config, None, None, included_epochs=computation_config.computation_epochs, should_force_recompute_placefields=True)
+        def initial_time_dependent_placefield_computation(active_session, pf_computation_config, prev_output_result: ComputationResult):
+            prev_output_result.computed_data['pf1D_dt'], prev_output_result.computed_data['pf2D_dt'] = perform_compute_time_dependent_placefields(active_session.spikes_df, active_session.position, pf_computation_config, None, None, included_epochs=pf_computation_config.computation_epochs, should_force_recompute_placefields=True)
             return prev_output_result
         """ 
         Access via:
@@ -62,4 +62,4 @@ class PlacefieldComputations(AllFunctionEnumeratingMixin):
             
             active_pf_2D
         """
-        return initial_time_dependent_placefield_computation(computation_result.sess, computation_result.computation_config, computation_result)
+        return initial_time_dependent_placefield_computation(computation_result.sess, computation_result.computation_config.pf_params, computation_result)

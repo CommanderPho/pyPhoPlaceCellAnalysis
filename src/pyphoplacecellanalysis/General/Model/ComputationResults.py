@@ -30,10 +30,10 @@ class ComputationResult(DynamicParameters):
         The primary output data is stored in self.computed_data's dict
     """
     sess: DataSession
-    computation_config: PlacefieldComputationParameters
+    computation_config: DynamicParameters
     computed_data: dict
 
-    def __init__(self, sess: DataSession, computation_config: PlacefieldComputationParameters, computed_data: dict): 
+    def __init__(self, sess: DataSession, computation_config: DynamicParameters, computed_data: dict): 
         super(ComputationResult, self).__init__(sess=sess, computation_config=computation_config, computed_data=computed_data)
             
 
