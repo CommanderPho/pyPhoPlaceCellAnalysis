@@ -30,4 +30,4 @@ class MainPipelineWindowWithDockArea(QWidget):
 
 
 	def __str__(self):
- 		return 
+		return 

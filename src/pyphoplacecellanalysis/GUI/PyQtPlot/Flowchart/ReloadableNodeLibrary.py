@@ -1,5 +1,17 @@
 import importlib
 from pyphoplacecellanalysis.External.pyqtgraph.flowchart.NodeLibrary import NodeLibrary
+import pyphoplacecellanalysis.External.pyqtgraph.flowchart.library as fclib
+
+# Import the custom nodes:
+from pyphoplacecellanalysis.GUI.PyQtPlot.Flowchart.CustomNodes.DisplayNodes.ImageViewNode import ImageViewNode
+from pyphoplacecellanalysis.GUI.PyQtPlot.Flowchart.CustomNodes.DisplayNodes.UnsharpMaskNode import UnsharpMaskNode
+
+from pyphoplacecellanalysis.GUI.PyQtPlot.Flowchart.CustomNodes.BasePipeline.PipelineInputDataNode import PipelineInputDataNode
+from pyphoplacecellanalysis.GUI.PyQtPlot.Flowchart.CustomNodes.BasePipeline.PipelineFilteringDataNode import PipelineFilteringDataNode
+from pyphoplacecellanalysis.GUI.PyQtPlot.Flowchart.CustomNodes.BasePipeline.PipelineComputationsNode import PipelineComputationsNode
+from pyphoplacecellanalysis.GUI.PyQtPlot.Flowchart.CustomNodes.DisplayNodes.PipelineDisplayNode import PipelineDisplayNode
+from pyphoplacecellanalysis.GUI.PyQtPlot.Flowchart.CustomNodes.Compute.PhoPythonEvalNode import PhoPythonEvalNode
+from pyphoplacecellanalysis.GUI.PyQtPlot.Flowchart.CustomNodes.DisplayNodes.PipelineResultVisNode import PipelineResultVisNode
 
 
 class ReloadableNodeLibrary(NodeLibrary):
@@ -70,3 +82,51 @@ class ReloadableNodeLibrary(NodeLibrary):
             self.register_custom_nodes_function(self) # call to re-register the custom nodes. Not sure if this will work.
         
 
+    @classmethod
+    def _register_only_custom_node_types(cls, library):
+
+        # Custom Nodes:
+        library.addNodeType(PhoPythonEvalNode, [('Data',), 
+                                            ('Pho Pipeline','Eval')])
+            
+        # Pipeline Nodes:
+        library.addNodeType(PipelineInputDataNode, [('Data',), 
+                                            ('Pho Pipeline','Input')])
+        library.addNodeType(PipelineFilteringDataNode, [('Filters',), 
+                                            ('Pho Pipeline','Filtering')])
+        library.addNodeType(PipelineComputationsNode, [('Data',), 
+                                            ('Pho Pipeline','Computation')])
+        library.addNodeType(PipelineDisplayNode, [('Display',), 
+                                            ('Pho Pipeline','Display')])    
+        library.addNodeType(PipelineResultVisNode, [('Display',), 
+                                            ('Pho Pipeline','Display')])
+        return library
+
+    @classmethod
+    def setup_custom_node_library(cls, fc):
+        """Register Custom Nodes so they appear in the flowchart context menu
+        
+        fc: an actual Flowchart object
+        """
+        ## Method 1: Register to global default library:
+        #fclib.registerNodeType(ImageViewNode, [('Display',)])
+        #fclib.registerNodeType(UnsharpMaskNode, [('Image',)])
+
+        ## Method 2: If we want to make our custom node available only to this flowchart,
+        ## then instead of registering the node type globally, we can create a new 
+        ## NodeLibrary:
+        # library = fclib.LIBRARY.copy() # start with the default node set
+        library = ReloadableNodeLibrary.from_node_library(fclib.LIBRARY.copy())  # start with the default node set
+        
+        library.addNodeType(ImageViewNode, [('Display',)])
+        # Add the unsharp mask node to two locations in the menu to demonstrate
+        # that we can create arbitrary menu structures
+        library.addNodeType(UnsharpMaskNode, [('Image',)])
+        
+        library = cls._register_only_custom_node_types(library=library)
+        library.register_custom_nodes_function = cls._register_only_custom_node_types # set the reload custom nodes function to the function used to register the custom nodes
+
+        fc.setLibrary(library)
+        
+        
+    
