@@ -1,6 +1,8 @@
 from copy import deepcopy
 import time
 import sys
+from indexed import IndexedOrderedDict
+
 import pyphoplacecellanalysis.External.pyqtgraph as pg
 from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtCore, QtGui, QtWidgets
 import pyphoplacecellanalysis.External.pyqtgraph.opengl as gl # for 3D raster plot
@@ -146,15 +148,25 @@ class Spike2DRaster(Render2DScrollWindowPlotMixin, SpikeRasterBase):
             From self._buildGraphics()
         """
         # self._build_neuron_id_graphics(self.ui.main_gl_widget, self.y)
-        self.params.config_items = []
+        # self.params.config_items = [] # Old list version:
+        self.params.config_items = IndexedOrderedDict()
+        curr_neuron_ids_list = self.find_cell_ids_from_neuron_IDXs(self.fragile_linear_neuron_IDXs)
+        # self.config_neuron_id_map = {}
+        
         for i, fragile_linear_neuron_IDX in enumerate(self.fragile_linear_neuron_IDXs):
+            curr_neuron_id = curr_neuron_ids_list[i] # aclu value
+            
             curr_color = self.params.neuron_qcolors_map[fragile_linear_neuron_IDX]
             curr_color.setAlphaF(0.5)
             curr_pen = pg.mkPen(curr_color)
             curr_config_item = (i, fragile_linear_neuron_IDX, curr_pen, self.lower_y[i], self.upper_y[i])
-            self.params.config_items.append(curr_config_item)    
+            self.params.config_items[curr_neuron_id] = curr_config_item # add the current config item to the config items 
+            
+            # self.params.config_items.append(curr_config_item) # Old list version:
+            # append to aclu (neuron_id) to config map:
+            # self.config_neuron_id_map[curr_neuron_id] = curr_config_item
     
-        self.config_fragile_linear_neuron_IDX_map = dict(zip(self.fragile_linear_neuron_IDXs, self.params.config_items))
+        self.config_fragile_linear_neuron_IDX_map = dict(zip(self.fragile_linear_neuron_IDXs, self.params.config_items.values()))
         
         
   
