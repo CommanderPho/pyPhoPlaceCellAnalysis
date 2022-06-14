@@ -31,6 +31,8 @@
     <addaction name="actionLoad"/>
     <addaction name="actionSave"/>
     <addaction name="actionSave_As"/>
+    <addaction name="separator"/>
+    <addaction name="actionQuit_Application"/>
    </widget>
    <widget class="QMenu" name="menuAnalyses">
     <property name="title">
@@ -41,15 +43,29 @@
     <property name="title">
      <string>Help</string>
     </property>
+    <addaction name="actionAbout"/>
    </widget>
    <widget class="QMenu" name="menuWindows">
     <property name="title">
      <string>Windows</string>
     </property>
    </widget>
+   <widget class="QMenu" name="menuVisualizations">
+    <property name="title">
+     <string>Visualizations</string>
+    </property>
+    <addaction name="actionNew_2D_Raster_PyQtGraph"/>
+    <addaction name="actionNew_3D_Raster_PyQtGraph"/>
+    <addaction name="actionNew_3D_Raster_Vedo"/>
+    <addaction name="separator"/>
+    <addaction name="actionNew_Tuning_Curves_Explorer_ipcDataExplorer"/>
+    <addaction name="actionNew_Spikes_Behavior_Explorer_ipspikesDataExplorer"/>
+    <addaction name="separator"/>
+   </widget>
    <addaction name="menuFile"/>
    <addaction name="menuAnalyses"/>
    <addaction name="menuWindows"/>
+   <addaction name="menuVisualizations"/>
    <addaction name="menuHelp"/>
   </widget>
   <widget class="QStatusBar" name="statusbar"/>
@@ -87,6 +103,61 @@
   <action name="actionQuit_App">
    <property name="text">
     <string>Quit App</string>
+   </property>
+  </action>
+  <action name="actionAbout">
+   <property name="text">
+    <string>About...</string>
+   </property>
+  </action>
+  <action name="actionQuit_Application">
+   <property name="text">
+    <string>Quit Application</string>
+   </property>
+  </action>
+  <action name="actionNew_3D_Raster_PyQtGraph">
+   <property name="icon">
+    <iconset resource="../../../Resources/GuiResources.qrc">
+     <normaloff>:/Icons/Icons/SpikeRaster3DIcon.ico</normaloff>:/Icons/Icons/SpikeRaster3DIcon.ico</iconset>
+   </property>
+   <property name="text">
+    <string>New 3D Raster (PyQtGraph)</string>
+   </property>
+  </action>
+  <action name="actionNew_Tuning_Curves_Explorer_ipcDataExplorer">
+   <property name="icon">
+    <iconset resource="../../../Resources/GuiResources.qrc">
+     <normaloff>:/Icons/Icons/TuningMapDataExplorerIconWithLabel.ico</normaloff>:/Icons/Icons/TuningMapDataExplorerIconWithLabel.ico</iconset>
+   </property>
+   <property name="text">
+    <string>New Tuning Curves Explorer (ipcDataExplorer)</string>
+   </property>
+  </action>
+  <action name="actionNew_Spikes_Behavior_Explorer_ipspikesDataExplorer">
+   <property name="icon">
+    <iconset resource="../../../Resources/GuiResources.qrc">
+     <normaloff>:/Icons/Icons/InteractivePlaceCellDataExplorerIconWithLabel.ico</normaloff>:/Icons/Icons/InteractivePlaceCellDataExplorerIconWithLabel.ico</iconset>
+   </property>
+   <property name="text">
+    <string>New Spikes+Behavior Explorer (ipspikesDataExplorer)</string>
+   </property>
+  </action>
+  <action name="actionNew_3D_Raster_Vedo">
+   <property name="icon">
+    <iconset resource="../../../Resources/GuiResources.qrc">
+     <normaloff>:/Icons/Icons/SpikeRaster3D_VedoIcon.ico</normaloff>:/Icons/Icons/SpikeRaster3D_VedoIcon.ico</iconset>
+   </property>
+   <property name="text">
+    <string>New 3D Raster (Vedo)</string>
+   </property>
+  </action>
+  <action name="actionNew_2D_Raster_PyQtGraph">
+   <property name="icon">
+    <iconset resource="../../../Resources/GuiResources.qrc">
+     <normaloff>:/Icons/Icons/SpikeRaster2DIcon.ico</normaloff>:/Icons/Icons/SpikeRaster2DIcon.ico</iconset>
+   </property>
+   <property name="text">
+    <string>New 2D Raster (PyQtGraph)</string>
    </property>
   </action>
  </widget>
