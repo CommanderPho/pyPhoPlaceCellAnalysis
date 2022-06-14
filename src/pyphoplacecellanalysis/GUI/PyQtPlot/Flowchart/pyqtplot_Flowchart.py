@@ -322,7 +322,6 @@ def _add_pho_pipeline_programmatic_flowchart_nodes(app, fc, on_add_function=None
     
     pipeline_computation_node = fc.createNode('PipelineComputationsNode', pos=(pipeline_start_x+154, 50))
     
-
     pipeline_display_node = fc.createNode('PipelineDisplayNode', pos=(pipeline_start_x+280, 120))
     # pipeline_display_node.setApp(app) # Sets the shared singleton app instance
     # pipeline_display_node.setView(new_root_render_widget, on_remove_function=on_remove_widget_fn) # Sets the view associated with the node. Note that this is the 
@@ -331,7 +330,6 @@ def _add_pho_pipeline_programmatic_flowchart_nodes(app, fc, on_add_function=None
     # dynamic widget building mode:
     # pipeline_display_node.setView(on_add_function=on_add_widget_fn, on_remove_function=on_remove_widget_fn) # Sets the view associated with the node. Note that this is the programmatically instantiated node
     # pipeline_display_node.setView(on_add_function=on_add_function, on_remove_function=on_remove_function) # Sets the view associated with the node. Note that this is the programmatically instantiated node
-    
     
     # Pipeline Result Visualization Node:
     pipeline_result_viz_node = fc.createNode('PipelineResultVisNode', pos=(pipeline_start_x+280, 220))
