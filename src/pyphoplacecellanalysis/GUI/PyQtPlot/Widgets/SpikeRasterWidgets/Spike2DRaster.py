@@ -134,6 +134,10 @@ class Spike2DRaster(Render2DScrollWindowPlotMixin, SpikeRasterBase):
     
     def _build_cell_configs(self):
         """ Adds the neuron/cell configurations that are used to color and format the scatterplot spikes and such. 
+        Requires:
+            self.lower_y = DataSeriesToSpatial.build_series_identity_axis(self.n_cells, center_mode=self.params.center_mode, bin_position_mode='left_edges', side_bin_margins = self.params.side_bin_margins) / self.n_cells
+            self.upper_y = DataSeriesToSpatial.build_series_identity_axis(self.n_cells, center_mode=self.params.center_mode, bin_position_mode='right_edges', side_bin_margins = self.params.side_bin_margins) / self.n_cells
+        
         Adds:
             self.params.config_items: list
             self.config_fragile_linear_neuron_IDX_map: dict<self.fragile_linear_neuron_IDXs, self.params.config_items>
@@ -311,6 +315,12 @@ class Spike2DRaster(Render2DScrollWindowPlotMixin, SpikeRasterBase):
     @QtCore.pyqtSlot(object)
     def on_neuron_colors_changed(self, neuron_id_color_update_dict):
         """ Called when the neuron colors have finished changing (changed) to update the rendered elements.
+        
+        Inputs:
+            neuron_id_color_update_dict: a neuron_id:QColor dictionary
+        Updates:
+            self.all_spots
+            
         """
         print(f'Spike2DRaster.neuron_id_color_update_dict: {neuron_id_color_update_dict}')
         ## Rebuild Raster Plot Points:
