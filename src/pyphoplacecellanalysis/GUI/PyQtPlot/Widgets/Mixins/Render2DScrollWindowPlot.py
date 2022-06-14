@@ -25,17 +25,6 @@ class Render2DScrollWindowPlotMixin:
     ## Scrollable Window Signals
     window_scrolled = QtCore.pyqtSignal(float, float) # signal is emitted on updating the 2D sliding window, where the first argument is the new start value and the 2nd is the new end value
     
-    # def _build_spikes_data_values(self, spikes_df):
-    #     # All units at once approach:
-    #     # Filter the dataframe using that column and value from the list
-    #     curr_spike_t = spikes_df[spikes_df.spikes.time_variable_name].to_numpy() # this will map
-    #     curr_spike_x = np.interp(curr_spike_t, (self.spikes_window.active_window_start_time, self.spikes_window.active_window_end_time), (0.0, +self.temporal_axis_length))
-    #     curr_spike_y = spikes_df['visualization_raster_y_location'].to_numpy() # this will map
-    #     curr_spike_pens = [self.config_fragile_linear_neuron_IDX_map[a_cell_id][2] for a_cell_id in spikes_df['fragile_linear_neuron_IDX'].to_numpy()] # get the pens for each spike from the configs map
-    #     curr_n = len(curr_spike_t) # curr number of spikes
-    #     return curr_spike_x, curr_spike_y, curr_spike_pens, curr_n
-    
-    
     def _build_all_spikes_data_values(self):
         """ build global spikes for entire dataframe (not just the current window) 
         

@@ -1,9 +1,5 @@
 from pyphoplacecellanalysis.External.pyqtgraph.flowchart import Flowchart, Node
-import pyphoplacecellanalysis.External.pyqtgraph.flowchart.library as fclib
-
 from pyphoplacecellanalysis.GUI.PyQtPlot.Flowchart.ReloadableNodeLibrary import ReloadableNodeLibrary
-
-
 from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtGui, QtCore, QtWidgets
 
 # Must be called before any figures are created:
@@ -19,18 +15,11 @@ from pyphoplacecellanalysis.External.pyqtgraph.dockarea.DockArea import DockArea
 import pyphoplacecellanalysis.External.pyqtgraph as pg
 import numpy as np
 
-from pyphoplacecellanalysis.GUI.PyQtPlot.Windows.pyqtplot_MainWindow import PhoPipelineMainWindow
+from pyphoplacecellanalysis.GUI.Qt.MainApplicationWindows.PhoMainPipelineWindow.pyqtplot_MainWindow import PhoPipelineMainWindow
 from pyphoplacecellanalysis.GUI.PyQtPlot.Windows.pyqtplot_SecondaryWindow import PhoPipelineSecondaryWindow
 
-# Import the custom nodes:
-from pyphoplacecellanalysis.GUI.PyQtPlot.Flowchart.CustomNodes.DisplayNodes.ImageViewNode import ImageViewNode
-from pyphoplacecellanalysis.GUI.PyQtPlot.Flowchart.CustomNodes.DisplayNodes.UnsharpMaskNode import UnsharpMaskNode
-from pyphoplacecellanalysis.GUI.PyQtPlot.Flowchart.CustomNodes.BasePipeline.PipelineInputDataNode import PipelineInputDataNode
-from pyphoplacecellanalysis.GUI.PyQtPlot.Flowchart.CustomNodes.BasePipeline.PipelineFilteringDataNode import PipelineFilteringDataNode
-from pyphoplacecellanalysis.GUI.PyQtPlot.Flowchart.CustomNodes.BasePipeline.PipelineComputationsNode import PipelineComputationsNode
-from pyphoplacecellanalysis.GUI.PyQtPlot.Flowchart.CustomNodes.DisplayNodes.PipelineDisplayNode import PipelineDisplayNode
-from pyphoplacecellanalysis.GUI.PyQtPlot.Flowchart.CustomNodes.Compute.PhoPythonEvalNode import PhoPythonEvalNode
-from pyphoplacecellanalysis.GUI.PyQtPlot.Flowchart.CustomNodes.DisplayNodes.PipelineResultVisNode import PipelineResultVisNode
+
+
 
 from pyphoplacecellanalysis.GUI.PyQtPlot.Flowchart.CustomNodes.Mixins.DisplayNodeViewHelpers import ProducedViewType
 
@@ -54,16 +43,10 @@ from pyphoplacecellanalysis.External.pyqtgraph.widgets.CheckTable import CheckTa
 """
 def plot_flowchartWidget(title='PhoFlowchartApp'):
     """ 
-
     Usage:
         from pyphoplacecellanalysis.GUI.PyQtPlot.Flowchart.pyqtplot_Flowchart import plot_flowchartWidget
         pipeline_flowchart_window, pipeline_flowchart_app = plot_flowchartWidget(title='PhoMainPipelineFlowchartApp')
     """
-
-    ## Create main window with a grid layout inside
-    # win = QtGui.QMainWindow()
-    # cw = QtGui.QWidget()
-    # win.setCentralWidget(cw)
     
     # Use the widget defined in the designer as the central widget   
     mainAppWindow = PhoPipelineMainWindow(title)
@@ -75,21 +58,11 @@ def plot_flowchartWidget(title='PhoFlowchartApp'):
     print(f'cw: {cw}')
     
     # setup the main layout of the central widget:
-    # layout = QtGui.QGridLayout()
-    # cw.setLayout(layout)
-    
     layout = QtGui.QVBoxLayout()
     cw.setLayout(layout)
-    
-
-    # area = _build_dock_area(mainAppWindow, layout)    
     mainAppWindow.area = DockArea()
-    # mainAppWindow.setCentralWidget(area)
-    # mainAppWindow.resize(1000,500)
-    # layout.addWidget(mainAppWindow.area, 0, 0) # start at 1 since the console is available at 0
     layout.addWidget(mainAppWindow.area) # start at 1 since the console is available at 0
 
-    
     ## Create docks, place them into the window one at a time.
     ## Note that size arguments are only a suggestion; docks will still have to
     ## fill the entire dock area and obey the limits of their internal widgets.
@@ -182,7 +155,8 @@ def plot_flowchartWidget(title='PhoFlowchartApp'):
         return new_view_widget, dDisplayItem
     
     # Setup the nodes in the flowchart:
-    _setup_custom_node_library(mainAppWindow.flowchart)
+    ReloadableNodeLibrary.setup_custom_node_library(mainAppWindow.flowchart)
+    # _setup_custom_node_library(mainAppWindow.flowchart)
     
     # end node setup:
     mainAppWindow.show()
@@ -288,49 +262,6 @@ def _build_dock_save_load(area, d1):
     restoreBtn.clicked.connect(load)
 
 
-def _register_only_custom_node_types(library):
-    # Custom Nodes:
-    library.addNodeType(PhoPythonEvalNode, [('Data',), 
-                                        ('Pho Pipeline','Eval')])
-        
-    # Pipeline Nodes:
-    library.addNodeType(PipelineInputDataNode, [('Data',), 
-                                        ('Pho Pipeline','Input')])
-    library.addNodeType(PipelineFilteringDataNode, [('Filters',), 
-                                        ('Pho Pipeline','Filtering')])
-    library.addNodeType(PipelineComputationsNode, [('Data',), 
-                                        ('Pho Pipeline','Computation')])
-    library.addNodeType(PipelineDisplayNode, [('Display',), 
-                                        ('Pho Pipeline','Display')])    
-    library.addNodeType(PipelineResultVisNode, [('Display',), 
-                                        ('Pho Pipeline','Display')])
-    return library
-
-
-def _setup_custom_node_library(fc):
-    """Register Custom Nodes so they appear in the flowchart context menu"""
-    ## Method 1: Register to global default library:
-    #fclib.registerNodeType(ImageViewNode, [('Display',)])
-    #fclib.registerNodeType(UnsharpMaskNode, [('Image',)])
-
-    ## Method 2: If we want to make our custom node available only to this flowchart,
-    ## then instead of registering the node type globally, we can create a new 
-    ## NodeLibrary:
-    # library = fclib.LIBRARY.copy() # start with the default node set
-    library = ReloadableNodeLibrary.from_node_library(fclib.LIBRARY.copy())  # start with the default node set
-    
-    
-    library.addNodeType(ImageViewNode, [('Display',)])
-    # Add the unsharp mask node to two locations in the menu to demonstrate
-    # that we can create arbitrary menu structures
-    library.addNodeType(UnsharpMaskNode, [('Image',)])
-    
-    library = _register_only_custom_node_types(library=library)
-    
-    library.register_custom_nodes_function = _register_only_custom_node_types # set the reload custom nodes function to the function used to register the custom nodes
-
-    fc.setLibrary(library)
-    
 
 
 
@@ -391,7 +322,6 @@ def _add_pho_pipeline_programmatic_flowchart_nodes(app, fc, on_add_function=None
     
     pipeline_computation_node = fc.createNode('PipelineComputationsNode', pos=(pipeline_start_x+154, 50))
     
-
     pipeline_display_node = fc.createNode('PipelineDisplayNode', pos=(pipeline_start_x+280, 120))
     # pipeline_display_node.setApp(app) # Sets the shared singleton app instance
     # pipeline_display_node.setView(new_root_render_widget, on_remove_function=on_remove_widget_fn) # Sets the view associated with the node. Note that this is the 
@@ -400,7 +330,6 @@ def _add_pho_pipeline_programmatic_flowchart_nodes(app, fc, on_add_function=None
     # dynamic widget building mode:
     # pipeline_display_node.setView(on_add_function=on_add_widget_fn, on_remove_function=on_remove_widget_fn) # Sets the view associated with the node. Note that this is the programmatically instantiated node
     # pipeline_display_node.setView(on_add_function=on_add_function, on_remove_function=on_remove_function) # Sets the view associated with the node. Note that this is the programmatically instantiated node
-    
     
     # Pipeline Result Visualization Node:
     pipeline_result_viz_node = fc.createNode('PipelineResultVisNode', pos=(pipeline_start_x+280, 220))

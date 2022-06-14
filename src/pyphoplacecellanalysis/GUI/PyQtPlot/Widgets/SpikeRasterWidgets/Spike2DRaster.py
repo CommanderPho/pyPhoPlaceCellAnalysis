@@ -1,6 +1,8 @@
 from copy import deepcopy
 import time
 import sys
+from indexed import IndexedOrderedDict
+
 import pyphoplacecellanalysis.External.pyqtgraph as pg
 from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtCore, QtGui, QtWidgets
 import pyphoplacecellanalysis.External.pyqtgraph.opengl as gl # for 3D raster plot
@@ -15,7 +17,7 @@ from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.Mixins.Render2DScrollWindowPlot
 
 
 class Spike2DRaster(Render2DScrollWindowPlotMixin, SpikeRasterBase):
-    """ Displays a 3D version of a raster plot with the spikes occuring along a plane. 
+    """ Displays a 2D version of a raster plot with the spikes occuring along a plane. 
     
     Usage:
         from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.SpikeRasterWidgets.Spike2DRaster import Spike2DRaster
@@ -120,7 +122,7 @@ class Spike2DRaster(Render2DScrollWindowPlotMixin, SpikeRasterBase):
         if 'visualization_raster_y_location' not in self.spikes_df.columns:
             print('Spike2DRaster.setup(): adding "visualization_raster_y_location" column to spikes_df...')
             # all_y = [y[i] for i, a_cell_id in enumerate(curr_spikes_df['fragile_linear_neuron_IDX'].to_numpy())]
-            all_y = [self.y_fragile_linear_neuron_IDX_map[a_cell_id] for a_cell_id in self.spikes_df['fragile_linear_neuron_IDX'].to_numpy()]
+            all_y = [self.y_fragile_linear_neuron_IDX_map[a_cell_IDX] for a_cell_IDX in self.spikes_df['fragile_linear_neuron_IDX'].to_numpy()]
             self.spikes_df['visualization_raster_y_location'] = all_y # adds as a column to the dataframe. Only needs to be updated when the number of active units changes
             print('done.')
         # self.spikes_df
@@ -134,6 +136,10 @@ class Spike2DRaster(Render2DScrollWindowPlotMixin, SpikeRasterBase):
     
     def _build_cell_configs(self):
         """ Adds the neuron/cell configurations that are used to color and format the scatterplot spikes and such. 
+        Requires:
+            self.lower_y = DataSeriesToSpatial.build_series_identity_axis(self.n_cells, center_mode=self.params.center_mode, bin_position_mode='left_edges', side_bin_margins = self.params.side_bin_margins) / self.n_cells
+            self.upper_y = DataSeriesToSpatial.build_series_identity_axis(self.n_cells, center_mode=self.params.center_mode, bin_position_mode='right_edges', side_bin_margins = self.params.side_bin_margins) / self.n_cells
+        
         Adds:
             self.params.config_items: list
             self.config_fragile_linear_neuron_IDX_map: dict<self.fragile_linear_neuron_IDXs, self.params.config_items>
@@ -142,15 +148,25 @@ class Spike2DRaster(Render2DScrollWindowPlotMixin, SpikeRasterBase):
             From self._buildGraphics()
         """
         # self._build_neuron_id_graphics(self.ui.main_gl_widget, self.y)
-        self.params.config_items = []
+        # self.params.config_items = [] # Old list version:
+        self.params.config_items = IndexedOrderedDict()
+        curr_neuron_ids_list = self.find_cell_ids_from_neuron_IDXs(self.fragile_linear_neuron_IDXs)
+        # self.config_neuron_id_map = {}
+        
         for i, fragile_linear_neuron_IDX in enumerate(self.fragile_linear_neuron_IDXs):
+            curr_neuron_id = curr_neuron_ids_list[i] # aclu value
+            
             curr_color = self.params.neuron_qcolors_map[fragile_linear_neuron_IDX]
             curr_color.setAlphaF(0.5)
             curr_pen = pg.mkPen(curr_color)
             curr_config_item = (i, fragile_linear_neuron_IDX, curr_pen, self.lower_y[i], self.upper_y[i])
-            self.params.config_items.append(curr_config_item)    
+            self.params.config_items[curr_neuron_id] = curr_config_item # add the current config item to the config items 
+            
+            # self.params.config_items.append(curr_config_item) # Old list version:
+            # append to aclu (neuron_id) to config map:
+            # self.config_neuron_id_map[curr_neuron_id] = curr_config_item
     
-        self.config_fragile_linear_neuron_IDX_map = dict(zip(self.fragile_linear_neuron_IDXs, self.params.config_items))
+        self.config_fragile_linear_neuron_IDX_map = dict(zip(self.fragile_linear_neuron_IDXs, self.params.config_items.values()))
         
         
   
@@ -311,6 +327,12 @@ class Spike2DRaster(Render2DScrollWindowPlotMixin, SpikeRasterBase):
     @QtCore.pyqtSlot(object)
     def on_neuron_colors_changed(self, neuron_id_color_update_dict):
         """ Called when the neuron colors have finished changing (changed) to update the rendered elements.
+        
+        Inputs:
+            neuron_id_color_update_dict: a neuron_id:QColor dictionary
+        Updates:
+            self.all_spots
+            
         """
         print(f'Spike2DRaster.neuron_id_color_update_dict: {neuron_id_color_update_dict}')
         ## Rebuild Raster Plot Points:
