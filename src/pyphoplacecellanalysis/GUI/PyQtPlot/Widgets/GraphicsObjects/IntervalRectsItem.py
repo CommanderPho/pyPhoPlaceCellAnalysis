@@ -14,6 +14,19 @@ class IntervalRectsItem(pg.GraphicsObject):
     """ Created to render the 2D Intervals as rectangles in a pyqtgraph 
     
         Based on pyqtgraph's CandlestickItem example
+        
+        
+    Usage:
+        from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.GraphicsObjects.IntervalRectsItem import IntervalRectsItem, main
+        active_interval_rects_item = IntervalRectsItem(data)
+        
+        ## Add the active_interval_rects_item to the main_plot_widget: 
+        main_plot_widget = spike_raster_window.spike_raster_plt_2d.ui.main_plot_widget # PlotItem
+        main_plot_widget.addItem(active_interval_rects_item)
+
+        ## Remove the active_interval_rects_item:
+        main_plot_widget.removeItem(active_interval_rects_item)
+
     """
     def __init__(self, data):
         pg.GraphicsObject.__init__(self)
