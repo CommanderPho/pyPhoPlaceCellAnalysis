@@ -17,7 +17,7 @@ from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.Mixins.Render2DScrollWindowPlot
 
 
 class Spike2DRaster(Render2DScrollWindowPlotMixin, SpikeRasterBase):
-    """ Displays a 3D version of a raster plot with the spikes occuring along a plane. 
+    """ Displays a 2D version of a raster plot with the spikes occuring along a plane. 
     
     Usage:
         from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.SpikeRasterWidgets.Spike2DRaster import Spike2DRaster
@@ -122,7 +122,7 @@ class Spike2DRaster(Render2DScrollWindowPlotMixin, SpikeRasterBase):
         if 'visualization_raster_y_location' not in self.spikes_df.columns:
             print('Spike2DRaster.setup(): adding "visualization_raster_y_location" column to spikes_df...')
             # all_y = [y[i] for i, a_cell_id in enumerate(curr_spikes_df['fragile_linear_neuron_IDX'].to_numpy())]
-            all_y = [self.y_fragile_linear_neuron_IDX_map[a_cell_id] for a_cell_id in self.spikes_df['fragile_linear_neuron_IDX'].to_numpy()]
+            all_y = [self.y_fragile_linear_neuron_IDX_map[a_cell_IDX] for a_cell_IDX in self.spikes_df['fragile_linear_neuron_IDX'].to_numpy()]
             self.spikes_df['visualization_raster_y_location'] = all_y # adds as a column to the dataframe. Only needs to be updated when the number of active units changes
             print('done.')
         # self.spikes_df
