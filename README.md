@@ -1,4 +1,4 @@
-[![Project generated with PyScaffold](https://img.shields.io/badge/-PyScaffold-005CA0?logo=pyscaffold)](https://pyscaffold.org/)
+[![Project generated with PyScaffold](https://img.shields.io/badge/-PyScaffold-005CA0?logo=pyscaffold)](https://pyscaffold.org/) [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.6647477.svg)](https://doi.org/10.5281/zenodo.6647477)
 <!-- These are examples of badges you might also want to add to your README. Update the URLs accordingly.
 [![Built Status](https://api.cirrus-ci.com/github/<USER>/pyPhoPlaceCellAnalysis.svg?branch=main)](https://cirrus-ci.com/github/<USER>/pyPhoPlaceCellAnalysis)
 [![ReadTheDocs](https://readthedocs.org/projects/pyPhoPlaceCellAnalysis/badge/?version=latest)](https://pyPhoPlaceCellAnalysis.readthedocs.io/en/stable/)
