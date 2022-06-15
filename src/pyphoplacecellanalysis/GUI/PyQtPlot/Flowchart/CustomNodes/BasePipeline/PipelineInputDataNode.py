@@ -106,7 +106,7 @@ class PipelineInputDataNode(ExtendedCtrlNode):
             # self.stateGroup.
             # raise NotImplementedError
 
-        with ProgressDialog("Pipeline Input Loading..", 0, self.num_known_types, parent=None, busyCursor=True, wait=250) as dlg:
+        with ProgressDialog("Pipeline Input Loading..", 0, self.num_known_types, cancelText="Cancel", parent=None, busyCursor=True, wait=250) as dlg:
             # do stuff
             # dlg.setValue(0)   ## could also use dlg += 1
             # curr_bapun_pipeline = NeuropyPipeline.init_from_known_data_session_type('bapun', known_data_session_type_dict['bapun'])

@@ -118,7 +118,7 @@ class PipelineComputationsNode(ExtendedCtrlNode):
         all_filters_list = list(pipeline.filtered_sessions.keys())
         self.updateConfigRows(all_filters_list)
         
-        with ProgressDialog("Pipeline Input Loading: Bapun Format..", 0, 1, parent=None, busyCursor=True, wait=250) as dlg:
+        with ProgressDialog("Pipeline Input Loading: Bapun Format..", 0, 1, cancelText="Cancel", parent=None, busyCursor=True, wait=250) as dlg:
             pipeline = NonInteractiveWrapper.perform_computation(pipeline, computation_configs, enabled_filter_names=self.enabled_computation_filters)
 
         return {'updated_computation_configs': computation_configs,'computed_pipeline': pipeline}

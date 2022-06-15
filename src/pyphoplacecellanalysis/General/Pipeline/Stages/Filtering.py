@@ -26,17 +26,21 @@ class FilterablePipelineStage:
 class FilteredPipelineMixin:
     """ To be added to the pipeline to enable conveninece access ot its pipeline stage post Filtered stage. """
     ## Filtered Properties:
-    
     @property
     def filtered_epochs(self):
         """The filtered_sessions property, accessed through the stage."""
         return self.stage.filtered_epochs
-    
+        
     @property
     def filtered_sessions(self):
         """The filtered_sessions property, accessed through the stage."""
         return self.stage.filtered_sessions
     
+    @property
+    def active_config_names(self):
+        """The names of the active configs that can be used to index into the other properties (which are dictionaries)."""
+        return list(self.stage.active_configs.keys())
+
     @property
     def active_configs(self):
         """The active_configs property corresponding to the InteractivePlaceCellConfig obtained by filtering the session. Accessed through the stage."""

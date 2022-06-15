@@ -5,6 +5,11 @@ from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtWidgets
 
 dlg = QtWidgets.QFileDialog
 
+""" 
+
+This list of various parameter types illustrates how to define a custom param tree:
+
+"""
 cfg = {
     'list': {
         'limits': {

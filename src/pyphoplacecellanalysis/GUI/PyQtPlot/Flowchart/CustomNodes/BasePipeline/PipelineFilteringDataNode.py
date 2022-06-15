@@ -108,7 +108,7 @@ class PipelineFilteringDataNode(ExtendedCtrlNode):
         # print(f'selected_config_value: {selected_config_value}; updated_configs: {updated_configs}')
         # self.updateKeys(updated_configs) # Update the possible keys
         
-        with ProgressDialog("Pipeline Filtering: {active_data_mode} Format..", 0, 1, parent=None, busyCursor=True, wait=250) as dlg:
+        with ProgressDialog("Pipeline Filtering: {active_data_mode} Format..", 0, 1, cancelText="Cancel", parent=None, busyCursor=True, wait=250) as dlg:
             # build a list of only the enabled filters
              enabled_session_filter_configs = OrderedDict()
              for an_enabled_filter_name in self.enabled_filters:

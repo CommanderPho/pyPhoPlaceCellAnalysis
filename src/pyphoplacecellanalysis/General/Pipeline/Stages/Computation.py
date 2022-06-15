@@ -110,6 +110,11 @@ class PipelineWithComputedPipelineStageMixin:
         return self.stage.computation_results
     
     @property
+    def active_completed_computation_result_names(self):
+        """The this list of all computed configs."""
+        return self.stage._get_valid_computation_results_config_names()
+    
+    @property
     def registered_computation_functions(self):
         """The registered_computation_functions property."""
         return self.stage.registered_computation_functions
@@ -202,4 +207,36 @@ class ComputedPipelineStage(LoadableInput, LoadableSessionInput, FilterablePipel
             if debug_print:
                 print(f'No registered_computation_functions, skipping extended computations.')
             return previous_computation_result # just return the unaltered result
+    
+    
+    def _get_valid_computation_results_config_names(self, debug_print=False):
+        """ returns the names of all the configs (usually epochs, like 'maze1' or 'maze2') that have been completely computed
+        Returns:
+            computed_epochs_list: the names of all the configs (usually epochs, like 'maze1' or 'maze2') that have been computed
+        """
+        computed_config_names_list = list(self.computation_results.keys()) # ['maze1', 'maze2']
+        if debug_print:
+            print(f'computed_config_names_list: {computed_config_names_list}') 
+
+        complete_computed_config_names_list = []
+        for curr_config_name in computed_config_names_list:
+            # Try to see if the current config is valid or incomplete
+            curr_config_incomplete_reason = None
+            active_computation_results = self.computation_results.get(curr_config_name, None)
+            if active_computation_results is None:
+                curr_config_incomplete_reason = 'MISSING_computation_results'
+            # Check the members:
+            active_computed_data = self.computation_results[curr_config_name].computed_data
+            if active_computed_data is None:
+                curr_config_incomplete_reason = 'INVALID_computation_results_computed_data'
+            active_computation_config = self.computation_results[curr_config_name].computation_config
+            if active_computation_config is None:
+                curr_config_incomplete_reason = 'INVALID_computation_results_computation_config'
+            if curr_config_incomplete_reason is not None:
+                if debug_print:
+                    print(f'curr_config_incomplete_reason: {curr_config_incomplete_reason}')
+            else:
+                complete_computed_config_names_list.append(curr_config_name)
+                
+        return complete_computed_config_names_list
     
