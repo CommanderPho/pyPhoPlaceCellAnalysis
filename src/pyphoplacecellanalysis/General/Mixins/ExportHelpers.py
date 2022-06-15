@@ -4,6 +4,16 @@ import pandas as pd
 import numpy as np
 from pyphocorehelpers.DataStructure.dynamic_parameters import DynamicParameters
 
+
+def get_default_pipeline_data_keys(active_config_name):
+    if active_config_name is None:
+        active_config_name = 'sess' # the default keys for no filter config are '/sess/spikes_df'
+        
+    return {'spikes_df': f'/filtered_sessions/{active_config_name}/spikes_df',
+            'positions_df': f'/filtered_sessions/{active_config_name}/pos_df'
+        }
+
+
         
 def save_some_pipeline_data_to_h5(active_pipeline, finalized_output_cache_file='./pipeline_cache_store.h5'):
     """ 
@@ -35,10 +45,7 @@ def save_some_pipeline_data_to_h5(active_pipeline, finalized_output_cache_file='
         """
         # local_output_structure = output_structure.setdefault(sess_identifier_key, {})
         
-        local_output_keys = {
-            'spikes_df': f'{sess_identifier_key}/spikes_df',
-            'pos_df': f'{sess_identifier_key}/pos_df'
-        }
+        local_output_keys = get_default_pipeline_data_keys(sess_identifier_key)
         spikes_df.to_hdf(finalized_output_cache_file, key=f'{sess_identifier_key}/spikes_df')
         pos_df.to_hdf(finalized_output_cache_file, key=f'{sess_identifier_key}/pos_df', format='table')
         return sess_identifier_key, local_output_keys
