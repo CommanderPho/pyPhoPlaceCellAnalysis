@@ -1,7 +1,7 @@
 """ Simple helper functions that are used to add Save/Restore state buttons to a ParameterTree
 
 Known to be used by:
-	PhoPy3DPositionAnalysis2021\LibrariesExamples\PyQtPlot\PyQtGraph_PipelineFilterParameterTree_Testing.py
+    PhoPy3DPositionAnalysis2021.LibrariesExamples.PyQtPlot.PyQtGraph_PipelineFilterParameterTree_Testing.py
 
 """
 

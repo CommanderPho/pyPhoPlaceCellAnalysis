@@ -13,20 +13,14 @@ from BuildParamTypes import makeAllParamTypes
 
 import pyphoplacecellanalysis.External.pyqtgraph.parametertree.parameterTypes as pTypes
 from pyphoplacecellanalysis.External.pyqtgraph.parametertree import Parameter, ParameterTree
-
+from pyphoplacecellanalysis.GUI.PyQtPlot.Params.SaveRestoreStateParamHelpers import default_parameters_save_restore_state_button_children
 
 def plot_paramTreeWidget(title='PhoParamTreeApp'):
     app = pg.mkQApp(title)
     # Build parameter tree:
     params = [
         makeAllParamTypes(),
-        {'name': 'Save/Restore functionality', 'type': 'group', 'children': [
-            {'name': 'Save State', 'type': 'action'},
-            {'name': 'Restore State', 'type': 'action', 'children': [
-                {'name': 'Add missing items', 'type': 'bool', 'value': True},
-                {'name': 'Remove extra items', 'type': 'bool', 'value': True},
-            ]},
-        ]},
+        default_parameters_save_restore_state_button_children(),
         {'name': 'Custom context menu', 'type': 'group', 'children': [
             {'name': 'List contextMenu', 'type': 'float', 'value': 0, 'context': [
                 'menu1',
