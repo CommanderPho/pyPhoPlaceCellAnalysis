@@ -30,7 +30,7 @@ class IntervalRectsItem(pg.GraphicsObject):
     """
     def __init__(self, data):
         pg.GraphicsObject.__init__(self)
-        self.data = data  ## data must have fields: time, open, close, min, max
+        self.data = data  ## data must have fields: start_t, series_vertical_offset, duration_t, series_height, pen, brush
         self.generatePicture()
     
     def generatePicture(self):
