@@ -84,6 +84,7 @@ def build_export_parameters_tree(curr_active_pipeline, parameter_names='ExportPa
         """ 
         Implicitly captures:
             p
+            all_computed_config_names # to call _build_current_export_keys(...) properly
         """
         if debug_print:
             print("tree changes:")
@@ -105,7 +106,7 @@ def build_export_parameters_tree(curr_active_pipeline, parameter_names='ExportPa
                 if debug_print:
                     print(f'matched uncheck event. data: {data}')
                 # data: the list of currently checked changes:
-                updated_key_children_list = _build_current_export_keys(include_whitelist=data)
+                updated_key_children_list = _build_current_export_keys(all_computed_config_names, include_whitelist=data)
                 if debug_print:
                     print(f'\tupdated_key_children_list: {updated_key_children_list}')    
                 # replace the children keys:
@@ -135,7 +136,9 @@ def build_export_parameters_tree(curr_active_pipeline, parameter_names='ExportPa
     def action_perform_export():
         """ Do the actual export task here:
         
-            Implicitly captures: curr_active_pipeline, 
+            Implicitly captures: 
+                curr_active_pipeline 
+                p
         """
         print(f'action_perform_export()')
         # direct from widget (WORKS):
@@ -147,13 +150,21 @@ def build_export_parameters_tree(curr_active_pipeline, parameter_names='ExportPa
             print(f'\tcurr_export_path_str: {curr_export_path_str}')
 
         ## TODO: validate the path and make sure it's valid:
-            
-        finalized_output_cache_file = curr_export_path_str
-        output_save_result = save_some_pipeline_data_to_h5(curr_active_pipeline, finalized_output_cache_file=finalized_output_cache_file)
-        if debug_print:
-            print(f'\toutput_save_result: {output_save_result}')
         
-
+        # Get list of current configs to export:
+        included_export_session_identifiers = p['Included Exports'] # ['maze1'] - only the currently checked exports
+        
+        # Get keys to add:
+        export_keys_list = p.param("Export Keys") # ExportHdf5KeysGroup 
+        active_export_keys_list = [str(a_child.name()) for a_child in export_keys_list.children()] # ['/filtered_sessions/maze1/spikes_df', '/filtered_sessions/maze1/pos_df']
+        
+        if len(included_export_session_identifiers) > 0:
+            output_save_result = save_some_pipeline_data_to_h5(curr_active_pipeline, included_session_identifiers=included_export_session_identifiers, finalized_output_cache_file=curr_export_path_str)
+            if debug_print:
+                print(f'\toutput_save_result: {output_save_result}')
+        else:
+            print(f'export pressed but no session identifiers are currently included for export. Check the boxes!')
+        
     btnExport = p.param('Export')
     btnExport.sigActivated.connect(action_perform_export)
     

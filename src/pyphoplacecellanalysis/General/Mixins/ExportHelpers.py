@@ -15,8 +15,13 @@ def get_default_pipeline_data_keys(active_config_name):
 
 
         
-def save_some_pipeline_data_to_h5(active_pipeline, finalized_output_cache_file='./pipeline_cache_store.h5'):
+def save_some_pipeline_data_to_h5(active_pipeline, included_session_identifiers=None, custom_key_prefix=None, finalized_output_cache_file='./pipeline_cache_store.h5', debug_print=False):
     """ 
+    
+    Inputs:
+        included_session_identifiers: [] -  a list of session names to include in the output (e.g. ['maze','maze1','maze2']
+       finalized_output_cache_file: str - a string specifying the prefix to prepend to each h5 key created, or None to use the default
+        
     # Saves out ['/spikes_df', '/sess/spikes_df', '/filtered_sessions/maze2/spikes_df', '/filtered_sessions/maze1/spikes_df', '/filtered_sessions/maze/spikes_df'] to a .h5 file which can be loaded with
     # with pd.HDFStore(finalized_spike_df_cache_file) as store:
         # print(store.keys())
@@ -44,7 +49,6 @@ def save_some_pipeline_data_to_h5(active_pipeline, finalized_output_cache_file='
         
         """
         # local_output_structure = output_structure.setdefault(sess_identifier_key, {})
-        
         local_output_keys = get_default_pipeline_data_keys(sess_identifier_key)
         spikes_df.to_hdf(finalized_output_cache_file, key=f'{sess_identifier_key}/spikes_df')
         pos_df.to_hdf(finalized_output_cache_file, key=f'{sess_identifier_key}/pos_df', format='table')
@@ -52,14 +56,38 @@ def save_some_pipeline_data_to_h5(active_pipeline, finalized_output_cache_file='
 
     output_structure = DynamicParameters(finalized_output_cache_file=finalized_output_cache_file)
     
-    local_sess_identifier_key, local_output_keys = _perform_save_cache_pipeline_data_to_h5(active_pipeline.sess.spikes_df, active_pipeline.sess.position.to_dataframe(), sess_identifier_key='sess', finalized_output_cache_file=finalized_output_cache_file)
-    output_structure[local_sess_identifier_key] = local_output_keys
+    if included_session_identifiers is None:
+        included_session_identifiers = ['sess'] + active_pipeline.filtered_session_names
+                            
+        
+    # Save out the non-filtered (sess) if desired:
+    if 'sess' in included_session_identifiers:
+        if custom_key_prefix is not None:
+            curr_sess_identifier_key = '/'.join([custom_key_prefix, 'sess'])
+        else:
+            curr_sess_identifier_key = 'sess'
+        local_sess_identifier_key, local_output_keys = _perform_save_cache_pipeline_data_to_h5(active_pipeline.sess.spikes_df, active_pipeline.sess.position.to_dataframe(), sess_identifier_key=curr_sess_identifier_key, finalized_output_cache_file=finalized_output_cache_file)
+        output_structure[local_sess_identifier_key] = local_output_keys
+    else:
+        if debug_print:
+            print("skipping 'sess' because it is not included in included_session_identifiers")
     
     for (a_key, a_filtered_session) in active_pipeline.filtered_sessions.items():
-        print(f'a_filtered_session: {a_filtered_session}')
-        local_sess_identifier_key, local_output_keys = _perform_save_cache_pipeline_data_to_h5(a_filtered_session.spikes_df, a_filtered_session.position.to_dataframe(), sess_identifier_key=f'filtered_sessions/{a_key}', finalized_output_cache_file=finalized_output_cache_file)
-        output_structure[local_sess_identifier_key] = local_output_keys 
-    
+        if a_key in included_session_identifiers:
+            if debug_print:
+                print(f'a_filtered_session: {a_filtered_session}')
+                
+            # curr_sess_identifier_key = f'filtered_sessions/{a_key}'
+            if custom_key_prefix is not None:
+                curr_sess_identifier_key = '/'.join([custom_key_prefix, 'filtered_sessions', a_key])
+            else:
+                curr_sess_identifier_key = '/'.join(['filtered_sessions', a_key])
+            
+            local_sess_identifier_key, local_output_keys = _perform_save_cache_pipeline_data_to_h5(a_filtered_session.spikes_df, a_filtered_session.position.to_dataframe(), sess_identifier_key=curr_sess_identifier_key, finalized_output_cache_file=finalized_output_cache_file)
+            output_structure[local_sess_identifier_key] = local_output_keys 
+        else:
+            if debug_print:
+                print(f'skipping {a_key} because it is not included in included_session_identifiers')
     return output_structure
 
 
@@ -99,6 +127,7 @@ def get_h5_data_keys(finalized_output_cache_file, enable_debug_print=False):
         if enable_debug_print:
             print(out_keys)
     return out_keys
+
 
 
 def _test_save_pipeline_data_to_h5(curr_active_pipeline, finalized_output_cache_file=None, data_output_directory=None, enable_dry_run=True, enable_debug_print=True):
