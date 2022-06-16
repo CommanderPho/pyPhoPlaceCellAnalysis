@@ -28,9 +28,11 @@ class SpikeAnalysisComputations(AllFunctionEnumeratingMixin):
         Model Goal:
             "Thus, the combined goal is to track the sequence of gaps as well as possible without changing state too much."
         
-        Model Parameters:
-            scaling parameter `s`: controls the “resolution” with which the discrete rate values of the states are able to track the real-valued gaps; 
-            parameter `gamma`: (default 1.0) controls the ease with which the automaton can change states
+        Model Parameters:            
+            s: the base of the exponential distribution that is used for modeling the event frequencies
+                scaling parameter `s`: controls the "resolution" with which the discrete rate values of the states are able to track the real-valued gaps; 
+            gamma: coefficient for the transition costs between states
+                parameter `gamma`: (default 1.0) controls the ease with which the automaton can change states
 
         """
         def _compute_pybursts_burst_interval_detection(sess, max_num_spikes_per_neuron=20000, kleinberg_parameters=DynamicParameters(s=2, gamma=0.1), use_progress_bar=False, debug_print=False):
