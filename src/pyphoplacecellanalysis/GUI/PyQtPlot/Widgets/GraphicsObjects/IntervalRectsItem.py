@@ -50,7 +50,8 @@ class IntervalRectsItem(pg.GraphicsObject):
         for (start_t, series_vertical_offset, duration_t, series_height, pen, brush) in self.data:
             p.setPen(pen)
             p.setBrush(brush) # filling of the rectangles by a passed color:
-            p.drawRect(QtCore.QRectF(start_t, series_vertical_offset-series_height, duration_t, series_height)) # QRectF: (left, top, width, height)
+            # p.drawRect(QtCore.QRectF(start_t, series_vertical_offset-series_height, duration_t, series_height)) # QRectF: (left, top, width, height)
+            p.drawRect(QtCore.QRectF(start_t, series_vertical_offset, duration_t, series_height)) # QRectF: (left, top, width, height)
 
         p.end()
     

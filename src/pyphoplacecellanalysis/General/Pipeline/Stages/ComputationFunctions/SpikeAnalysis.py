@@ -23,7 +23,16 @@ class SpikeAnalysisComputations(AllFunctionEnumeratingMixin):
     _computationGroupName = 'burst_detection'
     
     def _perform_spike_burst_detection_computation(computation_result: ComputationResult, debug_print=False):
-        """ Computes periods when the cells are firing in bursts """
+        """ Computes periods when the cells are firing in bursts
+        
+        Model Goal:
+            "Thus, the combined goal is to track the sequence of gaps as well as possible without changing state too much."
+        
+        Model Parameters:
+            scaling parameter `s`: controls the “resolution” with which the discrete rate values of the states are able to track the real-valued gaps; 
+            parameter `gamma`: (default 1.0) controls the ease with which the automaton can change states
+
+        """
         def _compute_pybursts_burst_interval_detection(sess, max_num_spikes_per_neuron=20000, kleinberg_parameters=DynamicParameters(s=2, gamma=0.1), use_progress_bar=False, debug_print=False):
             out_pyburst_intervals = IndexedOrderedDict()
 
