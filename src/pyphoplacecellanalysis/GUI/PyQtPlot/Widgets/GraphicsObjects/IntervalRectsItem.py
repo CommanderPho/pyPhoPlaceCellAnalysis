@@ -14,8 +14,16 @@ class IntervalRectsItem(pg.GraphicsObject):
     """ Created to render the 2D Intervals as rectangles in a pyqtgraph 
     
         Based on pyqtgraph's CandlestickItem example
+       
+    Rectangle Item Specification: 
+        Renders rectangles, with each specified by a tuple of the form:
+            (start_t, series_vertical_offset, duration_t, series_height, pen, brush)
+
+        Note that this is analagous to the position arguments of `QRectF`:
+            (left, top, width, height) and (pen, brush)
+            
         
-        
+            
     Usage:
         from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.GraphicsObjects.IntervalRectsItem import IntervalRectsItem, main
         active_interval_rects_item = IntervalRectsItem(data)
@@ -80,15 +88,7 @@ def main():
     plt.setWindowTitle('pyqtgraph example: customGraphicsItem')
     
 if __name__ == '__main__':
-    # data = [  ## fields are (time, open, close, min, max).
-    # 	(1., 10, 13, 5, 15),
-    # 	(2., 13, 17, 9, 20),
-    # 	(3., 17, 14, 11, 23),
-    # 	(4., 14, 15, 5, 19),
-    # 	(5., 15, 9, 8, 22),
-    # 	(6., 9, 15, 8, 16),
-    # ]
- 
+    
     # (start_t, duration_t, start_alt_axis, alt_axis_size, pen_color, brush_color)
     main()
     pg.exec()
