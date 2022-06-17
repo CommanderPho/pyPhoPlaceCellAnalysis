@@ -2,7 +2,7 @@
 
 
 class Render2DNeuronIdentityLinesMixin:
-    """ renders the horizontal lines on the 2D plots 
+    """ renders the horizontal lines separating the neurons on the 2D raster plots 
     
     TODO: This is not really a mixin, need to figure out how I want these used.
 

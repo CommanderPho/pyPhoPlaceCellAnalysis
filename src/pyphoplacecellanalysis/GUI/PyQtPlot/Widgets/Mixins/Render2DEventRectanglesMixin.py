@@ -20,6 +20,8 @@ class Render2DEventRectanglesMixin:
     """docstring for Render2DEventRectanglesMixin.
     active_burst_intervals
     
+        TODO: This is not really a mixin, need to figure out how I want these used.
+        
     """
     
     
