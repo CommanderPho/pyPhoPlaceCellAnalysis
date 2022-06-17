@@ -1,4 +1,4 @@
-""" Render2DEventRectanglesMixin
+""" Render2DEventRectanglesHelper and Render2DEventRectanglesMixin
 
 """
 from copy import deepcopy
@@ -16,73 +16,11 @@ from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.GraphicsObjects.IntervalRectsIt
 from lazy_property import LazyProperty, LazyWritableProperty
 
 
-class Render2DEventRectanglesMixin:
-    """docstring for Render2DEventRectanglesMixin.
-    active_burst_intervals
-    
-        TODO: This is not really a mixin, need to figure out how I want these used.
-        
+class Render2DEventRectanglesHelper:
+    """ Static helper that adds interval/epoch rectangles to 2D raster plots
+ 
     """
     
-    
-    @property
-    def render_event_rectangles_plots(self):
-        """The render_event_rectangles_plots property."""
-        return self._render_event_rectangles_plots
-    @render_event_rectangles_plots.setter
-    def render_event_rectangles_plots(self, value):
-        self._render_event_rectangles_plots = value
-    
-    
-    def _get_series_offsets(self):
-        """ builds the y-axis offsets for each data series (for example each neuron with its row of spikes)
-        
-            For this neuron_IDX example - it gives a list of the y-positions of the bottom edge of each neuron's row.
-        """
-        # from pyphoplacecellanalysis.General.DataSeriesToSpatial import DataSeriesToSpatial
-        # num_cells = spike_raster_window.spike_raster_plt_2d.n_cells
-        # center_mode = spike_raster_window.spike_raster_plt_2d.params.center_mode
-        # side_bin_margins = spike_raster_window.spike_raster_plt_2d.params.side_bin_margins
-        # series_offsets = DataSeriesToSpatial.build_series_identity_axis(num_cells, center_mode=center_mode, bin_position_mode='left_edges', side_bin_margins = side_bin_margins)
-        # series_offsets_lower = DataSeriesToSpatial.build_series_identity_axis(num_cells, center_mode=center_mode, bin_position_mode='left_edges', side_bin_margins = side_bin_margins) / num_cells
-        # series_offsets_upper = DataSeriesToSpatial.build_series_identity_axis(num_cells, center_mode=center_mode, bin_position_mode='right_edges', side_bin_margins = side_bin_margins) / num_cells
-        # num_series = len(series_offsets)
-        # fixed_series_height = (series_offsets[1]-series_offsets[0])
-        # # series_heights = num_series*[fixed_series_height] # the height is the same for all series
-
-        # series_heights = series_offsets_upper - series_offsets_lower
-        # series_fragile_linear_neuron_IDX_map = dict(zip(spike_raster_window.spike_raster_plt_2d.fragile_linear_neuron_IDXs, series_offsets))
-        # series_heights
-
-
-        ## Directly from pre-computed y, lower_y, upper_y values:
-        series_offsets = spike_raster_window.spike_raster_plt_2d.y
-        series_offsets_lower = spike_raster_window.spike_raster_plt_2d.lower_y
-        series_offsets_upper = spike_raster_window.spike_raster_plt_2d.upper_y
-        num_series = len(series_offsets)
-        # series_heights = series_offsets_upper - series_offsets_lower # this does not work
-        fixed_series_height = (series_offsets[1]-series_offsets[0])
-        series_heights = num_series*[fixed_series_height] # the height is the same for all series
-        series_fragile_linear_neuron_IDX_map = spike_raster_window.spike_raster_plt_2d.y_fragile_linear_neuron_IDX_map
-
-        ## Fixed calculations to get series starts not centers:
-        # Assume we have series_offsets which are centers (e.g. # series_offsets: [0.5 1.5 2.5 3.5 4.5 5.5 6.5 7.5 8.5 9.5 10.5 11.5 12.5 13.5 14.5 15.5 16.5 17.5 18.5 19.5 20.5 21.5 22.5 23.5 24.5 25.5 26.5 27.5 28.5 29.5 30.5 31.5 32.5 33.5 34.5 35.5 36.5 37.5 38.5 39.5])
-        series_start_offsets = series_offsets - (np.array(series_heights)/2.0) # series_start_offsets: [0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39]
-        print(f'series_start_offsets: {series_start_offsets}')
-
-        print(f'series_offsets: {series_offsets}')
-        print(f'series_offsets_lower: {series_offsets_lower}')
-        print(f'series_offsets_upper: {series_offsets_upper}')
-        print(f'series_heights: {series_heights}')
-        print(f'series_fragile_linear_neuron_IDX_map: {series_fragile_linear_neuron_IDX_map}')
-
-        # series_offsets: [0.5 1.5 2.5 3.5 4.5 5.5 6.5 7.5 8.5 9.5 10.5 11.5 12.5 13.5 14.5 15.5 16.5 17.5 18.5 19.5 20.5 21.5 22.5 23.5 24.5 25.5 26.5 27.5 28.5 29.5 30.5 31.5 32.5 33.5 34.5 35.5 36.5 37.5 38.5 39.5]
-        # series_offsets_lower: [0 0.025 0.05 0.075 0.1 0.125 0.15 0.175 0.2 0.225 0.25 0.275 0.3 0.325 0.35 0.375 0.4 0.425 0.45 0.475 0.5 0.525 0.55 0.575 0.6 0.625 0.65 0.675 0.7 0.725 0.75 0.775 0.8 0.825 0.85 0.875 0.9 0.925 0.95 0.975]
-        # series_offsets_upper: [0.025 0.05 0.075 0.1 0.125 0.15 0.175 0.2 0.225 0.25 0.275 0.3 0.325 0.35 0.375 0.4 0.425 0.45 0.475 0.5 0.525 0.55 0.575 0.6 0.625 0.65 0.675 0.7 0.725 0.75 0.775 0.8 0.825 0.85 0.875 0.9 0.925 0.95 0.975 1]
-        # series_heights: [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0]
-        # series_fragile_linear_neuron_IDX_map: {0: 0.5, 1: 1.5, 2: 2.5, 3: 3.5, 4: 4.5, 5: 5.5, 6: 6.5, 7: 7.5, 8: 8.5, 9: 9.5, 10: 10.5, 11: 11.5, 12: 12.5, 13: 13.5, 14: 14.5, 15: 15.5, 16: 16.5, 17: 17.5, 18: 18.5, 19: 19.5, 20: 20.5, 21: 21.5, 22: 22.5, 23: 23.5, 24: 24.5, 25: 25.5, 26: 26.5, 27: 27.5, 28: 28.5, 29: 29.5, 30: 30.5, 31: 31.5, 32: 32.5, 33: 33.5, 34: 34.5, 35: 35.5, 36: 36.5, 37: 37.5, 38: 38.5, 39: 39.5}
-
-
     
     @classmethod
     def _post_process_detected_burst_interval_dict(cls, active_burst_interval_dict, cell_id_to_fragile_linear_neuron_IDX_map, neuron_colors_hex, y_fragile_linear_neuron_IDX_map, included_burst_levels=[1], fixed_series_height=1.0, debug_print=False):
@@ -208,8 +146,6 @@ class Render2DEventRectanglesMixin:
             
         return data
     
-    
-    
     ## Debugging rectangles:
     @staticmethod
     def _simple_debugging_rects_data(series_start_offsets):
@@ -243,22 +179,25 @@ class Render2DEventRectanglesMixin:
 
     # data = _simple_debugging_rects_data(series_start_offsets) # overwrites the data with 2 simple debugging rects
     
-    
+    ##################################################
+    ## MAIN METHODS
+    ##################################################
+        
     @classmethod
-    def add_event_rectangles(cls, active_2d_plot, active_burst_intervals, debug_print=False):
+    def add_event_rectangles(cls, active_2d_plot, active_burst_intervals, included_burst_levels=[1], debug_print=False):
         """ 
         Inputs:
             active_2d_plot: e.g. spike_raster_window.spike_raster_plt_2d
             active_burst_intervals
         Usage:            
-            from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.Mixins.Render2DEventRectanglesMixin import Render2DEventRectanglesMixin
+            from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.Mixins.Render2DEventRectanglesHelper import Render2DEventRectanglesHelper
 
-            output_display_items = Render2DEventRectanglesMixin.add_event_rectangles(spike_raster_window.spike_raster_plt_2d, active_burst_intervals) # {'interval_rects_item': active_interval_rects_item}
+            output_display_items = Render2DEventRectanglesHelper.add_event_rectangles(spike_raster_window.spike_raster_plt_2d, active_burst_intervals) # {'interval_rects_item': active_interval_rects_item}
             active_interval_rects_item = output_display_items['interval_rects_item']
 
         """
         # Build many-order bursts:
-        # filtered_burst_intervals = Render2DEventRectanglesMixin._post_process_detected_burst_interval_dict(active_burst_intervals, included_burst_levels=[1,2,3,4])
+        # filtered_burst_intervals = Render2DEventRectanglesHelper._post_process_detected_burst_interval_dict(active_burst_intervals, included_burst_levels=[1,2,3,4])
         
         ## Gets the 2D plot from itself:
         # active_2d_plot = spike_raster_window.spike_raster_plt_2d
@@ -268,7 +207,7 @@ class Render2DEventRectanglesMixin:
                     active_2d_plot.cell_id_to_fragile_linear_neuron_IDX_map,
                     active_2d_plot.params.neuron_colors_hex,
                     active_2d_plot.y_fragile_linear_neuron_IDX_map,
-                    included_burst_levels=[1]
+                    included_burst_levels=included_burst_levels
                 )
                     
         # Builds the render rectangles:
@@ -290,10 +229,7 @@ class Render2DEventRectanglesMixin:
         # return the updated display items:
         return {'interval_rects_item': active_interval_rects_item}
 
-    ##################################################
-    ## MAIN METHOD
-    ##################################################
-        
+
     @classmethod
     def remove_event_rectangles(cls, active_2d_plot, active_interval_rects_item):
         """ Remove the active_interval_rects_item:
@@ -301,7 +237,7 @@ class Render2DEventRectanglesMixin:
             active_2d_plot: e.g. spike_raster_window.spike_raster_plt_2d
         Usage:
             ## Remove the rectangles:
-            Render2DEventRectanglesMixin.remove_event_rectangles(spike_raster_window.spike_raster_plt_2d, active_interval_rects_item)
+            Render2DEventRectanglesHelper.remove_event_rectangles(spike_raster_window.spike_raster_plt_2d, active_interval_rects_item)
 
 
         """
@@ -311,12 +247,85 @@ class Render2DEventRectanglesMixin:
         active_interval_rects_item = None
         
         
-
-    # def add_event_rectangles(self, active_2d_plot, active_burst_intervals):
-    #     return Render2DEventRectanglesMixin.add_event_rectangles(active_2d_plot, active_burst_intervals)
         
-    # def remove_event_rectangles(self):
-    #     ## Remove the active_interval_rects_item:
-    #     main_plot_widget.removeItem(active_interval_rects_item)
-    #     active_interval_rects_item = None
+
+    # ####################################################
+    # ### Render2DEventRectanglesMixin: the mixin version that uses the static helper
+    # class Render2DEventRectanglesMixin:
+    #     """ A Mixin that uses Render2DEventRectanglesHelper to render 2D event rectangles on conforming classes
+        
+    #     TODO: This is not really a mixin, need to figure out how I want these used.
+            
+    #     Requires:
+    #         active_burst_intervals
+        
+    #     """
+    #     @property
+    #     def render_event_rectangles_plots(self):
+    #         """The render_event_rectangles_plots property."""
+    #         return self._render_event_rectangles_plots
+    #     @render_event_rectangles_plots.setter
+    #     def render_event_rectangles_plots(self, value):
+    #         self._render_event_rectangles_plots = value
+        
+        
+    #     def _get_series_offsets(self):
+    #         """ builds the y-axis offsets for each data series (for example each neuron with its row of spikes)
+            
+    #             For this neuron_IDX example - it gives a list of the y-positions of the bottom edge of each neuron's row.
+    #         """
+    #         # from pyphoplacecellanalysis.General.DataSeriesToSpatial import DataSeriesToSpatial
+    #         # num_cells = spike_raster_window.spike_raster_plt_2d.n_cells
+    #         # center_mode = spike_raster_window.spike_raster_plt_2d.params.center_mode
+    #         # side_bin_margins = spike_raster_window.spike_raster_plt_2d.params.side_bin_margins
+    #         # series_offsets = DataSeriesToSpatial.build_series_identity_axis(num_cells, center_mode=center_mode, bin_position_mode='left_edges', side_bin_margins = side_bin_margins)
+    #         # series_offsets_lower = DataSeriesToSpatial.build_series_identity_axis(num_cells, center_mode=center_mode, bin_position_mode='left_edges', side_bin_margins = side_bin_margins) / num_cells
+    #         # series_offsets_upper = DataSeriesToSpatial.build_series_identity_axis(num_cells, center_mode=center_mode, bin_position_mode='right_edges', side_bin_margins = side_bin_margins) / num_cells
+    #         # num_series = len(series_offsets)
+    #         # fixed_series_height = (series_offsets[1]-series_offsets[0])
+    #         # # series_heights = num_series*[fixed_series_height] # the height is the same for all series
+
+    #         # series_heights = series_offsets_upper - series_offsets_lower
+    #         # series_fragile_linear_neuron_IDX_map = dict(zip(spike_raster_window.spike_raster_plt_2d.fragile_linear_neuron_IDXs, series_offsets))
+    #         # series_heights
+
+
+    #         ## Directly from pre-computed y, lower_y, upper_y values:
+    #         series_offsets = spike_raster_window.spike_raster_plt_2d.y
+    #         series_offsets_lower = spike_raster_window.spike_raster_plt_2d.lower_y
+    #         series_offsets_upper = spike_raster_window.spike_raster_plt_2d.upper_y
+    #         num_series = len(series_offsets)
+    #         # series_heights = series_offsets_upper - series_offsets_lower # this does not work
+    #         fixed_series_height = (series_offsets[1]-series_offsets[0])
+    #         series_heights = num_series*[fixed_series_height] # the height is the same for all series
+    #         series_fragile_linear_neuron_IDX_map = spike_raster_window.spike_raster_plt_2d.y_fragile_linear_neuron_IDX_map
+
+    #         ## Fixed calculations to get series starts not centers:
+    #         # Assume we have series_offsets which are centers (e.g. # series_offsets: [0.5 1.5 2.5 3.5 4.5 5.5 6.5 7.5 8.5 9.5 10.5 11.5 12.5 13.5 14.5 15.5 16.5 17.5 18.5 19.5 20.5 21.5 22.5 23.5 24.5 25.5 26.5 27.5 28.5 29.5 30.5 31.5 32.5 33.5 34.5 35.5 36.5 37.5 38.5 39.5])
+    #         series_start_offsets = series_offsets - (np.array(series_heights)/2.0) # series_start_offsets: [0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39]
+    #         print(f'series_start_offsets: {series_start_offsets}')
+
+    #         print(f'series_offsets: {series_offsets}')
+    #         print(f'series_offsets_lower: {series_offsets_lower}')
+    #         print(f'series_offsets_upper: {series_offsets_upper}')
+    #         print(f'series_heights: {series_heights}')
+    #         print(f'series_fragile_linear_neuron_IDX_map: {series_fragile_linear_neuron_IDX_map}')
+
+    #         # series_offsets: [0.5 1.5 2.5 3.5 4.5 5.5 6.5 7.5 8.5 9.5 10.5 11.5 12.5 13.5 14.5 15.5 16.5 17.5 18.5 19.5 20.5 21.5 22.5 23.5 24.5 25.5 26.5 27.5 28.5 29.5 30.5 31.5 32.5 33.5 34.5 35.5 36.5 37.5 38.5 39.5]
+    #         # series_offsets_lower: [0 0.025 0.05 0.075 0.1 0.125 0.15 0.175 0.2 0.225 0.25 0.275 0.3 0.325 0.35 0.375 0.4 0.425 0.45 0.475 0.5 0.525 0.55 0.575 0.6 0.625 0.65 0.675 0.7 0.725 0.75 0.775 0.8 0.825 0.85 0.875 0.9 0.925 0.95 0.975]
+    #         # series_offsets_upper: [0.025 0.05 0.075 0.1 0.125 0.15 0.175 0.2 0.225 0.25 0.275 0.3 0.325 0.35 0.375 0.4 0.425 0.45 0.475 0.5 0.525 0.55 0.575 0.6 0.625 0.65 0.675 0.7 0.725 0.75 0.775 0.8 0.825 0.85 0.875 0.9 0.925 0.95 0.975 1]
+    #         # series_heights: [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0]
+    #         # series_fragile_linear_neuron_IDX_map: {0: 0.5, 1: 1.5, 2: 2.5, 3: 3.5, 4: 4.5, 5: 5.5, 6: 6.5, 7: 7.5, 8: 8.5, 9: 9.5, 10: 10.5, 11: 11.5, 12: 12.5, 13: 13.5, 14: 14.5, 15: 15.5, 16: 16.5, 17: 17.5, 18: 18.5, 19: 19.5, 20: 20.5, 21: 21.5, 22: 22.5, 23: 23.5, 24: 24.5, 25: 25.5, 26: 26.5, 27: 27.5, 28: 28.5, 29: 29.5, 30: 30.5, 31: 31.5, 32: 32.5, 33: 33.5, 34: 34.5, 35: 35.5, 36: 36.5, 37: 37.5, 38: 38.5, 39: 39.5}
+
+    #     ##################################################
+    #     ## MAIN METHODS
+    #     ##################################################
+            
+    #     def add_event_rectangles(self, active_2d_plot, active_burst_intervals):
+    #         return Render2DEventRectanglesHelper.add_event_rectangles(active_2d_plot, active_burst_intervals)
+            
+    #     def remove_event_rectangles(self):
+    #         ## Remove the active_interval_rects_item:
+    #         main_plot_widget.removeItem(active_interval_rects_item)
+    #         active_interval_rects_item = None
 
