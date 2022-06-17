@@ -6,6 +6,9 @@ import numpy as np
 import pandas as pd
 # import matplotlib.pyplot as plt
 from indexed import IndexedOrderedDict
+from lazy_property import LazyProperty, LazyWritableProperty
+
+from neuropy.core import Epoch
 
 from pyphocorehelpers.print_helpers import print_dataframe_memory_usage
 
@@ -13,7 +16,6 @@ import pyphoplacecellanalysis.External.pyqtgraph as pg
 # from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtCore, QtGui, QtWidgets
 from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.GraphicsObjects.IntervalRectsItem import IntervalRectsItem
 
-from lazy_property import LazyProperty, LazyWritableProperty
 
 
 class Render2DEventRectanglesHelper:
@@ -21,6 +23,56 @@ class Render2DEventRectanglesHelper:
  
     """
     
+    ##################################################
+    ## Common METHODS
+    ##################################################
+    _required_interval_visualization_columns = ['t_start', 't_duration', 'series_vertical_offset', 'series_height', 'pen', 'brush']
+    
+    @classmethod
+    def _build_interval_tuple_list_from_dataframe(cls, df):
+        """ build the tuple list required for rendering intervals: fields are (start_t, series_vertical_offset, duration_t, series_height, pen, brush).
+        Inputs:
+            df: a Pandas.DataFrame with the columns ['t_start', 't_duration', 'series_vertical_offset', 'series_height', 'pen', 'brush']
+        Returns:
+            a list of tuples with fields (start_t, series_vertical_offset, duration_t, series_height, pen, brush)
+        """    
+        ## Validate that it has all required columns:
+        assert np.isin(cls._required_interval_visualization_columns, df.columns).all(), f"dataframe is missing required columns:\n Required: {cls._required_interval_visualization_columns}, current: {df.columns} "
+        return list(zip(df.t_start, df.series_vertical_offset, df.t_duration, df.series_height, df.pen, df.brush))
+        
+    @classmethod
+    def build_IntervalRectsItem_from_epoch(cls, epochs, dataframe_vis_columns_function, debug_print=False):
+        """ Builds an appropriate IntervalRectsItem from any Epoch object and a function that is passed the converted dataframe and adds the visualization specific columns: ['series_vertical_offset', 'series_height', 'pen', 'brush']
+        
+        Input:
+            epochs: Either a neuropy.core.Epoch object OR dataframe with the columns ["t_start", "t_end",'t_duration']
+            dataframe_vis_columns_function: callable that takes a pd.DataFrame that adds the remaining required columns to the dataframe if needed.
+        
+        Returns:
+            IntervalRectsItem
+        """
+        if isinstance(epochs, Epoch):
+            # if it's an Epoch, convert it to a dataframe
+            raw_df = epochs.to_dataframe()
+            active_df = pd.DataFrame({'t_start':raw_df.start.copy(), 't_duration':raw_df.duration.copy()}) # still will need columns ['series_vertical_offset', 'series_height', 'pen', 'brush'] added later
+
+        elif isinstance(epochs, pd.DataFrame):
+            # already a dataframe
+            active_df = epochs.copy()
+        else:
+            raise NotImplementedError
+        
+        active_df = dataframe_vis_columns_function(active_df)
+        
+        ## build the output tuple list: fields are (start_t, series_vertical_offset, duration_t, series_height, pen, brush).
+        curr_IntervalRectsItem_interval_tuples = cls._build_interval_tuple_list_from_dataframe(active_df)
+        ## build the IntervalRectsItem
+        return IntervalRectsItem(curr_IntervalRectsItem_interval_tuples)
+    
+    
+    ##################################################
+    ## Spike Events METHODS
+    ##################################################
     
     @classmethod
     def _post_process_detected_burst_interval_dict(cls, active_burst_interval_dict, cell_id_to_fragile_linear_neuron_IDX_map, neuron_colors_hex, y_fragile_linear_neuron_IDX_map, included_burst_levels=[1], fixed_series_height=1.0, debug_print=False):
