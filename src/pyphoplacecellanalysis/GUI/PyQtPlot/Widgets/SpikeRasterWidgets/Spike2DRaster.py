@@ -14,6 +14,7 @@ import numpy as np
 from pyphoplacecellanalysis.General.DataSeriesToSpatial import DataSeriesToSpatial
 from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.SpikeRasterWidgets.SpikeRasterBase import SpikeRasterBase
 from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.Mixins.Render2DScrollWindowPlot import Render2DScrollWindowPlotMixin
+from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.Mixins.Render2DNeuronIdentityLinesMixin import Render2DNeuronIdentityLinesMixin
 
 
 class Spike2DRaster(Render2DScrollWindowPlotMixin, SpikeRasterBase):
@@ -227,6 +228,8 @@ class Spike2DRaster(Render2DScrollWindowPlotMixin, SpikeRasterBase):
             self.ui.scatter_plot = pg.ScatterPlotItem(name='spikeRasterScatterPlotItem', pxMode=True, symbol=vtick, size=10, pen={'color': 'w', 'width': 2})
             self.ui.scatter_plot.opts['useCache'] = True
             self.ui.main_plot_widget.addItem(self.ui.scatter_plot)
+            _v_axis_item = Render2DNeuronIdentityLinesMixin.setup_custom_neuron_identity_axis(self.ui.main_plot_widget, self.n_cells)
+                
         else:
             self.ui.main_plot_widget = None
             self.ui.scatter_plot = None
@@ -259,6 +262,8 @@ class Spike2DRaster(Render2DScrollWindowPlotMixin, SpikeRasterBase):
         if self.Includes2DActiveWindowScatter:
             self.ui.main_plot_widget.disableAutoRange('xy')
             self.ui.main_plot_widget.setRange(xRange=[0.0, +self.temporal_axis_length], yRange=[self.y[0], self.y[-1]])
+            _v_axis_item = Render2DNeuronIdentityLinesMixin.setup_custom_neuron_identity_axis(self.ui.main_plot_widget, self.n_cells)
+    
     
     @QtCore.pyqtSlot()
     def on_adjust_temporal_spatial_mapping(self):

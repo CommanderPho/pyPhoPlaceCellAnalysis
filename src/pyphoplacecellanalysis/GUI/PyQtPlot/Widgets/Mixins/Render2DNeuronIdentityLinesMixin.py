@@ -9,6 +9,9 @@ class Render2DNeuronIdentityLinesMixin:
     Usage:
         from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.Mixins.Render2DNeuronIdentityLinesMixin import Render2DNeuronIdentityLinesMixin
         
+        v_axis_item = Render2DNeuronIdentityLinesMixin.setup_custom_neuron_identity_axis(main_plot_widget, spike_raster_window.spike_raster_plt_2d.n_cells)
+        
+        -- OR --
         v_axis_item = Render2DNeuronIdentityLinesMixin.setup_custom_neuron_ticks(main_plot_widget, spike_raster_window.spike_raster_plt_2d.n_cells)
         v_axis_item = Render2DNeuronIdentityLinesMixin.add_lines(main_plot_widget)
         
@@ -26,8 +29,8 @@ class Render2DNeuronIdentityLinesMixin:
     def _setup_custom_neuron_ticks(plot_widget, n_cells):
         """ Build custom ticks with one for each neuron """
         neuron_id_ticks = [
-            [(float(i),f'{i}') for i in np.arange(0, 5, n_cells)], # [ (majorTickValue1, majorTickString1), (majorTickValue2, majorTickString2), ... ],
             [(float(i),'') for i in np.arange(n_cells+1)], #[ (minorTickValue1, minorTickString1), (minorTickValue2, minorTickString2), ... ],
+            # [(float(i), f'{i}') for i in np.arange(0, 5, n_cells)], # [ (majorTickValue1, majorTickString1), (majorTickValue2, majorTickString2), ... ],
         ]
         v_axis_item = plot_widget.axes['left']['item'] # AxisItem 
         v_axis_item.setTicks(neuron_id_ticks)
