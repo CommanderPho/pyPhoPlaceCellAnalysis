@@ -22,6 +22,7 @@ from pyphoplacecellanalysis.GUI.PyQtPlot.Flowchart.CustomNodes.BasePipeline.Pipe
 from pyphoplacecellanalysis.GUI.PyQtPlot.Flowchart.CustomNodes.DisplayNodes.PipelineDisplayNode import PipelineDisplayNode
 from pyphoplacecellanalysis.GUI.PyQtPlot.Flowchart.CustomNodes.Mixins.DisplayNodeViewHelpers import PipelineDynamicDockDisplayAreaMixin
 
+from pyphoplacecellanalysis.GUI.Qt.Mixins.PhoMainAppWindowBase import PhoMainAppWindowBase
 
 path = os.path.dirname(os.path.abspath(__file__))
 # uiFile = os.path.join(path, 'MainPipelineWindow.ui')
@@ -39,14 +40,8 @@ stylesheet_data_stream = QTextStream(stylesheet_qss_file)
 
 
 
-class PhoPipelineMainWindow(PipelineDynamicDockDisplayAreaMixin, QtWidgets.QMainWindow):
-    """ Note that this loads from 'MainPipelineWindowWithDockArea.ui' """
-    
-    @property
-    def app(self):
-        """The app property."""
-        return self._app
-    
+class PhoPipelineMainWindow(PipelineDynamicDockDisplayAreaMixin, PhoMainAppWindowBase):
+    """ Note that this loads from 'MainPipelineWindowWithDockArea.ui' """    
     @property
     def flowchart(self):
         """The flowchart property."""
@@ -94,14 +89,14 @@ class PhoPipelineMainWindow(PipelineDynamicDockDisplayAreaMixin, QtWidgets.QMain
     
 
     def __init__(self, title='PhoFlowchartApp', *args, **kwargs):
-        self._app = pg.mkQApp(title) # makes a new QApplication or gets the reference to an existing one.
+        # self._app = pg.mkQApp(title) # makes a new QApplication or gets the reference to an existing one.
+        # # Load Stylesheet:
+        # self._app.setStyleSheet(stylesheet_data_stream.readAll())
+        self._initialize_data()
+        super(PhoPipelineMainWindow, self).__init__(*args, **kwargs)
         # Load Stylesheet:
         self._app.setStyleSheet(stylesheet_data_stream.readAll())
         
-        self._initialize_data()
-        
-        super(PhoPipelineMainWindow, self).__init__(*args, **kwargs)
-
         #Load the UI Page
         uic.loadUi(uiFile, self) # load from the ui file
         

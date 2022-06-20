@@ -8,6 +8,8 @@ from pyphoplacecellanalysis.External.pyqtgraph.dockarea.Dock import Dock
 from pyphoplacecellanalysis.External.pyqtgraph.dockarea.DockArea import DockArea
 from pyphoplacecellanalysis.External.pyqtgraph.console import ConsoleWidget
 
+from pyphoplacecellanalysis.GUI.Qt.Mixins.PhoMainAppWindowBase import PhoMainAppWindowBase
+
 # DockAreaWrapper
 
 
@@ -171,26 +173,19 @@ class DynamicDockDisplayAreaContentMixin:
     
     
 
-class PhoDockAreaContainingWindow(DynamicDockDisplayAreaContentMixin, QtWidgets.QMainWindow):
-    """ a custom QMainWindow subclass that contains a DockArea as its central view.
+class PhoDockAreaContainingWindow(DynamicDockDisplayAreaContentMixin, PhoMainAppWindowBase):
+    """ a custom PhoMainAppWindowBase (QMainWindow) subclass that contains a DockArea as its central view.
     
         Can be used to dynamically create windows composed of multiple separate widgets programmatically.
     
     """
     @property
-    def app(self):
-        """The app property."""
-        return self._app
-    
-    @property
     def area(self):
         return self.ui.area
 
-    
     def __init__(self, title='PhoDockAreaContainingWindow', *args, **kwargs):
-        self._app = pg.mkQApp(title) # makes a new QApplication or gets the reference to an existing one.
-        self.ui = PhoUIContainer()
-        
+        # self._app = pg.mkQApp(title) # makes a new QApplication or gets the reference to an existing one.
+        # self.ui = PhoUIContainer()
         self.DynamicDockDisplayAreaContentMixin_on_init()
         super(PhoDockAreaContainingWindow, self).__init__(*args, **kwargs)
         self.setup()

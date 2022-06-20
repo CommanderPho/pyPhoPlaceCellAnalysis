@@ -5,8 +5,11 @@ import pyphoplacecellanalysis.External.pyqtgraph as pg
 from pyphoplacecellanalysis.Resources import ActionIcons
 from pyphoplacecellanalysis.Resources import GuiResources
 
+from pyphoplacecellanalysis.GUI.Qt.Mixins.PhoMainAppWindowBase import PhoMainAppWindowBase
 
-class PhoBaseMainWindow(QtWidgets.QMainWindow):
+
+
+class PhoBaseMainWindow(PhoMainAppWindowBase):
     """ a custom QMainWindow subclass that contains a DockArea as its central view.
     
         Can be used to dynamically create windows composed of multiple separate widgets programmatically.
@@ -18,15 +21,11 @@ class PhoBaseMainWindow(QtWidgets.QMainWindow):
         curr_window = PhoBaseMainWindow(content_widget=curr_content_widget)
     
     """
-    @property
-    def app(self):
-        """The app property."""
-        return self._app
     
     
     def __init__(self, title='PhoBaseMainWindow', content_widget=None, defer_show=False, *args, **kwargs):
-        self._app = pg.mkQApp(title) # makes a new QApplication or gets the reference to an existing one.
-        self.ui = PhoUIContainer()
+        # self._app = pg.mkQApp(title) # makes a new QApplication or gets the reference to an existing one.
+        # self.ui = PhoUIContainer()
         super(PhoBaseMainWindow, self).__init__(*args, **kwargs)
         if content_widget is not None:
             self.ui.main_widget = content_widget
