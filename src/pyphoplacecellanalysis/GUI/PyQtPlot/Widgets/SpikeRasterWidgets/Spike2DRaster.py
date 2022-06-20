@@ -173,7 +173,7 @@ class Spike2DRaster(Render2DScrollWindowPlotMixin, SpikeRasterBase):
   
     def _buildGraphics(self):
         """ 
-        ui.main_plot_widget: 2D display 
+        plots.main_plot_widget: 2D display 
             self.ui.scatter_plot: the active 2D display of the current window
         
         ui.background_static_scroll_window_plot: the static plot of the entire data (always shows the entire time range)
@@ -204,7 +204,7 @@ class Spike2DRaster(Render2DScrollWindowPlotMixin, SpikeRasterBase):
         # Custom 2D raster plot:
         curr_plot_row = 1
         if self.Includes2DActiveWindowScatter:
-            self.ui.main_plot_widget = self.ui.main_graphics_layout_widget.addPlot(row=curr_plot_row, col=0)
+            self.plots.main_plot_widget = self.ui.main_graphics_layout_widget.addPlot(row=curr_plot_row, col=0)
             curr_plot_row += 1
             # self.ui.plots = [] # create an empty array for each plot, of which there will be one for each unit.
             # # build the position range for each unit along the y-axis:
@@ -214,24 +214,24 @@ class Spike2DRaster(Render2DScrollWindowPlotMixin, SpikeRasterBase):
             vtick.moveTo(0, -0.5)
             vtick.lineTo(0, 0.5)
 
-            self.ui.main_plot_widget.setLabel('left', 'Cell ID', units='')
-            self.ui.main_plot_widget.setLabel('bottom', 'Time', units='s')
-            self.ui.main_plot_widget.setMouseEnabled(x=False, y=False)
-            self.ui.main_plot_widget.enableAutoRange(x=False, y=False)
-            self.ui.main_plot_widget.setAutoVisible(x=False, y=False)
-            self.ui.main_plot_widget.setAutoPan(x=False, y=False)
-            self.ui.main_plot_widget.enableAutoRange('xy', False)  ## stop auto-scaling after the first data set is plotted
+            self.plots.main_plot_widget.setLabel('left', 'Cell ID', units='')
+            self.plots.main_plot_widget.setLabel('bottom', 'Time', units='s')
+            self.plots.main_plot_widget.setMouseEnabled(x=False, y=False)
+            self.plots.main_plot_widget.enableAutoRange(x=False, y=False)
+            self.plots.main_plot_widget.setAutoVisible(x=False, y=False)
+            self.plots.main_plot_widget.setAutoPan(x=False, y=False)
+            self.plots.main_plot_widget.enableAutoRange('xy', False)  ## stop auto-scaling after the first data set is plotted
             
-            # self.ui.main_plot_widget.disableAutoRange()
+            # self.plots.main_plot_widget.disableAutoRange()
             self._update_plot_ranges()
             
             self.ui.scatter_plot = pg.ScatterPlotItem(name='spikeRasterScatterPlotItem', pxMode=True, symbol=vtick, size=10, pen={'color': 'w', 'width': 2})
             self.ui.scatter_plot.opts['useCache'] = True
-            self.ui.main_plot_widget.addItem(self.ui.scatter_plot)
-            _v_axis_item = Render2DNeuronIdentityLinesMixin.setup_custom_neuron_identity_axis(self.ui.main_plot_widget, self.n_cells)
+            self.plots.main_plot_widget.addItem(self.ui.scatter_plot)
+            _v_axis_item = Render2DNeuronIdentityLinesMixin.setup_custom_neuron_identity_axis(self.plots.main_plot_widget, self.n_cells)
                 
         else:
-            self.ui.main_plot_widget = None
+            self.plots.main_plot_widget = None
             self.ui.scatter_plot = None
 
         
@@ -255,14 +255,14 @@ class Spike2DRaster(Render2DScrollWindowPlotMixin, SpikeRasterBase):
     ##################################
     
     def _update_plot_ranges(self):
-        # self.ui.main_plot_widget.setXRange(-self.half_render_window_duration, +self.half_render_window_duration)
-        # self.ui.main_plot_widget.setXRange(0.0, +self.temporal_axis_length, padding=0)
-        # self.ui.main_plot_widget.setYRange(self.y[0], self.y[-1], padding=0)
-        # self.ui.main_plot_widget.disableAutoRange()
+        # self.plots.main_plot_widget.setXRange(-self.half_render_window_duration, +self.half_render_window_duration)
+        # self.plots.main_plot_widget.setXRange(0.0, +self.temporal_axis_length, padding=0)
+        # self.plots.main_plot_widget.setYRange(self.y[0], self.y[-1], padding=0)
+        # self.plots.main_plot_widget.disableAutoRange()
         if self.Includes2DActiveWindowScatter:
-            self.ui.main_plot_widget.disableAutoRange('xy')
-            self.ui.main_plot_widget.setRange(xRange=[0.0, +self.temporal_axis_length], yRange=[self.y[0], self.y[-1]])
-            _v_axis_item = Render2DNeuronIdentityLinesMixin.setup_custom_neuron_identity_axis(self.ui.main_plot_widget, self.n_cells)
+            self.plots.main_plot_widget.disableAutoRange('xy')
+            self.plots.main_plot_widget.setRange(xRange=[0.0, +self.temporal_axis_length], yRange=[self.y[0], self.y[-1]])
+            _v_axis_item = Render2DNeuronIdentityLinesMixin.setup_custom_neuron_identity_axis(self.plots.main_plot_widget, self.n_cells)
     
     
     @QtCore.pyqtSlot()
@@ -305,7 +305,7 @@ class Spike2DRaster(Render2DScrollWindowPlotMixin, SpikeRasterBase):
     def update_zoomed_plot(self, min_t, max_t):
         # Update the main_plot_widget:
         if self.Includes2DActiveWindowScatter:
-            self.ui.main_plot_widget.setXRange(min_t, max_t, padding=0)
+            self.plots.main_plot_widget.setXRange(min_t, max_t, padding=0)
 
         # self.render_window_duration = (max_x - min_x) # update the render_window_duration from the slider width
         scroll_window_width = max_t - min_t

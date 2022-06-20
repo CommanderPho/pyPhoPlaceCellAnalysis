@@ -306,7 +306,7 @@ class Render2DEventRectanglesHelper:
         active_interval_rects_item = IntervalRectsItem(data)
 
         ## Add the active_interval_rects_item to the main_plot_widget: 
-        main_plot_widget = active_2d_plot.ui.main_plot_widget # PlotItem
+        main_plot_widget = active_2d_plot.plots.main_plot_widget # PlotItem
         main_plot_widget.addItem(active_interval_rects_item)
         # return the updated display items:
         return {'interval_rects_item': active_interval_rects_item}
@@ -324,7 +324,7 @@ class Render2DEventRectanglesHelper:
 
         """
         ## Remove the active_interval_rects_item:
-        main_plot_widget = active_2d_plot.ui.main_plot_widget # PlotItem
+        main_plot_widget = active_2d_plot.plots.main_plot_widget # PlotItem
         main_plot_widget.removeItem(active_interval_rects_item)
         active_interval_rects_item = None
         
@@ -338,7 +338,7 @@ class Render2DEventRectanglesHelper:
             
         """
         main_graphics_layout_widget = active_2d_plot.ui.main_graphics_layout_widget # GraphicsLayoutWidget
-        main_plot_widget = active_2d_plot.ui.main_plot_widget # PlotItem
+        main_plot_widget = active_2d_plot.plots.main_plot_widget # PlotItem
         
         ## Test separate epoch rect rendering plot that's linked with the main plot:
         epoch_rect_separate_plot = main_graphics_layout_widget.addPlot(row=0, col=0) # PlotItem

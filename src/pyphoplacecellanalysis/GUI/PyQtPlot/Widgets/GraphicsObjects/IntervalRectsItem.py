@@ -29,7 +29,7 @@ class IntervalRectsItem(pg.GraphicsObject):
         active_interval_rects_item = IntervalRectsItem(data)
         
         ## Add the active_interval_rects_item to the main_plot_widget: 
-        main_plot_widget = spike_raster_window.spike_raster_plt_2d.ui.main_plot_widget # PlotItem
+        main_plot_widget = spike_raster_window.spike_raster_plt_2d.plots.main_plot_widget # PlotItem
         main_plot_widget.addItem(active_interval_rects_item)
 
         ## Remove the active_interval_rects_item:

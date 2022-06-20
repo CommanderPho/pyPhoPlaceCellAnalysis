@@ -50,7 +50,7 @@ class Render2DNeuronIdentityLinesMixin:
 
         Usage:
             ## Add the lines to the main_plot_widget: 
-            main_plot_widget = spike_raster_window.spike_raster_plt_2d.ui.main_plot_widget # PlotItem
+            main_plot_widget = spike_raster_window.spike_raster_plt_2d.plots.main_plot_widget # PlotItem
             v_axis_item = Render2DNeuronIdentityLinesMixin.add_lines(main_plot_widget)
 
             ## Add the lines to the background_static_scroll_window_plot: 

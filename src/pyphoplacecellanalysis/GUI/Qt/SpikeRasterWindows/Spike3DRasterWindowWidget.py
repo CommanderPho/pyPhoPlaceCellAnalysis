@@ -271,9 +271,9 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
         if self.ui.spike_raster_plt_2d is not None:
             # self.ui.spike_raster_plt_2d.installEventFilter(self) # Kinda works, but doesn't show when scrolling over plots
             # self.ui.spike_raster_plt_2d.ui.background_static_scroll_window_plot.installEventFilter(self) # background_static_scroll_window_plot is a PlotItem 
-            # if self.ui.spike_raster_plt_2d.ui.main_plot_widget is not None:
+            # if self.ui.spike_raster_plt_2d.plots.main_plot_widget is not None:
             #     # This doesn't work
-            #     self.ui.spike_raster_plt_2d.ui.main_plot_widget.installEventFilter(self) # main_plot_widget is a PlotItem 
+            #     self.ui.spike_raster_plt_2d.plots.main_plot_widget.installEventFilter(self) # main_plot_widget is a PlotItem 
             if self.ui.spike_raster_plt_2d.ui.scatter_plot is not None:
                 # This is the first thing that produces detected event.type() == QtCore.QEvent.GraphicsSceneWheel when the scrolling is done over the 2D active widnow raster plot 
                 self.ui.spike_raster_plt_2d.ui.scatter_plot.installEventFilter(self) # scatter_plot is a ScatterPlotItem 
