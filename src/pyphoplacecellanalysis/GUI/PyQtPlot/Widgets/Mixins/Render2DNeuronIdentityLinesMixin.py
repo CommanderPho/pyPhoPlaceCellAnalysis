@@ -54,7 +54,7 @@ class Render2DNeuronIdentityLinesMixin:
             v_axis_item = Render2DNeuronIdentityLinesMixin.add_lines(main_plot_widget)
 
             ## Add the lines to the background_static_scroll_window_plot: 
-            background_static_scroll_plot_widget = spike_raster_window.spike_raster_plt_2d.ui.background_static_scroll_window_plot # PlotItem
+            background_static_scroll_plot_widget = spike_raster_window.spike_raster_plt_2d.plots.background_static_scroll_window_plot # PlotItem
             background_v_axis_item = Render2DNeuronIdentityLinesMixin.add_lines(background_static_scroll_plot_widget)
 
         """

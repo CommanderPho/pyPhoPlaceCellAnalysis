@@ -174,9 +174,9 @@ class Spike2DRaster(Render2DScrollWindowPlotMixin, SpikeRasterBase):
     def _buildGraphics(self):
         """ 
         plots.main_plot_widget: 2D display 
-            self.ui.scatter_plot: the active 2D display of the current window
+            self.plots.scatter_plot: the active 2D display of the current window
         
-        ui.background_static_scroll_window_plot: the static plot of the entire data (always shows the entire time range)
+        plots.background_static_scroll_window_plot: the static plot of the entire data (always shows the entire time range)
             Presents a linear scroll region over the top to allow the user to select the active window.
             
             
@@ -225,23 +225,23 @@ class Spike2DRaster(Render2DScrollWindowPlotMixin, SpikeRasterBase):
             # self.plots.main_plot_widget.disableAutoRange()
             self._update_plot_ranges()
             
-            self.ui.scatter_plot = pg.ScatterPlotItem(name='spikeRasterScatterPlotItem', pxMode=True, symbol=vtick, size=10, pen={'color': 'w', 'width': 2})
-            self.ui.scatter_plot.opts['useCache'] = True
-            self.plots.main_plot_widget.addItem(self.ui.scatter_plot)
+            self.plots.scatter_plot = pg.ScatterPlotItem(name='spikeRasterScatterPlotItem', pxMode=True, symbol=vtick, size=10, pen={'color': 'w', 'width': 2})
+            self.plots.scatter_plot.opts['useCache'] = True
+            self.plots.main_plot_widget.addItem(self.plots.scatter_plot)
             _v_axis_item = Render2DNeuronIdentityLinesMixin.setup_custom_neuron_identity_axis(self.plots.main_plot_widget, self.n_cells)
                 
         else:
             self.plots.main_plot_widget = None
-            self.ui.scatter_plot = None
+            self.plots.scatter_plot = None
 
         
         # From Render2DScrollWindowPlotMixin:
-        self.ui.background_static_scroll_window_plot = self.ui.main_graphics_layout_widget.addPlot(row=curr_plot_row, col=0) # curr_plot_row: 2 if  self.Includes2DActiveWindowScatter
-        self.ui.background_static_scroll_window_plot = self._buildScrollRasterPreviewWindowGraphics(self.ui.background_static_scroll_window_plot)
+        self.plots.background_static_scroll_window_plot = self.ui.main_graphics_layout_widget.addPlot(row=curr_plot_row, col=0) # curr_plot_row: 2 if  self.Includes2DActiveWindowScatter
+        self.plots.background_static_scroll_window_plot = self._buildScrollRasterPreviewWindowGraphics(self.plots.background_static_scroll_window_plot)
 
         # self._buildScrollRasterPreviewWindowGraphics()
         if self.Includes2DActiveWindowScatter:
-            self.ui.scatter_plot.addPoints(self.all_spots)
+            self.plots.scatter_plot.addPoints(self.all_spots)
     
         # self.Render2DScrollWindowPlot_on_window_update # register with the animation time window for updates for the scroller.
         # Connect the signals for the zoom region and the LinearRegionItem
@@ -350,7 +350,7 @@ class Spike2DRaster(Render2DScrollWindowPlotMixin, SpikeRasterBase):
         # Update preview_overview_scatter_plot
         self.plots.preview_overview_scatter_plot.setData(self.all_spots)
         if self.Includes2DActiveWindowScatter:
-            self.ui.scatter_plot.setData(self.all_spots)
+            self.plots.scatter_plot.setData(self.all_spots)
         
     
 # Start Qt event loop unless running in interactive mode.
