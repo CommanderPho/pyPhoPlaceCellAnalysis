@@ -313,7 +313,29 @@ class Render2DEventRectanglesHelper:
         active_interval_rects_item = None
         
         
+    @classmethod
+    def add_separate_render_epoch_rects_plot_item(cls, active_2d_plot):
+        """ Adds a separate independent plot for epoch time rects to the 2D plot above the others:
         
+        Requires:
+            active_2d_plot.ui.main_graphics_layout_widget <GraphicsLayoutWidget>
+            
+        """
+        main_graphics_layout_widget = active_2d_plot.ui.main_graphics_layout_widget # GraphicsLayoutWidget
+        main_plot_widget = active_2d_plot.ui.main_plot_widget # PlotItem
+        
+        ## Test separate epoch rect rendering plot that's linked with the main plot:
+        epoch_rect_separate_plot = main_graphics_layout_widget.addPlot(row=0, col=0) # PlotItem
+        epoch_rect_separate_plot.setObjectName('epoch_rect_separate_plot')
+
+        # Setup axes bounds for the bottom windowed plot:
+        epoch_rect_separate_plot.hideAxis('left')
+        epoch_rect_separate_plot.hideAxis('bottom')
+
+        # setup the epoch_rect_separate_plot to have a linked X-axis to the other scroll plot:
+        epoch_rect_separate_plot.setXLink(main_plot_widget) # works to synchronize the main zoomed plot (current window) with the epoch_rect_separate_plot (rectangles plotter)
+
+        return epoch_rect_separate_plot
 
     # ####################################################
     # ### Render2DEventRectanglesMixin: the mixin version that uses the static helper
