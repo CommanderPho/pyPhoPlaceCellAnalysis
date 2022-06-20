@@ -22,6 +22,12 @@ class IntervalsDatasource(BaseDatasource):
     Usage:
         from pyphoplacecellanalysis.General.Model.Datasources.IntervalDatasource import IntervalsDatasource
 
+        _test_fn = Specific2DRenderTimeEpochsHelper.build_Laps_formatter_datasource(debug_print=False)
+        test_laps_interval_datasource = IntervalsDatasource.init_from_epoch_object(sess.laps.as_epoch_obj(), _test_fn, datasource_name='intervals_datasource_from_laps_epoch_obj')
+        test_laps_interval_datasource
+
+        active_laps_interval_rects_item = Specific2DRenderTimeEpochsHelper.build_Laps_2D_render_time_epochs(sess, series_vertical_offset=43.0, series_height=2.0)
+        
 
     """
     
