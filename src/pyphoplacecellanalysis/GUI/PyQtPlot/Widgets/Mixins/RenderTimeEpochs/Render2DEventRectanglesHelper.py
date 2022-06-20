@@ -57,7 +57,7 @@ class Render2DEventRectanglesHelper:
         return list(zip(df.t_start, df.series_vertical_offset, df.t_duration, df.series_height, df.pen, df.brush))
         
     @classmethod
-    def build_IntervalRectsItem_from_epoch(cls, epochs, dataframe_vis_columns_function, debug_print=False):
+    def build_IntervalRectsItem_from_epoch(cls, epochs: Epoch, dataframe_vis_columns_function, debug_print=False):
         """ Builds an appropriate IntervalRectsItem from any Epoch object and a function that is passed the converted dataframe and adds the visualization specific columns: ['series_vertical_offset', 'series_height', 'pen', 'brush']
         
         Input:
@@ -86,7 +86,7 @@ class Render2DEventRectanglesHelper:
         return IntervalRectsItem(curr_IntervalRectsItem_interval_tuples)
     
     @classmethod
-    def build_IntervalRectsItem_from_interval_datasource(cls, interval_datasource):
+    def build_IntervalRectsItem_from_interval_datasource(cls, interval_datasource: IntervalsDatasource):
         """ Builds an appropriate IntervalRectsItem from any IntervalsDatasource object 
         Input:
             interval_datasource: IntervalsDatasource
@@ -98,6 +98,8 @@ class Render2DEventRectanglesHelper:
         curr_IntervalRectsItem_interval_tuples = cls._build_interval_tuple_list_from_dataframe(active_df)
         ## build the IntervalRectsItem
         return IntervalRectsItem(curr_IntervalRectsItem_interval_tuples)
+    
+    
     
     
     ##################################################
@@ -170,29 +172,50 @@ class Render2DEventRectanglesHelper:
             # add the 'fragile_linear_neuron_IDX' column:
             curr_pyburst_interval_df.loc[:, 'fragile_linear_neuron_IDX'] = a_fragile_neuron_IDX
             # add the 'visualization_raster_y_location' column:
-            curr_pyburst_interval_df.loc[:, 'visualization_series_y_location'] = [y_fragile_linear_neuron_IDX_map[a_cell_IDX] for a_cell_IDX in curr_pyburst_interval_df['fragile_linear_neuron_IDX'].to_numpy()]
+            curr_pyburst_interval_df.loc[:, 'series_vertical_offset'] = [y_fragile_linear_neuron_IDX_map[a_cell_IDX] for a_cell_IDX in curr_pyburst_interval_df['fragile_linear_neuron_IDX'].to_numpy()]
         #     # add the 'visualization_raster_y_location' column:
-        #     curr_pyburst_interval_df.loc[:, 'visualization_series_y_location'] = [y_fragile_linear_neuron_IDX_map[a_cell_IDX] for a_cell_IDX in curr_pyburst_interval_df['fragile_linear_neuron_IDX'].to_numpy()]
+        #     curr_pyburst_interval_df.loc[:, 'series_vertical_offset'] = [y_fragile_linear_neuron_IDX_map[a_cell_IDX] for a_cell_IDX in curr_pyburst_interval_df['fragile_linear_neuron_IDX'].to_numpy()]
         #     # add the 'visualization_raster_y_location' column:
-        #     curr_pyburst_interval_df.loc[:, 'visualization_series_y_location'] = [y_fragile_linear_neuron_IDX_map[a_cell_IDX] for a_cell_IDX in curr_pyburst_interval_df['fragile_linear_neuron_IDX'].to_numpy()]
+        #     curr_pyburst_interval_df.loc[:, 'series_vertical_offset'] = [y_fragile_linear_neuron_IDX_map[a_cell_IDX] for a_cell_IDX in curr_pyburst_interval_df['fragile_linear_neuron_IDX'].to_numpy()]
 
             ## hierarchical offset: offset increases slightly (up to a max percentage of the fixed_track_height, specified by `hierarchical_level_max_offset_height_portion`) per level
             hierarchical_level_max_offset_height_portion = 0.5 # offset by at most 20% of the fixed_series_height across all levels
             num_levels = len(included_burst_levels)
             offset_step_per_level = (fixed_series_height*hierarchical_level_max_offset_height_portion)/float(num_levels) # get the offset step per level
             # Optionally add the hierarchical offsets to position the different levels of bursts at different heights
-            curr_pyburst_interval_df.loc[:, 'visualization_series_y_location'] = curr_pyburst_interval_df['visualization_series_y_location'] + ((curr_pyburst_interval_df['burst_level']-1.0)*offset_step_per_level) - 0.5
+            curr_pyburst_interval_df.loc[:, 'series_vertical_offset'] = curr_pyburst_interval_df['series_vertical_offset'] + ((curr_pyburst_interval_df['burst_level']-1.0)*offset_step_per_level) - 0.5
         
-            # add the 'visualization_series_heights' column:
-            curr_pyburst_interval_df.loc[:, 'visualization_series_height'] = fixed_series_height # the height is the same for all series
+            # add the 'series_heights' column:
+            curr_pyburst_interval_df.loc[:, 'series_height'] = fixed_series_height # the height is the same for all series
 
+            # # add the 'brush_color' column:
+            # curr_pyburst_interval_df.loc[:, 'pen_color_hex'] = curr_color_hex_pen
+            # curr_pyburst_interval_df.loc[:, 'brush_color_hex'] = curr_color_hex_brush
+            
             # add the 'brush_color' column:
             curr_pyburst_interval_df.loc[:, 'pen_color_hex'] = curr_color_hex_pen
             curr_pyburst_interval_df.loc[:, 'brush_color_hex'] = curr_color_hex_brush
-
+            # Set the actual brushes here too:
+            curr_pyburst_interval_df.loc[:, 'pen'] = [pg.mkPen(a_pen_hex_color) for a_pen_hex_color in curr_pyburst_interval_df.pen_color_hex]
+            curr_pyburst_interval_df.loc[:, 'brush'] = [pg.mkBrush(a_brush_color_hex) for a_brush_color_hex in curr_pyburst_interval_df.brush_color_hex]
+            
             filtered_burst_interval_dict[a_cell_id] = curr_pyburst_interval_df
             
         return filtered_burst_interval_dict
+            
+            
+    @classmethod
+    def build_interval_datasource_from_active_burst_intervals(cls, active_burst_intervals, datasource_name='active_burst_intervals_datasource'):
+        """ Builds an appropriate IntervalsDatasource from a dict of dataframes for each cell 
+        Input:
+            active_burst_intervals: IntervalsDatasource
+        Returns:
+            IntervalsDatasource
+        """        
+        df = pd.concat(active_burst_intervals.values())
+        interval_datasource = IntervalsDatasource(df, datasource_name=datasource_name)
+        return interval_datasource # IntervalsDatasource
+            
             
     @staticmethod
     def build_interval_rects_data(active_burst_intervals, included_burst_levels=[1]):
@@ -222,7 +245,7 @@ class Render2DEventRectanglesHelper:
             curr_series_pens = [pg.mkPen(a_pen_hex_color) for a_pen_hex_color in curr_pyburst_interval_df.pen_color_hex]
             curr_series_brushes = [pg.mkBrush(a_brush_color_hex) for a_brush_color_hex in curr_pyburst_interval_df.brush_color_hex]
             ## build the output tuple list: fields are (start_t, series_vertical_offset, duration_t, series_height, pen, brush).        
-            curr_IntervalRectsItem_interval_pairs = list(zip(curr_pyburst_interval_df.t_start, curr_pyburst_interval_df.visualization_series_y_location, curr_pyburst_interval_df.t_duration, curr_pyburst_interval_df.visualization_series_height, curr_series_pens, curr_series_brushes))
+            curr_IntervalRectsItem_interval_pairs = list(zip(curr_pyburst_interval_df.t_start, curr_pyburst_interval_df.series_vertical_offset, curr_pyburst_interval_df.t_duration, curr_pyburst_interval_df.series_height, curr_series_pens, curr_series_brushes))
             
             data = data + curr_IntervalRectsItem_interval_pairs
             
@@ -264,6 +287,38 @@ class Render2DEventRectanglesHelper:
     ##################################################
     ## MAIN METHODS
     ##################################################
+        
+    @classmethod
+    def build_burst_event_rectangle_datasource(cls, active_2d_plot, active_burst_intervals, datasource_name='active_burst_intervals_datasource', included_burst_levels=[1,2,3,4], debug_print=False) -> IntervalsDatasource:
+        """ 
+        Inputs:
+            active_2d_plot: e.g. spike_raster_window.spike_raster_plt_2d
+            active_burst_intervals
+            
+        Returns:
+            IntervalsDatasource
+        
+        TODO:
+            don't need ['interval_pair']
+        
+        Usage:            
+            from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.Mixins.Render2DEventRectanglesHelper import Render2DEventRectanglesHelper
+
+            output_display_items = Render2DEventRectanglesHelper.add_event_rectangles(spike_raster_window.spike_raster_plt_2d, active_burst_intervals) # {'interval_rects_item': active_interval_rects_item}
+            active_interval_rects_item = output_display_items['interval_rects_item']
+
+        """        
+        # Builds the filtered burst intervals:
+        filtered_burst_intervals = cls._post_process_detected_burst_interval_dict(active_burst_intervals, 
+                    active_2d_plot.cell_id_to_fragile_linear_neuron_IDX_map,
+                    active_2d_plot.params.neuron_colors_hex,
+                    active_2d_plot.y_fragile_linear_neuron_IDX_map,
+                    included_burst_levels=included_burst_levels
+                )
+        return Render2DEventRectanglesHelper.build_interval_datasource_from_active_burst_intervals(active_burst_intervals=filtered_burst_intervals, datasource_name=datasource_name)
+        
+        
+    
         
     @classmethod
     def add_event_rectangles(cls, active_2d_plot, active_burst_intervals, included_burst_levels=[1], debug_print=False):
@@ -353,6 +408,17 @@ class Render2DEventRectanglesHelper:
 
         return epoch_rect_separate_plot
 
+
+
+
+
+
+
+
+
+
+
+    # pip install dvg-pyqt-controls
     # ####################################################
     # ### Render2DEventRectanglesMixin: the mixin version that uses the static helper
     # class Render2DEventRectanglesMixin:
