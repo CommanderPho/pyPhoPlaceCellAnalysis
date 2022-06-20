@@ -15,6 +15,8 @@ from pyphocorehelpers.print_helpers import print_dataframe_memory_usage
 import pyphoplacecellanalysis.External.pyqtgraph as pg
 # from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtCore, QtGui, QtWidgets
 from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.GraphicsObjects.IntervalRectsItem import IntervalRectsItem
+from pyphoplacecellanalysis.General.Model.Datasources.IntervalDatasource import IntervalsDatasource
+
 
 
 class EventRectanglesDataseries(object):
@@ -59,7 +61,7 @@ class Render2DEventRectanglesHelper:
         """ Builds an appropriate IntervalRectsItem from any Epoch object and a function that is passed the converted dataframe and adds the visualization specific columns: ['series_vertical_offset', 'series_height', 'pen', 'brush']
         
         Input:
-            epochs: Either a neuropy.core.Epoch object OR dataframe with the columns ["t_start", "t_end",'t_duration']
+            epochs: Either a neuropy.core.Epoch object OR dataframe with the columns ['t_start', 't_duration']
             dataframe_vis_columns_function: callable that takes a pd.DataFrame that adds the remaining required columns to the dataframe if needed.
         
         Returns:
@@ -78,6 +80,20 @@ class Render2DEventRectanglesHelper:
         
         active_df = dataframe_vis_columns_function(active_df)
         
+        ## build the output tuple list: fields are (start_t, series_vertical_offset, duration_t, series_height, pen, brush).
+        curr_IntervalRectsItem_interval_tuples = cls._build_interval_tuple_list_from_dataframe(active_df)
+        ## build the IntervalRectsItem
+        return IntervalRectsItem(curr_IntervalRectsItem_interval_tuples)
+    
+    @classmethod
+    def build_IntervalRectsItem_from_interval_datasource(cls, interval_datasource):
+        """ Builds an appropriate IntervalRectsItem from any IntervalsDatasource object 
+        Input:
+            interval_datasource: IntervalsDatasource
+        Returns:
+            IntervalRectsItem
+        """        
+        active_df = interval_datasource.df
         ## build the output tuple list: fields are (start_t, series_vertical_offset, duration_t, series_height, pen, brush).
         curr_IntervalRectsItem_interval_tuples = cls._build_interval_tuple_list_from_dataframe(active_df)
         ## build the IntervalRectsItem

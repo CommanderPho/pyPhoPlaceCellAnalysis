@@ -5,6 +5,8 @@ import pandas as pd
 import pyphoplacecellanalysis.External.pyqtgraph as pg
 
 from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.Mixins.RenderTimeEpochs.Render2DEventRectanglesHelper import Render2DEventRectanglesHelper
+from pyphoplacecellanalysis.General.Model.Datasources.IntervalDatasource import IntervalsDatasource
+
 
 
 class RenderTimeEpochsItem(object):
@@ -122,7 +124,6 @@ class Specific2DRenderTimeEpochsHelper:
             return active_Laps_df
 
         return _add_interval_dataframe_visualization_columns_Laps
-
         
     @classmethod
     def build_Laps_2D_render_time_epochs(cls, curr_sess, **kwargs):
@@ -131,7 +132,13 @@ class Specific2DRenderTimeEpochsHelper:
 
         """
         active_Laps_Epochs = curr_sess.laps.as_epoch_obj() # <Epoch> object
-        active_laps_interval_rects_item = Render2DEventRectanglesHelper.build_IntervalRectsItem_from_epoch(active_Laps_Epochs, cls.build_Laps_formatter_datasource(**kwargs))
+        laps_interval_datasource = IntervalsDatasource.init_from_epoch_object(active_Laps_Epochs, cls.build_Laps_formatter_datasource(**kwargs),       datasource_name='intervals_datasource_from_laps_epoch_obj')
+        ## build the output tuple list: fields are (start_t, series_vertical_offset, duration_t, series_height, pen, brush).
+        # curr_IntervalRectsItem_interval_tuples = Render2DEventRectanglesHelper._build_interval_tuple_list_from_dataframe(test_laps_interval_datasource)
+        # active_laps_interval_rects_item = Render2DEventRectanglesHelper.build_IntervalRectsItem_from_epoch(active_Laps_Epochs, cls.build_Laps_formatter_datasource(**kwargs))
+        
+        ## IntervalsDatasource version:
+        active_laps_interval_rects_item = Render2DEventRectanglesHelper.build_IntervalRectsItem_from_interval_datasource(laps_interval_datasource)
         active_laps_interval_rects_item.setToolTip('Laps')
         return active_laps_interval_rects_item
     
