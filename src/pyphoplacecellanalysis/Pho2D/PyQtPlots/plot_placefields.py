@@ -12,6 +12,8 @@ from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtCore, QtGui
 from pyphocorehelpers.indexing_helpers import compute_paginated_grid_config
 from pyphoplacecellanalysis.GUI.PyQtPlot.pyqtplot_basic import pyqtplot_common_setup
 
+from pyphoplacecellanalysis.GUI.Qt.Mixins.PhoMainAppWindowBase import PhoMainAppWindowBase
+
 # class PlotLocationIdentifier(object):
 #     """docstring for PlotLocationIdentifier."""
 #     def __init__(self, arg):
@@ -175,7 +177,9 @@ def pyqtplot_plot_image(xbin_edges, ybin_edges, image, enable_LUT_Histogram=Fals
     if root_render_widget is None:
         if parent_root_widget is None:
             # Create window to hold the image:
-            parent_root_widget = QtGui.QMainWindow()
+            
+            # parent_root_widget = QtGui.QMainWindow()
+            parent_root_widget = PhoMainAppWindowBase()
             parent_root_widget.resize(800,800)
         
         # Build a single image view to display the image:
