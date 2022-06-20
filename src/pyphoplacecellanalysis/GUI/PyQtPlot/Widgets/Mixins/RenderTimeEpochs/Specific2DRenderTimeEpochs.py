@@ -28,7 +28,7 @@ class Specific2DRenderTimeEpochsHelper:
     ##########################################
     ## PBE (Population Burst Events)
     @staticmethod
-    def build_PBEs_formatter_datasource(debug_print=False, **kwargs):
+    def build_PBEs_dataframe_formatter(debug_print=False, **kwargs):
         # class PBE_IntervalRectFormatter:
         #     """ An alternative to the simplier _add_interval_dataframe_visualization_columns_PBE(...) function version that can be passed to _add_rendered_epochs(...) as a callback if state is desired.
         #         adds the remaining _required_interval_visualization_columns specifically for PBEs
@@ -83,12 +83,10 @@ class Specific2DRenderTimeEpochsHelper:
         return _add_interval_dataframe_visualization_columns_PBE
         
         
-        
-        
-    
+
     @classmethod
-    def build_PBEs_2D_render_time_epochs_datasource(cls, curr_sess, **kwargs):
-        return IntervalsDatasource.init_from_epoch_object(curr_sess.pbe, cls.build_PBEs_formatter_datasource(**kwargs),       datasource_name='intervals_datasource_from_PBEs_epoch_obj')
+    def build_PBEs_render_time_epochs_datasource(cls, curr_sess, **kwargs):
+        return IntervalsDatasource.init_from_epoch_object(curr_sess.pbe, cls.build_PBEs_dataframe_formatter(**kwargs), datasource_name='intervals_datasource_from_PBEs_epoch_obj')
     
     
     @classmethod
@@ -103,7 +101,7 @@ class Specific2DRenderTimeEpochsHelper:
         ## IntervalsDatasource version:
         # PBEs_interval_datasource = IntervalsDatasource.init_from_epoch_object(active_PBEs_obj, cls.build_PBEs_formatter_datasource(**kwargs),       datasource_name='intervals_datasource_from_PBEs_epoch_obj')
         
-        PBEs_interval_datasource = cls.build_PBEs_2D_render_time_epochs_datasource(curr_sess=curr_sess, **kwargs)
+        PBEs_interval_datasource = cls.build_PBEs_render_time_epochs_datasource(curr_sess=curr_sess, **kwargs)
         active_pbe_interval_rects_item = Render2DEventRectanglesHelper.build_IntervalRectsItem_from_interval_datasource(PBEs_interval_datasource)
         active_pbe_interval_rects_item.setToolTip('PBEs')
         return active_pbe_interval_rects_item
@@ -112,9 +110,7 @@ class Specific2DRenderTimeEpochsHelper:
     ##########################################
     ## PBE (Population Burst Events)
     @staticmethod
-    def build_Laps_formatter_datasource(debug_print=False, **kwargs):
-        
-        
+    def build_Laps_dataframe_formatter(debug_print=False, **kwargs):
         def _add_interval_dataframe_visualization_columns_Laps(active_Laps_df):
             """ Adds the remaining _required_interval_visualization_columns specifically for PBEs
             """
@@ -139,18 +135,27 @@ class Specific2DRenderTimeEpochsHelper:
 
         return _add_interval_dataframe_visualization_columns_Laps
         
+        
+    @classmethod
+    def build_Laps_render_time_epochs_datasource(cls, curr_sess, **kwargs):
+        active_Laps_Epochs = curr_sess.laps.as_epoch_obj() # <Epoch> object
+        return IntervalsDatasource.init_from_epoch_object(active_Laps_Epochs, cls.build_Laps_dataframe_formatter(**kwargs), datasource_name='intervals_datasource_from_laps_epoch_obj')
+    
+    
     @classmethod
     def build_Laps_2D_render_time_epochs(cls, curr_sess, **kwargs):
         """ 
         Usage:
 
         """
-        active_Laps_Epochs = curr_sess.laps.as_epoch_obj() # <Epoch> object
+        # active_Laps_Epochs = curr_sess.laps.as_epoch_obj() # <Epoch> object
         ## IntervalsDatasource version:
-        laps_interval_datasource = IntervalsDatasource.init_from_epoch_object(active_Laps_Epochs, cls.build_Laps_formatter_datasource(**kwargs),       datasource_name='intervals_datasource_from_laps_epoch_obj')
+        # laps_interval_datasource = IntervalsDatasource.init_from_epoch_object(active_Laps_Epochs, cls.build_Laps_formatter_datasource(**kwargs), datasource_name='intervals_datasource_from_laps_epoch_obj')
+        laps_interval_datasource = cls.build_Laps_render_time_epochs_datasource(curr_sess=curr_sess, **kwargs)
         active_laps_interval_rects_item = Render2DEventRectanglesHelper.build_IntervalRectsItem_from_interval_datasource(laps_interval_datasource)
         active_laps_interval_rects_item.setToolTip('Laps')
         return active_laps_interval_rects_item
+    
     
     @classmethod
     def add_Laps_2D_render_time_epochs(cls, curr_sess, destination_plot):
