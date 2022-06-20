@@ -57,7 +57,7 @@ class Render2DScrollWindowPlotMixin:
 
             self.spikes_window.total_df_start_end_times # to get the current start/end times to set the linear region to
         Creates:
-            self.all_spots # data for all spikes to be rendered on a scatter plot
+            self.plots_data.all_spots # data for all spikes to be rendered on a scatter plot
             self.ui.scroll_window_region # a pg.LinearRegionItem                        
             self.plots.preview_overview_scatter_plot # a pg.ScatterPlotItem
         
@@ -78,11 +78,11 @@ class Render2DScrollWindowPlotMixin:
         # ALL Spikes in the preview window:
         curr_spike_x, curr_spike_y, curr_spike_pens, curr_n = self._build_all_spikes_data_values()        
         pos = np.vstack((curr_spike_x, curr_spike_y)) # np.shape(curr_spike_t): (11,), np.shape(curr_spike_x): (11,), np.shape(curr_spike_y): (11,), curr_n: 11
-        self.all_spots = [{'pos': pos[:,i], 'data': i, 'pen': curr_spike_pens[i]} for i in range(curr_n)]
+        self.plots_data.all_spots = [{'pos': pos[:,i], 'data': i, 'pen': curr_spike_pens[i]} for i in range(curr_n)]
         
         self.plots.preview_overview_scatter_plot = pg.ScatterPlotItem(name='spikeRasterOverviewWindowScatterPlotItem', pxMode=True, symbol=vtick, size=5, pen={'color': 'w', 'width': 1})
         self.plots.preview_overview_scatter_plot.opts['useCache'] = True
-        self.plots.preview_overview_scatter_plot.addPoints(self.all_spots) # , hoverable=True
+        self.plots.preview_overview_scatter_plot.addPoints(self.plots_data.all_spots) # , hoverable=True
         background_static_scroll_window_plot.addItem(self.plots.preview_overview_scatter_plot)
         
         # Add the linear region overlay:

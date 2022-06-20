@@ -241,7 +241,7 @@ class Spike2DRaster(Render2DScrollWindowPlotMixin, SpikeRasterBase):
 
         # self._buildScrollRasterPreviewWindowGraphics()
         if self.Includes2DActiveWindowScatter:
-            self.plots.scatter_plot.addPoints(self.all_spots)
+            self.plots.scatter_plot.addPoints(self.plots_data.all_spots)
     
         # self.Render2DScrollWindowPlot_on_window_update # register with the animation time window for updates for the scroller.
         # Connect the signals for the zoom region and the LinearRegionItem
@@ -336,7 +336,7 @@ class Spike2DRaster(Render2DScrollWindowPlotMixin, SpikeRasterBase):
         Inputs:
             neuron_id_color_update_dict: a neuron_id:QColor dictionary
         Updates:
-            self.all_spots
+            self.plots_data.all_spots
             
         """
         print(f'Spike2DRaster.neuron_id_color_update_dict: {neuron_id_color_update_dict}')
@@ -346,11 +346,11 @@ class Spike2DRaster(Render2DScrollWindowPlotMixin, SpikeRasterBase):
         # ALL Spikes in the preview window:
         curr_spike_x, curr_spike_y, curr_spike_pens, curr_n = self._build_all_spikes_data_values()        
         pos = np.vstack((curr_spike_x, curr_spike_y)) # np.shape(curr_spike_t): (11,), np.shape(curr_spike_x): (11,), np.shape(curr_spike_y): (11,), curr_n: 11
-        self.all_spots = [{'pos': pos[:,i], 'data': i, 'pen': curr_spike_pens[i]} for i in range(curr_n)] # update self.all_spots
+        self.plots_data.all_spots = [{'pos': pos[:,i], 'data': i, 'pen': curr_spike_pens[i]} for i in range(curr_n)] # update self.plots_data.all_spots
         # Update preview_overview_scatter_plot
-        self.plots.preview_overview_scatter_plot.setData(self.all_spots)
+        self.plots.preview_overview_scatter_plot.setData(self.plots_data.all_spots)
         if self.Includes2DActiveWindowScatter:
-            self.plots.scatter_plot.setData(self.all_spots)
+            self.plots.scatter_plot.setData(self.plots_data.all_spots)
         
     
 # Start Qt event loop unless running in interactive mode.
