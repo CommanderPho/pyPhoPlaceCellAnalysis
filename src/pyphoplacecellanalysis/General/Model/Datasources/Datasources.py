@@ -88,7 +88,11 @@ class DataframeDatasource(BaseDatasource):
     
     @property
     def datasource_UIDs(self):
-        """The datasource_UID property."""
+        """The datasource_UID property.
+        
+        Note: Assumes multiple series are given by the non-time columns:
+        
+        """
         return [f'{self.custom_datasource_name}.{col_name}' for col_name in self.data_column_values]
     
     
@@ -97,6 +101,7 @@ class DataframeDatasource(BaseDatasource):
     def active_data_column_names(self):
         """ the names of only the non-time columns """
         return self.data_column_values
+        # return self.data_column_names # TODO: why does this return the self.data_column_values instead of self.data_column_names??
     
     @property
     def active_data_column_values(self):
@@ -153,6 +158,15 @@ class DataframeDatasource(BaseDatasource):
         """ called to get the data that should be displayed for the window starting at new_start and ending at new_end """
         return self.df[self.df[self.time_column_name].between(new_start, new_end)]
     
+
+
+
+
+
+
+
+
+
 
 class SpikesDataframeDatasource(DataframeDatasource):
     """ Provides neural spiking data for one or more neuron (unit) and the timestamps at which they occur 't'.
