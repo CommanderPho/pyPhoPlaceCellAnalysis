@@ -82,17 +82,28 @@ class Specific2DRenderTimeEpochsHelper:
         # return pbe_interval_rects_formatter
         return _add_interval_dataframe_visualization_columns_PBE
         
+        
+        
+        
+    
+    @classmethod
+    def build_PBEs_2D_render_time_epochs_datasource(cls, curr_sess, **kwargs):
+        return IntervalsDatasource.init_from_epoch_object(curr_sess.pbe, cls.build_PBEs_formatter_datasource(**kwargs),       datasource_name='intervals_datasource_from_PBEs_epoch_obj')
+    
+    
     @classmethod
     def build_PBEs_2D_render_time_epochs(cls, curr_sess, **kwargs):
         """ builds the animal position 3D Curves and adds them to the spike_raster_plot
         Usage:
             active_plot_curve_datasource = Specific3DTimeCurvesHelper.build_position_3D_time_curves(curr_sess, spike_raster_plt_3d)
         """
-        active_PBEs_obj = curr_sess.pbe # <Epoch> object
+        # active_PBEs_obj = curr_sess.pbe # <Epoch> object
         # pbe_interval_rects_formatter = cls.build_PBEs_formatter_datasource()
         # active_pbe_interval_rects_item = Render2DEventRectanglesHelper.build_IntervalRectsItem_from_epoch(active_PBEs_obj, pbe_interval_rects_formatter) # IntervalRectsItem
         ## IntervalsDatasource version:
-        PBEs_interval_datasource = IntervalsDatasource.init_from_epoch_object(active_PBEs_obj, cls.build_PBEs_formatter_datasource(**kwargs),       datasource_name='intervals_datasource_from_PBEs_epoch_obj')
+        # PBEs_interval_datasource = IntervalsDatasource.init_from_epoch_object(active_PBEs_obj, cls.build_PBEs_formatter_datasource(**kwargs),       datasource_name='intervals_datasource_from_PBEs_epoch_obj')
+        
+        PBEs_interval_datasource = cls.build_PBEs_2D_render_time_epochs_datasource(curr_sess=curr_sess, **kwargs)
         active_pbe_interval_rects_item = Render2DEventRectanglesHelper.build_IntervalRectsItem_from_interval_datasource(PBEs_interval_datasource)
         active_pbe_interval_rects_item.setToolTip('PBEs')
         return active_pbe_interval_rects_item
