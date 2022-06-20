@@ -62,8 +62,8 @@ class Render2DScrollWindowPlotMixin:
             self.plots.preview_overview_scatter_plot # a pg.ScatterPlotItem
         
         Usage:
-            self.ui.background_static_scroll_window_plot = self.ui.main_graphics_layout_widget.addPlot(row=2, col=0)
-            self.ui.background_static_scroll_window_plot = self._buildScrollRasterPreviewWindowGraphics(self.ui.background_static_scroll_window_plot)
+            self.plots.background_static_scroll_window_plot = self.ui.main_graphics_layout_widget.addPlot(row=2, col=0)
+            self.plots.background_static_scroll_window_plot = self._buildScrollRasterPreviewWindowGraphics(self.plots.background_static_scroll_window_plot)
         
         
         """
