@@ -82,7 +82,7 @@ class Specific2DRenderTimeEpochsHelper:
         return pbe_interval_rects_formatter
         
     @classmethod
-    def build_PBEs_2D_render_time_epochs(cls, curr_sess, spike_raster_plt_3d):
+    def build_PBEs_2D_render_time_epochs(cls, curr_sess):
         """ builds the animal position 3D Curves and adds them to the spike_raster_plot
         Usage:
             active_plot_curve_datasource = Specific3DTimeCurvesHelper.build_position_3D_time_curves(curr_sess, spike_raster_plt_3d)
@@ -96,7 +96,9 @@ class Specific2DRenderTimeEpochsHelper:
     ##########################################
     ## PBE (Population Burst Events)
     @staticmethod
-    def build_Laps_formatter_datasource(debug_print=False):
+    def build_Laps_formatter_datasource(debug_print=False, **kwargs):
+        
+        
         def _add_interval_dataframe_visualization_columns_Laps(active_Laps_df):
             """ Adds the remaining _required_interval_visualization_columns specifically for PBEs
             """
@@ -105,28 +107,37 @@ class Specific2DRenderTimeEpochsHelper:
                 print(f'num_intervals: {num_intervals}') # num_intervals: 206
 
             ## PBE parameters:
-            y_location = 43.5
-            height = 1.5
+            y_location = 0.0
+            height = 1.0
+            # y_location = 43.5            
+            # height = 1.5
             pen_color = pg.mkColor('red')
-            brush_color = pg.mkColor('grey')
+            brush_color = pg.mkColor('red')
 
             ## Add the missing parameters to the dataframe:
-            active_Laps_df['series_vertical_offset'] = y_location
-            active_Laps_df['series_height'] = height
-            active_Laps_df['pen'] = pg.mkPen(pen_color)
-            active_Laps_df['brush'] = pg.mkBrush(brush_color)
+            active_Laps_df['series_vertical_offset'] = kwargs.setdefault('series_vertical_offset', y_location)
+            active_Laps_df['series_height'] = kwargs.setdefault('series_height', height)
+            active_Laps_df['pen'] = kwargs.setdefault('pen', pg.mkPen(pen_color)) 
+            active_Laps_df['brush'] = kwargs.setdefault('brush', pg.mkBrush(brush_color))  
             return active_Laps_df
+
         return _add_interval_dataframe_visualization_columns_Laps
 
         
     @classmethod
-    def build_Laps_2D_render_time_epochs(cls, curr_sess, spike_raster_plt_3d):
+    def build_Laps_2D_render_time_epochs(cls, curr_sess, **kwargs):
         """ 
         Usage:
 
         """
         active_Laps_Epochs = curr_sess.laps.as_epoch_obj() # <Epoch> object
-        active_laps_interval_rects_item = Render2DEventRectanglesHelper.build_IntervalRectsItem_from_epoch(active_Laps_Epochs, cls.build_Laps_formatter_datasource())
+        active_laps_interval_rects_item = Render2DEventRectanglesHelper.build_IntervalRectsItem_from_epoch(active_Laps_Epochs, cls.build_Laps_formatter_datasource(**kwargs))
+        active_laps_interval_rects_item.setToolTip('Laps')
         return active_laps_interval_rects_item
     
-    
+    @classmethod
+    def add_Laps_2D_render_time_epochs(cls, curr_sess, destination_plot):
+        active_interval_rects_item = cls.build_Laps_2D_render_time_epochs(curr_sess=curr_sess)
+        
+        destination_plot.addPlot(active_interval_rects_item)
+        
