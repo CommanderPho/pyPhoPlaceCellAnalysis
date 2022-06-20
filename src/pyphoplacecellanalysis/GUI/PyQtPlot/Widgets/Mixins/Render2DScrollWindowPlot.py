@@ -67,16 +67,6 @@ class Render2DScrollWindowPlotMixin:
         
         
         """
-        
-        # if graphics_layout_widget is None:
-        #     raise NotImplementedError
-        #     self.ui.main_graphics_layout_widget = pg.GraphicsLayoutWidget()
-        #     self.ui.main_graphics_layout_widget.useOpenGL(True)
-        #     self.ui.main_graphics_layout_widget.resize(1000,600)
-        #     # Add the main widget to the layout in the (0, 0) location:
-        #     self.ui.layout.addWidget(self.ui.main_graphics_layout_widget, 0, 0) # add the GLViewWidget to the layout at 0, 0
-            
-        
         # Common Tick Label
         vtick = QtGui.QPainterPath()
         vtick.moveTo(0, -0.5)
