@@ -3,6 +3,9 @@ from neuropy.core import Epoch
 
 from qtpy import QtCore
 
+from pyphocorehelpers.print_helpers import SimplePrintable, PrettyPrintable, iPythonKeyCompletingMixin
+from pyphocorehelpers.DataStructure.dynamic_parameters import DynamicParameters
+
 from pyphocorehelpers.DataStructure.general_parameter_containers import DebugHelper, VisualizationParameters, RenderPlots, RenderPlotsData
 from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.GraphicsObjects.IntervalRectsItem import IntervalRectsItem, RectangleRenderTupleHelpers
 from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.Mixins.RenderTimeEpochs.Specific2DRenderTimeEpochs import Specific2DRenderTimeEpochsHelper
@@ -12,21 +15,30 @@ from pyphoplacecellanalysis.General.Model.Datasources.IntervalDatasource import 
 
 
 
-class RenderedEpochsItemsContainer(RenderPlots):
+class RenderedEpochsItemsContainer(iPythonKeyCompletingMixin, DynamicParameters):
     """ Wraps a list of plots and their rendered_rects_item for a given datasource/name
+    
+        Note that the plots are only given by self.dynamically_added_attributes since the 'name' key exists.
+    
     """
-    def __init__(self, name, rendered_rects_item, target_plots_list):
-        super(RenderedEpochsItemsContainer, self).__init__(name)
-        # target_plots_dict = {}
+    def __init__(self, rendered_rects_item, target_plots_list):
+        super(RenderedEpochsItemsContainer, self).__init__()
         for a_plot in target_plots_list:
             # make an independent copy of the rendered_rects_item for each plot
-            # target_plots_dict[a_plot] = rendered_rects_item.copy()
             independent_data_copy = RectangleRenderTupleHelpers.copy_data(rendered_rects_item.data)
             self[a_plot] = IntervalRectsItem(data=independent_data_copy)
-            # self[a_plot] = IntervalRectsItem(data=deepcopy(rendered_rects_item.data))
-            # target_plots_dict[a_plot] = IntervalRectsItem(data=deepcopy(rendered_rects_item.data))
-        # super(RenderedEpochsItemsContainer, self).__init__(name, target_plots_dict=target_plots_dict)
         
+    # @property
+    # def plot_keys(self):
+    #     """The plots property."""
+    #     return self.dynamically_added_attributes
+        
+    # def plot_items(self):
+    #     return {key:value for key, value in self.items() if (key != 'name')}.items()
+        
+    # def items(self):
+    #     return {key:value for key, value in super().items() if (key != 'name')}.items()
+    
     
 
 class EpochRenderingMixin:
@@ -167,7 +179,9 @@ class EpochRenderingMixin:
                 if a_plot in extant_rects_plot_items_container:
                     # the plot is already here: remove and re-add it
                     extant_rect_plot_item = extant_rects_plot_items_container[a_plot]
-                    a_plot.removeItem(extant_rect_plot_item)
+                    a_plot.removeItem(extant_rect_plot_item) # Remove it from the plot
+                    
+                    
                     # TODO: update the item's data instead of replacing it
                     # # add the new one:
                     # extant_rects_plot_items_container[a_plot] = new_interval_rects_item.copy()
@@ -186,16 +200,15 @@ class EpochRenderingMixin:
                 
         else:
             # Need to create a new RenderedEpochsItemsContainer with the items:
-            self.rendered_epochs[name] = RenderedEpochsItemsContainer(name, new_interval_rects_item, child_plots) # set the plot item
+            self.rendered_epochs[name] = RenderedEpochsItemsContainer(new_interval_rects_item, child_plots) # set the plot item
             for a_plot, a_rect_item in self.rendered_epochs[name].items():
-                a_plot.removeItem(a_rect_item)
-                a_plot.addItem(a_rect_item)
+                if not isinstance(a_rect_item, str):
+                    if debug_print:
+                        print(f'plotting item')
+                    a_plot.removeItem(a_rect_item)
+                    a_plot.addItem(a_rect_item)
 
-            
-        # for a_plot in child_plots:
-        #     a_plot.removeItem(new_interval_rects_item)
-        #     a_plot.addItem(new_interval_rects_item)
-
+       
 
     def remove_rendered_intervals(self, name, child_plots_removal_list=None, debug_print=True):
         """ removes the intervals specified by the interval_datasource to the plots
@@ -205,17 +218,18 @@ class EpochRenderingMixin:
         extant_rects_plot_item = self.rendered_epochs[name]
         items_to_remove_from_rendered_epochs = []
         for a_plot, a_rect_item in extant_rects_plot_item.items():
-            if child_plots_removal_list is not None:
-                if a_plot in child_plots_removal_list:
-                    # only remove if the plot is in the child plots:
+            if not isinstance(a_rect_item, str):                
+                if child_plots_removal_list is not None:
+                    if a_plot in child_plots_removal_list:
+                        # only remove if the plot is in the child plots:
+                        a_plot.removeItem(a_rect_item)
+                        items_to_remove_from_rendered_epochs.append(a_plot)
+                    else:
+                        pass # continue
+                else:
+                    # otherwise remove all
                     a_plot.removeItem(a_rect_item)
                     items_to_remove_from_rendered_epochs.append(a_plot)
-                else:
-                    pass # continue
-            else:
-                # otherwise remove all
-                a_plot.removeItem(a_rect_item)
-                items_to_remove_from_rendered_epochs.append(a_plot)
                 
         ## remove the items from the list:
         for a_key_to_remove in items_to_remove_from_rendered_epochs:
@@ -228,12 +242,15 @@ class EpochRenderingMixin:
             del self.rendered_epochs[name]
             del self.interval_datasources[name]
     
+
         
     def clear_all_rendered_intervals(self, child_plots_removal_list=None, debug_print=True):
-        for a_name in self.rendered_epochs.keys():
-            if debug_print:
-                print(f'removing {a_name}...')
-            self.remove_rendered_intervals(a_name, child_plots_removal_list=child_plots_removal_list, debug_print=debug_print)
+        curr_rendered_epoch_names = list(self.rendered_epochs.keys()) # done to prevent problems with dict changing size during iteration
+        for a_name in curr_rendered_epoch_names:
+            if a_name != 'name':
+                if debug_print:
+                    print(f'removing {a_name}...')
+                self.remove_rendered_intervals(a_name, child_plots_removal_list=child_plots_removal_list, debug_print=debug_print)
         
     
     @staticmethod
