@@ -16,8 +16,12 @@ from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.SpikeRasterWidgets.SpikeRasterB
 from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.Mixins.Render2DScrollWindowPlot import Render2DScrollWindowPlotMixin
 from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.Mixins.Render2DNeuronIdentityLinesMixin import Render2DNeuronIdentityLinesMixin
 
+from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.Mixins.RenderTimeEpochs.EpochRenderingMixin import EpochRenderingMixin
 
-class Spike2DRaster(Render2DScrollWindowPlotMixin, SpikeRasterBase):
+from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.Mixins.RenderTimeEpochs.Specific2DRenderTimeEpochs import Specific2DRenderTimeEpochsHelper
+
+
+class Spike2DRaster(EpochRenderingMixin, Render2DScrollWindowPlotMixin, SpikeRasterBase):
     """ Displays a 2D version of a raster plot with the spikes occuring along a plane. 
     
     Usage:
@@ -68,6 +72,13 @@ class Spike2DRaster(Render2DScrollWindowPlotMixin, SpikeRasterBase):
         return lines_dict
     
     
+    ## FOR EpochRenderingMixin
+    @property    
+    def interval_rendering_plots(self):
+        """ returns the list of child subplots/graphics (usually PlotItems) that participate in rendering intervals """
+        return [self.plots.background_static_scroll_window_plot, self.plots.main_plot_widget] # for spike_raster_plt_2d
+    
+    
     ######  Get/Set Properties ######:
     
 
@@ -78,6 +89,8 @@ class Spike2DRaster(Render2DScrollWindowPlotMixin, SpikeRasterBase):
         self.temporal_mapping_changed.connect(self.on_adjust_temporal_spatial_mapping)
         self.spikes_window.timeWindow.window_duration_changed_signal.connect(self.on_adjust_temporal_spatial_mapping)
         # self.on_window_duration_changed.connect(self.on_adjust_temporal_spatial_mapping)
+        
+        self.EpochRenderingMixin_on_init()
         
         if self.enable_show_on_init:
             self.show()
@@ -126,6 +139,8 @@ class Spike2DRaster(Render2DScrollWindowPlotMixin, SpikeRasterBase):
             all_y = [self.y_fragile_linear_neuron_IDX_map[a_cell_IDX] for a_cell_IDX in self.spikes_df['fragile_linear_neuron_IDX'].to_numpy()]
             self.spikes_df['visualization_raster_y_location'] = all_y # adds as a column to the dataframe. Only needs to be updated when the number of active units changes
             print('done.')
+            
+        self.EpochRenderingMixin_on_setup()
         # self.spikes_df
         
         
@@ -173,10 +188,10 @@ class Spike2DRaster(Render2DScrollWindowPlotMixin, SpikeRasterBase):
   
     def _buildGraphics(self):
         """ 
-        ui.main_plot_widget: 2D display 
-            self.ui.scatter_plot: the active 2D display of the current window
+        plots.main_plot_widget: 2D display 
+            self.plots.scatter_plot: the active 2D display of the current window
         
-        ui.background_static_scroll_window_plot: the static plot of the entire data (always shows the entire time range)
+        plots.background_static_scroll_window_plot: the static plot of the entire data (always shows the entire time range)
             Presents a linear scroll region over the top to allow the user to select the active window.
             
             
@@ -184,6 +199,7 @@ class Spike2DRaster(Render2DScrollWindowPlotMixin, SpikeRasterBase):
         ##### Main Raster Plot Content Top ##########
         
         self.ui.main_graphics_layout_widget = pg.GraphicsLayoutWidget()
+        self.ui.main_graphics_layout_widget.setObjectName('main_graphics_layout_widget')
         self.ui.main_graphics_layout_widget.useOpenGL(True)
         self.ui.main_graphics_layout_widget.resize(1000,600)
         # Add the main widget to the layout in the (0, 0) location:
@@ -204,7 +220,8 @@ class Spike2DRaster(Render2DScrollWindowPlotMixin, SpikeRasterBase):
         # Custom 2D raster plot:
         curr_plot_row = 1
         if self.Includes2DActiveWindowScatter:
-            self.ui.main_plot_widget = self.ui.main_graphics_layout_widget.addPlot(row=curr_plot_row, col=0)
+            self.plots.main_plot_widget = self.ui.main_graphics_layout_widget.addPlot(row=curr_plot_row, col=0, name='main_plot_widget')
+            self.plots.main_plot_widget.setObjectName('main_plot_widget') # this seems necissary, the 'name' parameter in addPlot(...) seems to only change some internal property related to the legend
             curr_plot_row += 1
             # self.ui.plots = [] # create an empty array for each plot, of which there will be one for each unit.
             # # build the position range for each unit along the y-axis:
@@ -214,35 +231,46 @@ class Spike2DRaster(Render2DScrollWindowPlotMixin, SpikeRasterBase):
             vtick.moveTo(0, -0.5)
             vtick.lineTo(0, 0.5)
 
-            self.ui.main_plot_widget.setLabel('left', 'Cell ID', units='')
-            self.ui.main_plot_widget.setLabel('bottom', 'Time', units='s')
-            self.ui.main_plot_widget.setMouseEnabled(x=False, y=False)
-            self.ui.main_plot_widget.enableAutoRange(x=False, y=False)
-            self.ui.main_plot_widget.setAutoVisible(x=False, y=False)
-            self.ui.main_plot_widget.setAutoPan(x=False, y=False)
-            self.ui.main_plot_widget.enableAutoRange('xy', False)  ## stop auto-scaling after the first data set is plotted
             
-            # self.ui.main_plot_widget.disableAutoRange()
+            self.plots.main_plot_widget.setLabel('left', 'Cell ID', units='')
+            self.plots.main_plot_widget.setLabel('bottom', 'Time', units='s')
+            self.plots.main_plot_widget.setMouseEnabled(x=False, y=False)
+            self.plots.main_plot_widget.enableAutoRange(x=False, y=False)
+            self.plots.main_plot_widget.setAutoVisible(x=False, y=False)
+            self.plots.main_plot_widget.setAutoPan(x=False, y=False)
+            self.plots.main_plot_widget.enableAutoRange('xy', False)  ## stop auto-scaling after the first data set is plotted
+            
+            # self.plots.main_plot_widget.disableAutoRange()
             self._update_plot_ranges()
             
-            self.ui.scatter_plot = pg.ScatterPlotItem(name='spikeRasterScatterPlotItem', pxMode=True, symbol=vtick, size=10, pen={'color': 'w', 'width': 2})
-            self.ui.scatter_plot.opts['useCache'] = True
-            self.ui.main_plot_widget.addItem(self.ui.scatter_plot)
-            _v_axis_item = Render2DNeuronIdentityLinesMixin.setup_custom_neuron_identity_axis(self.ui.main_plot_widget, self.n_cells)
+            ## TODO: what plot is this actually?
+            self.plots.scatter_plot = pg.ScatterPlotItem(name='spikeRasterScatterPlotItem', pxMode=True, symbol=vtick, size=10, pen={'color': 'w', 'width': 2})
+            self.plots.scatter_plot.setObjectName('scatter_plot')
+            self.plots.scatter_plot.opts['useCache'] = True
+            self.plots.main_plot_widget.addItem(self.plots.scatter_plot)
+            _v_axis_item = Render2DNeuronIdentityLinesMixin.setup_custom_neuron_identity_axis(self.plots.main_plot_widget, self.n_cells)
                 
         else:
-            self.ui.main_plot_widget = None
-            self.ui.scatter_plot = None
+            self.plots.main_plot_widget = None
+            self.plots.scatter_plot = None
 
         
         # From Render2DScrollWindowPlotMixin:
-        self.ui.background_static_scroll_window_plot = self.ui.main_graphics_layout_widget.addPlot(row=curr_plot_row, col=0) # curr_plot_row: 2 if  self.Includes2DActiveWindowScatter
-        self.ui.background_static_scroll_window_plot = self._buildScrollRasterPreviewWindowGraphics(self.ui.background_static_scroll_window_plot)
+        self.plots.background_static_scroll_window_plot = self.ui.main_graphics_layout_widget.addPlot(row=curr_plot_row, col=0, name='background_static_scroll_window_plot') # curr_plot_row: 2 if  self.Includes2DActiveWindowScatter
+        self.plots.background_static_scroll_window_plot.setObjectName('background_static_scroll_window_plot') # this seems necissary, the 'name' parameter in addPlot(...) seems to only change some internal property related to the legend
+
+        # print(f'main_plot_widget.objectName(): {main_plot_widget.objectName()}')
+
+        self.plots.background_static_scroll_window_plot = self._buildScrollRasterPreviewWindowGraphics(self.plots.background_static_scroll_window_plot)
 
         # self._buildScrollRasterPreviewWindowGraphics()
         if self.Includes2DActiveWindowScatter:
-            self.ui.scatter_plot.addPoints(self.all_spots)
+            self.plots.scatter_plot.addPoints(self.plots_data.all_spots)
     
+        
+        
+        self.EpochRenderingMixin_on_buildUI()
+        
         # self.Render2DScrollWindowPlot_on_window_update # register with the animation time window for updates for the scroller.
         # Connect the signals for the zoom region and the LinearRegionItem
         # self.ui.scroll_window_region.sigRegionChanged.connect(self.update_zoom_plotter)
@@ -255,14 +283,14 @@ class Spike2DRaster(Render2DScrollWindowPlotMixin, SpikeRasterBase):
     ##################################
     
     def _update_plot_ranges(self):
-        # self.ui.main_plot_widget.setXRange(-self.half_render_window_duration, +self.half_render_window_duration)
-        # self.ui.main_plot_widget.setXRange(0.0, +self.temporal_axis_length, padding=0)
-        # self.ui.main_plot_widget.setYRange(self.y[0], self.y[-1], padding=0)
-        # self.ui.main_plot_widget.disableAutoRange()
+        # self.plots.main_plot_widget.setXRange(-self.half_render_window_duration, +self.half_render_window_duration)
+        # self.plots.main_plot_widget.setXRange(0.0, +self.temporal_axis_length, padding=0)
+        # self.plots.main_plot_widget.setYRange(self.y[0], self.y[-1], padding=0)
+        # self.plots.main_plot_widget.disableAutoRange()
         if self.Includes2DActiveWindowScatter:
-            self.ui.main_plot_widget.disableAutoRange('xy')
-            self.ui.main_plot_widget.setRange(xRange=[0.0, +self.temporal_axis_length], yRange=[self.y[0], self.y[-1]])
-            _v_axis_item = Render2DNeuronIdentityLinesMixin.setup_custom_neuron_identity_axis(self.ui.main_plot_widget, self.n_cells)
+            self.plots.main_plot_widget.disableAutoRange('xy')
+            self.plots.main_plot_widget.setRange(xRange=[0.0, +self.temporal_axis_length], yRange=[self.y[0], self.y[-1]])
+            _v_axis_item = Render2DNeuronIdentityLinesMixin.setup_custom_neuron_identity_axis(self.plots.main_plot_widget, self.n_cells)
     
     
     @QtCore.pyqtSlot()
@@ -288,7 +316,6 @@ class Spike2DRaster(Render2DScrollWindowPlotMixin, SpikeRasterBase):
         # build the position range for each unit along the y-axis:
         self.y = DataSeriesToSpatial.build_series_identity_axis(self.n_cells, center_mode=self.params.center_mode, bin_position_mode=self.params.bin_position_mode, side_bin_margins = self.params.side_bin_margins)
         
-        
         # Get updated time window
         updated_time_window = self.spikes_window.active_time_window # (30.0, 930.0)
         # update the current scroll region:
@@ -305,7 +332,7 @@ class Spike2DRaster(Render2DScrollWindowPlotMixin, SpikeRasterBase):
     def update_zoomed_plot(self, min_t, max_t):
         # Update the main_plot_widget:
         if self.Includes2DActiveWindowScatter:
-            self.ui.main_plot_widget.setXRange(min_t, max_t, padding=0)
+            self.plots.main_plot_widget.setXRange(min_t, max_t, padding=0)
 
         # self.render_window_duration = (max_x - min_x) # update the render_window_duration from the slider width
         scroll_window_width = max_t - min_t
@@ -336,7 +363,7 @@ class Spike2DRaster(Render2DScrollWindowPlotMixin, SpikeRasterBase):
         Inputs:
             neuron_id_color_update_dict: a neuron_id:QColor dictionary
         Updates:
-            self.all_spots
+            self.plots_data.all_spots
             
         """
         print(f'Spike2DRaster.neuron_id_color_update_dict: {neuron_id_color_update_dict}')
@@ -346,13 +373,40 @@ class Spike2DRaster(Render2DScrollWindowPlotMixin, SpikeRasterBase):
         # ALL Spikes in the preview window:
         curr_spike_x, curr_spike_y, curr_spike_pens, curr_n = self._build_all_spikes_data_values()        
         pos = np.vstack((curr_spike_x, curr_spike_y)) # np.shape(curr_spike_t): (11,), np.shape(curr_spike_x): (11,), np.shape(curr_spike_y): (11,), curr_n: 11
-        self.all_spots = [{'pos': pos[:,i], 'data': i, 'pen': curr_spike_pens[i]} for i in range(curr_n)] # update self.all_spots
+        self.plots_data.all_spots = [{'pos': pos[:,i], 'data': i, 'pen': curr_spike_pens[i]} for i in range(curr_n)] # update self.plots_data.all_spots
         # Update preview_overview_scatter_plot
-        self.plots.preview_overview_scatter_plot.setData(self.all_spots)
+        self.plots.preview_overview_scatter_plot.setData(self.plots_data.all_spots)
         if self.Includes2DActiveWindowScatter:
-            self.ui.scatter_plot.setData(self.all_spots)
+            self.plots.scatter_plot.setData(self.plots_data.all_spots)
         
     
+    
+    ######################################################
+    # EpochRenderingMixin Convencince methods:
+    #####################################################
+    
+    def add_laps_intervals(self, sess):
+        """ Convenince method to add the Laps rectangles to the 2D Plots 
+            NOTE: sess can be a DataSession, a Laps object, or an Epoch object containing Laps directly.
+            active_2d_plot.add_PBEs_intervals(sess)
+        """
+        laps_interval_datasource = Specific2DRenderTimeEpochsHelper.build_Laps_render_time_epochs_datasource(curr_sess=sess, series_vertical_offset=42.0, series_height=1.0)
+        self.add_rendered_intervals(laps_interval_datasource, name='Laps', debug_print=False) # removes the rendered intervals
+        
+    def remove_laps_intervals(self):
+        self.remove_rendered_intervals('Laps', debug_print=False)
+        
+    def add_PBEs_intervals(self, sess):
+        """ Convenince method to add the PBE rectangles to the 2D Plots 
+            NOTE: sess can be a DataSession, or an Epoch object containing PBEs directly.
+        """
+        new_PBEs_interval_datasource = Specific2DRenderTimeEpochsHelper.build_PBEs_render_time_epochs_datasource(curr_sess=sess, series_vertical_offset=43.0, series_height=1.0) # new_PBEs_interval_datasource
+        self.add_rendered_intervals(new_PBEs_interval_datasource, name='PBEs', debug_print=False) # adds the rendered intervals
+
+    def remove_PBEs_intervals(self):
+        self.remove_rendered_intervals('PBEs', debug_print=False)
+        
+        
 # Start Qt event loop unless running in interactive mode.
 # if __name__ == '__main__':
 #     # v = Visualizer()

@@ -22,19 +22,6 @@ class PipelineFilteringDataNode(ExtendedCtrlNode):
         ('refilter', 'action'),
     ]
     
-    def __init__(self, name):
-        ## Define the input / output terminals available on this node
-        terminals = {
-            'active_data_mode': dict(io='in'),
-            'pipeline': dict(io='in'),
-            'computation_configs': dict(io='out'),
-            'filter_configs': dict(io='out'),
-            'filtered_pipeline': dict(io='out'),
-        }
-        ExtendedCtrlNode.__init__(self, name, terminals=terminals)
-        self.keys = [] # the active config keys
-        self.ui_build()
-
     @property
     def enabled_filters(self):
         """Gets the list of filters for which to do filtering for from the current selections in the checkbox table UI. Returns a list of filter names that are enabled."""
@@ -48,6 +35,29 @@ class PipelineFilteringDataNode(ExtendedCtrlNode):
             if row_include_state:
                 enabled_filter_names.append(row_config_name)
         return enabled_filter_names                
+    
+    @property
+    def is_action_enabled(self):
+        """The is_action_enabled property."""
+        return (len(self.enabled_filters) > 0) # if we have one or more enabled filter the action can be performed. Otherwise it's disabled.
+    
+    
+    def __init__(self, name):
+        ## Define the input / output terminals available on this node
+        terminals = {
+            'active_data_mode': dict(io='in'),
+            'pipeline': dict(io='in'),
+            'computation_configs': dict(io='out'),
+            'filter_configs': dict(io='out'),
+            'filtered_pipeline': dict(io='out'),
+        }
+        ExtendedCtrlNode.__init__(self, name, terminals=terminals)
+        
+        self.keys = [] # the active config keys
+        self.ui_build()
+
+
+    
     
     def ui_build(self):
         # Setup the refilter button:
@@ -73,6 +83,9 @@ class PipelineFilteringDataNode(ExtendedCtrlNode):
             # if we have one or more rows (columns are assumed to be fixed), set at least the first entry by default
             self.ctrls['included_configs_table'].set_value(0,0,True)
         
+        self.ui_update()
+        
+
         
     def process(self, active_data_mode=None, pipeline=None, display=True):
         # CtrlNode has created self.ctrls, which is a dict containing {ctrlName: widget}
@@ -119,6 +132,15 @@ class PipelineFilteringDataNode(ExtendedCtrlNode):
         return {'computation_configs': active_session_computation_configs, 'filter_configs':active_session_filter_configs, 'filtered_pipeline': pipeline}
 
 
+
+    
+    
+    
+    ##############################################################
+    def ui_update(self):
+        """ called to update the ctrls depending on its properties. """
+        self.ctrls['refilter'].setEnabled(self.is_action_enabled)
+
     def updateConfigRows(self, data):
         if isinstance(data, dict):
             keys = list(data.keys())
@@ -140,7 +162,7 @@ class PipelineFilteringDataNode(ExtendedCtrlNode):
             c.blockSignals(False)
         # Update the self.keys value:
         self.configRows = keys
-        
+        self.ui_update()
         
 
     def saveState(self):

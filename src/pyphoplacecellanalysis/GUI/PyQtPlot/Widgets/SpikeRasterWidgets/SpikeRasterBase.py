@@ -14,7 +14,7 @@ import qtawesome as qta
 
 from neuropy.core.neuron_identities import NeuronIdentityAccessingMixin
 
-from pyphocorehelpers.DataStructure.general_parameter_containers import DebugHelper, VisualizationParameters, RenderPlots
+from pyphocorehelpers.DataStructure.general_parameter_containers import DebugHelper, VisualizationParameters, RenderPlots, RenderPlotsData
 from pyphoplacecellanalysis.General.Mixins.SpikesRenderingBaseMixin import SpikeRenderingBaseMixin, SpikesDataframeOwningMixin
 
 from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer
@@ -277,7 +277,9 @@ class SpikeRasterBase(UnitSortableMixin, DataSeriesToSpatialTransformingMixin, N
         SpikeRenderingBaseMixin.helper_setup_neuron_colors_and_order(self, neuron_colors=neuron_colors, neuron_sort_order=neuron_sort_order)
         
         # make root container for plots
-        self.plots = RenderPlots('')
+        self.plots = RenderPlots(self.applicationName)
+        self.plots_data = RenderPlotsData(self.applicationName)
+        
         
         self.playback_controller = playback_controller
         # Setup the animation playback object for the time window:

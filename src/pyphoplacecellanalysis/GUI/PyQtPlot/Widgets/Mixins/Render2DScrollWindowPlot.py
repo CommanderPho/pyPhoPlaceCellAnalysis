@@ -57,26 +57,16 @@ class Render2DScrollWindowPlotMixin:
 
             self.spikes_window.total_df_start_end_times # to get the current start/end times to set the linear region to
         Creates:
-            self.all_spots # data for all spikes to be rendered on a scatter plot
+            self.plots_data.all_spots # data for all spikes to be rendered on a scatter plot
             self.ui.scroll_window_region # a pg.LinearRegionItem                        
             self.plots.preview_overview_scatter_plot # a pg.ScatterPlotItem
         
         Usage:
-            self.ui.background_static_scroll_window_plot = self.ui.main_graphics_layout_widget.addPlot(row=2, col=0)
-            self.ui.background_static_scroll_window_plot = self._buildScrollRasterPreviewWindowGraphics(self.ui.background_static_scroll_window_plot)
+            self.plots.background_static_scroll_window_plot = self.ui.main_graphics_layout_widget.addPlot(row=2, col=0)
+            self.plots.background_static_scroll_window_plot = self._buildScrollRasterPreviewWindowGraphics(self.plots.background_static_scroll_window_plot)
         
         
         """
-        
-        # if graphics_layout_widget is None:
-        #     raise NotImplementedError
-        #     self.ui.main_graphics_layout_widget = pg.GraphicsLayoutWidget()
-        #     self.ui.main_graphics_layout_widget.useOpenGL(True)
-        #     self.ui.main_graphics_layout_widget.resize(1000,600)
-        #     # Add the main widget to the layout in the (0, 0) location:
-        #     self.ui.layout.addWidget(self.ui.main_graphics_layout_widget, 0, 0) # add the GLViewWidget to the layout at 0, 0
-            
-        
         # Common Tick Label
         vtick = QtGui.QPainterPath()
         vtick.moveTo(0, -0.5)
@@ -88,18 +78,19 @@ class Render2DScrollWindowPlotMixin:
         # ALL Spikes in the preview window:
         curr_spike_x, curr_spike_y, curr_spike_pens, curr_n = self._build_all_spikes_data_values()        
         pos = np.vstack((curr_spike_x, curr_spike_y)) # np.shape(curr_spike_t): (11,), np.shape(curr_spike_x): (11,), np.shape(curr_spike_y): (11,), curr_n: 11
-        self.all_spots = [{'pos': pos[:,i], 'data': i, 'pen': curr_spike_pens[i]} for i in range(curr_n)]
+        self.plots_data.all_spots = [{'pos': pos[:,i], 'data': i, 'pen': curr_spike_pens[i]} for i in range(curr_n)]
         
         self.plots.preview_overview_scatter_plot = pg.ScatterPlotItem(name='spikeRasterOverviewWindowScatterPlotItem', pxMode=True, symbol=vtick, size=5, pen={'color': 'w', 'width': 1})
+        self.plots.preview_overview_scatter_plot.setObjectName('preview_overview_scatter_plot') # this seems necissary, the 'name' parameter in addPlot(...) seems to only change some internal property related to the legend
         self.plots.preview_overview_scatter_plot.opts['useCache'] = True
-        self.plots.preview_overview_scatter_plot.addPoints(self.all_spots) # , hoverable=True
+        self.plots.preview_overview_scatter_plot.addPoints(self.plots_data.all_spots) # , hoverable=True
         background_static_scroll_window_plot.addItem(self.plots.preview_overview_scatter_plot)
         
         # Add the linear region overlay:
         # self.ui.scroll_window_region = pg.LinearRegionItem(pen=pg.mkPen('#fff'), brush=pg.mkBrush('#f004'), hoverBrush=pg.mkBrush('#fff4'), hoverPen=pg.mkPen('#f00'), clipItem=self.plots.preview_overview_scatter_plot) # bound the LinearRegionItem to the plotted data
         
         self.ui.scroll_window_region = CustomLinearRegionItem(pen=pg.mkPen('#fff'), brush=pg.mkBrush('#f004'), hoverBrush=pg.mkBrush('#fff4'), hoverPen=pg.mkPen('#f00'), clipItem=self.plots.preview_overview_scatter_plot) # bound the LinearRegionItem to the plotted data
-                
+        self.ui.scroll_window_region.setObjectName('scroll_window_region')
         self.ui.scroll_window_region.setZValue(10)
         # Add the LinearRegionItem to the ViewBox, but tell the ViewBox to exclude this item when doing auto-range calculations.
         background_static_scroll_window_plot.addItem(self.ui.scroll_window_region, ignoreBounds=True)
