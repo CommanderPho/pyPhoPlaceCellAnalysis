@@ -136,8 +136,11 @@ class RenderTimeEpochMeshesMixin:
 
 
     def _temporal_to_spatial(self, epoch_start_times, epoch_durations):
-        """ epoch_window_relative_start_x_positions, epoch_spatial_durations = self._temporal_to_spatial()
-        
+        """ 
+            This is why the rectangle positions are updated when the window is scrolled (on update_epoch_meshes)
+            
+        Usage:
+            epoch_window_relative_start_x_positions, epoch_spatial_durations = self._temporal_to_spatial()
         """
         return DataSeriesToSpatial.temporal_to_spatial_transform_computation(epoch_start_times, epoch_durations, self.spikes_window.active_window_start_time, self.spikes_window.active_window_end_time, self.temporal_axis_length, center_mode='zero_centered')
         

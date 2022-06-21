@@ -110,7 +110,7 @@ class DataSeriesToSpatial:
             
             
         Usage:
-        
+            DataSeriesToSpatial.temporal_to_spatial_transform_computation(epoch_start_times, epoch_durations, self.spikes_window.active_window_start_time, self.spikes_window.active_window_end_time, self.temporal_axis_length, center_mode='zero_centered')
     
         """
         window_duration = active_window_end_time - active_window_start_time
