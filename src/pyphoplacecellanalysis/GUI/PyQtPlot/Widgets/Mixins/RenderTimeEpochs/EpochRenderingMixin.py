@@ -23,11 +23,16 @@ class RenderedEpochsItemsContainer(iPythonKeyCompletingMixin, DynamicParameters)
     """
     def __init__(self, rendered_rects_item, target_plots_list):
         super(RenderedEpochsItemsContainer, self).__init__()
-        for a_plot in target_plots_list:
-            # make an independent copy of the rendered_rects_item for each plot
-            independent_data_copy = RectangleRenderTupleHelpers.copy_data(rendered_rects_item.data)
-            self[a_plot] = IntervalRectsItem(data=independent_data_copy)
-        
+        if len(target_plots_list) == 1:
+            a_plot = target_plots_list[0]
+            self[a_plot] = rendered_rects_item # no conflict, so can just return the original rendered_rects_item
+
+        else:
+            for a_plot in target_plots_list:
+                # make an independent copy of the rendered_rects_item for each plot
+                independent_data_copy = RectangleRenderTupleHelpers.copy_data(rendered_rects_item.data)
+                self[a_plot] = IntervalRectsItem(data=independent_data_copy)
+
    
 class EpochRenderingMixin:
     """ Implementors render Epochs/Intervals
@@ -198,7 +203,6 @@ class EpochRenderingMixin:
                 independent_data_copy = RectangleRenderTupleHelpers.copy_data(new_interval_rects_item.data)
                 extant_rects_plot_items_container[a_plot] = IntervalRectsItem(data=independent_data_copy)
                 extant_rects_plot_items_container[a_plot].setToolTip(name)
-                # extant_rects_plot_items_container[a_plot] = new_interval_rects_item.copy()
                 a_plot.addItem(extant_rects_plot_items_container[a_plot])
                 returned_rect_items[a_plot.objectName()] = dict(plot=a_plot, rect_item=extant_rects_plot_items_container[a_plot])
                 # Adjust the bounds to fit any children:

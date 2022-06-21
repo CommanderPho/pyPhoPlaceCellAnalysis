@@ -125,6 +125,15 @@ class Spike3DRaster(PyQtGraphSpecificTimeCurvesMixin, RenderTimeEpochMeshesMixin
         """The series_identity_y_values property."""
         return self._series_identity_y_values
     
+    
+    
+    
+    @property
+    def interval_rendering_plots(self):
+        """ returns the list of child subplots/graphics (usually PlotItems) that participate in rendering intervals """
+        return [self.ui.main_gl_widget]
+    
+    
     def __init__(self, params=None, spikes_window=None, playback_controller=None, neuron_colors=None, neuron_sort_order=None, application_name=None, **kwargs):
         super(Spike3DRaster, self).__init__(params=params, spikes_window=spikes_window, playback_controller=playback_controller, neuron_colors=neuron_colors, neuron_sort_order=neuron_sort_order, application_name=application_name, **kwargs)
         

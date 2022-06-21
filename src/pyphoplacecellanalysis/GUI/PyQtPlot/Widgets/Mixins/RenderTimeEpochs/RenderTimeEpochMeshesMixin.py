@@ -10,8 +10,8 @@ from pyphocorehelpers.print_helpers import SimplePrintable, PrettyPrintable
 from pyphocorehelpers.geometry_helpers import find_ranges_in_window
 
 from pyphoplacecellanalysis.General.DataSeriesToSpatial import DataSeriesToSpatial
-
-
+from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.Mixins.RenderTimeEpochs.EpochRenderingMixin import EpochRenderingMixin, RenderedEpochsItemsContainer
+from pyphoplacecellanalysis.General.Model.Datasources.IntervalDatasource import IntervalsDatasource
 
 class RenderEpochs(PrettyPrintable, SimplePrintable, metaclass=OrderedMeta):
     def __init__(self, name) -> None:
@@ -26,7 +26,7 @@ class RenderEpochs(PrettyPrintable, SimplePrintable, metaclass=OrderedMeta):
     
     
 
-class RenderTimeEpochMeshesMixin:
+class RenderTimeEpochMeshesMixin(EpochRenderingMixin):
     """ 
         RenderTimeEpochMeshes
         
@@ -61,36 +61,170 @@ class RenderTimeEpochMeshesMixin:
             @QtCore.pyqtSlot()
             def RenderTimeEpochMeshesMixin_on_update_window(self)
     
+    
+    
+    REFACTORING to EpochRenderingMixin inheritances:
+    
+    
+    Removing:
+        params.render_epochs
+        plots.new_cube_objects
+    
+    Adding:
+
+    
     """
     
+    #############################################################################
+    ################## EpochRenderingMixin Required Conformances
+    #############################################################################
+    @property
+    def interval_rendering_plots(self):
+        """ returns the list of child subplots/graphics (usually PlotItems) that participate in rendering intervals """
+        # return [self.ui.main_gl_widget]
+        raise NotImplementedError # MUST OVERRIDE in child
+    
+    
+    
+    def add_rendered_intervals(self, interval_datasource, name=None, child_plots=None, debug_print=True):
+        """ adds the intervals specified by the interval_datasource to the plots 
+        
+        Inputs: 
+            interval_datasource: IntervalDatasource
+            name: str, an optional but highly recommended string identifier like 'Laps'
+            child_plots: an optional list of plots to add the intervals to. If None are specified, the defaults are used (defined by the implementor)
+            
+        Returns:
+            returned_rect_items: a dictionary of tuples containing the newly created rect items and the plots they were added to.
+            
+            
+        Usage:
+            active_pbe_interval_rects_item = Render2DEventRectanglesHelper.build_IntervalRectsItem_from_interval_datasource(interval_datasources.PBEs)
+            
+        """
+        assert isinstance(interval_datasource, IntervalsDatasource), f"interval_datasource: must be an IntervalsDatasource object but instead is of type: {type(interval_datasource)}"
+        if child_plots is None:
+            child_plots = self.interval_rendering_plots
+
+        num_plot_items = len(child_plots)
+        if debug_print:
+            print(f'num_plot_items: {num_plot_items}')
+            
+
+        if name is None:
+            print(f'WARNING: no name provided for rendered intervals. Defaulting to datasource name: "{interval_datasource.custom_datasource_name}"')
+            name = interval_datasource.custom_datasource_name
+        
+        extant_datasource = self.interval_datasources.get(name, None)
+        if extant_datasource is None:
+            # no extant datasource with this name, create it:
+            self.interval_datasources[name] = interval_datasource # add new datasource.
+
+        else:
+            # extant_datasource exists!
+            print(f'WARNING: extant_datasource with the name ({name}) already exists. Attempting to update.')
+            if extant_datasource == interval_datasource:
+                # already the same datasource
+                print(f'\t already the same datasource!')
+                return
+            else:
+                # Otherwise the datasource should be replaced:
+                print(f'\t replacing extant datasource.')
+                # TODO: remove plots associated with replaced datasource
+                self.interval_datasources[name] = interval_datasource
+                        
+        
+        returned_mesh_list_items = {}
+        
+        # Build the rendered interval item:
+        # self.add_render_epochs(self.interval_datasources[name].time_column_values.t_start.to_numpy(), self.interval_datasources[name].time_column_values.t_duration.to_numpy(), epoch_type_name=name)
+        
+        # new_interval_rects_item = Render2DEventRectanglesHelper.build_IntervalRectsItem_from_interval_datasource(interval_datasource)
+        # new_interval_rects_item.setToolTip(name)
+        
+        ######### PLOTS:
+        
+        extant_rects_plot_items_container = self.rendered_epochs.get(name, None)
+        if extant_rects_plot_items_container is not None:
+            # extant plot exists!
+            print(f'WARNING: extant_rects_plot_item with the name ({name}) already exists. removing.')
+            assert isinstance(extant_rects_plot_items_container, RenderedEpochsItemsContainer), f"extant_rects_plot_item must be RenderedEpochsItemsContainer but type(extant_rects_plot_item): {type(extant_rects_plot_items_container)}"
+            
+            for a_plot in child_plots:
+                if a_plot in extant_rects_plot_items_container:
+                    # the plot is already here: remove and re-add it
+                    # extant_rect_plot_item_meshes = extant_rects_plot_items_container[a_plot] # this is done inside self.update_epoch_meshes                                        
+                    self.perform_update_epoch_meshes(name, self.interval_datasources[name].time_column_values.t_start.to_numpy(),
+                                             self.interval_datasources[name].time_column_values.t_duration.to_numpy(), child_plots=None)
+                        
+                    
+                                        
+                else:
+                    # Only if child plot doesn't yet exist:
+                    new_mesh_objects = self._build_epoch_meshes(self.interval_datasources[name].time_column_values.t_start.to_numpy(), self.interval_datasources[name].time_column_values.t_duration.to_numpy())
+                    extant_rects_plot_items_container[a_plot] = new_mesh_objects
+                    
+                    ## Can't do:
+                    for curr_cube in extant_rects_plot_items_container[a_plot]:
+                        a_plot.addItem(curr_cube) # add directly
+                    
+                    # a_plot.addItem(extant_rects_plot_items_container[a_plot]) # can't do for OpenGL
+                    returned_mesh_list_items[a_plot.objectName()] = dict(plot=a_plot, rect_item=extant_rects_plot_items_container[a_plot])
+                
+                    
+        else:
+            # Need to create a new RenderedEpochsItemsContainer with the items:
+            # Equiv to new_interval_rects_item:
+            new_mesh_objects = self._build_epoch_meshes(self.interval_datasources[name].time_column_values.t_start.to_numpy(), self.interval_datasources[name].time_column_values.t_duration.to_numpy())
+            self.rendered_epochs[name] = RenderedEpochsItemsContainer(new_mesh_objects, child_plots) # set the plot item
+            for a_plot, a_rect_item_meshes in self.rendered_epochs[name].items():
+                if not isinstance(a_rect_item_meshes, str):
+                    if debug_print:
+                        print(f'plotting item')
+                        
+                    for curr_cube in a_rect_item_meshes:
+                        # a_plot.removeItem(curr_cube)
+                        a_plot.addItem(curr_cube) # add directly
+                    
+                    returned_mesh_list_items[a_plot.objectName()] = dict(plot=a_plot, rect_item=a_rect_item_meshes)                                                
+                                                
+        return returned_mesh_list_items 
+
+
+
+    #######################################################################################################################################
+    
+    
+    #############################################################################
+    ################## Old/Internal Functions
+    #############################################################################
     @property
     def has_render_epoch_meshes(self):
         """ True if epoch meshes to render have been added. """
-        if self.params.render_epochs is None:
-            return False        
-        if self.plots.new_cube_objects is None:
+        if self.rendered_epochs is None:
             return False
-        else:
-            return (len(self.plots.new_cube_objects) > 0)
-        
+        return len(self.rendered_epochs) > 0 # TODO: this won't work due to the 'name' property of the render_epochs
+
 
     @QtCore.pyqtSlot()
     def RenderTimeEpochMeshesMixin_on_init(self):
         """ perform any parameters setting/checking during init """
-        self.params.setdefault('render_epochs', None)        
+        # self.params.setdefault('render_epochs', None)
+        self.EpochRenderingMixin_on_init()
+        
 
     @QtCore.pyqtSlot()
     def RenderTimeEpochMeshesMixin_on_setup(self):
         """ perfrom setup/creation of widget/graphical/data objects. Only the core objects are expected to exist on the implementor (root widget, etc) """
+        self.EpochRenderingMixin_on_setup()
         self.close_signal.connect(self.RenderTimeEpochMeshesMixin_on_destroy) # Connect the *_on_destroy function to the close_signal
-        # self.epoch_connection = pg.SignalProxy(self.window_scrolled, delay=0.2, rateLimit=60, slot=self.RenderTimeEpochMeshesMixin_on_window_update_rate_limited)
-        # self.epoch_connection.blockSignals(True) # block signals by default so it isn't calling update needlessly
 
     @QtCore.pyqtSlot()
     def RenderTimeEpochMeshesMixin_on_buildUI(self):
         """ perfrom setup/creation of widget/graphical/data objects. Only the core objects are expected to exist on the implementor (root widget, etc) """
-        self.plots.setdefault('new_cube_objects', None)
-
+        self.EpochRenderingMixin_on_buildUI()
+        # self.plots.setdefault('new_cube_objects', None) # need to keep: unique
+        
     @QtCore.pyqtSlot()
     def RenderTimeEpochMeshesMixin_on_destroy(self):
         """ perfrom teardown/destruction of anything that needs to be manually removed or released """
@@ -98,12 +232,13 @@ class RenderTimeEpochMeshesMixin:
         # self.epoch_connection = None
         pass
 
+
     @QtCore.pyqtSlot(float, float)
     def RenderTimeEpochMeshesMixin_on_window_update(self, new_start=None, new_end=None):
         """ called when the window is updated to update the mesh locations. """
         if self.has_render_epoch_meshes:
-            self.update_epoch_meshes(self.params.render_epochs.starts_t, self.params.render_epochs.durations)
-
+            self.update_all_epoch_meshes()
+            
     ############### Rate-Limited SLots ###############:
     ##################################################
     ## For use with pg.SignalProxy
@@ -151,6 +286,9 @@ class RenderTimeEpochMeshesMixin:
         # pbe_half_durations = curr_sess.pbe.durations / 2.0
         # pbe_t_centers = curr_sess.pbe.starts + pbe_half_durations
 
+        Input:
+            a_plot: self.ui.main_gl_widget
+            
         Usage:  
             curr_sess.pbe.durations
         
@@ -158,16 +296,20 @@ class RenderTimeEpochMeshesMixin:
         centers_t = starts_t + (durations / 2.0)
         x_centers, duration_spatial_widths = self._temporal_to_spatial(centers_t, durations) # actually compute the centers of each epoch rect, not the start
                 
-        self.plots.new_cube_objects = []
+        new_mesh_objects = []
+        # self.plots.new_cube_objects = []
         for i in np.arange(len(x_centers)):
             curr_md = RenderTimeEpochMeshesMixin._build_cube_mesh_data()
             curr_cube = gl.GLMeshItem(meshdata=curr_md, smooth=True, color=(1, 0, 0, 0.2), shader='balloon', glOptions='additive') # , drawEdges=True, edgeColor=(0, 0, 0, 1)
             curr_cube.translate(x_centers[i], -self.n_half_cells, self.floor_z)
             curr_cube.scale(duration_spatial_widths[i], self.n_full_cell_grid, 0.25)
             # curr_cube.setParentItem(self.ui.parent_epoch_container_item)
-            self.ui.main_gl_widget.addItem(curr_cube) # add directly
-            self.plots.new_cube_objects.append(curr_cube)
+            # a_plot.addItem(curr_cube) # add directly
+            new_mesh_objects.append(curr_cube)
 
+        return new_mesh_objects
+    
+    
     ############### Public Methods ###################:
     ##################################################
     def add_render_epochs(self, starts_t, durations, epoch_type_name='PBE'):
@@ -178,8 +320,10 @@ class RenderTimeEpochMeshesMixin:
         self.params.render_epochs.durations = durations
         self._build_epoch_meshes(self.params.render_epochs.starts_t, self.params.render_epochs.durations)
         # self.epoch_connection.blockSignals(False) # Disabling blocking the signals so it can update
-        
-    def update_epoch_meshes(self, starts_t, durations):
+    
+    
+    
+    def update_all_epoch_meshes(self):
         """ Modifies both the position and scale of the existing self.plots.new_cube_objects
         Requires Implementors:
         
@@ -190,13 +334,41 @@ class RenderTimeEpochMeshesMixin:
             self.floor_z
             self.n_full_cell_grid
         """
+        curr_rendered_epoch_names = list(self.rendered_epochs.keys()) # done to prevent problems with dict changing size during iteration
+        for a_name in curr_rendered_epoch_names:
+            if a_name != 'name':
+                self.perform_update_epoch_meshes(a_name, self.interval_datasources[a_name].time_column_values.t_start.to_numpy(),
+                                             self.interval_datasources[a_name].time_column_values.t_duration.to_numpy(), child_plots=None)
+      
+                
+                    
+                    
+    def perform_update_epoch_meshes(self, name, starts_t, durations, child_plots=None):
+        """ Modifies both the position and scale of the existing self.plots.new_cube_objects
+        Requires Implementors:
+        
+        Functions:
+           ._temporal_to_spatial(...)
+        Variables:
+            self.n_half_cells 
+            self.floor_z
+            self.n_full_cell_grid
+        """
+        if child_plots is None:
+            child_plots = self.interval_rendering_plots
+        
         centers_t = starts_t + (durations / 2.0)
         x_shifted_centers, duration_spatial_widths = self._temporal_to_spatial(centers_t, durations) # actually compute the centers of each epoch rect, not the start
         
-        for (i, aCube) in enumerate(self.plots.new_cube_objects):
-            aCube.resetTransform()
-            aCube.translate(x_shifted_centers[i], -self.n_half_cells, self.floor_z)
-            aCube.scale(duration_spatial_widths[i], self.n_full_cell_grid, 0.25)
+        for a_plot in child_plots:
+            assert a_plot in self.rendered_epochs[name], f"a_plot must be in self.rendered_epochs[name]"
+            # the plot is already here: remove and re-add it
+            extant_rect_plot_item_meshes = self.rendered_epochs[name][a_plot]
+            # Update the meshes for this item:
+            for (i, aCube) in enumerate(extant_rect_plot_item_meshes):
+                aCube.resetTransform()
+                aCube.translate(x_shifted_centers[i], -self.n_half_cells, self.floor_z)
+                aCube.scale(duration_spatial_widths[i], self.n_full_cell_grid, 0.25)
            
             
     def remove_epoch_meshes(self):
