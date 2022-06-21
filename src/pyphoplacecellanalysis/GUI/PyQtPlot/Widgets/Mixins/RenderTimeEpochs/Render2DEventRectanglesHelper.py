@@ -20,7 +20,7 @@ from pyphoplacecellanalysis.General.Model.Datasources.IntervalDatasource import 
 
 
 class EventRectanglesDataseries(object):
-    """docstring for EventRectanglesDataseries."""
+    """ UNUSED """
     def __init__(self, name, data, create_fcn, update_fcn, remove_fcn):
         super(EventRectanglesDataseries, self).__init__()
         self.name = name
@@ -37,6 +37,8 @@ class EventRectanglesDataseries(object):
 class Render2DEventRectanglesHelper:
     """ Static helper that adds interval/epoch rectangles to 2D raster plots
  
+        Also has the full implemention of Bursts (which are plotted as rectangles per-neuron, which hasn't been updated to the new EpochRenderingMixin format yet
+
     """
     
     ##################################################
