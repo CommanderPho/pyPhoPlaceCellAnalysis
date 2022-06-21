@@ -16,8 +16,10 @@ from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.SpikeRasterWidgets.SpikeRasterB
 from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.Mixins.Render2DScrollWindowPlot import Render2DScrollWindowPlotMixin
 from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.Mixins.Render2DNeuronIdentityLinesMixin import Render2DNeuronIdentityLinesMixin
 
+from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.Mixins.RenderTimeEpochs.EpochRenderingMixin import EpochRenderingMixin
 
-class Spike2DRaster(Render2DScrollWindowPlotMixin, SpikeRasterBase):
+
+class Spike2DRaster(EpochRenderingMixin, Render2DScrollWindowPlotMixin, SpikeRasterBase):
     """ Displays a 2D version of a raster plot with the spikes occuring along a plane. 
     
     Usage:
@@ -68,6 +70,13 @@ class Spike2DRaster(Render2DScrollWindowPlotMixin, SpikeRasterBase):
         return lines_dict
     
     
+    ## FOR EpochRenderingMixin
+    @property    
+    def interval_rendering_plots(self):
+        """ returns the list of child subplots/graphics (usually PlotItems) that participate in rendering intervals """
+        return [self.plots.background_static_scroll_window_plot, self.plots.main_plot_widget] # for spike_raster_plt_2d
+    
+    
     ######  Get/Set Properties ######:
     
 
@@ -78,6 +87,8 @@ class Spike2DRaster(Render2DScrollWindowPlotMixin, SpikeRasterBase):
         self.temporal_mapping_changed.connect(self.on_adjust_temporal_spatial_mapping)
         self.spikes_window.timeWindow.window_duration_changed_signal.connect(self.on_adjust_temporal_spatial_mapping)
         # self.on_window_duration_changed.connect(self.on_adjust_temporal_spatial_mapping)
+        
+        self.EpochRenderingMixin_on_init()
         
         if self.enable_show_on_init:
             self.show()
@@ -126,6 +137,8 @@ class Spike2DRaster(Render2DScrollWindowPlotMixin, SpikeRasterBase):
             all_y = [self.y_fragile_linear_neuron_IDX_map[a_cell_IDX] for a_cell_IDX in self.spikes_df['fragile_linear_neuron_IDX'].to_numpy()]
             self.spikes_df['visualization_raster_y_location'] = all_y # adds as a column to the dataframe. Only needs to be updated when the number of active units changes
             print('done.')
+            
+        self.EpochRenderingMixin_on_setup()
         # self.spikes_df
         
         
@@ -184,6 +197,7 @@ class Spike2DRaster(Render2DScrollWindowPlotMixin, SpikeRasterBase):
         ##### Main Raster Plot Content Top ##########
         
         self.ui.main_graphics_layout_widget = pg.GraphicsLayoutWidget()
+        self.ui.main_graphics_layout_widget.setObjectName('main_graphics_layout_widget')
         self.ui.main_graphics_layout_widget.useOpenGL(True)
         self.ui.main_graphics_layout_widget.resize(1000,600)
         # Add the main widget to the layout in the (0, 0) location:
@@ -205,6 +219,7 @@ class Spike2DRaster(Render2DScrollWindowPlotMixin, SpikeRasterBase):
         curr_plot_row = 1
         if self.Includes2DActiveWindowScatter:
             self.plots.main_plot_widget = self.ui.main_graphics_layout_widget.addPlot(row=curr_plot_row, col=0, name='main_plot_widget')
+            self.plots.main_plot_widget.setObjectName('main_plot_widget') # this seems necissary, the 'name' parameter in addPlot(...) seems to only change some internal property related to the legend
             curr_plot_row += 1
             # self.ui.plots = [] # create an empty array for each plot, of which there will be one for each unit.
             # # build the position range for each unit along the y-axis:
@@ -214,6 +229,7 @@ class Spike2DRaster(Render2DScrollWindowPlotMixin, SpikeRasterBase):
             vtick.moveTo(0, -0.5)
             vtick.lineTo(0, 0.5)
 
+            
             self.plots.main_plot_widget.setLabel('left', 'Cell ID', units='')
             self.plots.main_plot_widget.setLabel('bottom', 'Time', units='s')
             self.plots.main_plot_widget.setMouseEnabled(x=False, y=False)
@@ -225,7 +241,9 @@ class Spike2DRaster(Render2DScrollWindowPlotMixin, SpikeRasterBase):
             # self.plots.main_plot_widget.disableAutoRange()
             self._update_plot_ranges()
             
+            ## TODO: what plot is this actually?
             self.plots.scatter_plot = pg.ScatterPlotItem(name='spikeRasterScatterPlotItem', pxMode=True, symbol=vtick, size=10, pen={'color': 'w', 'width': 2})
+            self.plots.scatter_plot.setObjectName('scatter_plot')
             self.plots.scatter_plot.opts['useCache'] = True
             self.plots.main_plot_widget.addItem(self.plots.scatter_plot)
             _v_axis_item = Render2DNeuronIdentityLinesMixin.setup_custom_neuron_identity_axis(self.plots.main_plot_widget, self.n_cells)
@@ -237,12 +255,20 @@ class Spike2DRaster(Render2DScrollWindowPlotMixin, SpikeRasterBase):
         
         # From Render2DScrollWindowPlotMixin:
         self.plots.background_static_scroll_window_plot = self.ui.main_graphics_layout_widget.addPlot(row=curr_plot_row, col=0, name='background_static_scroll_window_plot') # curr_plot_row: 2 if  self.Includes2DActiveWindowScatter
+        self.plots.background_static_scroll_window_plot.setObjectName('background_static_scroll_window_plot') # this seems necissary, the 'name' parameter in addPlot(...) seems to only change some internal property related to the legend
+
+        # print(f'main_plot_widget.objectName(): {main_plot_widget.objectName()}')
+
         self.plots.background_static_scroll_window_plot = self._buildScrollRasterPreviewWindowGraphics(self.plots.background_static_scroll_window_plot)
 
         # self._buildScrollRasterPreviewWindowGraphics()
         if self.Includes2DActiveWindowScatter:
             self.plots.scatter_plot.addPoints(self.plots_data.all_spots)
     
+        
+        
+        self.EpochRenderingMixin_on_buildUI()
+        
         # self.Render2DScrollWindowPlot_on_window_update # register with the animation time window for updates for the scroller.
         # Connect the signals for the zoom region and the LinearRegionItem
         # self.ui.scroll_window_region.sigRegionChanged.connect(self.update_zoom_plotter)
@@ -287,7 +313,6 @@ class Spike2DRaster(Render2DScrollWindowPlotMixin, SpikeRasterBase):
         # assert (len(self.ui.plots) == self.n_cells), f"after all operations the length of the plots array should be the same as the n_cells, but len(self.ui.plots): {len(self.ui.plots)} and self.n_cells: {self.n_cells}!"
         # build the position range for each unit along the y-axis:
         self.y = DataSeriesToSpatial.build_series_identity_axis(self.n_cells, center_mode=self.params.center_mode, bin_position_mode=self.params.bin_position_mode, side_bin_margins = self.params.side_bin_margins)
-        
         
         # Get updated time window
         updated_time_window = self.spikes_window.active_time_window # (30.0, 930.0)

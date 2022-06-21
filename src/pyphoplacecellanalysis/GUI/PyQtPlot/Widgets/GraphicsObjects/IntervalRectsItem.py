@@ -2,7 +2,7 @@
 Demonstrate creation of a custom graphic (a candlestick plot)
 
 """
-
+import copy
 import pyphoplacecellanalysis.External.pyqtgraph as pg
 from pyphoplacecellanalysis.External.pyqtgraph import QtCore, QtGui
 
@@ -72,7 +72,54 @@ class IntervalRectsItem(pg.GraphicsObject):
         ## (in this case, QPicture does all the work of computing the bouning rect for us)
         return QtCore.QRectF(self.picture.boundingRect())
 
+    ## Copy Constructors:
+    def __copy__(self):
+        independent_data_copy = RectangleRenderTupleHelpers.copy_data(self.data)
+        return IntervalRectsItem(independent_data_copy)
+    
+    def __deepcopy__(self, memo):
+        independent_data_copy = RectangleRenderTupleHelpers.copy_data(self.data)
+        return IntervalRectsItem(independent_data_copy)
+        # return IntervalRectsItem(copy.deepcopy(self.data, memo))
 
+
+
+
+class RectangleRenderTupleHelpers:
+    """ class for use in copying, serializing, etc the list of tuples used by IntervalRectsItem """
+    @staticmethod
+    def QPen_to_dict(a_pen):
+        return {'color': pg.colorStr(a_pen.color()),'width':a_pen.widthF()}
+
+    @staticmethod
+    def QBrush_to_dict(a_brush):
+        return {'color': pg.colorStr(a_brush.color())} # ,'gradient':a_brush.gradient()
+
+    
+    @classmethod
+    def get_serialized_data(cls, tuples_data):
+        """ converts the list of (float, float, float, float, QPen, QBrush) tuples into a list of (float, float, float, float, pen_color_hex:str, brush_color_hex:str) for serialization. """            
+        return [(start_t, series_vertical_offset, duration_t, series_height, cls.QPen_to_dict(pen), cls.QBrush_to_dict(brush)) for (start_t, series_vertical_offset, duration_t, series_height, pen, brush) in tuples_data]
+
+    
+    @staticmethod
+    def get_deserialized_data(seralized_tuples_data):
+        """ converts the list of (float, float, float, float, pen_color_hex:str, brush_color_hex:str) tuples back to the original (float, float, float, float, QPen, QBrush) list
+        
+        Inverse operation of .get_serialized_data(...).
+        
+        Usage:
+            seralized_tuples_data = RectangleRenderTupleHelpers.get_serialized_data(tuples_data)
+            tuples_data = RectangleRenderTupleHelpers.get_deserialized_data(seralized_tuples_data)
+        """ 
+        return [(start_t, series_vertical_offset, duration_t, series_height, pg.mkPen(pen_color_hex), pg.mkBrush(**brush_color_hex)) for (start_t, series_vertical_offset, duration_t, series_height, pen_color_hex, brush_color_hex) in seralized_tuples_data]
+
+    @classmethod
+    def copy_data(cls, tuples_data):
+        seralized_tuples_data = cls.get_serialized_data(tuples_data).copy()
+        return cls.get_deserialized_data(seralized_tuples_data)
+            
+        
 def main():
     data = [  ## fields are (series_offset, start_t, duration_t).
         (1., 10, 13),
