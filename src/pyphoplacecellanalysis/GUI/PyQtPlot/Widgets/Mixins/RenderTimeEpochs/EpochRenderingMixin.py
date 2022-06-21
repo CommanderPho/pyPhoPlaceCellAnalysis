@@ -28,19 +28,7 @@ class RenderedEpochsItemsContainer(iPythonKeyCompletingMixin, DynamicParameters)
             independent_data_copy = RectangleRenderTupleHelpers.copy_data(rendered_rects_item.data)
             self[a_plot] = IntervalRectsItem(data=independent_data_copy)
         
-    # @property
-    # def plot_keys(self):
-    #     """The plots property."""
-    #     return self.dynamically_added_attributes
-        
-    # def plot_items(self):
-    #     return {key:value for key, value in self.items() if (key != 'name')}.items()
-        
-    # def items(self):
-    #     return {key:value for key, value in super().items() if (key != 'name')}.items()
-    
-    
-
+   
 class EpochRenderingMixin:
     """ Implementors render Epochs/Intervals
     
@@ -53,8 +41,29 @@ class EpochRenderingMixin:
         self.plots.rendered_epochs: RenderPlots
         
     
-    ### TODO: TO ADD TO RasterPlot2D or BaseRasterPlot:
+    Known Conformances:
+        RasterPlot2D: to render laps, PBEs, and more on the 2D plots
 
+    Usage:
+        ## Build a PBEs datasource:
+        laps_interval_datasource = Specific2DRenderTimeEpochsHelper.build_Laps_render_time_epochs_datasource(curr_sess=sess, series_vertical_offset=42.0, series_height=1.0)
+        new_PBEs_interval_datasource = Specific2DRenderTimeEpochsHelper.build_PBEs_render_time_epochs_datasource(curr_sess=sess, series_vertical_offset=43.0, series_height=1.0) # new_PBEs_interval_datasource
+        
+        ## General Adding:
+            active_2d_plot.add_rendered_intervals(new_PBEs_interval_datasource, name='PBEs', child_plots=[background_static_scroll_plot_widget, main_plot_widget], debug_print=True)
+            active_2d_plot.add_rendered_intervals(laps_interval_datasource, name='Laps', child_plots=[background_static_scroll_plot_widget, main_plot_widget], debug_print=True)
+        
+        ## Selectively Adding:
+            # Tests adding PBEs to just a single child plot (main_plot_widget):
+            active_2d_plot.add_rendered_intervals(new_PBEs_interval_datasource, name='PBEs', child_plots=[main_plot_widget], debug_print=True)
+
+        ## Selectively Removing:
+            active_2d_plot.remove_rendered_intervals(name='PBEs', child_plots_removal_list=[main_plot_widget]) # Tests removing a single series from a single plot (main_plot_widget)
+            active_2d_plot.remove_rendered_intervals(name='PBEs') # Tests removing a single series ('PBEs') from all plots it's on
+            
+        ## Clearing:
+            active_2d_plot.clear_all_rendered_intervals()
+        
     """
     @property
     def interval_rendering_plots(self):
