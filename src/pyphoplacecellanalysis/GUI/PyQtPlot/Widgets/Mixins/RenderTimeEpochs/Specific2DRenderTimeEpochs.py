@@ -1,25 +1,16 @@
 import numpy as np
 import pandas as pd
 
+from neuropy.core.laps import Laps
+from neuropy.core.epoch import Epoch
+from neuropy.core.session.dataSession import DataSession
+
 
 import pyphoplacecellanalysis.External.pyqtgraph as pg
 
 from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.Mixins.RenderTimeEpochs.Render2DEventRectanglesHelper import Render2DEventRectanglesHelper
 from pyphoplacecellanalysis.General.Model.Datasources.IntervalDatasource import IntervalsDatasource
 
-
-
-class RenderTimeEpochsItem(object):
-    """docstring for RenderTimeEpochsItem."""
-    def __init__(self, name, data):
-        super(RenderTimeEpochsItem, self).__init__()
-        self.name = name
-        self.data = data # data should be either a Epoch object, a dataframe with the appropriate properties, or a callable
-        self.plots = [] # IntervalRectsItem
-        
-
-
-    
 
 class Specific2DRenderTimeEpochsHelper:
     """ Analagous to Specific3DTimeCurvesHelper """
@@ -86,7 +77,13 @@ class Specific2DRenderTimeEpochsHelper:
 
     @classmethod
     def build_PBEs_render_time_epochs_datasource(cls, curr_sess, **kwargs):
-        return IntervalsDatasource.init_from_epoch_object(curr_sess.pbe, cls.build_PBEs_dataframe_formatter(**kwargs), datasource_name='intervals_datasource_from_PBEs_epoch_obj')
+        if isinstance(curr_sess, DataSession):
+            active_pbe_Epochs = curr_sess.pbe # <Epoch> object
+        elif isinstance(curr_sess, Epoch):
+            active_pbe_Epochs = curr_sess  # <Epoch> object passed directly
+        else:
+            raise NotImplementedError
+        return IntervalsDatasource.init_from_epoch_object(active_pbe_Epochs, cls.build_PBEs_dataframe_formatter(**kwargs), datasource_name='intervals_datasource_from_PBEs_epoch_obj')
     
     
     @classmethod
@@ -138,7 +135,25 @@ class Specific2DRenderTimeEpochsHelper:
         
     @classmethod
     def build_Laps_render_time_epochs_datasource(cls, curr_sess, **kwargs):
-        active_Laps_Epochs = curr_sess.laps.as_epoch_obj() # <Epoch> object
+        """_summary_
+
+        Args:
+            curr_sess (DataSession || Laps || Epoch): _description_
+
+        Raises:
+            NotImplementedError: _description_
+
+        Returns:
+            IntervalsDatasource: _description_
+        """
+        if isinstance(curr_sess, DataSession):
+            active_Laps_Epochs = curr_sess.laps.as_epoch_obj() # <Epoch> object
+        elif isinstance(curr_sess, Laps):
+            active_Laps_Epochs = curr_sess.as_epoch_obj()
+        elif isinstance(curr_sess, Epoch):
+            active_Laps_Epochs = curr_sess
+        else:
+            raise NotImplementedError
         return IntervalsDatasource.init_from_epoch_object(active_Laps_Epochs, cls.build_Laps_dataframe_formatter(**kwargs), datasource_name='intervals_datasource_from_laps_epoch_obj')
     
     
