@@ -360,6 +360,8 @@ class EpochRenderingMixin:
     @classmethod
     def compute_bounds_adjustment_for_rect_item(cls, a_plot, a_rect_item, should_apply_adjustment:bool=True, debug_print=True):
         """ 
+        NOTE: 2D Only
+        
         Inputs:
             a_plot: PlotItem or equivalent
             a_rect_item: 
@@ -385,7 +387,9 @@ class EpochRenderingMixin:
     
     @staticmethod
     def get_added_rect_item_required_y_value(a_rect_item, debug_print=False):
-        """ curr_rect.top() # 43.0
+        """  
+        NOTE: 2D Only
+            curr_rect.top() # 43.0
             curr_rect.bottom() # 45.0 (why is bottom() greater than top()?
             # curr_rect.y()
  
@@ -401,6 +405,8 @@ class EpochRenderingMixin:
     @staticmethod
     def get_plot_view_range(a_plot, debug_print=True):
         """ gets the current viewRange for the passed in plot
+        NOTE: 2D Only
+      
         Inputs:
             a_plot: PlotItem
         Returns:
