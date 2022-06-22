@@ -165,9 +165,6 @@ class RenderTimeEpochMeshesMixin(EpochRenderingMixin):
     
     _required_3D_interval_visualization_columns = ['t_start', 't_duration', 'series_vertical_offset', 'series_height', 'pen_aRGB', 'brush_aRGB', 'smooth', 'shader', 'glOptions']
     
-    _default_mesh_item_options = dict(smooth=True, color=(1, 0, 0, 0.2), shader='balloon', glOptions='additive')
-    
-    
     @classmethod
     def _build_epoch_meshes_3D_dict_from_dataframe(cls, df):
         """ build the dict required for rendering intervals to be passed in to ._build_epoch_meshes(...): fields are (start_t, series_vertical_offset, duration_t, series_height, pen_aRGB, brush_aRGB, smooth, shader, glOptions).
@@ -187,7 +184,7 @@ class RenderTimeEpochMeshesMixin(EpochRenderingMixin):
 
     
 
-    def add_rendered_intervals(self, interval_datasource, name=None, child_plots=None, debug_print=True):
+    def add_rendered_intervals(self, interval_datasource, name=None, child_plots=None, debug_print=True, **kwargs):
         """ adds the intervals specified by the interval_datasource to the plots 
         
         Inputs: 
@@ -238,20 +235,36 @@ class RenderTimeEpochMeshesMixin(EpochRenderingMixin):
         
         ## Post-update datasource:
         ## Update the Datasource to contain the 3D mesh specific properties:
+        assert np.isin(RenderTimeEpochMeshesMixin._required_interval_visualization_columns, self.interval_datasources[name].df.columns).all(), f"dataframe is missing required columns:\n Required: {RenderTimeEpochMeshesMixin._required_interval_visualization_columns}, current: {self.interval_datasources[name].df.columns}"
         
-        assert np.isin(RenderTimeEpochMeshesMixin._required_interval_visualization_columns, self.interval_datasources.Laps.df.columns).all(), f"dataframe is missing required columns:\n Required: {RenderTimeEpochMeshesMixin._required_interval_visualization_columns}, current: {self.interval_datasources.Laps.df.columns}"
-        ## TODO: all default values currently hardcoded, allow passing in optional parameters:
-        if 'pen_aRGB' not in self.interval_datasources.Laps.df.columns:
-            self.interval_datasources.Laps.df['pen_aRGB'] = [a_pen.color().getRgbF() for a_pen in self.interval_datasources.Laps._df['pen']] # gets the RgbF values of the QColor returned from the QPen a_pen
-        if 'brush_aRGB' not in self.interval_datasources.Laps.df.columns:
-            self.interval_datasources.Laps.df['brush_aRGB'] = [a_brush.color().getRgbF() for a_brush in self.interval_datasources.Laps._df['brush']] # gets the RgbF values of the QColor returned from the QPen a_pen
-        if 'smooth' not in self.interval_datasources.Laps.df.columns:
-            self.interval_datasources.Laps.df['smooth'] = True
-        if 'shader' not in self.interval_datasources.Laps.df.columns:
-            self.interval_datasources.Laps.df['shader'] = 'balloon'
-        if 'glOptions' not in self.interval_datasources.Laps.df.columns:
-            self.interval_datasources.Laps.df['glOptions'] = 'additive'
-
+        # enable_visualization_datasource_parameters_override: if True, the dataframe properties used to render the interval meshes in 3D are overriden with the user-arguments provided (if provided) or the defaults:
+        enable_visualization_datasource_parameters_override = True
+     
+        # Get user-provided parameter values (passed by the user as kwargs) or the default values:
+        series_vertical_offset = kwargs.get('series_vertical_offset', -self.n_half_cells)
+        series_height = kwargs.get('series_height', self.n_full_cell_grid)        
+        pen_aRGB = kwargs.get('pen_aRGB', [a_pen.color().getRgbF() for a_pen in self.interval_datasources[name].df['pen']]) # gets the RgbF values of the QColor returned from the QPen a_pen
+        brush_aRGB = kwargs.get('brush_aRGB', [a_brush.color().getRgbF() for a_brush in self.interval_datasources[name].df['brush']]) # gets the RgbF values of the QColor returned from the QBrush a_brush
+        # if isinstance(brush_aRGB, tuple):
+        #     brush_aRGB = [brush_aRGB] # wrap the tuple in the list so it can be added to the df column like a scalar
+        smooth = kwargs.get('smooth', True)
+        shader = kwargs.get('shader', 'balloon')
+        glOptions = kwargs.get('glOptions', 'additive')
+            
+        if enable_visualization_datasource_parameters_override:
+            self.interval_datasources[name].df['series_vertical_offset'] = series_vertical_offset
+            self.interval_datasources[name].df['series_height'] = series_height
+            
+        if enable_visualization_datasource_parameters_override or 'pen_aRGB' not in self.interval_datasources[name].df.columns:
+            self.interval_datasources[name].df['pen_aRGB'] = pen_aRGB  # gets the RgbF values of the QColor returned from the QPen a_pen
+        if enable_visualization_datasource_parameters_override or 'brush_aRGB' not in self.interval_datasources[name].df.columns:
+            self.interval_datasources[name].df['brush_aRGB'] = brush_aRGB 
+        if enable_visualization_datasource_parameters_override or 'smooth' not in self.interval_datasources[name].df.columns:
+            self.interval_datasources[name].df['smooth'] = smooth
+        if enable_visualization_datasource_parameters_override or 'shader' not in self.interval_datasources[name].df.columns:
+            self.interval_datasources[name].df['shader'] = shader
+        if enable_visualization_datasource_parameters_override or 'glOptions' not in self.interval_datasources[name].df.columns:
+            self.interval_datasources[name].df['glOptions'] = glOptions
 
         ######### PLOTS:
         returned_mesh_list_items = {}
@@ -267,7 +280,10 @@ class RenderTimeEpochMeshesMixin(EpochRenderingMixin):
                     # the plot is already here: remove and re-add it
                     # extant_rect_plot_item_meshes = extant_rects_plot_items_container[a_plot] # this is done inside self.update_epoch_meshes                                        
                     self._perform_update_epoch_meshes(name, self.interval_datasources[name].time_column_values.t_start.to_numpy(),
-                                             self.interval_datasources[name].time_column_values.t_duration.to_numpy(), child_plots=None)
+                                             self.interval_datasources[name].time_column_values.t_duration.to_numpy(),
+                                             series_vertical_offset = self.interval_datasources[name].df.series_vertical_offset.to_numpy(),
+                                             series_height = self.interval_datasources[name].series_height.df.to_numpy(),
+                                             child_plots=None)
                         
                 else:
                     # Only if child plot doesn't yet exist:
@@ -411,26 +427,17 @@ class RenderTimeEpochMeshesMixin(EpochRenderingMixin):
         centers_t = t_start + (t_duration / 2.0)
         x_centers, duration_spatial_widths = self._temporal_to_spatial(centers_t, t_duration) # actually compute the centers of each epoch rect, not the start
         
-        # _default_mesh_item_options = dict(smooth=True, color=(1, 0, 0, 0.2), shader='balloon', glOptions='additive')
-        
-        ## Just add them in?
-        #  ['t_start', 't_duration', 'series_vertical_offset', 'series_height', 'pen_aRGB', 'brush_aRGB', 'smooth', 'shader', 'glOptions']
-        
-        # pg.colorStr(a_pen.color())
-        
-        # a_pen.color().getRgbF() # gets the RgbF values of the QColor returned from the QPen a_pen
+        print(f'_build_epoch_meshes(...): kwargs: {list(kwargs.keys())}')
         series_vertical_offset = kwargs.get('series_vertical_offset', [-self.n_half_cells]*num_intervals)
         series_height = kwargs.get('series_height', [self.n_full_cell_grid]*num_intervals)
         
         pen_aRGB = kwargs.get('pen_aRGB', [(1, 0, 0, 0.2)]*num_intervals)
         brush_aRGB = kwargs.get('brush_aRGB', [(1, 0, 0, 0.2)]*num_intervals)
+        print(f'\t brush_aRGB: {brush_aRGB}')
         # color = kwargs.get('color', [(1, 0, 0, 0.2)]*num_intervals)
         smooth = kwargs.get('smooth', [True]*num_intervals)
         shader = kwargs.get('shader', ['balloon']*num_intervals)
         glOptions = kwargs.get('glOptions', ['additive']*num_intervals)
-        
-        # color = kwargs.setdefault('pen', pg.mkPen(pen_color))
-        # fill_color = kwargs.setdefault('brush', pg.mkBrush(brush_color))  
         
         new_mesh_objects = []
         for i in np.arange(len(x_centers)):
