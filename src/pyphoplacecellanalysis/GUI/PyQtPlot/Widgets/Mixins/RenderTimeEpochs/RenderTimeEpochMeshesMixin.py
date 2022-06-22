@@ -365,13 +365,13 @@ class RenderTimeEpochMeshesMixin(EpochRenderingMixin):
         curr_rendered_epoch_names = list(self.rendered_epochs.keys()) # done to prevent problems with dict changing size during iteration
         for a_name in curr_rendered_epoch_names:
             if a_name != 'name':
-                print(f'updating: {a_name}...')
+                # print(f'updating: {a_name}...')
                 self._perform_update_epoch_meshes(a_name, self.interval_datasources[a_name].time_column_values.t_start.to_numpy(),
                                              self.interval_datasources[a_name].time_column_values.t_duration.to_numpy(),
                                              series_vertical_offset = self.interval_datasources[a_name].df.series_vertical_offset.to_numpy(),
                                              series_height = self.interval_datasources[a_name].df.series_height.to_numpy(),
                                              child_plots=None)
-                print(f'done.')
+                # print(f'done.')
 
 
     def get_all_epoch_meshes(self):
