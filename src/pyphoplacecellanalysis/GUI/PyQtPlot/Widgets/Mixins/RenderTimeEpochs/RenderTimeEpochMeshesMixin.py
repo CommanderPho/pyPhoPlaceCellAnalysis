@@ -13,6 +13,9 @@ from pyphoplacecellanalysis.General.DataSeriesToSpatial import DataSeriesToSpati
 from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.Mixins.RenderTimeEpochs.EpochRenderingMixin import EpochRenderingMixin, RenderedEpochsItemsContainer
 from pyphoplacecellanalysis.General.Model.Datasources.IntervalDatasource import IntervalsDatasource
 
+from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.Mixins.RenderTimeEpochs.Specific2DRenderTimeEpochs import Specific2DRenderTimeEpochsHelper # Only for the convenince methods that build datasources (laps, PBEs, etc)
+
+
 class RenderEpochs(PrettyPrintable, SimplePrintable, metaclass=OrderedMeta):
     def __init__(self, name) -> None:
         # super(RenderEpochs, self).__init__(**kwargs)
@@ -199,6 +202,11 @@ class RenderTimeEpochMeshesMixin(EpochRenderingMixin):
         Usage:
             active_pbe_interval_rects_item = Render2DEventRectanglesHelper.build_IntervalRectsItem_from_interval_datasource(interval_datasources.PBEs)
             
+            num_epochs = np.shape(laps_interval_datasource.df)[0]
+            # glOptions: 'additive', 'translucent', 'opaque'
+            # shader: 'balloon', 'shaded', 'edgeHilight', None
+            out = active_3d_plot.add_rendered_intervals(interval_datasource=laps_interval_datasource, name='Laps', debug_print=True, brush_aRGB=([(1.0, 0.5, 1.0, 0.2)] * num_epochs), shader='balloon', glOptions='additive', smooth=False, series_height=10.0, series_vertical_offset=-30.0)
+
         """
         
         ######### DATASOURCE:
@@ -239,7 +247,7 @@ class RenderTimeEpochMeshesMixin(EpochRenderingMixin):
         
         # enable_visualization_datasource_parameters_override: if True, the dataframe properties used to render the interval meshes in 3D are overriden with the user-arguments provided (if provided) or the defaults:
         enable_visualization_datasource_parameters_override = True
-     
+
         # Get user-provided parameter values (passed by the user as kwargs) or the default values:
         series_vertical_offset = kwargs.get('series_vertical_offset', -self.n_half_cells)
         series_height = kwargs.get('series_height', self.n_full_cell_grid)        
@@ -277,8 +285,7 @@ class RenderTimeEpochMeshesMixin(EpochRenderingMixin):
             
             for a_plot in child_plots:
                 if a_plot in extant_rects_plot_items_container:
-                    # the plot is already here: remove and re-add it
-                    # extant_rect_plot_item_meshes = extant_rects_plot_items_container[a_plot] # this is done inside self.update_epoch_meshes                                        
+                    # the plot is already here: just update it
                     self._perform_update_epoch_meshes(name, self.interval_datasources[name].time_column_values.t_start.to_numpy(),
                                              self.interval_datasources[name].time_column_values.t_duration.to_numpy(),
                                              series_vertical_offset = self.interval_datasources[name].df.series_vertical_offset.to_numpy(),
@@ -287,7 +294,6 @@ class RenderTimeEpochMeshesMixin(EpochRenderingMixin):
                         
                 else:
                     # Only if child plot doesn't yet exist:
-                    # new_mesh_objects = self._build_epoch_meshes(self.interval_datasources[name].time_column_values.t_start.to_numpy(), self.interval_datasources[name].time_column_values.t_duration.to_numpy())                    
                     new_mesh_objects = self._build_epoch_meshes(**RenderTimeEpochMeshesMixin._build_epoch_meshes_3D_dict_from_dataframe(self.interval_datasources[name].df))
                     
                     extant_rects_plot_items_container[a_plot] = new_mesh_objects
@@ -300,7 +306,6 @@ class RenderTimeEpochMeshesMixin(EpochRenderingMixin):
         else:
             # Need to create a new RenderedEpochsItemsContainer with the items:
             # Equiv to new_interval_rects_item:
-            # new_mesh_objects = self._build_epoch_meshes(self.interval_datasources[name].time_column_values.t_start.to_numpy(), self.interval_datasources[name].time_column_values.t_duration.to_numpy())
             new_mesh_objects = self._build_epoch_meshes(**RenderTimeEpochMeshesMixin._build_epoch_meshes_3D_dict_from_dataframe(self.interval_datasources[name].df))
             self.rendered_epochs[name] = RenderedEpochsItemsContainer(new_mesh_objects, child_plots) # set the plot item
             for a_plot, a_rect_item_meshes in self.rendered_epochs[name].items():
@@ -429,13 +434,13 @@ class RenderTimeEpochMeshesMixin(EpochRenderingMixin):
         centers_t = t_start + (t_duration / 2.0)
         x_centers, duration_spatial_widths = self._temporal_to_spatial(centers_t, t_duration) # actually compute the centers of each epoch rect, not the start
         
-        print(f'_build_epoch_meshes(...): kwargs: {list(kwargs.keys())}')
+        # print(f'_build_epoch_meshes(...): kwargs: {list(kwargs.keys())}')
         series_vertical_offset = kwargs.get('series_vertical_offset', [-self.n_half_cells]*num_intervals)
         series_height = kwargs.get('series_height', [self.n_full_cell_grid]*num_intervals)
         
         pen_aRGB = kwargs.get('pen_aRGB', [(1, 0, 0, 0.2)]*num_intervals)
         brush_aRGB = kwargs.get('brush_aRGB', [(0, 0, 1, 0.2)]*num_intervals)
-        print(f'\t brush_aRGB: {brush_aRGB}')
+        # print(f'\t brush_aRGB: {brush_aRGB}')
         # color = kwargs.get('color', [(1, 0, 0, 0.2)]*num_intervals)
         smooth = kwargs.get('smooth', [True]*num_intervals)
         shader = kwargs.get('shader', ['balloon']*num_intervals)
@@ -444,26 +449,12 @@ class RenderTimeEpochMeshesMixin(EpochRenderingMixin):
         new_mesh_objects = []
         for i in np.arange(len(x_centers)):
             curr_color = list(brush_aRGB[i])
-            # curr_color = pg.mkColor('#ffffff') # throws error, cannot be a QColor
-            # curr_color = list(pg.mkColor('#ffffff').getRgbF()) # does not render anything
-            # curr_color = list(pg.mkColor('#ffffff').getRgb()) # causes "Error while drawing item" and doesn't render
-            # curr_color = [1.0, 1.0, 1.0, 0.2] # causes "Error while drawing item" and doesn't render
-            # curr_color = [1, 1, 1, 1] # Worked, but only after clearing notebook and starting again :[
-            # curr_color = pg.mkColor((255, 255, 255, 51))
-            print(f'curr_color[{i}]: {curr_color}')
-            
+            # print(f'curr_color[{i}]: {curr_color}')
             # curr_md = RenderTimeEpochMeshesMixin._build_cube_mesh_data(faceColor=[1,1,1,1]) # works
             curr_md = RenderTimeEpochMeshesMixin._build_cube_mesh_data(faceColor=curr_color) # works
-            # curr_cube = gl.GLMeshItem(meshdata=curr_md, smooth=True, color=(1, 0, 0, 0.2), shader='balloon', glOptions='additive') # , drawEdges=True, edgeColor=(0, 0, 0, 1)
-            # curr_cube = gl.GLMeshItem(meshdata=curr_md, **_default_mesh_item_options)
-            # curr_cube = gl.GLMeshItem(meshdata=curr_md, smooth=smooth[i], color=brush_aRGB[i], shader=shader[i], glOptions=glOptions[i])
-           
             curr_cube = gl.GLMeshItem(meshdata=curr_md, smooth=smooth[i], shader=shader[i], glOptions=glOptions[i]) # , color=pg.mkColor(curr_color)
             curr_cube.translate(x_centers[i], series_vertical_offset[i], self.floor_z)
             curr_cube.scale(duration_spatial_widths[i], series_height[i], 0.25)
-            # curr_cube = gl.GLMeshItem(meshdata=curr_md, **_default_mesh_item_options) # , drawEdges=True, edgeColor=(0, 0, 0, 1)
-            # curr_cube.translate(x_centers[i], -self.n_half_cells, self.floor_z)
-            # curr_cube.scale(duration_spatial_widths[i], self.n_full_cell_grid, 0.25)
             # curr_cube.setParentItem(self.ui.parent_epoch_container_item)
             new_mesh_objects.append(curr_cube)
 
@@ -541,3 +532,33 @@ class RenderTimeEpochMeshesMixin(EpochRenderingMixin):
             
     #######################################################################################################################################
     
+    ######################################################
+    # Common intervals convencince methods:
+    """
+    NOTE:
+        series_height = self.n_full_cell_grid => Full Height
+        series_vertical_offset = -self.n_half_cells => Centered
+    """    
+    #####################################################
+    def add_laps_intervals(self, sess):
+        """ Convenince method to add the Laps rectangles to the 3D Plots 
+            NOTE: sess can be a DataSession, a Laps object, or an Epoch object containing Laps directly.
+            active_2d_plot.add_PBEs_intervals(sess)
+        """
+        laps_interval_datasource = Specific2DRenderTimeEpochsHelper.build_Laps_render_time_epochs_datasource(curr_sess=sess, series_vertical_offset=(-float(self.n_half_cells)+1.0), series_height = 1.0)
+        self.add_rendered_intervals(laps_interval_datasource, name='Laps', debug_print=False) # removes the rendered intervals
+        
+    def remove_laps_intervals(self):
+        self.remove_rendered_intervals('Laps', debug_print=False)
+        
+    def add_PBEs_intervals(self, sess):
+        """ Convenince method to add the PBE rectangles to the 3D Plots 
+            NOTE: sess can be a DataSession, or an Epoch object containing PBEs directly.
+        """
+        new_PBEs_interval_datasource = Specific2DRenderTimeEpochsHelper.build_PBEs_render_time_epochs_datasource(curr_sess=sess, series_vertical_offset=(-float(self.n_half_cells)+2.0), series_height = 1.0) # new_PBEs_interval_datasource
+        self.add_rendered_intervals(new_PBEs_interval_datasource, name='PBEs', debug_print=False) # adds the rendered intervals
+
+    def remove_PBEs_intervals(self):
+        self.remove_rendered_intervals('PBEs', debug_print=False)
+        
+        
