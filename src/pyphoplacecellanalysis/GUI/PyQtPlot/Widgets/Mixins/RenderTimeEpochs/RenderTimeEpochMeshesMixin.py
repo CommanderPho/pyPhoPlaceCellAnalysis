@@ -84,8 +84,12 @@ class RenderTimeEpochMeshesMixin(EpochRenderingMixin):
         # return [self.ui.main_gl_widget]
         raise NotImplementedError # MUST OVERRIDE in child
     
-    
-    
+    @property
+    def rendered_epoch_series_names(self):
+        """The rendered_epoch_names property."""
+        return [a_name for a_name in self.rendered_epochs.keys() if a_name != 'name']
+
+
     def add_rendered_intervals(self, interval_datasource, name=None, child_plots=None, debug_print=True):
         """ adds the intervals specified by the interval_datasource to the plots 
         
@@ -218,7 +222,22 @@ class RenderTimeEpochMeshesMixin(EpochRenderingMixin):
         """ True if epoch meshes to render have been added. """
         if self.rendered_epochs is None:
             return False
-        return len(self.rendered_epochs) > 0 # TODO: this won't work due to the 'name' property of the render_epochs
+        # Find at least one plot:
+        # curr_rendered_epoch_names = [a_name for a_name in self.rendered_epochs.keys() if a_name != 'name'] # done to prevent problems with dict changing size during iteration
+        curr_rendered_epoch_names = self.rendered_epoch_series_names
+        child_plots = self.interval_rendering_plots
+        # See if we have at least one set of non-empty rendered rects
+        for a_name in curr_rendered_epoch_names:
+            if a_name != 'name':
+                for a_plot in child_plots:
+                    extant_rect_plot_item_meshes = self.rendered_epochs[a_name][a_plot]
+                    if len(extant_rect_plot_item_meshes) > 0:
+                        # has at least one set of non-empty rendered rects
+                        return True
+        # Otherwise we found no non-empty mesh rects and should return false
+        return False
+
+
 
 
     @QtCore.pyqtSlot()
@@ -386,6 +405,21 @@ class RenderTimeEpochMeshesMixin(EpochRenderingMixin):
                 aCube.scale(duration_spatial_widths[i], self.n_full_cell_grid, 0.25)
            
 
+
+    def get_all_epoch_meshes(self):
+        """ returns a flat list of all epoch meshes """
+        curr_rendered_epoch_names = list(self.rendered_epochs.keys()) # done to prevent problems with dict changing size during iteration
+        child_plots = self.interval_rendering_plots
+        flat_mesh_list = []
+        for a_name in curr_rendered_epoch_names:
+            if a_name != 'name':
+                for a_plot in child_plots:
+                    extant_rect_plot_item_meshes = self.rendered_epochs[a_name][a_plot]
+                    flat_mesh_list.extend(extant_rect_plot_item_meshes) # append these meshes with those of previous names/plots
+        return flat_mesh_list
+    
+
+    
     ## TODO: IMPLEMENT            
     # def remove_epoch_meshes(self):
     #     for (i, aCube) in enumerate(self.plots.new_cube_objects):
