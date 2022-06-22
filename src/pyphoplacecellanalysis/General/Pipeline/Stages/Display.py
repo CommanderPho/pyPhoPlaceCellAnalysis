@@ -211,6 +211,10 @@ class PipelineWithDisplayPipelineStageMixin:
         """The registered_display_function_dict property can be used to get the corresponding function from the string name."""
         return self.stage.registered_display_function_dict
     
+    @property
+    def registered_display_function_docs_dict(self):
+        """Returns the doc strings for each registered display function. This is taken from their docstring at the start of the function defn, and provides an overview into what the function will do."""
+        return {a_fn_name:a_fn.__doc__ for a_fn_name, a_fn in self.registered_display_function_dict.items()}
     
     def register_display_function(self, registered_name, display_function):
         # assert (self.can_display), "Current self.stage must already be a ComputedPipelineStage. Call self.filter_sessions with filter configs to reach this step."
