@@ -382,7 +382,7 @@ class RenderTimeEpochMeshesMixin(EpochRenderingMixin):
     ############### Internal Methods #################:
     ##################################################
     @classmethod
-    def _build_cube_mesh_data(cls):
+    def _build_cube_mesh_data(cls, faceColor=None): # could also add , vertexColor=None
         vertexes = np.array([[1, 0, 0], #0
                             [0, 0, 0], #1
                             [0, 1, 0], #2
@@ -397,7 +397,9 @@ class RenderTimeEpochMeshesMixin(EpochRenderingMixin):
                         [0,4,5], [0,7,5],
                         [2,4,5], [2,6,5],
                         [3,6,5], [3,7,5]])
-        colors = np.array([[1,0,0,1] for i in range(12)])
+        if faceColor is None:
+            faceColor = [1,1,0,1]
+        colors = np.array([faceColor for i in range(12)])
         md = gl.MeshData(vertexes=vertexes, faces=faces, edges=None, vertexColors=None, faceColors=colors)
         return md
 
@@ -432,7 +434,7 @@ class RenderTimeEpochMeshesMixin(EpochRenderingMixin):
         series_height = kwargs.get('series_height', [self.n_full_cell_grid]*num_intervals)
         
         pen_aRGB = kwargs.get('pen_aRGB', [(1, 0, 0, 0.2)]*num_intervals)
-        brush_aRGB = kwargs.get('brush_aRGB', [(1, 0, 0, 0.2)]*num_intervals)
+        brush_aRGB = kwargs.get('brush_aRGB', [(0, 0, 1, 0.2)]*num_intervals)
         print(f'\t brush_aRGB: {brush_aRGB}')
         # color = kwargs.get('color', [(1, 0, 0, 0.2)]*num_intervals)
         smooth = kwargs.get('smooth', [True]*num_intervals)
@@ -441,10 +443,22 @@ class RenderTimeEpochMeshesMixin(EpochRenderingMixin):
         
         new_mesh_objects = []
         for i in np.arange(len(x_centers)):
-            curr_md = RenderTimeEpochMeshesMixin._build_cube_mesh_data()
+            curr_color = list(brush_aRGB[i])
+            # curr_color = pg.mkColor('#ffffff') # throws error, cannot be a QColor
+            # curr_color = list(pg.mkColor('#ffffff').getRgbF()) # does not render anything
+            # curr_color = list(pg.mkColor('#ffffff').getRgb()) # causes "Error while drawing item" and doesn't render
+            # curr_color = [1.0, 1.0, 1.0, 0.2] # causes "Error while drawing item" and doesn't render
+            # curr_color = [1, 1, 1, 1] # Worked, but only after clearing notebook and starting again :[
+            # curr_color = pg.mkColor((255, 255, 255, 51))
+            print(f'curr_color[{i}]: {curr_color}')
+            
+            # curr_md = RenderTimeEpochMeshesMixin._build_cube_mesh_data(faceColor=[1,1,1,1]) # works
+            curr_md = RenderTimeEpochMeshesMixin._build_cube_mesh_data(faceColor=curr_color) # works
             # curr_cube = gl.GLMeshItem(meshdata=curr_md, smooth=True, color=(1, 0, 0, 0.2), shader='balloon', glOptions='additive') # , drawEdges=True, edgeColor=(0, 0, 0, 1)
             # curr_cube = gl.GLMeshItem(meshdata=curr_md, **_default_mesh_item_options)
-            curr_cube = gl.GLMeshItem(meshdata=curr_md, smooth=smooth[i], color=brush_aRGB[i], shader=shader[i], glOptions=glOptions[i])
+            # curr_cube = gl.GLMeshItem(meshdata=curr_md, smooth=smooth[i], color=brush_aRGB[i], shader=shader[i], glOptions=glOptions[i])
+           
+            curr_cube = gl.GLMeshItem(meshdata=curr_md, smooth=smooth[i], shader=shader[i], glOptions=glOptions[i]) # , color=pg.mkColor(curr_color)
             curr_cube.translate(x_centers[i], series_vertical_offset[i], self.floor_z)
             curr_cube.scale(duration_spatial_widths[i], series_height[i], 0.25)
             # curr_cube = gl.GLMeshItem(meshdata=curr_md, **_default_mesh_item_options) # , drawEdges=True, edgeColor=(0, 0, 0, 1)
