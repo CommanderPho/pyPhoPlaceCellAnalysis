@@ -19,21 +19,6 @@ from pyphoplacecellanalysis.General.Model.Datasources.IntervalDatasource import 
 
 
 
-class EventRectanglesDataseries(object):
-    """ UNUSED """
-    def __init__(self, name, data, create_fcn, update_fcn, remove_fcn):
-        super(EventRectanglesDataseries, self).__init__()
-        self.name = name
-        self.data = data
-        self.create_fcn = create_fcn
-        self.update_fcn = update_fcn
-        self.remove_fcn = remove_fcn
-        
-    
-        
-
-    
-
 class Render2DEventRectanglesHelper:
     """ Static helper that adds interval/epoch rectangles to 2D raster plots
  
