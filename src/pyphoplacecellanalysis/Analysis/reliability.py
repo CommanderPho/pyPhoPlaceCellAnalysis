@@ -168,7 +168,8 @@ def compute_lap_to_lap_reliability(active_pf, filtered_spikes_df, lap_ids, celli
     return out_indicies, out_digitized_position_bins, out_within_lap_spikes_overlap
     
 
-# def compute_reliability_metrics(out_indicies, out_digitized_position_bins, out_within_lap_spikes_overlap):
+
+# def compute_reliability_metrics(out_indicies, out_digitized_position_bins, out_within_lap_spikes_overlap, debug_print=False, plot_results=False):
 #     """ Takes input from compute_lap_to_lap_reliability(...) to build the actual reliability metrics """
 #     # Actual Computations of Reliability:
 #     out_pairwise_pair_results = np.zeros_like(out_within_lap_spikes_overlap)
@@ -184,10 +185,14 @@ def compute_lap_to_lap_reliability(active_pf, filtered_spikes_df, lap_ids, celli
 # #         next_item = out_within_lap_spikes_overlap[:, next_item_lap_idx]
 # #         out_pairwise_pair_results[:, next_item_lap_idx] = (first_item * next_item) # the result should be stored in the index of the second item, if we're doing the typical backwards style differences.
 # #         # print(f'np.max(out_pairwise_pair_results[:, next_item_lap_idx]): {np.max(out_pairwise_pair_results[:, next_item_lap_idx])}')
-        
+
 #     if debug_print: 
 #         print(f'max out: {np.max(out_pairwise_pair_results)}')
         
+#     lap_ids 
+#     flat_lap_idxs = np.arange(len(lap_ids))
+    
+    
 #     # add to the extant plot as a new color:
 #     if plot_results:
 #         for lap_idx, lap_ID in zip(flat_lap_idxs, lap_ids):
@@ -207,6 +212,6 @@ def compute_lap_to_lap_reliability(active_pf, filtered_spikes_df, lap_ids, celli
 #         fig_result, axs_result = plt.subplots(2, 1, sharex=True, sharey=True, figsize=(24, 40))
 #         axs_result[0].plot(out_digitized_position_bins, all_laps_reliability, 'r')
 #         axs_result[1].plot(out_digitized_position_bins, cum_laps_reliability, 'r')
-    
+
     
     
