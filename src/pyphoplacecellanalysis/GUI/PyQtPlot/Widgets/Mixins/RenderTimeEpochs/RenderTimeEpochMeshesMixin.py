@@ -312,14 +312,15 @@ class RenderTimeEpochMeshesMixin(EpochRenderingMixin):
     
     ############### Public Methods ###################:
     ##################################################
-    def add_render_epochs(self, starts_t, durations, epoch_type_name='PBE'):
-        """ adds the render epochs to be displayed. Stores them internally"""
-        self.params.render_epochs = RenderEpochs(epoch_type_name)
-        self.params.render_epochs.epoch_type_name = epoch_type_name
-        self.params.render_epochs.starts_t = starts_t
-        self.params.render_epochs.durations = durations
-        self._build_epoch_meshes(self.params.render_epochs.starts_t, self.params.render_epochs.durations)
-        # self.epoch_connection.blockSignals(False) # Disabling blocking the signals so it can update
+    ## TODO: IMPLEMENT            
+    # def add_render_epochs(self, starts_t, durations, epoch_type_name='PBE'):
+    #     """ adds the render epochs to be displayed. Stores them internally"""
+    #     self.params.render_epochs = RenderEpochs(epoch_type_name)
+    #     self.params.render_epochs.epoch_type_name = epoch_type_name
+    #     self.params.render_epochs.starts_t = starts_t
+    #     self.params.render_epochs.durations = durations
+    #     self._build_epoch_meshes(self.params.render_epochs.starts_t, self.params.render_epochs.durations)
+    #     # self.epoch_connection.blockSignals(False) # Disabling blocking the signals so it can update
     
     
     
@@ -370,15 +371,16 @@ class RenderTimeEpochMeshesMixin(EpochRenderingMixin):
                 aCube.translate(x_shifted_centers[i], -self.n_half_cells, self.floor_z)
                 aCube.scale(duration_spatial_widths[i], self.n_full_cell_grid, 0.25)
            
-            
-    def remove_epoch_meshes(self):
-        for (i, aCube) in enumerate(self.plots.new_cube_objects):
-            # aCube.setParent(None) # Set parent None is just as good as removing from self.ui.main_gl_widget I think
-            self.ui.main_gl_widget.removeItem(aCube)
-            aCube.deleteLater()
-        self.plots.new_cube_objects.clear()
-        # if not self.has_render_epoch_meshes:
-        #     # if there are no epoch meshes left to render, block the update signal.
-        #     self.epoch_connection.blockSignals(True)
+
+    ## TODO: IMPLEMENT            
+    # def remove_epoch_meshes(self):
+    #     for (i, aCube) in enumerate(self.plots.new_cube_objects):
+    #         # aCube.setParent(None) # Set parent None is just as good as removing from self.ui.main_gl_widget I think
+    #         self.ui.main_gl_widget.removeItem(aCube)
+    #         aCube.deleteLater()
+    #     self.plots.new_cube_objects.clear()
+    #     # if not self.has_render_epoch_meshes:
+    #     #     # if there are no epoch meshes left to render, block the update signal.
+    #     #     self.epoch_connection.blockSignals(True)
         
 
