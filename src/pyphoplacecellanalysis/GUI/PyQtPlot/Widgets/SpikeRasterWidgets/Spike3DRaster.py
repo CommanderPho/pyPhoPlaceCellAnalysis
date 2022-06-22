@@ -474,32 +474,6 @@ class Spike3DRaster(PyQtGraphSpecificTimeCurvesMixin, RenderTimeEpochMeshesMixin
     # def _build_axes_arrow_graphics(self, w):
         
     #     md = gl.MeshData.cylinder(rows=10, cols=20, radius=[1., 2.0], length=5.)
-        
-        
-            
-            
-    ######################################################
-    # EpochRenderingMixin Convencince methods:
-    #####################################################
-    def _perform_add_render_item(self, a_plot, a_render_item):
-        """Performs the operation of adding the render item from the plot specified
-
-        Args:
-            a_render_item (_type_): _description_
-            a_plot (_type_): _description_
-        """
-        a_plot.addItem(a_render_item) # 2D (PlotItem)
-        
-        
-    def _perform_remove_render_item(self, a_plot, a_render_item):
-        """Performs the operation of removing the render item from the plot specified
-
-        Args:
-            a_render_item (IntervalRectsItem): _description_
-            a_plot (PlotItem): _description_
-        """
-        a_plot.removeItem(a_render_item) # 2D (PlotItem)
-        
 
     ###################################
     #### EVENT HANDLERS
