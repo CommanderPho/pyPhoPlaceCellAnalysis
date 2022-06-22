@@ -300,28 +300,20 @@ class RenderTimeEpochMeshesMixin(EpochRenderingMixin):
 
 
     ## TODO: IMPLEMENT            
-    def add_render_epochs(self, starts_t, durations, epoch_type_name='PBE', **kwargs):
-        
-        """ adds the render epochs to be displayed. Stores them internally"""
-        new_datasource = IntervalsDatasource.init_from_times_values(starts_t, durations, datasource_name=epoch_type_name)
-        
-        Specific2DRenderTimeEpochsHelper.build_Laps_dataframe_formatter(**kwargs)
-        
-        new_datasource._df['']
-        ## IntervalsDatasource for 2D Plots columns: _required_interval_visualization_columns = ['t_start', 't_duration', 'series_vertical_offset', 'series_height', 'pen', 'brush']
-        ## IntervalsDatasource for 3D Plots columns: _required_interval_visualization_columns = ['t_start', 't_duration', 'series_vertical_offset', 'series_height', 'pen', 'brush']
-        
-        
-        # init_from_epoch_object(active_Laps_Epochs, cls.build_Laps_dataframe_formatter(**kwargs), datasource_name='intervals_datasource_from_laps_epoch_obj')
-        
-        
-        
-        self.params.render_epochs = RenderEpochs(epoch_type_name)
-        self.params.render_epochs.epoch_type_name = epoch_type_name
-        self.params.render_epochs.starts_t = starts_t
-        self.params.render_epochs.durations = durations
-        self._build_epoch_meshes(self.params.render_epochs.starts_t, self.params.render_epochs.durations)
-        # self.epoch_connection.blockSignals(False) # Disabling blocking the signals so it can update
+    # def add_render_epochs(self, starts_t, durations, epoch_type_name='PBE', **kwargs):
+    #     """ adds the render epochs to be displayed. Stores them internally"""
+    #     new_datasource = IntervalsDatasource.init_from_times_values(starts_t, durations, datasource_name=epoch_type_name)
+    #     Specific2DRenderTimeEpochsHelper.build_Laps_dataframe_formatter(**kwargs)
+    #     new_datasource._df['']
+    #     ## IntervalsDatasource for 2D Plots columns: _required_interval_visualization_columns = ['t_start', 't_duration', 'series_vertical_offset', 'series_height', 'pen', 'brush']
+    #     ## IntervalsDatasource for 3D Plots columns: _required_interval_visualization_columns = ['t_start', 't_duration', 'series_vertical_offset', 'series_height', 'pen', 'brush']
+    #     # init_from_epoch_object(active_Laps_Epochs, cls.build_Laps_dataframe_formatter(**kwargs), datasource_name='intervals_datasource_from_laps_epoch_obj')
+    #     self.params.render_epochs = RenderEpochs(epoch_type_name)
+    #     self.params.render_epochs.epoch_type_name = epoch_type_name
+    #     self.params.render_epochs.starts_t = starts_t
+    #     self.params.render_epochs.durations = durations
+    #     self._build_epoch_meshes(self.params.render_epochs.starts_t, self.params.render_epochs.durations)
+    #     # self.epoch_connection.blockSignals(False) # Disabling blocking the signals so it can update
     
         
     
@@ -353,7 +345,10 @@ class RenderTimeEpochMeshesMixin(EpochRenderingMixin):
         for a_name in curr_rendered_epoch_names:
             if a_name != 'name':
                 self._perform_update_epoch_meshes(a_name, self.interval_datasources[a_name].time_column_values.t_start.to_numpy(),
-                                             self.interval_datasources[a_name].time_column_values.t_duration.to_numpy(), child_plots=None)
+                                             self.interval_datasources[a_name].time_column_values.t_duration.to_numpy(),
+                                             series_vertical_offset = self.interval_datasources[a_name].df.series_vertical_offset.to_numpy(),
+                                             series_height = self.interval_datasources[a_name].series_height.df.to_numpy(),
+                                             child_plots=None)
 
     def get_all_epoch_meshes(self):
         """ returns a flat list of all epoch meshes """
@@ -454,7 +449,7 @@ class RenderTimeEpochMeshesMixin(EpochRenderingMixin):
         return new_mesh_objects
     
           
-    def _perform_update_epoch_meshes(self, name, starts_t, durations, child_plots=None):
+    def _perform_update_epoch_meshes(self, name, starts_t, durations, series_vertical_offset=None, series_height=None, child_plots=None):
         """ Modifies both the position and scale of the existing self.rendered_epochs
         Requires Implementors:
         
@@ -478,8 +473,18 @@ class RenderTimeEpochMeshesMixin(EpochRenderingMixin):
             # Update the meshes for this item:
             for (i, aCube) in enumerate(extant_rect_plot_item_meshes):
                 aCube.resetTransform()
-                aCube.translate(x_shifted_centers[i], -self.n_half_cells, self.floor_z)
-                aCube.scale(duration_spatial_widths[i], self.n_full_cell_grid, 0.25)
+                if series_vertical_offset is None:
+                    curr_series_vertical_offset = -self.n_half_cells
+                else:
+                    curr_series_vertical_offset = series_vertical_offset[i]
+                    
+                if series_height is None:
+                    curr_series_height = self.n_full_cell_grid
+                else:
+                    curr_series_height = series_height[i]
+                    
+                aCube.translate(x_shifted_centers[i], curr_series_vertical_offset, self.floor_z)
+                aCube.scale(duration_spatial_widths[i], curr_series_height, 0.25)
            
 
 
@@ -508,6 +513,10 @@ class RenderTimeEpochMeshesMixin(EpochRenderingMixin):
         """
         for curr_cube in a_render_item:
             a_plot.removeItem(curr_cube) # add directly
-
+            curr_cube.deleteLater()
+        
+        # TODO: is this okay?
+        a_render_item.clear()
+            
     #######################################################################################################################################
     
