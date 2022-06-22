@@ -161,6 +161,30 @@ class RenderTimeEpochMeshesMixin(EpochRenderingMixin):
     ############### Public Methods ###################:
     ##################################################
     
+    _required_interval_visualization_columns = ['t_start', 't_duration', 'series_vertical_offset', 'series_height', 'pen', 'brush']
+    
+    _required_3D_interval_visualization_columns = ['t_start', 't_duration', 'series_vertical_offset', 'series_height', 'pen_aRGB', 'brush_aRGB', 'smooth', 'shader', 'glOptions']
+    
+    _default_mesh_item_options = dict(smooth=True, color=(1, 0, 0, 0.2), shader='balloon', glOptions='additive')
+    
+    
+    @classmethod
+    def _build_epoch_meshes_3D_dict_from_dataframe(cls, df):
+        """ build the dict required for rendering intervals to be passed in to ._build_epoch_meshes(...): fields are (start_t, series_vertical_offset, duration_t, series_height, pen_aRGB, brush_aRGB, smooth, shader, glOptions).
+        
+        NOTE: Analgous to _build_interval_tuple_list_from_dataframe(...) but for 3D
+        
+        Inputs:
+            df: a Pandas.DataFrame with the columns ['t_start', 't_duration', 'series_vertical_offset', 'series_height', 'pen_aRGB', 'brush_aRGB', 'smooth', 'shader', 'glOptions']
+        Returns:
+            a dict with the keys ('t_start', 't_duration', 'series_vertical_offset', 'series_height', 'pen_aRGB', 'brush_aRGB', 'smooth', 'shader', 'glOptions') with all values being arrays of the same length
+        """    
+        ## Validate that it has all required columns:
+        assert np.isin(cls._required_3D_interval_visualization_columns, df.columns).all(), f"dataframe is missing required columns:\n Required: {cls._required_3D_interval_visualization_columns}, current: {df.columns} "
+        return {'t_start': df.t_start.to_numpy(), 't_duration': df.t_duration.to_numpy(), 'series_vertical_offset': df.series_vertical_offset.to_numpy(), 'series_height': df.series_height.to_numpy(),
+                'pen_aRGB': df.pen_aRGB.to_numpy(), 'brush_aRGB': df.brush_aRGB.to_numpy(),
+                'smooth': df.smooth.to_numpy(), 'shader': df.shader.to_numpy(), 'glOptions': df.glOptions.to_numpy()}
+
     
 
     def add_rendered_intervals(self, interval_datasource, name=None, child_plots=None, debug_print=True):
@@ -211,9 +235,24 @@ class RenderTimeEpochMeshesMixin(EpochRenderingMixin):
                 print(f'\t replacing extant datasource.')
                 # TODO: remove plots associated with replaced datasource
                 self.interval_datasources[name] = interval_datasource
-                        
         
+        ## Post-update datasource:
+        ## Update the Datasource to contain the 3D mesh specific properties:
         
+        assert np.isin(RenderTimeEpochMeshesMixin._required_interval_visualization_columns, self.interval_datasources.Laps.df.columns).all(), f"dataframe is missing required columns:\n Required: {RenderTimeEpochMeshesMixin._required_interval_visualization_columns}, current: {self.interval_datasources.Laps.df.columns}"
+        ## TODO: all default values currently hardcoded, allow passing in optional parameters:
+        if 'pen_aRGB' not in self.interval_datasources.Laps.df.columns:
+            self.interval_datasources.Laps.df['pen_aRGB'] = [a_pen.color().getRgbF() for a_pen in self.interval_datasources.Laps._df['pen']] # gets the RgbF values of the QColor returned from the QPen a_pen
+        if 'brush_aRGB' not in self.interval_datasources.Laps.df.columns:
+            self.interval_datasources.Laps.df['brush_aRGB'] = [a_brush.color().getRgbF() for a_brush in self.interval_datasources.Laps._df['brush']] # gets the RgbF values of the QColor returned from the QPen a_pen
+        if 'smooth' not in self.interval_datasources.Laps.df.columns:
+            self.interval_datasources.Laps.df['smooth'] = True
+        if 'shader' not in self.interval_datasources.Laps.df.columns:
+            self.interval_datasources.Laps.df['shader'] = 'balloon'
+        if 'glOptions' not in self.interval_datasources.Laps.df.columns:
+            self.interval_datasources.Laps.df['glOptions'] = 'additive'
+
+
         ######### PLOTS:
         returned_mesh_list_items = {}
         
@@ -232,7 +271,9 @@ class RenderTimeEpochMeshesMixin(EpochRenderingMixin):
                         
                 else:
                     # Only if child plot doesn't yet exist:
-                    new_mesh_objects = self._build_epoch_meshes(self.interval_datasources[name].time_column_values.t_start.to_numpy(), self.interval_datasources[name].time_column_values.t_duration.to_numpy())
+                    # new_mesh_objects = self._build_epoch_meshes(self.interval_datasources[name].time_column_values.t_start.to_numpy(), self.interval_datasources[name].time_column_values.t_duration.to_numpy())                    
+                    new_mesh_objects = self._build_epoch_meshes(**RenderTimeEpochMeshesMixin._build_epoch_meshes_3D_dict_from_dataframe(self.interval_datasources[name].df))
+                    
                     extant_rects_plot_items_container[a_plot] = new_mesh_objects
                     
                     ## Can't do:
@@ -243,7 +284,8 @@ class RenderTimeEpochMeshesMixin(EpochRenderingMixin):
         else:
             # Need to create a new RenderedEpochsItemsContainer with the items:
             # Equiv to new_interval_rects_item:
-            new_mesh_objects = self._build_epoch_meshes(self.interval_datasources[name].time_column_values.t_start.to_numpy(), self.interval_datasources[name].time_column_values.t_duration.to_numpy())
+            # new_mesh_objects = self._build_epoch_meshes(self.interval_datasources[name].time_column_values.t_start.to_numpy(), self.interval_datasources[name].time_column_values.t_duration.to_numpy())
+            new_mesh_objects = self._build_epoch_meshes(**RenderTimeEpochMeshesMixin._build_epoch_meshes_3D_dict_from_dataframe(self.interval_datasources[name].df))
             self.rendered_epochs[name] = RenderedEpochsItemsContainer(new_mesh_objects, child_plots) # set the plot item
             for a_plot, a_rect_item_meshes in self.rendered_epochs[name].items():
                 if not isinstance(a_rect_item_meshes, str):
@@ -258,9 +300,22 @@ class RenderTimeEpochMeshesMixin(EpochRenderingMixin):
 
 
     ## TODO: IMPLEMENT            
-    def add_render_epochs(self, starts_t, durations, epoch_type_name='PBE'):
+    def add_render_epochs(self, starts_t, durations, epoch_type_name='PBE', **kwargs):
         
         """ adds the render epochs to be displayed. Stores them internally"""
+        new_datasource = IntervalsDatasource.init_from_times_values(starts_t, durations, datasource_name=epoch_type_name)
+        
+        Specific2DRenderTimeEpochsHelper.build_Laps_dataframe_formatter(**kwargs)
+        
+        new_datasource._df['']
+        ## IntervalsDatasource for 2D Plots columns: _required_interval_visualization_columns = ['t_start', 't_duration', 'series_vertical_offset', 'series_height', 'pen', 'brush']
+        ## IntervalsDatasource for 3D Plots columns: _required_interval_visualization_columns = ['t_start', 't_duration', 'series_vertical_offset', 'series_height', 'pen', 'brush']
+        
+        
+        # init_from_epoch_object(active_Laps_Epochs, cls.build_Laps_dataframe_formatter(**kwargs), datasource_name='intervals_datasource_from_laps_epoch_obj')
+        
+        
+        
         self.params.render_epochs = RenderEpochs(epoch_type_name)
         self.params.render_epochs.epoch_type_name = epoch_type_name
         self.params.render_epochs.starts_t = starts_t
@@ -345,7 +400,7 @@ class RenderTimeEpochMeshesMixin(EpochRenderingMixin):
         return DataSeriesToSpatial.temporal_to_spatial_transform_computation(epoch_start_times, epoch_durations, self.spikes_window.active_window_start_time, self.spikes_window.active_window_end_time, self.temporal_axis_length, center_mode='zero_centered')
         
 
-    def _build_epoch_meshes(self, starts_t, durations):
+    def _build_epoch_meshes(self, t_start, t_duration, **kwargs):
         """ builds, but does not add, the list of gl.GLMeshItem to be added to the OpenGL viewport. There is one per interval.
         
         Input:
@@ -353,18 +408,46 @@ class RenderTimeEpochMeshesMixin(EpochRenderingMixin):
             
         Usage:  
             curr_sess.pbe.durations
+            
+        TODO: need equivalent of curr_IntervalRectsItem_interval_tuples = cls._build_interval_tuple_list_from_dataframe(active_df) ## build the output tuple list: fields are (start_t, series_vertical_offset, duration_t, series_height, pen, brush)
         
         """        
-        centers_t = starts_t + (durations / 2.0)
-        x_centers, duration_spatial_widths = self._temporal_to_spatial(centers_t, durations) # actually compute the centers of each epoch rect, not the start
-                
+        num_intervals = len(t_start)
+        centers_t = t_start + (t_duration / 2.0)
+        x_centers, duration_spatial_widths = self._temporal_to_spatial(centers_t, t_duration) # actually compute the centers of each epoch rect, not the start
+        
+        # _default_mesh_item_options = dict(smooth=True, color=(1, 0, 0, 0.2), shader='balloon', glOptions='additive')
+        
+        ## Just add them in?
+        #  ['t_start', 't_duration', 'series_vertical_offset', 'series_height', 'pen_aRGB', 'brush_aRGB', 'smooth', 'shader', 'glOptions']
+        
+        # pg.colorStr(a_pen.color())
+        
+        # a_pen.color().getRgbF() # gets the RgbF values of the QColor returned from the QPen a_pen
+        series_vertical_offset = kwargs.get('series_vertical_offset', [-self.n_half_cells]*num_intervals)
+        series_height = kwargs.get('series_height', [self.n_full_cell_grid]*num_intervals)
+        
+        pen_aRGB = kwargs.get('pen_aRGB', [(1, 0, 0, 0.2)]*num_intervals)
+        brush_aRGB = kwargs.get('brush_aRGB', [(1, 0, 0, 0.2)]*num_intervals)
+        # color = kwargs.get('color', [(1, 0, 0, 0.2)]*num_intervals)
+        smooth = kwargs.get('smooth', [True]*num_intervals)
+        shader = kwargs.get('shader', ['balloon']*num_intervals)
+        glOptions = kwargs.get('glOptions', ['additive']*num_intervals)
+        
+        # color = kwargs.setdefault('pen', pg.mkPen(pen_color))
+        # fill_color = kwargs.setdefault('brush', pg.mkBrush(brush_color))  
+        
         new_mesh_objects = []
-        # self.plots.new_cube_objects = []
         for i in np.arange(len(x_centers)):
             curr_md = RenderTimeEpochMeshesMixin._build_cube_mesh_data()
-            curr_cube = gl.GLMeshItem(meshdata=curr_md, smooth=True, color=(1, 0, 0, 0.2), shader='balloon', glOptions='additive') # , drawEdges=True, edgeColor=(0, 0, 0, 1)
-            curr_cube.translate(x_centers[i], -self.n_half_cells, self.floor_z)
-            curr_cube.scale(duration_spatial_widths[i], self.n_full_cell_grid, 0.25)
+            # curr_cube = gl.GLMeshItem(meshdata=curr_md, smooth=True, color=(1, 0, 0, 0.2), shader='balloon', glOptions='additive') # , drawEdges=True, edgeColor=(0, 0, 0, 1)
+            # curr_cube = gl.GLMeshItem(meshdata=curr_md, **_default_mesh_item_options)
+            curr_cube = gl.GLMeshItem(meshdata=curr_md, smooth=smooth[i], color=brush_aRGB[i], shader=shader[i], glOptions=glOptions[i])
+            curr_cube.translate(x_centers[i], series_vertical_offset[i], self.floor_z)
+            curr_cube.scale(duration_spatial_widths[i], series_height[i], 0.25)
+            # curr_cube = gl.GLMeshItem(meshdata=curr_md, **_default_mesh_item_options) # , drawEdges=True, edgeColor=(0, 0, 0, 1)
+            # curr_cube.translate(x_centers[i], -self.n_half_cells, self.floor_z)
+            # curr_cube.scale(duration_spatial_widths[i], self.n_full_cell_grid, 0.25)
             # curr_cube.setParentItem(self.ui.parent_epoch_container_item)
             new_mesh_objects.append(curr_cube)
 
