@@ -157,18 +157,13 @@ class RenderTimeEpochMeshesMixin(EpochRenderingMixin):
                     self.perform_update_epoch_meshes(name, self.interval_datasources[name].time_column_values.t_start.to_numpy(),
                                              self.interval_datasources[name].time_column_values.t_duration.to_numpy(), child_plots=None)
                         
-                    
-                                        
                 else:
                     # Only if child plot doesn't yet exist:
                     new_mesh_objects = self._build_epoch_meshes(self.interval_datasources[name].time_column_values.t_start.to_numpy(), self.interval_datasources[name].time_column_values.t_duration.to_numpy())
                     extant_rects_plot_items_container[a_plot] = new_mesh_objects
                     
                     ## Can't do:
-                    for curr_cube in extant_rects_plot_items_container[a_plot]:
-                        a_plot.addItem(curr_cube) # add directly
-                    
-                    # a_plot.addItem(extant_rects_plot_items_container[a_plot]) # can't do for OpenGL
+                    self._perform_add_render_item(a_plot, extant_rects_plot_items_container[a_plot])
                     returned_mesh_list_items[a_plot.objectName()] = dict(plot=a_plot, rect_item=extant_rects_plot_items_container[a_plot])
                 
                     
@@ -182,15 +177,35 @@ class RenderTimeEpochMeshesMixin(EpochRenderingMixin):
                     if debug_print:
                         print(f'plotting item')
                         
-                    for curr_cube in a_rect_item_meshes:
-                        # a_plot.removeItem(curr_cube)
-                        a_plot.addItem(curr_cube) # add directly
-                    
+                    self._perform_add_render_item(a_plot, a_rect_item_meshes)
                     returned_mesh_list_items[a_plot.objectName()] = dict(plot=a_plot, rect_item=a_rect_item_meshes)                                                
                                                 
         return returned_mesh_list_items 
 
 
+    ######################################################
+    # EpochRenderingMixin Convencince methods:
+    #####################################################
+    def _perform_add_render_item(self, a_plot, a_render_item):
+        """Performs the operation of adding the render item from the plot specified
+
+        Args:
+            a_render_item (list): a list of a_rect_item_meshes
+            a_plot (_type_): _description_
+        """
+        for curr_cube in a_render_item:
+            a_plot.addItem(curr_cube) # add directly
+        
+        
+    def _perform_remove_render_item(self, a_plot, a_render_item):
+        """Performs the operation of removing the render item from the plot specified
+
+        Args:
+            a_render_item (IntervalRectsItem): _description_
+            a_plot (PlotItem): _description_
+        """
+        for curr_cube in a_render_item:
+            a_plot.removeItem(curr_cube) # add directly
 
     #######################################################################################################################################
     
@@ -304,7 +319,6 @@ class RenderTimeEpochMeshesMixin(EpochRenderingMixin):
             curr_cube.translate(x_centers[i], -self.n_half_cells, self.floor_z)
             curr_cube.scale(duration_spatial_widths[i], self.n_full_cell_grid, 0.25)
             # curr_cube.setParentItem(self.ui.parent_epoch_container_item)
-            # a_plot.addItem(curr_cube) # add directly
             new_mesh_objects.append(curr_cube)
 
         return new_mesh_objects

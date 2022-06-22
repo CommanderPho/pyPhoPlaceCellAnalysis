@@ -127,6 +127,9 @@ class EpochRenderingMixin:
 
     
     #######################################################################################################################################
+    
+    
+    
     def add_rendered_intervals(self, interval_datasource, name=None, child_plots=None, debug_print=True):
         """ adds the intervals specified by the interval_datasource to the plots 
         
@@ -193,7 +196,7 @@ class EpochRenderingMixin:
                 if a_plot in extant_rects_plot_items_container:
                     # the plot is already here: remove and re-add it
                     extant_rect_plot_item = extant_rects_plot_items_container[a_plot]
-                    a_plot.removeItem(extant_rect_plot_item) # Remove it from the plot
+                    self._perform_remove_render_item(a_plot, extant_rect_plot_item)
                                         
                     # TODO: update the item's data instead of replacing it
                     # # add the new one:
@@ -203,7 +206,7 @@ class EpochRenderingMixin:
                 independent_data_copy = RectangleRenderTupleHelpers.copy_data(new_interval_rects_item.data)
                 extant_rects_plot_items_container[a_plot] = IntervalRectsItem(data=independent_data_copy)
                 extant_rects_plot_items_container[a_plot].setToolTip(name)
-                a_plot.addItem(extant_rects_plot_items_container[a_plot])
+                self._perform_add_render_item(a_plot, extant_rects_plot_items_container[a_plot])
                 returned_rect_items[a_plot.objectName()] = dict(plot=a_plot, rect_item=extant_rects_plot_items_container[a_plot])
                 # Adjust the bounds to fit any children:
                 EpochRenderingMixin.compute_bounds_adjustment_for_rect_item(a_plot, extant_rects_plot_items_container[a_plot])
@@ -216,8 +219,8 @@ class EpochRenderingMixin:
                 if not isinstance(a_rect_item, str):
                     if debug_print:
                         print(f'plotting item')
-                    a_plot.removeItem(a_rect_item)
-                    a_plot.addItem(a_rect_item)
+                    self._perform_remove_render_item(a_plot, a_rect_item)
+                    self._perform_add_render_item(a_plot, a_rect_item)
                     returned_rect_items[a_plot.objectName()] = dict(plot=a_plot, rect_item=a_rect_item)
                     
                     # Adjust the bounds to fit any children:
@@ -225,8 +228,6 @@ class EpochRenderingMixin:
                                                 
                                                 
         return returned_rect_items 
-
-       
 
     def remove_rendered_intervals(self, name, child_plots_removal_list=None, debug_print=True):
         """ removes the intervals specified by the interval_datasource to the plots
@@ -245,13 +246,13 @@ class EpochRenderingMixin:
                 if child_plots_removal_list is not None:
                     if a_plot in child_plots_removal_list:
                         # only remove if the plot is in the child plots:
-                        a_plot.removeItem(a_rect_item)
+                        self._perform_remove_render_item(a_plot, a_rect_item)
                         items_to_remove_from_rendered_epochs.append(a_plot)
                     else:
                         pass # continue
                 else:
                     # otherwise remove all
-                    a_plot.removeItem(a_rect_item)
+                    self._perform_remove_render_item(a_plot, a_rect_item)
                     items_to_remove_from_rendered_epochs.append(a_plot)
                 
         ## remove the items from the list:
@@ -267,7 +268,6 @@ class EpochRenderingMixin:
     
         return items_to_remove_from_rendered_epochs
 
-        
     def clear_all_rendered_intervals(self, child_plots_removal_list=None, debug_print=True):
         """ removes all rendered rects - a batch version of removed_rendered_intervals(...) """
         curr_rendered_epoch_names = list(self.rendered_epochs.keys()) # done to prevent problems with dict changing size during iteration
@@ -280,7 +280,6 @@ class EpochRenderingMixin:
       
     def list_all_rendered_intervals(self, debug_print = True):
         """ Returns a dictionary containing the hierarchy of all the members. Can optionally also print. 
-        
         
         Example:
             interval_info = active_2d_plot.list_all_rendered_intervals()
@@ -317,9 +316,14 @@ class EpochRenderingMixin:
                     print(f'WARNING: there was an item in a_render_container of type string: (a_plot: {a_plot} <{type(a_plot)}>, a_rect_item: {type(a_rect_item)}')
                     # pass 
                 else:
+                    if isinstance(a_rect_item, IntervalRectsItem):
+                        num_intervals = len(a_rect_item.data)
+                    else:
+                        num_intervals = len(a_rect_item) # for 3D plots, for example, we have a list of meshes which we will use len(...) to get the number of
+                        
                     if debug_print:
-                        print(f'\t\t{a_plot.objectName()}: plot[{len(a_rect_item.data)} intervals]')
-                    curr_plots_dict[a_plot.objectName()] = f'plot[{len(a_rect_item.data)} intervals]'
+                        print(f'\t\t{a_plot.objectName()}: plot[{num_intervals} intervals]')
+                    curr_plots_dict[a_plot.objectName()] = f'plot[{num_intervals} intervals]'
             out_dict[a_name] = curr_plots_dict
             
         if debug_print:
@@ -327,6 +331,32 @@ class EpochRenderingMixin:
     
         return out_dict
     
+    # ---------------------------------------------------------------------------- #
+    #                          Private Implementor Methods                         #
+    # ---------------------------------------------------------------------------- #
+    def _perform_add_render_item(self, a_plot, a_render_item):
+        """Performs the operation of adding the render item from the plot specified
+
+        Args:
+            a_render_item (_type_): _description_
+            a_plot (_type_): _description_
+        """
+        raise NotImplementedError  # Needs to be overriden for the specific plot type in the implementor
+        
+        
+    def _perform_remove_render_item(self, a_plot, a_render_item):
+        """Performs the operation of removing the render item from the plot specified
+
+        Args:
+            a_render_item (IntervalRectsItem): _description_
+            a_plot (PlotItem): _description_
+        """
+        raise NotImplementedError  # Needs to be overriden for the specific plot type in the implementor
+    
+    
+    # ---------------------------------------------------------------------------- #
+    #                                 Class Methods                                #
+    # ---------------------------------------------------------------------------- #
     @classmethod
     def compute_bounds_adjustment_for_rect_item(cls, a_plot, a_rect_item, should_apply_adjustment:bool=True, debug_print=True):
         """ 
