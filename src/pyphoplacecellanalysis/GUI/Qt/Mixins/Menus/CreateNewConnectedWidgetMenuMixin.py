@@ -158,6 +158,8 @@ class CreateNewVedoPlotterCommand(BaseMenuCommand):
 """ 
 curr_active_pipeline, active_config_name, display_output, and spike_raster_window
 
+TODO: NOTE that I run into an issue here, as the menus can't be setup properly from a _display_* function because by defn display functions only receieve computation_results and optional arguments, and never a full pipeline reference (they're instead performed on a pipeline itself. As such they can't get the 'curr_active_pipeline' to pass in to build these commands.
+
 """
 class CreateNewDataExplorer_ipc_PlotterCommand(BaseMenuCommand):
     def __init__(self, spike_raster_window, curr_active_pipeline, active_config_name, display_output={}) -> None:
