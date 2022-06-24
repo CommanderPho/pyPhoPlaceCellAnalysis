@@ -30,8 +30,8 @@ class PhoMainAppWindowBase(GlobalConnectionManagerAccessingMixin, QtWidgets.QMai
         super(PhoMainAppWindowBase, self).__init__(*args, **kwargs)
             
         self.GlobalConnectionManagerAccessingMixin_on_init(owning_application=self.app) # initializes self._connection_man
-        self.setup()
-        self.buildUI()
+        # self.setup()
+        # self.buildUI()
         
 
     def setup(self):

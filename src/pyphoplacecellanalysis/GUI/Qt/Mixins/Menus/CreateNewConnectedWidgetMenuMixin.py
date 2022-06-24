@@ -3,6 +3,7 @@ from qtpy import QtCore, QtGui, QtWidgets
 from pyphoplacecellanalysis.Resources import GuiResources, ActionIcons
 
 from pyphoplacecellanalysis.GUI.Qt.Mixins.PhoMenuHelper import PhoMenuHelper
+from pyphoplacecellanalysis.GUI.Qt.Mixins.Menus.BaseMenuProviderMixin import BaseMenuCommand
 # GuiResources_rc
 
 
@@ -39,13 +40,15 @@ class CreateNewConnectedWidgetMenuMixin(object):
 
 
     @classmethod
-    def try_add_create_new_connected_widget_menu(cls, a_content_widget):
+    def try_add_create_new_connected_widget_menu(cls, a_content_widget, curr_active_pipeline, active_config_name, display_output):
         """ 
         Usage:
             curr_window, menuCreateNewConnected, actions_dict = _try_add_create_new_connected_widget_menu(spike_raster_window)
         """
         curr_window = PhoMenuHelper.try_get_menu_window(a_content_widget)
-        menuCreateNewConnected, actions_dict = cls._build_create_new_connected_widget_menu(curr_window)    
+        menuCreateNewConnected, actions_dict = cls._build_create_new_connected_widget_menu(curr_window)
+        # Build and attach the menu commands by passing the references needed to perform the actions:
+        cls.try_attach_action_commands(a_content_widget, curr_active_pipeline, active_config_name, display_output) # Attaches the commands
         return curr_window, menuCreateNewConnected, actions_dict
 
     @classmethod
@@ -66,6 +69,16 @@ class CreateNewConnectedWidgetMenuMixin(object):
         curr_window.ui.actionMenuCreateNewConnectedWidget = None # Null out the action:
         curr_window.ui.menuCreateNewConnectedWidget = None # Null out the reference to the menu item itself
         curr_window.ui.createNewConnectedWidgetMenuActionsDict = {} # Empty the dict of actions
+            
+    @classmethod
+    def try_attach_action_commands(cls, spike_raster_window, curr_active_pipeline, active_config_name, display_output):
+        ## Register the actual commands for each action:
+        curr_window = PhoMenuHelper.try_get_menu_window(spike_raster_window)
+        curr_window.ui.createNewConnectedWidgetMenuActionsDict['actionNewConnected3DRaster_PyQtGraph'].triggered.connect(CreateNewPyQtGraphPlotterCommand(spike_raster_window))
+        curr_window.ui.createNewConnectedWidgetMenuActionsDict['actionNewConnected3DRaster_Vedo'].triggered.connect(CreateNewVedoPlotterCommand(spike_raster_window))
+        curr_window.ui.createNewConnectedWidgetMenuActionsDict['actionNewConnectedDataExplorer_ipc'].triggered.connect(CreateNewDataExplorer_ipc_PlotterCommand(spike_raster_window, curr_active_pipeline, active_config_name, display_output))
+        curr_window.ui.createNewConnectedWidgetMenuActionsDict['actionNewConnectedDataExplorer_ipspikes'].triggered.connect(CreateNewDataExplorer_ipspikes_PlotterCommand(spike_raster_window, curr_active_pipeline, active_config_name, display_output))
+
             
     @classmethod
     def _build_create_new_connected_widget_menu(cls, a_main_window, debug_print=False):
@@ -89,6 +102,7 @@ class CreateNewConnectedWidgetMenuMixin(object):
             
             curr_action_key = PhoMenuHelper.add_action_item(a_main_window, "New Connected Spikes+Behavior Explorer (ipspikesDataExplorer)", name="actionNewConnectedDataExplorer_ipspikes", tooltip="Create a new 3D Interactive Spike and Behavior Plotter and connect it to this window", icon_path=":/Icons/Icons/TuningMapDataExplorerIconWithLabel.ico", actions_dict=a_main_window.ui.createNewConnectedWidgetMenuActionsDict)
             
+            
             ## Now Create the Menus for each QAction:
             
             # menuCreateNewConnectedWidget = menubar.addMenu('&Connections')
@@ -107,3 +121,76 @@ class CreateNewConnectedWidgetMenuMixin(object):
             return a_main_window.ui.menuCreateNewConnectedWidget, a_main_window.ui.createNewConnectedWidgetMenuActionsDict
 
 
+
+## Actions to be executed to create new plotters:
+class CreateNewPyQtGraphPlotterCommand(BaseMenuCommand):
+    """
+    A command to create a plotter as needed
+    """
+    def __init__(self, spike_raster_window) -> None:
+        super(CreateNewPyQtGraphPlotterCommand, self).__init__()
+        self._spike_raster_window = spike_raster_window
+        
+    def execute(self, filename: str) -> None:
+        """ Implicitly captures spike_raster_window """
+        test_independent_pyqtgraph_raster_widget = self._spike_raster_window.create_new_connected_widget(type_of_3d_plotter='pyqtgraph')
+        test_independent_pyqtgraph_raster_widget.show()
+        # print(f"hiding {filename}")
+        # self._hidden_files.append(filename)
+
+        
+class CreateNewVedoPlotterCommand(BaseMenuCommand):
+    """
+    A command to create a plotter as needed
+    """
+    def __init__(self, spike_raster_window) -> None:
+        super(CreateNewVedoPlotterCommand, self).__init__()
+        self._spike_raster_window = spike_raster_window
+        
+    def execute(self, filename: str) -> None:
+        """ Implicitly captures spike_raster_window """
+        test_independent_vedo_raster_widget = self._spike_raster_window.create_new_connected_widget(type_of_3d_plotter='vedo')
+        test_independent_vedo_raster_widget.show()
+        # global_connected_widgets['test_independent_vedo_raster_widget'] = test_independent_vedo_raster_widget
+
+        
+## These DataExplorers can't be created from spike_raster_window alone because it only holds a spike_df and not a full session object. Thus need to capture:
+""" 
+curr_active_pipeline, active_config_name, display_output, and spike_raster_window
+
+"""
+class CreateNewDataExplorer_ipc_PlotterCommand(BaseMenuCommand):
+    def __init__(self, spike_raster_window, curr_active_pipeline, active_config_name, display_output={}) -> None:
+        super(CreateNewDataExplorer_ipc_PlotterCommand, self).__init__()
+        self._spike_raster_window = spike_raster_window
+        self._curr_active_pipeline = curr_active_pipeline
+        self._active_config_name = active_config_name
+        self._display_output = display_output
+        
+    def execute(self, filename: str) -> None:
+        pActiveTuningCurvesPlotter = None
+        # display_output = {}
+        self._display_output = self._display_output | self._curr_active_pipeline.display('_display_3d_interactive_tuning_curves_plotter', self._active_config_name, extant_plotter=self._display_output.get('pActiveTuningCurvesPlotter', None), panel_controls_mode='Qt') # Works now!
+        ipcDataExplorer = self._display_output['ipcDataExplorer']
+        self._display_output['pActiveTuningCurvesPlotter'] = self._display_output.pop('plotter') # rename the key from the generic "plotter" to "pActiveSpikesBehaviorPlotter" to avoid collisions with others
+        pActiveTuningCurvesPlotter = self._display_output['pActiveTuningCurvesPlotter']
+        root_dockAreaWindow, placefieldControlsContainerWidget, pf_widgets = self._display_output['pane'] # for Qt mode:
+
+class CreateNewDataExplorer_ipspikes_PlotterCommand(BaseMenuCommand):
+    def __init__(self, spike_raster_window, curr_active_pipeline, active_config_name, display_output={}) -> None:
+        super(CreateNewDataExplorer_ipspikes_PlotterCommand, self).__init__()
+        self._spike_raster_window = spike_raster_window
+        self._curr_active_pipeline = curr_active_pipeline
+        self._active_config_name = active_config_name
+        self._display_output = display_output
+        
+    def execute(self, filename: str) -> None:
+        pActiveSpikesBehaviorPlotter = None
+        # display_output = {}
+        self._display_output = self._display_output | self._curr_active_pipeline.display('_display_3d_interactive_spike_and_behavior_browser', self._active_config_name, extant_plotter=self._display_output.get('pActiveSpikesBehaviorPlotter', None)) # Works now!
+        ipspikesDataExplorer = self._display_output['ipspikesDataExplorer']
+        self._display_output['pActiveSpikesBehaviorPlotter'] = self._display_output.pop('plotter') # rename the key from the generic "plotter" to "pActiveSpikesBehaviorPlotter" to avoid collisions with others
+        pActiveSpikesBehaviorPlotter = self._display_output['pActiveSpikesBehaviorPlotter']
+        ## Sync ipspikesDataExplorer to raster window:
+        extra_interactive_spike_behavior_browser_sync_connection = self._spike_raster_window.connect_additional_controlled_plotter(controlled_plt=ipspikesDataExplorer)
+        # test_independent_vedo_raster_widget.show()

@@ -42,7 +42,6 @@ class PhoBaseMainWindow(PhoMainAppWindowBase):
     def setup(self):
         # Use existing central widget: 
         # Use self.ui.main_widget as central widget:        
-        
         if self.ui.main_widget is not None:
             main_widget_geom = self.ui.main_widget.window().geometry() # get the QTCore PyRect object
             main_x, main_y, main_width, main_height = main_widget_geom.getRect() # Note: dx & dy refer to width and height

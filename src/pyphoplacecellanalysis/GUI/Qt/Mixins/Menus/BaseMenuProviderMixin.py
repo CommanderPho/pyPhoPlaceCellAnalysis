@@ -4,6 +4,30 @@ from pyphoplacecellanalysis.Resources import GuiResources, ActionIcons
 from pyphoplacecellanalysis.GUI.Qt.Mixins.PhoMenuHelper import PhoMenuHelper
 
 
+class BaseMenuCommand:
+    """
+    An abstract base command to be executed from a Menu item
+    """
+    def __init__(self) -> None:
+        pass
+
+    @property
+    def is_visible(self):
+        return True
+    
+    @property
+    def is_enabled(self):
+        return True
+        
+    def execute(self, filename: str) -> None:
+        """ Implicitly captures spike_raster_window """
+        raise NotImplementedError # implementors must override        
+    
+    def __call__(self, *args, **kwds):
+        return self.execute('')
+
+    
+
 def BaseMenuProviderMixin(object):
     """ a mixin class that provides one ore more QActions and QMenu items
     
