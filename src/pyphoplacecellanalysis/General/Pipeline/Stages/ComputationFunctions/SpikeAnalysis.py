@@ -14,11 +14,12 @@ from tqdm.notebook import tqdm
 
 
 from pyphocorehelpers.mixins.member_enumerating import AllFunctionEnumeratingMixin
+from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.ComputationFunctionRegistryHolder import ComputationFunctionRegistryHolder
 from pyphoplacecellanalysis.General.Model.ComputationResults import ComputationResult
 from pyphocorehelpers.DataStructure.dynamic_parameters import DynamicParameters
 
 
-class SpikeAnalysisComputations(AllFunctionEnumeratingMixin):
+class SpikeAnalysisComputations(AllFunctionEnumeratingMixin, metaclass=ComputationFunctionRegistryHolder):
     
     _computationGroupName = 'burst_detection'
     

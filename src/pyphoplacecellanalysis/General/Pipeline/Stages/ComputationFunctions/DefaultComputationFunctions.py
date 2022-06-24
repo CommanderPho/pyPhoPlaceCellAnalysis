@@ -11,10 +11,12 @@ from pyphoplacecellanalysis.General.Decoder.decoder_result import build_position
 from pyphocorehelpers.mixins.member_enumerating import AllFunctionEnumeratingMixin
 from pyphoplacecellanalysis.Analysis.reconstruction import BayesianPlacemapPositionDecoder, Zhang_Two_Step
 
+from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.ComputationFunctionRegistryHolder import ComputationFunctionRegistryHolder
+
 
 """-------------- Specific Computation Functions to be registered --------------"""
 
-class DefaultComputationFunctions(AllFunctionEnumeratingMixin):
+class DefaultComputationFunctions(AllFunctionEnumeratingMixin, metaclass=ComputationFunctionRegistryHolder):
     
 
     def _perform_position_decoding_computation(computation_result: ComputationResult):

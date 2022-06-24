@@ -7,10 +7,11 @@ from copy import deepcopy
 from neuropy.analyses.time_dependent_placefields import PfND_TimeDependent, perform_compute_time_dependent_placefields
 
 from pyphocorehelpers.mixins.member_enumerating import AllFunctionEnumeratingMixin
+from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.ComputationFunctionRegistryHolder import ComputationFunctionRegistryHolder
 from pyphoplacecellanalysis.General.Model.ComputationResults import ComputationResult
 
 
-class PlacefieldComputations(AllFunctionEnumeratingMixin):
+class PlacefieldComputations(AllFunctionEnumeratingMixin, metaclass=ComputationFunctionRegistryHolder):
     
     def _perform_baseline_placefield_computation(computation_result: ComputationResult, debug_print=False):
         """ Builds the initial 1D and 2D placefields 

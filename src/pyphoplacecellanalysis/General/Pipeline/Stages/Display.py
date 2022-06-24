@@ -18,6 +18,7 @@ from pyphoplacecellanalysis.General.Pipeline.Stages.Computation import ComputedP
 from pyphoplacecellanalysis.General.Configs.DynamicConfigs import PlottingConfig, InteractivePlaceCellConfig
 from pyphoplacecellanalysis.General.Pipeline.Stages.BaseNeuropyPipelineStage import PipelineStage
 
+from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DisplayFunctionRegistryHolder import DisplayFunctionRegistryHolder
 # Import Display Functions
 from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DefaultDisplayFunctions import DefaultDisplayFunctions
 from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.Ratemaps import DefaultRatemapDisplayFunctions
@@ -150,7 +151,6 @@ def update_figure_files_output_Format(computation_result, active_config, root_ou
     return active_config
     
 
-
 class DefaultRegisteredDisplayFunctions:
     """ Simply enables specifying the default computation functions that will be defined in this file and automatically registered. 
     
@@ -164,21 +164,25 @@ class DefaultRegisteredDisplayFunctions:
         Called in:
             DisplayPipelineStage.__init__(...): to register display functions
         """
-        # Register the Ratemap/Placemap display functions: 
-        for (a_display_fn_name, a_display_fn) in DefaultDisplayFunctions.get_all_functions(use_definition_order=False):
-            self.register_display_function(a_display_fn_name, a_display_fn)
+        for (a_display_class_name, a_display_class) in DisplayFunctionRegistryHolder.get_registry().items():
+            for (a_display_fn_name, a_display_fn) in a_display_class.get_all_functions(use_definition_order=False):
+                self.register_display_function(a_display_fn_name, a_display_fn)
+        
+        # # Register the Ratemap/Placemap display functions: 
+        # for (a_display_fn_name, a_display_fn) in DefaultDisplayFunctions.get_all_functions(use_definition_order=False):
+        #     self.register_display_function(a_display_fn_name, a_display_fn)
             
-        # Register the Ratemap/Placemap display functions: 
-        for (a_display_fn_name, a_display_fn) in DefaultRatemapDisplayFunctions.get_all_functions(use_definition_order=False):
-            self.register_display_function(a_display_fn_name, a_display_fn)
+        # # Register the Ratemap/Placemap display functions: 
+        # for (a_display_fn_name, a_display_fn) in DefaultRatemapDisplayFunctions.get_all_functions(use_definition_order=False):
+        #     self.register_display_function(a_display_fn_name, a_display_fn)
             
-        # Register the Bayesian decoder display functions: 
-        for (a_display_fn_name, a_display_fn) in DefaultDecoderDisplayFunctions.get_all_functions(use_definition_order=False):
-            self.register_display_function(a_display_fn_name, a_display_fn)
+        # # Register the Bayesian decoder display functions: 
+        # for (a_display_fn_name, a_display_fn) in DefaultDecoderDisplayFunctions.get_all_functions(use_definition_order=False):
+        #     self.register_display_function(a_display_fn_name, a_display_fn)
             
-        # Register the spike rasters display functions: 
-        for (a_display_fn_name, a_display_fn) in SpikeRastersDisplayFunctions.get_all_functions(use_definition_order=False):
-            self.register_display_function(a_display_fn_name, a_display_fn)
+        # # Register the spike rasters display functions: 
+        # for (a_display_fn_name, a_display_fn) in SpikeRastersDisplayFunctions.get_all_functions(use_definition_order=False):
+        #     self.register_display_function(a_display_fn_name, a_display_fn)
             
   
   
