@@ -17,7 +17,7 @@ from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.Computa
 """-------------- Specific Computation Functions to be registered --------------"""
 
 class DefaultComputationFunctions(AllFunctionEnumeratingMixin, metaclass=ComputationFunctionRegistryHolder):
-    
+    _computationPrecidence = 1 # must be done after PlacefieldComputations
 
     def _perform_position_decoding_computation(computation_result: ComputationResult):
         """ Builds the 2D Placefield Decoder """

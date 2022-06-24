@@ -22,6 +22,7 @@ from pyphocorehelpers.DataStructure.dynamic_parameters import DynamicParameters
 class SpikeAnalysisComputations(AllFunctionEnumeratingMixin, metaclass=ComputationFunctionRegistryHolder):
     
     _computationGroupName = 'burst_detection'
+    _computationPrecidence = 4
     
     def _perform_spike_burst_detection_computation(computation_result: ComputationResult, debug_print=False):
         """ Computes periods when the cells are firing in bursts

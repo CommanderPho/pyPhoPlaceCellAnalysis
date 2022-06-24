@@ -10,6 +10,9 @@ from pyphoplacecellanalysis.General.Decoder.decoder_result import build_position
 
 class ExtendedStatsComputations(AllFunctionEnumeratingMixin, metaclass=ComputationFunctionRegistryHolder):
     
+    _computationGroupName = 'extended_stats'
+    _computationPrecidence = 3
+    
     def _perform_extended_statistics_computation(computation_result: ComputationResult, debug_print=False):
         """ Computes extended statistics regarding firing rates and such from the various dataframes. """
         time_binned_position_resampler = build_position_df_resampled_to_time_windows(computation_result.sess.position.to_dataframe(), time_bin_size=computation_result.computation_config.pf_params.time_bin_size) # TimedeltaIndexResampler

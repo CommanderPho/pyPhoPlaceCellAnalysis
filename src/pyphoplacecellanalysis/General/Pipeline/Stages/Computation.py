@@ -17,11 +17,11 @@ from pyphoplacecellanalysis.General.Model.ComputationResults import ComputationR
 
 from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.ComputationFunctionRegistryHolder import ComputationFunctionRegistryHolder
 
-from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.PlacefieldComputations import PlacefieldComputations
+
 from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.DefaultComputationFunctions import DefaultComputationFunctions
+from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.PlacefieldComputations import PlacefieldComputations
 from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.ExtendedStats import ExtendedStatsComputations
 from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.SpikeAnalysis import SpikeAnalysisComputations
-
 
 
 class ComputablePipelineStage:
@@ -71,9 +71,16 @@ class DefaultRegisteredComputations:
     """ Simply enables specifying the default computation functions that will be defined in this file and automatically registered. """
     def register_default_known_computation_functions(self):
         # Note: execution ORDER MATTERS for the computation functions, unlike the display functions, so they need to be enumerated in the correct order and not sorted alphabetically
-        for (a_computation_class_name, a_computation_class) in ComputationFunctionRegistryHolder.get_registry().items():
+        
+        # Sort by precidence:
+        # _computationPrecidence
+        
+        for (a_computation_class_name, a_computation_class) in reversed(ComputationFunctionRegistryHolder.get_registry().items()):
             for (a_computation_fn_name, a_computation_fn) in reversed(a_computation_class.get_all_functions(use_definition_order=True)):
                 self.register_computation(a_computation_fn_name, a_computation_fn)
+        
+        
+        # [SpikeAnalysisComputations, ExtendedStatsComputations, DefaultComputationFunctions, PlacefieldComputations]
         
         
         # # Register the neuronal firing analysis computation functions:
