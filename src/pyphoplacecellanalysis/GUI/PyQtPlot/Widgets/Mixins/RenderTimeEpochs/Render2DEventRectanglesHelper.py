@@ -5,12 +5,12 @@ from copy import deepcopy
 import numpy as np
 import pandas as pd
 # import matplotlib.pyplot as plt
-from indexed import IndexedOrderedDict
-from lazy_property import LazyProperty, LazyWritableProperty
+# from indexed import IndexedOrderedDict
+# from lazy_property import LazyProperty, LazyWritableProperty
 
 from neuropy.core import Epoch
 
-from pyphocorehelpers.print_helpers import print_dataframe_memory_usage
+# from pyphocorehelpers.print_helpers import print_dataframe_memory_usage
 
 import pyphoplacecellanalysis.External.pyqtgraph as pg
 # from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtCore, QtGui, QtWidgets
