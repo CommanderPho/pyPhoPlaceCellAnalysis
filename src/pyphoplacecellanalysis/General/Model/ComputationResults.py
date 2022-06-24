@@ -4,19 +4,7 @@ from dataclasses import dataclass
 import sys
 
 import numpy as np
-
-try:
-    from neuropy import core
-
-    # importlib.reload(core)
-except ImportError:
-    sys.path.append(r"C:\Users\Pho\repos\NeuroPy")  # Windows
-    # sys.path.append('/home/pho/repo/BapunAnalysis2021/NeuroPy') # Linux
-    # sys.path.append(r'/Users/pho/repo/Python Projects/NeuroPy') # MacOS
-    print(
-        "neuropy module not found, adding directory to sys.path. \n >> Updated sys.path."
-    )
-    from neuropy import core
+from neuropy import core
 from neuropy.core.session.dataSession import DataSession
 from neuropy.analyses.placefields import PlacefieldComputationParameters
 
@@ -32,9 +20,10 @@ class ComputationResult(DynamicParameters):
     sess: DataSession
     computation_config: DynamicParameters
     computed_data: dict
+    accumulated_errors: dict
 
-    def __init__(self, sess: DataSession, computation_config: DynamicParameters, computed_data: dict): 
-        super(ComputationResult, self).__init__(sess=sess, computation_config=computation_config, computed_data=computed_data)
-            
+    def __init__(self, sess: DataSession, computation_config: DynamicParameters, computed_data: dict, accumulated_errors: dict={}): 
+        super(ComputationResult, self).__init__(sess=sess, computation_config=computation_config, computed_data=computed_data, accumulated_errors=accumulated_errors)
+
 
 

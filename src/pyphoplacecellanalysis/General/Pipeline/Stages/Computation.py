@@ -26,7 +26,7 @@ class ComputablePipelineStage:
     """ Designates that a pipeline stage is computable. """
         
     @classmethod
-    def _perform_single_computation(cls, active_session, computation_config):
+    def _build_initial_computationResult(cls, active_session, computation_config):
         """Conceptually, a single computation consists of a specific active_session and a specific computation_config object
         Args:
             active_session (DataSession): this is the filtered data session
@@ -36,7 +36,7 @@ class ComputablePipelineStage:
             [type]: [description]
         """
         # only requires that active_session has the .spikes_df and .position  properties
-        output_result = ComputationResult(active_session, computation_config, computed_data=dict()) # Note that this active_session should be correctly filtered
+        output_result = ComputationResult(active_session, computation_config, computed_data=dict(), accumulated_errors=dict()) # Note that this active_session should be correctly filtered
         
         return output_result
 
@@ -57,7 +57,7 @@ class ComputablePipelineStage:
                 else:
                     # set/update the computation configs:
                     self.active_configs[a_select_config_name].computation_config = active_computation_params #TODO: if more than one computation config is passed in, the active_config should be duplicated for each computation config.
-                self.computation_results[a_select_config_name] = ComputablePipelineStage._perform_single_computation(a_filtered_session, active_computation_params) # returns a computation result. This stores the computation config used to compute it.
+                self.computation_results[a_select_config_name] = ComputablePipelineStage._build_initial_computationResult(a_filtered_session, active_computation_params) # returns a computation result. This stores the computation config used to compute it.
                 # call to perform any registered computations:
                 self.computation_results[a_select_config_name] = self.perform_registered_computations(self.computation_results[a_select_config_name], debug_print=True)
             else:
@@ -200,6 +200,8 @@ class ComputedPipelineStage(LoadableInput, LoadableSessionInput, FilterablePipel
             previous_computation_result, accumulated_errors = composed_registered_computations_function(previous_computation_result)
             
             print(f'perform_registered_computations(...): \n\taccumulated_errors: {accumulated_errors}')
+            # Add the function to the computation result:
+            previous_computation_result.accumulated_errors = accumulated_errors
             
             return previous_computation_result
             
