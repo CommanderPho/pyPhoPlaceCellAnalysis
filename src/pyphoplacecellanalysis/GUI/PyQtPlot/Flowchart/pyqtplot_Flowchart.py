@@ -15,11 +15,8 @@ from pyphoplacecellanalysis.External.pyqtgraph.dockarea.DockArea import DockArea
 import pyphoplacecellanalysis.External.pyqtgraph as pg
 import numpy as np
 
-from pyphoplacecellanalysis.GUI.Qt.MainApplicationWindows.PhoMainPipelineWindow.pyqtplot_MainWindow import PhoPipelineMainWindow
+from pyphoplacecellanalysis.GUI.Qt.MainApplicationWindows.PhoPipelineMainWindow.pyqtplot_MainWindow import PhoPipelineMainWindow
 from pyphoplacecellanalysis.GUI.PyQtPlot.Windows.pyqtplot_SecondaryWindow import PhoPipelineSecondaryWindow
-
-
-
 
 from pyphoplacecellanalysis.GUI.PyQtPlot.Flowchart.CustomNodes.Mixins.DisplayNodeViewHelpers import ProducedViewType
 

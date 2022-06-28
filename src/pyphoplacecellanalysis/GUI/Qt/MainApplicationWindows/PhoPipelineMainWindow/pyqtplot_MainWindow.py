@@ -26,7 +26,7 @@ from pyphoplacecellanalysis.GUI.Qt.Mixins.PhoMainAppWindowBase import PhoMainApp
 
 path = os.path.dirname(os.path.abspath(__file__))
 # uiFile = os.path.join(path, 'MainPipelineWindow.ui')
-uiFile = os.path.join(path, 'MainPipelineWindowWithDockArea.ui') # mostly empty
+uiFile = os.path.join(path, 'MainPipelineWindowWithDockArea', 'MainPipelineWindowWithDockArea.ui') # mostly empty
 
 # For BreezeStylesheets support:
 from qtpy import QtWidgets
