@@ -13,9 +13,12 @@ from pyphoplacecellanalysis.General.Pipeline.NeuropyPipeline import NeuropyPipel
 from pyphoplacecellanalysis.GUI.PyQtPlot.Flowchart.CustomNodes.MiscNodes.ExtendedCtrlNode import ExtendedCtrlNode
 
 # Neuropy:
-from neuropy.core.session.data_session_loader import DataSessionLoader
-from neuropy.analyses.laps import estimation_session_laps
-
+# from neuropy.core.session.data_session_loader import DataSessionLoader
+# from neuropy.analyses.laps import estimation_session_laps
+from neuropy.core.session.Formats.BaseDataSessionFormats import DataSessionFormatRegistryHolder
+from neuropy.core.session.Formats.Specific.BapunDataSessionFormat import BapunDataSessionFormatRegisteredClass
+from neuropy.core.session.Formats.Specific.KDibaOldDataSessionFormat import KDibaOldDataSessionFormatRegisteredClass
+from neuropy.core.session.Formats.Specific.RachelDataSessionFormat import RachelDataSessionFormat
 
 class PipelineInputDataNode(ExtendedCtrlNode):
     """Configure, Load, and Return the input pipeline data as defined by a known data type (such as kdiba or Bapun)."""
@@ -121,13 +124,7 @@ class PipelineInputDataNode(ExtendedCtrlNode):
     @classmethod
     def _get_known_data_session_types_dict(cls):
         """ a static accessor for the knwon data session types. Note here the default paths and such are defined. """
-        known_data_session_type_dict = {'kdiba':KnownDataSessionTypeProperties(load_function=(lambda a_base_dir: DataSessionLoader.kdiba_old_format_session(a_base_dir)),
-                                    basedir=Path(r'R:\data\KDIBA\gor01\one\2006-6-07_11-26-53')),
-                    'bapun':KnownDataSessionTypeProperties(load_function=(lambda a_base_dir: DataSessionLoader.bapun_data_session(a_base_dir)),
-                                    basedir=Path(r'R:\data\Bapun\Day5TwoNovel'))
-                    }
-        known_data_session_type_dict['kdiba'].post_load_functions = [lambda a_loaded_sess: estimation_session_laps(a_loaded_sess)]
-        return known_data_session_type_dict
+        return DataSessionFormatRegistryHolder.get_registry_known_data_session_type_dict()
 
 
 

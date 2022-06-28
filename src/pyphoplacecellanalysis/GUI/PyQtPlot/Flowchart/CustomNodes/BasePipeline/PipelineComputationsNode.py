@@ -92,10 +92,6 @@ class PipelineComputationsNode(ExtendedCtrlNode):
         # data_mode = self.ctrls['data_mode'].value()
         
         # print(f'PipelineComputationsNode.data_mode: {data_mode}')
-
-        # active_known_data_session_type_dict = self._get_known_data_session_types_dict()
-        # # curr_bapun_pipeline = NeuropyPipeline.init_from_known_data_session_type('bapun', known_data_session_type_dict['bapun'])
-        # curr_pipeline = NeuropyPipeline.init_from_known_data_session_type(data_mode, active_known_data_session_type_dict[data_mode])    
         if (pipeline is None) or (computation_configs is None):
             self.updateConfigRows(computation_configs)
             return {'updated_computation_configs': computation_configs, 'computed_pipeline': None}
