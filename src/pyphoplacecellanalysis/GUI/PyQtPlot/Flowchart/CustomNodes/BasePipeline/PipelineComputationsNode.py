@@ -8,12 +8,12 @@ import numpy as np
 
 # pyPhoPlaceCellAnalysis:
 from pyphoplacecellanalysis.General.NonInteractiveWrapper import NonInteractiveWrapper
-
+from pyphoplacecellanalysis.GUI.PyQtPlot.Flowchart.CustomNodes.Mixins.CtrlNodeMixins import CheckTableCtrlOwnerMixin
 from pyphoplacecellanalysis.GUI.PyQtPlot.Flowchart.CustomNodes.MiscNodes.ExtendedCtrlNode import ExtendedCtrlNode
 
 
 
-class PipelineComputationsNode(ExtendedCtrlNode):
+class PipelineComputationsNode(CheckTableCtrlOwnerMixin, ExtendedCtrlNode):
     """Performs computations on the active pipeline"""
     nodeName = "PipelineComputationsNode"
     uiTemplate = [
@@ -30,7 +30,9 @@ class PipelineComputationsNode(ExtendedCtrlNode):
             'computed_pipeline': dict(io='out'),
         }
         ExtendedCtrlNode.__init__(self, name, terminals=terminals)
+        self.connections = dict()
         self.ui_build()
+        
         
     @property
     def enabled_computation_filters(self):
@@ -82,6 +84,9 @@ class PipelineComputationsNode(ExtendedCtrlNode):
             
         self.ctrls['included_configs_table'].sigStateChanged.connect(on_table_check_changed)
         
+        self.connections['checktable_state_changed_connection'] = self.ctrls['included_configs_table'].sigStateChanged.connect(self.on_checktable_checked_state_changed) # ExtendedCheckTable 
+        
+        
         rows_data = [f'row[{i}]' for i in np.arange(2)]
         self.configRows = rows_data # sample rows
         self.ctrls['included_configs_table'].updateRows(self.configRows)
@@ -120,6 +125,13 @@ class PipelineComputationsNode(ExtendedCtrlNode):
         return {'updated_computation_configs': computation_configs,'computed_pipeline': pipeline}
 
 
+    ##############################################################
+    def ui_update(self):
+        """ called to update the ctrls depending on its properties. """
+        # self.ctrls['recompute'].setEnabled(self.is_action_enabled)
+        pass
+
+
     def updateConfigRows(self, data):
         if isinstance(data, dict):
             keys = list(data.keys())
@@ -143,7 +155,14 @@ class PipelineComputationsNode(ExtendedCtrlNode):
         self.configRows = keys
         
         
-
+    @QtCore.pyqtSlot(object, object, object)
+    def on_checktable_checked_state_changed(self, row, col, state):
+        # print(f'_test_filtering_node_state_changed(row: {row}, col: {col}, state: {state})')
+        # print(f'curr_filtering_node.enabled_filters: {self.enabled_filters}')
+        self.ui_update()
+        
+    
+        
     def saveState(self):
         state = ExtendedCtrlNode.saveState(self)
         return {'config_rows':self.configRows, 'ctrls': state}
