@@ -11,6 +11,8 @@ from neuropy.core.session.KnownDataSessionTypeProperties import KnownDataSession
 # pyPhoPlaceCellAnalysis:
 from pyphoplacecellanalysis.General.Pipeline.NeuropyPipeline import NeuropyPipeline # get_neuron_identities
 from pyphoplacecellanalysis.GUI.PyQtPlot.Flowchart.CustomNodes.MiscNodes.ExtendedCtrlNode import ExtendedCtrlNode
+from pyphoplacecellanalysis.GUI.PyQtPlot.Flowchart.CustomNodes.Mixins.CtrlNodeMixins import ComboBoxCtrlOwnerMixin
+
 
 # Neuropy:
 # from neuropy.core.session.data_session_loader import DataSessionLoader
@@ -20,11 +22,12 @@ from neuropy.core.session.Formats.Specific.BapunDataSessionFormat import BapunDa
 from neuropy.core.session.Formats.Specific.KDibaOldDataSessionFormat import KDibaOldDataSessionFormatRegisteredClass
 from neuropy.core.session.Formats.Specific.RachelDataSessionFormat import RachelDataSessionFormat
 
-class PipelineInputDataNode(ExtendedCtrlNode):
+
+class PipelineInputDataNode(ComboBoxCtrlOwnerMixin, ExtendedCtrlNode):
     """Configure, Load, and Return the input pipeline data as defined by a known data type (such as kdiba or Bapun)."""
     nodeName = "PipelineInputDataNode"
     uiTemplate = [
-        ('data_mode', 'combo', {'values': ['bapun', 'kdiba', 'custom...'], 'index': 0}),
+        ('data_mode', 'combo', {'values': ['custom...'], 'index': 0}),
         ('reload', 'action'),
         # ('sigma',  'spin', {'value': 1.0, 'step': 1.0, 'bounds': [0.0, None]}),
         # ('strength', 'spin', {'value': 1.0, 'dec': True, 'step': 0.5, 'minStep': 0.01, 'bounds': [0.0, None]}),
@@ -44,7 +47,7 @@ class PipelineInputDataNode(ExtendedCtrlNode):
         print(f'num_known_types: {self.num_known_types}')
         ExtendedCtrlNode.__init__(self, name, terminals=terminals)
         self.ui_build()
-        
+        self.ui_update()
                 
         
     def ui_build(self):
@@ -121,13 +124,45 @@ class PipelineInputDataNode(ExtendedCtrlNode):
             return {'known_data_mode': data_mode, 'loaded_pipeline': curr_pipeline}
 
 
+    def ui_update(self, debug_print=False):
+        """ called to update the ctrls depending on its properties. 
+        Specific here rebuilds the UI (mainly the combo-box) by calling _get_known_data_session_types_dict(...) 
+        """
+        ## Update Combo box items:
+        ## Freeze signals:
+        curr_combo_box = self.ctrls['data_mode'] # QComboBox 
+        curr_combo_box.blockSignals(True)
+        
+        ## Capture the previous selection:
+        selected_index, selected_item_text = self.get_current_combo_item_selection(curr_combo_box, debug_print=debug_print)
+
+        # Build updated list:
+        self.active_known_data_session_type_dict = self._get_known_data_session_types_dict()
+        self.num_known_types = len(self.active_known_data_session_type_dict.keys())
+        ## Build updated list:
+        updated_list = list(self.active_known_data_session_type_dict.keys())
+        updated_list.append('Custom...')
+
+        self.replace_combo_items(curr_combo_box, updated_list, debug_print=debug_print)
+        
+        ## Re-select the previously selected item if possible:
+        # selected_item_text = 'kdiba'
+        found_desired_index = self.try_select_combo_item_with_text(curr_combo_box, selected_item_text, debug_print=debug_print)
+        
+        ## Unblock the signals:        
+        curr_combo_box.blockSignals(False)
+
+
+
+    
+        
     @classmethod
     def _get_known_data_session_types_dict(cls):
         """ a static accessor for the knwon data session types. Note here the default paths and such are defined. """
         return DataSessionFormatRegistryHolder.get_registry_known_data_session_type_dict()
 
 
-
+    
 # class PipelineResultBreakoutNode(CtrlNode):
 #     """Breaks out results from active pipeline"""
 #     nodeName = "PipelineResultBreakoutNode"

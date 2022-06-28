@@ -11,9 +11,15 @@ import numpy as np
 # pyPhoPlaceCellAnalysis:
 from pyphoplacecellanalysis.General.NonInteractiveWrapper import NonInteractiveWrapper
 from pyphoplacecellanalysis.GUI.PyQtPlot.Flowchart.CustomNodes.MiscNodes.ExtendedCtrlNode import ExtendedCtrlNode
+from pyphoplacecellanalysis.GUI.PyQtPlot.Flowchart.CustomNodes.Mixins.CtrlNodeMixins import CheckTableCtrlOwnerMixin
+
+# from neuropy.core.session.Formats.Specific.BapunDataSessionFormat import BapunDataSessionFormatRegisteredClass
+# from neuropy.core.session.Formats.Specific.KDibaOldDataSessionFormat import KDibaOldDataSessionFormatRegisteredClass
+# from neuropy.core.session.Formats.Specific.RachelDataSessionFormat import RachelDataSessionFormat
+from neuropy.core.session.Formats.BaseDataSessionFormats import DataSessionFormatRegistryHolder
 
 
-class PipelineFilteringDataNode(ExtendedCtrlNode):
+class PipelineFilteringDataNode(CheckTableCtrlOwnerMixin, ExtendedCtrlNode):
     """Filters active pipeline"""
     nodeName = "PipelineFilteringDataNode"
     uiTemplate = [
@@ -54,11 +60,10 @@ class PipelineFilteringDataNode(ExtendedCtrlNode):
         ExtendedCtrlNode.__init__(self, name, terminals=terminals)
         
         self.keys = [] # the active config keys
+        self.connections = dict()
         self.ui_build()
 
 
-    
-    
     def ui_build(self):
         # Setup the refilter button:
         self.ctrls['refilter'].setText('refilter')
@@ -67,10 +72,8 @@ class PipelineFilteringDataNode(ExtendedCtrlNode):
             # Not sure whether to call self.changed() (from CtrlNode) or self.update() from its parent class.
             # self.update() 
             self.changed() # should trigger re-computation in a blocking manner.
-            
             # global fail
             # fail = not fail
-            
             fail = False
             if fail:
                 self.ctrls['refilter'].failure(message="FAIL.", tip="There was a failure. Get over it.")
@@ -82,6 +85,8 @@ class PipelineFilteringDataNode(ExtendedCtrlNode):
         if (len(self.ctrls['included_configs_table'].saveState()['rows']) > 1):
             # if we have one or more rows (columns are assumed to be fixed), set at least the first entry by default
             self.ctrls['included_configs_table'].set_value(0,0,True)
+        
+        self.connections['checktable_state_changed_connection'] = self.ctrls['included_configs_table'].sigStateChanged.connect(self.on_checktable_checked_state_changed) # ExtendedCheckTable 
         
         self.ui_update()
         
@@ -96,19 +101,28 @@ class PipelineFilteringDataNode(ExtendedCtrlNode):
             updated_configs = [] # empty list, no options
             # self.updateKeys(updated_configs) # Update the possible keys
             self.updateConfigRows(updated_configs)
-            return {'active_session_computation_configs': None, 'active_session_filter_configs':None,
-                    'filtered_pipeline': None}
+            return {'active_session_computation_configs': None, 'active_session_filter_configs':None, 'filtered_pipeline': None}
 
         if active_data_mode is not None:
-            if active_data_mode == 'bapun':
-                active_session_computation_configs, active_session_filter_configs = NonInteractiveWrapper.bapun_format_define_configs(pipeline)
-            elif active_data_mode == 'kdiba':
-                active_session_computation_configs, active_session_filter_configs = NonInteractiveWrapper.kdiba_format_define_configs(pipeline)
+            active_data_session_type_dict = DataSessionFormatRegistryHolder.get_registry_data_session_type_class_name_dict()
+            active_data_mode_type = active_data_session_type_dict.get(active_data_mode, None)
+            if active_data_mode_type is not None:
+                active_session_filter_configs = active_data_mode_type.build_default_filter_functions(sess=pipeline.sess)
+                active_session_computation_configs = active_data_mode_type.build_default_computation_configs(sess=pipeline.sess)
             else:
-                curr_pipeline = None
-                active_session_computation_configs = None
-                active_session_filter_configs = None
-                raise
+                print(f'active_data_mode: {active_data_mode} was not found to match any registered types: {active_data_session_type_dict}!')
+                active_session_filter_configs = {}
+                active_session_computation_configs = {}
+
+            # if active_data_mode == 'bapun':
+            #     active_session_computation_configs, active_session_filter_configs = NonInteractiveWrapper.bapun_format_define_configs(pipeline)
+            # elif active_data_mode == 'kdiba':
+            #     active_session_computation_configs, active_session_filter_configs = NonInteractiveWrapper.kdiba_format_define_configs(pipeline)
+            # else:
+            #     curr_pipeline = None
+            #     active_session_computation_configs = None
+            #     active_session_filter_configs = None
+            #     raise
             
         assert (pipeline is not None), 'pipeline is None but has no reason to be!'
         
@@ -116,6 +130,8 @@ class PipelineFilteringDataNode(ExtendedCtrlNode):
         # updated_configs = list(pipeline.computation_results.keys()) # ['maze1', 'maze2']
         updated_configs = list(active_session_filter_configs.keys()) # ['maze1', 'maze2']
         self.updateConfigRows(updated_configs)
+        self.ui_update()
+        
         
         # selected_config_value = str(self.ctrls['included_configs'].currentText())
         # print(f'selected_config_value: {selected_config_value}; updated_configs: {updated_configs}')
@@ -163,7 +179,13 @@ class PipelineFilteringDataNode(ExtendedCtrlNode):
         # Update the self.keys value:
         self.configRows = keys
         self.ui_update()
-        
+
+    @QtCore.pyqtSlot(object, object, object)
+    def on_checktable_checked_state_changed(self, row, col, state):
+        # print(f'_test_filtering_node_state_changed(row: {row}, col: {col}, state: {state})')
+        # print(f'curr_filtering_node.enabled_filters: {self.enabled_filters}')
+        self.ui_update()
+
 
     def saveState(self):
         state = ExtendedCtrlNode.saveState(self)
