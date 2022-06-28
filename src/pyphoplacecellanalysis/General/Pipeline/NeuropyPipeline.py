@@ -19,8 +19,7 @@ from pyphoplacecellanalysis.General.Pipeline.Stages.Filtering import FilteredPip
 from pyphoplacecellanalysis.General.Pipeline.Stages.Loading import PipelineWithInputStage, PipelineWithLoadableStage
 
 # from pyphoplacecellanalysis.General.SessionSelectionAndFiltering import batch_filter_session
-
-from pyphoplacecellanalysis.General.KnownDataSessionTypeProperties import KnownDataSessionTypeProperties
+from neuropy.core.session.KnownDataSessionTypeProperties import KnownDataSessionTypeProperties
 from pyphoplacecellanalysis.General.Pipeline.Stages.BaseNeuropyPipelineStage import PipelineStage
 
 

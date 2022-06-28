@@ -7,8 +7,7 @@ from pyphoplacecellanalysis.External.pyqtgraph.widgets.ProgressDialog import Pro
 import pyphoplacecellanalysis.External.pyqtgraph as pg
 import numpy as np
 
-
-from pyphoplacecellanalysis.General.KnownDataSessionTypeProperties import KnownDataSessionTypeProperties
+from neuropy.core.session.KnownDataSessionTypeProperties import KnownDataSessionTypeProperties
 # pyPhoPlaceCellAnalysis:
 from pyphoplacecellanalysis.General.Pipeline.NeuropyPipeline import NeuropyPipeline # get_neuron_identities
 from pyphoplacecellanalysis.GUI.PyQtPlot.Flowchart.CustomNodes.MiscNodes.ExtendedCtrlNode import ExtendedCtrlNode

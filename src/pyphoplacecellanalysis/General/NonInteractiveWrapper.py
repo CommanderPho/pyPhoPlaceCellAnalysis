@@ -15,21 +15,12 @@ except ImportError:
     print("neuropy module not found, adding directory to sys.path. \n >> Updated sys.path.")
     from neuropy import core
 
-from neuropy.core.session.data_session_loader import DataSessionLoader
-from neuropy.analyses.laps import estimation_session_laps
 from neuropy.core.epoch import NamedTimerange
-
-from neuropy.analyses.placefields import PlacefieldComputationParameters, perform_compute_placefields
-from neuropy.core.neuron_identities import NeuronIdentity, build_units_colormap, PlotStringBrevityModeEnum
-from neuropy.utils.debug_helpers import debug_print_placefield, debug_print_spike_counts, debug_print_subsession_neuron_differences
-from neuropy.plotting.ratemaps import enumTuningMap2DPlotVariables
-
+from neuropy.analyses.placefields import PlacefieldComputationParameters
 
 from pyphocorehelpers.DataStructure.dynamic_parameters import DynamicParameters
 from pyphocorehelpers.indexing_helpers import compute_position_grid_size
-from pyphoplacecellanalysis.General.KnownDataSessionTypeProperties import KnownDataSessionTypeProperties
 # pyPhoPlaceCellAnalysis:
-from pyphoplacecellanalysis.General.Pipeline.NeuropyPipeline import NeuropyPipeline # get_neuron_identities
 from pyphoplacecellanalysis.General.SessionSelectionAndFiltering import batch_filter_session, build_custom_epochs_filters
 
 
