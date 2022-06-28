@@ -78,6 +78,8 @@ class PipelineInputDataNode(ComboBoxCtrlOwnerMixin, ExtendedCtrlNode):
             data_mode_from_combo_list = 'bapun'
         elif s['data_mode'] == 'kdiba':
             data_mode_from_combo_list = 'kdiba'
+        elif s['data_mode'] == 'rachel':
+            data_mode_from_combo_list = 'rachel'
         else:
             # raise NotImplementedError
             # Data mode from input terminal:

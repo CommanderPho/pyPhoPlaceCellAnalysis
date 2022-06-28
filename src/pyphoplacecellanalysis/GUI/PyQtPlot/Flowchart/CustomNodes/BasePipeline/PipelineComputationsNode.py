@@ -18,7 +18,7 @@ class PipelineComputationsNode(CheckTableCtrlOwnerMixin, ExtendedCtrlNode):
     nodeName = "PipelineComputationsNode"
     uiTemplate = [
         ('recompute', 'action'),
-        ('included_configs_table', 'extendedchecktable', {'columns': ['compute'], 'rows': ['test1', 'test2']}),
+        ('included_configs_table', 'extendedchecktable', {'columns': ['compute'], 'rows': []}),
     ]
     
     def __init__(self, name):
