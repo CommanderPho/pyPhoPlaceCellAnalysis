@@ -3,8 +3,8 @@ import numpy as np
 import pandas as pd
 
 # NeuroPy (Diba Lab Python Repo) Loading
-from neuropy import core
 from pyphoplacecellanalysis.General.Model.ComputationResults import ComputationResult
+from pyphocorehelpers.DataStructure.dynamic_parameters import DynamicParameters
 
 
 from pyphoplacecellanalysis.General.Decoder.decoder_result import build_position_df_discretized_binned_positions, build_position_df_resampled_to_time_windows
@@ -35,13 +35,7 @@ class DefaultComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Computa
         """ Builds the Zhang Velocity/Position For 2-step Bayesian Decoder for 2D Placefields """
         def _compute_avg_speed_at_each_position_bin(active_position_df, active_pf_computation_config, xbin, ybin, show_plots=False, debug_print=False):
             """ compute the average speed at each position x: """
-            ## Non-working attempt to use edges instead of bins:
-            # xbin_edges = xbin + [(xbin[-1] + (xbin[1] - xbin[0]))] # add an additional (right) edge to the end of the xbin array for use with pd.cut
-            # ybin_edges = ybin + [(ybin[-1] + (ybin[1] - ybin[0]))] # add an additional (right) edge to the end of the ybin array for use with pd.cut
-            # print(f'xbin_edges: {np.shape(xbin_edges)}\n ybin_edges: {np.shape(ybin_edges)}, np.shape(np.arange(len(xbin_edges))): {np.shape(np.arange(len(xbin_edges)))}')
-            # active_position_df['binned_x'] = pd.cut(active_position_df['x'].to_numpy(), bins=xbin_edges, include_lowest=True, labels=np.arange(start=1, stop=len(xbin_edges))) # same shape as the input data 
-            # active_position_df['binned_y'] = pd.cut(active_position_df['y'].to_numpy(), bins=ybin_edges, include_lowest=True, labels=np.arange(start=1, stop=len(ybin_edges))) # same shape as the input data 
-
+            
             def _compute_group_stats_for_var(active_position_df, xbin, ybin, variable_name:str = 'speed', debug_print=False):
                 # For each unique binned_x and binned_y value, what is the average velocity_x at that point?
                 position_bin_dependent_specific_average_velocities = active_position_df.groupby(['binned_x','binned_y'])[variable_name].agg([np.nansum, np.nanmean, np.nanmin, np.nanmax]).reset_index() #.apply(lambda g: g.mean(skipna=True)) #.agg((lambda x: x.mean(skipna=False)))
@@ -179,3 +173,59 @@ class DefaultComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Computa
         computation_result.computed_data['pf2D_TwoStepDecoder']['most_likely_positions'][1, :] = prev_one_step_bayesian_decoder.ybin_centers[computation_result.computed_data['pf2D_TwoStepDecoder']['most_likely_position_indicies'][1, :]]
         # computation_result.computed_data['pf2D_TwoStepDecoder']['sigma_t_all'] = sigma_t_all # set sigma_t_all                
         return computation_result
+
+
+
+    def _perform_velocity_vs_pf_density_computation(computation_result: ComputationResult, debug_print=False):
+            """ Builds the analysis to test Eloy's Pf-Density/Velocity Hypothesis for 2D Placefields
+            
+            Requires:
+                # computed_data['pf1D']
+                computed_data['pf2D']
+                computed_data['pf2D_TwoStepDecoder']['avg_speed_per_pos']
+                
+            Provides:
+                computed_data['EloyAnalysis']
+                computed_data['EloyAnalysis']['pdf_normalized_pf_2D']: 
+                computed_data['EloyAnalysis']['pf_overlapDensity']: 
+                computed_data['EloyAnalysis']['sorted_avg_speed_per_pos']: 
+                computed_data['EloyAnalysis']['sorted_PFoverlapDensity']: 
+                computed_data['EloyAnalysis']['avg_speed_sort_idxs']: 
+                
+            """
+            active_pf_1D = computation_result.computed_data['pf1D']
+            active_pf_2D = computation_result.computed_data['pf2D']
+            ##  Average velocity per position bin:
+            avg_speed_per_pos = computation_result.computed_data['pf2D_TwoStepDecoder']['avg_speed_per_pos']
+    
+            if debug_print:
+                print(f'avg_speed_per_pos.shape: {avg_speed_per_pos.shape}') # (59, 21)
+
+            # _test_1D_AOC_normalized_pdf = active_pf_1D.ratemap.pdf_normalized_tuning_curves
+            pdf_normalized_pf_2D = active_pf_2D.ratemap.pdf_normalized_tuning_curves
+            # np.shape(_test_1D_AOC_normalized_pdf) # (39, 59)
+            # np.shape(_test_2D_AOC_normalized_pdf) # (39, 59, 21)
+            if debug_print:
+                print(f'np.shape(_test_2D_AOC_normalized_pdf): {np.shape(pdf_normalized_pf_2D)}') # (59, 21)
+
+            ## Compute the PFoverlapDensity by summing over all cells:
+            pf_overlapDensity = np.sum(pdf_normalized_pf_2D, 0) # should be same size as positions
+            if debug_print:
+                print(f'_test_PFoverlapDensity.shape: {pf_overlapDensity.shape}') # (59, 21)
+
+            ## Renormalize by dividing by the number of placefields (i)
+            pf_overlapDensity = pf_overlapDensity / float(active_pf_1D.ratemap.n_neurons)
+
+            ## Order the bins in a flat array by ascending speed values:
+            avg_speed_sort_idxs = np.argsort(avg_speed_per_pos, axis=None) # axis=None means the array is flattened before sorting
+            # avg_speed_sort_idxs
+            ## Apply the same ordering to the PFoverlapDensities
+            sorted_avg_speed_per_pos = avg_speed_per_pos.flat[avg_speed_sort_idxs]
+            sorted_PFoverlapDensity = pf_overlapDensity.flat[avg_speed_sort_idxs]
+            # sorted_avg_speed_per_pos            
+            computation_result.computed_data['EloyAnalysis'] = DynamicParameters.init_from_dict({'pdf_normalized_pf_2D': pdf_normalized_pf_2D, 'pf_overlapDensity': pf_overlapDensity,
+                                                                   'sorted_avg_speed_per_pos': sorted_avg_speed_per_pos, 'sorted_PFoverlapDensity': sorted_PFoverlapDensity,
+                                                                   'avg_speed_sort_idxs': avg_speed_sort_idxs
+                                                                   })
+            return computation_result
+        
