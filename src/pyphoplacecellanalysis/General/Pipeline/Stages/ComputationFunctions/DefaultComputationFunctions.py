@@ -195,13 +195,14 @@ class DefaultComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Computa
             """
             active_pf_1D = computation_result.computed_data['pf1D']
             active_pf_2D = computation_result.computed_data['pf2D']
+            
             ##  Average velocity per position bin:
             avg_speed_per_pos = computation_result.computed_data['pf2D_TwoStepDecoder']['avg_speed_per_pos']
     
             if debug_print:
                 print(f'avg_speed_per_pos.shape: {avg_speed_per_pos.shape}') # (59, 21)
 
-            # _test_1D_AOC_normalized_pdf = active_pf_1D.ratemap.pdf_normalized_tuning_curves
+            pdf_normalized_pf_1D = active_pf_1D.ratemap.pdf_normalized_tuning_curves
             pdf_normalized_pf_2D = active_pf_2D.ratemap.pdf_normalized_tuning_curves
             # np.shape(_test_1D_AOC_normalized_pdf) # (39, 59)
             # np.shape(_test_2D_AOC_normalized_pdf) # (39, 59, 21)
@@ -209,21 +210,25 @@ class DefaultComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Computa
                 print(f'np.shape(_test_2D_AOC_normalized_pdf): {np.shape(pdf_normalized_pf_2D)}') # (59, 21)
 
             ## Compute the PFoverlapDensity by summing over all cells:
-            pf_overlapDensity = np.sum(pdf_normalized_pf_2D, 0) # should be same size as positions
+            pf_overlapDensity_1D = np.sum(pdf_normalized_pf_1D, 0) # should be same size as positions
+            pf_overlapDensity_2D = np.sum(pdf_normalized_pf_2D, 0) # should be same size as positions
             if debug_print:
-                print(f'_test_PFoverlapDensity.shape: {pf_overlapDensity.shape}') # (59, 21)
+                print(f'_test_PFoverlapDensity.shape: {pf_overlapDensity_2D.shape}') # (59, 21)
 
             ## Renormalize by dividing by the number of placefields (i)
-            pf_overlapDensity = pf_overlapDensity / float(active_pf_1D.ratemap.n_neurons)
+            pf_overlapDensity_1D = pf_overlapDensity_1D / float(active_pf_1D.ratemap.n_neurons)
+            pf_overlapDensity_2D = pf_overlapDensity_2D / float(active_pf_2D.ratemap.n_neurons)
+
 
             ## Order the bins in a flat array by ascending speed values:
             avg_speed_sort_idxs = np.argsort(avg_speed_per_pos, axis=None) # axis=None means the array is flattened before sorting
             # avg_speed_sort_idxs
             ## Apply the same ordering to the PFoverlapDensities
             sorted_avg_speed_per_pos = avg_speed_per_pos.flat[avg_speed_sort_idxs]
-            sorted_PFoverlapDensity = pf_overlapDensity.flat[avg_speed_sort_idxs]
+            sorted_PFoverlapDensity = pf_overlapDensity_2D.flat[avg_speed_sort_idxs]
             # sorted_avg_speed_per_pos            
-            computation_result.computed_data['EloyAnalysis'] = DynamicParameters.init_from_dict({'pdf_normalized_pf_2D': pdf_normalized_pf_2D, 'pf_overlapDensity': pf_overlapDensity,
+            computation_result.computed_data['EloyAnalysis'] = DynamicParameters.init_from_dict({'pdf_normalized_pf_1D': pdf_normalized_pf_1D, 'pdf_normalized_pf_2D': pdf_normalized_pf_2D,
+                                                                                                 'pf_overlapDensity_1D': pf_overlapDensity_1D, 'pf_overlapDensity_2D': pf_overlapDensity_2D,
                                                                    'sorted_avg_speed_per_pos': sorted_avg_speed_per_pos, 'sorted_PFoverlapDensity': sorted_PFoverlapDensity,
                                                                    'avg_speed_sort_idxs': avg_speed_sort_idxs
                                                                    })
