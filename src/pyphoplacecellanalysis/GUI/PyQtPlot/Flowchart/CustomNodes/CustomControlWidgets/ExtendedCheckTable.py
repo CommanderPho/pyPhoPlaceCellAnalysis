@@ -18,6 +18,13 @@ class ExtendedCheckTable(CheckTable):
         CheckTable.__init__(self, columns)
 
     @property
+    def rowsMap(self):
+        """The mapping of the row names to their index, analagous to columnsMap
+            # OrderedDict([('maze1', 0), ('maze2', 1), ('maze', 2)])
+        """
+        return OrderedDict({a_row_name:row_idx for row_idx, a_row_name in enumerate(self.rowNames)}) # {'maze1': 0, 'maze2': 1, 'maze': 2}
+        
+    @property
     def checked_state(self):
         """The checked_state property.
             # OrderedDict([('maze1', [False, False]), ('maze2', [False, False])])
@@ -27,15 +34,9 @@ class ExtendedCheckTable(CheckTable):
             'rows': [['maze1', False, False], ['maze2', False, False]]}
         """
         rows = curr_state['rows'] # print(f'\t {rows_state}') # [['row[0]', True, False], ['row[1]', False, False]]
-        # enabled_filter_names = []
         out_dict = OrderedDict()
         for (row_config_name, *row_include_states_list) in rows:
-            # ['row[0]', True, False]
-            # row_config_name = a_row[0]
-            # row_include_state = a_row[1]
             out_dict[row_config_name] = row_include_states_list
-            # if row_include_state:
-            # 	enabled_filter_names.append(row_config_name)
     
         return out_dict
 

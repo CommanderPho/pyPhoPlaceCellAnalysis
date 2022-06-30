@@ -1,10 +1,5 @@
-from pathlib import Path
-import pyphoplacecellanalysis.External.pyqtgraph.flowchart.library as fclib
-from pyphoplacecellanalysis.External.pyqtgraph.flowchart.library.common import CtrlNode
 from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtGui, QtCore
 from pyphoplacecellanalysis.External.pyqtgraph.widgets.ProgressDialog import ProgressDialog
-import pyphoplacecellanalysis.External.pyqtgraph as pg
-import numpy as np
 
 # pyPhoPlaceCellAnalysis:
 from pyphoplacecellanalysis.General.NonInteractiveWrapper import NonInteractiveWrapper
@@ -30,23 +25,23 @@ class PipelineComputationsNode(CheckTableCtrlOwnerMixin, ExtendedCtrlNode):
             'computed_pipeline': dict(io='out'),
         }
         ExtendedCtrlNode.__init__(self, name, terminals=terminals)
+        self.configRows = []
         self.connections = dict()
         self.ui_build()
-        
-        
-    @property
-    def enabled_computation_filters(self):
-        """Gets the list of filters for which to do computations on from the current selections in the checkbox table UI. Returns a list of filter names that are enabled."""
-        rows_state = self.ctrls['included_configs_table'].saveState()['rows']
-        # print(f'\t {rows_state}') # [['row[0]', True, False], ['row[1]', False, False]]
-        enabled_filter_names = []
-        for a_row in rows_state:
-            # ['row[0]', True, False]
-            row_config_name = a_row[0]
-            row_include_state = a_row[1]
-            if row_include_state:
-                enabled_filter_names.append(row_config_name)
-        return enabled_filter_names                
+                
+    # @property
+    # def enabled_computation_filters(self):
+    #     """Gets the list of filters for which to do computations on from the current selections in the checkbox table UI. Returns a list of filter names that are enabled."""
+    #     rows_state = self.ctrls['included_configs_table'].saveState()['rows']
+    #     # print(f'\t {rows_state}') # [['row[0]', True, False], ['row[1]', False, False]]
+    #     enabled_filter_names = []
+    #     for a_row in rows_state:
+    #         # ['row[0]', True, False]
+    #         row_config_name = a_row[0]
+    #         row_include_state = a_row[1]
+    #         if row_include_state:
+    #             enabled_filter_names.append(row_config_name)
+    #     return enabled_filter_names                
 
 
     def ui_build(self):
@@ -57,10 +52,8 @@ class PipelineComputationsNode(CheckTableCtrlOwnerMixin, ExtendedCtrlNode):
             # Not sure whether to call self.changed() (from CtrlNode) or self.update() from its parent class.
             # self.update() 
             self.changed() # should trigger re-computation in a blocking manner.
-            
             # global fail
             # fail = not fail
-            
             fail = False
             if fail:
                 self.ctrls['recompute'].failure(message="FAIL.", tip="There was a failure. Get over it.")
@@ -70,32 +63,12 @@ class PipelineComputationsNode(CheckTableCtrlOwnerMixin, ExtendedCtrlNode):
         self.ctrls['recompute'].clicked.connect(click)
         
         # Check Table:
-        self.configRows = []
-        def on_table_check_changed(row, col, state):
-            # note row: int, col: str, state: 0 for unchecked or 2 for checked
-            print(f'on_table_check_changed(row: {row}, col: {col}, state: {state})')
-            rows_state = self.ctrls['included_configs_table'].saveState()['rows']
-            print(f'\t {rows_state}') # [['row[0]', True, False], ['row[1]', False, False]]
-            for a_row in rows_state:
-                # ['row[0]', True, False]
-                row_config_name = a_row[0]
-                row_include_state = a_row[1]
-                
-            
-        self.ctrls['included_configs_table'].sigStateChanged.connect(on_table_check_changed)
-        
-        self.connections['checktable_state_changed_connection'] = self.ctrls['included_configs_table'].sigStateChanged.connect(self.on_checktable_checked_state_changed) # ExtendedCheckTable 
-        
-        ## sample rows
-        # rows_data = [f'row[{i}]' for i in np.arange(2)]
-        # self.configRows = rows_data # sample rows
-        
-        self.ctrls['included_configs_table'].updateRows(self.configRows)
-    
+        self.selectFirstConfigRow()        
+        self.connections['checktable_state_changed_connection'] = self.ctrls['included_configs_table'].sigStateChanged.connect(self.on_checktable_checked_state_changed) # ExtendedCheckTable
+        self.ui_update()
         
     def process(self, pipeline=None, computation_configs=None, display=True):
         # CtrlNode has created self.ctrls, which is a dict containing {ctrlName: widget}
-        # data_mode = self.ctrls['data_mode'].value()
         
         # print(f'PipelineComputationsNode.data_mode: {data_mode}')
         if (pipeline is None) or (computation_configs is None):
@@ -114,14 +87,16 @@ class PipelineComputationsNode(CheckTableCtrlOwnerMixin, ExtendedCtrlNode):
         """
         # TODO:L allow selecting which of these are active too.
         
-        
-        
         # Gets the names of the filters applied and updates the config rows with them
         all_filters_list = list(pipeline.filtered_sessions.keys())
         self.updateConfigRows(all_filters_list)
         
-        with ProgressDialog("Pipeline Input Loading: Bapun Format..", 0, 1, cancelText="Cancel", parent=None, busyCursor=True, wait=250) as dlg:
-            pipeline = NonInteractiveWrapper.perform_computation(pipeline, computation_configs, enabled_filter_names=self.enabled_computation_filters)
+        if len(self.enabled_filters) == 0:
+            print(f'no enabled computation filters! Cannot perform computation!')
+            pipeline = None
+        else:
+            with ProgressDialog("Pipeline Computations...", 0, 1, cancelText="Cancel", parent=None, busyCursor=True, wait=250) as dlg:
+                pipeline = NonInteractiveWrapper.perform_computation(pipeline, computation_configs, enabled_filter_names=self.enabled_filters)
 
         return {'updated_computation_configs': computation_configs,'computed_pipeline': pipeline}
 
@@ -129,37 +104,10 @@ class PipelineComputationsNode(CheckTableCtrlOwnerMixin, ExtendedCtrlNode):
     ##############################################################
     def ui_update(self):
         """ called to update the ctrls depending on its properties. """
-        # self.ctrls['recompute'].setEnabled(self.is_action_enabled)
-        pass
+        self.ctrls['recompute'].setEnabled(self.is_action_enabled)
 
-
-    def updateConfigRows(self, data):
-        if isinstance(data, dict):
-            keys = list(data.keys())
-        elif isinstance(data, list) or isinstance(data, tuple):
-            keys = data
-        elif isinstance(data, np.ndarray) or isinstance(data, np.void):
-            keys = data.dtype.names
-        else:
-            print("Unknown data type:", type(data), data)
-            return
-            
-        for c in self.ctrls.values():
-            c.blockSignals(True)
-        #for c in [self.ctrls['included_configs'], self.ctrls['y'], self.ctrls['size']]:
-        for c in [self.ctrls['included_configs_table']]:
-            c.updateRows(keys) # update the rows with the config rows
-
-        for c in self.ctrls.values():
-            c.blockSignals(False)
-        # Update the self.keys value:
-        self.configRows = keys
-        
-        
     @QtCore.pyqtSlot(object, object, object)
     def on_checktable_checked_state_changed(self, row, col, state):
-        # print(f'_test_filtering_node_state_changed(row: {row}, col: {col}, state: {state})')
-        # print(f'curr_filtering_node.enabled_filters: {self.enabled_filters}')
         self.ui_update()
         
     
