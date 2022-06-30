@@ -17,8 +17,8 @@ class PipelineComputationsNode(CheckTableCtrlOwnerMixin, ExtendedCtrlNode):
     """Performs computations on the active pipeline"""
     nodeName = "PipelineComputationsNode"
     uiTemplate = [
-        ('recompute', 'action'),
         ('included_configs_table', 'extendedchecktable', {'columns': ['compute'], 'rows': []}),
+        ('recompute', 'action')
     ]
     
     def __init__(self, name):
@@ -86,9 +86,10 @@ class PipelineComputationsNode(CheckTableCtrlOwnerMixin, ExtendedCtrlNode):
         
         self.connections['checktable_state_changed_connection'] = self.ctrls['included_configs_table'].sigStateChanged.connect(self.on_checktable_checked_state_changed) # ExtendedCheckTable 
         
+        ## sample rows
+        # rows_data = [f'row[{i}]' for i in np.arange(2)]
+        # self.configRows = rows_data # sample rows
         
-        rows_data = [f'row[{i}]' for i in np.arange(2)]
-        self.configRows = rows_data # sample rows
         self.ctrls['included_configs_table'].updateRows(self.configRows)
     
         

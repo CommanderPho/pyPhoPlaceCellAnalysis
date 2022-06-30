@@ -24,7 +24,7 @@ class PipelineFilteringDataNode(CheckTableCtrlOwnerMixin, ExtendedCtrlNode):
     nodeName = "PipelineFilteringDataNode"
     uiTemplate = [
         # ('included_configs', 'combo', {'values': [], 'index': 0}),
-        ('included_configs_table', 'extendedchecktable', {'columns': ['filter'], 'rows': ['test1', 'test2']}),
+        ('included_configs_table', 'extendedchecktable', {'columns': ['filter'], 'rows': []}),
         ('refilter', 'action'),
     ]
     
