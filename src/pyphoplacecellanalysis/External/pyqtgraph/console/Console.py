@@ -11,7 +11,7 @@ from ..functions import SignalBlock
 from ..Qt import QT_LIB, QtCore, QtGui, QtWidgets
 
 ui_template = importlib.import_module(
-    f'.template_{QT_LIB.lower()}', package=__package__)
+    f'.template_{QT_LIB.lower()}', package='pyphoplacecellanalysis.External.pyqtgraph.console')
 
 
 class ConsoleWidget(QtWidgets.QWidget):

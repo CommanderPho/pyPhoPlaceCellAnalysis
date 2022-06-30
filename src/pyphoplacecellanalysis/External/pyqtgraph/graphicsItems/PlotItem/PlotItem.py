@@ -26,7 +26,7 @@ from ..ViewBox import ViewBox
 translate = QtCore.QCoreApplication.translate
 
 ui_template = importlib.import_module(
-    f'.plotConfigTemplate_{QT_LIB.lower()}', package=__package__)
+    f'.plotConfigTemplate_{QT_LIB.lower()}', package='pyphoplacecellanalysis.External.pyqtgraph.graphicsItems.PlotItem')
 
 __all__ = ['PlotItem']
 

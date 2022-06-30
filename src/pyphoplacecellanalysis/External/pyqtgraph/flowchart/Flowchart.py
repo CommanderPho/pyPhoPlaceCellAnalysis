@@ -8,7 +8,7 @@ from ..Qt import QT_LIB, QtCore, QtWidgets
 from .Node import Node
 
 FlowchartCtrlTemplate = importlib.import_module(
-    f'.FlowchartCtrlTemplate_{QT_LIB.lower()}', package=__package__)
+    f'.FlowchartCtrlTemplate_{QT_LIB.lower()}', package='pyphoplacecellanalysis.External.pyqtgraph.flowchart')
     
 from numpy import ndarray
 
