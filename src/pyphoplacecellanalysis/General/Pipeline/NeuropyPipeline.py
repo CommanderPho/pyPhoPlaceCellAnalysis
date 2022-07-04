@@ -24,17 +24,8 @@ from pyphoplacecellanalysis.General.Pipeline.Stages.BaseNeuropyPipelineStage imp
 
 
 # NeuroPy (Diba Lab Python Repo) Loading
-try:
-    from neuropy import core
-
-    importlib.reload(core)
-except ImportError:
-    sys.path.append(r"C:\Users\Pho\repos\NeuroPy")  # Windows
-    # sys.path.append('/home/pho/repo/BapunAnalysis2021/NeuroPy') # Linux
-    # sys.path.append(r'/Users/pho/repo/Python Projects/NeuroPy') # MacOS
-    print("neuropy module not found, adding directory to sys.path. \n >> Updated sys.path.")
-    from neuropy import core
-
+from neuropy import core
+importlib.reload(core)
 
 
 
@@ -58,9 +49,7 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
 
     """
     
-    def __init__(self, name="pipeline", session_data_type='kdiba', basedir=None,
-                 load_function: Callable = None,
-                 post_load_functions: List[Callable] = []):
+    def __init__(self, name="pipeline", session_data_type='kdiba', basedir=None, load_function: Callable = None, post_load_functions: List[Callable] = []):
         # super(NeuropyPipeline, self).__init__()
         self.pipeline_name = name
         self.session_data_type = None

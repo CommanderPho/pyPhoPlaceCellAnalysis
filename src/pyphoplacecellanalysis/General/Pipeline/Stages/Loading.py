@@ -124,9 +124,14 @@ class LoadedPipelineStage(LoadableInput, LoadableSessionInput, BaseNeuropyPipeli
 
 class PipelineWithInputStage:
     """ Has an input stage. """
-    def set_input(self, session_data_type:str='', basedir="", load_function: Callable = None, post_load_functions: List[Callable] = [],
-                  auto_load=True, **kwargs):
-        """ Called to set the input stage """
+    def set_input(self, session_data_type:str='', basedir="", load_function: Callable = None, post_load_functions: List[Callable] = [], auto_load=True, **kwargs):
+        """ 
+        Called to set the input stage
+        
+        Known Uses:
+            Called on NeuropyPipeline.__init__(...)
+        
+        """
         if not isinstance(basedir, Path):
             print(f"basedir is not Path. Converting...")
             active_basedir = Path(basedir)
@@ -135,7 +140,9 @@ class PipelineWithInputStage:
             active_basedir = basedir
 
         if not active_basedir.exists():
+            print(f'active_basedir: "{active_basedir}" does not exist!')
             raise FileExistsError
+
         
         self.session_data_type = session_data_type
         
