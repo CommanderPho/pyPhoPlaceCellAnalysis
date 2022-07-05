@@ -193,7 +193,7 @@ class DefaultComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Computa
                 computed_data['EloyAnalysis']['avg_speed_sort_idxs']: 
                 
             """
-            active_pf_1D = computation_result.computed_data['pf1D']
+            # active_pf_1D = computation_result.computed_data['pf1D']
             active_pf_2D = computation_result.computed_data['pf2D']
             
             ##  Average velocity per position bin:
@@ -202,7 +202,12 @@ class DefaultComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Computa
             if debug_print:
                 print(f'avg_speed_per_pos.shape: {avg_speed_per_pos.shape}') # (59, 21)
 
-            pdf_normalized_pf_1D = active_pf_1D.ratemap.pdf_normalized_tuning_curves
+
+            # Disable 1D:
+            pdf_normalized_pf_1D = None
+            pf_overlapDensity_1D = None 
+            
+            # pdf_normalized_pf_1D = active_pf_1D.ratemap.pdf_normalized_tuning_curves
             pdf_normalized_pf_2D = active_pf_2D.ratemap.pdf_normalized_tuning_curves
             # np.shape(_test_1D_AOC_normalized_pdf) # (39, 59)
             # np.shape(_test_2D_AOC_normalized_pdf) # (39, 59, 21)
@@ -210,13 +215,13 @@ class DefaultComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Computa
                 print(f'np.shape(_test_2D_AOC_normalized_pdf): {np.shape(pdf_normalized_pf_2D)}') # (59, 21)
 
             ## Compute the PFoverlapDensity by summing over all cells:
-            pf_overlapDensity_1D = np.sum(pdf_normalized_pf_1D, 0) # should be same size as positions
+            # pf_overlapDensity_1D = np.sum(pdf_normalized_pf_1D, 0) # should be same size as positions
             pf_overlapDensity_2D = np.sum(pdf_normalized_pf_2D, 0) # should be same size as positions
             if debug_print:
                 print(f'_test_PFoverlapDensity.shape: {pf_overlapDensity_2D.shape}') # (59, 21)
 
             ## Renormalize by dividing by the number of placefields (i)
-            pf_overlapDensity_1D = pf_overlapDensity_1D / float(active_pf_1D.ratemap.n_neurons)
+            # pf_overlapDensity_1D = pf_overlapDensity_1D / float(active_pf_1D.ratemap.n_neurons)
             pf_overlapDensity_2D = pf_overlapDensity_2D / float(active_pf_2D.ratemap.n_neurons)
 
 
