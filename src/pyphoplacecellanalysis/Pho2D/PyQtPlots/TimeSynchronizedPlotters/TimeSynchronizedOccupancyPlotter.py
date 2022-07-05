@@ -79,10 +79,14 @@ class TimeSynchronizedOccupancyPlotter(AnimalTrajectoryPlottingMixin, TimeSynchr
         # self.ui.root_view.setRange(QtCore.QRectF(*self.params.image_bounds_extent))
 
         self.ui.root_plot = self.ui.root_graphics_layout_widget.addPlot(row=0, col=0, name=f'Occupancy', title=f'Occupancy -  t = {self.active_time_dependent_placefields.last_t}')
-        self.ui.root_plot.addItem(self.ui.imv)  # add ImageItem to PlotItem
+        self.ui.root_plot.addItem(self.ui.imv, defaultPadding=0.0)  # add ImageItem to PlotItem
         self.ui.root_plot.showAxes(True)
-        self.ui.root_plot.setXRange(*self.params.x_range)
-        self.ui.root_plot.setYRange(*self.params.y_range)
+        self.ui.root_plot.hideButtons() # Hides the auto-scale button
+        
+        # self.ui.root_plot.showAxes(False)        
+        self.ui.root_plot.setRange(xRange=self.params.x_range, yRange=self.params.y_range, padding=0.0)
+        # Sets only the panning limits:
+        self.ui.root_plot.setLimits(xMin=self.params.x_range[0], xMax=self.params.x_range[-1], yMin=self.params.y_range[0], yMax=self.params.y_range[-1])
 
         ## Optional Animal Trajectory Path Plot:
         self.AnimalTrajectoryPlottingMixin_on_buildUI()
