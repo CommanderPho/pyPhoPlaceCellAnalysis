@@ -188,6 +188,7 @@ class DefaultComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Computa
                 computed_data['EloyAnalysis']
                 computed_data['EloyAnalysis']['pdf_normalized_pf_1D']: 
                 computed_data['EloyAnalysis']['pf_overlapDensity_1D']: 
+                computed_data['EloyAnalysis']['avg_1D_speed_per_pos']: 
                 computed_data['EloyAnalysis']['avg_1D_speed_sort_idxs']: 
                 computed_data['EloyAnalysis']['sorted_1D_avg_speed_per_pos']: 
                 computed_data['EloyAnalysis']['sorted_PFoverlapDensity_1D']: 
@@ -195,6 +196,7 @@ class DefaultComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Computa
                 
                 computed_data['EloyAnalysis']['pdf_normalized_pf_2D']: 
                 computed_data['EloyAnalysis']['pf_overlapDensity_2D']: 
+                computed_data['EloyAnalysis']['avg_2D_speed_per_pos']:
                 computed_data['EloyAnalysis']['avg_2D_speed_sort_idxs']: 
                 computed_data['EloyAnalysis']['sorted_avg_2D_speed_per_pos']: 
                 computed_data['EloyAnalysis']['sorted_PFoverlapDensity_2D']: 
@@ -264,6 +266,7 @@ class DefaultComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Computa
 
             computation_result.computed_data['EloyAnalysis'] = DynamicParameters.init_from_dict({'pdf_normalized_pf_1D': pdf_normalized_pf_1D, 'pdf_normalized_pf_2D': pdf_normalized_pf_2D,
                                                                                                  'pf_overlapDensity_1D': pf_overlapDensity_1D, 'pf_overlapDensity_2D': pf_overlapDensity_2D,
+                                                                                                 'avg_1D_speed_per_pos': avg_1D_speed_per_pos, 'avg_2D_speed_per_pos': avg_2D_speed_per_pos,
                                                                                                  'avg_1D_speed_sort_idxs': avg_1D_speed_sort_idxs, 'avg_2D_speed_sort_idxs': avg_2D_speed_sort_idxs,
                                                                     'sorted_1D_avg_speed_per_pos': sorted_1D_avg_speed_per_pos, 'sorted_avg_2D_speed_per_pos': sorted_avg_2D_speed_per_pos, 
                                                                     'sorted_PFoverlapDensity_1D': sorted_PFoverlapDensity_1D, 'sorted_PFoverlapDensity_2D': sorted_PFoverlapDensity_2D                                                                   

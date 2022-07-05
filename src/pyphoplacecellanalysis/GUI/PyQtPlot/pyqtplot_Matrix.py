@@ -9,14 +9,18 @@ from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtWidgets, mkQApp, QtGu
 """
 
 class MatrixRenderingWindow(QtWidgets.QMainWindow):
-    """ example application main window """
+    """ example application main window 
+    
+    Observed to work well to display simple binned heatmaps/grids such as avg velocity across spatial bins, etc.
+    
+    """
     def __init__(self, *args, matrix=None, columns=None, **kwargs):
         super(MatrixRenderingWindow, self).__init__(*args, **kwargs)
         gr_wid = pg.GraphicsLayoutWidget(show=True)
         self.setCentralWidget(gr_wid)
         self.setWindowTitle('pyqtgraph example: Correlation matrix display')
         self.resize(600,500)
-        self.show()
+        
 
 
         # default_matrix = np.array([
@@ -46,10 +50,11 @@ class MatrixRenderingWindow(QtWidgets.QMainWindow):
         plotItem.showAxes( True, showValues=(True, True, False, False), size=20 )
 
         # define major tick marks and labels:
-        ticks = [ (idx, label) for idx, label in enumerate( columns ) ]
-        for side in ('left','top','right','bottom'):
-            plotItem.getAxis(side).setTicks( (ticks, []) ) # add list of major ticks; no minor ticks
-        plotItem.getAxis('bottom').setHeight(10) # include some additional space at bottom of figure
+        if columns is not None:
+            ticks = [(idx, label) for idx, label in enumerate(columns)]
+            for side in ('left','top','right','bottom'):
+                plotItem.getAxis(side).setTicks( (ticks, []) ) # add list of major ticks; no minor ticks
+            plotItem.getAxis('bottom').setHeight(10) # include some additional space at bottom of figure
 
         colorMap = pg.colormap.get("CET-D1")     # choose perceptually uniform, diverging color map
         # generate an adjustabled color bar, initially spanning -1 to 1:
@@ -57,7 +62,9 @@ class MatrixRenderingWindow(QtWidgets.QMainWindow):
         # link color bar and color map to correlogram, and show it in plotItem:
         bar.setImageItem(correlogram, insert_in=plotItem)    
 
-
+        self.show()
+        
+        
 # mkQApp("Correlation matrix display")
 # main_window = MatrixRenderingWindow()
 
