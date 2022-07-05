@@ -168,23 +168,6 @@ class DefaultRegisteredDisplayFunctions:
             for (a_display_fn_name, a_display_fn) in a_display_class.get_all_functions(use_definition_order=False):
                 self.register_display_function(a_display_fn_name, a_display_fn)
         
-        # # Register the Ratemap/Placemap display functions: 
-        # for (a_display_fn_name, a_display_fn) in DefaultDisplayFunctions.get_all_functions(use_definition_order=False):
-        #     self.register_display_function(a_display_fn_name, a_display_fn)
-            
-        # # Register the Ratemap/Placemap display functions: 
-        # for (a_display_fn_name, a_display_fn) in DefaultRatemapDisplayFunctions.get_all_functions(use_definition_order=False):
-        #     self.register_display_function(a_display_fn_name, a_display_fn)
-            
-        # # Register the Bayesian decoder display functions: 
-        # for (a_display_fn_name, a_display_fn) in DefaultDecoderDisplayFunctions.get_all_functions(use_definition_order=False):
-        #     self.register_display_function(a_display_fn_name, a_display_fn)
-            
-        # # Register the spike rasters display functions: 
-        # for (a_display_fn_name, a_display_fn) in SpikeRastersDisplayFunctions.get_all_functions(use_definition_order=False):
-        #     self.register_display_function(a_display_fn_name, a_display_fn)
-            
-  
   
 
 class PipelineWithDisplayPipelineStageMixin:

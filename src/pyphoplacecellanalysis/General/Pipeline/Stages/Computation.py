@@ -79,28 +79,7 @@ class DefaultRegisteredComputations:
             for (a_computation_fn_name, a_computation_fn) in reversed(a_computation_class.get_all_functions(use_definition_order=True)):
                 self.register_computation(a_computation_fn_name, a_computation_fn)
         
-        
-        # [SpikeAnalysisComputations, ExtendedStatsComputations, DefaultComputationFunctions, PlacefieldComputations]
-        
-        
-        # # Register the neuronal firing analysis computation functions:
-        # for (a_computation_fn_name, a_computation_fn) in reversed(SpikeAnalysisComputations.get_all_functions(use_definition_order=True)):
-        #     self.register_computation(a_computation_fn_name, a_computation_fn)
-            
-        # # Register the Ratemap/Placemap computation functions: 
-        # for (a_computation_fn_name, a_computation_fn) in reversed(ExtendedStatsComputations.get_all_functions(use_definition_order=True)):
-        #     self.register_computation(a_computation_fn_name, a_computation_fn)
-            
-        # for (a_computation_fn_name, a_computation_fn) in reversed(DefaultComputationFunctions.get_all_functions(use_definition_order=True)):
-        #     self.register_computation(a_computation_fn_name, a_computation_fn)
-            
-        # for (a_computation_fn_name, a_computation_fn) in reversed(PlacefieldComputations.get_all_functions(use_definition_order=True)):
-        #     self.register_computation(a_computation_fn_name, a_computation_fn)
-            
-        
-        
-        
-    
+
 
 
 class PipelineWithComputedPipelineStageMixin:
@@ -192,7 +171,6 @@ class ComputedPipelineStage(LoadableInput, LoadableSessionInput, FilterablePipel
     
     def register_computation(self, registered_name, computation_function):
         self.registered_computation_function_dict[registered_name] = computation_function
-        # self.registered_computation_functions.append(computation_function)
         
     def perform_registered_computations(self, previous_computation_result=None, debug_print=False):
         """ Called after load is complete to post-process the data """
