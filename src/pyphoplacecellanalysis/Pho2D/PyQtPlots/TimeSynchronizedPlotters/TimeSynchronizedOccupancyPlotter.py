@@ -16,8 +16,7 @@ from pyphoplacecellanalysis.Pho2D.PyQtPlots.TimeSynchronizedPlotters.Mixins.Anim
 
 
 class TimeSynchronizedOccupancyPlotter(AnimalTrajectoryPlottingMixin, TimeSynchronizedPlotterBase):
-    """ Plots the time-dependent occupancy.
-    
+    """ Plots the time-dependent occupancy produced by a PfND_TimeDependent instance.
     
     Usage:
     
@@ -30,8 +29,8 @@ class TimeSynchronizedOccupancyPlotter(AnimalTrajectoryPlottingMixin, TimeSynchr
         active_time_dependent_placefields2D = PfND_TimeDependent(deepcopy(sess.spikes_df.copy()), deepcopy(sess.position), epochs=included_epochs,
                                           speed_thresh=computation_config.speed_thresh, frate_thresh=computation_config.frate_thresh,
                                           grid_bin=computation_config.grid_bin, smooth=computation_config.smooth)
-        curr_occupancy_plotter = TimeSynchronizedOccupancyPlotter(active_time_dependent_placefields2D)
-        curr_occupancy_plotter.show()
+        curr_sync_occupancy_plotter = TimeSynchronizedOccupancyPlotter(active_time_dependent_placefields2D)
+        curr_sync_occupancy_plotter.show()
 
     """
     # Application/Window Configuration Options:
@@ -65,9 +64,7 @@ class TimeSynchronizedOccupancyPlotter(AnimalTrajectoryPlottingMixin, TimeSynchr
         
         self.AnimalTrajectoryPlottingMixin_on_setup()
         
-        
-        
-        
+
     def _buildGraphics(self):
         ## More Involved Mode:
         self.ui.root_graphics_layout_widget = pg.GraphicsLayoutWidget()

@@ -10,7 +10,7 @@ from pyphocorehelpers.DataStructure.general_parameter_containers import Visualiz
 from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer
 
 class TimeSynchronizedPlotterBase(QtWidgets.QWidget):
-    """
+    """ Subclasses generally display time-dependent results produced by a PfND_TimeDependent instance in a manner synchronized with another plotter/renderer.
     
     Usage:
     
@@ -23,8 +23,8 @@ class TimeSynchronizedPlotterBase(QtWidgets.QWidget):
         active_time_dependent_placefields2D = PfND_TimeDependent(deepcopy(sess.spikes_df.copy()), deepcopy(sess.position), epochs=included_epochs,
                                           speed_thresh=computation_config.speed_thresh, frate_thresh=computation_config.frate_thresh,
                                           grid_bin=computation_config.grid_bin, smooth=computation_config.smooth)
-        curr_occupancy_plotter = TimeSynchronizedPlotterBase(active_time_dependent_placefields2D)
-        curr_occupancy_plotter.show()
+        curr_sync_plotter = TimeSynchronizedPlotterBase(active_time_dependent_placefields2D)
+        curr_sync_plotter.show()
 
     """
     # Application/Window Configuration Options:
