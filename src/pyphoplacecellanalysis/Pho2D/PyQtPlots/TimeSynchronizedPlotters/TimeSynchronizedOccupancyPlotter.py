@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 from qtpy import QtCore, QtWidgets
 
-from neuropy.analyses.time_dependent_placefields import PfND_TimeDependent
+# from neuropy.analyses.time_dependent_placefields import PfND_TimeDependent
 
 import pyphoplacecellanalysis.External.pyqtgraph as pg
 # from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtCore, QtGui

@@ -2,22 +2,11 @@ from collections import OrderedDict
 from datetime import datetime
 from pathlib import Path
 import numpy as np
-import pandas as pd
-import matplotlib.pyplot as plt
-import pyvista as pv
-import pyvistaqt as pvqt
 
-
-from pyphocorehelpers.indexing_helpers import interleave_elements
-from pyphocorehelpers.print_helpers import WrappingMessagePrinter
-from pyphocorehelpers.plotting.mixins.figure_param_text_box import add_figure_text_box # for _display_add_computation_param_text_box
-from pyphocorehelpers.geometry_helpers import compute_data_extent, compute_data_aspect_ratio
-
+from neuropy.core.neuron_identities import NeuronIdentity, build_units_colormap, PlotStringBrevityModeEnum
 
 from pyphoplacecellanalysis.General.Pipeline.Stages.Computation import ComputedPipelineStage
-from pyphoplacecellanalysis.General.Configs.DynamicConfigs import PlottingConfig, InteractivePlaceCellConfig
 from pyphoplacecellanalysis.General.Pipeline.Stages.BaseNeuropyPipelineStage import PipelineStage
-
 from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DisplayFunctionRegistryHolder import DisplayFunctionRegistryHolder
 # Import Display Functions
 from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DefaultDisplayFunctions import DefaultDisplayFunctions
@@ -25,8 +14,7 @@ from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.Ratemaps im
 from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import DefaultDecoderDisplayFunctions
 from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.SpikeRasters import SpikeRastersDisplayFunctions
 from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.EloyAnalysis import EloyAnalysisDisplayFunctions
-
-from neuropy.core.neuron_identities import NeuronIdentity, build_units_colormap, PlotStringBrevityModeEnum
+from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.Interactive3dDisplayFunctions import Interactive3dDisplayFunctions
 
 
 
@@ -242,8 +230,6 @@ class PipelineWithDisplayPipelineStageMixin:
         assert (active_session_filter_configuration in self.computation_results), f"self.computation_results doesn't contain a key for the provided active_session_filter_configuration ('{active_session_filter_configuration}'). Did you only enable computation with enabled_filter_names in perform_computation that didn't include this key?"
         return display_function(self.computation_results[active_session_filter_configuration], self.active_configs[active_session_filter_configuration], **kwargs)
 
-
-    
 
 class DisplayPipelineStage(DefaultRegisteredDisplayFunctions, ComputedPipelineStage):
     """ The concrete pipeline stage for displaying the output computed in previous stages."""
