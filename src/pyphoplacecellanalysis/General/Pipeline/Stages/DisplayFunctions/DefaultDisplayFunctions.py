@@ -18,8 +18,6 @@ from pyphocorehelpers.mixins.member_enumerating import AllFunctionEnumeratingMix
 from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DisplayFunctionRegistryHolder import DisplayFunctionRegistryHolder
 from pyphoplacecellanalysis.General.Mixins.DisplayHelpers import _display_add_computation_param_text_box, _save_displayed_figure_if_needed
 
-
-
 from neuropy.core.neuron_identities import NeuronIdentity, build_units_colormap, PlotStringBrevityModeEnum
 from neuropy.plotting.placemaps import plot_all_placefields
 from neuropy.plotting.ratemaps import enumTuningMap2DPlotVariables # for getting the variant name from the dict
