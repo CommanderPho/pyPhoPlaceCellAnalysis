@@ -24,7 +24,7 @@ from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DefaultDisp
 from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.Ratemaps import DefaultRatemapDisplayFunctions
 from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import DefaultDecoderDisplayFunctions
 from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.SpikeRasters import SpikeRastersDisplayFunctions
-
+from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.EloyAnalysis import EloyAnalysisDisplayFunctions
 
 from neuropy.core.neuron_identities import NeuronIdentity, build_units_colormap, PlotStringBrevityModeEnum
 
@@ -207,6 +207,10 @@ class PipelineWithDisplayPipelineStageMixin:
         # assert (self.can_display), "Current self.stage must already be a ComputedPipelineStage. Call self.filter_sessions with filter configs to reach this step."
         self.stage.register_display_function(registered_name, display_function)
         
+    def reload_default_display_functions(self):
+        """ reloads/re-registers the default display functions after adding a new one """
+        self.stage.reload_default_display_functions() 
+        
     def prepare_for_display(self, root_output_dir=r'R:\data\Output', should_smooth_maze=True):
         assert (self.is_computed), "Current self.is_computed must be true. Call self.perform_computations to reach this step."
         self.stage = DisplayPipelineStage(self.stage)  # build the Display stage
@@ -273,6 +277,10 @@ class DisplayPipelineStage(DefaultRegisteredDisplayFunctions, ComputedPipelineSt
         return list(self.registered_display_function_dict.keys()) 
     
     
+    def reload_default_display_functions(self):
+        """ reloads/re-registers the default display functions after adding a new one """
+        self.register_default_known_display_functions()
+        
     def register_display_function(self, registered_name, display_function):
         """ registers a new custom display function"""
         self.registered_display_function_dict[registered_name] = display_function
