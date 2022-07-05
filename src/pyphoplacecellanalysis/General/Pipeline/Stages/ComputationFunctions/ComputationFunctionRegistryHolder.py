@@ -15,7 +15,7 @@ class ComputationFunctionRegistryHolder(RegistryHolder):
 
         Args:
             absolute_flat_path_keys (bool, optional): _description_. Defaults to False.
-
+            applying_disable_dict (dict, optional): a dictionary to exclude returned items 
         Returns:
             _type_: _description_
         """
