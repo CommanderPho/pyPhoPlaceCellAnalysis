@@ -88,6 +88,14 @@ class TimeSynchronizedOccupancyPlotter(AnimalTrajectoryPlottingMixin, TimeSynchr
         # Sets only the panning limits:
         self.ui.root_plot.setLimits(xMin=self.params.x_range[0], xMax=self.params.x_range[-1], yMin=self.params.y_range[0], yMax=self.params.y_range[-1])
 
+        ## Sets all limits:
+        # _x, _y, _width, _height = self.params.image_bounds_extent # [23.923329354140844, 123.85967782096927, 241.7178791533281, 30.256480996256016]
+        # self.ui.root_plot.setLimits(minXRange=_width, maxXRange=_width, minYRange=_height, maxYRange=_height)
+        # self.ui.root_plot.setLimits(xMin=self.params.x_range[0], xMax=self.params.x_range[-1], yMin=self.params.y_range[0], yMax=self.params.y_range[-1],
+        #                             minXRange=_width, maxXRange=_width, minYRange=_height, maxYRange=_height)
+        
+        self.ui.root_plot.setMouseEnabled(x=False, y=False)
+        
         ## Optional Animal Trajectory Path Plot:
         self.AnimalTrajectoryPlottingMixin_on_buildUI()
         

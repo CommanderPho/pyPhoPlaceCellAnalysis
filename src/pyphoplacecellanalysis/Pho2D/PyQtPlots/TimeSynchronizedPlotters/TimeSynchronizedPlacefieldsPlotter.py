@@ -155,17 +155,16 @@ class TimeSynchronizedPlacefieldsPlotter(AnimalTrajectoryPlottingMixin, TimeSync
             img_item.setImage(image, rect=self.params.image_bounds_extent, autoLevels=False)
             img_item.setLookupTable(self.params.cmap.getLookupTable(nPts=256), update=False)
 
-            # curr_plot.setXRange(global_min_x-margin, global_max_x+margin)
-            # curr_plot.setYRange(global_min_y-margin, global_max_y+margin)
-            # curr_plot.setXRange(*self.params.x_range)
-            # curr_plot.setYRange(*self.params.y_range)
             curr_plot.setRange(xRange=self.params.x_range, yRange=self.params.y_range, padding=0.0, update=False, disableAutoRange=True)
             # Lock the aspect ratio AFTER setting the x/y range:
             # curr_plot.setAspectLocked(lock=True, ratio=self.params.image_aspect_ratio)
 
             # Sets only the panning limits:
             curr_plot.setLimits(xMin=self.params.x_range[0], xMax=self.params.x_range[-1], yMin=self.params.y_range[0], yMax=self.params.y_range[-1])
-        
+            # curr_plot.setLimits(xMin=self.params.x_range[0], xMax=self.params.x_range[-1], yMin=self.params.y_range[0], yMax=self.params.y_range[-1])
+            curr_plot.setMouseEnabled(x=False, y=False)
+            curr_plot.setMenuEnabled(enableMenu=False)
+            
             # Link Axes to previous item:
             if a_linear_index > 0:
                 prev_plot_item = self.ui.plot_array[a_linear_index-1]
