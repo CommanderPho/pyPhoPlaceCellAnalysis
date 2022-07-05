@@ -220,10 +220,8 @@ class PhoPythonEvalNodeCtrlWidget(QtWidgets.QWidget):
         self.ui.update_code_from_node_btn.clicked.connect(self.eval_node.update_code_from_node)
         
         
-    def _build_inputs_header_text(self):
-        
-        
-        return "'# Access inputs as args['input_name']"
+    def _build_inputs_header_text(self):        
+        return "# Access inputs as args['input']"
     
     def _build_outputs_return_footer_text(self):
         return "{'output': None} ## one key per output terminal"
