@@ -17,11 +17,12 @@ except ImportError:
 
 from neuropy.core.epoch import NamedTimerange
 from neuropy.analyses.placefields import PlacefieldComputationParameters
+from neuropy.core.session.SessionSelectionAndFiltering import build_custom_epochs_filters
+
 
 from pyphocorehelpers.DataStructure.dynamic_parameters import DynamicParameters
 from pyphocorehelpers.indexing_helpers import compute_position_grid_size
 # pyPhoPlaceCellAnalysis:
-from pyphoplacecellanalysis.General.SessionSelectionAndFiltering import batch_filter_session, build_custom_epochs_filters
 
 
 
