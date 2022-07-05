@@ -7,8 +7,7 @@ from pyphoplacecellanalysis.General.Configs.DynamicConfigs import PlottingConfig
 from pyphocorehelpers.mixins.member_enumerating import AllFunctionEnumeratingMixin
 from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DisplayFunctionRegistryHolder import DisplayFunctionRegistryHolder
 
-from neuropy.utils.dynamic_container import unwrap_placefield_computation_parameters  # for testing whether active_config.computation_config is an instance of PlacefieldComputationParameters in _display_2d_placefield_result_plot_ratemaps_2D(...)
-
+# from neuropy.utils.mixins.unwrap_placefield_computation_parameters import unwrap_placefield_computation_parameters
 
 from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.DockAreaWrapper import DockAreaWrapper
 

@@ -7,7 +7,8 @@ from pyphoplacecellanalysis.General.Mixins.DisplayHelpers import _display_add_co
 from neuropy.core.neuron_identities import NeuronIdentity, build_units_colormap, PlotStringBrevityModeEnum
 from neuropy.plotting.placemaps import plot_all_placefields
 from neuropy.plotting.ratemaps import enumTuningMap2DPlotVariables # for getting the variant name from the dict
-from neuropy.utils.dynamic_container import unwrap_placefield_computation_parameters  # for testing whether active_config.computation_config is an instance of PlacefieldComputationParameters in _display_2d_placefield_result_plot_ratemaps_2D(...)
+from neuropy.utils.mixins.unwrap_placefield_computation_parameters import unwrap_placefield_computation_parameters
+
 from pyphoplacecellanalysis.PhoPositionalData.plotting.placefield import plot_1d_placecell_validations
 
 
