@@ -116,6 +116,16 @@ class PipelineWithComputedPipelineStageMixin:
         """The registered_computation_function_names property."""
         return self.stage.registered_computation_function_names
     
+    @property
+    def registered_computation_function_dict(self):
+        """The registered_computation_function_dict property can be used to get the corresponding function from the string name."""
+        return self.stage.registered_computation_function_dict
+    
+    @property
+    def registered_computation_function_docs_dict(self):
+        """Returns the doc strings for each registered computation function. This is taken from their docstring at the start of the function defn, and provides an overview into what the function will do."""
+        return {a_fn_name:a_fn.__doc__ for a_fn_name, a_fn in self.registered_computation_function_dict.items()}
+    
     
     ## Computation Helpers: 
     def perform_computations(self, active_computation_params: DynamicParameters=None, enabled_filter_names=None):
