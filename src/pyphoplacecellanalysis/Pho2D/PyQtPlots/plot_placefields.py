@@ -6,12 +6,13 @@
 #     _instance = QApplication([])
 # app = _instance
 import numpy as np
+
+from pyphocorehelpers.geometry_helpers import compute_data_aspect_ratio, compute_data_extent
+from pyphocorehelpers.indexing_helpers import compute_paginated_grid_config
+
 import pyphoplacecellanalysis.External.pyqtgraph as pg
 from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtCore, QtGui
-
-from pyphocorehelpers.indexing_helpers import compute_paginated_grid_config
 from pyphoplacecellanalysis.GUI.PyQtPlot.pyqtplot_basic import pyqtplot_common_setup
-
 from pyphoplacecellanalysis.GUI.Qt.Mixins.PhoMainAppWindowBase import PhoMainAppWindowBase
 
 # class PlotLocationIdentifier(object):
@@ -72,6 +73,8 @@ def pyqtplot_plot_image_array(xbin_edges, ybin_edges, images, occupancy, max_num
     cmap = pg.colormap.get('jet','matplotlib') # prepare a linear color map
 
     image_bounds_extent, x_range, y_range = _pyqtplot_build_image_bounds_extent(xbin_edges, ybin_edges, margin=2.0, debug_print=debug_print)
+    # image_aspect_ratio, image_width_height_tuple = compute_data_aspect_ratio(x_range, y_range)
+    # print(f'image_aspect_ratio: {image_aspect_ratio} - xScale/yScale: {float(image_width_height_tuple.width) / float(image_width_height_tuple.height)}')
     
     # Compute Images:
     included_unit_indicies = np.arange(np.shape(images)[0]) # include all unless otherwise specified
@@ -90,6 +93,10 @@ def pyqtplot_plot_image_array(xbin_edges, ybin_edges, images, occupancy, max_num
         curr_page_relative_linear_index = np.mod(a_linear_index, int(page_grid_sizes[page_idx].num_rows * page_grid_sizes[page_idx].num_columns))
         curr_page_relative_row = np.mod(curr_row, page_grid_sizes[page_idx].num_rows)
         curr_page_relative_col = np.mod(curr_col, page_grid_sizes[page_idx].num_columns)
+        is_first_column = (curr_page_relative_col == 0)
+        is_first_row = (curr_page_relative_row == 0)
+        is_last_column = (curr_page_relative_col == (page_grid_sizes[page_idx].num_columns-1))
+        is_last_row = (curr_page_relative_row == (page_grid_sizes[page_idx].num_rows-1))
         if debug_print:
             print(f'a_linear_index: {a_linear_index}, curr_page_relative_linear_index: {curr_page_relative_linear_index}, curr_row: {curr_row}, curr_col: {curr_col}, curr_page_relative_row: {curr_page_relative_row}, curr_page_relative_col: {curr_page_relative_col}, curr_included_unit_index: {curr_included_unit_index}')
 
@@ -99,9 +106,10 @@ def pyqtplot_plot_image_array(xbin_edges, ybin_edges, images, occupancy, max_num
 
         image = np.squeeze(images[a_linear_index,:,:])
         # Pre-filter the data:
-        image = np.array(image.copy()) / np.nanmax(image) # note scaling by maximum here!
-        if drop_below_threshold is not None:
-            image[np.where(occupancy < drop_below_threshold)] = np.nan # null out the occupancy
+        with np.errstate(divide='ignore', invalid='ignore'):
+            image = np.array(image.copy()) / np.nanmax(image) # note scaling by maximum here!
+            if drop_below_threshold is not None:
+                image[np.where(occupancy < drop_below_threshold)] = np.nan # null out the occupancy
 
         # Build the image item:
         img_item = pg.ImageItem(image=image, levels=(0,1))
@@ -114,8 +122,26 @@ def pyqtplot_plot_image_array(xbin_edges, ybin_edges, images, occupancy, max_num
         
         # # plot mode:
         curr_plot = root_render_widget.addPlot(row=curr_row, col=curr_col, name=curr_plot_identifier_string, title=curr_cell_identifier_string)
-        curr_plot.addItem(img_item)  # add ImageItem to PlotItem
-        curr_plot.showAxes(True)
+        curr_plot.showAxes(False)
+        if is_last_row:
+            curr_plot.showAxes('x', True)
+            curr_plot.showAxis('bottom', show=True)
+        else:
+            curr_plot.showAxes('x', False)
+            curr_plot.showAxis('bottom', show=False)
+            
+        if is_first_column:
+            curr_plot.showAxes('y', True)
+            curr_plot.showAxis('left', show=True)
+        else:
+            curr_plot.showAxes('y', False)
+            curr_plot.showAxis('left', show=False)
+        
+        curr_plot.hideButtons() # Hides the auto-scale button
+        
+        curr_plot.addItem(img_item, defaultPadding=0.0)  # add ImageItem to PlotItem
+        # curr_plot.setAspectLocked(lock=True, ratio=image_aspect_ratio)
+        # curr_plot.showAxes(True)
         # curr_plot.showGrid(True, True, 0.7)
         # curr_plot.setLabel('bottom', "Label to test offset")
         
@@ -127,19 +153,31 @@ def pyqtplot_plot_image_array(xbin_edges, ybin_edges, images, occupancy, max_num
         # curr_plot.addItem(curr_label)
 
         # Update the image:
-        img_item.setImage(image, rect=image_bounds_extent)
-        img_item.setLookupTable(cmap.getLookupTable(nPts=256))
+        img_item.setImage(image, rect=image_bounds_extent, autoLevels=False)
+        img_item.setLookupTable(cmap.getLookupTable(nPts=256), update=False)
 
+        # curr_plot.set
         # margin = 2.0
         # curr_plot.setXRange(global_min_x-margin, global_max_x+margin)
         # curr_plot.setYRange(global_min_y-margin, global_max_y+margin)
-        curr_plot.setXRange(*x_range)
-        curr_plot.setYRange(*y_range)
-
+        # curr_plot.setXRange(*x_range)
+        # curr_plot.setYRange(*y_range)
+        curr_plot.setRange(xRange=x_range, yRange=y_range, padding=0.0, update=False, disableAutoRange=True)
+        # Sets only the panning limits:
+        curr_plot.setLimits(xMin=x_range[0], xMax=x_range[-1], yMin=y_range[0], yMax=y_range[-1])
+        # Link Axes to previous item:
+        if a_linear_index > 0:
+            prev_plot_item = plot_array[a_linear_index-1]
+            curr_plot.setXLink(prev_plot_item)
+            curr_plot.setYLink(prev_plot_item)
+            
+            
         # Interactive Color Bar:
         bar = pg.ColorBarItem(values= (0, 1), colorMap=cmap, width=5, interactive=False) # prepare interactive color bar
         # Have ColorBarItem control colors of img and appear in 'plot':
         bar.setImageItem(img_item, insert_in=curr_plot)
+        
+        
 
         img_item_array.append(img_item)
         plot_array.append(curr_plot)
