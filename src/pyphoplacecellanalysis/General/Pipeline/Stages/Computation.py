@@ -15,13 +15,15 @@ from pyphoplacecellanalysis.General.Pipeline.Stages.Filtering import FilterableP
 from pyphoplacecellanalysis.General.Pipeline.Stages.Loading import LoadableInput, LoadableSessionInput, LoadedPipelineStage    
 from pyphoplacecellanalysis.General.Model.ComputationResults import ComputationResult
 
+import pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions
+# from General.Pipeline.Stages.ComputationFunctions import ComputationFunctionRegistryHolder # should include ComputationFunctionRegistryHolder and all specifics
 from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.ComputationFunctionRegistryHolder import ComputationFunctionRegistryHolder
 
 
-from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.DefaultComputationFunctions import DefaultComputationFunctions
-from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.PlacefieldComputations import PlacefieldComputations
-from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.ExtendedStats import ExtendedStatsComputations
-from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.SpikeAnalysis import SpikeAnalysisComputations
+# from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.DefaultComputationFunctions import DefaultComputationFunctions
+# from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.PlacefieldComputations import PlacefieldComputations
+# from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.ExtendedStats import ExtendedStatsComputations
+# from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.SpikeAnalysis import SpikeAnalysisComputations
 
 
 class ComputablePipelineStage:
@@ -42,18 +44,18 @@ class ComputablePipelineStage:
         
         return output_result
 
-    def single_computation(self, active_computation_params: DynamicParameters=None, enabled_filter_names=None):
+    def evaluate_single_computation_params(self, active_computation_params: DynamicParameters=None, enabled_filter_names=None):
         """ 'single' here refers to the fact that it evaluates only one of the active_computation_params
         
         Takes its filtered_session and applies the provided active_computation_params to it. The results are stored in self.computation_results under the same key as the filtered session. """
-        assert (len(self.filtered_sessions.keys()) > 0), "Must have at least one filtered session before calling single_computation(...). Call self.select_filters(...) first."
+        assert (len(self.filtered_sessions.keys()) > 0), "Must have at least one filtered session before calling evaluate_single_computation_params(...). Call self.select_filters(...) first."
         # self.active_computation_results = dict()
         if enabled_filter_names is None:
             enabled_filter_names = list(self.filtered_sessions.keys()) # all filters if specific enabled names aren't specified
 
         for a_select_config_name, a_filtered_session in self.filtered_sessions.items():                
             if a_select_config_name in enabled_filter_names:
-                print(f'Performing single_computation on filtered_session with filter named "{a_select_config_name}"...')
+                print(f'Performing evaluate_single_computation_params on filtered_session with filter named "{a_select_config_name}"...')
                 if active_computation_params is None:
                     active_computation_params = self.active_configs[a_select_config_name].computation_config # get the previously set computation configs
                 else:
@@ -130,7 +132,7 @@ class PipelineWithComputedPipelineStageMixin:
     ## Computation Helpers: 
     def perform_computations(self, active_computation_params: DynamicParameters=None, enabled_filter_names=None):
         assert (self.can_compute), "Current self.stage must already be a ComputedPipelineStage. Call self.filter_sessions with filter configs to reach this step."
-        self.stage.single_computation(active_computation_params, enabled_filter_names=enabled_filter_names)
+        self.stage.evaluate_single_computation_params(active_computation_params, enabled_filter_names=enabled_filter_names)
         
     def register_computation(self, registered_name, computation_function):
         assert (self.can_compute), "Current self.stage must already be a ComputedPipelineStage. Call self.filter_sessions with filter configs to reach this step."
