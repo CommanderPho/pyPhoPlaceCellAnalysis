@@ -110,6 +110,8 @@ class Interactive3dDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Displ
         pActiveInteractiveLapsPlotter = iplapsDataExplorer.plot(pActivePlotter=pActiveInteractiveLapsPlotter)
         return {'iplapsDataExplorer': iplapsDataExplorer, 'plotter': pActiveInteractiveLapsPlotter}
 
+
+
     def _display_3d_image_plotter(computation_result, active_config, **kwargs):
         """ 
         Inputs: {'extant_plotter': None} 
