@@ -95,10 +95,10 @@ class TimeSynchronizedOccupancyPlotter(AnimalTrajectoryPlottingMixin, TimeSynchr
         #                             minXRange=_width, maxXRange=_width, minYRange=_height, maxYRange=_height)
         
         self.ui.root_plot.setMouseEnabled(x=False, y=False)
+        self.ui.root_plot.setMenuEnabled(enableMenu=False)
         
         ## Optional Animal Trajectory Path Plot:
         self.AnimalTrajectoryPlottingMixin_on_buildUI()
-        
         
         # ## Optional Interactive Color Bar:
         # bar = pg.ColorBarItem(values= (0, 1), colorMap=self.params.cmap, width=5, interactive=False) # prepare interactive color bar
