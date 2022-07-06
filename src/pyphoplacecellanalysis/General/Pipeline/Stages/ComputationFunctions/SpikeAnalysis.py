@@ -25,8 +25,18 @@ class SpikeAnalysisComputations(AllFunctionEnumeratingMixin, metaclass=Computati
     _computationPrecidence = 4
     
     def _perform_spike_burst_detection_computation(computation_result: ComputationResult, debug_print=False):
-        """ Computes periods when the cells are firing in bursts
+        """ Computes periods when the cells are firing in bursts in a hierarchical manner
         
+        Requires:
+            pf2D_Decoder
+            
+        Optional Requires:
+            computation_result.computation_config['spike_analysis']
+        
+        Provides:
+        computation_result.computed_data['burst_detection']
+            ['burst_detection']['burst_intervals']
+    
         Model Goal:
             "Thus, the combined goal is to track the sequence of gaps as well as possible without changing state too much."
         
@@ -38,6 +48,7 @@ class SpikeAnalysisComputations(AllFunctionEnumeratingMixin, metaclass=Computati
 
         """
         def _compute_pybursts_burst_interval_detection(sess, max_num_spikes_per_neuron=20000, kleinberg_parameters=DynamicParameters(s=2, gamma=0.1), use_progress_bar=False, debug_print=False):
+           """ Computes spike bursts in a hierarchical manner"""
             out_pyburst_intervals = IndexedOrderedDict()
 
             # Build the progress bar:
@@ -139,8 +150,5 @@ class SpikeAnalysisComputations(AllFunctionEnumeratingMixin, metaclass=Computati
             active_burst_info
         """
         return computation_result
-    
-    
-    
     
     
