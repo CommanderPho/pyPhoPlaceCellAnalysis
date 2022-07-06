@@ -202,7 +202,6 @@ class PipelineWithDisplayPipelineStageMixin:
         
     def prepare_for_display(self, root_output_dir=r'R:\data\Output', should_smooth_maze=True):
         assert (self.is_computed), "Current self.is_computed must be true. Call self.perform_computations to reach this step."
-        self.reload_default_display_functions() # reload default display functions first
         self.stage = DisplayPipelineStage(self.stage)  # build the Display stage
         # Loops through all the configs and ensure that they have the neuron identity info if they need it.
         for an_active_config_name in self.active_configs.keys():
@@ -213,6 +212,7 @@ class PipelineWithDisplayPipelineStageMixin:
                 self.active_configs[an_active_config_name] = add_custom_plotting_options_if_needed(self.active_configs[an_active_config_name], should_smooth_maze=should_smooth_maze)
                 self.active_configs[an_active_config_name] = update_figure_files_output_Format(self.computation_results[an_active_config_name], self.active_configs[an_active_config_name], root_output_dir=root_output_dir)
 
+        self.reload_default_display_functions() # reload default display functions first
                     
     def display(self, display_function, active_session_filter_configuration: str, **kwargs):
         """ Called to actually perform the display. Should output a figure/widget/graphic of some kind. 
