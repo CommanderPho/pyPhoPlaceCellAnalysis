@@ -49,6 +49,7 @@ class ExtendedStatsComputations(AllFunctionEnumeratingMixin, metaclass=Computati
     
     def _perform_firing_rate_trends_computation(computation_result: ComputationResult, debug_print=False):
         """ Computes trends and time-courses of each neuron's firing rate. 
+        
             TODO: Doesn't return an accurate set of windows corresponding to the bins, which is strange because it should be trivial given that these are the same windows used for position, right?
             
         

@@ -48,7 +48,7 @@ class SpikeAnalysisComputations(AllFunctionEnumeratingMixin, metaclass=Computati
 
         """
         def _compute_pybursts_burst_interval_detection(sess, max_num_spikes_per_neuron=20000, kleinberg_parameters=DynamicParameters(s=2, gamma=0.1), use_progress_bar=False, debug_print=False):
-           """ Computes spike bursts in a hierarchical manner"""
+            """ Computes spike bursts in a hierarchical manner """
             out_pyburst_intervals = IndexedOrderedDict()
 
             # Build the progress bar:
@@ -88,9 +88,9 @@ class SpikeAnalysisComputations(AllFunctionEnumeratingMixin, metaclass=Computati
                     curr_pyburst_interval_df['interval_pair'] = list(zip(curr_pyburst_interval_df.t_start, curr_pyburst_interval_df.t_duration)) # pairs like # [(33, 4), (76, 16), (76, 1)]
                     # print(f'interval_pairs: {interval_pairs}') 
                     out_pyburst_intervals[a_cell_id] = curr_pyburst_interval_df
-            
+
             return out_pyburst_intervals
-            
+
         """
         
         # To Access results from previous computation stages:
