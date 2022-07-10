@@ -130,7 +130,11 @@ class PipelineWithComputedPipelineStageMixin:
         """Returns the doc strings for each registered computation function. This is taken from their docstring at the start of the function defn, and provides an overview into what the function will do."""
         return {a_fn_name:a_fn.__doc__ for a_fn_name, a_fn in self.registered_computation_function_dict.items()}
     
-    
+    def reload_default_computation_functions(self):
+        """ reloads/re-registers the default display functions after adding a new one """
+        self.stage.reload_default_computation_functions() 
+        
+        
     ## Computation Helpers: 
     def perform_computations(self, active_computation_params: Optional[DynamicParameters]=None, enabled_filter_names=None, omitted_computation_functions_name_list=None, debug_print=False):
         assert (self.can_compute), "Current self.stage must already be a ComputedPipelineStage. Call self.filter_sessions with filter configs to reach this step."
@@ -181,7 +185,11 @@ class ComputedPipelineStage(LoadableInput, LoadableSessionInput, FilterablePipel
         """The registered_computation_function_names property."""
         return list(self.registered_computation_function_dict.keys()) 
     
-    
+    def reload_default_computation_functions(self):
+        """ reloads/re-registers the default display functions after adding a new one """
+        self.register_default_known_computation_functions() # registers the default
+        
+        
     def register_computation(self, registered_name, computation_function):
         self.registered_computation_function_dict[registered_name] = computation_function
         
