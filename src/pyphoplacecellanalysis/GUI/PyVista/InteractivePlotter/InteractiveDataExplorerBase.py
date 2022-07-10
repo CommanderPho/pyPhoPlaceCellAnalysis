@@ -10,11 +10,11 @@ from pyvistaqt.plotting import MultiPlotter
 
 from qtpy import QtCore, QtGui, QtWidgets
 
-from pyphocorehelpers.DataStructure.general_parameter_containers import DebugHelper, VisualizationParameters
+from pyphocorehelpers.DataStructure.general_parameter_containers import DebugHelper, VisualizationParameters, RenderPlotsData, RenderPlots
+from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer
 
 from pyphoplacecellanalysis.PhoPositionalData.plotting.gui import customize_default_pyvista_theme, print_controls_helper_text
 from pyphoplacecellanalysis.PhoPositionalData.import_data import build_spike_positions_list
-
 from pyphoplacecellanalysis.PhoPositionalData.plotting.spikeAndPositions import animal_location_circle, animal_location_trail_circle
 
 
@@ -129,12 +129,12 @@ class InteractiveDataExplorerBase(InteractivePyvistaPlotterBuildIfNeededMixin, I
         self.y = self.active_session.position.y
         
         # Helper variables
-        self.params = VisualizationParameters('')
-        self.debug = DebugHelper('')
-
-        self.plots_data = dict()
-        self.plots = dict()
-        self.ui = dict()
+        display_class_name = f'{str(type(self))}{data_explorer_name}'
+        self.params = VisualizationParameters(name=display_class_name)
+        self.debug = DebugHelper(name=display_class_name)
+        self.plots_data = RenderPlotsData(name=display_class_name)
+        self.plots = RenderPlots(name=display_class_name)
+        self.ui = PhoUIContainer(name=display_class_name)
         
     @staticmethod
     def _unpack_variables(active_session):
