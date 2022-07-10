@@ -6,6 +6,18 @@ from pyphoplacecellanalysis.PhoPositionalData.plotting.mixins.general_plotting_m
 
 
 class OccupancyPlottingConfig(BasePlotDataParams):
+    """ 
+    This class ues the 'param' library to observe changes to its members and perform corresponding updates to the class that holds it when they happen:
+    
+    From  OccupancyPlottingMixin.setup_occupancy_plotting_mixin(self):
+        # Setup watchers:    
+        self.occupancy_plotting_config.param.watch(self.plot_occupancy_bars, OccupancyPlottingConfig._config_update_watch_labels(), queued=True)
+        self.occupancy_plotting_config.param.watch(self.on_occupancy_plot_update_visibility, OccupancyPlottingConfig._config_visibility_watch_labels(), queued=True)
+    
+    
+    Note that _config_update_watch_labels() provides the names/labels of the properties that when updated trigger plot_occupancy_bars(...)
+        and _config_visibility_watch_labels() provides those for on_occupancy_plot_update_visibility(...)
+    """
     debug_logging = False
 
     @staticmethod
@@ -44,7 +56,46 @@ class OccupancyPlottingConfig(BasePlotDataParams):
 
     
 class OccupancyPlottingMixin:
-    """ Implementor visually plots a 3D occupancy map """
+    """ Implementor visually plots a 3D occupancy map 
+    
+    Implementor must call self.setup_occupancy_plotting_mixin() at some time prior to displaying the bars.
+    
+    Requires (Implementor Must Provide):
+        self.params.active_epoch_placefields.ratemap
+        self.params.active_epoch_placefields.ratemap.occupancy
+        self.ratemap.xbin
+        self.ratemap.ybin
+        self.ratemap.xbin_centers
+        self.ratemap.ybin_centers
+        self.plots
+        self.p
+        
+        
+        
+        
+    Provides:
+        Provided Properties:
+            occupancy_plotting_config
+            occupancy_plot_actor
+            xbin
+            ybin
+            xbin_centers
+            ybin_centers
+            
+            self.plots['occupancyPlotActor']
+            self.plots_data['occupancyPlotData']
+            self.params._active_occupancy_plotting_config
+            
+            
+        Provided Methods:
+            plot_occupancy_bars(...)
+            setup_occupancy_plotting_mixin(...)
+            
+    Known Uses:
+        InteractivePlaceCellTuningCurvesDataExplorer: to render Occupancy bars on the maze
+    
+    
+    """
     debug_logging = False
     
     @property
