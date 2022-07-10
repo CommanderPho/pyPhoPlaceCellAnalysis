@@ -2,6 +2,9 @@
 # -*- coding: utf-8 -*-
 """
 @author: pho
+
+# TODO: what is this?
+
 """
 import sys
 import numpy as np
@@ -21,7 +24,6 @@ def process_positionalAnalysis_data(data):
     dy = np.squeeze(data['positionalAnalysis']['displacement']['dy'])
     return t,x,y,speeds,dt,dx,dy
 
-
 #todo:
 def process_finalSpikingDatasitionalAnalysis_data(data):
     t = np.squeeze(data['positionalAnalysis']['track_position']['t'])
@@ -33,13 +35,11 @@ def process_finalSpikingDatasitionalAnalysis_data(data):
     dy = np.squeeze(data['positionalAnalysis']['displacement']['dy'])
     return t,x,y,speeds,dt,dx,dy
 
-
 def gen_2d_histrogram(x, y, sigma, bins=80):
     heatmap, xedges, yedges = np.histogram2d(x, y, bins=bins, density=False)
     heatmap = gaussian_filter(heatmap, sigma=sigma)
     extent = [xedges[0], xedges[-1], yedges[0], yedges[-1]]
     return heatmap.T, extent, xedges, yedges
-
 
 def get_heatmap_color_vectors(point_heatmap_value):
     # Convert the values into a actual color vectors
@@ -52,7 +52,6 @@ def bin_edges_to_midpoints(x):
     # Takes a set of N+1 edges and gets the N midpoints centered between each pair
     # See https://stackoverflow.com/questions/23855976/middle-point-of-each-pair-of-an-numpy-array
     return (x[1:] + x[:-1]) / 2
-
 
 def process_chunk_equal_poritions_data_vectors(data_vectors_matrix, curr_view_window_length=30):
     # data_vectors_matrix: a N x M matrix where M is the number of equal length data vectors (of length N)
@@ -74,8 +73,6 @@ def process_chunk_equal_poritions_data_vectors(data_vectors_matrix, curr_view_wi
         reshaped_data_matrix[i,:,:] = data_vectors_matrix[i, 0:trimmed_length].reshape(other_reshaped_dimension, curr_view_window_length)
 
     return reshaped_data_matrix
-
-
 
 
 def process_chunk_equal_poritions_data(t, x, y, speeds, dt, dx, dy, curr_view_window_length=30):

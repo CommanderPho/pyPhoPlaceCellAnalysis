@@ -9,7 +9,7 @@ import numpy as np
 import pyphoplacecellanalysis.External.pyqtgraph as pg
 from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtCore, QtGui
 
-from BuildParamTypes import makeAllParamTypes
+from pyphoplacecellanalysis.GUI.PyQtPlot.Params.BuildParamTypes import makeAllParamTypes
 
 import pyphoplacecellanalysis.External.pyqtgraph.parametertree.parameterTypes as pTypes
 from pyphoplacecellanalysis.External.pyqtgraph.parametertree import Parameter, ParameterTree

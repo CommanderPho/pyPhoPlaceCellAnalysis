@@ -4,7 +4,7 @@ from qtpy import QtCore, QtWidgets
 import pyphoplacecellanalysis.External.pyqtgraph as pg
 
 from pyphocorehelpers.DataStructure.general_parameter_containers import VisualizationParameters
-# from pyphocorehelpers.gui.Qt.SyncedTimelineWindowLink import connect_additional_controlled_plotter, connect_controlled_time_synchornized_plotter
+# from pyphocorehelpers.gui.Qt.SyncedTimelineWindowLink import connect_additional_controlled_plotter, connect_controlled_time_synchronized_plotter
 from pyphocorehelpers.gui.Qt.GlobalConnectionManager import GlobalConnectionManager, GlobalConnectionManagerAccessingMixin
 from pyphocorehelpers.gui.Qt.qevent_lookup_helpers import QEventLookupHelpers
 

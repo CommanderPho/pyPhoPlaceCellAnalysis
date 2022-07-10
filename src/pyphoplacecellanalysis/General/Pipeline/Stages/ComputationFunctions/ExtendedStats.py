@@ -14,7 +14,21 @@ class ExtendedStatsComputations(AllFunctionEnumeratingMixin, metaclass=Computati
     _computationPrecidence = 3
     
     def _perform_extended_statistics_computation(computation_result: ComputationResult, debug_print=False):
-        """ Computes extended statistics regarding firing rates and such from the various dataframes. """
+        """ Computes extended statistics regarding firing rates and such from the various dataframes.
+        
+        Requires:
+            computation_result.sess.position
+            computation_result.computation_config.pf_params.time_bin_size
+            
+        Provides:
+            computation_result.computed_data['extended_stats']
+                ['extended_stats']['time_binned_positioned_resampler']
+                ['extended_stats']['time_binned_position_df']
+                ['extended_stats']['time_binned_position_mean']
+                ['extended_stats']['time_binned_position_covariance']                
+                
+        
+        """
         time_binned_position_resampler = build_position_df_resampled_to_time_windows(computation_result.sess.position.to_dataframe(), time_bin_size=computation_result.computation_config.pf_params.time_bin_size) # TimedeltaIndexResampler
         time_binned_position_df = time_binned_position_resampler.nearest() # an actual dataframe
         computation_result.computed_data['extended_stats'] = {
@@ -35,7 +49,23 @@ class ExtendedStatsComputations(AllFunctionEnumeratingMixin, metaclass=Computati
     
     def _perform_firing_rate_trends_computation(computation_result: ComputationResult, debug_print=False):
         """ Computes trends and time-courses of each neuron's firing rate. 
-            Doesn't return an accurate set of windows corresponding to the bins, which is strange because it should be trivial given that these are the same windows used for position, right?
+        
+            TODO: Doesn't return an accurate set of windows corresponding to the bins, which is strange because it should be trivial given that these are the same windows used for position, right?
+            
+        
+        Requires:
+            ['pf2D_Decoder']
+            ['extended_stats']['time_binned_position_df']
+            
+        Provides:
+            computation_result.computed_data['firing_rate_trends']
+                ['firing_rate_trends']['active_rolling_window_times']
+                ['firing_rate_trends']['mean_firing_rates']
+                ['firing_rate_trends']['desired_window_length_seconds']
+                ['firing_rate_trends']['desired_window_length_bins']
+                ['firing_rate_trends']['active_firing_rates_df']
+                ['firing_rate_trends']['moving_mean_firing_rates_df']
+        
         """
         # compute the mean firing rates over all time for each cell
         mean_firing_rates = np.nanmean(computation_result.computed_data['pf2D_Decoder'].F, axis=0) # output should be (n_units, )
@@ -81,7 +111,18 @@ class ExtendedStatsComputations(AllFunctionEnumeratingMixin, metaclass=Computati
     
     
     def _perform_placefield_overlap_computation(computation_result: ComputationResult, debug_print=False):
-        """ Computes the pairwise overlap between every pair of placefields. """
+        """ Computes the pairwise overlap between every pair of placefields. 
+        
+        TODO: Move to PlacefieldDensityAnalysisComputationFunctions
+        
+        
+        Requires:
+            pf2D_Decoder
+            
+        Provides:
+            ['placefield_overlap']
+        
+        """
         """ all_pairwise_neuron_IDXs_combinations: (np.shape: (903, 2))
         array([[ 0,  1],
             [ 0,  2],

@@ -15,13 +15,15 @@ from pyphoplacecellanalysis.General.Pipeline.Stages.Filtering import FilterableP
 from pyphoplacecellanalysis.General.Pipeline.Stages.Loading import LoadableInput, LoadableSessionInput, LoadedPipelineStage    
 from pyphoplacecellanalysis.General.Model.ComputationResults import ComputationResult
 
+import pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions
+# from General.Pipeline.Stages.ComputationFunctions import ComputationFunctionRegistryHolder # should include ComputationFunctionRegistryHolder and all specifics
 from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.ComputationFunctionRegistryHolder import ComputationFunctionRegistryHolder
 
 
-from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.DefaultComputationFunctions import DefaultComputationFunctions
-from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.PlacefieldComputations import PlacefieldComputations
-from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.ExtendedStats import ExtendedStatsComputations
-from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.SpikeAnalysis import SpikeAnalysisComputations
+# from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.DefaultComputationFunctions import DefaultComputationFunctions
+# from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.PlacefieldComputations import PlacefieldComputations
+# from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.ExtendedStats import ExtendedStatsComputations
+# from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.SpikeAnalysis import SpikeAnalysisComputations
 
 
 class ComputablePipelineStage:
@@ -42,18 +44,18 @@ class ComputablePipelineStage:
         
         return output_result
 
-    def single_computation(self, active_computation_params: DynamicParameters=None, enabled_filter_names=None):
+    def evaluate_single_computation_params(self, active_computation_params: DynamicParameters=None, enabled_filter_names=None, omitted_computation_functions_name_list=None):
         """ 'single' here refers to the fact that it evaluates only one of the active_computation_params
         
         Takes its filtered_session and applies the provided active_computation_params to it. The results are stored in self.computation_results under the same key as the filtered session. """
-        assert (len(self.filtered_sessions.keys()) > 0), "Must have at least one filtered session before calling single_computation(...). Call self.select_filters(...) first."
+        assert (len(self.filtered_sessions.keys()) > 0), "Must have at least one filtered session before calling evaluate_single_computation_params(...). Call self.select_filters(...) first."
         # self.active_computation_results = dict()
         if enabled_filter_names is None:
             enabled_filter_names = list(self.filtered_sessions.keys()) # all filters if specific enabled names aren't specified
 
         for a_select_config_name, a_filtered_session in self.filtered_sessions.items():                
             if a_select_config_name in enabled_filter_names:
-                print(f'Performing single_computation on filtered_session with filter named "{a_select_config_name}"...')
+                print(f'Performing evaluate_single_computation_params on filtered_session with filter named "{a_select_config_name}"...')
                 if active_computation_params is None:
                     active_computation_params = self.active_configs[a_select_config_name].computation_config # get the previously set computation configs
                 else:
@@ -61,7 +63,7 @@ class ComputablePipelineStage:
                     self.active_configs[a_select_config_name].computation_config = active_computation_params #TODO: if more than one computation config is passed in, the active_config should be duplicated for each computation config.
                 self.computation_results[a_select_config_name] = ComputablePipelineStage._build_initial_computationResult(a_filtered_session, active_computation_params) # returns a computation result. This stores the computation config used to compute it.
                 # call to perform any registered computations:
-                self.computation_results[a_select_config_name] = self.perform_registered_computations(self.computation_results[a_select_config_name], debug_print=True)
+                self.computation_results[a_select_config_name] = self.perform_registered_computations(self.computation_results[a_select_config_name], omitted_computation_functions_name_list=omitted_computation_functions_name_list, debug_print=True)
             else:
                 # this filter is excluded from the enabled list, no computations will we performed on it
                 self.computation_results.pop(a_select_config_name, None) # remove the computation results from previous runs from the dictionary to indicate that it hasn't been computed
@@ -79,28 +81,7 @@ class DefaultRegisteredComputations:
             for (a_computation_fn_name, a_computation_fn) in reversed(a_computation_class.get_all_functions(use_definition_order=True)):
                 self.register_computation(a_computation_fn_name, a_computation_fn)
         
-        
-        # [SpikeAnalysisComputations, ExtendedStatsComputations, DefaultComputationFunctions, PlacefieldComputations]
-        
-        
-        # # Register the neuronal firing analysis computation functions:
-        # for (a_computation_fn_name, a_computation_fn) in reversed(SpikeAnalysisComputations.get_all_functions(use_definition_order=True)):
-        #     self.register_computation(a_computation_fn_name, a_computation_fn)
-            
-        # # Register the Ratemap/Placemap computation functions: 
-        # for (a_computation_fn_name, a_computation_fn) in reversed(ExtendedStatsComputations.get_all_functions(use_definition_order=True)):
-        #     self.register_computation(a_computation_fn_name, a_computation_fn)
-            
-        # for (a_computation_fn_name, a_computation_fn) in reversed(DefaultComputationFunctions.get_all_functions(use_definition_order=True)):
-        #     self.register_computation(a_computation_fn_name, a_computation_fn)
-            
-        # for (a_computation_fn_name, a_computation_fn) in reversed(PlacefieldComputations.get_all_functions(use_definition_order=True)):
-        #     self.register_computation(a_computation_fn_name, a_computation_fn)
-            
-        
-        
-        
-    
+
 
 
 class PipelineWithComputedPipelineStageMixin:
@@ -137,19 +118,29 @@ class PipelineWithComputedPipelineStageMixin:
         """The registered_computation_function_names property."""
         return self.stage.registered_computation_function_names
     
+    @property
+    def registered_computation_function_dict(self):
+        """The registered_computation_function_dict property can be used to get the corresponding function from the string name."""
+        return self.stage.registered_computation_function_dict
+    
+    @property
+    def registered_computation_function_docs_dict(self):
+        """Returns the doc strings for each registered computation function. This is taken from their docstring at the start of the function defn, and provides an overview into what the function will do."""
+        return {a_fn_name:a_fn.__doc__ for a_fn_name, a_fn in self.registered_computation_function_dict.items()}
+    
     
     ## Computation Helpers: 
-    def perform_computations(self, active_computation_params: DynamicParameters=None, enabled_filter_names=None):
+    def perform_computations(self, active_computation_params: DynamicParameters=None, enabled_filter_names=None, omitted_computation_functions_name_list=None):
         assert (self.can_compute), "Current self.stage must already be a ComputedPipelineStage. Call self.filter_sessions with filter configs to reach this step."
-        self.stage.single_computation(active_computation_params, enabled_filter_names=enabled_filter_names)
+        self.stage.evaluate_single_computation_params(active_computation_params, enabled_filter_names=enabled_filter_names, omitted_computation_functions_name_list=omitted_computation_functions_name_list)
         
     def register_computation(self, registered_name, computation_function):
         assert (self.can_compute), "Current self.stage must already be a ComputedPipelineStage. Call self.filter_sessions with filter configs to reach this step."
         self.stage.register_computation(registered_name, computation_function)
 
-    def perform_registered_computations(self, previous_computation_result=None, debug_print=False):
+    def perform_registered_computations(self, previous_computation_result=None, omitted_computation_functions_name_list=None, debug_print=False):
         assert (self.can_compute), "Current self.stage must already be a ComputedPipelineStage. Call self.perform_computations to reach this step."
-        self.stage.perform_registered_computations(previous_computation_result, debug_print=debug_print)
+        self.stage.perform_registered_computations(previous_computation_result, omitted_computation_functions_name_list=omitted_computation_functions_name_list, debug_print=debug_print)
     
     
     
@@ -176,7 +167,6 @@ class ComputedPipelineStage(LoadableInput, LoadableSessionInput, FilterablePipel
         self.computation_results = dict()
         
         self.registered_computation_function_dict = OrderedDict()
-        # self.registered_computation_functions = list()
         self.register_default_known_computation_functions() # registers the default
         
     @property
@@ -192,27 +182,38 @@ class ComputedPipelineStage(LoadableInput, LoadableSessionInput, FilterablePipel
     
     def register_computation(self, registered_name, computation_function):
         self.registered_computation_function_dict[registered_name] = computation_function
-        # self.registered_computation_functions.append(computation_function)
         
-    def perform_registered_computations(self, previous_computation_result=None, debug_print=False):
+    def perform_registered_computations(self, previous_computation_result=None, omitted_computation_functions_name_list=None, debug_print=False):
         """ Called after load is complete to post-process the data """
-        if (len(self.registered_computation_functions) > 0):
+        
+        # Need to exclude any computation functions specified in omitted_computation_functions_dict
+        if omitted_computation_functions_name_list is not None:
+            active_computation_function_dict = {a_computation_fn_name:a_computation_fn for (a_computation_fn_name, a_computation_fn) in self.registered_computation_function_dict.items() if a_computation_fn_name not in omitted_computation_functions_name_list}
+            active_computation_functions = list(active_computation_function_dict.values())
+            
+            
+            print(f'including only {len(active_computation_functions)} out of {len(self.registered_computation_function_names)} registered computation functions.')
+            # TODO: do something about the previous_computation_result?
+            
+        else:
+            active_computation_functions = self.registered_computation_functions
+        
+        
+        if (len(active_computation_functions) > 0):
             if debug_print:
-                print(f'Performing perform_registered_computations(...) with {len(self.registered_computation_functions)} registered_computation_functions...')
-            # composed_registered_computations_function = compose_functions(*self.registered_computation_functions) # functions are composed left-to-right
-            # Use exception-tolerant version of function composition (functions are composed left-to-right):
-            composed_registered_computations_function = compose_functions_with_error_handling(*self.registered_computation_functions) # functions are composed left-to-right
+                print(f'Performing perform_registered_computations(...) with {len(active_computation_functions)} registered_computation_functions...')
             
-            # if previous_computation_result is None:
-            #     assert (self.computation_results is not None), "if no previous_computation_result is passed, one should have been computed previously."
-            #     previous_computation_result = self.computation_results # Get the previously computed computation results. Note that if this function is called multiple times and assumes the results are coming in fresh, this can be an error.
-            
-            # normal version that fails on any exception:
+            # ## normal version that fails on any exception:
+            # composed_registered_computations_function = compose_functions(*active_computation_functions) # functions are composed left-to-right
             # previous_computation_result = composed_registered_computations_function(previous_computation_result)
-            # exception-tolerant version
+            # accumulated_errors = None
+
+            ## Use exception-tolerant version of function composition (functions are composed left-to-right):
+            composed_registered_computations_function = compose_functions_with_error_handling(*active_computation_functions) # functions are composed left-to-right, exception-tolerant version
             previous_computation_result, accumulated_errors = composed_registered_computations_function(previous_computation_result)
             
-            print(f'perform_registered_computations(...): \n\taccumulated_errors: {accumulated_errors}')
+            if debug_print:
+                print(f'perform_registered_computations(...): \n\taccumulated_errors: {accumulated_errors}')
             # Add the function to the computation result:
             previous_computation_result.accumulated_errors = accumulated_errors
             

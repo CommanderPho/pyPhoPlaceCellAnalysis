@@ -3,6 +3,10 @@
 Created on Sat Oct  9 12:33:48 2021
 
 @author: Pho
+
+
+# TODO: this seems to relate to loading RoyMaze1! Does/Did that functionality work in Python?
+
 """
 
 import numpy as np

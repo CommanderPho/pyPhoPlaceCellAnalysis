@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 from qtpy import QtCore, QtWidgets
 
-from neuropy.analyses.time_dependent_placefields import PfND_TimeDependent
+# from neuropy.analyses.time_dependent_placefields import PfND_TimeDependent
 
 import pyphoplacecellanalysis.External.pyqtgraph as pg
 # from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtCore, QtGui
@@ -16,8 +16,7 @@ from pyphoplacecellanalysis.Pho2D.PyQtPlots.TimeSynchronizedPlotters.Mixins.Anim
 
 
 class TimeSynchronizedOccupancyPlotter(AnimalTrajectoryPlottingMixin, TimeSynchronizedPlotterBase):
-    """ Plots the time-dependent occupancy.
-    
+    """ Plots the time-dependent occupancy produced by a PfND_TimeDependent instance.
     
     Usage:
     
@@ -30,8 +29,8 @@ class TimeSynchronizedOccupancyPlotter(AnimalTrajectoryPlottingMixin, TimeSynchr
         active_time_dependent_placefields2D = PfND_TimeDependent(deepcopy(sess.spikes_df.copy()), deepcopy(sess.position), epochs=included_epochs,
                                           speed_thresh=computation_config.speed_thresh, frate_thresh=computation_config.frate_thresh,
                                           grid_bin=computation_config.grid_bin, smooth=computation_config.smooth)
-        curr_occupancy_plotter = TimeSynchronizedOccupancyPlotter(active_time_dependent_placefields2D)
-        curr_occupancy_plotter.show()
+        curr_sync_occupancy_plotter = TimeSynchronizedOccupancyPlotter(active_time_dependent_placefields2D)
+        curr_sync_occupancy_plotter.show()
 
     """
     # Application/Window Configuration Options:
@@ -65,9 +64,7 @@ class TimeSynchronizedOccupancyPlotter(AnimalTrajectoryPlottingMixin, TimeSynchr
         
         self.AnimalTrajectoryPlottingMixin_on_setup()
         
-        
-        
-        
+
     def _buildGraphics(self):
         ## More Involved Mode:
         self.ui.root_graphics_layout_widget = pg.GraphicsLayoutWidget()
@@ -82,14 +79,26 @@ class TimeSynchronizedOccupancyPlotter(AnimalTrajectoryPlottingMixin, TimeSynchr
         # self.ui.root_view.setRange(QtCore.QRectF(*self.params.image_bounds_extent))
 
         self.ui.root_plot = self.ui.root_graphics_layout_widget.addPlot(row=0, col=0, name=f'Occupancy', title=f'Occupancy -  t = {self.active_time_dependent_placefields.last_t}')
-        self.ui.root_plot.addItem(self.ui.imv)  # add ImageItem to PlotItem
+        self.ui.root_plot.addItem(self.ui.imv, defaultPadding=0.0)  # add ImageItem to PlotItem
         self.ui.root_plot.showAxes(True)
-        self.ui.root_plot.setXRange(*self.params.x_range)
-        self.ui.root_plot.setYRange(*self.params.y_range)
+        self.ui.root_plot.hideButtons() # Hides the auto-scale button
+        
+        # self.ui.root_plot.showAxes(False)        
+        self.ui.root_plot.setRange(xRange=self.params.x_range, yRange=self.params.y_range, padding=0.0)
+        # Sets only the panning limits:
+        self.ui.root_plot.setLimits(xMin=self.params.x_range[0], xMax=self.params.x_range[-1], yMin=self.params.y_range[0], yMax=self.params.y_range[-1])
 
+        ## Sets all limits:
+        # _x, _y, _width, _height = self.params.image_bounds_extent # [23.923329354140844, 123.85967782096927, 241.7178791533281, 30.256480996256016]
+        # self.ui.root_plot.setLimits(minXRange=_width, maxXRange=_width, minYRange=_height, maxYRange=_height)
+        # self.ui.root_plot.setLimits(xMin=self.params.x_range[0], xMax=self.params.x_range[-1], yMin=self.params.y_range[0], yMax=self.params.y_range[-1],
+        #                             minXRange=_width, maxXRange=_width, minYRange=_height, maxYRange=_height)
+        
+        self.ui.root_plot.setMouseEnabled(x=False, y=False)
+        self.ui.root_plot.setMenuEnabled(enableMenu=False)
+        
         ## Optional Animal Trajectory Path Plot:
         self.AnimalTrajectoryPlottingMixin_on_buildUI()
-        
         
         # ## Optional Interactive Color Bar:
         # bar = pg.ColorBarItem(values= (0, 1), colorMap=self.params.cmap, width=5, interactive=False) # prepare interactive color bar

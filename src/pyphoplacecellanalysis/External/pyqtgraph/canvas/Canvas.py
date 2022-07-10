@@ -8,7 +8,7 @@ from ..graphicsItems.ViewBox import ViewBox
 from ..Qt import QT_LIB, QtCore, QtGui, QtWidgets
 
 ui_template = importlib.import_module(
-    f'.CanvasTemplate_{QT_LIB.lower()}', package=__package__)
+    f'.CanvasTemplate_{QT_LIB.lower()}', package='pyphoplacecellanalysis.External.pyqtgraph.canvas')
     
 import gc
 import weakref

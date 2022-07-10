@@ -26,18 +26,6 @@ from qtpy.QtCore import QFile, QTextStream
 import pyphoplacecellanalysis.External.breeze_style_sheets.breeze_resources
 
 
-
-"""
-TODO:
-It looks like CheckTable is what I want in terms of a checkbox list.
-
-from pyphoplacecellanalysis.External.pyqtgraph.widgets.CheckTable import CheckTable
-
-
-
-
-
-"""
 def plot_flowchartWidget(title='PhoFlowchartApp'):
     """ 
     Usage:
@@ -50,7 +38,6 @@ def plot_flowchartWidget(title='PhoFlowchartApp'):
     mainAppWindow.setWindowTitle(f'PhoFlowchartApp: pyqtgraph FlowchartCustomNodes: {title}')
     
     # get central widget:
-    # cw = mainAppWindow.flowchart_controls
     cw = mainAppWindow.centralwidget
     print(f'cw: {cw}')
     

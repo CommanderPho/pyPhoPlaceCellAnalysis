@@ -22,7 +22,7 @@ from .. import functions as fn
 from ..Qt import QT_LIB, QtCore, QtGui, QtWidgets
 
 ui_template = importlib.import_module(
-    f'.ImageViewTemplate_{QT_LIB.lower()}', package=__package__)
+    f'.ImageViewTemplate_{QT_LIB.lower()}', package='pyphoplacecellanalysis.External.pyqtgraph.imageview')
 
 from .. import debug as debug
 from .. import getConfigOption

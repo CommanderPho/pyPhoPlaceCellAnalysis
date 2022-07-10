@@ -5,13 +5,11 @@
 """
 import sys
 from threading import Thread
-from ipygany import PolyMesh, Scene, IsoColor, WarpByScalar
+# from ipygany import PolyMesh, Scene, IsoColor, WarpByScalar
 import pyvista as pv
 import pyvistaqt as pvqt
 import numpy as np
 from pathlib import Path
-import bqplot.scales
-import seaborn as sns
 from mpl_toolkits import mplot3d
 import matplotlib.pyplot as plt
 import matplotlib.cm as cm
@@ -20,8 +18,6 @@ from matplotlib.colors import Normalize
 import math # For color map generation
 from matplotlib.colors import ListedColormap
 from matplotlib.cm import hsv
-
-import ipywidgets as widgets
 
 from pyphoplacecellanalysis.PhoPositionalData.process_data import get_filtered_window
 

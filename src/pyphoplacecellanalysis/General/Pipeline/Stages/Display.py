@@ -2,31 +2,20 @@ from collections import OrderedDict
 from datetime import datetime
 from pathlib import Path
 import numpy as np
-import pandas as pd
-import matplotlib.pyplot as plt
-import pyvista as pv
-import pyvistaqt as pvqt
 
-
-from pyphocorehelpers.indexing_helpers import interleave_elements
-from pyphocorehelpers.print_helpers import WrappingMessagePrinter
-from pyphocorehelpers.plotting.mixins.figure_param_text_box import add_figure_text_box # for _display_add_computation_param_text_box
-from pyphocorehelpers.geometry_helpers import compute_data_extent, compute_data_aspect_ratio
-
+from neuropy.core.neuron_identities import NeuronIdentity, build_units_colormap, PlotStringBrevityModeEnum
 
 from pyphoplacecellanalysis.General.Pipeline.Stages.Computation import ComputedPipelineStage
-from pyphoplacecellanalysis.General.Configs.DynamicConfigs import PlottingConfig, InteractivePlaceCellConfig
 from pyphoplacecellanalysis.General.Pipeline.Stages.BaseNeuropyPipelineStage import PipelineStage
-
 from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DisplayFunctionRegistryHolder import DisplayFunctionRegistryHolder
 # Import Display Functions
 from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DefaultDisplayFunctions import DefaultDisplayFunctions
 from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.Ratemaps import DefaultRatemapDisplayFunctions
 from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import DefaultDecoderDisplayFunctions
 from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.SpikeRasters import SpikeRastersDisplayFunctions
-
-
-from neuropy.core.neuron_identities import NeuronIdentity, build_units_colormap, PlotStringBrevityModeEnum
+from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.EloyAnalysis import EloyAnalysisDisplayFunctions
+from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.Interactive3dDisplayFunctions import Interactive3dDisplayFunctions
+from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.FiringStatisticsDisplayFunctions import FiringStatisticsDisplayFunctions
 
 
 
@@ -168,23 +157,6 @@ class DefaultRegisteredDisplayFunctions:
             for (a_display_fn_name, a_display_fn) in a_display_class.get_all_functions(use_definition_order=False):
                 self.register_display_function(a_display_fn_name, a_display_fn)
         
-        # # Register the Ratemap/Placemap display functions: 
-        # for (a_display_fn_name, a_display_fn) in DefaultDisplayFunctions.get_all_functions(use_definition_order=False):
-        #     self.register_display_function(a_display_fn_name, a_display_fn)
-            
-        # # Register the Ratemap/Placemap display functions: 
-        # for (a_display_fn_name, a_display_fn) in DefaultRatemapDisplayFunctions.get_all_functions(use_definition_order=False):
-        #     self.register_display_function(a_display_fn_name, a_display_fn)
-            
-        # # Register the Bayesian decoder display functions: 
-        # for (a_display_fn_name, a_display_fn) in DefaultDecoderDisplayFunctions.get_all_functions(use_definition_order=False):
-        #     self.register_display_function(a_display_fn_name, a_display_fn)
-            
-        # # Register the spike rasters display functions: 
-        # for (a_display_fn_name, a_display_fn) in SpikeRastersDisplayFunctions.get_all_functions(use_definition_order=False):
-        #     self.register_display_function(a_display_fn_name, a_display_fn)
-            
-  
   
 
 class PipelineWithDisplayPipelineStageMixin:
@@ -224,6 +196,10 @@ class PipelineWithDisplayPipelineStageMixin:
         # assert (self.can_display), "Current self.stage must already be a ComputedPipelineStage. Call self.filter_sessions with filter configs to reach this step."
         self.stage.register_display_function(registered_name, display_function)
         
+    def reload_default_display_functions(self):
+        """ reloads/re-registers the default display functions after adding a new one """
+        self.stage.reload_default_display_functions() 
+        
     def prepare_for_display(self, root_output_dir=r'R:\data\Output', should_smooth_maze=True):
         assert (self.is_computed), "Current self.is_computed must be true. Call self.perform_computations to reach this step."
         self.stage = DisplayPipelineStage(self.stage)  # build the Display stage
@@ -236,6 +212,7 @@ class PipelineWithDisplayPipelineStageMixin:
                 self.active_configs[an_active_config_name] = add_custom_plotting_options_if_needed(self.active_configs[an_active_config_name], should_smooth_maze=should_smooth_maze)
                 self.active_configs[an_active_config_name] = update_figure_files_output_Format(self.computation_results[an_active_config_name], self.active_configs[an_active_config_name], root_output_dir=root_output_dir)
 
+        self.reload_default_display_functions() # reload default display functions first
                     
     def display(self, display_function, active_session_filter_configuration: str, **kwargs):
         """ Called to actually perform the display. Should output a figure/widget/graphic of some kind. 
@@ -255,8 +232,6 @@ class PipelineWithDisplayPipelineStageMixin:
         assert (active_session_filter_configuration in self.computation_results), f"self.computation_results doesn't contain a key for the provided active_session_filter_configuration ('{active_session_filter_configuration}'). Did you only enable computation with enabled_filter_names in perform_computation that didn't include this key?"
         return display_function(self.computation_results[active_session_filter_configuration], self.active_configs[active_session_filter_configuration], **kwargs)
 
-
-    
 
 class DisplayPipelineStage(DefaultRegisteredDisplayFunctions, ComputedPipelineStage):
     """ The concrete pipeline stage for displaying the output computed in previous stages."""
@@ -290,6 +265,10 @@ class DisplayPipelineStage(DefaultRegisteredDisplayFunctions, ComputedPipelineSt
         return list(self.registered_display_function_dict.keys()) 
     
     
+    def reload_default_display_functions(self):
+        """ reloads/re-registers the default display functions after adding a new one """
+        self.register_default_known_display_functions()
+        
     def register_display_function(self, registered_name, display_function):
         """ registers a new custom display function"""
         self.registered_display_function_dict[registered_name] = display_function

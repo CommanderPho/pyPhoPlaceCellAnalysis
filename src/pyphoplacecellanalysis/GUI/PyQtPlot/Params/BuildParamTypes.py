@@ -1,7 +1,7 @@
 from pyphoplacecellanalysis.External.pyqtgraph.parametertree import Parameter
 from pyphoplacecellanalysis.External.pyqtgraph.parametertree.Parameter import PARAM_TYPES
 from pyphoplacecellanalysis.External.pyqtgraph.parametertree.parameterTypes import GroupParameter
-from ParamTreeCfg import cfg
+from pyphoplacecellanalysis.GUI.PyQtPlot.Params.ParamTreeCfg import cfg
 
 _encounteredTypes = {'group'}
 
