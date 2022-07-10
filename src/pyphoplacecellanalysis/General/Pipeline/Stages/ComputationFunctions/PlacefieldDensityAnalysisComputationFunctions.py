@@ -179,8 +179,19 @@ class PlacefieldDensityAnalysisComputationFunctions(AllFunctionEnumeratingMixin,
                 
             Provides:
                 computed_data['RatemapPeaksAnalysis']
-                computed_data['RatemapPeaksAnalysis']['tuning_curve_findpeaks_results']: peaks_outputs: fp_mask, mask_results_df, fp_topo, topo_results_df, topo_persistence_df
+                # computed_data['RatemapPeaksAnalysis']['tuning_curve_findpeaks_results']: peaks_outputs: fp_mask, mask_results_df, fp_topo, topo_results_df, topo_persistence_df
                 
+                computed_data['RatemapPeaksAnalysis']['mask_results']: 
+                    computed_data['RatemapPeaksAnalysis']['mask_results']['fp_list']:
+                    computed_data['RatemapPeaksAnalysis']['mask_results']['df_list']:
+                    
+                computed_data['RatemapPeaksAnalysis']['topo_results']:
+                    computed_data['RatemapPeaksAnalysis']['topo_results']['fp_list']:
+                    computed_data['RatemapPeaksAnalysis']['topo_results']['df_list']:
+                    computed_data['RatemapPeaksAnalysis']['topo_results']['persistence_df_list']:
+                    computed_data['RatemapPeaksAnalysis']['topo_results']['peak_xy_points_pos_list']: the actual (x, y) positions of the peak points for each neuron
+                    
+                mask_results
             """            
             def ratemap_find_placefields(ratemap, debug_print=False):
                 """ Uses the `findpeaks` library for finding local maxima of TuningMaps
@@ -274,10 +285,18 @@ class PlacefieldDensityAnalysisComputationFunctions(AllFunctionEnumeratingMixin,
             # n_neurons = active_pf_2D.ratemap.n_neurons
             
             # peaks_outputs: fp_mask, mask_results_df, fp_topo, topo_results_df, topo_persistence_df
-            peaks_outputs = [ratemap_find_placefields(a_tuning_curve.copy(), debug_print=debug_print) for a_tuning_curve in active_pf_2D.ratemap.pdf_normalized_tuning_curves]
+            # peaks_outputs = [ratemap_find_placefields(a_tuning_curve.copy(), debug_print=debug_print) for a_tuning_curve in active_pf_2D.ratemap.pdf_normalized_tuning_curves]
+            # fp_mask_list, mask_results_df_list, fp_topo_list, topo_results_df_list, topo_persistence_df_list = tuple(zip(*findpeaks_results))
+            fp_mask_list, mask_results_df_list, fp_topo_list, topo_results_df_list, topo_persistence_df_list = tuple(zip(*[ratemap_find_placefields(a_tuning_curve.copy(), debug_print=debug_print) for a_tuning_curve in active_pf_2D.ratemap.pdf_normalized_tuning_curves]))
+            topo_results_peak_xy_pos_list = [np.vstack((active_pf_2D.xbin[curr_topo_result_df['xbin_idx'].to_numpy()], active_pf_2D.ybin[curr_topo_result_df['ybin_idx'].to_numpy()])) for curr_topo_result_df in topo_results_df_list]
+            # peak_xy_pos_shapes = [np.shape(a_xy_pos) for a_xy_pos in topo_results_peak_xy_pos_list]
+
 
             # fp_mask, mask_results_df, fp_topo, topo_results_df, topo_persistence_df = ratemap_find_placefields(active_pf_2D.ratemap.pdf_normalized_tuning_curves[3].copy(), debug_print=False)
             # topo_results_df
             
-            computation_result.computed_data['RatemapPeaksAnalysis'] = DynamicParameters(tuning_curve_findpeaks_results=peaks_outputs)
+            # computation_result.computed_data['RatemapPeaksAnalysis'] = DynamicParameters(tuning_curve_findpeaks_results=peaks_outputs)
+            computation_result.computed_data['RatemapPeaksAnalysis'] = DynamicParameters(mask_results=DynamicParameters(fp_list=fp_mask_list, df_list=mask_results_df_list),
+                                                                                         topo_results=DynamicParameters(fp_list=fp_topo_list, df_list=topo_results_df_list, persistence_df_list=topo_persistence_df_list, peak_xy_points_pos_list=topo_results_peak_xy_pos_list))
+            
             return computation_result
