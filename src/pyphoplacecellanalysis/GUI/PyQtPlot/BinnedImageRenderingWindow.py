@@ -26,9 +26,9 @@ def add_bin_ticks(plot_item, xbins=None, ybins=None):
     return plot_item
 
 
-def build_binned_imageItem(plot_item, params, xbins=None, ybins=None, matrix=None, data_label='Avg Velocity'):
-        local_plots_data = RenderPlotsData(name=data_label)
-        local_plots = RenderPlots(name=data_label)
+def build_binned_imageItem(plot_item, params, xbins=None, ybins=None, matrix=None, name='avg_velocity', data_label='Avg Velocity'):
+        local_plots_data = RenderPlotsData(name=name)
+        local_plots = RenderPlots(name=name)
         
         # plotItem.invertY(True)           # orient y axis to run top-to-bottom
         # Normal ImageItem():
@@ -45,6 +45,7 @@ def build_binned_imageItem(plot_item, params, xbins=None, ybins=None, matrix=Non
         # link color bar and color map to correlogram, and show it in plotItem:
         local_plots.colorBarItem.setImageItem(local_plots.imageItem, insert_in=plot_item)
         
+        local_plots_data.matrix = matrix.copy()
         local_plots_data.matrix_min = np.nanmin(matrix)
         local_plots_data.matrix_max = np.nanmax(matrix)
         # Set the colorbar to the range:
@@ -115,12 +116,14 @@ class BasicBinnedImageRenderingWindow(QtWidgets.QMainWindow):
             Based off of pyphoplacecellanalysis.GUI.PyQtPlot.pyqtplot_Matrix.MatrixRenderingWindow
     """
     
-    def __init__(self, matrix=None, xbins=None, ybins=None, defer_show=False, title="Avg Velocity per Pos (X, Y)", variable_label='Avg Velocity', **kwargs):
+    def __init__(self, matrix=None, xbins=None, ybins=None, name='avg_velocity', title="Avg Velocity per Pos (X, Y)", variable_label='Avg Velocity', drop_below_threshold: float=0.0000001, defer_show=False, **kwargs):
         super(BasicBinnedImageRenderingWindow, self).__init__(**kwargs)
         self.params = VisualizationParameters(name='BasicBinnedImageRenderingWindow')
         self.plots_data = RenderPlotsData(name='BasicBinnedImageRenderingWindow')
         self.plots = RenderPlots(name='BasicBinnedImageRenderingWindow')
         self.ui = PhoUIContainer(name='BasicBinnedImageRenderingWindow')
+        self.ui.connections = PhoUIContainer(name='BasicBinnedImageRenderingWindow')
+        
         
         self.params.colorMap = pg.colormap.get("viridis")
         pg.setConfigOption('imageAxisOrder', 'row-major') # Switch default order to Row-major
@@ -131,19 +134,25 @@ class BasicBinnedImageRenderingWindow(QtWidgets.QMainWindow):
         self.setWindowTitle(title)
         self.resize(600,500)
         
-        self.plots.mainPlotItem = self.ui.graphics_layout.addPlot(title=title, row=0, col=0)      # add PlotItem to the main GraphicsLayoutWidget
-        # plotItem.invertY(True)           # orient y axis to run top-to-bottom
-        self.plots.mainPlotItem.setDefaultPadding(0.0)  # plot without padding data range
-        self.plots.mainPlotItem.setMouseEnabled(x=False, y=False)
-        self.plots.mainPlotItem = add_bin_ticks(plot_item=self.plots.mainPlotItem, xbins=xbins, ybins=ybins)
+        ## Add Label for debugging:
+        self.ui.mainLabel = pg.LabelItem(justify='right')
+        self.ui.graphics_layout.addItem(self.ui.mainLabel)
+        
+        # Add the item for the provided data:
+        self.add_data(row=1, col=0, matrix=matrix, xbins=xbins, ybins=ybins, name=name, title=title, variable_label=variable_label, drop_below_threshold=drop_below_threshold)
+            
+        
+        # self.plots.mainPlotItem = self.ui.graphics_layout.addPlot(title=title, row=1, col=0)      # add PlotItem to the main GraphicsLayoutWidget
+        # # plotItem.invertY(True)           # orient y axis to run top-to-bottom
+        # self.plots.mainPlotItem.setDefaultPadding(0.0)  # plot without padding data range
+        # self.plots.mainPlotItem.setMouseEnabled(x=False, y=False)
+        # self.plots.mainPlotItem = add_bin_ticks(plot_item=self.plots.mainPlotItem, xbins=xbins, ybins=ybins)
 
-        # self.plots.mainImageItem, self.params.colorMap, self.plots.colorBarItem, local_plots_data = build_binned_imageItem(self.plots.mainPlotItem, xbins=xbins, ybins=ybins, matrix=matrix, data_label=variable_label)
+        # # self.plots.mainImageItem, self.params.colorMap, self.plots.colorBarItem, local_plots_data = build_binned_imageItem(self.plots.mainPlotItem, xbins=xbins, ybins=ybins, matrix=matrix, data_label=variable_label)
         
-        
-        
-        local_plots, local_plots_data = build_binned_imageItem(self.plots.mainPlotItem, self.params, xbins=xbins, ybins=ybins, matrix=matrix, data_label=variable_label)
-        self.plots_data[local_plots_data.name] = local_plots_data
-        self.plots[local_plots.name] = local_plots
+        # local_plots, local_plots_data = build_binned_imageItem(self.plots.mainPlotItem, self.params, xbins=xbins, ybins=ybins, matrix=matrix, name=name, data_label=variable_label)
+        # self.plots_data[local_plots_data.name] = local_plots_data
+        # self.plots[local_plots.name] = local_plots
         
         # # Normal ImageItem():
         # self.plots.mainImageItem = pg.ImageItem(matrix.T)
@@ -170,17 +179,50 @@ class BasicBinnedImageRenderingWindow(QtWidgets.QMainWindow):
         if not defer_show:
             self.show()
 
-    def add_data(self, row=1, col=0, matrix=None, xbins=None, ybins=None, title="Avg Velocity per Pos (X, Y)", variable_label='Avg Velocity'):
+    def add_data(self, row=2, col=0, matrix=None, xbins=None, ybins=None, name='avg_velocity', title="Avg Velocity per Pos (X, Y)", variable_label='Avg Velocity', drop_below_threshold: float=0.0000001):
         newPlotItem = self.ui.graphics_layout.addPlot(title=title, row=row, col=col)      # add PlotItem to the main GraphicsLayoutWidget
         newPlotItem.setDefaultPadding(0.0)  # plot without padding data range
         newPlotItem.setMouseEnabled(x=False, y=False)
         newPlotItem = add_bin_ticks(plot_item=newPlotItem, xbins=xbins, ybins=ybins)
+
+        if drop_below_threshold is not None:
+            matrix = matrix.astype(float) # required because NaN isn't available in Integer dtype arrays (in case the matrix is of integer type, this prevents a ValueError)
+            matrix[np.where(matrix < drop_below_threshold)] = np.nan # null out the occupancy
+            
         
-        self.plots_data[title] = matrix.copy()
-        self.plots[title] = newPlotItem
+        local_plots, local_plots_data = build_binned_imageItem(newPlotItem, self.params, xbins=xbins, ybins=ybins, matrix=matrix, name=name, data_label=variable_label)
+        self.plots_data[name] = local_plots_data
+        self.plots[name] = local_plots
+        self.plots[name].mainPlotItem = newPlotItem
         
-        local_plots, local_plots_data = build_binned_imageItem(newPlotItem, self.params, xbins=xbins, ybins=ybins, matrix=matrix, data_label=variable_label)
-        self.plots_data[local_plots_data.name] = local_plots_data
-        self.plots[local_plots.name] = local_plots
+        self.add_crosshairs(newPlotItem, matrix, name=name)
+        
         # newImageItem, newcolorMap, newColorBarItem, local_plots_data = build_binned_imageItem(newPlotItem, xbins=xbins, ybins=ybins, matrix=matrix, data_label=variable_label)
         # new_plots_data[local_plots_data.name] = local_plots_data
+        
+        
+    def add_crosshairs(self, plot_item, matrix, name):
+        """ adds crosshairs that allow the user to hover a bin and have the label dynamically display the bin (x, y) and value."""
+        vLine = pg.InfiniteLine(angle=90, movable=False)
+        hLine = pg.InfiniteLine(angle=0, movable=False)
+        plot_item.addItem(vLine, ignoreBounds=True)
+        plot_item.addItem(hLine, ignoreBounds=True)
+        vb = plot_item.vb
+
+        def mouseMoved(evt):
+            pos = evt[0]  ## using signal proxy turns original arguments into a tuple
+            if plot_item.sceneBoundingRect().contains(pos):
+                mousePoint = vb.mapSceneToView(pos)
+                index_x = int(mousePoint.x())
+                index_y = int(mousePoint.y())
+                
+                matrix_shape = np.shape(matrix)
+                is_valid_x_index = (index_x > 0 and index_x < matrix_shape[0])
+                is_valid_y_index = (index_y > 0 and index_y < matrix_shape[1])
+                
+                if is_valid_x_index and is_valid_y_index:
+                    self.ui.mainLabel.setText("<span style='font-size: 12pt'>(x=%0.1f, y=%0.1f), <span style='color: green'>value=%0.3f</span>" % (index_x, index_y, matrix[index_x][index_y]))
+                vLine.setPos(mousePoint.x())
+                hLine.setPos(mousePoint.y())
+
+        self.ui.connections[name] = pg.SignalProxy(plot_item.scene().sigMouseMoved, rateLimit=60, slot=mouseMoved)
