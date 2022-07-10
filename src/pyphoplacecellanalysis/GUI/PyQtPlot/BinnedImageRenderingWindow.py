@@ -114,6 +114,16 @@ class BasicBinnedImageRenderingWindow(QtWidgets.QMainWindow):
         
         History:
             Based off of pyphoplacecellanalysis.GUI.PyQtPlot.pyqtplot_Matrix.MatrixRenderingWindow
+            
+        Usage:
+            from pyphoplacecellanalysis.GUI.PyQtPlot.BinnedImageRenderingWindow import BasicBinnedImageRenderingWindow
+            
+            out = BasicBinnedImageRenderingWindow(active_eloy_analysis.avg_2D_speed_per_pos, active_pf_2D_dt.xbin_labels, active_pf_2D_dt.ybin_labels, name='avg_velocity', title="Avg Velocity per Pos (X, Y)", variable_label='Avg Velocity')
+            out.add_data(row=2, col=0, matrix=active_eloy_analysis.pf_overlapDensity_2D, xbins=active_pf_2D_dt.xbin_labels, ybins=active_pf_2D_dt.ybin_labels, name='pf_overlapDensity', title='pf overlapDensity metric', variable_label='pf overlapDensity')
+            out.add_data(row=3, col=0, matrix=active_pf_2D.ratemap.occupancy, xbins=active_pf_2D.xbin, ybins=active_pf_2D.ybin, name='occupancy_seconds', title='Seconds Occupancy', variable_label='seconds')
+            out.add_data(row=4, col=0, matrix=active_simpler_pf_densities_analysis.n_neurons_meeting_firing_critiera_by_position_bins_2D, xbins=active_pf_2D.xbin, ybins=active_pf_2D.ybin, name='n_neurons_meeting_firing_critiera_by_position_bins_2D', title='# neurons > 1Hz per Pos (X, Y)', variable_label='# neurons')
+
+
     """
     
     def __init__(self, matrix=None, xbins=None, ybins=None, name='avg_velocity', title="Avg Velocity per Pos (X, Y)", variable_label='Avg Velocity', drop_below_threshold: float=0.0000001, defer_show=False, **kwargs):
@@ -140,41 +150,6 @@ class BasicBinnedImageRenderingWindow(QtWidgets.QMainWindow):
         
         # Add the item for the provided data:
         self.add_data(row=1, col=0, matrix=matrix, xbins=xbins, ybins=ybins, name=name, title=title, variable_label=variable_label, drop_below_threshold=drop_below_threshold)
-            
-        
-        # self.plots.mainPlotItem = self.ui.graphics_layout.addPlot(title=title, row=1, col=0)      # add PlotItem to the main GraphicsLayoutWidget
-        # # plotItem.invertY(True)           # orient y axis to run top-to-bottom
-        # self.plots.mainPlotItem.setDefaultPadding(0.0)  # plot without padding data range
-        # self.plots.mainPlotItem.setMouseEnabled(x=False, y=False)
-        # self.plots.mainPlotItem = add_bin_ticks(plot_item=self.plots.mainPlotItem, xbins=xbins, ybins=ybins)
-
-        # # self.plots.mainImageItem, self.params.colorMap, self.plots.colorBarItem, local_plots_data = build_binned_imageItem(self.plots.mainPlotItem, xbins=xbins, ybins=ybins, matrix=matrix, data_label=variable_label)
-        
-        # local_plots, local_plots_data = build_binned_imageItem(self.plots.mainPlotItem, self.params, xbins=xbins, ybins=ybins, matrix=matrix, name=name, data_label=variable_label)
-        # self.plots_data[local_plots_data.name] = local_plots_data
-        # self.plots[local_plots.name] = local_plots
-        
-        # # Normal ImageItem():
-        # self.plots.mainImageItem = pg.ImageItem(matrix.T)
-        # # create transform to center the corner element on the origin, for any assigned image:
-        # # tr = QtGui.QTransform().translate(-0.5, -0.5) 
-        # # image.setTransform(tr)
-        # # image.setImage(matrix.T)
-        # self.plots.mainPlotItem.addItem(self.plots.mainImageItem)
-
-        # # Color Map:
-        # self.params.colorMap = pg.colormap.get("viridis")
-        # # generate an adjustabled color bar
-        # self.plots.colorBarItem = pg.ColorBarItem(values=(0,1), colorMap=self.params.colorMap, label='Avg Velocity')
-        # # bar = pg.ColorBarItem(values=(-1,1), cmap=colorMap) 
-        # # link color bar and color map to correlogram, and show it in plotItem:
-        # self.plots.colorBarItem.setImageItem(self.plots.mainImageItem, insert_in=self.plots.mainPlotItem)
-        
-        # self.plots_data.matrix = matrix.copy()
-        # self.plots_data.matrix_min = np.nanmin(self.plots_data.matrix)
-        # self.plots_data.matrix_max = np.nanmax(self.plots_data.matrix)
-        # # Set the colorbar to the range:
-        # self.plots.colorBarItem.setLevels(low=self.plots_data.matrix_min, high=self.plots_data.matrix_max)
         
         if not defer_show:
             self.show()
