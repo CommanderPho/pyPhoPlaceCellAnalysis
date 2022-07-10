@@ -198,8 +198,6 @@ class PipelineDisplayNode(DisplayMatplotlibWidgetMixin, AssociatedOutputWidgetNo
                 raise NotImplementedError
                 pass 
             
-            # curr_kdiba_pipeline.display(DefaultDisplayFunctions._display_2d_placefield_result_plot_ratemaps_2D, filter_name, enable_spike_overlay=False, plot_variable=enumTuningMap2DPlotVariables.FIRING_MAPS, fignum=0, max_screen_figure_size=(None, 1868), debug_print=False, enable_saving_to_disk=enable_saving_to_disk) # works!
-            
             if self.display_results is not None:
                 custom_args = self.display_results.get('kwargs', {})
             else:

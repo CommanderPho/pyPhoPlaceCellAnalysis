@@ -2,6 +2,9 @@
 # import importlib
 from dataclasses import dataclass
 import sys
+import typing
+from typing import Optional
+
 
 import numpy as np
 from neuropy import core
@@ -18,11 +21,13 @@ class ComputationResult(DynamicParameters):
         The primary output data is stored in self.computed_data's dict
     """
     sess: DataSession
-    computation_config: DynamicParameters
-    computed_data: dict
-    accumulated_errors: dict
+    computation_config: Optional[DynamicParameters]
+    computed_data: Optional[DynamicParameters]
+    accumulated_errors: Optional[DynamicParameters]
 
-    def __init__(self, sess: DataSession, computation_config: DynamicParameters, computed_data: dict, accumulated_errors: dict={}): 
+    def __init__(self, sess: DataSession, computation_config: DynamicParameters, computed_data: DynamicParameters, accumulated_errors: Optional[DynamicParameters]=None):
+        if accumulated_errors is None:
+            accumulated_errors = DynamicParameters()
         super(ComputationResult, self).__init__(sess=sess, computation_config=computation_config, computed_data=computed_data, accumulated_errors=accumulated_errors)
 
 

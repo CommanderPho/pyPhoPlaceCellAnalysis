@@ -1,5 +1,7 @@
 from collections import OrderedDict
 import sys
+import typing
+from typing import Optional
 import numpy as np
 import pandas as pd
 
@@ -40,11 +42,11 @@ class ComputablePipelineStage:
             [type]: [description]
         """
         # only requires that active_session has the .spikes_df and .position  properties
-        output_result = ComputationResult(active_session, computation_config, computed_data=dict(), accumulated_errors=dict()) # Note that this active_session should be correctly filtered
+        output_result = ComputationResult(active_session, computation_config, computed_data=DynamicParameters(), accumulated_errors=DynamicParameters()) # Note that this active_session should be correctly filtered
         
         return output_result
 
-    def evaluate_single_computation_params(self, active_computation_params: DynamicParameters=None, enabled_filter_names=None, omitted_computation_functions_name_list=None):
+    def evaluate_single_computation_params(self, active_computation_params: Optional[DynamicParameters]=None, enabled_filter_names=None, omitted_computation_functions_name_list=None, debug_print=False):
         """ 'single' here refers to the fact that it evaluates only one of the active_computation_params
         
         Takes its filtered_session and applies the provided active_computation_params to it. The results are stored in self.computation_results under the same key as the filtered session. """
@@ -63,7 +65,7 @@ class ComputablePipelineStage:
                     self.active_configs[a_select_config_name].computation_config = active_computation_params #TODO: if more than one computation config is passed in, the active_config should be duplicated for each computation config.
                 self.computation_results[a_select_config_name] = ComputablePipelineStage._build_initial_computationResult(a_filtered_session, active_computation_params) # returns a computation result. This stores the computation config used to compute it.
                 # call to perform any registered computations:
-                self.computation_results[a_select_config_name] = self.perform_registered_computations(self.computation_results[a_select_config_name], omitted_computation_functions_name_list=omitted_computation_functions_name_list, debug_print=True)
+                self.computation_results[a_select_config_name] = self.perform_registered_computations(self.computation_results[a_select_config_name], omitted_computation_functions_name_list=omitted_computation_functions_name_list, debug_print=debug_print)
             else:
                 # this filter is excluded from the enabled list, no computations will we performed on it
                 self.computation_results.pop(a_select_config_name, None) # remove the computation results from previous runs from the dictionary to indicate that it hasn't been computed
@@ -130,9 +132,9 @@ class PipelineWithComputedPipelineStageMixin:
     
     
     ## Computation Helpers: 
-    def perform_computations(self, active_computation_params: DynamicParameters=None, enabled_filter_names=None, omitted_computation_functions_name_list=None):
+    def perform_computations(self, active_computation_params: Optional[DynamicParameters]=None, enabled_filter_names=None, omitted_computation_functions_name_list=None, debug_print=False):
         assert (self.can_compute), "Current self.stage must already be a ComputedPipelineStage. Call self.filter_sessions with filter configs to reach this step."
-        self.stage.evaluate_single_computation_params(active_computation_params, enabled_filter_names=enabled_filter_names, omitted_computation_functions_name_list=omitted_computation_functions_name_list)
+        self.stage.evaluate_single_computation_params(active_computation_params, enabled_filter_names=enabled_filter_names, omitted_computation_functions_name_list=omitted_computation_functions_name_list, debug_print=False)
         
     def register_computation(self, registered_name, computation_function):
         assert (self.can_compute), "Current self.stage must already be a ComputedPipelineStage. Call self.filter_sessions with filter configs to reach this step."
@@ -149,10 +151,10 @@ class PipelineWithComputedPipelineStageMixin:
 class ComputedPipelineStage(LoadableInput, LoadableSessionInput, FilterablePipelineStage, DefaultRegisteredComputations, ComputablePipelineStage, BaseNeuropyPipelineStage):
     """Docstring for ComputedPipelineStage."""
     identity: PipelineStage = PipelineStage.Computed
-    filtered_sessions: dict = None
-    filtered_epochs: dict = None
-    active_configs: dict = None
-    computation_results: dict = None
+    filtered_sessions: Optional[DynamicParameters] = None
+    filtered_epochs: Optional[DynamicParameters] = None
+    active_configs: Optional[DynamicParameters] = None
+    computation_results: Optional[DynamicParameters] = None
     
     def __init__(self, loaded_stage: LoadedPipelineStage):
         # super(ClassName, self).__init__()
@@ -161,10 +163,10 @@ class ComputedPipelineStage(LoadableInput, LoadableSessionInput, FilterablePipel
         self.loaded_data = loaded_stage.loaded_data
 
         # Initialize custom fields:
-        self.filtered_sessions = dict()
-        self.filtered_epochs = dict()
-        self.active_configs = dict() # active_config corresponding to each filtered session/epoch
-        self.computation_results = dict()
+        self.filtered_sessions = DynamicParameters()
+        self.filtered_epochs = DynamicParameters()
+        self.active_configs = DynamicParameters() # active_config corresponding to each filtered session/epoch
+        self.computation_results = DynamicParameters()
         
         self.registered_computation_function_dict = OrderedDict()
         self.register_default_known_computation_functions() # registers the default
