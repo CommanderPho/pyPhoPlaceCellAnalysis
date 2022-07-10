@@ -202,12 +202,14 @@ class ComputedPipelineStage(LoadableInput, LoadableSessionInput, FilterablePipel
         if (len(active_computation_functions) > 0):
             if debug_print:
                 print(f'Performing perform_registered_computations(...) with {len(active_computation_functions)} registered_computation_functions...')
+            
+            # ## normal version that fails on any exception:
             # composed_registered_computations_function = compose_functions(*active_computation_functions) # functions are composed left-to-right
-            # Use exception-tolerant version of function composition (functions are composed left-to-right):
-            composed_registered_computations_function = compose_functions_with_error_handling(*active_computation_functions) # functions are composed left-to-right
-            # normal version that fails on any exception:
             # previous_computation_result = composed_registered_computations_function(previous_computation_result)
-            # exception-tolerant version
+            # accumulated_errors = None
+
+            ## Use exception-tolerant version of function composition (functions are composed left-to-right):
+            composed_registered_computations_function = compose_functions_with_error_handling(*active_computation_functions) # functions are composed left-to-right, exception-tolerant version
             previous_computation_result, accumulated_errors = composed_registered_computations_function(previous_computation_result)
             
             if debug_print:
