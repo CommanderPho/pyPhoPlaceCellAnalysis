@@ -18,8 +18,8 @@ from pyphocorehelpers.gui.PyVista.CascadingDynamicPlotsList import CascadingDyna
 # Fixed Geometry objects:
 animal_location_sphere = pv.Sphere(radius=2.3)
 animal_location_direction_cone = pv.Cone()
-animal_location_circle = pv.Circle(radius=8.0)
-animal_location_trail_circle = pv.Circle(radius=2.3)
+point_location_circle = pv.Circle(radius=8.0)
+point_location_trail_circle = pv.Circle(radius=2.3)
 
 ## Spike indicator geometry:
 spike_geom_cone = pv.Cone(direction=(0.0, 0.0, -1.0), height=10.0, radius=0.2) # The spike geometry that is only displayed for a short while after the spike occurs
