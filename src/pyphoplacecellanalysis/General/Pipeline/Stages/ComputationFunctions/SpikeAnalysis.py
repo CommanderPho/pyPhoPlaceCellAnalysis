@@ -141,7 +141,7 @@ class SpikeAnalysisComputations(AllFunctionEnumeratingMixin, metaclass=Computati
         
                 
         out_pyburst_intervals = _compute_pybursts_burst_interval_detection(computation_result.sess, **active_spike_analysis_config)        
-        computation_result.computed_data[SpikeAnalysisComputations._computationGroupName] = {'burst_intervals': out_pyburst_intervals}
+        computation_result.computed_data[SpikeAnalysisComputations._computationGroupName] = DynamicParameters.init_from_dict({'burst_intervals': out_pyburst_intervals})
             
         """ 
         Access via ['burst_detection']['burst_intervals']

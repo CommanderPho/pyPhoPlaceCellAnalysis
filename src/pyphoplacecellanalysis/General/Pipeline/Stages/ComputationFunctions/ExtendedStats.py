@@ -2,6 +2,7 @@ import numpy as np
 import pandas as pd
 import itertools
 
+from pyphocorehelpers.DataStructure.dynamic_parameters import DynamicParameters
 from pyphocorehelpers.mixins.member_enumerating import AllFunctionEnumeratingMixin
 from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.ComputationFunctionRegistryHolder import ComputationFunctionRegistryHolder
 from pyphoplacecellanalysis.General.Model.ComputationResults import ComputationResult
@@ -31,12 +32,12 @@ class ExtendedStatsComputations(AllFunctionEnumeratingMixin, metaclass=Computati
         """
         time_binned_position_resampler = build_position_df_resampled_to_time_windows(computation_result.sess.position.to_dataframe(), time_bin_size=computation_result.computation_config.pf_params.time_bin_size) # TimedeltaIndexResampler
         time_binned_position_df = time_binned_position_resampler.nearest() # an actual dataframe
-        computation_result.computed_data['extended_stats'] = {
+        computation_result.computed_data['extended_stats'] = DynamicParameters.init_from_dict({
          'time_binned_positioned_resampler': time_binned_position_resampler,
          'time_binned_position_df': time_binned_position_df,
          'time_binned_position_mean': time_binned_position_df.resample("1min").mean(), # 3 minutes
          'time_binned_position_covariance': time_binned_position_df.cov(min_periods=12)
-        }
+        })
         """ 
         Access via ['extended_stats']['time_binned_position_df']
         Example:
@@ -91,14 +92,14 @@ class ExtendedStatsComputations(AllFunctionEnumeratingMixin, metaclass=Computati
             computation_result.computed_data['pf2D_Decoder'].neuron_IDs
             computation_result.computed_data['pf2D_Decoder'].neuron_IDXs
         """
-        computation_result.computed_data['firing_rate_trends'] = {
+        computation_result.computed_data['firing_rate_trends'] = DynamicParameters.init_from_dict({
          'active_rolling_window_times': active_rolling_window_times,
          'mean_firing_rates': mean_firing_rates,
          'desired_window_length_seconds': desired_window_length_seconds,
          'desired_window_length_bins': desired_window_length_bins, # 3 minutes
          'active_firing_rates_df': active_firing_rates_df,
          'moving_mean_firing_rates_df': moving_mean_firing_rates_df
-        }
+        })
         """ 
         Access via ['firing_rate_trends']['moving_mean_firing_rates_df']
         Example:
@@ -152,11 +153,11 @@ class ExtendedStatsComputations(AllFunctionEnumeratingMixin, metaclass=Computati
         total_pairwise_overlaps = total_pairwise_overlaps[pairwise_overlap_sort_order]
         all_pairwise_overlaps = all_pairwise_overlaps[pairwise_overlap_sort_order,:,:]
 
-        computation_result.computed_data['placefield_overlap'] = {
+        computation_result.computed_data['placefield_overlap'] = DynamicParameters.init_from_dict({
          'all_pairwise_neuron_IDs_combinations': all_pairwise_neuron_IDs_combinations,
          'total_pairwise_overlaps': total_pairwise_overlaps,
          'all_pairwise_overlaps': all_pairwise_overlaps,
-        }
+        })
         """ 
         Access via ['placefield_overlap']['all_pairwise_overlaps']
         Example:
