@@ -1,7 +1,5 @@
 # InteractivePyvistaPlotterBuildIfNeededMixin
 
-# from pyvistaqt import BackgroundPlotter
-
 # from neuropy
 import numpy as np
 import pyvista as pv
@@ -10,26 +8,14 @@ from pyvista.plotting.plotting import Plotter
 from pyvistaqt import BackgroundPlotter
 from pyvistaqt.plotting import MultiPlotter
 
-
 from qtpy import QtCore, QtGui, QtWidgets
-# from qtpy.QtGui import QPalette
-# from qtpy.QtWidgets import QApplication, QPushButton, QLabel
-from qtpy.QtCore import QObject, QRunnable, QThread, QThreadPool, Signal, Slot
-
-
-# from qtpy.QtCore import Qt
-# from qtpy.QtGui import QPalette
-# from qtpy.QtWidgets import QApplication, QPushButton, QLabel
-
 
 from pyphocorehelpers.DataStructure.general_parameter_containers import DebugHelper, VisualizationParameters
 
 from pyphoplacecellanalysis.PhoPositionalData.plotting.gui import customize_default_pyvista_theme, print_controls_helper_text
 from pyphoplacecellanalysis.PhoPositionalData.import_data import build_spike_positions_list
 
-
 from pyphoplacecellanalysis.PhoPositionalData.plotting.spikeAndPositions import animal_location_circle, animal_location_trail_circle
-
 
 
 ######### MIXINS #############
@@ -118,7 +104,16 @@ class InteractivePyvistaPlotter_ObjectManipulationMixin:
 ######### InteractiveDataExplorerBase #############
 ##############################        
 class InteractiveDataExplorerBase(InteractivePyvistaPlotterBuildIfNeededMixin, InteractivePyvistaPlotter_ObjectManipulationMixin, QtCore.QObject):
-    """The common base class for building an interactive PyVistaQT BackgroundPlotter with extra GUI components and controls.
+    """The common abstract base class for building an interactive PyVistaQT BackgroundPlotter with extra GUI components and controls.
+    
+    
+    Function call order:
+        __init__
+        _setup()
+        _setup_variables()
+        _setup_visualization()
+        _setup_pyvista_theme()
+
     """
     def __init__(self, active_config, active_session, extant_plotter=None, data_explorer_name='InteractiveDataExplorerBase', **kwargs):
         QtCore.QObject.__init__(self, **kwargs) # Initialize the QObject
@@ -143,11 +138,14 @@ class InteractiveDataExplorerBase(InteractivePyvistaPlotterBuildIfNeededMixin, I
         
     @staticmethod
     def _unpack_variables(active_session):
+        """ Unpacks the required variables from the active_session and returns them. Bascally a flexible mapping between active_session's properties and the required variables for the plotter. """
         # Spike variables: num_cells, spike_list, cell_ids, flattened_spikes
         num_cells = active_session.neurons.n_neurons
         spike_list = active_session.neurons.spiketrains
         cell_ids = active_session.neurons.neuron_ids
         # Gets the flattened spikes, sorted in ascending timestamp for all cells. Returns a FlattenedSpiketrains object
+        
+        ## TODO: FIXME: NOTE: No indexing issues here as it uses neuron_ids
         flattened_spike_identities = np.concatenate([np.full((active_session.neurons.n_spikes[i],), active_session.neurons.neuron_ids[i]) for i in np.arange(active_session.neurons.n_neurons)]) # repeat the neuron_id for each spike that belongs to that neuron
         flattened_spike_times = np.concatenate(active_session.neurons.spiketrains)
         # Get the indicies required to sort the flattened_spike_times
