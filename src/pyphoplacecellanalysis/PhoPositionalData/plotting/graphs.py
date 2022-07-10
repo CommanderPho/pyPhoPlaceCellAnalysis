@@ -2,6 +2,16 @@ from copy import deepcopy
 import numpy as np
 import pyvista as pv
 
+
+""" 
+
+TODO: Why isn't this a class, or in a standardized format?
+
+Main Function: plot_3d_binned_bars
+
+Used in: c:\Users\pho\repos\pyPhoPlaceCellAnalysis\src\pyphoplacecellanalysis\PhoPositionalData\plotting\mixins\occupancy_plotting_mixins.py
+
+"""
 def build_3d_plot_identifier_name(*args):
     return '_'.join(list(args))    
 
