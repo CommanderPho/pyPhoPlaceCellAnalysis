@@ -156,7 +156,7 @@ def getProminence(var, step, ybin_centers=None, xbin_centers=None, min_depth=Non
 
     <var>: 2D ndarray, data to find local maxima. Missings (nans) are masked.
     <step>: float, contour interval. Finder interval gives better accuarcy.
-    <lats>, <lons>: 1d array, y and x coordinates of <var>. If not given,
+    <ybin_centers>, <lons>: 1d array, y and x coordinates of <var>. If not given,
                     use int indices.
     <min_depth>: float, filter out peaks with prominence smaller than this.
     <include_edge>: bool, whether to include unclosed contours that touch
@@ -246,7 +246,7 @@ def getProminence(var, step, ybin_centers=None, xbin_centers=None, min_depth=Non
     parents={}
 
     #----------------Get bounding box----------------
-    #bbox=Bbox.from_bounds(lons[0],lats[0],np.ptp(lons),np.ptp(height))
+    #bbox=Bbox.from_bounds(lons[0],ybin_centers[0],np.ptp(lons),np.ptp(height))
     bbox=Path([[xbin_centers[0],ybin_centers[0]], [xbin_centers[0],ybin_centers[-1]],
         [xbin_centers[-1],ybin_centers[-1]], [xbin_centers[-1],ybin_centers[0]], [xbin_centers[0], ybin_centers[0]]])
 
@@ -505,26 +505,28 @@ def plot_Prominence(xx, yy, slab, peaks, idmap, promap, parentmap, debug_print=F
         yy = active_pf_2D_dt.ybin_labels
         slab = active_pf_2D.ratemap.tuning_curves[3].T
         zmax = slab.max()
-        peaks, idmap, promap, parentmap = getProminence(slab, step, lats=yy, lons=xx, min_area=None, include_edge=True, verbose=False)
+        peaks, idmap, promap, parentmap = getProminence(slab, step, ybin_centers=yy, lons=xx, min_area=None, include_edge=True, verbose=False)
         figure, (ax1, ax2, ax3, ax4) = plot_Prominence(xx, yy, slab, peaks, idmap, promap, parentmap, debug_print=False)
     
     """
-    figure=plt.figure(figsize=(12,10),dpi=100)
+    figure = plt.figure(figsize=(12,10),dpi=100)
     zmax = slab.max()
     XX, YY = np.meshgrid(xx,yy)
 
+    ## Subplot 1: Top-Left - Contour Plot
     ax1=figure.add_subplot(2,2,1)
     ax1.contourf(XX,YY,slab,levels=np.arange(0,zmax,1))
     ax1.set_xlabel('X')
     ax1.set_ylabel('Y')
     ax1.set_title('Top view, col contours as dashed lines')
 
-    for kk,vv in peaks.items():
+    for kk, vv in peaks.items():
         if debug_print:
             print (kk)
         cols=vv['contour']
-        ax1.plot(cols.vertices[:,0],cols.vertices[:,1],'k:')
+        ax1.plot(cols.vertices[:,0], cols.vertices[:,1],'k:')
 
+    ## Subplot 2: Top-Right - Cross-section
     line=slab[slab.shape[0]//2]
     ax2=figure.add_subplot(2,2,2)
     ax2.plot(xx,line,'b-')
@@ -532,26 +534,28 @@ def plot_Prominence(xx, yy, slab, peaks, idmap, promap, parentmap, debug_print=F
     ax2.set_ylabel('Z')
     ax2.set_title('Cross section through y=0')
 
-    for kk,vv in peaks.items():
-        xii,yii=vv['center']
-        z2ii=vv['height']
-        pro=vv['prominence']
-        z1ii=z2ii-pro
-        ax2.plot([xii,xii], [z1ii,z2ii],'k:')
-        ax2.text(xii,z2ii,'p%d, parent = %d' %(kk,vv['parent']),
+    for kk, vv in peaks.items():
+        xii, yii = vv['center']
+        z2ii = vv['height']
+        pro = vv['prominence']
+        z1ii = z2ii-pro
+        ax2.plot([xii, xii], [z1ii, z2ii],'k:')
+        ax2.text(xii, z2ii,'p%d, parent = %d' %(kk, vv['parent']),
                 horizontalalignment='center',
                 verticalalignment='bottom')
 
+    ## Subplot 3: Bottom-Left - 3D Grid
     ax3=figure.add_subplot(2,2,3,projection='3d')
     ax3.plot_surface(XX,YY,slab,rstride=4,cstride=4,cmap='viridis',alpha=0.8)
 
-    for kk,vv in peaks.items():
+    for kk, vv in peaks.items():
         xii,yii=vv['center']
         z2ii=vv['height']
         pro=vv['prominence']
         z1ii=z2ii-pro
         ax3.plot([xii,xii],[yii,yii],[z1ii,z2ii], color='r', linewidth=2)
 
+    ## Subplot 4: Bottom-Right - Matrix of Promeneces
     ax4=figure.add_subplot(2,2,4)
     cs=ax4.imshow(promap,origin='lower',interpolation='nearest',
             extent=[-10,10,-10,10])
@@ -590,62 +594,10 @@ if __name__=='__main__':
     slab+=10*np.exp(-(XX+4)**2/2**2 - YY**2/2**2)
 
     step=0.2
-    zmax=slab.max()
-    peaks,idmap,promap,parentmap=getProminence(slab,step,ybin_centers=yy,xbin_centers=xx,min_area=None,
-            include_edge=True)
+    peaks, idmap, promap, parentmap = getProminence(slab, step, ybin_centers=yy, xbin_centers=xx, min_area=None, include_edge=True, verbose=False)
 
     #-------------------Plot------------------------
-    from mpl_toolkits.mplot3d import Axes3D
-    figure=plt.figure(figsize=(12,10),dpi=100)
-
-    ax1=figure.add_subplot(2,2,1)
-
-    ax1.contourf(XX,YY,slab,levels=np.arange(0,zmax,1))
-    ax1.set_xlabel('X')
-    ax1.set_ylabel('Y')
-    ax1.set_title('Top view, col contours as dashed lines')
-
-    for kk,vv in peaks.items():
-        print (kk)
-        cols=vv['contour']
-        ax1.plot(cols.vertices[:,0],cols.vertices[:,1],'k:')
-
-    line=slab[slab.shape[0]//2]
-    ax2=figure.add_subplot(2,2,2)
-    ax2.plot(xx,line,'b-')
-    ax2.set_xlabel('X')
-    ax2.set_ylabel('Z')
-    ax2.set_title('Cross section through y=0')
-
-    for kk,vv in peaks.items():
-        xii,yii=vv['center']
-        z2ii=vv['height']
-        pro=vv['prominence']
-        z1ii=z2ii-pro
-        ax2.plot([xii,xii], [z1ii,z2ii],'k:')
-        ax2.text(xii,z2ii,'p%d, parent = %d' %(kk,vv['parent']),
-                horizontalalignment='center',
-                verticalalignment='bottom')
-
-    ax3=figure.add_subplot(2,2,3,projection='3d')
-    ax3.plot_surface(XX,YY,slab,rstride=4,cstride=4,cmap='viridis',alpha=0.8)
-
-    for kk,vv in peaks.items():
-        xii,yii=vv['center']
-        z2ii=vv['height']
-        pro=vv['prominence']
-        z1ii=z2ii-pro
-        ax3.plot([xii,xii],[yii,yii],[z1ii,z2ii], color='r', linewidth=2)
-
-    ax4=figure.add_subplot(2,2,4)
-    cs=ax4.imshow(promap,origin='lower',interpolation='nearest',
-            extent=[-10,10,-10,10])
-    ax4.set_xlabel('X')
-    ax4.set_ylabel('Y')
-    ax4.set_title('Top view, prominences at peaks')
-    plt.colorbar(cs,ax=ax4)
-
-    plt.show(block=False)
-
+    figure, (ax1, ax2, ax3, ax4) = plot_Prominence(xx, yy, slab, peaks, idmap, promap, parentmap, debug_print=False)
+    
     from pprint import pprint
     pprint(peaks)
