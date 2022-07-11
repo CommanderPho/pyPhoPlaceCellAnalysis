@@ -8,7 +8,7 @@ from qtpy import QtCore, QtGui, QtWidgets
 from pyphocorehelpers.DataStructure.general_parameter_containers import DebugHelper, VisualizationParameters, RenderPlotsData, RenderPlots
 from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer
 
-from pyphoplacecellanalysis.PhoPositionalData.plotting.gui import customize_default_pyvista_theme, print_controls_helper_text
+from pyphoplacecellanalysis.PhoPositionalData.plotting.gui import customize_default_pyvista_theme, get_gradients, print_controls_helper_text
 from pyphoplacecellanalysis.PhoPositionalData.import_data import build_spike_positions_list # Used in _unpack_variables
 from pyphoplacecellanalysis.GUI.PyVista.InteractivePlotter.Mixins.InteractivePlotterMixins import InteractivePyvistaPlotter_ObjectManipulationMixin, InteractivePyvistaPlotter_PointAndPathPlottingMixin, InteractivePyvistaPlotterBuildIfNeededMixin
 
@@ -49,6 +49,8 @@ class InteractiveDataExplorerBase(InteractivePyvistaPlotter_PointAndPathPlotting
         self.plots_data = RenderPlotsData(name=display_class_name)
         self.plots = RenderPlots(name=display_class_name)
         self.ui = PhoUIContainer(name=display_class_name)
+        
+        self.params.plotter_backgrounds = get_gradients()
         
     @staticmethod
     def _unpack_variables(active_session):

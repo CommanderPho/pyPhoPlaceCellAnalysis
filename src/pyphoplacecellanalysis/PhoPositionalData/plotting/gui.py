@@ -28,10 +28,25 @@ def _customize_default_slider_gui_style(my_theme):
     my_theme.slider_styles.modern.cap_width = 0.02
     return my_theme
 
+
+def get_gradients():
+    ## All gradient design are curtosy of https://uigradients.com
+    # https://github.com/Ghosh/uiGradients
+    # NOTE: Arranged dark->light
+    gradient_dict = dict()
+    gradient_dict['Deep Space (Dark)'] = ('#000000', '#434343') # 
+    gradient_dict['Grade Grey'] = ('#2c3e50', '#bdc3c7') # 'Grade Grey'
+    gradient_dict['Purple Paradise'] = ('#1d2b64', '#f8cdda') # 'Purple Paradise'
+    # gradient[] = ('#0F2027', '##203A43', '#2C5364') # Unknown
+    gradient_dict['Colors of Sky (light, cloud-like)'] = ('#e0eafc', '#cfdef3') # 'Colors of Sky (light, cloud-like)'
+    gradient_dict['Clouds (Apple-like white)'] = ('#ECE9E6', '##FFFFFF') # 'Clouds (Apple-like white)'
+    return gradient_dict
+
 def customize_default_pyvista_theme():
     my_theme = pv.themes.DefaultTheme()
     my_theme = _customize_default_slider_gui_style(my_theme)
     my_theme.window_size = [1920, 1080]
+    my_theme.background  = 'white'
     ## Apply the theme as the active pyvista theme
     print('Applying custom Pyvista theme.')
     pv.global_theme.load_theme(my_theme)
