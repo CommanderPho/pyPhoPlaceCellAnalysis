@@ -38,13 +38,16 @@ class InteractivePlaceCellTuningCurvesDataExplorer(OccupancyPlottingMixin, Place
     """
     show_legend = True
 
-    def __init__(self, active_config, active_session, active_epoch_placefields, pf_colors, extant_plotter=None):
+    def __init__(self, active_config, active_session, active_epoch_placefields, pf_colors, extant_plotter=None, **kwargs):
         super(InteractivePlaceCellTuningCurvesDataExplorer, self).__init__(active_config, active_session, extant_plotter, data_explorer_name='TuningMapDataExplorer')
         self.params.active_epoch_placefields = deepcopy(active_epoch_placefields)
         self.params.pf_colors = deepcopy(pf_colors)
         self.params.pf_colors_hex = None
         self.params.pf_active_configs = None
         self.ui = dict()
+        
+        if kwargs.get('should_nan_non_visited_elements', None) is not None:
+            self.params.should_nan_non_visited_elements = kwargs.get('should_nan_non_visited_elements', None)
         
         self.use_fragile_linear_neuron_IDX_as_cell_id = False # if False, uses the normal 'aclu' value as the cell id (which I think is correct)
         
