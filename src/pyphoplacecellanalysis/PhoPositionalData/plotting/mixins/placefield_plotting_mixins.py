@@ -116,8 +116,7 @@ class PlacefieldRenderingPyVistaMixin:
         self.params.should_override_disable_smooth_shading = True # if True, forces smooth_shading to be False regardless of other parameters
         
         
-        
-        _temp_input_params = get_dict_subset(self.params.__dict__, ['should_use_normalized_tuning_curves','should_pdf_normalize_manually','should_nan_non_visited_elements','should_force_placefield_custom_color','should_display_placefield_points',
+        _temp_input_params = get_dict_subset(self.params, ['should_use_normalized_tuning_curves','should_pdf_normalize_manually','should_nan_non_visited_elements','should_force_placefield_custom_color','should_display_placefield_points',
                                                                     'should_override_disable_smooth_shading', 'nan_opacity'])
         print(f'_temp_input_params: {_temp_input_params}')
         
