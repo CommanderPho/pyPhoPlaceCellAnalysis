@@ -2,7 +2,8 @@ import sys
 import numpy as np
 import pandas as pd
 from findpeaks import findpeaks # for _perform_pf_find_ratemap_peaks_computation. Install with pip install findpeaks 
-# NeuroPy (Diba Lab Python Repo) Loading
+from pyphoplacecellanalysis.External.peak_prominence2d import getProminence, plot_Prominence # Required for _perform_pf_find_ratemap_peaks_peak_prominence2d_computation
+
 from pyphoplacecellanalysis.General.Model.ComputationResults import ComputationResult
 from pyphocorehelpers.DataStructure.dynamic_parameters import DynamicParameters
 
@@ -309,6 +310,91 @@ class PlacefieldDensityAnalysisComputationFunctions(AllFunctionEnumeratingMixin,
             # n_xbins = len(active_pf_2D.xbin) - 1 # the -1 is to get the counts for the centers only
             # n_ybins = len(active_pf_2D.ybin) - 1 # the -1 is to get the counts for the centers only
             # n_neurons = active_pf_2D.ratemap.n_neurons
+            
+            # peaks_outputs: fp_mask, mask_results_df, fp_topo, topo_results_df, topo_persistence_df
+            # peaks_outputs = [ratemap_find_placefields(a_tuning_curve.copy(), debug_print=debug_print) for a_tuning_curve in active_pf_2D.ratemap.pdf_normalized_tuning_curves]
+            # fp_mask_list, mask_results_df_list, fp_topo_list, topo_results_df_list, topo_persistence_df_list = tuple(zip(*findpeaks_results))
+            fp_mask_list, mask_results_df_list, fp_topo_list, topo_results_df_list, topo_persistence_df_list = tuple(zip(*[ratemap_find_placefields(a_tuning_curve.copy(), debug_print=debug_print) for a_tuning_curve in active_pf_2D.ratemap.pdf_normalized_tuning_curves]))
+            topo_results_peak_xy_pos_list = [np.vstack((active_pf_2D.xbin[curr_topo_result_df['xbin_idx'].to_numpy()], active_pf_2D.ybin[curr_topo_result_df['ybin_idx'].to_numpy()])) for curr_topo_result_df in topo_results_df_list]
+            # peak_xy_pos_shapes = [np.shape(a_xy_pos) for a_xy_pos in topo_results_peak_xy_pos_list]
+
+            peaks_are_included_list, filtered_df_list, filtered_peak_xy_points_pos_list = _filter_found_peaks_by_exclusion_threshold(topo_results_df_list, topo_results_peak_xy_pos_list, peak_score_inclusion_percent_threshold=peak_score_inclusion_percent_threshold)
+            
+            # computation_result.computed_data['RatemapPeaksAnalysis'] = DynamicParameters(tuning_curve_findpeaks_results=peaks_outputs)
+            computation_result.computed_data['RatemapPeaksAnalysis'] = DynamicParameters(mask_results=DynamicParameters(fp_list=fp_mask_list, df_list=mask_results_df_list),
+                                                                                         topo_results=DynamicParameters(fp_list=fp_topo_list, df_list=topo_results_df_list, persistence_df_list=topo_persistence_df_list, peak_xy_points_pos_list=topo_results_peak_xy_pos_list),
+                                                                                         final_filtered_results=DynamicParameters(df_list=filtered_df_list, peak_xy_points_pos_list=filtered_peak_xy_points_pos_list, peaks_are_included_list=peaks_are_included_list)
+                                                                                         )
+            
+            return computation_result
+
+
+
+
+    def _perform_pf_find_ratemap_peaks_peak_prominence2d_computation(computation_result: ComputationResult, debug_print=False, peak_score_inclusion_percent_threshold=0.25):
+            """ Uses the peak_prominence2d package to find the peaks and promenences of 2D placefields
+            
+            Independent of the peak functions.
+            
+            Requires:
+                computed_data['pf2D']                
+                
+            Provides:
+                computed_data['RatemapPeaksAnalysis']
+                # computed_data['RatemapPeaksAnalysis']['tuning_curve_findpeaks_results']: peaks_outputs: fp_mask, mask_results_df, fp_topo, topo_results_df, topo_persistence_df
+                
+                computed_data['RatemapPeaksAnalysis']['mask_results']: 
+                    computed_data['RatemapPeaksAnalysis']['mask_results']['fp_list']:
+                    computed_data['RatemapPeaksAnalysis']['mask_results']['df_list']:
+                    
+                computed_data['RatemapPeaksAnalysis']['topo_results']:
+                    computed_data['RatemapPeaksAnalysis']['topo_results']['fp_list']:
+                    computed_data['RatemapPeaksAnalysis']['topo_results']['df_list']:
+                    computed_data['RatemapPeaksAnalysis']['topo_results']['persistence_df_list']:
+                    computed_data['RatemapPeaksAnalysis']['topo_results']['peak_xy_points_pos_list']: the actual (x, y) positions of the peak points for each neuron
+                    
+                computed_data['RatemapPeaksAnalysis']['final_filtered_results']:
+                    computed_data['RatemapPeaksAnalysis']['final_filtered_results']['peaks_are_included_list']: a list of bools into the original raw arrays ('topo_results') that was used to filter down to the final peaks based on the promenences
+                    computed_data['RatemapPeaksAnalysis']['final_filtered_results']['df_list']:
+                    computed_data['RatemapPeaksAnalysis']['final_filtered_results']['peak_xy_points_pos_list']:
+                    
+                
+            """            
+            
+
+            def perform_compute_prominence_contours(xbin_centers, ybin_centers, slab, step=0.2):
+                """
+                xbin_centers and ybin_centers should be like *bin_labels not *bin
+                slab should usually be transposed: tuning_curves[i].T
+                
+                Usage:        
+                    step = 0.2
+                    i = 0
+                    xx, yy, slab, peaks, idmap, promap, parentmap = perform_compute_prominence_contours(active_pf_2D_dt.xbin_labels, active_pf_2D_dt.ybin_labels, active_pf_2D.ratemap.tuning_curves[i].T, step=step)
+                    
+                    # Test plot the promenence result
+                    figure, (ax1, ax2, ax3, ax4) = plot_Prominence(xx, yy, slab, peaks, idmap, promap, parentmap, debug_print=False)
+
+                """
+                peaks, idmap, promap, parentmap = getProminence(slab, step, lats=ybin_centers, lons=xbin_centers, min_area=None, include_edge=True, verbose=False)
+                return xbin_centers, ybin_centers, slab, peaks, idmap, promap, parentmap
+
+
+                            
+            # active_pf_1D = computation_result.computed_data['pf1D']
+            active_pf_2D = computation_result.computed_data['pf2D']
+            # n_xbins = len(active_pf_2D.xbin) - 1 # the -1 is to get the counts for the centers only
+            # n_ybins = len(active_pf_2D.ybin) - 1 # the -1 is to get the counts for the centers only
+            # n_neurons = active_pf_2D.ratemap.n_neurons
+            step = 0.2
+            out_results = []
+
+            for i in np.arange(active_pf_2D.ratemap.n_neurons):
+                xx, yy, slab, peaks, idmap, promap, parentmap = perform_compute_prominence_contours(active_pf_2D_dt.xbin_labels, active_pf_2D_dt.ybin_labels, active_pf_2D.ratemap.tuning_curves[i].T, step=step)
+                out_results.append((xx, yy, slab, peaks, idmap, promap, parentmap))
+    
+                
+            
             
             # peaks_outputs: fp_mask, mask_results_df, fp_topo, topo_results_df, topo_persistence_df
             # peaks_outputs = [ratemap_find_placefields(a_tuning_curve.copy(), debug_print=debug_print) for a_tuning_curve in active_pf_2D.ratemap.pdf_normalized_tuning_curves]
