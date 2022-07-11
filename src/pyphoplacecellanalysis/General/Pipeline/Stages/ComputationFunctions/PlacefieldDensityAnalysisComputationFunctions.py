@@ -171,7 +171,7 @@ class PlacefieldDensityAnalysisComputationFunctions(AllFunctionEnumeratingMixin,
         
         
         
-    def _perform_pf_find_ratemap_peaks_computation(computation_result: ComputationResult, debug_print=False):
+    def _perform_pf_find_ratemap_peaks_computation(computation_result: ComputationResult, debug_print=False, peak_score_inclusion_percent_threshold=0.25):
             """ Builds the simplified density analysis suggested by Kamran at the 2022-07-06 lab meeting related analysis to test Eloy's Pf-Density/Velocity Hypothesis for 2D Placefields
             
             Requires:
@@ -191,7 +191,12 @@ class PlacefieldDensityAnalysisComputationFunctions(AllFunctionEnumeratingMixin,
                     computed_data['RatemapPeaksAnalysis']['topo_results']['persistence_df_list']:
                     computed_data['RatemapPeaksAnalysis']['topo_results']['peak_xy_points_pos_list']: the actual (x, y) positions of the peak points for each neuron
                     
-                mask_results
+                computed_data['RatemapPeaksAnalysis']['final_filtered_results']:
+                    computed_data['RatemapPeaksAnalysis']['final_filtered_results']['peaks_are_included_list']: a list of bools into the original raw arrays ('topo_results') that was used to filter down to the final peaks based on the promenences
+                    computed_data['RatemapPeaksAnalysis']['final_filtered_results']['df_list']:
+                    computed_data['RatemapPeaksAnalysis']['final_filtered_results']['peak_xy_points_pos_list']:
+                    
+                
             """            
             def ratemap_find_placefields(ratemap, debug_print=False):
                 """ Uses the `findpeaks` library for finding local maxima of TuningMaps
@@ -278,6 +283,27 @@ class PlacefieldDensityAnalysisComputationFunctions(AllFunctionEnumeratingMixin,
                 mask_results_df = _expand_mask_results(results_mask)
                 return fp_mask, mask_results_df, fp_topo, topo_results_df, topo_persistence_df
                 
+                
+            def _filter_found_peaks_by_exclusion_threshold(df_list, peak_xy_points_pos_list, peak_score_inclusion_percent_threshold=0.25):
+                peak_score_inclusion_threshold = peak_score_inclusion_percent_threshold * 255.0 # it must be at least 1/4 of the promenance of the largest peak (which is always 255.0)
+                peaks_are_included_list = [(result_df['peak_score'] > peak_score_inclusion_threshold) for result_df in df_list]
+                
+                # inclusion_filter_function = lambda result_list: [a_result[peak_is_included, :] for a_result, peak_is_included in zip(result_list, peaks_are_included_list)]
+                ## filter by the peaks_are_included_list:
+                # filtered_df_list = [result_df[(result_df['peak_score'] > peak_score_inclusion_threshold)] for result_df in df_list]  # WORKS
+                # filtered_df_list = [df_list[i][peak_is_included] for i, peak_is_included in enumerate(peaks_are_included_list)] # Also works
+                # filtered_peak_xy_points_pos_list = [peak_xy_points_pos_list[i][:, peak_is_included] for i, peak_is_included in enumerate(peaks_are_included_list)]
+                
+                filtered_df_list = [a_df[peak_is_included] for a_df, peak_is_included in zip(df_list, peaks_are_included_list)] # Also works
+                filtered_peak_xy_points_pos_list = [a_xy_points_pos[:, peak_is_included] for a_xy_points_pos, peak_is_included in zip(peak_xy_points_pos_list, peaks_are_included_list)]
+
+                # print(f'peaks_are_included_list: {peaks_are_included_list}')
+                # print(f'filtered_df_list: {filtered_df_list}')
+                # print(f'filtered_peak_xy_points_pos_list: {filtered_peak_xy_points_pos_list}')
+
+                return peaks_are_included_list, filtered_df_list, filtered_peak_xy_points_pos_list
+                
+                
             # active_pf_1D = computation_result.computed_data['pf1D']
             active_pf_2D = computation_result.computed_data['pf2D']
             # n_xbins = len(active_pf_2D.xbin) - 1 # the -1 is to get the counts for the centers only
@@ -291,12 +317,12 @@ class PlacefieldDensityAnalysisComputationFunctions(AllFunctionEnumeratingMixin,
             topo_results_peak_xy_pos_list = [np.vstack((active_pf_2D.xbin[curr_topo_result_df['xbin_idx'].to_numpy()], active_pf_2D.ybin[curr_topo_result_df['ybin_idx'].to_numpy()])) for curr_topo_result_df in topo_results_df_list]
             # peak_xy_pos_shapes = [np.shape(a_xy_pos) for a_xy_pos in topo_results_peak_xy_pos_list]
 
-
-            # fp_mask, mask_results_df, fp_topo, topo_results_df, topo_persistence_df = ratemap_find_placefields(active_pf_2D.ratemap.pdf_normalized_tuning_curves[3].copy(), debug_print=False)
-            # topo_results_df
+            peaks_are_included_list, filtered_df_list, filtered_peak_xy_points_pos_list = _filter_found_peaks_by_exclusion_threshold(topo_results_df_list, topo_results_peak_xy_pos_list, peak_score_inclusion_percent_threshold=peak_score_inclusion_percent_threshold)
             
             # computation_result.computed_data['RatemapPeaksAnalysis'] = DynamicParameters(tuning_curve_findpeaks_results=peaks_outputs)
             computation_result.computed_data['RatemapPeaksAnalysis'] = DynamicParameters(mask_results=DynamicParameters(fp_list=fp_mask_list, df_list=mask_results_df_list),
-                                                                                         topo_results=DynamicParameters(fp_list=fp_topo_list, df_list=topo_results_df_list, persistence_df_list=topo_persistence_df_list, peak_xy_points_pos_list=topo_results_peak_xy_pos_list))
+                                                                                         topo_results=DynamicParameters(fp_list=fp_topo_list, df_list=topo_results_df_list, persistence_df_list=topo_persistence_df_list, peak_xy_points_pos_list=topo_results_peak_xy_pos_list),
+                                                                                         final_filtered_results=DynamicParameters(df_list=filtered_df_list, peak_xy_points_pos_list=filtered_peak_xy_points_pos_list, peaks_are_included_list=peaks_are_included_list)
+                                                                                         )
             
             return computation_result
