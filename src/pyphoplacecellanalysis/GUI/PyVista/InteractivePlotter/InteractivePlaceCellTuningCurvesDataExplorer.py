@@ -47,7 +47,10 @@ class InteractivePlaceCellTuningCurvesDataExplorer(OccupancyPlottingMixin, Place
         self.ui = dict()
         
         if kwargs.get('should_nan_non_visited_elements', None) is not None:
-            self.params.should_nan_non_visited_elements = kwargs.get('should_nan_non_visited_elements', None)
+            self.params.should_nan_non_visited_elements = kwargs['should_nan_non_visited_elements']
+            
+        if kwargs.get('zScalingFactor', None) is not None:
+            self.params.zScalingFactor = kwargs['zScalingFactor']
         
         self.use_fragile_linear_neuron_IDX_as_cell_id = False # if False, uses the normal 'aclu' value as the cell id (which I think is correct)
         
@@ -118,12 +121,11 @@ class InteractivePlaceCellTuningCurvesDataExplorer(OccupancyPlottingMixin, Place
 
 
     def _setup_visualization(self): 
-        self.params.debug_disable_all_gui_controls = True
-        
+        self.params.debug_disable_all_gui_controls = True       
         self.params.enable_placefield_aligned_spikes = True # If True, the spikes are aligned to the z-position of their respective place field, so they visually sit on top of the placefield surface
         # self.params.zScalingFactor = 10.0
-        self.params.zScalingFactor = 100.0
-        
+        self.params.setdefault('zScalingFactor', 3000.0)
+
         self.params.use_mutually_exclusive_placefield_checkboxes = True       
         self.params.show_legend = True
         
@@ -154,10 +156,11 @@ class InteractivePlaceCellTuningCurvesDataExplorer(OccupancyPlottingMixin, Place
         
         
         ## Placefield Rendering Options:
-        self.params.should_nan_non_visited_elements = False
-        self.params.should_display_placefield_points = True
-        
-        
+        self.params.setdefault('should_nan_non_visited_elements', True)
+        self.params.setdefault('should_display_placefield_points', True)
+            
+        ## TODO: I'm not sure about this one, we might want to override pf_colors_hex, or this could be where the issues where it wasn't displaying the colors I passed in were coming from.
+        # if not self.params.hasattr('pf_colors_hex'):
         self.params.pf_colors_hex = [to_hex(self.params.pf_colors[:,i], keep_alpha=False) for i in self.tuning_curve_indicies] 
         
         self.setup_spike_rendering_mixin()
