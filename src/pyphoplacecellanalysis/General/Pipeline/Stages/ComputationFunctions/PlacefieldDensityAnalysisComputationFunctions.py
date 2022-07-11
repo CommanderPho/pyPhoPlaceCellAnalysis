@@ -366,7 +366,7 @@ class PlacefieldDensityAnalysisComputationFunctions(AllFunctionEnumeratingMixin,
                     figure, (ax1, ax2, ax3, ax4) = plot_Prominence(xx, yy, slab, peaks, idmap, promap, parentmap, debug_print=False)
 
                 """
-                peaks, idmap, promap, parentmap = getProminence(slab, step, lats=ybin_centers, lons=xbin_centers, min_area=None, include_edge=True, verbose=False)
+                peaks, idmap, promap, parentmap = getProminence(slab, step, ybin_centers=ybin_centers, xbin_centers=xbin_centers, min_area=None, include_edge=True, verbose=False)
                 return xbin_centers, ybin_centers, slab, peaks, idmap, promap, parentmap
 
 

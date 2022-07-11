@@ -146,7 +146,7 @@ def contourGeoArea(contour,bmap=None):
 
 
 
-def getProminence(var, step, lats=None, lons=None, min_depth=None,
+def getProminence(var, step, ybin_centers=None, xbin_centers=None, min_depth=None,
         include_edge=True,
         min_area=None, max_area=None, area_func=contourArea,
         centroid_num_to_center=5,
@@ -217,19 +217,19 @@ def getProminence(var, step, lats=None, lons=None, min_depth=None,
     var=np.ma.masked_where(np.isnan(var),var).astype('float')
     needslerpx=True
     needslerpy=True
-    if lats is None:
-        lats=np.arange(var.shape[0])
+    if ybin_centers is None:
+        ybin_centers=np.arange(var.shape[0])
         needslerpy=False
-    if lons is None:
-        lons=np.arange(var.shape[1])
+    if xbin_centers is None:
+        xbin_centers=np.arange(var.shape[1])
         needslerpx=False
 
     if area_func==contourGeoArea:
         from mpl_toolkits.basemap import Basemap
-        lat1=np.min(lats)
-        lat2=np.max(lats)
-        lon1=np.min(lons)
-        lon2=np.max(lons)
+        lat1=np.min(ybin_centers)
+        lat2=np.max(ybin_centers)
+        lon1=np.min(xbin_centers)
+        lon2=np.max(xbin_centers)
 
         bmap=Basemap(projection='cea',\
                 llcrnrlat=lat1,llcrnrlon=lon1,\
@@ -247,12 +247,12 @@ def getProminence(var, step, lats=None, lons=None, min_depth=None,
 
     #----------------Get bounding box----------------
     #bbox=Bbox.from_bounds(lons[0],lats[0],np.ptp(lons),np.ptp(height))
-    bbox=Path([[lons[0],lats[0]], [lons[0],lats[-1]],
-        [lons[-1],lats[-1]], [lons[-1],lats[0]], [lons[0], lats[0]]])
+    bbox=Path([[xbin_centers[0],ybin_centers[0]], [xbin_centers[0],ybin_centers[-1]],
+        [xbin_centers[-1],ybin_centers[-1]], [xbin_centers[-1],ybin_centers[0]], [xbin_centers[0], ybin_centers[0]]])
 
     #If not allow unclosed contours, get all contours in one go
     if not include_edge:
-        conts=ax.contour(lons,lats,var,levels)
+        conts=ax.contour(xbin_centers,ybin_centers,var,levels)
         contours=conts.collections[::-1]
         got_levels=conts.cvalues
         if not np.all(got_levels==levels):
@@ -268,7 +268,7 @@ def getProminence(var, step, lats=None, lons=None, min_depth=None,
 
         #-Get a 2-level contour if allow unclosed contours-
         if include_edge:
-            csii=ax.contourf(lons,lats,var,[levii,vmax+step])
+            csii=ax.contourf(xbin_centers,ybin_centers,var,[levii,vmax+step])
             csii=csii.collections[0]
             ax.cla()
         else:
@@ -368,8 +368,8 @@ def getProminence(var, step, lats=None, lons=None, min_depth=None,
                         # method compares the number of points that fail the contains_point()
                         # check with points at the edge. If all failing points are
                         # at the edge,report a contain relation
-                        fail=checkIn(contjj,vv[-1],lons[0],lons[-1],lats[0],
-                                lats[-1])
+                        fail=checkIn(contjj,vv[-1],xbin_centers[0],xbin_centers[-1],ybin_centers[0],
+                                ybin_centers[-1])
                         if len(fail)==0:
                             match_list.append(kk)
 
@@ -465,13 +465,13 @@ def getProminence(var, step, lats=None, lons=None, min_depth=None,
         result[kk]=peakii
         # lerp1 to get center indices
         if needslerpx:
-            fitx=interp1d(lons,np.arange(var.shape[1]))
+            fitx=interp1d(xbin_centers,np.arange(var.shape[1]))
             xidx=fitx(centerkk[0])
         else:
             xidx=centerkk[0]
 
         if needslerpy:
-            fity=interp1d(lats,np.arange(var.shape[0]))
+            fity=interp1d(ybin_centers,np.arange(var.shape[0]))
             yidx=fity(centerkk[1])
         else:
             yidx=centerkk[1]
@@ -591,7 +591,7 @@ if __name__=='__main__':
 
     step=0.2
     zmax=slab.max()
-    peaks,idmap,promap,parentmap=getProminence(slab,step,lats=yy,lons=xx,min_area=None,
+    peaks,idmap,promap,parentmap=getProminence(slab,step,ybin_centers=yy,xbin_centers=xx,min_area=None,
             include_edge=True)
 
     #-------------------Plot------------------------
