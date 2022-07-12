@@ -4,6 +4,9 @@ import pandas as pd
 from findpeaks import findpeaks # for _perform_pf_find_ratemap_peaks_computation. Install with pip install findpeaks 
 
 
+import matplotlib
+# configure backend here
+matplotlib.use('Agg')
 import matplotlib.pyplot as plt # required for _perform_pf_analyze_results_peak_prominence2d_computation to build Path objects. Nothing is plotted though
 
 
@@ -20,6 +23,7 @@ from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.Computa
 """-------------- Specific Computation Functions to be registered --------------"""
 
 modify_dict_mode = True # if True, writes the dict
+
 def find_contours_at_levels(xbin_centers, ybin_centers, slab, peak_probe_point, probe_levels):
     """ finds the contours containing the peak_probe_point at the specified probe_levels.
         performs slicing through desired z-values (1/2 prominence, etc) using contourf
@@ -39,7 +43,7 @@ def find_contours_at_levels(xbin_centers, ybin_centers, slab, peak_probe_point, 
         # Note that contourf requires at least 2 levels, hence the use of the vmax+1.0 term and accessing only the first item in the collection. Otherwise: "ValueError: Filled contours require at least 2 levels."
         csii = ax.contourf(xbin_centers, ybin_centers, slab, [levii, vmax+1.0]) ## Heavy-lifting code here. levii is the level
         csii = csii.collections[0]
-        ax.cla()
+        # ax.cla() ## TODO: this is the most computationally expensive part of the code, and it doesn't seem necissary
         #--------------Loop through contours at level--------------
         # find only the ones containing the peak_probe_point
         included_computed_contours[levii] = [contjj for jj, contjj in enumerate(csii.get_paths()) if contjj.contains_point(peak_probe_point)]
