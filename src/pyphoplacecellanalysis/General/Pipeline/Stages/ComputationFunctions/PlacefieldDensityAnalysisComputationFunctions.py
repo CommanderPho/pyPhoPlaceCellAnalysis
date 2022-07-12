@@ -477,7 +477,7 @@ class PlacefieldDensityAnalysisComputationFunctions(AllFunctionEnumeratingMixin,
             # peak_height_multiplier_probe_levels = (0.5, 0.9) # 50% and 90% of the peak height
             # out_computed_contours = analyze_peaks(peaks, peak_height_multiplier_probe_levels, debug_print=True)
 
-            def analyze_prominence_2d_result(xbin_centers, ybin_centers, slab, result_tuple, peak_height_multiplier_probe_levels = (0.5, 0.9), debug_print=False):
+            def analyze_prominence_2d_result(xbin_centers, ybin_centers, result_tuple, peak_height_multiplier_probe_levels = (0.5, 0.9), debug_print=False):
                 slab, peaks, idmap, promap, parentmap = result_tuple
                 """
                 Return <result>: dict, keys: ids of found peaks.
@@ -504,24 +504,18 @@ class PlacefieldDensityAnalysisComputationFunctions(AllFunctionEnumeratingMixin,
 
                 
                 
-            def analyze_prominence_2d_results(result_tuples, peak_height_multiplier_probe_levels = (0.5, 0.9), debug_print=False):
+            def analyze_prominence_2d_results(active_peak_prominence_2d_results, peak_height_multiplier_probe_levels = (0.5, 0.9), debug_print=False):
+                xbin_centers, ybin_centers = active_peak_prominence_2d_results.xx, active_peak_prominence_2d_results.yy
+                neuron_extended_ids = active_peak_prominence_2d_results.neuron_extended_ids
                 # active_peak_prominence_2d_results.result_tuples[0]
-                for (neuron_idx, result_tuple) in result_tuples.items():
-                    analyze_prominence_2d_result(result_tuple, peak_height_multiplier_probe_levels=peak_height_multiplier_probe_levels, debug_print=debug_print)
+                for (i, result_tuple) in active_peak_prominence_2d_results.result_tuples.items():
+                    neuron_id = neuron_extended_ids[i].id
                     
+                    analyze_prominence_2d_result(xbin_centers, ybin_centers, result_tuple, peak_height_multiplier_probe_levels=peak_height_multiplier_probe_levels, debug_print=debug_print)
                     
-            # active_peak_prominence_2d_results.xx, active_peak_prominence_2d_results.yy, active_peak_prominence_2d_results.neuron_extended_ids, active_peak_prominence_2d_results.result_tuples
-            
-            active_peak_prominence_2d_results.xx, active_peak_prominence_2d_results.yy, slab
-            # active_peak_prominence_2d_results.xx, active_peak_prominence_2d_results.yy, slab
-            all_out = analyze_prominence_2d_results(result_tuples, peak_height_multiplier_probe_levels=peak_height_multiplier_probe_levels, debug_print=False)
-
-            
-
 
             active_peak_prominence_2d_results = computation_result.computed_data['RatemapPeaksAnalysis']['PeakProminence2D']
-
-            all_out = analyze_prominence_2d_results(active_peak_prominence_2d_results.result_tuples, peak_height_multiplier_probe_levels=peak_height_multiplier_probe_levels, debug_print=debug_print)
+            all_out = analyze_prominence_2d_results(active_peak_prominence_2d_results, peak_height_multiplier_probe_levels=peak_height_multiplier_probe_levels, debug_print=debug_print)
             
 
 
