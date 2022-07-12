@@ -11,6 +11,16 @@ lowest contour line encircling it but containing no higher summit.
 
 Optionally, peaks with small prominence or area can be filtered out.
 
+Many of these terms come from the study of actual mountain ranges.
+
+Terminology:
+"col": In geomorphology, a col is the lowest point on a mountain ridge between two peaks.
+"key col": a property of a peak; the highest col surrounding the peak - a unique point on this contour line 
+"parent peak": a property of a peak; some higher mountain, selected according to various criteria. 
+
+Notes:
+"Peaks with high prominence tend to be the highest points around and are likely to have extraordinary views."
+
 
 Author: guangzhi XU (xugzhi1987@gmail.com; guangzhi.xu@outlook.com)
 Update time: 2018-11-10 16:03:49.
@@ -268,7 +278,7 @@ def getProminence(var, step, ybin_centers=None, xbin_centers=None, min_depth=Non
 
         #-Get a 2-level contour if allow unclosed contours-
         if include_edge:
-            csii=ax.contourf(xbin_centers,ybin_centers,var,[levii,vmax+step])
+            csii=ax.contourf(xbin_centers,ybin_centers,var,[levii,vmax+step]) ## Heavy-lifting code here. levii is the level
             csii=csii.collections[0]
             ax.cla()
         else:
@@ -281,7 +291,7 @@ def getProminence(var, step, ybin_centers=None, xbin_centers=None, min_depth=Non
             #contjj.is_edge=contjj.intersects_bbox(bbox,False) # False significant
             # this might be another matplotlib bug, intersects_bbox() used
             # to work
-            contjj.is_edge=contjj.intersects_path(bbox,False) # False significant
+            contjj.is_edge=contjj.intersects_path(bbox, False) # False significant
 
             # NOTE: contjj.is_edge==True is NOT equivalent to
             # isContClosed(contjj)==False, unclosed contours inside boundaries
@@ -368,8 +378,7 @@ def getProminence(var, step, ybin_centers=None, xbin_centers=None, min_depth=Non
                         # method compares the number of points that fail the contains_point()
                         # check with points at the edge. If all failing points are
                         # at the edge,report a contain relation
-                        fail=checkIn(contjj,vv[-1],xbin_centers[0],xbin_centers[-1],ybin_centers[0],
-                                ybin_centers[-1])
+                        fail=checkIn(contjj,vv[-1],xbin_centers[0],xbin_centers[-1],ybin_centers[0], ybin_centers[-1])
                         if len(fail)==0:
                             match_list.append(kk)
 
@@ -428,6 +437,7 @@ def getProminence(var, step, ybin_centers=None, xbin_centers=None, min_depth=Non
                     #for mm in match_list:
                         #peaks[mm].append(contjj)
 
+    # ==================================================================================================================== #
     #------------------Prepare output------------------
     result={}
     result_map=np.zeros(var.shape)
@@ -446,7 +456,7 @@ def getProminence(var, step, ybin_centers=None, xbin_centers=None, min_depth=Non
         prokk=prominence[kk]
 
         #-------Use first few centroids to get center-------
-        nc=min(centroid_num_to_center,len(vv))
+        nc = min(centroid_num_to_center,len(vv))
         centerkk=np.array([jj.vertices.mean(axis=0) for jj in vv[:nc]])
         centerkk=np.mean(centerkk,axis=0)
 
@@ -463,7 +473,7 @@ def getProminence(var, step, ybin_centers=None, xbin_centers=None, min_depth=Non
             }
 
         result[kk]=peakii
-        # lerp1 to get center indices
+        # lerp1 (lienar interpolation) to get center indices
         if needslerpx:
             fitx=interp1d(xbin_centers,np.arange(var.shape[1]))
             xidx=fitx(centerkk[0])
@@ -489,6 +499,8 @@ def getProminence(var, step, ybin_centers=None, xbin_centers=None, min_depth=Non
 
 
 
+
+
 #-------------------Plot------------------------
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
@@ -511,21 +523,25 @@ def plot_Prominence(xx, yy, slab, peaks, idmap, promap, parentmap, debug_print=F
     """
     figure = plt.figure(figsize=(12,10),dpi=100)
     zmax = slab.max()
-    XX, YY = np.meshgrid(xx,yy)
+    XX, YY = np.meshgrid(xx, yy)
 
+    # ==================================================================================================================== #
     ## Subplot 1: Top-Left - Contour Plot
     ax1=figure.add_subplot(2,2,1)
-    ax1.contourf(XX,YY,slab,levels=np.arange(0,zmax,1))
+    ax1.contourf(XX, YY, slab, levels=np.arange(0, zmax, 1))
     ax1.set_xlabel('X')
     ax1.set_ylabel('Y')
     ax1.set_title('Top view, col contours as dashed lines')
 
-    for kk, vv in peaks.items():
+    # This plots the dashed lines on top of the contour plot, but idk what the dashed lines even are. They're often out in space irrelevant to the main peaks.
+    # The dotted black lines refer to the "col"s (see definition of col in header) of the peaks. 
+    for key, value in peaks.items():
         if debug_print:
-            print (kk)
-        cols=vv['contour']
+            print (key)
+        cols=value['contour']
         ax1.plot(cols.vertices[:,0], cols.vertices[:,1],'k:')
 
+    # ==================================================================================================================== #
     ## Subplot 2: Top-Right - Cross-section
     line=slab[slab.shape[0]//2]
     ax2=figure.add_subplot(2,2,2)
@@ -534,31 +550,40 @@ def plot_Prominence(xx, yy, slab, peaks, idmap, promap, parentmap, debug_print=F
     ax2.set_ylabel('Z')
     ax2.set_title('Cross section through y=0')
 
-    for kk, vv in peaks.items():
-        xii, yii = vv['center']
-        z2ii = vv['height']
-        pro = vv['prominence']
+    # This adds the vertical black dotted lines to the cross-section through each peak and the text with the peak label/parent
+    for key, value in peaks.items():
+        xii, yii = value['center']
+        z2ii = value['height']
+        pro = value['prominence']
         z1ii = z2ii-pro
         ax2.plot([xii, xii], [z1ii, z2ii],'k:')
-        ax2.text(xii, z2ii,'p%d, parent = %d' %(kk, vv['parent']),
+        ax2.text(xii, z2ii,'p%d, parent = %d' %(key, value['parent']),
                 horizontalalignment='center',
                 verticalalignment='bottom')
 
+    # ==================================================================================================================== #
     ## Subplot 3: Bottom-Left - 3D Grid
     ax3=figure.add_subplot(2,2,3,projection='3d')
-    ax3.plot_surface(XX,YY,slab,rstride=4,cstride=4,cmap='viridis',alpha=0.8)
-
-    for kk, vv in peaks.items():
-        xii,yii=vv['center']
-        z2ii=vv['height']
-        pro=vv['prominence']
+        
+    # this actually plots the 3D surface:
+    ax3.plot_surface(XX, YY, slab, rstride=4, cstride=4, cmap='viridis', alpha=0.8) 
+    # rstride, cstride: Downsampling stride in each direction. These arguments are mutually exclusive with rcount and ccount.
+    
+    
+    ## This part looks like it just plots some ascending vertical lines through the peaks of the 3D plot, but you can't really see them. They look like they go through the center of the peak.
+    for key, value in peaks.items():
+        xii,yii=value['center']
+        z2ii=value['height']
+        pro=value['prominence']
         z1ii=z2ii-pro
         ax3.plot([xii,xii],[yii,yii],[z1ii,z2ii], color='r', linewidth=2)
+        
+        
 
+    # ==================================================================================================================== #
     ## Subplot 4: Bottom-Right - Matrix of Promeneces
     ax4=figure.add_subplot(2,2,4)
-    cs=ax4.imshow(promap,origin='lower',interpolation='nearest',
-            extent=[-10,10,-10,10])
+    cs=ax4.imshow(promap,origin='lower',interpolation='nearest', extent=[-10,10,-10,10])
     ax4.set_xlabel('X')
     ax4.set_ylabel('Y')
     ax4.set_title('Top view, prominences at peaks')
