@@ -444,14 +444,13 @@ class PlacefieldDensityAnalysisComputationFunctions(AllFunctionEnumeratingMixin,
                 plt.close(fig) # close the figure when done generating the contours to prevent an empty figure from showing
                 return included_computed_contours
 
-            def analyze_peak(active_peak, peak_height_multiplier_probe_levels, debug_print=False):
+            def analyze_peak(xbin_centers, ybin_centers, slab, active_peak, peak_height_multiplier_probe_levels, debug_print=False):
                 peak_probe_point = active_peak['center']
                 peak_height = active_peak['height']
                 probe_levels = np.array([peak_height*multiplier for multiplier in peak_height_multiplier_probe_levels]).astype('float') # specific probe levels
-                # probe_levels = np.array([peak_height*0.5, peak_height*0.9]).astype('float') # specific probe levels
                 if debug_print:
                     print(f'probe_levels: {probe_levels}')
-                included_computed_contours = find_contours_at_levels(active_peak_prominence_2d_results.xx, active_peak_prominence_2d_results.yy, slab, peak_probe_point, probe_levels)
+                included_computed_contours = find_contours_at_levels(xbin_centers, ybin_centers, slab, peak_probe_point, probe_levels)
                 if debug_print:
                     print(f'\t computing contour stats...')
                 included_computed_contour_stats = {probe_lvl:[contour.get_extents() for contour in contour_list] for probe_lvl, contour_list in included_computed_contours.items()} # previous did get_extents() .size
@@ -461,12 +460,15 @@ class PlacefieldDensityAnalysisComputationFunctions(AllFunctionEnumeratingMixin,
                 
                 # get_path_collection_extents
                 
-            def analyze_peaks(peaks, peak_height_multiplier_probe_levels, debug_print=False):
+            def analyze_peaks(xbin_centers, ybin_centers, slab, peaks, peak_height_multiplier_probe_levels, debug_print=False):
+                """ Analyze all peaks of a given cell/ratemap
+                
+                """
                 out_computed_contours = DynamicParameters.init_from_dict({})
                 
                 for peak_id, active_peak in peaks.items():
                     print(f'computing contours for peak_id: {peak_id}...')
-                    included_computed_contours, probe_levels, contour_stats = analyze_peak(active_peak, peak_height_multiplier_probe_levels, debug_print=debug_print)
+                    included_computed_contours, probe_levels, contour_stats = analyze_peak(xbin_centers, ybin_centers, slab, active_peak, peak_height_multiplier_probe_levels, debug_print=debug_print)
                     out_computed_contours[peak_id] = DynamicParameters.init_from_dict({'contours': included_computed_contours, 'levels': probe_levels, 'stats': contour_stats})
                 print(f'done.')
                 return out_computed_contours
@@ -475,7 +477,7 @@ class PlacefieldDensityAnalysisComputationFunctions(AllFunctionEnumeratingMixin,
             # peak_height_multiplier_probe_levels = (0.5, 0.9) # 50% and 90% of the peak height
             # out_computed_contours = analyze_peaks(peaks, peak_height_multiplier_probe_levels, debug_print=True)
 
-            def analyze_prominence_2d_result(result_tuple, peak_height_multiplier_probe_levels = (0.5, 0.9), debug_print=False):
+            def analyze_prominence_2d_result(xbin_centers, ybin_centers, slab, result_tuple, peak_height_multiplier_probe_levels = (0.5, 0.9), debug_print=False):
                 slab, peaks, idmap, promap, parentmap = result_tuple
                 """
                 Return <result>: dict, keys: ids of found peaks.
@@ -493,7 +495,7 @@ class PlacefieldDensityAnalysisComputationFunctions(AllFunctionEnumeratingMixin,
                         'parent'    : int, id of a peak's parent. Heightest peak as a
                                     parent id of 0.
                 """
-                out_computed_contours = analyze_peaks(peaks, peak_height_multiplier_probe_levels, debug_print=debug_print)
+                out_computed_contours = analyze_peaks(xbin_centers, ybin_centers, slab, peaks, peak_height_multiplier_probe_levels, debug_print=debug_print)
                 for a_level, bounding_box_list in out_computed_contours[1].stats.items():
                     assert len(bounding_box_list) == 1, "list of bounding boxes is greater than 1! The number of Paths returned must be greater than one!"
                     bounding_box = bounding_box_list[0]
@@ -510,7 +512,8 @@ class PlacefieldDensityAnalysisComputationFunctions(AllFunctionEnumeratingMixin,
                     
             # active_peak_prominence_2d_results.xx, active_peak_prominence_2d_results.yy, active_peak_prominence_2d_results.neuron_extended_ids, active_peak_prominence_2d_results.result_tuples
             
-            
+            active_peak_prominence_2d_results.xx, active_peak_prominence_2d_results.yy, slab
+            # active_peak_prominence_2d_results.xx, active_peak_prominence_2d_results.yy, slab
             all_out = analyze_prominence_2d_results(result_tuples, peak_height_multiplier_probe_levels=peak_height_multiplier_probe_levels, debug_print=False)
 
             
