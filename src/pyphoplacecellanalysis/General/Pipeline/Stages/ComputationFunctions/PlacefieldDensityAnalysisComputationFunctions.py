@@ -19,6 +19,107 @@ from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.Computa
 
 """-------------- Specific Computation Functions to be registered --------------"""
 
+modify_dict_mode = True # if True, writes the dict
+def find_contours_at_levels(xbin_centers, ybin_centers, slab, peak_probe_point, probe_levels):
+    """ finds the contours containing the peak_probe_point at the specified probe_levels.
+        performs slicing through desired z-values (1/2 prominence, etc) using contourf
+        
+    Returns:
+        a dict with keys of the probe_levels and values containing a list of their corresponding contours
+    """
+    vmax = np.nanmax(slab)
+    vmin = np.nanmin(slab)
+    # peak_probe_point = active_peak['center']
+    # peak_height = active_peak['height']
+    
+    fig, ax = plt.subplots()
+    included_computed_contours = DynamicParameters.init_from_dict({}) 
+    #---------------Loop through levels---------------
+    for ii, levii in enumerate(probe_levels[::-1]):
+        # Note that contourf requires at least 2 levels, hence the use of the vmax+1.0 term and accessing only the first item in the collection. Otherwise: "ValueError: Filled contours require at least 2 levels."
+        csii = ax.contourf(xbin_centers, ybin_centers, slab, [levii, vmax+1.0]) ## Heavy-lifting code here. levii is the level
+        csii = csii.collections[0]
+        ax.cla()
+        #--------------Loop through contours at level--------------
+        # find only the ones containing the peak_probe_point
+        included_computed_contours[levii] = [contjj for jj, contjj in enumerate(csii.get_paths()) if contjj.contains_point(peak_probe_point)]
+    plt.close(fig) # close the figure when done generating the contours to prevent an empty figure from showing
+    return included_computed_contours
+
+def analyze_peak(xbin_centers, ybin_centers, slab, active_peak_dict, peak_height_multiplier_probe_levels, debug_print=False):
+    peak_probe_point = active_peak_dict['center']
+    peak_height = active_peak_dict['height']
+    probe_levels = np.array([peak_height*multiplier for multiplier in peak_height_multiplier_probe_levels]).astype('float') # specific probe levels
+    if debug_print:
+        print(f'probe_levels: {probe_levels}')
+    included_computed_contours = find_contours_at_levels(xbin_centers, ybin_centers, slab, peak_probe_point, probe_levels) # TODO: efficiency: This would be more efficient to do for all peaks at once I believe
+    if debug_print:
+        print(f'\t computing contour stats...')
+    included_computed_contour_stats = {probe_lvl:[{'bbox':contour.get_extents(), 'size':contour.get_extents().size} for contour in contour_list] for probe_lvl, contour_list in included_computed_contours.items()} # previous did get_extents() .size
+    
+    if modify_dict_mode:
+        active_peak_dict['computed_contours'] = included_computed_contours
+        active_peak_dict['computed_contour_stats'] = included_computed_contour_stats
+        active_peak_dict['probe_levels'] = probe_levels
+        # return active_peak_dict
+        return included_computed_contours, probe_levels, included_computed_contour_stats
+    else:
+        ## Also add to active_peak dictionary:
+        return included_computed_contours, probe_levels, included_computed_contour_stats
+    
+    # get_path_collection_extents
+    
+def analyze_peaks(xbin_centers, ybin_centers, slab, peaks, peak_height_multiplier_probe_levels, debug_print=False):
+    """ Analyze all peaks of a given cell/ratemap
+    
+    """
+    out_computed_contours = DynamicParameters.init_from_dict({})
+    
+    for peak_id, active_peak_dict in peaks.items():
+        print(f'computing contours for peak_id: {peak_id}...')
+        included_computed_contours, probe_levels, contour_stats = analyze_peak(xbin_centers, ybin_centers, slab, active_peak_dict, peak_height_multiplier_probe_levels, debug_print=debug_print)
+        out_computed_contours[peak_id] = DynamicParameters.init_from_dict({'contours': included_computed_contours, 'levels': probe_levels, 'stats': contour_stats})
+    print(f'done.')
+    return out_computed_contours
+
+## Testing above:
+# peak_height_multiplier_probe_levels = (0.5, 0.9) # 50% and 90% of the peak height
+# out_computed_contours = analyze_peaks(peaks, peak_height_multiplier_probe_levels, debug_print=True)
+
+def analyze_prominence_2d_result(xbin_centers, ybin_centers, result_tuple, peak_height_multiplier_probe_levels = (0.5, 0.9), debug_print=False):
+    slab, peaks, idmap, promap, parentmap = result_tuple
+    """
+    Return <result>: dict, keys: ids of found peaks.
+                    values: dict, storing info of a peak:
+            'id'        : int, id of peak,
+            'height'    : max of height level,
+            'col_level' : height level at col,
+            'prominence': prominence of peak,
+            'area'      : float, area of col contour. If latitude and 
+                        longitude axes available, geographical area in
+                        km^2. Otherwise, area in unit^2, unit is the same
+                        as x, y axes,
+            'contours'  : list, contours of peak from heights level to col,
+                        each being a matplotlib Path obj
+            'parent'    : int, id of a peak's parent. Heightest peak as a
+                        parent id of 0.
+    """
+    return analyze_peaks(xbin_centers, ybin_centers, slab, peaks, peak_height_multiplier_probe_levels, debug_print=debug_print)
+
+def analyze_prominence_2d_results(active_peak_prominence_2d_results, peak_height_multiplier_probe_levels = (0.5, 0.9), debug_print=False):
+    xbin_centers, ybin_centers = active_peak_prominence_2d_results.xx, active_peak_prominence_2d_results.yy
+    neuron_extended_ids = active_peak_prominence_2d_results.neuron_extended_ids
+    all_out_computed_contours = {}
+    # active_peak_prominence_2d_results.result_tuples[0]
+    for (i, result_tuple) in enumerate(active_peak_prominence_2d_results.result_tuples):
+        neuron_id = neuron_extended_ids[i].id
+        out_computed_contours = analyze_prominence_2d_result(xbin_centers, ybin_centers, result_tuple, peak_height_multiplier_probe_levels=peak_height_multiplier_probe_levels, debug_print=debug_print)
+        all_out_computed_contours[neuron_id] = out_computed_contours
+    return all_out_computed_contours
+        
+
+            
+            
 class PlacefieldDensityAnalysisComputationFunctions(AllFunctionEnumeratingMixin, metaclass=ComputationFunctionRegistryHolder):
     """Performs analyeses related to placefield densities and overlap across spactial bins. Includes analyses for Eloy from 07-2022. """
     _computationPrecidence = 2 # must be done after PlacefieldComputations and DefaultComputationFunctions
@@ -416,115 +517,14 @@ class PlacefieldDensityAnalysisComputationFunctions(AllFunctionEnumeratingMixin,
                     
                     
             """            
-            modify_dict_mode = True # if True, writes the dict
-
-            def find_contours_at_levels(xbin_centers, ybin_centers, slab, peak_probe_point, probe_levels):
-                """ finds the contours containing the peak_probe_point at the specified probe_levels.
-                    performs slicing through desired z-values (1/2 prominence, etc) using contourf
-                    
-                Returns:
-                    a dict with keys of the probe_levels and values containing a list of their corresponding contours
-                """
-                vmax = np.nanmax(slab)
-                vmin = np.nanmin(slab)
-                # peak_probe_point = active_peak['center']
-                # peak_height = active_peak['height']
-                
-                fig, ax = plt.subplots()
-                included_computed_contours = DynamicParameters.init_from_dict({}) 
-                #---------------Loop through levels---------------
-                for ii, levii in enumerate(probe_levels[::-1]):
-                    # Note that contourf requires at least 2 levels, hence the use of the vmax+1.0 term and accessing only the first item in the collection. Otherwise: "ValueError: Filled contours require at least 2 levels."
-                    csii = ax.contourf(xbin_centers, ybin_centers, slab, [levii, vmax+1.0]) ## Heavy-lifting code here. levii is the level
-                    csii = csii.collections[0]
-                    ax.cla()
-                    #--------------Loop through contours at level--------------
-                    # find only the ones containing the peak_probe_point
-                    included_computed_contours[levii] = [contjj for jj, contjj in enumerate(csii.get_paths()) if contjj.contains_point(peak_probe_point)]
-                plt.close(fig) # close the figure when done generating the contours to prevent an empty figure from showing
-                return included_computed_contours
-
-            def analyze_peak(xbin_centers, ybin_centers, slab, active_peak_dict, peak_height_multiplier_probe_levels, debug_print=False):
-                peak_probe_point = active_peak_dict['center']
-                peak_height = active_peak_dict['height']
-                probe_levels = np.array([peak_height*multiplier for multiplier in peak_height_multiplier_probe_levels]).astype('float') # specific probe levels
-                if debug_print:
-                    print(f'probe_levels: {probe_levels}')
-                included_computed_contours = find_contours_at_levels(xbin_centers, ybin_centers, slab, peak_probe_point, probe_levels) # TODO: efficiency: This would be more efficient to do for all peaks at once I believe
-                if debug_print:
-                    print(f'\t computing contour stats...')
-                included_computed_contour_stats = {probe_lvl:[{'bbox':contour.get_extents(), 'size':contour.get_extents().size} for contour in contour_list] for probe_lvl, contour_list in included_computed_contours.items()} # previous did get_extents() .size
-                
-                if modify_dict_mode:
-                    active_peak_dict['computed_contours'] = included_computed_contours
-                    active_peak_dict['computed_contour_stats'] = included_computed_contour_stats
-                    active_peak_dict['probe_levels'] = probe_levels
-                    # return active_peak_dict
-                    return included_computed_contours, probe_levels, included_computed_contour_stats
-                else:
-                    ## Also add to active_peak dictionary:
-                    return included_computed_contours, probe_levels, included_computed_contour_stats
-                
-                # get_path_collection_extents
-                
-            def analyze_peaks(xbin_centers, ybin_centers, slab, peaks, peak_height_multiplier_probe_levels, debug_print=False):
-                """ Analyze all peaks of a given cell/ratemap
-                
-                """
-                out_computed_contours = DynamicParameters.init_from_dict({})
-                
-                for peak_id, active_peak_dict in peaks.items():
-                    print(f'computing contours for peak_id: {peak_id}...')
-                    included_computed_contours, probe_levels, contour_stats = analyze_peak(xbin_centers, ybin_centers, slab, active_peak_dict, peak_height_multiplier_probe_levels, debug_print=debug_print)
-                    out_computed_contours[peak_id] = DynamicParameters.init_from_dict({'contours': included_computed_contours, 'levels': probe_levels, 'stats': contour_stats})
-                print(f'done.')
-                return out_computed_contours
-
-            ## Testing above:
-            # peak_height_multiplier_probe_levels = (0.5, 0.9) # 50% and 90% of the peak height
-            # out_computed_contours = analyze_peaks(peaks, peak_height_multiplier_probe_levels, debug_print=True)
-
-            def analyze_prominence_2d_result(xbin_centers, ybin_centers, result_tuple, peak_height_multiplier_probe_levels = (0.5, 0.9), debug_print=False):
-                slab, peaks, idmap, promap, parentmap = result_tuple
-                """
-                Return <result>: dict, keys: ids of found peaks.
-                                values: dict, storing info of a peak:
-                        'id'        : int, id of peak,
-                        'height'    : max of height level,
-                        'col_level' : height level at col,
-                        'prominence': prominence of peak,
-                        'area'      : float, area of col contour. If latitude and 
-                                    longitude axes available, geographical area in
-                                    km^2. Otherwise, area in unit^2, unit is the same
-                                    as x, y axes,
-                        'contours'  : list, contours of peak from heights level to col,
-                                    each being a matplotlib Path obj
-                        'parent'    : int, id of a peak's parent. Heightest peak as a
-                                    parent id of 0.
-                """
-                out_computed_contours = analyze_peaks(xbin_centers, ybin_centers, slab, peaks, peak_height_multiplier_probe_levels, debug_print=debug_print)
-                for a_level, bounding_box_list in out_computed_contours[1].stats.items():
-                    assert len(bounding_box_list) == 1, "list of bounding boxes is greater than 1! The number of Paths returned must be greater than one!"
-                    bounding_box = bounding_box_list[0]
-                    bounding_box.size
-                    bounding_box.
-
-                
-                
-            def analyze_prominence_2d_results(active_peak_prominence_2d_results, peak_height_multiplier_probe_levels = (0.5, 0.9), debug_print=False):
-                xbin_centers, ybin_centers = active_peak_prominence_2d_results.xx, active_peak_prominence_2d_results.yy
-                neuron_extended_ids = active_peak_prominence_2d_results.neuron_extended_ids
-                # active_peak_prominence_2d_results.result_tuples[0]
-                for (i, result_tuple) in active_peak_prominence_2d_results.result_tuples.items():
-                    neuron_id = neuron_extended_ids[i].id
-                    analyze_prominence_2d_result(xbin_centers, ybin_centers, result_tuple, peak_height_multiplier_probe_levels=peak_height_multiplier_probe_levels, debug_print=debug_print)
-                    
-
-            active_peak_prominence_2d_results = computation_result.computed_data['RatemapPeaksAnalysis']['PeakProminence2D']
-            all_out = analyze_prominence_2d_results(active_peak_prominence_2d_results, peak_height_multiplier_probe_levels=peak_height_multiplier_probe_levels, debug_print=debug_print)
             
 
+            
+            
+            
 
+            active_peak_prominence_2d_results = computation_result.computed_data['RatemapPeaksAnalysis']['PeakProminence2D']
+            computation_result.computed_data['RatemapPeaksAnalysis']['PeakProminence2D']['analyzed_results'] = analyze_prominence_2d_results(active_peak_prominence_2d_results, peak_height_multiplier_probe_levels=peak_height_multiplier_probe_levels, debug_print=debug_print)
             return computation_result
 
 
