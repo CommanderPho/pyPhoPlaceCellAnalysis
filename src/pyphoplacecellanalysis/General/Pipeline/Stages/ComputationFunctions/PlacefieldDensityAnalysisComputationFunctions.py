@@ -343,7 +343,7 @@ class PlacefieldDensityAnalysisComputationFunctions(AllFunctionEnumeratingMixin,
             return computation_result
 
 
-    def _perform_pf_find_ratemap_peaks_peak_prominence2d_computation(computation_result: ComputationResult, step=0.2, peak_height_multiplier_probe_levels = (0.5, 0.9), debug_print=True):
+    def _perform_pf_find_ratemap_peaks_peak_prominence2d_computation(computation_result: ComputationResult, step=0.01, peak_height_multiplier_probe_levels = (0.5, 0.9), debug_print=False):
             """ Uses the peak_prominence2d package to find the peaks and promenences of 2D placefields
             
             Independent of the other peak-computing computation functions above
@@ -400,7 +400,7 @@ class PlacefieldDensityAnalysisComputationFunctions(AllFunctionEnumeratingMixin,
                 return included_computed_contours
 
 
-            def _perform_compute_prominence_contours(xbin_centers, ybin_centers, slab, step=0.2):
+            def _perform_compute_prominence_contours(xbin_centers, ybin_centers, slab, step=0.1):
                 """
                 xbin_centers and ybin_centers should be like *bin_labels not *bin
                 slab should usually be transposed: tuning_curves[i].T
@@ -414,7 +414,7 @@ class PlacefieldDensityAnalysisComputationFunctions(AllFunctionEnumeratingMixin,
                     figure, (ax1, ax2, ax3, ax4) = plot_Prominence(xx, yy, slab, peaks, idmap, promap, parentmap, debug_print=False)
 
                 """
-                peaks_dict, id_map, prominence_map, parent_map = getProminence(slab, step, ybin_centers=ybin_centers, xbin_centers=xbin_centers, min_area=None, include_edge=True, verbose=False)
+                peaks_dict, id_map, prominence_map, parent_map = getProminence(slab, step, ybin_centers=ybin_centers, xbin_centers=xbin_centers, min_area=None, min_depth=0.2, include_edge=True, verbose=False)
                 return xbin_centers, ybin_centers, slab, peaks_dict, id_map, prominence_map, parent_map
             
             
@@ -452,17 +452,16 @@ class PlacefieldDensityAnalysisComputationFunctions(AllFunctionEnumeratingMixin,
             
             ## TODO: change to amap with keys of active_pf_2D.neuron_ids
             # out_result_tuples = []
+            # active_tuning_curves = active_pf_2D.ratemap.tuning_curves # Raw Tuning Curves
+            active_tuning_curves = active_pf_2D.ratemap.unit_max_tuning_curves # Unit-max scaled tuning curves
             
             out_results = {}
             #  Build the results first:
             for i in np.arange(n_neurons):
                 neuron_id = active_pf_2D.neuron_extended_ids[i].id
-                xx, yy, slab, peaks, id_map, prominence_map, parent_map = _perform_compute_prominence_contours(active_pf_2D.xbin_centers, active_pf_2D.ybin_centers, active_pf_2D.ratemap.tuning_curves[i].T, step=step)
-                
+                # xx, yy, slab, peaks, id_map, prominence_map, parent_map = _perform_compute_prominence_contours(active_pf_2D.xbin_centers, active_pf_2D.ybin_centers, active_pf_2D.ratemap.tuning_curves[i].T, step=step)
+                xx, yy, slab, peaks, id_map, prominence_map, parent_map = _perform_compute_prominence_contours(active_pf_2D.xbin_centers, active_pf_2D.ybin_centers, active_tuning_curves[i].T, step=step)
                 peaks = analyze_peaks(active_pf_2D.xbin_centers, active_pf_2D.ybin_centers, slab, peaks, peak_height_multiplier_probe_levels, debug_print=debug_print)
-                # peaks = analyze_peaks(active_pf_2D.xbin_labels, active_pf_2D.ybin_labels, slab, peaks, peak_height_multiplier_probe_levels, debug_print=debug_print)
-                
-                # out_result_tuples.append((slab, peaks, id_map, prominence_map, parent_map))
                 # out_results[neuron_id] = {'peaks': peaks, 'slab': slab} # could add more properties
                 out_results[neuron_id] = {'peaks': peaks, 'slab': slab, 'id_map':id_map, 'prominence_map':prominence_map, 'parent_map':parent_map} # could add more properties
     
