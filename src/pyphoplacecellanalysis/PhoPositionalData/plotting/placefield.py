@@ -357,7 +357,9 @@ def plot_placefields2D(pTuningCurves, active_placefields, pf_colors: np.ndarray,
             pdata_currActiveNeuronTuningCurve_Points_plotActor = None
     
     ## Build CascadingDynamicPlotsList Wrapper:
-        currActiveNeuronTuningCurve_plotActors = CascadingDynamicPlotsList(active_main_plotActor=pdata_currActiveNeuronTuningCurve_plotActor, active_points_plotActor=pdata_currActiveNeuronTuningCurve_Points_plotActor)
+        # currActiveNeuronTuningCurve_plotActors = CascadingDynamicPlotsList(active_main_plotActor=pdata_currActiveNeuronTuningCurve_plotActor, active_points_plotActor=pdata_currActiveNeuronTuningCurve_Points_plotActor)
+        currActiveNeuronTuningCurve_plotActors = CascadingDynamicPlotsList(main=pdata_currActiveNeuronTuningCurve_plotActor,
+                                                                           points=pdata_currActiveNeuronTuningCurve_Points_plotActor)
     
     ## Built Multiplotter Wrapper:
     # data = [pv.Sphere(center=(2, 0, 0)), pv.Cube(center=(0, 2, 0)), pv.Cone()]
