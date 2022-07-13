@@ -80,7 +80,7 @@ def _build_pyvista_single_neuron_prominence_result_data(neuron_id, a_result, pro
     # return peak_locations, colors, prominence_array, is_included_array
     
 
-def _render_peak_prominence_2d_results_on_pyvista_plotter(ipcDataExplorer, active_peak_prominence_2d_results, valid_neuron_id=2, debug_print=True, **kwargs):
+def _render_peak_prominence_2d_results_on_pyvista_plotter(ipcDataExplorer, active_peak_prominence_2d_results, valid_neuron_id=2, render=True, debug_print=True, **kwargs):
     """
     
     Built Data:
@@ -151,7 +151,7 @@ def _render_peak_prominence_2d_results_on_pyvista_plotter(ipcDataExplorer, activ
     curr_pdata = curr_neuron_plot_data['pdata_currActiveNeuronTuningCurve']
     curr_contours_mesh_name = f'pf[{valid_neuron_id}]_contours'
     curr_contours = curr_pdata.contour(isosurfaces=ipcDataExplorer.params.zScalingFactor*flat_peak_levels) # I really don't know why we need to multiply by zScalingFactor (~2000.0) again.
-    contours_mesh_actor = ipcDataExplorer.p.add_mesh(curr_contours, color="white", line_width=3, name=curr_contours_mesh_name) # should add it to the ipcDataExplorer's extant plotter (overlaying it on the current mesh
+    contours_mesh_actor = ipcDataExplorer.p.add_mesh(curr_contours, color="white", line_width=3, name=curr_contours_mesh_name, render=render) # should add it to the ipcDataExplorer's extant plotter (overlaying it on the current mesh
     out_pf_contours_data[curr_contours_mesh_name] = curr_contours
     out_pf_contours_actors[curr_contours_mesh_name] = contours_mesh_actor
     
@@ -167,7 +167,7 @@ def _render_peak_prominence_2d_results_on_pyvista_plotter(ipcDataExplorer, activ
             a_peak_level = peak_levels[peak_idx][level_idx]
             ## Can use a rectangle instead of a box:
             out_pf_box_data[curr_box_mesh_name] = pv.Rectangle([((x0+width), y0, a_peak_level), ((x0+width), (y0+height), a_peak_level), (x0, (y0+height), a_peak_level), (x0, y0, a_peak_level)])
-            out_pf_box_actors[curr_box_mesh_name] = ipcDataExplorer.p.add_mesh(out_pf_box_data[curr_box_mesh_name], color="white",  name=curr_box_mesh_name, show_edges=True, edge_color="white", line_width=1.5, opacity=0.75, label=curr_box_mesh_name, style='wireframe')
+            out_pf_box_actors[curr_box_mesh_name] = ipcDataExplorer.p.add_mesh(out_pf_box_data[curr_box_mesh_name], color="white",  name=curr_box_mesh_name, show_edges=True, edge_color="white", line_width=1.5, opacity=0.75, label=curr_box_mesh_name, style='wireframe', render=render)
             
             ## Box Mode:
             ## build the corner points of the box:
@@ -210,8 +210,8 @@ def _render_peak_prominence_2d_results_on_pyvista_plotter(ipcDataExplorer, activ
             out_pf_text_size_data[curr_text_label_mesh_x_name] = x_text_mesh
             out_pf_text_size_data[curr_text_label_mesh_y_name] = y_text_mesh
             
-            out_pf_text_size_actors[curr_text_label_mesh_x_name] = ipcDataExplorer.p.add_mesh(x_text_mesh, name=curr_text_label_mesh_x_name)
-            out_pf_text_size_actors[curr_text_label_mesh_y_name] = ipcDataExplorer.p.add_mesh(y_text_mesh, name=curr_text_label_mesh_y_name)
+            out_pf_text_size_actors[curr_text_label_mesh_x_name] = ipcDataExplorer.p.add_mesh(x_text_mesh, name=curr_text_label_mesh_x_name, render=render)
+            out_pf_text_size_actors[curr_text_label_mesh_y_name] = ipcDataExplorer.p.add_mesh(y_text_mesh, name=curr_text_label_mesh_y_name, render=render)
             
 
 
@@ -220,13 +220,21 @@ def _render_peak_prominence_2d_results_on_pyvista_plotter(ipcDataExplorer, activ
     point_labels = peak_labels.copy()
     points = peak_locations.copy()
     point_mask = None
+    
     plotActors_labels, data_dict_labels = _perform_plot_point_labels(ipcDataExplorer.p, points, point_labels=point_labels, point_mask=point_mask,
                                                                             **({'font_size': 10, 'name':curr_peak_points_mesh_name,
                                                                                 'shape_opacity': 0.1, 'shape_color':'grey', 'shape':'rounded_rect', 'fill_shape':True, 'margin':3,
-                                                                                'show_points': False, 'point_size': 8, 'point_color':'white', 'render_points_as_spheres': True} | kwargs)
+                                                                                'show_points': False, 'point_size': 8, 'point_color':'white', 'render_points_as_spheres': True, 'render': render} | kwargs)
                                                                         )
     out_pf_peak_points_actors[curr_peak_points_mesh_name] = plotActors_labels['main']
     out_pf_peak_points_data[curr_peak_points_mesh_name] = {'name':curr_peak_points_mesh_name, 'active_data':{'peak_locations':peak_locations, 'point_labels':point_labels} | data_dict_labels}
+    
+    # ALT: as an alternative to the labeled points, we could the add_points function to add them
+    # pdata_currActiveNeuronTuningCurve_Points = pdata_currActiveNeuronTuningCurve.extract_points(pdata_currActiveNeuronTuningCurve.points[:, 2] > 0)  # UnstructuredGrid
+    # pdata_currActiveTuningCurvePeaks_Points_plotActor = ipcDataExplorer.p.add_points(pdata_currActiveNeuronTuningCurve_Points, label=f'{curr_active_neuron_pf_identifier}_peak_points', name=f'{curr_active_neuron_pf_identifier}_peak_points', render_points_as_spheres=True, point_size=6.0, color=curr_active_neuron_opaque_color, render=render)    
+
+    
+    
     ## Build the final output structures:
     all_peaks_actors = CascadingDynamicPlotsList(contours=CascadingDynamicPlotsList(**out_pf_contours_actors), boxes=CascadingDynamicPlotsList(**out_pf_box_actors), text=CascadingDynamicPlotsList(**out_pf_text_size_actors), peak_points=CascadingDynamicPlotsList(**out_pf_peak_points_actors))
     all_peaks_data = dict(contours=out_pf_contours_data, boxes=out_pf_box_data, text=out_pf_text_size_data, peak_points=out_pf_peak_points_data)
@@ -239,7 +247,124 @@ from pyphoplacecellanalysis.PhoPositionalData.plotting.peak_prominences import _
 out_pf_contours_data, out_pf_contours_actors, out_pf_box_data, out_pf_box_actors, out_pf_text_size_data, out_pf_text_size_actors, out_pf_peak_points_data, out_pf_peak_points_actors = _render_peak_prominence_2d_results_on_pyvista_plotter(ipcDataExplorer, active_peak_prominence_2d_results, valid_neuron_id=12, debug_print=False)
 
 
-self.plots['tuningCurvePlotActors'], self.plots_data['tuningCurvePlotData'], self.plots['tuningCurvePlotLegendActor']
-
+    self.plots['tuningCurvePlotActors'], self.plots_data['tuningCurvePlotData'], self.plots['tuningCurvePlotLegendActor']
+    ipcDataExplorer.plots_data['tuningCurvePlotData'][active_neuron_id]['peaks']
 
 """
+
+
+def render_all_neuron_peak_prominence_2d_results_on_pyvista_plotter(ipcDataExplorer, active_peak_prominence_2d_results, debug_print=False, **kwargs):
+    """
+    Computes the appropriate contour/peaks/rectangle/etc components for each neuron_id using the active_peak_prominence_2d_results and uses them to create new:
+    Inputs:
+        `ipcDataExplorer`: a valid and activate 3D Interactive Tuning Curves Plotter instance, as would be produced by calling `curr_active_pipeline.display('_display_3d_interactive_tuning_curves_plotter', ...)`
+        `active_peak_prominence_2d_results`: the computed results from the 'PeakProminence2D' computation stage.
+        
+    Provides: 
+        Modifies ipcDataExplorer's `.plots['tuningCurvePlotActors']` and `.plots_data['tuningCurvePlotActors']` properties just like endogenous ipcDataExplorer functions do.
+        FOR EACH neuron_id -> active_neuron_id:
+            ipcDataExplorer.plots['tuningCurvePlotActors'][active_neuron_id].peaks: a hierarchy of nested CascadingDynamicPlotsList objects
+            ipcDataExplorer.plots_data['tuningCurvePlotData'][active_neuron_id]['peaks']: a series of nested-dicts with the same key hierarchy as the above peaks
+        
+    Usage:
+    
+        active_peak_prominence_2d_results = curr_active_pipeline.computation_results[active_config_name].computed_data.get('RatemapPeaksAnalysis', {}).get('PeakProminence2D', None)
+        pActiveTuningCurvesPlotter = None
+        display_output = display_output | curr_active_pipeline.display('_display_3d_interactive_tuning_curves_plotter', active_config_name, extant_plotter=display_output.get('pActiveTuningCurvesPlotter', None), panel_controls_mode='Qt', should_nan_non_visited_elements=False, zScalingFactor=2000.0) # Works now!
+        ipcDataExplorer = display_output['ipcDataExplorer']
+        display_output['pActiveTuningCurvesPlotter'] = display_output.pop('plotter') # rename the key from the generic "plotter" to "pActiveSpikesBehaviorPlotter" to avoid collisions with others
+        pActiveTuningCurvesPlotter = display_output['pActiveTuningCurvesPlotter']
+        root_dockAreaWindow, placefieldControlsContainerWidget, pf_widgets = display_output['pane'] # for Qt mode
+        
+        
+        
+    """
+    for active_neuron_id in ipcDataExplorer.neuron_ids:
+        if debug_print:
+            print(f'processing active_neuron_id: {active_neuron_id}...')
+        all_peaks_data, all_peaks_actors = _render_peak_prominence_2d_results_on_pyvista_plotter(ipcDataExplorer, active_peak_prominence_2d_results, valid_neuron_id=active_neuron_id, render=False, debug_print=debug_print, **kwargs)
+        tuning_curve_is_visible = ipcDataExplorer.plots['tuningCurvePlotActors'][active_neuron_id].main.GetVisibility() # either 0 or 1 depending on the visibility of this cell
+        all_peaks_actors.SetVisibility(tuning_curve_is_visible) # Change the visibility to match the current tuning_curve_visibility_state
+        ipcDataExplorer.plots['tuningCurvePlotActors'][active_neuron_id].peaks = all_peaks_actors # sets the .peaks property of the CascadingDynamicPlotsList
+        ipcDataExplorer.plots_data['tuningCurvePlotData'][active_neuron_id]['peaks'] = all_peaks_data
+
+
+    # Once done, render
+    ipcDataExplorer.p.render()
+    
+    if debug_print:
+        print('done.')
+        
+    return ipcDataExplorer
+
+
+
+
+
+
+
+
+
+
+# def __pyvista_contours_testing_overflow():
+#     """  This function contains unused code dumped from the Jupyter-Lab notebook 112 after completely the contour plotting features that I wanted to. It felt like a waste to scrap it.    
+#     """
+#     ## Look at splitting the contours with split_bodies():
+#     # this works well, but not sure if I need it
+#     split_contours = curr_contours.split_bodies()
+#     split_contours
+
+#     out_contours_data = {}
+#     out_contours_actors = {}
+
+#     for i, a_contour in enumerate(split_contours):
+#         curr_contour_mesh_name = f'contours[{valid_neuron_id}][{i}]'
+#         out_contours_data[curr_contour_mesh_name] = a_contour
+#         a_curr_contour_mesh_actor = ipcDataExplorer.p.add_mesh(a_contour, color="green", line_width=i+1, name=curr_contour_mesh_name) # should add it to the ipcDataExplorer's extant plotter (overlaying it on the current mesh
+#         out_contours_actors[curr_contour_mesh_name] = a_curr_contour_mesh_actor
+#         # is_inside_bounds(point, bounds) # where bounds is (xMin, xMax, yMin, yMax, zMin, zMax)
+
+#     mesh = split_contours.pop(1)
+#     mesh
+
+#     # mesh.select_enclosed_points()
+
+#     def get_bounding_box_size(mesh):
+#         # also, grab the size of the central gear
+#         x_size = mesh.bounds[1] - mesh.bounds[0]
+#         y_size = mesh.bounds[3] - mesh.bounds[2]
+#         z_size = mesh.bounds[5] - mesh.bounds[4]
+#         return x_size, y_size, z_size
+
+#     #     plotter = pv.Plotter()
+#     #     plotter.add_mesh(split_gears, smooth_shading=True, split_sharp_edges=True)
+#     #     plotter.add_mesh(mesh, smooth_shading=True, split_sharp_edges=True)
+#     #     plotter.show_grid(
+#     #         mesh=mesh,
+#     #         axes_ranges=[0, x_size, 0, y_size, 0, z_size],
+#     #         show_xaxis=False,
+#     #         bold=True,
+#     #         grid=False,
+#     #     )
+#     #     plotter.show()
+
+
+#     first_key = list(out_contours_data.keys())[0]
+#     a_contour = out_contours_data[first_key]
+#     a_contour_actor = out_contours_actors[first_key]
+
+#     x_size, y_size, z_size = get_bounding_box_size(a_contour)
+#     # axes_ranges=[0, x_size, 0, y_size, 0, z_size]
+#     a_curr_contour_mesh_grid = ipcDataExplorer.p.show_grid(
+#             mesh=a_contour)
+
+#     # a_curr_contour_mesh_grid = ipcDataExplorer.p.show_grid(
+#     #         mesh=a_contour,
+#     #         axes_ranges=[0, x_size, 0, y_size, 0, z_size],
+#     #         show_xaxis=False,
+#     #         bold=True,
+#     #         grid=False,
+#     # )
+
+
+#     central_gear.translate([0, 60, 60], inplace=True)
