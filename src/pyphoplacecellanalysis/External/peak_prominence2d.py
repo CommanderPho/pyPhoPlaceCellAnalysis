@@ -505,9 +505,12 @@ def getProminence(var, step, ybin_centers=None, xbin_centers=None, min_depth=Non
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 
-def plot_Prominence(xx, yy, slab, peaks, idmap, promap, parentmap, debug_print=False):
+def plot_Prominence(xx, yy, slab, peaks, idmap, promap, parentmap, n_contour_levels=None, debug_print=False):
     """ simple test plot of the results calculated from getProminence.
     
+    Inputs:
+        n_contour_levels: should be an integer indicating the number of levels to display in the contour plot
+        
     Usage:
     
         from pyphoplacecellanalysis.External.peak_prominence2d import getProminence, plot_Prominence
@@ -528,7 +531,12 @@ def plot_Prominence(xx, yy, slab, peaks, idmap, promap, parentmap, debug_print=F
     # ==================================================================================================================== #
     ## Subplot 1: Top-Left - Contour Plot
     ax1=figure.add_subplot(2,2,1)
-    ax1.contourf(XX, YY, slab, levels=np.arange(0, zmax, 1))
+    
+    if n_contour_levels is not None:
+        levels = np.linspace(0.0, zmax, n_contour_levels)
+    else:
+        levels = np.arange(0, zmax, 1) # old way
+    ax1.contourf(XX, YY, slab, levels=levels)
     ax1.set_xlabel('X')
     ax1.set_ylabel('Y')
     ax1.set_title('Top view, col contours as dashed lines')
