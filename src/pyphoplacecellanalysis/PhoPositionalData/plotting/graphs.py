@@ -130,9 +130,9 @@ def plot_point_labels(p, xbin_centers, ybin_centers, data, point_labels=None, po
 
     Args:
         p ([type]): [description]
-        xbin_centers ([type]): [description]
-        ybin_centers ([type]): [description]
-        data ([type]): [description]
+        xbin_centers ([type]): an array of n_xbins
+        ybin_centers ([type]): an array of n_ybins
+        data ([type]): the height data of dimension (n_xbins, n_ybins)
         point_labels [str]: a set of labels of length equal to data to display on the points
         zScalingFactor (float, optional): [description]. Defaults to 1.0.
 
@@ -153,7 +153,7 @@ def plot_point_labels(p, xbin_centers, ybin_centers, data, point_labels=None, po
     """
     # build a structured grid out of the bins
     twoDimGrid_x, twoDimGrid_y = np.meshgrid(xbin_centers, ybin_centers)
-    active_data = data[:,:].T.copy() # A single tuning curve
+    active_data = data[:,:].T.copy() # Copy the elevation/value data
     grid = pv.StructuredGrid(twoDimGrid_x, twoDimGrid_y, active_data)
     points = grid.points
     
