@@ -343,7 +343,7 @@ class PlacefieldDensityAnalysisComputationFunctions(AllFunctionEnumeratingMixin,
             return computation_result
 
 
-    def _perform_pf_find_ratemap_peaks_peak_prominence2d_computation(computation_result: ComputationResult, step=0.2, peak_height_multiplier_probe_levels = (0.5, 0.9), debug_print=False):
+    def _perform_pf_find_ratemap_peaks_peak_prominence2d_computation(computation_result: ComputationResult, step=0.2, peak_height_multiplier_probe_levels = (0.5, 0.9), debug_print=True):
             """ Uses the peak_prominence2d package to find the peaks and promenences of 2D placefields
             
             Independent of the other peak-computing computation functions above
@@ -391,6 +391,7 @@ class PlacefieldDensityAnalysisComputationFunctions(AllFunctionEnumeratingMixin,
                     # assert n_contours == 1, f"contour_stats is supposed to be equal to 1 but len(included_computed_contours[levii]): {len(included_computed_contours[levii])}!"
                     if n_contours == 0:
                         warn( f"n_contours is 0 for level: {levii}")
+                        included_computed_contours[levii] = None # set to None
                     else:                   
                         included_computed_contours[levii] = included_computed_contours[levii][0] # unwrapped from the list format, it's just the single Path/Curve now
                     
@@ -423,7 +424,7 @@ class PlacefieldDensityAnalysisComputationFunctions(AllFunctionEnumeratingMixin,
                 included_computed_contours = _find_contours_at_levels(xbin_centers, ybin_centers, slab, peaks_dict['center'], peaks_dict['probe_levels']) # DONE: efficiency: This would be more efficient to do for all peaks at once I believe. CONCLUSION: No, this needs to be done separately for each peak as they each have separate prominences which determine the levels they should be sliced at.
                 if debug_print:
                     print(f'\t computing contour stats...')
-                peaks_dict['level_slices'] = {probe_lvl:{'contour':contour, 'bbox':contour.get_extents(), 'size':contour.get_extents().size} for probe_lvl, contour in included_computed_contours.items()} # previous did get_extents() .size
+                peaks_dict['level_slices'] = {probe_lvl:{'contour':contour, 'bbox':contour.get_extents(), 'size':contour.get_extents().size} for probe_lvl, contour in included_computed_contours.items() if (contour is not None)} # previous did get_extents() .size
                 return peaks_dict
                 # get_path_collection_extents
                 
