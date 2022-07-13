@@ -7,6 +7,7 @@
 """
 from collections import OrderedDict
 from copy import deepcopy
+from warnings import warn
 import numpy as np
 import pandas as pd
 import pyvista as pv
@@ -164,14 +165,35 @@ class InteractivePlaceCellTuningCurvesDataExplorer(OccupancyPlottingMixin, Place
         ## TODO: I'm not sure about this one, we might want to override pf_colors_hex, or this could be where the issues where it wasn't displaying the colors I passed in were coming from.
         # if not self.params.hasattr('pf_colors_hex'):
         self.params.pf_colors_hex = [to_hex(self.params.pf_colors[:,i], keep_alpha=False) for i in self.tuning_curve_indicies]         
-        self.params.setdefault('active_plotter_background_gradient', self.params.plotter_backgrounds['Clouds (Apple-like white)'])
+        # self.params.setdefault('active_plotter_background_gradient', self.params.plotter_backgrounds['Clouds (Apple-like white)'])
+        self.params.setdefault('active_plotter_background_gradient', self.params.plotter_backgrounds['Deep Space (Dark)'])
         
         self.setup_spike_rendering_mixin()
         self.build_tuning_curve_configs()
         self.setup_occupancy_plotting_mixin()
     
 
+    def set_background(self, background):
+        if isinstance(background, str):
+            self.params.active_plotter_background_gradient = self.params.plotter_backgrounds[background]
+        elif isinstance(background, (tuple, list)):
+            # build gradient out of it:
+            if len(background) >= 2:
+                if len(background) > 2:
+                    warn(f"the expected input is a string into the background dictionary (like 'Purple Paradise') or a tuple of hex RGB string values to build a gradient from. The first two passed values will be used and the rest dropped. Trying to continue...")
+                self.params.active_plotter_background_gradient[0], self.params.active_plotter_background_gradient[1] = background[0], background[1]
+            else:
+                print(f'valid options are any of the following strings: {list(self.params.plotter_backgrounds.keys())}')
+                raise NotImplementedError
+                
+        else:
+            print(f'valid options are any of the following strings: {list(self.params.plotter_backgrounds.keys())}')
+            raise NotImplementedError        
+                
+        self.p.set_background(self.params.active_plotter_background_gradient[0], top=self.params.active_plotter_background_gradient[1])
         
+        
+
     def plot(self, pActivePlotter=None):
         ## Build the new BackgroundPlotter:
         self.p = InteractivePlaceCellTuningCurvesDataExplorer.build_new_plotter_if_needed(pActivePlotter, title=self.data_explorer_name)
