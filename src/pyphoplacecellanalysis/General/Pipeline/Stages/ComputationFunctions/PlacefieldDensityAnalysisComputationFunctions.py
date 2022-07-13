@@ -366,6 +366,7 @@ class PlacefieldDensityAnalysisComputationFunctions(AllFunctionEnumeratingMixin,
                     
             """            
             
+            matplotlib.use('Agg') # require use of non-interactive backend to prevent the stupid figure from showing up
 
             def _find_contours_at_levels(xbin_centers, ybin_centers, slab, peak_probe_point, probe_levels):
                 """ finds the contours containing the peak_probe_point at the specified probe_levels.
@@ -456,15 +457,19 @@ class PlacefieldDensityAnalysisComputationFunctions(AllFunctionEnumeratingMixin,
             #  Build the results first:
             for i in np.arange(n_neurons):
                 neuron_id = active_pf_2D.neuron_extended_ids[i].id
-                xx, yy, slab, peaks, id_map, prominence_map, parent_map = _perform_compute_prominence_contours(active_pf_2D.xbin_labels, active_pf_2D.ybin_labels, active_pf_2D.ratemap.tuning_curves[i].T, step=step)
-                peaks = analyze_peaks(active_pf_2D.xbin_labels, active_pf_2D.ybin_labels, slab, peaks, peak_height_multiplier_probe_levels, debug_print=debug_print)
+                xx, yy, slab, peaks, id_map, prominence_map, parent_map = _perform_compute_prominence_contours(active_pf_2D.xbin_centers, active_pf_2D.ybin_centers, active_pf_2D.ratemap.tuning_curves[i].T, step=step)
+                
+                peaks = analyze_peaks(active_pf_2D.xbin_centers, active_pf_2D.ybin_centers, slab, peaks, peak_height_multiplier_probe_levels, debug_print=debug_print)
+                # peaks = analyze_peaks(active_pf_2D.xbin_labels, active_pf_2D.ybin_labels, slab, peaks, peak_height_multiplier_probe_levels, debug_print=debug_print)
                 
                 # out_result_tuples.append((slab, peaks, id_map, prominence_map, parent_map))
                 # out_results[neuron_id] = {'peaks': peaks, 'slab': slab} # could add more properties
                 out_results[neuron_id] = {'peaks': peaks, 'slab': slab, 'id_map':id_map, 'prominence_map':prominence_map, 'parent_map':parent_map} # could add more properties
     
             computation_result.computed_data.setdefault('RatemapPeaksAnalysis', DynamicParameters()) # get the existing RatemapPeaksAnalysis output or create a new one if needed
-            computation_result.computed_data['RatemapPeaksAnalysis']['PeakProminence2D'] = DynamicParameters(xx=active_pf_2D.xbin_labels, yy=active_pf_2D.ybin_labels, neuron_extended_ids=active_pf_2D.neuron_extended_ids, results=out_results)
+            computation_result.computed_data['RatemapPeaksAnalysis']['PeakProminence2D'] = DynamicParameters(xx=active_pf_2D.xbin_centers, yy=active_pf_2D.ybin_centers, neuron_extended_ids=active_pf_2D.neuron_extended_ids, results=out_results)
+            
+            # computation_result.computed_data['RatemapPeaksAnalysis']['PeakProminence2D'] = DynamicParameters(xx=active_pf_2D.xbin_labels, yy=active_pf_2D.ybin_labels, neuron_extended_ids=active_pf_2D.neuron_extended_ids, results=out_results)
             return computation_result
 
 
