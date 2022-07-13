@@ -5,6 +5,9 @@
 import numpy as np
 import pyvista as pv # for building bounding boxes
 from pyphoplacecellanalysis.PhoPositionalData.plotting.graphs import plot_point_labels, _perform_plot_point_labels
+from pyphocorehelpers.gui.PyVista.CascadingDynamicPlotsList import CascadingDynamicPlotsList # used to wrap _render_peak_prominence_2d_results_on_pyvista_plotter's outputs
+
+
 
 def _build_pyvista_single_neuron_prominence_result_data(neuron_id, a_result, promenence_plot_threshold = 1.0, included_level_indicies=[1], debug_print=False):
     """ Unfortunately I realize now that these centers, etc are all represented in terms of number of bins, not actual x, y values.
@@ -176,7 +179,6 @@ def _render_peak_prominence_2d_results_on_pyvista_plotter(ipcDataExplorer, activ
 #             out_pf_box_actors[curr_box_mesh_name] = ipcDataExplorer.p.add_mesh(out_pf_box_data[curr_box_mesh_name], color="white",  name=curr_box_mesh_name, show_edges=True, edge_color="white", line_width=0.5, opacity=0.75, label=curr_box_mesh_name)
             
     
-    
             ## Text Labels:
             curr_text_label_mesh_x_name = f'pf[{valid_neuron_id}]_peak[{peak_idx}]_lvl[{level_idx}]_text_label_x'
             curr_text_label_mesh_y_name = f'pf[{valid_neuron_id}]_peak[{peak_idx}]_lvl[{level_idx}]_text_label_y'
@@ -234,8 +236,11 @@ def _render_peak_prominence_2d_results_on_pyvista_plotter(ipcDataExplorer, activ
     #     } | data_dict_labels
     # }
     
-    return out_pf_contours_data, out_pf_contours_actors, out_pf_box_data, out_pf_box_actors, out_pf_text_size_data, out_pf_text_size_actors, out_pf_peak_points_data, out_pf_peak_points_actors
     
+    all_peaks_actors = CascadingDynamicPlotsList(contours=CascadingDynamicPlotsList(**out_pf_contours_actors), boxes=CascadingDynamicPlotsList(**out_pf_box_actors), text=CascadingDynamicPlotsList(**out_pf_text_size_actors), peak_points=CascadingDynamicPlotsList(**out_pf_peak_points_actors))
+    all_peaks_data = dict(contours=out_pf_contours_data, boxes=out_pf_box_data, text=out_pf_text_size_data, peak_points=out_pf_peak_points_data)
+    # return out_pf_contours_data, out_pf_contours_actors, out_pf_box_data, out_pf_box_actors, out_pf_text_size_data, out_pf_text_size_actors, out_pf_peak_points_data, out_pf_peak_points_actors
+    return all_peaks_data, all_peaks_actors
     
 """
 from pyphoplacecellanalysis.PhoPositionalData.plotting.peak_prominences import _render_peak_prominence_2d_results_on_pyvista_plotter
