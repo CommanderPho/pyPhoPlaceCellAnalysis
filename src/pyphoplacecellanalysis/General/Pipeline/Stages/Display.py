@@ -81,9 +81,19 @@ def add_custom_plotting_options_if_needed(active_config, should_smooth_maze):
     active_config.plotting_config.use_smoothed_maze_rendering = should_smooth_maze
     return active_config
 
-def update_figure_files_output_Format(computation_result, active_config, root_output_dir='output', debug_print=False):
+def update_figure_files_output_path(computation_result, active_config, root_output_dir='output', debug_print=False):
+    """ Changes the plotting_config's output path to a path with the style of  f'{root_output_dir}/2022-01-16/{active_session_name}/{active_epoch_name}'
+    Called by prepare_for_display(...) to build the output file paths for saving figures to one that dynamically contains the current day date and relevent parameters.
+
+    Requires:
+        active_config.computation_config.pf_params: to incorporate the current computation parameters into the output path
+        active_config.plotting_config: to be updated
+
+    Changes:
+        active_config.plotting_config
+    """
     def _set_figure_save_root_day_computed_mode(plotting_config, active_session_name, active_epoch_name, root_output_dir='output', debug_print=False):
-        """ Outputs to a path with the style of  """
+        """ Changes the plotting_config's output path to a path with the style of  f'output/2022-01-16/{active_session_name}/{active_epoch_name}' """
         out_figure_save_original_root = plotting_config.get_figure_save_path('test') # 2022-01-16/
         if debug_print:
             print(f'out_figure_save_original_root: {out_figure_save_original_root}')
@@ -96,21 +106,9 @@ def update_figure_files_output_Format(computation_result, active_config, root_ou
             print(f'out_figure_save_root: {out_figure_save_root}') # out_figure_save_root: output\2006-6-07_11-26-53\maze1\2022-01-18\2006-6-07_11-26-53\maze1
         return plotting_config
     
-    
-    # def _test_get_full_figure_path_components(output_root, out_day_date_folder_name, active_session_name, active_epoch_name, active_computation_config_str, active_plot_type_name, active_variant_name):
-    #     return [output_root, out_day_date_folder_name, active_session_name, active_epoch_name, active_computation_config_str, active_plot_type_name, active_variant_name]
-    
-    
-    # _test_get_full_figure_path_components('output', datetime.today().strftime('%Y-%m-%d'), active_config.active_session_config.session_name, active_config.active_epochs.name, active_config.computation_config.str_for_filename(False),
-    #                                       active_plot_type_name, active_variant_name)
-    
-    
-    
+
     if debug_print:
         print(f'_display_custom_user_function(computation_result, active_config, **kwargs):')
-    # print(f'active_config.keys(): {list(active_config.keys())}') # active_config.keys(): ['active_session_config', 'active_epochs', 'video_output_config', 'plotting_config', 'computation_config', 'filter_config']
-    # print(f'active_config.plotting_config: {active_config.plotting_config}')
-    # print(f'active_config.active_session_config: {active_config.active_session_config}')
     active_session_name = active_config.active_session_config.session_name
     if debug_print:
         print(f'active_session_name: {active_session_name}')
@@ -120,9 +118,10 @@ def update_figure_files_output_Format(computation_result, active_config, root_ou
     # active_epoch_names.name: maze1
     active_config.plotting_config = _set_figure_save_root_day_computed_mode(active_config.plotting_config, active_session_name, active_epoch_names.name, root_output_dir=root_output_dir, debug_print=debug_print)
     # get the output path for this figure name:
-    out_figure_save_root = active_config.plotting_config.get_figure_save_path('test_plot')
+    
     if debug_print:
-        print(f'out_figure_save_root: {out_figure_save_root}')
+        out_figure_save_root = active_config.plotting_config.get_figure_save_path('test_plot')
+        print(f'for a test plot with name "test_plot", the output path would be: {out_figure_save_root}')
     
     # Now convert the computation parameters for filename display:
     if debug_print:
@@ -208,9 +207,8 @@ class PipelineWithDisplayPipelineStageMixin:
             # Note that there may be different numbers of neurons included in the different configs (which include different epochs/filters) so a single one-size-fits-all approach to assigning color identities won't work here.
             if an_active_config_name in self.computation_results:
                 self.active_configs[an_active_config_name] = add_neuron_identity_info_if_needed(self.computation_results[an_active_config_name], self.active_configs[an_active_config_name])
-                
                 self.active_configs[an_active_config_name] = add_custom_plotting_options_if_needed(self.active_configs[an_active_config_name], should_smooth_maze=should_smooth_maze)
-                self.active_configs[an_active_config_name] = update_figure_files_output_Format(self.computation_results[an_active_config_name], self.active_configs[an_active_config_name], root_output_dir=root_output_dir)
+                self.active_configs[an_active_config_name] = update_figure_files_output_path(self.computation_results[an_active_config_name], self.active_configs[an_active_config_name], root_output_dir=root_output_dir)
 
         self.reload_default_display_functions() # reload default display functions first
                     

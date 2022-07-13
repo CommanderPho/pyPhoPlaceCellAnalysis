@@ -32,7 +32,10 @@ def _display_add_computation_param_text_box(fig, computation_config):
     return add_figure_text_box(fig, render_text=render_text)
 # used by _display_2d_placefield_result_plot_ratemaps_2D
 
+""" 
+TODO: EXPLORE: REVIEW: thse debug_print_* functions seem very useful and I didn't know they were here
 
+"""
 
 def debug_print_identity_properties_from_session(curr_sess, debug_print=True):
     """ 

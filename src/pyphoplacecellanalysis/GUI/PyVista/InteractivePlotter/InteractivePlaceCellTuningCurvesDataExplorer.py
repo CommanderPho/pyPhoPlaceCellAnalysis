@@ -7,6 +7,7 @@
 """
 from collections import OrderedDict
 from copy import deepcopy
+from warnings import warn
 import numpy as np
 import pandas as pd
 import pyvista as pv
@@ -15,19 +16,19 @@ from matplotlib.colors import ListedColormap, to_hex
 
 from scipy.interpolate import RectBivariateSpline # for 2D spline interpolation
 
+from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer
 from pyphoplacecellanalysis.GUI.PyVista.InteractivePlotter.PhoInteractivePlotter import PhoInteractivePlotter
 # from pyphoplacecellanalysis.PhoPositionalData.plotting.mixins.general_plotting_mixins
 from pyphoplacecellanalysis.PhoPositionalData.plotting.mixins.occupancy_plotting_mixins import OccupancyPlottingMixin
 from pyphoplacecellanalysis.PhoPositionalData.plotting.mixins.placefield_plotting_mixins import HideShowPlacefieldsRenderingMixin, PlacefieldRenderingPyVistaMixin
 from pyphoplacecellanalysis.PhoPositionalData.plotting.mixins.spikes_mixins import SpikesDataframeOwningFromSessionMixin, SpikeRenderingPyVistaMixin, HideShowSpikeRenderingMixin
 
-from pyphoplacecellanalysis.PhoPositionalData.plotting.spikeAndPositions import build_active_spikes_plot_data_df, plot_placefields2D, update_plotVisiblePlacefields2D, build_custom_placefield_maps_lookup_table
 from pyphoplacecellanalysis.PhoPositionalData.plotting.gui import CallbackSequence, SetVisibilityCallback, MutuallyExclusiveRadioButtonGroup, add_placemap_toggle_checkboxes, add_placemap_toggle_mutually_exclusive_checkboxes
 
 from pyphocorehelpers.gui.PyVista.PhoCustomVtkWidgets import PhoWidgetHelper
 from pyphocorehelpers.gui.PyVista.PhoCustomVtkWidgets import MultilineTextConsoleWidget
 
-from pyphoplacecellanalysis.PhoPositionalData.plotting.spikeAndPositions import build_active_spikes_plot_data, perform_plot_flat_arena, build_spike_spawn_effect_light_actor, spike_geom_circle, spike_geom_box, spike_geom_cone, animal_location_circle, animal_location_trail_circle
+from pyphoplacecellanalysis.PhoPositionalData.plotting.spikeAndPositions import build_active_spikes_plot_data, perform_plot_flat_arena, build_spike_spawn_effect_light_actor
 #
 from pyphoplacecellanalysis.GUI.PyVista.InteractivePlotter.InteractiveDataExplorerBase import InteractiveDataExplorerBase
 
@@ -39,13 +40,19 @@ class InteractivePlaceCellTuningCurvesDataExplorer(OccupancyPlottingMixin, Place
     """
     show_legend = True
 
-    def __init__(self, active_config, active_session, active_epoch_placefields, pf_colors, extant_plotter=None):
+    def __init__(self, active_config, active_session, active_epoch_placefields, pf_colors, extant_plotter=None, **kwargs):
         super(InteractivePlaceCellTuningCurvesDataExplorer, self).__init__(active_config, active_session, extant_plotter, data_explorer_name='TuningMapDataExplorer')
         self.params.active_epoch_placefields = deepcopy(active_epoch_placefields)
         self.params.pf_colors = deepcopy(pf_colors)
         self.params.pf_colors_hex = None
         self.params.pf_active_configs = None
-        self.ui = dict()
+        self.ui = PhoUIContainer()
+        
+        if kwargs.get('should_nan_non_visited_elements', None) is not None:
+            self.params.should_nan_non_visited_elements = kwargs['should_nan_non_visited_elements']
+            
+        if kwargs.get('zScalingFactor', None) is not None:
+            self.params.zScalingFactor = kwargs['zScalingFactor']
         
         self.use_fragile_linear_neuron_IDX_as_cell_id = False # if False, uses the normal 'aclu' value as the cell id (which I think is correct)
         
@@ -116,12 +123,11 @@ class InteractivePlaceCellTuningCurvesDataExplorer(OccupancyPlottingMixin, Place
 
 
     def _setup_visualization(self): 
-        self.params.debug_disable_all_gui_controls = True
-        
+        self.params.debug_disable_all_gui_controls = True       
         self.params.enable_placefield_aligned_spikes = True # If True, the spikes are aligned to the z-position of their respective place field, so they visually sit on top of the placefield surface
         # self.params.zScalingFactor = 10.0
-        self.params.zScalingFactor = 100.0
-        
+        self.params.setdefault('zScalingFactor', 3000.0)
+
         self.params.use_mutually_exclusive_placefield_checkboxes = True       
         self.params.show_legend = True
         
@@ -152,21 +158,49 @@ class InteractivePlaceCellTuningCurvesDataExplorer(OccupancyPlottingMixin, Place
         
         
         ## Placefield Rendering Options:
-        self.params.should_nan_non_visited_elements = False
-        self.params.should_display_placefield_points = True
-        
-        
-        self.params.pf_colors_hex = [to_hex(self.params.pf_colors[:,i], keep_alpha=False) for i in self.tuning_curve_indicies] 
+        self.params.setdefault('should_nan_non_visited_elements', True)
+        self.params.setdefault('should_display_placefield_points', True)
+        self.params.setdefault('nan_opacity', 0.1)
+        self.params.setdefault('should_override_disable_smooth_shading', True)
+            
+        ## TODO: I'm not sure about this one, we might want to override pf_colors_hex, or this could be where the issues where it wasn't displaying the colors I passed in were coming from.
+        # if not self.params.hasattr('pf_colors_hex'):
+        self.params.pf_colors_hex = [to_hex(self.params.pf_colors[:,i], keep_alpha=False) for i in self.tuning_curve_indicies]         
+        # self.params.setdefault('active_plotter_background_gradient', self.params.plotter_backgrounds['Clouds (Apple-like white)'])
+        self.params.setdefault('active_plotter_background_gradient', self.params.plotter_backgrounds['Deep Space (Dark)'])
         
         self.setup_spike_rendering_mixin()
         self.build_tuning_curve_configs()
         self.setup_occupancy_plotting_mixin()
     
 
+    def set_background(self, background):
+        if isinstance(background, str):
+            self.params.active_plotter_background_gradient = self.params.plotter_backgrounds[background]
+        elif isinstance(background, (tuple, list)):
+            # build gradient out of it:
+            if len(background) >= 2:
+                if len(background) > 2:
+                    warn(f"the expected input is a string into the background dictionary (like 'Purple Paradise') or a tuple of hex RGB string values to build a gradient from. The first two passed values will be used and the rest dropped. Trying to continue...")
+                self.params.active_plotter_background_gradient[0], self.params.active_plotter_background_gradient[1] = background[0], background[1]
+            else:
+                print(f'valid options are any of the following strings: {list(self.params.plotter_backgrounds.keys())}')
+                raise NotImplementedError
+                
+        else:
+            print(f'valid options are any of the following strings: {list(self.params.plotter_backgrounds.keys())}')
+            raise NotImplementedError        
+                
+        self.p.set_background(self.params.active_plotter_background_gradient[0], top=self.params.active_plotter_background_gradient[1])
         
+        
+
     def plot(self, pActivePlotter=None):
         ## Build the new BackgroundPlotter:
         self.p = InteractivePlaceCellTuningCurvesDataExplorer.build_new_plotter_if_needed(pActivePlotter, title=self.data_explorer_name)
+        self.p.set_background(self.params.active_plotter_background_gradient[0], top=self.params.active_plotter_background_gradient[1])
+        self.p.enable_depth_peeling(number_of_peels=8, occlusion_ratio=0) # drastically improves rendering but bogs down performance
+        
         # Plot the flat arena
         self.plots['maze_bg'] = perform_plot_flat_arena(self.p, self.x, self.y, bShowSequenceTraversalGradient=False, smoothing=self.active_config.plotting_config.use_smoothed_maze_rendering)
         
@@ -208,6 +242,7 @@ class InteractivePlaceCellTuningCurvesDataExplorer(OccupancyPlottingMixin, Place
         # # Apply configs on startup:
         # # Update the ipcDataExplorer's colors for spikes and placefields from its configs on init:
         # self.on_config_update({neuron_id:a_config.color for neuron_id, a_config in self.active_neuron_render_configs_map.items()}, defer_update=False)
+
 
         return self.p
     

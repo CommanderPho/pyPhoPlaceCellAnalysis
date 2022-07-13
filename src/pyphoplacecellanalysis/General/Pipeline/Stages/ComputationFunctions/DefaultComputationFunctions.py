@@ -3,8 +3,8 @@ import numpy as np
 import pandas as pd
 
 # NeuroPy (Diba Lab Python Repo) Loading
-from pyphoplacecellanalysis.General.Model.ComputationResults import ComputationResult
 from pyphocorehelpers.DataStructure.dynamic_parameters import DynamicParameters
+from pyphoplacecellanalysis.General.Model.ComputationResults import ComputationResult
 
 
 from pyphoplacecellanalysis.General.Decoder.decoder_result import build_position_df_discretized_binned_positions, build_position_df_resampled_to_time_windows
@@ -91,11 +91,11 @@ class DefaultComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Computa
             print(f'np.shape(sigma_t_all): {np.shape(sigma_t_all)}')
         
         # normalize sigma_t_all:
-        computation_result.computed_data['pf2D_TwoStepDecoder'] = {'xbin':active_xbins, 'ybin':active_ybins,
+        computation_result.computed_data['pf2D_TwoStepDecoder'] = DynamicParameters.init_from_dict({'xbin':active_xbins, 'ybin':active_ybins,
                                                                    'avg_speed_per_pos': avg_speed_per_pos,
                                                                    'K':K, 'V':V,
                                                                    'sigma_t_all':sigma_t_all, 'flat_sigma_t_all': np.squeeze(np.reshape(sigma_t_all, (-1, 1)))
-        }
+        })
         
         computation_result.computed_data['pf2D_TwoStepDecoder']['C'] = 1.0
         computation_result.computed_data['pf2D_TwoStepDecoder']['k'] = 1.0

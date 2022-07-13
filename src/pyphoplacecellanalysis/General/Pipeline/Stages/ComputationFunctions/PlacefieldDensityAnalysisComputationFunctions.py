@@ -1,8 +1,18 @@
 import sys
+from warnings import warn
 import numpy as np
 import pandas as pd
+from findpeaks import findpeaks # for _perform_pf_find_ratemap_peaks_computation. Install with pip install findpeaks 
 
-# NeuroPy (Diba Lab Python Repo) Loading
+
+import matplotlib
+# configure backend here
+matplotlib.use('Agg')
+import matplotlib.pyplot as plt # required for _perform_pf_analyze_results_peak_prominence2d_computation to build Path objects. Nothing is plotted though
+
+
+from pyphoplacecellanalysis.External.peak_prominence2d import getProminence, plot_Prominence # Required for _perform_pf_find_ratemap_peaks_peak_prominence2d_computation
+
 from pyphoplacecellanalysis.General.Model.ComputationResults import ComputationResult
 from pyphocorehelpers.DataStructure.dynamic_parameters import DynamicParameters
 
@@ -13,6 +23,11 @@ from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.Computa
 
 """-------------- Specific Computation Functions to be registered --------------"""
 
+modify_dict_mode = True # if True, writes the dict
+
+
+            
+            
 class PlacefieldDensityAnalysisComputationFunctions(AllFunctionEnumeratingMixin, metaclass=ComputationFunctionRegistryHolder):
     """Performs analyeses related to placefield densities and overlap across spactial bins. Includes analyses for Eloy from 07-2022. """
     _computationPrecidence = 2 # must be done after PlacefieldComputations and DefaultComputationFunctions
@@ -114,7 +129,7 @@ class PlacefieldDensityAnalysisComputationFunctions(AllFunctionEnumeratingMixin,
                                                                    })
             return computation_result
         
-        
+
     def _perform_velocity_vs_pf_simplified_count_density_computation(computation_result: ComputationResult, debug_print=False):
             """ Builds the simplified density analysis suggested by Kamran at the 2022-07-06 lab meeting related analysis to test Eloy's Pf-Density/Velocity Hypothesis for 2D Placefields
             
@@ -169,3 +184,293 @@ class PlacefieldDensityAnalysisComputationFunctions(AllFunctionEnumeratingMixin,
             computation_result.computed_data['SimplerNeuronMeetingThresholdFiringAnalysis'] = DynamicParameters.init_from_dict({'n_neurons_meeting_firing_critiera_by_position_bins_2D': n_neurons_meeting_firing_critiera_by_position_bins_2D, 'sorted_n_neurons_meeting_firing_critiera_by_position_bins_2D': sorted_n_neurons_meeting_firing_critiera_by_position_bins_2D})
             return computation_result
         
+        
+        
+    def _perform_pf_find_ratemap_peaks_computation(computation_result: ComputationResult, debug_print=False, peak_score_inclusion_percent_threshold=0.25):
+            """ Builds the simplified density analysis suggested by Kamran at the 2022-07-06 lab meeting related analysis to test Eloy's Pf-Density/Velocity Hypothesis for 2D Placefields
+            
+            Requires:
+                computed_data['pf2D']                
+                
+            Provides:
+                computed_data['RatemapPeaksAnalysis']
+                # computed_data['RatemapPeaksAnalysis']['tuning_curve_findpeaks_results']: peaks_outputs: fp_mask, mask_results_df, fp_topo, topo_results_df, topo_persistence_df
+                
+                computed_data['RatemapPeaksAnalysis']['mask_results']: 
+                    computed_data['RatemapPeaksAnalysis']['mask_results']['fp_list']:
+                    computed_data['RatemapPeaksAnalysis']['mask_results']['df_list']:
+                    
+                computed_data['RatemapPeaksAnalysis']['topo_results']:
+                    computed_data['RatemapPeaksAnalysis']['topo_results']['fp_list']:
+                    computed_data['RatemapPeaksAnalysis']['topo_results']['df_list']:
+                    computed_data['RatemapPeaksAnalysis']['topo_results']['persistence_df_list']:
+                    computed_data['RatemapPeaksAnalysis']['topo_results']['peak_xy_points_pos_list']: the actual (x, y) positions of the peak points for each neuron
+                    
+                computed_data['RatemapPeaksAnalysis']['final_filtered_results']:
+                    computed_data['RatemapPeaksAnalysis']['final_filtered_results']['peaks_are_included_list']: a list of bools into the original raw arrays ('topo_results') that was used to filter down to the final peaks based on the promenences
+                    computed_data['RatemapPeaksAnalysis']['final_filtered_results']['df_list']:
+                    computed_data['RatemapPeaksAnalysis']['final_filtered_results']['peak_xy_points_pos_list']:
+                    
+                
+            """            
+            def ratemap_find_placefields(ratemap, debug_print=False):
+                """ Uses the `findpeaks` library for finding local maxima of TuningMaps
+                Input:
+                ratemap: a 2D ratemap
+                
+                Returns:
+                
+                
+                """
+                def _ratemap_compute_peaks(X, debug_print):
+                    if debug_print:
+                        print(f'np.shape(X): {np.shape(X)}') # np.shape(X): (60, 8)
+                    
+                    if debug_print:
+                        verboosity_level = 3 # info
+                    else:
+                        # verboosity_level = 2 # warnings only
+                        verboosity_level = 1 # errors only
+                    # Initialize
+                    
+                    fp_mask = findpeaks(method='mask', verbose=verboosity_level)
+                    # Fit
+                    results_mask = fp_mask.fit(X)
+                    # Initialize
+                    fp_topo = findpeaks(method='topology', verbose=verboosity_level)
+                    # Fit
+                    results_topo = fp_topo.fit(X)
+                    return fp_mask, results_mask, fp_topo, results_topo
+
+                def _expand_mask_results(results_mask):
+                    """ Expands the results from peak detection with the 'mask' method and returns a dataframe """
+                    # list(results_mask.keys()) # ['Xraw', 'Xproc', 'Xdetect', 'Xranked']
+                    ranked_peaks = results_mask['Xranked'] # detected peaks with respect the input image. Elements are the ranked peaks (1=best).
+                    peak_scores = results_mask['Xdetect'] # the scores
+                    peak_indicies = np.argwhere(ranked_peaks) # [[ 3  7],[ 7 14],[ 7 15],[13 17],[13 18],[25 17],[29 11],[44 15],[59 22]]
+                    if debug_print:
+                        print(peak_indicies) 
+                    peak_ranks = ranked_peaks[peak_indicies[:,0], peak_indicies[:,1]] # array([1, 2, 3, 4, 5, 6, 7, 8, 9])
+                    if debug_print:
+                        print(f'peak_ranks: {peak_ranks}')
+                    peak_scores = peak_scores[peak_indicies[:,0], peak_indicies[:,1]]
+                    if debug_print:
+                        print(f'peak_scores: {peak_ranks}')
+                    peak_values = results_mask['Xraw'][peak_indicies[:,0], peak_indicies[:,1]]
+                    if debug_print:
+                        print(f'peak_values: {peak_values}')
+                    # scipy.ndimage.measurements.label # to label the found peaks?
+                    return pd.DataFrame({'rank': peak_ranks, 'peak_score': peak_scores, 'xbin_idx':peak_indicies[:,0], 'ybin_idx':peak_indicies[:,1], 'value': peak_values})
+                
+                def _expand_topo_results(results_topo):
+                    """ Expands the results from peak detection with the 'topology' method and returns a dataframe """
+                    # list(results_mask.keys()) # results_topo.keys(): ['Xraw', 'Xproc', 'Xdetect', 'Xranked', 'persistence', 'groups0']
+                    ranked_peaks = results_topo['Xranked'] # detected peaks with respect the input image. Elements are the ranked peaks (1=best).
+                    peak_scores = results_topo['Xdetect'] # the scores (higher is better)
+                    peak_indicies = np.argwhere(ranked_peaks) # [[ 3  7],[ 7 14],[ 7 15],[13 17],[13 18],[25 17],[29 11],[44 15],[59 22]]
+                    peak_ranks = ranked_peaks[peak_indicies[:,0], peak_indicies[:,1]] # array([1, 2, 3, 4, 5, 6, 7, 8, 9])
+                    # is_peak = results_topo['persistence'].peak.to_numpy() # Bool array, True if it is a peak, false otherwise
+                    is_peak = peak_ranks > 0 # Bool array, True if it is a peak, false otherwise
+                    peak_indicies = peak_indicies[is_peak] # only get the peak_indicies corresponding to peaks (not valleys)
+                    peak_ranks = peak_ranks[is_peak] # remove non-peak indicies
+                    if debug_print:
+                        print(peak_indicies)
+                    if debug_print:
+                        print(f'peak_ranks: {peak_ranks}')
+                    peak_scores = peak_scores[peak_indicies[:,0], peak_indicies[:,1]]
+                    if debug_print:
+                        print(f'peak_scores: {peak_ranks}')
+                    peak_values = results_topo['Xraw'][peak_indicies[:,0], peak_indicies[:,1]]
+                    if debug_print:
+                        print(f'peak_values: {peak_values}')
+                    if debug_print:
+                        print(f"Xproc: {results_topo['Xproc']}, groups0: {results_topo['groups0']}") # , persistence: {results_topo['persistence']}
+                    
+                    out_df = pd.DataFrame({'rank': peak_ranks, 'peak_score': peak_scores, 'xbin_idx':peak_indicies[:,0], 'ybin_idx':peak_indicies[:,1], 'value': peak_values})
+                    out_df.sort_values(by=['rank'], ascending=True, inplace=True, ignore_index=True)
+                    
+                    return (out_df, results_topo['persistence'])
+                
+                fp_mask, results_mask, fp_topo, results_topo = _ratemap_compute_peaks(ratemap, debug_print=debug_print)
+                if debug_print:
+                    print(f'results_topo.keys(): {list(results_topo.keys())}')
+                topo_results_df, topo_persistence_df =_expand_topo_results(results_topo)
+                mask_results_df = _expand_mask_results(results_mask)
+                return fp_mask, mask_results_df, fp_topo, topo_results_df, topo_persistence_df
+                
+                
+            def _filter_found_peaks_by_exclusion_threshold(df_list, peak_xy_points_pos_list, peak_score_inclusion_percent_threshold=0.25):
+                peak_score_inclusion_threshold = peak_score_inclusion_percent_threshold * 255.0 # it must be at least 1/4 of the promenance of the largest peak (which is always 255.0)
+                peaks_are_included_list = [(result_df['peak_score'] > peak_score_inclusion_threshold) for result_df in df_list]
+                
+                # inclusion_filter_function = lambda result_list: [a_result[peak_is_included, :] for a_result, peak_is_included in zip(result_list, peaks_are_included_list)]
+                ## filter by the peaks_are_included_list:
+                # filtered_df_list = [result_df[(result_df['peak_score'] > peak_score_inclusion_threshold)] for result_df in df_list]  # WORKS
+                # filtered_df_list = [df_list[i][peak_is_included] for i, peak_is_included in enumerate(peaks_are_included_list)] # Also works
+                # filtered_peak_xy_points_pos_list = [peak_xy_points_pos_list[i][:, peak_is_included] for i, peak_is_included in enumerate(peaks_are_included_list)]
+                
+                filtered_df_list = [a_df[peak_is_included] for a_df, peak_is_included in zip(df_list, peaks_are_included_list)] # Also works
+                filtered_peak_xy_points_pos_list = [a_xy_points_pos[:, peak_is_included] for a_xy_points_pos, peak_is_included in zip(peak_xy_points_pos_list, peaks_are_included_list)]
+
+                # print(f'peaks_are_included_list: {peaks_are_included_list}')
+                # print(f'filtered_df_list: {filtered_df_list}')
+                # print(f'filtered_peak_xy_points_pos_list: {filtered_peak_xy_points_pos_list}')
+
+                return peaks_are_included_list, filtered_df_list, filtered_peak_xy_points_pos_list
+                
+                
+            # active_pf_1D = computation_result.computed_data['pf1D']
+            active_pf_2D = computation_result.computed_data['pf2D']
+            # n_xbins = len(active_pf_2D.xbin) - 1 # the -1 is to get the counts for the centers only
+            # n_ybins = len(active_pf_2D.ybin) - 1 # the -1 is to get the counts for the centers only
+            # n_neurons = active_pf_2D.ratemap.n_neurons
+            
+            # peaks_outputs: fp_mask, mask_results_df, fp_topo, topo_results_df, topo_persistence_df
+            # peaks_outputs = [ratemap_find_placefields(a_tuning_curve.copy(), debug_print=debug_print) for a_tuning_curve in active_pf_2D.ratemap.pdf_normalized_tuning_curves]
+            # fp_mask_list, mask_results_df_list, fp_topo_list, topo_results_df_list, topo_persistence_df_list = tuple(zip(*findpeaks_results))
+            fp_mask_list, mask_results_df_list, fp_topo_list, topo_results_df_list, topo_persistence_df_list = tuple(zip(*[ratemap_find_placefields(a_tuning_curve.copy(), debug_print=debug_print) for a_tuning_curve in active_pf_2D.ratemap.pdf_normalized_tuning_curves]))
+            topo_results_peak_xy_pos_list = [np.vstack((active_pf_2D.xbin[curr_topo_result_df['xbin_idx'].to_numpy()], active_pf_2D.ybin[curr_topo_result_df['ybin_idx'].to_numpy()])) for curr_topo_result_df in topo_results_df_list]
+            # peak_xy_pos_shapes = [np.shape(a_xy_pos) for a_xy_pos in topo_results_peak_xy_pos_list]
+
+            peaks_are_included_list, filtered_df_list, filtered_peak_xy_points_pos_list = _filter_found_peaks_by_exclusion_threshold(topo_results_df_list, topo_results_peak_xy_pos_list, peak_score_inclusion_percent_threshold=peak_score_inclusion_percent_threshold)
+            
+            # computation_result.computed_data['RatemapPeaksAnalysis'] = DynamicParameters(tuning_curve_findpeaks_results=peaks_outputs)
+            computation_result.computed_data['RatemapPeaksAnalysis'] = DynamicParameters(mask_results=DynamicParameters(fp_list=fp_mask_list, df_list=mask_results_df_list),
+                                                                                         topo_results=DynamicParameters(fp_list=fp_topo_list, df_list=topo_results_df_list, persistence_df_list=topo_persistence_df_list, peak_xy_points_pos_list=topo_results_peak_xy_pos_list),
+                                                                                         final_filtered_results=DynamicParameters(df_list=filtered_df_list, peak_xy_points_pos_list=filtered_peak_xy_points_pos_list, peaks_are_included_list=peaks_are_included_list)
+                                                                                         )
+            
+            return computation_result
+
+
+    def _perform_pf_find_ratemap_peaks_peak_prominence2d_computation(computation_result: ComputationResult, step=0.01, peak_height_multiplier_probe_levels = (0.5, 0.9), debug_print=False):
+            """ Uses the peak_prominence2d package to find the peaks and promenences of 2D placefields
+            
+            Independent of the other peak-computing computation functions above
+            
+            Inputs:
+                peak_height_multiplier_probe_levels = (0.5, 0.9) # 50% and 90% of the peak height
+                
+            Requires:
+                computed_data['pf2D']
+                
+            Provides:
+                computed_data['RatemapPeaksAnalysis']['PeakProminence2D']:
+                    computed_data['RatemapPeaksAnalysis']['PeakProminence2D']['xx']:
+                    computed_data['RatemapPeaksAnalysis']['PeakProminence2D']['yy']:
+                    computed_data['RatemapPeaksAnalysis']['PeakProminence2D']['neuron_extended_ids']
+                    
+                    
+                    computed_data['RatemapPeaksAnalysis']['PeakProminence2D']['result_tuples']: (slab, peaks, idmap, promap, parentmap)
+                    
+                    
+            """            
+            
+            matplotlib.use('Agg') # require use of non-interactive backend to prevent the stupid figure from showing up
+
+            def _find_contours_at_levels(xbin_centers, ybin_centers, slab, peak_probe_point, probe_levels):
+                """ finds the contours containing the peak_probe_point at the specified probe_levels.
+                    performs slicing through desired z-values (1/2 prominence, etc) using contourf
+                    
+                Returns:
+                    a dict with keys of the probe_levels and values containing a list of their corresponding contours
+                """
+                vmax = np.nanmax(slab)
+                fig, ax = plt.subplots()
+                included_computed_contours = DynamicParameters.init_from_dict({}) 
+                #---------------Loop through levels---------------
+                for ii, levii in enumerate(probe_levels[::-1]):
+                    # Note that contourf requires at least 2 levels, hence the use of the vmax+1.0 term and accessing only the first item in the collection. Otherwise: "ValueError: Filled contours require at least 2 levels."
+                    csii = ax.contourf(xbin_centers, ybin_centers, slab, [levii, vmax+1.0]) ## Heavy-lifting code here. levii is the level
+                    csii = csii.collections[0]
+                    # ax.cla() ## TODO: this is the most computationally expensive part of the code, and it doesn't seem necissary
+                    #--------------Loop through contours at level--------------
+                    # find only the ones containing the peak_probe_point
+                    included_computed_contours[levii] = [contjj for jj, contjj in enumerate(csii.get_paths()) if contjj.contains_point(peak_probe_point)]
+                    n_contours = len(included_computed_contours[levii])
+                    assert n_contours <= 1, f"n_contours is supposed to be equal to be either 0 or 1 but len(included_computed_contours[levii]): {len(included_computed_contours[levii])}!"
+                    # assert n_contours == 1, f"contour_stats is supposed to be equal to 1 but len(included_computed_contours[levii]): {len(included_computed_contours[levii])}!"
+                    if n_contours == 0:
+                        warn( f"n_contours is 0 for level: {levii}")
+                        included_computed_contours[levii] = None # set to None
+                    else:                   
+                        included_computed_contours[levii] = included_computed_contours[levii][0] # unwrapped from the list format, it's just the single Path/Curve now
+                    
+                plt.close(fig) # close the figure when done generating the contours to prevent an empty figure from showing
+                return included_computed_contours
+
+
+            def _perform_compute_prominence_contours(xbin_centers, ybin_centers, slab, step=0.1):
+                """
+                xbin_centers and ybin_centers should be like *bin_labels not *bin
+                slab should usually be transposed: tuning_curves[i].T
+                
+                Usage:        
+                    step = 0.2
+                    i = 0
+                    xx, yy, slab, peaks, idmap, promap, parentmap = perform_compute_prominence_contours(active_pf_2D_dt.xbin_labels, active_pf_2D_dt.ybin_labels, active_pf_2D.ratemap.tuning_curves[i].T, step=step)
+                    
+                    # Test plot the promenence result
+                    figure, (ax1, ax2, ax3, ax4) = plot_Prominence(xx, yy, slab, peaks, idmap, promap, parentmap, debug_print=False)
+
+                """
+                peaks_dict, id_map, prominence_map, parent_map = getProminence(slab, step, ybin_centers=ybin_centers, xbin_centers=xbin_centers, min_area=None, min_depth=0.2, include_edge=True, verbose=False)
+                return xbin_centers, ybin_centers, slab, peaks_dict, id_map, prominence_map, parent_map
+            
+            
+            def _analyze_peak(xbin_centers, ybin_centers, slab, peaks_dict, peak_height_multiplier_probe_levels, debug_print=False):
+                peaks_dict['probe_levels'] = np.array([peaks_dict['height']*multiplier for multiplier in peak_height_multiplier_probe_levels]).astype('float') # specific probe levels
+                if debug_print:
+                    print(f"probe_levels: {peaks_dict['probe_levels']}")
+                included_computed_contours = _find_contours_at_levels(xbin_centers, ybin_centers, slab, peaks_dict['center'], peaks_dict['probe_levels']) # DONE: efficiency: This would be more efficient to do for all peaks at once I believe. CONCLUSION: No, this needs to be done separately for each peak as they each have separate prominences which determine the levels they should be sliced at.
+                if debug_print:
+                    print(f'\t computing contour stats...')
+                peaks_dict['level_slices'] = {probe_lvl:{'contour':contour, 'bbox':contour.get_extents(), 'size':contour.get_extents().size} for probe_lvl, contour in included_computed_contours.items() if (contour is not None)} # previous did get_extents() .size
+                return peaks_dict
+                # get_path_collection_extents
+                
+            def analyze_peaks(xbin_centers, ybin_centers, slab, peaks, peak_height_multiplier_probe_levels, debug_print=False):
+                """ Analyze all peaks of a given cell/ratemap
+                """
+                # out_computed_contours = DynamicParameters.init_from_dict({})
+                for peak_id, active_peak_dict in peaks.items():
+                    if debug_print:
+                        print(f'computing contours for peak_id: {peak_id}...')
+                    active_peak_dict = _analyze_peak(xbin_centers, ybin_centers, slab, active_peak_dict, peak_height_multiplier_probe_levels, debug_print=debug_print)
+                    # out_computed_contours[peak_id] = DynamicParameters.init_from_dict({'contours': included_computed_contours, 'levels': probe_levels, 'stats': contour_stats})
+                if debug_print:
+                    print(f'done.')
+                return peaks
+
+            ## Testing above:
+            # peak_height_multiplier_probe_levels = (0.5, 0.9) # 50% and 90% of the peak height
+            # out_computed_contours = analyze_peaks(peaks, peak_height_multiplier_probe_levels, debug_print=True)
+
+
+            active_pf_2D = computation_result.computed_data['pf2D']
+            n_neurons = active_pf_2D.ratemap.n_neurons
+            
+            ## TODO: change to amap with keys of active_pf_2D.neuron_ids
+            # out_result_tuples = []
+            # active_tuning_curves = active_pf_2D.ratemap.tuning_curves # Raw Tuning Curves
+            active_tuning_curves = active_pf_2D.ratemap.unit_max_tuning_curves # Unit-max scaled tuning curves
+            
+            out_results = {}
+            #  Build the results first:
+            for i in np.arange(n_neurons):
+                neuron_id = active_pf_2D.neuron_extended_ids[i].id
+                # xx, yy, slab, peaks, id_map, prominence_map, parent_map = _perform_compute_prominence_contours(active_pf_2D.xbin_centers, active_pf_2D.ybin_centers, active_pf_2D.ratemap.tuning_curves[i].T, step=step)
+                xx, yy, slab, peaks, id_map, prominence_map, parent_map = _perform_compute_prominence_contours(active_pf_2D.xbin_centers, active_pf_2D.ybin_centers, active_tuning_curves[i].T, step=step)
+                peaks = analyze_peaks(active_pf_2D.xbin_centers, active_pf_2D.ybin_centers, slab, peaks, peak_height_multiplier_probe_levels, debug_print=debug_print)
+                # out_results[neuron_id] = {'peaks': peaks, 'slab': slab} # could add more properties
+                out_results[neuron_id] = {'peaks': peaks, 'slab': slab, 'id_map':id_map, 'prominence_map':prominence_map, 'parent_map':parent_map} # could add more properties
+    
+            computation_result.computed_data.setdefault('RatemapPeaksAnalysis', DynamicParameters()) # get the existing RatemapPeaksAnalysis output or create a new one if needed
+            computation_result.computed_data['RatemapPeaksAnalysis']['PeakProminence2D'] = DynamicParameters(xx=active_pf_2D.xbin_centers, yy=active_pf_2D.ybin_centers, neuron_extended_ids=active_pf_2D.neuron_extended_ids, results=out_results)
+            
+            # computation_result.computed_data['RatemapPeaksAnalysis']['PeakProminence2D'] = DynamicParameters(xx=active_pf_2D.xbin_labels, yy=active_pf_2D.ybin_labels, neuron_extended_ids=active_pf_2D.neuron_extended_ids, results=out_results)
+            return computation_result
+
+
+
+

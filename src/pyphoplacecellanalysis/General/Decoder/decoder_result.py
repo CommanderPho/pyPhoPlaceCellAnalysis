@@ -219,14 +219,6 @@ class DecoderResultDisplayingPlot2D(DecoderResultDisplayingBaseClass):
         im = ax.imshow(curr_p_x_given_n, **main_plot_kwargs) # add the curr_px_given_n image
         ax.axis("off")
 
-        # ax.vlines(200, 'ymin'=0, 'ymax'=1, 'r')
-        # ax.set_xticks([25, 50])
-        # ax.vline(50, 'r')
-        # ax.vlines([50], 0, 1, transform=ax.get_xaxis_transform(), colors='r')
-        # ax.vlines([50], 0, 1, colors='r')
-        # brev_mode = PlotStringBrevityModeEnum.MINIMAL
-        # final_string_components = [full_extended_id_string, pf_firing_rate_string]
-
         # conventional way:
         final_title = '\n'.join(final_string_components)
         ax.set_title(final_title) # f"Cell {ratemap.neuron_ids[cell]} - {ratemap.get_extended_neuron_id_string(neuron_i=cell)} \n{round(np.nanmax(pfmap),2)} Hz"
@@ -238,17 +230,9 @@ class DecoderResultDisplayingPlot2D(DecoderResultDisplayingBaseClass):
             print(f'update(i: {i})')
             
         self.index = i
-        # curr_ax = self.axs
-        # active_window = pho_custom_decoder.active_time_windows[i] # a tuple with a start time and end time
-        # active_p_x_given_n = np.squeeze(pho_custom_decoder.p_x_given_n[:,:,i]) # same size as occupancy
         active_window, active_p_x_given_n, active_most_likely_x_position, active_nearest_measured_position = self.get_data(self.index)
         if DecoderResultDisplayingPlot2D.debug_print:
             print(f'active_window: {active_window}, active_p_x_given_n: {active_p_x_given_n}, active_most_likely_x_position: {active_most_likely_x_position}, active_nearest_measured_position: {active_nearest_measured_position}')
-
-        # Plot the main heatmap for this pfmap:
-        # im = plot_single_tuning_map_2D(self.xbin, self.ybin, active_p_x_given_n, self.occupancy, neuron_extended_id=self.ratemap.neuron_extended_ids[neuron_IDX], drop_below_threshold=drop_below_threshold, brev_mode=brev_mode, plot_mode=plot_mode, ax=curr_ax)
-        # self.active_im = plot_single_tuning_map_2D(self.xbin, self.ybin, active_p_x_given_n, self.occupancy, drop_below_threshold=None, ax=self.axs)
-        # self.active_im = DecoderResultDisplayingPlot2D.plot_single_decoder_result(self.xbin, self.ybin, active_p_x_given_n, drop_below_threshold=None, final_string_components=[f'Decoder Result[i: {self.index}]: time window: {active_window}'], ax=self.axs);
         
         # Update only:
         self.active_im.set_array(DecoderResultDisplayingPlot2D.prepare_data_for_plotting(active_p_x_given_n, drop_below_threshold=None))

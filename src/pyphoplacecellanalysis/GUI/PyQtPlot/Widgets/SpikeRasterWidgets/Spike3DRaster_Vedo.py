@@ -5,7 +5,6 @@ from copy import deepcopy
 
 import numpy as np
 import pandas as pd
-from matplotlib.colors import ListedColormap, to_hex # for neuron colors to_hex
 
 import pyphoplacecellanalysis.External.pyqtgraph as pg
 from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtCore, QtGui, QtWidgets # pyqtgraph is only currently used for its Qt imports
@@ -32,8 +31,6 @@ from pyphoplacecellanalysis.GUI.Vedo.VedoMeshManipulatable import VedoPlotterHel
 from pyphoplacecellanalysis.GUI.Vedo.Vedo3DStatic import StaticVedo_3DRasterHelper
 
 from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.Mixins.TimeCurves3D.Render3DTimeCurvesMixin import VedoSpecificTimeCurvesMixin
-
-from pyphoplacecellanalysis.GUI.Qt.PlaybackControls.Spike3DRasterBottomPlaybackControlBarWidget import Spike3DRasterBottomPlaybackControlBar
 
 
 # class Spike3DRaster_Vedo(SimplePlayPauseWithExternalAppMixin, SpikeRasterBottomFrameControlsMixin, VedoSpecificTimeCurvesMixin, SpikeRasterBase):
