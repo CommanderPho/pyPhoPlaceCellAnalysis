@@ -165,8 +165,8 @@ def getProminence(var, step, ybin_centers=None, xbin_centers=None, min_depth=Non
     '''Find 2d prominences of peaks.
 
     <var>: 2D ndarray, data to find local maxima. Missings (nans) are masked.
-    <step>: float, contour interval. Finder interval gives better accuarcy.
-    <ybin_centers>, <lons>: 1d array, y and x coordinates of <var>. If not given,
+    <step>: float, contour interval. Finer (smaller) interval gives better accuarcy.
+    <ybin_centers>, <xbin_centers>: 1d array, y and x coordinates of <var>. If not given,
                     use int indices.
     <min_depth>: float, filter out peaks with prominence smaller than this.
     <include_edge>: bool, whether to include unclosed contours that touch
@@ -256,7 +256,7 @@ def getProminence(var, step, ybin_centers=None, xbin_centers=None, min_depth=Non
     parents={}
 
     #----------------Get bounding box----------------
-    #bbox=Bbox.from_bounds(lons[0],ybin_centers[0],np.ptp(lons),np.ptp(height))
+    #bbox=Bbox.from_bounds(xbin_centers[0],ybin_centers[0],np.ptp(xbin_centers),np.ptp(height))
     bbox=Path([[xbin_centers[0],ybin_centers[0]], [xbin_centers[0],ybin_centers[-1]],
         [xbin_centers[-1],ybin_centers[-1]], [xbin_centers[-1],ybin_centers[0]], [xbin_centers[0], ybin_centers[0]]])
 
@@ -517,7 +517,7 @@ def plot_Prominence(xx, yy, slab, peaks, idmap, promap, parentmap, debug_print=F
         yy = active_pf_2D_dt.ybin_labels
         slab = active_pf_2D.ratemap.tuning_curves[3].T
         zmax = slab.max()
-        peaks, idmap, promap, parentmap = getProminence(slab, step, ybin_centers=yy, lons=xx, min_area=None, include_edge=True, verbose=False)
+        peaks, idmap, promap, parentmap = getProminence(slab, step, ybin_centers=yy, xbin_centers=xx, min_area=None, include_edge=True, verbose=False)
         figure, (ax1, ax2, ax3, ax4) = plot_Prominence(xx, yy, slab, peaks, idmap, promap, parentmap, debug_print=False)
     
     """
