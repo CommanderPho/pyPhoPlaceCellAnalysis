@@ -460,7 +460,8 @@ class PlacefieldDensityAnalysisComputationFunctions(AllFunctionEnumeratingMixin,
                 peaks = analyze_peaks(active_pf_2D.xbin_labels, active_pf_2D.ybin_labels, slab, peaks, peak_height_multiplier_probe_levels, debug_print=debug_print)
                 
                 # out_result_tuples.append((slab, peaks, id_map, prominence_map, parent_map))
-                out_results[neuron_id] = {'peaks': peaks, 'slab': slab} # could add more properties
+                # out_results[neuron_id] = {'peaks': peaks, 'slab': slab} # could add more properties
+                out_results[neuron_id] = {'peaks': peaks, 'slab': slab, 'id_map':id_map, 'prominence_map':prominence_map, 'parent_map':parent_map} # could add more properties
     
             computation_result.computed_data.setdefault('RatemapPeaksAnalysis', DynamicParameters()) # get the existing RatemapPeaksAnalysis output or create a new one if needed
             computation_result.computed_data['RatemapPeaksAnalysis']['PeakProminence2D'] = DynamicParameters(xx=active_pf_2D.xbin_labels, yy=active_pf_2D.ybin_labels, neuron_extended_ids=active_pf_2D.neuron_extended_ids, results=out_results)
