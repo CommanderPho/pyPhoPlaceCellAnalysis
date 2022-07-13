@@ -86,6 +86,7 @@ def perform_plot_flat_arena(p, *args, z=-0.01, bShowSequenceTraversalGradient=Fa
     """ Upgraded to render a much better looking 3D extruded maze surface.
     
         smoothing: whether or not to perform delaunay_2d() triangulation and output. Won't work on Z or N shaped mazes for example because it would close them.
+            I think a "convex hull" operation might be okay though for these?
         
     """
     # Call with:

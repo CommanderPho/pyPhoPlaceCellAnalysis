@@ -158,6 +158,8 @@ class InteractivePlaceCellTuningCurvesDataExplorer(OccupancyPlottingMixin, Place
         ## Placefield Rendering Options:
         self.params.setdefault('should_nan_non_visited_elements', True)
         self.params.setdefault('should_display_placefield_points', True)
+        self.params.setdefault('nan_opacity', 0.1)
+        self.params.setdefault('should_override_disable_smooth_shading', True)
             
         ## TODO: I'm not sure about this one, we might want to override pf_colors_hex, or this could be where the issues where it wasn't displaying the colors I passed in were coming from.
         # if not self.params.hasattr('pf_colors_hex'):

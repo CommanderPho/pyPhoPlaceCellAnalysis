@@ -107,17 +107,16 @@ class PlacefieldRenderingPyVistaMixin:
         # 'should_display_placefield_points':True, # Default True, whether to redner the individual points of the placefield
         # 'render_lines_as_tubes':True, 'show_scalar_bar':False, 'use_transparency':True} | kwargs)
         
-        self.params.should_nan_non_visited_elements = True
+        # self.params.should_nan_non_visited_elements = True
         # self.params.nan_opacity = 0.0
-        self.params.nan_opacity = 0.1
+        # self.params.nan_opacity = 0.1
         
-        self.params.should_display_placefield_points = True
+        # self.params.should_display_placefield_points = True
         
         self.params.should_override_disable_smooth_shading = True # if True, forces smooth_shading to be False regardless of other parameters
         
         
-        _temp_input_params = get_dict_subset(self.params, ['should_use_normalized_tuning_curves','should_pdf_normalize_manually','should_nan_non_visited_elements','should_force_placefield_custom_color','should_display_placefield_points',
-                                                                    'should_override_disable_smooth_shading', 'nan_opacity'])
+        _temp_input_params = get_dict_subset(self.params, ['should_use_normalized_tuning_curves','should_pdf_normalize_manually','should_nan_non_visited_elements','should_force_placefield_custom_color','should_display_placefield_points', 'should_override_disable_smooth_shading', 'nan_opacity'])
         print(f'_temp_input_params: {_temp_input_params}')
         
         self.p, self.plots['tuningCurvePlotActors'], self.plots_data['tuningCurvePlotData'], self.plots['tuningCurvePlotLegendActor'], temp_plots_data = plot_placefields2D(self.p, self.params.active_epoch_placefields, self.params.pf_colors, zScalingFactor=self.params.zScalingFactor, show_legend=self.params.show_legend, **_temp_input_params) # note that the get_dict_subset(...) thing is just a safe way to get only the relevant members.
