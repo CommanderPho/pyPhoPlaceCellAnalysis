@@ -4,7 +4,8 @@ from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtGui, QtCore, QtWidget
 
 # Must be called before any figures are created:
 import matplotlib
-matplotlib.use('qtagg')
+# matplotlib.use('qtagg')
+matplotlib.use('Qt5Agg')
 
 from pyphoplacecellanalysis.External.pyqtgraph.console import ConsoleWidget
 from pyphoplacecellanalysis.External.pyqtgraph.widgets.MatplotlibWidget import MatplotlibWidget
