@@ -223,20 +223,11 @@ def _render_peak_prominence_2d_results_on_pyvista_plotter(ipcDataExplorer, activ
     plotActors_labels, data_dict_labels = _perform_plot_point_labels(ipcDataExplorer.p, points, point_labels=point_labels, point_mask=point_mask,
                                                                             **({'font_size': 10, 'name':curr_peak_points_mesh_name,
                                                                                 'shape_opacity': 0.1, 'shape_color':'grey', 'shape':'rounded_rect', 'fill_shape':True, 'margin':3,
-                                                                                'show_points': True, 'point_size': 8, 'point_color':'white', 'render_points_as_spheres': True} | kwargs)
+                                                                                'show_points': False, 'point_size': 8, 'point_color':'white', 'render_points_as_spheres': True} | kwargs)
                                                                         )
     out_pf_peak_points_actors[curr_peak_points_mesh_name] = plotActors_labels['main']
     out_pf_peak_points_data[curr_peak_points_mesh_name] = {'name':curr_peak_points_mesh_name, 'active_data':{'peak_locations':peak_locations, 'point_labels':point_labels} | data_dict_labels}
-    # plotActors = {plot_name: plotActors_labels['main']}
-    # data_dict = {plot_name: { 
-    #         'name':plot_name,
-    #         'grid': grid, 
-    #         'twoDimGrid_x':twoDimGrid_x, 'twoDimGrid_y':twoDimGrid_y, 
-    #         'active_data': active_data
-    #     } | data_dict_labels
-    # }
-    
-    
+    ## Build the final output structures:
     all_peaks_actors = CascadingDynamicPlotsList(contours=CascadingDynamicPlotsList(**out_pf_contours_actors), boxes=CascadingDynamicPlotsList(**out_pf_box_actors), text=CascadingDynamicPlotsList(**out_pf_text_size_actors), peak_points=CascadingDynamicPlotsList(**out_pf_peak_points_actors))
     all_peaks_data = dict(contours=out_pf_contours_data, boxes=out_pf_box_data, text=out_pf_text_size_data, peak_points=out_pf_peak_points_data)
     # return out_pf_contours_data, out_pf_contours_actors, out_pf_box_data, out_pf_box_actors, out_pf_text_size_data, out_pf_text_size_actors, out_pf_peak_points_data, out_pf_peak_points_actors
