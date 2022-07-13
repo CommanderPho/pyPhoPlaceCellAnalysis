@@ -16,6 +16,7 @@ from matplotlib.colors import ListedColormap, to_hex
 
 from scipy.interpolate import RectBivariateSpline # for 2D spline interpolation
 
+from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer
 from pyphoplacecellanalysis.GUI.PyVista.InteractivePlotter.PhoInteractivePlotter import PhoInteractivePlotter
 # from pyphoplacecellanalysis.PhoPositionalData.plotting.mixins.general_plotting_mixins
 from pyphoplacecellanalysis.PhoPositionalData.plotting.mixins.occupancy_plotting_mixins import OccupancyPlottingMixin
@@ -45,7 +46,7 @@ class InteractivePlaceCellTuningCurvesDataExplorer(OccupancyPlottingMixin, Place
         self.params.pf_colors = deepcopy(pf_colors)
         self.params.pf_colors_hex = None
         self.params.pf_active_configs = None
-        self.ui = dict()
+        self.ui = PhoUIContainer()
         
         if kwargs.get('should_nan_non_visited_elements', None) is not None:
             self.params.should_nan_non_visited_elements = kwargs['should_nan_non_visited_elements']
@@ -198,7 +199,8 @@ class InteractivePlaceCellTuningCurvesDataExplorer(OccupancyPlottingMixin, Place
         ## Build the new BackgroundPlotter:
         self.p = InteractivePlaceCellTuningCurvesDataExplorer.build_new_plotter_if_needed(pActivePlotter, title=self.data_explorer_name)
         self.p.set_background(self.params.active_plotter_background_gradient[0], top=self.params.active_plotter_background_gradient[1])
-                              
+        self.p.enable_depth_peeling(number_of_peels=8, occlusion_ratio=0) # drastically improves rendering but bogs down performance
+        
         # Plot the flat arena
         self.plots['maze_bg'] = perform_plot_flat_arena(self.p, self.x, self.y, bShowSequenceTraversalGradient=False, smoothing=self.active_config.plotting_config.use_smoothed_maze_rendering)
         
@@ -240,6 +242,7 @@ class InteractivePlaceCellTuningCurvesDataExplorer(OccupancyPlottingMixin, Place
         # # Apply configs on startup:
         # # Update the ipcDataExplorer's colors for spikes and placefields from its configs on init:
         # self.on_config_update({neuron_id:a_config.color for neuron_id, a_config in self.active_neuron_render_configs_map.items()}, defer_update=False)
+
 
         return self.p
     
