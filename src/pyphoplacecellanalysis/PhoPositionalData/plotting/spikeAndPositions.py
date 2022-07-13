@@ -30,6 +30,10 @@ spike_geom_box = pv.Box(bounds=[-0.2, 0.2, -0.2, 0.2, -0.05, 0.05])
 # ==================================================================================================================== #
 # Main Animal Arena                                                                                                    #
 # ==================================================================================================================== #
+# """
+#     Note that perform_plot_flat_arena(...) is widely imported and used throughout the packages, and it would be difficult to move it.
+# """
+
 
 def _build_flat_arena_data(x, y, z=-0.01, smoothing=True, extrude_height=-5):
         # Builds the flat base maze map that the other data will be plot on top of

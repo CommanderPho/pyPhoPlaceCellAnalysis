@@ -198,7 +198,7 @@ def plot_1D_placecell_validation(active_epoch_placefields1D, placefield_cell_ind
 
 
 # ==================================================================================================================== #
-# Placefields                                                                                                          #
+# 2D Placefields for PyVista Interactive Plotters                                                                      #
 # ==================================================================================================================== #
 # Private _____________________________________________________________________________________________________________ #
 def _build_custom_placefield_maps_lookup_table(curr_active_neuron_color, num_opacity_tiers, opacity_tier_values):
@@ -234,7 +234,6 @@ def _force_plot_ignore_scalar_as_color(plot_mesh_actor, lookup_table):
         lookup_table.Build()
         plot_mesh_actor.GetMapper().SetLookupTable(lookup_table)
         plot_mesh_actor.GetMapper().SetScalarModeToUsePointData()
-
 
 # Public _____________________________________________________________________________________________________________ #
 def plot_placefields2D(pTuningCurves, active_placefields, pf_colors: np.ndarray, zScalingFactor=10.0, show_legend=False, enable_debug_print=False, **kwargs):
