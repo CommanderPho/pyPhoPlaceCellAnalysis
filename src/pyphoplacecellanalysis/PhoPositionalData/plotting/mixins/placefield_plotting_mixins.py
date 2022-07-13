@@ -11,18 +11,6 @@ from pyphoplacecellanalysis.PhoPositionalData.plotting.mixins.general_plotting_m
 from pyphoplacecellanalysis.PhoPositionalData.plotting.spikeAndPositions import plot_placefields2D, update_plotColorsPlacefield2D
 
 
-
-class RenderItemsConfiguration(QtCore.QObject):
-    """docstring for RenderItemsConfiguration."""
-    def __init__(self, arg, **kwargs):
-        QtCore.QObject.__init__(self, **kwargs)
-        
-        # super(RenderItemsConfiguration, self).__init__()
-    
-    # SignalProxy
-    
-    
-
 class PlacefieldOwningMixin(NeuronIdentityAccessingMixin, NeuronConfigOwningMixin):
     """ Implementor owns placefields and has access to their data and configuration objects
     
@@ -86,9 +74,8 @@ class PlacefieldOwningMixin(NeuronIdentityAccessingMixin, NeuronConfigOwningMixi
         """
         return np.array([self.params.reverse_cellID_to_tuning_curve_idx_lookup_map.get(a_cell_id, None) for a_cell_id in neuron_ids])
     
-    
-    
-    
+
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
 class PlacefieldRenderingPyVistaMixin:
     """ Implementors render placefields with PyVista 
     
@@ -130,15 +117,15 @@ class PlacefieldRenderingPyVistaMixin:
         ## Legend data:
         self.plots_data['tuningCurvePlotLegendData'] = temp_plots_data['legend_entries']
         
-        
-
     def update_rendered_placefields(self, neuron_id_color_update_dict):
         """ updates the placefields from the new color_update_dict
         May 2022
         """
         update_plotColorsPlacefield2D(self.plots['tuningCurvePlotActors'], self.plots_data['tuningCurvePlotData'], neuron_id_color_update_dict=neuron_id_color_update_dict)
 
-    
+
+
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
 class HideShowPlacefieldsRenderingMixin(PlacefieldOwningMixin):
     """ Implementor Visually Displays Placefield data and enables basic interactivity for it.
     

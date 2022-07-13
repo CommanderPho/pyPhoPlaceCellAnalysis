@@ -428,7 +428,8 @@ class InteractivePlaceCellDataExplorer(GlobalConnectionManagerAccessingMixin, In
         #     legendActor = None
 
 
-        self.p.enable_depth_peeling(number_of_peels=4, occlusion_ratio=0) # Supposedly helps with translucency
+        self.p.enable_depth_peeling(number_of_peels=4, occlusion_ratio=0) # helps with translucency
+        # self.p.enable_depth_peeling(number_of_peels=8, occlusion_ratio=0) # drastically improves rendering but bogs down performance
         self.p.hide_axes()
         # self.p.camera_position = 'xy' # Overhead (top) view
         # apply_close_overhead_zoomed_camera_view(self.p)

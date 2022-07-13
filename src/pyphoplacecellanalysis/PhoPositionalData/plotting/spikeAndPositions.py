@@ -34,32 +34,10 @@ from vtkmodules.vtkCommonCore import vtkLookupTable # required for build_custom_
 
 
 
-    
-def build_custom_placefield_maps_lookup_table(curr_active_neuron_color, num_opacity_tiers, opacity_tier_values):
-    """
-    Inputs:
-        curr_active_neuron_color: an RGBA value
-    Usage:
-        
-        build_custom_placefield_maps_lookup_table(curr_active_neuron_color, 3, [0.0, 0.6, 1.0])
-    """
-    # opacity_tier_values: [0.0, 0.6, 1.0]
-    # Build a simple lookup table of the curr_active_neuron_color with varying opacities
-    
-    if isinstance(curr_active_neuron_color, (tuple, list)):
-        curr_active_neuron_color = np.array(curr_active_neuron_color)
-    
-    lut = vtkLookupTable()
-    lut.SetNumberOfTableValues(num_opacity_tiers)
-    for i in np.arange(num_opacity_tiers):
-        map_curr_active_neuron_color = curr_active_neuron_color.copy()
-        map_curr_active_neuron_color[3] = opacity_tier_values[i]
-        # print('map_curr_active_neuron_color: {}'.format(map_curr_active_neuron_color))
-        lut.SetTableValue(i, map_curr_active_neuron_color)
-    return lut
 
-
-
+# ==================================================================================================================== #
+# Main Animal Arena                                                                                                    #
+# ==================================================================================================================== #
 
 def _build_flat_arena_data(x, y, z=-0.01, smoothing=True, extrude_height=-5):
         # Builds the flat base maze map that the other data will be plot on top of
@@ -115,6 +93,10 @@ def perform_plot_flat_arena(p, *args, z=-0.01, bShowSequenceTraversalGradient=Fa
 
 
 
+# ==================================================================================================================== #
+# Spikes                                                                                                               #
+# ==================================================================================================================== #
+
 # dataframe version of the build_active_spikes_plot_pointdata(...) function
 def build_active_spikes_plot_pointdata_df(active_flat_df: pd.DataFrame, enable_debug_print=False):
     """Builds the pv.PolyData pointcloud from the spikes dataframe points.
@@ -158,7 +140,6 @@ def build_active_spikes_plot_pointdata_df(active_flat_df: pd.DataFrame, enable_d
 
     return spike_history_pdata
 
-
 # dataframe versions of the build_active_spikes_plot_data(...) function
 def build_active_spikes_plot_data_df(active_flat_df: pd.DataFrame, spike_geom, enable_debug_print=False):
     """ 
@@ -168,8 +149,6 @@ def build_active_spikes_plot_data_df(active_flat_df: pd.DataFrame, spike_geom, e
     spike_history_pdata = build_active_spikes_plot_pointdata_df(active_flat_df, enable_debug_print=enable_debug_print)
     spike_history_pc = spike_history_pdata.glyph(scale=False, geom=spike_geom.copy()) # create many glyphs from the point cloud
     return spike_history_pdata, spike_history_pc
-
-
 
 ## compatability with pre 2021-11-28 implementations
 def build_active_spikes_plot_pointdata(active_flattened_spike_identities, active_flattened_spike_positions_list):
@@ -201,27 +180,35 @@ def build_active_spikes_plot_data(active_flattened_spike_identities, active_flat
 
 
 
-## This light effect occurs when a spike happens to indicate its presence
-light_spawn_constant_z_offset = 2.5
-light_spawn_constant_z_focal_position = -0.5 # by default, the light focuses under the floor
 
-def build_spike_spawn_effect_light_actor(p, spike_position, spike_unit_color='white'):
-    # spike_position: should be a tuple like (0, 0, 10)
-    light_source_position = spike_position
-    light_source_position[3] = light_source_position[3] + light_spawn_constant_z_offset
-    light_focal_point = spike_position
-    light_focal_point[3] = light_focal_point[3] + light_spawn_constant_z_focal_position
+
+
+# ==================================================================================================================== #
+# Placefields                                                                                                          #
+# ==================================================================================================================== #
     
-    SpikeSpawnEffectLight = pv.Light(position=light_source_position, focal_point=light_focal_point, color=spike_unit_color)
-    SpikeSpawnEffectLight.positional = True
-    SpikeSpawnEffectLight.cone_angle = 40
-    SpikeSpawnEffectLight.exponent = 10
-    SpikeSpawnEffectLight.intensity = 3
-    SpikeSpawnEffectLight.show_actor()
-    p.add_light(SpikeSpawnEffectLight)
-    return SpikeSpawnEffectLight # return the light actor for removal later
-
-
+def build_custom_placefield_maps_lookup_table(curr_active_neuron_color, num_opacity_tiers, opacity_tier_values):
+    """
+    Inputs:
+        curr_active_neuron_color: an RGBA value
+    Usage:
+        
+        build_custom_placefield_maps_lookup_table(curr_active_neuron_color, 3, [0.0, 0.6, 1.0])
+    """
+    # opacity_tier_values: [0.0, 0.6, 1.0]
+    # Build a simple lookup table of the curr_active_neuron_color with varying opacities
+    
+    if isinstance(curr_active_neuron_color, (tuple, list)):
+        curr_active_neuron_color = np.array(curr_active_neuron_color)
+    
+    lut = vtkLookupTable()
+    lut.SetNumberOfTableValues(num_opacity_tiers)
+    for i in np.arange(num_opacity_tiers):
+        map_curr_active_neuron_color = curr_active_neuron_color.copy()
+        map_curr_active_neuron_color[3] = opacity_tier_values[i]
+        # print('map_curr_active_neuron_color: {}'.format(map_curr_active_neuron_color))
+        lut.SetTableValue(i, map_curr_active_neuron_color)
+    return lut
 
 def force_plot_ignore_scalar_as_color(plot_mesh_actor, lookup_table):
         """The following custom lookup table solution is required to successfuly plot the surfaces with opacity dependant on their scalars property and still have a consistent color (instead of using the scalars for the color too). Note that the previous "fix" for the problem of the scalars determining the object's color when I don't want them to:
@@ -235,11 +222,9 @@ def force_plot_ignore_scalar_as_color(plot_mesh_actor, lookup_table):
         plot_mesh_actor.GetMapper().SetLookupTable(lookup_table)
         plot_mesh_actor.GetMapper().SetScalarModeToUsePointData()
 
-
 def plot_placefields2D(pTuningCurves, active_placefields, pf_colors: np.ndarray, zScalingFactor=10.0, show_legend=False, enable_debug_print=False, **kwargs):
     """ Plots 2D (as opposed to linearized/1D) Placefields in a 3D PyVista plot """
     # active_placefields: Pf2D    
-
 
     params = ({'should_use_normalized_tuning_curves':True, # Default True
         'should_pdf_normalize_manually':False, # Default False.
@@ -248,18 +233,7 @@ def plot_placefields2D(pTuningCurves, active_placefields, pf_colors: np.ndarray,
         'should_display_placefield_points':True, # Default True, whether to redner the individual points of the placefield
         'nan_opacity':0.0,
         } | kwargs)
-    
-
-
-    # should_use_normalized_tuning_curves = True # Default True
-    # should_pdf_normalize_manually = False # Default False.
-    # should_nan_non_visited_elements = True # Default False. If True, sets the non-visited portions of the placefield to np.NaN before plotting.
-   
-    # # Rendering/Display Preferences:
-    # should_force_placefield_custom_color = True # Default True    
-    # should_display_placefield_points = True # Default True, whether to redner the individual points of the placefield
-    
-    
+        
     if params['should_use_normalized_tuning_curves']:
         curr_tuning_curves = active_placefields.ratemap.normalized_tuning_curves.copy()
     else:
@@ -399,15 +373,8 @@ def plot_placefields2D(pTuningCurves, active_placefields, pf_colors: np.ndarray,
         
     else:
         legendActor = None
-        
-    # pTuningCurves.show_grid()
-    # pTuningCurves.add_axes(line_width=5, labels_off=False)
-    # pTuningCurves.enable_depth_peeling(number_of_peels=num_curr_tuning_curves)
-    # pTuningCurves.enable_3_lights()
-    # pTuningCurves.enable_shadows()
+    
     return pTuningCurves, tuningCurvePlotActors, tuningCurvePlotData, legendActor, plots_data
-
-
 
 def update_plotColorsPlacefield2D(tuningCurvePlotActors, tuningCurvePlotData, neuron_id_color_update_dict):
     """ Updates the colors of the placefields plots from the neuron_id_color_update_dict
@@ -445,9 +412,6 @@ def update_plotColorsPlacefield2D(tuningCurvePlotActors, tuningCurvePlotData, ne
         pdata_currActiveNeuronTuningCurve_Points_plotActor = tuningCurvePlotActors[neuron_id]['points']
         pdata_currActiveNeuronTuningCurve_Points_plotActor.GetProperty().SetColor(rgb_color)
         
-        
-
-
 def update_plotVisiblePlacefields2D(tuningCurvePlotActors, isTuningCurveVisible):
     # Updates the visible placefields. Complements plot_placefields2D
     num_active_tuningCurveActors = len(tuningCurvePlotActors)
@@ -462,3 +426,27 @@ def update_plotVisiblePlacefields2D(tuningCurvePlotActors, isTuningCurveVisible)
             # tuningCurvePlotActors[i].hide_actor()
     
     
+    
+# ==================================================================================================================== #
+# Misc. Light Spawning Effect                                                                                          #
+# ==================================================================================================================== #
+## This light effect occurs when a spike happens to indicate its presence
+light_spawn_constant_z_offset = 2.5
+light_spawn_constant_z_focal_position = -0.5 # by default, the light focuses under the floor
+
+def build_spike_spawn_effect_light_actor(p, spike_position, spike_unit_color='white'):
+    # spike_position: should be a tuple like (0, 0, 10)
+    light_source_position = spike_position
+    light_source_position[3] = light_source_position[3] + light_spawn_constant_z_offset
+    light_focal_point = spike_position
+    light_focal_point[3] = light_focal_point[3] + light_spawn_constant_z_focal_position
+    
+    SpikeSpawnEffectLight = pv.Light(position=light_source_position, focal_point=light_focal_point, color=spike_unit_color)
+    SpikeSpawnEffectLight.positional = True
+    SpikeSpawnEffectLight.cone_angle = 40
+    SpikeSpawnEffectLight.exponent = 10
+    SpikeSpawnEffectLight.intensity = 3
+    SpikeSpawnEffectLight.show_actor()
+    p.add_light(SpikeSpawnEffectLight)
+    return SpikeSpawnEffectLight # return the light actor for removal later
+
