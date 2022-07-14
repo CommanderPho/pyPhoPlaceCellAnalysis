@@ -413,6 +413,8 @@ class PlacefieldDensityAnalysisComputationFunctions(AllFunctionEnumeratingMixin,
             # out_result_tuples = []
             # active_tuning_curves = active_pf_2D.ratemap.tuning_curves # Raw Tuning Curves
             active_tuning_curves = active_pf_2D.ratemap.unit_max_tuning_curves # Unit-max scaled tuning curves
+            tuning_curve_peak_firing_rates = active_pf_2D.ratemap.tuning_curve_peak_firing_rates # the peak firing rates of each tuning curve
+            
             #  Build the results:
             out_results = {}
             out_cell_peak_dfs_list = []
@@ -420,7 +422,8 @@ class PlacefieldDensityAnalysisComputationFunctions(AllFunctionEnumeratingMixin,
             
 
             for neuron_idx in np.arange(n_neurons):
-                neuron_id = active_pf_2D.neuron_extended_ids[neuron_idx].id               
+                neuron_id = active_pf_2D.neuron_extended_ids[neuron_idx].id
+                neuron_tuning_curve_peak_firing_rate = tuning_curve_peak_firing_rates[neuron_idx]
                 slab = active_tuning_curves[neuron_idx].T
                 _, _, slab, cell_peaks_dict, id_map, prominence_map, parent_map = compute_prominence_contours(xbin_centers=active_pf_2D.xbin_centers, ybin_centers=active_pf_2D.ybin_centers, slab=slab, step=step, min_area=None, min_depth=0.2, include_edge=True, verbose=False)
                 #""" Analyze all peaks of a given cell/ratemap """
@@ -429,6 +432,9 @@ class PlacefieldDensityAnalysisComputationFunctions(AllFunctionEnumeratingMixin,
                 ## Neuron:
                 n_total_cell_slice_results = n_slices * n_peaks                
                 neuron_id_arr = np.full((n_total_cell_slice_results,), neuron_id) # repeat the neuron_id many times for the datatable
+                neuron_peak_curve_rate_arr = np.full((n_total_cell_slice_results,), neuron_tuning_curve_peak_firing_rate) # repeat the neuron_id many times for the datatable
+                
+                
                 
                 ## Peak
                 summit_slice_peak_id_arr = np.zeros((n_peaks, n_slices), dtype=np.int16) # same summit/peak id for all in the slice
@@ -484,15 +490,17 @@ class PlacefieldDensityAnalysisComputationFunctions(AllFunctionEnumeratingMixin,
                         summit_slice_center_y_arr[peak_idx, lvl_idx] = float(y0) + (0.5 * float(height))
                         
                     
-                # if debug_print:
-                print(f'building peak_df for neuron[{neuron_idx}] with {n_peaks}...')    
-                cell_peaks_df = pd.DataFrame({'neuron_id': neuron_id_arr, 'summit_idx': summit_slice_peak_id_arr.flatten(), 'summit_slice_idx': summit_slice_idx_arr.flatten(),
+                if debug_print:
+                    print(f'building peak_df for neuron[{neuron_idx}] with {n_peaks}...')
+                cell_peaks_df = pd.DataFrame({'neuron_id': neuron_id_arr, 'neuron_peak_firing_rate': neuron_peak_curve_rate_arr, 'summit_idx': summit_slice_peak_id_arr.flatten(), 'summit_slice_idx': summit_slice_idx_arr.flatten(),
                                              'slice_level_multiplier': summit_slice_peak_level_multiplier_arr.flatten(), 'summit_slice_level': summit_slice_peak_level_arr.flatten(),
-                                             'peak_height': summit_slice_peak_height_arr.flatten(), 'peak_prominence': summit_slice_peak_prominence_arr.flatten(),
+                                             'peak_relative_height': summit_slice_peak_height_arr.flatten(), 'peak_prominence': summit_slice_peak_prominence_arr.flatten(),
                                              'peak_center_x': summit_peak_center_x_arr.flatten(), 'peak_center_y': summit_peak_center_y_arr.flatten(),
                                              'summit_slice_x_width': summit_slice_x_side_length_arr.flatten(), 'summit_slice_y_width': summit_slice_y_side_length_arr.flatten(),
                                              'summit_slice_center_x': summit_slice_center_x_arr.flatten(), 'summit_slice_center_y': summit_slice_center_y_arr.flatten()
                                              })
+                cell_peaks_df['peak_height'] = cell_peaks_df['peak_relative_height'] * neuron_peak_curve_rate_arr
+                
                 out_cell_peak_dfs_list.append(cell_peaks_df)
                 
                                            
@@ -502,7 +510,8 @@ class PlacefieldDensityAnalysisComputationFunctions(AllFunctionEnumeratingMixin,
                 out_results[neuron_id] = {'peaks': cell_peaks_dict, 'slab': slab, 'id_map':id_map, 'prominence_map':prominence_map, 'parent_map':parent_map} 
     
             # Build final concatenated dataframe:
-            print(f'building final concatenated cell_peaks_df for {n_neurons} total neurons...')
+            if debug_print:
+                print(f'building final concatenated cell_peaks_df for {n_neurons} total neurons...')
             cell_peaks_df = pd.concat(out_cell_peak_dfs_list)
 
             ## Build function output:
