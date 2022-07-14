@@ -431,7 +431,7 @@ class PlacefieldDensityAnalysisComputationFunctions(AllFunctionEnumeratingMixin,
                 neuron_id_arr = np.full((n_total_cell_slice_results,), neuron_id) # repeat the neuron_id many times for the datatable
                 
                 ## Peak
-                summit_slice_peak_id_arr = np.zeros((n_peaks, n_slices)) # same summit/peak id for all in the slice
+                summit_slice_peak_id_arr = np.zeros((n_peaks, n_slices), dtype=np.int16) # same summit/peak id for all in the slice
                 summit_slice_peak_level_multiplier_arr = np.zeros((n_peaks, n_slices), dtype=np.float16) # same summit/peak id for all in the slice
                 summit_slice_peak_level_arr = np.zeros((n_peaks, n_slices), dtype=np.float16) # same summit/peak id for all in the slice
                 summit_slice_peak_height_arr = np.zeros((n_peaks, n_slices), dtype=np.float16) # same summit/peak id for all in the slice
@@ -441,7 +441,7 @@ class PlacefieldDensityAnalysisComputationFunctions(AllFunctionEnumeratingMixin,
                 
                 
                 ## Slice
-                summit_slice_idx_arr = np.tile(np.arange(n_slices), n_peaks) # array([0, 1, 0, 1, 0, 1, 0, 1, 0, 1])
+                summit_slice_idx_arr = np.tile(np.arange(n_slices), n_peaks).astype('int') # array([0, 1, 0, 1, 0, 1, 0, 1, 0, 1])
                 summit_slice_x_side_length_arr = np.zeros((n_peaks, n_slices), dtype=np.float16)
                 summit_slice_y_side_length_arr = np.zeros((n_peaks, n_slices), dtype=np.float16)
                 summit_slice_center_x_arr = np.zeros((n_peaks, n_slices), dtype=np.float16)
@@ -460,8 +460,8 @@ class PlacefieldDensityAnalysisComputationFunctions(AllFunctionEnumeratingMixin,
                     
                     ## This is where we would loop through each desired slice/probe levels:
                     a_peak_dict['probe_levels'] = np.array([a_peak_dict['height']*multiplier for multiplier in peak_height_multiplier_probe_levels]).astype('float') # specific probe levels
-                    summit_slice_peak_level_arr[peak_idx, :] = np.array(peak_height_multiplier_probe_levels).astype('float')
-                    summit_slice_peak_level_multiplier_arr[peak_idx, :] = a_peak_dict['probe_levels']
+                    summit_slice_peak_level_multiplier_arr[peak_idx, :] = np.array(peak_height_multiplier_probe_levels).astype('float')
+                    summit_slice_peak_level_arr[peak_idx, :] = a_peak_dict['probe_levels']
                     included_computed_contours = _find_contours_at_levels(active_pf_2D.xbin_centers, active_pf_2D.ybin_centers, slab, a_peak_dict['center'], a_peak_dict['probe_levels']) # DONE: efficiency: This would be more efficient to do for all peaks at once I believe. CONCLUSION: No, this needs to be done separately for each peak as they each have separate prominences which determine the levels they should be sliced at.
                     ## Build the dict that contains the output level slices
                     a_peak_dict['level_slices'] = {probe_lvl:{'contour':contour, 'bbox':contour.get_extents(), 'size':contour.get_extents().size} for probe_lvl, contour in included_computed_contours.items() if (contour is not None)} # 
