@@ -363,7 +363,7 @@ class PlacefieldDensityAnalysisComputationFunctions(AllFunctionEnumeratingMixin,
                     
                     computed_data['RatemapPeaksAnalysis']['PeakProminence2D']['result_tuples']: (slab, peaks, idmap, promap, parentmap)
                     
-                    
+                    flat_peaks_df
             """            
             
             matplotlib.use('Agg') # require use of non-interactive backend to prevent the stupid figure from showing up
@@ -415,33 +415,53 @@ class PlacefieldDensityAnalysisComputationFunctions(AllFunctionEnumeratingMixin,
             active_tuning_curves = active_pf_2D.ratemap.unit_max_tuning_curves # Unit-max scaled tuning curves
             #  Build the results:
             out_results = {}
+            out_cell_peak_dfs_list = []
+            n_slices = len(peak_height_multiplier_probe_levels)
+            
 
-            for i in np.arange(n_neurons):
-                neuron_id = active_pf_2D.neuron_extended_ids[i].id
-                # xx, yy, slab, peaks, id_map, prominence_map, parent_map = _perform_compute_prominence_contours(active_pf_2D.xbin_centers, active_pf_2D.ybin_centers, active_tuning_curves[i].T, step=step)
-                """ NOTE: for getProminence(...), 
-                
-                
-                Usage:        
-                    step = 0.2
-                    i = 0
-                    xx, yy, slab, peaks, idmap, promap, parentmap = perform_compute_prominence_contours(active_pf_2D_dt.xbin_labels, active_pf_2D_dt.ybin_labels, active_pf_2D.ratemap.tuning_curves[i].T, step=step)
-                    
-                    # Test plot the promenence result
-                    figure, (ax1, ax2, ax3, ax4) = plot_Prominence(xx, yy, slab, peaks, idmap, promap, parentmap, debug_print=False)
-
-                """
-                
-                slab = active_tuning_curves[i].T
+            for neuron_idx in np.arange(n_neurons):
+                neuron_id = active_pf_2D.neuron_extended_ids[neuron_idx].id               
+                slab = active_tuning_curves[neuron_idx].T
                 _, _, slab, cell_peaks_dict, id_map, prominence_map, parent_map = compute_prominence_contours(xbin_centers=active_pf_2D.xbin_centers, ybin_centers=active_pf_2D.ybin_centers, slab=slab, step=step, min_area=None, min_depth=0.2, include_edge=True, verbose=False)
-                
-                
                 #""" Analyze all peaks of a given cell/ratemap """
-                for i, (peak_id, a_peak_dict) in enumerate(cell_peaks_dict.items()):
+                n_peaks = len(cell_peaks_dict)
+                
+                ## Neuron:
+                n_total_cell_slice_results = n_slices * n_peaks                
+                neuron_id_arr = np.full((n_total_cell_slice_results,), neuron_id) # repeat the neuron_id many times for the datatable
+                
+                ## Peak
+                summit_slice_peak_id_arr = np.zeros((n_peaks, n_slices)) # same summit/peak id for all in the slice
+                summit_slice_peak_level_multiplier_arr = np.zeros((n_peaks, n_slices), dtype=np.float16) # same summit/peak id for all in the slice
+                summit_slice_peak_level_arr = np.zeros((n_peaks, n_slices), dtype=np.float16) # same summit/peak id for all in the slice
+                summit_slice_peak_height_arr = np.zeros((n_peaks, n_slices), dtype=np.float16) # same summit/peak id for all in the slice
+                summit_slice_peak_prominence_arr = np.zeros((n_peaks, n_slices), dtype=np.float16) # same summit/peak id for all in the slice
+                summit_peak_center_x_arr = np.zeros((n_peaks, n_slices), dtype=np.float16)
+                summit_peak_center_y_arr = np.zeros((n_peaks, n_slices), dtype=np.float16)
+                
+                
+                ## Slice
+                summit_slice_idx_arr = np.tile(np.arange(n_slices), n_peaks) # array([0, 1, 0, 1, 0, 1, 0, 1, 0, 1])
+                summit_slice_x_side_length_arr = np.zeros((n_peaks, n_slices), dtype=np.float16)
+                summit_slice_y_side_length_arr = np.zeros((n_peaks, n_slices), dtype=np.float16)
+                summit_slice_center_x_arr = np.zeros((n_peaks, n_slices), dtype=np.float16)
+                summit_slice_center_y_arr = np.zeros((n_peaks, n_slices), dtype=np.float16)
+
+                for peak_idx, (peak_id, a_peak_dict) in enumerate(cell_peaks_dict.items()):
                     if debug_print:
                         print(f'computing contours for peak_id: {peak_id}...')                    
+                    
+                    summit_slice_peak_height_arr[peak_idx, :] = a_peak_dict['height']
+                    summit_slice_peak_prominence_arr[peak_idx, :] = a_peak_dict['prominence']
+                    summit_peak_center_x_arr[peak_idx, :] = a_peak_dict['center'][0]
+                    summit_peak_center_y_arr[peak_idx, :] = a_peak_dict['center'][1]
+                    
+                    
+                    
                     ## This is where we would loop through each desired slice/probe levels:
                     a_peak_dict['probe_levels'] = np.array([a_peak_dict['height']*multiplier for multiplier in peak_height_multiplier_probe_levels]).astype('float') # specific probe levels
+                    summit_slice_peak_level_arr[peak_idx, :] = np.array(peak_height_multiplier_probe_levels).astype('float')
+                    summit_slice_peak_level_multiplier_arr[peak_idx, :] = a_peak_dict['probe_levels']
                     included_computed_contours = _find_contours_at_levels(active_pf_2D.xbin_centers, active_pf_2D.ybin_centers, slab, a_peak_dict['center'], a_peak_dict['probe_levels']) # DONE: efficiency: This would be more efficient to do for all peaks at once I believe. CONCLUSION: No, this needs to be done separately for each peak as they each have separate prominences which determine the levels they should be sliced at.
                     ## Build the dict that contains the output level slices
                     a_peak_dict['level_slices'] = {probe_lvl:{'contour':contour, 'bbox':contour.get_extents(), 'size':contour.get_extents().size} for probe_lvl, contour in included_computed_contours.items() if (contour is not None)} # 
@@ -449,15 +469,45 @@ class PlacefieldDensityAnalysisComputationFunctions(AllFunctionEnumeratingMixin,
                     if debug_print:
                         print(f"probe_levels: {a_peak_dict['probe_levels']}")
 
+                    ## Build flat output:
+                    
+                    for lvl_idx, probe_lvl in enumerate(a_peak_dict['probe_levels']):
+                        a_slice = a_peak_dict['level_slices'][probe_lvl]
+                        slice_bbox = a_slice['bbox']
+                        (x0, y0, width, height) = slice_bbox.bounds        
+                        summit_slice_peak_id_arr[peak_idx, lvl_idx] = peak_id
+                        summit_slice_x_side_length_arr[peak_idx, lvl_idx] = width
+                        summit_slice_y_side_length_arr[peak_idx, lvl_idx] = height
+                        # summit_slice_center_x_arr[peak_idx, lvl_idx] = slice_bbox.center[0]
+                        # summit_slice_center_y_arr[peak_idx, lvl_idx] = slice_bbox.center[1]
+                        summit_slice_center_x_arr[peak_idx, lvl_idx] = float(x0) + (0.5 * float(width))
+                        summit_slice_center_y_arr[peak_idx, lvl_idx] = float(y0) + (0.5 * float(height))
+                        
+                    
+                # if debug_print:
+                print(f'building peak_df for neuron[{neuron_idx}] with {n_peaks}...')    
+                cell_peaks_df = pd.DataFrame({'neuron_id': neuron_id_arr, 'summit_idx': summit_slice_peak_id_arr.flatten(), 'summit_slice_idx': summit_slice_idx_arr.flatten(),
+                                             'slice_level_multiplier': summit_slice_peak_level_multiplier_arr.flatten(), 'summit_slice_level': summit_slice_peak_level_arr.flatten(),
+                                             'peak_height': summit_slice_peak_height_arr.flatten(), 'peak_prominence': summit_slice_peak_prominence_arr.flatten(),
+                                             'peak_center_x': summit_peak_center_x_arr.flatten(), 'peak_center_y': summit_peak_center_y_arr.flatten(),
+                                             'summit_slice_x_width': summit_slice_x_side_length_arr.flatten(), 'summit_slice_y_width': summit_slice_y_side_length_arr.flatten(),
+                                             'summit_slice_center_x': summit_slice_center_x_arr.flatten(), 'summit_slice_center_y': summit_slice_center_y_arr.flatten()
+                                             })
+                out_cell_peak_dfs_list.append(cell_peaks_df)
+                
                                            
                 if debug_print:
                     print(f'done.') # END Analyze peaks
                     
                 out_results[neuron_id] = {'peaks': cell_peaks_dict, 'slab': slab, 'id_map':id_map, 'prominence_map':prominence_map, 'parent_map':parent_map} 
     
+            # Build final concatenated dataframe:
+            print(f'building final concatenated cell_peaks_df for {n_neurons} total neurons...')
+            cell_peaks_df = pd.concat(out_cell_peak_dfs_list)
+
             ## Build function output:
             computation_result.computed_data.setdefault('RatemapPeaksAnalysis', DynamicParameters()) # get the existing RatemapPeaksAnalysis output or create a new one if needed
-            computation_result.computed_data['RatemapPeaksAnalysis']['PeakProminence2D'] = DynamicParameters(xx=active_pf_2D.xbin_centers, yy=active_pf_2D.ybin_centers, neuron_extended_ids=active_pf_2D.neuron_extended_ids, results=out_results)
+            computation_result.computed_data['RatemapPeaksAnalysis']['PeakProminence2D'] = DynamicParameters(xx=active_pf_2D.xbin_centers, yy=active_pf_2D.ybin_centers, neuron_extended_ids=active_pf_2D.neuron_extended_ids, results=out_results, flat_peaks_df=cell_peaks_df)
             
             return computation_result
 
