@@ -10,11 +10,8 @@ from pyphocorehelpers.gui.PyVista.CascadingDynamicPlotsList import CascadingDyna
 
 
 def _build_pyvista_single_neuron_prominence_result_data(neuron_id, a_result, promenence_plot_threshold = 1.0, included_level_indicies=[1], debug_print=False):
-    """ Unfortunately I realize now that these centers, etc are all represented in terms of number of bins, not actual x, y values.
+    """
     
-    Centers might be someting like:
-    array([[49.2379, 18.2778, 5.2],
-       [1.8755, 17.9038, 1.6]])
     """
     slab, peaks, idmap, promap, parentmap = a_result['slab'], a_result['peaks'], a_result['id_map'], a_result['prominence_map'], a_result['parent_map']
     n_peaks = len(peaks)
