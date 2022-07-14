@@ -438,20 +438,20 @@ class PlacefieldDensityAnalysisComputationFunctions(AllFunctionEnumeratingMixin,
                 
                 ## Peak
                 summit_slice_peak_id_arr = np.zeros((n_peaks, n_slices), dtype=np.int16) # same summit/peak id for all in the slice
-                summit_slice_peak_level_multiplier_arr = np.zeros((n_peaks, n_slices), dtype=np.float16) # same summit/peak id for all in the slice
-                summit_slice_peak_level_arr = np.zeros((n_peaks, n_slices), dtype=np.float16) # same summit/peak id for all in the slice
-                summit_slice_peak_height_arr = np.zeros((n_peaks, n_slices), dtype=np.float16) # same summit/peak id for all in the slice
-                summit_slice_peak_prominence_arr = np.zeros((n_peaks, n_slices), dtype=np.float16) # same summit/peak id for all in the slice
-                summit_peak_center_x_arr = np.zeros((n_peaks, n_slices), dtype=np.float16)
-                summit_peak_center_y_arr = np.zeros((n_peaks, n_slices), dtype=np.float16)
+                summit_slice_peak_level_multiplier_arr = np.zeros((n_peaks, n_slices), dtype=float) # same summit/peak id for all in the slice
+                summit_slice_peak_level_arr = np.zeros((n_peaks, n_slices), dtype=float) # same summit/peak id for all in the slice
+                summit_slice_peak_height_arr = np.zeros((n_peaks, n_slices), dtype=float) # same summit/peak id for all in the slice
+                summit_slice_peak_prominence_arr = np.zeros((n_peaks, n_slices), dtype=float) # same summit/peak id for all in the slice
+                summit_peak_center_x_arr = np.zeros((n_peaks, n_slices), dtype=float)
+                summit_peak_center_y_arr = np.zeros((n_peaks, n_slices), dtype=float)
                 
                 
                 ## Slice
                 summit_slice_idx_arr = np.tile(np.arange(n_slices), n_peaks).astype('int') # array([0, 1, 0, 1, 0, 1, 0, 1, 0, 1])
-                summit_slice_x_side_length_arr = np.zeros((n_peaks, n_slices), dtype=np.float16)
-                summit_slice_y_side_length_arr = np.zeros((n_peaks, n_slices), dtype=np.float16)
-                summit_slice_center_x_arr = np.zeros((n_peaks, n_slices), dtype=np.float16)
-                summit_slice_center_y_arr = np.zeros((n_peaks, n_slices), dtype=np.float16)
+                summit_slice_x_side_length_arr = np.zeros((n_peaks, n_slices), dtype=float)
+                summit_slice_y_side_length_arr = np.zeros((n_peaks, n_slices), dtype=float)
+                summit_slice_center_x_arr = np.zeros((n_peaks, n_slices), dtype=float)
+                summit_slice_center_y_arr = np.zeros((n_peaks, n_slices), dtype=float)
 
                 for peak_idx, (peak_id, a_peak_dict) in enumerate(cell_peaks_dict.items()):
                     if debug_print:
