@@ -372,6 +372,11 @@ class PlacefieldDensityAnalysisComputationFunctions(AllFunctionEnumeratingMixin,
                 """ finds the contours containing the peak_probe_point at the specified probe_levels.
                     performs slicing through desired z-values (1/2 prominence, etc) using contourf
                     
+                    
+                Inputs:
+                    peak_probe_point: a point (x, y) to use to validate or exclude found contours. This allows us to only get the contour the encloses a peak at a given level, not any others that may happen to be at that level as well.
+                    probe_levels: a list of z-values to slice at to find the contours
+                    
                 Returns:
                     a dict with keys of the probe_levels and values containing a list of their corresponding contours
                 """
