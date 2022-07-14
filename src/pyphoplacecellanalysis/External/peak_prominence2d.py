@@ -498,6 +498,22 @@ def getProminence(var, step, ybin_centers=None, xbin_centers=None, min_depth=Non
     return result, id_map, result_map, parent_map
 
 
+def compute_prominence_contours(xbin_centers, ybin_centers, slab, step=0.1, min_area=None, min_depth=0.2, include_edge=True, verbose=False, **kwargs):
+    """ Simple wrapper around the getProminence function by Pho Hale
+    xbin_centers and ybin_centers should be like *bin_labels not *bin
+    slab should usually be transposed: tuning_curves[i].T
+    
+    Usage:        
+        step = 0.2
+        i = 0
+        xx, yy, slab, peaks, idmap, promap, parentmap = perform_compute_prominence_contours(active_pf_2D_dt.xbin_labels, active_pf_2D_dt.ybin_labels, active_pf_2D.ratemap.tuning_curves[i].T, step=step)
+        
+        # Test plot the promenence result
+        figure, (ax1, ax2, ax3, ax4) = plot_Prominence(xx, yy, slab, peaks, idmap, promap, parentmap, debug_print=False)
+
+    """
+    peaks_dict, id_map, prominence_map, parent_map = getProminence(slab, step, ybin_centers=ybin_centers, xbin_centers=xbin_centers, min_area=min_area, min_depth=min_depth, include_edge=include_edge, verbose=verbose, **kwargs)
+    return xbin_centers, ybin_centers, slab, peaks_dict, id_map, prominence_map, parent_map
 
 
 
