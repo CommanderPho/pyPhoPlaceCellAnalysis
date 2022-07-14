@@ -405,13 +405,7 @@ class PlacefieldDensityAnalysisComputationFunctions(AllFunctionEnumeratingMixin,
                 return included_computed_contours
 
 
-            
-            
-            ## Testing above:
-            # peak_height_multiplier_probe_levels = (0.5, 0.9) # 50% and 90% of the peak height
-            # out_computed_contours = analyze_peaks(peaks, peak_height_multiplier_probe_levels, debug_print=True)
-
-
+            # begin main function body ___________________________________________________________________________________________ #
             active_pf_2D = computation_result.computed_data['pf2D']
             n_neurons = active_pf_2D.ratemap.n_neurons
             
@@ -439,26 +433,27 @@ class PlacefieldDensityAnalysisComputationFunctions(AllFunctionEnumeratingMixin,
                 """
                 
                 slab = active_tuning_curves[i].T
-                _, _, slab, peaks_dict, id_map, prominence_map, parent_map = compute_prominence_contours(xbin_centers=active_pf_2D.xbin_centers, ybin_centers=active_pf_2D.ybin_centers, slab=slab, step=step, min_area=None, min_depth=0.2, include_edge=True, verbose=False)
+                _, _, slab, cell_peaks_dict, id_map, prominence_map, parent_map = compute_prominence_contours(xbin_centers=active_pf_2D.xbin_centers, ybin_centers=active_pf_2D.ybin_centers, slab=slab, step=step, min_area=None, min_depth=0.2, include_edge=True, verbose=False)
                 
                 
                 #""" Analyze all peaks of a given cell/ratemap """
-                for i, (peak_id, active_peak_dict) in enumerate(peaks_dict.items()):
+                for i, (peak_id, a_peak_dict) in enumerate(cell_peaks_dict.items()):
                     if debug_print:
-                        print(f'computing contours for peak_id: {peak_id}...')
-                    
-                    active_peak_dict['probe_levels'] = np.array([active_peak_dict['height']*multiplier for multiplier in peak_height_multiplier_probe_levels]).astype('float') # specific probe levels
+                        print(f'computing contours for peak_id: {peak_id}...')                    
+                    ## This is where we would loop through each desired slice/probe levels:
+                    a_peak_dict['probe_levels'] = np.array([a_peak_dict['height']*multiplier for multiplier in peak_height_multiplier_probe_levels]).astype('float') # specific probe levels
+                    included_computed_contours = _find_contours_at_levels(active_pf_2D.xbin_centers, active_pf_2D.ybin_centers, slab, a_peak_dict['center'], a_peak_dict['probe_levels']) # DONE: efficiency: This would be more efficient to do for all peaks at once I believe. CONCLUSION: No, this needs to be done separately for each peak as they each have separate prominences which determine the levels they should be sliced at.
+                    ## Build the dict that contains the output level slices
+                    a_peak_dict['level_slices'] = {probe_lvl:{'contour':contour, 'bbox':contour.get_extents(), 'size':contour.get_extents().size} for probe_lvl, contour in included_computed_contours.items() if (contour is not None)} # 
+
                     if debug_print:
-                        print(f"probe_levels: {active_peak_dict['probe_levels']}")
-                    included_computed_contours = _find_contours_at_levels(active_pf_2D.xbin_centers, active_pf_2D.ybin_centers, slab, active_peak_dict['center'], active_peak_dict['probe_levels']) # DONE: efficiency: This would be more efficient to do for all peaks at once I believe. CONCLUSION: No, this needs to be done separately for each peak as they each have separate prominences which determine the levels they should be sliced at.
-                    if debug_print:
-                        print(f'\t computing contour stats...')
-                    active_peak_dict['level_slices'] = {probe_lvl:{'contour':contour, 'bbox':contour.get_extents(), 'size':contour.get_extents().size} for probe_lvl, contour in included_computed_contours.items() if (contour is not None)} # 
+                        print(f"probe_levels: {a_peak_dict['probe_levels']}")
+
                                            
                 if debug_print:
                     print(f'done.') # END Analyze peaks
                     
-                out_results[neuron_id] = {'peaks': peaks_dict, 'slab': slab, 'id_map':id_map, 'prominence_map':prominence_map, 'parent_map':parent_map} 
+                out_results[neuron_id] = {'peaks': cell_peaks_dict, 'slab': slab, 'id_map':id_map, 'prominence_map':prominence_map, 'parent_map':parent_map} 
     
             ## Build function output:
             computation_result.computed_data.setdefault('RatemapPeaksAnalysis', DynamicParameters()) # get the existing RatemapPeaksAnalysis output or create a new one if needed
