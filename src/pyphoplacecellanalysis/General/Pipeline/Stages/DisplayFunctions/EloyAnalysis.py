@@ -151,10 +151,7 @@ class EloyAnalysisDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Displa
                         if debug_print:
                             print(f"\tcenter: {peak_center}")
                             print(f"\theight: {peak_height}")
-                        ax.scatter(peak_center[0], peak_center[1], color=curr_color) # probably just accumulate these
-                        # bboxes = a_peak['pf_bbox']
-                        # sizes = a_peak['pf_size']
-                                                
+                        ax.scatter(peak_center[0], peak_center[1], color=curr_color) # probably just accumulate these                                                
                         for level_value in filtered_levels_list:
                             curr_slice = curr_slices[level_value]    
                             curr_contour = curr_slice['contour']
