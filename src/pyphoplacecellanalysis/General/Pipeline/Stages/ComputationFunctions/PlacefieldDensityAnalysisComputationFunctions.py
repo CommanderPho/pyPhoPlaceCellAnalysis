@@ -11,7 +11,7 @@ matplotlib.use('Agg')
 import matplotlib.pyplot as plt # required for _perform_pf_analyze_results_peak_prominence2d_computation to build Path objects. Nothing is plotted though
 
 
-from pyphoplacecellanalysis.External.peak_prominence2d import getProminence, plot_Prominence # Required for _perform_pf_find_ratemap_peaks_peak_prominence2d_computation
+from pyphoplacecellanalysis.External.peak_prominence2d import compute_prominence_contours # Required for _perform_pf_find_ratemap_peaks_peak_prominence2d_computation
 
 from pyphoplacecellanalysis.General.Model.ComputationResults import ComputationResult
 from pyphocorehelpers.DataStructure.dynamic_parameters import DynamicParameters
@@ -405,48 +405,8 @@ class PlacefieldDensityAnalysisComputationFunctions(AllFunctionEnumeratingMixin,
                 return included_computed_contours
 
 
-            def _perform_compute_prominence_contours(xbin_centers, ybin_centers, slab, step=0.1):
-                """
-                xbin_centers and ybin_centers should be like *bin_labels not *bin
-                slab should usually be transposed: tuning_curves[i].T
-                
-                Usage:        
-                    step = 0.2
-                    i = 0
-                    xx, yy, slab, peaks, idmap, promap, parentmap = perform_compute_prominence_contours(active_pf_2D_dt.xbin_labels, active_pf_2D_dt.ybin_labels, active_pf_2D.ratemap.tuning_curves[i].T, step=step)
-                    
-                    # Test plot the promenence result
-                    figure, (ax1, ax2, ax3, ax4) = plot_Prominence(xx, yy, slab, peaks, idmap, promap, parentmap, debug_print=False)
-
-                """
-                peaks_dict, id_map, prominence_map, parent_map = getProminence(slab, step, ybin_centers=ybin_centers, xbin_centers=xbin_centers, min_area=None, min_depth=0.2, include_edge=True, verbose=False)
-                return xbin_centers, ybin_centers, slab, peaks_dict, id_map, prominence_map, parent_map
             
             
-            def _analyze_peak(xbin_centers, ybin_centers, slab, peaks_dict, peak_height_multiplier_probe_levels, debug_print=False):
-                peaks_dict['probe_levels'] = np.array([peaks_dict['height']*multiplier for multiplier in peak_height_multiplier_probe_levels]).astype('float') # specific probe levels
-                if debug_print:
-                    print(f"probe_levels: {peaks_dict['probe_levels']}")
-                included_computed_contours = _find_contours_at_levels(xbin_centers, ybin_centers, slab, peaks_dict['center'], peaks_dict['probe_levels']) # DONE: efficiency: This would be more efficient to do for all peaks at once I believe. CONCLUSION: No, this needs to be done separately for each peak as they each have separate prominences which determine the levels they should be sliced at.
-                if debug_print:
-                    print(f'\t computing contour stats...')
-                peaks_dict['level_slices'] = {probe_lvl:{'contour':contour, 'bbox':contour.get_extents(), 'size':contour.get_extents().size} for probe_lvl, contour in included_computed_contours.items() if (contour is not None)} # previous did get_extents() .size
-                return peaks_dict
-                # get_path_collection_extents
-                
-            def analyze_peaks(xbin_centers, ybin_centers, slab, peaks, peak_height_multiplier_probe_levels, debug_print=False):
-                """ Analyze all peaks of a given cell/ratemap
-                """
-                # out_computed_contours = DynamicParameters.init_from_dict({})
-                for peak_id, active_peak_dict in peaks.items():
-                    if debug_print:
-                        print(f'computing contours for peak_id: {peak_id}...')
-                    active_peak_dict = _analyze_peak(xbin_centers, ybin_centers, slab, active_peak_dict, peak_height_multiplier_probe_levels, debug_print=debug_print)
-                    # out_computed_contours[peak_id] = DynamicParameters.init_from_dict({'contours': included_computed_contours, 'levels': probe_levels, 'stats': contour_stats})
-                if debug_print:
-                    print(f'done.')
-                return peaks
-
             ## Testing above:
             # peak_height_multiplier_probe_levels = (0.5, 0.9) # 50% and 90% of the peak height
             # out_computed_contours = analyze_peaks(peaks, peak_height_multiplier_probe_levels, debug_print=True)
@@ -459,21 +419,51 @@ class PlacefieldDensityAnalysisComputationFunctions(AllFunctionEnumeratingMixin,
             # out_result_tuples = []
             # active_tuning_curves = active_pf_2D.ratemap.tuning_curves # Raw Tuning Curves
             active_tuning_curves = active_pf_2D.ratemap.unit_max_tuning_curves # Unit-max scaled tuning curves
-            
+            #  Build the results:
             out_results = {}
-            #  Build the results first:
+
             for i in np.arange(n_neurons):
                 neuron_id = active_pf_2D.neuron_extended_ids[i].id
-                # xx, yy, slab, peaks, id_map, prominence_map, parent_map = _perform_compute_prominence_contours(active_pf_2D.xbin_centers, active_pf_2D.ybin_centers, active_pf_2D.ratemap.tuning_curves[i].T, step=step)
-                xx, yy, slab, peaks, id_map, prominence_map, parent_map = _perform_compute_prominence_contours(active_pf_2D.xbin_centers, active_pf_2D.ybin_centers, active_tuning_curves[i].T, step=step)
-                peaks = analyze_peaks(active_pf_2D.xbin_centers, active_pf_2D.ybin_centers, slab, peaks, peak_height_multiplier_probe_levels, debug_print=debug_print)
-                # out_results[neuron_id] = {'peaks': peaks, 'slab': slab} # could add more properties
-                out_results[neuron_id] = {'peaks': peaks, 'slab': slab, 'id_map':id_map, 'prominence_map':prominence_map, 'parent_map':parent_map} # could add more properties
+                # xx, yy, slab, peaks, id_map, prominence_map, parent_map = _perform_compute_prominence_contours(active_pf_2D.xbin_centers, active_pf_2D.ybin_centers, active_tuning_curves[i].T, step=step)
+                """ NOTE: for getProminence(...), 
+                
+                
+                Usage:        
+                    step = 0.2
+                    i = 0
+                    xx, yy, slab, peaks, idmap, promap, parentmap = perform_compute_prominence_contours(active_pf_2D_dt.xbin_labels, active_pf_2D_dt.ybin_labels, active_pf_2D.ratemap.tuning_curves[i].T, step=step)
+                    
+                    # Test plot the promenence result
+                    figure, (ax1, ax2, ax3, ax4) = plot_Prominence(xx, yy, slab, peaks, idmap, promap, parentmap, debug_print=False)
+
+                """
+                
+                slab = active_tuning_curves[i].T
+                _, _, slab, peaks_dict, id_map, prominence_map, parent_map = compute_prominence_contours(xbin_centers=active_pf_2D.xbin_centers, ybin_centers=active_pf_2D.ybin_centers, slab=slab, step=step, min_area=None, min_depth=0.2, include_edge=True, verbose=False)
+                
+                
+                #""" Analyze all peaks of a given cell/ratemap """
+                for i, (peak_id, active_peak_dict) in enumerate(peaks_dict.items()):
+                    if debug_print:
+                        print(f'computing contours for peak_id: {peak_id}...')
+                    
+                    active_peak_dict['probe_levels'] = np.array([active_peak_dict['height']*multiplier for multiplier in peak_height_multiplier_probe_levels]).astype('float') # specific probe levels
+                    if debug_print:
+                        print(f"probe_levels: {active_peak_dict['probe_levels']}")
+                    included_computed_contours = _find_contours_at_levels(active_pf_2D.xbin_centers, active_pf_2D.ybin_centers, slab, active_peak_dict['center'], active_peak_dict['probe_levels']) # DONE: efficiency: This would be more efficient to do for all peaks at once I believe. CONCLUSION: No, this needs to be done separately for each peak as they each have separate prominences which determine the levels they should be sliced at.
+                    if debug_print:
+                        print(f'\t computing contour stats...')
+                    active_peak_dict['level_slices'] = {probe_lvl:{'contour':contour, 'bbox':contour.get_extents(), 'size':contour.get_extents().size} for probe_lvl, contour in included_computed_contours.items() if (contour is not None)} # 
+                                           
+                if debug_print:
+                    print(f'done.') # END Analyze peaks
+                    
+                out_results[neuron_id] = {'peaks': peaks_dict, 'slab': slab, 'id_map':id_map, 'prominence_map':prominence_map, 'parent_map':parent_map} 
     
+            ## Build function output:
             computation_result.computed_data.setdefault('RatemapPeaksAnalysis', DynamicParameters()) # get the existing RatemapPeaksAnalysis output or create a new one if needed
             computation_result.computed_data['RatemapPeaksAnalysis']['PeakProminence2D'] = DynamicParameters(xx=active_pf_2D.xbin_centers, yy=active_pf_2D.ybin_centers, neuron_extended_ids=active_pf_2D.neuron_extended_ids, results=out_results)
             
-            # computation_result.computed_data['RatemapPeaksAnalysis']['PeakProminence2D'] = DynamicParameters(xx=active_pf_2D.xbin_labels, yy=active_pf_2D.ybin_labels, neuron_extended_ids=active_pf_2D.neuron_extended_ids, results=out_results)
             return computation_result
 
 
