@@ -238,6 +238,11 @@ def build_all_placefield_output_panels(ipcDataExplorer):
         rootControlsBarWidget.ui.pf_widgets
         rootControlsBarWidget.ui.end_button_helper_obj
         rootControlsBarWidget.ui.end_button_helper_connections
+        
+        
+        self.ui.btnNonPlacefieldSpikes
+        self.ui.btnToggleOccupancy
+        
     
     """ 
     ## UI Designer Version:    

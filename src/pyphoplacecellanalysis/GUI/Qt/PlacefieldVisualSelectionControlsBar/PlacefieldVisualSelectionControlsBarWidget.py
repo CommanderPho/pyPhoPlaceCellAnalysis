@@ -63,6 +63,10 @@ class PlacefieldVisualSelectionControlsBarWidget(QtWidgets.QWidget):
     def initUI(self):
         # self.setObjectName('placefieldControlsContainer')
         # self.ui.btnToggleOccupancy
+        # self.ui.btnNonPlacefieldSpikes
+        
+        
+        
         
         # self.ui.batchControlPanel.hide()
         self.resize(self.desired_full_panel_width, self.desired_full_panel_height)
