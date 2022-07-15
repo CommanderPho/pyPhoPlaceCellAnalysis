@@ -341,6 +341,20 @@ border-color: rgb(0, 0, 0);</string>
               </property>
              </widget>
             </item>
+            <item>
+             <widget class="QPushButton" name="pushButton">
+              <property name="text">
+               <string>PushButton</string>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QPushButton" name="pushButton_2">
+              <property name="text">
+               <string>PushButton</string>
+              </property>
+             </widget>
+            </item>
            </layout>
           </widget>
          </item>

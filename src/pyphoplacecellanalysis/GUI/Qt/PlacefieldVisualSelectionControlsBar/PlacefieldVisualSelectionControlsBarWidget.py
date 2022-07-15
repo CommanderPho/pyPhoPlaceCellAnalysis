@@ -5,17 +5,19 @@
 import numpy as np
 
 import pyphoplacecellanalysis.External.pyqtgraph as pg
-from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtCore, QtGui, QtWidgets, mkQApp
+from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtCore, QtGui, QtWidgets, mkQApp, uic
 
 from matplotlib.colors import to_hex # required for QColor conversion to hex
 
+# from pyphoplacecellanalysis.GUI.Qt.PlacefieldVisualSelectionControlsBar.PlacefieldVisualSelectionControlsBarWidgetBase import Ui_rootForm # Generated file from .ui
+from Uic_AUTOGEN_PlacefieldVisualSelectionControlsBarWidgetBase import Ui_rootForm
 
-from pyphoplacecellanalysis.GUI.Qt.PlacefieldVisualSelectionControlsBar.PlacefieldVisualSelectionControlsBarWidgetBase import Ui_rootForm # Generated file from .ui
-
-# For compatibility with the panel ui version:
-# from pyphoplacecellanalysis.PhoPositionalData.plotting.mixins.general_plotting_mixins import SingleNeuronPlottingExtended
-from pyphoplacecellanalysis.PhoPositionalData.plotting.mixins.general_plotting_mixins import SingleNeuronPlottingExtended
-
+## IMPORTS:
+# import os
+# # from ...pyPhoPlaceCellAnalysis.src.pyphoplacecellanalysis.GUI.PyQtPlot.Windows import MainPipelineWindowWithDockArea
+# path = os.path.dirname(os.path.abspath(__file__))
+# # uiFile = os.path.join(path, 'MainPipelineWindow.ui')
+# uiFile = os.path.join(path, 'PlacefieldVisualSelectionControlsBarWidgetBase.ui') # mostly empty
 
 
 class PlacefieldVisualSelectionControlsBarWidget(QtWidgets.QWidget):
@@ -34,11 +36,13 @@ class PlacefieldVisualSelectionControlsBarWidget(QtWidgets.QWidget):
     
     enable_debug_print = False
     
-    def __init__(self, *args, **kwargs):
-        super(PlacefieldVisualSelectionControlsBarWidget, self).__init__(*args, **kwargs)
+    def __init__(self, *args, parent=None, **kwargs):
+        super(PlacefieldVisualSelectionControlsBarWidget, self).__init__(*args, parent=parent, **kwargs)
         self.ui = Ui_rootForm()
         self.ui.setupUi(self) # builds the design from the .ui onto this widget.
         
+        #Load the UI Page
+        # uic.loadUi(uiFile, self) # load from the ui file
         self.desired_full_panel_width = PlacefieldVisualSelectionControlsBarWidget.desired_full_panel_width
         self.desired_full_panel_height = PlacefieldVisualSelectionControlsBarWidget.desired_full_panel_height
         
@@ -67,6 +71,7 @@ class PlacefieldVisualSelectionControlsBarWidget(QtWidgets.QWidget):
         
     def initUI(self):
         # self.setObjectName('placefieldControlsContainer')
+        # self.ui.btnToggleOccupancy
         
         # self.ui.batchControlPanel.hide()
         self.resize(self.desired_full_panel_width, self.desired_full_panel_height)
