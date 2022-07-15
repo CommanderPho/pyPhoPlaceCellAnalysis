@@ -36,6 +36,7 @@ class Interactive3dDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Displ
         from pyphoplacecellanalysis.GUI.Qt.PlacefieldVisualSelectionControls.qt_placefield import build_all_placefield_output_panels
         
         panel_controls_mode = kwargs.pop('panel_controls_mode', 'Qt') # valid options are 'Qt', 'Panel', or None
+        should_use_separate_window = kwargs.pop('separate_window', True)
         pActiveTuningCurvesPlotter = kwargs.get('extant_plotter', None)
         ipcDataExplorer = InteractivePlaceCellTuningCurvesDataExplorer(active_config, computation_result.sess, computation_result.computed_data['pf2D'], active_config.plotting_config.pf_colors, **({'extant_plotter':None} | kwargs))
         pActiveTuningCurvesPlotter = ipcDataExplorer.plot(pActiveTuningCurvesPlotter) # [2, 17449]
@@ -56,8 +57,12 @@ class Interactive3dDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Displ
             WidgetPositioningHelpers.align_window_edges(ipcDataExplorer.p, placefieldControlsContainerWidget, relative_position = 'above', resize_to_main=(1.0, None))
             
             # Wrap:
-            active_root_main_widget = ipcDataExplorer.p.window()
-            root_dockAreaWindow, app = DockAreaWrapper.wrap_with_dockAreaWindow(active_root_main_widget, placefieldControlsContainerWidget, title=ipcDataExplorer.data_explorer_name)
+            if ~should_use_separate_window:
+                active_root_main_widget = ipcDataExplorer.p.window()
+                root_dockAreaWindow, app = DockAreaWrapper.wrap_with_dockAreaWindow(active_root_main_widget, placefieldControlsContainerWidget, title=ipcDataExplorer.data_explorer_name)
+            else:
+                print(f'Skipping separate window because should_use_separate_window == True')
+                root_dockAreaWindow = None
             pane = (root_dockAreaWindow, placefieldControlsContainerWidget, pf_widgets)
             
         elif panel_controls_mode == 'Panel':        

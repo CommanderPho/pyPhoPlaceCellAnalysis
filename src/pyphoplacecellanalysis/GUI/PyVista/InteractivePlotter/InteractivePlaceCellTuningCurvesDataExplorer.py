@@ -139,6 +139,27 @@ class InteractivePlaceCellTuningCurvesDataExplorer(OccupancyPlottingMixin, Place
             assert ('aclu' in self.spikes_df.columns), "self.spikes_df must contain the 'aclu' column! Something is wrong!"     
 
 
+        ## Build the spikes_df's 'is_pf_included' column if it doesn't exist (which it probably doesn't). 
+        try:
+            test = self.spikes_df['is_pf_included']
+        except KeyError as e:
+            ## Rebuild the IDXs and add the valid key:
+            pf_only_spike_is_included = np.isin(self.spikes_df.flat_spike_idx,
+                                    self.params.active_epoch_placefields.filtered_spikes_df.flat_spike_idx.to_numpy())
+
+            # ALTERNATIVE: Could completely filter out the non-pf included spikes, but it's probably nicer just to change their properties so we can control if we want to see them or not:
+            # ipcDataExplorer._spikes_df = ipcDataExplorer.spikes_df[pf_only_spike_is_included]
+
+            ## Add column to the spikes_df that indicates whether that spike is included in the placefield calculations or filtered out:
+            self._spikes_df['is_pf_included'] = pf_only_spike_is_included
+            
+            
+        
+
+
+
+
+
     def _setup_visualization(self): 
         self.params.debug_disable_all_gui_controls = True       
         self.params.enable_placefield_aligned_spikes = True # If True, the spikes are aligned to the z-position of their respective place field, so they visually sit on top of the placefield surface
@@ -168,9 +189,7 @@ class InteractivePlaceCellTuningCurvesDataExplorer(OccupancyPlottingMixin, Place
         # UPDATE: there has to be, as np.shape(ipcDataExplorer.params.pf_colors) # (4, 39)
         # 
         # (39,)
-        
-        
-        
+            
         """
         
         
@@ -189,6 +208,9 @@ class InteractivePlaceCellTuningCurvesDataExplorer(OccupancyPlottingMixin, Place
         self.setup_spike_rendering_mixin()
         self.build_tuning_curve_configs()
         self.setup_occupancy_plotting_mixin()
+        
+        
+
     
 
     def set_background(self, background):
@@ -209,6 +231,17 @@ class InteractivePlaceCellTuningCurvesDataExplorer(OccupancyPlottingMixin, Place
             raise NotImplementedError        
                 
         self.p.set_background(self.params.active_plotter_background_gradient[0], top=self.params.active_plotter_background_gradient[1])
+        
+        
+    def update_include_only_placefield_spikes(self):
+        ## Once all the mixins are done, set the properties for the non-pf spikes:
+        # Currently makes them a near-black color, but they are too visually bold:
+        self._spikes_df.loc[~self._spikes_df['is_pf_included'], 'R'] = 0.1
+        self._spikes_df.loc[~self._spikes_df['is_pf_included'], 'G'] = 0.1
+        self._spikes_df.loc[~self._spikes_df['is_pf_included'], 'B'] = 0.1
+        self._spikes_df.loc[~self._spikes_df['is_pf_included'], 'render_opacity'] = 0.0 # Render opacity other than zero doesn't seem to work on linux at least
+        ## Call update_spikes() to render the changes:
+        self.update_spikes()
         
         
 
@@ -259,7 +292,7 @@ class InteractivePlaceCellTuningCurvesDataExplorer(OccupancyPlottingMixin, Place
         # # Apply configs on startup:
         # # Update the ipcDataExplorer's colors for spikes and placefields from its configs on init:
         # self.on_config_update({neuron_id:a_config.color for neuron_id, a_config in self.active_neuron_render_configs_map.items()}, defer_update=False)
-
+        self.update_include_only_placefield_spikes()
 
         return self.p
     

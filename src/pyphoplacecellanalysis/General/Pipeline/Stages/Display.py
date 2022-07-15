@@ -156,6 +156,7 @@ class DefaultRegisteredDisplayFunctions:
             for (a_display_fn_name, a_display_fn) in a_display_class.get_all_functions(use_definition_order=False):
                 self.register_display_function(a_display_fn_name, a_display_fn)
         
+    
   
 
 class PipelineWithDisplayPipelineStageMixin:
