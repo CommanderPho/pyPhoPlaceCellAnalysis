@@ -21,7 +21,8 @@ from pyphoplacecellanalysis.GUI.PyVista.InteractivePlotter.PhoInteractivePlotter
 # from pyphoplacecellanalysis.PhoPositionalData.plotting.mixins.general_plotting_mixins
 from pyphoplacecellanalysis.PhoPositionalData.plotting.mixins.occupancy_plotting_mixins import OccupancyPlottingMixin
 from pyphoplacecellanalysis.PhoPositionalData.plotting.mixins.placefield_plotting_mixins import HideShowPlacefieldsRenderingMixin, PlacefieldRenderingPyVistaMixin
-from pyphoplacecellanalysis.PhoPositionalData.plotting.mixins.spikes_mixins import SpikesDataframeOwningFromSessionMixin, SpikeRenderingPyVistaMixin, HideShowSpikeRenderingMixin
+from pyphoplacecellanalysis.General.Mixins.SpikesRenderingBaseMixin import SpikesDataframeOwningMixin # replaced SpikesDataframeOwningFromSessionMixin, not sure how much the session is actually used for now.
+from pyphoplacecellanalysis.PhoPositionalData.plotting.mixins.spikes_mixins import SpikeRenderingPyVistaMixin, HideShowSpikeRenderingMixin, SpikesDataframeOwningFromSessionMixin
 
 from pyphoplacecellanalysis.PhoPositionalData.plotting.gui import CallbackSequence, SetVisibilityCallback, MutuallyExclusiveRadioButtonGroup, add_placemap_toggle_checkboxes, add_placemap_toggle_mutually_exclusive_checkboxes
 
@@ -33,10 +34,17 @@ from pyphoplacecellanalysis.PhoPositionalData.plotting.spikeAndPositions import 
 from pyphoplacecellanalysis.GUI.PyVista.InteractivePlotter.InteractiveDataExplorerBase import InteractiveDataExplorerBase
 
 
-# needs perform_plot_flat_arena
-class InteractivePlaceCellTuningCurvesDataExplorer(OccupancyPlottingMixin, PlacefieldRenderingPyVistaMixin, HideShowPlacefieldsRenderingMixin, SpikesDataframeOwningFromSessionMixin, SpikeRenderingPyVistaMixin, HideShowSpikeRenderingMixin, InteractiveDataExplorerBase): 
+# SpikesDataframeOwningFromSessionMixin
+class InteractivePlaceCellTuningCurvesDataExplorer(OccupancyPlottingMixin, PlacefieldRenderingPyVistaMixin, HideShowPlacefieldsRenderingMixin, SpikesDataframeOwningMixin, SpikeRenderingPyVistaMixin, HideShowSpikeRenderingMixin, InteractiveDataExplorerBase): 
     """ This 3D Vedo GUI displays a map of the animal's environment alongside the computed placefield results (visualizing them as 2D surfaces overlaying the maze) and the neural spiking data that they were produced from.
         - Does not aim to be animated in time, instead easily configurable to show the user whatever they'd like to look at.
+        
+        
+        TODO: note that this takes an active_session but placefields are only shown for a given epoch! Many of the things that would access the active_session run the risk of being incorrect for the placecells, like the spikes? I guess if its passed the filtered_session for this epoch (which it should be) at least the time frame will be right.
+        
+        TODO: see where self.active_session is used. Hopefully it's only in _setup_variables? But it is set as an instance property, so that isn't good.
+        
+        
     """
     show_legend = True
 
@@ -47,6 +55,9 @@ class InteractivePlaceCellTuningCurvesDataExplorer(OccupancyPlottingMixin, Place
         self.params.pf_colors_hex = None
         self.params.pf_active_configs = None
         self.ui = PhoUIContainer()
+        
+        # self._spikes_df = active_session.spikes_df[np.isin(active_session.spikes_df.flat_spike_idx, active_epoch_placefields.filtered_spikes_df.flat_spike_idx.to_numpy())].copy()
+        self._spikes_df = deepcopy(active_session.spikes_df)
         
         if kwargs.get('should_nan_non_visited_elements', None) is not None:
             self.params.should_nan_non_visited_elements = kwargs['should_nan_non_visited_elements']
@@ -74,6 +85,12 @@ class InteractivePlaceCellTuningCurvesDataExplorer(OccupancyPlottingMixin, Place
         return self.params.cell_ids
         # return self.active_session.neurons.neuron_ids
             
+    @property
+    def spikes_df(self):
+        """IMPORTANT: Need to override the spikes_df from the mixin because we only want the filtered spikes used to compute the placefields, not all of them."""
+        return self._spikes_df
+        # return self.active_session.spikes_df[np.isin(self.active_session.spikes_df.flat_spike_idx, self.params.active_epoch_placefields.filtered_spikes_df.flat_spike_idx.to_numpy())]
+    
     
     def _setup_variables(self):
         num_cells, spike_list, self.params.cell_ids, self.params.flattened_spike_identities, self.params.flattened_spike_times, flattened_sort_indicies, t_start, self.params.reverse_cellID_idx_lookup_map, t, x, y, linear_pos, speeds, self.params.flattened_spike_positions_list = InteractiveDataExplorerBase._unpack_variables(self.active_session)
@@ -110,16 +127,16 @@ class InteractivePlaceCellTuningCurvesDataExplorer(OccupancyPlottingMixin, Place
         ## Ensure we have the 'fragile_linear_neuron_IDX' property
         if self.use_fragile_linear_neuron_IDX_as_cell_id:
             try:
-                test = self.active_session.spikes_df['fragile_linear_neuron_IDX']
+                test = self.spikes_df['fragile_linear_neuron_IDX']
             except KeyError as e:
                 ## Rebuild the IDXs and add the valid key:
-                self.active_session.spikes_df.spikes._obj, neuron_id_to_new_IDX_map_new_method = self.active_session.spikes_df.spikes.rebuild_fragile_linear_neuron_IDXs(debug_print=True)
+                self.spikes_df.spikes._obj, neuron_id_to_new_IDX_map_new_method = self.spikes_df.spikes.rebuild_fragile_linear_neuron_IDXs(debug_print=True)
                 print(f'neuron_id_to_new_IDX_map_new_method: {neuron_id_to_new_IDX_map_new_method}')
         
                 ## OBSERVATION: This map is invalid once things are removed until it is rebuilt, which is why the 'fragile_linear_neuron_IDX' column was coming in all messed-up.
-                # self.active_session.spikes_df['fragile_linear_neuron_IDX'] = np.array([int(self.active_session.neurons.reverse_cellID_index_map[original_cellID]) for original_cellID in self.active_session.spikes_df['aclu'].values])
+                # self.spikes_df['fragile_linear_neuron_IDX'] = np.array([int(self.active_session.neurons.reverse_cellID_index_map[original_cellID]) for original_cellID in self.spikes_df['aclu'].values])
         else:
-            assert ('aclu' in self.active_session.spikes_df.columns), "self.active_session.spikes_df must contain the 'aclu' column! Something is wrong!"     
+            assert ('aclu' in self.spikes_df.columns), "self.spikes_df must contain the 'aclu' column! Something is wrong!"     
 
 
     def _setup_visualization(self): 
@@ -212,7 +229,7 @@ class InteractivePlaceCellTuningCurvesDataExplorer(OccupancyPlottingMixin, Place
         self._hide_all_tuning_curves()
         
         # active_spike_index = 4
-        # active_included_place_cell_spikes_indicies = self.active_session.spikes_df.eval('(fragile_linear_neuron_IDX == @active_spike_index)') # '@' prefix indicates a local variable. All other variables are evaluated as column names
+        # active_included_place_cell_spikes_indicies = self.spikes_df.eval('(fragile_linear_neuron_IDX == @active_spike_index)') # '@' prefix indicates a local variable. All other variables are evaluated as column names
         needs_render = self.plot_spikes()
 
         if needs_render:
@@ -291,14 +308,14 @@ class InteractivePlaceCellTuningCurvesDataExplorer(OccupancyPlottingMixin, Place
 
         # Attempt to set the spike heights:
         # Add a custom z override for the spikes but with the default value so nothing is changed:
-        self.active_session.spikes_df['z'] = np.full_like(self.active_session.spikes_df['x'].values, 1.1) # Offset a little bit in the z-direction so we can see it
+        self.spikes_df['z'] = np.full_like(self.spikes_df['x'].values, 1.1) # Offset a little bit in the z-direction so we can see it
 
         for i in np.arange(self.params.active_epoch_placefields.ratemap.n_neurons):
             curr_cell_id = self.params.active_epoch_placefields.cell_ids[i]
             # set the z values for the current cell index to the heights offset for that cell:
-            self.active_session.spikes_df.loc[(self.active_session.spikes_df.aclu == curr_cell_id), 'z'] = spike_pf_heights_2D[i] # Set the spike heights to the appropriate z value
+            self.spikes_df.loc[(self.spikes_df.aclu == curr_cell_id), 'z'] = spike_pf_heights_2D[i] # Set the spike heights to the appropriate z value
 
-        # when finished, self.active_session.spikes_df is modified with the updated 'z' values
+        # when finished, self.spikes_df is modified with the updated 'z' values
 
     ## Config Updating:
     def on_config_update(self, updated_colors_map, defer_update=False):

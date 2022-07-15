@@ -43,6 +43,7 @@ class SpikeRenderingPyVistaMixin(SpikeRenderingBaseMixin):
                 
         Known Uses:
             InteractivePlaceCellTuningCurvesDataExplorer
+            
     """
     debug_logging = True
     
@@ -118,31 +119,34 @@ class SpikeRenderingPyVistaMixin(SpikeRenderingBaseMixin):
 
 
 class HideShowSpikeRenderingMixin:
-    """ Implementors present spiking data with the option to hide/show/etc some of the outputs interactively. """    
+    """ Implementors present spiking data with the option to hide/show/etc some of the outputs interactively.
+    Usage:
+        Only used in InteractivePlaceCellTuningCurvesDataExplorer
+    """    
     debug_logging = True
         
     @property
     def spike_exclusion_mask(self):
         """The spike_exclusion_mask property."""
-        return self.active_session.spikes_df['render_exclusion_mask']
+        return self.spikes_df['render_exclusion_mask']
     @spike_exclusion_mask.setter
     def spike_exclusion_mask(self, value):
-        self.active_session.spikes_df['render_exclusion_mask'] = value    
+        self.spikes_df['render_exclusion_mask'] = value    
     
     def setup_hide_show_spike_rendering_mixin(self):
         """ 
-        # Adds columns to self.active_session.spikes_df:
+        # Adds columns to self.spikes_df:
             'render_opacity', 'render_exclusion_mask'
         """
-        self.active_session.spikes_df['render_opacity'] = 0.0 # Initialize all spikes to 0.0 opacity, meaning they won't be rendered.
-        self.active_session.spikes_df['render_exclusion_mask'] = False # all are included (not in the exclusion mask) to begin. This does not mean that they will be visible because 'render_opacity' is still set to zero.
+        self.spikes_df['render_opacity'] = 0.0 # Initialize all spikes to 0.0 opacity, meaning they won't be rendered.
+        self.spikes_df['render_exclusion_mask'] = False # all are included (not in the exclusion mask) to begin. This does not mean that they will be visible because 'render_opacity' is still set to zero.
         
     def update_active_spikes(self, spike_opacity_mask, is_additive=False):
         """ Main update callback function for visual changes. Updates the self.spikes_df.
         Usage: 
             included_cell_ids = [48, 61]
             
-            ipcDataExplorer.update_active_spikes(np.isin(ipcDataExplorer.active_session.spikes_df['aclu'], included_cell_ids)) # actives only the spikes that have aclu values (cell ids) in the included_cell_ids array.
+            ipcDataExplorer.update_active_spikes(np.isin(ipcDataExplorer.spikes_df['aclu'], included_cell_ids)) # actives only the spikes that have aclu values (cell ids) in the included_cell_ids array.
         """
         assert np.shape(self.spikes_df['render_opacity']) == np.shape(spike_opacity_mask), "spike_opacity_mask must have one value for every spike in self.spikes_df, specifying its opacity"
         print(f'update_active_spikes(spike_opacity_mask: ..., is_additive: {is_additive})')

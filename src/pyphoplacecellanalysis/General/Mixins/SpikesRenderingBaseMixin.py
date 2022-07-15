@@ -44,6 +44,8 @@ class SpikeRenderingBaseMixin:
         
     Used by:
         SpikeRasterBase (and all of its subclasses)
+        SpikeRenderingPyVistaMixin -> InteractivePlaceCellTuningCurvesDataExplorer
+        
         
     TODO: why does this seem to duplicate nearly all the functionality in DataSeriesColorHelpers???
         I think the answer is because this mixin existed first, and DataSeriesColorHelpers was created in an attempt to generalize and centralize this functionality. 
