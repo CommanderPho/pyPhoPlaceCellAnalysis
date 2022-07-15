@@ -58,14 +58,20 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
 
 
     @classmethod
-    def init_from_known_data_session_type(cls, type_name: str, known_type_properties: KnownDataSessionTypeProperties, override_basepath=None):
+    def init_from_known_data_session_type(cls, type_name: str, known_type_properties: KnownDataSessionTypeProperties, override_basepath=None, override_post_load_functions=None):
         """ Initializes a new pipeline from a known data session type (e.g. 'bapun' or 'kdiba', which loads some defaults) """
         if override_basepath is not None:
             basepath = override_basepath
         else:
             basepath = known_type_properties.basedir
+        if override_post_load_functions is not None:
+            post_load_functions = override_post_load_functions
+        else:
+            post_load_functions = known_type_properties.post_load_functions
+            
+            
         return cls(name=f'{type_name}_pipeline', session_data_type=type_name, basedir=basepath,
-            load_function=known_type_properties.load_function, post_load_functions=known_type_properties.post_load_functions)
+            load_function=known_type_properties.load_function, post_load_functions=post_load_functions)
 
 
     @property
