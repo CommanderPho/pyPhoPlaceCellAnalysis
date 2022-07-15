@@ -342,14 +342,14 @@ border-color: rgb(0, 0, 0);</string>
              </widget>
             </item>
             <item>
-             <widget class="QPushButton" name="pushButton">
+             <widget class="QPushButton" name="btnNonPlacefieldSpikes">
               <property name="text">
-               <string>PushButton</string>
+               <string>Non-Placefield Spikes</string>
               </property>
              </widget>
             </item>
             <item>
-             <widget class="QPushButton" name="pushButton_2">
+             <widget class="QPushButton" name="btnDebugTest">
               <property name="text">
                <string>PushButton</string>
               </property>

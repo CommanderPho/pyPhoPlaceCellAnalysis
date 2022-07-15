@@ -12,14 +12,6 @@ from matplotlib.colors import to_hex # required for QColor conversion to hex
 # from pyphoplacecellanalysis.GUI.Qt.PlacefieldVisualSelectionControlsBar.PlacefieldVisualSelectionControlsBarWidgetBase import Ui_rootForm # Generated file from .ui
 from Uic_AUTOGEN_PlacefieldVisualSelectionControlsBarWidgetBase import Ui_rootForm
 
-## IMPORTS:
-# import os
-# # from ...pyPhoPlaceCellAnalysis.src.pyphoplacecellanalysis.GUI.PyQtPlot.Windows import MainPipelineWindowWithDockArea
-# path = os.path.dirname(os.path.abspath(__file__))
-# # uiFile = os.path.join(path, 'MainPipelineWindow.ui')
-# uiFile = os.path.join(path, 'PlacefieldVisualSelectionControlsBarWidgetBase.ui') # mostly empty
-
-
 class PlacefieldVisualSelectionControlsBarWidget(QtWidgets.QWidget):
     """docstring for PlacefieldVisualSelectionControlsBarWidget."""
  
@@ -38,11 +30,10 @@ class PlacefieldVisualSelectionControlsBarWidget(QtWidgets.QWidget):
     
     def __init__(self, *args, parent=None, **kwargs):
         super(PlacefieldVisualSelectionControlsBarWidget, self).__init__(*args, parent=parent, **kwargs)
+        #Load the UI:
         self.ui = Ui_rootForm()
         self.ui.setupUi(self) # builds the design from the .ui onto this widget.
         
-        #Load the UI Page
-        # uic.loadUi(uiFile, self) # load from the ui file
         self.desired_full_panel_width = PlacefieldVisualSelectionControlsBarWidget.desired_full_panel_width
         self.desired_full_panel_height = PlacefieldVisualSelectionControlsBarWidget.desired_full_panel_height
         
