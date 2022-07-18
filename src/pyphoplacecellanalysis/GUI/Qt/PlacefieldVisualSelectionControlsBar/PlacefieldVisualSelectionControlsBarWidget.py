@@ -10,7 +10,10 @@ from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtCore, QtGui, QtWidget
 from matplotlib.colors import to_hex # required for QColor conversion to hex
 
 # from pyphoplacecellanalysis.GUI.Qt.PlacefieldVisualSelectionControlsBar.PlacefieldVisualSelectionControlsBarWidgetBase import Ui_rootForm # Generated file from .ui
-from Uic_AUTOGEN_PlacefieldVisualSelectionControlsBarWidgetBase import Ui_rootForm
+# from Uic_AUTOGEN_PlacefieldVisualSelectionControlsBarWidgetBase import Ui_rootForm
+from pyphoplacecellanalysis.GUI.Qt.PlacefieldVisualSelectionControlsBar.Uic_AUTOGEN_PlacefieldVisualSelectionControlsBarWidgetBase import Ui_rootForm
+
+
 
 class PlacefieldVisualSelectionControlsBarWidget(QtWidgets.QWidget):
     """docstring for PlacefieldVisualSelectionControlsBarWidget."""

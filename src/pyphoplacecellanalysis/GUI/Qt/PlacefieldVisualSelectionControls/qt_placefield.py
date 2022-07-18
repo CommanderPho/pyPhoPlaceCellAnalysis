@@ -334,7 +334,6 @@ def build_all_placefield_output_panels(ipcDataExplorer):
         curr_widget.tuning_curve_display_config_changed.connect(_on_tuning_curve_display_config_changed)
         curr_widget.sig_neuron_color_changed.connect(_on_neuron_color_display_config_changed)
         
-        
         pf_layout.addWidget(curr_widget)
         # pf_widgets.append(curr_widget)
         rootControlsBarWidget.ui.pf_widgets.append(curr_widget)
