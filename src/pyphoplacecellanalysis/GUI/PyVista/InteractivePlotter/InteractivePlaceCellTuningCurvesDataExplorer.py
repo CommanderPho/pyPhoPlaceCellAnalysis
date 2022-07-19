@@ -225,8 +225,34 @@ class InteractivePlaceCellTuningCurvesDataExplorer(OccupancyPlottingMixin, Place
         self.build_tuning_curve_configs()
         self.setup_occupancy_plotting_mixin()
         
+    
+    ### Overriden from HideShowPlacefieldsRenderingMixin    
+    def update_active_spikes(self, spike_opacity_mask, is_additive=False):
+        """ Overriden from HideShowPlacefieldsRenderingMixin    
+        Main update callback function for visual changes. Updates the self.spikes_df.
         
-
+        Inputs:
+            spike_opacity_mask: 
+            is_additive:bool : if True, the opacity values in spike_opacity_mask are added to the existing opacity values and then the updated opacities are clipped to [0.0, 1.0]. If False, these values are set as opacities directly.
+        Usage: 
+            included_cell_ids = [48, 61]
+            
+            ipcDataExplorer.update_active_spikes(np.isin(ipcDataExplorer.spikes_df['aclu'], included_cell_ids)) # actives only the spikes that have aclu values (cell ids) in the included_cell_ids array.
+        """
+        assert np.shape(self.spikes_df['render_opacity']) == np.shape(spike_opacity_mask), "spike_opacity_mask must have one value for every spike in self.spikes_df, specifying its opacity"        
+        if is_additive:
+            # use the 'out' argument to re-assign it to the self.spikes_df['render_opacity'] array in-place:
+            self.spikes_df['render_opacity'] = np.clip((self.spikes_df['render_opacity'] + spike_opacity_mask), 0.0, 1.0)
+            # self.spikes_df['render_opacity'] = np.clip((self.spikes_df['render_opacity'] + spike_opacity_mask), 0.0, 1.0, self.spikes_df['render_opacity'])
+        else:
+            self.spikes_df['render_opacity'] = spike_opacity_mask
+            
+        # Before updating spikes, impose the show/hide constraints for the non_pf spikes:
+        if not self.params.get('should_display_non_pf_spikes', False):
+            ## Hide all non_pf spikes:
+            self._spikes_df.loc[~self._spikes_df['is_pf_included'], 'render_opacity'] = 0.0 # TODO: Render opacity other than zero doesn't seem to work on linux at least
+        # Otherwise just doing the normal update should suffice:
+        self.update_spikes()
     
 
     def set_background(self, background):
@@ -252,14 +278,15 @@ class InteractivePlaceCellTuningCurvesDataExplorer(OccupancyPlottingMixin, Place
         
     def update_include_only_placefield_spikes(self):
         ## Once all the mixins are done, set the properties for the non-pf spikes:
-        # Currently makes them a near-black color, but they are too visually bold:
-        self._spikes_df.loc[~self._spikes_df['is_pf_included'], 'R'] = 0.1
-        self._spikes_df.loc[~self._spikes_df['is_pf_included'], 'G'] = 0.1
-        self._spikes_df.loc[~self._spikes_df['is_pf_included'], 'B'] = 0.1
-        self._spikes_df.loc[~self._spikes_df['is_pf_included'], 'render_opacity'] = 0.0 # Render opacity other than zero doesn't seem to work on linux at least
-        ## Call update_spikes() to render the changes:
-        self.update_spikes()
-        
+        if not self.params.get('should_display_non_pf_spikes', False):
+            # Currently makes them a near-black color, but they are too visually bold:
+            # self._spikes_df.loc[~self._spikes_df['is_pf_included'], 'R'] = 0.1
+            # self._spikes_df.loc[~self._spikes_df['is_pf_included'], 'G'] = 0.1
+            # self._spikes_df.loc[~self._spikes_df['is_pf_included'], 'B'] = 0.1
+            self._spikes_df.loc[~self._spikes_df['is_pf_included'], 'render_opacity'] = 0.0 # Render opacity other than zero doesn't seem to work on linux at least
+            ## Call update_spikes() to render the changes:
+            self.update_spikes()
+            
         
 
     def plot(self, pActivePlotter=None):

@@ -145,6 +145,8 @@ class HideShowSpikeRenderingMixin:
         self.spikes_df['render_opacity'] = 0.0 # Initialize all spikes to 0.0 opacity, meaning they won't be rendered.
         self.spikes_df['render_exclusion_mask'] = False # all are included (not in the exclusion mask) to begin. This does not mean that they will be visible because 'render_opacity' is still set to zero.
         
+        
+    # General spike masking functions ____________________________________________________________________________________ #
     def update_active_spikes(self, spike_opacity_mask, is_additive=False):
         """ Main update callback function for visual changes. Updates the self.spikes_df.
         
@@ -168,6 +170,27 @@ class HideShowSpikeRenderingMixin:
             self.spikes_df['render_opacity'] = spike_opacity_mask
         self.update_spikes()
             
+            
+    def change_spike_rows_included(self, row_specifier_mask, are_included):
+        """change_spike_rows_included presents an IDX vs. ID agnostic interface with the self.spikes_df to allow the bulk of the code to work for both cases.
+
+        Args:
+            row_specifier_mask ([type]): the boolean mask indentifying rows of the dataframe.
+            are_included ([type]): [description]
+        """
+        if are_included:
+            self.update_active_spikes(row_specifier_mask, is_additive=True)
+        else:
+            # in remove mode, make the passed values negative and again specify is_additive=True mode:
+            remove_opacity_specifier = row_specifier_mask # gets the only spikes that are included in the cell_ids
+            remove_opacity = np.zeros(np.shape(remove_opacity_specifier))
+            remove_opacity[remove_opacity_specifier] = -1 # set to negative one, to ensure that regardless of the current opacity the clipped opacity will be removed (set to 0.0) for these items
+            self.update_active_spikes(remove_opacity, is_additive=True)
+            
+            
+            
+            
+    # Cell/Neuron spikes masking helpers _________________________________________________________________________________ #
     def change_unit_spikes_included(self, neuron_IDXs=None, cell_IDs=None, are_included=True):
         """ Called to update the set of visible spikes for specified cell indicies or IDs
         Args:
@@ -214,7 +237,6 @@ class HideShowSpikeRenderingMixin:
         # self.update_neuron_render_configs(config_IDXs, updated_configs) # TODO: previously was self.update_neuron_render_configs(config_IDXs, updated_configs) but had to change to self.update_neuron_render_configs_from_indicies(config_IDXs, updated_configs)
         self.update_neuron_render_configs_from_indicies(config_IDXs, updated_configs) # update the config with the new values:
         
-
     def clear_all_spikes_included(self):
         # removes all spikes from inclusion
         if self.debug_logging:
@@ -224,23 +246,6 @@ class HideShowSpikeRenderingMixin:
         self.change_unit_spikes_included(cell_IDs=self.tuning_curves_valid_neuron_ids, are_included=False)
            
 
-    def change_spike_rows_included(self, row_specifier_mask, are_included):
-        """change_spike_rows_included presents an IDX vs. ID agnostic interface with the self.spikes_df to allow the bulk of the code to work for both cases.
-
-        Args:
-            row_specifier_mask ([type]): the boolean mask indentifying rows of the dataframe.
-            are_included ([type]): [description]
-        """
-        if are_included:
-            self.update_active_spikes(row_specifier_mask, is_additive=True)
-        else:
-            # in remove mode, make the passed values negative and again specify is_additive=True mode:
-            remove_opacity_specifier = row_specifier_mask # gets the only spikes that are included in the cell_ids
-            remove_opacity = np.zeros(np.shape(remove_opacity_specifier))
-            remove_opacity[remove_opacity_specifier] = -1 # set to negative one, to ensure that regardless of the current opacity the clipped opacity will be removed (set to 0.0) for these items
-            self.update_active_spikes(remove_opacity, is_additive=True)
-        
-        
     def mask_spikes_from_render(self, excluded_cell_ids):
         self.spike_exclusion_mask[np.isin(self.spikes_df['aclu'], excluded_cell_ids)] = True
         self.update_spikes()

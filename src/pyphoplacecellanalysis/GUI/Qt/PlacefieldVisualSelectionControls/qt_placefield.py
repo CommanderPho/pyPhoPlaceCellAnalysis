@@ -203,6 +203,7 @@ def build_batch_interactive_placefield_visibility_controls(rootControlsBarWidget
             print('EndButtonPanel._btn_toggle_occupancy_callback(...)')
         occupancy_button_checked_state_is_checked = rootControlsBarWidget.ui.btnToggleOccupancy.isChecked()
         ipcDataExplorer.occupancy_plotting_config.isVisible = occupancy_button_checked_state_is_checked # Set the occupancy_plotting_config.isVisible property to the updated is_checked state
+        ipcDataExplorer.p.render()
 
     ## Setup btnNonPlacefieldSpikes:
     def _btn_toggle_pf_only_spikes():
@@ -216,7 +217,7 @@ def build_batch_interactive_placefield_visibility_controls(rootControlsBarWidget
         non_pf_spikes_button_checked_state_is_checked = rootControlsBarWidget.ui.btnNonPlacefieldSpikes.isChecked()
         ipcDataExplorer.params.should_display_non_pf_spikes = non_pf_spikes_button_checked_state_is_checked # Set the params.should_display_non_pf_spikes property to the updated is_checked state
         ipcDataExplorer.update_spikes() # call update spikes on value change to render the updated spikes    
-
+        ipcDataExplorer.p.render()
 
 
     def _btn_perform_refresh_callback():
@@ -225,7 +226,7 @@ def build_batch_interactive_placefield_visibility_controls(rootControlsBarWidget
 
         ## TODO: perform update
         ipcDataExplorer.update_spikes()
-        
+        ipcDataExplorer.p.render()
                 
         
     end_button_helper_obj = BatchActionsEndButtonPanelHelper(hide_all_callback=_btn_hide_all_callback, show_all_callback=_btn_show_all_callback)
