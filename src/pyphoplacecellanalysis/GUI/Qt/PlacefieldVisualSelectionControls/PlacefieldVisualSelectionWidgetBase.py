@@ -35,22 +35,45 @@ class Ui_rootForm(object):
         self.groupBox.setMinimumSize(QtCore.QSize(50, 0))
         self.groupBox.setMaximumSize(QtCore.QSize(160, 160))
         self.groupBox.setBaseSize(QtCore.QSize(50, 0))
+        self.groupBox.setStyleSheet("QToolButton {\n"
+"    color: rgb(244, 244, 244);\n"
+"}\n"
+"QToolButton:disabled {\n"
+"    color: gray;\n"
+"    background-color: gray;\n"
+"    border: 1px black;\n"
+"    border-style: outset;                \n"
+"}\n"
+"QToolButton:checked{\n"
+"    color: rgb(255, 170, 0); \n"
+"    font: bold;\n"
+"    border: 1px white;\n"
+"    border-style: outset;\n"
+"}\n"
+"QToolButton:!checked{\n"
+"    /*color: black; */\n"
+"    /*background-color: green;*/\n"
+"    /*border: 1px black;*/\n"
+"    /*border-style: outset;*/\n"
+"    /*border: 1px black;*/\n"
+"    /*border-style: dashed;*/\n"
+"}")
         self.groupBox.setAlignment(QtCore.Qt.AlignHCenter|QtCore.Qt.AlignTop)
         self.groupBox.setFlat(False)
         self.groupBox.setObjectName("groupBox")
-        self.verticalLayout_2 = QtWidgets.QVBoxLayout(self.groupBox)
-        self.verticalLayout_2.setContentsMargins(2, 0, 2, 4)
-        self.verticalLayout_2.setSpacing(2)
-        self.verticalLayout_2.setObjectName("verticalLayout_2")
+        self.verticalLayout = QtWidgets.QVBoxLayout(self.groupBox)
+        self.verticalLayout.setContentsMargins(2, 0, 2, 4)
+        self.verticalLayout.setSpacing(2)
+        self.verticalLayout.setObjectName("verticalLayout")
         self.btnTitle = QtWidgets.QPushButton(self.groupBox)
         self.btnTitle.setObjectName("btnTitle")
-        self.verticalLayout_2.addWidget(self.btnTitle)
+        self.verticalLayout.addWidget(self.btnTitle)
         self.btnColorButton = ColorButton(self.groupBox)
         self.btnColorButton.setEnabled(False)
         self.btnColorButton.setMinimumSize(QtCore.QSize(24, 24))
         self.btnColorButton.setText("")
         self.btnColorButton.setObjectName("btnColorButton")
-        self.verticalLayout_2.addWidget(self.btnColorButton)
+        self.verticalLayout.addWidget(self.btnColorButton)
         self.chkbtnPlacefield = QtWidgets.QToolButton(self.groupBox)
         self.chkbtnPlacefield.setMinimumSize(QtCore.QSize(48, 25))
         self.chkbtnPlacefield.setStyleSheet("QToolButton {\n"
@@ -87,7 +110,7 @@ class Ui_rootForm(object):
         self.chkbtnPlacefield.setPopupMode(QtWidgets.QToolButton.DelayedPopup)
         self.chkbtnPlacefield.setToolButtonStyle(QtCore.Qt.ToolButtonTextBesideIcon)
         self.chkbtnPlacefield.setObjectName("chkbtnPlacefield")
-        self.verticalLayout_2.addWidget(self.chkbtnPlacefield)
+        self.verticalLayout.addWidget(self.chkbtnPlacefield)
         self.chkbtnSpikes = QtWidgets.QToolButton(self.groupBox)
         self.chkbtnSpikes.setMinimumSize(QtCore.QSize(48, 25))
         self.chkbtnSpikes.setStyleSheet("QToolButton {\n"
@@ -124,15 +147,15 @@ class Ui_rootForm(object):
         self.chkbtnSpikes.setPopupMode(QtWidgets.QToolButton.DelayedPopup)
         self.chkbtnSpikes.setToolButtonStyle(QtCore.Qt.ToolButtonTextOnly)
         self.chkbtnSpikes.setObjectName("chkbtnSpikes")
-        self.verticalLayout_2.addWidget(self.chkbtnSpikes)
+        self.verticalLayout.addWidget(self.chkbtnSpikes)
         self.gridLayout.addWidget(self.groupBox, 0, 0, 1, 1)
 
         self.retranslateUi(rootForm)
         QtCore.QMetaObject.connectSlotsByName(rootForm)
-    
+
     def retranslateUi(self, rootForm):
         _translate = QtCore.QCoreApplication.translate
-        rootForm.setWindowTitle(_translate("rootForm", "Form"))
+        rootForm.setWindowTitle(_translate("rootForm", "Pf"))
         self.groupBox.setTitle(_translate("rootForm", "pf[i]"))
         self.btnTitle.setText(_translate("rootForm", "pf[i]"))
         self.chkbtnPlacefield.setText(_translate("rootForm", "pf"))

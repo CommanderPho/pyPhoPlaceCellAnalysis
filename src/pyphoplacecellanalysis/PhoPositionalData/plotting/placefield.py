@@ -237,7 +237,12 @@ def _force_plot_ignore_scalar_as_color(plot_mesh_actor, lookup_table):
 
 # Public _____________________________________________________________________________________________________________ #
 def plot_placefields2D(pTuningCurves, active_placefields, pf_colors: np.ndarray, zScalingFactor=10.0, show_legend=False, enable_debug_print=False, **kwargs):
-    """ Plots 2D (as opposed to linearized/1D) Placefields in a 3D PyVista plot """
+    """ Plots 2D (as opposed to linearized/1D) Placefields in a 3D PyVista plot
+    
+    Known Usages:
+        placefield_plotting_mixins.PlacefieldRenderingPyVistaMixin.plot_placefields()
+        
+    """
 # active_placefields: Pf2D    
 
     params = ({'should_use_normalized_tuning_curves':True, # Default True
@@ -421,11 +426,11 @@ Inputs:
         _force_plot_ignore_scalar_as_color(pdata_currActiveNeuronTuningCurve_plotActor, tuningCurvePlotData[neuron_id]['lut'])
     
     ## Set color of the edges on the placefield surface (edge_color)
-        pdata_currActiveNeuronTuningCurve_plotActor.GetProperty().SetEdgeColor(rgb_color)
+        pdata_currActiveNeuronTuningCurve_plotActor.GetProperty().SetEdgeColor(rgb_color) # note no-opacity in setting the edge colors
     
     # set the color of the points on the placefield surface:
         pdata_currActiveNeuronTuningCurve_Points_plotActor = tuningCurvePlotActors[neuron_id]['points']
-        pdata_currActiveNeuronTuningCurve_Points_plotActor.GetProperty().SetColor(rgb_color)
+        pdata_currActiveNeuronTuningCurve_Points_plotActor.GetProperty().SetColor(rgb_color) # note no-opacity in setting the points colors
     
 def update_plotVisiblePlacefields2D(tuningCurvePlotActors, isTuningCurveVisible):
 # Updates the visible placefields. Complements plot_placefields2D

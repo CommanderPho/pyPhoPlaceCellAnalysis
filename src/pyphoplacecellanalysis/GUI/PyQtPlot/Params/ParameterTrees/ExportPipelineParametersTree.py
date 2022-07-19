@@ -6,7 +6,18 @@ from pyphoplacecellanalysis.General.Mixins.ExportHelpers import get_default_pipe
 """ ExportPipelineParametersTree
 Usage:
     from pyphoplacecellanalysis.GUI.PyQtPlot.Params.ParameterTrees.ExportPipelineParametersTree import build_export_parameters_tree
+    
+    ## Build the actual ParameterTree widget, the core GUI
+    title = 'ExportParamsTest'
+    app = pg.mkQApp(title)
     p = build_export_parameters_tree(curr_active_pipeline, parameter_names='ExportParams', finalized_output_cache_file='data/pipeline_cache_store.h5', include_state_save_restore_buttons=False, debug_print=True)
+
+    paramTree = ParameterTree()
+    paramTree.setParameters(p, showTop=False)
+    paramTree.show()
+    paramTree.setWindowTitle(f'PhoParamTreeApp: pyqtgraph ParameterTree: {title}')
+    paramTree.resize(800,600)
+    
 
 """
 

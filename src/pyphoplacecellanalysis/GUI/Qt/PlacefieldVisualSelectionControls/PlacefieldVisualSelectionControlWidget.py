@@ -220,6 +220,51 @@ class PlacefieldVisualSelectionWidget(QtWidgets.QWidget):
         return SingleNeuronPlottingExtended(name=self.name, isVisible=self.isVisible, color=color_hex_str, spikesVisible=self.spikesVisible)
         
 
+    def add_ui_push_button(self, name):
+        button_name = f'btn{name}'
+        btnNew = QtWidgets.QPushButton(self.groupBox)
+        btnNew.setText(_translate("rootForm", "pf[i]"))
+        btnNew.setObjectName(button_name)
+        self.verticalLayout.addWidget(btnNew)
+        
+        return btnNew
+
+    # def add_ui_color_button(self):
+    #     btnNewColorButton = ColorButton(self.groupBox)
+    #     btnNewColorButton.setEnabled(False)
+    #     btnNewColorButton.setMinimumSize(QtCore.QSize(24, 24))
+    #     btnNewColorButton.setText("")
+    #     btnNewColorButton.setObjectName("btnColorButton")
+    #     self.verticalLayout.addWidget(btnNewColorButton)
+    #     return btnNewColorButton
+    
+    @classmethod
+    def build_ui_toggle_button(cls, name='chkbtnNewButton', text='spikes', parent=None):
+        """ 
+        Builds a simple new toggle button widget
+        
+        chkbtnNewButton = self.build_ui_toggle_button(name=name, text=text, parent=self.groupBox)
+        self.verticalLayout.addWidget(chkbtnNewButton)
+        
+        """
+        chkbtnNewButton = QtWidgets.QToolButton(parent)
+        chkbtnNewButton.setMinimumSize(QtCore.QSize(48, 25))
+        chkbtnNewButton.setStyleSheet(cls.css_toolButton())
+        chkbtnNewButton.setCheckable(True)
+        chkbtnNewButton.setPopupMode(QtWidgets.QToolButton.DelayedPopup)
+        chkbtnNewButton.setToolButtonStyle(QtCore.Qt.ToolButtonTextBesideIcon)
+        chkbtnNewButton.setText(text)
+        chkbtnNewButton.setObjectName(name)
+        return chkbtnNewButton
+        
+    def add_ui_toggle_button(self, name='chkbtnNewButton', text='spikes'):
+        """ adds a simple toggle chkbtn """
+        # chkbtnNewButton = QtWidgets.QToolButton(self.groupBox)
+        chkbtnNewButton = self.build_ui_toggle_button(name=name, text=text, parent=self.groupBox)
+        self.verticalLayout.addWidget(chkbtnNewButton)
+        return chkbtnNewButton
+        
+    
     @staticmethod
     def css_pushButton():
         css = '''

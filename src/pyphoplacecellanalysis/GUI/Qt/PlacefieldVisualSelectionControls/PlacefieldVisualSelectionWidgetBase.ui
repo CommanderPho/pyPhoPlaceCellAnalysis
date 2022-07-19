@@ -75,6 +75,31 @@ border-color: rgb(0, 0, 0);</string>
        <height>0</height>
       </size>
      </property>
+     <property name="styleSheet">
+      <string notr="true">QToolButton {
+    color: rgb(244, 244, 244);
+}
+QToolButton:disabled {
+    color: gray;
+    background-color: gray;
+    border: 1px black;
+    border-style: outset;                
+}
+QToolButton:checked{
+    color: rgb(255, 170, 0); 
+    font: bold;
+    border: 1px white;
+    border-style: outset;
+}
+QToolButton:!checked{
+    /*color: black; */
+    /*background-color: green;*/
+    /*border: 1px black;*/
+    /*border-style: outset;*/
+	/*border: 1px black;*/
+    /*border-style: dashed;*/
+}</string>
+     </property>
      <property name="title">
       <string>pf[i]</string>
      </property>
@@ -84,7 +109,7 @@ border-color: rgb(0, 0, 0);</string>
      <property name="flat">
       <bool>false</bool>
      </property>
-     <layout class="QVBoxLayout" name="verticalLayout_2">
+     <layout class="QVBoxLayout" name="verticalLayout">
       <property name="spacing">
        <number>2</number>
       </property>

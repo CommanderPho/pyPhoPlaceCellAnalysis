@@ -86,6 +86,10 @@ class PlacefieldRenderingPyVistaMixin:
             self.params.unit_labels
             self.params.pf_fragile_linear_neuron_IDXs
             ... More?
+            
+            
+    Known Uses:
+        InteractivePlaceCellTuningCurvesDataExplorer
     """
     def plot_placefields(self):
         """This is the main plot function to render the placefields        
@@ -123,6 +127,9 @@ class HideShowPlacefieldsRenderingMixin(PlacefieldOwningMixin):
     
         From PlacefieldOwningMixin:
             self.active_tuning_curve_render_configs
+            
+    Known Uses:
+        InteractivePlaceCellTuningCurvesDataExplorer
     
     """
     debug_logging = False
