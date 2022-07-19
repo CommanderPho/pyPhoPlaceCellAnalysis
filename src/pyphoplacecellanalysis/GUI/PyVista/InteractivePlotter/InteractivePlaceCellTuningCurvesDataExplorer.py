@@ -44,7 +44,12 @@ class InteractivePlaceCellTuningCurvesDataExplorer(OccupancyPlottingMixin, Place
         
         TODO: see where self.active_session is used. Hopefully it's only in _setup_variables? But it is set as an instance property, so that isn't good.
         
-        
+        Function call order:
+            __init__
+            _setup()
+            _setup_variables()
+            _setup_visualization()
+            _setup_pyvista_theme()
     """
     show_legend = True
 
@@ -54,7 +59,7 @@ class InteractivePlaceCellTuningCurvesDataExplorer(OccupancyPlottingMixin, Place
         self.params.pf_colors = deepcopy(pf_colors)
         self.params.pf_colors_hex = None
         self.params.pf_active_configs = None
-        self.ui = PhoUIContainer()
+        # self.ui = PhoUIContainer() # should not over-write the parent's self.ui which is also a PhoUIContainer
         
         # self._spikes_df = active_session.spikes_df[np.isin(active_session.spikes_df.flat_spike_idx, active_epoch_placefields.filtered_spikes_df.flat_spike_idx.to_numpy())].copy()
         self._spikes_df = deepcopy(active_session.spikes_df)
@@ -67,7 +72,7 @@ class InteractivePlaceCellTuningCurvesDataExplorer(OccupancyPlottingMixin, Place
         
         self.use_fragile_linear_neuron_IDX_as_cell_id = False # if False, uses the normal 'aclu' value as the cell id (which I think is correct)
         
-        self._setup()
+        self._setup() # self._setup() -> self.setup_variables(), self.setup_visualization()
         
     # from NeuronIdentityAccessingMixin
     @property
@@ -160,14 +165,23 @@ class InteractivePlaceCellTuningCurvesDataExplorer(OccupancyPlottingMixin, Place
 
 
 
-    def _setup_visualization(self): 
+    def _setup_visualization(self):
+        """ called after self._setup_variables() as the 2nd stage of self._setup() """
+        
+        
+        ## Overrides:
         self.params.debug_disable_all_gui_controls = True       
         self.params.enable_placefield_aligned_spikes = True # If True, the spikes are aligned to the z-position of their respective place field, so they visually sit on top of the placefield surface
         # self.params.zScalingFactor = 10.0
-        self.params.setdefault('zScalingFactor', 3000.0)
+        # self.params.use_mutually_exclusive_placefield_checkboxes = True       
+        # self.params.show_legend = True
 
-        self.params.use_mutually_exclusive_placefield_checkboxes = True       
-        self.params.show_legend = True
+        
+        ## Defaults:
+        self.params.setdefault('zScalingFactor', 3000.0)
+        self.params.setdefault('use_mutually_exclusive_placefield_checkboxes', True)
+        self.params.setdefault('show_legend', True)
+
         
         # self.params.use_fragile_linear_neuron_IDX_slider_instead_of_checkboxes = True
         self.params.use_fragile_linear_neuron_IDX_slider_instead_of_checkboxes = False
@@ -214,6 +228,7 @@ class InteractivePlaceCellTuningCurvesDataExplorer(OccupancyPlottingMixin, Place
     
 
     def set_background(self, background):
+        """ TODO: refactor out into base class """
         if isinstance(background, str):
             self.params.active_plotter_background_gradient = self.params.plotter_backgrounds[background]
         elif isinstance(background, (tuple, list)):

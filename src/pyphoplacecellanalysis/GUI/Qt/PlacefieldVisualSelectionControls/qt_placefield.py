@@ -239,11 +239,9 @@ def build_all_placefield_output_panels(ipcDataExplorer):
         rootControlsBarWidget.ui.end_button_helper_obj
         rootControlsBarWidget.ui.end_button_helper_connections
         
-        
         self.ui.btnNonPlacefieldSpikes
         self.ui.btnToggleOccupancy
         
-    
     """ 
     ## UI Designer Version:    
     rootControlsBarWidget = PlacefieldVisualSelectionControlsBarWidget()
@@ -309,7 +307,6 @@ def build_all_placefield_output_panels(ipcDataExplorer):
         ipcDataExplorer.apply_tuning_curve_configs() # works (seemingly)
 
     ## Build the Placefield Control Widgets:
-    # pf_widgets = []
     rootControlsBarWidget.ui.pf_widgets = []
     valid_neuron_ids = ipcDataExplorer.tuning_curves_valid_neuron_ids
     for (idx, neuron_id) in enumerate(valid_neuron_ids):

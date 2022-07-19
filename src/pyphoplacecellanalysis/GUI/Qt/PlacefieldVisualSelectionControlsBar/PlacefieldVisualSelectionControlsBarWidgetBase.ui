@@ -315,6 +315,38 @@ border-color: rgb(0, 0, 0);</string>
          </item>
          <item>
           <widget class="QGroupBox" name="grpExtraPlots">
+           <property name="styleSheet">
+            <string notr="true">QPushButton {
+    /*background-color: green;*/
+    color: rgb(244, 244, 244);
+    /*border: 2px green;*/
+    /*border-radius: 22px;*/
+    /*border-style: outset;*/
+	/*border-style: inset;*/
+}
+QPushButton:disabled {
+    color: gray;
+    background-color: gray;
+    border: 1px black;
+    border-style: outset;                
+}
+QPushButton:checked{
+    color: rgb(255, 170, 0); 
+    /*font:  12px; */  
+    font: bold;
+    /*background-color: red;*/
+    border: 1px white;
+    border-style: outset;
+}
+QToolButton:!checked{
+    /*color: black; */
+    /*background-color: green;*/
+    /*border: 1px black;*/
+    /*border-style: outset;*/
+	/*border: 1px black;*/
+    /*border-style: dashed;*/
+}</string>
+           </property>
            <property name="title">
             <string>Extra Plots</string>
            </property>
@@ -339,6 +371,9 @@ border-color: rgb(0, 0, 0);</string>
               <property name="text">
                <string>Occupancy</string>
               </property>
+              <property name="checkable">
+               <bool>true</bool>
+              </property>
              </widget>
             </item>
             <item>
@@ -346,12 +381,21 @@ border-color: rgb(0, 0, 0);</string>
               <property name="text">
                <string>Non-Placefield Spikes</string>
               </property>
+              <property name="checkable">
+               <bool>true</bool>
+              </property>
+              <property name="checked">
+               <bool>true</bool>
+              </property>
              </widget>
             </item>
             <item>
              <widget class="QPushButton" name="btnDebugTest">
               <property name="text">
                <string>PushButton</string>
+              </property>
+              <property name="checkable">
+               <bool>true</bool>
               </property>
              </widget>
             </item>

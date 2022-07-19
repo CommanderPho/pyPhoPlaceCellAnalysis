@@ -6,8 +6,9 @@ from pyphoplacecellanalysis.PhoPositionalData.plotting.mixins.general_plotting_m
 
 
 class OccupancyPlottingConfig(BasePlotDataParams):
-    """ 
-    This class ues the 'param' library to observe changes to its members and perform corresponding updates to the class that holds it when they happen:
+    """ NOTE: Upon reviewing many different versions of my plotting implementations, this Param-based one is the most succinct and smooth.
+
+    This class uses the 'param' library to observe changes to its members and perform corresponding updates to the class that holds it when they happen:
     
     From  OccupancyPlottingMixin.setup_occupancy_plotting_mixin(self):
         # Setup watchers:    
@@ -30,7 +31,7 @@ class OccupancyPlottingConfig(BasePlotDataParams):
     # Overriding defaults from parent
     name = param.String(default='Occupancy')
     # name = param.Parameter(default='name', doc='The name of the placefield')
-    isVisible = param.Boolean(default=True, doc="Whether the plot is visible")
+    isVisible = param.Boolean(default=False, doc="Whether the plot is visible") # default to False
 
     # Bar properties:
     barOpacity = param.Number(default=0.75, bounds=(0.0, 1.0), step=0.1)
@@ -69,8 +70,6 @@ class OccupancyPlottingMixin:
         self.ratemap.ybin_centers
         self.plots
         self.p
-        
-        
         
         
     Provides:
@@ -145,7 +144,8 @@ class OccupancyPlottingMixin:
         if self.debug_logging:
             print(f'OccupancyPlottingMixin.plot_occupancy_bars(): config: {self.occupancy_plotting_config}')
             
-        self.plots['occupancyPlotActor'], self.plots_data['occupancyPlotData'] = self._perform_plot_occupancy_bars(self.occupancy_plotting_config.to_bars_plot_config_dict(), self.occupancy_plotting_config.to_labels_plot_config_dict())
+        self.plots['occupancyPlotActor'], self.plots_data['occupancyPlotData'] = self._perform_plot_occupancy_bars(self.occupancy_plotting_config.to_bars_plot_config_dict(),
+                                                                                                                   self.occupancy_plotting_config.to_labels_plot_config_dict())
         self.p.enable_depth_peeling() # this fixes bug where it appears transparent even when opacity is set to 1.00
         
     
