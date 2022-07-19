@@ -4,6 +4,7 @@
 @author: pho
 """
 import sys
+from warnings import warn
 import pyvista as pv
 import numpy as np
 import pandas as pd
@@ -93,6 +94,7 @@ def perform_plot_flat_arena(p, *args, z=-0.01, bShowSequenceTraversalGradient=Fa
 # Spikes                                                                                                               #
 # ==================================================================================================================== #
 
+# Modern (2022+) Functions: dataframe versions  __________________________________________________________________ #
 # dataframe version of the build_active_spikes_plot_pointdata(...) function
 def build_active_spikes_plot_pointdata_df(active_flat_df: pd.DataFrame, enable_debug_print=False):
     """Builds the pv.PolyData pointcloud from the spikes dataframe points.
@@ -107,10 +109,17 @@ def build_active_spikes_plot_pointdata_df(active_flat_df: pd.DataFrame, enable_d
         # use custom override z-values
         print('build_active_spikes_plot_pointdata_df(...): Found custom z column! Using Data!!')
         assert np.shape(active_flat_df['z']) == np.shape(active_flat_df['x']), "custom z values must be the same shape as the x column"
-        spike_history_point_cloud = active_flat_df[['x','y','z']].to_numpy()
+        spike_history_point_cloud = active_flat_df[['x','y','z']].to_numpy()        
     else:
-        # no provided custom z value
-        active_flat_df['z_fixed'] = np.full_like(active_flat_df['x'].values, 1.1) # Offset a little bit in the z-direction so we can see it
+        # no provided custom z override value ...
+        if 'z_fixed' not in active_flat_df.columns:
+            # ... and no previously built 'z_fixed' column:
+            active_flat_df['z_fixed'] = np.full_like(active_flat_df['x'].values, 1.1) # Offset a little bit in the z-direction so we can see it
+        else:
+            # ... but has a previously built 'z_fixed' column:
+            assert np.shape(active_flat_df['z_fixed']) == np.shape(active_flat_df['x']), "previously built-z_fixed column must be the same shape as the x column! TODO: probably just rebuild!"
+            active_flat_df['z_fixed'] = np.full_like(active_flat_df['x'].values, 1.1) # Offset a little bit in the z-direction so we can see it
+        ## Now have a 'z_fixed' column, so use it:
         spike_history_point_cloud = active_flat_df[['x','y','z_fixed']].to_numpy()
         
     ## Old way:
@@ -121,7 +130,7 @@ def build_active_spikes_plot_pointdata_df(active_flat_df: pd.DataFrame, enable_d
         spike_history_pdata['render_opacity'] = active_flat_df['render_opacity'].values
         # alternative might be repeating 4 times along the second dimension for no reason.
     else:
-        print('no custom render_opacity set on dataframe.')
+        warn('WARNING: no custom render_opacity set on dataframe.')
         
     # rebuild the RGB data from the dataframe:
     if (np.isin(['R','G','B','render_opacity'], active_flat_df.columns).all()):
@@ -132,20 +141,26 @@ def build_active_spikes_plot_pointdata_df(active_flat_df: pd.DataFrame, enable_d
         if enable_debug_print:
             print('successfully set custom rgb key from separate R, G, B columns in dataframe.')
     else:
-        print('WARNING: DATAFRAME LACKS RGB VALUES!')
-
+        warn('WARNING: DATAFRAME LACKS RGB VALUES!')
     return spike_history_pdata
 
 # dataframe versions of the build_active_spikes_plot_data(...) function
 def build_active_spikes_plot_data_df(active_flat_df: pd.DataFrame, spike_geom, enable_debug_print=False):
-    """ 
+    """
     Usage:
         spike_history_pdata, spike_history_pc = build_active_spikes_plot_data_df(active_flat_df, spike_geom)
+
+    Known Uses:
+        SpikeRenderingPyVistaMixin.plot_spikes(...)
+        SpikeRenderingPyVistaMixin.update_spikes(...)
+            
     """
     spike_history_pdata = build_active_spikes_plot_pointdata_df(active_flat_df, enable_debug_print=enable_debug_print)
     spike_history_pc = spike_history_pdata.glyph(scale=False, geom=spike_geom.copy()) # create many glyphs from the point cloud
     return spike_history_pdata, spike_history_pc
 
+
+# Old Functions: compatability with pre 2021-11-28 implementations __________________________________________________________________ #
 ## compatability with pre 2021-11-28 implementations
 def build_active_spikes_plot_pointdata(active_flattened_spike_identities, active_flattened_spike_positions_list):
     # spike_series_times = active_flattened_spike_times # currently unused

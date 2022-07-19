@@ -29,7 +29,7 @@ from pyphoplacecellanalysis.PhoPositionalData.plotting.gui import CallbackSequen
 from pyphocorehelpers.gui.PyVista.PhoCustomVtkWidgets import PhoWidgetHelper
 from pyphocorehelpers.gui.PyVista.PhoCustomVtkWidgets import MultilineTextConsoleWidget
 
-from pyphoplacecellanalysis.PhoPositionalData.plotting.spikeAndPositions import build_active_spikes_plot_data, perform_plot_flat_arena, build_spike_spawn_effect_light_actor
+from pyphoplacecellanalysis.PhoPositionalData.plotting.spikeAndPositions import perform_plot_flat_arena
 #
 from pyphoplacecellanalysis.GUI.PyVista.InteractivePlotter.InteractiveDataExplorerBase import InteractiveDataExplorerBase
 
@@ -121,13 +121,11 @@ class InteractivePlaceCellTuningCurvesDataExplorer(OccupancyPlottingMixin, Place
         # self.params.reverse_cellID_idx_lookup_map # TODO: note that this is kidna wrong for placefields and should not be used.
         self.params.reverse_cellID_to_tuning_curve_idx_lookup_map = OrderedDict(zip(self.tuning_curves_valid_neuron_ids, self.tuning_curve_indicies)) # maps cell_ids to fragile_linear_neuron_IDXs
         # NOTE: note that the forward map cannot be built, because there's not a placefield for every self.cell_id (some cell_ids have an invalid placefield).
-        
-        
         ## TODO: need to watch out for any refereences to access active_session.neurons.*, as this still will have the invalid IDs. Could re-filter I suppose??
-        
         ## TODO: would need to rebuild: spikes_df['neuron_IDX'] as well, as these will be wrong after refresh and the lookup functions will thus be wrong as well.
-            
-            
+        
+        
+        
         
         ## Ensure we have the 'fragile_linear_neuron_IDX' property
         if self.use_fragile_linear_neuron_IDX_as_cell_id:
@@ -215,9 +213,13 @@ class InteractivePlaceCellTuningCurvesDataExplorer(OccupancyPlottingMixin, Place
             
         ## TODO: I'm not sure about this one, we might want to override pf_colors_hex, or this could be where the issues where it wasn't displaying the colors I passed in were coming from.
         # if not self.params.hasattr('pf_colors_hex'):
-        self.params.pf_colors_hex = [to_hex(self.params.pf_colors[:,i], keep_alpha=False) for i in self.tuning_curve_indicies]         
+        self.params.pf_colors_hex = [to_hex(self.params.pf_colors[:,i], keep_alpha=False) for i in self.tuning_curve_indicies]  ## TODO: where are these hex colors used, and is there an indexing issue here? (Confirm that self.tuning_curve_indicies is alsigned with self.params.pf_colors[:,i])
         # self.params.setdefault('active_plotter_background_gradient', self.params.plotter_backgrounds['Clouds (Apple-like white)'])
         self.params.setdefault('active_plotter_background_gradient', self.params.plotter_backgrounds['Deep Space (Dark)'])
+        
+        ## Spikes Rendering Options:
+        self.params.setdefault('should_display_non_pf_spikes', False) # Whether to include non-placefield spikes
+        
         
         self.setup_spike_rendering_mixin()
         self.build_tuning_curve_configs()

@@ -120,6 +120,10 @@ class SpikeRenderingPyVistaMixin(SpikeRenderingBaseMixin):
 
 class HideShowSpikeRenderingMixin:
     """ Implementors present spiking data with the option to hide/show/etc some of the outputs interactively.
+    
+    
+    Calls self.update_spikes() upon any updates to render the changes.
+    
     Usage:
         Only used in InteractivePlaceCellTuningCurvesDataExplorer
     """    
@@ -143,13 +147,19 @@ class HideShowSpikeRenderingMixin:
         
     def update_active_spikes(self, spike_opacity_mask, is_additive=False):
         """ Main update callback function for visual changes. Updates the self.spikes_df.
+        
+        
+        Inputs:
+            spike_opacity_mask: 
+            is_additive:bool : if True, the opacity values in spike_opacity_mask are added to the existing opacity values and then the updated opacities are clipped to [0.0, 1.0]. If False, these values are set as opacities directly.
         Usage: 
             included_cell_ids = [48, 61]
             
             ipcDataExplorer.update_active_spikes(np.isin(ipcDataExplorer.spikes_df['aclu'], included_cell_ids)) # actives only the spikes that have aclu values (cell ids) in the included_cell_ids array.
         """
         assert np.shape(self.spikes_df['render_opacity']) == np.shape(spike_opacity_mask), "spike_opacity_mask must have one value for every spike in self.spikes_df, specifying its opacity"
-        print(f'update_active_spikes(spike_opacity_mask: ..., is_additive: {is_additive})')
+        if self.debug_logging:
+            print(f'update_active_spikes(spike_opacity_mask: ..., is_additive: {is_additive})')
         if is_additive:
             # use the 'out' argument to re-assign it to the self.spikes_df['render_opacity'] array in-place:
             self.spikes_df['render_opacity'] = np.clip((self.spikes_df['render_opacity'] + spike_opacity_mask), 0.0, 1.0)
@@ -163,6 +173,9 @@ class HideShowSpikeRenderingMixin:
         Args:
             cell_ids ([type]): [description]
             are_included ([type]): [description]
+            
+            
+            Internally calls self.change_spike_rows_included(...)
         """
         assert (neuron_IDXs is not None) or (cell_IDs is not None), "You must specify either neuron_IDXs or cell_IDs, but not both"
         # TODO: could use the NeuronIdentityAccessingMixin helper class
@@ -221,10 +234,10 @@ class HideShowSpikeRenderingMixin:
         if are_included:
             self.update_active_spikes(row_specifier_mask, is_additive=True)
         else:
-            # in remove mode, make the values negative:
+            # in remove mode, make the passed values negative and again specify is_additive=True mode:
             remove_opacity_specifier = row_specifier_mask # gets the only spikes that are included in the cell_ids
             remove_opacity = np.zeros(np.shape(remove_opacity_specifier))
-            remove_opacity[remove_opacity_specifier] = -1 # set to negative one, to ensure that regardless of the current opacity the clipped opacity will be removed for these items
+            remove_opacity[remove_opacity_specifier] = -1 # set to negative one, to ensure that regardless of the current opacity the clipped opacity will be removed (set to 0.0) for these items
             self.update_active_spikes(remove_opacity, is_additive=True)
         
         

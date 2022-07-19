@@ -92,6 +92,8 @@ def build_batch_interactive_placefield_visibility_controls(rootControlsBarWidget
         Internally calls build_all_placefield_output_panels(...) to build the output panel widgets.
         
         
+        Performs updates by calling ipcDataExplorer.change_unit_spikes_included(...)
+        
     Args:
         ipcDataExplorer ([type]): [description]
 
@@ -128,7 +130,7 @@ def build_batch_interactive_placefield_visibility_controls(rootControlsBarWidget
             if debug_logging:
                 print(f'changed_neuron_ids: {changed_neuron_ids}')
             ipcDataExplorer.change_unit_spikes_included(cell_IDs=changed_neuron_ids, are_included=new_is_visible)
-            # ipcDataExplorer.change_unit_spikes_included(cell_IDs=self.tuning_curves_valid_neuron_ids, are_included=new_is_visible)
+            
 
     def _btn_hide_all_spikes_callback():
         if debug_logging:
@@ -178,35 +180,58 @@ def build_batch_interactive_placefield_visibility_controls(rootControlsBarWidget
     def _btn_hide_all_callback():
         if debug_logging:
             print('EndButtonPanel.btn_hide_all_callback(...)')
-        # ipcDataExplorer.clear_all_spikes_included()
-        # ipcDataExplorer.update_active_placefields([])
         _btn_hide_all_pfs_callback()
         _btn_hide_all_spikes_callback()
         
     def _btn_show_all_callback():
         if debug_logging:
             print('EndButtonPanel.btn_show_all_callback(...)')
-        # ipcDataExplorer._show_all_tuning_curves()
-        # ipcDataExplorer.update_active_placefields([])
         _btn_show_all_pfs_callback()
         _btn_show_all_spikes_callback()
 
-        
+    ################################################
+    ####### Misc Features callbacks
+
+    # Setup btnToggleOccupancy:
+    def _btn_toggle_occupancy_callback():
+        """ 
+        Implicitly captures: 
+            ipcDataExplorer
+            rootControlsBarWidget.ui.btnToggleOccupancy
+        """
+        if debug_logging:
+            print('EndButtonPanel._btn_toggle_occupancy_callback(...)')
+        occupancy_button_checked_state_is_checked = rootControlsBarWidget.ui.btnToggleOccupancy.isChecked()
+        ipcDataExplorer.occupancy_plotting_config.isVisible = occupancy_button_checked_state_is_checked # Set the occupancy_plotting_config.isVisible property to the updated is_checked state
+
+    ## Setup btnNonPlacefieldSpikes:
+    def _btn_toggle_pf_only_spikes():
+        """ 
+        Implicitly captures: 
+            ipcDataExplorer
+            rootControlsBarWidget.ui.btnNonPlacefieldSpikes
+        """
+        if debug_logging:
+            print('EndButtonPanel._btn_toggle_pf_only_spikes(...)')
+        non_pf_spikes_button_checked_state_is_checked = rootControlsBarWidget.ui.btnNonPlacefieldSpikes.isChecked()
+        ipcDataExplorer.params.should_display_non_pf_spikes = non_pf_spikes_button_checked_state_is_checked # Set the params.should_display_non_pf_spikes property to the updated is_checked state
+        ipcDataExplorer.update_spikes() # call update spikes on value change to render the updated spikes    
+
+
+
     def _btn_perform_refresh_callback():
         if debug_logging:
             print('EndButtonPanel._btn_perform_refesh_callback(...)')
 
         ## TODO: perform update
         ipcDataExplorer.update_spikes()
-        # ipcDataExplorer._show_all_tuning_curves()
-        # ipcDataExplorer.update_active_placefi        
         
                 
         
     end_button_helper_obj = BatchActionsEndButtonPanelHelper(hide_all_callback=_btn_hide_all_callback, show_all_callback=_btn_show_all_callback)
     
     btnShowAll_Pfs, btnShowAll_Spikes, btnShowAll_Both = rootControlsBarWidget.show_all_buttons_list
-    btnHideAll_Pfs, btnHideAll_Spikes, btnHideAll_Both = rootControlsBarWidget.hide_all_buttons_list 
+    btnHideAll_Pfs, btnHideAll_Spikes, btnHideAll_Both = rootControlsBarWidget.hide_all_buttons_list
     
     connections = []
     buttons = [btnShowAll_Pfs, btnShowAll_Spikes, btnShowAll_Both, btnHideAll_Pfs, btnHideAll_Spikes, btnHideAll_Both]
@@ -221,6 +246,18 @@ def build_batch_interactive_placefield_visibility_controls(rootControlsBarWidget
     connections.append(btnShowAll_Spikes.clicked.connect(_btn_show_all_spikes_callback))
     
     # Connect any extra signals:
+    
+    ## Setup btnToggleOccupancy:
+    # Update the toggle button's state based on the occupancy_plotting_config.isVisible property:
+    rootControlsBarWidget.ui.btnToggleOccupancy.setChecked(ipcDataExplorer.occupancy_plotting_config.isVisible) # Set Initial button state 
+    connections.append(rootControlsBarWidget.ui.btnToggleOccupancy.clicked.connect(_btn_toggle_occupancy_callback)) # Connect
+    
+    ## Setup btnNonPlacefieldSpikes:
+    # Update the toggle button's state based on the ipcDataExplorer.params.should_display_non_pf_spikesproperty:
+    rootControlsBarWidget.ui.btnNonPlacefieldSpikes.setChecked(ipcDataExplorer.params.setdefault('should_display_non_pf_spikes', False))
+    connections.append(rootControlsBarWidget.ui.btnNonPlacefieldSpikes.clicked.connect(_btn_toggle_pf_only_spikes))
+    
+    ## Refresh Button:
     connections.append(rootControlsBarWidget.sigRefresh.connect(_btn_perform_refresh_callback))
     
     return end_button_helper_obj, connections
@@ -229,6 +266,8 @@ def build_batch_interactive_placefield_visibility_controls(rootControlsBarWidget
 
 def build_all_placefield_output_panels(ipcDataExplorer):
     """ Builds the row of custom SingleEditablePlacefieldDisplayConfiguration widgets for each placecell that allow configuring their display
+    
+    Called by _display_3d_interactive_tuning_curves_plotter
     
     TODO: can't get signals working unfortunately. https://stackoverflow.com/questions/45090982/passing-extra-arguments-through-connect
     https://eli.thegreenplace.net/2011/04/25/passing-extra-arguments-to-pyqt-slot
