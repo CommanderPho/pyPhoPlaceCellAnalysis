@@ -137,6 +137,16 @@ class HideShowSpikeRenderingMixin:
     def spike_exclusion_mask(self, value):
         self.spikes_df['render_exclusion_mask'] = value    
     
+    @property
+    def additional_render_opacity_modifier(self):
+        """The additional_render_opacity_modifier optionally allows implementors to provide an additional column that will be added to the render_opacity prior to clipping.
+        Must be either None or an array the same length as a column of self.spikes_df.        
+        """
+        return None
+    # @additional_render_opacity_modifier.setter
+    # def additional_render_opacity_modifier(self, value):
+    #     self._additional_render_opacity_modifier = value
+    
     def setup_hide_show_spike_rendering_mixin(self):
         """ 
         # Adds columns to self.spikes_df:
@@ -149,8 +159,7 @@ class HideShowSpikeRenderingMixin:
     # General spike masking functions ____________________________________________________________________________________ #
     def update_active_spikes(self, spike_opacity_mask, is_additive=False):
         """ Main update callback function for visual changes. Updates the self.spikes_df.
-        
-        
+                
         Inputs:
             spike_opacity_mask: 
             is_additive:bool : if True, the opacity values in spike_opacity_mask are added to the existing opacity values and then the updated opacities are clipped to [0.0, 1.0]. If False, these values are set as opacities directly.
@@ -162,14 +171,14 @@ class HideShowSpikeRenderingMixin:
         assert np.shape(self.spikes_df['render_opacity']) == np.shape(spike_opacity_mask), "spike_opacity_mask must have one value for every spike in self.spikes_df, specifying its opacity"
         if self.debug_logging:
             print(f'update_active_spikes(spike_opacity_mask: ..., is_additive: {is_additive})')
+        if self.additional_render_opacity_modifier is not None:
+            assert np.shape(self.additional_render_opacity_modifier) == np.shape(spike_opacity_mask), "if self.additional_render_opacity_modifier is not None, it must have one value for every spike in self.spikes_df specifying its additive opacity value"
+            spike_opacity_mask = spike_opacity_mask + self.additional_render_opacity_modifier
         if is_additive:
-            # use the 'out' argument to re-assign it to the self.spikes_df['render_opacity'] array in-place:
             self.spikes_df['render_opacity'] = np.clip((self.spikes_df['render_opacity'] + spike_opacity_mask), 0.0, 1.0)
-            # self.spikes_df['render_opacity'] = np.clip((self.spikes_df['render_opacity'] + spike_opacity_mask), 0.0, 1.0, self.spikes_df['render_opacity'])
         else:
             self.spikes_df['render_opacity'] = spike_opacity_mask
-        self.update_spikes()
-            
+        self.update_spikes()            
             
     def change_spike_rows_included(self, row_specifier_mask, are_included):
         """change_spike_rows_included presents an IDX vs. ID agnostic interface with the self.spikes_df to allow the bulk of the code to work for both cases.
@@ -196,13 +205,10 @@ class HideShowSpikeRenderingMixin:
         Args:
             cell_ids ([type]): [description]
             are_included ([type]): [description]
-            
-            
+                        
             Internally calls self.change_spike_rows_included(...)
         """
         assert (neuron_IDXs is not None) or (cell_IDs is not None), "You must specify either neuron_IDXs or cell_IDs, but not both"
-        # TODO: could use the NeuronIdentityAccessingMixin helper class
-            # self.get_neuron_id_and_idx(neuron_i=neuron_IDXs, cell_ids=cell_ids)
         if neuron_IDXs is not None:
             # IDXs mode, preferred.
             if self.debug_logging:
@@ -233,16 +239,12 @@ class HideShowSpikeRenderingMixin:
             self.active_neuron_render_configs[an_updated_config_idx].spikesVisible = are_included # update the config
             updated_configs.append(self.active_neuron_render_configs[an_updated_config_idx])
         # call the parent (NeuronConfigOwningMixin) function to ensure the configs are updated.
-        # self.update_neuron_render_configs(neuron_IDXs, updated_configs) # update configs (never worked)
-        # self.update_neuron_render_configs(config_IDXs, updated_configs) # TODO: previously was self.update_neuron_render_configs(config_IDXs, updated_configs) but had to change to self.update_neuron_render_configs_from_indicies(config_IDXs, updated_configs)
         self.update_neuron_render_configs_from_indicies(config_IDXs, updated_configs) # update the config with the new values:
         
     def clear_all_spikes_included(self):
         # removes all spikes from inclusion
         if self.debug_logging:
             print(f'HideShowSpikeRenderingMixin.clear_spikes_included(): clearing all spikes.')     
-        # self.change_unit_spikes_included(neuron_IDXs=self.neuron_config_indicies, are_included=False) # get all indicies, and set them all to excluded
-        # self.change_unit_spikes_included(neuron_IDXs=self.neuron_config_indicies, are_included=False) # get all indicies, and set them all to excluded
         self.change_unit_spikes_included(cell_IDs=self.tuning_curves_valid_neuron_ids, are_included=False)
            
 
