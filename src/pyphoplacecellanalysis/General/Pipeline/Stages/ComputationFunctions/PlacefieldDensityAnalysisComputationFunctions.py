@@ -22,6 +22,8 @@ from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.Computa
 
 from scipy.ndimage.filters import uniform_filter, gaussian_filter # for _perform_pf_find_ratemap_peaks_peak_prominence2d_computation
 
+from neuropy.utils.mixins.binning_helpers import build_df_discretized_binned_position_columns # for _perform_pf_find_ratemap_peaks_peak_prominence2d_computation/_build_filtered_summits_analysis_results
+
 """-------------- Specific Computation Functions to be registered --------------"""
 
 modify_dict_mode = True # if True, writes the dict
@@ -350,14 +352,18 @@ class PlacefieldDensityAnalysisComputationFunctions(AllFunctionEnumeratingMixin,
             
             return computation_result
 
+    
 
-    def _perform_pf_find_ratemap_peaks_peak_prominence2d_computation(computation_result: ComputationResult, step=0.01, peak_height_multiplier_probe_levels = (0.5, 0.9), debug_print=False):
+    def _perform_pf_find_ratemap_peaks_peak_prominence2d_computation(computation_result: ComputationResult, step=0.01, peak_height_multiplier_probe_levels=(0.5, 0.9), minimum_included_peak_height = 0.2, uniform_blur_size = 3, gaussian_blur_sigma = 3, debug_print=False):
             """ Uses the peak_prominence2d package to find the peaks and promenences of 2D placefields
             
             Independent of the other peak-computing computation functions above
             
             Inputs:
                 peak_height_multiplier_probe_levels = (0.5, 0.9) # 50% and 90% of the peak height
+                gaussian_blur_sigma: input to gaussian_filter for blur of peak counts
+                uniform_blur_size: inputt to uniform_filter for blur of peak counts
+                
                 
             Requires:
                 computed_data['pf2D']
@@ -427,12 +433,9 @@ class PlacefieldDensityAnalysisComputationFunctions(AllFunctionEnumeratingMixin,
                                                                                                     active_peak_prominence_2d_results, active_eloy_analysis, slice_level_multiplier=0.5, minimum_included_peak_height=1.0, debug_print = False)
                                                                                                     
                 """
+                ## Find which position bin each peak falls in and add it to the flat_peaks_df:
                 filtered_summits_analysis_df = flat_peaks_df[flat_peaks_df['peak_height'] >= minimum_included_peak_height].copy() # filter for peaks greater than 1.0Hz
-                ## Find which position bin each peak falls in:
-                if 'peak_center_binned_x' not in filtered_summits_analysis_df:
-                    filtered_summits_analysis_df['peak_center_binned_x'] = pd.cut(filtered_summits_analysis_df['peak_center_x'].to_numpy(), bins=xbin, include_lowest=True, labels=xbin_labels) # same shape as the input data
-                if 'peak_center_binned_y' not in filtered_summits_analysis_df:
-                    filtered_summits_analysis_df['peak_center_binned_y'] = pd.cut(filtered_summits_analysis_df['peak_center_y'].to_numpy(), bins=ybin, include_lowest=True, labels=ybin_labels)
+                
                 ## IMPORTANT: Filter by only one of the slice_levels before continuing, otherwise you're double-counting:
                 filtered_summits_analysis_df = filtered_summits_analysis_df[filtered_summits_analysis_df['slice_level_multiplier'] == slice_level_multiplier].copy()
 
@@ -441,10 +444,6 @@ class PlacefieldDensityAnalysisComputationFunctions(AllFunctionEnumeratingMixin,
                 n_ybins = len(ybin) - 1 # the -1 is to get the counts for the centers only
                 pf_peak_counts_map = np.zeros((n_xbins, n_ybins), dtype=int) # create an initially zero matrix
 
-                ## Extract the previously computed results:
-                avg_2D_speed_per_pos = active_eloy_analysis.avg_2D_speed_per_pos
-                avg_2D_speed_sort_idxs = active_eloy_analysis.avg_2D_speed_sort_idxs
-                assert np.shape(avg_2D_speed_per_pos) == np.shape(pf_peak_counts_map), f"the shape of the active_eloy_analysis.avg_2D_speed_per_pos ({np.shape(avg_2D_speed_per_pos)}) and the shape of the newly built pf_peak_counts_map ({np.shape(pf_peak_counts_map)}) must match!"
                 
                 current_bin_counts = filtered_summits_analysis_df.value_counts(subset=['peak_center_binned_x', 'peak_center_binned_y'], normalize=False, sort=False, ascending=True, dropna=True) # current_bin_counts: a series with a MultiIndex index for each bin that has nonzero counts
                 if debug_print:
@@ -457,13 +456,10 @@ class PlacefieldDensityAnalysisComputationFunctions(AllFunctionEnumeratingMixin,
                     except IndexError as e:
                         print(f'e: {e}\n filtered_summits_analysis_df: {np.shape(filtered_summits_analysis_df)}, current_bin_counts: {np.shape(current_bin_counts)}\n pf_peak_counts_map: {np.shape(pf_peak_counts_map)}')
                         raise e
-                        
-                    # TODO: Also build velocity columns:
-                    # avg_2D_speed_per_pos[xbin_label-1, ybin_label-1]
-
+                    
                 return filtered_summits_analysis_df, pf_peak_counts_map
-                            
-                
+            
+            # ==================================================================================================================== #
             # begin main function body ___________________________________________________________________________________________ #
             active_pf_2D = computation_result.computed_data['pf2D']
             n_neurons = active_pf_2D.ratemap.n_neurons
@@ -492,8 +488,6 @@ class PlacefieldDensityAnalysisComputationFunctions(AllFunctionEnumeratingMixin,
                 neuron_id_arr = np.full((n_total_cell_slice_results,), neuron_id) # repeat the neuron_id many times for the datatable
                 neuron_peak_curve_rate_arr = np.full((n_total_cell_slice_results,), neuron_tuning_curve_peak_firing_rate) # repeat the neuron_id many times for the datatable
                 
-                
-                
                 ## Peak
                 summit_slice_peak_id_arr = np.zeros((n_peaks, n_slices), dtype=np.int16) # same summit/peak id for all in the slice
                 summit_slice_peak_level_multiplier_arr = np.zeros((n_peaks, n_slices), dtype=float) # same summit/peak id for all in the slice
@@ -502,7 +496,6 @@ class PlacefieldDensityAnalysisComputationFunctions(AllFunctionEnumeratingMixin,
                 summit_slice_peak_prominence_arr = np.zeros((n_peaks, n_slices), dtype=float) # same summit/peak id for all in the slice
                 summit_peak_center_x_arr = np.zeros((n_peaks, n_slices), dtype=float)
                 summit_peak_center_y_arr = np.zeros((n_peaks, n_slices), dtype=float)
-                
                 
                 ## Slice
                 summit_slice_idx_arr = np.tile(np.arange(n_slices), n_peaks).astype('int') # array([0, 1, 0, 1, 0, 1, 0, 1, 0, 1])
@@ -520,8 +513,6 @@ class PlacefieldDensityAnalysisComputationFunctions(AllFunctionEnumeratingMixin,
                     summit_peak_center_x_arr[peak_idx, :] = a_peak_dict['center'][0]
                     summit_peak_center_y_arr[peak_idx, :] = a_peak_dict['center'][1]
                     
-                    
-                    
                     ## This is where we would loop through each desired slice/probe levels:
                     a_peak_dict['probe_levels'] = np.array([a_peak_dict['height']*multiplier for multiplier in peak_height_multiplier_probe_levels]).astype('float') # specific probe levels
                     summit_slice_peak_level_multiplier_arr[peak_idx, :] = np.array(peak_height_multiplier_probe_levels).astype('float')
@@ -534,7 +525,6 @@ class PlacefieldDensityAnalysisComputationFunctions(AllFunctionEnumeratingMixin,
                         print(f"probe_levels: {a_peak_dict['probe_levels']}")
 
                     ## Build flat output:
-                    
                     for lvl_idx, probe_lvl in enumerate(a_peak_dict['probe_levels']):
                         a_slice = a_peak_dict['level_slices'][probe_lvl]
                         slice_bbox = a_slice['bbox']
@@ -571,33 +561,30 @@ class PlacefieldDensityAnalysisComputationFunctions(AllFunctionEnumeratingMixin,
             if debug_print:
                 print(f'building final concatenated cell_peaks_df for {n_neurons} total neurons...')
             cell_peaks_df = pd.concat(out_cell_peak_dfs_list)
+            ## Find which position bin each peak falls in and add it to the flat_peaks_df:
+            cell_peaks_df, (xbin, ybin), bin_infos = build_df_discretized_binned_position_columns(cell_peaks_df, bin_values=(active_pf_2D.xbin, active_pf_2D.ybin), position_column_names=('peak_center_x', 'peak_center_y'), binned_column_names=('peak_center_binned_x', 'peak_center_binned_y'), active_computation_config=None, force_recompute=False, debug_print=debug_print)
 
+            ## Find the avg velocity corresponding to each position bin containing a peak value:
+            active_eloy_analysis = computation_result.computed_data.get('EloyAnalysis', None)            
+            if active_eloy_analysis is not None:
+                ## Extract the previously computed results:
+                avg_2D_speed_per_pos = active_eloy_analysis.avg_2D_speed_per_pos # (60, 8)
+                # avg_2D_speed_sort_idxs = active_eloy_analysis.avg_2D_speed_sort_idxs
+                # assert np.shape(avg_2D_speed_per_pos) == np.shape(pf_peak_counts_map), f"the shape of the active_eloy_analysis.avg_2D_speed_per_pos ({np.shape(avg_2D_speed_per_pos)}) and the shape of the newly built pf_peak_counts_map ({np.shape(pf_peak_counts_map)}) must match!"
+                _temp_peak_center_bin_label_xy = cell_peaks_df[['peak_center_binned_x', 'peak_center_binned_y']].to_numpy()-1 # (26, 2)
+                ## Add the column to matrix:
+                cell_peaks_df['peak_center_avg_speed'] = avg_2D_speed_per_pos[_temp_peak_center_bin_label_xy[:,0], _temp_peak_center_bin_label_xy[:,1]] # array([33.2289, 33.7748, 35.9964, 0, 59.3887, 37.354, 16.1506, 0, 49.8418, 33.2289, 0, 14.9843, 33.8302, 29.8891, 37.354, 10.6905, 0, 33.7748, nan, 53.9505, 34.003, 33.7748, 22.7252, nan, 11.8898, 58.9018])                
+            
 
             ## Filter the summits, compute velocities, etc:            
-            active_eloy_analysis = computation_result.computed_data.get('EloyAnalysis', None)
-            filtered_summits_analysis_df, pf_peak_counts_map = _build_filtered_summits_analysis_results(active_pf_2D.xbin, active_pf_2D.ybin, active_pf_2D.xbin_labels, active_pf_2D.ybin_labels, cell_peaks_df, active_eloy_analysis, slice_level_multiplier=0.5, minimum_included_peak_height=0.2, debug_print = debug_print)
-            ## Find the avg velocity corresponding to each position bin containing a peak value:
-            _temp_peak_center_bin_label_xy = filtered_summits_analysis_df[['peak_center_binned_x', 'peak_center_binned_y']].to_numpy()-1 # (26, 2)
-            # _temp_peak_center_bin_label_yx = filtered_summits_analysis_df[['peak_center_binned_y', 'peak_center_binned_x']].to_numpy()-1 # (26, 2)
-            # _temp_peak_center_bin_label_yx
-            # _temp_peak_center_bin_label_xy[:,0] # array([46, 21, 35, 56, 18, 32,  1, 59, 36, 46, 56, 42, 33, 24, 32,  8, 59, 21, 53, 27, 22, 21, 47, 35, 36, 35], dtype=int64)
-            avg_2D_speed_per_pos = active_eloy_analysis.avg_2D_speed_per_pos # (60, 8)
-            avg_2D_speed_sort_idxs = active_eloy_analysis.avg_2D_speed_sort_idxs
-            # peak_avg_2D_speed_per_pos = avg_2D_speed_per_pos[_temp_peak_center_bin_label_yx.T]
-            # peak_avg_2D_speed_per_pos = avg_2D_speed_per_pos[_temp_peak_center_bin_label_xy.T]
-            # avg_2D_speed_per_pos[46, 4]
-            # avg_2D_speed_per_pos[[46, 21], [4, 3]]
-            # avg_2D_speed_per_pos[[46, 21], [4, 3]] # array([33.2289, 33.7748])
-            peak_avg_2D_speed_per_pos = avg_2D_speed_per_pos[_temp_peak_center_bin_label_xy[:,0], _temp_peak_center_bin_label_xy[:,1]] # array([33.2289, 33.7748, 35.9964, 0, 59.3887, 37.354, 16.1506, 0, 49.8418, 33.2289, 0, 14.9843, 33.8302, 29.8891, 37.354, 10.6905, 0, 33.7748, nan, 53.9505, 34.003, 33.7748, 22.7252, nan, 11.8898, 58.9018])
-            # peak_avg_2D_speed_per_pos # array([33.2289, 33.7748, 35.9964, 0, 59.3887, 37.354, 16.1506, 0, 49.8418, 33.2289, 0, 14.9843, 33.8302, 29.8891, 37.354, 10.6905, 0, 33.7748, nan, 53.9505, 34.003, 33.7748, 22.7252, nan, 11.8898, 58.9018])
-            ## Add the column to matrix:
-            filtered_summits_analysis_df['peak_center_avg_speed'] = peak_avg_2D_speed_per_pos
+            
+            filtered_summits_analysis_df, pf_peak_counts_map = _build_filtered_summits_analysis_results(active_pf_2D.xbin, active_pf_2D.ybin, active_pf_2D.xbin_labels, active_pf_2D.ybin_labels, cell_peaks_df, active_eloy_analysis, slice_level_multiplier=0.5, minimum_included_peak_height=minimum_included_peak_height, debug_print = debug_print)
+            
 
             # pf_peak_counts_map
-            pf_peak_counts_map_blurred = uniform_filter(pf_peak_counts_map.astype('float'), size=3, mode='constant')
-            pf_peak_counts_map_blurred_gaussian = gaussian_filter(pf_peak_counts_map.astype('float'), sigma=3)
+            pf_peak_counts_map_blurred = uniform_filter(pf_peak_counts_map.astype('float'), size=uniform_blur_size, mode='constant')
+            pf_peak_counts_map_blurred_gaussian = gaussian_filter(pf_peak_counts_map.astype('float'), sigma=gaussian_blur_sigma)
             pf_peak_counts_results = DynamicParameters(raw=pf_peak_counts_map, uniform_blurred=pf_peak_counts_map_blurred, gaussian_blurred=pf_peak_counts_map_blurred_gaussian)
-
 
             ## Build function output:
             computation_result.computed_data.setdefault('RatemapPeaksAnalysis', DynamicParameters()) # get the existing RatemapPeaksAnalysis output or create a new one if needed
