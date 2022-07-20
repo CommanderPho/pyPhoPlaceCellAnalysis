@@ -20,11 +20,18 @@ class DefaultDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=DisplayFunc
         return out_figures_list
 
     def _display_2d_placefield_result_plot_raw(computation_result, active_config, **kwargs):
+        """ produces a stupid figure """
         out_figures_list = computation_result.computed_data['pf2D'].plot_raw(**({'label_cells': True} | kwargs)); # Plots an overview of each cell all in one figure
         return out_figures_list
 
     def _display_2d_placefield_result_plot_ratemaps_2D(computation_result, active_config, enable_saving_to_disk=False, **kwargs):
-        """ displays 2D placefields in a MATPLOTLIB window """
+        """ displays 2D placefields in a MATPLOTLIB window 
+        
+        Internally wraps `PfND.plot_ratemaps_2D` which itself wraps `neuropy.plotting.ratemaps.plot_ratemap_2D`
+        
+        TODO: doesn't show peak firing rates
+        
+        """
         computation_result.computed_data['pf2D'].plot_ratemaps_2D(**({'subplots': (None, 3), 'resolution_multiplier': 1.0, 'enable_spike_overlay': False, 'brev_mode': PlotStringBrevityModeEnum.MINIMAL} | kwargs))
         
         # plot_variable_name = ({'plot_variable': None} | kwargs)
@@ -52,6 +59,9 @@ class DefaultDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=DisplayFunc
 
     def _display_normal(computation_result, active_config, **kwargs):
         """
+        
+        Internally wraps `neuropy.plotting.placemaps.plot_all_placefields` which itself wraps `PfND.plot_ratemaps_2D` which itself wraps `neuropy.plotting.ratemaps.plot_ratemap_2D`
+        
         Usage:
             _display_normal(curr_kdiba_pipeline.computation_results['maze1'], curr_kdiba_pipeline.active_configs['maze1'])
         """

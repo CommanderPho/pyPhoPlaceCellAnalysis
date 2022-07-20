@@ -11,6 +11,10 @@ class FiringStatisticsDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Di
     
     def display_firing_rate_trends(computation_result, active_config, enable_saving_to_disk=False, debug_print=False, **kwargs):
         """ DOCTODO
+        
+        TODO: this sucks, it displays a beeswarm plot that locks everything up for minutes
+        
+        
         Usage:
         
             # np.shape(active_one_step_decoder.active_time_windows) # (2892, 2)
