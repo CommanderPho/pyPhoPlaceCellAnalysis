@@ -6,6 +6,8 @@ import pandas as pd
 
 # Neuropy:
 from neuropy.analyses.placefields import PfND # for build_position_df_discretized_binned_positions
+from neuropy.utils.mixins.binning_helpers import BinnedPositionsMixin, bin_pos_nD, build_df_discretized_binned_position_columns
+
 
 from ...Analysis.reconstruction import BayesianPlacemapPositionDecoder
 from pyphocorehelpers.indexing_helpers import find_neighbours
@@ -29,25 +31,29 @@ def build_position_df_time_window_idx(active_pos_df, curr_active_time_windows, d
     return active_pos_df
 
 def build_position_df_discretized_binned_positions(active_pos_df, active_computation_config, xbin_values=None, ybin_values=None, debug_print=False):
-    """ Adds the binned_x and binned_y columns to the position dataframe """
-
-    # bin the dataframe's x and y positions into bins, with binned_x and binned_y containing the index of the bin that the given position is contained within.
-    if (xbin_values is None) or (ybin_values is None):
-        # determine the correct bins to use from active_computation_config.grid_bin:
-        if debug_print:
-            print(f'active_grid_bin: {active_computation_config.grid_bin}')
-        xbin, ybin, bin_info = PfND._bin_pos_nD(active_pos_df['x'].values, active_pos_df['y'].values, bin_size=active_computation_config.grid_bin) # bin_size mode
-    else:
-        # use the extant values passed in:
-        if debug_print:
-            print(f'using extant bins passed as arguments: xbin_values.shape: {xbin_values.shape}, ybin_values.shape: {ybin_values.shape}')
-        xbin = xbin_values
-        ybin = ybin_values
-        bin_info = None
+    """ Adds the binned_x and binned_y columns to the position dataframe 
     
-    active_pos_df['binned_x'] = pd.cut(active_pos_df['x'].to_numpy(), bins=xbin, include_lowest=True, labels=np.arange(start=1, stop=len(xbin))) # same shape as the input data 
-    active_pos_df['binned_y'] = pd.cut(active_pos_df['y'].to_numpy(), bins=ybin, include_lowest=True, labels=np.arange(start=1, stop=len(ybin))) 
-    return active_pos_df, xbin, ybin, bin_info
+    TODO: CORRECTNESS: POTENTIAL_BUG: I notice that the *bin_centers are being passed here from its call as opposed to the .xbin, .ybin themselves. Is this an issue?
+    """
+    # # bin the dataframe's x and y positions into bins, with binned_x and binned_y containing the index of the bin that the given position is contained within.
+    # if (xbin_values is None) or (ybin_values is None):
+    #     # determine the correct bins to use from active_computation_config.grid_bin:
+    #     if debug_print:
+    #         print(f'active_grid_bin: {active_computation_config.grid_bin}')
+    #     xbin, ybin, bin_info = PfND._bin_pos_nD(active_pos_df['x'].values, active_pos_df['y'].values, bin_size=active_computation_config.grid_bin) # bin_size mode
+    # else:
+    #     # use the extant values passed in:
+    #     if debug_print:
+    #         print(f'using extant bins passed as arguments: xbin_values.shape: {xbin_values.shape}, ybin_values.shape: {ybin_values.shape}')
+    #     xbin = xbin_values
+    #     ybin = ybin_values
+    #     bin_info = None
+    
+    # active_pos_df['binned_x'] = pd.cut(active_pos_df['x'].to_numpy(), bins=xbin, include_lowest=True, labels=np.arange(start=1, stop=len(xbin))) # same shape as the input data 
+    # active_pos_df['binned_y'] = pd.cut(active_pos_df['y'].to_numpy(), bins=ybin, include_lowest=True, labels=np.arange(start=1, stop=len(ybin))) 
+    active_pos_df, (xbin, ybin), bin_infos = build_df_discretized_binned_position_columns(active_pos_df, bin_values=(xbin_values, ybin_values), active_computation_config=active_computation_config, force_recompute=False, debug_print=debug_print)
+    # bin_infos # TODO: note that bin_infos is actually a list of 1D bin_info objects (or None if explict bins were passed) instead of a single 2D bin_info object. Don't think it's used anyways
+    return active_pos_df, xbin, ybin, bin_infos
 
 
 def build_position_df_resampled_to_time_windows(active_pos_df, time_bin_size=0.02):
