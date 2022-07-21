@@ -50,11 +50,7 @@ def build_binned_imageItem(plot_item, params, xbins=None, ybins=None, matrix=Non
         local_plots_data.matrix_max = np.nanmax(matrix)
         # Set the colorbar to the range:
         local_plots.colorBarItem.setLevels(low=local_plots_data.matrix_min, high=local_plots_data.matrix_max)
-        
-        # self.params = VisualizationParameters(name='BasicBinnedImageRenderingWindow')
-        # self.plots_data = RenderPlotsData(name='BasicBinnedImageRenderingWindow')
-        # self.plots = RenderPlots(name='BasicBinnedImageRenderingWindow')
-        # self.ui = PhoUIContainer(name='BasicBinnedImageRenderingWindow')
+
         return local_plots, local_plots_data
         
         
@@ -172,8 +168,7 @@ class BasicBinnedImageRenderingWindow(QtWidgets.QMainWindow):
         
         self.add_crosshairs(newPlotItem, matrix, name=name)
         
-        # newImageItem, newcolorMap, newColorBarItem, local_plots_data = build_binned_imageItem(newPlotItem, xbins=xbins, ybins=ybins, matrix=matrix, data_label=variable_label)
-        # new_plots_data[local_plots_data.name] = local_plots_data
+        
         
         
     def add_crosshairs(self, plot_item, matrix, name):

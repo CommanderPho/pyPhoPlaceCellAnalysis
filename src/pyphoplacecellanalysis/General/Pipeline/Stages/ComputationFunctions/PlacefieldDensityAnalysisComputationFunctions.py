@@ -589,7 +589,7 @@ class PlacefieldDensityAnalysisComputationFunctions(AllFunctionEnumeratingMixin,
             ## Build function output:
             computation_result.computed_data.setdefault('RatemapPeaksAnalysis', DynamicParameters()) # get the existing RatemapPeaksAnalysis output or create a new one if needed
             computation_result.computed_data['RatemapPeaksAnalysis']['PeakProminence2D'] = DynamicParameters(xx=active_pf_2D.xbin_centers, yy=active_pf_2D.ybin_centers, neuron_extended_ids=active_pf_2D.neuron_extended_ids, results=out_results,
-                                                                                                             flat_peaks_df=cell_peaks_df, peak_counts=pf_peak_counts_results)
+                                                                                                             flat_peaks_df=cell_peaks_df, filtered_flat_peaks_df=filtered_summits_analysis_df, peak_counts=pf_peak_counts_results)
 
             return computation_result
 

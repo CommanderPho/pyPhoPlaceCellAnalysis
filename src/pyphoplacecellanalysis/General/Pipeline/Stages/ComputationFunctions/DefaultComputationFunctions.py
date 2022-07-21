@@ -22,6 +22,7 @@ class DefaultComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Computa
     def _perform_position_decoding_computation(computation_result: ComputationResult):
         """ Builds the 2D Placefield Decoder """
         def position_decoding_computation(active_session, pf_computation_config, prev_output_result: ComputationResult):
+            ## TODO: IMPORTANT!! POTENTIAL_BUG: Should this passed-in spikes_df actually be the filtered spikes_df that was used to compute the placefields in PfND? That would be `prev_output_result.computed_data['pf2D'].filtered_spikes_df`
             prev_output_result.computed_data['pf2D_Decoder'] = BayesianPlacemapPositionDecoder(pf_computation_config.time_bin_size, prev_output_result.computed_data['pf2D'], active_session.spikes_df.copy(), debug_print=False)
             # %timeit pho_custom_decoder.compute_all():  18.8 s ± 149 ms per loop (mean ± std. dev. of 7 runs, 1 loop each)
             prev_output_result.computed_data['pf2D_Decoder'].compute_all() #  --> n = self.

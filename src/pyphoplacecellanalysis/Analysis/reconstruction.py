@@ -27,11 +27,20 @@ n_i: the number of spikes fired by each cell during the time window of considera
 
 
 class ZhangReconstructionImplementation:
+    """ 
+    
+    TODO: NOTE: BUG: INVESTIGATE: IMPORTANT: build_concatenated_F previously used:
+        maps = pf.ratemap.normalized_tuning_curves  # (40, 48) for 1D, (40, 48, 10) for 2D
+        I'm pretty sure this is wrong, as I think it's supposed to be in units of Hz and it's throwing off an unrelated calculation about mean firing rates and such which just so happens to use the result from this function.
+        
+    """
 
     # Shared:    
     @staticmethod
     def compute_time_binned_spiking_activity(spikes_df, max_time_bin_size:float=0.02, debug_print=False):
         """Given a spikes dataframe, this function temporally bins the spikes, counting the number that fall into each bin.
+
+        NOTE: Reviewed this on 2022-07-20 and this looks good to me.
 
         Args:
             spikes_df ([type]): [description]
@@ -71,8 +80,6 @@ class ZhangReconstructionImplementation:
         # any_unit_spike_counts = spikes_df[time_variable_name].value_counts(bins=out_binning_info.num_bins, sort=False) # fast way to get the binned counts across all cells
         spikes_df['binned_time'] = pd.cut(spikes_df[time_variable_name].to_numpy(), bins=time_window_edges, include_lowest=True, labels=time_window_edges_binning_info.bin_indicies[1:]) # same shape as the input data (time_binned_spikes_df: (69142,))
 
-        # any_unit_spike_counts = spikes_df.groupby(['binned_time'])[time_variable_name].agg('count') # unused any cell spike counts
-        
         unit_specific_bin_specific_spike_counts = spikes_df.groupby(['aclu','binned_time'])[time_variable_name].agg('count')
         active_aclu_binned_time_multiindex = unit_specific_bin_specific_spike_counts.index
         active_unique_aclu_values = np.unique(active_aclu_binned_time_multiindex.get_level_values('aclu'))
@@ -81,26 +88,15 @@ class ZhangReconstructionImplementation:
             print(f'np.shape(unit_specific_spike_counts): {np.shape(unit_specific_binned_spike_counts)}') # np.shape(unit_specific_spike_counts): (40, 85841)
 
         unit_specific_binned_spike_counts = pd.DataFrame(unit_specific_binned_spike_counts, columns=active_unique_aclu_values, index=time_window_edges_binning_info.bin_indicies[1:])
-        # unit_specific_spike_counts.get_group(2)
-
-        # spikes_df.groupby(['binned_time']).agg('count')
-
-        # for name, group in spikes_df.groupby(['aclu','binned_time']):
-        #     print(f'name: {name}, group: {group}') 
-
-        # neuron_ids, neuron_specific_spikes_dfs = partition(spikes_df, 'aclu')
-        # spikes_df.groupby(['aclu','binned_time'])
-        # groups.size().unstack()
-        # spikes_df._obj.groupby(['aclu'])
-        # neuron_ids, neuron_specific_spikes_dfs = partition(spikes_df, 'aclu')
 
         return unit_specific_binned_spike_counts, time_window_edges, time_window_edges_binning_info
 
     @staticmethod
     def build_concatenated_F(pf, debug_print=False):
+        """ TODO: NOTE: uses the normalized_tuning_curves instead of the non-normalized ones! This means the returned concatenated_F will not be firing rates in Hz """
         neuron_IDs = pf.ratemap.neuron_ids
         neuron_IDXs = np.arange(len(neuron_IDs))
-        maps = pf.ratemap.normalized_tuning_curves  # (40, 48) for 1D, (40, 48, 10) for 2D
+        maps = pf.ratemap.normalized_tuning_curves  # (40, 48) for 1D, (40, 48, 10) for 2D        
         if debug_print:
             print(f'maps: {np.shape(maps)}') # maps: (40, 48, 10)
         f_i = [np.squeeze(maps[i,:,:]) for i in neuron_IDXs] # produces a list of (48 x 10) maps
@@ -126,7 +122,7 @@ class ZhangReconstructionImplementation:
             unit_specific_binned_spike_counts, out_digitized_variable_bins, out_binning_info = ZhangReconstructionImplementation.time_bin_spike_counts_N_i(sess.spikes_df.copy(), time_bin_size, debug_print=debug_print) # unit_specific_binned_spike_counts.to_numpy(): (40, 85841)
             
         """
-        unit_specific_binned_spike_counts, time_window_edges, time_window_edges_binning_info = ZhangReconstructionImplementation.compute_time_binned_spiking_activity(spikes_df, time_bin_size);
+        unit_specific_binned_spike_counts, time_window_edges, time_window_edges_binning_info = ZhangReconstructionImplementation.compute_time_binned_spiking_activity(spikes_df, time_bin_size)
         unit_specific_binned_spike_counts = unit_specific_binned_spike_counts.T # Want the outputs to have each time window as a column, with a single time window giving a column vector for each neuron
         if debug_print:
             print(f'unit_specific_binned_spike_counts.to_numpy(): {np.shape(unit_specific_binned_spike_counts.to_numpy())}') # (85841, 40)
@@ -426,6 +422,7 @@ class BayesianPlacemapPositionDecoder(PlacemapPositionDecoder):
     
     @classmethod
     def serialized_keys(cls):
+        """ I remember this is for being able to save/persist this computed object to disk. """
         input_keys = ['time_bin_size', 'pf', 'spikes_df', 'debug_print']
         # intermediate_keys = ['unit_specific_time_binned_spike_counts', 'time_window_edges', 'time_window_edges_binning_info']
         saved_result_keys = ['flat_p_x_given_n']
