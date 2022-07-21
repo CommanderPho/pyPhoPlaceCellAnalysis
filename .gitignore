@@ -52,3 +52,6 @@ MANIFEST
 .venv*/
 .conda*/
 # Uic_AUTOGEN_*.py # Needs to be omitted now that I'm loading .ui files directly. They were found to be missing on linux workstation.
+src/pyphoplacecellanalysis/External/pyqtgraph/**/Uic_AUTOGEN_*Template.py
+src/pyphoplacecellanalysis/External/pyqtgraph/examples/Uic_AUTOGEN_DateAxisItem_QtDesigner.py
+src/pyphoplacecellanalysis/External/pyqtgraph/examples/Uic_AUTOGEN_designerExample.py
