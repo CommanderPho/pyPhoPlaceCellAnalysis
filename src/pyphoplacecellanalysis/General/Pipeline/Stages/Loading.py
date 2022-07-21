@@ -7,25 +7,6 @@ from pathlib import Path
 from pyphocorehelpers.function_helpers import compose_functions
 from pyphoplacecellanalysis.General.Pipeline.Stages.BaseNeuropyPipelineStage import BaseNeuropyPipelineStage, PipelineStage
 
-# # NeuroPy (Diba Lab Python Repo) Loading
-# try:
-#     from neuropy import core
-
-#     importlib.reload(core)
-# except ImportError:
-#     sys.path.append(r"C:\Users\Pho\repos\NeuroPy")  # Windows
-#     # sys.path.append('/home/pho/repo/BapunAnalysis2021/NeuroPy') # Linux
-#     # sys.path.append(r'/Users/pho/repo/Python Projects/NeuroPy') # MacOS
-#     print("neuropy module not found, adding directory to sys.path. \n >> Updated sys.path.")
-#     from neuropy import core
-
-# # Neuropy:
-# from neuropy.core.session.data_session_loader import DataSessionLoader
-# from neuropy.core.session.dataSession import DataSession
-# from neuropy.analyses.placefields import PlacefieldComputationParameters, perform_compute_placefields
-
-
-
 
 class LoadableInput:
     def _check(self):
