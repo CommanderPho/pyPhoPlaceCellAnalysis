@@ -130,7 +130,6 @@ class BasicBinnedImageRenderingWindow(QtWidgets.QMainWindow):
         self.ui = PhoUIContainer(name='BasicBinnedImageRenderingWindow')
         self.ui.connections = PhoUIContainer(name='BasicBinnedImageRenderingWindow')
         
-        
         self.params.colorMap = pg.colormap.get("viridis")
         pg.setConfigOption('imageAxisOrder', 'row-major') # Switch default order to Row-major
 
@@ -183,12 +182,15 @@ class BasicBinnedImageRenderingWindow(QtWidgets.QMainWindow):
             pos = evt[0]  ## using signal proxy turns original arguments into a tuple
             if plot_item.sceneBoundingRect().contains(pos):
                 mousePoint = vb.mapSceneToView(pos)
+                # Note that int(...) truncates towards zero (floor effect)
                 index_x = int(mousePoint.x())
                 index_y = int(mousePoint.y())
                 
                 matrix_shape = np.shape(matrix)
-                is_valid_x_index = (index_x > 0 and index_x < matrix_shape[0])
-                is_valid_y_index = (index_y > 0 and index_y < matrix_shape[1])
+                # is_valid_x_index = (index_x > 0 and index_x < matrix_shape[0])
+                # is_valid_y_index = (index_y > 0 and index_y < matrix_shape[1])
+                is_valid_x_index = (index_x >= 0 and index_x < matrix_shape[0])
+                is_valid_y_index = (index_y >= 0 and index_y < matrix_shape[1])
                 
                 if is_valid_x_index and is_valid_y_index:
                     self.ui.mainLabel.setText("<span style='font-size: 12pt'>(x=%0.1f, y=%0.1f), <span style='color: green'>value=%0.3f</span>" % (index_x, index_y, matrix[index_x][index_y]))

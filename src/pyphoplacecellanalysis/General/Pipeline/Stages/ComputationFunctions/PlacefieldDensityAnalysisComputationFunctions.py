@@ -197,8 +197,9 @@ class PlacefieldDensityAnalysisComputationFunctions(AllFunctionEnumeratingMixin,
         
         
     def _perform_pf_find_ratemap_peaks_computation(computation_result: ComputationResult, debug_print=False, peak_score_inclusion_percent_threshold=0.25):
-            """ Builds the simplified density analysis suggested by Kamran at the 2022-07-06 lab meeting related analysis to test Eloy's Pf-Density/Velocity Hypothesis for 2D Placefields
-            
+            """ Uses the `findpeaks` library to compute the topographical peak locations and information with the intent of doing an extended pf size/density analysis.
+                Not really used as the `peak_prominence2d` seems to work much better.
+                        
             Requires:
                 computed_data['pf2D']                
                 
@@ -221,7 +222,6 @@ class PlacefieldDensityAnalysisComputationFunctions(AllFunctionEnumeratingMixin,
                     computed_data['RatemapPeaksAnalysis']['final_filtered_results']['df_list']:
                     computed_data['RatemapPeaksAnalysis']['final_filtered_results']['peak_xy_points_pos_list']:
                     
-                
             """            
             def ratemap_find_placefields(ratemap, debug_print=False):
                 """ Uses the `findpeaks` library for finding local maxima of TuningMaps
@@ -328,23 +328,15 @@ class PlacefieldDensityAnalysisComputationFunctions(AllFunctionEnumeratingMixin,
 
                 return peaks_are_included_list, filtered_df_list, filtered_peak_xy_points_pos_list
                 
-                
+            # ==================================================================================================================== #
+            # BEGIN MAIN FUNCTION BODY                                                                                             #
+            # ==================================================================================================================== #
             # active_pf_1D = computation_result.computed_data['pf1D']
             active_pf_2D = computation_result.computed_data['pf2D']
-            # n_xbins = len(active_pf_2D.xbin) - 1 # the -1 is to get the counts for the centers only
-            # n_ybins = len(active_pf_2D.ybin) - 1 # the -1 is to get the counts for the centers only
-            # n_neurons = active_pf_2D.ratemap.n_neurons
-            
-            # peaks_outputs: fp_mask, mask_results_df, fp_topo, topo_results_df, topo_persistence_df
-            # peaks_outputs = [ratemap_find_placefields(a_tuning_curve.copy(), debug_print=debug_print) for a_tuning_curve in active_pf_2D.ratemap.pdf_normalized_tuning_curves]
-            # fp_mask_list, mask_results_df_list, fp_topo_list, topo_results_df_list, topo_persistence_df_list = tuple(zip(*findpeaks_results))
             fp_mask_list, mask_results_df_list, fp_topo_list, topo_results_df_list, topo_persistence_df_list = tuple(zip(*[ratemap_find_placefields(a_tuning_curve.copy(), debug_print=debug_print) for a_tuning_curve in active_pf_2D.ratemap.pdf_normalized_tuning_curves]))
             topo_results_peak_xy_pos_list = [np.vstack((active_pf_2D.xbin[curr_topo_result_df['xbin_idx'].to_numpy()], active_pf_2D.ybin[curr_topo_result_df['ybin_idx'].to_numpy()])) for curr_topo_result_df in topo_results_df_list]
-            # peak_xy_pos_shapes = [np.shape(a_xy_pos) for a_xy_pos in topo_results_peak_xy_pos_list]
-
             peaks_are_included_list, filtered_df_list, filtered_peak_xy_points_pos_list = _filter_found_peaks_by_exclusion_threshold(topo_results_df_list, topo_results_peak_xy_pos_list, peak_score_inclusion_percent_threshold=peak_score_inclusion_percent_threshold)
             
-            # computation_result.computed_data['RatemapPeaksAnalysis'] = DynamicParameters(tuning_curve_findpeaks_results=peaks_outputs)
             computation_result.computed_data['RatemapPeaksAnalysis'] = DynamicParameters(mask_results=DynamicParameters(fp_list=fp_mask_list, df_list=mask_results_df_list),
                                                                                          topo_results=DynamicParameters(fp_list=fp_topo_list, df_list=topo_results_df_list, persistence_df_list=topo_persistence_df_list, peak_xy_points_pos_list=topo_results_peak_xy_pos_list),
                                                                                          final_filtered_results=DynamicParameters(df_list=filtered_df_list, peak_xy_points_pos_list=filtered_peak_xy_points_pos_list, peaks_are_included_list=peaks_are_included_list)
@@ -425,7 +417,7 @@ class PlacefieldDensityAnalysisComputationFunctions(AllFunctionEnumeratingMixin,
                 plt.close(fig) # close the figure when done generating the contours to prevent an empty figure from showing
                 return included_computed_contours
 
-            def _build_filtered_summits_analysis_results(xbin, ybin, xbin_labels, ybin_labels, flat_peaks_df, active_eloy_analysis, slice_level_multiplier=0.5, minimum_included_peak_height=0.5, debug_print = False):
+            def _build_filtered_summits_analysis_results(xbin, ybin, xbin_labels, ybin_labels, flat_peaks_df, active_eloy_analysis, slice_level_multiplier=0.5, minimum_included_peak_height=0.5, debug_print=False):
                 """ builds the filtered summits analysis results dataframe and flat counts matrix 
                 
                 Usage:
@@ -444,7 +436,6 @@ class PlacefieldDensityAnalysisComputationFunctions(AllFunctionEnumeratingMixin,
                 n_ybins = len(ybin) - 1 # the -1 is to get the counts for the centers only
                 pf_peak_counts_map = np.zeros((n_xbins, n_ybins), dtype=int) # create an initially zero matrix
 
-                
                 current_bin_counts = filtered_summits_analysis_df.value_counts(subset=['peak_center_binned_x', 'peak_center_binned_y'], normalize=False, sort=False, ascending=True, dropna=True) # current_bin_counts: a series with a MultiIndex index for each bin that has nonzero counts
                 if debug_print:
                     print(f'np.shape(current_bin_counts): {np.shape(current_bin_counts)}') # (247,)
@@ -465,7 +456,7 @@ class PlacefieldDensityAnalysisComputationFunctions(AllFunctionEnumeratingMixin,
             n_neurons = active_pf_2D.ratemap.n_neurons
             
             ## TODO: change to amap with keys of active_pf_2D.neuron_ids
-            # out_result_tuples = []
+            
             # active_tuning_curves = active_pf_2D.ratemap.tuning_curves # Raw Tuning Curves
             active_tuning_curves = active_pf_2D.ratemap.unit_max_tuning_curves # Unit-max scaled tuning curves
             tuning_curve_peak_firing_rates = active_pf_2D.ratemap.tuning_curve_peak_firing_rates # the peak firing rates of each tuning curve
@@ -507,7 +498,6 @@ class PlacefieldDensityAnalysisComputationFunctions(AllFunctionEnumeratingMixin,
                 for peak_idx, (peak_id, a_peak_dict) in enumerate(cell_peaks_dict.items()):
                     if debug_print:
                         print(f'computing contours for peak_id: {peak_id}...')                    
-                    
                     summit_slice_peak_height_arr[peak_idx, :] = a_peak_dict['height']
                     summit_slice_peak_prominence_arr[peak_idx, :] = a_peak_dict['prominence']
                     summit_peak_center_x_arr[peak_idx, :] = a_peak_dict['center'][0]
@@ -577,11 +567,8 @@ class PlacefieldDensityAnalysisComputationFunctions(AllFunctionEnumeratingMixin,
             
 
             ## Filter the summits, compute velocities, etc:            
-            
             filtered_summits_analysis_df, pf_peak_counts_map = _build_filtered_summits_analysis_results(active_pf_2D.xbin, active_pf_2D.ybin, active_pf_2D.xbin_labels, active_pf_2D.ybin_labels, cell_peaks_df, active_eloy_analysis, slice_level_multiplier=0.5, minimum_included_peak_height=minimum_included_peak_height, debug_print = debug_print)
             
-
-            # pf_peak_counts_map
             pf_peak_counts_map_blurred = uniform_filter(pf_peak_counts_map.astype('float'), size=uniform_blur_size, mode='constant')
             pf_peak_counts_map_blurred_gaussian = gaussian_filter(pf_peak_counts_map.astype('float'), sigma=gaussian_blur_sigma)
             pf_peak_counts_results = DynamicParameters(raw=pf_peak_counts_map, uniform_blurred=pf_peak_counts_map_blurred, gaussian_blurred=pf_peak_counts_map_blurred_gaussian)
