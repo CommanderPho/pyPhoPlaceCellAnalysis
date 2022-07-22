@@ -4,6 +4,35 @@ import pandas as pd
 import numpy as np
 from pyphocorehelpers.DataStructure.dynamic_parameters import DynamicParameters
 
+# ==================================================================================================================== #
+# FIGURE/GRAPHICS EXPORT                                                                                               #
+# ==================================================================================================================== #
+
+import pyphoplacecellanalysis.External.pyqtgraph as pg
+import pyphoplacecellanalysis.External.pyqtgraph.exporters
+# import pyphoplacecellanalysis.External.pyqtgraph.widgets.GraphicsLayoutWidget
+from pyphoplacecellanalysis.External.pyqtgraph.widgets.GraphicsView import GraphicsView
+
+def export_pyqtgraph_plot(a_plot, debug_print=True):
+    # create an exporter instance, as an argument give it
+    # the item you wish to export    
+    if isinstance(a_plot, GraphicsView):
+        a_plot = a_plot.scene()
+    else:
+        a_plot = a_plot.plotItem
+    exporter = pg.exporters.ImageExporter(a_plot)
+    # set export parameters if needed
+    # exporter.parameters()['width'] = 100   # (note this also affects height parameter)
+    # save to file
+    export_filepath = 'fileName.png'
+    exporter.export(export_filepath)
+    if debug_print:
+        print(f'exported plot to {export_filepath}')
+
+
+# ==================================================================================================================== #
+# DATA EXPORT                                                                                                          #
+# ==================================================================================================================== #
 
 def get_default_pipeline_data_keys(active_config_name):
     if active_config_name is None:
@@ -12,7 +41,6 @@ def get_default_pipeline_data_keys(active_config_name):
     return {'spikes_df': f'/filtered_sessions/{active_config_name}/spikes_df',
             'positions_df': f'/filtered_sessions/{active_config_name}/pos_df'
         }
-
 
         
 def save_some_pipeline_data_to_h5(active_pipeline, included_session_identifiers=None, custom_key_prefix=None, finalized_output_cache_file='./pipeline_cache_store.h5', debug_print=False):
@@ -127,7 +155,6 @@ def get_h5_data_keys(finalized_output_cache_file, enable_debug_print=False):
         if enable_debug_print:
             print(out_keys)
     return out_keys
-
 
 
 def _test_save_pipeline_data_to_h5(curr_active_pipeline, finalized_output_cache_file=None, data_output_directory=None, enable_dry_run=True, enable_debug_print=True):
