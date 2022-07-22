@@ -29,7 +29,7 @@ class DefaultDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=DisplayFunc
         
         Internally wraps `PfND.plot_ratemaps_2D` which itself wraps `neuropy.plotting.ratemaps.plot_ratemap_2D`
         
-        TODO: doesn't show peak firing rates
+            optionally shows peak firing rates
         
         """
         computation_result.computed_data['pf2D'].plot_ratemaps_2D(**({'subplots': (None, 3), 'resolution_multiplier': 1.0, 'enable_spike_overlay': False, 'brev_mode': PlotStringBrevityModeEnum.MINIMAL} | kwargs))
