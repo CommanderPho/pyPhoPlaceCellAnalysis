@@ -50,15 +50,20 @@ class PlottingConfig(DynamicParameters):
         return self.active_output_parent_dir     
 
     def get_figure_save_path(self, *args):
+        """ If no *args are passed just returns the computed parent basepath. """
         # print('get_figure_save_path(...):')
         args_list = list(args)
-        basename = args_list.pop()
-        subdirectories = args_list
-        # print(f'\tsubdirectories: {subdirectories}\n basename: {basename}')
-        curr_parent_out_path = self.active_output_parent_dir.joinpath(*subdirectories)
-        # print(f'\t curr_parent_out_path: {curr_parent_out_path}')
+        if len(args) == 0:
+            curr_parent_out_path = self.active_output_parent_dir
+            out_path = curr_parent_out_path
+        else:            
+            basename = args_list.pop()
+            subdirectories = args_list
+            curr_parent_out_path = self.active_output_parent_dir.joinpath(*subdirectories)
+            out_path = curr_parent_out_path.joinpath(basename)
+        
         curr_parent_out_path.mkdir(parents=True, exist_ok=True)
-        return curr_parent_out_path.joinpath(basename)
+        return out_path
     
     
     def change_active_out_parent_dir(self, new_parent):
