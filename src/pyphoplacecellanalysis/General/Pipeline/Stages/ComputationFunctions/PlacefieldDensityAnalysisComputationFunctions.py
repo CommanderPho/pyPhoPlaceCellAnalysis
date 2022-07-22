@@ -520,7 +520,7 @@ class PlacefieldDensityAnalysisComputationFunctions(AllFunctionEnumeratingMixin,
                         elif (matching_vertical_scan_y_idxs[0] < peak_y_bin_idx):
                             # add the upper extrema
                             warn(f'\tWARNING: len(matching_vertical_scan_y_idxs) == 1: missing upper extrema, adding ybin_outer_extrema[1] = {ybin_outer_extrema[1]} to matching_vertical_scan_y_idxs')
-                            matching_vertical_scan_y_idxs.append(ybin_outer_extrema[1])
+                            matching_vertical_scan_y_idxs = np.append(matching_vertical_scan_y_idxs, [ybin_outer_extrema[1]])
                         else:
                             # # EQUAL CONDITION SHOULDN'T HAPPEN!
                             # raise NotImplementedError
@@ -591,7 +591,7 @@ class PlacefieldDensityAnalysisComputationFunctions(AllFunctionEnumeratingMixin,
                         elif (matching_horizontal_scan_x_idxs[0] < peak_x_bin_idx):
                             # add the upper extrema
                             warn(f'\tWARNING: len(matching_horizontal_scan_x_idxs) == 1: missing upper extrema, adding xbin_outer_extrema[1] = {xbin_outer_extrema[1]} to matching_horizontal_scan_x_idxs')
-                            matching_horizontal_scan_x_idxs.append(xbin_outer_extrema[1])
+                            matching_horizontal_scan_x_idxs = np.append(matching_horizontal_scan_x_idxs, [xbin_outer_extrema[1]])
                         else:
                             # # EQUAL CONDITION SHOULDN'T HAPPEN!
                             # raise NotImplementedError
