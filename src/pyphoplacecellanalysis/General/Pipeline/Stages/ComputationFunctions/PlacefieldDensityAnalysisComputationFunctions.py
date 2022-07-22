@@ -450,6 +450,218 @@ class PlacefieldDensityAnalysisComputationFunctions(AllFunctionEnumeratingMixin,
                     
                 return filtered_summits_analysis_df, pf_peak_counts_map
             
+            def _compute_distances_from_peaks_to_boundary(active_pf_2D, filtered_flat_peaks_df, debug_print = True):
+                """ Computes the distance to boundary by computing the distance to the nearest never-occupied bin
+                        For any given peak location, the distance to the boundary in each of the four directions can be computed.
+                
+                # filtered_flat_peaks_df
+
+                # Required Input Columns:
+                # ['peak_center_binned_x', 'peak_center_binned_y']
+
+                # Output Columns:
+                # ['peak_nearest_boundary_bin_negX', 'peak_nearest_boundary_bin_posX', 'peak_nearest_boundary_bin_negY', 'peak_nearest_boundary_bin_posY'] # separate
+
+                # ['peak_nearest_directional_boundary_bins', 'peak_nearest_directional_boundary_displacements', 'peak_nearest_directional_boundary_distances'] # combined tuple columns
+                
+                
+                TODO: I should have just used actual continuous position values instead of counting bins :[
+                    
+                Usage:
+                    peak_nearest_directional_boundary_bins, peak_nearest_directional_boundary_displacements, peak_nearest_directional_boundary_distances = _compute_distances_from_peaks_to_boundary(active_pf_2D, filtered_summits_analysis_df, debug_print=debug_print)
+
+                """
+                # Build the boundary mask from the NaN speeds, which correspond to never-occupied cells:
+                # boundary_mask_indicies = ~np.isfinite(active_eloy_analysis.avg_2D_speed_per_pos)
+                boundary_mask_indicies = active_pf_2D.never_visited_occupancy_mask.copy() # True if value is never-occupied, False otherwise
+
+                ## Add a padding of size 1 of True values around the edge, ensuring a border of never-visited bins on all sides:
+                # boundary_mask_indicies = np.pad(boundary_mask_indicies, 1, 'constant', constant_values=(True, True)) ## BUG: this changes the indicies and doesn't completely fix the problem
+
+                ## Get just the True indicies. A 2-tuple of 1D np.array vectors containing the true indicies
+                boundary_mask_true_indicies = np.vstack(np.where(boundary_mask_indicies)).T
+                # boundary_mask_true_indicies.shape # (235, 2)
+                # boundary_mask_true_indicies
+
+                ## Compute the extrema to deal with border effects:
+                # active_pf_2D.bin_info
+                xbin_indicies = active_pf_2D.xbin_labels -1
+                xbin_outer_extrema = (xbin_indicies[0]-1, xbin_indicies[-1]+1) # if indicies [0, 59] are valid, the outer_extrema for this axis should be (-1, 60)
+                ybin_indicies = active_pf_2D.ybin_labels -1
+                ybin_outer_extrema = (ybin_indicies[0]-1, ybin_indicies[-1]+1) # if indicies [0, 7] are valid, the outer_extrema for this axis should be (-1, 8)
+
+                if debug_print:
+                    print(f'xbin_indicies: {xbin_indicies}\nxbin_outer_extrema: {xbin_outer_extrema}\nybin_indicies: {ybin_indicies}\nybin_outer_extrema: {ybin_outer_extrema}')
+                
+                peak_nearest_directional_boundary_bins, peak_nearest_directional_boundary_displacements, peak_nearest_directional_boundary_distances = list(), list(), list()
+
+                for a_peak_row in filtered_flat_peaks_df[['peak_center_binned_x', 'peak_center_binned_y']].itertuples():
+                    peak_x_bin_idx, peak_y_bin_idx = (a_peak_row.peak_center_binned_x-1), (a_peak_row.peak_center_binned_y-1)
+                    if debug_print:
+                        print(f'peak_x_bin_idx: {peak_x_bin_idx}, peak_y_bin_idx: {peak_y_bin_idx}')
+                    # For a given (x_idx, y_idx):
+                    ## Perform vertical line scan (across y-values) by first getting all matching x-values:
+                    matching_vertical_scan_y_idxs = boundary_mask_true_indicies[(boundary_mask_true_indicies[:,0]==peak_x_bin_idx), 1] # the [*, 1] is because we only need the y-values
+                    # matching_vertical_scan_y_idxs # array([0, 1, 2, 6, 7], dtype=int64)
+                    if debug_print:
+                        print(f'\tmatching_vertical_scan_y_idxs: {matching_vertical_scan_y_idxs}')
+
+                    if len(matching_vertical_scan_y_idxs) == 0:
+                        # both min and max ends missing. Should be set to the bin just outside the minimum and maximum bin in that dimension
+                        warn(f'\tWARNING: len(matching_vertical_scan_y_idxs) == 0: setting matching_vertical_scan_y_idxs = {ybin_outer_extrema}')
+                        matching_vertical_scan_y_idxs = ybin_outer_extrema
+                    elif len(matching_vertical_scan_y_idxs) == 1:
+                        # only one end missing, need to determine which end it is and replace the missing end with the appropriate extrema
+                        if (matching_vertical_scan_y_idxs[0] > peak_y_bin_idx):
+                            # add the lower extrema
+                            warn(f'\tWARNING: len(matching_vertical_scan_y_idxs) == 1: missing lower extrema, adding ybin_outer_extrema[0] = {ybin_outer_extrema[0]} to matching_vertical_scan_y_idxs')
+                            matching_vertical_scan_y_idxs = np.insert(matching_vertical_scan_y_idxs, 0, ybin_outer_extrema[0])
+                            # matching_horizontal_scan_x_idxs.insert(xbin_outer_extrema[0], 0)
+                        elif (matching_vertical_scan_y_idxs[0] < peak_y_bin_idx):
+                            # add the upper extrema
+                            warn(f'\tWARNING: len(matching_vertical_scan_y_idxs) == 1: missing upper extrema, adding ybin_outer_extrema[1] = {ybin_outer_extrema[1]} to matching_vertical_scan_y_idxs')
+                            matching_vertical_scan_y_idxs.append(ybin_outer_extrema[1])
+                        else:
+                            # # EQUAL CONDITION SHOULDN'T HAPPEN!
+                            # raise NotImplementedError
+                            # This condition should only happen when peak_y_bin_idx is right against the boundary itself (e.g. (peak_y_bin_idx == 7) or (peak_y_bin_idx == 0)
+                            if (peak_y_bin_idx == ybin_indicies[0]):
+                                # matching_vertical_scan_y_idxs[0] = ybin_outer_extrema[0] ## replace the duplicated value with the lower extreme
+                                warn(f'\tWARNING: peak_y_bin_idx ({peak_y_bin_idx}) == ybin_indicies[0] ({ybin_indicies[0]}): setting matching_vertical_scan_y_idxs = {ybin_outer_extrema}')
+                                matching_vertical_scan_y_idxs = ybin_outer_extrema
+                            elif (peak_y_bin_idx == ybin_indicies[-1]):
+                                # matching_vertical_scan_y_idxs[0] = ybin_outer_extrema[1] ## replace the duplicated value with the upper extreme
+                                warn(f'\tWARNING: peak_y_bin_idx ({peak_y_bin_idx}) == ybin_indicies[-1] ({ybin_indicies[-1]}): setting matching_vertical_scan_y_idxs = {ybin_outer_extrema}')
+                                matching_vertical_scan_y_idxs = ybin_outer_extrema
+                            else:
+                                warn(f'\tWARNING: This REALLY should not happen! peak_y_bin_idx: {peak_y_bin_idx}, matching_vertical_scan_y_idxs: {matching_vertical_scan_y_idxs}!!')
+                                raise NotImplementedError
+                                
+                    ## Partition on the peak_y_bin_idx:
+                    found_start_indicies = np.searchsorted(matching_vertical_scan_y_idxs, peak_y_bin_idx, side='left')
+                    found_end_indicies = np.searchsorted(matching_vertical_scan_y_idxs, peak_y_bin_idx, side='right') # find the end of the range
+                    out = np.hstack((found_start_indicies, found_end_indicies))
+                    if debug_print:     
+                        print(f'\tfound_start_indicies: {found_start_indicies}, found_end_indicies: {found_end_indicies}, out: {out}')
+                    split_vertical_scan_y_idxs = np.array_split(matching_vertical_scan_y_idxs, [found_start_indicies]) # need to pass in found_start_indicies as a list containing the scalar value because this functionality is different than if the scalar itself is passed in.
+                    if debug_print:
+                        print(f'\tsplit_vertical_scan_y_idxs: {split_vertical_scan_y_idxs}')
+
+                    """ Encountering IndexError with split_vertical_scan_y_idxs[0][-1], says len(split_vertical_scan_y_idxs[0]) == 0
+                    peak_x_bin_idx: 1, peak_y_bin_idx: 0
+                        matching_vertical_scan_y_idxs: [6 7]
+                        found_start_indicies: 0, found_end_indicies: 0, out: [0 0]
+                        split_vertical_scan_y_idxs: [array([], dtype=int64), array([6, 7], dtype=int64)]
+
+                    """
+                    lower_list, upper_list = split_vertical_scan_y_idxs[0], split_vertical_scan_y_idxs[1]
+                    if len(lower_list)==0:
+                        # if the lower list is empty get the ybin_outer_extrema[0]
+                        below_bound = ybin_outer_extrema[0]
+                    else:
+                        below_bound = lower_list[-1] # get the last (maximum) of the lower list
+
+                    if len(upper_list)==0:
+                        # if the upper list is empty get the ybin_outer_extrema[1]
+                        above_bound = ybin_outer_extrema[1]
+                    else:
+                        above_bound = upper_list[0] # get the first (minimum) of the upper list
+                    vertical_scan_result = (below_bound, above_bound) # get the last (maximum) of the lower list, and the first (minimum) of the upper list.
+                    if debug_print:
+                        print(f'\tvertical_scan_result: {vertical_scan_result}') # vertical_scan_result: (2, 6)
+
+
+                    ## Perform horizontal line scan (across x-values):
+                    matching_horizontal_scan_x_idxs = boundary_mask_true_indicies[(boundary_mask_true_indicies[:,1]==peak_y_bin_idx), 0] # the [*, 0] is because we only need the x-values
+                    # matching_horizontal_scan_x_idxs # array([0, 1, 2, 6, 7], dtype=int64)
+                    if debug_print:
+                        print(f'\tmatching_horizontal_scan_x_idxs: {matching_horizontal_scan_x_idxs}')
+
+                    if len(matching_horizontal_scan_x_idxs) == 0:
+                        # both min and max ends missing. Should be set to the bin just outside the minimum and maximum bin in that dimension
+                        warn(f'\tWARNING: len(matching_horizontal_scan_x_idxs) == 0: setting matching_horizontal_scan_x_idxs = {xbin_outer_extrema}')
+                        matching_horizontal_scan_x_idxs = xbin_outer_extrema
+                    elif len(matching_horizontal_scan_x_idxs) == 1:
+                        # only one end missing, need to determine which end it is and replace the missing end with the appropriate extrema
+                        if (matching_horizontal_scan_x_idxs[0] > peak_x_bin_idx):
+                            # add the lower extrema
+                            warn(f'\tWARNING: len(matching_horizontal_scan_x_idxs) == 1: missing lower extrema, adding xbin_outer_extrema[0] = {xbin_outer_extrema[0]} to matching_horizontal_scan_x_idxs')
+                            matching_horizontal_scan_x_idxs = np.insert(matching_horizontal_scan_x_idxs, 0, xbin_outer_extrema[0])
+                            # matching_horizontal_scan_x_idxs.insert(xbin_outer_extrema[0], 0)
+                        elif (matching_horizontal_scan_x_idxs[0] < peak_x_bin_idx):
+                            # add the upper extrema
+                            warn(f'\tWARNING: len(matching_horizontal_scan_x_idxs) == 1: missing upper extrema, adding xbin_outer_extrema[1] = {xbin_outer_extrema[1]} to matching_horizontal_scan_x_idxs')
+                            matching_horizontal_scan_x_idxs.append(xbin_outer_extrema[1])
+                        else:
+                            # # EQUAL CONDITION SHOULDN'T HAPPEN!
+                            # raise NotImplementedError
+                            # This condition should only happen when peak_x_bin_idx is right against the boundary itself (e.g. (peak_x_bin_idx == 7) or (peak_x_bin_idx == 0)
+                            if (peak_x_bin_idx == xbin_indicies[0]):
+                                # matching_horizontal_scan_x_idxs[0] = xbin_outer_extrema[0] ## replace the duplicated value with the lower extreme
+                                warn(f'\tWARNING: peak_x_bin_idx ({peak_x_bin_idx}) == xbin_indicies[0] ({xbin_indicies[0]}): setting matching_horizontal_scan_x_idxs = {xbin_outer_extrema}')
+                                matching_horizontal_scan_x_idxs = xbin_outer_extrema
+                            elif (peak_x_bin_idx == xbin_indicies[-1]):
+                                # matching_horizontal_scan_x_idxs[0] = xbin_outer_extrema[1] ## replace the duplicated value with the upper extreme
+                                warn(f'\tWARNING: peak_x_bin_idx ({peak_x_bin_idx}) == xbin_indicies[-1] ({xbin_indicies[-1]}): setting matching_horizontal_scan_x_idxs = {xbin_outer_extrema}')
+                                matching_horizontal_scan_x_idxs = xbin_outer_extrema
+                            else:
+                                warn(f'\tWARNING: This REALLY should not happen! peak_x_bin_idx: {peak_x_bin_idx}, matching_horizontal_scan_x_idxs: {matching_horizontal_scan_x_idxs}!!')
+                                raise NotImplementedError
+                                
+                    # Otherwise we're good
+
+                    ### Partition on the peak_x_bin_idx
+                    found_start_indicies = np.searchsorted(matching_horizontal_scan_x_idxs, peak_x_bin_idx, side='left')
+                    found_end_indicies = np.searchsorted(matching_horizontal_scan_x_idxs, peak_x_bin_idx, side='right') # find the end of the range
+                    out = np.hstack((found_start_indicies, found_end_indicies))
+                    if debug_print:
+                        print(f'\tfound_start_indicies: {found_start_indicies}, found_end_indicies: {found_end_indicies}, out: {out}')
+                    split_horizontal_scan_x_idxs = np.array_split(matching_horizontal_scan_x_idxs, [found_start_indicies]) # need to pass in found_start_indicies as a list containing the scalar value because this functionality is different than if the scalar itself is passed in.
+                    if debug_print:
+                        print(f'\tsplit_horizontal_scan_x_idxs: {split_horizontal_scan_x_idxs}')
+
+                    lower_list, upper_list = split_horizontal_scan_x_idxs[0], split_horizontal_scan_x_idxs[1]
+                    if len(lower_list)==0:
+                        # if the lower list is empty get the xbin_outer_extrema[0]
+                        below_bound = xbin_outer_extrema[0]
+                    else:
+                        below_bound = lower_list[-1] # get the last (maximum) of the lower list
+                    if len(upper_list)==0:
+                        # if the upper list is empty get the xbin_outer_extrema[1]
+                        above_bound = xbin_outer_extrema[1]
+                    else:
+                        above_bound = upper_list[0] # get the first (minimum) of the upper list
+                    horizontal_scan_result = (below_bound, above_bound) # get the last (maximum) of the lower list, and the first (minimum) of the upper list.
+                    if debug_print:
+                        print(f'\thorizontal_scan_result: {horizontal_scan_result}') # horizontal_scan_result: (0, 60)
+                    
+                    ## Build final four directional boundary bins:
+                    final_four_boundary_bin_tuples = [(peak_x_bin_idx, boundary_y) for boundary_y in vertical_scan_result] # [(46, 2), (46, 7)]
+                    final_four_boundary_bin_tuples += [(boundary_x, peak_y_bin_idx) for boundary_x in horizontal_scan_result] # [(0, 4), (60, 4)]
+                    # final_four_boundary_bin_tuples # [(46, 2), (46, 7), (0, 4), (60, 4)]
+                    # Add to outputs:
+                    peak_nearest_directional_boundary_bins.append(final_four_boundary_bin_tuples)
+                    final_four_boundary_bins = np.array(final_four_boundary_bin_tuples) # convert to a (4, 2) np.array
+                    if debug_print:
+                        print(f'\tfinal_four_boundary_bins: {final_four_boundary_bins}')
+                    ## Compute displacements from current point to each boundary:
+                    final_four_boundary_displacements = final_four_boundary_bins - [peak_x_bin_idx, peak_y_bin_idx]
+                    if debug_print:
+                        print(f'\tfinal_four_boundary_displacements: {final_four_boundary_displacements}')
+
+                    # Add to outputs:
+                    peak_nearest_directional_boundary_displacements.append([(final_four_boundary_displacements[row_idx,0], final_four_boundary_displacements[row_idx,1]) for row_idx in np.arange(final_four_boundary_displacements.shape[0])])
+
+                    # Compute distances from current point to each boundary:
+                    # Flatten down to the pure distances in each component axis, form is (down, up, left, right)
+                    final_four_boundary_distances = np.max(np.abs(final_four_boundary_displacements), axis=1) # array([ 2,  2, 47, 14], dtype=int64)
+                    # final_four_boundary_distances # again a (4, 2) np.array
+                    if debug_print:
+                        print(f'\tfinal_four_boundary_distances: {final_four_boundary_distances}')
+                    peak_nearest_directional_boundary_distances.append(final_four_boundary_distances)
+                
+                return peak_nearest_directional_boundary_bins, peak_nearest_directional_boundary_displacements, peak_nearest_directional_boundary_distances
+
             # ==================================================================================================================== #
             # begin main function body ___________________________________________________________________________________________ #
             active_pf_2D = computation_result.computed_data['pf2D']
@@ -572,6 +784,30 @@ class PlacefieldDensityAnalysisComputationFunctions(AllFunctionEnumeratingMixin,
             pf_peak_counts_map_blurred = uniform_filter(pf_peak_counts_map.astype('float'), size=uniform_blur_size, mode='constant')
             pf_peak_counts_map_blurred_gaussian = gaussian_filter(pf_peak_counts_map.astype('float'), sigma=gaussian_blur_sigma)
             pf_peak_counts_results = DynamicParameters(raw=pf_peak_counts_map, uniform_blurred=pf_peak_counts_map_blurred, gaussian_blurred=pf_peak_counts_map_blurred_gaussian)
+
+            ## Add distance to boundary by computing the distance to the nearest never-occupied bin
+            peak_nearest_directional_boundary_bins, peak_nearest_directional_boundary_displacements, peak_nearest_directional_boundary_distances = _compute_distances_from_peaks_to_boundary(active_pf_2D, filtered_summits_analysis_df, debug_print=debug_print)
+
+            ## Add the output columns to the peaks dataframe:
+            # Output Columns:
+            # ['peak_nearest_boundary_bin_negX', 'peak_nearest_boundary_bin_posX', 'peak_nearest_boundary_bin_negY', 'peak_nearest_boundary_bin_posY'] # separate
+            # ['peak_nearest_directional_boundary_bins', 'peak_nearest_directional_boundary_displacements', 'peak_nearest_directional_boundary_distances'] # combined tuple columns
+            filtered_summits_analysis_df['peak_nearest_directional_boundary_bins'] = peak_nearest_directional_boundary_bins
+            filtered_summits_analysis_df['peak_nearest_directional_boundary_displacements'] = peak_nearest_directional_boundary_displacements
+            filtered_summits_analysis_df['peak_nearest_directional_boundary_distances'] = peak_nearest_directional_boundary_distances
+            filtered_summits_analysis_df['nearest_directional_boundary_direction_idx'] = np.argmin(peak_nearest_directional_boundary_distances, axis=1) # an index [0,1,2,3] corresponding to the direction of travel to the nearest index. Corresponds to (down, up, left, right)
+            filtered_summits_analysis_df['nearest_directional_boundary_direction_distance'] = np.min(peak_nearest_directional_boundary_distances, axis=1) # the distance in the minimal dimension towards the nearest boundary
+
+            # ['peak_nearest_boundary_bin_negX', 'peak_nearest_boundary_bin_posX', 'peak_nearest_boundary_bin_negY', 'peak_nearest_boundary_bin_posY'] # separate
+            distances = np.vstack([np.asarray(a_tuple) for a_tuple in peak_nearest_directional_boundary_distances])
+            x_distances = np.min(distances[:,3:], axis=1) # find the distance to nearest wall vertically
+            y_distances = np.min(distances[:,:2], axis=1) # find the distance to nearest wall horizontally
+
+            filtered_summits_analysis_df['nearest_x_boundary_distance'] = x_distances # the distance in the minimal dimension towards the nearest x boundary
+            filtered_summits_analysis_df['nearest_y_boundary_distance'] = y_distances # the distance in the minimal dimension towards the nearest y boundary
+
+
+
 
             ## Build function output:
             computation_result.computed_data.setdefault('RatemapPeaksAnalysis', DynamicParameters()) # get the existing RatemapPeaksAnalysis output or create a new one if needed
