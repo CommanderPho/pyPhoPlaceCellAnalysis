@@ -28,8 +28,6 @@ from neuropy.utils.mixins.binning_helpers import build_df_discretized_binned_pos
 
 modify_dict_mode = True # if True, writes the dict
 
-
-            
             
 class PlacefieldDensityAnalysisComputationFunctions(AllFunctionEnumeratingMixin, metaclass=ComputationFunctionRegistryHolder):
     """Performs analyeses related to placefield densities and overlap across spactial bins. Includes analyses for Eloy from 07-2022. 
@@ -195,7 +193,6 @@ class PlacefieldDensityAnalysisComputationFunctions(AllFunctionEnumeratingMixin,
             return computation_result
         
         
-        
     def _perform_pf_find_ratemap_peaks_computation(computation_result: ComputationResult, debug_print=False, peak_score_inclusion_percent_threshold=0.25):
             """ Uses the `findpeaks` library to compute the topographical peak locations and information with the intent of doing an extended pf size/density analysis.
                 Not really used as the `peak_prominence2d` seems to work much better.
@@ -345,7 +342,6 @@ class PlacefieldDensityAnalysisComputationFunctions(AllFunctionEnumeratingMixin,
             return computation_result
 
     
-
     def _perform_pf_find_ratemap_peaks_peak_prominence2d_computation(computation_result: ComputationResult, step=0.01, peak_height_multiplier_probe_levels=(0.5, 0.9), minimum_included_peak_height = 0.2, uniform_blur_size = 3, gaussian_blur_sigma = 3, debug_print=False):
             """ Uses the peak_prominence2d package to find the peaks and promenences of 2D placefields
             
@@ -453,7 +449,10 @@ class PlacefieldDensityAnalysisComputationFunctions(AllFunctionEnumeratingMixin,
             def _compute_distances_from_peaks_to_boundary(active_pf_2D, filtered_flat_peaks_df, debug_print = True):
                 """ Computes the distance to boundary by computing the distance to the nearest never-occupied bin
                         For any given peak location, the distance to the boundary in each of the four directions can be computed.
-                
+                        
+                    TODO: this function currently uses the binned peak positions and computes distances to the boundaries in terms of bins in each dimension. Could use a continuous position measure as well.
+                    
+
                 # filtered_flat_peaks_df
 
                 # Required Input Columns:
