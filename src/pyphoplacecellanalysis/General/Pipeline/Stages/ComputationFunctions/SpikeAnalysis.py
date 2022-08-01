@@ -170,6 +170,7 @@ class SpikeAnalysisComputations(AllFunctionEnumeratingMixin, metaclass=Computati
                     ['firing_rate_trends']['all_session_spikes']['time_window_edges_binning_info']
                     ['firing_rate_trends']['all_session_spikes']['time_binned_unit_specific_binned_spike_rate']
                     ['firing_rate_trends']['all_session_spikes']['min_spike_rates']
+                    ['firing_rate_trends']['all_session_spikes']['mean_spike_rates']
                     ['firing_rate_trends']['all_session_spikes']['median_spike_rates']
                     ['firing_rate_trends']['all_session_spikes']['max_spike_rates']
                     
@@ -178,6 +179,7 @@ class SpikeAnalysisComputations(AllFunctionEnumeratingMixin, metaclass=Computati
                     ['firing_rate_trends']['pf_included_spikes_only']['time_window_edges_binning_info']
                     ['firing_rate_trends']['pf_included_spikes_only']['time_binned_unit_specific_binned_spike_rate']
                     ['firing_rate_trends']['pf_included_spikes_only']['min_spike_rates']
+                    ['firing_rate_trends']['pf_included_spikes_only']['mean_spike_rates']
                     ['firing_rate_trends']['pf_included_spikes_only']['median_spike_rates']
                     ['firing_rate_trends']['pf_included_spikes_only']['max_spike_rates']
         
@@ -194,18 +196,21 @@ class SpikeAnalysisComputations(AllFunctionEnumeratingMixin, metaclass=Computati
         ## Compute for all the session spikes first:
         active_session_spikes_df = computation_result.sess.spikes_df.copy()
         sess_unit_specific_binned_spike_rate, sess_time_window_edges, sess_time_window_edges_binning_info = _simple_time_binned_firing_rates(active_session_spikes_df)
-        sess_max_spike_rates = sess_unit_specific_binned_spike_rate.max()
-        sess_median_spike_rates = sess_unit_specific_binned_spike_rate.median()
         sess_min_spike_rates = sess_unit_specific_binned_spike_rate.min()
+        sess_mean_spike_rates = sess_unit_specific_binned_spike_rate.mean()
+        sess_median_spike_rates = sess_unit_specific_binned_spike_rate.median()
+        sess_max_spike_rates = sess_unit_specific_binned_spike_rate.max()
+        
         
         # Compute for only the placefield included spikes as well:
         active_pf_2D = computation_result.computed_data['pf2D']
         active_pf_included_spikes_only_spikes_df = active_pf_2D.filtered_spikes_df.copy()
         pf_only_unit_specific_binned_spike_rate, pf_only_time_window_edges, pf_only_time_window_edges_binning_info = _simple_time_binned_firing_rates(active_pf_included_spikes_only_spikes_df)
-        pf_only_max_spike_rates = pf_only_unit_specific_binned_spike_rate.max()
-        pf_only_median_spike_rates = pf_only_unit_specific_binned_spike_rate.median()
         pf_only_min_spike_rates = pf_only_unit_specific_binned_spike_rate.min()
-
+        pf_only_mean_spike_rates = pf_only_unit_specific_binned_spike_rate.mean()
+        pf_only_median_spike_rates = pf_only_unit_specific_binned_spike_rate.median()
+        pf_only_max_spike_rates = pf_only_unit_specific_binned_spike_rate.max()
+        
         computation_result.computed_data['firing_rate_trends'] = DynamicParameters.init_from_dict({
             'time_bin_size_seconds': time_bin_size_seconds,
             'all_session_spikes': DynamicParameters.init_from_dict({
@@ -213,6 +218,7 @@ class SpikeAnalysisComputations(AllFunctionEnumeratingMixin, metaclass=Computati
                 'time_window_edges_binning_info': sess_time_window_edges_binning_info,
                 'time_binned_unit_specific_binned_spike_rate': sess_unit_specific_binned_spike_rate,
                 'min_spike_rates': sess_min_spike_rates,
+                'mean_spike_rates': sess_mean_spike_rates,
                 'median_spike_rates': sess_median_spike_rates,
                 'max_spike_rates': sess_max_spike_rates,                
             }),
@@ -221,6 +227,7 @@ class SpikeAnalysisComputations(AllFunctionEnumeratingMixin, metaclass=Computati
                 'time_window_edges_binning_info': pf_only_time_window_edges_binning_info,
                 'time_binned_unit_specific_binned_spike_rate': pf_only_unit_specific_binned_spike_rate,
                 'min_spike_rates': pf_only_min_spike_rates,
+                'mean_spike_rates': pf_only_mean_spike_rates,
                 'median_spike_rates': pf_only_median_spike_rates,
                 'max_spike_rates': pf_only_max_spike_rates,                
             }),
