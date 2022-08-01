@@ -19,6 +19,9 @@ from pyphoplacecellanalysis.General.Model.ComputationResults import ComputationR
 from pyphocorehelpers.DataStructure.dynamic_parameters import DynamicParameters
 
 
+from pyphoplacecellanalysis.Analysis.reconstruction import ZhangReconstructionImplementation # for _perform_firing_rate_trends_computation
+
+
 class SpikeAnalysisComputations(AllFunctionEnumeratingMixin, metaclass=ComputationFunctionRegistryHolder):
     
     _computationGroupName = 'burst_detection'
@@ -152,3 +155,74 @@ class SpikeAnalysisComputations(AllFunctionEnumeratingMixin, metaclass=Computati
         return computation_result
     
     
+    def _perform_firing_rate_trends_computation(computation_result: ComputationResult, debug_print=False):
+        """ Computes trends and time-courses of each neuron's firing rate. 
+        
+        Requires:
+            ['pf2D']
+            
+        Provides:
+            computation_result.computed_data['firing_rate_trends']
+                ['firing_rate_trends']['time_bin_size_seconds']
+                
+                ['firing_rate_trends']['all_session_spikes']:
+                    ['firing_rate_trends']['all_session_spikes']['time_window_edges']
+                    ['firing_rate_trends']['all_session_spikes']['time_window_edges_binning_info']
+                    ['firing_rate_trends']['all_session_spikes']['time_binned_unit_specific_binned_spike_rate']
+                    ['firing_rate_trends']['all_session_spikes']['min_spike_rates']
+                    ['firing_rate_trends']['all_session_spikes']['median_spike_rates']
+                    ['firing_rate_trends']['all_session_spikes']['max_spike_rates']
+                    
+                ['firing_rate_trends']['pf_included_spikes_only']:
+                    ['firing_rate_trends']['pf_included_spikes_only']['time_window_edges']
+                    ['firing_rate_trends']['pf_included_spikes_only']['time_window_edges_binning_info']
+                    ['firing_rate_trends']['pf_included_spikes_only']['time_binned_unit_specific_binned_spike_rate']
+                    ['firing_rate_trends']['pf_included_spikes_only']['min_spike_rates']
+                    ['firing_rate_trends']['pf_included_spikes_only']['median_spike_rates']
+                    ['firing_rate_trends']['pf_included_spikes_only']['max_spike_rates']
+        
+        """
+        def _simple_time_binned_firing_rates(active_spikes_df, time_bin_size_seconds=0.5):
+            """ This simple function computes the firing rates for each time bin """
+            unit_specific_binned_spike_counts, time_window_edges, time_window_edges_binning_info = ZhangReconstructionImplementation.compute_time_binned_spiking_activity(active_spikes_df.copy(), time_bin_size_seconds)
+            ## Convert to firing rates in Hz for each bin by dividing by the time bin size
+            unit_specific_binned_spike_rate = unit_specific_binned_spike_counts.astype('float') / time_bin_size_seconds
+            return unit_specific_binned_spike_rate, time_window_edges, time_window_edges_binning_info
+
+        time_bin_size_seconds = 0.5
+        
+        ## Compute for all the session spikes first:
+        active_session_spikes_df = computation_result.sess.spikes_df.copy()
+        sess_unit_specific_binned_spike_rate, sess_time_window_edges, sess_time_window_edges_binning_info = _simple_time_binned_firing_rates(active_session_spikes_df)
+        sess_max_spike_rates = sess_unit_specific_binned_spike_rate.max()
+        sess_median_spike_rates = sess_unit_specific_binned_spike_rate.median()
+        sess_min_spike_rates = sess_unit_specific_binned_spike_rate.min()
+        
+        # Compute for only the placefield included spikes as well:
+        active_pf_2D = computation_result.computed_data['pf2D']
+        active_pf_included_spikes_only_spikes_df = active_pf_2D.filtered_spikes_df.copy()
+        pf_only_unit_specific_binned_spike_rate, pf_only_time_window_edges, pf_only_time_window_edges_binning_info = _simple_time_binned_firing_rates(active_pf_included_spikes_only_spikes_df)
+        pf_only_max_spike_rates = pf_only_unit_specific_binned_spike_rate.max()
+        pf_only_median_spike_rates = pf_only_unit_specific_binned_spike_rate.median()
+        pf_only_min_spike_rates = pf_only_unit_specific_binned_spike_rate.min()
+
+        computation_result.computed_data['firing_rate_trends'] = DynamicParameters.init_from_dict({
+            'time_bin_size_seconds': time_bin_size_seconds,
+            'all_session_spikes': DynamicParameters.init_from_dict({
+                'time_window_edges': sess_time_window_edges,
+                'time_window_edges_binning_info': sess_time_window_edges_binning_info,
+                'time_binned_unit_specific_binned_spike_rate': sess_unit_specific_binned_spike_rate,
+                'min_spike_rates': sess_min_spike_rates,
+                'median_spike_rates': sess_median_spike_rates,
+                'max_spike_rates': sess_max_spike_rates,                
+            }),
+            'pf_included_spikes_only': DynamicParameters.init_from_dict({
+                'time_window_edges': pf_only_time_window_edges,
+                'time_window_edges_binning_info': pf_only_time_window_edges_binning_info,
+                'time_binned_unit_specific_binned_spike_rate': pf_only_unit_specific_binned_spike_rate,
+                'min_spike_rates': pf_only_min_spike_rates,
+                'median_spike_rates': pf_only_median_spike_rates,
+                'max_spike_rates': pf_only_max_spike_rates,                
+            }),
+        })
+        return computation_result
