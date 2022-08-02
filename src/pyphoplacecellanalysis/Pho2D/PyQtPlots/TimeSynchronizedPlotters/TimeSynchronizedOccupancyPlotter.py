@@ -39,14 +39,31 @@ class TimeSynchronizedOccupancyPlotter(AnimalTrajectoryPlottingMixin, TimeSynchr
     
     enable_debug_print = False
     
-    def __init__(self, active_time_dependent_placefields2D, drop_below_threshold: float=0.0000001, application_name=None, parent=None):
+    
+    @property
+    def occupancy_mode_to_render(self):
+        """The occupancy_mode_to_render property."""
+        return self.params.occupany_mode_to_render
+    @occupancy_mode_to_render.setter
+    def occupancy_mode_to_render(self, value):
+        self.params.occupany_mode_to_render = value
+        # on update, be sure to call self._update_plots()
+        self._update_plots()
+    
+    
+    def __init__(self, active_time_dependent_placefields2D, drop_below_threshold: float=0.0000001, occupancy_mode_to_render='seconds_occupancy', application_name=None, parent=None):
         """_summary_
+        
+        ## allows toggling between the various computed occupancies: such as raw counts,  normalized location, and seconds_occupancy
+            occupancy_mode_to_render: ['seconds_occupancy', 'num_pos_samples_occupancy', 'num_pos_samples_smoothed_occupancy', 'normalized_occupancy']
+        
         """
         super().__init__(application_name=application_name, parent=parent) # Call the inherited classes __init__ method
-        
+    
         self.active_time_dependent_placefields = active_time_dependent_placefields2D
         
         self.setup()
+        self.params.occupany_mode_to_render = occupancy_mode_to_render
         self.params.drop_below_threshold = drop_below_threshold
         
         self.buildUI()
@@ -131,30 +148,35 @@ class TimeSynchronizedOccupancyPlotter(AnimalTrajectoryPlottingMixin, TimeSynchr
         # Update the plots:
         curr_t = self.active_time_dependent_placefields.last_t
         
-        ## TODO: allow toggling between the various computed occupancies: such as raw counts,  normalized location, and seconds_occupancy
-        
-        # image = curr_ratemap.occupancy
-        # image = self.active_time_dependent_placefields.curr_normalized_occupancy
-        # image_title = 'curr_normalized_occupancy'
-        
-        image = self.active_time_dependent_placefields.curr_seconds_occupancy.copy()
-        image_title = 'curr_seconds_occupancy'
+        # self.occupancy_mode_to_render: allowed values: ['seconds_occupancy', 'num_pos_samples_occupancy', 'num_pos_samples_smoothed_occupancy', 'normalized_occupancy']
+        if self.occupancy_mode_to_render == 'seconds_occupancy':
+            image = self.active_time_dependent_placefields.curr_seconds_occupancy.copy()
+            image_title = 'curr_seconds_occupancy map'
+        elif self.occupancy_mode_to_render == 'num_pos_samples_occupancy':
+            image = self.active_time_dependent_placefields.curr_num_pos_samples_occupancy_map.copy()
+            image_title = 'curr_num_pos_samples_occupancy map'
+        elif self.occupancy_mode_to_render == 'num_pos_samples_smoothed_occupancy':
+            image = self.active_time_dependent_placefields.curr_num_pos_samples_smoothed_occupancy_map.copy()
+            image_title = 'curr_num_pos_samples_occupancy map (smoothed)'
+        elif self.occupancy_mode_to_render == 'normalized_occupancy':
+            image = self.active_time_dependent_placefields.curr_normalized_occupancy.copy()
+            image_title = 'curr_normalized_occupancy map'
+        else:
+            raise NotImplementedError
         
         if self.params.drop_below_threshold is not None:
             # image[np.where(occupancy < self.params.drop_below_threshold)] = np.nan # null out the occupancy
             image[np.where(image < self.params.drop_below_threshold)] = np.nan # null out the occupancy
         
         # self.ui.imv.setImage(image, xvals=self.active_time_dependent_placefields.xbin)
-        
         self.ui.imv.setImage(image, rect=self.params.image_bounds_extent)
         
         self.AnimalTrajectoryPlottingMixin_update_plots()
         
         # self.setWindowTitle(f'{self.windowName} - {image_title} t = {curr_t}')
-        self.setWindowTitle(f'{image_title} t = {curr_t}')
+        self.setWindowTitle(f'TimeSynchronizedOccupancyPlotter - {image_title} t = {curr_t}')
     
 
-            
 # included_epochs = None
 # computation_config = active_session_computation_configs[0]
 # active_time_dependent_placefields2D = PfND_TimeDependent(deepcopy(sess.spikes_df.copy()), deepcopy(sess.position), epochs=included_epochs,

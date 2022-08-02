@@ -110,7 +110,6 @@ class TimeSynchronizedPlacefieldsPlotter(AnimalTrajectoryPlottingMixin, TimeSync
             is_last_column = (curr_page_relative_col == (page_grid_sizes[page_idx].num_columns-1))
             is_last_row = (curr_page_relative_row == (page_grid_sizes[page_idx].num_rows-1))
             
-               
             neuron_IDX = curr_included_unit_index
             cell_ID = self.active_time_dependent_placefields.ratemap.neuron_ids[neuron_IDX]
             curr_cell_identifier_string = f'Cell[{cell_ID}]'

@@ -1,5 +1,6 @@
 import numpy as np
 import pandas as pd
+import matplotlib.pyplot as plt
 
 from pyphocorehelpers.mixins.member_enumerating import AllFunctionEnumeratingMixin
 from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DisplayFunctionRegistryHolder import DisplayFunctionRegistryHolder
@@ -11,7 +12,7 @@ from pyphoplacecellanalysis.General.Mixins.DisplayHelpers import _display_add_co
 
 from neuropy.core.neuron_identities import NeuronIdentity, build_units_colormap, PlotStringBrevityModeEnum
 from neuropy.plotting.placemaps import plot_all_placefields
-from neuropy.plotting.ratemaps import enumTuningMap2DPlotVariables # for getting the variant name from the dict
+from neuropy.utils.matplotlib_helpers import enumTuningMap2DPlotVariables # for getting the variant name from the dict
 from neuropy.utils.mixins.unwrap_placefield_computation_parameters import unwrap_placefield_computation_parameters
 
 

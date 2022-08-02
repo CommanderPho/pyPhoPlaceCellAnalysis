@@ -1,8 +1,5 @@
-import matplotlib.pyplot as plt
-
 from pyphocorehelpers.mixins.member_enumerating import AllFunctionEnumeratingMixin
 from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DisplayFunctionRegistryHolder import DisplayFunctionRegistryHolder
-
 
 from pyphoplacecellanalysis.PhoPositionalData.plotting.placefield import plot_1d_placecell_validations
 
