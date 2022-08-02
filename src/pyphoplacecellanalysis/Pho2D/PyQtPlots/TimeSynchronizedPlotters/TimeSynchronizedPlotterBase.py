@@ -33,6 +33,12 @@ class TimeSynchronizedPlotterBase(QtWidgets.QWidget):
     
     enable_debug_print = False
     
+    @property
+    def last_t(self):
+        """Convinence accessor to active_time_dependent_placefields's last_t property."""
+        return self.active_time_dependent_placefields.last_t
+
+
     def __init__(self, application_name=None, parent=None):
         """_summary_
         """
@@ -91,6 +97,10 @@ class TimeSynchronizedPlotterBase(QtWidgets.QWidget):
         raise NotImplementedError
     
         
+    # ==================================================================================================================== #
+    # QT Slots                                                                                                             #
+    # ==================================================================================================================== #
+    
     @QtCore.Slot(float, float)
     def on_window_changed(self, start_t, end_t):
         # called when the window is updated
@@ -100,13 +110,16 @@ class TimeSynchronizedPlotterBase(QtWidgets.QWidget):
             profiler = pg.debug.Profiler(disabled=True, delayed=True)
             
         self.update(end_t, defer_render=False)
-        
         if self.enable_debug_print:
             profiler('Finished calling _update_plots()')
             
-
-    @property
-    def last_t(self):
-        """Convinence accessor to active_time_dependent_placefields's last_t property."""
-        return self.active_time_dependent_placefields.last_t
+    ############### Rate-Limited SLots ###############:
+    ##################################################
+    ## For use with pg.SignalProxy
+    # using signal proxy turns original arguments into a tuple
+    @QtCore.Slot(object)
+    def on_window_changed_rate_limited(self, evt):
+        self.on_window_changed(*evt)
+        
+        
     
