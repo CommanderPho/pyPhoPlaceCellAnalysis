@@ -210,7 +210,7 @@ class ComputedPipelineStage(LoadableInput, LoadableSessionInput, FilterablePipel
         self.registered_computation_function_dict[registered_name] = computation_function
         
     def perform_registered_computations(self, previous_computation_result=None, computation_functions_name_whitelist=None, computation_functions_name_blacklist=None, fail_on_exception:bool=False, debug_print=False):
-        """ Called after load is complete to post-process the data """
+        """ Executes the computations """
         
         # Need to exclude any computation functions specified in omitted_computation_functions_dict
         if computation_functions_name_whitelist is not None:
