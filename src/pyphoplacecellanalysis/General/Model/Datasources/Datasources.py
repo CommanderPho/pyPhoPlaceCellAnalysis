@@ -144,7 +144,8 @@ class DataframeDatasource(BaseDatasource):
         # Initialize the datasource as a BaseDatasource
         BaseDatasource.__init__(self, datasource_name=datasource_name)
         self._df = df
-        assert self.time_column_name in df.columns, "dataframe must have a time column with name 't'"
+        assert self.time_column_name in df.columns, f"dataframe must have a time column with name '{self.time_column_name}'.\n\tdf.columns: {list(df.columns)}"
+        
         
         
     @classmethod
