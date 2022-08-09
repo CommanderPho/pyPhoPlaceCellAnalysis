@@ -85,9 +85,9 @@ class PipelineWithComputedPipelineStageMixin:
 
         
     ## Computation Helpers: 
-    def perform_computations(self, active_computation_params: Optional[DynamicParameters]=None, enabled_filter_names=None, computation_functions_name_whitelist=None, computation_functions_name_blacklist=None, fail_on_exception:bool=False, debug_print=False):
+    def perform_computations(self, active_computation_params: Optional[DynamicParameters]=None, enabled_filter_names=None, overwrite_extant_results=False, computation_functions_name_whitelist=None, computation_functions_name_blacklist=None, fail_on_exception:bool=False, debug_print=False):
         assert (self.can_compute), "Current self.stage must already be a ComputedPipelineStage. Call self.filter_sessions with filter configs to reach this step."
-        self.stage.evaluate_single_computation_params(active_computation_params, enabled_filter_names=enabled_filter_names, computation_functions_name_whitelist=computation_functions_name_whitelist, computation_functions_name_blacklist=computation_functions_name_blacklist, fail_on_exception=fail_on_exception, debug_print=debug_print)
+        self.stage.evaluate_single_computation_params(active_computation_params, enabled_filter_names=enabled_filter_names, overwrite_extant_results=overwrite_extant_results, computation_functions_name_whitelist=computation_functions_name_whitelist, computation_functions_name_blacklist=computation_functions_name_blacklist, fail_on_exception=fail_on_exception, debug_print=debug_print)
         
 
     def perform_registered_computations(self, previous_computation_result=None, computation_functions_name_whitelist=None, computation_functions_name_blacklist=None, fail_on_exception:bool=False, debug_print=False):
@@ -224,10 +224,14 @@ class ComputedPipelineStage(LoadableInput, LoadableSessionInput, FilterablePipel
     
     
 
-    def evaluate_single_computation_params(self, active_computation_params: Optional[DynamicParameters]=None, enabled_filter_names=None, computation_functions_name_whitelist=None, computation_functions_name_blacklist=None, fail_on_exception:bool=False, debug_print=False):
+    def evaluate_single_computation_params(self, active_computation_params: Optional[DynamicParameters]=None, enabled_filter_names=None, overwrite_extant_results=False, computation_functions_name_whitelist=None, computation_functions_name_blacklist=None, fail_on_exception:bool=False, debug_print=False):
         """ 'single' here refers to the fact that it evaluates only one of the active_computation_params
         
-        Takes its filtered_session and applies the provided active_computation_params to it. The results are stored in self.computation_results under the same key as the filtered session. """
+        Takes its filtered_session and applies the provided active_computation_params to it. The results are stored in self.computation_results under the same key as the filtered session. 
+        
+        Called only by the pipeline's .perform_computations(...) function
+        
+        """
         assert (len(self.filtered_sessions.keys()) > 0), "Must have at least one filtered session before calling evaluate_single_computation_params(...). Call self.select_filters(...) first."
         # self.active_computation_results = dict()
         if enabled_filter_names is None:
@@ -242,12 +246,25 @@ class ComputedPipelineStage(LoadableInput, LoadableSessionInput, FilterablePipel
                 else:
                     # set/update the computation configs:
                     self.active_configs[a_select_config_name].computation_config = active_computation_params #TODO: if more than one computation config is passed in, the active_config should be duplicated for each computation config.
-                self.computation_results[a_select_config_name] = ComputedPipelineStage._build_initial_computationResult(a_filtered_session, active_computation_params) # returns a computation result. This stores the computation config used to compute it.
+                
+                
+                
+                
+                if overwrite_extant_results or (self.computation_results.get(a_select_config_name, None) is None):
+                    self.computation_results[a_select_config_name] = ComputedPipelineStage._build_initial_computationResult(a_filtered_session, active_computation_params) # returns a computation result. This stores the computation config used to compute it.
+                else:
+                    # Otherwise it already exists and is not None, so don't overwrite it:
+                    self.computation_results.setdefault(a_select_config_name, ComputedPipelineStage._build_initial_computationResult(a_filtered_session, active_computation_params)) # returns a computation result. This stores the computation config used to compute it.
+                
                 # call to perform any registered computations:
                 self.computation_results[a_select_config_name] = self.perform_registered_computations(self.computation_results[a_select_config_name], computation_functions_name_whitelist=computation_functions_name_whitelist, computation_functions_name_blacklist=computation_functions_name_blacklist, fail_on_exception=fail_on_exception, debug_print=debug_print)
             else:
                 # this filter is excluded from the enabled list, no computations will we performed on it
-                self.computation_results.pop(a_select_config_name, None) # remove the computation results from previous runs from the dictionary to indicate that it hasn't been computed
+                if overwrite_extant_results:
+                    self.computation_results.pop(a_select_config_name, None) # remove the computation results from previous runs from the dictionary to indicate that it hasn't been computed
+                else:
+                    # no *additional* computations will be performed on it, but it will be pass through and not removed form the self.computation_results
+                    pass
 
 
     def rerun_failed_computations(self, enabled_filter_names=None, fail_on_exception:bool=False, debug_print=False):
