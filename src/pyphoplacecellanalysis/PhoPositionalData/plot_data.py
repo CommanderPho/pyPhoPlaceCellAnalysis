@@ -4,16 +4,11 @@
 @author: pho
 """
 import sys
-from threading import Thread
 # from ipygany import PolyMesh, Scene, IsoColor, WarpByScalar
 import pyvista as pv
 import pyvistaqt as pvqt
 import numpy as np
-from pathlib import Path
-from mpl_toolkits import mplot3d
 import matplotlib.pyplot as plt
-import matplotlib.cm as cm
-from matplotlib.colors import Normalize
 # import mplcursors
 import math # For color map generation
 from matplotlib.colors import ListedColormap
