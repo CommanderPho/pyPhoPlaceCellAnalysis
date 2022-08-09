@@ -122,7 +122,8 @@ class ComputedPipelineStage(LoadableInput, LoadableSessionInput, FilterablePipel
         self.computation_results = DynamicParameters()
         
         self.registered_computation_function_dict = OrderedDict()
-        self.register_default_known_computation_functions() # registers the default
+        self.reload_default_computation_functions() # registers the default
+        
         
     @property
     def registered_computation_functions(self):
