@@ -189,6 +189,15 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
     # Session Pickling for Loading/Saving                                                                                  #
     # ==================================================================================================================== #
 
+    def save_pipeline(self, active_pickle_filename='loadedSessPickle.pkl'):
+        ## Build Pickle Path:
+        finalized_loaded_sess_pickle_path = Path(self.sess.basepath).joinpath(active_pickle_filename).resolve()
+        print(f'finalized_loaded_sess_pickle_path: {finalized_loaded_sess_pickle_path}')
+        # Save reloaded pipeline out to pickle for future loading
+        saveData(finalized_loaded_sess_pickle_path, db=self) # Save the pipeline out to pickle.
+        return finalized_loaded_sess_pickle_path
+        
+
     @staticmethod
     def try_load_pickled_pipeline_or_reload_if_needed(active_data_mode_name, active_data_mode_type_properties, basedir, override_post_load_functions=None, force_reload=False, active_pickle_filename='loadedSessPickle.pkl'):
         """ After a session has completed the loading stage prior to filtering (after all objects are built and such), it can be pickled to a file to drastically speed up future loading requests (as would have to be done when the notebook is restarted, etc) 
