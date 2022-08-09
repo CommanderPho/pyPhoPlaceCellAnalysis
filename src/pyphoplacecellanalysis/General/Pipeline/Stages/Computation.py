@@ -114,8 +114,14 @@ class PipelineWithComputedPipelineStageMixin:
     
     @property
     def active_completed_computation_result_names(self):
-        """The this list of all computed configs."""
-        return self.stage._get_valid_computation_results_config_names()
+        """The this list of all computed configs."""        
+        # return self.stage._get_valid_computation_results_config_names()
+        return self.stage._get_computation_results_progress()[0] # get [0] because it returns complete_computed_config_names_list, incomplete_computed_config_dict
+    
+    @property
+    def active_incomplete_computation_result_status_dicts(self):
+        """The this dict containing all the incompletely computed configs and their reason for being incomplete."""
+        return self.stage._get_computation_results_progress()[1] # get [0] because it returns complete_computed_config_names_list, incomplete_computed_config_dict
     
     @property
     def registered_computation_functions(self):
@@ -267,7 +273,7 @@ class ComputedPipelineStage(LoadableInput, LoadableSessionInput, FilterablePipel
                 print(f'No registered_computation_functions, skipping extended computations.')
             return previous_computation_result # just return the unaltered result
     
-    def _get_valid_computation_results_config_names(self, debug_print=False):
+    def _get_computation_results_progress(self, debug_print=False):
         """ returns the names of all the configs (usually epochs, like 'maze1' or 'maze2') that have been completely computed
         Returns:
             computed_epochs_list: the names of all the configs (usually epochs, like 'maze1' or 'maze2') that have been computed
@@ -277,24 +283,29 @@ class ComputedPipelineStage(LoadableInput, LoadableSessionInput, FilterablePipel
             print(f'computed_config_names_list: {computed_config_names_list}') 
 
         complete_computed_config_names_list = []
+        incomplete_computed_config_dict = {}
         for curr_config_name in computed_config_names_list:
             # Try to see if the current config is valid or incomplete
             curr_config_incomplete_reason = None
             active_computation_results = self.computation_results.get(curr_config_name, None)
             if active_computation_results is None:
                 curr_config_incomplete_reason = 'MISSING_computation_results'
-            # Check the members:
-            active_computed_data = self.computation_results[curr_config_name].computed_data
-            if active_computed_data is None:
-                curr_config_incomplete_reason = 'INVALID_computation_results_computed_data'
-            active_computation_config = self.computation_results[curr_config_name].computation_config
-            if active_computation_config is None:
-                curr_config_incomplete_reason = 'INVALID_computation_results_computation_config'
+            else:
+                # Check the members:
+                active_computed_data = self.computation_results[curr_config_name].computed_data
+                if active_computed_data is None:
+                    curr_config_incomplete_reason = 'INVALID_computation_results_computed_data'
+                active_computation_config = self.computation_results[curr_config_name].computation_config
+                if active_computation_config is None:
+                    curr_config_incomplete_reason = 'INVALID_computation_results_computation_config'
+
             if curr_config_incomplete_reason is not None:
                 if debug_print:
                     print(f'curr_config_incomplete_reason: {curr_config_incomplete_reason}')
+                ## Add the incomplete config to the incomplete dict with its reason for being incomplete:
+                incomplete_computed_config_dict[curr_config_name] = curr_config_incomplete_reason
             else:
                 complete_computed_config_names_list.append(curr_config_name)
                 
-        return complete_computed_config_names_list
+        return complete_computed_config_names_list, incomplete_computed_config_dict
     
