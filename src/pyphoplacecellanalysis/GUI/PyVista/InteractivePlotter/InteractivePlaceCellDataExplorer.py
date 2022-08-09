@@ -17,11 +17,11 @@ from pyphocorehelpers.gui.PyVista.PhoCustomVtkWidgets import PhoWidgetHelper
 from pyphocorehelpers.gui.PyVista.PhoCustomVtkWidgets import MultilineTextConsoleWidget
 
 import pyphoplacecellanalysis.External.pyqtgraph as pg
-from pyphoplacecellanalysis.PhoPositionalData.plotting.animations import make_mp4_from_plotter
+from pyphoplacecellanalysis.Pho3D.PyVista.animations import make_mp4_from_plotter
 from pyphoplacecellanalysis.GUI.PyVista.InteractivePlotter.PhoInteractivePlotter import PhoInteractivePlotter
 
-from pyphoplacecellanalysis.PhoPositionalData.plotting.gui import customize_default_pyvista_theme, print_controls_helper_text
-from pyphoplacecellanalysis.PhoPositionalData.plotting.spikeAndPositions import build_active_spikes_plot_data, perform_plot_flat_arena, spike_geom_box, spike_geom_cone
+from pyphoplacecellanalysis.Pho3D.PyVista.gui import customize_default_pyvista_theme, print_controls_helper_text
+from pyphoplacecellanalysis.Pho3D.PyVista.spikeAndPositions import build_active_spikes_plot_data, perform_plot_flat_arena, spike_geom_box, spike_geom_cone
 from pyphoplacecellanalysis.GUI.PyVista.InteractivePlotter.InteractiveDataExplorerBase import InteractiveDataExplorerBase
 from pyphoplacecellanalysis.PhoPositionalData.plotting.visualization_window import VisualizationWindow # Used to build "Windows" into the data points such as the window defining the fixed time period preceeding the current time where spikes had recently fired, etc.
 

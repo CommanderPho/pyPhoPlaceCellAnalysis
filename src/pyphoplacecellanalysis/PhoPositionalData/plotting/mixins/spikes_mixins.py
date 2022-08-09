@@ -7,7 +7,7 @@ import pyvista as pv
 from pyphocorehelpers.indexing_helpers import safe_get, partition
 
 from pyphoplacecellanalysis.PhoPositionalData.plotting.mixins.general_plotting_mixins import NeuronConfigOwningMixin
-from pyphoplacecellanalysis.PhoPositionalData.plotting.spikeAndPositions import build_active_spikes_plot_data_df
+from pyphoplacecellanalysis.Pho3D.PyVista.spikeAndPositions import build_active_spikes_plot_data_df
 from pyphoplacecellanalysis.General.Mixins.SpikesRenderingBaseMixin import SpikeRenderingBaseMixin, SpikesDataframeOwningMixin
 
 # class SingleCellSpikePlotData(param.Parameterized):
