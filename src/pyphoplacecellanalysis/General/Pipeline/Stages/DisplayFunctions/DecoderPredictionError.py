@@ -364,10 +364,12 @@ def _temp_debug_two_step_plots_animated_imshow(active_one_step_decoder, active_t
     plt.draw()
     # plt.show()
     
-    
-    
+# ==================================================================================================================== #
+# Functions for drawing the decoded position and the animal position as a callback                                     #
+# ==================================================================================================================== #
 
 def _temp_debug_draw_predicted_position_difference(predicted_positions, measured_positions, time_window, ax=None):
+    """ Draws the decoded position and the actual animal's position, and an arrow between them. """
     if ax is None:
         raise NotImplementedError
         # ax = plt.gca()
@@ -397,6 +399,8 @@ def _temp_debug_draw_predicted_position_difference(predicted_positions, measured
     fig.legend((predicted_line, measured_line), ('Predicted', 'Measured'), 'upper right')
     return {'ax':ax, 'predicted_line':predicted_line, 'measured_line':measured_line, 'active_arrow':active_arrow}
     # update function:
+    
+    
     
 def _temp_debug_draw_update_predicted_position_difference(predicted_positions, measured_positions, time_window, ax=None, predicted_line=None, measured_line=None, active_arrow=None):
     assert measured_line is not None, "measured_line is required!"
