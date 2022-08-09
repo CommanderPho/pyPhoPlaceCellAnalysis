@@ -11,7 +11,11 @@ from pyphoplacecellanalysis.General.Pipeline.Stages.BaseNeuropyPipelineStage imp
 # Session Pickling for Loading/Saving                                                                                  #
 # ==================================================================================================================== #
 ## Test using pickle to pickle the loaded session object after loading
-import pickle
+# import pickle
+## `dill` support: dill is a drop-in replacement for pickle. Existing code can be updated to allow complete pickling using
+import dill as pickle # requires mamba install dill -c conda-forge
+
+
 from neuropy.utils.mixins.print_helpers import ProgressMessagePrinter
 
 # Its important to use binary mode
