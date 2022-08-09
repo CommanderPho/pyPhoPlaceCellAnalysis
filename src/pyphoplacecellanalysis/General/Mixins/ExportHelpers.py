@@ -118,7 +118,6 @@ def save_some_pipeline_data_to_h5(active_pipeline, included_session_identifiers=
                 print(f'skipping {a_key} because it is not included in included_session_identifiers')
     return output_structure
 
-
 def load_pipeline_data_from_h5(finalized_output_cache_file, desired_spikes_df_key, desired_positions_df_key):
     """  Load the saved .h5 spikes dataframe for testing:
     
@@ -136,8 +135,6 @@ def load_pipeline_data_from_h5(finalized_output_cache_file, desired_spikes_df_ke
     # spikes_df
     # pos_df
     return spikes_df, pos_df
-
-
 
 def get_h5_data_keys(finalized_output_cache_file, enable_debug_print=False):
     """ Returns the keys (variables) in the .h5 file

@@ -20,25 +20,15 @@ class DefaultDecoderDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Disp
     def _display_two_step_decoder_prediction_error_2D(computation_result, active_config, enable_saving_to_disk=False, **kwargs):
             """ Plots the prediction error for the two_step decoder at each point in time.
                 Based off of "_temp_debug_two_step_plots_animated_imshow"
+                
+                THIS ONE WORKS. 
             """
             # Get the decoders from the computation result:
             active_one_step_decoder = computation_result.computed_data['pf2D_Decoder']
             active_two_step_decoder = computation_result.computed_data.get('pf2D_TwoStepDecoder', None)
             active_measured_positions = computation_result.sess.position.to_dataframe()
 
-            # # Extended Stats:
-            # active_extended_stats = computation_result.computed_data['extended_stats']
-            # time_binned_pos_resampler = active_extended_stats['time_binned_positioned_resampler'] # TimedeltaIndexResampler
-            # time_binned_pos_df = active_extended_stats['time_binned_position_df'] # actual dataframe
-            # time_binned_position_mean = active_extended_stats['time_binned_position_mean']
-
-            # # Active Placefield Overlap:
-            # active_placefield_overlap = computation_result.computed_data['placefield_overlap']
-            # all_pairwise_neuron_IDs_combinations = active_placefield_overlap['all_pairwise_neuron_IDs_combinations'] # TimedeltaIndexResampler
-            # total_pairwise_overlaps = active_placefield_overlap['total_pairwise_overlaps'] # actual dataframe
-            # all_pairwise_overlaps = active_placefield_overlap['all_pairwise_overlaps']
-            # np.shape(all_pairwise_overlaps) # (903, 63, 63)
-
+        
             # Simple plot type 1:
             plotted_variable_name = kwargs.get('variable_name', 'p_x_given_n') # Tries to get the user-provided variable name, otherwise defaults to 'p_x_given_n'
             _temp_debug_two_step_plots_animated_imshow(active_one_step_decoder, active_two_step_decoder, variable_name=plotted_variable_name) # Works
@@ -49,6 +39,8 @@ class DefaultDecoderDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Disp
     def _display_two_step_decoder_prediction_error_animated_2D(computation_result, active_config, **kwargs):
         """ More advanced plot that plots the prediction error for the two_step decoder at each point in time.
             Based off of "_temp_debug_two_step_plots_animated_imshow"
+            
+            TODO: THIS ONE DOES NOT WORK!
         """
         raise NotImplementedError # Doesn't work, or even appear to be done!
     
@@ -294,6 +286,7 @@ def _temp_debug_two_step_plots_imshow(active_one_step_decoder, active_two_step_d
 
 
     
+# MAIN IMPLEMENTATION FUNCTION:
 def _temp_debug_two_step_plots_animated_imshow(active_one_step_decoder, active_two_step_decoder, variable_name='p_x_given_n_and_x_prev', override_variable_value=None, update_callback_function=None):
     """Matplotlib-based imshow plot with interactive slider for displaying two-step bayesian decoding results
 
@@ -353,7 +346,7 @@ def _temp_debug_two_step_plots_animated_imshow(active_one_step_decoder, active_t
 
     axcolor = 'lightgoldenrodyellow'
     axframe = plt.axes([0.25, 0.1, 0.65, 0.03], facecolor=axcolor)
-    sframe = Slider(axframe, 'Frame', 0, num_frames-1, valinit=2, valfmt='%d')
+    sframe = Slider(axframe, 'Frame', 0, num_frames-1, valinit=2, valfmt='%d') # MATPLOTLIB Slider
 
     def update(val):
         new_frame = int(np.around(sframe.val))
@@ -370,6 +363,9 @@ def _temp_debug_two_step_plots_animated_imshow(active_one_step_decoder, active_t
     sframe.on_changed(update)
     plt.draw()
     # plt.show()
+    
+    
+    
 
 def _temp_debug_draw_predicted_position_difference(predicted_positions, measured_positions, time_window, ax=None):
     if ax is None:
