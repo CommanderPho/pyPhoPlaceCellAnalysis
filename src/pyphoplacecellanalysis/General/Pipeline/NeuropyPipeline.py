@@ -8,8 +8,7 @@ import importlib
 import sys
 from pathlib import Path
 from typing import Callable, List
-
-# from pyphocorehelpers.function_helpers import compose_functions
+import inspect # used for filter_sessions(...)'s inspect.getsource to compare filters:
 
 import numpy as np
 import pandas as pd
@@ -78,6 +77,7 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
         """
         if override_basepath is not None:
             basepath = override_basepath
+            known_type_properties.basedir = override_basepath # change the known_type_properties default path to the specified override path
         else:
             basepath = known_type_properties.basedir
         if override_post_load_functions is not None:
@@ -104,7 +104,11 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
 
         if loaded_pipeline is not None:
             print(f'Loading pickled pipeline success: {finalized_loaded_sess_pickle_path}.')
-            curr_active_pipeline = loaded_pipeline
+            if isinstance(loaded_pipeline, NeuropyPipeline):        
+                curr_active_pipeline = loaded_pipeline
+            else:
+                # Otherwise we assume it's a complete computed pipeline pickeled result, in which case the pipeline is located in the 'curr_active_pipeline' key of the loaded dictionary.
+                curr_active_pipeline = loaded_pipeline['curr_active_pipeline']
         else:
             # Otherwise load failed, perform the fallback computation
             print(f'Must reload/rebuild.')
@@ -142,9 +146,42 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
         """The is_filtered property."""
         return (self.stage is not None) and (isinstance(self.stage, ComputedPipelineStage))
  
-    def filter_sessions(self, active_session_filter_configurations):
-        self.stage = ComputedPipelineStage(self.stage)
-        self.stage.select_filters(active_session_filter_configurations) # select filters when done
+    def filter_sessions(self, active_session_filter_configurations, debug_print = False):
+        if self.is_filtered:
+            # RESUSE LOADED FILTERING: If the loaded pipeline is already filtered, check to see if the filters match those that were previously applied. If they do, don't re-filter unless the user specifies to.
+            prev_session_filter_configurations = {a_config_name:a_config.filter_config['filter_function'] for a_config_name, a_config in self.active_configs.items()}
+            # print(f'prev_session_filter_configurations: {prev_session_filter_configurations}')
+            # Check for any non-equal ones:
+            is_common_filter_name = np.isin(list(active_session_filter_configurations.keys()), list(prev_session_filter_configurations.keys()))
+            is_novel_filter_name = np.logical_not(is_common_filter_name)
+            if debug_print:
+                print(f'is_common_filter_name: {is_common_filter_name}')
+                print(f'is_novel_filter_name: {is_novel_filter_name}')
+            # novel_filter_names = list(active_session_filter_configurations.keys())[np.logical_not(np.isin(list(active_session_filter_configurations.keys()), list(prev_session_filter_configurations.keys())))]
+            # novel_filter_names = [a_name for a_name in list(active_session_filter_configurations.keys()) if a_name not in list(prev_session_filter_configurations.keys())]
+            common_filter_names = np.array(list(active_session_filter_configurations.keys()))[is_common_filter_name]
+            novel_filter_names = np.array(list(active_session_filter_configurations.keys()))[is_novel_filter_name]
+            if debug_print:
+                print(f'common_filter_names: {common_filter_names}')
+            if len(novel_filter_names) > 0:
+                print(f'novel_filter_names: {novel_filter_names}')
+            ## Deal with filters with the same name, but different filter functions:
+            changed_filters_names_list = [a_config_name for a_config_name in common_filter_names if (inspect.getsource(prev_session_filter_configurations[a_config_name]) != inspect.getsource(active_session_filter_configurations[a_config_name]))] # changed_filters_names_list: a list of filter names for filters that have changed but have the same name
+            if debug_print:
+                print(f'changed_filters_names_list: {changed_filters_names_list}')
+            unprocessed_filters = {a_config_name:active_session_filter_configurations[a_config_name] for a_config_name in changed_filters_names_list}
+            assert len(changed_filters_names_list) == 0, f"WARNING: changed_filters_names_list > 0!: {changed_filters_names_list}"
+            # if len(changed_filters_names_list) > 0:
+            #     print(f'WARNING: changed_filters_names_list > 0!: {changed_filters_names_list}')
+            for a_novel_filter_name in novel_filter_names:
+                unprocessed_filters[a_novel_filter_name] = active_session_filter_configurations[a_novel_filter_name]
+
+            ## TODO: filter for the new and changed filters here:
+            self.stage.select_filters(unprocessed_filters, clear_filtered_results=False) # select filters when done
+    
+        else:
+            self.stage = ComputedPipelineStage(self.stage)
+            self.stage.select_filters(active_session_filter_configurations) # select filters when done
        
     
 
