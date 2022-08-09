@@ -23,12 +23,6 @@ import pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions
 from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.ComputationFunctionRegistryHolder import ComputationFunctionRegistryHolder
 
 
-# from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.DefaultComputationFunctions import DefaultComputationFunctions
-# from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.PlacefieldComputations import PlacefieldComputations
-# from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.ExtendedStats import ExtendedStatsComputations
-# from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.SpikeAnalysis import SpikeAnalysisComputations
-
-
 class ComputablePipelineStage:
     """ Designates that a pipeline stage is computable. """
         
