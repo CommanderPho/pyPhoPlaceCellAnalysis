@@ -3,7 +3,7 @@
 """
 @author: pho
 
-TODO: REORGANIZE_PLOTTER_SCRIPTS: PyVista
+NOTE: This is a GOOD, general class that offers both 2D (matplot) and 3D (pyvista) functionality
 
 """
 from indexed import IndexedOrderedDict
