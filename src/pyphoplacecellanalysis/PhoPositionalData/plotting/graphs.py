@@ -4,6 +4,7 @@ import pyvista as pv
 
 
 """ 
+TODO: REORGANIZE_PLOTTER_SCRIPTS: PyVista
 
 TODO: Why isn't this a class, or in a standardized format?
 
@@ -123,7 +124,6 @@ def _perform_plot_point_labels(p, active_points, point_labels=None, point_mask=N
         'points': active_points
     }
     return plotActors, data_dict 
-    
     
 def plot_point_labels(p, xbin_centers, ybin_centers, data, point_labels=None, point_mask=None, zScalingFactor=1.0, **kwargs):
     """ Plots 3D text point labels at the provided points.

@@ -4,6 +4,11 @@ from matplotlib.backends.backend_pdf import PdfPages
 import matplotlib.pyplot as plt
 
 """ 
+
+TODO: REORGANIZE_PLOTTER_SCRIPTS: matplotlib
+
+
+
 # Simple Figure Saving Demonstration:
 
 aFig.suptitle('Lap Trajectories 2D', fontsize=22)

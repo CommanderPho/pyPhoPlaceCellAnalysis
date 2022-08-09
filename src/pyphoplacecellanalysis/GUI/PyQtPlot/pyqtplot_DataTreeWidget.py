@@ -37,6 +37,10 @@ import pyphoplacecellanalysis.External.pyqtgraph as pg
 from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtCore, QtGui
 from collections import OrderedDict
 
+## For custom parameters:
+from pyphocorehelpers.DataStructure.dynamic_parameters import DynamicParameters
+from neuropy.utils.dynamic_container import DynamicContainer
+
 try:
     import metaarray  # noqa
     HAVE_METAARRAY = True
@@ -73,6 +77,12 @@ class CustomFormattingDataTreeWidget(pg.DataTreeWidget):
             childs = OrderedDict(enumerate(data.__dict__)) ## Convert to an OrderedDict
             # childs = data.__dict__ ## Convert to a regular __dict__
             # childs = {} # returns no children
+            
+        elif isinstance(data, (DynamicParameters, DynamicContainer)):
+            desc = "PhoCustomFormatting applied! DynamicParameters or DynamicContainer"
+            # childs = OrderedDict(enumerate(data.to_dict())) ## Convert to an OrderedDict
+            childs = OrderedDict(data.to_dict()) ## Convert to an OrderedDict
+
         else:
             raise NotImplementedError
         
@@ -119,6 +129,7 @@ class CustomFormattingDataTreeWidget(pg.DataTreeWidget):
                         childs = OrderedDict(sorted(data.items()))
                     except TypeError: # if sorting falls
                         childs = OrderedDict(data.items())
+                        
             elif isinstance(data, (list, tuple)):
                 desc = "length=%d" % len(data)
                 childs = OrderedDict(enumerate(data)) # for list-like objects, enumerate their indices/items as an OrderedDict so recurrsion will work.

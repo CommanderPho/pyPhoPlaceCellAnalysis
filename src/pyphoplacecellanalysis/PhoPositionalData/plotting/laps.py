@@ -15,6 +15,11 @@ import pyvista as pv
 import pyvistaqt as pvqt
 
 """ 
+
+NOTE: This is a GOOD, general class that offers both 2D (matplot) and 3D (pyvista) functionality
+
+
+
 from pyphoplacecellanalysis.PhoPositionalData.plotting.laps import plot_lap_trajectories_2d
 # Complete Version:
 fig, axs, laps_pages = plot_lap_trajectories_2d(sess, curr_num_subplots=len(sess.laps.lap_id), active_page_index=0)

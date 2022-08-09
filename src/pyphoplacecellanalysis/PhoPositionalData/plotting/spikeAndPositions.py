@@ -2,6 +2,14 @@
 # -*- coding: utf-8 -*-
 """
 @author: pho
+
+
+TODO: REORGANIZE_PLOTTER_SCRIPTS: PyVista
+
+
+## Seems to primarily be a PyVista (pv) helper functions file
+
+
 """
 import sys
 from warnings import warn

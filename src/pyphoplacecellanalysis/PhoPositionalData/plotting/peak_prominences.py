@@ -1,5 +1,10 @@
 """ peak_prominence_mixins
 
+TODO: REORGANIZE_PLOTTER_SCRIPTS: PyVista
+
+Helper functions that draw/render the neuron's computed peak/prominence/size/contours info on the 3D PyVista placefields plot
+
+
 """
 
 import numpy as np
@@ -295,71 +300,3 @@ def render_all_neuron_peak_prominence_2d_results_on_pyvista_plotter(ipcDataExplo
 
 
 
-
-
-
-
-
-
-# def __pyvista_contours_testing_overflow():
-#     """  This function contains unused code dumped from the Jupyter-Lab notebook 112 after completely the contour plotting features that I wanted to. It felt like a waste to scrap it.    
-#     """
-#     ## Look at splitting the contours with split_bodies():
-#     # this works well, but not sure if I need it
-#     split_contours = curr_contours.split_bodies()
-#     split_contours
-
-#     out_contours_data = {}
-#     out_contours_actors = {}
-
-#     for i, a_contour in enumerate(split_contours):
-#         curr_contour_mesh_name = f'contours[{valid_neuron_id}][{i}]'
-#         out_contours_data[curr_contour_mesh_name] = a_contour
-#         a_curr_contour_mesh_actor = ipcDataExplorer.p.add_mesh(a_contour, color="green", line_width=i+1, name=curr_contour_mesh_name) # should add it to the ipcDataExplorer's extant plotter (overlaying it on the current mesh
-#         out_contours_actors[curr_contour_mesh_name] = a_curr_contour_mesh_actor
-#         # is_inside_bounds(point, bounds) # where bounds is (xMin, xMax, yMin, yMax, zMin, zMax)
-
-#     mesh = split_contours.pop(1)
-#     mesh
-
-#     # mesh.select_enclosed_points()
-
-#     def get_bounding_box_size(mesh):
-#         # also, grab the size of the central gear
-#         x_size = mesh.bounds[1] - mesh.bounds[0]
-#         y_size = mesh.bounds[3] - mesh.bounds[2]
-#         z_size = mesh.bounds[5] - mesh.bounds[4]
-#         return x_size, y_size, z_size
-
-#     #     plotter = pv.Plotter()
-#     #     plotter.add_mesh(split_gears, smooth_shading=True, split_sharp_edges=True)
-#     #     plotter.add_mesh(mesh, smooth_shading=True, split_sharp_edges=True)
-#     #     plotter.show_grid(
-#     #         mesh=mesh,
-#     #         axes_ranges=[0, x_size, 0, y_size, 0, z_size],
-#     #         show_xaxis=False,
-#     #         bold=True,
-#     #         grid=False,
-#     #     )
-#     #     plotter.show()
-
-
-#     first_key = list(out_contours_data.keys())[0]
-#     a_contour = out_contours_data[first_key]
-#     a_contour_actor = out_contours_actors[first_key]
-
-#     x_size, y_size, z_size = get_bounding_box_size(a_contour)
-#     # axes_ranges=[0, x_size, 0, y_size, 0, z_size]
-#     a_curr_contour_mesh_grid = ipcDataExplorer.p.show_grid(
-#             mesh=a_contour)
-
-#     # a_curr_contour_mesh_grid = ipcDataExplorer.p.show_grid(
-#     #         mesh=a_contour,
-#     #         axes_ranges=[0, x_size, 0, y_size, 0, z_size],
-#     #         show_xaxis=False,
-#     #         bold=True,
-#     #         grid=False,
-#     # )
-
-
-#     central_gear.translate([0, 60, 60], inplace=True)

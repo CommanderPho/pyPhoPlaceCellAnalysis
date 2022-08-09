@@ -11,10 +11,15 @@ from pyphoplacecellanalysis.PhoPositionalData.load_exported import import_mat_fi
 import scipy.io # used for not HDF format files:
 from warnings import warn
 
+import pyphoplacecellanalysis.External.pyqtgraph as pg
 from pyphoplacecellanalysis.GUI.PyQtPlot.pyqtplot_DataTreeWidget import plot_dataTreeWidget # for GUI
 
 class MatFileBrowser(object):
-    """ A helper class that allows the user to interactively browser .mat (MATLAB files in a filesystem directory) """
+    """ A helper class that allows the user to interactively browser .mat (MATLAB files in a filesystem directory) 
+    
+    NOTE: This actually does work (as a primise) but it displays the data very poorly. 
+    
+    """
     
     @classmethod
     def discover_mat_files(cls, basedir, recursive=True):
@@ -105,3 +110,18 @@ class MatFileBrowser(object):
         tree, app = plot_dataTreeWidget(data=d, title=f'MAT Browsing GUI: {len(loaded_data_dict)} .mat files')
         return tree, app
     
+
+
+def main():
+    wants_recurrsive_mat_file_search = False
+    # mat_import_parent_path = Path(r'R:\data\RoyMaze1')
+    mat_import_parent_path = Path(r'W:\Data\KDIBA\gor01\one\2006-6-08_14-26-15')
+    found_files = MatFileBrowser.discover_mat_files(mat_import_parent_path, recursive=wants_recurrsive_mat_file_search)
+    found_file_variables_dict = MatFileBrowser.whos_mat_files(found_files)
+    tree, app = MatFileBrowser.build_browsing_gui(found_file_variables_dict)
+    tree.show()
+    pg.exec()
+    
+    
+if __name__ == "__main__":
+    main()
