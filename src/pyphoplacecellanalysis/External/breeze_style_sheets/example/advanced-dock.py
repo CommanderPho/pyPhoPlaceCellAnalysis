@@ -27,6 +27,8 @@
     =============
 
     Simple PyQt application using the advanced-docking-system.
+    
+    NOTE: Requires pyqtads: mamba install pyqtads -c conda-forge 
 '''
 
 import shared
