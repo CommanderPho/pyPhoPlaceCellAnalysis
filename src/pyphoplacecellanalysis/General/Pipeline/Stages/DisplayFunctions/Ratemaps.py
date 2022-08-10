@@ -26,6 +26,9 @@ class DefaultRatemapDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Disp
         Internally wraps `PfND.plot_ratemaps_2D` which itself wraps `neuropy.plotting.ratemaps.plot_ratemap_2D`
         
             optionally shows peak firing rates
+            
+            
+        TODO: plot the information about the source of the data, such as the session information? Or perhaps we could just leave that encoded in the exported file name? It is hard to track the figures though
         
         """
         computation_result.computed_data['pf2D'].plot_ratemaps_2D(**({'subplots': (None, 3), 'resolution_multiplier': 1.0, 'enable_spike_overlay': False, 'brev_mode': PlotStringBrevityModeEnum.MINIMAL} | kwargs))
