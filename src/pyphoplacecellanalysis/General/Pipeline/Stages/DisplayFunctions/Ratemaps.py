@@ -40,6 +40,14 @@ class DefaultRatemapDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Disp
         active_pf_computation_params = unwrap_placefield_computation_parameters(active_config.computation_config)
         _display_add_computation_param_text_box(active_figure, active_pf_computation_params) # Adds the parameters text.
         
+        ## Setup the plot title and add the session information:
+        session_identifier = computation_result.sess.get_session_description() # 'sess_bapun_RatN_Day4_2019-10-15_11-30-06'
+        fig_label = f'{plot_variable_name} | plot_ratemaps_2D | {session_identifier} | {active_figure.number}'
+        # print(f'fig_label: {fig_label}')
+        active_figure.set_label(fig_label)
+        active_figure.canvas.manager.set_window_title(fig_label) # sets the window's title
+        
+        
         active_pf_2D_figures = [active_figure]            
         
         # Save the figure out to disk if we need to:
