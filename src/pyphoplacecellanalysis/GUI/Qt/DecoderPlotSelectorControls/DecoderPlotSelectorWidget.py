@@ -28,6 +28,15 @@ pg.setConfigOptions(imageAxisOrder='row-major')
 
 
 class DecoderPlotSelectorWidget(QtWidgets.QWidget):
+    """ 
+
+    Usage:    
+        from pyphoplacecellanalysis.GUI.Qt.DecoderPlotSelectorControls.DecoderPlotSelectorWidget import DecoderPlotSelectorWidget
+
+        widget = DecoderPlotSelectorWidget()
+        widget.show()
+
+    """
     def __init__(self, name='DecoderPlotSelectorWidget', parent=None):
         super().__init__(parent=parent) # Call the inherited classes __init__ method
 
