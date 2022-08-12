@@ -272,9 +272,7 @@ class Spike2DRaster(EpochRenderingMixin, Render2DScrollWindowPlotMixin, SpikeRas
         self.EpochRenderingMixin_on_buildUI()
         
         # self.Render2DScrollWindowPlot_on_window_update # register with the animation time window for updates for the scroller.
-        # Connect the signals for the zoom region and the LinearRegionItem
-        # self.ui.scroll_window_region.sigRegionChanged.connect(self.update_zoom_plotter)
-        
+        # Connect the signals for the zoom region and the LinearRegionItem        
         self.rate_limited_signal_scrolled_proxy = pg.SignalProxy(self.window_scrolled, rateLimit=60, slot=self.update_zoomed_plot_rate_limited) # Limit updates to 60 Signals/Second
         
         
