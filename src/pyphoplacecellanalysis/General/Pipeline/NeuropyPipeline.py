@@ -25,6 +25,9 @@ from pyphoplacecellanalysis.General.Pipeline.Stages.BaseNeuropyPipelineStage imp
 from neuropy import core
 importlib.reload(core)
 
+from neuropy.core.session.Formats.BaseDataSessionFormats import DataSessionFormatRegistryHolder # hopefully this works without all the other imports
+
+
 
 class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, FilteredPipelineMixin, PipelineWithComputedPipelineStageMixin, PipelineWithDisplayPipelineStageMixin):
     """ 
@@ -75,6 +78,46 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
         """ After a session has completed the loading stage prior to filtering (after all objects are built and such), it can be pickled to a file to drastically speed up future loading requests (as would have to be done when the notebook is restarted, etc) 
         Tries to find an extant pickled pipeline, and if it exists it loads and returns that. Otherwise, it loads/rebuilds the pipeline from scratch (from the initial raw data files) and then saves a pickled copy out to disk to speed up future loading attempts.
         """
+        def _ensure_unpickled_pipeline_up_to_date(curr_active_pipeline, active_data_mode_name, basedir, desired_time_variable_name, debug_print=False):
+            """ Ensures that all sessions in the pipeline are valid after unpickling, and updates them if they aren't.
+            # TODO: NOTE: this doesn't successfully save the changes to the spikes_df.time_variable_name to the pickle (or doesn't load them). This probably can't be pickled and would need to be set on startup.
+            
+            Usage:
+                
+                desired_time_variable_name = active_data_mode_registered_class._time_variable_name # Requires desired_time_variable_name
+                pipeline_needs_resave = _ensure_unpickled_session_up_to_date(curr_active_pipeline, active_data_mode_name=active_data_mode_name, basedir=basedir, desired_time_variable_name=desired_time_variable_name, debug_print=False)
+
+                ## Save out the changes to the pipeline after computation to the pickle file for easy loading in the future
+                if pipeline_needs_resave:
+                    curr_active_pipeline.save_pipeline(active_pickle_filename='loadedSessPickle.pkl')
+                else:
+                    print(f'property already present in pickled version. No need to save.')
+            
+            """
+            def _ensure_unpickled_session_up_to_date(a_sess, active_data_mode_name, basedir, desired_time_variable_name, debug_print=False):
+                """ makes sure that the passed in session which was loaded from a pickled pipeline has the required properties and such set. Used for post-hoc fixes when changes are made after pickling. """
+                did_add_property = False
+                if not hasattr(a_sess.config, 'format_name'):
+                    did_add_property = True
+                    a_sess.config.format_name = active_data_mode_name
+                if (a_sess.basepath != Path(basedir)):
+                    did_add_property = True
+                    a_sess.config.basepath = Path(basedir)
+                if desired_time_variable_name != a_sess.spikes_df.spikes.time_variable_name:
+                    if debug_print:
+                        print(f'a_sess.spikes_df.spikes.time_variable_name: {a_sess.spikes_df.spikes.time_variable_name}')
+                    # did_add_property = True
+                    a_sess.spikes_df.spikes.set_time_variable_name(desired_time_variable_name)
+                return did_add_property
+
+            did_add_property = False
+            did_add_property = did_add_property or _ensure_unpickled_session_up_to_date(curr_active_pipeline.sess, active_data_mode_name=active_data_mode_name, basedir=basedir, desired_time_variable_name=desired_time_variable_name, debug_print=debug_print)
+            ## Apply to all of the pipeline's filtered sessions:
+            for a_sess in curr_active_pipeline.filtered_sessions.values():
+                did_add_property = did_add_property or _ensure_unpickled_session_up_to_date(a_sess, active_data_mode_name=active_data_mode_name, basedir=basedir, desired_time_variable_name=desired_time_variable_name, debug_print=debug_print)
+            return did_add_property
+
+        ## BEGIN FUNCTION BODY
         if override_basepath is not None:
             basepath = override_basepath
             known_type_properties.basedir = override_basepath # change the known_type_properties default path to the specified override path
@@ -109,6 +152,18 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
             else:
                 # Otherwise we assume it's a complete computed pipeline pickeled result, in which case the pipeline is located in the 'curr_active_pipeline' key of the loaded dictionary.
                 curr_active_pipeline = loaded_pipeline['curr_active_pipeline']
+                
+            ## Do patching/repair on the unpickled timeline and its sessions to ensure all correct properties are set:
+            active_data_session_types_registered_classes_dict = DataSessionFormatRegistryHolder.get_registry_data_session_type_class_name_dict()
+            active_data_mode_registered_class = active_data_session_types_registered_classes_dict[type_name]
+            desired_time_variable_name = active_data_mode_registered_class._time_variable_name # Requires desired_time_variable_name
+            pipeline_needs_resave = _ensure_unpickled_pipeline_up_to_date(curr_active_pipeline, active_data_mode_name=type_name, basedir=Path(basepath), desired_time_variable_name=desired_time_variable_name, debug_print=False)
+            ## Save out the changes to the pipeline after computation to the pickle file for easy loading in the future
+            if pipeline_needs_resave:
+                curr_active_pipeline.save_pipeline(active_pickle_filename=active_pickle_filename)
+            else:
+                print(f'property already present in pickled version. No need to save.')
+    
         else:
             # Otherwise load failed, perform the fallback computation
             print(f'Must reload/rebuild.')
