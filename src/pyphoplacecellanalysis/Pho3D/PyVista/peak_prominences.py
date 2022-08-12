@@ -9,7 +9,7 @@ Helper functions that draw/render the neuron's computed peak/prominence/size/con
 
 import numpy as np
 import pyvista as pv # for building bounding boxes
-from pyphoplacecellanalysis.PhoPositionalData.plotting.graphs import plot_point_labels, _perform_plot_point_labels
+from pyphoplacecellanalysis.Pho3D.PyVista.graphs import plot_point_labels, _perform_plot_point_labels
 from pyphocorehelpers.gui.PyVista.CascadingDynamicPlotsList import CascadingDynamicPlotsList # used to wrap _render_peak_prominence_2d_results_on_pyvista_plotter's outputs
 
 

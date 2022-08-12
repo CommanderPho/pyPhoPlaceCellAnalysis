@@ -10,6 +10,8 @@ from pyphoplacecellanalysis.External.pyqtgraph.console import ConsoleWidget
 
 from pyphoplacecellanalysis.GUI.Qt.Mixins.PhoMainAppWindowBase import PhoMainAppWindowBase
 
+from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.DockPlanningHelperWidget.DockPlanningHelperWidget import DockPlanningHelperWidget
+
 # DockAreaWrapper
 
 
@@ -57,7 +59,9 @@ class DynamicDockDisplayAreaContentMixin:
     @QtCore.pyqtSlot()
     def DynamicDockDisplayAreaContentMixin_on_buildUI(self):
         """ perfrom setup/creation of widget/graphical/data objects. Only the core objects are expected to exist on the implementor (root widget, etc) """
-        pass
+        ## TODO: currently temporary
+        self.ui.dock_helper_widgets = [] # required for holding references to dynamically created dock_helper_Widgets.
+        
     
     @QtCore.pyqtSlot()
     def DynamicDockDisplayAreaContentMixin_on_destroy(self):
@@ -70,8 +74,8 @@ class DynamicDockDisplayAreaContentMixin:
         """ adds a dynamic display dock with an appropriate widget of type 'viewContentsType' to the dock area container on the main window. """
         # Add the sample display dock items to the nested dynamic display dock:
         display_dock_area = self.displayDockArea
-        curr_display_dock_items = display_dock_area.children()
-        curr_num_display_dock_items = len(curr_display_dock_items)
+        # curr_display_dock_items = display_dock_area.children()
+        # curr_num_display_dock_items = len(curr_display_dock_items)
 
         if identifier is None:
             identifier = 'item'
@@ -132,6 +136,28 @@ class DynamicDockDisplayAreaContentMixin:
         # self.dynamic_display_dict[identifier] = {"dock":dDisplayItem, "widget":new_view_widget}        
         return widget, dDisplayItem
     
+    def find_display_dock(self, identifier):
+        """ returns the first found Dock with the specified title equal to the identifier , or None if it doesn't exist. """
+        curr_display_dock_items = self.displayDockArea.findChildren(Dock) # find all dock-type children
+        for a_dock_item in curr_display_dock_items:
+            if a_dock_item.title() == identifier:
+                return a_dock_item #found the correct item, return it
+        return None # if never found, return None        
+        # dock_item_titles = [a_dock_item.title() for a_dock_item in curr_display_dock_items]
+        
+    
+    def rename_display_dock(self, original_identifier, new_identifier):
+        """ renames an existing dock. Searches for Dock-type children instead of using the self.dynamic_display_dict because of the nestedness introduced by the nested dock widgets. """
+        # extant_group_items = self.dynamic_display_dict.get(original_identifier, None) # tries to find extant items with this identifier in the dict of extant plots
+        # assert extant_group_items is not None, f"original_identifier: {original_identifier} -- {self.dynamic_display_dict}"
+        extant_dock_item = self.find_display_dock(original_identifier)
+        assert extant_dock_item is not None, f"original_identifier: {original_identifier} -- {[a_dock_item.title() for a_dock_item in self.displayDockArea.findChildren(Dock)]}"
+        extant_dock_items_widgets = extant_dock_item.widgets # list, e.g. [<pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.DockPlanningHelperWidget.DockPlanningHelperWidget.DockPlanningHelperWidget at 0x1d6b2a1b820>]
+        # Perform the update:
+        extant_dock_item.setTitle(new_identifier)
+        ## TODO: update the self.dynamic_display_dict
+        
+        
     
     def remove_display_dock(self, identifier):
         """ removes a group of dynamic display widgets with identifier 'identifier'. """
@@ -171,8 +197,42 @@ class DynamicDockDisplayAreaContentMixin:
         # self.plotDict[name] = {"dock":dock, "widget":widget, "view":view}
     
     
-    
+    def on_dock_rename(self, old_name, new_name):
+        """ called when a dock item is renamed """
+        pass
 
+    def create_planning_helper_dock(self, identifier='New Test Dock Widget', dockAddLocationOpts=['bottom']):
+        """ creates a new planning helper dock relative to an existing dock item 
+        
+        create_planning_helper_dock(identifier='New Test Dock Widget', dockAddLocationOpts=['bottom'])
+        """
+        test_dock_planning_widget = DockPlanningHelperWidget(dock_title=identifier, dock_id=identifier, defer_show=True) # don't show yet
+        test_dock_planning_widget, dDisplayItem = self.add_display_dock(identifier=test_dock_planning_widget.identifier, widget=test_dock_planning_widget, dockAddLocationOpts=dockAddLocationOpts, dockIsClosable=True)
+        # connect the helper widget's add relative widget signal to the perform_create_new_relative_dock function
+        test_dock_planning_widget.action_create_new_dock.connect(self.perform_create_new_relative_dock) 
+        
+        return test_dock_planning_widget, dDisplayItem
+        
+    # @QtCore.pyqtSlot(object, str)
+    # def perform_create_new_relative_dock(self, dock_item, relative_position_string):
+    @QtCore.pyqtSlot(object, str)
+    def perform_create_new_relative_dock(self, calling_widget, relative_position_string):
+        """ NOTE: captures win """
+        print(f'perform_create_new_relative_dock(calling_widget: {calling_widget}, relative_position_string: {relative_position_string})') ## Getting called with calling_widget == NONE for some reason.
+        
+        dock_item = calling_widget.embedding_dock_item
+        if dock_item is not None:
+            returned_helper_widget, returned_dock = self.create_planning_helper_dock(dockAddLocationOpts=[calling_widget, relative_position_string]) # create the new item
+        else:
+            print(f'WARNING: dock_item is None for {calling_widget}! Creating using ONLY the position string (not relative to the dock item since it cannot be found!')
+            returned_helper_widget, returned_dock = self.create_planning_helper_dock(dockAddLocationOpts=[relative_position_string]) # create the new item
+
+        ## TODO: must hold a reference to the returned widgets else they're garbage collected            
+        self.ui.dock_helper_widgets.append((returned_helper_widget, returned_dock))
+        return returned_helper_widget, returned_dock
+ 
+        
+# ==================================================================================================================== #
 class PhoDockAreaContainingWindow(DynamicDockDisplayAreaContentMixin, PhoMainAppWindowBase):
     """ a custom PhoMainAppWindowBase (QMainWindow) subclass that contains a DockArea as its central view.
     
@@ -197,7 +257,7 @@ class PhoDockAreaContainingWindow(DynamicDockDisplayAreaContentMixin, PhoMainApp
         # Use self.ui.area as central widget:        
         self.setCentralWidget(self.ui.area)    
         self.DynamicDockDisplayAreaContentMixin_on_setup()
-        
+        self.GlobalConnectionManagerAccessingMixin_on_setup()
         
     def buildUI(self):
         self.DynamicDockDisplayAreaContentMixin_on_buildUI()
@@ -206,10 +266,66 @@ class PhoDockAreaContainingWindow(DynamicDockDisplayAreaContentMixin, PhoMainApp
     
     def closeEvent(self, event):
         # Enables closing all secondary windows when this (main) window is closed.
+        self.GlobalConnectionManagerAccessingMixin_on_destroy()
         self.DynamicDockDisplayAreaContentMixin_on_destroy()
         
         for window in QtWidgets.QApplication.topLevelWidgets():
             window.close()
+            
+    ########################################################
+    ## For GlobalConnectionManagerAccessingMixin conformance:
+    ########################################################
+    
+    # @QtCore.pyqtSlot()
+    def GlobalConnectionManagerAccessingMixin_on_setup(self):
+        """ perfrom registration of drivers/drivables:"""
+        ## TODO: register children
+        pass
+
+    # @QtCore.pyqtSlot()
+    def GlobalConnectionManagerAccessingMixin_on_destroy(self):
+        """ perfrom teardown/destruction of anything that needs to be manually removed or released """
+        ## TODO: unregister children
+        pass
+        
+        
+            
+            
+# ==================================================================================================================== #
+class NestedDockAreaWidget(DynamicDockDisplayAreaContentMixin, QtWidgets.QWidget):
+    """ a custom QWidget subclass that contains a DockArea as its central view and allows adding nested dock items dynamically
+    """
+    @property
+    def area(self):
+        return self.ui.area
+
+    def __init__(self, *args, **kwargs):
+        # self._app = pg.mkQApp(title) # makes a new QApplication or gets the reference to an existing one.
+        self.ui = PhoUIContainer()
+        self.DynamicDockDisplayAreaContentMixin_on_init()
+        super(NestedDockAreaWidget, self).__init__(*args, **kwargs)
+        self.setup()
+        self.buildUI()
+        
+
+    def setup(self):
+        self.ui.area = DockArea()
+        # Use self.ui.area as central widget:        
+        self.ui.layout = QtWidgets.QGridLayout()
+        self.setLayout(self.ui.layout)
+        self.ui.layout.addWidget(self.ui.area, 0, 0)        
+        self.DynamicDockDisplayAreaContentMixin_on_setup()
+        
+        
+    def buildUI(self):
+        self.DynamicDockDisplayAreaContentMixin_on_buildUI()
+        
+    
+    def closeEvent(self, event):
+        # Enables closing all secondary windows when this (main) window is closed.
+        self.DynamicDockDisplayAreaContentMixin_on_destroy()
+        
+            
             
             
     

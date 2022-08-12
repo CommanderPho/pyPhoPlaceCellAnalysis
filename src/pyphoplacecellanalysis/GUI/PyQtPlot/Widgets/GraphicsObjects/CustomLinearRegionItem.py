@@ -1,13 +1,44 @@
+from typing import Callable
 from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtCore, QtGui
 from pyphoplacecellanalysis.External.pyqtgraph.graphicsItems.LinearRegionItem import LinearRegionItem
 # from pyphoplacecellanalysis.External.pyqtgraph.graphicsItems.GraphicsObject import GraphicsObject
 from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.GraphicsObjects.CustomInfiniteLine import CustomInfiniteLine
 
+from dataclasses import dataclass
 
+
+@dataclass
+class MouseInteractionCriteria(object):
+    """Docstring for MouseInteractionCriteria."""
+    drag: Callable
+    hover: Callable
+    click: Callable
+    
+
+
+    
 
 class CustomLinearRegionItem(LinearRegionItem):
+    """ A custom pg.LinearRegionItem` subclass that allows the user to easily translate/scroll the window without resizing it.
     
-    def __init__(self, values=(0, 1), orientation='vertical', brush=None, pen=None, hoverBrush=None, hoverPen=None, movable=True, bounds=None, span=(0, 1), swapMode='sort', clipItem=None):
+    NOTE: also uses CustomInfiniteLine subclass
+    
+    
+    The widget is made of the middle area sandwiched between two infinite lines.
+    
+    The middle area's interaction config (which mouse keys can interact, etc) is defined by:
+    regionAreaMouseInteractionCriteria
+
+    The two lines is defined by:    
+    endLinesMouseInteractionCriteria
+    
+    By default both left and middle clicks can drag the area, but **only right-clicks can resize the region** (by dragging one of the two lines).
+    
+    """
+    
+
+    def __init__(self, values=(0, 1), orientation='vertical', brush=None, pen=None, hoverBrush=None, hoverPen=None, movable=True, bounds=None, span=(0, 1), swapMode='sort', clipItem=None,
+                 regionAreaMouseInteractionCriteria: MouseInteractionCriteria=None, endLinesMouseInteractionCriteria: MouseInteractionCriteria=None):
         """Create a new LinearRegionItem.
         
         ==============  =====================================================================
@@ -52,6 +83,45 @@ class CustomLinearRegionItem(LinearRegionItem):
         # Call parent __init__ function:
         LinearRegionItem.__init__(self, values=values, orientation=orientation, brush=brush, pen=pen, hoverBrush=hoverBrush, hoverPen=hoverPen, movable=movable, bounds=bounds, span=span, swapMode=swapMode, clipItem=clipItem)
         
+        ## Setup the mouse action critiera for the background rectangle (excluding the two end-position lines, which are set below):
+        if regionAreaMouseInteractionCriteria is None:
+            # Original/Default Conditions
+            regionAreaMouseInteractionCriteria = MouseInteractionCriteria(drag=lambda an_evt: (an_evt.button() == QtCore.Qt.MouseButton.LeftButton),
+                                                                        hover=lambda an_evt: (an_evt.acceptDrags(QtCore.Qt.MouseButton.LeftButton)),
+                                                                        click=lambda an_evt: (an_evt.button() == QtCore.Qt.MouseButton.RightButton)
+            )
+            
+            # Actually override drag:
+            def _override_accept_either_mouse_button_drags(an_evt):
+                can_accept = an_evt.acceptDrags(QtCore.Qt.MouseButton.LeftButton)
+                can_accept = can_accept and an_evt.acceptDrags(QtCore.Qt.MouseButton.MiddleButton)
+                return can_accept
+            regionAreaMouseInteractionCriteria.hover = _override_accept_either_mouse_button_drags
+            
+            regionAreaMouseInteractionCriteria.drag = lambda an_evt: (an_evt.button() == QtCore.Qt.MouseButton.LeftButton) or (an_evt.button() == QtCore.Qt.MouseButton.MiddleButton)
+            
+            
+        self._custom_area_mouse_action_criteria = regionAreaMouseInteractionCriteria
+        
+        
+        # ## Add the custom mouse event criteria as arguments to the CustomInfiniteLine's
+        # lineKwds['custom_mouse_drag_criteria_fn'] = lambda an_evt: (an_evt.button() == QtCore.Qt.MouseButton.LeftButton) # Original/Default Condition
+        # # lineKwds['custom_mouse_drag_criteria_fn'] = lambda an_evt: (an_evt.button() == QtCore.Qt.MouseButton.RightButton) or (an_evt.button() == QtCore.Qt.MouseButton.MiddleButton)
+        
+        # lineKwds['custom_mouse_hover_criteria_fn'] = lambda an_evt: (an_evt.acceptDrags(QtCore.Qt.MouseButton.LeftButton)) # Original/Default Condition
+        # # lineKwds['custom_mouse_hover_criteria_fn'] = lambda an_evt: (an_evt.acceptDrags(QtCore.Qt.MouseButton.LeftButton) and ((an_evt.modifiers() == QtCore.Qt.ControlModifier) or (an_evt.modifiers() == QtCore.Qt.AltModifier) or (an_evt.modifiers() == QtCore.Qt.ShiftModifier)))
+        # lineKwds['custom_mouse_click_criteria_fn'] = lambda an_evt: (an_evt.button() == QtCore.Qt.MouseButton.RightButton) # Original/Default Condition
+        
+        if endLinesMouseInteractionCriteria is None:
+            # Original/Default Conditions
+            endLinesMouseInteractionCriteria = MouseInteractionCriteria(drag=lambda an_evt: (an_evt.button() == QtCore.Qt.MouseButton.LeftButton),
+                                                                        hover=lambda an_evt: (an_evt.acceptDrags(QtCore.Qt.MouseButton.LeftButton)),
+                                                                        click=lambda an_evt: (an_evt.button() == QtCore.Qt.MouseButton.RightButton)
+            )
+            ## Only allow right-button to adjust lines/handles directly:
+            endLinesMouseInteractionCriteria.hover = lambda an_evt: (an_evt.acceptDrags(QtCore.Qt.MouseButton.RightButton))
+            endLinesMouseInteractionCriteria.drag = lambda an_evt: (an_evt.button() == QtCore.Qt.MouseButton.RightButton)
+
         ## Parent Implementation:
         # GraphicsObject.__init__(self)
         # self.orientation = orientation
@@ -76,17 +146,38 @@ class CustomLinearRegionItem(LinearRegionItem):
         )
         
         ## Add the custom mouse event criteria as arguments to the CustomInfiniteLine's
-        lineKwds['custom_mouse_drag_criteria_fn'] = lambda an_evt: (an_evt.button() == QtCore.Qt.MouseButton.LeftButton) # Original/Default Condition
+        lineKwds['custom_mouse_drag_criteria_fn'] = endLinesMouseInteractionCriteria.drag
         # lineKwds['custom_mouse_drag_criteria_fn'] = lambda an_evt: (an_evt.button() == QtCore.Qt.MouseButton.RightButton) or (an_evt.button() == QtCore.Qt.MouseButton.MiddleButton)
         
-        lineKwds['custom_mouse_hover_criteria_fn'] = lambda an_evt: (an_evt.acceptDrags(QtCore.Qt.MouseButton.LeftButton)) # Original/Default Condition
+        lineKwds['custom_mouse_hover_criteria_fn'] = endLinesMouseInteractionCriteria.hover
         # lineKwds['custom_mouse_hover_criteria_fn'] = lambda an_evt: (an_evt.acceptDrags(QtCore.Qt.MouseButton.LeftButton) and ((an_evt.modifiers() == QtCore.Qt.ControlModifier) or (an_evt.modifiers() == QtCore.Qt.AltModifier) or (an_evt.modifiers() == QtCore.Qt.ShiftModifier)))
-        lineKwds['custom_mouse_click_criteria_fn'] = lambda an_evt: (an_evt.button() == QtCore.Qt.MouseButton.RightButton) # Original/Default Condition
+        lineKwds['custom_mouse_click_criteria_fn'] = endLinesMouseInteractionCriteria.click
         
         # custom_mouse_drag_criteria_fn=None, custom_mouse_hover_criteria_fn=None, custom_mouse_click_criteria_fn=None
         self._setup_rebuild_with_custom_lines(values, lineKwds)
 
-    
+    @property
+    def custom_mouse_drag_criteria_fn(self):
+        """The custom_mouse_drag_criteria_fn property."""
+        return self._custom_area_mouse_action_criteria.drag
+    @custom_mouse_drag_criteria_fn.setter
+    def custom_mouse_drag_criteria_fn(self, value):
+        self._custom_area_mouse_action_criteria.drag = value
+    @property
+    def custom_mouse_hover_criteria_fn(self):
+        """The custom_mouse_hover_criteria_fn property."""
+        return self._custom_area_mouse_action_criteria.hover
+    @custom_mouse_hover_criteria_fn.setter
+    def custom_mouse_hover_criteria_fn(self, value):
+        self._custom_area_mouse_action_criteria.hover = value
+    @property
+    def custom_mouse_click_criteria_fn(self):
+        """The custom_mouse_click_criteria_fn property."""
+        return self._custom_area_mouse_action_criteria.click
+    @custom_mouse_click_criteria_fn.setter
+    def custom_mouse_click_criteria_fn(self, value):
+        self._custom_area_mouse_action_criteria.click = value
+        
     
     def _setup_rebuild_with_custom_lines(self, values, lineKwds):
         """ rebuilds using CustomInfiniteLine items for self.lines instead of the simple InfiniteLine used in the base class"""
@@ -129,7 +220,11 @@ class CustomLinearRegionItem(LinearRegionItem):
 
         
     def mouseDragEvent(self, ev):
-        if not self.movable or ev.button() != QtCore.Qt.MouseButton.LeftButton:
+        drag_criteria_fn = self.custom_mouse_drag_criteria_fn
+        if drag_criteria_fn is None:
+            drag_criteria_fn = lambda an_evt: (an_evt.button() == QtCore.Qt.MouseButton.LeftButton) # 
+            
+        if not self.movable or not drag_criteria_fn(ev):
             return
         ev.accept()
         
@@ -155,7 +250,11 @@ class CustomLinearRegionItem(LinearRegionItem):
             self.sigRegionChanged.emit(self)
             
     def mouseClickEvent(self, ev):
-        if self.moving and ev.button() == QtCore.Qt.MouseButton.RightButton:
+        click_criteria_fn = self.custom_mouse_click_criteria_fn
+        if click_criteria_fn is None:
+            click_criteria_fn = lambda an_evt: (an_evt.button() == QtCore.Qt.MouseButton.RightButton) # Original/Default Condition
+            
+        if self.moving and click_criteria_fn(ev):
             ev.accept()
             for i, l in enumerate(self.lines):
                 l.setPos(self.startPositions[i])
@@ -164,7 +263,10 @@ class CustomLinearRegionItem(LinearRegionItem):
             self.sigRegionChangeFinished.emit(self)
 
     def hoverEvent(self, ev):
-        if self.movable and (not ev.isExit()) and ev.acceptDrags(QtCore.Qt.MouseButton.LeftButton):
+        hover_criteria_fn = self.custom_mouse_hover_criteria_fn
+        if hover_criteria_fn is None:
+            hover_criteria_fn = lambda an_evt: (an_evt.acceptDrags(QtCore.Qt.MouseButton.LeftButton))
+        if self.movable and (not ev.isExit()) and hover_criteria_fn(ev):
             self.setMouseHover(True)
         else:
             self.setMouseHover(False)

@@ -62,6 +62,7 @@ def debug_print_identity_properties_from_session(curr_sess, debug_print=True):
     n_cells = len(curr_map_keys)
     if debug_print:
         print(f'debug_print_identity_properties_from_session(curr_sess, ...): n_cells={n_cells}')
+        print(f'\t\t session: {curr_sess.get_session_description()}')
         print(f'\t\t curr_map_keys: {curr_map_keys}\n \t\t curr_map_values: {curr_map_values}')
     return n_cells, curr_map_keys, curr_map_values
 

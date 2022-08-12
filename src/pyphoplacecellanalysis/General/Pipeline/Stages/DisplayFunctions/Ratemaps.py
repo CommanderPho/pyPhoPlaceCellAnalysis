@@ -26,6 +26,9 @@ class DefaultRatemapDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Disp
         Internally wraps `PfND.plot_ratemaps_2D` which itself wraps `neuropy.plotting.ratemaps.plot_ratemap_2D`
         
             optionally shows peak firing rates
+            
+            
+        TODO: plot the information about the source of the data, such as the session information? Or perhaps we could just leave that encoded in the exported file name? It is hard to track the figures though
         
         """
         computation_result.computed_data['pf2D'].plot_ratemaps_2D(**({'subplots': (None, 3), 'resolution_multiplier': 1.0, 'enable_spike_overlay': False, 'brev_mode': PlotStringBrevityModeEnum.MINIMAL} | kwargs))
@@ -36,6 +39,14 @@ class DefaultRatemapDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Disp
         
         active_pf_computation_params = unwrap_placefield_computation_parameters(active_config.computation_config)
         _display_add_computation_param_text_box(active_figure, active_pf_computation_params) # Adds the parameters text.
+        
+        ## Setup the plot title and add the session information:
+        session_identifier = computation_result.sess.get_session_description() # 'sess_bapun_RatN_Day4_2019-10-15_11-30-06'
+        fig_label = f'{plot_variable_name} | plot_ratemaps_2D | {session_identifier} | {active_figure.number}'
+        # print(f'fig_label: {fig_label}')
+        active_figure.set_label(fig_label)
+        active_figure.canvas.manager.set_window_title(fig_label) # sets the window's title
+        
         
         active_pf_2D_figures = [active_figure]            
         

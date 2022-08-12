@@ -38,7 +38,9 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
     applicationName = 'Spike3DRasterWindow'
     windowName = 'Spike3DRasterWindow'
     
+    # enable_debug_print = True
     enable_debug_print = False
+    # enable_interaction_events_debug_print = True
     enable_interaction_events_debug_print = False
     
     # TODO: add signals here:
@@ -193,6 +195,7 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
         self.params.type_of_3d_plotter = type_of_3d_plotter
         
         # Helper Mixins: INIT:
+        self._numScheduledScalings = 0
         self.SpikeRasterBottomFrameControlsMixin_on_init()
         self.SpikeRasterLeftSidebarControlsMixin_on_init()
         
@@ -385,7 +388,7 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
         self.spike_raster_plt_2d.update_scroll_window_region(next_start_timestamp, next_start_timestamp+self.animation_active_time_window.window_duration, block_signals=True) # self.spike_raster_plt_2d.window_scrolled should be emitted
         
         # signal emit:
-        # self.spike_raster_plt_2d.window_scrolled.emit(next_start_timestamp, next_start_timestamp+self.animation_active_time_window.window_duration)
+        self.spike_raster_plt_2d.window_scrolled.emit(next_start_timestamp, next_start_timestamp+self.animation_active_time_window.window_duration)
 
         # update_scroll_window_region
         # self.ui.spike_raster_plt_3d.spikes_window.update_window_start_end(self.ui.spike_raster_plt_2d.spikes_window.active_time_window[0], self.ui.spike_raster_plt_2d.spikes_window.active_time_window[1])
@@ -577,8 +580,35 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
         # print(f'Spike3DRasterWindowWidget.eventFilter(self, watched, event)')
         if event.type() == QtCore.QEvent.GraphicsSceneWheel:
             # QtCore.QEvent.GraphicsSceneWheel
+            """ 
+            
+            event.delta(): -120 # Returns the distance that the wheel is rotated, in eighths (1/8s) of a degree. A positive value indicates that the wheel was rotated forwards away from the user; a negative value indicates that the wheel was rotated backwards toward the user.
+                Most mouse types work in steps of 15 degrees, in which case the delta value is a multiple of 120 (== 15 * 8).
+
+        	event.orientation(): 1 for alternative scroll wheel dir and 2 for primary scroll wheel dir
+ 
+            """
             if self.should_debug_print_interaction_events:
                 print(f'Spike3DRasterWindowWidget.eventFilter(...)\n\t detected event.type() == QtCore.QEvent.GraphicsSceneWheel')
+                print(f'\twatched: {watched}\n\tevent: {event}')
+                print(f'\tevent.delta(): {event.delta()}')
+                print(f'\tevent.orientation(): {event.orientation()}')
+                # print(f'\tevent.phase(): {event.phase()}')
+                # print(f'\tevent.pixelDelta(): {event.pixelDelta()}')
+                
+            # computing the "intensity" of wheel move and adding it to _numScheduledScalings
+            # see https://wiki.qt.io/Smooth_Zoom_In_QGraphicsView
+            # numDegrees = event.delta() / 8
+            # numSteps = numDegrees / 15 # see QWheelEvent documentation
+            
+            numSteps = event.delta()
+            self._numScheduledScalings = self._numScheduledScalings + numSteps
+            if (self._numScheduledScalings * numSteps < 0):
+                self._numScheduledScalings = numSteps # if user moved the wheel in another direction, we reset previously scheduled scalings
+                
+            self.shift_animation_frame_val(self._numScheduledScalings) # TODO: this isn't quite right
+            
+            
             return True
         else:
             if self.should_debug_print_interaction_events:

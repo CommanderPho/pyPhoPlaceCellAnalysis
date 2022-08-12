@@ -6,7 +6,7 @@ from pyvistaqt import BackgroundPlotter
 from pyvistaqt.plotting import MultiPlotter
 
 
-from pyphoplacecellanalysis.PhoPositionalData.plotting.spikeAndPositions import point_location_circle, point_location_trail_circle # Required for InteractivePyvistaPlotter_PointAndPathPlottingMixin
+from pyphoplacecellanalysis.Pho3D.PyVista.spikeAndPositions import point_location_circle, point_location_trail_circle # Required for InteractivePyvistaPlotter_PointAndPathPlottingMixin
 
 class InteractivePyvistaPlotterBuildIfNeededMixin:
     """ allows the implementor to build a new plotter if it needs, or re-use the existing one if it already exists. """
