@@ -59,7 +59,9 @@ class DynamicDockDisplayAreaContentMixin:
     @QtCore.pyqtSlot()
     def DynamicDockDisplayAreaContentMixin_on_buildUI(self):
         """ perfrom setup/creation of widget/graphical/data objects. Only the core objects are expected to exist on the implementor (root widget, etc) """
-        pass
+        ## TODO: currently temporary
+        self.ui.dock_helper_widgets = [] # required for holding references to dynamically created dock_helper_Widgets.
+        
     
     @QtCore.pyqtSlot()
     def DynamicDockDisplayAreaContentMixin_on_destroy(self):
@@ -211,16 +213,22 @@ class DynamicDockDisplayAreaContentMixin:
         
         return test_dock_planning_widget, dDisplayItem
         
+    # @QtCore.pyqtSlot(object, str)
+    # def perform_create_new_relative_dock(self, dock_item, relative_position_string):
     @QtCore.pyqtSlot(object, str)
-    def perform_create_new_relative_dock(self, dock_item, relative_position_string):
+    def perform_create_new_relative_dock(self, calling_widget, relative_position_string):
         """ NOTE: captures win """
-        print(f'perform_create_new_relative_dock(dock_item: {dock_item}, relative_position_string: {relative_position_string})')
-        returned_helper_widget, returned_dock = self.create_planning_helper_dock(dockAddLocationOpts=[dock_item, relative_position_string]) # create the new item
-        # self.ui.returned_helper_widget
+        print(f'perform_create_new_relative_dock(calling_widget: {calling_widget}, relative_position_string: {relative_position_string})') ## Getting called with calling_widget == NONE for some reason.
         
-        ## TODO: must hold a reference to the returned widgets else they're garbage collected
-        
-        
+        dock_item = calling_widget.embedding_dock_item
+        if dock_item is not None:
+            returned_helper_widget, returned_dock = self.create_planning_helper_dock(dockAddLocationOpts=[calling_widget, relative_position_string]) # create the new item
+        else:
+            print(f'WARNING: dock_item is None for {calling_widget}! Creating using ONLY the position string (not relative to the dock item since it cannot be found!')
+            returned_helper_widget, returned_dock = self.create_planning_helper_dock(dockAddLocationOpts=[relative_position_string]) # create the new item
+
+        ## TODO: must hold a reference to the returned widgets else they're garbage collected            
+        self.ui.dock_helper_widgets.append((returned_helper_widget, returned_dock))
         return returned_helper_widget, returned_dock
  
         

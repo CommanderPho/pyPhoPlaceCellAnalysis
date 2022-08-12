@@ -20,7 +20,6 @@ class DockPlanningHelperWidget(QtWidgets.QWidget):
     
     action_create_new_dock = QtCore.pyqtSignal(object, str) # signal emitted when the mapping from the temporal window to the spatial layout is changed
     
-    
     close_signal = QtCore.pyqtSignal() # Called when the window is closing. 
     
     
@@ -188,13 +187,15 @@ class DockPlanningHelperWidget(QtWidgets.QWidget):
     def on_click_create_new_dock_below(self):
         # [self.embedding_dock_item, 'bottom']
         print(f'on_click_create_new_dock_below()')
-        self.action_create_new_dock.emit(self.embedding_dock_item, 'bottom')
+        # self.action_create_new_dock.emit(self.embedding_dock_item, 'bottom')
+        self.action_create_new_dock.emit(self, 'bottom')
 
     @QtCore.pyqtSlot()        
     def on_click_create_new_dock_right(self):
         # [self.embedding_dock_item, 'right']
         print(f'on_click_create_new_dock_right()')
-        self.action_create_new_dock.emit(self.embedding_dock_item, 'right')
+        # self.action_create_new_dock.emit(self.embedding_dock_item, 'right')
+        self.action_create_new_dock.emit(self, 'right')
 
     def __str__(self):
          return 
