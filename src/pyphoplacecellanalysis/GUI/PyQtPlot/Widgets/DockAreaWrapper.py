@@ -257,7 +257,7 @@ class PhoDockAreaContainingWindow(DynamicDockDisplayAreaContentMixin, PhoMainApp
         # Use self.ui.area as central widget:        
         self.setCentralWidget(self.ui.area)    
         self.DynamicDockDisplayAreaContentMixin_on_setup()
-        
+        self.GlobalConnectionManagerAccessingMixin_on_setup()
         
     def buildUI(self):
         self.DynamicDockDisplayAreaContentMixin_on_buildUI()
@@ -266,11 +266,29 @@ class PhoDockAreaContainingWindow(DynamicDockDisplayAreaContentMixin, PhoMainApp
     
     def closeEvent(self, event):
         # Enables closing all secondary windows when this (main) window is closed.
+        self.GlobalConnectionManagerAccessingMixin_on_destroy()
         self.DynamicDockDisplayAreaContentMixin_on_destroy()
         
         for window in QtWidgets.QApplication.topLevelWidgets():
             window.close()
             
+    ########################################################
+    ## For GlobalConnectionManagerAccessingMixin conformance:
+    ########################################################
+    
+    # @QtCore.pyqtSlot()
+    def GlobalConnectionManagerAccessingMixin_on_setup(self):
+        """ perfrom registration of drivers/drivables:"""
+        ## TODO: register children
+        pass
+
+    # @QtCore.pyqtSlot()
+    def GlobalConnectionManagerAccessingMixin_on_destroy(self):
+        """ perfrom teardown/destruction of anything that needs to be manually removed or released """
+        ## TODO: unregister children
+        pass
+        
+        
             
             
 # ==================================================================================================================== #
