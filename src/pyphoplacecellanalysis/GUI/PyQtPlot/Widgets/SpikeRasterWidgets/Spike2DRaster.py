@@ -342,7 +342,12 @@ class Spike2DRaster(EpochRenderingMixin, Render2DScrollWindowPlotMixin, SpikeRas
             self.ui.spinRenderWindowDuration.setValue(scroll_window_width)
             
         # Finally, update the actual spikes_window. This is the part that updates the 3D Raster plot because we bind to this window's signal
-        self.spikes_window.update_window_start(min_t)
+        # self.spikes_window.update_window_start(min_t)
+        
+        # Here is the main problem: The duration and window end-time aren't being updated
+        self.spikes_window.update_window_start_end(new_start=min_t, new_end=max_t)
+        
+        
         
     @QtCore.pyqtSlot(float, float)
     def update_scroll_window_region(self, new_start, new_end, block_signals: bool=True):
