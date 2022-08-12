@@ -36,7 +36,7 @@ class AnimalTrajectoryPlottingMixin:
         
         self.params.trajectory_path_current_position_marker_size = 25.0
         # self.params.trajectory_path_marker_max_fill_opacity = 255
-        self.params.trajectory_path_marker_max_fill_opacity = 200
+        self.params.trajectory_path_marker_max_fill_opacity = 200 # out of 255
         
         ### Path Settings:
         self.params.recent_position_trajectory_path_pen = pg.mkPen({'color': [255, 255, 255, 10], 'width': 1}) # White
