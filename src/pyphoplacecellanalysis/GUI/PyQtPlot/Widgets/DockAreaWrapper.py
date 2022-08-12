@@ -217,6 +217,10 @@ class DynamicDockDisplayAreaContentMixin:
         print(f'perform_create_new_relative_dock(dock_item: {dock_item}, relative_position_string: {relative_position_string})')
         returned_helper_widget, returned_dock = self.create_planning_helper_dock(dockAddLocationOpts=[dock_item, relative_position_string]) # create the new item
         # self.ui.returned_helper_widget
+        
+        ## TODO: must hold a reference to the returned widgets else they're garbage collected
+        
+        
         return returned_helper_widget, returned_dock
  
         
