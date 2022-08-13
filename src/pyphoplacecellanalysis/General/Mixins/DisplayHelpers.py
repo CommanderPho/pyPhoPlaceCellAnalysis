@@ -165,3 +165,34 @@ def debug_print_base_raster_plotter_info(raster_plotter):
     print(f'.spikes_window address: {hex(id(raster_plotter.spikes_window))}')
         
 
+
+def _debug_print_spike_raster_window_animation_properties(spike_raster_window):
+    """ dumps debug properties related to animation for a spike_raster_window
+    Usage:
+        from pyphoplacecellanalysis.GUI.Qt.SpikeRasterWindows.Spike3DRasterWindowWidget import Spike3DRasterWindowWidget
+        display_output = display_output | curr_active_pipeline.display('_display_spike_rasters_window', active_config_name, active_config_name=active_config_name)
+        spike_raster_window = display_output['spike_raster_window']
+        _debug_print_spike_raster_window_animation_properties(spike_raster_window) 
+    
+    Example Output:
+        animation_active_time_window.window_duration: 0.0
+        animation_time_step: 0.04
+        animation_active_time_window.active_window_start_time: 7412.0642973107815
+        render_window_duration: 0.0
+        spike_raster_plt_2d.spikes_window.active_time_window: (7412.0642973107815, 7412.0642973107815)
+        spike_raster_plt_2d.spikes_window.window_duration: 0.0
+        spike_raster_plt_2d.ui.scroll_window_region
+        min_x: 7412.0642973107815, max_x: 7412.0642973107815, x_duration: 0.0
+
+    """
+    print(f'\tanimation_active_time_window.window_duration: {spike_raster_window.animation_active_time_window.window_duration}')
+    print(f'\tanimation_time_step: {spike_raster_window.animation_time_step}')
+    print(f'\tanimation_active_time_window.active_window_start_time: {spike_raster_window.animation_active_time_window.active_window_start_time}')
+    print(f'\trender_window_duration: {spike_raster_window.render_window_duration}')
+    print(f'\tspike_raster_plt_2d.spikes_window.active_time_window: {spike_raster_window.spike_raster_plt_2d.spikes_window.active_time_window}') # (7455.820603311667, 7470.820603311667) start_t matches, but end_t does not! 
+    print(f'\tspike_raster_plt_2d.spikes_window.window_duration: {spike_raster_window.spike_raster_plt_2d.spikes_window.window_duration}') # 15.0 -- This on the other hand, is not right... 
+    min_x, max_x = spike_raster_window.spike_raster_plt_2d.ui.scroll_window_region.getRegion()
+    x_duration = max_x - min_x
+    print(f'\tspike_raster_plt_2d.ui.scroll_window_region\n\t\tmin_x: {min_x}, max_x: {max_x}, x_duration: {x_duration}') # min_x: 7455.820603311667, max_x: 7532.52160713601, x_duration: 76.70100382434339 -- NOTE: these are the real seconds!
+
+

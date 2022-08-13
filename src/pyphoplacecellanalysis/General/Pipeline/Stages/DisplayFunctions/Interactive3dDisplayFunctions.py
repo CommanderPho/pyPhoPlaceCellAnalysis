@@ -29,6 +29,10 @@ class Interactive3dDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Displ
         """ 
         Inputs: {'extant_plotter': None} 
         Outputs: {'ipcDataExplorer', 'plotter', 'pane'}
+        
+        Optional Keywords:
+            override_pf2D: the placefield PfND or PfND_TimeDependent object to use as the source data.
+        
         """
         # Panel library based Placefield controls
         from pyphoplacecellanalysis.GUI.Panel.panel_placefield import build_panel_interactive_placefield_visibility_controls

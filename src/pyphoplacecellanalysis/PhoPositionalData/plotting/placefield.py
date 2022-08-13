@@ -357,7 +357,7 @@ def plot_placefields2D(pTuningCurves, active_placefields, pf_colors: np.ndarray,
         
     ## Add points:
     
-        if params['should_display_placefield_points']:
+        if params['should_display_placefield_points'] and (pdata_currActiveNeuronTuningCurve_Points.n_points > 0):
             pdata_currActiveNeuronTuningCurve_Points_plotActor = pTuningCurves.add_points(pdata_currActiveNeuronTuningCurve_Points, label=f'{curr_active_neuron_pf_identifier}_points', name=f'{curr_active_neuron_pf_identifier}_points',
                                                                                 render_points_as_spheres=True, point_size=4.0, color=curr_active_neuron_opaque_color, render=False)    
     
