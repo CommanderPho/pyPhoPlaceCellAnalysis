@@ -152,12 +152,6 @@ class InteractivePlaceCellDataExplorer(GlobalConnectionManagerAccessingMixin, In
                                                                                             self.flattened_spike_positions_list[:, active_included_all_historical_indicies],
                                                                                             spike_geom=spike_geom_box.copy())
 
-            # active_included_all_historical_indicies = self.active_session.flattened_spiketrains.spikes_df.eval('(t_seconds > @historical_t_start) & (t_seconds < @t_stop)') # '@' prefix indicates a local variable. All other variables are
-            # historical_spikes_pdata, historical_spikes_pc = build_active_spikes_plot_data_df(flattened_spike_times[active_included_all_historical_indicies],
-            #                                                                                 flattened_spike_active_unitIdentities[active_included_all_historical_indicies],
-            #                                                                                 flattened_spike_positions_list[:, active_included_all_historical_indicies],
-            #                                                                                 spike_geom=spike_geom_box.copy())
-
             if historical_spikes_pc.n_points >= 1:
                 self.plots['spikes_main_historical'] = self.p.add_mesh(historical_spikes_pc, name='historical_spikes_main', scalars='cellID', cmap=self.active_config.plotting_config.pf_listed_colormap, show_scalar_bar=False, lighting=True, render=False)
                 needs_render = True
@@ -249,9 +243,6 @@ class InteractivePlaceCellDataExplorer(GlobalConnectionManagerAccessingMixin, In
         # flattened_spike_positions_list = self.active_session.flattened_spiketrains.spikes_df[["x", "y"]].to_numpy().T
         flattened_spike_positions_list = self.params.flattened_spike_positions_list
 
-
-         
-        
         # evaluated as column names
         active_included_all_historical_indicies = ((flattened_spike_times > historical_t_start) & (flattened_spike_times < t_stop)) # Two Sided Range Mode
         historical_spikes_pdata, historical_spikes_pc = build_active_spikes_plot_data(flattened_spike_active_unitIdentities[active_included_all_historical_indicies],

@@ -14,7 +14,7 @@ from PyQt5 import QtCore, QtGui, QtWidgets
 class Ui_Form(object):
     def setupUi(self, Form):
         Form.setObjectName("Form")
-        Form.resize(400, 300)
+        Form.resize(394, 300)
         self.gridLayout = QtWidgets.QGridLayout(Form)
         self.gridLayout.setContentsMargins(-1, -1, -1, 2)
         self.gridLayout.setObjectName("gridLayout")
@@ -64,13 +64,3 @@ class Ui_Form(object):
         self.label_2.setText(_translate("Form", "Variable"))
         self.cmbVariableName.setToolTip(_translate("Form", "Corresponds to _temp_debug_two_step_plots_animated_imshow\'s variable_name arg"))
         self.cmbVariableName.setCurrentText(_translate("Form", "p_x_given_n"))
-
-
-if __name__ == "__main__":
-    import sys
-    app = QtWidgets.QApplication(sys.argv)
-    Form = QtWidgets.QWidget()
-    ui = Ui_Form()
-    ui.setupUi(Form)
-    Form.show()
-    sys.exit(app.exec_())
