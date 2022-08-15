@@ -391,21 +391,17 @@ class BayesianPlacemapPositionDecoder(PlacemapPositionDecoder):
         active_window_midpoints = window_starts + ((window_ends - window_starts) / 2.0)
         return active_window_midpoints
     
-    
     @property
     def most_likely_positions(self):
         """The most_likely_positions for each window."""
         return np.vstack((self.xbin_centers[self.most_likely_position_indicies[0,:]], self.ybin_centers[self.most_likely_position_indicies[1,:]])).T # much more efficient than the other implementation. Result is # (85844, 2)
     
-    
-    
-    
-    # placefield properties:
+    # placefield properties: _____________________________________________________________________________________________ #
     @property
     def ratemap(self):
         return self.pf.ratemap
             
-    # ratemap properties (xbin & ybin)  
+    # ratemap properties (xbin & ybin) ___________________________________________________________________________________ #
     @property
     def xbin(self):
         return self.ratemap.xbin
@@ -545,3 +541,5 @@ class BayesianPlacemapPositionDecoder(PlacemapPositionDecoder):
         # self.most_likely_position_indicies
         
 
+    ## NICE MEME!
+    

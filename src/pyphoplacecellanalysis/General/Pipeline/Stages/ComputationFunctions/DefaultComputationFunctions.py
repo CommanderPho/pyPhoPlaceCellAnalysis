@@ -20,7 +20,11 @@ class DefaultComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Computa
     _computationPrecidence = 1 # must be done after PlacefieldComputations
 
     def _perform_position_decoding_computation(computation_result: ComputationResult):
-        """ Builds the 2D Placefield Decoder """
+        """ Builds the 2D Placefield Decoder 
+        
+            TODO: CORRECTNESS: Consider whether spikes_df or just the spikes_df used to compute the pf2D should be passed. Only the cells used to build the decoder should be used to decode, that much is certain.
+        
+        """
         def position_decoding_computation(active_session, pf_computation_config, prev_output_result: ComputationResult):
             ## TODO: IMPORTANT!! POTENTIAL_BUG: Should this passed-in spikes_df actually be the filtered spikes_df that was used to compute the placefields in PfND? That would be `prev_output_result.computed_data['pf2D'].filtered_spikes_df`
             prev_output_result.computed_data['pf2D_Decoder'] = BayesianPlacemapPositionDecoder(pf_computation_config.time_bin_size, prev_output_result.computed_data['pf2D'], active_session.spikes_df.copy(), debug_print=False)

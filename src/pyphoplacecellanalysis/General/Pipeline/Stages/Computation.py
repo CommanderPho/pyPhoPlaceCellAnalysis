@@ -22,9 +22,6 @@ import pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions
 # from General.Pipeline.Stages.ComputationFunctions import ComputationFunctionRegistryHolder # should include ComputationFunctionRegistryHolder and all specifics
 from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.ComputationFunctionRegistryHolder import ComputationFunctionRegistryHolder
 
-
-
-
 class PipelineWithComputedPipelineStageMixin:
     """ To be added to the pipeline to enable conveninece access ot its pipeline stage post Computed stage. """
     ## Computed Properties:
@@ -89,7 +86,6 @@ class PipelineWithComputedPipelineStageMixin:
         assert (self.can_compute), "Current self.stage must already be a ComputedPipelineStage. Call self.filter_sessions with filter configs to reach this step."
         self.stage.evaluate_single_computation_params(active_computation_params, enabled_filter_names=enabled_filter_names, overwrite_extant_results=overwrite_extant_results, computation_functions_name_whitelist=computation_functions_name_whitelist, computation_functions_name_blacklist=computation_functions_name_blacklist, fail_on_exception=fail_on_exception, debug_print=debug_print)
         
-
     def perform_registered_computations(self, previous_computation_result=None, computation_functions_name_whitelist=None, computation_functions_name_blacklist=None, fail_on_exception:bool=False, debug_print=False):
         assert (self.can_compute), "Current self.stage must already be a ComputedPipelineStage. Call self.perform_computations to reach this step."
         self.stage.perform_registered_computations(previous_computation_result, computation_functions_name_whitelist=computation_functions_name_whitelist, computation_functions_name_blacklist=computation_functions_name_blacklist, fail_on_exception=fail_on_exception, debug_print=debug_print)
@@ -97,8 +93,6 @@ class PipelineWithComputedPipelineStageMixin:
     def rerun_failed_computations(self, previous_computation_result, fail_on_exception:bool=False, debug_print=False):
         """ retries the computation functions that previously failed and resulted in accumulated_errors in the previous_computation_result """
         return self.stage.rerun_failed_computations(previous_computation_result, fail_on_exception=fail_on_exception, debug_print=debug_print)
-    
-    
     
 
 class ComputedPipelineStage(LoadableInput, LoadableSessionInput, FilterablePipelineStage, BaseNeuropyPipelineStage):
@@ -124,7 +118,6 @@ class ComputedPipelineStage(LoadableInput, LoadableSessionInput, FilterablePipel
         self.registered_computation_function_dict = OrderedDict()
         self.reload_default_computation_functions() # registers the default
         
-        
     @property
     def registered_computation_functions(self):
         """The registered_computation_functions property."""
@@ -143,8 +136,7 @@ class ComputedPipelineStage(LoadableInput, LoadableSessionInput, FilterablePipel
         """    
         for (a_computation_class_name, a_computation_class) in reversed(ComputationFunctionRegistryHolder.get_registry().items()):
             for (a_computation_fn_name, a_computation_fn) in reversed(a_computation_class.get_all_functions(use_definition_order=True)):
-                self.register_computation(a_computation_fn_name, a_computation_fn
-                                          )
+                self.register_computation(a_computation_fn_name, a_computation_fn)
         
     def register_computation(self, registered_name, computation_function):
         self.registered_computation_function_dict[registered_name] = computation_function
@@ -154,7 +146,6 @@ class ComputedPipelineStage(LoadableInput, LoadableSessionInput, FilterablePipel
         
         The return value should be set to the self.computation_results[a_select_config_name]
         """
-        
         # Need to exclude any computation functions specified in omitted_computation_functions_dict
         if computation_functions_name_whitelist is not None:
             active_computation_function_dict = {a_computation_fn_name:a_computation_fn for (a_computation_fn_name, a_computation_fn) in self.registered_computation_function_dict.items() if a_computation_fn_name in computation_functions_name_whitelist}
@@ -173,8 +164,6 @@ class ComputedPipelineStage(LoadableInput, LoadableSessionInput, FilterablePipel
         # Perform the computations:
         return ComputedPipelineStage._execute_computation_functions(active_computation_functions, previous_computation_result=previous_computation_result, fail_on_exception=fail_on_exception, debug_print=debug_print)
     
-    
-    
     def rerun_failed_computations(self, previous_computation_result, fail_on_exception:bool=False, debug_print=False):
         """ retries the computation functions that previously failed and resulted in accumulated_errors in the previous_computation_result """
         active_computation_errors = previous_computation_result.accumulated_errors
@@ -183,9 +172,6 @@ class ComputedPipelineStage(LoadableInput, LoadableSessionInput, FilterablePipel
         # Perform the computations:
         return ComputedPipelineStage._execute_computation_functions(potentially_updated_failed_functions, previous_computation_result=previous_computation_result, fail_on_exception=fail_on_exception, debug_print=debug_print)
         
-        
-
-    
     def _get_computation_results_progress(self, debug_print=False):
         """ returns the names of all the configs (usually epochs, like 'maze1' or 'maze2') that have been completely computed
         Returns:
@@ -222,9 +208,6 @@ class ComputedPipelineStage(LoadableInput, LoadableSessionInput, FilterablePipel
                 
         return complete_computed_config_names_list, incomplete_computed_config_dict
     
-    
-    
-
     def evaluate_single_computation_params(self, active_computation_params: Optional[DynamicParameters]=None, enabled_filter_names=None, overwrite_extant_results=False, computation_functions_name_whitelist=None, computation_functions_name_blacklist=None, fail_on_exception:bool=False, debug_print=False):
         """ 'single' here refers to the fact that it evaluates only one of the active_computation_params
         
@@ -272,7 +255,6 @@ class ComputedPipelineStage(LoadableInput, LoadableSessionInput, FilterablePipel
                     # no *additional* computations will be performed on it, but it will be pass through and not removed form the self.computation_results
                     pass
 
-
     def rerun_failed_computations(self, enabled_filter_names=None, fail_on_exception:bool=False, debug_print=False):
         """ retries the computation functions that previously failed and resulted in accumulated_errors in the previous_computation_result """
         if enabled_filter_names is None:
@@ -283,18 +265,16 @@ class ComputedPipelineStage(LoadableInput, LoadableSessionInput, FilterablePipel
                 previous_computation_result = self.computation_results[a_select_config_name]
                 self.computation_results[a_select_config_name] = self.rerun_failed_computations(previous_computation_result, fail_on_exception=fail_on_exception, debug_print=debug_print)    
                 
-                
-
     @classmethod    
     def continue_computations_if_needed(cls, curr_active_pipeline, active_computation_params=None, enabled_filter_names=None, overwrite_extant_results=False, computation_functions_name_whitelist=None, computation_functions_name_blacklist=None, fail_on_exception:bool=False, debug_print=False):
         """ continues computations for a pipeline 
 
             NOTE: TODO: this is not yet implemented.
             Calls perform_registered_computations(...) to do the actual comptuations
-        
+
         
             TODO: the rest of the system can't work until we have a way of associating the previously computed results with the functions that compute them. As it stands we don't know anything about whether a new function was registered after the computations were complete, etc.
-        
+                DESIGN GOAL: don't make this too complicated.
         
         Usage:
             continue_computations_if_needed(curr_active_pipeline, active_session_computation_configs[0], overwrite_extant_results=False, computation_functions_name_blacklist=['_perform_spike_burst_detection_computation'], debug_print=True)
@@ -323,7 +303,6 @@ class ComputedPipelineStage(LoadableInput, LoadableSessionInput, FilterablePipel
 
         ## TODO: initially compute incomplete_computed_config_dict items...
 
-        
         ## Next look for previously failed computation results:
 
         ## Next look for previously complete computation results that lack computations for functions explicitly specified in the whitelist (if provided):

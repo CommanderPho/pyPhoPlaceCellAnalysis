@@ -66,6 +66,10 @@ def build_position_df_resampled_to_time_windows(active_pos_df, time_bin_size=0.0
     
 
 class DecoderResultDisplayingBaseClass:
+    """ Initialize by passing in a decoder of type BayesianPlacemapPositionDecoder 
+    Responsible for displaying the decoded positions. 
+    
+    """
     def __init__(self, decoder: BayesianPlacemapPositionDecoder):
         super(DecoderResultDisplayingBaseClass, self).__init__()
         self.decoder = decoder
