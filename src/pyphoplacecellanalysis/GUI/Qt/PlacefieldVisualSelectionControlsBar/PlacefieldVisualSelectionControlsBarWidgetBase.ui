@@ -7,7 +7,7 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>1200</width>
+    <width>1370</width>
     <height>200</height>
    </rect>
   </property>
@@ -480,7 +480,7 @@ QToolButton:!checked{
           <rect>
            <x>0</x>
            <y>0</y>
-           <width>1192</width>
+           <width>1362</width>
            <height>130</height>
           </rect>
          </property>

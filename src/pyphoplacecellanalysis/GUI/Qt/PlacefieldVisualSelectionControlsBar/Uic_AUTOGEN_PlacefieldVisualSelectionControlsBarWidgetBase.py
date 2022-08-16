@@ -14,7 +14,7 @@ from PyQt5 import QtCore, QtGui, QtWidgets
 class Ui_rootForm(object):
     def setupUi(self, rootForm):
         rootForm.setObjectName("rootForm")
-        rootForm.resize(1200, 200)
+        rootForm.resize(1370, 200)
         sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.MinimumExpanding)
         sizePolicy.setHorizontalStretch(0)
         sizePolicy.setVerticalStretch(0)
@@ -187,7 +187,7 @@ class Ui_rootForm(object):
         self.scroll_area.setWidgetResizable(True)
         self.scroll_area.setObjectName("scroll_area")
         self.placefieldControlsContainer = QtWidgets.QWidget()
-        self.placefieldControlsContainer.setGeometry(QtCore.QRect(0, 0, 1192, 130))
+        self.placefieldControlsContainer.setGeometry(QtCore.QRect(0, 0, 1362, 130))
         self.placefieldControlsContainer.setBaseSize(QtCore.QSize(1200, 200))
         self.placefieldControlsContainer.setObjectName("placefieldControlsContainer")
         self.scroll_area.setWidget(self.placefieldControlsContainer)

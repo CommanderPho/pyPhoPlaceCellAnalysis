@@ -153,7 +153,7 @@ def pyqtplot_plot_image_array(xbin_edges, ybin_edges, images, occupancy, max_num
         # curr_plot.addItem(curr_label)
 
         # Update the image:
-        img_item.setImage(image, rect=image_bounds_extent, autoLevels=False)
+        img_item.setImage(image, rect=image_bounds_extent, autoLevels=False) # rect: [x, y, w, h]
         img_item.setLookupTable(cmap.getLookupTable(nPts=256), update=False)
 
         # curr_plot.set
