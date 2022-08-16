@@ -10,7 +10,7 @@ from pyphoplacecellanalysis.GUI.Qt.FigureFormatConfigControls.Uic_AUTOGEN_Single
 
 class SingleGroupOptionalMembersCtrl(QtWidgets.QWidget):
     
-    value_changed = QtCore.pyqtSignal(str,bool,int,bool,int)
+    value_changed = QtCore.pyqtSignal(object,bool,int,bool,int)
     
     @property
     def control_name(self):
@@ -21,7 +21,7 @@ class SingleGroupOptionalMembersCtrl(QtWidgets.QWidget):
         self.ui.lblPropertyName.setText(value)
 
     @property
-    def values(self):
+    def tuple_values(self):
         """The values property."""
         if self.ui.checkBox_0.isChecked():
             v1 = self.ui.spinBox_0.value()
@@ -32,8 +32,8 @@ class SingleGroupOptionalMembersCtrl(QtWidgets.QWidget):
         else:
             v2 = None
         return (v1, v2)
-    @values.setter
-    def values(self, value):
+    @tuple_values.setter
+    def tuple_values(self, value):
         assert len(value) == 2
         v1, v2 = value    
         self.ui.checkBox_0.setChecked(v1 is not None)
@@ -43,7 +43,7 @@ class SingleGroupOptionalMembersCtrl(QtWidgets.QWidget):
         if v2 is not None:
             self.ui.spinBox_1.setValue(v2)
     
-    def __init__(self, control_name:str = 'test_ctrl', parent=None):
+    def __init__(self, parent=None, control_name:str = 'test_ctrl'):
         super().__init__(parent=parent) # Call the inherited classes __init__ method
         self.ui = Ui_SingleGroupOptionalMembersCtrl()
         self.ui.setupUi(self) # builds the design from the .ui onto this widget.
@@ -55,6 +55,7 @@ class SingleGroupOptionalMembersCtrl(QtWidgets.QWidget):
     def initUI(self):
         pass
 
+    @QtCore.pyqtSlot()
     def on_update_values(self):
         print('on_update_values')
         print(f'\t {(self.ui.checkBox_0.isChecked(), self.ui.spinBox_0.value())}')
@@ -64,3 +65,16 @@ class SingleGroupOptionalMembersCtrl(QtWidgets.QWidget):
         
     def __str__(self):
          return 
+
+
+
+
+
+## Start Qt event loop
+if __name__ == '__main__':
+    app = mkQApp("PlacefieldVisualSelectionWidget Example")
+    widget = SingleGroupOptionalMembersCtrl(control_name='Subplots')
+    widget.show()
+    pg.exec()
+
+
