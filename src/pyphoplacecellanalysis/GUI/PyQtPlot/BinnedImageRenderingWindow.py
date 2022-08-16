@@ -26,32 +26,44 @@ def add_bin_ticks(plot_item, xbins=None, ybins=None):
     return plot_item
 
 
-def build_binned_imageItem(plot_item, params, xbins=None, ybins=None, matrix=None, name='avg_velocity', data_label='Avg Velocity'):
-        local_plots_data = RenderPlotsData(name=name)
-        local_plots = RenderPlots(name=name)
-        
-        # plotItem.invertY(True)           # orient y axis to run top-to-bottom
-        # Normal ImageItem():
-        local_plots.imageItem = pg.ImageItem(matrix.T)
-        plot_item.addItem(local_plots.imageItem)
+def build_binned_imageItem(plot_item, params, xbins=None, ybins=None, matrix=None, name='avg_velocity', data_label='Avg Velocity', color_bar_mode=None):
+    """ 
+    color_bar_mode: options for the colorbar of each image
+        ### curr_cbar_mode: 'each', 'one', None
+    """
+    local_plots_data = RenderPlotsData(name=name)
+    local_plots_data.matrix = matrix.copy()
+    local_plots_data.matrix_min = np.nanmin(matrix)
+    local_plots_data.matrix_max = np.nanmax(matrix)
+    
+    # plotItem.invertY(True)           # orient y axis to run top-to-bottom
+    
+    local_plots = RenderPlots(name=name)
+    # Normal ImageItem():
+    local_plots.imageItem = pg.ImageItem(matrix.T)
+    plot_item.addItem(local_plots.imageItem)
 
-        # Color Map:
-        if hasattr(params, 'colorMap'):
-            colorMap = params.colorMap
+    # Color Map:
+    if color_bar_mode is None:
+        local_plots.colorBarItem = None # no colorbar item
+    else:
+        if color_bar_mode == 'each':
+            if hasattr(params, 'colorMap'):
+                colorMap = params.colorMap
+            else:
+                colorMap = pg.colormap.get("viridis")         
+            # generate an adjustabled color bar
+            local_plots.colorBarItem = pg.ColorBarItem(values=(0,1), colorMap=colorMap, label=data_label)
+            # link color bar and color map to correlogram, and show it in plotItem:
+            local_plots.colorBarItem.setImageItem(local_plots.imageItem, insert_in=plot_item)        
+            # Set the colorbar to the range:
+            local_plots.colorBarItem.setLevels(low=local_plots_data.matrix_min, high=local_plots_data.matrix_max)
         else:
-            colorMap = pg.colormap.get("viridis")
-        # generate an adjustabled color bar
-        local_plots.colorBarItem = pg.ColorBarItem(values=(0,1), colorMap=colorMap, label=data_label)
-        # link color bar and color map to correlogram, and show it in plotItem:
-        local_plots.colorBarItem.setImageItem(local_plots.imageItem, insert_in=plot_item)
-        
-        local_plots_data.matrix = matrix.copy()
-        local_plots_data.matrix_min = np.nanmin(matrix)
-        local_plots_data.matrix_max = np.nanmax(matrix)
-        # Set the colorbar to the range:
-        local_plots.colorBarItem.setLevels(low=local_plots_data.matrix_min, high=local_plots_data.matrix_max)
-
-        return local_plots, local_plots_data
+            ## TODO: globally shared colorbar item:
+            # local_plots.colorBarItem = self.params.shared_colorBarItem # shared colorbar item
+            local_plots.colorBarItem = None # shared colorbar item
+            
+    return local_plots, local_plots_data
         
         
 
@@ -122,7 +134,7 @@ class BasicBinnedImageRenderingWindow(QtWidgets.QMainWindow):
 
     """
     
-    def __init__(self, matrix=None, xbins=None, ybins=None, name='avg_velocity', title="Avg Velocity per Pos (X, Y)", variable_label='Avg Velocity', drop_below_threshold: float=0.0000001, defer_show=False, **kwargs):
+    def __init__(self, matrix=None, xbins=None, ybins=None, name='avg_velocity', title="Avg Velocity per Pos (X, Y)", variable_label='Avg Velocity', drop_below_threshold: float=0.0000001, color_bar_mode=None, wants_crosshairs=True, defer_show=False, **kwargs):
         super(BasicBinnedImageRenderingWindow, self).__init__(**kwargs)
         self.params = VisualizationParameters(name='BasicBinnedImageRenderingWindow')
         self.plots_data = RenderPlotsData(name='BasicBinnedImageRenderingWindow')
@@ -131,6 +143,15 @@ class BasicBinnedImageRenderingWindow(QtWidgets.QMainWindow):
         self.ui.connections = PhoUIContainer(name='BasicBinnedImageRenderingWindow')
         
         self.params.colorMap = pg.colormap.get("viridis")
+        self.params.color_bar_mode = color_bar_mode
+        if self.params.color_bar_mode == 'one':
+            # Single shared color_bar between all items:
+            self.params.shared_colorBarItem = pg.ColorBarItem(values=(0,1), colorMap=self.params.colorMap, label='all_pf_2Ds')
+        else:
+            self.params.shared_colorBarItem = None
+            
+        self.params.wants_crosshairs = wants_crosshairs
+
         pg.setConfigOption('imageAxisOrder', 'row-major') # Switch default order to Row-major
 
         ## Create:        
@@ -160,13 +181,48 @@ class BasicBinnedImageRenderingWindow(QtWidgets.QMainWindow):
             matrix[np.where(matrix < drop_below_threshold)] = np.nan # null out the occupancy
             
         
-        local_plots, local_plots_data = build_binned_imageItem(newPlotItem, self.params, xbins=xbins, ybins=ybins, matrix=matrix, name=name, data_label=variable_label)
+        local_plots, local_plots_data = build_binned_imageItem(newPlotItem, self.params, xbins=xbins, ybins=ybins, matrix=matrix, name=name, data_label=variable_label, color_bar_mode=self.params.color_bar_mode)
         self.plots_data[name] = local_plots_data
         self.plots[name] = local_plots
         self.plots[name].mainPlotItem = newPlotItem
         
-        self.add_crosshairs(newPlotItem, matrix, name=name)
+        if self.params.color_bar_mode == 'one':
+            self.plots[name].colorBarItem = self.params.shared_colorBarItem # shared colorbar item
+            self._update_global_shared_colorbaritem()
         
+        if self.params.wants_crosshairs:
+            self.add_crosshairs(newPlotItem, matrix, name=name)
+        
+        
+    def _update_global_shared_colorbaritem(self):
+        ## Add Global Colorbar for single colorbar mode:
+        # Get all data for the purpose of computing global min/max:
+        all_pf_plot_data = [self.plots_data[a_plot_name] for a_plot_name in self.plots_data.dynamically_added_attributes] # all plot items PlotItem
+        all_pf_plot_data_mins = np.array([a_dataum.matrix_min for a_dataum in all_pf_plot_data])
+        all_pf_plot_data_maxes = np.array([a_dataum.matrix_max for a_dataum in all_pf_plot_data])
+        global_data_min = np.nanmin(all_pf_plot_data_mins)
+        global_data_max = np.nanmax(all_pf_plot_data_maxes)
+
+        all_pf_plot_items = [self.plots[a_plot_name].mainPlotItem for a_plot_name in self.plots.dynamically_added_attributes] # all plot items PlotItem
+        all_pf_image_items = [self.plots[a_plot_name].imageItem for a_plot_name in self.plots.dynamically_added_attributes] # all plot items ImageItems
+
+        # if hasattr(self.params, 'colorMap'):
+        #     colorMap = self.params.colorMap
+        # else:
+        #     colorMap = pg.colormap.get("viridis")
+
+        ## All same colorbar mode:
+        # generate an adjustabled color bar
+        # shared_colorBarItem = pg.ColorBarItem(values=(0,1), colorMap=colorMap, label='all_pf_2Ds')
+        
+        shared_colorBarItem = self.params.shared_colorBarItem # get the shared color bar item
+        # link color bar and color map to correlogram, and show it in plotItem:
+        # shared_colorBarItem
+        shared_colorBarItem.setImageItem(all_pf_image_items, insert_in=all_pf_plot_items[0]) # pass a list of ImageItems, insert the color bar after the last plot  , insert_in=all_pf_plot_items[-1]
+        # Update the colorbar to the range:
+        shared_colorBarItem.setLevels(low=global_data_min, high=global_data_max)
+
+
         
         
         

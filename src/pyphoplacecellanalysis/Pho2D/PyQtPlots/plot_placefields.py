@@ -7,6 +7,9 @@
 # app = _instance
 import numpy as np
 
+from neuropy.utils.matplotlib_helpers import _build_variable_max_value_label, enumTuningMap2DPlotMode, enumTuningMap2DPlotVariables, _determine_best_placefield_2D_layout, _scale_current_placefield_to_acceptable_range
+
+
 from pyphocorehelpers.geometry_helpers import compute_data_aspect_ratio, compute_data_extent
 from pyphocorehelpers.indexing_helpers import compute_paginated_grid_config
 
@@ -104,12 +107,8 @@ def pyqtplot_plot_image_array(xbin_edges, ybin_edges, images, occupancy, max_num
         curr_cell_identifier_string = f'Cell[{neuron_IDX}]'
         curr_plot_identifier_string = f'pyqtplot_plot_image_array.{curr_cell_identifier_string}'
 
-        image = np.squeeze(images[a_linear_index,:,:])
-        # Pre-filter the data:
-        with np.errstate(divide='ignore', invalid='ignore'):
-            image = np.array(image.copy()) / np.nanmax(image) # note scaling by maximum here!
-            if drop_below_threshold is not None:
-                image[np.where(occupancy < drop_below_threshold)] = np.nan # null out the occupancy
+        # # Pre-filter the data:
+        image = _scale_current_placefield_to_acceptable_range(np.squeeze(images[a_linear_index,:,:]), occupancy=occupancy, drop_below_threshold=drop_below_threshold)
 
         # Build the image item:
         img_item = pg.ImageItem(image=image, levels=(0,1))
