@@ -36,6 +36,18 @@ class Ui_Form(object):
         self.chkEnableSavingToDisk.setChecked(True)
         self.chkEnableSavingToDisk.setObjectName("chkEnableSavingToDisk")
         self.verticalLayout.addWidget(self.chkEnableSavingToDisk)
+        self.line = QtWidgets.QFrame(Form)
+        self.line.setFrameShape(QtWidgets.QFrame.HLine)
+        self.line.setFrameShadow(QtWidgets.QFrame.Sunken)
+        self.line.setObjectName("line")
+        self.verticalLayout.addWidget(self.line)
+        self.pushButton = QtWidgets.QPushButton(Form)
+        self.pushButton.setObjectName("pushButton")
+        self.verticalLayout.addWidget(self.pushButton)
+        self.buttonBox = QtWidgets.QDialogButtonBox(Form)
+        self.buttonBox.setStandardButtons(QtWidgets.QDialogButtonBox.Apply|QtWidgets.QDialogButtonBox.Cancel|QtWidgets.QDialogButtonBox.RestoreDefaults)
+        self.buttonBox.setObjectName("buttonBox")
+        self.verticalLayout.addWidget(self.buttonBox)
 
         self.retranslateUi(Form)
         self.chkEnableSpikeOverlay.toggled['bool'].connect(Form.on_update_values) # type: ignore
@@ -49,4 +61,5 @@ class Ui_Form(object):
         self.chkEnableSpikeOverlay.setText(_translate("Form", "enable_spike_overlay"))
         self.chkDebugPrint.setText(_translate("Form", "debug_print"))
         self.chkEnableSavingToDisk.setText(_translate("Form", "enable_saving_to_disk"))
+        self.pushButton.setText(_translate("Form", "Open Out folder in System File Manager"))
 from pyphoplacecellanalysis.GUI.Qt.FigureFormatConfigControls.SingleGroupOptionalMembersCtrl import SingleGroupOptionalMembersCtrl
