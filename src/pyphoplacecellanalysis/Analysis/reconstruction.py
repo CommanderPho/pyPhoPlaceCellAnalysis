@@ -27,7 +27,7 @@ n_i: the number of spikes fired by each cell during the time window of considera
 
 
 class ZhangReconstructionImplementation:
-    """ 
+    """ These staticmethods are used by BayesianPlacemapPositionDecoder to compute the one-step Bayesian decoded position from the neural activitiy.
     
     TODO: NOTE: BUG: INVESTIGATE: IMPORTANT: build_concatenated_F previously used:
         maps = pf.ratemap.normalized_tuning_curves  # (40, 48) for 1D, (40, 48, 10) for 2D
@@ -91,9 +91,27 @@ class ZhangReconstructionImplementation:
 
         return unit_specific_binned_spike_counts, time_window_edges, time_window_edges_binning_info
 
+
+    @classmethod
+    def time_bin_spike_counts_N_i(cls, spikes_df, time_bin_size, debug_print=False):
+        """ Returns the number of spikes that occured for each neuron in each time bin.
+        Example:
+            unit_specific_binned_spike_counts, out_digitized_variable_bins, out_binning_info = ZhangReconstructionImplementation.time_bin_spike_counts_N_i(sess.spikes_df.copy(), time_bin_size, debug_print=debug_print) # unit_specific_binned_spike_counts.to_numpy(): (40, 85841)
+            
+        """
+        unit_specific_binned_spike_counts, time_window_edges, time_window_edges_binning_info = cls.compute_time_binned_spiking_activity(spikes_df, time_bin_size)
+        unit_specific_binned_spike_counts = unit_specific_binned_spike_counts.T # Want the outputs to have each time window as a column, with a single time window giving a column vector for each neuron
+        if debug_print:
+            print(f'unit_specific_binned_spike_counts.to_numpy(): {np.shape(unit_specific_binned_spike_counts.to_numpy())}') # (85841, 40)
+        return unit_specific_binned_spike_counts.to_numpy(), time_window_edges, time_window_edges_binning_info
+    
+    
+
     @staticmethod
     def build_concatenated_F(pf, debug_print=False):
-        """ TODO: NOTE: uses the normalized_tuning_curves instead of the non-normalized ones! This means the returned concatenated_F will not be firing rates in Hz """
+        """ Returns a matrix F where each column is a flattened list of firing rates as a function of each position x.
+            TODO: NOTE: uses the normalized_tuning_curves instead of the non-normalized ones! This means the returned concatenated_F will not be firing rates in Hz 
+        """
         neuron_IDs = pf.ratemap.neuron_ids
         neuron_IDXs = np.arange(len(neuron_IDs))
         maps = pf.ratemap.normalized_tuning_curves  # (40, 48) for 1D, (40, 48, 10) for 2D        
@@ -115,18 +133,6 @@ class ZhangReconstructionImplementation:
         return neuron_IDXs, neuron_IDs, f_i, F_i, F, P_x
 
 
-    @staticmethod
-    def time_bin_spike_counts_N_i(spikes_df, time_bin_size, debug_print=False):
-        """ Returns the number of spikes that occured for each neuron in each time bin.
-        Example:
-            unit_specific_binned_spike_counts, out_digitized_variable_bins, out_binning_info = ZhangReconstructionImplementation.time_bin_spike_counts_N_i(sess.spikes_df.copy(), time_bin_size, debug_print=debug_print) # unit_specific_binned_spike_counts.to_numpy(): (40, 85841)
-            
-        """
-        unit_specific_binned_spike_counts, time_window_edges, time_window_edges_binning_info = ZhangReconstructionImplementation.compute_time_binned_spiking_activity(spikes_df, time_bin_size)
-        unit_specific_binned_spike_counts = unit_specific_binned_spike_counts.T # Want the outputs to have each time window as a column, with a single time window giving a column vector for each neuron
-        if debug_print:
-            print(f'unit_specific_binned_spike_counts.to_numpy(): {np.shape(unit_specific_binned_spike_counts.to_numpy())}') # (85841, 40)
-        return unit_specific_binned_spike_counts.to_numpy(), time_window_edges, time_window_edges_binning_info
 
 
     # Optimal Functions:
@@ -415,7 +421,7 @@ class BayesianPlacemapPositionDecoder(PlacemapPositionDecoder):
     def ybin_centers(self):
         return self.ratemap.ybin_centers
     
-    
+    # Serialization/Saving Properties ____________________________________________________________________________________ #
     @classmethod
     def serialized_keys(cls):
         """ I remember this is for being able to save/persist this computed object to disk. """
@@ -476,6 +482,7 @@ class BayesianPlacemapPositionDecoder(PlacemapPositionDecoder):
         # assert np.shape(self.unit_specific_time_binned_spike_counts)[0] == len(self.neuron_IDXs), f"in _setup_time_bin_spike_counts_N_i(): output should equal self.neuronIDXs but np.shape(self.unit_specific_time_binned_spike_counts)[0]: {np.shape(self.unit_specific_time_binned_spike_counts)[0]} and len(self.neuron_IDXs): {len(self.neuron_IDXs)}"
         if np.shape(self.unit_specific_time_binned_spike_counts)[0] > len(self.neuron_IDXs):
             # Drop the irrelevant indicies:
+            ## TODO: Correctness: Verify that the correct indicies are dropped, not just the first set of them.
             self.unit_specific_time_binned_spike_counts = self.unit_specific_time_binned_spike_counts[self.neuron_IDXs,:] # Drop the irrelevent indicies
         
         assert np.shape(self.unit_specific_time_binned_spike_counts)[0] == len(self.neuron_IDXs), f"in _setup_time_bin_spike_counts_N_i(): output should equal self.neuronIDXs but np.shape(self.unit_specific_time_binned_spike_counts)[0]: {np.shape(self.unit_specific_time_binned_spike_counts)[0]} and len(self.neuron_IDXs): {len(self.neuron_IDXs)}"
