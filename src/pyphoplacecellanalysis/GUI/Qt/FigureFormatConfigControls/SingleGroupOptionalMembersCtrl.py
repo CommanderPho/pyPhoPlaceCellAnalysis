@@ -9,8 +9,11 @@ from pyphoplacecellanalysis.GUI.Qt.FigureFormatConfigControls.Uic_AUTOGEN_Single
 
 
 class SingleGroupOptionalMembersCtrl(QtWidgets.QWidget):
+    """ A widget that represents a tuple with optional-valued members 
     
+    """
     value_changed = QtCore.pyqtSignal(object,bool,int,bool,int)
+    _debug_print = False
     
     @property
     def control_name(self):
@@ -57,9 +60,10 @@ class SingleGroupOptionalMembersCtrl(QtWidgets.QWidget):
 
     @QtCore.pyqtSlot()
     def on_update_values(self):
-        print('on_update_values')
-        print(f'\t {(self.ui.checkBox_0.isChecked(), self.ui.spinBox_0.value())}')
-        print(f'\t {(self.ui.checkBox_1.isChecked(), self.ui.spinBox_1.value())}')
+        if self._debug_print:
+            print('on_update_values')
+            print(f'\t {(self.ui.checkBox_0.isChecked(), self.ui.spinBox_0.value())}')
+            print(f'\t {(self.ui.checkBox_1.isChecked(), self.ui.spinBox_1.value())}')
         self.value_changed.emit(self.control_name, self.ui.checkBox_0.isChecked(), self.ui.spinBox_0.value(), self.ui.checkBox_1.isChecked(), self.ui.spinBox_1.value())
         # value_changed(str,bool,int,bool,int)
         

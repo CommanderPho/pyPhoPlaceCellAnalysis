@@ -1,5 +1,10 @@
 # FigureFormatConfigControls.py
 # Generated from c:\Users\pho\repos\pyPhoPlaceCellAnalysis\src\pyphoplacecellanalysis\GUI\Qt\FigureFormatConfigControls\FigureFormatConfigControls.ui automatically by PhoPyQtClassGenerator VSCode Extension
+
+from datetime import datetime
+from pathlib import Path
+import warnings # for getting the current date to set the ouptut folder name
+from pyphocorehelpers.Filesystem.open_in_system_file_manager import reveal_in_system_file_manager
 import pyphoplacecellanalysis.External.pyqtgraph as pg
 from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtCore, QtGui, QtWidgets, mkQApp
 
@@ -12,6 +17,10 @@ from pyphoplacecellanalysis.GUI.Qt.FigureFormatConfigControls.Uic_AUTOGEN_Figure
     
 
 class FigureFormatConfigControls(QtWidgets.QWidget):
+    _debug_print = False
+    
+    ## Signals
+    figure_format_config_updated = QtCore.pyqtSignal(object)
     
     @property
     def enable_saving_to_disk(self):
@@ -36,13 +45,26 @@ class FigureFormatConfigControls(QtWidgets.QWidget):
     def enable_debug_print(self, value):
         self.ui.chkDebugPrint.setChecked(value)
         
-
-    def __init__(self, parent=None):
+    @property
+    def figure_format_config(self):
+        figure_format_config = {self.ui.tupleCtrl_0.control_name:self.ui.tupleCtrl_0.tuple_values,
+                    self.ui.tupleCtrl_1.control_name:self.ui.tupleCtrl_1.tuple_values,
+                    # self.ui.tupleCtrl_2.control_name:self.ui.tupleCtrl_2.tuple_values,
+        }
+        ## Add explicit column/row widths to fix window sizing issue:
+        figure_format_config = (dict(fig_column_width=self.ui.tupleCtrl_2.tuple_values[0], fig_row_height=self.ui.tupleCtrl_2.tuple_values[1]) | figure_format_config)
+        figure_format_config = (dict(enable_spike_overlay=self.enable_spike_overlay, debug_print=self.enable_debug_print, enable_saving_to_disk=self.enable_saving_to_disk) | figure_format_config)
+        return figure_format_config
+    
+    
+    def __init__(self, parent=None, config=None):
         super().__init__(parent=parent) # Call the inherited classes __init__ method
   
         self.ui = Ui_Form()
         self.ui.setupUi(self) # builds the design from the .ui onto this widget.
 
+        self.config = config # InteractivePlaceCellConfig
+        
         self.initUI()
         self.show() # Show the GUI
 
@@ -60,6 +82,37 @@ class FigureFormatConfigControls(QtWidgets.QWidget):
         self.ui.tupleCtrl_2.tuple_values = (5.0, 5.0)
         self.ui.tupleCtrl_2.tuple_values = (None, None)
         
+        # self.ui.filepkr_FigureOutputPath.path
+        try:
+            curr_fig_save_path = self.config.plotting_config.get_figure_save_path()
+        except AttributeError as e:
+            warnings.warn('No config! using default')
+            curr_fig_save_path = r'W:\Data\Output'
+        except Exception as e:
+            raise e
+        
+        if self._debug_print:
+            print(f'Old Individual Plotting Function Figure Output path: {str(curr_fig_save_path)}')
+        self.ui.filepkr_FigureOutputPath.path = curr_fig_save_path
+        ## Connect Buttons:
+        # self.ui.btnOpenFigureExportPathInSystemFileBrowser.pressed.connect(self.perform_open_in_system_filebrowser)
+        
+        
+        # self.ui.filepkr_ProgrammaticDisplayFcnOutputPath:
+        programmatic_display_function_testing_output_parent_path = None # currently always start with the hardcoded default below, the user can always change it
+        if programmatic_display_function_testing_output_parent_path is None:   
+            programmatic_display_function_testing_output_parent_path = Path(r'C:\Users\pho\repos\PhoPy3DPositionAnalysis2021\EXTERNAL\Screenshots\ProgrammaticDisplayFunctionTesting')
+        else:
+            programmatic_display_function_testing_output_parent_path = Path(programmatic_display_function_testing_output_parent_path) # make sure it's a Path
+        # programmatic_display_function_testing_output_parent_path.mkdir(exist_ok=True)
+        out_day_date_folder_name = datetime.today().strftime('%Y-%m-%d') # A string with the day's date like '2022-01-16'
+        programmatic_display_function_testing_output_parent_path = programmatic_display_function_testing_output_parent_path.joinpath(out_day_date_folder_name)
+        if self._debug_print:
+            print(f'Figure Output path: {str(programmatic_display_function_testing_output_parent_path)}')
+        # Set the path control to this path:
+        self.ui.filepkr_ProgrammaticDisplayFcnOutputPath.path = programmatic_display_function_testing_output_parent_path
+        
+    
         # enable_spike_overlay
  
         ## Connect signals
@@ -67,38 +120,55 @@ class FigureFormatConfigControls(QtWidgets.QWidget):
         self.ui.tupleCtrl_1.value_changed.connect(self.on_update_values) # type: ignore
         self.ui.tupleCtrl_2.value_changed.connect(self.on_update_values) # type: ignore
         
- 
         
+        self.ui.buttonBox.accepted.connect(self.on_apply)
+        self.ui.buttonBox.rejected.connect(self.on_cancel)
+        
+        
+       
     @QtCore.pyqtSlot()
     def on_update_values(self):
-        print('on_update_values')
+        figure_format_config = self.figure_format_config
+        if self._debug_print:
+            print('on_update_values')
+            print(f'\t {figure_format_config}')
+        # Made accessible by self.figure_format_config access.
+        self.figure_format_config_updated.emit(figure_format_config) # emit the signal
         
-        figure_format_config = {self.ui.tupleCtrl_0.control_name:self.ui.tupleCtrl_0.tuple_values,
-                    self.ui.tupleCtrl_1.control_name:self.ui.tupleCtrl_1.tuple_values,
-                    # self.ui.tupleCtrl_2.control_name:self.ui.tupleCtrl_2.tuple_values,
-        }
-        
-        ## Add explicit column/row widths to fix window sizing issue:
-        figure_format_config = (dict(fig_column_width=self.ui.tupleCtrl_2.tuple_values[0], fig_row_height=self.ui.tupleCtrl_2.tuple_values[1]) | figure_format_config)
-        
-        figure_format_config = (dict(enable_spike_overlay=self.enable_spike_overlay, debug_print=self.enable_debug_print, enable_saving_to_disk=self.enable_saving_to_disk) | figure_format_config)
-        
-        print(f'\t {figure_format_config}')
-        # TODO: OUTPUT figure_format_config
-        
-        
-        # self.ui.check
-        # chkEnableSpikeOverlay
-        # chkDebugPrint
-        # chkEnableSavingToDisk
+    # def __str__(self):
+    #      return 
 
-    def __str__(self):
-         return 
 
-"""
-lblPropertyName
+    # ==================================================================================================================== #
+    # Figure Output Section                                                                                                #
+    # ==================================================================================================================== #
+    @QtCore.pyqtSlot()
+    def perform_open_in_system_filebrowser(self):
+        print('perform_open_in_system_filebrowser()')
+        curr_fig_save_path = self.ui.filepkr_FigureOutputPath.path
+        print(f'\t{str(curr_fig_save_path)}')
+        reveal_in_system_file_manager(curr_fig_save_path)
 
-"""
+    # ==================================================================================================================== #
+    # Slots for actions button at bottom of widget                                                                         #
+    # ==================================================================================================================== #
+
+    @QtCore.pyqtSlot()
+    def on_apply(self):
+        print('on_apply()')
+        self.figure_format_config_updated.emit(self.figure_format_config) # emit the signal
+
+    @QtCore.pyqtSlot()
+    def on_cancel(self):
+        print('on_cancel()')
+        # self.figure_format_config_updated.emit(self.figure_format_config) # emit the signal
+
+
+    @QtCore.pyqtSlot()
+    def on_revert(self):
+        print('on_revert()')
+        # self.figure_format_config_updated.emit(self.figure_format_config) # emit the signal
+
 
 ## Start Qt event loop
 if __name__ == '__main__':
