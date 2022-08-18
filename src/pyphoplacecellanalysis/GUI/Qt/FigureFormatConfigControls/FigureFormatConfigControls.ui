@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>431</width>
-    <height>300</height>
+    <height>323</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -83,7 +83,7 @@
         <x>0</x>
         <y>0</y>
         <width>411</width>
-        <height>46</height>
+        <height>69</height>
        </rect>
       </property>
       <property name="sizePolicy">
@@ -95,7 +95,7 @@
       <attribute name="label">
        <string>Figure Output/Export</string>
       </attribute>
-      <widget class="QWidget" name="">
+      <widget class="QWidget" name="layoutWidget">
        <property name="geometry">
         <rect>
          <x>1</x>
@@ -134,7 +134,7 @@
         <x>0</x>
         <y>0</y>
         <width>411</width>
-        <height>46</height>
+        <height>69</height>
        </rect>
       </property>
       <property name="sizePolicy">
@@ -199,6 +199,11 @@
  </widget>
  <customwidgets>
   <customwidget>
+   <class>FilesystemPathLineEdit</class>
+   <extends>QLineEdit</extends>
+   <header location="global">pyphocorehelpers.gui.Qt.InlineFilesystemPathSelectWidget.FilesystemPathLineEdit</header>
+  </customwidget>
+  <customwidget>
    <class>SingleGroupOptionalMembersCtrl</class>
    <extends>QWidget</extends>
    <header location="global">pyphoplacecellanalysis.GUI.Qt.FigureFormatConfigControls.SingleGroupOptionalMembersCtrl</header>
@@ -213,11 +218,6 @@
    <extends>QWidget</extends>
    <header location="global">pyphocorehelpers.gui.Qt.InlineFilesystemPathSelectWidget.InlineFilesystemPathSelectWidget</header>
    <container>1</container>
-  </customwidget>
-  <customwidget>
-   <class>FilesystemPathLineEdit</class>
-   <extends>QLineEdit</extends>
-   <header location="global">pyphocorehelpers.gui.Qt.InlineFilesystemPathSelectWidget.FilesystemPathLineEdit</header>
   </customwidget>
  </customwidgets>
  <resources/>
