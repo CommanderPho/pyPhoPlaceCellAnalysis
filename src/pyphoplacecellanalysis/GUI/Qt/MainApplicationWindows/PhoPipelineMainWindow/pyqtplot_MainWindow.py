@@ -120,7 +120,7 @@ class PhoPipelineMainWindow(PipelineDynamicDockDisplayAreaMixin, PhoMainAppWindo
 
     def _initialize_data(self):
         self._flowchart = None
-        self._pipeline = None
+        self._pipeline = None # never set
         
         self._dynamic_display_output_dict = OrderedDict() # for PipelineDynamicDockDisplayAreaMixin
         # ## later on, process data through the node

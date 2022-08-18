@@ -261,6 +261,4 @@ class OccupancyPlottingMixin:
                                                                             point_labels=point_labeling_function, 
                                                                             point_mask=point_masking_function,
                                                                             shape='rounded_rect', shape_opacity= 0.5, show_points=False, name='OccupancyLabels')
-        # , **({'point_labels': <function <lambda> at 0x0000018E817420D0>, 'point_mask': <function <lambda> at 0x0000018E8174F1F0>, 'shape': 'rounded_rect', 'shape_opacity': 0.5, 'show_points': False, 'name': 'OccupancyLabels'} | kwargs)
-        
         return plotActors, data_dict
