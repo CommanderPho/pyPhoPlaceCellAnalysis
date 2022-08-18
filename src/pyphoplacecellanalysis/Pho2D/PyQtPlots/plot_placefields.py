@@ -120,7 +120,8 @@ def pyqtplot_plot_image_array(xbin_edges, ybin_edges, images, occupancy, max_num
         #     # vb.autoRange()
         
         # # plot mode:
-        curr_plot = root_render_widget.addPlot(row=curr_row, col=curr_col, name=curr_plot_identifier_string, title=curr_cell_identifier_string)
+        curr_plot = root_render_widget.addPlot(row=curr_row, col=curr_col, title=curr_cell_identifier_string) # , name=curr_plot_identifier_string 
+        curr_plot.setObjectName(curr_plot_identifier_string)
         curr_plot.showAxes(False)
         if is_last_row:
             curr_plot.showAxes('x', True)

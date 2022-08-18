@@ -125,7 +125,8 @@ class TimeSynchronizedPlacefieldsPlotter(AnimalTrajectoryPlottingMixin, TimeSync
                     image[np.where(occupancy < self.params.drop_below_threshold)] = np.nan # null out the occupancy
             img_item = pg.ImageItem(image=image, levels=(0,1))
                 
-            curr_plot = self.ui.root_graphics_layout_widget.addPlot(row=curr_row, col=curr_col, name=curr_plot_identifier_string, title=curr_cell_identifier_string)
+            curr_plot = self.ui.root_graphics_layout_widget.addPlot(row=curr_row, col=curr_col, title=curr_cell_identifier_string) # , name=curr_plot_identifier_string
+            curr_plot.setObjectName(curr_plot_identifier_string)
             curr_plot.addItem(img_item, defaultPadding=0.0)  # add ImageItem to PlotItem
             # curr_plot.showAxes(True)
             

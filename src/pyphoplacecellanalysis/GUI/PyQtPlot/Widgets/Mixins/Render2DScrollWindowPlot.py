@@ -81,7 +81,7 @@ class Render2DScrollWindowPlotMixin:
         self.plots_data.all_spots = [{'pos': pos[:,i], 'data': i, 'pen': curr_spike_pens[i]} for i in range(curr_n)]
         
         self.plots.preview_overview_scatter_plot = pg.ScatterPlotItem(name='spikeRasterOverviewWindowScatterPlotItem', pxMode=True, symbol=vtick, size=5, pen={'color': 'w', 'width': 1})
-        self.plots.preview_overview_scatter_plot.setObjectName('preview_overview_scatter_plot') # this seems necissary, the 'name' parameter in addPlot(...) seems to only change some internal property related to the legend
+        self.plots.preview_overview_scatter_plot.setObjectName('preview_overview_scatter_plot') # this seems necissary, the 'name' parameter in addPlot(...) seems to only change some internal property related to the legend AND drastically slows down the plotting
         self.plots.preview_overview_scatter_plot.opts['useCache'] = True
         self.plots.preview_overview_scatter_plot.addPoints(self.plots_data.all_spots) # , hoverable=True
         background_static_scroll_window_plot.addItem(self.plots.preview_overview_scatter_plot)

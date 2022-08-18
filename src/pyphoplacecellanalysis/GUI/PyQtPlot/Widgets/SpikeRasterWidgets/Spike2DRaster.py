@@ -220,8 +220,8 @@ class Spike2DRaster(EpochRenderingMixin, Render2DScrollWindowPlotMixin, SpikeRas
         # Custom 2D raster plot:
         curr_plot_row = 1
         if self.Includes2DActiveWindowScatter:
-            self.plots.main_plot_widget = self.ui.main_graphics_layout_widget.addPlot(row=curr_plot_row, col=0, name='main_plot_widget')
-            self.plots.main_plot_widget.setObjectName('main_plot_widget') # this seems necissary, the 'name' parameter in addPlot(...) seems to only change some internal property related to the legend
+            self.plots.main_plot_widget = self.ui.main_graphics_layout_widget.addPlot(row=curr_plot_row, col=0) # , name='main_plot_widget'
+            self.plots.main_plot_widget.setObjectName('main_plot_widget') # this seems necissary, the 'name' parameter in addPlot(...) seems to only change some internal property related to the legend AND drastically slows down the plotting
             curr_plot_row += 1
             # self.ui.plots = [] # create an empty array for each plot, of which there will be one for each unit.
             # # build the position range for each unit along the y-axis:
@@ -256,8 +256,8 @@ class Spike2DRaster(EpochRenderingMixin, Render2DScrollWindowPlotMixin, SpikeRas
 
         
         # From Render2DScrollWindowPlotMixin:
-        self.plots.background_static_scroll_window_plot = self.ui.main_graphics_layout_widget.addPlot(row=curr_plot_row, col=0, name='background_static_scroll_window_plot') # curr_plot_row: 2 if  self.Includes2DActiveWindowScatter
-        self.plots.background_static_scroll_window_plot.setObjectName('background_static_scroll_window_plot') # this seems necissary, the 'name' parameter in addPlot(...) seems to only change some internal property related to the legend
+        self.plots.background_static_scroll_window_plot = self.ui.main_graphics_layout_widget.addPlot(row=curr_plot_row, col=0) # , name='background_static_scroll_window_plot'  curr_plot_row: 2 if  self.Includes2DActiveWindowScatter
+        self.plots.background_static_scroll_window_plot.setObjectName('background_static_scroll_window_plot') # this seems necissary, the 'name' parameter in addPlot(...) seems to only change some internal property related to the legend  AND drastically slows down the plotting
 
         # print(f'main_plot_widget.objectName(): {main_plot_widget.objectName()}')
 

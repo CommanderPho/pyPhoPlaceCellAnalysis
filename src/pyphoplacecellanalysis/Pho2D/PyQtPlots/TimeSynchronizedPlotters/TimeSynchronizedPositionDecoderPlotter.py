@@ -96,7 +96,8 @@ class TimeSynchronizedPositionDecoderPlotter(AnimalTrajectoryPlottingMixin, Time
         # self.ui.root_view.addItem(self.ui.imv)
         # self.ui.root_view.setRange(QtCore.QRectF(*self.params.image_bounds_extent))
 
-        self.ui.root_plot = self.ui.root_graphics_layout_widget.addPlot(row=0, col=0, name=f'PositionDecoder', title=f'PositionDecoder -  t = {self.last_window_time}')
+        self.ui.root_plot = self.ui.root_graphics_layout_widget.addPlot(row=0, col=0, title=f'PositionDecoder -  t = {self.last_window_time}') # , name=f'PositionDecoder'
+        self.ui.root_plot.setObjectName('PositionDecoder')
         self.ui.root_plot.addItem(self.ui.imv, defaultPadding=0.0)  # add ImageItem to PlotItem
         self.ui.root_plot.showAxes(True)
         self.ui.root_plot.hideButtons() # Hides the auto-scale button
