@@ -1,9 +1,9 @@
 import numpy as np
 import pyphoplacecellanalysis.External.pyqtgraph as pg
 from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtWidgets, mkQApp, QtGui
+from pyphoplacecellanalysis.External.pyqtgraph.colormap import ColorMap
 from pyphoplacecellanalysis.External.pyqtgraph.graphicsItems.GradientEditorItem import Gradients
 from pyphoplacecellanalysis.External.pyqtgraph.graphicsItems.NonUniformImage import NonUniformImage
-
 
 from pyphocorehelpers.DataStructure.general_parameter_containers import VisualizationParameters, RenderPlotsData, RenderPlots
 from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer
@@ -44,14 +44,20 @@ def build_binned_imageItem(plot_item, params, xbins=None, ybins=None, matrix=Non
     plot_item.addItem(local_plots.imageItem)
 
     # Color Map:
+    if hasattr(params, 'colorMap'):
+        colorMap = params.colorMap
+    else:
+        colorMap = pg.colormap.get("viridis")      
+        
     if color_bar_mode is None:
         local_plots.colorBarItem = None # no colorbar item
+        ## Still need to setup the colormap on the image
+        lut = colorMap.getLookupTable(0.0, 1.0)
+        local_plots.imageItem.setLookupTable(lut)
+        local_plots.imageItem.setLevels([local_plots_data.matrix_min, local_plots_data.matrix_max])
+        
     else:
-        if color_bar_mode == 'each':
-            if hasattr(params, 'colorMap'):
-                colorMap = params.colorMap
-            else:
-                colorMap = pg.colormap.get("viridis")         
+        if color_bar_mode == 'each':   
             # generate an adjustabled color bar
             local_plots.colorBarItem = pg.ColorBarItem(values=(0,1), colorMap=colorMap, label=data_label)
             # link color bar and color map to correlogram, and show it in plotItem:
@@ -134,7 +140,7 @@ class BasicBinnedImageRenderingWindow(QtWidgets.QMainWindow):
 
     """
     
-    def __init__(self, matrix=None, xbins=None, ybins=None, name='avg_velocity', title="Avg Velocity per Pos (X, Y)", variable_label='Avg Velocity', drop_below_threshold: float=0.0000001, color_bar_mode=None, wants_crosshairs=True, defer_show=False, **kwargs):
+    def __init__(self, matrix=None, xbins=None, ybins=None, name='avg_velocity', title="Avg Velocity per Pos (X, Y)", variable_label='Avg Velocity', drop_below_threshold: float=0.0000001, color_map='viridis', color_bar_mode=None, wants_crosshairs=True, defer_show=False, **kwargs):
         super(BasicBinnedImageRenderingWindow, self).__init__(**kwargs)
         self.params = VisualizationParameters(name='BasicBinnedImageRenderingWindow')
         self.plots_data = RenderPlotsData(name='BasicBinnedImageRenderingWindow')
@@ -142,7 +148,13 @@ class BasicBinnedImageRenderingWindow(QtWidgets.QMainWindow):
         self.ui = PhoUIContainer(name='BasicBinnedImageRenderingWindow')
         self.ui.connections = PhoUIContainer(name='BasicBinnedImageRenderingWindow')
         
-        self.params.colorMap = pg.colormap.get("viridis")
+        if isinstance(color_map, str):        
+            self.params.colorMap = pg.colormap.get("viridis")
+        else:
+            # better be a ColorMap object directly
+            assert isinstance(color_map, ColorMap)
+            self.params.colorMap = color_map
+            
         self.params.color_bar_mode = color_bar_mode
         if self.params.color_bar_mode == 'one':
             # Single shared color_bar between all items:
