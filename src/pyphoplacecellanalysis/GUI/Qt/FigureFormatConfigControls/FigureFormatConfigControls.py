@@ -21,6 +21,7 @@ class FigureFormatConfigControls(QtWidgets.QWidget):
     
     ## Signals
     figure_format_config_updated = QtCore.pyqtSignal(object)
+    figure_format_config_finalized = QtCore.pyqtSignal(object) # called only when the changes to the config are finalized by clicking 'Apply' or 'Ok' Button
     
     @property
     def enable_saving_to_disk(self):
@@ -55,8 +56,21 @@ class FigureFormatConfigControls(QtWidgets.QWidget):
         figure_format_config = (dict(fig_column_width=self.ui.tupleCtrl_2.tuple_values[0], fig_row_height=self.ui.tupleCtrl_2.tuple_values[1]) | figure_format_config)
         figure_format_config = (dict(enable_spike_overlay=self.enable_spike_overlay, debug_print=self.enable_debug_print, enable_saving_to_disk=self.enable_saving_to_disk) | figure_format_config)
         return figure_format_config
-    
-    
+    @figure_format_config.setter
+    def figure_format_config(self, value):
+        """ update the ui properties and controls from the passed in figure_format_config dict. Not all properties required to be present, and those not specified will be unchanged. """
+        if value.get('subplots', None) is not None:
+            self.ui.tupleCtrl_0.tuple_values = value.get('subplots', self.ui.tupleCtrl_0.tuple_values)
+        if value.get('max_screen_figure_size', None) is not None:
+            self.ui.tupleCtrl_1.tuple_values = value.get('max_screen_figure_size', self.ui.tupleCtrl_1.tuple_values)
+        # Row/Col Width/Height:
+        curr_tuple_values = self.ui.tupleCtrl_2.tuple_values
+        self.ui.tupleCtrl_2.tuple_values = (value.get('fig_column_width', curr_tuple_values[0]), value.get('fig_row_height', curr_tuple_values[1]))
+        self.enable_spike_overlay = value.get('enable_spike_overlay', self.enable_spike_overlay) 
+        self.enable_debug_print = value.get('debug_print', self.enable_debug_print)
+        self.enable_saving_to_disk = value.get('enable_saving_to_disk', self.enable_saving_to_disk)
+            
+            
     def __init__(self, parent=None, config=None):
         super().__init__(parent=parent) # Call the inherited classes __init__ method
   
@@ -70,7 +84,7 @@ class FigureFormatConfigControls(QtWidgets.QWidget):
 
 
     def initUI(self):
-        self.ui.tupleCtrl_0.control_name = 'Subplots'
+        self.ui.tupleCtrl_0.control_name = 'subplots'
         self.ui.tupleCtrl_0.tuple_values = (20, 8)
         self.ui.tupleCtrl_0.tuple_values = (None, 8)
         
@@ -112,17 +126,17 @@ class FigureFormatConfigControls(QtWidgets.QWidget):
         # Set the path control to this path:
         self.ui.filepkr_ProgrammaticDisplayFcnOutputPath.path = programmatic_display_function_testing_output_parent_path
         
-    
-        # enable_spike_overlay
- 
         ## Connect signals
         self.ui.tupleCtrl_0.value_changed.connect(self.on_update_values) # type: ignore
         self.ui.tupleCtrl_1.value_changed.connect(self.on_update_values) # type: ignore
         self.ui.tupleCtrl_2.value_changed.connect(self.on_update_values) # type: ignore
         
-        
-        self.ui.buttonBox.accepted.connect(self.on_apply)
-        self.ui.buttonBox.rejected.connect(self.on_cancel)
+        # self.ui.buttonBox.clicked.connect(self.on_general_buttonbox_action) # called on any action for the button itself
+        self.ui.buttonBox.button(QtWidgets.QDialogButtonBox.Apply).clicked.connect(self.on_apply)
+        self.ui.buttonBox.button(QtWidgets.QDialogButtonBox.Cancel).clicked.connect(self.on_cancel)
+        # self.ui.buttonBox.button(QtWidgets.QDialogButtonBox.Reset).clicked.connect(self.on_revert)
+        self.ui.buttonBox.button(QtWidgets.QDialogButtonBox.RestoreDefaults).clicked.connect(self.on_revert)
+        # self.ui.buttonBox.rejected.connect(self.on_cancel)
         
         
        
@@ -153,11 +167,15 @@ class FigureFormatConfigControls(QtWidgets.QWidget):
     # Slots for actions button at bottom of widget                                                                         #
     # ==================================================================================================================== #
 
+    # @QtCore.pyqtSlot(object)
+    def on_general_buttonbox_action(self, button):
+        print('on_general_buttonbox_action({button})')
+    
     @QtCore.pyqtSlot()
     def on_apply(self):
         print('on_apply()')
-        self.figure_format_config_updated.emit(self.figure_format_config) # emit the signal
-
+        self.figure_format_config_finalized.emit(self.figure_format_config) # emit the finalized signal
+        
     @QtCore.pyqtSlot()
     def on_cancel(self):
         print('on_cancel()')

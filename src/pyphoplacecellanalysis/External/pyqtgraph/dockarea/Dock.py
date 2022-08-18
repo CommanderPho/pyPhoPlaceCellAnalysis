@@ -258,7 +258,7 @@ class Dock(QtWidgets.QWidget, DockDrop):
 
 
 class DockLabel(VerticalLabel):
-
+    """ the label at the top of the Dock widget that displays the title and allows dragging/closing. """
     sigClicked = QtCore.Signal(object, object)
     sigCloseClicked = QtCore.Signal()
 
