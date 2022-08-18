@@ -28,6 +28,7 @@ class PipelineInputDataNode(ComboBoxCtrlOwnerMixin, ExtendedCtrlNode):
     nodeName = "PipelineInputDataNode"
     uiTemplate = [
         ('data_mode', 'combo', {'values': ['custom...'], 'index': 0}),
+        ('basedir', 'file'), # {'label': 'basedir', 'is_save_mode': False, 'path_type': 'folder', 'allows_multiple': False}
         ('reload', 'action'),
         # ('sigma',  'spin', {'value': 1.0, 'step': 1.0, 'bounds': [0.0, None]}),
         # ('strength', 'spin', {'value': 1.0, 'dec': True, 'step': 0.5, 'minStep': 0.01, 'bounds': [0.0, None]}),
@@ -37,13 +38,15 @@ class PipelineInputDataNode(ComboBoxCtrlOwnerMixin, ExtendedCtrlNode):
         terminals = {
             # 'dataIn': dict(io='in'),    # each terminal needs at least a name and
             'known_mode': dict(io='in'),
-            'basedir': dict(io='in'),
+            'override_basepath': dict(io='in'),
             'loaded_pipeline': dict(io='out'),  # to specify whether it is input or output
             'known_data_mode': dict(io='out'),
+            'basedir': dict(io='out'),
         }                              # other more advanced options are available
                                        # as well..
         # Static:
         self.active_known_data_session_type_dict = PipelineInputDataNode._get_known_data_session_types_dict()
+        self.active_known_data_session_type_class_names_dict = PipelineInputDataNode._get_known_data_session_type_class_names_dict()
         self.num_known_types = len(self.active_known_data_session_type_dict.keys())
         print(f'num_known_types: {self.num_known_types}')
         ExtendedCtrlNode.__init__(self, name, terminals=terminals)
@@ -67,8 +70,12 @@ class PipelineInputDataNode(ComboBoxCtrlOwnerMixin, ExtendedCtrlNode):
                 
         # self.ctrls['reload'].clicked.connect(click)
         
+        ## Add Custom File Control
+        # W:\Data\Bapun\RatN\Day4OpenField
+        self.ctrls['basedir'].sigFileSelectionChanged.connect(self.onBasedirPathChanged)
+        
 
-    def process(self, known_mode='', basedir=None, display=True):
+    def process(self, known_mode='', override_basepath=None, display=True):
     # def process(self, known_mode='Bapun', display=True):
         # CtrlNode has created self.ctrls, which is a dict containing {ctrlName: widget}
         # data_mode = self.ctrls['data_mode'].value()                
@@ -110,15 +117,45 @@ class PipelineInputDataNode(ComboBoxCtrlOwnerMixin, ExtendedCtrlNode):
                 self.ctrls['data_mode'].setCurrentIndex(found_desired_index)
             else:
                 data_mode = data_mode_from_combo_list
-                
-            # self.stateGroup.
-            # raise NotImplementedError
-
+            
+        # Get the data mode properties from the specified data_mode
+        active_data_mode_registered_class = self.active_known_data_session_type_class_names_dict[data_mode]
+        active_data_mode_type_properties = self.active_known_data_session_type_dict[data_mode]
+        
+        ## Prefer in the override_basepath input argument first if it is valid, and then the basedir from the ctrl widget, and then the default
+        override_basedir_from_path_ctrl = str(self.ctrls['basedir'].path)
+        print(f'override_basedir_from_path_ctrl: {override_basedir_from_path_ctrl}')
+            
+        if (override_basepath is None) or (override_basepath == ''):
+            # No valid input argument for override_basepath
+            if (override_basedir_from_path_ctrl is None) or (override_basedir_from_path_ctrl == '') or (override_basedir_from_path_ctrl == '.'):
+                # invalid or no specified basepath in the ctrl:
+                print(f'basedir not set from input variable or user ctrl: applying default of "{active_data_mode_type_properties.basedir}"')
+                self.ctrls['basedir'].path = active_data_mode_type_properties.basedir # set to default directory
+                basedir = active_data_mode_type_properties.basedir
+            else:
+                # potnetially valid override_basedir
+                basedir = override_basedir_from_path_ctrl
+         
+        else:
+            # valid input argument, use that one:
+            if override_basedir_from_path_ctrl != override_basepath:
+                # override in control is different than that specified in input
+                print(f'path control mode: {override_basedir_from_path_ctrl} and input argument mode: {override_basepath} differ. Using input argument mode ({override_basepath}) currently.')
+                self.ctrls['basedir'].path = override_basepath
+            # either way, use this as the basedir    
+            basedir = override_basepath
+    
+        # # Use this to set the 'basedir' path value:
+        # self.ctrls['basedir'].path = active_data_mode_type_properties.basedir
+        
         with ProgressDialog("Pipeline Input Loading..", 0, self.num_known_types, cancelText="Cancel", parent=None, busyCursor=True, wait=250) as dlg:
             # do stuff
             # dlg.setValue(0)   ## could also use dlg += 1
             # curr_bapun_pipeline = NeuropyPipeline.init_from_known_data_session_type('bapun', known_data_session_type_dict['bapun'])
-            curr_pipeline = NeuropyPipeline.init_from_known_data_session_type(data_mode, self.active_known_data_session_type_dict[data_mode], override_basepath=basedir)
+            # curr_pipeline = NeuropyPipeline.init_from_known_data_session_type(data_mode, active_data_mode_type_properties, override_basepath=Path(basedir))
+            curr_pipeline = NeuropyPipeline.try_init_from_saved_pickle_or_reload_if_needed(data_mode, active_data_mode_type_properties, override_basepath=Path(basedir))    
+        
             # dlg.setValue(num_known_types)   ## could also use dlg += 1
             if dlg.wasCanceled():
                 curr_pipeline = None
@@ -156,14 +193,23 @@ class PipelineInputDataNode(ComboBoxCtrlOwnerMixin, ExtendedCtrlNode):
         curr_combo_box.blockSignals(False)
 
 
-
-    
+    @QtCore.pyqtSlot(str)
+    def onBasedirPathChanged(self, updated_basedir):
+        print(f'onBasedirPathChanged(updated_basedir: {updated_basedir})')
+        # self.ctrls['basedir'].path
+        s = self.stateGroup.state()
+        print(f'\ts: {s}')
+        self.update()
         
     @classmethod
     def _get_known_data_session_types_dict(cls):
         """ a static accessor for the knwon data session types. Note here the default paths and such are defined. """
         return DataSessionFormatRegistryHolder.get_registry_known_data_session_type_dict()
 
+    @classmethod
+    def _get_known_data_session_type_class_names_dict(cls):
+        """ a static accessor for the knwon data session types. Note here the default paths and such are defined. """
+        return DataSessionFormatRegistryHolder.get_registry_data_session_type_class_name_dict()
 
     
 # class PipelineResultBreakoutNode(CtrlNode):
