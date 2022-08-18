@@ -43,6 +43,9 @@ def build_binned_imageItem(plot_item, params, xbins=None, ybins=None, matrix=Non
     local_plots.imageItem = pg.ImageItem(matrix.T)
     plot_item.addItem(local_plots.imageItem)
 
+    plot_item.setAspectLocked(lock=True, ratio=1)
+
+
     # Color Map:
     if hasattr(params, 'colorMap'):
         colorMap = params.colorMap
