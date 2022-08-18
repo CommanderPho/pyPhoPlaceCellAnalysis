@@ -4,6 +4,7 @@ from pyphoplacecellanalysis.External.pyqtgraph.widgets.FeedbackButton import Fee
 from pyphoplacecellanalysis.External.pyqtgraph.widgets.CheckTable import CheckTable
 
 from pyphoplacecellanalysis.GUI.PyQtPlot.Flowchart.CustomNodes.CustomControlWidgets.ExtendedCheckTable import ExtendedCheckTable
+from pyphocorehelpers.gui.Qt.InlineFilesystemPathSelectWidget.InlineFilesystemPathSelectWidget import InlineFilesystemPathSelectWidget
 
 
 class ExtendedCtrlNode(CtrlNode):
@@ -75,7 +76,19 @@ class ExtendedCtrlNode(CtrlNode):
                 #     # add a single row with a default label if no labels are provided
                 #     row_labels = [f'row[{i}]' for i in np.arange(1)]
                 #     w.updateRows(row_labels)
-                    
+            elif t == 'file':
+                # if 'label' in o:
+                #     label = o['label']
+                
+                # if 'path_type' in o:
+                #     path_type = o['path_type']
+                label = o.get('label', '')
+                is_save_mode = o.get('is_save_mode', False)
+                path_type = o.get('path_type', 'folder')
+                allows_multiple = o.get('allows_multiple', False)
+                print(f'DEBUG STATUS LOGGING: {o}')
+                w = InlineFilesystemPathSelectWidget(label=label, is_save_mode=is_save_mode, path_type=path_type, allows_multiple=allows_multiple)
+                
             else:
                 raise Exception("Unknown widget type '%s'" % str(t))
 
