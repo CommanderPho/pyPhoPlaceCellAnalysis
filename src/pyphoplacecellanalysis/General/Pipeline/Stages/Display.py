@@ -212,12 +212,14 @@ class PipelineWithDisplayPipelineStageMixin:
                 self.active_configs[an_active_config_name] = update_figure_files_output_path(self.computation_results[an_active_config_name], self.active_configs[an_active_config_name], root_output_dir=root_output_dir)
 
         self.reload_default_display_functions() # reload default display functions first
-                    
+
+
+    # MAIN FUNCTION ______________________________________________________________________________________________________ #
     def display(self, display_function, active_session_filter_configuration: str, **kwargs):
         """ Called to actually perform the display. Should output a figure/widget/graphic of some kind. 
         Inputs:
             display_function: either a Callable display function (e.g. DefaultDisplayFunctions._display_1d_placefield_validations) or a str containing the name of a registered display function (e.g. '_display_1d_placefield_validations')
-            active_session_filter_configuration: the string that's a key into the computation results like 'maze1' or 'maze2'.
+            active_session_filter_configuration: the string that's a key into the computation results like 'maze1' or 'maze2' that specifies which result you want to display.
         """
         assert self.can_display, "Current self.stage must already be a DisplayPipelineStage. Call self.prepare_for_display to reach this step."
         if display_function is None:
