@@ -37,6 +37,7 @@ class PipelineInputDataNode(ComboBoxCtrlOwnerMixin, ExtendedCtrlNode):
         terminals = {
             # 'dataIn': dict(io='in'),    # each terminal needs at least a name and
             'known_mode': dict(io='in'),
+            'basedir': dict(io='in'),
             'loaded_pipeline': dict(io='out'),  # to specify whether it is input or output
             'known_data_mode': dict(io='out'),
         }                              # other more advanced options are available
@@ -67,7 +68,7 @@ class PipelineInputDataNode(ComboBoxCtrlOwnerMixin, ExtendedCtrlNode):
         # self.ctrls['reload'].clicked.connect(click)
         
 
-    def process(self, known_mode='', display=True):
+    def process(self, known_mode='', basedir=None, display=True):
     # def process(self, known_mode='Bapun', display=True):
         # CtrlNode has created self.ctrls, which is a dict containing {ctrlName: widget}
         # data_mode = self.ctrls['data_mode'].value()                
@@ -117,7 +118,7 @@ class PipelineInputDataNode(ComboBoxCtrlOwnerMixin, ExtendedCtrlNode):
             # do stuff
             # dlg.setValue(0)   ## could also use dlg += 1
             # curr_bapun_pipeline = NeuropyPipeline.init_from_known_data_session_type('bapun', known_data_session_type_dict['bapun'])
-            curr_pipeline = NeuropyPipeline.init_from_known_data_session_type(data_mode, self.active_known_data_session_type_dict[data_mode])    
+            curr_pipeline = NeuropyPipeline.init_from_known_data_session_type(data_mode, self.active_known_data_session_type_dict[data_mode], override_basepath=basedir)
             # dlg.setValue(num_known_types)   ## could also use dlg += 1
             if dlg.wasCanceled():
                 curr_pipeline = None
