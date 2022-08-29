@@ -15,21 +15,7 @@ from pyphoplacecellanalysis.General.Model.Datasources.IntervalDatasource import 
 
 from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.Mixins.RenderTimeEpochs.Specific2DRenderTimeEpochs import Specific2DRenderTimeEpochsHelper # Only for the convenince methods that build datasources (laps, PBEs, etc)
 
-
-class RenderEpochs(PrettyPrintable, SimplePrintable, metaclass=OrderedMeta):
-    def __init__(self, name) -> None:
-        # super(RenderEpochs, self).__init__(**kwargs)
-        self.name = name
-        # self.__dict__ = (self.__dict__ | kwargs)
-        
-    # def __init__(self, name, **kwargs) -> None:
-    #     # super(VisualizationParameters, self).__init__(**kwargs)
-    #     self.name = name
-    #     # self.__dict__ = (self.__dict__ | kwargs)
-    
-    
-
-class RenderTimeEpochMeshesMixin(EpochRenderingMixin):
+class RenderTimeEpoch3DMeshesMixin(EpochRenderingMixin):
     """  Extends EpochRenderingMixin for 3D OpenGL Plots such as Spike3DRaster, enabling it to render intervals in an OpenGL view
     
         It does this by overriding EpochRenderingMixin's add_rendered_intervals(...) function
@@ -66,7 +52,7 @@ class RenderTimeEpochMeshesMixin(EpochRenderingMixin):
             .update_epoch_meshes(starts_t, durations)
             
             @QtCore.pyqtSlot()
-            def RenderTimeEpochMeshesMixin_on_update_window(self)
+            def RenderTimeEpoch3DMeshesMixin_on_update_window(self)
     
     
     
@@ -119,26 +105,26 @@ class RenderTimeEpochMeshesMixin(EpochRenderingMixin):
 
 
     @QtCore.pyqtSlot()
-    def RenderTimeEpochMeshesMixin_on_init(self):
+    def RenderTimeEpoch3DMeshesMixin_on_init(self):
         """ perform any parameters setting/checking during init """
         # self.params.setdefault('render_epochs', None)
         self.EpochRenderingMixin_on_init()
         
 
     @QtCore.pyqtSlot()
-    def RenderTimeEpochMeshesMixin_on_setup(self):
+    def RenderTimeEpoch3DMeshesMixin_on_setup(self):
         """ perfrom setup/creation of widget/graphical/data objects. Only the core objects are expected to exist on the implementor (root widget, etc) """
         self.EpochRenderingMixin_on_setup()
-        self.close_signal.connect(self.RenderTimeEpochMeshesMixin_on_destroy) # Connect the *_on_destroy function to the close_signal
+        self.close_signal.connect(self.RenderTimeEpoch3DMeshesMixin_on_destroy) # Connect the *_on_destroy function to the close_signal
 
     @QtCore.pyqtSlot()
-    def RenderTimeEpochMeshesMixin_on_buildUI(self):
+    def RenderTimeEpoch3DMeshesMixin_on_buildUI(self):
         """ perfrom setup/creation of widget/graphical/data objects. Only the core objects are expected to exist on the implementor (root widget, etc) """
         self.EpochRenderingMixin_on_buildUI()
         # self.plots.setdefault('new_cube_objects', None) # need to keep: unique
         
     @QtCore.pyqtSlot()
-    def RenderTimeEpochMeshesMixin_on_destroy(self):
+    def RenderTimeEpoch3DMeshesMixin_on_destroy(self):
         """ perfrom teardown/destruction of anything that needs to be manually removed or released """
         # self.epoch_connection.disconnect()
         # self.epoch_connection = None
@@ -146,7 +132,7 @@ class RenderTimeEpochMeshesMixin(EpochRenderingMixin):
 
 
     @QtCore.pyqtSlot(float, float)
-    def RenderTimeEpochMeshesMixin_on_window_update(self, new_start=None, new_end=None):
+    def RenderTimeEpoch3DMeshesMixin_on_window_update(self, new_start=None, new_end=None):
         """ called when the window is updated to update the mesh locations. """
         if self.has_render_epoch_meshes:
             self.update_all_epoch_meshes()
@@ -156,8 +142,8 @@ class RenderTimeEpochMeshesMixin(EpochRenderingMixin):
     ## For use with pg.SignalProxy
     # using signal proxy turns original arguments into a tuple
     @QtCore.pyqtSlot(object)
-    def RenderTimeEpochMeshesMixin_on_window_update_rate_limited(self, evt):
-        self.RenderTimeEpochMeshesMixin_on_window_update(*evt)
+    def RenderTimeEpoch3DMeshesMixin_on_window_update_rate_limited(self, evt):
+        self.RenderTimeEpoch3DMeshesMixin_on_window_update(*evt)
 
 
     
@@ -243,7 +229,7 @@ class RenderTimeEpochMeshesMixin(EpochRenderingMixin):
         
         ## Post-update datasource:
         ## Update the Datasource to contain the 3D mesh specific properties:
-        assert np.isin(RenderTimeEpochMeshesMixin._required_interval_visualization_columns, self.interval_datasources[name].df.columns).all(), f"dataframe is missing required columns:\n Required: {RenderTimeEpochMeshesMixin._required_interval_visualization_columns}, current: {self.interval_datasources[name].df.columns}"
+        assert np.isin(RenderTimeEpoch3DMeshesMixin._required_interval_visualization_columns, self.interval_datasources[name].df.columns).all(), f"dataframe is missing required columns:\n Required: {RenderTimeEpoch3DMeshesMixin._required_interval_visualization_columns}, current: {self.interval_datasources[name].df.columns}"
         
         # enable_visualization_datasource_parameters_override: if True, the dataframe properties used to render the interval meshes in 3D are overriden with the user-arguments provided (if provided) or the defaults:
         enable_visualization_datasource_parameters_override = True
@@ -294,7 +280,7 @@ class RenderTimeEpochMeshesMixin(EpochRenderingMixin):
                         
                 else:
                     # Only if child plot doesn't yet exist:
-                    new_mesh_objects = self._build_epoch_meshes(**RenderTimeEpochMeshesMixin._build_epoch_meshes_3D_dict_from_dataframe(self.interval_datasources[name].df))
+                    new_mesh_objects = self._build_epoch_meshes(**RenderTimeEpoch3DMeshesMixin._build_epoch_meshes_3D_dict_from_dataframe(self.interval_datasources[name].df))
                     
                     extant_rects_plot_items_container[a_plot] = new_mesh_objects
                     
@@ -306,7 +292,7 @@ class RenderTimeEpochMeshesMixin(EpochRenderingMixin):
         else:
             # Need to create a new RenderedEpochsItemsContainer with the items:
             # Equiv to new_interval_rects_item:
-            new_mesh_objects = self._build_epoch_meshes(**RenderTimeEpochMeshesMixin._build_epoch_meshes_3D_dict_from_dataframe(self.interval_datasources[name].df))
+            new_mesh_objects = self._build_epoch_meshes(**RenderTimeEpoch3DMeshesMixin._build_epoch_meshes_3D_dict_from_dataframe(self.interval_datasources[name].df))
             self.rendered_epochs[name] = RenderedEpochsItemsContainer(new_mesh_objects, child_plots) # set the plot item
             for a_plot, a_rect_item_meshes in self.rendered_epochs[name].items():
                 if not isinstance(a_rect_item_meshes, str):
@@ -453,8 +439,8 @@ class RenderTimeEpochMeshesMixin(EpochRenderingMixin):
         for i in np.arange(len(x_centers)):
             curr_color = list(brush_aRGB[i])
             # print(f'curr_color[{i}]: {curr_color}')
-            # curr_md = RenderTimeEpochMeshesMixin._build_cube_mesh_data(faceColor=[1,1,1,1]) # works
-            curr_md = RenderTimeEpochMeshesMixin._build_cube_mesh_data(faceColor=curr_color) # works
+            # curr_md = RenderTimeEpoch3DMeshesMixin._build_cube_mesh_data(faceColor=[1,1,1,1]) # works
+            curr_md = RenderTimeEpoch3DMeshesMixin._build_cube_mesh_data(faceColor=curr_color) # works
             curr_cube = gl.GLMeshItem(meshdata=curr_md, smooth=smooth[i], shader=shader[i], glOptions=glOptions[i]) # , color=pg.mkColor(curr_color)
             curr_cube.translate(x_centers[i], series_vertical_offset[i], self.floor_z)
             curr_cube.scale(duration_spatial_widths[i], series_height[i], 0.25)
