@@ -71,7 +71,7 @@ def build_pdf_export_metadata(session_descriptor_string, filter_name, out_path=N
         out_day_date_folder_name = datetime.today().strftime('%Y-%m-%d') # A string with the day's date like '2022-01-16'
         # out_path = Path(r'C:\Users\pho\repos\PhoPy3DPositionAnalysis2021\EXTERNAL\Screenshots\ProgrammaticDisplayFunctionTesting\2022-07-11')
         
-        out_path = Path(r'EXTERNAL\Screenshots\ProgrammaticDisplayFunctionTesting').joinpath(out_day_date_folder_name).resolve()
+        out_path = Path(r'EXTERNAL/Screenshots/ProgrammaticDisplayFunctionTesting').joinpath(out_day_date_folder_name).resolve()
         # out_path = Path(r'EXTERNAL\Screenshots\ProgrammaticDisplayFunctionTesting\2022-07-11').resolve()
     else:
         out_path = Path(out_path) # make sure it's a Path
