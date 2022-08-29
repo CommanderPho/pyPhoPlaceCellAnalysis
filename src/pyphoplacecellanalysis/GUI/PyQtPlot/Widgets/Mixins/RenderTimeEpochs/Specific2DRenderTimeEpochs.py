@@ -105,7 +105,7 @@ class Specific2DRenderTimeEpochsHelper:
     
     
     ##########################################
-    ## PBE (Population Burst Events)
+    ## Laps
     @staticmethod
     def build_Laps_dataframe_formatter(debug_print=False, **kwargs):
         def _add_interval_dataframe_visualization_columns_Laps(active_Laps_df):

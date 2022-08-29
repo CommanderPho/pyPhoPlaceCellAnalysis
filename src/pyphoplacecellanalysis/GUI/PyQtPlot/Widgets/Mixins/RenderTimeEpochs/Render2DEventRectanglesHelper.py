@@ -160,10 +160,6 @@ class Render2DEventRectanglesHelper:
             curr_pyburst_interval_df.loc[:, 'fragile_linear_neuron_IDX'] = a_fragile_neuron_IDX
             # add the 'visualization_raster_y_location' column:
             curr_pyburst_interval_df.loc[:, 'series_vertical_offset'] = [y_fragile_linear_neuron_IDX_map[a_cell_IDX] for a_cell_IDX in curr_pyburst_interval_df['fragile_linear_neuron_IDX'].to_numpy()]
-        #     # add the 'visualization_raster_y_location' column:
-        #     curr_pyburst_interval_df.loc[:, 'series_vertical_offset'] = [y_fragile_linear_neuron_IDX_map[a_cell_IDX] for a_cell_IDX in curr_pyburst_interval_df['fragile_linear_neuron_IDX'].to_numpy()]
-        #     # add the 'visualization_raster_y_location' column:
-        #     curr_pyburst_interval_df.loc[:, 'series_vertical_offset'] = [y_fragile_linear_neuron_IDX_map[a_cell_IDX] for a_cell_IDX in curr_pyburst_interval_df['fragile_linear_neuron_IDX'].to_numpy()]
 
             ## hierarchical offset: offset increases slightly (up to a max percentage of the fixed_track_height, specified by `hierarchical_level_max_offset_height_portion`) per level
             hierarchical_level_max_offset_height_portion = 0.5 # offset by at most 20% of the fixed_series_height across all levels
@@ -172,7 +168,7 @@ class Render2DEventRectanglesHelper:
             # Optionally add the hierarchical offsets to position the different levels of bursts at different heights
             curr_pyburst_interval_df.loc[:, 'series_vertical_offset'] = curr_pyburst_interval_df['series_vertical_offset'] + ((curr_pyburst_interval_df['burst_level']-1.0)*offset_step_per_level) - 0.5
         
-            # add the 'series_heights' column:
+            # add the 'series_height' column:
             curr_pyburst_interval_df.loc[:, 'series_height'] = fixed_series_height # the height is the same for all series
 
             # # add the 'brush_color' column:
