@@ -87,7 +87,7 @@ class RenderDataseries(SimplePrintable, PrettyPrintable, QtCore.QObject):
         """The number of different data series."""
         return len(self.data_series_config_list)
       
-      
+    ## Primary data access function
     def get_data_series_spatial_values(self, curr_windowed_df):
         """ uses its internal configuration to get the appropriate values for each of its series from the passed in curr_windowed_df, converting them to spatial values if needed. """
         if self.direct_spatial_data_series_list is not None:
@@ -134,6 +134,7 @@ class RenderDataseries(SimplePrintable, PrettyPrintable, QtCore.QObject):
             if enable_debug_print:
                 print(f"a_series_config_dict: {a_series_config_dict}")
                 
+            ## Here, we get any extra (non- spatial or pre-spatatial values such as ['color_name', 'line_width', 'z_scaling_factor']) for this data series and extract them and their values to append to this series' data_series_values_dict (which is finally added to the flat data_series_values_list which is returned)
             a_series_value_dict_all_keys = np.array(list(a_series_config_dict.keys()))
             extra_series_keys = np.setdiff1d(a_series_value_dict_all_keys, cls.pre_spatial_expected_keys) # get only the unexpected/unhandled keys,  # ['color_name', 'line_width', 'z_scaling_factor']
             extra_series_options_dict = {an_extra_key:a_series_config_dict[an_extra_key] for an_extra_key in extra_series_keys} # # {'color_name': 'yellow', 'line_width': 1.25, 'z_scaling_factor': 1.0}
