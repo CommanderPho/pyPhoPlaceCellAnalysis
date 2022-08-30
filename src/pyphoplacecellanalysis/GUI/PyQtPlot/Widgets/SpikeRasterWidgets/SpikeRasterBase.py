@@ -235,8 +235,8 @@ class SpikeRasterBase(UnitSortableMixin, DataSeriesToSpatialTransformingMixin, N
     def temporal_zoom_factor(self, value):
         self.params.temporal_zoom_factor = value
         self.temporal_mapping_changed.emit()
-        
 
+        
     def __init__(self, params=None, spikes_window=None, playback_controller=None, neuron_colors=None, neuron_sort_order=None, application_name=None, should_show=True, **kwargs):
         """ 
         

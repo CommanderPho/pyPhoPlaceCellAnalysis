@@ -468,12 +468,7 @@ class Spike3DRaster(PyQtGraphSpecificTimeCurvesMixin, RenderTimeEpoch3DMeshesMix
             curr_id_txtitem.setObjectName(f'neuron_id_txtitem_fragile_IDX_{a_fragile_linear_neuron_IDX}_aclu_{cell_id}')
             curr_id_txtitem.setData(pos=(self.side_wall_x, self.fragile_linear_neuron_IDX_to_spatial(a_fragile_linear_neuron_IDX), (self.floor_z - 0.5)), color=curr_color) # TODO: could update color as well
             
-            # curr_id_txtitem.resetTransform()
-            # curr_id_txtitem.translate(self.near_wall_x, self.y[i], (self.z_floor - 0.5))
 
-    # def _build_axes_arrow_graphics(self, w):
-        
-    #     md = gl.MeshData.cylinder(rows=10, cols=20, radius=[1., 2.0], length=5.)
 
     ###################################
     #### EVENT HANDLERS

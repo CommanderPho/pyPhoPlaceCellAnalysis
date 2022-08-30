@@ -199,7 +199,7 @@ class Spike3DRaster_Vedo(VedoSpecificTimeCurvesMixin, SpikeRasterBase):
         self.params.setdefault('bin_position_mode', 'bin_center')
         
         # self.params.spike_height_z = 4.0
-        self.params.spike_start_z = self.floor_z # self.z_floor
+        self.params.spike_start_z = self.floor_z # self.floor_z
         self.params.spike_end_z = self.params.spike_start_z + self.params.spike_height_z
         
         # self.params.max_y_pos = 50.0

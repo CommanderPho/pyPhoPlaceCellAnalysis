@@ -24,7 +24,7 @@ class TimeCurvesViewMixin(Render3DTimeCurvesBaseGridMixin):
     
     Implementors Require:
         self.params.time_curves_z_normalization_mode: ['None', 'global']: Used in .calculate_data_z_scaling_factor() to determine the data_z_scaling_factor for the 3D time curves
-        self.z_floor
+        self.floor_z
         self.params.time_curves_datasource.data_column_values
     
     Implementors must implement:
@@ -42,7 +42,7 @@ class TimeCurvesViewMixin(Render3DTimeCurvesBaseGridMixin):
     
     @property
     def data_z_scaling_factor(self):
-        """ the factor required to scale the data_values_range to fit within the z_max_value """
+        """ the factor required to scale the data_values_range (which is the ordinate axes of the data) to fit within the z_max_value """
         return self.calculate_data_z_scaling_factor()
     
     def calculate_data_z_scaling_factor(self):
@@ -51,7 +51,7 @@ class TimeCurvesViewMixin(Render3DTimeCurvesBaseGridMixin):
             return 1.0
         elif self.params.time_curves_z_normalization_mode == 'global':
             data_values_range = np.ptp(self.params.time_curves_datasource.data_column_values)
-            z_max_value = np.abs(self.z_floor) # get the z-height of the floor so as not to go below it.
+            z_max_value = np.abs(self.floor_z) # get the z-height of the floor so as not to go below it.
             data_z_scaling_factor = z_max_value / data_values_range
         else:
             raise NotImplementedError
@@ -64,7 +64,7 @@ class TimeCurvesViewMixin(Render3DTimeCurvesBaseGridMixin):
     def TimeCurvesViewMixin_on_init(self):        
         """ time_curves properties:
             time_curves_datasource (default None): 
-            time_curves_no_update (default False): called to disabling updating time curves internally
+            time_curves_no_update (default False): called to disable updating time curves internally
             time_curves_z_normalization_mode (default 'None'): specifies how the 3D curves' z-axis is normalized.
             time_curves_z_baseline (default 5.0): the z-position at which to start 3D curves.
             time_curves_z_scaling_max (default 10.0): the max relative z-position for the maximal 3D curve value to be scaled to. The maximum absolute curve value will be (time_curves_z_baseline + time_curves_z_scaling_max).
@@ -168,7 +168,11 @@ class TimeCurvesViewMixin(Render3DTimeCurvesBaseGridMixin):
         self.update_3D_time_curves()
         
         
-    
+        
+# ==================================================================================================================== #
+# Rendering Library Specific Implementations Below                                                                     #
+# ==================================================================================================================== #
+# Note that 'Specific' in the names of these two classes indicates that they are specific to the technology, not that they render only particular sets of curves (contrary to how it was used in the class `Specific2DRenderTimeEpochsHelper`, which does render particular curves)
 
 ########## PyQtGraph Specific TimeCurvesMixin (specializes TimeCurvesViewMixin):
 class PyQtGraphSpecificTimeCurvesMixin(TimeCurvesViewMixin):
@@ -186,10 +190,11 @@ class PyQtGraphSpecificTimeCurvesMixin(TimeCurvesViewMixin):
     """
     def clear_all_3D_time_curves(self):
         for (aUID, plt) in self.plots.time_curves.items():
-            self.ui.main_gl_widget.removeItem(plt)
+            self.ui.main_gl_widget.removeItem(plt) # this should automatically work for 2D curves as well
             # plt.delete_later() #?
         # Clear the dict
         self.plots.time_curves.clear()
+        ## This part might be 3D only, but we do have a working 2D version so maybe just bring that in?
         self.remove_3D_time_curves_baseline_grid_mesh() # from Render3DTimeCurvesBaseGridMixin
         
     def _build_or_update_plot(self, plot_name, points, **kwargs):

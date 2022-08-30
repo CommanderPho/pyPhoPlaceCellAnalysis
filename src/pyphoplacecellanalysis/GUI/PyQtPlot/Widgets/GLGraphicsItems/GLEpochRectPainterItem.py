@@ -144,7 +144,7 @@ class GLEpochRectPainterItem(GLGraphicsItem.GLGraphicsItem):
         for (i, aCube) in enumerate(self.plots.new_cube_objects):
             # aCube.setPos(t_centers[i], self.n_half_cells, 0)
             aCube.resetTransform()
-            aCube.translate(t_shifted_centers[i], -self.n_half_cells, self.z_floor)
+            aCube.translate(t_shifted_centers[i], -self.n_half_cells, self.floor_z)
             aCube.scale(durations[i], self.n_full_cell_grid, 0.25)
             # aCube.setData(pos=(t_centers[i], self.n_half_cells, 0))
             # aCube.setParent(None)
