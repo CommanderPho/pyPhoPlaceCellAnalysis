@@ -17,11 +17,11 @@ from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.Mixins.Render2DScrollWindowPlot
 from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.Mixins.Render2DNeuronIdentityLinesMixin import Render2DNeuronIdentityLinesMixin
 
 from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.Mixins.RenderTimeEpochs.EpochRenderingMixin import EpochRenderingMixin
-
 from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.Mixins.RenderTimeEpochs.Specific2DRenderTimeEpochs import Specific2DRenderTimeEpochsHelper
+from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.Mixins.TimeCurves3D.Render3DTimeCurvesMixin import PyQtGraphSpecificTimeCurvesMixin
 
 
-class Spike2DRaster(EpochRenderingMixin, Render2DScrollWindowPlotMixin, SpikeRasterBase):
+class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Render2DScrollWindowPlotMixin, SpikeRasterBase):
     """ Displays a 2D version of a raster plot with the spikes occuring along a plane. 
     
     Usage:
@@ -80,11 +80,22 @@ class Spike2DRaster(EpochRenderingMixin, Render2DScrollWindowPlotMixin, SpikeRas
     
     
     ######  Get/Set Properties ######:
-    
+
+    ## FOR TimeCurvesViewMixin
+    @property
+    def floor_z(self):
+        """The offset of the floor in the ordinate-axis. Which is actually the y-axis for a 2D plot """
+        return 0
+        
 
 
     def __init__(self, params=None, spikes_window=None, playback_controller=None, neuron_colors=None, neuron_sort_order=None, application_name=None, **kwargs):
         super(Spike2DRaster, self).__init__(params=params, spikes_window=spikes_window, playback_controller=playback_controller, neuron_colors=neuron_colors, neuron_sort_order=neuron_sort_order, application_name=application_name, **kwargs)
+        
+        # Init the TimeCurvesViewMixin for 3D Line plots:
+        ### No plots will actually be added until self.add_3D_time_curves(plot_dataframe) is called with a valid dataframe.
+        self.TimeCurvesViewMixin_on_init()
+        
          # Setup Signals:
         self.temporal_mapping_changed.connect(self.on_adjust_temporal_spatial_mapping)
         self.spikes_window.timeWindow.window_duration_changed_signal.connect(self.on_adjust_temporal_spatial_mapping)
