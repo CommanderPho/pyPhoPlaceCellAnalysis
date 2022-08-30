@@ -4,6 +4,10 @@ import numpy as np
 class Render2DNeuronIdentityLinesMixin:
     """ renders the horizontal lines separating the neurons on the 2D raster plots 
     
+    Review 2022-08-30 - Confirmed working as implemented! (Actually, the correct spacing/grid layout of the lines wasn't validated and doesn't look perfect, but the whole thing works.
+
+    
+    
     TODO: This is not really a mixin, need to figure out how I want these used.
     
     Usage:

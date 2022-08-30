@@ -89,7 +89,7 @@ def build_spike_3d_raster_with_2d_controls(curr_spikes_df, window_duration=15.0,
         spike_raster_plt_3d.setWindowTitle('Main 3D Raster Window')
         WidgetPositioningHelpers.move_widget_to_top_left_corner(spike_raster_plt_3d, debug_print=False)
         WidgetPositioningHelpers.align_3d_and_2d_windows(spike_raster_plt_3d, spike_raster_plt_2d) # Align the two windows
-        spike_raster_plt_2d.update_scroll_window_region(window_start_time, window_start_time+window_duration, block_signals=False)
+        spike_raster_plt_2d.update_scroll_window_region(window_start_time, window_start_time+window_duration, block_signals=False) # TODO: ERROR: I know that these numbers are wrong, they should be in the 1000's. See spike_raster_plt_2d._fix_initial_linearRegionLocation(debug_print=True)
         spike_raster_window = None
     else:
         spike_raster_window = Spike3DRasterWindowWidget(curr_spikes_df, window_duration=window_duration, window_start_time=window_start_time, neuron_colors=neuron_colors, neuron_sort_order=neuron_sort_order, application_name=application_name, type_of_3d_plotter='pyqtgraph')
