@@ -276,13 +276,16 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
         if self.Includes2DActiveWindowScatter:
             self.plots.scatter_plot.addPoints(self.plots_data.all_spots)
     
-        
-        
         self.EpochRenderingMixin_on_buildUI()
         
         # self.Render2DScrollWindowPlot_on_window_update # register with the animation time window for updates for the scroller.
         # Connect the signals for the zoom region and the LinearRegionItem        
         self.rate_limited_signal_scrolled_proxy = pg.SignalProxy(self.window_scrolled, rateLimit=60, slot=self.update_zoomed_plot_rate_limited) # Limit updates to 60 Signals/Second
+    
+
+        # For this 2D Implementation of TimeCurvesViewMixin/PyQtGraphSpecificTimeCurvesMixin
+        self.ui.main_time_curves_view_widget = None
+    
         
         
     ###################################
@@ -457,6 +460,114 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
     def remove_PBEs_intervals(self):
         self.remove_rendered_intervals('PBEs', debug_print=False)
         
+        
+        
+
+
+    ######################################################
+    # TimeCurvesViewMixin/PyQtGraphSpecificTimeCurvesMixin specific overrides for 2D:
+    """ 
+    As soon as the first 2D Time Curve plot is needed, it creates:
+        self.ui.main_time_curves_view_widget - PlotItem by calling add_separate_render_time_curves_plot_item(...)
+    
+    main_time_curves_view_widget creates new PlotDataItems by calling self.ui.main_time_curves_view_widget.plot(...)
+        This .plot(...) command can take either: 
+            .plot(x=x, y=y)
+            .plot(ndarray(N,2)): single numpy array with shape (N, 2), where x=data[:,0] and y=data[:,1]
+            
+     
+    
+    """
+    
+    #####################################################
+    
+    def _build_or_update_plot(self, plot_name, points, **kwargs):
+        """ 
+        uses or builds a new self.ui.main_time_curves_view_widget, which the item is added to
+        
+        """
+        
+        if self.ui.main_time_curves_view_widget is None:
+            # needs to build the primary 2D time curves plotItem:
+            print(f'Spike2DRaster created a new self.ui.main_time_curves_view_widget for TimeCurvesViewMixin plots!')
+            self.ui.main_time_curves_view_widget = Spike2DRaster.add_separate_render_time_curves_plot_item(self) # PlotItem
+        
+        
+        # build the plot arguments (color, line thickness, etc)        
+        plot_args = ({'color_name':'white','line_width':0.5,'z_scaling_factor':1.0} | kwargs)
+        
+        if plot_name in self.plots.time_curves:
+            # Plot already exists, update it instead.
+            plt = self.plots.time_curves[plot_name]
+            plt.setData(pos=points)
+        else:
+            # plot doesn't exist, built it fresh.
+            
+            line_color = plot_args.get('color', None)
+            if line_color is None:
+                # if no explicit color value is provided, build a new color from the 'color_name' key, or if that's missing just use white.
+                line_color = pg.mkColor(plot_args.setdefault('color_name', 'white'))
+                line_color.setAlphaF(0.8)
+                
+            
+            
+            if np.shape(points)[1] == 3:
+                # same data from 3D version, drop the y-value accordingly:
+                """
+                    points: (N, 3)
+                    # t/x, _, 'y' 
+                    array([[-7.47296, -35, 0.931493],
+                        [-7.43977, -35, 0.931998],
+                        ...
+                """                
+                points = points[:,[0,2]]
+
+            assert np.shape(points)[1] == 2, f"points must be (N, 2) but it instead {np.shape(points)}"
+            
+            # Note .plot(...) seems to allow more options than .addLine(...)
+            # curr_plt = self.ui.main_time_curves_view_widget.addLine(x=curr_data_series_dict['x'], y=curr_data_series_dict['y'])
+            plt = self.ui.main_time_curves_view_widget.plot(points, pen=line_color, name=plot_name) # TODO: is this the slow version of name =?
+            # end for curr_data_series_index in np.arange(num_data_series)
+            self.plots.time_curves[plot_name] = plt # add it to the dictionary.
+
+            # TODO: set line_width?
+            # TODO: scaling like the 3D version?
+            
+            # plt = gl.GLLinePlotItem(pos=points, color=line_color, width=plot_args.setdefault('line_width',0.5), antialias=True)
+            # plt.scale(1.0, 1.0, plot_args.setdefault('z_scaling_factor',1.0)) # Scale the data_values_range to fit within the z_max_value. Shouldn't need to be adjusted so long as data doesn't change.            
+            # # plt.scale(1.0, 1.0, self.data_z_scaling_factor) # Scale the data_values_range to fit within the z_max_value. Shouldn't need to be adjusted so long as data doesn't change.
+            # self.ui.main_gl_widget.addItem(plt)
+            # self.plots.time_curves[plot_name] = plt # add it to the dictionary.
+        return plt
+    
+    
+    @classmethod
+    def add_separate_render_time_curves_plot_item(cls, active_2d_plot):
+        """ Adds a separate independent plot for epoch time rects to the 2D plot above the others:
+        
+        Requires:
+            active_2d_plot.ui.main_graphics_layout_widget <GraphicsLayoutWidget>
+            
+        Returns:
+         new_curves_separate_plot: a PlotItem
+            
+        """
+        main_graphics_layout_widget = active_2d_plot.ui.main_graphics_layout_widget # GraphicsLayoutWidget
+        main_plot_widget = active_2d_plot.plots.main_plot_widget # PlotItem
+        
+        new_curves_separate_plot = main_graphics_layout_widget.addPlot(row=0, col=0, rowspan=1) # PlotItem
+        new_curves_separate_plot.setObjectName('new_curves_separate_plot')
+
+        # Setup axes bounds for the bottom windowed plot:
+        # new_curves_separate_plot.hideAxis('left')
+        new_curves_separate_plot.showAxis('left')
+        new_curves_separate_plot.hideAxis('bottom')
+
+        # setup the new_curves_separate_plot to have a linked X-axis to the other scroll plot:
+        new_curves_separate_plot.setXLink(main_plot_widget) # works to synchronize the main zoomed plot (current window) with the epoch_rect_separate_plot (rectangles plotter)
+        
+        return new_curves_separate_plot
+
         
 # Start Qt event loop unless running in interactive mode.
 # if __name__ == '__main__':
