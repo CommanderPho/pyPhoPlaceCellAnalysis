@@ -242,3 +242,64 @@ class RenderDataseries(SimplePrintable, PrettyPrintable, QtCore.QObject):
 
         return data_series_values_list
 
+
+    ## Helper Update Function
+    def update_data_series_config_items(self, series_inclusion_filter=None, target_key = 'line_width', target_value = 5.0, debug_print=False):
+        """
+        curr_data_series_config_list: active_plot_curve_datasource.data_series_specs.data_series_config_list.copy()
+        series_inclusion_filter: Callable
+        target_series_name: 'x position' # a filter for which dataseries to include in the update
+        target_key: 'line_width' # the specific key to be updated to the target_value
+        target_value: 5.0
+        
+        Example:
+            # Updates the 'line_width' property of all series' named 'x position' or 'y position'
+            curr_data_series_config_list, updated_values_count = update_data_series_config_items(active_plot_curve_datasource.data_series_specs.data_series_config_list.copy(),
+                                            series_inclusion_filter=lambda a_data_series_config: (a_data_series_config['name'] in ['x position', 'y position']),
+                                            target_key='line_width', target_value=9.0)
+
+        """
+        if self.direct_spatial_data_series_list is not None:
+            curr_data_series_config_list = self.direct_spatial_data_series_list
+        else:
+            curr_data_series_config_list = self.data_series_pre_spatial_list
+        
+        if series_inclusion_filter is None:
+            series_inclusion_filter = lambda a_data_series_config: True # include all if no filter specified
+
+        curr_data_series_config_list, updated_values_count = RenderDataseries.perform_update_data_series_config_items(curr_data_series_config_list, series_inclusion_filter, target_key=target_key, target_value=target_value, debug_print=debug_print)
+        # apply the changes locally just to be safe:
+        if self.direct_spatial_data_series_list is not None:
+            self.direct_spatial_data_series_list = curr_data_series_config_list
+        else:
+            self.data_series_pre_spatial_list = curr_data_series_config_list
+        
+        return curr_data_series_config_list, updated_values_count
+
+        
+        
+    @classmethod
+    def perform_update_data_series_config_items(cls, curr_data_series_config_list, series_inclusion_filter, target_key = 'line_width', target_value = 5.0, debug_print=False):
+        """
+        curr_data_series_config_list: active_plot_curve_datasource.data_series_specs.data_series_config_list.copy()
+        series_inclusion_filter: Callable
+        target_series_name: 'x position' # a filter for which dataseries to include in the update
+        target_key: 'line_width' # the specific key to be updated to the target_value
+        target_value: 5.0
+        
+        Example:
+            # Updates the 'line_width' property of all series' named 'x position' or 'y position'
+            curr_data_series_config_list, updated_values_count = RenderDataseries.perform_update_data_series_config_items(active_plot_curve_datasource.data_series_specs.data_series_config_list.copy(),
+                                            series_inclusion_filter=lambda a_data_series_config: (a_data_series_config['name'] in ['x position', 'y position']),
+                                            target_key='line_width', target_value=9.0)
+
+        """
+        updated_values_count = 0
+        for a_data_series_config in curr_data_series_config_list:
+            # a_data_series_config is a dict object
+            if series_inclusion_filter(a_data_series_config):
+                a_data_series_config[target_key] = target_value # update that value 
+                updated_values_count = updated_values_count + 1
+        if debug_print:
+            print(f'updated_values_count: {updated_values_count}')
+        return curr_data_series_config_list, updated_values_count
