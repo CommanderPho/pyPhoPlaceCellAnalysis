@@ -142,9 +142,14 @@ class EpochRenderingMixin:
             returned_rect_items: a dictionary of tuples containing the newly created rect items and the plots they were added to.
             
             
-        Usage:
+        Example:
             active_pbe_interval_rects_item = Render2DEventRectanglesHelper.build_IntervalRectsItem_from_interval_datasource(interval_datasources.PBEs)
             
+        Usages:
+            Used in the EpochRenderingMixin Convencince methods in Spike2DRaster:
+                .add_laps_intervals(...)
+                .add_PBEs_intervals(...)
+        
         """
         assert isinstance(interval_datasource, IntervalsDatasource), f"interval_datasource: must be an IntervalsDatasource object but instead is of type: {type(interval_datasource)}"
         if child_plots is None:
@@ -370,7 +375,8 @@ class EpochRenderingMixin:
             adjustment_needed: a float representing the difference of adjustment after adjusting or NONE if no changes needed
             
         Usage:
-            compute_bounds_adjustment_for_rect_item(a_plot,
+            Called in add_rendered_intervals(...) above, but not sure if it's working or helping.
+            The rects that do work are the BurstIntervals which rely on *.y_fragile_linear_neuron_IDX_map instead.
         """
         adjustment_needed = None
         curr_x_min, curr_x_max, curr_y_min, curr_y_max = cls.get_plot_view_range(a_plot, debug_print=False) # curr_x_min: 22.30206346133491, curr_x_max: 1739.1355703625595, curr_y_min: 0.5, curr_y_max: 39.5        
@@ -392,7 +398,9 @@ class EpochRenderingMixin:
             curr_rect.top() # 43.0
             curr_rect.bottom() # 45.0 (why is bottom() greater than top()?
             # curr_rect.y()
- 
+            
+         Usage:
+            Only known to be used by .compute_bounds_adjustment_for_rect_item(...) above
         """
         curr_rect = a_rect_item.boundingRect() # PyQt5.QtCore.QRectF(29.0, 43.0, 1683.0, 2.0)
         # new_min_y_range = min(curr_rect.top(), curr_rect.bottom()) # TODO: allow adjusting to items below the axis as well (by looking at minimums)
@@ -413,6 +421,9 @@ class EpochRenderingMixin:
             (curr_x_min, curr_x_max, curr_y_min, curr_y_max)
 
         Usage:
+            Only known to be used by .compute_bounds_adjustment_for_rect_item(...) above
+            
+        Examples:
             curr_x_min, curr_x_max, curr_y_min, curr_y_max = get_plot_view_range(main_plot_widget, debug_print=True)
             curr_x_min, curr_x_max, curr_y_min, curr_y_max = get_plot_view_range(background_static_scroll_plot_widget, debug_print=True)
         """

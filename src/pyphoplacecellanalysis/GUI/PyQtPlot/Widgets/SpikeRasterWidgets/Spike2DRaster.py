@@ -94,9 +94,13 @@ class Spike2DRaster(EpochRenderingMixin, Render2DScrollWindowPlotMixin, SpikeRas
         
         if self.enable_show_on_init:
             self.show()
+            
+        # NOTE: It looks like this didn't work when called before self.show(), but worked when called from the Notebook. Might just be a timeing thing.
+        ## Make sure to set the initial linear scroll region size/location to something reasonable and not cut-off so the user can adjust it:
+        self._fix_initial_linearRegionLocation() # Implemented in Render2DScrollWindowPlotMixin, since it's the one that creates the Scrollwindow anyways
         
 
-
+    
     def setup(self):
         # self.setup_spike_rendering_mixin() # NeuronIdentityAccessingMixin
         # self.app = pg.mkQApp("Spike2DRaster")
@@ -137,18 +141,11 @@ class Spike2DRaster(EpochRenderingMixin, Render2DScrollWindowPlotMixin, SpikeRas
             print('Spike2DRaster.setup(): adding "visualization_raster_y_location" column to spikes_df...')
             # all_y = [y[i] for i, a_cell_id in enumerate(curr_spikes_df['fragile_linear_neuron_IDX'].to_numpy())]
             all_y = [self.y_fragile_linear_neuron_IDX_map[a_cell_IDX] for a_cell_IDX in self.spikes_df['fragile_linear_neuron_IDX'].to_numpy()]
-            self.spikes_df['visualization_raster_y_location'] = all_y # adds as a column to the dataframe. Only needs to be updated when the number of active units changes
+            self.spikes_df['visualization_raster_y_location'] = all_y # adds as a column to the dataframe. Only needs to be updated when the number of active units changes. BUG? NO, RESOLVED: actually, this should be updated when anything that would change .y_fragile_linear_neuron_IDX_map would change, right? Meaning: .y, ... oh, I see. self.y doesn't change because self.params.center_mode, self.params.bin_position_mode, and self.params.side_bin_margins aren't expected to change. 
             print('done.')
             
         self.EpochRenderingMixin_on_setup()
         # self.spikes_df
-        
-        
-
-    
-
-    
-        
     
     def _build_cell_configs(self):
         """ Adds the neuron/cell configurations that are used to color and format the scatterplot spikes and such. 
@@ -156,6 +153,12 @@ class Spike2DRaster(EpochRenderingMixin, Render2DScrollWindowPlotMixin, SpikeRas
             self.lower_y = DataSeriesToSpatial.build_series_identity_axis(self.n_cells, center_mode=self.params.center_mode, bin_position_mode='left_edges', side_bin_margins = self.params.side_bin_margins) / self.n_cells
             self.upper_y = DataSeriesToSpatial.build_series_identity_axis(self.n_cells, center_mode=self.params.center_mode, bin_position_mode='right_edges', side_bin_margins = self.params.side_bin_margins) / self.n_cells
         
+        NOTE: on self.y vs (self.lower_y, self.upper_y): two ndarrays of the same length as self.y but they each express the start/end edges of each series as a ratio of the total.
+            this means for example: 
+                y:       [0.5, 1.5, 2.5, ..., 65.5, 66.5, 67.5]
+                lower_y: [0.0, 0.0147059, 0.0294118, ..., 0.955882, 0.970588, 0.985294]
+                upper_y: [0.0147059, 0.0294118, 0.0441176, ..., 0.970588, 0.985294, 1.0]
+
         Adds:
             self.params.config_items: list
             self.config_fragile_linear_neuron_IDX_map: dict<self.fragile_linear_neuron_IDXs, self.params.config_items>
@@ -164,10 +167,8 @@ class Spike2DRaster(EpochRenderingMixin, Render2DScrollWindowPlotMixin, SpikeRas
             From self._buildGraphics()
         """
         # self._build_neuron_id_graphics(self.ui.main_gl_widget, self.y)
-        # self.params.config_items = [] # Old list version:
         self.params.config_items = IndexedOrderedDict()
         curr_neuron_ids_list = self.find_cell_ids_from_neuron_IDXs(self.fragile_linear_neuron_IDXs)
-        # self.config_neuron_id_map = {}
         
         for i, fragile_linear_neuron_IDX in enumerate(self.fragile_linear_neuron_IDXs):
             curr_neuron_id = curr_neuron_ids_list[i] # aclu value
@@ -178,9 +179,6 @@ class Spike2DRaster(EpochRenderingMixin, Render2DScrollWindowPlotMixin, SpikeRas
             curr_config_item = (i, fragile_linear_neuron_IDX, curr_pen, self.lower_y[i], self.upper_y[i])
             self.params.config_items[curr_neuron_id] = curr_config_item # add the current config item to the config items 
             
-            # self.params.config_items.append(curr_config_item) # Old list version:
-            # append to aclu (neuron_id) to config map:
-            # self.config_neuron_id_map[curr_neuron_id] = curr_config_item
     
         self.config_fragile_linear_neuron_IDX_map = dict(zip(self.fragile_linear_neuron_IDXs, self.params.config_items.values()))
         
@@ -243,7 +241,7 @@ class Spike2DRaster(EpochRenderingMixin, Render2DScrollWindowPlotMixin, SpikeRas
             # self.plots.main_plot_widget.disableAutoRange()
             self._update_plot_ranges()
             
-            ## TODO: what plot is this actually?
+            ## This scatter plot is the dynamic raster that "zooms" on adjustment of the lienar slider region. It is NOT static background raster that's rendered at the bottom of the window!
             self.plots.scatter_plot = pg.ScatterPlotItem(name='spikeRasterScatterPlotItem', pxMode=True, symbol=vtick, size=10, pen={'color': 'w', 'width': 2})
             self.plots.scatter_plot.setObjectName('scatter_plot')
             self.plots.scatter_plot.opts['useCache'] = True
@@ -287,7 +285,29 @@ class Spike2DRaster(EpochRenderingMixin, Render2DScrollWindowPlotMixin, SpikeRas
         # self.plots.main_plot_widget.disableAutoRange()
         if self.Includes2DActiveWindowScatter:
             self.plots.main_plot_widget.disableAutoRange('xy')
-            self.plots.main_plot_widget.setRange(xRange=[0.0, +self.temporal_axis_length], yRange=[self.y[0], self.y[-1]])
+            ## TODO: BUG: CONFIRMED: This is for-sure a problem. In the ._buildScrollRasterPreviewWindowGraphics(...) where the linear region widget (scroll_window_region) is built, those x-values are definintely timestamps and start slightly negative. This is why the widget is getting cut-off
+            """ From the first setup:
+                # Setup range for plot:
+                earliest_t, latest_t = self.spikes_window.total_df_start_end_times
+                background_static_scroll_window_plot.setXRange(earliest_t, latest_t, padding=0)
+                background_static_scroll_window_plot.setYRange(np.nanmin(curr_spike_y), np.nanmax(curr_spike_y), padding=0)
+
+            Here it looks like I'm trying to use some sort of reletive x-coordinates (as I noted that I did in self.lower_y, self.upper_y?)
+            
+            OOPS, back-up, this is the main_plot_widget (that should be displaying the contents of the window above), not the same as the static background plot that displays all time.
+            """
+                    
+            # # Get updated time window
+            # updated_time_window = self.spikes_window.active_time_window # (30.0, 930.0) ## CHECKL this might actually be invalid at this timepoint, idk
+            # earliest_t, latest_t = updated_time_window
+            # resolved_start_x = np.nanmin(earliest_t, 0.0)
+            # print(f'resolved_start_x: {resolved_start_x}')
+            # resolved_end_x = (resolved_start_x+self.temporal_axis_length) # only let it go to the start_x + its appropriate length, otherwise it'll be too long?? Maybe I should actually use the window's end
+            # print(f'resolved_end_x: {resolved_end_x}')
+            # self.plots.main_plot_widget.setRange(xRange=[resolved_start_x, resolved_end_x], yRange=[self.y[0], self.y[-1]])
+            # ## NOW I THINK THIS IS JUST THE ZOOMED PLOT AND NOT THE REASON THE LINEAR SCROLL REGION is cut off
+                        
+            self.plots.main_plot_widget.setRange(xRange=[0.0, +self.temporal_axis_length], yRange=[self.y[0], self.y[-1]]) # After all this, I've concluded that it was indeed correct!
             _v_axis_item = Render2DNeuronIdentityLinesMixin.setup_custom_neuron_identity_axis(self.plots.main_plot_widget, self.n_cells)
     
     
@@ -314,8 +334,6 @@ class Spike2DRaster(EpochRenderingMixin, Render2DScrollWindowPlotMixin, SpikeRas
         # build the position range for each unit along the y-axis:
         self.y = DataSeriesToSpatial.build_series_identity_axis(self.n_cells, center_mode=self.params.center_mode, bin_position_mode=self.params.bin_position_mode, side_bin_margins = self.params.side_bin_margins)
         
-        # Get updated time window
-        updated_time_window = self.spikes_window.active_time_window # (30.0, 930.0)
         # update the current scroll region:
         # self.ui.scroll_window_region.setRegion(updated_time_window)
         

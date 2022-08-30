@@ -34,6 +34,10 @@ class CustomLinearRegionItem(LinearRegionItem):
     
     By default both left and middle clicks can drag the area, but **only right-clicks can resize the region** (by dragging one of the two lines).
     
+    
+    TODO:
+        - [ ] I'd like to add a "minimum-width" property that prevents the user from resizing the window to a sliver so small that they're no longer able to grab it. Instead even if they were resizing once the window reaches its minumum width it stops resizing and starts sliding/translating instead.
+            - I suppose this would alter the `swapMode` property too: maybe "push" already nearly does what I want this feature to do?
     """
     
 
@@ -137,13 +141,7 @@ class CustomLinearRegionItem(LinearRegionItem):
         
         # note LinearRegionItem.Horizontal and LinearRegionItem.Vertical
         # are kept for backward compatibility.
-        lineKwds = dict(
-            movable=movable,
-            bounds=bounds,
-            span=span,
-            pen=pen,
-            hoverPen=hoverPen,
-        )
+        lineKwds = dict(movable=movable, bounds=bounds, span=span, pen=pen, hoverPen=hoverPen)
         
         ## Add the custom mouse event criteria as arguments to the CustomInfiniteLine's
         lineKwds['custom_mouse_drag_criteria_fn'] = endLinesMouseInteractionCriteria.drag

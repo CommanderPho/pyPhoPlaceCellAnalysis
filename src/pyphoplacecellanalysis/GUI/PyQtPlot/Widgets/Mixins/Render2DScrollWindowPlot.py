@@ -114,6 +114,30 @@ class Render2DScrollWindowPlotMixin:
         
         return background_static_scroll_window_plot
 
+    
+    def _fix_initial_linearRegionLocation(self, debug_print=False):
+        """ Hopefully finally resolves the issue where the linear scroll region window was always cut-off initially. 
+        Note that when this is called, self.temporal_axis_length and self.spikes_window.window_duration were both observed to be 0.0, which is why they couldn't be used.
+        """
+        confirmed_valid_window_start_t = self.spikes_window.total_data_start_time
+        if (self.spikes_window.window_duration == 0.0):
+            # invalid window length, just choose something reasonable the user can grab, say 5% of the total window data
+            total_data_duration = self.spikes_window.total_data_end_time - self.spikes_window.total_data_start_time
+            reasonable_active_window_duration = float(total_data_duration) * 0.05 # 5%
+            ## UGHH, it works but please note that the final window is actually going to be MORE than 5% of the total data duration because of the temporal_zoom_factor > 1.0. 
+        else:
+            reasonable_active_window_duration = float(self.spikes_window.window_duration)
+            
+        # Compute the final reasonable window end_t:
+        confirmed_valid_window_end_t = confirmed_valid_window_start_t + reasonable_active_window_duration
+        if debug_print:
+            print(f'_fix_initial_linearRegionLocation():')
+            print(f'\tconfirmed_valid_window: (start_t: {confirmed_valid_window_start_t}, end_t: {confirmed_valid_window_end_t})')
+        ## THIS SHOULD FIX THE INITIAL SCROLLWINDOW ISSUE, preventing it from being outside the window it's rendered on top of, unless the active window is set wrong.
+        # self.update_scroll_window_region(confirmed_valid_window_start_t, confirmed_valid_window_end_t, block_signals=False)
+        self.Render2DScrollWindowPlot_on_window_update(confirmed_valid_window_start_t, confirmed_valid_window_end_t)
+        
+
 
     @QtCore.pyqtSlot()
     def _Render2DScrollWindowPlot_on_linear_region_item_update(self) -> None:
@@ -146,5 +170,6 @@ class Render2DScrollWindowPlotMixin:
         """ called to perform updates when the active window changes. Redraw, recompute data, etc. """
         # Make sure that the scroller isn't too tiny to grab.
         self.ui.scroll_window_region.setRegion([new_start, new_end]) # adjust scroll control
+    
     
     
