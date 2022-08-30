@@ -480,13 +480,21 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
     """
     
     #####################################################
-    
+    def clear_all_3D_time_curves(self):
+        for (aUID, plt) in self.plots.time_curves.items():
+            self.ui.main_time_curves_view_widget.removeItem(plt) # this should automatically work for 2D curves as well
+            # plt.delete_later() #?
+        # Clear the dict
+        self.plots.time_curves.clear()
+        ## This part might be 3D only, but we do have a working 2D version so maybe just bring that in?
+        self.remove_3D_time_curves_baseline_grid_mesh() # from Render3DTimeCurvesBaseGridMixin
+        
+        
     def _build_or_update_plot(self, plot_name, points, **kwargs):
         """ 
         uses or builds a new self.ui.main_time_curves_view_widget, which the item is added to
         
         """
-        
         if self.ui.main_time_curves_view_widget is None:
             # needs to build the primary 2D time curves plotItem:
             print(f'Spike2DRaster created a new self.ui.main_time_curves_view_widget for TimeCurvesViewMixin plots!')
@@ -569,6 +577,29 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
         return new_curves_separate_plot
 
         
+        
+    # Overrides for Render3DTimeCurvesBaseGridMixin, since this 2D class can't draw a 3D background grid _________________ #
+    def init_3D_time_curves_baseline_grid_mesh(self):
+        self.params.setdefault('time_curves_enable_baseline_grid', False) # this is False for this class (until it's implemented at least)
+        self.params.setdefault('time_curves_baseline_grid_color', 'White')
+        self.params.setdefault('time_curves_baseline_grid_alpha', 0.5)
+        # BaseGrid3DTimeCurvesHelper.init_3D_time_curves_baseline_grid_mesh(self)
+        pass
+
+    def add_3D_time_curves_baseline_grid_mesh(self):
+        # TODO: needs to be updated on .on_adjust_temporal_spatial_mapping(...)
+        # return BaseGrid3DTimeCurvesHelper.add_3D_time_curves_baseline_grid_mesh(self)
+        return False
+
+    def update_3D_time_curves_baseline_grid_mesh(self):
+        # BaseGrid3DTimeCurvesHelper.update_3D_time_curves_baseline_grid_mesh(self)
+        pass
+
+    def remove_3D_time_curves_baseline_grid_mesh(self):
+        return False # nothing to remove
+        # return BaseGrid3DTimeCurvesHelper.remove_3D_time_curves_baseline_grid_mesh(self)
+    
+    
 # Start Qt event loop unless running in interactive mode.
 # if __name__ == '__main__':
 #     # v = Visualizer()
