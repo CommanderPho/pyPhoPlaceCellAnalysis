@@ -88,9 +88,8 @@ class Specific2DRenderTimeEpochsHelper:
     
     @classmethod
     def build_PBEs_2D_render_time_epochs(cls, curr_sess, **kwargs):
-        """ builds the animal position 3D Curves and adds them to the spike_raster_plot
-        Usage:
-            active_plot_curve_datasource = Specific3DTimeCurvesHelper.build_position_3D_time_curves(curr_sess, spike_raster_plt_3d)
+        """ builds the animal PBE Rects and adds them to the spike_raster_plot
+        
         """
         # active_PBEs_obj = curr_sess.pbe # <Epoch> object
         # pbe_interval_rects_formatter = cls.build_PBEs_formatter_datasource()
