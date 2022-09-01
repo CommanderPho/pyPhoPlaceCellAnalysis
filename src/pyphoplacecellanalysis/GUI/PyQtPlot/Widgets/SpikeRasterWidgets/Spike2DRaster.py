@@ -563,7 +563,8 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
         main_graphics_layout_widget = active_2d_plot.ui.main_graphics_layout_widget # GraphicsLayoutWidget
         main_plot_widget = active_2d_plot.plots.main_plot_widget # PlotItem
         
-        new_curves_separate_plot = main_graphics_layout_widget.addPlot(row=0, col=0, rowspan=1) # PlotItem
+        # row=0 adds above extant plot
+        new_curves_separate_plot = main_graphics_layout_widget.addPlot(row=2, col=0, rowspan=1) # PlotItem
         new_curves_separate_plot.setObjectName('new_curves_separate_plot')
 
         # Setup axes bounds for the bottom windowed plot:
