@@ -110,7 +110,12 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
         ## Make sure to set the initial linear scroll region size/location to something reasonable and not cut-off so the user can adjust it:
         self._fix_initial_linearRegionLocation() # Implemented in Render2DScrollWindowPlotMixin, since it's the one that creates the Scrollwindow anyways
         
-
+        ## Starts the delayed_gui_itemer which will run after 1-second to update the GUI:
+        self._delayed_gui_timer = QtCore.QTimer(self)
+        self._delayed_gui_timer.timeout.connect(self._run_delayed_gui_load_code)
+        #Set the interval and start the timer.
+        self._delayed_gui_timer.start(1000)
+        
     
     def setup(self):
         # self.setup_spike_rendering_mixin() # NeuronIdentityAccessingMixin
@@ -287,6 +292,14 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
         self.ui.main_time_curves_view_widget = None
     
         
+    def _run_delayed_gui_load_code(self):
+        """ called when the self._delayed_gui_timer QTimer fires. """
+        #Stop the timer.
+        self._delayed_gui_timer.stop()
+        print(f'_run_delayed_gui_load_code() called!')
+        ## Make sure to set the initial linear scroll region size/location to something reasonable and not cut-off so the user can adjust it:
+        self._fix_initial_linearRegionLocation() # Implemented in Render2DScrollWindowPlotMixin, since it's the one that creates the Scrollwindow anyways
+
         
     ###################################
     #### EVENT HANDLERS
@@ -491,7 +504,7 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
         
         
     def _build_or_update_plot(self, plot_name, points, **kwargs):
-        """ 
+        """ For 3D
         uses or builds a new self.ui.main_time_curves_view_widget, which the item is added to
         
         """
@@ -516,8 +529,6 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
                 # if no explicit color value is provided, build a new color from the 'color_name' key, or if that's missing just use white.
                 line_color = pg.mkColor(plot_args.setdefault('color_name', 'white'))
                 line_color.setAlphaF(0.8)
-                
-            
             
             if np.shape(points)[1] == 3:
                 # same data from 3D version, drop the y-value accordingly:
