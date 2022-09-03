@@ -231,7 +231,8 @@ class PyQtGraphSpecificTimeCurvesMixin(TimeCurvesViewMixin):
         else:
             # Common to both:
             # Get current plot items:
-            curr_plot3D_active_window_data = self.params.time_curves_datasource.get_updated_data_window(self.spikes_window.active_window_start_time, self.spikes_window.active_window_end_time) # get updated data for the active window from the datasource
+            curr_plot3D_active_window_data = self.params.time_curves_datasource.get_updated_data_window(self.spikes_window.active_window_start_time, self.spikes_window.active_window_end_time) # get updated data for the active window from the datasource # if we want the data from the whole time, we aren't getting that here unfortunately
+            
             is_data_series_mode = self.params.time_curves_datasource.has_data_series_specs
             if is_data_series_mode:
                 data_series_spaital_values_list = self.params.time_curves_datasource.data_series_specs.get_data_series_spatial_values(curr_plot3D_active_window_data)

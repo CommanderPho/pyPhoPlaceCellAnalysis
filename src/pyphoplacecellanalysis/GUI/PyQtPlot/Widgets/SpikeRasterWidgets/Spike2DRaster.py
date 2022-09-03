@@ -232,11 +232,13 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
         self._build_cell_configs()   
         
         # Custom 2D raster plot:
+        self.params.main_graphics_plot_widget_rowspan = 3 # how many rows the main graphics PlotItems should span
+        
         curr_plot_row = 1
         if self.Includes2DActiveWindowScatter:
-            self.plots.main_plot_widget = self.ui.main_graphics_layout_widget.addPlot(row=curr_plot_row, col=0, rowspan=3, colspan=1) # , name='main_plot_widget'
+            self.plots.main_plot_widget = self.ui.main_graphics_layout_widget.addPlot(row=curr_plot_row, col=0, rowspan=self.params.main_graphics_plot_widget_rowspan, colspan=1) # , name='main_plot_widget'
             self.plots.main_plot_widget.setObjectName('main_plot_widget') # this seems necissary, the 'name' parameter in addPlot(...) seems to only change some internal property related to the legend AND drastically slows down the plotting
-            curr_plot_row += 1
+            curr_plot_row += (1 * self.params.main_graphics_plot_widget_rowspan)
             # self.ui.plots = [] # create an empty array for each plot, of which there will be one for each unit.
             # # build the position range for each unit along the y-axis:
             
@@ -270,7 +272,7 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
 
         
         # From Render2DScrollWindowPlotMixin:
-        self.plots.background_static_scroll_window_plot = self.ui.main_graphics_layout_widget.addPlot(row=curr_plot_row, col=0, rowspan=3, colspan=1) # , name='background_static_scroll_window_plot'  curr_plot_row: 2 if  self.Includes2DActiveWindowScatter
+        self.plots.background_static_scroll_window_plot = self.ui.main_graphics_layout_widget.addPlot(row=curr_plot_row, col=0, rowspan=self.params.main_graphics_plot_widget_rowspan, colspan=1) # , name='background_static_scroll_window_plot'  curr_plot_row: 2 if  self.Includes2DActiveWindowScatter
         self.plots.background_static_scroll_window_plot.setObjectName('background_static_scroll_window_plot') # this seems necissary, the 'name' parameter in addPlot(...) seems to only change some internal property related to the legend  AND drastically slows down the plotting
 
         # print(f'main_plot_widget.objectName(): {main_plot_widget.objectName()}')
@@ -337,6 +339,10 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
             self.plots.main_plot_widget.setRange(xRange=[0.0, +self.temporal_axis_length], yRange=[self.y[0], self.y[-1]]) # After all this, I've concluded that it was indeed correct!
             _v_axis_item = Render2DNeuronIdentityLinesMixin.setup_custom_neuron_identity_axis(self.plots.main_plot_widget, self.n_cells)
     
+    
+        # Update 3D Curves if we have them:
+        self.TimeCurvesViewMixin_on_window_update()
+        
     
     @QtCore.pyqtSlot()
     def on_adjust_temporal_spatial_mapping(self):
@@ -512,7 +518,9 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
             # needs to build the primary 2D time curves plotItem:
             print(f'Spike2DRaster created a new self.ui.main_time_curves_view_widget for TimeCurvesViewMixin plots!')
             # row=0 adds above extant plot
-            self.ui.main_time_curves_view_widget = self.create_separate_render_plot_item(row=2, col=0, rowspan=1, colspan=1, name='new_curves_separate_plot') # PlotItem
+            
+            row_index = (self.params.main_graphics_plot_widget_rowspan * 2)+1 # row 2 if they were all rowspan 2
+            self.ui.main_time_curves_view_widget = self.create_separate_render_plot_item(row=row_index, col=0, rowspan=1, colspan=1, name='new_curves_separate_plot') # PlotItem
         
         
         # build the plot arguments (color, line thickness, etc)        
