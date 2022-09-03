@@ -42,8 +42,8 @@ class Render2DScrollWindowPlotMixin:
     
     
     
-    # def _buildScrollRasterPreviewWindowGraphics(self, graphics_layout_widget: pg.GraphicsLayoutWidget=None, layout_row=0, layout_col=0):
-    def _buildScrollRasterPreviewWindowGraphics(self, background_static_scroll_window_plot):
+    # def ScrollRasterPreviewWindow_on_BuildUI(self, graphics_layout_widget: pg.GraphicsLayoutWidget=None, layout_row=0, layout_col=0):
+    def ScrollRasterPreviewWindow_on_BuildUI(self, background_static_scroll_window_plot):
         """ Note that this doesn't need to update because the background is static (it shows all time) 
         
         Inputs:
@@ -63,7 +63,7 @@ class Render2DScrollWindowPlotMixin:
         
         Usage:
             self.plots.background_static_scroll_window_plot = self.ui.main_graphics_layout_widget.addPlot(row=2, col=0)
-            self.plots.background_static_scroll_window_plot = self._buildScrollRasterPreviewWindowGraphics(self.plots.background_static_scroll_window_plot)
+            self.plots.background_static_scroll_window_plot = self.ScrollRasterPreviewWindow_on_BuildUI(self.plots.background_static_scroll_window_plot)
         
         
         """

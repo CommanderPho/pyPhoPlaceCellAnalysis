@@ -275,9 +275,9 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
 
         # print(f'main_plot_widget.objectName(): {main_plot_widget.objectName()}')
 
-        self.plots.background_static_scroll_window_plot = self._buildScrollRasterPreviewWindowGraphics(self.plots.background_static_scroll_window_plot)
+        self.plots.background_static_scroll_window_plot = self.ScrollRasterPreviewWindow_on_BuildUI(self.plots.background_static_scroll_window_plot)
 
-        # self._buildScrollRasterPreviewWindowGraphics()
+        # self.ScrollRasterPreviewWindow_on_BuildUI()
         if self.Includes2DActiveWindowScatter:
             self.plots.scatter_plot.addPoints(self.plots_data.all_spots)
     
@@ -312,7 +312,7 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
         # self.plots.main_plot_widget.disableAutoRange()
         if self.Includes2DActiveWindowScatter:
             self.plots.main_plot_widget.disableAutoRange('xy')
-            ## TODO: BUG: CONFIRMED: This is for-sure a problem. In the ._buildScrollRasterPreviewWindowGraphics(...) where the linear region widget (scroll_window_region) is built, those x-values are definintely timestamps and start slightly negative. This is why the widget is getting cut-off
+            ## TODO: BUG: CONFIRMED: This is for-sure a problem. In the .ScrollRasterPreviewWindow_on_BuildUI(...) where the linear region widget (scroll_window_region) is built, those x-values are definintely timestamps and start slightly negative. This is why the widget is getting cut-off
             """ From the first setup:
                 # Setup range for plot:
                 earliest_t, latest_t = self.spikes_window.total_df_start_end_times
