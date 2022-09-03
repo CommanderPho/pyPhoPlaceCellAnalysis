@@ -234,7 +234,7 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
         # Custom 2D raster plot:
         curr_plot_row = 1
         if self.Includes2DActiveWindowScatter:
-            self.plots.main_plot_widget = self.ui.main_graphics_layout_widget.addPlot(row=curr_plot_row, col=0) # , name='main_plot_widget'
+            self.plots.main_plot_widget = self.ui.main_graphics_layout_widget.addPlot(row=curr_plot_row, col=0, rowspan=3, colspan=1) # , name='main_plot_widget'
             self.plots.main_plot_widget.setObjectName('main_plot_widget') # this seems necissary, the 'name' parameter in addPlot(...) seems to only change some internal property related to the legend AND drastically slows down the plotting
             curr_plot_row += 1
             # self.ui.plots = [] # create an empty array for each plot, of which there will be one for each unit.
@@ -270,7 +270,7 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
 
         
         # From Render2DScrollWindowPlotMixin:
-        self.plots.background_static_scroll_window_plot = self.ui.main_graphics_layout_widget.addPlot(row=curr_plot_row, col=0) # , name='background_static_scroll_window_plot'  curr_plot_row: 2 if  self.Includes2DActiveWindowScatter
+        self.plots.background_static_scroll_window_plot = self.ui.main_graphics_layout_widget.addPlot(row=curr_plot_row, col=0, rowspan=3, colspan=1) # , name='background_static_scroll_window_plot'  curr_plot_row: 2 if  self.Includes2DActiveWindowScatter
         self.plots.background_static_scroll_window_plot.setObjectName('background_static_scroll_window_plot') # this seems necissary, the 'name' parameter in addPlot(...) seems to only change some internal property related to the legend  AND drastically slows down the plotting
 
         # print(f'main_plot_widget.objectName(): {main_plot_widget.objectName()}')
@@ -366,7 +366,7 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
         
 
     @QtCore.pyqtSlot(object)
-    def update_zoomed_plot_rate_limited(self, evt):        
+    def update_zoomed_plot_rate_limited(self, evt):
         min_t, max_t = evt ## using signal proxy turns original arguments into a tuple
         self.update_zoomed_plot(min_t, max_t)
 
@@ -511,7 +511,8 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
         if self.ui.main_time_curves_view_widget is None:
             # needs to build the primary 2D time curves plotItem:
             print(f'Spike2DRaster created a new self.ui.main_time_curves_view_widget for TimeCurvesViewMixin plots!')
-            self.ui.main_time_curves_view_widget = Spike2DRaster.add_separate_render_time_curves_plot_item(self) # PlotItem
+            # row=0 adds above extant plot
+            self.ui.main_time_curves_view_widget = self.create_separate_render_plot_item(row=2, col=0, rowspan=1, colspan=1, name='new_curves_separate_plot') # PlotItem
         
         
         # build the plot arguments (color, line thickness, etc)        
@@ -560,8 +561,7 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
         return plt
     
     
-    @classmethod
-    def add_separate_render_time_curves_plot_item(cls, active_2d_plot):
+    def create_separate_render_plot_item(self, row=2, col=0, rowspan=1, colspan=1, name='new_curves_separate_plot'):
         """ Adds a separate independent plot for epoch time rects to the 2D plot above the others:
         
         Requires:
@@ -571,20 +571,18 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
          new_curves_separate_plot: a PlotItem
             
         """
-        main_graphics_layout_widget = active_2d_plot.ui.main_graphics_layout_widget # GraphicsLayoutWidget
-        main_plot_widget = active_2d_plot.plots.main_plot_widget # PlotItem
-        
-        # row=0 adds above extant plot
-        new_curves_separate_plot = main_graphics_layout_widget.addPlot(row=2, col=0, rowspan=1) # PlotItem
-        new_curves_separate_plot.setObjectName('new_curves_separate_plot')
+        main_graphics_layout_widget = self.ui.main_graphics_layout_widget # GraphicsLayoutWidget
+        new_curves_separate_plot = main_graphics_layout_widget.addPlot(row=row, col=col, rowspan=rowspan, colspan=colspan) # PlotItem
+        new_curves_separate_plot.setObjectName(name)
 
         # Setup axes bounds for the bottom windowed plot:
         # new_curves_separate_plot.hideAxis('left')
         new_curves_separate_plot.showAxis('left')
         new_curves_separate_plot.hideAxis('bottom')
 
-        # setup the new_curves_separate_plot to have a linked X-axis to the other scroll plot:
-        new_curves_separate_plot.setXLink(main_plot_widget) # works to synchronize the main zoomed plot (current window) with the epoch_rect_separate_plot (rectangles plotter)
+        # # setup the new_curves_separate_plot to have a linked X-axis to the other scroll plot:
+        # main_plot_widget = self.plots.main_plot_widget # PlotItem
+        # new_curves_separate_plot.setXLink(main_plot_widget) # works to synchronize the main zoomed plot (current window) with the epoch_rect_separate_plot (rectangles plotter)
         
         return new_curves_separate_plot
 
