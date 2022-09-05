@@ -664,11 +664,12 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
         # Setup axes bounds for the bottom windowed plot:
         # new_curves_separate_plot.hideAxis('left')
         new_curves_separate_plot.showAxis('left')
-        new_curves_separate_plot.hideAxis('bottom')
+        # new_curves_separate_plot.hideAxis('bottom')
+        new_curves_separate_plot.showAxis('bottom')
 
         # # setup the new_curves_separate_plot to have a linked X-axis to the other scroll plot:
-        # main_plot_widget = self.plots.main_plot_widget # PlotItem
-        # new_curves_separate_plot.setXLink(main_plot_widget) # works to synchronize the main zoomed plot (current window) with the epoch_rect_separate_plot (rectangles plotter)
+        main_plot_widget = self.plots.main_plot_widget # PlotItem
+        new_curves_separate_plot.setXLink(main_plot_widget) # works to synchronize the main zoomed plot (current window) with the epoch_rect_separate_plot (rectangles plotter)
         
         return new_curves_separate_plot
 
