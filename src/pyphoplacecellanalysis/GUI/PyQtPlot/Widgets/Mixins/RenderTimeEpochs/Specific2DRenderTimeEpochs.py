@@ -19,9 +19,7 @@ class General2DRenderTimeEpochs(object):
     """docstring for General2DRenderTimeEpochs."""
     def __init__(self, arg):
         super(General2DRenderTimeEpochs, self).__init__()
-        
-        
-        
+    
     @classmethod
     def build_epochs_dataframe_formatter(debug_print=False, **kwargs):
         def _add_interval_dataframe_visualization_columns_general_epoch(active_df):
@@ -41,17 +39,22 @@ class General2DRenderTimeEpochs(object):
             # pen_color = [pg.mkColor('red'), pg.mkColor('cyan')]
             # brush_color = [pg.mkColor('red'), pg.mkColor('cyan')]
             
-            pen_color = [pg.mkColor('red'), pg.mkColor('cyan')]
-            brush_color = [pg.mkColor('red'), pg.mkColor('cyan')]
-
             ## Add the missing parameters to the dataframe:
             active_df['series_vertical_offset'] = kwargs.setdefault('series_vertical_offset', y_location)
             active_df['series_height'] = kwargs.setdefault('series_height', height)
-            # active_Laps_df['pen'] = kwargs.setdefault('pen', pg.mkPen(pen_color)) 
-            # active_Laps_df['brush'] = kwargs.setdefault('brush', pg.mkBrush(brush_color))  
+
+            if isinstance(pen_color, (list, tuple)):
+                active_df['pen'] = kwargs.setdefault('pen', [pg.mkPen(a_pen_color) for a_pen_color in pen_color])
+            else:
+                # Scalar value assignment:
+                active_df['pen'] = kwargs.setdefault('pen', pg.mkPen(pen_color)) 
+                
+            if isinstance(brush_color, (list, tuple)):
+                active_df['brush'] = kwargs.setdefault('brush', [pg.mkBrush(a_color) for a_color in brush_color])  
+            else:
+                # Scalar value assignment:
+                active_df['brush'] = kwargs.setdefault('brush', pg.mkBrush(brush_color))
             
-            active_df['pen'] = kwargs.setdefault('pen', [pg.mkPen(a_pen_color) for a_pen_color in pen_color]) 
-            active_df['brush'] = kwargs.setdefault('brush', [pg.mkBrush(a_color) for a_color in brush_color])  
 
             return active_df
 
