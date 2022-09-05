@@ -13,7 +13,9 @@ from pyphoplacecellanalysis.General.DataSeriesToSpatial import DataSeriesToSpati
 from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.Mixins.RenderTimeEpochs.EpochRenderingMixin import EpochRenderingMixin, RenderedEpochsItemsContainer
 from pyphoplacecellanalysis.General.Model.Datasources.IntervalDatasource import IntervalsDatasource
 
-from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.Mixins.RenderTimeEpochs.Specific2DRenderTimeEpochs import Specific2DRenderTimeEpochsHelper # Only for the convenince methods that build datasources (laps, PBEs, etc)
+from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.Mixins.RenderTimeEpochs.Specific2DRenderTimeEpochs import General2DRenderTimeEpochs, SessionEpochs2DRenderTimeEpochs, PBE_2DRenderTimeEpochs, Laps2DRenderTimeEpochs # Only for the convenince methods that build datasources (laps, PBEs, etc)
+
+
 
 class RenderTimeEpoch3DMeshesMixin(EpochRenderingMixin):
     """  Extends EpochRenderingMixin for 3D OpenGL Plots such as Spike3DRaster, enabling it to render intervals in an OpenGL view
@@ -534,7 +536,7 @@ class RenderTimeEpoch3DMeshesMixin(EpochRenderingMixin):
             NOTE: sess can be a DataSession, a Laps object, or an Epoch object containing Laps directly.
             active_2d_plot.add_PBEs_intervals(sess)
         """
-        laps_interval_datasource = Specific2DRenderTimeEpochsHelper.build_Laps_render_time_epochs_datasource(curr_sess=sess, series_vertical_offset=(-float(self.n_half_cells)+1.0), series_height = 1.0)
+        laps_interval_datasource = Laps2DRenderTimeEpochs.build_render_time_epochs_datasource(sess.laps.as_epoch_obj(), series_vertical_offset=(-float(self.n_half_cells)+1.0), series_height = 1.0)
         self.add_rendered_intervals(laps_interval_datasource, name='Laps', debug_print=False) # removes the rendered intervals
         
     def remove_laps_intervals(self):
@@ -544,7 +546,7 @@ class RenderTimeEpoch3DMeshesMixin(EpochRenderingMixin):
         """ Convenince method to add the PBE rectangles to the 3D Plots 
             NOTE: sess can be a DataSession, or an Epoch object containing PBEs directly.
         """
-        new_PBEs_interval_datasource = Specific2DRenderTimeEpochsHelper.build_PBEs_render_time_epochs_datasource(curr_sess=sess, series_vertical_offset=(-float(self.n_half_cells)+2.0), series_height = 1.0) # new_PBEs_interval_datasource
+        new_PBEs_interval_datasource = PBE_2DRenderTimeEpochs.build_render_time_epochs_datasource(sess.pbe, series_vertical_offset=(-float(self.n_half_cells)+2.0), series_height = 1.0) # new_PBEs_interval_datasource
         self.add_rendered_intervals(new_PBEs_interval_datasource, name='PBEs', debug_print=False) # adds the rendered intervals
 
     def remove_PBEs_intervals(self):
