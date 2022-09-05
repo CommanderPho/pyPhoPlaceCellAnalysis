@@ -15,6 +15,77 @@ from pyphoplacecellanalysis.General.Model.Datasources.IntervalDatasource import 
 class Specific2DRenderTimeEpochsHelper:
     """ Analagous to Specific3DTimeCurvesHelper """
     
+    ##########################################
+    ## General Epochs
+    @staticmethod
+    def build_general_epochs_dataframe_formatter(debug_print=False, **kwargs):
+        def _add_interval_dataframe_visualization_columns_general_epoch(active_Laps_df):
+            """ Adds the remaining _required_interval_visualization_columns specifically for PBEs
+            """
+            num_intervals = np.shape(active_Laps_df)[0]
+            if debug_print:
+                print(f'num_intervals: {num_intervals}') # num_intervals: 206
+
+    #         ## parameters:
+    #         y_location = 0.0
+    #         height = 1.0
+    #         pen_color = pg.mkColor('red')
+    #         brush_color = pg.mkColor('red')
+
+    #         ## Add the missing parameters to the dataframe:
+    #         active_Laps_df['series_vertical_offset'] = kwargs.setdefault('series_vertical_offset', y_location)
+    #         active_Laps_df['series_height'] = kwargs.setdefault('series_height', height)
+    #         active_Laps_df['pen'] = kwargs.setdefault('pen', pg.mkPen(pen_color)) 
+    #         active_Laps_df['brush'] = kwargs.setdefault('brush', pg.mkBrush(brush_color))  
+            ## parameters:
+            y_location = 0.0
+            height = 1.0
+            # pen_color = [pg.mkColor('red'), pg.mkColor('cyan')]
+            # brush_color = [pg.mkColor('red'), pg.mkColor('cyan')]
+            
+            pen_color = [pg.mkColor('red'), pg.mkColor('cyan')]
+            brush_color = [pg.mkColor('red'), pg.mkColor('cyan')]
+
+            ## Add the missing parameters to the dataframe:
+            active_Laps_df['series_vertical_offset'] = kwargs.setdefault('series_vertical_offset', y_location)
+            active_Laps_df['series_height'] = kwargs.setdefault('series_height', height)
+            # active_Laps_df['pen'] = kwargs.setdefault('pen', pg.mkPen(pen_color)) 
+            # active_Laps_df['brush'] = kwargs.setdefault('brush', pg.mkBrush(brush_color))  
+            
+            active_Laps_df['pen'] = kwargs.setdefault('pen', [pg.mkPen(a_pen_color) for a_pen_color in pen_color]) 
+            active_Laps_df['brush'] = kwargs.setdefault('brush', [pg.mkBrush(a_color) for a_color in brush_color])  
+
+            return active_Laps_df
+
+        return _add_interval_dataframe_visualization_columns_general_epoch
+
+    @classmethod
+    def build_general_render_time_epochs_datasource(cls, active_epochs_obj, **kwargs):
+        general_epochs_interval_datasource = IntervalsDatasource.init_from_epoch_object(active_epochs_obj, cls.build_general_epochs_dataframe_formatter(**kwargs), datasource_name='intervals_datasource_from_general_Epochs_obj')
+        return general_epochs_interval_datasource
+
+    @classmethod
+    def build_general_2D_render_time_epochs(cls, curr_sess, **kwargs):
+        """ builds the 
+        
+        """
+        if isinstance(curr_sess, DataSession):
+            active_Epochs = curr_sess.epochs # <Epoch> object
+        elif isinstance(curr_sess, Epoch):
+            active_Epochs = curr_sess  # <Epoch> object passed directly
+        else:
+            raise NotImplementedError
+        
+        interval_datasource = cls.build_general_render_time_epochs_datasource(active_epochs_obj=active_Epochs, **kwargs)
+        active_interval_rects_item = Render2DEventRectanglesHelper.build_IntervalRectsItem_from_interval_datasource(interval_datasource)
+        active_interval_rects_item.setToolTip('General')
+        return active_interval_rects_item
+    
+    @classmethod
+    def add_general_2D_render_time_epochs(cls, curr_sess, destination_plot):
+        active_interval_rects_item = cls.build_general_2D_render_time_epochs(curr_sess=curr_sess)
+        destination_plot.addPlot(active_interval_rects_item)
+        
     
     ##########################################
     ## PBE (Population Burst Events)
