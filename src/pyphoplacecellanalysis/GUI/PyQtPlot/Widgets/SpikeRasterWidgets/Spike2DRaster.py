@@ -495,9 +495,6 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
     def remove_PBEs_intervals(self):
         self.remove_rendered_intervals('PBEs', debug_print=False)
         
-        
-        
-
 
     ######################################################
     # TimeCurvesViewMixin/PyQtGraphSpecificTimeCurvesMixin specific overrides for 2D:
@@ -510,8 +507,6 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
             .plot(x=x, y=y)
             .plot(ndarray(N,2)): single numpy array with shape (N, 2), where x=data[:,0] and y=data[:,1]
             
-     
-    
     """
     
     #####################################################
@@ -566,29 +561,15 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
                                                'z_scaling_factor':curr_data_series_dict.get('z_scaling_factor', 0.5)}
                     
                 else:
-                    # TODO: currently only gets the first data_column. (doesn't yet support multiple)
-                    curr_plot_column_name = self.params.time_curves_datasource.data_column_names[curr_data_series_index]
-                    curr_plot_name = self.params.time_curves_datasource.datasource_UIDs[curr_data_series_index]
-                    
-                    curve_y_value = -self.n_half_cells
-                    
-                    # Get y-values:
-                    curr_x = self.temporal_to_spatial(curr_plot3D_active_window_data['t'].to_numpy())
-                    pts = np.column_stack([curr_x, np.full_like(curr_x, curve_y_value), curr_plot3D_active_window_data[curr_plot_column_name].to_numpy()])
-                    
-                    extra_plot_options_dict = {}
+                    raise NotImplementedError # gave up
                 
                 # outputs of either mode are curr_plot_name, pts
-                curr_plt = self._build_or_update_plot(curr_plot_name, pts, **extra_plot_options_dict)
+                curr_plt = self._build_or_update_time_curves_plot(curr_plot_name, pts, **extra_plot_options_dict)
                 # end for curr_data_series_index in np.arange(num_data_series)
 
             self.add_3D_time_curves_baseline_grid_mesh() # from Render3DTimeCurvesBaseGridMixin
 
-
-
-        
-        
-    def _build_or_update_plot(self, plot_name, points, **kwargs):
+    def _build_or_update_time_curves_plot(self, plot_name, points, **kwargs):
         """ For 3D
         uses or builds a new self.ui.main_time_curves_view_widget, which the item is added to
         
@@ -615,9 +596,7 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
                     ...
             """
             points = points[:, [0, 2]]
-
         assert np.shape(points)[1] == 2, f"points must be (N, 2) but it instead {np.shape(points)}"
-
 
         if plot_name in self.plots.time_curves:
             # Plot already exists, update it instead.
@@ -641,13 +620,7 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
             # TODO: set line_width?
             # TODO: scaling like the 3D version?
             
-            # plt = gl.GLLinePlotItem(pos=points, color=line_color, width=plot_args.setdefault('line_width',0.5), antialias=True)
-            # plt.scale(1.0, 1.0, plot_args.setdefault('z_scaling_factor',1.0)) # Scale the data_values_range to fit within the z_max_value. Shouldn't need to be adjusted so long as data doesn't change.            
-            # # plt.scale(1.0, 1.0, self.data_z_scaling_factor) # Scale the data_values_range to fit within the z_max_value. Shouldn't need to be adjusted so long as data doesn't change.
-            # self.ui.main_gl_widget.addItem(plt)
-            # self.plots.time_curves[plot_name] = plt # add it to the dictionary.
         return plt
-    
     
     def create_separate_render_plot_item(self, row=2, col=0, rowspan=1, colspan=1, name='new_curves_separate_plot'):
         """ Adds a separate independent plot for epoch time rects to the 2D plot above the others:
@@ -674,7 +647,6 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
         new_curves_separate_plot.setXLink(main_plot_widget) # works to synchronize the main zoomed plot (current window) with the epoch_rect_separate_plot (rectangles plotter)
         
         return new_curves_separate_plot
-
         
         
     # Overrides for Render3DTimeCurvesBaseGridMixin, since this 2D class can't draw a 3D background grid _________________ #

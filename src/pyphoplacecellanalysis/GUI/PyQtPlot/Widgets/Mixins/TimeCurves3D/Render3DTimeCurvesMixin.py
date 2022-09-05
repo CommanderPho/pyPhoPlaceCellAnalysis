@@ -144,7 +144,7 @@ class TimeCurvesViewMixin(Render3DTimeCurvesBaseGridMixin):
         """ TODO: unfortunately with this setup they would be recreated again in self.update_3D_time_curves() because the datasource would still be attached but the plot wouldn't exist. """
         raise NotImplementedError
         
-    def _build_or_update_plot(self, plot_name, points, **kwargs):
+    def _build_or_update_time_curves_plot(self, plot_name, points, **kwargs):
         # build the plot arguments (color, line thickness, etc)        
         plot_args = ({'color_name':'white','line_width':0.5,'z_scaling_factor':1.0} | kwargs)
         raise NotImplementedError
@@ -197,7 +197,7 @@ class PyQtGraphSpecificTimeCurvesMixin(TimeCurvesViewMixin):
         ## This part might be 3D only, but we do have a working 2D version so maybe just bring that in?
         self.remove_3D_time_curves_baseline_grid_mesh() # from Render3DTimeCurvesBaseGridMixin
         
-    def _build_or_update_plot(self, plot_name, points, **kwargs):
+    def _build_or_update_time_curves_plot(self, plot_name, points, **kwargs):
         # build the plot arguments (color, line thickness, etc)        
         plot_args = ({'color_name':'white','line_width':0.5,'z_scaling_factor':1.0} | kwargs)
         
@@ -275,7 +275,7 @@ class PyQtGraphSpecificTimeCurvesMixin(TimeCurvesViewMixin):
                     extra_plot_options_dict = {}
                 
                 # outputs of either mode are curr_plot_name, pts
-                curr_plt = self._build_or_update_plot(curr_plot_name, pts, **extra_plot_options_dict)
+                curr_plt = self._build_or_update_time_curves_plot(curr_plot_name, pts, **extra_plot_options_dict)
                 # end for curr_data_series_index in np.arange(num_data_series)
 
             self.add_3D_time_curves_baseline_grid_mesh() # from Render3DTimeCurvesBaseGridMixin
@@ -306,7 +306,7 @@ class VedoSpecificTimeCurvesMixin(TimeCurvesViewMixin):
         # Clear the dict
         self.plots.time_curves.clear()
         
-    def _build_or_update_plot(self, plot_name, points, **kwargs):
+    def _build_or_update_time_curves_plot(self, plot_name, points, **kwargs):
         # build the plot arguments (color, line thickness, etc)        
         plot_args = ({'color_name':'white','line_width':0.5,'z_scaling_factor':1.0} | kwargs)
         
@@ -378,7 +378,7 @@ class VedoSpecificTimeCurvesMixin(TimeCurvesViewMixin):
                 
                 
                 # outputs of either mode are curr_plot_name, pts
-                curr_plt = self._build_or_update_plot(curr_plot_name, pts, **extra_plot_options_dict)
+                curr_plt = self._build_or_update_time_curves_plot(curr_plot_name, pts, **extra_plot_options_dict)
                 # end for curr_data_series_index in np.arange(num_data_series)
         
         # call render after updating the time curves:
