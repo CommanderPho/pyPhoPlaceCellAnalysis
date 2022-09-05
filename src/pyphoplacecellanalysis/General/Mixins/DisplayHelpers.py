@@ -90,8 +90,6 @@ def debug_print_identity_properties(spikes_df, debug_print=True):
         print(f'debug_print_identity_properties(spikes_df, ...): n_cells={n_cells}')
         print(f'\t\t fragile_linear_neuron_IDXs: {fragile_linear_neuron_IDXs}\n \t\t cell_ids: {cell_ids}')
     return n_cells, fragile_linear_neuron_IDXs, cell_ids
-    
-    
 
 def debug_print_axes_locations(spike_raster_plt):
     """ debugs the active and global (data) windows. 
@@ -128,7 +126,7 @@ def debug_print_axes_locations(spike_raster_plt):
     print(f'\t(active_x_start: {active_x_start}, active_x_end: {active_x_end}), active_x_length: {active_x_end - active_x_start}')
 
     # Global (all data)
-    print('debug_print_axes_locations(...): Global Data Properties:')
+    print('debug_print_axes_locations(...): Global (all data) Data Properties:')
     global_start_t, global_end_t = spike_raster_plt.spikes_window.total_df_start_end_times
     global_total_data_duration = global_end_t - global_start_t
     print(f'\t(global_start_t: {global_start_t}, global_end_t: {global_end_t}), global_total_data_duration: {global_total_data_duration} (seconds)')
@@ -145,8 +143,6 @@ def debug_print_axes_locations(spike_raster_plt):
     return ((active_t_start, active_t_end, active_window_t_duration), (global_start_t, global_end_t, global_total_data_duration), 
             (active_x_start, active_x_end, (active_x_end - active_x_start)), (global_x_start, global_x_end, (global_x_end - global_x_start)))
 
-
-
 def debug_print_app_info(qt_app):
     """ prints the informationa bout the active QtApp. 
     
@@ -158,13 +154,10 @@ def debug_print_app_info(qt_app):
     if qt_app.objectName() != '':
         print(f'.objectName(): {qt_app.objectName()}')
 
-
 def debug_print_base_raster_plotter_info(raster_plotter):
     print(f'raster_plotter:\nmemory address: {hex(id(raster_plotter))}')
     debug_print_app_info(raster_plotter.app)
     print(f'.spikes_window address: {hex(id(raster_plotter.spikes_window))}')
-        
-
 
 def _debug_print_spike_raster_window_animation_properties(spike_raster_window):
     """ dumps debug properties related to animation for a spike_raster_window
@@ -196,3 +189,38 @@ def _debug_print_spike_raster_window_animation_properties(spike_raster_window):
     print(f'\tspike_raster_plt_2d.ui.scroll_window_region\n\t\tmin_x: {min_x}, max_x: {max_x}, x_duration: {x_duration}') # min_x: 7455.820603311667, max_x: 7532.52160713601, x_duration: 76.70100382434339 -- NOTE: these are the real seconds!
 
 
+def debug_print_active_firing_rate_trends_result_overview(active_firing_rate_trends):
+    """ 
+    
+    Usage:
+        from pyphoplacecellanalysis.General.Mixins.DisplayHelpers import _print_active_firing_rate_trends_result_overview
+        debug_print_active_firing_rate_trends_result_overview(active_firing_rate_trends)
+    
+    """
+    def _print_single_result(a_trends_set):
+        # a_trends_set['time_window_edges']
+        # a_trends_set['time_window_edges_binning_info']
+        binned_rates = a_trends_set['time_binned_unit_specific_binned_spike_rate']
+        mins = a_trends_set['min_spike_rates'].to_numpy()
+        means = binned_rates.mean().to_numpy()
+        medians = a_trends_set['median_spike_rates'].to_numpy()
+        maxs = a_trends_set['max_spike_rates'].to_numpy()
+        # print(f"\t\tmins: {mins}") # all zero, which is reasonable I suppose
+        print(f"\t\tmeans: {means}") # non-zero, which is good.
+        # print(f"\t\tmedians: {medians}") # also all zero, which doesn't seem super reasonable
+        print(f"\t\tmaxs: {maxs}")
+    print(f"time_bin_size_seconds: {active_firing_rate_trends['time_bin_size_seconds']}")
+    print(f"\tall_session_spikes: ")
+    _print_single_result(active_firing_rate_trends['all_session_spikes'])
+    print(f"\tpf_included_spikes_only: ")
+    _print_single_result(active_firing_rate_trends['pf_included_spikes_only'])
+
+def debug_print_spikes_df_column_info(spikes_df):
+    """ Prints info about the spikes_df (spikes dataframe)
+    Usage:
+        from pyphoplacecellanalysis.General.Mixins.DisplayHelpers import debug_print_spikes_df_column_info
+        _debug_print_spikes_df_column_info(curr_active_pipeline.sess.spikes_df)
+        _debug_print_spikes_df_column_info(curr_active_pipeline.filtered_sessions['track'].spikes_df)
+    """
+    print(f'.columns: {list(spikes_df.columns)}')
+    print(f'.spikes.time_variable_name: {spikes_df.spikes.time_variable_name}')    
