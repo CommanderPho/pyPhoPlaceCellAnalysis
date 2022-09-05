@@ -8,7 +8,6 @@ from pyphocorehelpers.DataStructure.dynamic_parameters import DynamicParameters
 
 from pyphocorehelpers.DataStructure.general_parameter_containers import DebugHelper, VisualizationParameters, RenderPlots, RenderPlotsData
 from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.GraphicsObjects.IntervalRectsItem import IntervalRectsItem, RectangleRenderTupleHelpers
-from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.Mixins.RenderTimeEpochs.Specific2DRenderTimeEpochs import Specific2DRenderTimeEpochsHelper
 from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.Mixins.RenderTimeEpochs.Render2DEventRectanglesHelper import Render2DEventRectanglesHelper
 
 from pyphoplacecellanalysis.General.Model.Datasources.IntervalDatasource import IntervalsDatasource
@@ -380,13 +379,33 @@ class EpochRenderingMixin:
         """
         adjustment_needed = None
         curr_x_min, curr_x_max, curr_y_min, curr_y_max = cls.get_plot_view_range(a_plot, debug_print=False) # curr_x_min: 22.30206346133491, curr_x_max: 1739.1355703625595, curr_y_min: 0.5, curr_y_max: 39.5        
-        new_max_y_range = cls.get_added_rect_item_required_y_value(a_rect_item, debug_print=debug_print)
+        if debug_print:
+            print(f'compute_bounds_adjustment_for_rect_item(a_plot, a_rect_item):')
+            print(f'\ta_plot.y: {curr_y_min}, {curr_y_max}')
+            
+        new_min_y_range, new_max_y_range = cls.get_added_rect_item_required_y_value(a_rect_item, debug_print=debug_print)
         if (new_max_y_range > curr_y_max):
             # needs adjustment
             adjustment_needed = (new_max_y_range - curr_y_max)
-            
-        if should_apply_adjustment:
-            a_plot.setYRange(curr_y_min, new_max_y_range)
+            if debug_print:
+                print(f'\t needs adjustment: a_rect_item requested new y_max: {new_max_y_range}')
+                    
+        final_y_max = max(new_max_y_range, curr_y_max)
+        
+        if (new_min_y_range < curr_y_min):
+            # needs adjustment
+            if adjustment_needed is None:
+                adjustment_needed = 0
+            adjustment_needed = adjustment_needed + (new_min_y_range - curr_y_min)
+            if debug_print:
+                print(f'\t needs adjustment: a_rect_item requested new new_min_y_range: {new_min_y_range}')            
+        else:
+            adjusted_y_min_range = new_min_y_range
+    
+        final_y_min = min(new_min_y_range, curr_y_min)
+    
+        if (adjustment_needed and should_apply_adjustment):
+            a_plot.setYRange(final_y_min, final_y_max, padding=0)
     
         return adjustment_needed
     
@@ -403,11 +422,12 @@ class EpochRenderingMixin:
             Only known to be used by .compute_bounds_adjustment_for_rect_item(...) above
         """
         curr_rect = a_rect_item.boundingRect() # PyQt5.QtCore.QRectF(29.0, 43.0, 1683.0, 2.0)
-        # new_min_y_range = min(curr_rect.top(), curr_rect.bottom()) # TODO: allow adjusting to items below the axis as well (by looking at minimums)
+        new_min_y_range = min(curr_rect.top(), curr_rect.bottom())
         new_max_y_range = max(curr_rect.top(), curr_rect.bottom())
         if debug_print:
+            print(f'new_min_y_range: {new_min_y_range}')
             print(f'new_max_y_range: {new_max_y_range}')
-        return new_max_y_range
+        return new_min_y_range, new_max_y_range
 
     
     @staticmethod
