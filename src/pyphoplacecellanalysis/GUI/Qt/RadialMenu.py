@@ -20,8 +20,7 @@ class RadialMenu(QtWidgets.QGraphicsObject):
         self.setAcceptHoverEvents(True)
         self.buttons = {}
 
-    def addButton(self, id, innerRadius, size, startAngle, angleSize, pen=None, 
-                  brush=None, icon=None):
+    def addButton(self, id, innerRadius, size, startAngle, angleSize, pen=None, brush=None, icon=None):
         # if a button already exists with the same id, remove it
         if id in self.buttons:
             oldItem = self.buttons.pop(id)
@@ -30,11 +29,9 @@ class RadialMenu(QtWidgets.QGraphicsObject):
             oldItem.setParent(None)
 
         # compute the extents of the inner and outer "circles"
-        startRect = QtCore.QRectF(
-            -innerRadius, -innerRadius, innerRadius * 2, innerRadius * 2)
+        startRect = QtCore.QRectF(-innerRadius, -innerRadius, innerRadius * 2, innerRadius * 2)
         outerRadius = innerRadius + size
-        endRect = QtCore.QRectF(
-            -outerRadius, -outerRadius, outerRadius * 2, outerRadius * 2)
+        endRect = QtCore.QRectF(-outerRadius, -outerRadius, outerRadius * 2, outerRadius * 2)
 
         # create the circle section path
         path = QtGui.QPainterPath()
@@ -71,6 +68,8 @@ class RadialMenu(QtWidgets.QGraphicsObject):
             iconItem.setPos(iconPos)
             # use the center of the pixmap as the offset for centering
             iconItem.setOffset(-pixmap.rect().center())
+            iconItem.setParentItem(item) # is this okay?
+            
 
     def itemAtPos(self, pos):
         for button in self.buttons.values():
@@ -112,41 +111,95 @@ class RadialMenu(QtWidgets.QGraphicsObject):
 # Testing                                                                                                              #
 # ==================================================================================================================== #
 ButtonData = [
-    (50, 40, QtWidgets.QStyle.SP_MessageBoxInformation), 
-    (90, 40, QtWidgets.QStyle.SP_MessageBoxQuestion), 
-    (180, 20, QtWidgets.QStyle.SP_FileDialogBack), 
-    (200, 20, QtWidgets.QStyle.SP_DialogOkButton), 
-    (220, 20, QtWidgets.QStyle.SP_DialogOpenButton), 
-    (290, 30, QtWidgets.QStyle.SP_ArrowDown), 
-    (320, 30, QtWidgets.QStyle.SP_ArrowUp), 
+    (50, 40, pg.QtWidgets.QStyle.SP_MessageBoxInformation), 
+    (90, 40, pg.QtWidgets.QStyle.SP_MessageBoxQuestion), 
+    (180, 20, pg.QtWidgets.QStyle.SP_FileDialogBack), 
+    (200, 20, pg.QtWidgets.QStyle.SP_DialogOkButton), 
+    (220, 20, pg.QtWidgets.QStyle.SP_DialogOpenButton), 
+    (290, 30, pg.QtWidgets.QStyle.SP_ArrowDown), 
+    (320, 30, pg.QtWidgets.QStyle.SP_ArrowUp), 
 ]
 
-class RadialTest(QtWidgets.QWidget):
-    def __init__(self):
-        QtWidgets.QWidget.__init__(self)
-        self.scene = QtWidgets.QGraphicsScene(self)
+
+secondLevelButtonData = [
+    (50, 40, pg.QtWidgets.QStyle.SP_MessageBoxInformation), 
+    (90, 40, pg.QtWidgets.QStyle.SP_MessageBoxQuestion), 
+    (180, 20, pg.QtWidgets.QStyle.SP_FileDialogBack), 
+    (200, 20, pg.QtWidgets.QStyle.SP_DialogOkButton), 
+    (220, 20, pg.QtWidgets.QStyle.SP_DialogOpenButton), 
+    (290, 30, pg.QtWidgets.QStyle.SP_ArrowDown), 
+    (320, 30, pg.QtWidgets.QStyle.SP_ArrowUp), 
+]
+
+class RadialMenuTest(pg.QtWidgets.QWidget):
+    def __init__(self, startInnerRadius=64, size=20):
+        self.startInnerRadius = startInnerRadius
+        self.level_radius_size = size
+        self.level_rings_dict = {}
+        
+        pg.QtWidgets.QWidget.__init__(self)
+        self.scene = pg.QtWidgets.QGraphicsScene(self)
 
         buttonItem = RadialMenu()
         self.scene.addItem(buttonItem)
         buttonItem.buttonClicked.connect(self.buttonClicked)
-        for index, (startAngle, extent, icon) in enumerate(ButtonData):
-            icon = self.style().standardIcon(icon, None, self)
-            buttonItem.addButton(index, 64, 20, startAngle, extent, icon=icon)
+        
+        
+        # for index, (startAngle, extent, icon) in enumerate(ButtonData):
+        #     icon = self.style().standardIcon(icon, None, self)
+        #     buttonItem.addButton(index, self.startInnerRadius, self.level_radius_size, startAngle, extent, icon=icon) # innerRadius, size, startAngle, angleSize
+
+        self.level_rings_dict[0] = self.add_buttonData(buttonItem, ButtonData, level_depth_idx=0)
+                
+        # Second level ring:
+        self.level_rings_dict[1] = self.add_buttonData(buttonItem, secondLevelButtonData, level_depth_idx=1)
+        # level_depth_idx = 2
+        # secondLevelInnerRadius = self.startInnerRadius + ((level_depth_idx-1) * self.level_radius_size)
+        # secondLevelStartIndex = len(ButtonData)+1
+        # for index, (startAngle, extent, icon) in enumerate(secondLevelButtonData):
+        #     icon = self.style().standardIcon(icon, None, self)
+        #     buttonItem.addButton((secondLevelStartIndex+index), secondLevelInnerRadius, self.level_radius_size, startAngle, extent, icon=icon) # innerRadius, size, startAngle, angleSize
 
         buttonItem.setPos(150, 150)
         buttonItem.setZValue(1000)
 
-        self.view = QtWidgets.QGraphicsView(self.scene, self)
-        self.view.setRenderHints(QtGui.QPainter.Antialiasing)
+        self.view = pg.QtWidgets.QGraphicsView(self.scene, self)
+        self.view.setRenderHints(pg.QtGui.QPainter.Antialiasing)
         self.scene.setSceneRect(0, 0, 300, 300)
         self.setGeometry(50, 50, 305, 305)
         self.show()
-
+        
+        
+    def add_buttonData(self, radialButton, buttonData, level_depth_idx=2):
+        # Second level ring:
+        out_btn_id_dict = {}
+        secondLevelInnerRadius = self.startInnerRadius + ((level_depth_idx-1) * self.level_radius_size)
+        # secondLevelStartIndex = len(buttonData)+1
+        secondLevelStartIndex = len(radialButton.buttons)+1
+        # is_level_visible = (level_depth_idx <= 1)
+        
+        for index, (startAngle, extent, icon) in enumerate(buttonData):
+            icon = self.style().standardIcon(icon, None, self)
+            curr_btn_id = (secondLevelStartIndex+index)
+            radialButton.addButton(curr_btn_id, secondLevelInnerRadius, self.level_radius_size, startAngle, extent, icon=icon) # innerRadius, size, startAngle, angleSize
+            curr_btn = radialButton.buttons[curr_btn_id] # QGraphicsPathItem
+            # if not is_level_visible:
+            #     curr_btn.hide()
+            out_btn_id_dict[curr_btn_id] = curr_btn
+        return out_btn_id_dict
+    
     def buttonClicked(self, id):
         print('Button id {} has been clicked'.format(id))
         
         
-        
+    def hide_rings_exceeding(self, max_ring_level_idx=1):
+        for ring_level_idx, ring_items_dict in self.level_rings_dict.items():
+            if ring_level_idx > max_ring_level_idx:
+                for curr_btn_id, curr_btn_item in ring_items_dict.items():
+                # for curr_btn_id, curr_btn_item in test_widget.level_rings_dict[1].items():
+                    # curr_btn_item = test_widget.level_rings_dict[1][8] # QGraphicsPathItem 
+                    curr_btn_item.hide()
+                    
         
         
 def main():
@@ -154,7 +207,7 @@ def main():
 	# app.setStyleSheet(stylesheet_data_stream.readAll())
 	# app.setStyleSheet(qdarkstyle.load_stylesheet_pyqt5()) # QDarkStyle version
 
-    test_widget = RadialTest()
+    test_widget = RadialMenuTest()
     test_widget.show()
     pg.exec()
         
