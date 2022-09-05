@@ -595,14 +595,14 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
             # needs to build the primary 2D time curves plotItem:
             print(f'Spike2DRaster created a new self.ui.main_time_curves_view_widget for TimeCurvesViewMixin plots!')
             # row=0 adds above extant plot
-            
             row_index = (self.params.main_graphics_plot_widget_rowspan * 2)+1 # row 2 if they were all rowspan 2
             self.ui.main_time_curves_view_widget = self.create_separate_render_plot_item(row=row_index, col=0, rowspan=1, colspan=1, name='new_curves_separate_plot') # PlotItem
         
         
         # build the plot arguments (color, line thickness, etc)        
         plot_args = ({'color_name':'white','line_width':0.5,'z_scaling_factor':1.0} | kwargs)
-
+        
+        ## Drop the y-value from the 3D version to get the appropriate 2D coordinates (x,y)
         if np.shape(points)[1] == 3:
             # same data from 3D version, drop the y-value accordingly:
             """
