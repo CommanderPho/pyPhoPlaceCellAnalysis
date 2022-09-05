@@ -20,6 +20,8 @@ from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.Mixins.RenderTimeEpochs.EpochRe
 from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.Mixins.RenderTimeEpochs.Specific2DRenderTimeEpochs import Specific2DRenderTimeEpochsHelper
 from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.Mixins.TimeCurves3D.Render3DTimeCurvesMixin import PyQtGraphSpecificTimeCurvesMixin
 
+from pyphoplacecellanalysis.General.Mixins.DisplayHelpers import debug_print_QRect, debug_print_axes_locations, debug_print_temporal_info
+
 
 class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Render2DScrollWindowPlotMixin, SpikeRasterBase):
     """ Displays a 2D version of a raster plot with the spikes occuring along a plane. 
@@ -696,7 +698,110 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
         return False # nothing to remove
         # return BaseGrid3DTimeCurvesHelper.remove_3D_time_curves_baseline_grid_mesh(self)
     
-    
+    def debug_print_spike_raster_2D_specific_plots_info(self, indent_string = '\t'):
+        """ Prints a bunch of debugging info related to its specific plots and what they're displaying.
+        Output Example:
+            spikes_window Properties:
+                total_df_start_end_times: (22.3668519082712, 2093.8524703475414)
+                active_time_window: (341.96749018175865, 356.96749018175865)
+                window_duration: 15.0
+            Spatial Properties:
+                temporal_axis_length: 15.0
+                temporal_zoom_factor: 1.0
+                render_window_duration: 15.0
+            Time Curves:
+                main_time_curves_view_widget.viewRect(): QRectF(x: 341.95783767210617, y: -0.19213325644284424, width: 15.009652509652483, height: 1.1716180255700652)
+            UI/Graphics Properties:
+                main_plot_widget:
+                    x: 341.96749018175865, 356.96749018175865
+                    y: -2.789445932897294, 72.7894459328973
+                background_static_scroll_plot_widget:
+                    x: 22.3668519082712, 2093.8524703475414
+                    y: 0.5, 69.5
+                ui.scroll_window_region
+                    min_x: 341.96749018175865, max_x: 356.96749018175865, x_duration: 15.0
+            debug_print_axes_locations(...): Active Window/Local Properties:
+                (active_t_start: 341.96749018175865, active_t_end: 356.96749018175865), active_window_t_duration: 15.0
+                (active_x_start: 2.3142857142857145, active_x_end: 2.422903412616405), active_x_length: 0.10861769833069035
+            debug_print_axes_locations(...): Global (all data) Data Properties:
+                (global_start_t: 22.3668519082712, global_end_t: 2093.8524703475414), global_total_data_duration: 2071.48561843927 (seconds)
+                total_data_duration_minutes: 34.0
+                (global_x_start: 0.0, global_x_end: 15.0), global_total_x_length: 15.0
+
+
+        """
+        # main_graphics_layout_widget = active_2d_plot.ui.main_graphics_layout_widget # GraphicsLayoutWidget
+        main_plot_widget = self.plots.main_plot_widget # PlotItem
+        background_static_scroll_plot_widget = self.plots.background_static_scroll_window_plot # PlotItem
+        
+        print(f'{indent_string}main_plot_widget:')
+        curr_x_min, curr_x_max, curr_y_min, curr_y_max = self.get_plot_view_range(main_plot_widget, debug_print=False)
+        print(f'{indent_string}\tx: {curr_x_min}, {curr_x_max}\n{indent_string}\ty: {curr_y_min}, {curr_y_max}')
+        
+        print(f'{indent_string}background_static_scroll_plot_widget:')
+        curr_x_min, curr_x_max, curr_y_min, curr_y_max = self.get_plot_view_range(background_static_scroll_plot_widget, debug_print=False)
+        print(f'{indent_string}\tx: {curr_x_min}, {curr_x_max}\n{indent_string}\ty: {curr_y_min}, {curr_y_max}')
+
+        min_x, max_x = self.ui.scroll_window_region.getRegion()
+        x_duration = max_x - min_x
+        print(f'{indent_string}ui.scroll_window_region\n{indent_string}\tmin_x: {min_x}, max_x: {max_x}, x_duration: {x_duration}') # min_x: 7455.820603311667, max_x: 7532.52160713601, x_duration: 76.70100382434339 -- NOTE: these are the real seconds!
+        
+        
+    def debug_print_spike_raster_timeline_alignments(self, indent_string = '\t'):
+        """ dumps debug properties related to alignment of various windows for a spike_raster_window
+            Created 2022-09-05 to debug issues with adding Time Curves to spike_raster_2d
+        Usage:
+            active_2d_plot.debug_print_spike_raster_timeline_alignments()
+        
+        Example Output:
+            spikes_window Properties:
+                total_df_start_end_times: (22.3668519082712, 2093.8524703475414)
+                active_time_window: (341.96749018175865, 356.96749018175865)
+                window_duration: 15.0
+            Spatial Properties:
+                temporal_axis_length: 15.0
+                temporal_zoom_factor: 1.0
+                render_window_duration: 15.0
+            Time Curves:
+                main_time_curves_view_widget.viewRect(): QRectF(x: 341.95783767210617, y: -0.19213325644284424, width: 15.009652509652483, height: 1.1716180255700652)
+            UI/Graphics Properties:
+                main_plot_widget:
+                    x: 341.96749018175865, 356.96749018175865
+                    y: -2.789445932897294, 72.7894459328973
+                background_static_scroll_plot_widget:
+                    x: 22.3668519082712, 2093.8524703475414
+                    y: 0.5, 69.5
+                ui.scroll_window_region
+                    min_x: 341.96749018175865, max_x: 356.96749018175865, x_duration: 15.0
+            debug_print_axes_locations(...): Active Window/Local Properties:
+                (active_t_start: 341.96749018175865, active_t_end: 356.96749018175865), active_window_t_duration: 15.0
+                (active_x_start: 2.3142857142857145, active_x_end: 2.422903412616405), active_x_length: 0.10861769833069035
+            debug_print_axes_locations(...): Global (all data) Data Properties:
+                (global_start_t: 22.3668519082712, global_end_t: 2093.8524703475414), global_total_data_duration: 2071.48561843927 (seconds)
+                total_data_duration_minutes: 34.0
+                (global_x_start: 0.0, global_x_end: 15.0), global_total_x_length: 15.0
+
+        """
+        
+        # Window Properties:
+        print(f'spikes_window Properties:')
+        self.spikes_window.debug_print_spikes_window(prefix_string='', indent_string=indent_string)
+        
+        ## Spatial Properties:
+        print(f'Spatial Properties:')
+        debug_print_temporal_info(self, prefix_string='', indent_string=indent_string)
+        
+        ## Time Curves: main_time_curves_view_widget:
+        print(f'Time Curves:')
+        main_tc_view_rect = self.ui.main_time_curves_view_widget.viewRect() # PyQt5.QtCore.QRectF(57.847549828567, -0.007193522045074202, 15.76451934295443, 1.0150365839255244)
+        debug_print_QRect(main_tc_view_rect, prefix_string='main_time_curves_view_widget.viewRect(): ', indent_string=indent_string)
+        
+        ## UI Properties:
+        print(f'UI/Graphics Properties:')
+        self.debug_print_spike_raster_2D_specific_plots_info(indent_string = '\t')
+        debug_print_axes_locations(self)
+
+
 # Start Qt event loop unless running in interactive mode.
 # if __name__ == '__main__':
 #     # v = Visualizer()

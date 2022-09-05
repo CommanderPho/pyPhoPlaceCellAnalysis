@@ -258,67 +258,13 @@ def debug_print_spikes_df_column_info(spikes_df):
 # ==================================================================================================================== #
 
 ## NEED to figure out
-def debug_print_spikes_window(spikes_window, prefix_string='spikes_window.', indent_string = '\t'):
-    print(f'{indent_string}{prefix_string}total_df_start_end_times: {spikes_window.total_df_start_end_times}') # (22.3668519082712, 2093.8524703475414)
-    print(f'{indent_string}{prefix_string}active_time_window: {spikes_window.active_time_window}') # (7455.820603311667, 7470.820603311667)
-    print(f'{indent_string}{prefix_string}window_duration: {spikes_window.window_duration}') # 15.0 -- This on the other hand, is not right...
-    
+
     
 def debug_print_temporal_info(active_2d_plot, prefix_string='active_2d_plot.', indent_string = '\t'):
+    """ NOTE: used by Spike2DRaster's debug_print_spike_raster_timeline_alignments(...) function """
     print(f'{indent_string}{prefix_string}temporal_axis_length: {active_2d_plot.temporal_axis_length}')
     print(f'{indent_string}{prefix_string}temporal_zoom_factor: {active_2d_plot.temporal_zoom_factor}')
     print(f'{indent_string}{prefix_string}render_window_duration: {active_2d_plot.render_window_duration}')
     
     
-def debug_print_spike_raster_2D_specific_plots_info(active_2d_plot, indent_string = '\t'):
-    # main_graphics_layout_widget = active_2d_plot.ui.main_graphics_layout_widget # GraphicsLayoutWidget
-    main_plot_widget = active_2d_plot.plots.main_plot_widget # PlotItem
-    background_static_scroll_plot_widget = active_2d_plot.plots.background_static_scroll_window_plot # PlotItem
-    
-    print(f'{indent_string}main_plot_widget:')
-    curr_x_min, curr_x_max, curr_y_min, curr_y_max = active_2d_plot.get_plot_view_range(main_plot_widget, debug_print=False)
-    print(f'{indent_string}\tx: {curr_x_min}, {curr_x_max}\n{indent_string}\ty: {curr_y_min}, {curr_y_max}')
-    
-    print(f'{indent_string}background_static_scroll_plot_widget:')
-    curr_x_min, curr_x_max, curr_y_min, curr_y_max = active_2d_plot.get_plot_view_range(background_static_scroll_plot_widget, debug_print=False)
-    print(f'{indent_string}\tx: {curr_x_min}, {curr_x_max}\n{indent_string}\ty: {curr_y_min}, {curr_y_max}')
-
-    min_x, max_x = active_2d_plot.ui.scroll_window_region.getRegion()
-    x_duration = max_x - min_x
-    print(f'{indent_string}ui.scroll_window_region\n{indent_string}\tmin_x: {min_x}, max_x: {max_x}, x_duration: {x_duration}') # min_x: 7455.820603311667, max_x: 7532.52160713601, x_duration: 76.70100382434339 -- NOTE: these are the real seconds!
-    
-    
-
-    
-def _debug_print_spike_raster_timeline_alignments(active_2d_plot, indent_string = '\t'):
-    """ dumps debug properties related to alignment of various windows for a spike_raster_window
-        Created 2022-09-05 to debug issues with adding Time Curves to spike_raster_2d
-    Usage:
-    
-    active_2d_plot
-    
-    Example Output:
-    
-    """
-    
-    # Window Properties:
-    print(f'spikes_window Properties:')
-    debug_print_spikes_window(active_2d_plot.spikes_window, prefix_string='', indent_string=indent_string)
-    
-    ## Spatial Properties:
-    print(f'Spatial Properties:')
-    debug_print_temporal_info(active_2d_plot, prefix_string='', indent_string=indent_string)
-    
-    ## Time Curves: main_time_curves_view_widget:
-    print(f'Time Curves:')
-    main_tc_view_rect = active_2d_plot.ui.main_time_curves_view_widget.viewRect() # PyQt5.QtCore.QRectF(57.847549828567, -0.007193522045074202, 15.76451934295443, 1.0150365839255244)
-    debug_print_QRect(main_tc_view_rect, prefix_string='main_time_curves_view_widget.viewRect(): ', indent_string=indent_string)
-    # print(f'{indent_string}active_2d_plot.ui.main_time_curves_view_widget.viewRect(): {}')
-    
-    ## UI Properties:
-    print(f'UI/Graphics Properties:')
-    debug_print_spike_raster_2D_specific_plots_info(active_2d_plot, indent_string = '\t')
-    debug_print_axes_locations(active_2d_plot)
-    # active_2d_plot.temporal_to_spatial(active_plot_curve_datasource_2d.time_column_values.to_numpy()) # yeah this is what is fucked
-
 

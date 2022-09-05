@@ -141,7 +141,11 @@ class SpikesDataframeWindow(LiveWindowedData):
         """ emit our own custom signal when the general datasource update method returns """
         self.spike_dataframe_changed_signal.emit()
     
-
+    def debug_print_spikes_window(self, prefix_string='spikes_window.', indent_string = '\t'):
+        print(f'{indent_string}{prefix_string}total_df_start_end_times: {self.total_df_start_end_times}')
+        print(f'{indent_string}{prefix_string}active_time_window: {self.active_time_window}')
+        print(f'{indent_string}{prefix_string}window_duration: {self.window_duration}')
+        
 
 
 class SpikesWindowOwningMixin:
@@ -183,4 +187,5 @@ class SpikesWindowOwningMixin:
         """ """
         return np.ceil(float(self.spikes_window.window_duration)/2.0) # 10 by default 
     
-    
+    def debug_print_spikes_window(self, prefix_string='spikes_window.', indent_string = '\t'):
+        self.spikes_window.debug_print_spikes_window(prefix_string=prefix_string, indent_string=indent_string)
