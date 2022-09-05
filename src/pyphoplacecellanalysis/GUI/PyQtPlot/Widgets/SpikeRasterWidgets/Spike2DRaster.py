@@ -161,7 +161,9 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
             print('done.')
             
         self.EpochRenderingMixin_on_setup()
-        # self.spikes_df
+
+        # Required for Time Curves:        
+        self.params.time_curves_datasource = None # required before calling self._update_plot_ranges()
     
     def _build_cell_configs(self):
         """ Adds the neuron/cell configurations that are used to color and format the scatterplot spikes and such. 
@@ -308,6 +310,11 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
     ##################################
     
     def _update_plot_ranges(self):
+        """
+        I believe this runs only once to setup the bounds of the plot.
+        TODO: TODO-DOC: Figure out when this is called and what its purpose is
+        
+        """
         # self.plots.main_plot_widget.setXRange(-self.half_render_window_duration, +self.half_render_window_duration)
         # self.plots.main_plot_widget.setXRange(0.0, +self.temporal_axis_length, padding=0)
         # self.plots.main_plot_widget.setYRange(self.y[0], self.y[-1], padding=0)
@@ -340,8 +347,8 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
             _v_axis_item = Render2DNeuronIdentityLinesMixin.setup_custom_neuron_identity_axis(self.plots.main_plot_widget, self.n_cells)
     
     
-        # Update 3D Curves if we have them:
-        self.TimeCurvesViewMixin_on_window_update()
+        # Update 3D Curves if we have them: TODO: figure out where this goes!
+        self.TimeCurvesViewMixin_on_window_update() # Don't think this does much here
         
     
     @QtCore.pyqtSlot()
@@ -370,6 +377,9 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
         # update the current scroll region:
         # self.ui.scroll_window_region.setRegion(updated_time_window)
         
+        # Update 3D Curves if we have them: TODO: figure out where this goes!
+        self.TimeCurvesViewMixin_on_window_update() # Don't think this does much here
+        
 
     @QtCore.pyqtSlot(object)
     def update_zoomed_plot_rate_limited(self, evt):
@@ -397,6 +407,10 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
         
         # Here is the main problem: The duration and window end-time aren't being updated
         self.spikes_window.update_window_start_end(new_start=min_t, new_end=max_t)
+        
+        
+        # Update 3D Curves if we have them: TODO: figure out where this goes!
+        self.TimeCurvesViewMixin_on_window_update()
         
         
         
@@ -508,6 +522,69 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
         ## This part might be 3D only, but we do have a working 2D version so maybe just bring that in?
         self.remove_3D_time_curves_baseline_grid_mesh() # from Render3DTimeCurvesBaseGridMixin
         
+    def update_3D_time_curves(self):
+        """ initialize the graphics objects if needed, or update them if they already exist. """
+        if self.params.time_curves_datasource is None:
+            return
+        elif self.params.time_curves_no_update:
+            # don't update because we're in no_update mode
+            print(f'')
+            return
+        else:
+            # Common to both:
+            # Get current plot items:
+            curr_plot3D_active_window_data = self.params.time_curves_datasource.get_updated_data_window(self.spikes_window.active_window_start_time, self.spikes_window.active_window_end_time) # get updated data for the active window from the datasource # if we want the data from the whole time, we aren't getting that here unfortunately
+            
+            is_data_series_mode = self.params.time_curves_datasource.has_data_series_specs # True for SpikeRaster2D
+            if is_data_series_mode:
+                data_series_spaital_values_list = self.params.time_curves_datasource.data_series_specs.get_data_series_spatial_values(curr_plot3D_active_window_data)
+                num_data_series = len(data_series_spaital_values_list)
+            else:
+                # old compatibility mode:
+                num_data_series = 1
+
+            # curr_data_series_index = 0
+            # Loop through the active data series:                
+            for curr_data_series_index in np.arange(num_data_series):
+                # Data series mode:
+                if is_data_series_mode:
+                    # Get the current series:
+                    curr_data_series_dict = data_series_spaital_values_list[curr_data_series_index]
+                    
+                    curr_plot_column_name = curr_data_series_dict.get('name', f'series[{curr_data_series_index}]') # get either the specified name or the generic 'series[i]' name otherwise
+                    curr_plot_name = self.params.time_curves_datasource.datasource_UIDs[curr_data_series_index]
+                    # points for the current plot:
+                    pts = np.column_stack([curr_data_series_dict['x'], curr_data_series_dict['y'], curr_data_series_dict['z']])
+                    
+                    # Extra options:
+                    # color_name = curr_data_series_dict.get('color_name','white')
+                    extra_plot_options_dict = {'color_name':curr_data_series_dict.get('color_name', 'white'),
+                                               'color':curr_data_series_dict.get('color', None),
+                                               'line_width':curr_data_series_dict.get('line_width', 0.5),
+                                               'z_scaling_factor':curr_data_series_dict.get('z_scaling_factor', 0.5)}
+                    
+                else:
+                    # TODO: currently only gets the first data_column. (doesn't yet support multiple)
+                    curr_plot_column_name = self.params.time_curves_datasource.data_column_names[curr_data_series_index]
+                    curr_plot_name = self.params.time_curves_datasource.datasource_UIDs[curr_data_series_index]
+                    
+                    curve_y_value = -self.n_half_cells
+                    
+                    # Get y-values:
+                    curr_x = self.temporal_to_spatial(curr_plot3D_active_window_data['t'].to_numpy())
+                    pts = np.column_stack([curr_x, np.full_like(curr_x, curve_y_value), curr_plot3D_active_window_data[curr_plot_column_name].to_numpy()])
+                    
+                    extra_plot_options_dict = {}
+                
+                # outputs of either mode are curr_plot_name, pts
+                curr_plt = self._build_or_update_plot(curr_plot_name, pts, **extra_plot_options_dict)
+                # end for curr_data_series_index in np.arange(num_data_series)
+
+            self.add_3D_time_curves_baseline_grid_mesh() # from Render3DTimeCurvesBaseGridMixin
+
+
+
+        
         
     def _build_or_update_plot(self, plot_name, points, **kwargs):
         """ For 3D
@@ -525,7 +602,21 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
         
         # build the plot arguments (color, line thickness, etc)        
         plot_args = ({'color_name':'white','line_width':0.5,'z_scaling_factor':1.0} | kwargs)
-        
+
+        if np.shape(points)[1] == 3:
+            # same data from 3D version, drop the y-value accordingly:
+            """
+                points: (N, 3)
+                # t/x, _, 'y' 
+                array([[-7.47296, -35, 0.931493],
+                    [-7.43977, -35, 0.931998],
+                    ...
+            """
+            points = points[:, [0, 2]]
+
+        assert np.shape(points)[1] == 2, f"points must be (N, 2) but it instead {np.shape(points)}"
+
+
         if plot_name in self.plots.time_curves:
             # Plot already exists, update it instead.
             plt = self.plots.time_curves[plot_name]
@@ -538,20 +629,7 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
                 # if no explicit color value is provided, build a new color from the 'color_name' key, or if that's missing just use white.
                 line_color = pg.mkColor(plot_args.setdefault('color_name', 'white'))
                 line_color.setAlphaF(0.8)
-            
-            if np.shape(points)[1] == 3:
-                # same data from 3D version, drop the y-value accordingly:
-                """
-                    points: (N, 3)
-                    # t/x, _, 'y' 
-                    array([[-7.47296, -35, 0.931493],
-                        [-7.43977, -35, 0.931998],
-                        ...
-                """                
-                points = points[:,[0,2]]
 
-            assert np.shape(points)[1] == 2, f"points must be (N, 2) but it instead {np.shape(points)}"
-            
             # Note .plot(...) seems to allow more options than .addLine(...)
             # curr_plt = self.ui.main_time_curves_view_widget.addLine(x=curr_data_series_dict['x'], y=curr_data_series_dict['y'])
             plt = self.ui.main_time_curves_view_widget.plot(points, pen=line_color, name=plot_name) # TODO: is this the slow version of name =?
