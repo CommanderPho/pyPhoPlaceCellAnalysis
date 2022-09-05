@@ -620,7 +620,7 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
         if plot_name in self.plots.time_curves:
             # Plot already exists, update it instead.
             plt = self.plots.time_curves[plot_name]
-            plt.setData(pos=points)
+            plt.setData(points)
         else:
             # plot doesn't exist, built it fresh.
             
