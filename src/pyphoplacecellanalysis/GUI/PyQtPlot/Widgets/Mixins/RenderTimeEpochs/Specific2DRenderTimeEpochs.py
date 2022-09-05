@@ -17,8 +17,39 @@ A general epochs_dataframe_formatter takes a dataframe and adds the required col
 """
 class General2DRenderTimeEpochs(object):
     """docstring for General2DRenderTimeEpochs."""
-    def __init__(self, arg):
+    def __init__(self):
         super(General2DRenderTimeEpochs, self).__init__()
+    
+    @classmethod
+    def _add_missing_df_columns(cls, active_df, y_location, height, pen_color, brush_color, **kwargs):
+        ## Add the missing parameters to the dataframe:
+            ## y_location:
+            if isinstance(y_location, (list, tuple)):
+                active_df['series_vertical_offset'] = kwargs.setdefault('series_vertical_offset', [a_y_location for a_y_location in y_location])
+            else:
+                # Scalar value assignment:
+                active_df['series_vertical_offset'] = kwargs.setdefault('series_vertical_offset', y_location)
+            ## series_height:
+            if isinstance(height, (list, tuple)):
+                active_df['series_height'] = kwargs.setdefault('series_height', [a_height for a_height in height])
+            else:
+                # Scalar value assignment:
+                active_df['series_height'] = kwargs.setdefault('series_height', height)
+                
+            ## pen_color:
+            if isinstance(pen_color, (list, tuple)):
+                active_df['pen'] = kwargs.setdefault('pen', [pg.mkPen(a_pen_color) for a_pen_color in pen_color])
+            else:
+                # Scalar value assignment:
+                active_df['pen'] = kwargs.setdefault('pen', pg.mkPen(pen_color)) 
+            ## brush_color:
+            if isinstance(brush_color, (list, tuple)):
+                active_df['brush'] = kwargs.setdefault('brush', [pg.mkBrush(a_color) for a_color in brush_color])  
+            else:
+                # Scalar value assignment:
+                active_df['brush'] = kwargs.setdefault('brush', pg.mkBrush(brush_color))
+            
+            return active_df #, kwargs
     
     @classmethod
     def build_epochs_dataframe_formatter(cls, **kwargs):
@@ -33,27 +64,36 @@ class General2DRenderTimeEpochs(object):
             pen_color = pg.mkColor('red')
             brush_color = pg.mkColor('red')
 
-            ## parameters:
-            # pen_color = [pg.mkColor('red'), pg.mkColor('cyan')]
-            # brush_color = [pg.mkColor('red'), pg.mkColor('cyan')]
-            
+            ## parameters:            
             ## Add the missing parameters to the dataframe:
-            active_df['series_vertical_offset'] = kwargs.setdefault('series_vertical_offset', y_location)
-            active_df['series_height'] = kwargs.setdefault('series_height', height)
-
-            if isinstance(pen_color, (list, tuple)):
-                active_df['pen'] = kwargs.setdefault('pen', [pg.mkPen(a_pen_color) for a_pen_color in pen_color])
-            else:
-                # Scalar value assignment:
-                active_df['pen'] = kwargs.setdefault('pen', pg.mkPen(pen_color)) 
-                
-            if isinstance(brush_color, (list, tuple)):
-                active_df['brush'] = kwargs.setdefault('brush', [pg.mkBrush(a_color) for a_color in brush_color])  
-            else:
-                # Scalar value assignment:
-                active_df['brush'] = kwargs.setdefault('brush', pg.mkBrush(brush_color))
+            active_df = cls._add_missing_df_columns(active_df, y_location, height, pen_color, brush_color, **kwargs)
             
-
+            # ## y_location:
+            # if isinstance(y_location, (list, tuple)):
+            #     active_df['series_vertical_offset'] = kwargs.setdefault('series_vertical_offset', [a_y_location for a_y_location in y_location])
+            # else:
+            #     # Scalar value assignment:
+            #     active_df['series_vertical_offset'] = kwargs.setdefault('series_vertical_offset', y_location)
+            # ## series_height:
+            # if isinstance(height, (list, tuple)):
+            #     active_df['series_height'] = kwargs.setdefault('series_height', [a_height for a_height in height])
+            # else:
+            #     # Scalar value assignment:
+            #     active_df['series_height'] = kwargs.setdefault('series_height', height)
+                
+            # ## pen_color:
+            # if isinstance(pen_color, (list, tuple)):
+            #     active_df['pen'] = kwargs.setdefault('pen', [pg.mkPen(a_pen_color) for a_pen_color in pen_color])
+            # else:
+            #     # Scalar value assignment:
+            #     active_df['pen'] = kwargs.setdefault('pen', pg.mkPen(pen_color)) 
+            # ## brush_color:
+            # if isinstance(brush_color, (list, tuple)):
+            #     active_df['brush'] = kwargs.setdefault('brush', [pg.mkBrush(a_color) for a_color in brush_color])  
+            # else:
+            #     # Scalar value assignment:
+            #     active_df['brush'] = kwargs.setdefault('brush', pg.mkBrush(brush_color))
+            
             return active_df
 
         return _add_interval_dataframe_visualization_columns_general_epoch
