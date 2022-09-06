@@ -144,22 +144,11 @@ class RadialMenuTest(pg.QtWidgets.QWidget):
         self.scene.addItem(buttonItem)
         buttonItem.buttonClicked.connect(self.buttonClicked)
         
+        ## Add Rings:
+        self.level_rings_dict[0] = self.add_buttonData(buttonItem, ButtonData, level_depth_idx=0)                
+        self.level_rings_dict[1] = self.add_buttonData(buttonItem, secondLevelButtonData, level_depth_idx=1)  # Second level ring:
+        self.hide_rings_exceeding(max_ring_level_idx=0)
         
-        # for index, (startAngle, extent, icon) in enumerate(ButtonData):
-        #     icon = self.style().standardIcon(icon, None, self)
-        #     buttonItem.addButton(index, self.startInnerRadius, self.level_radius_size, startAngle, extent, icon=icon) # innerRadius, size, startAngle, angleSize
-
-        self.level_rings_dict[0] = self.add_buttonData(buttonItem, ButtonData, level_depth_idx=0)
-                
-        # Second level ring:
-        self.level_rings_dict[1] = self.add_buttonData(buttonItem, secondLevelButtonData, level_depth_idx=1)
-        # level_depth_idx = 2
-        # secondLevelInnerRadius = self.startInnerRadius + ((level_depth_idx-1) * self.level_radius_size)
-        # secondLevelStartIndex = len(ButtonData)+1
-        # for index, (startAngle, extent, icon) in enumerate(secondLevelButtonData):
-        #     icon = self.style().standardIcon(icon, None, self)
-        #     buttonItem.addButton((secondLevelStartIndex+index), secondLevelInnerRadius, self.level_radius_size, startAngle, extent, icon=icon) # innerRadius, size, startAngle, angleSize
-
         buttonItem.setPos(150, 150)
         buttonItem.setZValue(1000)
 

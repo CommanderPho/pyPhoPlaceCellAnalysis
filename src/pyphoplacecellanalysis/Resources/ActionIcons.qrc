@@ -9,4 +9,9 @@
     <file>chain-small.png</file>
     <file>chain-unchain.png</file>
   </qresource>
+  <qresource prefix="Render">
+    <file>Icons/actions/spectrum-emission.png</file>
+    <file>Icons/actions/category-item.png</file>
+    <file>Icons/actions/chart-up-color.png</file>
+  </qresource>
 </RCC>
