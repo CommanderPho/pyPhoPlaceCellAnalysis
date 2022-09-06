@@ -102,7 +102,6 @@
    <addaction name="menuAdd_Renderable"/>
    <addaction name="menuHelp"/>
   </widget>
-  <widget class="QStatusBar" name="statusbar"/>
   <widget class="QToolBar" name="toolBar">
    <property name="windowTitle">
     <string>toolBar</string>
@@ -114,6 +113,7 @@
     <bool>false</bool>
    </attribute>
   </widget>
+  <widget class="QStatusBar" name="statusbar"/>
   <action name="actionLoad">
    <property name="text">
     <string>Load...</string>

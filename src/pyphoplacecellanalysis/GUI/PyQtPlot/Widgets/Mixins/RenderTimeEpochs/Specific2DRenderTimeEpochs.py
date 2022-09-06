@@ -19,6 +19,8 @@ class General2DRenderTimeEpochs(object):
     def __init__(self):
         super(General2DRenderTimeEpochs, self).__init__()
     
+    default_datasource_name = 'GeneralEpochs'
+    
     @classmethod
     def _add_missing_df_columns(cls, active_df, y_location, height, pen_color, brush_color, **kwargs):
         ## Add the missing parameters to the dataframe:
@@ -87,16 +89,14 @@ class General2DRenderTimeEpochs(object):
         else:
             raise NotImplementedError
         interval_datasource = cls.build_render_time_epochs_datasource(active_epochs_obj=active_Epochs, **kwargs)
-        out_rects = destination_plot.add_rendered_intervals(interval_datasource, name='GeneralEpochs', debug_print=True)
+        out_rects = destination_plot.add_rendered_intervals(interval_datasource, name=kwargs.setdefault('name', cls.default_datasource_name), debug_print=True)
         # return out_rects
         
 ##########################################
 ## General Epochs
 class SessionEpochs2DRenderTimeEpochs(General2DRenderTimeEpochs):
     """docstring for SessionEpochs2DRenderTimeEpochs."""
-    # def __init__(self, arg):
-    #     super(SessionEpochs2DRenderTimeEpochs, self).__init__()
-        
+    default_datasource_name = 'SessionEpochs'
     @classmethod
     def build_epochs_dataframe_formatter(cls, **kwargs):
         def _add_interval_dataframe_visualization_columns_general_epoch(active_df):
@@ -125,9 +125,8 @@ class SessionEpochs2DRenderTimeEpochs(General2DRenderTimeEpochs):
 ## Laps
 class Laps2DRenderTimeEpochs(General2DRenderTimeEpochs):
     """docstring for Laps2DRenderTimeEpochs."""
-    # def __init__(self, arg):
-    #     super(SessionEpochs2DRenderTimeEpochs, self).__init__()
-        
+    default_datasource_name = 'Laps'
+
     @classmethod
     def build_epochs_dataframe_formatter(cls, **kwargs):
         def _add_interval_dataframe_visualization_columns_general_epoch(active_df):
@@ -161,15 +160,14 @@ class Laps2DRenderTimeEpochs(General2DRenderTimeEpochs):
         else:
             raise NotImplementedError
         interval_datasource = cls.build_render_time_epochs_datasource(active_epochs_obj=active_Epochs, **kwargs)
-        out_rects = destination_plot.add_rendered_intervals(interval_datasource, name='Laps', debug_print=True)
+        out_rects = destination_plot.add_rendered_intervals(interval_datasource, name=kwargs.setdefault('name', cls.default_datasource_name), debug_print=True)
         
 ##########################################
 ## PBE (Population Burst Events)
 class PBE_2DRenderTimeEpochs(General2DRenderTimeEpochs):
     """docstring for PBE_2DRenderTimeEpochs."""
-    # def __init__(self, arg):
-    #     super(SessionEpochs2DRenderTimeEpochs, self).__init__()
-        
+    default_datasource_name = 'PBEs'
+    
     @classmethod
     def build_epochs_dataframe_formatter(cls, **kwargs):
         def _add_interval_dataframe_visualization_columns_general_epoch(active_df):
