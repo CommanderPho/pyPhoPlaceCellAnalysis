@@ -55,3 +55,6 @@ MANIFEST
 src/pyphoplacecellanalysis/External/pyqtgraph/**/Uic_AUTOGEN_*Template.py
 src/pyphoplacecellanalysis/External/pyqtgraph/examples/Uic_AUTOGEN_DateAxisItem_QtDesigner.py
 src/pyphoplacecellanalysis/External/pyqtgraph/examples/Uic_AUTOGEN_designerExample.py
+src/pyphoplacecellanalysis/Resources/Icons/unused
+src/pyphoplacecellanalysis/Resources/rc_ActionIcons.py
+src/pyphoplacecellanalysis/Resources/rc_GuiResources.py
