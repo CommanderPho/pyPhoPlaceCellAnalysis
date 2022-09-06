@@ -170,6 +170,10 @@ class Ui_GlobalApplicationMenusMainWindow(object):
         self.actionAddTimeIntervals_Laps.setText(_translate("GlobalApplicationMenusMainWindow", "Laps"))
         self.actionAddTimeIntervals_Custom.setText(_translate("GlobalApplicationMenusMainWindow", "Custom..."))
         self.actionAddTimeCurves_Random.setText(_translate("GlobalApplicationMenusMainWindow", "Random"))
-import ActionIcons_rc
-import GuiResources_rc
-import breeze_rc
+# import ActionIcons_rc
+# import GuiResources_rc
+# import breeze_rc
+
+## CUSTOM: DO NOT OVERWRITE:
+import pyphoplacecellanalysis.Resources.ActionIcons
+import pyphoplacecellanalysis.Resources.GuiResources
