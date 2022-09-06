@@ -1,0 +1,109 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <author>Pho Hale</author>
+ <class>LocalMenus_RenderableOptions</class>
+ <widget class="QMainWindow" name="LocalMenus_RenderableOptions">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>703</width>
+    <height>126</height>
+   </rect>
+  </property>
+  <property name="windowTitle">
+   <string notr="true">LocalMenus</string>
+  </property>
+  <widget class="QWidget" name="centralwidget"/>
+  <widget class="QMenuBar" name="menubar">
+   <property name="geometry">
+    <rect>
+     <x>0</x>
+     <y>0</y>
+     <width>703</width>
+     <height>22</height>
+    </rect>
+   </property>
+   <widget class="QMenu" name="menuAdd_Renderable">
+    <property name="title">
+     <string notr="true">Add Renderable</string>
+    </property>
+    <widget class="QMenu" name="menuAddRenderable_Time_Curves">
+     <property name="title">
+      <string notr="true">Add Time Curves...</string>
+     </property>
+     <property name="icon">
+      <iconset resource="../../../Resources/ActionIcons.qrc">
+       <normaloff>:/Render/Icons/actions/chart-up-color.png</normaloff>:/Render/Icons/actions/chart-up-color.png</iconset>
+     </property>
+     <addaction name="actionAddTimeCurves_Position"/>
+     <addaction name="actionAddTimeCurves_Random"/>
+     <addaction name="actionAddTimeCurves_Custom"/>
+    </widget>
+    <widget class="QMenu" name="menuAddRenderable_Time_Intervals">
+     <property name="title">
+      <string notr="true">Add Time Intervals...</string>
+     </property>
+     <property name="icon">
+      <iconset resource="../../../Resources/ActionIcons.qrc">
+       <normaloff>:/Render/Icons/actions/spectrum-emission.png</normaloff>:/Render/Icons/actions/spectrum-emission.png</iconset>
+     </property>
+     <addaction name="actionAddTimeIntervals_PBEs"/>
+     <addaction name="actionAddTimeIntervals_Session_Epochs"/>
+     <addaction name="actionAddTimeIntervals_Laps"/>
+     <addaction name="actionAddTimeIntervals_Custom"/>
+    </widget>
+    <addaction name="menuAddRenderable_Time_Curves"/>
+    <addaction name="menuAddRenderable_Time_Intervals"/>
+    <addaction name="actionAddCustomRenderable"/>
+   </widget>
+   <addaction name="menuAdd_Renderable"/>
+  </widget>
+  <action name="actionAddTimeCurves_Position">
+   <property name="text">
+    <string notr="true">Position</string>
+   </property>
+  </action>
+  <action name="actionAddTimeCurves_Custom">
+   <property name="text">
+    <string notr="true">Custom...</string>
+   </property>
+  </action>
+  <action name="actionAddCustomRenderable">
+   <property name="text">
+    <string notr="true">Add Custom...</string>
+   </property>
+  </action>
+  <action name="actionAddTimeIntervals_PBEs">
+   <property name="text">
+    <string notr="true">PBEs</string>
+   </property>
+  </action>
+  <action name="actionAddTimeIntervals_Session_Epochs">
+   <property name="text">
+    <string notr="true">Session Epochs</string>
+   </property>
+  </action>
+  <action name="actionAddTimeIntervals_Laps">
+   <property name="text">
+    <string notr="true">Laps</string>
+   </property>
+  </action>
+  <action name="actionAddTimeIntervals_Custom">
+   <property name="text">
+    <string notr="true">Custom...</string>
+   </property>
+  </action>
+  <action name="actionAddTimeCurves_Random">
+   <property name="text">
+    <string notr="true">Random</string>
+   </property>
+  </action>
+ </widget>
+ <resources>
+  <include location="../../../Resources/GuiResources.qrc"/>
+  <include location="../../../Resources/ActionIcons.qrc"/>
+  <include location="../../../External/breeze_style_sheets/dist/qrc/breeze.qrc"/>
+ </resources>
+ <connections/>
+</ui>

@@ -89,9 +89,6 @@ class ConnectionControlsMenuMixin(object):
             a_main_window.ui.menuConnections = QtWidgets.QMenu(a_main_window.ui.menubar) # A QMenu
             a_main_window.ui.actionMenuConnections = a_main_window.ui.menubar.addMenu(a_main_window.ui.menuConnections) # Used to remove the menu, a QAction
             # a_main_window.ui.menuConnections.setTearOffEnabled(True)
-            # icon1 = QtGui.QIcon()
-            # icon1.addPixmap(QtGui.QPixmap(":/Icons/Icons/chain.png"), QtGui.QIcon.Normal, QtGui.QIcon.Off)
-            # a_main_window.ui.menuConnections.setIcon(icon1)
             a_main_window.ui.menuConnections.setObjectName("menuConnections")
             a_main_window.ui.menuConnections.setTitle("Connections")
             
