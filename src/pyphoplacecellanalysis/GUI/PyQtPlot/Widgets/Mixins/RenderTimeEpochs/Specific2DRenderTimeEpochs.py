@@ -90,7 +90,6 @@ class General2DRenderTimeEpochs(object):
             raise NotImplementedError
         interval_datasource = cls.build_render_time_epochs_datasource(active_epochs_obj=active_Epochs, **kwargs)
         out_rects = destination_plot.add_rendered_intervals(interval_datasource, name=kwargs.setdefault('name', cls.default_datasource_name), debug_print=True)
-        # return out_rects
         
 ##########################################
 ## General Epochs
@@ -119,7 +118,6 @@ class SessionEpochs2DRenderTimeEpochs(General2DRenderTimeEpochs):
             return active_df
 
         return _add_interval_dataframe_visualization_columns_general_epoch
-    
     
 ##########################################
 ## Laps

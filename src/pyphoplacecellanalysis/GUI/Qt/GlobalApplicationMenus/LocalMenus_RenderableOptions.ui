@@ -57,7 +57,15 @@
     <addaction name="menuAddRenderable_Time_Intervals"/>
     <addaction name="actionAddCustomRenderable"/>
    </widget>
+   <widget class="QMenu" name="menuRenderable_Options">
+    <property name="title">
+     <string>Renderable Options</string>
+    </property>
+    <addaction name="actionRemove"/>
+    <addaction name="actionClear_All"/>
+   </widget>
    <addaction name="menuAdd_Renderable"/>
+   <addaction name="menuRenderable_Options"/>
   </widget>
   <action name="actionAddTimeCurves_Position">
    <property name="text">
@@ -97,6 +105,16 @@
   <action name="actionAddTimeCurves_Random">
    <property name="text">
     <string notr="true">Random</string>
+   </property>
+  </action>
+  <action name="actionClear_All">
+   <property name="text">
+    <string>Clear All</string>
+   </property>
+  </action>
+  <action name="actionRemove">
+   <property name="text">
+    <string>Remove</string>
    </property>
   </action>
  </widget>
