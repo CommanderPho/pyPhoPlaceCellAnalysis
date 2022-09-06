@@ -13,7 +13,7 @@ from pyphocorehelpers.geometry_helpers import find_ranges_in_window
 from pyphoplacecellanalysis.General.DataSeriesToSpatial import DataSeriesToSpatial
 from pyphoplacecellanalysis.General.Model.Datasources.CurveDatasource import CurveDatasource
 
-from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.Mixins.TimeCurves3D.Render3DTimeCurvesBaseGridMixin import BaseGrid3DTimeCurvesHelper, Render3DTimeCurvesBaseGridMixin
+from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.Mixins.TimeCurves.Render3DTimeCurvesBaseGridMixin import BaseGrid3DTimeCurvesHelper, Render3DTimeCurvesBaseGridMixin
 
 
 # An OrderedList of dictionaries of values to be provided by the datasource:

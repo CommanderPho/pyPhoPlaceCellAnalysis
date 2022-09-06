@@ -147,6 +147,7 @@ class PhoMenuHelper(object):
     
     @classmethod
     def set_menu_default_stylesheet(cls, root_menu_bar):
+        """ styles a QMenuBar with my preferred menu stylesheet """
         custom_theme_multiline_string = """QMenuBar
         {
             background-color: #31363b;

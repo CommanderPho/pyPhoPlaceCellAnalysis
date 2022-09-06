@@ -17,7 +17,7 @@ from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.SpikeRasterWidgets.SpikeRasterB
 
 from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.Mixins.RenderTimeEpochs.RenderTimeEpoch3DMeshesMixin import RenderTimeEpoch3DMeshesMixin
 
-from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.Mixins.TimeCurves3D.RenderTimeCurvesMixin import PyQtGraphSpecificTimeCurvesMixin
+from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.Mixins.TimeCurves.RenderTimeCurvesMixin import PyQtGraphSpecificTimeCurvesMixin
 
 
 

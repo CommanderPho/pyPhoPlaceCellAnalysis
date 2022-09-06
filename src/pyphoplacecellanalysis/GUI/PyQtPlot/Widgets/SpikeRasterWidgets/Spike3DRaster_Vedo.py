@@ -30,7 +30,7 @@ from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.SpikeRasterWidgets.SpikeRasterB
 from pyphoplacecellanalysis.GUI.Vedo.VedoMeshManipulatable import VedoPlotterHelpers
 from pyphoplacecellanalysis.GUI.Vedo.Vedo3DStatic import StaticVedo_3DRasterHelper
 
-from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.Mixins.TimeCurves3D.RenderTimeCurvesMixin import VedoSpecificTimeCurvesMixin
+from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.Mixins.TimeCurves.RenderTimeCurvesMixin import VedoSpecificTimeCurvesMixin
 
 
 # class Spike3DRaster_Vedo(SimplePlayPauseWithExternalAppMixin, SpikeRasterBottomFrameControlsMixin, VedoSpecificTimeCurvesMixin, SpikeRasterBase):

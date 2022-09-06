@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 from sklearn.preprocessing import MinMaxScaler
 from pyphoplacecellanalysis.General.Model.RenderDataseries import RenderDataseries
-from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.Mixins.TimeCurves3D.RenderTimeCurvesMixin import CurveDatasource
+from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.Mixins.TimeCurves.RenderTimeCurvesMixin import CurveDatasource
 
 ##########################################
 ## General Render Time Curves
@@ -352,7 +352,7 @@ class Specific3DTimeCurvesHelper:
             spike_visualization_mode: str - must be ('count', 'rate', 'mov_average')
         
         Usage:
-            from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.Mixins.TimeCurves3D.Specific3DTimeCurves import Specific3DTimeCurvesHelper
+            from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.Mixins.TimeCurves.Specific3DTimeCurves import Specific3DTimeCurvesHelper
             curr_computations_results = curr_active_pipeline.computation_results[active_config_name]
             
             active_curve_plotter_3d = spike_raster_window.spike_raster_plt_3d # from a spike_raster_window
