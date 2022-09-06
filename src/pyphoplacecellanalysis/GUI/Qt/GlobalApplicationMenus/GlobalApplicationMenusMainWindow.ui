@@ -62,10 +62,44 @@
     <addaction name="actionNew_Spikes_Behavior_Explorer_ipspikesDataExplorer"/>
     <addaction name="separator"/>
    </widget>
+   <widget class="QMenu" name="menuAdd_Renderable">
+    <property name="title">
+     <string>Add Renderable</string>
+    </property>
+    <widget class="QMenu" name="menuAddRenderable_Time_Curves">
+     <property name="title">
+      <string>Add Time Curves...</string>
+     </property>
+     <property name="icon">
+      <iconset resource="../../../Resources/ActionIcons.qrc">
+       <normaloff>:/Render/Icons/actions/chart-up-color.png</normaloff>:/Render/Icons/actions/chart-up-color.png</iconset>
+     </property>
+     <addaction name="actionAddTimeCurves_Position"/>
+     <addaction name="actionAddTimeCurves_Random"/>
+     <addaction name="actionAddTimeCurves_Custom"/>
+    </widget>
+    <widget class="QMenu" name="menuAddRenderable_Time_Intervals">
+     <property name="title">
+      <string>Add Time Intervals...</string>
+     </property>
+     <property name="icon">
+      <iconset resource="../../../Resources/ActionIcons.qrc">
+       <normaloff>:/Render/Icons/actions/spectrum-emission.png</normaloff>:/Render/Icons/actions/spectrum-emission.png</iconset>
+     </property>
+     <addaction name="actionAddTimeIntervals_PBEs"/>
+     <addaction name="actionAddTimeIntervals_Session_Epochs"/>
+     <addaction name="actionAddTimeIntervals_Laps"/>
+     <addaction name="actionAddTimeIntervals_Custom"/>
+    </widget>
+    <addaction name="menuAddRenderable_Time_Curves"/>
+    <addaction name="menuAddRenderable_Time_Intervals"/>
+    <addaction name="actionAdd_Custom"/>
+   </widget>
    <addaction name="menuFile"/>
    <addaction name="menuAnalyses"/>
    <addaction name="menuWindows"/>
    <addaction name="menuVisualizations"/>
+   <addaction name="menuAdd_Renderable"/>
    <addaction name="menuHelp"/>
   </widget>
   <widget class="QStatusBar" name="statusbar"/>
@@ -160,9 +194,50 @@
     <string>New 2D Raster (PyQtGraph)</string>
    </property>
   </action>
+  <action name="actionAddTimeCurves_Position">
+   <property name="text">
+    <string>Position</string>
+   </property>
+  </action>
+  <action name="actionAddTimeCurves_Custom">
+   <property name="text">
+    <string>Custom...</string>
+   </property>
+  </action>
+  <action name="actionAdd_Custom">
+   <property name="text">
+    <string>Add Custom...</string>
+   </property>
+  </action>
+  <action name="actionAddTimeIntervals_PBEs">
+   <property name="text">
+    <string>PBEs</string>
+   </property>
+  </action>
+  <action name="actionAddTimeIntervals_Session_Epochs">
+   <property name="text">
+    <string>Session Epochs</string>
+   </property>
+  </action>
+  <action name="actionAddTimeIntervals_Laps">
+   <property name="text">
+    <string>Laps</string>
+   </property>
+  </action>
+  <action name="actionAddTimeIntervals_Custom">
+   <property name="text">
+    <string>Custom...</string>
+   </property>
+  </action>
+  <action name="actionAddTimeCurves_Random">
+   <property name="text">
+    <string>Random</string>
+   </property>
+  </action>
  </widget>
  <resources>
   <include location="../../../Resources/GuiResources.qrc"/>
+  <include location="../../../Resources/ActionIcons.qrc"/>
   <include location="../../../External/breeze_style_sheets/dist/qrc/breeze.qrc"/>
  </resources>
  <connections/>
