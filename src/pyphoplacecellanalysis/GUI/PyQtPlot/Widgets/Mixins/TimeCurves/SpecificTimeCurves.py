@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 from sklearn.preprocessing import MinMaxScaler
 from pyphoplacecellanalysis.General.Model.RenderDataseries import RenderDataseries
-from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.Mixins.TimeCurves3D.Render3DTimeCurvesMixin import CurveDatasource
+from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.Mixins.TimeCurves3D.RenderTimeCurvesMixin import CurveDatasource
 
 ##########################################
 ## General Render Time Curves
