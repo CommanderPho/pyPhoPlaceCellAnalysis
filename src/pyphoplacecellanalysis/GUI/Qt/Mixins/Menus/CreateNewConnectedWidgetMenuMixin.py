@@ -19,20 +19,15 @@ class CreateNewConnectedWidgetMenuMixin(object):
         try_remove_create_new_connected_widget_menu(...)
     
     Example:
-        from pyphoplacecellanalysis.GUI.Qt.MainWindowWrapper import PhoBaseMainWindow
-
-        curr_content_widget = spike_raster_window.window()
-        curr_window = PhoBaseMainWindow(content_widget=curr_content_widget)
-        menuCreateNewConnectedWidget, actions_dict = build_menu(curr_window)
         
-        from pyphoplacecellanalysis.GUI.Qt.Mixins.CreateNewConnectedWidgetMenuMixin import CreateNewConnectedWidgetMenuMixin
-        curr_window, menuCreateNewConnectedWidget, actions_dict = CreateNewConnectedWidgetMenuMixin.try_add_create_new_connected_widget_menu(spike_raster_window)
+        from pyphoplacecellanalysis.GUI.Qt.Mixins.Menus.CreateNewConnectedWidgetMenuMixin import CreateNewConnectedWidgetMenuMixin
+        curr_window, menuCreateNewConnectedWidget, actions_dict = curr_window, menuCreateNewConnectedWidget, actions_dict = CreateNewConnectedWidgetMenuMixin.try_add_create_new_connected_widget_menu(spike_raster_window, curr_active_pipeline, curr_active_config, display_output)
+
 
     
     """
-    def build_create_new_connected_widget_menu(self):
-        return CreateNewConnectedWidgetMenuMixin.try_add_create_new_connected_widget_menu(self)
-
+    # def build_create_new_connected_widget_menu(self):
+    #     return CreateNewConnectedWidgetMenuMixin.try_add_create_new_connected_widget_menu(self)
 
     def remove_create_new_connected_widget_menu(self):
         """ Works to remove the menu created with menuCreateNewConnectedWidget, actions_dict = build_menu(curr_window) """

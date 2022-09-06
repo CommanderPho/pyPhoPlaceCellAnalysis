@@ -1,5 +1,6 @@
 from PyQt5 import QtWidgets, QtGui, QtCore
 from math import sqrt
+import numpy as np
 
 import pyphoplacecellanalysis.External.pyqtgraph as pg
 
@@ -70,6 +71,45 @@ class RadialMenu(QtWidgets.QGraphicsObject):
             iconItem.setOffset(-pixmap.rect().center())
             iconItem.setParentItem(item) # is this okay?
             
+    # def buildChildrenForItem(self, parent_id):
+    #     assert parent_id in self.buttons
+    #     parentItem = self.buttons[parent_id]
+    #     startAngle, angleSize
+    
+    
+    # def buildChildrenForItem(self, parent_id, parentOuterRadius, parentStartAngle, childrenItems):
+    def buildChildrenForItem(self, parent_id, parentStartAngle, childrenItems):
+        assert parent_id in self.buttons
+        parentItem = self.buttons[parent_id]
+        # parentOuterRadius = innerRadius  + size
+        # parentStartAngle
+        # parentStartAngle, angleSize
+        # for a_child_item in childrenItems:
+            # a_child_item[0]
+            # parentStartAngle
+            
+        
+        childButtonData = [((parentStartAngle+rel_startAngle), extent, icon) for (rel_startAngle, extent, icon) in childrenItems]
+        return childButtonData
+        
+        for index, (startAngle, extent, icon) in enumerate(childrenItems):
+            icon = self.style().standardIcon(icon, None, self)
+            curr_btn_id = (currLevelStartIndex+index)
+            radialButton.addButton(curr_btn_id, currLevelInnerRadius, self.level_radius_size, startAngle, extent, icon=icon) # innerRadius, size, startAngle, angleSize
+            
+            ## DO CHILDREN:
+            curr_children = debugChildrenButtonData.copy()
+            radialButton.buildChildrenForItem(curr_btn_id, parentOuterRadius=currLevelInnerRadius+self.level_radius_size,
+                                            parentStartAngle=startAngle,
+                                            childrenItems=curr_children)
+            
+            curr_btn = radialButton.buttons[curr_btn_id] # QGraphicsPathItem
+            # if not is_level_visible:
+            #     curr_btn.hide()
+            out_btn_id_dict[curr_btn_id] = curr_btn
+            
+            
+            
 
     def itemAtPos(self, pos):
         for button in self.buttons.values():
@@ -131,6 +171,30 @@ secondLevelButtonData = [
     (320, 30, pg.QtWidgets.QStyle.SP_ArrowUp), 
 ]
 
+debugChildrenButtonData = [
+    # (0, 20, pg.QtWidgets.QStyle.SP_ArrowBack), 
+    (0, 20, pg.QtWidgets.QStyle.SP_ArrowDown),
+    (0, 20, pg.QtWidgets.QStyle.SP_ArrowUp), 
+]
+# debugChildrenButtonData = [
+# ]
+# testButtonLabels = [
+# 'A','B','C'
+# ]
+
+# def _build_testButtonHierarchy(num_levels=3):
+#     for a_level_idx in np.arange(num_levels):
+
+#         for a_label in testButtonLabels:
+
+# 'SP_ArrowBack',
+# 'SP_ArrowDown',
+# 'SP_ArrowForward',
+# 'SP_ArrowLeft',
+# 'SP_ArrowRight',
+# 'SP_ArrowUp',
+
+
 class RadialMenuTest(pg.QtWidgets.QWidget):
     def __init__(self, startInnerRadius=64, size=20):
         self.startInnerRadius = startInnerRadius
@@ -140,17 +204,33 @@ class RadialMenuTest(pg.QtWidgets.QWidget):
         pg.QtWidgets.QWidget.__init__(self)
         self.scene = pg.QtWidgets.QGraphicsScene(self)
 
-        buttonItem = RadialMenu()
-        self.scene.addItem(buttonItem)
-        buttonItem.buttonClicked.connect(self.buttonClicked)
+        self.radialMenu = RadialMenu()
+        self.scene.addItem(self.radialMenu)
+        self.radialMenu.buttonClicked.connect(self.buttonClicked)
         
         ## Add Rings:
-        self.level_rings_dict[0] = self.add_buttonData(buttonItem, ButtonData, level_depth_idx=0)                
-        self.level_rings_dict[1] = self.add_buttonData(buttonItem, secondLevelButtonData, level_depth_idx=1)  # Second level ring:
-        self.hide_rings_exceeding(max_ring_level_idx=0)
+        self.level_rings_dict[0] = self.add_buttonData(self.radialMenu, ButtonData, level_depth_idx=0)                
+        # self.level_rings_dict[1] = self.add_buttonData(buttonItem, secondLevelButtonData, level_depth_idx=1)  # Second level ring:
+        # self.hide_rings_exceeding(max_ring_level_idx=0)
         
-        buttonItem.setPos(150, 150)
-        buttonItem.setZValue(1000)
+        # ## DO CHILDREN:
+        # if curr_btn_id == 3:
+        #     curr_children = debugChildrenButtonData.copy()
+        #     childButtonData = buttonItem.buildChildrenForItem(curr_btn_id, parentOuterRadius=currLevelInnerRadius+self.level_radius_size,
+        #                                     parentStartAngle=startAngle,
+        #                                     childrenItems=curr_children)
+            
+        #     childInnerRadius=currLevelInnerRadius+self.level_radius_size
+            
+        #     for child_index, (child_startAngle, child_extent, child_icon) in enumerate(childButtonData):
+        #         child_id = f'{curr_btn_id}.{child_index}'
+        #         buttonItem.addButton(child_id, childInnerRadius, self.level_radius_size, child_startAngle, child_extent, icon=child_icon) # innerRadius, size, startAngle, angleSize
+        #         self.level_rings_dict[1][child_id] = buttonItem.buttons[child_id] # QGraphicsPathItem
+        
+            
+        
+        self.radialMenu.setPos(150, 150)
+        self.radialMenu.setZValue(1000)
 
         self.view = pg.QtWidgets.QGraphicsView(self.scene, self)
         self.view.setRenderHints(pg.QtGui.QPainter.Antialiasing)
@@ -162,15 +242,31 @@ class RadialMenuTest(pg.QtWidgets.QWidget):
     def add_buttonData(self, radialButton, buttonData, level_depth_idx=2):
         # Second level ring:
         out_btn_id_dict = {}
-        secondLevelInnerRadius = self.startInnerRadius + ((level_depth_idx-1) * self.level_radius_size)
+        currLevelInnerRadius = self.startInnerRadius + ((level_depth_idx-1) * self.level_radius_size)
         # secondLevelStartIndex = len(buttonData)+1
-        secondLevelStartIndex = len(radialButton.buttons)+1
+        currLevelStartIndex = len(radialButton.buttons)+1
         # is_level_visible = (level_depth_idx <= 1)
         
         for index, (startAngle, extent, icon) in enumerate(buttonData):
             icon = self.style().standardIcon(icon, None, self)
-            curr_btn_id = (secondLevelStartIndex+index)
-            radialButton.addButton(curr_btn_id, secondLevelInnerRadius, self.level_radius_size, startAngle, extent, icon=icon) # innerRadius, size, startAngle, angleSize
+            curr_btn_id = (currLevelStartIndex+index)
+            radialButton.addButton(curr_btn_id, currLevelInnerRadius, self.level_radius_size, startAngle, extent, icon=icon) # innerRadius, size, startAngle, angleSize
+            
+            # ## DO CHILDREN:
+            # if curr_btn_id == 3:
+            #     curr_children = debugChildrenButtonData.copy()
+            #     childButtonData = radialButton.buildChildrenForItem(curr_btn_id, parentOuterRadius=currLevelInnerRadius+self.level_radius_size,
+            #                                     parentStartAngle=startAngle,
+            #                                     childrenItems=curr_children)
+                
+            #     childInnerRadius=currLevelInnerRadius+self.level_radius_size
+                
+            #     for child_index, (child_startAngle, child_extent, child_icon) in enumerate(childButtonData):
+            #         child_id = f'{curr_btn_id}.{child_index}'
+            #         radialButton.addButton(child_id, childInnerRadius, self.level_radius_size, child_startAngle, child_extent, icon=child_icon) # innerRadius, size, startAngle, angleSize
+            #         out_btn_id_dict[child_id] = radialButton.buttons[child_id] # QGraphicsPathItem
+            
+            
             curr_btn = radialButton.buttons[curr_btn_id] # QGraphicsPathItem
             # if not is_level_visible:
             #     curr_btn.hide()
