@@ -6,6 +6,8 @@ from sklearn.preprocessing import MinMaxScaler
 from pyphoplacecellanalysis.General.Model.RenderDataseries import RenderDataseries
 from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.Mixins.TimeCurves3D.Render3DTimeCurvesMixin import CurveDatasource
 
+##########################################
+## General Render Time Curves
 class GeneralRenderTimeCurves(object):
     """docstring for GeneralRenderTimeCurves.
     Analagous to the class-based General2DRenderTimeEpochs in pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.Mixins.RenderTimeEpochs.Specific2DRenderTimeEpochs
@@ -101,7 +103,9 @@ class GeneralRenderTimeCurves(object):
         destination_plot.add_3D_time_curves(curve_datasource=active_plot_curve_datasource) # Add the curves from the datasource
         return active_plot_curve_datasource
 
-        
+
+##########################################
+## Animal Position Curves
 class PositionRenderTimeCurves(GeneralRenderTimeCurves):
     
     default_datasource_name = 'PositionTimeCurves'
@@ -140,6 +144,8 @@ class PositionRenderTimeCurves(GeneralRenderTimeCurves):
         destination_plot.add_3D_time_curves(curve_datasource=active_plot_curve_datasource) # Add the curves from the datasource
         return active_plot_curve_datasource
 
+##########################################
+## MUA (Multi-Unit Activity) Curves
 class MUA_RenderTimeCurves(GeneralRenderTimeCurves):
     """ builds the MUA (Multi-Unit Activity) 3D Curves and adds them to the spike_raster_plot
     Usage:

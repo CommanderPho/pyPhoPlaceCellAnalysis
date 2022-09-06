@@ -573,7 +573,7 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
             self.add_3D_time_curves_baseline_grid_mesh() # from Render3DTimeCurvesBaseGridMixin
 
     def _build_or_update_time_curves_plot(self, plot_name, points, **kwargs):
-        """ For 3D
+        """ For 2D
         uses or builds a new self.ui.main_time_curves_view_widget, which the item is added to
         
         """

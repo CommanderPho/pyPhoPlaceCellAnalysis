@@ -106,8 +106,7 @@ class TimeCurvesViewMixin(Render3DTimeCurvesBaseGridMixin):
             
         ## Connect the data_series_specs_changed_signal:
         self.params.time_curves_datasource.data_series_specs_changed_signal.connect(self.TimeCurvesViewMixin_on_data_series_specs_changed)
-            
-        
+
         # TODO: should this really be overwritten here? Seems like previous plots should be removed first right?
         #       ## Specifically, it seems like self.clear_all_3D_time_curves() should be called if we are just going to overwrite it
         self.plots.time_curves = dict()
@@ -133,13 +132,7 @@ class TimeCurvesViewMixin(Render3DTimeCurvesBaseGridMixin):
         
     def clear_all_3D_time_curves(self):
         raise NotImplementedError
-        # for (aUID, plt) in self.plots.time_curves.items():
-        #     self.ui.main_gl_widget.removeItem(plt)
-        #     # plt.delete_later() #?
-        # # Clear the dict
-        # self.plots.time_curves.clear()
-
-    
+        
     def remove_3D_time_curves(self, UID=None, original_dataframe=None):
         """ TODO: unfortunately with this setup they would be recreated again in self.update_3D_time_curves() because the datasource would still be attached but the plot wouldn't exist. """
         raise NotImplementedError
@@ -187,6 +180,7 @@ class PyQtGraphSpecificTimeCurvesMixin(TimeCurvesViewMixin):
     
     Known Usages:
         Spike3DRaster
+        Spike2DRaster - BUT all methods are overriden within this class, so it effectively could have just inherited TimeCurvesViewMixin
     """
     def clear_all_3D_time_curves(self):
         for (aUID, plt) in self.plots.time_curves.items():
