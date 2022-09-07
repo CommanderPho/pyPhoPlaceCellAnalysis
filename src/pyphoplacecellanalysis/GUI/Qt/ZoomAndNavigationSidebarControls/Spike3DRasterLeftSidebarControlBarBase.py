@@ -76,6 +76,7 @@ class Ui_leftSideToolbarWidget(object):
         spacerItem = QtWidgets.QSpacerItem(20, 40, QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Minimum)
         self.verticalLayout.addItem(spacerItem)
         self.verticalSliderZoom = QtWidgets.QSlider(leftSideToolbarWidget)
+        self.verticalSliderZoom.setEnabled(False)
         self.verticalSliderZoom.setMinimum(0)
         self.verticalSliderZoom.setMaximum(1000)
         self.verticalSliderZoom.setProperty("value", 500)
@@ -86,6 +87,19 @@ class Ui_leftSideToolbarWidget(object):
         self.verticalSliderZoom.setTickInterval(100)
         self.verticalSliderZoom.setObjectName("verticalSliderZoom")
         self.verticalLayout.addWidget(self.verticalSliderZoom, 0, QtCore.Qt.AlignHCenter)
+        self.btnToggleCollapseExpand = QtWidgets.QToolButton(leftSideToolbarWidget)
+        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed)
+        sizePolicy.setHorizontalStretch(0)
+        sizePolicy.setVerticalStretch(0)
+        sizePolicy.setHeightForWidth(self.btnToggleCollapseExpand.sizePolicy().hasHeightForWidth())
+        self.btnToggleCollapseExpand.setSizePolicy(sizePolicy)
+        self.btnToggleCollapseExpand.setText("")
+        self.btnToggleCollapseExpand.setCheckable(True)
+        self.btnToggleCollapseExpand.setChecked(False)
+        self.btnToggleCollapseExpand.setToolButtonStyle(QtCore.Qt.ToolButtonIconOnly)
+        self.btnToggleCollapseExpand.setArrowType(QtCore.Qt.LeftArrow)
+        self.btnToggleCollapseExpand.setObjectName("btnToggleCollapseExpand")
+        self.verticalLayout.addWidget(self.btnToggleCollapseExpand)
         self.verticalLayout.setStretch(8, 1)
         self.verticalLayout_2.addLayout(self.verticalLayout)
 
@@ -100,6 +114,7 @@ class Ui_leftSideToolbarWidget(object):
         self.spinTemporalZoomFactor.setSuffix(_translate("leftSideToolbarWidget", "x"))
         self.label_6.setText(_translate("leftSideToolbarWidget", "win. dur."))
         self.spinRenderWindowDuration.setSuffix(_translate("leftSideToolbarWidget", "s"))
+        self.btnToggleCollapseExpand.setToolTip(_translate("leftSideToolbarWidget", "Collapse Sidebar"))
 from pyphoplacecellanalysis.External.pyqtgraph.widgets.SpinBox import SpinBox
 
 
