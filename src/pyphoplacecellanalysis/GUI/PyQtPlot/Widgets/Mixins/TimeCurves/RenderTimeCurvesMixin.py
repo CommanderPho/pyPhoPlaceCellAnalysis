@@ -41,6 +41,11 @@ class TimeCurvesViewMixin(Render3DTimeCurvesBaseGridMixin):
     """
     
     @property
+    def time_curve_render_dimensionality(self) -> int:
+        """ the dimensionality of the rendered time curves. (e.g. 2 for SpikeRaster2D, 3 for SpikeRaster3D, SpikeRaster3DVedo """
+        return 3 # default to 3D, since that's what the curves were initially used for. 
+    
+    @property
     def data_z_scaling_factor(self):
         """ the factor required to scale the data_values_range (which is the ordinate axes of the data) to fit within the z_max_value """
         return self.calculate_data_z_scaling_factor()

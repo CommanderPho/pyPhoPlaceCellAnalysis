@@ -512,6 +512,12 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
             
     """
     
+    
+    def time_curve_render_dimensionality(self) -> int:
+        """ the dimensionality of the rendered time curves. (e.g. 2 for SpikeRaster2D, 3 for SpikeRaster3D, SpikeRaster3DVedo """
+        return 2
+    
+    
     #####################################################
     def clear_all_3D_time_curves(self):
         for (aUID, plt) in self.plots.time_curves.items():
