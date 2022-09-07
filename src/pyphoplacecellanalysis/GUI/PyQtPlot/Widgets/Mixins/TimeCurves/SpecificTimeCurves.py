@@ -107,23 +107,58 @@ class GeneralRenderTimeCurves(object):
 ##########################################
 ## Animal Position Curves
 class PositionRenderTimeCurves(GeneralRenderTimeCurves):
+    """ 
+    add_render_time_curves
+        build_pre_spatial_to_spatial_mappings
+        build_render_time_curves_datasource
+            prepare_dataframe
+            data_series_pre_spatial_list
     
+    """
     default_datasource_name = 'PositionTimeCurves'
     
     @classmethod
-    def build_render_time_curves_datasource(cls, plot_df, pre_spatial_to_spatial_mappings, **kwargs):
-        # additional properties:
-        data_series_pre_spatial_list = [{'name':'linear position','t':'t','v_alt':None,'v_main':'lin_pos','color_name':'yellow', 'line_width':1.25, 'z_scaling_factor':1.0},
+    def data_series_pre_spatial_list(cls, *args, **kwargs):
+        """ returns the pre_spatial list for the dataseries. Usually just returns a constant, only a function in case a class wants to do separate setup based on a class property. """
+        return [{'name':'linear position','t':'t','v_alt':None,'v_main':'lin_pos','color_name':'yellow', 'line_width':1.25, 'z_scaling_factor':1.0},
             {'name':'x position','t':'t','v_alt':None,'v_main':'x', 'color_name':'red', 'line_width':0.5, 'z_scaling_factor':1.0},
             {'name':'y position','t':'t','v_alt':None,'v_main':'y', 'color_name':'green', 'line_width':0.5, 'z_scaling_factor':1.0}
         ]
-        
-        # a value scalar for the z-axis
+         
+    @classmethod
+    def prepare_dataframe(cls, plot_df, *args, **kwargs):
+        """ preforms and pre-processing of the dataframe needed (such as scaling/renaming columns/etc and returns a COPY """
         z_scaler = MinMaxScaler()
-        active_plot_curve_dataframe = plot_df[['t','x','y','lin_pos']].copy()
-        active_plot_curve_dataframe[['x','y']] = z_scaler.fit_transform(active_plot_curve_dataframe[['x','y']]) # scale x and y positions
-        active_plot_curve_dataframe[['lin_pos']] = z_scaler.fit_transform(active_plot_curve_dataframe[['lin_pos']]) # scale lin_pos position separately
+        transformed_df = plot_df[['t','x','y','lin_pos']].copy()
+        transformed_df[['x','y']] = z_scaler.fit_transform(transformed_df[['x','y']]) # scale x and y positions
+        transformed_df[['lin_pos']] = z_scaler.fit_transform(transformed_df[['lin_pos']]) # scale lin_pos position separately
+        return transformed_df
 
+
+    @classmethod
+    def build_pre_spatial_to_spatial_mappings(cls, destination_plot, *args, **kwargs):
+        """ builds and returns the mappings from the pre-spatial values to the spatial values, frequently using information from the destination_plot and passed-in variables. """
+        
+        if destination_plot.time_curve_render_dimensionality == 2:
+            # SpikeRaster2D needs different x_map_fn than the 3D plots:
+            x_map_fn = lambda t: t
+        else:            
+            x_map_fn = lambda t: destination_plot.temporal_to_spatial(t)
+
+        y_map_fn = lambda v: np.full_like(v, -destination_plot.n_half_cells)
+        z_map_fn = lambda v_main: v_main
+        return [{'name':'name','x':'t','y':'v_alt','z':'v_main','x_map_fn':x_map_fn,'y_map_fn':y_map_fn,'z_map_fn':z_map_fn},
+            {'name':'name','x':'t','y':'v_alt','z':'v_main','x_map_fn':x_map_fn,'y_map_fn':y_map_fn,'z_map_fn':z_map_fn},
+            {'name':'name','x':'t','y':'v_alt','z':'v_main','x_map_fn':x_map_fn,'y_map_fn':y_map_fn,'z_map_fn':z_map_fn}
+        ]
+    
+    
+    
+    @classmethod
+    def build_render_time_curves_datasource(cls, plot_df, pre_spatial_to_spatial_mappings, **kwargs):
+        """ typically shouldn't need to be overriden, just set up this way for customizability """
+        data_series_pre_spatial_list = cls.data_series_pre_spatial_list()
+        active_plot_curve_dataframe = cls.prepare_dataframe(plot_df)
         general_curve_interval_datasource = CurveDatasource(active_plot_curve_dataframe, data_series_specs=RenderDataseries.init_from_pre_spatial_data_series_list(data_series_pre_spatial_list, pre_spatial_to_spatial_mappings))
         return general_curve_interval_datasource
 
@@ -131,16 +166,15 @@ class PositionRenderTimeCurves(GeneralRenderTimeCurves):
     def add_render_time_curves(cls, curr_sess, destination_plot, **kwargs):
         """ directly-called method 
         destination_plot should implement add_rendered_intervals
+        
+        ## TODO: figure out how data should be provided to enable maximum generality. It seems that all datasources are currently dataframe based. 
+        
+        curr_sess: The session containing the data to be plotted. 
+        
         """
-        # Mappings from the pre-spatial values to the spatial values:
-        x_map_fn = lambda t: destination_plot.temporal_to_spatial(t)
-        y_map_fn = lambda v: np.full_like(v, -destination_plot.n_half_cells)
-        z_map_fn = lambda v_main: v_main
-        data_series_pre_spatial_to_spatial_mappings = [{'name':'name','x':'t','y':'v_alt','z':'v_main','x_map_fn':x_map_fn,'y_map_fn':y_map_fn,'z_map_fn':z_map_fn},
-            {'name':'name','x':'t','y':'v_alt','z':'v_main','x_map_fn':x_map_fn,'y_map_fn':y_map_fn,'z_map_fn':z_map_fn},
-            {'name':'name','x':'t','y':'v_alt','z':'v_main','x_map_fn':x_map_fn,'y_map_fn':y_map_fn,'z_map_fn':z_map_fn}
-        ]
-        active_plot_curve_datasource = cls.build_render_time_curves_datasource(curr_sess.position.to_dataframe(), data_series_pre_spatial_to_spatial_mappings)
+        plot_df = curr_sess.position.to_dataframe()
+        data_series_pre_spatial_to_spatial_mappings = cls.build_pre_spatial_to_spatial_mappings(destination_plot)
+        active_plot_curve_datasource = cls.build_render_time_curves_datasource(plot_df, data_series_pre_spatial_to_spatial_mappings)
         destination_plot.add_3D_time_curves(curve_datasource=active_plot_curve_datasource) # Add the curves from the datasource
         return active_plot_curve_datasource
 
@@ -191,6 +225,7 @@ class MUA_RenderTimeCurves(GeneralRenderTimeCurves):
 
         
 
+## OLD METHOD with two functions per curve type (e.g MUA, Position, etc)
 class Specific3DTimeCurvesHelper:
     """ Static helper methods that build commonly known 3D time curve datasources and add them to the provided plot.
     
