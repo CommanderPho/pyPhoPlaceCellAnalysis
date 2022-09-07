@@ -14,6 +14,13 @@
   <property name="windowTitle">
    <string notr="true">LocalMenus</string>
   </property>
+  <property name="styleSheet">
+   <string notr="true">background-color: rgb(71, 58, 46);
+border-color: rgb(207, 207, 207);
+background-color: rgba(71, 65, 60, 180);
+color: rgb(244, 244, 244);
+border-color: rgb(0, 0, 0);</string>
+  </property>
   <widget class="QWidget" name="centralwidget"/>
   <widget class="QMenuBar" name="menubar">
    <property name="geometry">
@@ -39,6 +46,8 @@
      <addaction name="actionAddTimeCurves_Position"/>
      <addaction name="actionAddTimeCurves_Random"/>
      <addaction name="actionAddTimeCurves_Custom"/>
+     <addaction name="separator"/>
+     <addaction name="actionClear_all_Time_Curves"/>
     </widget>
     <widget class="QMenu" name="menuAddRenderable_Time_Intervals">
      <property name="title">
@@ -52,10 +61,14 @@
      <addaction name="actionAddTimeIntervals_Session_Epochs"/>
      <addaction name="actionAddTimeIntervals_Laps"/>
      <addaction name="actionAddTimeIntervals_Custom"/>
+     <addaction name="separator"/>
+     <addaction name="actionClear_all_Time_Intervals"/>
     </widget>
     <addaction name="menuAddRenderable_Time_Curves"/>
     <addaction name="menuAddRenderable_Time_Intervals"/>
     <addaction name="actionAddCustomRenderable"/>
+    <addaction name="separator"/>
+    <addaction name="actionClear_all_Renderables"/>
    </widget>
    <addaction name="menuAdd_Renderable"/>
   </widget>
@@ -65,11 +78,17 @@
    </property>
   </action>
   <action name="actionAddTimeCurves_Custom">
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
    <property name="text">
     <string notr="true">Custom...</string>
    </property>
   </action>
   <action name="actionAddCustomRenderable">
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
    <property name="text">
     <string notr="true">Add Custom...</string>
    </property>
@@ -90,6 +109,9 @@
    </property>
   </action>
   <action name="actionAddTimeIntervals_Custom">
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
    <property name="text">
     <string notr="true">Custom...</string>
    </property>
@@ -97,6 +119,21 @@
   <action name="actionAddTimeCurves_Random">
    <property name="text">
     <string notr="true">Random</string>
+   </property>
+  </action>
+  <action name="actionClear_all_Time_Curves">
+   <property name="text">
+    <string>Clear all Time Curves</string>
+   </property>
+  </action>
+  <action name="actionClear_all_Time_Intervals">
+   <property name="text">
+    <string>Clear all Time Intervals</string>
+   </property>
+  </action>
+  <action name="actionClear_all_Renderables">
+   <property name="text">
+    <string>Clear all Renderables</string>
    </property>
   </action>
  </widget>

@@ -512,7 +512,7 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
             
     """
     
-    
+    @property
     def time_curve_render_dimensionality(self) -> int:
         """ the dimensionality of the rendered time curves. (e.g. 2 for SpikeRaster2D, 3 for SpikeRaster3D, SpikeRaster3DVedo """
         return 2
