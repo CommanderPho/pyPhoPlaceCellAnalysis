@@ -20,8 +20,8 @@ class LocalMenus_AddRenderable(QtWidgets.QMainWindow):
 		self.ui = Ui_LocalMenus_AddRenderable()
 		self.ui.setupUi(self) # builds the design from the .ui onto this widget.
 		self.initUI()
-		self.show() # Show the GUI
-
+		# Do not call show, as this is just to add menus, and should be destroyed when done
+		# self.show() # Show the GUI
 
 	def initUI(self):
 		pass
