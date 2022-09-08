@@ -74,7 +74,23 @@ class General2DRenderTimeEpochs(object):
 
     @classmethod
     def build_render_time_epochs_datasource(cls, active_epochs_obj, **kwargs):
-        general_epochs_interval_datasource = IntervalsDatasource.init_from_epoch_object(active_epochs_obj, cls.build_epochs_dataframe_formatter(**kwargs), datasource_name='intervals_datasource_from_general_Epochs_obj')
+        if isinstance(active_epochs_obj, Epoch):
+            general_epochs_interval_datasource = IntervalsDatasource.init_from_epoch_object(active_epochs_obj, cls.build_epochs_dataframe_formatter(**kwargs), datasource_name='intervals_datasource_from_general_Epochs_obj')
+            
+        elif isinstance(active_epochs_obj, pd.DataFrame):
+            ## NOTE that build_epochs_dataframe_formatter is never called if a dataframe is passed in directly, and the dataframe's columns must be named exactly correctly
+            general_epochs_interval_datasource = IntervalsDatasource(active_epochs_obj, datasource_name='intervals_datasource_from_general_dataframe_obj')
+            
+        elif isinstance(active_epochs_obj, tuple):
+            assert len(active_epochs_obj) == 3
+            # raise NotImplementedError # These do not work because they don't get the required columns added via cls.build_epochs_dataframe_formatter(**kwargs)
+            # must be a tuple containing (t_starts, t_durations, optional_values/ids)
+            _temp_formatter = cls.build_epochs_dataframe_formatter(**kwargs)
+            general_epochs_interval_datasource = IntervalsDatasource.init_from_times_values(*active_epochs_obj, cls.build_epochs_dataframe_formatter(**kwargs), datasource_name='intervals_datasource_from_general_times_tuple_obj')
+            
+            
+        else:
+            raise NotImplementedError
         return general_epochs_interval_datasource
 
     @classmethod
@@ -84,7 +100,7 @@ class General2DRenderTimeEpochs(object):
         """
         if isinstance(curr_sess, DataSession):
             active_Epochs = curr_sess.epochs # <Epoch> object
-        elif isinstance(curr_sess, Epoch):
+        elif isinstance(curr_sess, (Epoch, pd.DataFrame, tuple)):
             active_Epochs = curr_sess  # <Epoch> object passed directly
         else:
             raise NotImplementedError
@@ -207,6 +223,24 @@ class Replays_2DRenderTimeEpochs(General2DRenderTimeEpochs):
 
         return _add_interval_dataframe_visualization_columns_general_epoch
     
+    @classmethod
+    def add_render_time_epochs(cls, curr_sess, destination_plot, **kwargs):
+        """ directly-called method 
+        destination_plot should implement add_rendered_intervals
+        """
+        if isinstance(curr_sess, DataSession):
+            active_Epochs = curr_sess.epochs # <Epoch> object
+        elif isinstance(curr_sess, Epoch):
+            active_Epochs = curr_sess  # <Epoch> object passed directly
+        elif isinstance(curr_sess, pd.DataFrame):
+            active_Epochs = (curr_sess['start'].to_numpy(), curr_sess['duration'].to_numpy(), curr_sess['flat_replay_idx'].to_numpy())
+            
+        else:
+            raise NotImplementedError
+        interval_datasource = cls.build_render_time_epochs_datasource(active_epochs_obj=active_Epochs, **kwargs)
+        out_rects = destination_plot.add_rendered_intervals(interval_datasource, name=kwargs.setdefault('name', cls.default_datasource_name), debug_print=True)
+        
+        
     
 ##########################################
 ## Ripples
