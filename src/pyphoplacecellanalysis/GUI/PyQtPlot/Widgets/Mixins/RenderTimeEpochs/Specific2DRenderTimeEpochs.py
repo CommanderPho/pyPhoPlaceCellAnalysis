@@ -185,5 +185,46 @@ class PBE_2DRenderTimeEpochs(General2DRenderTimeEpochs):
 
         return _add_interval_dataframe_visualization_columns_general_epoch
       
+      
+
+##########################################
+## Replays
+class Replays_2DRenderTimeEpochs(General2DRenderTimeEpochs):
+    default_datasource_name = 'Replays'
+    
+    @classmethod
+    def build_epochs_dataframe_formatter(cls, **kwargs):
+        def _add_interval_dataframe_visualization_columns_general_epoch(active_df):
+            ## parameters:
+            y_location = 0.0
+            height = 5.5
+            pen_color = pg.mkColor('orange')
+            brush_color = pg.mkColor('orange')
+            
+            ## Add the missing parameters to the dataframe:
+            active_df = cls._add_missing_df_columns(active_df, y_location, height, pen_color, brush_color, **kwargs)
+            return active_df
+
+        return _add_interval_dataframe_visualization_columns_general_epoch
+    
+    
+##########################################
+## Ripples
+class Ripples_2DRenderTimeEpochs(General2DRenderTimeEpochs):
+    default_datasource_name = 'Ripples'
+    
+    @classmethod
+    def build_epochs_dataframe_formatter(cls, **kwargs):
+        def _add_interval_dataframe_visualization_columns_general_epoch(active_df):
+            ## parameters:
+            y_location = 10.0
+            height = 8.5
+            pen_color = pg.mkColor('blue')
+            brush_color = pg.mkColor('blue')
+            ## Add the missing parameters to the dataframe:
+            active_df = cls._add_missing_df_columns(active_df, y_location, height, pen_color, brush_color, **kwargs)
+            return active_df
+
+        return _add_interval_dataframe_visualization_columns_general_epoch
         
 """ HISTORICAL NOTE: Specific2DRenderTimeEpochsHelper has been removed in favor of a class-based approach """

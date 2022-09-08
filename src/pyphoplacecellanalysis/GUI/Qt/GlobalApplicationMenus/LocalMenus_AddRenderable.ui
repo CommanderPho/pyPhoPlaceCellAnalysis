@@ -50,9 +50,11 @@
       <iconset resource="../../../Resources/ActionIcons.qrc">
        <normaloff>:/Render/Icons/actions/spectrum-emission.png</normaloff>:/Render/Icons/actions/spectrum-emission.png</iconset>
      </property>
-     <addaction name="actionAddTimeIntervals_PBEs"/>
      <addaction name="actionAddTimeIntervals_Session_Epochs"/>
      <addaction name="actionAddTimeIntervals_Laps"/>
+     <addaction name="actionAddTimeIntervals_PBEs"/>
+     <addaction name="actionAddTimeIntervals_Ripples"/>
+     <addaction name="actionAddTimeIntervals_Replays"/>
      <addaction name="actionAddTimeIntervals_Custom"/>
      <addaction name="separator"/>
      <addaction name="actionClear_all_Time_Intervals"/>
@@ -127,6 +129,16 @@
   <action name="actionClear_all_Renderables">
    <property name="text">
     <string>Clear all Renderables</string>
+   </property>
+  </action>
+  <action name="actionAddTimeIntervals_Ripples">
+   <property name="text">
+    <string>Ripples</string>
+   </property>
+  </action>
+  <action name="actionAddTimeIntervals_Replays">
+   <property name="text">
+    <string>Replays</string>
    </property>
   </action>
  </widget>
