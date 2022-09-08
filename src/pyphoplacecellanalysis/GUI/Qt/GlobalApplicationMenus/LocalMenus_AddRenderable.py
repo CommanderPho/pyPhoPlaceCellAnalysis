@@ -7,6 +7,7 @@ import pyphoplacecellanalysis.External.pyqtgraph as pg
 from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtCore, QtGui, QtWidgets, mkQApp, uic
 
 ## IMPORTS:
+from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer
 from pyphoplacecellanalysis.Resources import GuiResources, ActionIcons
 from pyphoplacecellanalysis.GUI.Qt.GlobalApplicationMenus.Uic_AUTOGEN_LocalMenus_AddRenderable import Ui_LocalMenus_AddRenderable
 
@@ -80,7 +81,7 @@ class LocalMenus_AddRenderable(QtWidgets.QMainWindow):
     def add_renderable_context_menu(cls, active_2d_plot, sess):
         """ 
         Usage:
-            active_2d_plot = spike_raster_window.spike_raster_plt_2d # <pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.SpikeRasterWidgets.Spike2DRaster.Spike2DRaster at 0x196c7244280>
+            active_2d_plot = spike_raster_window.spike_raster_plt_2d 
             menuAdd_Renderable = LocalMenus_AddRenderable.add_renderable_context_menu(active_2d_plot, sess)
             
         """
@@ -119,15 +120,19 @@ class LocalMenus_AddRenderable(QtWidgets.QMainWindow):
         active_2d_plot_renderable_menus = cls.build_renderable_menu(active_2d_plot, sess)
         widget_2d_menu = active_2d_plot_renderable_menus[0]
         menuAdd_Renderable = widget_2d_menu.ui.menuAdd_Renderable
+        
+        ## Specific to SpikeRaster2D:        
         ## Add the custom menu to the context menus of the plots in SpikeRaster2D:        
         main_plot_widget = active_2d_plot.plots.main_plot_widget # PlotItem
         background_static_scroll_plot_widget = active_2d_plot.plots.background_static_scroll_window_plot # PlotItem
         _subFn_append_custom_menu_to_context_menu(main_plot_widget, menuAdd_Renderable)
         _subFn_append_custom_menu_to_context_menu(background_static_scroll_plot_widget, menuAdd_Renderable)
-        # return menuAdd_Renderable # try returning just the menu and not the stupid references to everything # FAILED
         
-        return active_2d_plot_renderable_menus # try returning just the menu and not the stupid references to everything # FAILED
-    
+        # Add the reference to the context menus to owner, so it isn't released:
+        ## TODO: currently replaces the dict entry, which we might want to use for other menus
+        active_2d_plot.ui.menus = PhoUIContainer.init_from_dict({'custom_context_menus': PhoUIContainer.init_from_dict({'add_renderables': active_2d_plot_renderable_menus})})        
+        return menuAdd_Renderable # try returning just the menu and not the stupid references to everything # Works when we hold a reference
+
     
 
 ## Start Qt event loop

@@ -67,9 +67,6 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
         """ Whether to debug print user interaction events like mouse clicks, mouse wheel, key presses, etc. """
         return (self.enable_debug_print and Spike3DRasterWindowWidget.enable_interaction_events_debug_print)
     
-
-
-
     @property
     def temporal_zoom_factor(self):
         """The time dilation factor that maps spikes in the current window to y-positions along the time axis multiplicatively.
