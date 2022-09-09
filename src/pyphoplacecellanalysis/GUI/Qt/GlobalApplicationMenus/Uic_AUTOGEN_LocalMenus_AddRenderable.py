@@ -16,11 +16,6 @@ class Ui_LocalMenus_AddRenderable(object):
         LocalMenus_AddRenderable.setObjectName("LocalMenus_AddRenderable")
         LocalMenus_AddRenderable.resize(703, 126)
         LocalMenus_AddRenderable.setWindowTitle("LocalMenus")
-        LocalMenus_AddRenderable.setStyleSheet("background-color: rgb(71, 58, 46);\n"
-"border-color: rgb(207, 207, 207);\n"
-"background-color: rgba(71, 65, 60, 180);\n"
-"color: rgb(244, 244, 244);\n"
-"border-color: rgb(0, 0, 0);")
         self.centralwidget = QtWidgets.QWidget(LocalMenus_AddRenderable)
         self.centralwidget.setObjectName("centralwidget")
         LocalMenus_AddRenderable.setCentralWidget(self.centralwidget)
@@ -76,14 +71,20 @@ class Ui_LocalMenus_AddRenderable(object):
         self.actionClear_all_Time_Intervals.setObjectName("actionClear_all_Time_Intervals")
         self.actionClear_all_Renderables = QtWidgets.QAction(LocalMenus_AddRenderable)
         self.actionClear_all_Renderables.setObjectName("actionClear_all_Renderables")
+        self.actionAddTimeIntervals_Ripples = QtWidgets.QAction(LocalMenus_AddRenderable)
+        self.actionAddTimeIntervals_Ripples.setObjectName("actionAddTimeIntervals_Ripples")
+        self.actionAddTimeIntervals_Replays = QtWidgets.QAction(LocalMenus_AddRenderable)
+        self.actionAddTimeIntervals_Replays.setObjectName("actionAddTimeIntervals_Replays")
         self.menuAddRenderable_Time_Curves.addAction(self.actionAddTimeCurves_Position)
         self.menuAddRenderable_Time_Curves.addAction(self.actionAddTimeCurves_Random)
         self.menuAddRenderable_Time_Curves.addAction(self.actionAddTimeCurves_Custom)
         self.menuAddRenderable_Time_Curves.addSeparator()
         self.menuAddRenderable_Time_Curves.addAction(self.actionClear_all_Time_Curves)
-        self.menuAddRenderable_Time_Intervals.addAction(self.actionAddTimeIntervals_PBEs)
         self.menuAddRenderable_Time_Intervals.addAction(self.actionAddTimeIntervals_Session_Epochs)
         self.menuAddRenderable_Time_Intervals.addAction(self.actionAddTimeIntervals_Laps)
+        self.menuAddRenderable_Time_Intervals.addAction(self.actionAddTimeIntervals_PBEs)
+        self.menuAddRenderable_Time_Intervals.addAction(self.actionAddTimeIntervals_Ripples)
+        self.menuAddRenderable_Time_Intervals.addAction(self.actionAddTimeIntervals_Replays)
         self.menuAddRenderable_Time_Intervals.addAction(self.actionAddTimeIntervals_Custom)
         self.menuAddRenderable_Time_Intervals.addSeparator()
         self.menuAddRenderable_Time_Intervals.addAction(self.actionClear_all_Time_Intervals)
@@ -102,6 +103,8 @@ class Ui_LocalMenus_AddRenderable(object):
         self.actionClear_all_Time_Curves.setText(_translate("LocalMenus_AddRenderable", "Clear all Time Curves"))
         self.actionClear_all_Time_Intervals.setText(_translate("LocalMenus_AddRenderable", "Clear all Time Intervals"))
         self.actionClear_all_Renderables.setText(_translate("LocalMenus_AddRenderable", "Clear all Renderables"))
+        self.actionAddTimeIntervals_Ripples.setText(_translate("LocalMenus_AddRenderable", "Ripples"))
+        self.actionAddTimeIntervals_Replays.setText(_translate("LocalMenus_AddRenderable", "Replays"))
 from pyphoplacecellanalysis.Resources import ActionIcons
 from pyphoplacecellanalysis.Resources import GuiResources
 from pyphoplacecellanalysis.Resources import breeze

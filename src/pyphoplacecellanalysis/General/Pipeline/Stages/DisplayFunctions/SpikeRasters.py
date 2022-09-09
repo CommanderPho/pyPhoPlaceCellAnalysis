@@ -2,6 +2,7 @@ import numpy as np
 import pandas as pd
 from functools import partial
 
+from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer
 from pyphocorehelpers.mixins.member_enumerating import AllFunctionEnumeratingMixin
 from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DisplayFunctionRegistryHolder import DisplayFunctionRegistryHolder
 
@@ -15,7 +16,8 @@ from pyphoplacecellanalysis.GUI.Qt.GlobalApplicationMenus.LocalMenus_AddRenderab
 
 from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.SpikeRasterWidgets.spike_raster_widgets import build_spike_3d_raster_with_2d_controls, build_spike_3d_raster_vedo_with_2d_controls
 from pyphoplacecellanalysis.GUI.Qt.Mixins.Menus.ConnectionControlsMenuMixin import ConnectionControlsMenuMixin
-
+from pyphoplacecellanalysis.GUI.Qt.Mixins.Menus.CreateNewConnectedWidgetMenuMixin import CreateNewConnectedWidgetMenuMixin
+from pyphoplacecellanalysis.GUI.Qt.Mixins.Menus.DebugMenuProviderMixin import DebugMenuProviderMixin
 
 
 ## TODO: update these to use the correct format! This format has been invalidated!
@@ -76,7 +78,6 @@ class SpikeRastersDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Displa
         active_config_name = kwargs.get('active_config_name', 'Unknown')
         # active_config_name = active_config.
         
-        
         # spike_raster_window = Spike3DRasterWindowWidget(computation_result.sess.spikes_df)
         # spike_raster_window = Spike3DRasterWindowWidget(computation_result.sess.spikes_df, neuron_colors=provided_neuron_id_to_color_map, neuron_sort_order=None, type_of_3d_plotter=type_of_3d_plotter, application_name=f'Spike Raster Window - {active_config_name}')
         spike_raster_window = Spike3DRasterWindowWidget(computation_result.sess.spikes_df, type_of_3d_plotter=type_of_3d_plotter, application_name=f'Spike Raster Window - {active_config_name}')
@@ -87,10 +88,27 @@ class SpikeRastersDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Displa
         
         ## Adds the custom renderable menu to the top-level menu of the plots in Spike2DRaster
         _active_2d_plot_renderable_menus = LocalMenus_AddRenderable.add_renderable_context_menu(spike_raster_window.spike_raster_plt_2d, computation_result.sess)  # Adds the custom context menus for SpikeRaster2D        
+        owning_pipeline_reference = kwargs.get('owning_pipeline', None) # A reference to the pipeline upon which this display function is being called
+        ## Note that curr_main_menu_window is usually not the same as spike_raster_window, instead curr_main_menu_window wraps it and produces the final output window
+        curr_main_menu_window, menuConnections, connections_actions_dict = ConnectionControlsMenuMixin.try_add_connections_menu(spike_raster_window)
+        spike_raster_window.main_menu_window = curr_main_menu_window # to retain the changes
+        
+        if owning_pipeline_reference is not None:
+            display_output = owning_pipeline_reference.display_output
+            curr_main_menu_window, menuCreateNewConnectedWidget, createNewConnected_actions_dict = CreateNewConnectedWidgetMenuMixin.try_add_create_new_connected_widget_menu(spike_raster_window, owning_pipeline_reference, active_config, display_output)
+            spike_raster_window.main_menu_window = curr_main_menu_window # to retain the changes
+            
+        else:
+            print(f'WARNING: _display_spike_rasters_window(...) has no owning_pipeline_reference in its parameters, so it cannot add the CreateNewConnectedWidgetMenuMixin menus.')
+            menuCreateNewConnectedWidget = None
+            createNewConnected_actions_dict = None
+            
+        # Debug Menu
+        
+        _debug_menu_provider = DebugMenuProviderMixin(render_widget=spike_raster_window)
+        _debug_menu_provider.DebugMenuProviderMixin_on_init()
+        _debug_menu_provider.DebugMenuProviderMixin_on_buildUI()
+            
         return {'spike_raster_plt_2d':spike_raster_window.spike_raster_plt_2d, 'spike_raster_plt_3d':spike_raster_window.spike_raster_plt_3d, 'spike_raster_window': spike_raster_window}
-    
-        # return {'spike_raster_plt_2d':spike_raster_plt_2d, 'spike_raster_plt_3d_vedo':spike_raster_plt_3d_vedo, 'spike_3d_to_2d_window_connection':spike_3d_to_2d_window_connection, 'spike_raster_window': spike_raster_window}
-    
-
 
 

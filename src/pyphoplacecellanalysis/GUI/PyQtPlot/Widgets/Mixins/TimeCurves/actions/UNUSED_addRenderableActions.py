@@ -2,7 +2,7 @@
 import pyphoplacecellanalysis.External.pyqtgraph as pg
 from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtCore, QtGui, QtWidgets, mkQApp, uic
 from pyphoplacecellanalysis.Resources import GuiResources, ActionIcons
-from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.Mixins.TimeCurves.actions.plotAction import PlotAction
+from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.Mixins.TimeCurves.actions.UNUSED_plotAction import PlotAction
 
 from pyphoplacecellanalysis.GUI.Qt.GlobalApplicationMenus.LocalMenus_AddRenderable import LocalMenus_AddRenderable
 # from pyphoplacecellanalysis.GUI.Qt.GlobalApplicationMenus.Uic_AUTOGEN_LocalMenus_AddRenderable import Ui_LocalMenus_AddRenderable

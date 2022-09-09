@@ -2,8 +2,10 @@
 from qtpy import QtCore, QtGui, QtWidgets
 from pyphoplacecellanalysis.Resources import GuiResources, ActionIcons
 
+from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer
 from pyphoplacecellanalysis.GUI.Qt.Mixins.PhoMenuHelper import PhoMenuHelper
 from pyphoplacecellanalysis.GUI.Qt.Mixins.Menus.BaseMenuProviderMixin import BaseMenuCommand
+from pyphoplacecellanalysis.GUI.Qt.Mixins.Menus.BaseMenuProviderMixin import initialize_global_menu_ui_variables
 # GuiResources_rc
 
 
@@ -21,7 +23,7 @@ class CreateNewConnectedWidgetMenuMixin(object):
     Example:
         
         from pyphoplacecellanalysis.GUI.Qt.Mixins.Menus.CreateNewConnectedWidgetMenuMixin import CreateNewConnectedWidgetMenuMixin
-        curr_window, menuCreateNewConnectedWidget, actions_dict = curr_window, menuCreateNewConnectedWidget, actions_dict = CreateNewConnectedWidgetMenuMixin.try_add_create_new_connected_widget_menu(spike_raster_window, curr_active_pipeline, curr_active_config, display_output)
+        curr_window, menuCreateNewConnectedWidget, actions_dict = CreateNewConnectedWidgetMenuMixin.try_add_create_new_connected_widget_menu(spike_raster_window, curr_active_pipeline, curr_active_config, display_output)
 
 
     
@@ -33,6 +35,7 @@ class CreateNewConnectedWidgetMenuMixin(object):
         """ Works to remove the menu created with menuCreateNewConnectedWidget, actions_dict = build_menu(curr_window) """
         return CreateNewConnectedWidgetMenuMixin.try_remove_create_new_connected_widget_menu(self)
 
+    # spike_raster_window.ui.menus.global_window_menus.create_new_connected_widget
 
     @classmethod
     def try_add_create_new_connected_widget_menu(cls, a_content_widget, curr_active_pipeline, active_config_name, display_output):
@@ -50,11 +53,11 @@ class CreateNewConnectedWidgetMenuMixin(object):
     def try_remove_create_new_connected_widget_menu(cls, a_content_widget):
         """ Works to remove the menu created with menuCreateNewConnectedWidget, actions_dict = build_menu(curr_window) """
         curr_window = a_content_widget.window()
-        curr_actions_dict = curr_window.ui.createNewConnectedWidgetMenuActionsDict
+        curr_actions_dict = curr_window.ui.menus.global_window_menus.create_new_connected_widget.actions_dict
         curr_menubar = curr_window.menuBar()
-        if curr_window.ui.menuCreateNewConnectedWidget is not None:
+        if curr_window.ui.menus.global_window_menus.create_new_connected_widget.top_level_menu is not None:
             # remove the menu's children:
-            curr_window.ui.menuCreateNewConnectedWidget.clear() # remove children items
+            curr_window.ui.menus.global_window_menus.create_new_connected_widget.top_level_menu.clear() # remove children items
 
         # curr_menubar.removeAction(curr_actions_dict['actionMenuCreateNewConnectedWidget'])
         curr_menubar.removeAction(curr_actions_dict['actionMenuCreateNewConnectedWidget'])
@@ -62,17 +65,17 @@ class CreateNewConnectedWidgetMenuMixin(object):
         
         # curr_window.ui.actionMenuCreateNewConnectedWidget.deleteLater()
         curr_window.ui.actionMenuCreateNewConnectedWidget = None # Null out the action:
-        curr_window.ui.menuCreateNewConnectedWidget = None # Null out the reference to the menu item itself
-        curr_window.ui.createNewConnectedWidgetMenuActionsDict = {} # Empty the dict of actions
+        curr_window.ui.menus.global_window_menus.create_new_connected_widget.top_level_menu = None # Null out the reference to the menu item itself
+        curr_window.ui.menus.global_window_menus.create_new_connected_widget.actions_dict = {} # Empty the dict of actions
             
     @classmethod
     def try_attach_action_commands(cls, spike_raster_window, curr_active_pipeline, active_config_name, display_output):
         ## Register the actual commands for each action:
         curr_window = PhoMenuHelper.try_get_menu_window(spike_raster_window)
-        curr_window.ui.createNewConnectedWidgetMenuActionsDict['actionNewConnected3DRaster_PyQtGraph'].triggered.connect(CreateNewPyQtGraphPlotterCommand(spike_raster_window))
-        curr_window.ui.createNewConnectedWidgetMenuActionsDict['actionNewConnected3DRaster_Vedo'].triggered.connect(CreateNewVedoPlotterCommand(spike_raster_window))
-        curr_window.ui.createNewConnectedWidgetMenuActionsDict['actionNewConnectedDataExplorer_ipc'].triggered.connect(CreateNewDataExplorer_ipc_PlotterCommand(spike_raster_window, curr_active_pipeline, active_config_name, display_output))
-        curr_window.ui.createNewConnectedWidgetMenuActionsDict['actionNewConnectedDataExplorer_ipspikes'].triggered.connect(CreateNewDataExplorer_ipspikes_PlotterCommand(spike_raster_window, curr_active_pipeline, active_config_name, display_output))
+        curr_window.ui.menus.global_window_menus.create_new_connected_widget.actions_dict['actionNewConnected3DRaster_PyQtGraph'].triggered.connect(CreateNewPyQtGraphPlotterCommand(spike_raster_window))
+        curr_window.ui.menus.global_window_menus.create_new_connected_widget.actions_dict['actionNewConnected3DRaster_Vedo'].triggered.connect(CreateNewVedoPlotterCommand(spike_raster_window))
+        curr_window.ui.menus.global_window_menus.create_new_connected_widget.actions_dict['actionNewConnectedDataExplorer_ipc'].triggered.connect(CreateNewDataExplorer_ipc_PlotterCommand(spike_raster_window, curr_active_pipeline, active_config_name, display_output))
+        curr_window.ui.menus.global_window_menus.create_new_connected_widget.actions_dict['actionNewConnectedDataExplorer_ipspikes'].triggered.connect(CreateNewDataExplorer_ipspikes_PlotterCommand(spike_raster_window, curr_active_pipeline, active_config_name, display_output))
 
             
     @classmethod
@@ -82,38 +85,41 @@ class CreateNewConnectedWidgetMenuMixin(object):
         if found_extant_menu is not None:
             if debug_print:
                 print(f'existing create new connected widget menu found. Returning without creating.')
-            return a_main_window.ui.menuCreateNewConnectedWidget, a_main_window.ui.createNewConnectedWidgetMenuActionsDict
+            return a_main_window.ui.menus.global_window_menus.create_new_connected_widget.top_level_menu, a_main_window.ui.menus.global_window_menus.create_new_connected_widget.actions_dict
         else:
             PhoMenuHelper.set_menu_default_stylesheet(a_main_window.ui.menubar) # Sets the default menu stylesheet
+            initialize_global_menu_ui_variables(a_main_window)
+            a_main_window.ui.menus.global_window_menus.create_new_connected_widget = PhoUIContainer.init_from_dict({'top_level_menu': None, 'actions_dict': {}})
+            
             ## Only creates the QActions now, no QMenus:
             # Define dictionary for actions:
-            a_main_window.ui.createNewConnectedWidgetMenuActionsDict = {}            
+            # a_main_window.ui.menus.global_window_menus.create_new_connected_widget.actions_dict = {}
             
-            curr_action_key = PhoMenuHelper.add_action_item(a_main_window, "New Connected 3D Raster (PyQtGraph)", name="actionNewConnected3DRaster_PyQtGraph", tooltip="Create a new PyQtGraph 3D Raster plotter and connect it to this window", icon_path=":/Icons/Icons/SpikeRaster3DIcon.ico", actions_dict=a_main_window.ui.createNewConnectedWidgetMenuActionsDict)
+            curr_action_key = PhoMenuHelper.add_action_item(a_main_window, "New Connected 3D Raster (PyQtGraph)", name="actionNewConnected3DRaster_PyQtGraph", tooltip="Create a new PyQtGraph 3D Raster plotter and connect it to this window", icon_path=":/Icons/Icons/SpikeRaster3DIcon.ico", actions_dict=a_main_window.ui.menus.global_window_menus.create_new_connected_widget.actions_dict)
             
-            curr_action_key = PhoMenuHelper.add_action_item(a_main_window, "New Connected 3D Raster (Vedo)", name="actionNewConnected3DRaster_Vedo", tooltip="Create a new Vedo 3D Raster plotter and connect it to this window", icon_path=":/Icons/Icons/SpikeRaster3D_VedoIcon.ico", actions_dict=a_main_window.ui.createNewConnectedWidgetMenuActionsDict)
+            curr_action_key = PhoMenuHelper.add_action_item(a_main_window, "New Connected 3D Raster (Vedo)", name="actionNewConnected3DRaster_Vedo", tooltip="Create a new Vedo 3D Raster plotter and connect it to this window", icon_path=":/Icons/Icons/SpikeRaster3D_VedoIcon.ico", actions_dict=a_main_window.ui.menus.global_window_menus.create_new_connected_widget.actions_dict)
         
-            curr_action_key = PhoMenuHelper.add_action_item(a_main_window, "New Connected Tuning Curves Explorer (ipcDataExplorer)", name="actionNewConnectedDataExplorer_ipc", tooltip="Create a new 3D Interactive Tuning Curve Data Explorer Plotter and connect it to this window", icon_path=":/Icons/Icons/InteractivePlaceCellDataExplorerIconWithLabel.ico", actions_dict=a_main_window.ui.createNewConnectedWidgetMenuActionsDict)
+            curr_action_key = PhoMenuHelper.add_action_item(a_main_window, "New Connected Tuning Curves Explorer (ipcDataExplorer)", name="actionNewConnectedDataExplorer_ipc", tooltip="Create a new 3D Interactive Tuning Curve Data Explorer Plotter and connect it to this window", icon_path=":/Icons/Icons/InteractivePlaceCellDataExplorerIconWithLabel.ico", actions_dict=a_main_window.ui.menus.global_window_menus.create_new_connected_widget.actions_dict)
             
-            curr_action_key = PhoMenuHelper.add_action_item(a_main_window, "New Connected Spikes+Behavior Explorer (ipspikesDataExplorer)", name="actionNewConnectedDataExplorer_ipspikes", tooltip="Create a new 3D Interactive Spike and Behavior Plotter and connect it to this window", icon_path=":/Icons/Icons/TuningMapDataExplorerIconWithLabel.ico", actions_dict=a_main_window.ui.createNewConnectedWidgetMenuActionsDict)
+            curr_action_key = PhoMenuHelper.add_action_item(a_main_window, "New Connected Spikes+Behavior Explorer (ipspikesDataExplorer)", name="actionNewConnectedDataExplorer_ipspikes", tooltip="Create a new 3D Interactive Spike and Behavior Plotter and connect it to this window", icon_path=":/Icons/Icons/TuningMapDataExplorerIconWithLabel.ico", actions_dict=a_main_window.ui.menus.global_window_menus.create_new_connected_widget.actions_dict)
             
             
             ## Now Create the Menus for each QAction:
             
             # menuCreateNewConnectedWidget = menubar.addMenu('&Connections')
-            a_main_window.ui.menuCreateNewConnectedWidget = QtWidgets.QMenu(a_main_window.ui.menubar) # A QMenu
-            a_main_window.ui.actionMenuCreateNewConnectedWidget = a_main_window.ui.menubar.addMenu(a_main_window.ui.menuCreateNewConnectedWidget) # Used to remove the menu, a QAction
-            # a_main_window.ui.menuCreateNewConnectedWidget.setTearOffEnabled(True)
-            a_main_window.ui.menuCreateNewConnectedWidget.setObjectName("menuCreateNewConnectedWidget")
-            a_main_window.ui.menuCreateNewConnectedWidget.setTitle("Create Connected Widget")
+            a_main_window.ui.menus.global_window_menus.create_new_connected_widget.top_level_menu = QtWidgets.QMenu(a_main_window.ui.menubar) # A QMenu
+            a_main_window.ui.actionMenuCreateNewConnectedWidget = a_main_window.ui.menubar.addMenu(a_main_window.ui.menus.global_window_menus.create_new_connected_widget.top_level_menu) # Used to remove the menu, a QAction
+            # a_main_window.ui.menus.global_window_menus.create_new_connected_widget.top_level_menu.setTearOffEnabled(True)
+            a_main_window.ui.menus.global_window_menus.create_new_connected_widget.top_level_menu.setObjectName("menuCreateNewConnectedWidget")
+            a_main_window.ui.menus.global_window_menus.create_new_connected_widget.top_level_menu.setTitle("Create Connected Widget")
 
             ## Add the actions to the QMenu item:
-            a_main_window.ui.menuCreateNewConnectedWidget.addActions(a_main_window.ui.createNewConnectedWidgetMenuActionsDict.values())
+            a_main_window.ui.menus.global_window_menus.create_new_connected_widget.top_level_menu.addActions(a_main_window.ui.menus.global_window_menus.create_new_connected_widget.actions_dict.values())
             
             ## TODO: is this even needed? I think it's done to remove it, but can't I just use a_main_window.ui.actionMenuCreateNewConnectedWidget directly?
-            a_main_window.ui.createNewConnectedWidgetMenuActionsDict['actionMenuCreateNewConnectedWidget'] = a_main_window.ui.actionMenuCreateNewConnectedWidget            
+            a_main_window.ui.menus.global_window_menus.create_new_connected_widget.actions_dict['actionMenuCreateNewConnectedWidget'] = a_main_window.ui.actionMenuCreateNewConnectedWidget            
             
-            return a_main_window.ui.menuCreateNewConnectedWidget, a_main_window.ui.createNewConnectedWidgetMenuActionsDict
+            return a_main_window.ui.menus.global_window_menus.create_new_connected_widget.top_level_menu, a_main_window.ui.menus.global_window_menus.create_new_connected_widget.actions_dict
 
 
 

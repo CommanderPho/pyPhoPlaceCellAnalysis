@@ -173,6 +173,14 @@ class PipelineWithDisplayPipelineStageMixin:
         return (self.last_completed_stage >= PipelineStage.Displayed)
     
     @property
+    def display_output(self):
+        """ display_output holds the displayed figures and their acompanying helpers."""
+        return self.stage.display_output
+    @display_output.setter
+    def display_output(self, value):
+        self.stage.display_output = value
+    
+    @property
     def registered_display_functions(self):
         """The registered_display_functions property."""
         return self.stage.registered_display_functions
@@ -231,14 +239,23 @@ class PipelineWithDisplayPipelineStageMixin:
             display_function = self.registered_display_function_dict[display_function] # find the actual function from the name
             
         assert (active_session_filter_configuration in self.computation_results), f"self.computation_results doesn't contain a key for the provided active_session_filter_configuration ('{active_session_filter_configuration}'). Did you only enable computation with enabled_filter_names in perform_computation that didn't include this key?"
-        return display_function(self.computation_results[active_session_filter_configuration], self.active_configs[active_session_filter_configuration], **kwargs)
+        
+        # We pop the active_config_name parameter from the kwargs, as this was an outdated workaround to optionally get the display functions this string but now it's passed directly by the call below        
+        kwarg_active_config_name = kwargs.pop('active_config_name', None)
+        if kwarg_active_config_name is not None:
+            assert kwarg_active_config_name == active_session_filter_configuration # they better be equal or else there is a conflict.
+        
+        return display_function(self.computation_results[active_session_filter_configuration], self.active_configs[active_session_filter_configuration], owning_pipeline=self, active_config_name=active_session_filter_configuration, **kwargs)
+    
+    
+        # return display_function(self.computation_results[active_session_filter_configuration], self.active_configs[active_session_filter_configuration], **kwargs)
 
 
 class DisplayPipelineStage(DefaultRegisteredDisplayFunctions, ComputedPipelineStage):
     """ The concrete pipeline stage for displaying the output computed in previous stages."""
     identity: PipelineStage = PipelineStage.Displayed
     
-    def __init__(self, computed_stage: ComputedPipelineStage, render_actions=dict()):
+    def __init__(self, computed_stage: ComputedPipelineStage, display_output=dict(), render_actions=dict()):
         # super(DisplayPipelineStage, self).__init__()
         # ComputedPipelineStage fields:
         self.stage_name = computed_stage.stage_name
@@ -251,6 +268,7 @@ class DisplayPipelineStage(DefaultRegisteredDisplayFunctions, ComputedPipelineSt
         self.registered_computation_function_dict = computed_stage.registered_computation_function_dict
 
         # Initialize custom fields:
+        self.display_output = display_output
         self.render_actions = render_actions    
         self.registered_display_function_dict = OrderedDict()
         self.register_default_known_display_functions() # registers the default display functions

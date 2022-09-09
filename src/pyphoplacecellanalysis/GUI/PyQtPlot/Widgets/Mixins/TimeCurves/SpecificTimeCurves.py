@@ -15,60 +15,6 @@ class GeneralRenderTimeCurves(object):
     def __init__(self):
         super(GeneralRenderTimeCurves, self).__init__()
     
-    # default_datasource_name = 'GeneralEpochs'
-    
-    # @classmethod
-    # def _add_missing_df_columns(cls, active_df, y_location, height, pen_color, brush_color, **kwargs):
-    #     ## Add the missing parameters to the dataframe:
-    #         ## y_location:
-    #         if isinstance(y_location, (list, tuple)):
-    #             active_df['series_vertical_offset'] = kwargs.setdefault('series_vertical_offset', [a_y_location for a_y_location in y_location])
-    #         else:
-    #             # Scalar value assignment:
-    #             active_df['series_vertical_offset'] = kwargs.setdefault('series_vertical_offset', y_location)
-    #         ## series_height:
-    #         if isinstance(height, (list, tuple)):
-    #             active_df['series_height'] = kwargs.setdefault('series_height', [a_height for a_height in height])
-    #         else:
-    #             # Scalar value assignment:
-    #             active_df['series_height'] = kwargs.setdefault('series_height', height)
-                
-    #         ## pen_color:
-    #         if isinstance(pen_color, (list, tuple)):
-    #             active_df['pen'] = kwargs.setdefault('pen', [pg.mkPen(a_pen_color) for a_pen_color in pen_color])
-    #         else:
-    #             # Scalar value assignment:
-    #             active_df['pen'] = kwargs.setdefault('pen', pg.mkPen(pen_color)) 
-    #         ## brush_color:
-    #         if isinstance(brush_color, (list, tuple)):
-    #             active_df['brush'] = kwargs.setdefault('brush', [pg.mkBrush(a_color) for a_color in brush_color])  
-    #         else:
-    #             # Scalar value assignment:
-    #             active_df['brush'] = kwargs.setdefault('brush', pg.mkBrush(brush_color))
-            
-    #         return active_df #, kwargs
-    
-    # @classmethod
-    # def build_time_curves_dataframe_formatter(cls, **kwargs):
-    #     def _add_interval_dataframe_visualization_columns_general_epoch(active_df):
-    #         """ Adds the remaining _required_interval_visualization_columns specifically for PBEs
-    #         """
-    #         num_intervals = np.shape(active_df)[0]
-            
-    #         ## parameters:
-    #         y_location = 0.0
-    #         height = 1.0
-    #         pen_color = pg.mkColor('red')
-    #         brush_color = pg.mkColor('red')
-
-    #         ## parameters:            
-    #         ## Add the missing parameters to the dataframe:
-    #         active_df = cls._add_missing_df_columns(active_df, y_location, height, pen_color, brush_color, **kwargs)
-    #         return active_df
-
-    #     return _add_interval_dataframe_visualization_columns_general_epoch
-
-
     @classmethod
     def build_render_time_curves_datasource(cls, plot_df, pre_spatial_to_spatial_mappings, **kwargs):
         # additional properties:

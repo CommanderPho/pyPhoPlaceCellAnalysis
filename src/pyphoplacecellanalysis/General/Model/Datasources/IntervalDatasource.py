@@ -139,9 +139,10 @@ class IntervalsDatasource(BaseDatasource):
             
         
     @classmethod
-    def init_from_times_values(cls, t_starts, t_durations, values, datasource_name='intervals_datasource_from_epoch_obj'):
+    def init_from_times_values(cls, t_starts, t_durations, values, dataframe_vis_columns_function, datasource_name='intervals_datasource_from_epoch_obj'):
         plot_df = pd.DataFrame({'t_start': t_starts, 't_duration': t_durations, 't_end': (t_starts + t_durations), 'v': values})
-        return cls(plot_df, datasource_name=datasource_name)
+        return cls.init_from_epoch_object(plot_df, dataframe_vis_columns_function=dataframe_vis_columns_function, datasource_name=datasource_name)
+        # return cls(plot_df, datasource_name=datasource_name)
         
         
     @classmethod

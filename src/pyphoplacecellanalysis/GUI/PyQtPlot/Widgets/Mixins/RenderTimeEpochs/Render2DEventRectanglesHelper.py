@@ -72,6 +72,8 @@ class Render2DEventRectanglesHelper:
         ## build the IntervalRectsItem
         return IntervalRectsItem(curr_IntervalRectsItem_interval_tuples)
     
+    
+    # MAIN METHOD to build datasource ____________________________________________________________________________________ #
     @classmethod
     def build_IntervalRectsItem_from_interval_datasource(cls, interval_datasource: IntervalsDatasource):
         """ Builds an appropriate IntervalRectsItem from any IntervalsDatasource object 
