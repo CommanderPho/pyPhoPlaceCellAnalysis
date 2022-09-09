@@ -80,14 +80,14 @@ class PhoBaseMainWindow(PhoMainAppWindowBase):
         #     menubar.removeAction(found_extant_menu)
         
         # menuConnections = menubar.addMenu('&Connections')
-        a_main_window.ui.menuConnections = QtWidgets.QMenu(a_main_window.ui.menubar) # A QMenu
-        a_main_window.ui.actionMenuConnections = a_main_window.ui.menubar.addMenu(a_main_window.ui.menuConnections) # Used to remove the menu, a QAction
+        a_main_window.ui.menus.global_window_menus.menuConnections.top_level_menu = QtWidgets.QMenu(a_main_window.ui.menubar) # A QMenu
+        a_main_window.ui.actionMenuConnections = a_main_window.ui.menubar.addMenu(a_main_window.ui.menus.global_window_menus.menuConnections.top_level_menu) # Used to remove the menu, a QAction
         
-        # a_main_window.ui.menuConnections.setTearOffEnabled(True)
+        # a_main_window.ui.menus.global_window_menus.menuConnections.top_level_menu.setTearOffEnabled(True)
         icon1 = QtGui.QIcon()
         icon1.addPixmap(QtGui.QPixmap(":/Icons/Icons/chain.png"), QtGui.QIcon.Normal, QtGui.QIcon.Off)
-        a_main_window.ui.menuConnections.setIcon(icon1)
-        a_main_window.ui.menuConnections.setObjectName("menuConnections")
+        a_main_window.ui.menus.global_window_menus.menuConnections.top_level_menu.setIcon(icon1)
+        a_main_window.ui.menus.global_window_menus.menuConnections.top_level_menu.setObjectName("menuConnections")
         # a_main_window.setMenuBar(menubar)
         
         # Define actions
@@ -108,10 +108,10 @@ class PhoBaseMainWindow(PhoMainAppWindowBase):
         a_main_window.ui.actionDisconnect_from_driver.setToolTip("Disconnects the item from the current driver")
 
         # Add to connections menu:
-        a_main_window.ui.menuConnections.addAction(a_main_window.ui.actionConnect_Child)
-        a_main_window.ui.menuConnections.addAction(a_main_window.ui.actionDisconnect_from_driver)
+        a_main_window.ui.menus.global_window_menus.menuConnections.top_level_menu.addAction(a_main_window.ui.actionConnect_Child)
+        a_main_window.ui.menus.global_window_menus.menuConnections.top_level_menu.addAction(a_main_window.ui.actionDisconnect_from_driver)
 
-        return a_main_window.ui.menuConnections, {'actionMenuConnections':a_main_window.ui.actionMenuConnections, 'actionConnect_Child':a_main_window.ui.actionConnect_Child, 'actionDisconnect_from_driver':a_main_window.ui.actionDisconnect_from_driver}
+        return a_main_window.ui.menus.global_window_menus.menuConnections.top_level_menu, {'actionMenuConnections':a_main_window.ui.actionMenuConnections, 'actionConnect_Child':a_main_window.ui.actionConnect_Child, 'actionDisconnect_from_driver':a_main_window.ui.actionDisconnect_from_driver}
 
         
     def closeEvent(self, event):

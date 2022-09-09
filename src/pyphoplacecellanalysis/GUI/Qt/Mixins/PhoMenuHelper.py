@@ -27,7 +27,7 @@ class PhoMenuHelper(object):
         Usage:
             a_main_window.ui.actionConnect_Child = QtWidgets.QAction(a_main_window)
             PhoMenuHelper.setup_menu_item(a_main_window.ui.actionConnect_Child, "Connect Child...", name="actionConnect_Child", tooltip="Connect a child widget to another widget", icon_path=":/Icons/chain--arrow.png")
-            a_main_window.ui.menuCreateNewConnectedWidget.addAction(a_main_window.ui.actionConnect_Child)
+            a_main_window.ui.menus.global_window_menus.create_new_connected_widget.top_level_menu.addAction(a_main_window.ui.actionConnect_Child)
 
         """
         action_item.setText(text)
@@ -96,7 +96,7 @@ class PhoMenuHelper(object):
     def add_menu(cls, a_main_window, text, name=None, parent_menu=None, tooltip=None, icon_path=None, menu_actions_dict=None):
         """ 
         
-        a_main_window.ui.menuCreateNewConnectedWidget
+        a_main_window.ui.menus.global_window_menus.create_new_connected_widget.top_level_menu
         
         parent_menu: a QMenu parent or the root menuBar
         """

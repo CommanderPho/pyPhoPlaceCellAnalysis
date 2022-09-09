@@ -1,9 +1,29 @@
 from qtpy import QtCore, QtGui, QtWidgets
 from pyphoplacecellanalysis.Resources import GuiResources, ActionIcons
 
+from pyphocorehelpers.DataStructure.dynamic_parameters import DynamicParameters
+from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer
 from pyphoplacecellanalysis.GUI.Qt.Mixins.PhoMenuHelper import PhoMenuHelper
 
 
+def initialize_global_menu_ui_variables(a_main_window):
+    """ 
+    sets up a_main_window.ui.menus.global_window_menus as needed for the menu providers if needed
+    """
+    if isinstance(a_main_window.ui, DynamicParameters):            
+        # Need this workaround because hasattr fails for DynamicParameters/PhoUIContainer right now:
+        a_main_window.ui.setdefault('menus', PhoUIContainer.init_from_dict({}))
+    else:
+        if not hasattr(a_main_window.ui, 'menus'):
+            a_main_window.ui.menus = PhoUIContainer.init_from_dict({})
+        
+    # a_main_window.ui.menus.setdefault('global_window_menus', PhoUIContainer.init_from_dict({}))
+    if not a_main_window.ui.menus.has_attr('global_window_menus'):
+        a_main_window.ui.menus.global_window_menus = PhoUIContainer.init_from_dict({})
+        
+            
+            
+            
 class BaseMenuCommand:
     """
     An abstract base command to be executed from a Menu item
@@ -26,7 +46,6 @@ class BaseMenuCommand:
     def __call__(self, *args, **kwds):
         return self.execute('')
 
-    
 
 def BaseMenuProviderMixin(object):
     """ a mixin class that provides one ore more QActions and QMenu items
@@ -109,3 +128,5 @@ def BaseMenuProviderMixin(object):
         """ called to perform updates when the active window changes. Redraw, recompute data, etc. """
         pass
 
+    
+            
