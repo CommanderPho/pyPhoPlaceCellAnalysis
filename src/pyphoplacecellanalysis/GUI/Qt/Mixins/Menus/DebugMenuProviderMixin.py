@@ -64,8 +64,8 @@ class DebugMenuProviderMixin(BaseMenuProviderMixin):
         self.root_window.ui.menus.global_window_menus.debug.active_drivables_menu.triggered.connect(lambda action: print(connection_man.registered_available_drivables.get(action.text(), f'Drivable KeyNotFound: {action.text()}')))
   
         ## Update Connections Menu:
-        curr_connections_items = list(connection_man.active_connections.keys())
-        for a_connection_key in curr_connections_items:
+        curr_connections_descriptions = list([a_conn_ref.description for a_conn_ref in connection_man.active_connections.values()])
+        for a_connection_key in curr_connections_descriptions:
             self.root_window.ui.menus.global_window_menus.debug.active_connections_menu.addAction(a_connection_key)
         self.root_window.ui.menus.global_window_menus.debug.active_connections_menu.triggered.connect(lambda action: print(connection_man.active_connections.get(action.text(), f'Connection KeyNotFound: {action.text()}')))
     
@@ -122,7 +122,7 @@ class DebugMenuProviderMixin(BaseMenuProviderMixin):
         for a_driveable_key in curr_drivable_items:
             self.root_window.ui.menus.global_window_menus.debug.active_drivables_menu.addAction(a_driveable_key)
         ## Update Connections Menu:
-        curr_connections_items = list(self.connection_man.active_connections.keys())
-        for a_connection_key in curr_connections_items:
+        curr_connections_descriptions = list([a_conn_ref.description for a_conn_ref in self.connection_man.active_connections.values()])
+        for a_connection_key in curr_connections_descriptions:
             self.root_window.ui.menus.global_window_menus.debug.active_connections_menu.addAction(a_connection_key)
             
