@@ -4,61 +4,24 @@ import pyphoplacecellanalysis.External.pyqtgraph.graphicsItems as graphicsItems
 from pyphoplacecellanalysis.External.pyqtgraph.graphicsItems.PlotItem import PlotItem #, PlotCurveItem
 from pyphoplacecellanalysis.External.pyqtgraph.graphicsItems.ScatterPlotItem import ScatterPlotItem #, PlotCurveItem
 
-""" 
+# """ 
 
 
 
-plot_items = [a_child for a_child in main_graphics_layout_widget.items() if isinstance(a_child, (PlotItem))] # ScatterPlotItem
-plot_items
+# plot_items = [a_child for a_child in main_graphics_layout_widget.items() if isinstance(a_child, (PlotItem))] # ScatterPlotItem
+# plot_items
 
-graphics_layout = main_graphics_layout_widget.ci # <pyphoplacecellanalysis.External.pyqtgraph.graphicsItems.GraphicsLayout.GraphicsLayout at 0x24affb75820>
+# graphics_layout = main_graphics_layout_widget.ci # <pyphoplacecellanalysis.External.pyqtgraph.graphicsItems.GraphicsLayout.GraphicsLayout at 0x24affb75820>
 
-graphics_layout.rows
-# {1: {0: <pyphoplacecellanalysis.External.pyqtgraph.graphicsItems.PlotItem.PlotItem.PlotItem at 0x24affb9dc10>},
-#  2: {0: <pyphoplacecellanalysis.External.pyqtgraph.graphicsItems.PlotItem.PlotItem.PlotItem at 0x24affb164c0>}}
+# graphics_layout.rows
+# # {1: {0: <pyphoplacecellanalysis.External.pyqtgraph.graphicsItems.PlotItem.PlotItem.PlotItem at 0x24affb9dc10>},
+# #  2: {0: <pyphoplacecellanalysis.External.pyqtgraph.graphicsItems.PlotItem.PlotItem.PlotItem at 0x24affb164c0>}}
 
-graphics_layout.items ## item: [(row, col), (row, col), ...]  lists all cells occupied by the item
-
-
-"""
+# graphics_layout.items ## item: [(row, col), (row, col), ...]  lists all cells occupied by the item
 
 
-# def recover_graphics_layout_widget_item_indicies(graphics_layout_widget, debug_print=False):
-#     """ Recovers the row/column indicies for the items of a graphics_layout_widget 
-    
-#     Example:
-#         found_item_rows, found_item_cols, found_items_list, (found_max_row, found_max_col) = recover_graphics_layout_widget_item_indicies(main_graphics_layout_widget)
-        
-#     """
-#     # num_plot_items = len(plot_items)
-#     num_plot_items = len(graphics_layout_widget.items())
-#     max_rows = num_plot_items
-#     max_cols = num_plot_items
-    
-#     # found_item_indicies = []
-#     found_item_rows = []
-#     found_item_cols = []
-#     found_items_list = []
+# """
 
-#     for row_i in np.arange(max_rows):
-#         for col_i in np.arange(max_cols):
-#             found_item = graphics_layout_widget.getItem(row_i, col_i)
-#             if found_item is not None:
-#                 found_item_rows.append(row_i)
-#                 found_item_cols.append(col_i)
-#                 found_items_list.append(found_item)
-#                 if debug_print:
-#                     print(f'found_item[row_i:{row_i}, col_i:{col_i}]: {found_item}')
-#         # try:
-#         #     print(f'main_graphics_layout_widget.itemIndex(): {main_graphics_layout_widget.itemIndex(a_child)}')
-#         # except Exception as e:
-#         #     pass
-
-#     found_max_row = max(found_item_rows)
-#     found_max_col = max(found_item_cols)
-#     if debug_print:
-#         print(f'found_max_row: {found_max_row}, found_max_col: {found_max_col}')
-#     return found_item_rows, found_item_cols, found_items_list, (found_max_row, found_max_col)
 
 def recover_graphics_layout_widget_item_indicies(graphics_layout_widget, debug_print=False):
     """ ✅WORKS✅ Recovers the row/column indicies for the items of a graphics_layout_widget 
