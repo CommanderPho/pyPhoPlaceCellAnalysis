@@ -61,11 +61,20 @@
     </widget>
     <addaction name="menuAddRenderable_Time_Curves"/>
     <addaction name="menuAddRenderable_Time_Intervals"/>
+    <addaction name="actionCreate_paired_time_synchronized_widget"/>
     <addaction name="actionAddCustomRenderable"/>
     <addaction name="separator"/>
     <addaction name="actionClear_all_Renderables"/>
    </widget>
+   <widget class="QMenu" name="menuCreate_Paired_Widget">
+    <property name="title">
+     <string>Create Paired Widget</string>
+    </property>
+    <addaction name="actionTimeSynchronizedOccupancyPlotter"/>
+    <addaction name="actionTimeSynchronizedPlacefieldsPlotter"/>
+   </widget>
    <addaction name="menuAdd_Renderable"/>
+   <addaction name="menuCreate_Paired_Widget"/>
   </widget>
   <action name="actionAddTimeCurves_Position">
    <property name="text">
@@ -139,6 +148,21 @@
   <action name="actionAddTimeIntervals_Replays">
    <property name="text">
     <string>Replays</string>
+   </property>
+  </action>
+  <action name="actionCreate_paired_time_synchronized_widget">
+   <property name="text">
+    <string>Create paired time synchronized widget</string>
+   </property>
+  </action>
+  <action name="actionTimeSynchronizedOccupancyPlotter">
+   <property name="text">
+    <string>TimeSynchronizedOccupancyPlotter</string>
+   </property>
+  </action>
+  <action name="actionTimeSynchronizedPlacefieldsPlotter">
+   <property name="text">
+    <string>TimeSynchronizedPlacefieldsPlotter</string>
    </property>
   </action>
  </widget>

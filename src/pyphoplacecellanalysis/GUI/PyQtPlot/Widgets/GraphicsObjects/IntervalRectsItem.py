@@ -3,8 +3,9 @@ Demonstrate creation of a custom graphic (a candlestick plot)
 
 """
 import copy
+import numpy as np
 import pyphoplacecellanalysis.External.pyqtgraph as pg
-from pyphoplacecellanalysis.External.pyqtgraph import QtCore, QtGui
+from pyphoplacecellanalysis.External.pyqtgraph import QtCore, QtGui, QtWidgets
 
 
 ## Create a subclass of GraphicsObject.
@@ -37,6 +38,11 @@ class IntervalRectsItem(pg.GraphicsObject):
 
     """
     def __init__(self, data):
+        # menu creation is deferred because it is expensive and often
+        # the user will never see the menu anyway.
+        self.menu = None
+        # note that the use of super() is often avoided because Qt does not 
+        # allow to inherit from multiple QObject subclasses.
         pg.GraphicsObject.__init__(self)
         self.data = data  ## data must have fields: start_t, series_vertical_offset, duration_t, series_height, pen, brush
         self.generatePicture()
@@ -82,6 +88,120 @@ class IntervalRectsItem(pg.GraphicsObject):
         return IntervalRectsItem(independent_data_copy)
         # return IntervalRectsItem(copy.deepcopy(self.data, memo))
 
+    # ==================================================================================================================== #
+    # Context Menu and Interaction Handling                                                                                #
+    # ==================================================================================================================== #
+    def mouseShape(self):
+        """
+        Return a QPainterPath representing the clickable shape of the curve
+
+        """
+        if self._mouseShape is None:
+            view = self.getViewBox()
+            if view is None:
+                return QtGui.QPainterPath()
+            stroker = QtGui.QPainterPathStroker()
+            path = self.getPath()
+            path = self.mapToItem(view, path)
+            stroker.setWidth(self.opts['mouseWidth'])
+            mousePath = stroker.createStroke(path)
+            self._mouseShape = self.mapFromItem(view, mousePath)
+        return self._mouseShape
+    
+    
+
+
+    # On right-click, raise the context menu
+    def mouseClickEvent(self, ev):
+        print(f'IntervalRectsItem.mouseClickEvent(ev: {ev})')
+        if ev.button() == QtCore.Qt.MouseButton.RightButton:
+            # if self.mouseShape().contains(ev.pos()):
+            #     ev.accept()
+            #     self.sigClicked.emit(self, ev)
+                
+            
+            if self.raiseContextMenu(ev):
+                ev.accept() # note that I think this means it won't pass the right click along to its parent view, might messup widget-wide menus
+
+    def raiseContextMenu(self, ev):
+        print(f'IntervalRectsItem.raiseContextMenu(ev: {ev})')
+        menu = self.getContextMenus()
+        
+        # Let the scene add on to the end of our context menu
+        # (this is optional)
+        # menu = self.scene().addParentContextMenus(self, menu, ev)
+        
+        pos = ev.screenPos()
+        menu.popup(QtCore.QPoint(int(pos.x()), int(pos.y())))
+        return True
+
+    # This method will be called when this item's _children_ want to raise
+    # a context menu that includes their parents' menus.
+    def getContextMenus(self, event=None):
+        if self.menu is None:
+            self.menu = QtWidgets.QMenu()
+            # self.menu.setTitle(self.name+ " options..")
+            self.menu.setTitle("IntervalRectItem options..")
+            
+            green = QtGui.QAction("Turn green", self.menu)
+            green.triggered.connect(self.setGreen)
+            self.menu.addAction(green)
+            self.menu.green = green
+            
+            blue = QtGui.QAction("Turn blue", self.menu)
+            blue.triggered.connect(self.setBlue)
+            self.menu.addAction(blue)
+            self.menu.green = blue
+            
+            alpha = QtWidgets.QWidgetAction(self.menu)
+            alphaSlider = QtWidgets.QSlider()
+            alphaSlider.setOrientation(QtCore.Qt.Orientation.Horizontal)
+            alphaSlider.setMaximum(255)
+            alphaSlider.setValue(255)
+            alphaSlider.valueChanged.connect(self.setAlpha)
+            alpha.setDefaultWidget(alphaSlider)
+            self.menu.addAction(alpha)
+            self.menu.alpha = alpha
+            self.menu.alphaSlider = alphaSlider
+        return self.menu
+
+    # Define context menu callbacks
+    def setGreen(self):
+        # self.pen = pg.mkPen('g')
+        print(f'.setGreen()...')
+        for i, a_tuple in enumerate(self.data):
+            # a_tuple : (start_t, series_vertical_offset, duration_t, series_height, pen, brush)
+            # list(a_tuple)
+            start_t, series_vertical_offset, duration_t, series_height, pen, brush = a_tuple
+            override_pen = pg.mkPen('g')
+            override_brush = pg.mkBrush('g')
+            self.data[i] = (start_t, series_vertical_offset, duration_t, series_height, override_pen, override_brush)
+        
+        # Need to regenerate picture
+        self.generatePicture()
+        # inform Qt that this item must be redrawn.
+        self.update()
+
+    def setBlue(self):
+        # self.pen = pg.mkPen('b')
+        # override_pen = pg.mkPen('b')
+        print(f'.setBlue()...')
+        for i, a_tuple in enumerate(self.data):
+            # a_tuple : (start_t, series_vertical_offset, duration_t, series_height, pen, brush)
+            # list(a_tuple)
+            start_t, series_vertical_offset, duration_t, series_height, pen, brush = a_tuple
+            override_pen = pg.mkPen('b')
+            override_brush = pg.mkBrush('b')
+            self.data[i] = (start_t, series_vertical_offset, duration_t, series_height, override_pen, override_brush)
+            
+        # Need to regenerate picture
+        self.generatePicture()
+        self.update()
+
+    def setAlpha(self, a):
+        self.setOpacity(a/255.)
+        
+        
 
 
 
@@ -121,14 +241,51 @@ class RectangleRenderTupleHelpers:
             
         
 def main():
-    data = [  ## fields are (series_offset, start_t, duration_t).
-        (1., 10, 13),
-        (2., 13, 17, 9, 20, 'w'),
-        (3., 17, 14, 11, 23, 'w'),
-        (4., 14, 15, 5, 19, 'w'),
-        (5., 15, 9, 8, 22, 'w'),
-        (6., 9, 15, 8, 16, 'w'),
-    ]
+    # data = [  ## fields are (series_offset, start_t, duration_t).
+    #     (1., 10, 13),
+    #     (2., 13, 17, 9, 20, 'w'),
+    #     (3., 17, 14, 11, 23, 'w'),
+    #     (4., 14, 15, 5, 19, 'w'),
+    #     (5., 15, 9, 8, 22, 'w'),
+    #     (6., 9, 15, 8, 16, 'w'),
+    # ]
+    
+    
+    # data = [  ## fields are (start_t, series_vertical_offset, duration_t, series_height, pen, brush).
+    #     (1., 10, 13),
+    #     (2., 13, 17, 9, 20, 'w'),
+    #     (3., 17, 14, 11, 23, 'w'),
+    #     (4., 14, 15, 5, 19, 'w'),
+    #     (5., 15, 9, 8, 22, 'w'),
+    #     (6., 9, 15, 8, 16, 'w'),
+    # ]
+    
+    
+    series_start_offsets = [1, 5, 7]
+    
+    # Have series_offsets which are centers and series_start_offsets which are bottom edges:
+    curr_border_color = pg.mkColor('r')
+    curr_border_color.setAlphaF(0.8)
+
+    curr_fill_color = pg.mkColor('w')
+    curr_fill_color.setAlphaF(0.2)
+
+    # build pen/brush from color
+    curr_series_pen = pg.mkPen(curr_border_color)
+    curr_series_brush = pg.mkBrush(curr_fill_color)
+    # data = [  ## fields are (start_t, series_vertical_offset, duration_t, series_height, pen, brush).
+    #     (40.0, 0.0, 2.0, 1.0, curr_series_pen, curr_series_brush),
+    #     (41.0, 1.0, 2.0, 1.0, curr_series_pen, curr_series_brush),
+    #     (44.0, series_start_offsets[0], 4.0, 1.0, curr_series_pen, curr_series_brush),
+    #     (45.0, series_start_offsets[-1], 4.0, 1.0, curr_series_pen, curr_series_brush),
+    # ]
+    data = []
+    step_x_offset = 0.5
+    for i in np.arange(len(series_start_offsets)):
+        curr_x_pos = (40.0+(step_x_offset*float(i)))
+        data.append((curr_x_pos, series_start_offsets[i], 0.5, 1.0, curr_series_pen, curr_series_brush))
+        
+    
     item = IntervalRectsItem(data)
     plt = pg.plot()
     plt.addItem(item)
