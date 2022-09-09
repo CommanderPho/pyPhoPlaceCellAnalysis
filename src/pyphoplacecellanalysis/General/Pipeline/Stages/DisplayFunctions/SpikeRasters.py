@@ -2,6 +2,7 @@ import numpy as np
 import pandas as pd
 from functools import partial
 
+from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer
 from pyphocorehelpers.mixins.member_enumerating import AllFunctionEnumeratingMixin
 from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DisplayFunctionRegistryHolder import DisplayFunctionRegistryHolder
 
@@ -15,7 +16,7 @@ from pyphoplacecellanalysis.GUI.Qt.GlobalApplicationMenus.LocalMenus_AddRenderab
 
 from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.SpikeRasterWidgets.spike_raster_widgets import build_spike_3d_raster_with_2d_controls, build_spike_3d_raster_vedo_with_2d_controls
 from pyphoplacecellanalysis.GUI.Qt.Mixins.Menus.ConnectionControlsMenuMixin import ConnectionControlsMenuMixin
-
+from pyphoplacecellanalysis.GUI.Qt.Mixins.Menus.CreateNewConnectedWidgetMenuMixin import CreateNewConnectedWidgetMenuMixin
 
 
 ## TODO: update these to use the correct format! This format has been invalidated!
@@ -87,6 +88,26 @@ class SpikeRastersDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Displa
         
         ## Adds the custom renderable menu to the top-level menu of the plots in Spike2DRaster
         _active_2d_plot_renderable_menus = LocalMenus_AddRenderable.add_renderable_context_menu(spike_raster_window.spike_raster_plt_2d, computation_result.sess)  # Adds the custom context menus for SpikeRaster2D        
+        
+        owning_pipeline_reference = kwargs.get('owning_pipeline', None) # A reference to the pipeline upon which this display function is being called
+        
+        curr_window, menuConnections, connections_actions_dict = ConnectionControlsMenuMixin.try_add_connections_menu(spike_raster_window)
+        spike_raster_window.main_menu_window = curr_window # to retain the changes
+        
+        if owning_pipeline_reference is not None:
+            display_output = owning_pipeline_reference.display_output
+            # if hasattr(spike_raster_window.ui.menus.global_window_menus, 'create_new_connected_widget'):
+            # if spike_raster_window.ui.menus.global_window_menus.has_attr('create_new_connected_widget'):
+            #     print(f'trying to remove extant create_new_connected_widget')
+            #     CreateNewConnectedWidgetMenuMixin.try_remove_create_new_connected_widget_menu(spike_raster_window) # remove it
+            curr_window, menuCreateNewConnectedWidget, createNewConnected_actions_dict = CreateNewConnectedWidgetMenuMixin.try_add_create_new_connected_widget_menu(spike_raster_window, owning_pipeline_reference, active_config, display_output)
+            spike_raster_window.main_menu_window = curr_window # to retain the changes
+            
+        else:
+            print(f'WARNING: _display_spike_rasters_window(...) has no owning_pipeline_reference in its parameters, so it cannot add the CreateNewConnectedWidgetMenuMixin menus.')
+            menuCreateNewConnectedWidget = None
+            createNewConnected_actions_dict = None
+
         return {'spike_raster_plt_2d':spike_raster_window.spike_raster_plt_2d, 'spike_raster_plt_3d':spike_raster_window.spike_raster_plt_3d, 'spike_raster_window': spike_raster_window}
     
         # return {'spike_raster_plt_2d':spike_raster_plt_2d, 'spike_raster_plt_3d_vedo':spike_raster_plt_3d_vedo, 'spike_3d_to_2d_window_connection':spike_3d_to_2d_window_connection, 'spike_raster_window': spike_raster_window}

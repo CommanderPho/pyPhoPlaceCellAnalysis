@@ -91,7 +91,6 @@ class CreateNewConnectedWidgetMenuMixin(object):
             initialize_global_menu_ui_variables(a_main_window)
             a_main_window.ui.menus.global_window_menus.create_new_connected_widget = PhoUIContainer.init_from_dict({'top_level_menu': None, 'actions_dict': {}})
             
-            
             ## Only creates the QActions now, no QMenus:
             # Define dictionary for actions:
             # a_main_window.ui.menus.global_window_menus.create_new_connected_widget.actions_dict = {}
