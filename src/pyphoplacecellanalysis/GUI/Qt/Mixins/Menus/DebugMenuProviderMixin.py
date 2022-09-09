@@ -67,7 +67,12 @@ class DebugMenuProviderMixin(BaseMenuProviderMixin):
         curr_connections_descriptions = list([a_conn_ref.description for a_conn_ref in connection_man.active_connections.values()])
         for a_connection_key in curr_connections_descriptions:
             self.root_window.ui.menus.global_window_menus.debug.active_connections_menu.addAction(a_connection_key)
-        self.root_window.ui.menus.global_window_menus.debug.active_connections_menu.triggered.connect(lambda action: print(connection_man.active_connections.get(action.text(), f'Connection KeyNotFound: {action.text()}')))
+        # self.root_window.ui.menus.global_window_menus.debug.active_connections_menu.triggered.connect(lambda action: print(connection_man.active_connections.get(action.text(), f'Connection KeyNotFound: {action.text()}')))
+        self.root_window.ui.menus.global_window_menus.debug.active_connections_menu.triggered.connect(lambda action: print((connection_man.find_active_connection(action.text()) or f'Connection KeyNotFound: {action.text()}')))
+        
+        
+        
+        
     
     
     def _DebugMenuProviderMixin_build_menus(self):
