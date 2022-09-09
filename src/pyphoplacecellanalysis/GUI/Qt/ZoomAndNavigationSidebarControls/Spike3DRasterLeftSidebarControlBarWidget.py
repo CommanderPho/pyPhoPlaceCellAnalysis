@@ -167,9 +167,9 @@ class SpikeRasterLeftSidebarControlsMixin:
         left_side_bar_controls.ui.spinTemporalZoomFactor.blockSignals(True)
         left_side_bar_controls.ui.spinRenderWindowDuration.blockSignals(True)
         
-        left_side_bar_controls.ui.verticalSliderZoom.setValue(self.temporal_zoom_factor)
+        left_side_bar_controls.ui.verticalSliderZoom.setValue(round(self.temporal_zoom_factor))
         left_side_bar_controls.ui.spinAnimationTimeStep.setValue(self.animation_time_step)
-        left_side_bar_controls.ui.spinTemporalZoomFactor.setValue(self.temporal_zoom_factor)
+        left_side_bar_controls.ui.spinTemporalZoomFactor.setValue(round(self.temporal_zoom_factor))
         left_side_bar_controls.ui.spinRenderWindowDuration.setValue(self.render_window_duration)
 
         left_side_bar_controls.ui.verticalSliderZoom.blockSignals(False)

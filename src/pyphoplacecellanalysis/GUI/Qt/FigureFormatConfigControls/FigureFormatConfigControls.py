@@ -93,7 +93,7 @@ class FigureFormatConfigControls(QtWidgets.QWidget):
         self.ui.tupleCtrl_1.tuple_values = (None, 1868)
         
         self.ui.tupleCtrl_2.control_name = 'col_width/row_height'
-        self.ui.tupleCtrl_2.tuple_values = (5.0, 5.0)
+        self.ui.tupleCtrl_2.tuple_values = (5, 5)
         self.ui.tupleCtrl_2.tuple_values = (None, None)
         
         # self.ui.filepkr_FigureOutputPath.path
