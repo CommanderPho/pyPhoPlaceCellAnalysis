@@ -77,7 +77,6 @@ class SpikeRastersDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Displa
         active_config_name = kwargs.get('active_config_name', 'Unknown')
         # active_config_name = active_config.
         
-        
         # spike_raster_window = Spike3DRasterWindowWidget(computation_result.sess.spikes_df)
         # spike_raster_window = Spike3DRasterWindowWidget(computation_result.sess.spikes_df, neuron_colors=provided_neuron_id_to_color_map, neuron_sort_order=None, type_of_3d_plotter=type_of_3d_plotter, application_name=f'Spike Raster Window - {active_config_name}')
         spike_raster_window = Spike3DRasterWindowWidget(computation_result.sess.spikes_df, type_of_3d_plotter=type_of_3d_plotter, application_name=f'Spike Raster Window - {active_config_name}')
@@ -88,30 +87,21 @@ class SpikeRastersDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Displa
         
         ## Adds the custom renderable menu to the top-level menu of the plots in Spike2DRaster
         _active_2d_plot_renderable_menus = LocalMenus_AddRenderable.add_renderable_context_menu(spike_raster_window.spike_raster_plt_2d, computation_result.sess)  # Adds the custom context menus for SpikeRaster2D        
-        
         owning_pipeline_reference = kwargs.get('owning_pipeline', None) # A reference to the pipeline upon which this display function is being called
-        
-        curr_window, menuConnections, connections_actions_dict = ConnectionControlsMenuMixin.try_add_connections_menu(spike_raster_window)
-        spike_raster_window.main_menu_window = curr_window # to retain the changes
+        ## Note that curr_main_menu_window is usually not the same as spike_raster_window, instead curr_main_menu_window wraps it and produces the final output window
+        curr_main_menu_window, menuConnections, connections_actions_dict = ConnectionControlsMenuMixin.try_add_connections_menu(spike_raster_window)
+        spike_raster_window.main_menu_window = curr_main_menu_window # to retain the changes
         
         if owning_pipeline_reference is not None:
             display_output = owning_pipeline_reference.display_output
-            # if hasattr(spike_raster_window.ui.menus.global_window_menus, 'create_new_connected_widget'):
-            # if spike_raster_window.ui.menus.global_window_menus.has_attr('create_new_connected_widget'):
-            #     print(f'trying to remove extant create_new_connected_widget')
-            #     CreateNewConnectedWidgetMenuMixin.try_remove_create_new_connected_widget_menu(spike_raster_window) # remove it
-            curr_window, menuCreateNewConnectedWidget, createNewConnected_actions_dict = CreateNewConnectedWidgetMenuMixin.try_add_create_new_connected_widget_menu(spike_raster_window, owning_pipeline_reference, active_config, display_output)
-            spike_raster_window.main_menu_window = curr_window # to retain the changes
+            curr_main_menu_window, menuCreateNewConnectedWidget, createNewConnected_actions_dict = CreateNewConnectedWidgetMenuMixin.try_add_create_new_connected_widget_menu(spike_raster_window, owning_pipeline_reference, active_config, display_output)
+            spike_raster_window.main_menu_window = curr_main_menu_window # to retain the changes
             
         else:
             print(f'WARNING: _display_spike_rasters_window(...) has no owning_pipeline_reference in its parameters, so it cannot add the CreateNewConnectedWidgetMenuMixin menus.')
             menuCreateNewConnectedWidget = None
             createNewConnected_actions_dict = None
-
+            
         return {'spike_raster_plt_2d':spike_raster_window.spike_raster_plt_2d, 'spike_raster_plt_3d':spike_raster_window.spike_raster_plt_3d, 'spike_raster_window': spike_raster_window}
-    
-        # return {'spike_raster_plt_2d':spike_raster_plt_2d, 'spike_raster_plt_3d_vedo':spike_raster_plt_3d_vedo, 'spike_3d_to_2d_window_connection':spike_3d_to_2d_window_connection, 'spike_raster_window': spike_raster_window}
-    
-
 
 

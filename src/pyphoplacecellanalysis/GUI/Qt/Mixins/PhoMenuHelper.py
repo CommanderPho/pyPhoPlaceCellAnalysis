@@ -72,7 +72,6 @@ class PhoMenuHelper(object):
         actions_dict[curr_action_key] = a_main_window.ui[curr_action_key] # add to actions dictionary
         return curr_action_key
         
-
     @classmethod
     def add_menu_action(cls, a_main_window, text, name=None, tooltip=None, icon_path=None, parent_menu=None, actions_dict=None):
         """Builds a new QAction and adds it to the provided actions_dict and sets a_main_window.ui.{curr_action_key} to the action.
@@ -87,10 +86,6 @@ class PhoMenuHelper(object):
         if parent_menu is None:
             raise NotImplementedError
         parent_menu.addAction(a_main_window.ui[curr_action_key]) # Add to menu
-        
-        
-    
-        
         
     @classmethod
     def add_menu(cls, a_main_window, text, name=None, parent_menu=None, tooltip=None, icon_path=None, menu_actions_dict=None):

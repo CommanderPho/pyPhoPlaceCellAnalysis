@@ -73,9 +73,6 @@ class ConnectionControlsMenuMixin(object):
             a_main_window.ui.menus.global_window_menus.menuConnections = PhoUIContainer.init_from_dict({'top_level_menu': None, 'actions_dict': {}})
             
             ## Only creates the QActions now, no QMenus:
-            # Define dictionary for actions:
-            # a_main_window.ui.menus.global_window_menus.menuConnections.actions_dict = {}
-            
             # Connect Child Item:
             curr_action_key = PhoMenuHelper.add_action_item(a_main_window, "Connect Child...", name="actionConnect_Child", tooltip="Connect a child widget to another widget", icon_path=":/Icons/chain--arrow.png", actions_dict=a_main_window.ui.menus.global_window_menus.menuConnections.actions_dict)
             # Disconnect from Driver item:

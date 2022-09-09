@@ -47,7 +47,7 @@ class BaseMenuCommand:
         return self.execute('')
 
 
-def BaseMenuProviderMixin(object):
+class BaseMenuProviderMixin(QtCore.QObject):
     """ a mixin class that provides one ore more QActions and QMenu items
     
         A best practice is to create actions as children of the window in which you’re going to use them.
@@ -58,9 +58,20 @@ def BaseMenuProviderMixin(object):
     """
     
     @property
+    def has_root_window(self):
+        if not hasattr(self, '_root_window'):
+            return False
+        else:
+            return (self._root_window is not None)
+        
+            
+    @property
     def root_window(self):
         """The global_window property."""
-        return self._root_window
+        if not hasattr(self, '_root_window'):
+            return None
+        else:
+            return self._root_window
         
     @property
     def root_menu_bar(self):
@@ -76,16 +87,30 @@ def BaseMenuProviderMixin(object):
     #     raise NotImplementedError # implementor must override with the dictionary name
     #     self.root_window.ui.menuDebugActionsDict = value
     
-    @QtCore.pyqtSlot()
+    
+    def __init__(self, render_widget: QtWidgets.QWidget, parent=None, **kwargs):
+        """ the __init__ form allows adding menus to extant widgets without modifying their class to inherit from this mixin """
+        super(BaseMenuProviderMixin, self).__init__(parent)
+        
+        # Setup member variables:
+        # Assumes that self is a QWidget subclass:
+        self._render_widget = render_widget # do we really need a reference to this?
+        self._root_window = PhoMenuHelper.try_get_menu_window(render_widget)
+    
+    
+    @QtCore.Slot()
     def BaseMenuProviderMixin_on_init(self):
         """ perform any parameters setting/checking during init """
         # Assumes that self is a QWidget subclass:
-        self._root_window = PhoMenuHelper.try_get_menu_window(self)
-        # Define dictionary:
-        # self.root_window.ui.menuDebugActionsDict = {}
+        # if not hasattr(self, '_root_window'):
+        if not self.has_root_window:
+            self._root_window = PhoMenuHelper.try_get_menu_window(self)
+    
+        initialize_global_menu_ui_variables(self._root_window) # sets up the .ui.menus.global_window_menus property
+        
 
     
-    @QtCore.pyqtSlot()
+    @QtCore.Slot()
     def BaseMenuProviderMixin_on_setup(self):
         """ perfrom setup/creation of widget/graphical/data objects. Only the core objects are expected to exist on the implementor (root widget, etc) """
         pass
@@ -110,20 +135,20 @@ def BaseMenuProviderMixin(object):
         pass
     
 
-    @QtCore.pyqtSlot()
+    @QtCore.Slot()
     def BaseMenuProviderMixin_on_buildUI(self):
         """ perfrom setup/creation of widget/graphical/data objects. Only the core objects are expected to exist on the implementor (root widget, etc) """
         self._BaseMenuProviderMixin_build_actions()
         self._BaseMenuProviderMixin_build_menus()
     
 
-    @QtCore.pyqtSlot()
+    @QtCore.Slot()
     def BaseMenuProviderMixin_on_destroy(self):
         """ perfrom teardown/destruction of anything that needs to be manually removed or released """
         pass
 
 
-    @QtCore.pyqtSlot()
+    @QtCore.Slot()
     def BaseMenuProviderMixin_on_menus_update(self):
         """ called to perform updates when the active window changes. Redraw, recompute data, etc. """
         pass
