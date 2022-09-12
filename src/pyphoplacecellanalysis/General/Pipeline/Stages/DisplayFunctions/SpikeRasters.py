@@ -110,10 +110,14 @@ class SpikeRastersDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Displa
         _debug_menu_provider.DebugMenuProviderMixin_on_init()
         _debug_menu_provider.DebugMenuProviderMixin_on_buildUI()
         
-        _createLinkedWidget_menu_provider = CreateLinkedWidget_MenuProvider(render_widget=spike_raster_window)
-        _createLinkedWidget_menu_provider.CreateLinkedWidget_MenuProvider_on_init()
-        _createLinkedWidget_menu_provider.CreateLinkedWidget_MenuProvider_on_buildUI()
+        # _createLinkedWidget_menu_provider = CreateLinkedWidget_MenuProvider(render_widget=spike_raster_window)
+        # _createLinkedWidget_menu_provider.CreateLinkedWidget_MenuProvider_on_init()
+        # _createLinkedWidget_menu_provider.CreateLinkedWidget_MenuProvider_on_buildUI()
         
+        ## Adds the custom renderable menu to the top-level menu of the plots in Spike2DRaster
+        # 
+
+        _createLinkedWidget_menus = LocalMenus_AddRenderable.add_Create_Paired_Widget_menu(spike_raster_window, computation_result.active_pf_2D_dt)  # Adds the custom context menus for SpikeRaster2D        
             
         return {'spike_raster_plt_2d':spike_raster_window.spike_raster_plt_2d, 'spike_raster_plt_3d':spike_raster_window.spike_raster_plt_3d, 'spike_raster_window': spike_raster_window}
 

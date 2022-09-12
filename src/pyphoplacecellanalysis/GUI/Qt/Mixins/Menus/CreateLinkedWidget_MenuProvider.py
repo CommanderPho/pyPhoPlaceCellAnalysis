@@ -157,14 +157,19 @@ class CreateLinkedWidget_MenuProvider(BaseMenuProviderMixin):
         for an_action, a_callback in zip(submenu_addTimeIntervals, submenu_addTimeIntervalCallbacks):
             _curr_conn = an_action.triggered.connect(a_callback)
             submenu_addTimeIntervals_Connections.append(_curr_conn)
-            
 
         active_2d_plot_renderable_menus = widget, renderable_menu, (submenu_addTimeIntervals, submenu_addTimeIntervalCallbacks, submenu_addTimeIntervals_Connections)
+        
+        
         widget_2d_menu = active_2d_plot_renderable_menus[0]
-        menuAdd_Renderable = widget_2d_menu.ui.menuAdd_Renderable
+        menuAdd_CreateLinkedWidget = widget_2d_menu.ui.menuAdd_Renderable
         
+        ## Add menu to the main menu bar:
+        # curr_window = self.root_window
+        # curr_menubar = self.root_menu_bar
+        # curr_actions_dict = self.CreateLinkedWidget_MenuProvider_actionsDict
         
-        
+        # curr_menubar.addMenu(menuAdd_CreateLinkedWidget)
         
         
 
@@ -179,9 +184,9 @@ class CreateLinkedWidget_MenuProvider(BaseMenuProviderMixin):
         curr_menubar.removeAction(curr_actions_dict[self.top_level_menu_name])
         curr_window.ui.actionMenuDebug = None
         
-        self.activeMenuReference.active_drivers_menu = None
-        self.activeMenuReference.active_drivables_menu = None
-        self.activeMenuReference.active_connections_menu = None
+        # self.activeMenuReference.active_drivers_menu = None
+        # self.activeMenuReference.active_drivables_menu = None
+        # self.activeMenuReference.active_connections_menu = None
         
         # curr_window.ui.menus.global_window_menus.debug.actions_dict = {} # Empty the dict of actions
         self.CreateLinkedWidget_MenuProvider_actionsDict = {}

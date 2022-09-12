@@ -124,14 +124,7 @@ class LocalMenus_AddRenderable(QtWidgets.QMainWindow):
             plot_options_context_menu = parent_widget.getContextMenus(None) # This gets the "Plot Options" menu
             # top_level_parent_context_menu = parent_context_menus.parent()
             top_level_parent_context_menu = parent_widget.vb.menu # ViewBoxMenu
-            
-            # parent_context_menus = parent_widget.getMenu() #. .getViewWidget() # GraphicsLayoutWidget 
-            # parent_context_menus = parent_widget.getContextMenus() #. .getViewWidget() # GraphicsLayoutWidget 
-            # parent_context_menus
-            # print(f'parent_context_menus.actions: {parent_context_menus.actions()}')
-            # print(f'parent_context_menus.actions: {[an_action.text() for an_action in parent_context_menus.actions()]}') # parent_context_menus.actions: ['Transforms', 'Downsample', 'Average', 'Alpha', 'Grid', 'Points']
-            
-            # active_parent_menu = parent_context_menus
+         
             active_parent_menu = top_level_parent_context_menu
             active_parent_menu.addSeparator()
             active_parent_menu.addMenu(additional_menu)
@@ -160,14 +153,36 @@ class LocalMenus_AddRenderable(QtWidgets.QMainWindow):
 
 
     @classmethod
-    def add_Create_Paired_Widget_menu(cls, destination_window, sess):
+    def add_Create_Paired_Widget_menu(cls, destination_window, active_pf_2D_dt):
         """ Adds the "Create Paired Widget" main-menu to the destination_window's menubar
 
+        active_pf_2D_dt: time-dependent placefield
+        
+        
         menuCreate_Paired_Widget
             actionTimeSynchronizedOccupancyPlotter
             actionTimeSynchronizedPlacefieldsPlotter
 
         """
+        
+        widget = LocalMenus_AddRenderable() # get the UI widget containing the menu items:
+        renderable_menu = widget.ui.menuCreate_Paired_Widget
+
+        ## Time Intervals/Epochs:
+        submenu_addTimeIntervals = [widget.ui.actionTimeSynchronizedOccupancyPlotter,
+                                    widget.ui.actionTimeSynchronizedPlacefieldsPlotter,
+                                    ]
+        submenu_addTimeIntervalCallbacks = [lambda evt=None: print(f'actionTimeSynchronizedOccupancyPlotter callback'),
+                                            lambda evt=None: print(f'actionTimeSynchronizedPlacefieldsPlotter callback'),
+                                            ]
+        submenu_addTimeIntervals_Connections = []
+        for an_action, a_callback in zip(submenu_addTimeIntervals, submenu_addTimeIntervalCallbacks):
+            _curr_conn = an_action.triggered.connect(a_callback)
+            submenu_addTimeIntervals_Connections.append(_curr_conn)
+            
+        active_2d_plot_renderable_menus = widget, renderable_menu, (submenu_addTimeIntervals, submenu_addTimeIntervalCallbacks, submenu_addTimeIntervals_Connections)
+        widget_2d_menu = active_2d_plot_renderable_menus[0]
+        menuAdd_Renderable = widget_2d_menu.ui.menuAdd_Renderable
         
         
         
