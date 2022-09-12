@@ -72,6 +72,7 @@
     </property>
     <addaction name="actionTimeSynchronizedOccupancyPlotter"/>
     <addaction name="actionTimeSynchronizedPlacefieldsPlotter"/>
+    <addaction name="actionTimeSynchronizedDecoderPlotter"/>
     <addaction name="separator"/>
     <addaction name="actionCombineTimeSynchronizedPlotterWindow"/>
    </widget>
@@ -178,6 +179,11 @@
   <action name="actionCombineTimeSynchronizedPlotterWindow">
    <property name="text">
     <string>Combined Time Syncrhonized Plotter</string>
+   </property>
+  </action>
+  <action name="actionTimeSynchronizedDecoderPlotter">
+   <property name="text">
+    <string>TimeSynchronizedDecoderPlotter</string>
    </property>
   </action>
  </widget>

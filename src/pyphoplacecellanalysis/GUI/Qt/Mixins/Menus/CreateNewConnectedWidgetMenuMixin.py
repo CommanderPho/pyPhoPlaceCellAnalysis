@@ -5,7 +5,7 @@ from pyphoplacecellanalysis.Resources import GuiResources, ActionIcons
 from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer
 from pyphoplacecellanalysis.GUI.Qt.Mixins.PhoMenuHelper import PhoMenuHelper
 from pyphoplacecellanalysis.GUI.Qt.Mixins.Menus.BaseMenuProviderMixin import BaseMenuCommand
-from pyphoplacecellanalysis.GUI.Qt.Mixins.Menus.BaseMenuProviderMixin import initialize_global_menu_ui_variables
+from pyphoplacecellanalysis.GUI.Qt.Mixins.Menus.BaseMenuProviderMixin import initialize_global_menu_ui_variables_if_needed
 # GuiResources_rc
 
 
@@ -34,8 +34,6 @@ class CreateNewConnectedWidgetMenuMixin(object):
     def remove_create_new_connected_widget_menu(self):
         """ Works to remove the menu created with menuCreateNewConnectedWidget, actions_dict = build_menu(curr_window) """
         return CreateNewConnectedWidgetMenuMixin.try_remove_create_new_connected_widget_menu(self)
-
-    # spike_raster_window.ui.menus.global_window_menus.create_new_connected_widget
 
     @classmethod
     def try_add_create_new_connected_widget_menu(cls, a_content_widget, curr_active_pipeline, active_config_name, display_output):
@@ -88,7 +86,7 @@ class CreateNewConnectedWidgetMenuMixin(object):
             return a_main_window.ui.menus.global_window_menus.create_new_connected_widget.top_level_menu, a_main_window.ui.menus.global_window_menus.create_new_connected_widget.actions_dict
         else:
             PhoMenuHelper.set_menu_default_stylesheet(a_main_window.ui.menubar) # Sets the default menu stylesheet
-            initialize_global_menu_ui_variables(a_main_window)
+            initialize_global_menu_ui_variables_if_needed(a_main_window)
             a_main_window.ui.menus.global_window_menus.create_new_connected_widget = PhoUIContainer.init_from_dict({'top_level_menu': None, 'actions_dict': {}})
             
             ## Only creates the QActions now, no QMenus:

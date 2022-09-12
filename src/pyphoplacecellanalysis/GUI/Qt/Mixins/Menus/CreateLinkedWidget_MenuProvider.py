@@ -71,7 +71,11 @@ class CreateLinkedWidget_MenuProvider(BaseMenuProviderMixin):
         self.ui.menuCreate_Paired_Widget
         self.ui.actionTimeSynchronizedOccupancyPlotter
         self.ui.actionTimeSynchronizedPlacefieldsPlotter
+        self.ui.actionTimeSynchronizedDecoderPlotter
+        
         self.ui.actionCombineTimeSynchronizedPlotterWindow
+        
+        
         
         """
         # self._CreateLinkedWidget_MenuProvider_build_menus()
@@ -83,14 +87,16 @@ class CreateLinkedWidget_MenuProvider(BaseMenuProviderMixin):
         ## Time Intervals/Epochs:
         submenu_menuItems = [widget.ui.actionTimeSynchronizedOccupancyPlotter,
                                     widget.ui.actionTimeSynchronizedPlacefieldsPlotter,
+                                    widget.ui.actionTimeSynchronizedDecoderPlotter,
                                     widget.ui.actionCombineTimeSynchronizedPlotterWindow,
                                     ]
         
         
-        all_plotters, root_dockAreaWindow, app = build_combined_time_synchronized_plotters_window(active_pf_2D_dt, controlling_widget=spike_raster_window.spike_raster_plt_2d, create_new_controlling_widget=False) # window_scrolled
+        # all_plotters, root_dockAreaWindow, app = build_combined_time_synchronized_plotters_window(active_pf_2D_dt, controlling_widget=spike_raster_window.spike_raster_plt_2d, create_new_controlling_widget=False) # window_scrolled
         
         submenu_menuCallbacks = [lambda evt=None: print(f'actionTimeSynchronizedOccupancyPlotter callback'),
                                             lambda evt=None: print(f'actionTimeSynchronizedPlacefieldsPlotter callback'),
+                                            lambda evt=None: print(f'actionTimeSynchronizedDecoderPlotter callback'),
                                             lambda evt=None: print(f'actionCombineTimeSynchronizedPlotterWindow callback'),
                                             ]
         submenu_menu_Connections = []
@@ -134,10 +140,6 @@ class CreateLinkedWidget_MenuProvider(BaseMenuProviderMixin):
 
         curr_menubar.removeAction(curr_actions_dict[self.top_level_menu_name])
         curr_window.ui.actionMenuCreateLinkedWidget = None
-        
-        # self.activeMenuReference.active_drivers_menu = None
-        # self.activeMenuReference.active_drivables_menu = None
-        # self.activeMenuReference.active_connections_menu = None
         
         # curr_window.ui.menus.global_window_menus.debug.actions_dict = {} # Empty the dict of actions
         self.CreateLinkedWidget_MenuProvider_actionsDict = {}

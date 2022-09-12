@@ -6,7 +6,7 @@ from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer
 from pyphoplacecellanalysis.GUI.Qt.Mixins.PhoMenuHelper import PhoMenuHelper
 
 
-def initialize_global_menu_ui_variables(a_main_window):
+def initialize_global_menu_ui_variables_if_needed(a_main_window):
     """ 
     sets up a_main_window.ui.menus.global_window_menus as needed for the menu providers if needed
     """
@@ -105,7 +105,7 @@ class BaseMenuProviderMixin(QtCore.QObject):
         if not self.has_root_window:
             self._root_window = PhoMenuHelper.try_get_menu_window(self)
     
-        initialize_global_menu_ui_variables(self._root_window) # sets up the .ui.menus.global_window_menus property
+        initialize_global_menu_ui_variables_if_needed(self._root_window) # sets up the .ui.menus.global_window_menus property
         
 
     

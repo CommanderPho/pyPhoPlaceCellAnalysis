@@ -46,7 +46,7 @@ class LocalMenus_AddRenderable(QtWidgets.QMainWindow):
 
 
     @classmethod
-    def build_renderable_menu(cls, destination_plot, sess):
+    def _build_renderable_menu(cls, destination_plot, sess):
         """ Builds the callbacks needed and connects them to the QActions and QMenus for the specific destination_plot to be used as context menus. 
         sess: Session
         destination_plot: e.g. active_2d_plot, active_3d_plot
@@ -134,7 +134,7 @@ class LocalMenus_AddRenderable(QtWidgets.QMainWindow):
                 
          ## Build `partial` versions of the functions specific to each raster plotter that can be called with no arguments (capturing the destination plotter and the session
         # build_renderable_menu_to_Spike2DRaster = partial(cls.build_renderable_menu, active_2d_plot, sess) # destination_plot
-        active_2d_plot_renderable_menus = cls.build_renderable_menu(active_2d_plot, sess)
+        active_2d_plot_renderable_menus = cls._build_renderable_menu(active_2d_plot, sess)
         widget_2d_menu = active_2d_plot_renderable_menus[0]
         menuAdd_Renderable = widget_2d_menu.ui.menuAdd_Renderable
         

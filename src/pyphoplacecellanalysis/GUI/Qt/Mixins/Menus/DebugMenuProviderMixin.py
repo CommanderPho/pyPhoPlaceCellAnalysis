@@ -56,7 +56,6 @@ class DebugMenuProviderMixin(BaseMenuProviderMixin):
         """ perfrom setup/creation of widget/graphical/data objects. Only the core objects are expected to exist on the implementor (root widget, etc) """
         pass
     
-    
     def _DebugMenuProviderMixin_build_actions(self):
         """ build QActions """
         ## Add the dynamic menu entries:
@@ -92,7 +91,6 @@ class DebugMenuProviderMixin(BaseMenuProviderMixin):
         an_action_key, self.activeMenuReference.active_connections_menu = PhoMenuHelper.add_menu(a_main_window=self.root_window, text="Active Connections", name='actionMenuDebugMenuActiveConnections', parent_menu=self.activeMenuReference.top_level_menu, menu_actions_dict=self.DebugMenuProviderMixin_actionsDict)
         # active_connections_menu = self.root_window.ui['actionMenuDebugMenuActiveConnections']
         
-
     @QtCore.Slot()
     def DebugMenuProviderMixin_on_buildUI(self):
         """ perfrom setup/creation of widget/graphical/data objects. Only the core objects are expected to exist on the implementor (root widget, etc) """

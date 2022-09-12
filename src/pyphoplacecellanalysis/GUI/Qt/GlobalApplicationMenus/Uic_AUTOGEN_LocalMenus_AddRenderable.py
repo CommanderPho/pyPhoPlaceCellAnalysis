@@ -91,6 +91,8 @@ class Ui_LocalMenus_AddRenderable(object):
         self.actionTimeSynchronizedPlacefieldsPlotter.setObjectName("actionTimeSynchronizedPlacefieldsPlotter")
         self.actionCombineTimeSynchronizedPlotterWindow = QtWidgets.QAction(LocalMenus_AddRenderable)
         self.actionCombineTimeSynchronizedPlotterWindow.setObjectName("actionCombineTimeSynchronizedPlotterWindow")
+        self.actionTimeSynchronizedDecoderPlotter = QtWidgets.QAction(LocalMenus_AddRenderable)
+        self.actionTimeSynchronizedDecoderPlotter.setObjectName("actionTimeSynchronizedDecoderPlotter")
         self.menuAddRenderable_Time_Curves.addAction(self.actionAddTimeCurves_Position)
         self.menuAddRenderable_Time_Curves.addAction(self.actionAddTimeCurves_Random)
         self.menuAddRenderable_Time_Curves.addAction(self.actionAddTimeCurves_Custom)
@@ -112,6 +114,7 @@ class Ui_LocalMenus_AddRenderable(object):
         self.menuAdd_Renderable.addAction(self.actionClear_all_Renderables)
         self.menuCreate_Paired_Widget.addAction(self.actionTimeSynchronizedOccupancyPlotter)
         self.menuCreate_Paired_Widget.addAction(self.actionTimeSynchronizedPlacefieldsPlotter)
+        self.menuCreate_Paired_Widget.addAction(self.actionTimeSynchronizedDecoderPlotter)
         self.menuCreate_Paired_Widget.addSeparator()
         self.menuCreate_Paired_Widget.addAction(self.actionCombineTimeSynchronizedPlotterWindow)
         self.menubar.addAction(self.menuAdd_Renderable.menuAction())
@@ -132,6 +135,7 @@ class Ui_LocalMenus_AddRenderable(object):
         self.actionTimeSynchronizedOccupancyPlotter.setText(_translate("LocalMenus_AddRenderable", "TimeSynchronizedOccupancyPlotter"))
         self.actionTimeSynchronizedPlacefieldsPlotter.setText(_translate("LocalMenus_AddRenderable", "TimeSynchronizedPlacefieldsPlotter"))
         self.actionCombineTimeSynchronizedPlotterWindow.setText(_translate("LocalMenus_AddRenderable", "Combined Time Syncrhonized Plotter"))
+        self.actionTimeSynchronizedDecoderPlotter.setText(_translate("LocalMenus_AddRenderable", "TimeSynchronizedDecoderPlotter"))
 from pyphoplacecellanalysis.Resources import ActionIcons
 from pyphoplacecellanalysis.Resources import GuiResources
 from pyphoplacecellanalysis.Resources import breeze
