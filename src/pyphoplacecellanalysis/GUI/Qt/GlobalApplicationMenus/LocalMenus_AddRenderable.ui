@@ -72,6 +72,8 @@
     </property>
     <addaction name="actionTimeSynchronizedOccupancyPlotter"/>
     <addaction name="actionTimeSynchronizedPlacefieldsPlotter"/>
+    <addaction name="separator"/>
+    <addaction name="actionCombineTimeSynchronizedPlotterWindow"/>
    </widget>
    <addaction name="menuAdd_Renderable"/>
    <addaction name="menuCreate_Paired_Widget"/>
@@ -171,6 +173,11 @@
    </property>
    <property name="text">
     <string>TimeSynchronizedPlacefieldsPlotter</string>
+   </property>
+  </action>
+  <action name="actionCombineTimeSynchronizedPlotterWindow">
+   <property name="text">
+    <string>Combined Time Syncrhonized Plotter</string>
    </property>
   </action>
  </widget>

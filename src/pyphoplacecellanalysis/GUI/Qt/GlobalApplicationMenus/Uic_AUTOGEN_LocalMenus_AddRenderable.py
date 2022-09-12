@@ -89,6 +89,8 @@ class Ui_LocalMenus_AddRenderable(object):
         icon3.addPixmap(QtGui.QPixmap(":/Render/Icons/actions/wifi-channel_2@1x.png"), QtGui.QIcon.Normal, QtGui.QIcon.Off)
         self.actionTimeSynchronizedPlacefieldsPlotter.setIcon(icon3)
         self.actionTimeSynchronizedPlacefieldsPlotter.setObjectName("actionTimeSynchronizedPlacefieldsPlotter")
+        self.actionCombineTimeSynchronizedPlotterWindow = QtWidgets.QAction(LocalMenus_AddRenderable)
+        self.actionCombineTimeSynchronizedPlotterWindow.setObjectName("actionCombineTimeSynchronizedPlotterWindow")
         self.menuAddRenderable_Time_Curves.addAction(self.actionAddTimeCurves_Position)
         self.menuAddRenderable_Time_Curves.addAction(self.actionAddTimeCurves_Random)
         self.menuAddRenderable_Time_Curves.addAction(self.actionAddTimeCurves_Custom)
@@ -110,6 +112,8 @@ class Ui_LocalMenus_AddRenderable(object):
         self.menuAdd_Renderable.addAction(self.actionClear_all_Renderables)
         self.menuCreate_Paired_Widget.addAction(self.actionTimeSynchronizedOccupancyPlotter)
         self.menuCreate_Paired_Widget.addAction(self.actionTimeSynchronizedPlacefieldsPlotter)
+        self.menuCreate_Paired_Widget.addSeparator()
+        self.menuCreate_Paired_Widget.addAction(self.actionCombineTimeSynchronizedPlotterWindow)
         self.menubar.addAction(self.menuAdd_Renderable.menuAction())
         self.menubar.addAction(self.menuCreate_Paired_Widget.menuAction())
 
@@ -127,6 +131,7 @@ class Ui_LocalMenus_AddRenderable(object):
         self.actionCreate_paired_time_synchronized_widget.setText(_translate("LocalMenus_AddRenderable", "Create paired time synchronized widget"))
         self.actionTimeSynchronizedOccupancyPlotter.setText(_translate("LocalMenus_AddRenderable", "TimeSynchronizedOccupancyPlotter"))
         self.actionTimeSynchronizedPlacefieldsPlotter.setText(_translate("LocalMenus_AddRenderable", "TimeSynchronizedPlacefieldsPlotter"))
+        self.actionCombineTimeSynchronizedPlotterWindow.setText(_translate("LocalMenus_AddRenderable", "Combined Time Syncrhonized Plotter"))
 from pyphoplacecellanalysis.Resources import ActionIcons
 from pyphoplacecellanalysis.Resources import GuiResources
 from pyphoplacecellanalysis.Resources import breeze
