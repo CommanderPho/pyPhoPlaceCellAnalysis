@@ -9,6 +9,9 @@ from pyphoplacecellanalysis.GUI.Qt.GlobalApplicationMenus.LocalMenus_AddRenderab
 
 from pyphoplacecellanalysis.Pho2D.PyQtPlots.TimeSynchronizedPlotters.Mixins.helpers import build_combined_time_synchronized_plotters_window, build_connected_time_synchronized_occupancy_plotter, build_connected_time_synchronized_placefields_plotter, build_connected_time_synchronized_decoder_plotter
 
+    
+from pyphoplacecellanalysis.GUI.Qt.Mixins.Menus.BaseMenuProviderMixin import BaseMenuCommand # for commands
+    
 
 class CreateLinkedWidget_MenuProvider(BaseMenuProviderMixin):
     """ 
@@ -149,3 +152,29 @@ class CreateLinkedWidget_MenuProvider(BaseMenuProviderMixin):
         """ called to update menus dynamically. Only needed if the menu items themselves change dynamically.
         """
         pass
+    
+    
+    
+# build_combined_time_synchronized_plotters_window, build_connected_time_synchronized_occupancy_plotter, build_connected_time_synchronized_placefields_plotter, build_connected_time_synchronized_decoder_plotter
+    
+## Actions to be executed to create new plotters:
+class CreateNewTimeSynchronizedPlotterCommand(BaseMenuCommand):
+    """ build_combined_time_synchronized_plotters_window
+    A command to create a plotter as needed
+    """
+    def __init__(self, spike_raster_window, active_pf_2D_dt, display_output={}) -> None:
+        super(CreateNewTimeSynchronizedPlotterCommand, self).__init__()
+        self._spike_raster_window = spike_raster_window
+        self._active_pf_2D_dt = active_pf_2D_dt
+        self._display_output = display_output
+        
+        
+    def execute(self, filename: str) -> None:
+        """ Implicitly captures spike_raster_window """
+        _out_synchronized_plotter = build_combined_time_synchronized_plotters_window(active_pf_2D_dt=self._active_pf_2D_dt, controlling_widget=self._spike_raster_window, create_new_controlling_widget=False)
+        
+        self._display_output['comboSynchronizedPlotter'] = _out_synchronized_plotter
+        # (controlling_widget, curr_sync_occupancy_plotter, curr_placefields_plotter), root_dockAreaWindow, app = _out_synchronized_plotter
+        
+        
+        

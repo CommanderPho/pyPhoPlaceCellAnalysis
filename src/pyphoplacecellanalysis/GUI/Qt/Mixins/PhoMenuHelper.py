@@ -277,34 +277,34 @@ class PhoMenuHelper(object):
         actions_dict[curr_action_key] = a_main_window.ui[curr_action_key] # add to actions dictionary
         return curr_action_key
         
-    @classmethod
-    def add_menu_action(cls, a_main_window, text, name=None, tooltip=None, icon_path=None, parent_menu=None, actions_dict=None):
-        """Builds a new QAction and adds it to the provided actions_dict and sets a_main_window.ui.{curr_action_key} to the action.
-            Internally calls cls.setup_menu_item(...) to configure the action before adding it.    
-        Args:
-            a_main_window (_type_): _description_
-            text (_type_): _description_
-            name (_type_, optional): _description_. Defaults to None.
-            tooltip (_type_, optional): _description_. Defaults to None.
-            icon_path (_type_, optional): _description_. Defaults to None.
+    # @classmethod
+    # def add_menu_action(cls, a_main_window, text, name=None, tooltip=None, icon_path=None, parent_menu=None, actions_dict=None):
+    #     """Builds a new QAction and adds it to the provided actions_dict and sets a_main_window.ui.{curr_action_key} to the action.
+    #         Internally calls cls.setup_menu_item(...) to configure the action before adding it.    
+    #     Args:
+    #         a_main_window (_type_): _description_
+    #         text (_type_): _description_
+    #         name (_type_, optional): _description_. Defaults to None.
+    #         tooltip (_type_, optional): _description_. Defaults to None.
+    #         icon_path (_type_, optional): _description_. Defaults to None.
             
             
-        # Separate setup:
-            # Connect Child Item:
-            curr_action_key = PhoMenuHelper.add_action_item(a_main_window, "Connect Child...", name="actionConnect_Child", tooltip="Connect a child widget to another widget", icon_path=":/Icons/chain--arrow.png", actions_dict=a_main_window.ui.menus.global_window_menus.menuConnections.actions_dict)
+    #     # Separate setup:
+    #         # Connect Child Item:
+    #         curr_action_key = PhoMenuHelper.add_action_item(a_main_window, "Connect Child...", name="actionConnect_Child", tooltip="Connect a child widget to another widget", icon_path=":/Icons/chain--arrow.png", actions_dict=a_main_window.ui.menus.global_window_menus.menuConnections.actions_dict)
             
             
             
-        """
-        if parent_menu is None:
-            raise NotImplementedError
-        parent_menu.addAction(a_main_window.ui[curr_action_key]) # Add to menu
+    #     """
+    #     if parent_menu is None:
+    #         raise NotImplementedError
+    #     parent_menu.addAction(a_main_window.ui[curr_action_key]) # Add to menu
         
-        # ## Add the actions to the QMenu item:
-        # a_main_window.ui.menus.global_window_menus.menuConnections.top_level_menu.addActions(a_main_window.ui.menus.global_window_menus.menuConnections.actions_dict.values())
+    #     # ## Add the actions to the QMenu item:
+    #     # a_main_window.ui.menus.global_window_menus.menuConnections.top_level_menu.addActions(a_main_window.ui.menus.global_window_menus.menuConnections.actions_dict.values())
                     
-        # ## TODO: is this even needed? I think it's done to remove it, but can't I just use a_main_window.ui.actionMenuConnections directly?
-        # a_main_window.ui.menus.global_window_menus.menuConnections.actions_dict['actionMenuConnections'] = a_main_window.ui.actionMenuConnections
+    #     # ## TODO: is this even needed? I think it's done to remove it, but can't I just use a_main_window.ui.actionMenuConnections directly?
+    #     # a_main_window.ui.menus.global_window_menus.menuConnections.actions_dict['actionMenuConnections'] = a_main_window.ui.actionMenuConnections
         
         
         

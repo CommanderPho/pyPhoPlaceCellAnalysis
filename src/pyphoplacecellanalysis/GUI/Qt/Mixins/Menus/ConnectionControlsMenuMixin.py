@@ -35,14 +35,15 @@ class ConnectionControlsMenuMixin(object):
     """
     top_level_menu_action_name = 'actionMenuConnections'
     top_level_menu_item_name = "menuConnections"
-    
-    def build_connections_menu(self):
-        return ConnectionControlsMenuMixin.try_add_connections_menu(self)
+
+    # ## Mixin properties:    
+    # def build_connections_menu(self):
+    #     return ConnectionControlsMenuMixin.try_add_connections_menu(self)
 
 
-    def remove_connections_menu(self):
-        """ Works to remove the menu created with menuConnections, actions_dict = build_menu(curr_window) """
-        return ConnectionControlsMenuMixin.try_remove_connections_menu(self)
+    # def remove_connections_menu(self):
+    #     """ Works to remove the menu created with menuConnections, actions_dict = build_menu(curr_window) """
+    #     return ConnectionControlsMenuMixin.try_remove_connections_menu(self)
 
 
     @classmethod
