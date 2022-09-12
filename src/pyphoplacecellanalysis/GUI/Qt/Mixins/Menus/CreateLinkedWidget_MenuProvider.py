@@ -5,6 +5,8 @@ from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer
 from pyphoplacecellanalysis.GUI.Qt.Mixins.PhoMenuHelper import PhoMenuHelper
 from pyphoplacecellanalysis.GUI.Qt.Mixins.Menus.BaseMenuProviderMixin import BaseMenuProviderMixin
 
+from pyphoplacecellanalysis.GUI.Qt.GlobalApplicationMenus.LocalMenus_AddRenderable import LocalMenus_AddRenderable
+
 class CreateLinkedWidget_MenuProvider(BaseMenuProviderMixin):
     """ 
     
@@ -52,60 +54,119 @@ class CreateLinkedWidget_MenuProvider(BaseMenuProviderMixin):
         pass
     
     
-    def _CreateLinkedWidget_MenuProvider_build_actions(self):
-        """ build QActions """
-        ## Add the dynamic menu entries:
-        # connection_man = self.connection_man
+    # def _CreateLinkedWidget_MenuProvider_build_actions(self):
+    #     """ build QActions """
+    #     ## Add the dynamic menu entries:
+    #     # connection_man = self.connection_man
         
-        # ## Update Drivers Menu:
-        # curr_drivers_items = list(connection_man.registered_available_drivers.keys())
-        # for a_driver_key in curr_drivers_items:
-        #     self.activeMenuReference.active_drivers_menu.addAction(a_driver_key)
-        # self.activeMenuReference.active_drivers_menu.triggered.connect(lambda action: print(connection_man.registered_available_drivers.get(action.text(), f'Driver KeyNotFound: {action.text()}')))
+    #     # ## Update Drivers Menu:
+    #     # curr_drivers_items = list(connection_man.registered_available_drivers.keys())
+    #     # for a_driver_key in curr_drivers_items:
+    #     #     self.activeMenuReference.active_drivers_menu.addAction(a_driver_key)
+    #     # self.activeMenuReference.active_drivers_menu.triggered.connect(lambda action: print(connection_man.registered_available_drivers.get(action.text(), f'Driver KeyNotFound: {action.text()}')))
 
-        # ## Update Drivable Menu:
-        # curr_drivable_items = list(connection_man.registered_available_drivables.keys())
-        # for a_driveable_key in curr_drivable_items:
-        #     self.activeMenuReference.active_drivables_menu.addAction(a_driveable_key)
-        # self.activeMenuReference.active_drivables_menu.triggered.connect(lambda action: print(connection_man.registered_available_drivables.get(action.text(), f'Drivable KeyNotFound: {action.text()}')))
+    #     # ## Update Drivable Menu:
+    #     # curr_drivable_items = list(connection_man.registered_available_drivables.keys())
+    #     # for a_driveable_key in curr_drivable_items:
+    #     #     self.activeMenuReference.active_drivables_menu.addAction(a_driveable_key)
+    #     # self.activeMenuReference.active_drivables_menu.triggered.connect(lambda action: print(connection_man.registered_available_drivables.get(action.text(), f'Drivable KeyNotFound: {action.text()}')))
   
-        # ## Update Connections Menu:
-        # curr_connections_descriptions = list([a_conn_ref.description for a_conn_ref in connection_man.active_connections.values()])
-        # for a_connection_key in curr_connections_descriptions:
-        #     self.activeMenuReference.active_connections_menu.addAction(a_connection_key)
-        # # self.activeMenuReference.active_connections_menu.triggered.connect(lambda action: print(connection_man.active_connections.get(action.text(), f'Connection KeyNotFound: {action.text()}')))
-        # self.activeMenuReference.active_connections_menu.triggered.connect(lambda action: print((connection_man.find_active_connection(action.text()) or f'Connection KeyNotFound: {action.text()}')))
-        pass
-        
-    def _CreateLinkedWidget_MenuProvider_build_menus(self):
-        """ build QMenus """
-        
-        an_action_key, self.activeMenuReference.top_level_menu = PhoMenuHelper.add_menu(a_main_window=self.root_window, text="Create Paired Widget", name=self.top_level_menu_name, parent_menu=self.root_menu_bar, menu_actions_dict=self.CreateLinkedWidget_MenuProvider_actionsDict)
-        
-        # Adds submenus:
-        # an_action_key, self.activeMenuReference.active_drivers_menu = PhoMenuHelper.add_menu(a_main_window=self.root_window, text="TimeSynchronizedOccupancyPlotter", name='actionMenuDebugMenuActiveDrivers', parent_menu=self.activeMenuReference.top_level_menu, menu_actions_dict=self.CreateLinkedWidget_MenuProvider_actionsDict)
-                
-        an_action_key = PhoMenuHelper.add_action_item(self.root_window, text="TimeSynchronizedOccupancyPlotter", icon_path=':/Render/Icons/actions/bar-chart_2@1x.png', actions_dict=self.CreateLinkedWidget_MenuProvider_actionsDict)
-                
-        # an_action_key, self.activeMenuReference.active_drivables_menu = PhoMenuHelper.add_menu(a_main_window=self.root_window, text="TimeSynchronizedPlacefieldsPlotter", name='actionMenuDebugMenuActiveDrivables', parent_menu=self.activeMenuReference.top_level_menu, menu_actions_dict=self.CreateLinkedWidget_MenuProvider_actionsDict)
-        
-        an_action_key = PhoMenuHelper.add_action_item(self.root_window, text="TimeSynchronizedPlacefieldsPlotter", icon_path=':/Render/Icons/actions/wifi-channel_2@1x.png', actions_dict=self.CreateLinkedWidget_MenuProvider_actionsDict)
-        
-        ## Add the actions to the QMenu item:
-        self.activeMenuReference.top_level_menu.addActions(self.CreateLinkedWidget_MenuProvider_actionsDict.values())
-                    
-        ## TODO: is this even needed? I think it's done to remove it, but can't I just use a_main_window.ui.actionMenuConnections directly?
-        # self.activeMenuReference.actions_dict['actionMenuConnections'] = self.root_window.ui.actionMenuConnections
+    #     # ## Update Connections Menu:
+    #     # curr_connections_descriptions = list([a_conn_ref.description for a_conn_ref in connection_man.active_connections.values()])
+    #     # for a_connection_key in curr_connections_descriptions:
+    #     #     self.activeMenuReference.active_connections_menu.addAction(a_connection_key)
+    #     # # self.activeMenuReference.active_connections_menu.triggered.connect(lambda action: print(connection_man.active_connections.get(action.text(), f'Connection KeyNotFound: {action.text()}')))
+    #     # self.activeMenuReference.active_connections_menu.triggered.connect(lambda action: print((connection_man.find_active_connection(action.text()) or f'Connection KeyNotFound: {action.text()}')))
+    #     pass
 
+    # def _CreateLinkedWidget_MenuProvider_build_menus(self):
+    #     """ build QMenus from UI
+        
+    #     self.ui.menuCreate_Paired_Widget
+    #     self.ui.actionTimeSynchronizedOccupancyPlotter
+    #     self.ui.actionTimeSynchronizedPlacefieldsPlotter
+        
+    #     """
+        
+    #     widget = LocalMenus_AddRenderable() # get the UI widget containing the menu items:
+    #     menu_item = widget.ui.menuCreate_Paired_Widget
+        
+    #     ## Time Intervals/Epochs:
+    #     submenu_addTimeIntervals = [widget.ui.actionTimeSynchronizedOccupancyPlotter,
+    #                                 widget.ui.actionTimeSynchronizedPlacefieldsPlotter,
+    #                                 ]
+    #     submenu_addTimeIntervalCallbacks = [lambda evt=None: print(f'actionTimeSynchronizedOccupancyPlotter callback'),
+    #                                         lambda evt=None: print(f'actionTimeSynchronizedPlacefieldsPlotter callback'),
+    #                                         ]
+    #     submenu_addTimeIntervals_Connections = []
+    #     for an_action, a_callback in zip(submenu_addTimeIntervals, submenu_addTimeIntervalCallbacks):
+    #         _curr_conn = an_action.triggered.connect(a_callback)
+    #         submenu_addTimeIntervals_Connections.append(_curr_conn)
+            
+
+    # def _CreateLinkedWidget_MenuProvider_build_menus(self):
+    #     """ build QMenus """
+        
+    #     widget = LocalMenus_AddRenderable() # get the UI widget containing the menu items:
+    #     renderable_menu = widget.ui.menuAdd_Renderable
         
         
+    #     an_action_key, self.activeMenuReference.top_level_menu = PhoMenuHelper.add_menu(a_main_window=self.root_window, text="Create Paired Widget", name=self.top_level_menu_name, parent_menu=self.root_menu_bar, menu_actions_dict=self.CreateLinkedWidget_MenuProvider_actionsDict)
         
+    #     # Adds submenus:
+    #     # an_action_key, self.activeMenuReference.active_drivers_menu = PhoMenuHelper.add_menu(a_main_window=self.root_window, text="TimeSynchronizedOccupancyPlotter", name='actionMenuDebugMenuActiveDrivers', parent_menu=self.activeMenuReference.top_level_menu, menu_actions_dict=self.CreateLinkedWidget_MenuProvider_actionsDict)
+                
+    #     an_action_key = PhoMenuHelper.add_action_item(self.root_window, text="TimeSynchronizedOccupancyPlotter", icon_path=':/Render/Icons/actions/bar-chart_2@1x.png', actions_dict=self.CreateLinkedWidget_MenuProvider_actionsDict)
+                
+    #     # an_action_key, self.activeMenuReference.active_drivables_menu = PhoMenuHelper.add_menu(a_main_window=self.root_window, text="TimeSynchronizedPlacefieldsPlotter", name='actionMenuDebugMenuActiveDrivables', parent_menu=self.activeMenuReference.top_level_menu, menu_actions_dict=self.CreateLinkedWidget_MenuProvider_actionsDict)
         
+    #     an_action_key = PhoMenuHelper.add_action_item(self.root_window, text="TimeSynchronizedPlacefieldsPlotter", icon_path=':/Render/Icons/actions/wifi-channel_2@1x.png', actions_dict=self.CreateLinkedWidget_MenuProvider_actionsDict)
+        
+    #     ## Add the actions to the QMenu item:
+    #     self.activeMenuReference.top_level_menu.addActions(self.CreateLinkedWidget_MenuProvider_actionsDict.values())
+                    
+    #     ## TODO: is this even needed? I think it's done to remove it, but can't I just use a_main_window.ui.actionMenuConnections directly?
+    #     # self.activeMenuReference.actions_dict['actionMenuConnections'] = self.root_window.ui.actionMenuConnections
+
     @QtCore.Slot()
     def CreateLinkedWidget_MenuProvider_on_buildUI(self):
-        """ perfrom setup/creation of widget/graphical/data objects. Only the core objects are expected to exist on the implementor (root widget, etc) """
-        self._CreateLinkedWidget_MenuProvider_build_menus()
-        self._CreateLinkedWidget_MenuProvider_build_actions() # the actions actually depend on the existance of the menus for this dynamic menu case
+        """ perfrom setup/creation of widget/graphical/data objects. Only the core objects are expected to exist on the implementor (root widget, etc)
+        
+        build QMenus from UI
+        
+        self.ui.menuCreate_Paired_Widget
+        self.ui.actionTimeSynchronizedOccupancyPlotter
+        self.ui.actionTimeSynchronizedPlacefieldsPlotter
+        
+        
+        """
+        # self._CreateLinkedWidget_MenuProvider_build_menus()
+        # self._CreateLinkedWidget_MenuProvider_build_actions() # the actions actually depend on the existance of the menus for this dynamic menu case
+        
+        widget = LocalMenus_AddRenderable() # get the UI widget containing the menu items:
+        renderable_menu = widget.ui.menuCreate_Paired_Widget
+        
+        ## Time Intervals/Epochs:
+        submenu_addTimeIntervals = [widget.ui.actionTimeSynchronizedOccupancyPlotter,
+                                    widget.ui.actionTimeSynchronizedPlacefieldsPlotter,
+                                    ]
+        submenu_addTimeIntervalCallbacks = [lambda evt=None: print(f'actionTimeSynchronizedOccupancyPlotter callback'),
+                                            lambda evt=None: print(f'actionTimeSynchronizedPlacefieldsPlotter callback'),
+                                            ]
+        submenu_addTimeIntervals_Connections = []
+        for an_action, a_callback in zip(submenu_addTimeIntervals, submenu_addTimeIntervalCallbacks):
+            _curr_conn = an_action.triggered.connect(a_callback)
+            submenu_addTimeIntervals_Connections.append(_curr_conn)
+            
+
+        active_2d_plot_renderable_menus = widget, renderable_menu, (submenu_addTimeIntervals, submenu_addTimeIntervalCallbacks, submenu_addTimeIntervals_Connections)
+        widget_2d_menu = active_2d_plot_renderable_menus[0]
+        menuAdd_Renderable = widget_2d_menu.ui.menuAdd_Renderable
+        
+        
+        
+        
+        
 
     @QtCore.Slot()
     def CreateLinkedWidget_MenuProvider_on_destroy(self):
