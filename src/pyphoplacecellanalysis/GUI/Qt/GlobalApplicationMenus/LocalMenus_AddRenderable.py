@@ -205,6 +205,63 @@ class LocalMenus_AddRenderable(QtWidgets.QMainWindow):
         return active_2d_plot_renderable_menus, curr_window, curr_menubar
 
 
+    @classmethod
+    def perform_build_manual_paired_Widget_menu(cls, action_parent, menu_parent):
+        """ does everything locally, does not apply it to any .ui.* paths """
+        actions_dict = PhoUIContainer.init_from_dict({})
+        # create_linked_widget = PhoUIContainer.init_from_dict({'top_level_menu': None, 'actions_dict': actions_dict})
+        
+        
+        # Actions:
+        actions_dict.actionCreate_paired_time_synchronized_widget = QtWidgets.QAction(action_parent)
+        actions_dict.actionCreate_paired_time_synchronized_widget.setObjectName("actionCreate_paired_time_synchronized_widget")
+        actions_dict.actionTimeSynchronizedOccupancyPlotter = QtWidgets.QAction(action_parent)
+        icon2 = QtGui.QIcon()
+        icon2.addPixmap(QtGui.QPixmap(":/Render/Icons/actions/bar-chart_2@1x.png"), QtGui.QIcon.Normal, QtGui.QIcon.Off)
+        actions_dict.actionTimeSynchronizedOccupancyPlotter.setIcon(icon2)
+        actions_dict.actionTimeSynchronizedOccupancyPlotter.setText("TimeSynchronizedOccupancyPlotter")
+        actions_dict.actionTimeSynchronizedOccupancyPlotter.setObjectName("actionTimeSynchronizedOccupancyPlotter")
+        
+        actions_dict.actionTimeSynchronizedPlacefieldsPlotter = QtWidgets.QAction(action_parent)
+        icon3 = QtGui.QIcon()
+        icon3.addPixmap(QtGui.QPixmap(":/Render/Icons/actions/wifi-channel_2@1x.png"), QtGui.QIcon.Normal, QtGui.QIcon.Off)
+        actions_dict.actionTimeSynchronizedPlacefieldsPlotter.setIcon(icon3)
+        actions_dict.actionTimeSynchronizedPlacefieldsPlotter.setText("TimeSynchronizedPlacefieldsPlotter")
+        actions_dict.actionTimeSynchronizedPlacefieldsPlotter.setObjectName("actionTimeSynchronizedPlacefieldsPlotter")
+        
+        actions_dict.actionCombineTimeSynchronizedPlotterWindow = QtWidgets.QAction(action_parent)
+        actions_dict.actionCombineTimeSynchronizedPlotterWindow.setText("Combined Time Syncrhonized Plotter")
+        actions_dict.actionCombineTimeSynchronizedPlotterWindow.setObjectName("actionCombineTimeSynchronizedPlotterWindow")
+        
+        actions_dict.actionTimeSynchronizedDecoderPlotter = QtWidgets.QAction(action_parent)
+        actions_dict.actionTimeSynchronizedDecoderPlotter.setText("TimeSynchronizedDecoderPlotter")
+        actions_dict.actionTimeSynchronizedDecoderPlotter.setObjectName("actionTimeSynchronizedDecoderPlotter")
+
+        ## Menu:
+        # actions_dict.menuCreate_Paired_Widget = QtWidgets.QMenu(menu_parent)
+        # actions_dict.menuCreate_Paired_Widget.setTitle("Create Paired Widget")
+        # actions_dict.menuCreate_Paired_Widget.setObjectName("menuCreate_Paired_Widget")
+        # actions_dict.menuCreate_Paired_Widget.addAction(actions_dict.actionTimeSynchronizedOccupancyPlotter)
+        # actions_dict.menuCreate_Paired_Widget.addAction(actions_dict.actionTimeSynchronizedPlacefieldsPlotter)
+        # actions_dict.menuCreate_Paired_Widget.addAction(actions_dict.actionTimeSynchronizedDecoderPlotter)
+        # actions_dict.menuCreate_Paired_Widget.addSeparator()
+        # actions_dict.menuCreate_Paired_Widget.addAction(actions_dict.actionCombineTimeSynchronizedPlotterWindow)
+        
+        top_level_menu_item = QtWidgets.QMenu(menu_parent)
+        top_level_menu_item.setTitle("Create Paired Widget")
+        top_level_menu_item.setObjectName("menuCreate_Paired_Widget")
+        top_level_menu_item.addAction(actions_dict.actionTimeSynchronizedOccupancyPlotter)
+        top_level_menu_item.addAction(actions_dict.actionTimeSynchronizedPlacefieldsPlotter)
+        top_level_menu_item.addAction(actions_dict.actionTimeSynchronizedDecoderPlotter)
+        top_level_menu_item.addSeparator()
+        top_level_menu_item.addAction(actions_dict.actionCombineTimeSynchronizedPlotterWindow)
+
+        # curr_window.ui.menus.global_window_menus.create_new_connected_widget.top_level_menu = actions_dict.menuCreate_Paired_Widget
+        # curr_window.ui.menus.global_window_menus.create_new_connected_widget.actions_dict = actions_dict
+        
+        
+        create_linked_widget = PhoUIContainer.init_from_dict({'top_level_menu': top_level_menu_item, 'actions_dict': actions_dict})
+        return create_linked_widget
     
 
 ## Start Qt event loop

@@ -137,27 +137,36 @@ class CreateLinkedWidget_MenuProvider(BaseMenuProviderMixin):
         ## Add menu to the main menu bar:
         curr_window = self.root_window
         curr_menubar = self.root_menu_bar
+        # curr_actions_dict = self.CreateLinkedWidget_MenuProvider_actionsDict
+        
+        # ## Manual .ui method:
+        # widget = LocalMenus_AddRenderable() # get the UI widget containing the menu items:
+        # # renderable_menu = widget.ui.menuCreate_Paired_Widget
+        # # new_menu, new_children_items, new_actions = PhoMenuHelper.perform_copy_QMenu(widget.ui.menuCreate_Paired_Widget, dest_parent=curr_menubar)
+        # new_menu, new_children_items, new_actions = PhoMenuHelper.perform_copy_QMenu(widget.ui.menuCreate_Paired_Widget, action_parent=curr_window, menu_parent=curr_menubar, debug_print=True)
+        
+        
+        # curr_window, curr_menubar, curr_actions_dict = LocalMenus_AddRenderable.build_manual_paired_Widget_menu(curr_window)
+                
+        create_linked_widget = LocalMenus_AddRenderable.perform_build_manual_paired_Widget_menu(action_parent=curr_window, menu_parent=curr_menubar)
+        self.activeMenuReference = create_linked_widget
+        
         curr_actions_dict = self.CreateLinkedWidget_MenuProvider_actionsDict
         
+        # renderable_menu = new_menu
         
-        widget = LocalMenus_AddRenderable() # get the UI widget containing the menu items:
-        # renderable_menu = widget.ui.menuCreate_Paired_Widget
-        # new_menu, new_children_items, new_actions = PhoMenuHelper.perform_copy_QMenu(widget.ui.menuCreate_Paired_Widget, dest_parent=curr_menubar)
-        new_menu, new_children_items, new_actions = PhoMenuHelper.perform_copy_QMenu(widget.ui.menuCreate_Paired_Widget, action_parent=curr_window, menu_parent=curr_menubar, debug_print=True)
-        
-        renderable_menu = new_menu
-        
-        self.activeMenuReference.top_level_menu = renderable_menu
-        self.activeMenuReference.actions_dict = curr_actions_dict
+        # self.activeMenuReference.top_level_menu = renderable_menu
+        # self.activeMenuReference.actions_dict = curr_actions_dict
+        print(f'activeMenuReference.top_level_menu: {self.activeMenuReference.top_level_menu}, activeMenuReference.actions_dict: {self.activeMenuReference.actions_dict}')
         
         self.activeMenuReference.top_level_menu.setObjectName("menuCreateLinkedWidget")
         
         
         # Manual Setup:
-        curr_actions_dict['actionTimeSynchronizedOccupancyPlotter'] = widget.ui.actionTimeSynchronizedOccupancyPlotter
-        curr_actions_dict['actionTimeSynchronizedPlacefieldsPlotter'] = widget.ui.actionTimeSynchronizedPlacefieldsPlotter
-        curr_actions_dict['actionTimeSynchronizedDecoderPlotter'] = widget.ui.actionTimeSynchronizedDecoderPlotter
-        curr_actions_dict['actionCombineTimeSynchronizedPlotterWindow'] = widget.ui.actionCombineTimeSynchronizedPlotterWindow
+        # curr_actions_dict['actionTimeSynchronizedOccupancyPlotter'] = widget.ui.actionTimeSynchronizedOccupancyPlotter
+        # curr_actions_dict['actionTimeSynchronizedPlacefieldsPlotter'] = widget.ui.actionTimeSynchronizedPlacefieldsPlotter
+        # curr_actions_dict['actionTimeSynchronizedDecoderPlotter'] = widget.ui.actionTimeSynchronizedDecoderPlotter
+        # curr_actions_dict['actionCombineTimeSynchronizedPlotterWindow'] = widget.ui.actionCombineTimeSynchronizedPlotterWindow
         
         curr_actions_dict['actionTimeSynchronizedOccupancyPlotter'].triggered.connect(CreateNewTimeSynchronizedPlotterCommand(spike_raster_window, active_pf_2D_dt, plotter_type='occupancy', display_output=display_output))
         curr_actions_dict['actionTimeSynchronizedPlacefieldsPlotter'].triggered.connect(CreateNewTimeSynchronizedPlotterCommand(spike_raster_window, active_pf_2D_dt, plotter_type='placefields', display_output=display_output))
@@ -165,7 +174,7 @@ class CreateLinkedWidget_MenuProvider(BaseMenuProviderMixin):
         curr_actions_dict['actionCombineTimeSynchronizedPlotterWindow'].triggered.connect(CreateNewTimeSynchronizedCombinedPlotterCommand(spike_raster_window, active_pf_2D_dt, display_output))
         
         
-        curr_window.ui.actionMenuCreateLinkedWidget = curr_menubar.addMenu(renderable_menu)  # add it to the menubar
+        curr_window.ui.actionMenuCreateLinkedWidget = curr_menubar.addMenu(self.activeMenuReference.top_level_menu)  # add it to the menubar
 
         # Save references in the curr_window
         self.activeMenuReference.actions_dict['actionMenuCreateLinkedWidget'] = curr_window.ui.actionMenuCreateLinkedWidget 
@@ -177,7 +186,7 @@ class CreateLinkedWidget_MenuProvider(BaseMenuProviderMixin):
         # self.activeMenuReference.all_refs = widget
         
         # widget.close()
-        self.activeMenuReference.all_refs = None
+        # self.activeMenuReference.all_refs = None
     
         return self.activeMenuReference.top_level_menu, self.activeMenuReference.actions_dict
         

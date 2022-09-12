@@ -1,8 +1,7 @@
 from qtpy import QtCore, QtGui, QtWidgets
 from pyphoplacecellanalysis.Resources import GuiResources, ActionIcons
 
-from pyphocorehelpers.DataStructure.dynamic_parameters import DynamicParameters
-from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer
+# from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer
 from pyphoplacecellanalysis.GUI.Qt.Mixins.PhoMenuHelper import PhoMenuHelper
 
 
@@ -10,20 +9,9 @@ def initialize_global_menu_ui_variables_if_needed(a_main_window):
     """ 
     sets up a_main_window.ui.menus.global_window_menus as needed for the menu providers if needed
     """
-    if isinstance(a_main_window.ui, DynamicParameters):            
-        # Need this workaround because hasattr fails for DynamicParameters/PhoUIContainer right now:
-        a_main_window.ui.setdefault('menus', PhoUIContainer.init_from_dict({}))
-    else:
-        if not hasattr(a_main_window.ui, 'menus'):
-            a_main_window.ui.menus = PhoUIContainer.init_from_dict({})
-        
-    # a_main_window.ui.menus.setdefault('global_window_menus', PhoUIContainer.init_from_dict({}))
-    if not a_main_window.ui.menus.has_attr('global_window_menus'):
-        a_main_window.ui.menus.global_window_menus = PhoUIContainer.init_from_dict({})
-        
-            
-            
-            
+    return PhoMenuHelper.initialize_global_menu_ui_variables_if_needed(a_main_window)
+    
+         
 class BaseMenuCommand:
     """
     An abstract base command to be executed from a Menu item

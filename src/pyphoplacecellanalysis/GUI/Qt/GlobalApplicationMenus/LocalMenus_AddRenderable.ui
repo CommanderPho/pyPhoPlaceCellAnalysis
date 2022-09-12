@@ -68,7 +68,7 @@
    </widget>
    <widget class="QMenu" name="menuCreate_Paired_Widget">
     <property name="title">
-     <string>Create Paired Widget</string>
+     <string notr="true">Create Paired Widget</string>
     </property>
     <addaction name="actionTimeSynchronizedOccupancyPlotter"/>
     <addaction name="actionTimeSynchronizedPlacefieldsPlotter"/>
@@ -164,7 +164,7 @@
      <normaloff>:/Render/Icons/actions/bar-chart_2@1x.png</normaloff>:/Render/Icons/actions/bar-chart_2@1x.png</iconset>
    </property>
    <property name="text">
-    <string>TimeSynchronizedOccupancyPlotter</string>
+    <string notr="true">TimeSynchronizedOccupancyPlotter</string>
    </property>
   </action>
   <action name="actionTimeSynchronizedPlacefieldsPlotter">
@@ -173,17 +173,17 @@
      <normaloff>:/Render/Icons/actions/wifi-channel_2@1x.png</normaloff>:/Render/Icons/actions/wifi-channel_2@1x.png</iconset>
    </property>
    <property name="text">
-    <string>TimeSynchronizedPlacefieldsPlotter</string>
+    <string notr="true">TimeSynchronizedPlacefieldsPlotter</string>
    </property>
   </action>
   <action name="actionCombineTimeSynchronizedPlotterWindow">
    <property name="text">
-    <string>Combined Time Syncrhonized Plotter</string>
+    <string notr="true">Combined Time Syncrhonized Plotter</string>
    </property>
   </action>
   <action name="actionTimeSynchronizedDecoderPlotter">
    <property name="text">
-    <string>TimeSynchronizedDecoderPlotter</string>
+    <string notr="true">TimeSynchronizedDecoderPlotter</string>
    </property>
   </action>
  </widget>

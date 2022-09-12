@@ -1,8 +1,12 @@
 import re # regular expression for PhoMenuHelper
 from qtpy import QtCore, QtGui, QtWidgets
+from pyphocorehelpers.DataStructure.dynamic_parameters import DynamicParameters # for initialize_global_menu_ui_variables_if_needed
 from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer
 from pyphoplacecellanalysis.GUI.Qt.MainWindowWrapper import PhoBaseMainWindow
 from pyphoplacecellanalysis.Resources import GuiResources, ActionIcons
+
+# from pyphoplacecellanalysis.GUI.Qt.Mixins.Menus.BaseMenuProviderMixin import initialize_global_menu_ui_variables_if_needed
+
 
 class PhoMenuHelper(object):
     """ A static helper for building QMenu items, QActions and adding them to a window """
@@ -28,6 +32,9 @@ class PhoMenuHelper(object):
             if not hasattr(curr_window, 'ui'):
                 # if the window has no .ui property, create one:
                 setattr(curr_window, 'ui', PhoUIContainer())
+                
+            cls.initialize_global_menu_ui_variables_if_needed(curr_window)
+            
         return curr_window
      
     @classmethod
@@ -382,7 +389,26 @@ class PhoMenuHelper(object):
                 
         return new_menu, new_children_items, new_actions
 
-
+    @classmethod
+    def initialize_global_menu_ui_variables_if_needed(cls, a_main_window):
+        """ 
+        sets up a_main_window.ui.menus.global_window_menus as needed for the menu providers if needed
+        """
+        if not hasattr(a_main_window, 'ui'):
+            # if the window has no .ui property, create one:
+            setattr(a_main_window, 'ui', PhoUIContainer())
+            
+        if isinstance(a_main_window.ui, DynamicParameters):            
+            # Need this workaround because hasattr fails for DynamicParameters/PhoUIContainer right now:
+            a_main_window.ui.setdefault('menus', PhoUIContainer.init_from_dict({}))
+        else:
+            if not hasattr(a_main_window.ui, 'menus'):
+                a_main_window.ui.menus = PhoUIContainer.init_from_dict({})
+            
+        # a_main_window.ui.menus.setdefault('global_window_menus', PhoUIContainer.init_from_dict({}))
+        if not a_main_window.ui.menus.has_attr('global_window_menus'):
+            a_main_window.ui.menus.global_window_menus = PhoUIContainer.init_from_dict({})
+        
     # @classmethod
     # def perform_copy_QMenu(cls, src_menu, dest_parent=None, debug_print=False):
     #     """ makes a copy of QMenu and its children

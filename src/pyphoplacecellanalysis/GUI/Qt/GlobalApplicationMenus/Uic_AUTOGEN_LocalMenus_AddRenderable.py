@@ -38,6 +38,7 @@ class Ui_LocalMenus_AddRenderable(object):
         self.menuAddRenderable_Time_Intervals.setIcon(icon1)
         self.menuAddRenderable_Time_Intervals.setObjectName("menuAddRenderable_Time_Intervals")
         self.menuCreate_Paired_Widget = QtWidgets.QMenu(self.menubar)
+        self.menuCreate_Paired_Widget.setTitle("Create Paired Widget")
         self.menuCreate_Paired_Widget.setObjectName("menuCreate_Paired_Widget")
         LocalMenus_AddRenderable.setMenuBar(self.menubar)
         self.actionAddTimeCurves_Position = QtWidgets.QAction(LocalMenus_AddRenderable)
@@ -83,15 +84,19 @@ class Ui_LocalMenus_AddRenderable(object):
         icon2 = QtGui.QIcon()
         icon2.addPixmap(QtGui.QPixmap(":/Render/Icons/actions/bar-chart_2@1x.png"), QtGui.QIcon.Normal, QtGui.QIcon.Off)
         self.actionTimeSynchronizedOccupancyPlotter.setIcon(icon2)
+        self.actionTimeSynchronizedOccupancyPlotter.setText("TimeSynchronizedOccupancyPlotter")
         self.actionTimeSynchronizedOccupancyPlotter.setObjectName("actionTimeSynchronizedOccupancyPlotter")
         self.actionTimeSynchronizedPlacefieldsPlotter = QtWidgets.QAction(LocalMenus_AddRenderable)
         icon3 = QtGui.QIcon()
         icon3.addPixmap(QtGui.QPixmap(":/Render/Icons/actions/wifi-channel_2@1x.png"), QtGui.QIcon.Normal, QtGui.QIcon.Off)
         self.actionTimeSynchronizedPlacefieldsPlotter.setIcon(icon3)
+        self.actionTimeSynchronizedPlacefieldsPlotter.setText("TimeSynchronizedPlacefieldsPlotter")
         self.actionTimeSynchronizedPlacefieldsPlotter.setObjectName("actionTimeSynchronizedPlacefieldsPlotter")
         self.actionCombineTimeSynchronizedPlotterWindow = QtWidgets.QAction(LocalMenus_AddRenderable)
+        self.actionCombineTimeSynchronizedPlotterWindow.setText("Combined Time Syncrhonized Plotter")
         self.actionCombineTimeSynchronizedPlotterWindow.setObjectName("actionCombineTimeSynchronizedPlotterWindow")
         self.actionTimeSynchronizedDecoderPlotter = QtWidgets.QAction(LocalMenus_AddRenderable)
+        self.actionTimeSynchronizedDecoderPlotter.setText("TimeSynchronizedDecoderPlotter")
         self.actionTimeSynchronizedDecoderPlotter.setObjectName("actionTimeSynchronizedDecoderPlotter")
         self.menuAddRenderable_Time_Curves.addAction(self.actionAddTimeCurves_Position)
         self.menuAddRenderable_Time_Curves.addAction(self.actionAddTimeCurves_Random)
@@ -125,17 +130,12 @@ class Ui_LocalMenus_AddRenderable(object):
 
     def retranslateUi(self, LocalMenus_AddRenderable):
         _translate = QtCore.QCoreApplication.translate
-        self.menuCreate_Paired_Widget.setTitle(_translate("LocalMenus_AddRenderable", "Create Paired Widget"))
         self.actionClear_all_Time_Curves.setText(_translate("LocalMenus_AddRenderable", "Clear all Time Curves"))
         self.actionClear_all_Time_Intervals.setText(_translate("LocalMenus_AddRenderable", "Clear all Time Intervals"))
         self.actionClear_all_Renderables.setText(_translate("LocalMenus_AddRenderable", "Clear all Renderables"))
         self.actionAddTimeIntervals_Ripples.setText(_translate("LocalMenus_AddRenderable", "Ripples"))
         self.actionAddTimeIntervals_Replays.setText(_translate("LocalMenus_AddRenderable", "Replays"))
         self.actionCreate_paired_time_synchronized_widget.setText(_translate("LocalMenus_AddRenderable", "Create paired time synchronized widget"))
-        self.actionTimeSynchronizedOccupancyPlotter.setText(_translate("LocalMenus_AddRenderable", "TimeSynchronizedOccupancyPlotter"))
-        self.actionTimeSynchronizedPlacefieldsPlotter.setText(_translate("LocalMenus_AddRenderable", "TimeSynchronizedPlacefieldsPlotter"))
-        self.actionCombineTimeSynchronizedPlotterWindow.setText(_translate("LocalMenus_AddRenderable", "Combined Time Syncrhonized Plotter"))
-        self.actionTimeSynchronizedDecoderPlotter.setText(_translate("LocalMenus_AddRenderable", "TimeSynchronizedDecoderPlotter"))
 from pyphoplacecellanalysis.Resources import ActionIcons
 from pyphoplacecellanalysis.Resources import GuiResources
 from pyphoplacecellanalysis.Resources import breeze
