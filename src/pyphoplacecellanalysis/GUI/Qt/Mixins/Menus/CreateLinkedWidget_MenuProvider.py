@@ -142,7 +142,9 @@ class CreateLinkedWidget_MenuProvider(BaseMenuProviderMixin):
         
         widget = LocalMenus_AddRenderable() # get the UI widget containing the menu items:
         # renderable_menu = widget.ui.menuCreate_Paired_Widget
-        new_menu, new_children_items, new_actions = PhoMenuHelper.perform_copy_QMenu(widget.ui.menuCreate_Paired_Widget, dest_parent=curr_menubar)
+        # new_menu, new_children_items, new_actions = PhoMenuHelper.perform_copy_QMenu(widget.ui.menuCreate_Paired_Widget, dest_parent=curr_menubar)
+        new_menu, new_children_items, new_actions = PhoMenuHelper.perform_copy_QMenu(widget.ui.menuCreate_Paired_Widget, action_parent=curr_window, menu_parent=curr_menubar, debug_print=True)
+        
         renderable_menu = new_menu
         
         self.activeMenuReference.top_level_menu = renderable_menu
@@ -172,7 +174,10 @@ class CreateLinkedWidget_MenuProvider(BaseMenuProviderMixin):
         # Debugging Reference
         # self.activeMenuReference.all_refs = active_2d_plot_renderable_menus
         
-        self.activeMenuReference.all_refs = widget
+        # self.activeMenuReference.all_refs = widget
+        
+        # widget.close()
+        self.activeMenuReference.all_refs = None
     
         return self.activeMenuReference.top_level_menu, self.activeMenuReference.actions_dict
         
