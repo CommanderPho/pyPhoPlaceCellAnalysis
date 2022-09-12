@@ -153,65 +153,63 @@ class LocalMenus_AddRenderable(QtWidgets.QMainWindow):
 
 
 
-    @classmethod
-    def add_Create_Paired_Widget_menu(cls, destination_window, active_pf_2D_dt):
-        """ Adds the "Create Paired Widget" main-menu to the destination_window's menubar
+    # @classmethod
+    # def add_Create_Paired_Widget_menu(cls, destination_window, active_pf_2D_dt):
+    #     """ Adds the "Create Paired Widget" main-menu to the destination_window's menubar
 
-        active_pf_2D_dt: time-dependent placefield
+    #     active_pf_2D_dt: time-dependent placefield
         
-        self.ui.menuCreate_Paired_Widget
-            self.ui.actionTimeSynchronizedOccupancyPlotter
-            self.ui.actionTimeSynchronizedPlacefieldsPlotter
+    #     self.ui.menuCreate_Paired_Widget
+    #         self.ui.actionTimeSynchronizedOccupancyPlotter
+    #         self.ui.actionTimeSynchronizedPlacefieldsPlotter
             
-        menuCreate_Paired_Widget
-            actionTimeSynchronizedOccupancyPlotter
-            actionTimeSynchronizedPlacefieldsPlotter
+    #     menuCreate_Paired_Widget
+    #         actionTimeSynchronizedOccupancyPlotter
+    #         actionTimeSynchronizedPlacefieldsPlotter
 
-        """
-        curr_window = PhoMenuHelper.try_get_menu_window(a_content_widget=destination_window)
-        curr_menubar = PhoMenuHelper.try_get_menu_bar(a_content_widget=destination_window)
+    #     """
+    #     curr_window = PhoMenuHelper.try_get_menu_window(a_content_widget=destination_window)
+    #     curr_menubar = PhoMenuHelper.try_get_menu_bar(a_content_widget=destination_window)
     
-        activeMenuReference = PhoUIContainer.init_from_dict({'top_level_menu': None, 'actions_dict': {}})
-        curr_window.ui.menus.global_window_menus.create_linked_widget = activeMenuReference
+    #     activeMenuReference = PhoUIContainer.init_from_dict({'top_level_menu': None, 'actions_dict': {}})
+    #     curr_window.ui.menus.global_window_menus.create_linked_widget = activeMenuReference
         
-        CreateLinkedWidget_MenuProvider_actionsDict = activeMenuReference.actions_dict
+    #     CreateLinkedWidget_MenuProvider_actionsDict = activeMenuReference.actions_dict
         
-        widget = LocalMenus_AddRenderable() # get the UI widget containing the menu items:
-        renderable_menu = widget.ui.menuCreate_Paired_Widget
+    #     widget = LocalMenus_AddRenderable() # get the UI widget containing the menu items:
+    #     renderable_menu = widget.ui.menuCreate_Paired_Widget
 
-        ## Time Intervals/Epochs:
-        submenu_addTimeSynchronizedPlotterMenuItems = [widget.ui.actionTimeSynchronizedOccupancyPlotter,
-                                    widget.ui.actionTimeSynchronizedPlacefieldsPlotter,
-                                    ]
-        submenu_addTimeSynchronizedPlotterCallbacks = [lambda evt=None: print(f'actionTimeSynchronizedOccupancyPlotter callback'),
-                                            lambda evt=None: print(f'actionTimeSynchronizedPlacefieldsPlotter callback'),
-                                            ]
-        submenu_addTimeSynchronizedPlotter_Connections = []
-        for an_action, a_callback in zip(submenu_addTimeSynchronizedPlotterMenuItems, submenu_addTimeSynchronizedPlotterCallbacks):
-            _curr_conn = an_action.triggered.connect(a_callback)
-            submenu_addTimeSynchronizedPlotter_Connections.append(_curr_conn)
+    #     ## Time Intervals/Epochs:
+    #     submenu_addTimeSynchronizedPlotterMenuItems = [widget.ui.actionTimeSynchronizedOccupancyPlotter,
+    #                                 widget.ui.actionTimeSynchronizedPlacefieldsPlotter,
+    #                                 ]
+    #     submenu_addTimeSynchronizedPlotterCallbacks = [lambda evt=None: print(f'actionTimeSynchronizedOccupancyPlotter callback'),
+    #                                         lambda evt=None: print(f'actionTimeSynchronizedPlacefieldsPlotter callback'),
+    #                                         ]
+    #     submenu_addTimeSynchronizedPlotter_Connections = []
+    #     for an_action, a_callback in zip(submenu_addTimeSynchronizedPlotterMenuItems, submenu_addTimeSynchronizedPlotterCallbacks):
+    #         _curr_conn = an_action.triggered.connect(a_callback)
+    #         submenu_addTimeSynchronizedPlotter_Connections.append(_curr_conn)
             
-        active_2d_plot_renderable_menus = widget, renderable_menu, (submenu_addTimeSynchronizedPlotterMenuItems, submenu_addTimeSynchronizedPlotterCallbacks, submenu_addTimeSynchronizedPlotter_Connections)
-        widget_2d_menu = active_2d_plot_renderable_menus[0]
-        # menuAdd_Renderable = widget_2d_menu.ui.menuAdd_Renderable
+    #     active_2d_plot_renderable_menus = widget, renderable_menu, (submenu_addTimeSynchronizedPlotterMenuItems, submenu_addTimeSynchronizedPlotterCallbacks, submenu_addTimeSynchronizedPlotter_Connections)
+    #     widget_2d_menu = active_2d_plot_renderable_menus[0]
+    #     # menuAdd_Renderable = widget_2d_menu.ui.menuAdd_Renderable
         
-        print(f'renderable_menu: {renderable_menu}') 
-        curr_menubar.addMenu(renderable_menu) # add it to the menubar
+    #     print(f'renderable_menu: {renderable_menu}') 
+    #     curr_menubar.addMenu(renderable_menu) # add it to the menubar
 
-        # Save references in the curr_window
-        activeMenuReference.top_level_menu = renderable_menu
-        print(f'activeMenuReference: {activeMenuReference}')
+    #     # Save references in the curr_window
+    #     activeMenuReference.top_level_menu = renderable_menu
+    #     print(f'activeMenuReference: {activeMenuReference}')
         
-        return active_2d_plot_renderable_menus, curr_window, curr_menubar
+    #     return active_2d_plot_renderable_menus, curr_window, curr_menubar
 
 
     @classmethod
     def perform_build_manual_paired_Widget_menu(cls, action_parent, menu_parent):
         """ does everything locally, does not apply it to any .ui.* paths """
         actions_dict = PhoUIContainer.init_from_dict({})
-        # create_linked_widget = PhoUIContainer.init_from_dict({'top_level_menu': None, 'actions_dict': actions_dict})
-        
-        
+                
         # Actions:
         actions_dict.actionCreate_paired_time_synchronized_widget = QtWidgets.QAction(action_parent)
         actions_dict.actionCreate_paired_time_synchronized_widget.setObjectName("actionCreate_paired_time_synchronized_widget")
@@ -237,16 +235,7 @@ class LocalMenus_AddRenderable(QtWidgets.QMainWindow):
         actions_dict.actionTimeSynchronizedDecoderPlotter.setText("TimeSynchronizedDecoderPlotter")
         actions_dict.actionTimeSynchronizedDecoderPlotter.setObjectName("actionTimeSynchronizedDecoderPlotter")
 
-        ## Menu:
-        # actions_dict.menuCreate_Paired_Widget = QtWidgets.QMenu(menu_parent)
-        # actions_dict.menuCreate_Paired_Widget.setTitle("Create Paired Widget")
-        # actions_dict.menuCreate_Paired_Widget.setObjectName("menuCreate_Paired_Widget")
-        # actions_dict.menuCreate_Paired_Widget.addAction(actions_dict.actionTimeSynchronizedOccupancyPlotter)
-        # actions_dict.menuCreate_Paired_Widget.addAction(actions_dict.actionTimeSynchronizedPlacefieldsPlotter)
-        # actions_dict.menuCreate_Paired_Widget.addAction(actions_dict.actionTimeSynchronizedDecoderPlotter)
-        # actions_dict.menuCreate_Paired_Widget.addSeparator()
-        # actions_dict.menuCreate_Paired_Widget.addAction(actions_dict.actionCombineTimeSynchronizedPlotterWindow)
-        
+        ## Menu:        
         top_level_menu_item = QtWidgets.QMenu(menu_parent)
         top_level_menu_item.setTitle("Create Paired Widget")
         top_level_menu_item.setObjectName("menuCreate_Paired_Widget")
@@ -255,10 +244,6 @@ class LocalMenus_AddRenderable(QtWidgets.QMainWindow):
         top_level_menu_item.addAction(actions_dict.actionTimeSynchronizedDecoderPlotter)
         top_level_menu_item.addSeparator()
         top_level_menu_item.addAction(actions_dict.actionCombineTimeSynchronizedPlotterWindow)
-
-        # curr_window.ui.menus.global_window_menus.create_new_connected_widget.top_level_menu = actions_dict.menuCreate_Paired_Widget
-        # curr_window.ui.menus.global_window_menus.create_new_connected_widget.actions_dict = actions_dict
-        
         
         create_linked_widget = PhoUIContainer.init_from_dict({'top_level_menu': top_level_menu_item, 'actions_dict': actions_dict})
         return create_linked_widget
