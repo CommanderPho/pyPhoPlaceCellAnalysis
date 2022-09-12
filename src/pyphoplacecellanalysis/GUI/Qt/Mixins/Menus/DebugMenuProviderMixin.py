@@ -14,12 +14,21 @@ class DebugMenuProviderMixin(BaseMenuProviderMixin):
     .ui.menus.global_window_menus.debug.actions_dict
     
     """
+    
+    @property
+    def activeMenuReference(self):
+        """The reference to the top-level PhoUIContainer for this menu where references are stored to the ui elements and their actions."""
+        return self.root_window.ui.menus.global_window_menus.debug
+    @activeMenuReference.setter
+    def activeMenuReference(self, value):
+        self.root_window.ui.menus.global_window_menus.debug = value
+        
     @property
     def DebugMenuProviderMixin_actionsDict(self):
-        return self.root_window.ui.menus.global_window_menus.debug.actions_dict
+        return self.activeMenuReference.actions_dict
     @DebugMenuProviderMixin_actionsDict.setter
     def DebugMenuProviderMixin_actionsDict(self, value):
-        self.root_window.ui.menus.global_window_menus.debug.actions_dict = value
+        self.activeMenuReference.actions_dict = value
         
     @property
     def connection_man(self):
@@ -38,7 +47,7 @@ class DebugMenuProviderMixin(BaseMenuProviderMixin):
         """ perform any parameters setting/checking during init """
         BaseMenuProviderMixin.BaseMenuProviderMixin_on_init(self)
         # Define the core object
-        self.root_window.ui.menus.global_window_menus.debug = PhoUIContainer.init_from_dict({'top_level_menu': None, 'actions_dict': {}})
+        self.activeMenuReference = PhoUIContainer.init_from_dict({'top_level_menu': None, 'actions_dict': {}})
     
     @QtCore.Slot()
     def DebugMenuProviderMixin_on_setup(self):
@@ -54,21 +63,21 @@ class DebugMenuProviderMixin(BaseMenuProviderMixin):
         ## Update Drivers Menu:
         curr_drivers_items = list(connection_man.registered_available_drivers.keys())
         for a_driver_key in curr_drivers_items:
-            self.root_window.ui.menus.global_window_menus.debug.active_drivers_menu.addAction(a_driver_key)
-        self.root_window.ui.menus.global_window_menus.debug.active_drivers_menu.triggered.connect(lambda action: print(connection_man.registered_available_drivers.get(action.text(), f'Driver KeyNotFound: {action.text()}')))
+            self.activeMenuReference.active_drivers_menu.addAction(a_driver_key)
+        self.activeMenuReference.active_drivers_menu.triggered.connect(lambda action: print(connection_man.registered_available_drivers.get(action.text(), f'Driver KeyNotFound: {action.text()}')))
 
         ## Update Drivable Menu:
         curr_drivable_items = list(connection_man.registered_available_drivables.keys())
         for a_driveable_key in curr_drivable_items:
-            self.root_window.ui.menus.global_window_menus.debug.active_drivables_menu.addAction(a_driveable_key)
-        self.root_window.ui.menus.global_window_menus.debug.active_drivables_menu.triggered.connect(lambda action: print(connection_man.registered_available_drivables.get(action.text(), f'Drivable KeyNotFound: {action.text()}')))
+            self.activeMenuReference.active_drivables_menu.addAction(a_driveable_key)
+        self.activeMenuReference.active_drivables_menu.triggered.connect(lambda action: print(connection_man.registered_available_drivables.get(action.text(), f'Drivable KeyNotFound: {action.text()}')))
   
         ## Update Connections Menu:
         curr_connections_descriptions = list([a_conn_ref.description for a_conn_ref in connection_man.active_connections.values()])
         for a_connection_key in curr_connections_descriptions:
-            self.root_window.ui.menus.global_window_menus.debug.active_connections_menu.addAction(a_connection_key)
-        # self.root_window.ui.menus.global_window_menus.debug.active_connections_menu.triggered.connect(lambda action: print(connection_man.active_connections.get(action.text(), f'Connection KeyNotFound: {action.text()}')))
-        self.root_window.ui.menus.global_window_menus.debug.active_connections_menu.triggered.connect(lambda action: print((connection_man.find_active_connection(action.text()) or f'Connection KeyNotFound: {action.text()}')))
+            self.activeMenuReference.active_connections_menu.addAction(a_connection_key)
+        # self.activeMenuReference.active_connections_menu.triggered.connect(lambda action: print(connection_man.active_connections.get(action.text(), f'Connection KeyNotFound: {action.text()}')))
+        self.activeMenuReference.active_connections_menu.triggered.connect(lambda action: print((connection_man.find_active_connection(action.text()) or f'Connection KeyNotFound: {action.text()}')))
         
         
         
@@ -77,13 +86,13 @@ class DebugMenuProviderMixin(BaseMenuProviderMixin):
     
     def _DebugMenuProviderMixin_build_menus(self):
         """ build QMenus """
-        an_action_key, self.root_window.ui.menus.global_window_menus.debug.top_level_menu = PhoMenuHelper.add_menu(a_main_window=self.root_window, text="Debug", name='actionMenuDebug', parent_menu=self.root_menu_bar, menu_actions_dict=self.DebugMenuProviderMixin_actionsDict)
+        an_action_key, self.activeMenuReference.top_level_menu = PhoMenuHelper.add_menu(a_main_window=self.root_window, text="Debug", name='actionMenuDebug', parent_menu=self.root_menu_bar, menu_actions_dict=self.DebugMenuProviderMixin_actionsDict)
         
-        an_action_key, self.root_window.ui.menus.global_window_menus.debug.active_drivers_menu = PhoMenuHelper.add_menu(a_main_window=self.root_window, text="Active Drivers", name='actionMenuDebugMenuActiveDrivers', parent_menu=self.root_window.ui.menus.global_window_menus.debug.top_level_menu, menu_actions_dict=self.DebugMenuProviderMixin_actionsDict)
+        an_action_key, self.activeMenuReference.active_drivers_menu = PhoMenuHelper.add_menu(a_main_window=self.root_window, text="Active Drivers", name='actionMenuDebugMenuActiveDrivers', parent_menu=self.activeMenuReference.top_level_menu, menu_actions_dict=self.DebugMenuProviderMixin_actionsDict)
         # active_drivers_menu = self.root_window.ui['actionMenuDebugMenuActiveDrivers']
-        an_action_key, self.root_window.ui.menus.global_window_menus.debug.active_drivables_menu = PhoMenuHelper.add_menu(a_main_window=self.root_window, text="Active Drivables", name='actionMenuDebugMenuActiveDrivables', parent_menu=self.root_window.ui.menus.global_window_menus.debug.top_level_menu, menu_actions_dict=self.DebugMenuProviderMixin_actionsDict)
+        an_action_key, self.activeMenuReference.active_drivables_menu = PhoMenuHelper.add_menu(a_main_window=self.root_window, text="Active Drivables", name='actionMenuDebugMenuActiveDrivables', parent_menu=self.activeMenuReference.top_level_menu, menu_actions_dict=self.DebugMenuProviderMixin_actionsDict)
         # active_drivables_menu = self.root_window.ui['actionMenuDebugMenuActiveDrivables']
-        an_action_key, self.root_window.ui.menus.global_window_menus.debug.active_connections_menu = PhoMenuHelper.add_menu(a_main_window=self.root_window, text="Active Connections", name='actionMenuDebugMenuActiveConnections', parent_menu=self.root_window.ui.menus.global_window_menus.debug.top_level_menu, menu_actions_dict=self.DebugMenuProviderMixin_actionsDict)
+        an_action_key, self.activeMenuReference.active_connections_menu = PhoMenuHelper.add_menu(a_main_window=self.root_window, text="Active Connections", name='actionMenuDebugMenuActiveConnections', parent_menu=self.activeMenuReference.top_level_menu, menu_actions_dict=self.DebugMenuProviderMixin_actionsDict)
         # active_connections_menu = self.root_window.ui['actionMenuDebugMenuActiveConnections']
         
 
@@ -105,9 +114,9 @@ class DebugMenuProviderMixin(BaseMenuProviderMixin):
         curr_menubar.removeAction(curr_actions_dict['actionMenuDebug'])
         curr_window.ui.actionMenuDebug = None
         
-        self.root_window.ui.menus.global_window_menus.debug.active_drivers_menu = None
-        self.root_window.ui.menus.global_window_menus.debug.active_drivables_menu = None
-        self.root_window.ui.menus.global_window_menus.debug.active_connections_menu = None
+        self.activeMenuReference.active_drivers_menu = None
+        self.activeMenuReference.active_drivables_menu = None
+        self.activeMenuReference.active_connections_menu = None
         
         # curr_window.ui.menus.global_window_menus.debug.actions_dict = {} # Empty the dict of actions
         self.DebugMenuProviderMixin_actionsDict = {}
@@ -121,13 +130,13 @@ class DebugMenuProviderMixin(BaseMenuProviderMixin):
         ## Update Drivers Menu:
         curr_drivers_items = list(self.connection_man.registered_available_drivers.keys())
         for a_driver_key in curr_drivers_items:
-            self.root_window.ui.menus.global_window_menus.debug.active_drivers_menu.addAction(a_driver_key)
+            self.activeMenuReference.active_drivers_menu.addAction(a_driver_key)
         ## Update Drivable Menu:
         curr_drivable_items = list(self.connection_man.registered_available_drivables.keys())
         for a_driveable_key in curr_drivable_items:
-            self.root_window.ui.menus.global_window_menus.debug.active_drivables_menu.addAction(a_driveable_key)
+            self.activeMenuReference.active_drivables_menu.addAction(a_driveable_key)
         ## Update Connections Menu:
         curr_connections_descriptions = list([a_conn_ref.description for a_conn_ref in self.connection_man.active_connections.values()])
         for a_connection_key in curr_connections_descriptions:
-            self.root_window.ui.menus.global_window_menus.debug.active_connections_menu.addAction(a_connection_key)
+            self.activeMenuReference.active_connections_menu.addAction(a_connection_key)
             
