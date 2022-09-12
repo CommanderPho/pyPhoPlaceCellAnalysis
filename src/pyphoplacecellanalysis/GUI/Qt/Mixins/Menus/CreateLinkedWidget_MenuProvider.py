@@ -47,6 +47,14 @@ class CreateLinkedWidget_MenuProvider(BaseMenuProviderMixin):
         """ the __init__ form allows adding menus to extant widgets without modifying their class to inherit from this mixin """
         super(CreateLinkedWidget_MenuProvider, self).__init__(render_widget=render_widget, parent=parent, **kwargs)
         # Setup member variables:
+        
+        spike_raster_window = kwargs.pop('spike_raster_window', None)
+        active_pf_2D_dt = kwargs.pop('active_pf_2D_dt', None)
+        display_output = kwargs.pop('display_output', None)
+        
+        
+        
+        
         pass
         
         
@@ -66,7 +74,7 @@ class CreateLinkedWidget_MenuProvider(BaseMenuProviderMixin):
     
     
     @QtCore.Slot()
-    def CreateLinkedWidget_MenuProvider_on_buildUI(self):
+    def CreateLinkedWidget_MenuProvider_on_buildUI(self, **kwargs):
         """ perfrom setup/creation of widget/graphical/data objects. Only the core objects are expected to exist on the implementor (root widget, etc)
         
         build QMenus from UI
@@ -81,6 +89,12 @@ class CreateLinkedWidget_MenuProvider(BaseMenuProviderMixin):
         
         
         """
+        
+        
+        spike_raster_window = kwargs.get('spike_raster_window', None)
+        active_pf_2D_dt = kwargs.get('active_pf_2D_dt', None)
+        display_output = kwargs.get('display_output', None)
+        
         # self._CreateLinkedWidget_MenuProvider_build_menus()
         # self._CreateLinkedWidget_MenuProvider_build_actions() # the actions actually depend on the existance of the menus for this dynamic menu case
         
@@ -97,11 +111,19 @@ class CreateLinkedWidget_MenuProvider(BaseMenuProviderMixin):
         
         # all_plotters, root_dockAreaWindow, app = build_combined_time_synchronized_plotters_window(active_pf_2D_dt, controlling_widget=spike_raster_window.spike_raster_plt_2d, create_new_controlling_widget=False) # window_scrolled
         
+        # submenu_menuCallbacks = [lambda evt=None: print(f'actionTimeSynchronizedOccupancyPlotter callback'),
+        #                                     lambda evt=None: print(f'actionTimeSynchronizedPlacefieldsPlotter callback'),
+        #                                     lambda evt=None: print(f'actionTimeSynchronizedDecoderPlotter callback'),
+        #                                     lambda evt=None: print(f'actionCombineTimeSynchronizedPlotterWindow callback'),
+        #                                     ]
+        
         submenu_menuCallbacks = [lambda evt=None: print(f'actionTimeSynchronizedOccupancyPlotter callback'),
                                             lambda evt=None: print(f'actionTimeSynchronizedPlacefieldsPlotter callback'),
                                             lambda evt=None: print(f'actionTimeSynchronizedDecoderPlotter callback'),
-                                            lambda evt=None: print(f'actionCombineTimeSynchronizedPlotterWindow callback'),
+                                            lambda evt=None: CreateNewTimeSynchronizedPlotterCommand(spike_raster_window, active_pf_2D_dt, display_output),
                                             ]
+        
+        
         submenu_menu_Connections = []
         for an_action, a_callback in zip(submenu_menuItems, submenu_menuCallbacks):
             _curr_conn = an_action.triggered.connect(a_callback)
