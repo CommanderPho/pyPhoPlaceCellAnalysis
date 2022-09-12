@@ -336,3 +336,83 @@ class PhoMenuHelper(object):
         menu_actions_dict[name] = a_main_window.ui[name] # add to actions dictionary
         return name, curr_menu
             
+    @classmethod
+    def perform_copy_QAction(cls, src_action, dest_parent=None, debug_print=False):
+        if debug_print:
+            print(f'perform_copy_QAction(src_action: {src_action}, src_action.parent(): {src_action.parent()}, dest_parent: {dest_parent})')
+        new_action = QtWidgets.QAction(dest_parent)
+        new_action.setIcon(src_action.icon())
+        new_action.setText(src_action.text())
+        new_action.setObjectName(src_action.objectName())
+        new_action.setActionGroup(src_action.actionGroup())
+        new_action.setEnabled(new_action.isEnabled())
+        return new_action
+
+    @classmethod
+    def perform_copy_QMenu(cls, src_menu, dest_parent=None, debug_print=False):
+        """ makes a copy of QMenu and its children
+        """
+        assert src_menu.parent() != dest_parent, "Expect that src_menu's parent isn't already dest_parent, but it already seems to be. "
+        if debug_print:
+            print(f'perform_copy_QMenu(src_menu: {src_menu}, src_menu.parent(): {src_menu.parent()}, dest_parent: {dest_parent})')
+        new_menu = QtWidgets.QMenu(dest_parent) # dest_parent: self.menubar
+        new_menu.setIcon(src_menu.icon())
+        new_menu.setTitle(src_menu.title())
+        new_menu.setObjectName(src_menu.objectName())
+        new_menu.setEnabled(src_menu.isEnabled())
+        
+        # new_menu.setActionGroup(src_menu.actionGroup())
+
+        old_children_items = src_menu.children()
+        new_children_items = []
+        new_actions = []
+        for a_child in old_children_items:
+            if isinstance(a_child, QtWidgets.QMenu):
+                # it's a submenu
+                # new_children_items.append(cls.perform_copy_QMenu(a_child, dest_parent=new_menu, debug_print=debug_print))
+                child_submenu, child_children_items, child_actions = cls.perform_copy_QMenu(a_child, dest_parent=new_menu, debug_print=debug_print)
+                new_children_items.append(child_submenu)
+                new_children_items.extend(child_children_items)
+                new_actions.extend(child_actions)
+                
+            elif isinstance(a_child, QtWidgets.QAction):
+                # it's a sub-action
+                new_actions.append(cls.perform_copy_QAction(a_child, dest_parent=new_menu, debug_print=debug_print))
+                
+        return new_menu, new_children_items, new_actions
+
+
+    # @classmethod
+    # def perform_copy_QMenu(cls, src_menu, dest_parent=None, debug_print=False):
+    #     """ makes a copy of QMenu and its children
+    #     """
+    #     assert src_menu.parent() != dest_parent, "Expect that src_menu's parent isn't already dest_parent, but it already seems to be. "
+    #     if debug_print:
+    #         print(f'src_menu: {src_menu}, src_menu.parent(): {src_menu.parent()}, dest_parent: {dest_parent}')
+    #     new_menu = QtWidgets.QMenu(dest_parent) # dest_parent: self.menubar
+    #     new_menu.setIcon(src_menu.icon())
+    #     new_menu.setTitle(src_menu.title())
+    #     new_menu.setObjectName(src_menu.objectName())
+    #     new_menu.setEnabled(src_menu.isEnabled())
+        
+    #     # new_menu.setActionGroup(src_menu.actionGroup())
+
+    #     old_children_items = src_menu.children()
+    #     new_children_items = []
+    #     new_actions = []
+    #     for a_child in old_children_items:
+    #         if isinstance(a_child, QtWidgets.QMenu):
+    #             # it's a submenu
+    #             # new_children_items.append(cls.perform_copy_QMenu(a_child, dest_parent=new_menu, debug_print=debug_print))
+    #             child_submenu, child_children_items, child_actions = cls.perform_copy_QMenu(a_child, dest_parent=new_menu, debug_print=debug_print)
+    #             new_children_items.append(child_submenu)
+    #             new_children_items.extend(child_children_items)
+    #             new_actions.extend(child_actions)
+                
+    #         elif isinstance(a_child, QtWidgets.QAction):
+    #             # it's a sub-action
+    #             new_actions.append(cls.perform_copy_QAction(a_child, dest_parent=new_menu, debug_print=debug_print))
+                
+    #     return new_menu, new_children_items, new_actions
+    
+    

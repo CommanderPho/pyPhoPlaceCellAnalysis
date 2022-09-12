@@ -92,16 +92,16 @@ class CreateLinkedWidget_MenuProvider(BaseMenuProviderMixin):
         
         # self._CreateLinkedWidget_MenuProvider_build_menus()
         # self._CreateLinkedWidget_MenuProvider_build_actions() # the actions actually depend on the existance of the menus for this dynamic menu case
-        
-        widget = LocalMenus_AddRenderable() # get the UI widget containing the menu items:
-        renderable_menu = widget.ui.menuCreate_Paired_Widget
+                
+        # widget = LocalMenus_AddRenderable() # get the UI widget containing the menu items:
+        # renderable_menu = widget.ui.menuCreate_Paired_Widget
         
         ## Time Intervals/Epochs:
-        submenu_menuItems = [widget.ui.actionTimeSynchronizedOccupancyPlotter,
-                                    widget.ui.actionTimeSynchronizedPlacefieldsPlotter,
-                                    widget.ui.actionTimeSynchronizedDecoderPlotter,
-                                    widget.ui.actionCombineTimeSynchronizedPlotterWindow,
-                                    ]
+        # submenu_menuItems = [widget.ui.actionTimeSynchronizedOccupancyPlotter,
+        #                             widget.ui.actionTimeSynchronizedPlacefieldsPlotter,
+        #                             widget.ui.actionTimeSynchronizedDecoderPlotter,
+        #                             widget.ui.actionCombineTimeSynchronizedPlotterWindow,
+        #                             ]
         
         
         # all_plotters, root_dockAreaWindow, app = build_combined_time_synchronized_plotters_window(active_pf_2D_dt, controlling_widget=spike_raster_window.spike_raster_plt_2d, create_new_controlling_widget=False) # window_scrolled
@@ -113,28 +113,56 @@ class CreateLinkedWidget_MenuProvider(BaseMenuProviderMixin):
         #                                     ]
         
         
-        submenu_menuCallbacks = [lambda evt=None: CreateNewTimeSynchronizedPlotterCommand(spike_raster_window, active_pf_2D_dt, plotter_type='occupancy', display_output=display_output),
-                                            lambda evt=None:CreateNewTimeSynchronizedPlotterCommand(spike_raster_window, active_pf_2D_dt, plotter_type='placefields', display_output=display_output),
-                                            lambda evt=None: CreateNewTimeSynchronizedPlotterCommand(spike_raster_window, active_pf_2D_dt, plotter_type='decoder', display_output=display_output),
-                                            lambda evt=None: CreateNewTimeSynchronizedCombinedPlotterCommand(spike_raster_window, active_pf_2D_dt, display_output),
-                                            ]
+        # submenu_menuCallbacks = [lambda evt=None: CreateNewTimeSynchronizedPlotterCommand(spike_raster_window, active_pf_2D_dt, plotter_type='occupancy', display_output=display_output),
+        #                                     lambda evt=None:CreateNewTimeSynchronizedPlotterCommand(spike_raster_window, active_pf_2D_dt, plotter_type='placefields', display_output=display_output),
+        #                                     lambda evt=None: CreateNewTimeSynchronizedPlotterCommand(spike_raster_window, active_pf_2D_dt, plotter_type='decoder', display_output=display_output),
+        #                                     lambda evt=None: CreateNewTimeSynchronizedCombinedPlotterCommand(spike_raster_window, active_pf_2D_dt, display_output),
+        #                                     ]
         
         
-        submenu_menu_Connections = []
-        for an_action, a_callback in zip(submenu_menuItems, submenu_menuCallbacks):
-            _curr_conn = an_action.triggered.connect(a_callback)
-            submenu_menu_Connections.append(_curr_conn)
+        # submenu_menu_Connections = []
+        # for an_action, a_callback in zip(submenu_menuItems, submenu_menuCallbacks):
+        #     _curr_conn = an_action.triggered.connect(a_callback)
+        #     submenu_menu_Connections.append(_curr_conn)
 
-        active_2d_plot_renderable_menus = widget, renderable_menu, (submenu_menuItems, submenu_menuCallbacks, submenu_menu_Connections)
+        # active_2d_plot_renderable_menus = widget, renderable_menu, (submenu_menuItems, submenu_menuCallbacks, submenu_menu_Connections)
+        
+        
+        
+        
+        
+        
+        
         
         ## Add menu to the main menu bar:
         curr_window = self.root_window
         curr_menubar = self.root_menu_bar
         curr_actions_dict = self.CreateLinkedWidget_MenuProvider_actionsDict
+        
+        
+        widget = LocalMenus_AddRenderable() # get the UI widget containing the menu items:
+        # renderable_menu = widget.ui.menuCreate_Paired_Widget
+        new_menu, new_children_items, new_actions = PhoMenuHelper.perform_copy_QMenu(widget.ui.menuCreate_Paired_Widget, dest_parent=curr_menubar)
+        renderable_menu = new_menu
+        
         self.activeMenuReference.top_level_menu = renderable_menu
         self.activeMenuReference.actions_dict = curr_actions_dict
         
         self.activeMenuReference.top_level_menu.setObjectName("menuCreateLinkedWidget")
+        
+        
+        # Manual Setup:
+        curr_actions_dict['actionTimeSynchronizedOccupancyPlotter'] = widget.ui.actionTimeSynchronizedOccupancyPlotter
+        curr_actions_dict['actionTimeSynchronizedPlacefieldsPlotter'] = widget.ui.actionTimeSynchronizedPlacefieldsPlotter
+        curr_actions_dict['actionTimeSynchronizedDecoderPlotter'] = widget.ui.actionTimeSynchronizedDecoderPlotter
+        curr_actions_dict['actionCombineTimeSynchronizedPlotterWindow'] = widget.ui.actionCombineTimeSynchronizedPlotterWindow
+        
+        curr_actions_dict['actionTimeSynchronizedOccupancyPlotter'].triggered.connect(CreateNewTimeSynchronizedPlotterCommand(spike_raster_window, active_pf_2D_dt, plotter_type='occupancy', display_output=display_output))
+        curr_actions_dict['actionTimeSynchronizedPlacefieldsPlotter'].triggered.connect(CreateNewTimeSynchronizedPlotterCommand(spike_raster_window, active_pf_2D_dt, plotter_type='placefields', display_output=display_output))
+        curr_actions_dict['actionTimeSynchronizedDecoderPlotter'].triggered.connect(CreateNewTimeSynchronizedPlotterCommand(spike_raster_window, active_pf_2D_dt, plotter_type='decoder', display_output=display_output))
+        curr_actions_dict['actionCombineTimeSynchronizedPlotterWindow'].triggered.connect(CreateNewTimeSynchronizedCombinedPlotterCommand(spike_raster_window, active_pf_2D_dt, display_output))
+        
+        
         curr_window.ui.actionMenuCreateLinkedWidget = curr_menubar.addMenu(renderable_menu)  # add it to the menubar
 
         # Save references in the curr_window
@@ -142,7 +170,9 @@ class CreateLinkedWidget_MenuProvider(BaseMenuProviderMixin):
         
         
         # Debugging Reference
-        self.activeMenuReference.all_refs = active_2d_plot_renderable_menus
+        # self.activeMenuReference.all_refs = active_2d_plot_renderable_menus
+        
+        self.activeMenuReference.all_refs = widget
     
         return self.activeMenuReference.top_level_menu, self.activeMenuReference.actions_dict
         
