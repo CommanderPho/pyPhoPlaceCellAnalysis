@@ -81,11 +81,6 @@ class DebugMenuProviderMixin(BaseMenuProviderMixin):
         # self.activeMenuReference.active_connections_menu.triggered.connect(lambda action: print(connection_man.active_connections.get(action.text(), f'Connection KeyNotFound: {action.text()}')))
         self.activeMenuReference.active_connections_menu.triggered.connect(lambda action: print((connection_man.find_active_connection(action.text()) or f'Connection KeyNotFound: {action.text()}')))
         
-        
-        
-        
-    
-    
     def _DebugMenuProviderMixin_build_menus(self):
         """ build QMenus """
         an_action_key, self.activeMenuReference.top_level_menu = PhoMenuHelper.add_menu(a_main_window=self.root_window, text="Debug", name=self.top_level_menu_name, parent_menu=self.root_menu_bar, menu_actions_dict=self.DebugMenuProviderMixin_actionsDict)

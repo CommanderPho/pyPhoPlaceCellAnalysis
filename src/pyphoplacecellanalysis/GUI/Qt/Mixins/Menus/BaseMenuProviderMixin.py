@@ -102,7 +102,6 @@ class BaseMenuProviderMixin(QtCore.QObject):
     def BaseMenuProviderMixin_on_init(self):
         """ perform any parameters setting/checking during init """
         # Assumes that self is a QWidget subclass:
-        # if not hasattr(self, '_root_window'):
         if not self.has_root_window:
             self._root_window = PhoMenuHelper.try_get_menu_window(self)
     

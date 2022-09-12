@@ -8,6 +8,7 @@ from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtCore, QtGui, QtWidget
 
 ## IMPORTS:
 from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer
+from pyphoplacecellanalysis.GUI.Qt.Mixins.PhoMenuHelper import PhoMenuHelper
 from pyphoplacecellanalysis.Resources import GuiResources, ActionIcons
 from pyphoplacecellanalysis.GUI.Qt.GlobalApplicationMenus.Uic_AUTOGEN_LocalMenus_AddRenderable import Ui_LocalMenus_AddRenderable
 
@@ -158,38 +159,51 @@ class LocalMenus_AddRenderable(QtWidgets.QMainWindow):
 
         active_pf_2D_dt: time-dependent placefield
         
-        
+        self.ui.menuCreate_Paired_Widget
+            self.ui.actionTimeSynchronizedOccupancyPlotter
+            self.ui.actionTimeSynchronizedPlacefieldsPlotter
+            
         menuCreate_Paired_Widget
             actionTimeSynchronizedOccupancyPlotter
             actionTimeSynchronizedPlacefieldsPlotter
 
         """
+        curr_window = PhoMenuHelper.try_get_menu_window(a_content_widget=destination_window)
+        curr_menubar = PhoMenuHelper.try_get_menu_bar(a_content_widget=destination_window)
+    
+        activeMenuReference = PhoUIContainer.init_from_dict({'top_level_menu': None, 'actions_dict': {}})
+        curr_window.ui.menus.global_window_menus.create_linked_widget = activeMenuReference
+        
+        CreateLinkedWidget_MenuProvider_actionsDict = activeMenuReference.actions_dict
         
         widget = LocalMenus_AddRenderable() # get the UI widget containing the menu items:
         renderable_menu = widget.ui.menuCreate_Paired_Widget
 
         ## Time Intervals/Epochs:
-        submenu_addTimeIntervals = [widget.ui.actionTimeSynchronizedOccupancyPlotter,
+        submenu_addTimeSynchronizedPlotterMenuItems = [widget.ui.actionTimeSynchronizedOccupancyPlotter,
                                     widget.ui.actionTimeSynchronizedPlacefieldsPlotter,
                                     ]
-        submenu_addTimeIntervalCallbacks = [lambda evt=None: print(f'actionTimeSynchronizedOccupancyPlotter callback'),
+        submenu_addTimeSynchronizedPlotterCallbacks = [lambda evt=None: print(f'actionTimeSynchronizedOccupancyPlotter callback'),
                                             lambda evt=None: print(f'actionTimeSynchronizedPlacefieldsPlotter callback'),
                                             ]
-        submenu_addTimeIntervals_Connections = []
-        for an_action, a_callback in zip(submenu_addTimeIntervals, submenu_addTimeIntervalCallbacks):
+        submenu_addTimeSynchronizedPlotter_Connections = []
+        for an_action, a_callback in zip(submenu_addTimeSynchronizedPlotterMenuItems, submenu_addTimeSynchronizedPlotterCallbacks):
             _curr_conn = an_action.triggered.connect(a_callback)
-            submenu_addTimeIntervals_Connections.append(_curr_conn)
+            submenu_addTimeSynchronizedPlotter_Connections.append(_curr_conn)
             
-        active_2d_plot_renderable_menus = widget, renderable_menu, (submenu_addTimeIntervals, submenu_addTimeIntervalCallbacks, submenu_addTimeIntervals_Connections)
+        active_2d_plot_renderable_menus = widget, renderable_menu, (submenu_addTimeSynchronizedPlotterMenuItems, submenu_addTimeSynchronizedPlotterCallbacks, submenu_addTimeSynchronizedPlotter_Connections)
         widget_2d_menu = active_2d_plot_renderable_menus[0]
-        menuAdd_Renderable = widget_2d_menu.ui.menuAdd_Renderable
+        # menuAdd_Renderable = widget_2d_menu.ui.menuAdd_Renderable
         
+        print(f'renderable_menu: {renderable_menu}') 
+        curr_menubar.addMenu(renderable_menu) # add it to the menubar
+
+        # Save references in the curr_window
+        activeMenuReference.top_level_menu = renderable_menu
+        print(f'activeMenuReference: {activeMenuReference}')
         
-        
-        
-        self.ui.menuCreate_Paired_Widget
-        self.ui.actionTimeSynchronizedOccupancyPlotter
-        self.ui.actionTimeSynchronizedPlacefieldsPlotter
+        return active_2d_plot_renderable_menus, curr_window, curr_menubar
+
 
     
 

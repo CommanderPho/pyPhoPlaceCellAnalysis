@@ -45,6 +45,8 @@ class CreateLinkedWidget_MenuProvider(BaseMenuProviderMixin):
     def CreateLinkedWidget_MenuProvider_on_init(self):
         """ perform any parameters setting/checking during init """
         BaseMenuProviderMixin.BaseMenuProviderMixin_on_init(self)
+        
+        assert self.has_root_window, "No root window!"
         # Define the core object
         self.activeMenuReference = PhoUIContainer.init_from_dict({'top_level_menu': None, 'actions_dict': {}})
     
@@ -147,30 +149,53 @@ class CreateLinkedWidget_MenuProvider(BaseMenuProviderMixin):
         renderable_menu = widget.ui.menuCreate_Paired_Widget
         
         ## Time Intervals/Epochs:
-        submenu_addTimeIntervals = [widget.ui.actionTimeSynchronizedOccupancyPlotter,
+        submenu_menuItems = [widget.ui.actionTimeSynchronizedOccupancyPlotter,
                                     widget.ui.actionTimeSynchronizedPlacefieldsPlotter,
                                     ]
-        submenu_addTimeIntervalCallbacks = [lambda evt=None: print(f'actionTimeSynchronizedOccupancyPlotter callback'),
+        submenu_menuCallbacks = [lambda evt=None: print(f'actionTimeSynchronizedOccupancyPlotter callback'),
                                             lambda evt=None: print(f'actionTimeSynchronizedPlacefieldsPlotter callback'),
                                             ]
-        submenu_addTimeIntervals_Connections = []
-        for an_action, a_callback in zip(submenu_addTimeIntervals, submenu_addTimeIntervalCallbacks):
+        submenu_menu_Connections = []
+        for an_action, a_callback in zip(submenu_menuItems, submenu_menuCallbacks):
             _curr_conn = an_action.triggered.connect(a_callback)
-            submenu_addTimeIntervals_Connections.append(_curr_conn)
+            submenu_menu_Connections.append(_curr_conn)
 
-        active_2d_plot_renderable_menus = widget, renderable_menu, (submenu_addTimeIntervals, submenu_addTimeIntervalCallbacks, submenu_addTimeIntervals_Connections)
+        active_2d_plot_renderable_menus = widget, renderable_menu, (submenu_menuItems, submenu_menuCallbacks, submenu_menu_Connections)
         
         
-        widget_2d_menu = active_2d_plot_renderable_menus[0]
-        menuAdd_CreateLinkedWidget = widget_2d_menu.ui.menuAdd_Renderable
+        # widget_2d_menu = active_2d_plot_renderable_menus[0]
+        # renderable_menu = widget_2d_menu.ui.menuCreate_Paired_Widget
+        # renderable_menu = widget.ui.menuCreate_Paired_Widget
+        
+        # curr_window = PhoMenuHelper.try_get_menu_window(a_content_widget=a_content_widget)
+        # curr_menubar = PhoMenuHelper.try_get_menu_bar(a_content_widget=a_content_widget)
+    
+        # print(f'renderable_menu: {renderable_menu}') 
+        # curr_menubar.addMenu(renderable_menu) # add it to the menubar
+
+        
         
         ## Add menu to the main menu bar:
-        # curr_window = self.root_window
-        # curr_menubar = self.root_menu_bar
-        # curr_actions_dict = self.CreateLinkedWidget_MenuProvider_actionsDict
+        curr_window = self.root_window
+        curr_menubar = self.root_menu_bar
+        curr_actions_dict = self.CreateLinkedWidget_MenuProvider_actionsDict
+        self.activeMenuReference.top_level_menu = renderable_menu
+        self.activeMenuReference.actions_dict = curr_actions_dict
         
-        # curr_menubar.addMenu(menuAdd_CreateLinkedWidget)
+        self.activeMenuReference.top_level_menu.setObjectName("menuCreateLinkedWidget")
+        curr_window.ui.actionMenuCreateLinkedWidget = curr_menubar.addMenu(renderable_menu)  # add it to the menubar
+
+        # Save references in the curr_window
+        self.activeMenuReference.actions_dict['actionMenuCreateLinkedWidget'] = curr_window.ui.actionMenuCreateLinkedWidget 
         
+        
+        # Debugging Reference
+        self.activeMenuReference.all_refs = active_2d_plot_renderable_menus
+    
+        return self.activeMenuReference.top_level_menu, self.activeMenuReference.actions_dict
+        
+        # return self.activeMenuReference.top_level_menu, self.activeMenuReference.actions_dict, self.activeMenuReference.all_refs
+    
         
 
     @QtCore.Slot()
