@@ -90,7 +90,10 @@ def build_connected_time_synchronized_occupancy_plotter(active_pf_2D_dt, sync_dr
     # Control Plotter by spike_raster_window:
     if sync_driver is not None:
         occupancy_raster_window_sync_connection = connect_time_synchronized_plotter(curr_occupancy_plotter, sync_driver)
+    else:
+        occupancy_raster_window_sync_connection = None
         
+    return curr_occupancy_plotter, occupancy_raster_window_sync_connection
 
 def build_connected_time_synchronized_placefields_plotter(active_pf_2D_dt, sync_driver=None, should_defer_show=False):
     """ 
@@ -104,7 +107,11 @@ def build_connected_time_synchronized_placefields_plotter(active_pf_2D_dt, sync_
         # placefields_raster_window_sync_connection = sync_driver.connection_man.connect_drivable_to_driver(drivable=curr_placefields_plotter, driver=sync_driver.spike_raster_plt_2d,
                                                     #    custom_connect_function=(lambda driver, drivable: pg.SignalProxy(driver.window_scrolled, delay=0.2, rateLimit=60, slot=drivable.on_window_changed_rate_limited)))
         placefields_raster_window_sync_connection = connect_time_synchronized_plotter(curr_placefields_plotter, sync_driver)
+    else:
+        placefields_raster_window_sync_connection = None
         
+    return curr_placefields_plotter, placefields_raster_window_sync_connection
+
         
         
 def build_connected_time_synchronized_decoder_plotter(active_pf_2D_dt, sync_driver=None, should_defer_show=False):
@@ -117,5 +124,9 @@ def build_connected_time_synchronized_decoder_plotter(active_pf_2D_dt, sync_driv
     # Control Plotter by spike_raster_window:
     if sync_driver is not None:
         decoder_raster_window_sync_connection = connect_time_synchronized_plotter(curr_position_decoder_plotter, sync_driver)
+    else:
+        decoder_raster_window_sync_connection = None
         
+    return curr_position_decoder_plotter, decoder_raster_window_sync_connection
+
         

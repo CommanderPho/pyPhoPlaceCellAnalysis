@@ -48,14 +48,9 @@ class CreateLinkedWidget_MenuProvider(BaseMenuProviderMixin):
         super(CreateLinkedWidget_MenuProvider, self).__init__(render_widget=render_widget, parent=parent, **kwargs)
         # Setup member variables:
         
-        spike_raster_window = kwargs.pop('spike_raster_window', None)
-        active_pf_2D_dt = kwargs.pop('active_pf_2D_dt', None)
-        display_output = kwargs.pop('display_output', None)
-        
-        
-        
-        
-        pass
+        # spike_raster_window = kwargs.pop('spike_raster_window', None)
+        # active_pf_2D_dt = kwargs.pop('active_pf_2D_dt', None)
+        # display_output = kwargs.pop('display_output', None)
         
         
     @QtCore.Slot()
@@ -117,10 +112,11 @@ class CreateLinkedWidget_MenuProvider(BaseMenuProviderMixin):
         #                                     lambda evt=None: print(f'actionCombineTimeSynchronizedPlotterWindow callback'),
         #                                     ]
         
-        submenu_menuCallbacks = [lambda evt=None: print(f'actionTimeSynchronizedOccupancyPlotter callback'),
-                                            lambda evt=None: print(f'actionTimeSynchronizedPlacefieldsPlotter callback'),
-                                            lambda evt=None: print(f'actionTimeSynchronizedDecoderPlotter callback'),
-                                            lambda evt=None: CreateNewTimeSynchronizedPlotterCommand(spike_raster_window, active_pf_2D_dt, display_output),
+        
+        submenu_menuCallbacks = [lambda evt=None: CreateNewTimeSynchronizedPlotterCommand(spike_raster_window, active_pf_2D_dt, plotter_type='occupancy', display_output=display_output),
+                                            lambda evt=None:CreateNewTimeSynchronizedPlotterCommand(spike_raster_window, active_pf_2D_dt, plotter_type='placefields', display_output=display_output),
+                                            lambda evt=None: CreateNewTimeSynchronizedPlotterCommand(spike_raster_window, active_pf_2D_dt, plotter_type='decoder', display_output=display_output),
+                                            lambda evt=None: CreateNewTimeSynchronizedCombinedPlotterCommand(spike_raster_window, active_pf_2D_dt, display_output),
                                             ]
         
         
@@ -130,7 +126,6 @@ class CreateLinkedWidget_MenuProvider(BaseMenuProviderMixin):
             submenu_menu_Connections.append(_curr_conn)
 
         active_2d_plot_renderable_menus = widget, renderable_menu, (submenu_menuItems, submenu_menuCallbacks, submenu_menu_Connections)
-        
         
         ## Add menu to the main menu bar:
         curr_window = self.root_window
@@ -180,12 +175,45 @@ class CreateLinkedWidget_MenuProvider(BaseMenuProviderMixin):
 # build_combined_time_synchronized_plotters_window, build_connected_time_synchronized_occupancy_plotter, build_connected_time_synchronized_placefields_plotter, build_connected_time_synchronized_decoder_plotter
     
 ## Actions to be executed to create new plotters:
+
+        
 class CreateNewTimeSynchronizedPlotterCommand(BaseMenuCommand):
     """ build_combined_time_synchronized_plotters_window
     A command to create a plotter as needed
     """
-    def __init__(self, spike_raster_window, active_pf_2D_dt, display_output={}) -> None:
+    def __init__(self, spike_raster_window, active_pf_2D_dt, plotter_type='occupancy', display_output={}) -> None:
         super(CreateNewTimeSynchronizedPlotterCommand, self).__init__()
+        self._spike_raster_window = spike_raster_window
+        self._active_pf_2D_dt = active_pf_2D_dt
+        self._display_output = display_output
+        self._plotter_type = plotter_type
+        
+        
+    def execute(self, filename: str) -> None:
+        """ Implicitly captures spike_raster_window """
+        print(f'CreateNewTimeSynchronizedPlotterCommand(): {self._plotter_type} callback')
+        
+        if self._plotter_type == 'occupancy':
+            _out_sync_tuple = build_connected_time_synchronized_occupancy_plotter(active_pf_2D_dt=self._active_pf_2D_dt, sync_driver=self._spike_raster_window)
+        elif self._plotter_type == 'placefields':
+            _out_sync_tuple = build_connected_time_synchronized_placefields_plotter(active_pf_2D_dt=self._active_pf_2D_dt, sync_driver=self._spike_raster_window)
+        elif self._plotter_type == 'decoder':
+            _out_sync_tuple = build_connected_time_synchronized_decoder_plotter(active_pf_2D_dt=self._active_pf_2D_dt, sync_driver=self._spike_raster_window)
+        else:
+            raise NotImplementedError
+        
+        _out_display_key = f'synchronizedPlotter_{self._plotter_type}'
+        _out_synchronized_plotter, _out_sync_connection = _out_sync_tuple
+        print(f'_out_display_key: {_out_display_key}')
+        self._display_output[_out_display_key] = _out_sync_tuple
+        
+    
+class CreateNewTimeSynchronizedCombinedPlotterCommand(BaseMenuCommand):
+    """ build_combined_time_synchronized_plotters_window
+    A command to create a plotter as needed
+    """
+    def __init__(self, spike_raster_window, active_pf_2D_dt, display_output={}) -> None:
+        super(CreateNewTimeSynchronizedCombinedPlotterCommand, self).__init__()
         self._spike_raster_window = spike_raster_window
         self._active_pf_2D_dt = active_pf_2D_dt
         self._display_output = display_output
@@ -197,6 +225,4 @@ class CreateNewTimeSynchronizedPlotterCommand(BaseMenuCommand):
         
         self._display_output['comboSynchronizedPlotter'] = _out_synchronized_plotter
         # (controlling_widget, curr_sync_occupancy_plotter, curr_placefields_plotter), root_dockAreaWindow, app = _out_synchronized_plotter
-        
-        
         

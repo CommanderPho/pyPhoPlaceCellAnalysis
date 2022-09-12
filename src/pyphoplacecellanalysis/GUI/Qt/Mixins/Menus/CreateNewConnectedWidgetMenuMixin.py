@@ -9,7 +9,7 @@ from pyphoplacecellanalysis.GUI.Qt.Mixins.Menus.BaseMenuProviderMixin import ini
 # GuiResources_rc
 
 
-class CreateNewConnectedWidgetMenuMixin(object):
+class CreateNewConnectedWidgetMenuHelper(object):
     """Adds a dynamically generated menubar to a QMainWindow for the purpose of connecting various separate windows
     
     Requirements:
@@ -28,13 +28,6 @@ class CreateNewConnectedWidgetMenuMixin(object):
 
     
     """
-    # def build_create_new_connected_widget_menu(self):
-    #     return CreateNewConnectedWidgetMenuMixin.try_add_create_new_connected_widget_menu(self)
-
-    def remove_create_new_connected_widget_menu(self):
-        """ Works to remove the menu created with menuCreateNewConnectedWidget, actions_dict = build_menu(curr_window) """
-        return CreateNewConnectedWidgetMenuMixin.try_remove_create_new_connected_widget_menu(self)
-
     @classmethod
     def try_add_create_new_connected_widget_menu(cls, a_content_widget, curr_active_pipeline, active_config_name, display_output):
         """ 

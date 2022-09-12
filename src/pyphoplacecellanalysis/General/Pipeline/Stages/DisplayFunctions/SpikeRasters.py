@@ -16,7 +16,7 @@ from pyphoplacecellanalysis.GUI.Qt.GlobalApplicationMenus.LocalMenus_AddRenderab
 
 from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.SpikeRasterWidgets.spike_raster_widgets import build_spike_3d_raster_with_2d_controls, build_spike_3d_raster_vedo_with_2d_controls
 from pyphoplacecellanalysis.GUI.Qt.Mixins.Menus.ConnectionControlsMenuMixin import ConnectionControlsMenuMixin
-from pyphoplacecellanalysis.GUI.Qt.Mixins.Menus.CreateNewConnectedWidgetMenuMixin import CreateNewConnectedWidgetMenuMixin
+from pyphoplacecellanalysis.GUI.Qt.Mixins.Menus.CreateNewConnectedWidgetMenuMixin import CreateNewConnectedWidgetMenuHelper
 from pyphoplacecellanalysis.GUI.Qt.Mixins.Menus.DebugMenuProviderMixin import DebugMenuProviderMixin
 from pyphoplacecellanalysis.GUI.Qt.Mixins.Menus.CreateLinkedWidget_MenuProvider import CreateLinkedWidget_MenuProvider
 
@@ -96,7 +96,7 @@ class SpikeRastersDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Displa
         
         if owning_pipeline_reference is not None:
             display_output = owning_pipeline_reference.display_output
-            curr_main_menu_window, menuCreateNewConnectedWidget, createNewConnected_actions_dict = CreateNewConnectedWidgetMenuMixin.try_add_create_new_connected_widget_menu(spike_raster_window, owning_pipeline_reference, active_config, display_output)
+            curr_main_menu_window, menuCreateNewConnectedWidget, createNewConnected_actions_dict = CreateNewConnectedWidgetMenuHelper.try_add_create_new_connected_widget_menu(spike_raster_window, owning_pipeline_reference, active_config, display_output)
             spike_raster_window.main_menu_window = curr_main_menu_window # to retain the changes
             
         else:
@@ -119,7 +119,12 @@ class SpikeRastersDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Displa
             # _createLinkedWidget_menus = LocalMenus_AddRenderable.add_Create_Paired_Widget_menu(spike_raster_window, active_pf_2D_dt)  # Adds the custom context menus for SpikeRaster2D
             _createLinkedWidget_menu_provider = CreateLinkedWidget_MenuProvider(render_widget=spike_raster_window)
             _createLinkedWidget_menu_provider.CreateLinkedWidget_MenuProvider_on_init()
-            _createLinkedWidget_menu_provider.CreateLinkedWidget_MenuProvider_on_buildUI()
+            # _createLinkedWidget_menu_provider.CreateLinkedWidget_MenuProvider_on_buildUI()
+            if owning_pipeline_reference is not None:
+                display_output = owning_pipeline_reference.display_output
+                _createLinkedWidget_menu_provider.CreateLinkedWidget_MenuProvider_on_buildUI(spike_raster_window=spike_raster_window, active_pf_2D_dt=active_pf_2D_dt, display_output=display_output)
+            else:
+                print(f'WARNING: owning_pipeline_reference is NONE in  _display_spike_rasters_window!')
             
             # active_2d_plot_renderable_menus, curr_window, curr_menubar
             pass
