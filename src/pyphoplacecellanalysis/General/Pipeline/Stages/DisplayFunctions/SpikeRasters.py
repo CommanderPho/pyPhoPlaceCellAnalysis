@@ -18,6 +18,7 @@ from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.SpikeRasterWidgets.spike_raster
 from pyphoplacecellanalysis.GUI.Qt.Mixins.Menus.ConnectionControlsMenuMixin import ConnectionControlsMenuMixin
 from pyphoplacecellanalysis.GUI.Qt.Mixins.Menus.CreateNewConnectedWidgetMenuMixin import CreateNewConnectedWidgetMenuMixin
 from pyphoplacecellanalysis.GUI.Qt.Mixins.Menus.DebugMenuProviderMixin import DebugMenuProviderMixin
+from pyphoplacecellanalysis.GUI.Qt.Mixins.Menus.CreateLinkedWidget_MenuProvider import CreateLinkedWidget_MenuProvider
 
 
 ## TODO: update these to use the correct format! This format has been invalidated!
@@ -108,6 +109,11 @@ class SpikeRastersDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Displa
         _debug_menu_provider = DebugMenuProviderMixin(render_widget=spike_raster_window)
         _debug_menu_provider.DebugMenuProviderMixin_on_init()
         _debug_menu_provider.DebugMenuProviderMixin_on_buildUI()
+        
+        _createLinkedWidget_menu_provider = CreateLinkedWidget_MenuProvider(render_widget=spike_raster_window)
+        _createLinkedWidget_menu_provider.CreateLinkedWidget_MenuProvider_on_init()
+        _createLinkedWidget_menu_provider.CreateLinkedWidget_MenuProvider_on_buildUI()
+        
             
         return {'spike_raster_plt_2d':spike_raster_window.spike_raster_plt_2d, 'spike_raster_plt_3d':spike_raster_window.spike_raster_plt_3d, 'spike_raster_window': spike_raster_window}
 

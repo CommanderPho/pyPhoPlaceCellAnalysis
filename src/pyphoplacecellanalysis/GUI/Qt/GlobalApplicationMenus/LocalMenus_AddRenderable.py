@@ -21,6 +21,15 @@ from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.Mixins.TimeCurves.SpecificTimeC
 
 # class LocalMenus_AddRenderable(QtWidgets.QWidget):
 class LocalMenus_AddRenderable(QtWidgets.QMainWindow):
+    """ 
+    
+    
+    menuCreate_Paired_Widget
+        actionTimeSynchronizedOccupancyPlotter
+        actionTimeSynchronizedPlacefieldsPlotter
+
+    
+    """
     def __init__(self, parent=None):
         super().__init__(parent=parent) # Call the inherited classes __init__ method
         # self.ui = uic.loadUi("../pyPhoPlaceCellAnalysis/src/pyphoplacecellanalysis/GUI/Qt/GlobalApplicationMenus/LocalMenus_AddRenderable.ui", self) # Load the .ui file
@@ -144,8 +153,28 @@ class LocalMenus_AddRenderable(QtWidgets.QMainWindow):
         
         # Add the reference to the context menus to owner, so it isn't released:
         ## TODO: currently replaces the dict entry, which we might want to use for other menus
-        active_2d_plot.ui.menus = PhoUIContainer.init_from_dict({'custom_context_menus': PhoUIContainer.init_from_dict({'add_renderables': active_2d_plot_renderable_menus})})        
+        active_2d_plot.ui.menus = PhoUIContainer.init_from_dict({'custom_context_menus': PhoUIContainer.init_from_dict({'add_renderables': active_2d_plot_renderable_menus})})
+        
         return menuAdd_Renderable # try returning just the menu and not the stupid references to everything # Works when we hold a reference
+
+
+
+    @classmethod
+    def add_Create_Paired_Widget_menu(cls, destination_window, sess):
+        """ Adds the "Create Paired Widget" main-menu to the destination_window's menubar
+
+        menuCreate_Paired_Widget
+            actionTimeSynchronizedOccupancyPlotter
+            actionTimeSynchronizedPlacefieldsPlotter
+
+        """
+        
+        
+        
+        
+        self.ui.menuCreate_Paired_Widget
+        self.ui.actionTimeSynchronizedOccupancyPlotter
+        self.ui.actionTimeSynchronizedPlacefieldsPlotter
 
     
 

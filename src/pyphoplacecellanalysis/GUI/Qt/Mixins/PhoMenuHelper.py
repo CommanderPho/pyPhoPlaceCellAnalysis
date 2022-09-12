@@ -82,14 +82,31 @@ class PhoMenuHelper(object):
             name (_type_, optional): _description_. Defaults to None.
             tooltip (_type_, optional): _description_. Defaults to None.
             icon_path (_type_, optional): _description_. Defaults to None.
+            
+            
+        # Separate setup:
+            # Connect Child Item:
+            curr_action_key = PhoMenuHelper.add_action_item(a_main_window, "Connect Child...", name="actionConnect_Child", tooltip="Connect a child widget to another widget", icon_path=":/Icons/chain--arrow.png", actions_dict=a_main_window.ui.menus.global_window_menus.menuConnections.actions_dict)
+            
+            
+            
         """
         if parent_menu is None:
             raise NotImplementedError
         parent_menu.addAction(a_main_window.ui[curr_action_key]) # Add to menu
         
+        # ## Add the actions to the QMenu item:
+        # a_main_window.ui.menus.global_window_menus.menuConnections.top_level_menu.addActions(a_main_window.ui.menus.global_window_menus.menuConnections.actions_dict.values())
+                    
+        # ## TODO: is this even needed? I think it's done to remove it, but can't I just use a_main_window.ui.actionMenuConnections directly?
+        # a_main_window.ui.menus.global_window_menus.menuConnections.actions_dict['actionMenuConnections'] = a_main_window.ui.actionMenuConnections
+        
+        
+        
+        
     @classmethod
     def add_menu(cls, a_main_window, text, name=None, parent_menu=None, tooltip=None, icon_path=None, menu_actions_dict=None):
-        """ 
+        """ Modifies `a_main_window.ui[name]`
         
         a_main_window.ui.menus.global_window_menus.create_new_connected_widget.top_level_menu
         
@@ -107,7 +124,7 @@ class PhoMenuHelper(object):
         curr_menu.setObjectName(name)
         if tooltip is not None:
             curr_menu.setToolTip(tooltip)
-            
+        
         a_main_window.ui[name] = parent_menu.addMenu(curr_menu) # Used to remove the menu, a QAction
         if menu_actions_dict is None:
             raise NotImplementedError

@@ -14,6 +14,8 @@ class DebugMenuProviderMixin(BaseMenuProviderMixin):
     .ui.menus.global_window_menus.debug.actions_dict
     
     """
+    top_level_menu_name = 'actionMenuDebug'
+    
     
     @property
     def activeMenuReference(self):
@@ -86,7 +88,7 @@ class DebugMenuProviderMixin(BaseMenuProviderMixin):
     
     def _DebugMenuProviderMixin_build_menus(self):
         """ build QMenus """
-        an_action_key, self.activeMenuReference.top_level_menu = PhoMenuHelper.add_menu(a_main_window=self.root_window, text="Debug", name='actionMenuDebug', parent_menu=self.root_menu_bar, menu_actions_dict=self.DebugMenuProviderMixin_actionsDict)
+        an_action_key, self.activeMenuReference.top_level_menu = PhoMenuHelper.add_menu(a_main_window=self.root_window, text="Debug", name=self.top_level_menu_name, parent_menu=self.root_menu_bar, menu_actions_dict=self.DebugMenuProviderMixin_actionsDict)
         
         an_action_key, self.activeMenuReference.active_drivers_menu = PhoMenuHelper.add_menu(a_main_window=self.root_window, text="Active Drivers", name='actionMenuDebugMenuActiveDrivers', parent_menu=self.activeMenuReference.top_level_menu, menu_actions_dict=self.DebugMenuProviderMixin_actionsDict)
         # active_drivers_menu = self.root_window.ui['actionMenuDebugMenuActiveDrivers']
@@ -111,7 +113,7 @@ class DebugMenuProviderMixin(BaseMenuProviderMixin):
         curr_menubar = self.root_menu_bar
         curr_actions_dict = self.DebugMenuProviderMixin_actionsDict
 
-        curr_menubar.removeAction(curr_actions_dict['actionMenuDebug'])
+        curr_menubar.removeAction(curr_actions_dict[self.top_level_menu_name])
         curr_window.ui.actionMenuDebug = None
         
         self.activeMenuReference.active_drivers_menu = None

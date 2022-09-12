@@ -156,11 +156,19 @@
    </property>
   </action>
   <action name="actionTimeSynchronizedOccupancyPlotter">
+   <property name="icon">
+    <iconset resource="../../../Resources/ActionIcons.qrc">
+     <normaloff>:/Render/Icons/actions/bar-chart_2@1x.png</normaloff>:/Render/Icons/actions/bar-chart_2@1x.png</iconset>
+   </property>
    <property name="text">
     <string>TimeSynchronizedOccupancyPlotter</string>
    </property>
   </action>
   <action name="actionTimeSynchronizedPlacefieldsPlotter">
+   <property name="icon">
+    <iconset resource="../../../Resources/ActionIcons.qrc">
+     <normaloff>:/Render/Icons/actions/wifi-channel_2@1x.png</normaloff>:/Render/Icons/actions/wifi-channel_2@1x.png</iconset>
+   </property>
    <property name="text">
     <string>TimeSynchronizedPlacefieldsPlotter</string>
    </property>
