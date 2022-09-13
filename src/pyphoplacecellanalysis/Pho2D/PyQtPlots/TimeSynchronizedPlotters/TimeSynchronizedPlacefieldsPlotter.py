@@ -7,6 +7,7 @@ from neuropy.analyses.time_dependent_placefields import PfND_TimeDependent
 import pyphoplacecellanalysis.External.pyqtgraph as pg
 # from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtCore, QtGui
 from pyphocorehelpers.DataStructure.general_parameter_containers import VisualizationParameters
+from pyphocorehelpers.DataStructure.data_structure_builders import Width_Height_Tuple
 from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer
 from pyphocorehelpers.indexing_helpers import compute_paginated_grid_config
 from pyphocorehelpers.geometry_helpers import compute_data_aspect_ratio, compute_data_extent
@@ -99,6 +100,9 @@ class TimeSynchronizedPlacefieldsPlotter(AnimalTrajectoryPlottingMixin, TimeSync
         subplot_no_pagination_configuration, self.params.included_combined_indicies_pages, self.params.page_grid_sizes = compute_paginated_grid_config(nMapsToShow, max_num_columns=self.params.max_num_columns, max_subplots_per_page=None, data_indicies=included_unit_indicies, last_figure_subplots_same_layout=True)
         page_idx = 0 # page_idx is zero here because we only have one page:
         
+        
+        self.compute_desired_page_aspect_ratio()
+        
         for (a_linear_index, curr_row, curr_col, curr_included_unit_index) in self.params.included_combined_indicies_pages[page_idx]:
             # Need to convert to page specific:
             curr_page_relative_linear_index = np.mod(a_linear_index, int(self.params.page_grid_sizes[page_idx].num_rows * self.params.page_grid_sizes[page_idx].num_columns))
@@ -129,9 +133,6 @@ class TimeSynchronizedPlacefieldsPlotter(AnimalTrajectoryPlottingMixin, TimeSync
             
             img_item = pg.ImageItem(image=image, levels=(0,1), border='w')
             
-            # self.params.image_aspect_ratio = 
-            
-                
             curr_plot = self.ui.root_graphics_layout_widget.addPlot(row=curr_row, col=curr_col, title=curr_cell_identifier_string) # , name=curr_plot_identifier_string
             curr_plot.setObjectName(curr_plot_identifier_string)
             curr_plot.addItem(img_item, defaultPadding=0.0)  # add ImageItem to PlotItem
@@ -246,6 +247,53 @@ class TimeSynchronizedPlacefieldsPlotter(AnimalTrajectoryPlottingMixin, TimeSync
         self.setWindowTitle(f'{image_title} t = {curr_t}')
     
 
+    def compute_desired_page_aspect_ratio(self):
+        """ requires:
+        self.params:
+            .page_grid_sizes
+            .image_aspect_ratio
+            
+        Sets:
+        self.params:
+            .page_width_height_tuple
+            .page_aspect_ratio
+        """
+        ## Computes the appropriate size of the widget given the aspect-ratio of the image data and the number of rows/columns in the page layout:
+        max_num_rows = max([a_rol_col_tuple.num_rows for a_rol_col_tuple in self.params.page_grid_sizes])
+        max_num_cols = max([a_rol_col_tuple.num_columns for a_rol_col_tuple in self.params.page_grid_sizes])
+        print(f'max_num_rows: {max_num_rows}, max_num_cols: {max_num_cols}')                   
+
+        single_image_aspect_ratio = self.params.image_aspect_ratio # each single_image_width = 0.9776615738374339 * single_image_height 
+        # aspect_ratio = width / height
+        single_image_height = 1.0
+        single_image_width = single_image_aspect_ratio * single_image_height
+        # single_image_tuple = Width_Height_Tuple(single_image_width, single_image_height)
+        page_height = single_image_height * float(max_num_rows)
+        page_width = single_image_width * float(max_num_cols)
+        page_width_height_tuple = Width_Height_Tuple(page_width, page_height) # Width_Height_Tuple(width=4.8883078691871695, height=11.0)
+        page_aspect_ratio = page_width / page_height
+        print(f'page_aspect_ratio: {page_aspect_ratio}') # 0.4443916244715609
+        
+        self.params.page_width_height_tuple = page_width_height_tuple
+        self.params.page_aspect_ratio = page_aspect_ratio
+         
+
+        
+    def desired_widget_size(self, desired_page_height = 600.0, desired_page_width = None, debug_print=True):
+        """ Requires that self.compute_desired_page_aspect_ratio has already been called on the target 
+        """
+        ## Apply the computed page_aspect_ratio to an arbitrary desired height to get the appropriate width of the widget
+        assert (desired_page_width is None) or (desired_page_height is None), "Either desired_page_height or desired_page_width must be None so the other can be computed"
+        
+        if desired_page_width is None:
+            desired_page_width = self.params.page_aspect_ratio * desired_page_height
+        elif desired_page_height is None:
+            desired_page_height = desired_page_width / self.params.page_aspect_ratio
+        else:
+            raise NotImplementedError
+        if debug_print:
+            print(f'desired_page_height: {desired_page_height}, desired_page_width: {desired_page_width}')
+        return Width_Height_Tuple(desired_page_width, desired_page_height)
             
             
 # included_epochs = None
