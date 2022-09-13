@@ -121,9 +121,9 @@ class DefaultDecoderDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Disp
                 # active_window = pho_custom_decoder.active_time_windows[window_idx] # a tuple with a start time and end time
                 # active_p_x_given_n = np.squeeze(pho_custom_decoder.p_x_given_n[:,:,window_idx]) # same size as occupancy
                 # Actual Position Plots:
-                axs[0].plot(position_df['t'].to_numpy(), position_df['x'].to_numpy(), label='measured x', color='#ff0000ff')
+                axs[0].plot(position_df['t'].to_numpy(), position_df['x'].to_numpy(), label='measured x', color='#ff0000ff') # Opaque RED
                 axs[0].set_title('x')
-                axs[1].plot(position_df['t'].to_numpy(), position_df['y'].to_numpy(), label='measured y', color='#ff0000ff')
+                axs[1].plot(position_df['t'].to_numpy(), position_df['y'].to_numpy(), label='measured y', color='#ff0000ff') # Opaque RED
                 axs[1].set_title('y')
                 # # Most likely position plots:
                 # axs[2].plot(pho_custom_decoder.active_time_window_centers, np.squeeze(pho_custom_decoder.most_likely_positions[:,0]), lw=0.5) # (Num windows x 2)
@@ -219,17 +219,15 @@ class DefaultDecoderDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Disp
             active_time_window_variable = computation_result.computed_data['pf2D_Decoder'].active_time_window_centers
             active_most_likely_positions_x = active_two_step_decoder['most_likely_positions'][0,:]
             active_most_likely_positions_y = active_two_step_decoder['most_likely_positions'][1,:]
-            two_step_options_dict = {
+            two_step_options_dict = { # Green?
                 'color':'#00ff7f99',
                 'face_color':'#55ff0099',
                 'edge_color':'#00aa0099'
             }
             # marker_style: 'circle', marker_size:0.25
             axs[0].plot(active_time_window_variable, active_most_likely_positions_x, lw=1.0, color='#00ff7f99', alpha=0.6, label='2-step: most likely positions x') # (Num windows x 2)
-            # axs[0].set_title('most likely positions x')
             axs[1].plot(active_time_window_variable, active_most_likely_positions_y, lw=1.0, color='#00ff7f99', alpha=0.6, label='2-step: most likely positions y') # (Num windows x 2)
-            # axs[1].set_title('most likely positions y')
-
+            
 
 def _temp_debug_two_step_plots(active_one_step_decoder, active_two_step_decoder, variable_name='all_scaling_factors_k', override_variable_value=None):
     """ Handles plots using the plot command """

@@ -326,6 +326,12 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
             # No 3D plotter:
             output_widget = None 
             
+        elif type_of_3d_plotter == 'pyqtgraph2D':
+            # a 2D child widget:
+            output_widget = Spike2DRaster.init_from_independent_data(self.spikes_df, window_duration=window_duration, window_start_time=window_start_time, neuron_colors=neuron_colors, neuron_sort_order=neuron_sort_order, application_name=self.applicationName, enable_independent_playback_controller=False, should_show=False, parent=None)
+            # connect_controlled_time_synchronized_plotter(...) should still be good for the new Spike2DRaster            
+            
+            
         elif type_of_3d_plotter == 'pyqtgraph':
             output_widget = Spike3DRaster.init_from_independent_data(self.spikes_df, window_duration=window_duration, window_start_time=window_start_time, neuron_colors=neuron_colors, neuron_sort_order=neuron_sort_order, application_name=self.applicationName, enable_independent_playback_controller=False, should_show=False, parent=None)
             # Connect the 2D window scrolled signal to the 3D plot's spikes_window.update_window_start_end function

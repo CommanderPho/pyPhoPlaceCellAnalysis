@@ -63,7 +63,8 @@ class CreateNewConnectedWidgetMenuHelper(object):
     def try_attach_action_commands(cls, spike_raster_window, curr_active_pipeline, active_config_name, display_output):
         ## Register the actual commands for each action:
         curr_window = PhoMenuHelper.try_get_menu_window(spike_raster_window)
-        curr_window.ui.menus.global_window_menus.create_new_connected_widget.actions_dict['actionNewConnected3DRaster_PyQtGraph'].triggered.connect(CreateNewPyQtGraphPlotterCommand(spike_raster_window))
+        curr_window.ui.menus.global_window_menus.create_new_connected_widget.actions_dict['actionNewConnected2DRaster'].triggered.connect(CreateNewPyQtGraphPlotterCommand(spike_raster_window, type_of_connected_plotter='pyqtgraph2D'))
+        curr_window.ui.menus.global_window_menus.create_new_connected_widget.actions_dict['actionNewConnected3DRaster_PyQtGraph'].triggered.connect(CreateNewPyQtGraphPlotterCommand(spike_raster_window, type_of_connected_plotter='pyqtgraph'))
         curr_window.ui.menus.global_window_menus.create_new_connected_widget.actions_dict['actionNewConnected3DRaster_Vedo'].triggered.connect(CreateNewVedoPlotterCommand(spike_raster_window))
         curr_window.ui.menus.global_window_menus.create_new_connected_widget.actions_dict['actionNewConnectedDataExplorer_ipc'].triggered.connect(CreateNewDataExplorer_ipc_PlotterCommand(spike_raster_window, curr_active_pipeline, active_config_name, display_output))
         curr_window.ui.menus.global_window_menus.create_new_connected_widget.actions_dict['actionNewConnectedDataExplorer_ipspikes'].triggered.connect(CreateNewDataExplorer_ipspikes_PlotterCommand(spike_raster_window, curr_active_pipeline, active_config_name, display_output))
@@ -85,6 +86,8 @@ class CreateNewConnectedWidgetMenuHelper(object):
             ## Only creates the QActions now, no QMenus:
             # Define dictionary for actions:
             # a_main_window.ui.menus.global_window_menus.create_new_connected_widget.actions_dict = {}
+                 
+            curr_action_key = PhoMenuHelper.add_action_item(a_main_window, "New Connected 2D Raster", name="actionNewConnected2DRaster", tooltip="Create a new 2D Raster plotter and connect it to this window", icon_path=":/Icons/Icons/SpikeRaster2DIcon.ico", actions_dict=a_main_window.ui.menus.global_window_menus.create_new_connected_widget.actions_dict)
             
             curr_action_key = PhoMenuHelper.add_action_item(a_main_window, "New Connected 3D Raster (PyQtGraph)", name="actionNewConnected3DRaster_PyQtGraph", tooltip="Create a new PyQtGraph 3D Raster plotter and connect it to this window", icon_path=":/Icons/Icons/SpikeRaster3DIcon.ico", actions_dict=a_main_window.ui.menus.global_window_menus.create_new_connected_widget.actions_dict)
             
@@ -114,21 +117,20 @@ class CreateNewConnectedWidgetMenuHelper(object):
 
 
 
+
 ## Actions to be executed to create new plotters:
 class CreateNewPyQtGraphPlotterCommand(BaseMenuCommand):
     """
     A command to create a plotter as needed
     """
-    def __init__(self, spike_raster_window) -> None:
+    def __init__(self, spike_raster_window, type_of_connected_plotter='pyqtgraph') -> None:
         super(CreateNewPyQtGraphPlotterCommand, self).__init__()
         self._spike_raster_window = spike_raster_window
+        self._type_of_connected_plotter = type_of_connected_plotter # e.g. 'pyqtgraph', 'pyqtgraph2D'
         
     def execute(self, filename: str) -> None:
-        """ Implicitly captures spike_raster_window """
-        test_independent_pyqtgraph_raster_widget = self._spike_raster_window.create_new_connected_widget(type_of_3d_plotter='pyqtgraph')
+        test_independent_pyqtgraph_raster_widget = self._spike_raster_window.create_new_connected_widget(type_of_3d_plotter=self._type_of_connected_plotter)
         test_independent_pyqtgraph_raster_widget.show()
-        # print(f"hiding {filename}")
-        # self._hidden_files.append(filename)
 
         
 class CreateNewVedoPlotterCommand(BaseMenuCommand):
