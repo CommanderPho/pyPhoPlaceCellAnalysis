@@ -4,6 +4,8 @@ from pathlib import Path
 import numpy as np
 
 from neuropy.core.neuron_identities import NeuronIdentity, build_units_colormap, PlotStringBrevityModeEnum
+from neuropy.utils.result_context import IdentifyingContext
+
 
 from pyphoplacecellanalysis.General.Pipeline.Stages.Computation import ComputedPipelineStage
 from pyphoplacecellanalysis.General.Pipeline.Stages.BaseNeuropyPipelineStage import PipelineStage
@@ -223,7 +225,7 @@ class PipelineWithDisplayPipelineStageMixin:
 
 
     # MAIN FUNCTION ______________________________________________________________________________________________________ #
-    def display(self, display_function, active_session_filter_configuration: str, **kwargs):
+    def display(self, display_function, active_session_configuration_context, **kwargs):
         """ Called to actually perform the display. Should output a figure/widget/graphic of some kind. 
         Inputs:
             display_function: either a Callable display function (e.g. DefaultDisplayFunctions._display_1d_placefield_validations) or a str containing the name of a registered display function (e.g. '_display_1d_placefield_validations')
@@ -238,14 +240,29 @@ class PipelineWithDisplayPipelineStageMixin:
             assert (display_function in self.registered_display_function_names), f"ERROR: The display function with the name {display_function} could not be found! Is it registered?"
             display_function = self.registered_display_function_dict[display_function] # find the actual function from the name
             
-        assert (active_session_filter_configuration in self.computation_results), f"self.computation_results doesn't contain a key for the provided active_session_filter_configuration ('{active_session_filter_configuration}'). Did you only enable computation with enabled_filter_names in perform_computation that didn't include this key?"
+        ## Old form: active_session_filter_configuration: str
+        if isinstance(active_session_configuration_context, str):
+            ## Old strictly name-based version (pre 2022-09-12):
+            active_session_configuration_name = active_session_configuration_context
+            
+        elif isinstance(active_session_configuration_context, IdentifyingContext):
+            # NEW 2022-09-12-style call with an identifying context (IdentifyingContext) object
+            active_session_configuration_name = active_session_configuration_context.filter_name
+            kwargs.setdefault('active_context', active_session_configuration_context) # add 'active_context' to the kwargs for the display function if possible
+            
+        else:
+            raise NotImplementedError
         
+        ## Sanity checking:
+        assert (active_session_configuration_name in self.computation_results), f"self.computation_results doesn't contain a key for the provided active_session_filter_configuration ('{active_session_configuration_name}'). Did you only enable computation with enabled_filter_names in perform_computation that didn't include this key?"
         # We pop the active_config_name parameter from the kwargs, as this was an outdated workaround to optionally get the display functions this string but now it's passed directly by the call below        
         kwarg_active_config_name = kwargs.pop('active_config_name', None)
         if kwarg_active_config_name is not None:
-            assert kwarg_active_config_name == active_session_filter_configuration # they better be equal or else there is a conflict.
-        
-        return display_function(self.computation_results[active_session_filter_configuration], self.active_configs[active_session_filter_configuration], owning_pipeline=self, active_config_name=active_session_filter_configuration, **kwargs)
+            assert kwarg_active_config_name == active_session_configuration_name # they better be equal or else there is a conflict.
+
+            
+                
+        return display_function(self.computation_results[active_session_configuration_name], self.active_configs[active_session_configuration_name], owning_pipeline=self, active_config_name=active_session_configuration_name, **kwargs)
     
     
         # return display_function(self.computation_results[active_session_filter_configuration], self.active_configs[active_session_filter_configuration], **kwargs)
