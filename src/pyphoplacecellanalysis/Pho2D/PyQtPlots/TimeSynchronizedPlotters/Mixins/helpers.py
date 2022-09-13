@@ -57,6 +57,7 @@ def build_combined_time_synchronized_plotters_window(active_pf_2D_dt, fixed_wind
             controlling_widget = spike_raster_plt_2d
             is_controlling_widget_external = False
         else:
+            print(f'WARNING: build_combined_time_synchronized_plotters_window(...) called with (controlling_widget == None) and (create_new_controlling_widget == False)')
             controlling_widget = None # no controlling widget
             is_controlling_widget_external = True
     else:
