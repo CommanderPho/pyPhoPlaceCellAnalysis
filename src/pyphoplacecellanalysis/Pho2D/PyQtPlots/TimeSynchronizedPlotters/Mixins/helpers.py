@@ -43,6 +43,10 @@ def build_combined_time_synchronized_plotters_window(active_pf_2D_dt, fixed_wind
             
         return root_dockAreaWindow, app
     
+    
+    # pg.setConfigOptions(imageAxisOrder='row-major')  # best performance
+    
+    
     # Build the 2D Raster Plotter using a fixed window duration
     current_window_start_time = active_pf_2D_dt.last_t - fixed_window_duration
     

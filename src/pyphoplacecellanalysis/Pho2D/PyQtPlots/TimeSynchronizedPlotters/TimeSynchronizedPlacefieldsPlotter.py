@@ -64,9 +64,8 @@ class TimeSynchronizedPlacefieldsPlotter(AnimalTrajectoryPlottingMixin, TimeSync
         self.params.image_margins = 0.0
         
         self.params.image_bounds_extent, self.params.x_range, self.params.y_range = _pyqtplot_build_image_bounds_extent(self.active_time_dependent_placefields.xbin, self.active_time_dependent_placefields.ybin, margin=self.params.image_margins, debug_print=self.enable_debug_print)
-        # self.params.image_aspect_ratio, image_width_height_tuple = compute_data_aspect_ratio(self.params.x_range, self.params.y_range)
-        # print(f'image_aspect_ratio: {self.params.image_aspect_ratio}')
-        
+        self.params.image_aspect_ratio, image_width_height_tuple = compute_data_aspect_ratio(self.params.x_range, self.params.y_range)
+        print(f'image_aspect_ratio: {self.params.image_aspect_ratio}, image_width_height_tuple: {image_width_height_tuple}')
         
         self.params.nMapsToShow = self.active_time_dependent_placefields.ratemap.n_neurons
         self.AnimalTrajectoryPlottingMixin_on_setup()
@@ -93,22 +92,22 @@ class TimeSynchronizedPlacefieldsPlotter(AnimalTrajectoryPlottingMixin, TimeSync
         nMapsToShow = len(included_unit_indicies)
 
         # Paging Management: Constrain the subplots values to just those that you need
-        subplot_no_pagination_configuration, included_combined_indicies_pages, page_grid_sizes = compute_paginated_grid_config(nMapsToShow, max_num_columns=self.params.max_num_columns, max_subplots_per_page=None, data_indicies=included_unit_indicies, last_figure_subplots_same_layout=True)
+        subplot_no_pagination_configuration, self.params.included_combined_indicies_pages, self.params.page_grid_sizes = compute_paginated_grid_config(nMapsToShow, max_num_columns=self.params.max_num_columns, max_subplots_per_page=None, data_indicies=included_unit_indicies, last_figure_subplots_same_layout=True)
         page_idx = 0 # page_idx is zero here because we only have one page:
         
-        for (a_linear_index, curr_row, curr_col, curr_included_unit_index) in included_combined_indicies_pages[page_idx]:
+        for (a_linear_index, curr_row, curr_col, curr_included_unit_index) in self.params.included_combined_indicies_pages[page_idx]:
             # Need to convert to page specific:
-            curr_page_relative_linear_index = np.mod(a_linear_index, int(page_grid_sizes[page_idx].num_rows * page_grid_sizes[page_idx].num_columns))
-            curr_page_relative_row = np.mod(curr_row, page_grid_sizes[page_idx].num_rows)
-            curr_page_relative_col = np.mod(curr_col, page_grid_sizes[page_idx].num_columns)
+            curr_page_relative_linear_index = np.mod(a_linear_index, int(self.params.page_grid_sizes[page_idx].num_rows * self.params.page_grid_sizes[page_idx].num_columns))
+            curr_page_relative_row = np.mod(curr_row, self.params.page_grid_sizes[page_idx].num_rows)
+            curr_page_relative_col = np.mod(curr_col, self.params.page_grid_sizes[page_idx].num_columns)
             if self.enable_debug_print:
                 print(f'a_linear_index: {a_linear_index}, curr_page_relative_linear_index: {curr_page_relative_linear_index}, curr_row: {curr_row}, curr_col: {curr_col}, curr_page_relative_row: {curr_page_relative_row}, curr_page_relative_col: {curr_page_relative_col}, curr_included_unit_index: {curr_included_unit_index}')
                 
                 
             is_first_column = (curr_page_relative_col == 0)
             is_first_row = (curr_page_relative_row == 0)
-            is_last_column = (curr_page_relative_col == (page_grid_sizes[page_idx].num_columns-1))
-            is_last_row = (curr_page_relative_row == (page_grid_sizes[page_idx].num_rows-1))
+            is_last_column = (curr_page_relative_col == (self.params.page_grid_sizes[page_idx].num_columns-1))
+            is_last_row = (curr_page_relative_row == (self.params.page_grid_sizes[page_idx].num_rows-1))
             
             neuron_IDX = curr_included_unit_index
             cell_ID = self.active_time_dependent_placefields.ratemap.neuron_ids[neuron_IDX]
@@ -123,7 +122,11 @@ class TimeSynchronizedPlacefieldsPlotter(AnimalTrajectoryPlottingMixin, TimeSync
                 image = np.array(image) / np.nanmax(image) # note scaling by maximum here!
                 if self.params.drop_below_threshold is not None:
                     image[np.where(occupancy < self.params.drop_below_threshold)] = np.nan # null out the occupancy
-            img_item = pg.ImageItem(image=image, levels=(0,1))
+            
+            img_item = pg.ImageItem(image=image, levels=(0,1), border='w')
+            
+            # self.params.image_aspect_ratio = 
+            
                 
             curr_plot = self.ui.root_graphics_layout_widget.addPlot(row=curr_row, col=curr_col, title=curr_cell_identifier_string) # , name=curr_plot_identifier_string
             curr_plot.setObjectName(curr_plot_identifier_string)
@@ -152,18 +155,18 @@ class TimeSynchronizedPlacefieldsPlotter(AnimalTrajectoryPlottingMixin, TimeSync
             curr_plot.addItem(curr_trajectory_curve)
             
             # Update the image:
-            img_item.setImage(image, rect=self.params.image_bounds_extent, autoLevels=False)
+            img_item.setImage(image, rect=self.params.image_bounds_extent, autoLevels=False) # rect: [x, y, w, h] # , axisOrder='row-major'
             img_item.setLookupTable(self.params.cmap.getLookupTable(nPts=256), update=False)
 
             curr_plot.setRange(xRange=self.params.x_range, yRange=self.params.y_range, padding=0.0, update=False, disableAutoRange=True)
-            # Lock the aspect ratio AFTER setting the x/y range:
-            # curr_plot.setAspectLocked(lock=True, ratio=self.params.image_aspect_ratio)
-
             # Sets only the panning limits:
             curr_plot.setLimits(xMin=self.params.x_range[0], xMax=self.params.x_range[-1], yMin=self.params.y_range[0], yMax=self.params.y_range[-1])
             # curr_plot.setLimits(xMin=self.params.x_range[0], xMax=self.params.x_range[-1], yMin=self.params.y_range[0], yMax=self.params.y_range[-1])
             curr_plot.setMouseEnabled(x=False, y=False)
             curr_plot.setMenuEnabled(enableMenu=False)
+            
+            # Lock the aspect ratio AFTER setting the x/y range:
+            # curr_plot.setAspectLocked(lock=True, ratio=self.params.image_aspect_ratio)
             
             # Link Axes to previous item:
             if a_linear_index > 0:

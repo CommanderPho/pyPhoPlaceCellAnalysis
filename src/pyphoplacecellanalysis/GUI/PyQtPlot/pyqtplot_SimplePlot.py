@@ -20,5 +20,5 @@ def plot_simple_graph(y=np.random.normal(size=100)):
 
 
 if __name__ == '__main__':
-    # win, app = plot_simple_graph()
+    plts, win, app = plot_simple_graph()
     pg.exec()

@@ -105,16 +105,12 @@ class SpikeRastersDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Displa
             createNewConnected_actions_dict = None
             
         # Debug Menu
-        
         _debug_menu_provider = DebugMenuProviderMixin(render_widget=spike_raster_window)
         _debug_menu_provider.DebugMenuProviderMixin_on_init()
         _debug_menu_provider.DebugMenuProviderMixin_on_buildUI()
         
         ## Adds the custom renderable menu to the top-level menu of the plots in Spike2DRaster
-        # 
-        
         active_pf_2D_dt = computation_result.computed_data.get('pf2D_dt', None)
-        
         if active_pf_2D_dt is not None:
             active_pf_2D_dt.reset()
             active_pf_2D_dt.update(t=45.0, start_relative_t=True)
@@ -122,16 +118,13 @@ class SpikeRastersDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Displa
             # _createLinkedWidget_menus = LocalMenus_AddRenderable.add_Create_Paired_Widget_menu(spike_raster_window, active_pf_2D_dt)  # Adds the custom context menus for SpikeRaster2D
             _createLinkedWidget_menu_provider = CreateLinkedWidget_MenuProvider(render_widget=spike_raster_window)
             _createLinkedWidget_menu_provider.CreateLinkedWidget_MenuProvider_on_init()
-            # _createLinkedWidget_menu_provider.CreateLinkedWidget_MenuProvider_on_buildUI()
             if owning_pipeline_reference is not None:
-                
                 display_output = owning_pipeline_reference.display_output
                 _createLinkedWidget_menu_provider.CreateLinkedWidget_MenuProvider_on_buildUI(spike_raster_window=spike_raster_window, active_pf_2D_dt=active_pf_2D_dt, display_output=display_output)
             else:
                 print(f'WARNING: owning_pipeline_reference is NONE in  _display_spike_rasters_window!')
             
-            # active_2d_plot_renderable_menus, curr_window, curr_menubar
-            pass
+            
         else:
             print(f'active_pf_2D_dt is None! Skipping Create Paired Widget Menu...')
     

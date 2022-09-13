@@ -73,56 +73,6 @@ def build_binned_imageItem(plot_item, params, xbins=None, ybins=None, matrix=Non
             local_plots.colorBarItem = None # shared colorbar item
             
     return local_plots, local_plots_data
-        
-        
-
-# class BinnedImageRenderingWindow(QtWidgets.QMainWindow):
-#     """ Renders a Matrix of binned data in the window.
-#         NOTE: uses pg.NonUniformImage and includes an interactive histogram.
-#         Observed to work well to display simple binned heatmaps/grids such as avg velocity across spatial bins, etc.    
-        
-#         History:
-#             Based off of pyphoplacecellanalysis.GUI.PyQtPlot.pyqtplot_Matrix.MatrixRenderingWindow
-#     """
-    
-#     def __init__(self, matrix=None, xbins=None, ybins=None, defer_show=False, **kwargs):
-#         super(BinnedImageRenderingWindow, self).__init__(**kwargs)
-#         # green - orange - red
-#         Gradients['gor'] = {'ticks': [(0.0, (74, 158, 71)), (0.5, (255, 230, 0)), (1, (191, 79, 76))], 'mode': 'rgb'}
-        
-#         gr_wid = pg.GraphicsLayoutWidget(show=True)
-#         self.setCentralWidget(gr_wid)
-#         self.setWindowTitle('BinnedImageRenderingWindow')
-#         self.resize(600,500)
-#         plotItem = gr_wid.addPlot(title="Avg Velocity per Pos (X, Y)", row=0, col=0)      # add PlotItem to the main GraphicsLayoutWidget
-#         # plotItem.invertY(True)           # orient y axis to run top-to-bottom
-#         plotItem.setDefaultPadding(0.0)  # plot without padding data range
-#         plotItem.setMouseEnabled(x=False, y=False)
-        
-#         # Full Histogram:
-#         lut = pg.HistogramLUTItem(orientation="horizontal")
-#         gr_wid.nextRow()
-#         gr_wid.addItem(lut)
-
-#         # load the gradient
-#         lut.gradient.loadPreset('gor')
-
-#         ## NonUniformImage:
-#         image = NonUniformImage(xbins, ybins, matrix)
-#         image.setLookupTable(lut, autoLevel=True)
-#         image.setZValue(-1)
-#         plotItem.addItem(image)
-
-#         h = image.getHistogram()
-#         lut.plot.setData(*h)
-
-#         # show full frame, label tick marks at top and left sides, with some extra space for labels:
-#         plotItem.showAxes(True, showValues=(True, True, False, False), size=20)
-        
-#         if not defer_show:
-#             self.show()
-
-
 
 class BasicBinnedImageRenderingWindow(QtWidgets.QMainWindow):
     """ Renders a Matrix of binned data in the window.NonUniformImage and includes no histogram.

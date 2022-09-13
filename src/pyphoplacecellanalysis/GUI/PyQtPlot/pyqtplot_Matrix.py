@@ -65,11 +65,14 @@ class MatrixRenderingWindow(QtWidgets.QMainWindow):
         self.show()
         
         
-# mkQApp("Correlation matrix display")
-# main_window = MatrixRenderingWindow()
+
 
 ## Start Qt event loop
 if __name__ == '__main__':
+    pg.mkQApp("Correlation matrix display")
+    main_window = MatrixRenderingWindow()
+    main_window.show()
+    # win, app = MatrixRenderingWindow()
     pg.exec()
 
 
