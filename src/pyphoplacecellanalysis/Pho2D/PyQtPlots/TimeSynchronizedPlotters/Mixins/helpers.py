@@ -20,17 +20,19 @@ def build_combined_time_synchronized_plotters_window(active_pf_2D_dt, fixed_wind
         active_pf_2D_dt.update(t=45.0, start_relative_t=True)
         all_plotters, root_dockAreaWindow, app = build_combined_time_synchronized_plotters_window(active_pf_2D_dt, fixed_window_duration = 15.0)
     """
-    def _merge_plotters(a_controlling_widget, curr_sync_occupancy_plotter, curr_placefields_plotter, is_controlling_widget_external=False):
+    def _merge_plotters(a_controlling_widget, curr_sync_occupancy_plotter, curr_placefields_plotter, is_controlling_widget_external=False, debug_print=False):
         # root_dockAreaWindow, app = DockAreaWrapper.wrap_with_dockAreaWindow(curr_sync_occupancy_plotter, spike_raster_plt_2d, title='All Time Synchronized Plotters')
         # curr_placefields_plotter, dDisplayItem = root_dockAreaWindow.add_display_dock(identifier='Time Dependent Placefields', widget=curr_placefields_plotter, dockAddLocationOpts=['left'])
         # root_dockAreaWindow, app = DockAreaWrapper.wrap_with_dockAreaWindow(curr_sync_occupancy_plotter, curr_placefields_plotter, title='All Time Synchronized Plotters')
         
         
         out_Width_Height_Tuple = curr_placefields_plotter.desired_widget_size(desired_page_height = 600.0, debug_print=True)
-        print(f'out_Width_Height_Tuple: {out_Width_Height_Tuple}')
+        if debug_print:
+            print(f'out_Width_Height_Tuple: {out_Width_Height_Tuple}')
         
         final_desired_width, final_desired_height = out_Width_Height_Tuple
-        print(f'final_desired_width: {final_desired_width}, final_desired_height: {final_desired_height}')
+        if debug_print:
+            print(f'final_desired_width: {final_desired_width}, final_desired_height: {final_desired_height}')
         
         # build a win of type PhoDockAreaContainingWindow
         root_dockAreaWindow, app = DockAreaWrapper._build_default_dockAreaWindow(title='All Time Synchronized Plotters', defer_show=True)

@@ -71,7 +71,7 @@ class TimeSynchronizedPlacefieldsPlotter(AnimalTrajectoryPlottingMixin, TimeSync
         
         self.params.image_bounds_extent, self.params.x_range, self.params.y_range = _pyqtplot_build_image_bounds_extent(self.active_time_dependent_placefields.xbin, self.active_time_dependent_placefields.ybin, margin=self.params.image_margins, debug_print=self.enable_debug_print)
         self.params.image_aspect_ratio, image_width_height_tuple = compute_data_aspect_ratio(self.params.x_range, self.params.y_range)
-        print(f'image_aspect_ratio: {self.params.image_aspect_ratio}, image_width_height_tuple: {image_width_height_tuple}')
+        # print(f'image_aspect_ratio: {self.params.image_aspect_ratio}, image_width_height_tuple: {image_width_height_tuple}')
         
         self.params.nMapsToShow = self.active_time_dependent_placefields.ratemap.n_neurons
         self.AnimalTrajectoryPlottingMixin_on_setup()
@@ -247,7 +247,7 @@ class TimeSynchronizedPlacefieldsPlotter(AnimalTrajectoryPlottingMixin, TimeSync
         self.setWindowTitle(f'{image_title} t = {curr_t}')
     
 
-    def compute_desired_page_aspect_ratio(self):
+    def compute_desired_page_aspect_ratio(self, debug_print=False):
         """ requires:
         self.params:
             .page_grid_sizes
@@ -261,7 +261,8 @@ class TimeSynchronizedPlacefieldsPlotter(AnimalTrajectoryPlottingMixin, TimeSync
         ## Computes the appropriate size of the widget given the aspect-ratio of the image data and the number of rows/columns in the page layout:
         max_num_rows = max([a_rol_col_tuple.num_rows for a_rol_col_tuple in self.params.page_grid_sizes])
         max_num_cols = max([a_rol_col_tuple.num_columns for a_rol_col_tuple in self.params.page_grid_sizes])
-        print(f'max_num_rows: {max_num_rows}, max_num_cols: {max_num_cols}')                   
+        if debug_print:
+            print(f'max_num_rows: {max_num_rows}, max_num_cols: {max_num_cols}')                   
 
         single_image_aspect_ratio = self.params.image_aspect_ratio # each single_image_width = 0.9776615738374339 * single_image_height 
         # aspect_ratio = width / height
@@ -272,12 +273,13 @@ class TimeSynchronizedPlacefieldsPlotter(AnimalTrajectoryPlottingMixin, TimeSync
         page_width = single_image_width * float(max_num_cols)
         page_width_height_tuple = Width_Height_Tuple(page_width, page_height) # Width_Height_Tuple(width=4.8883078691871695, height=11.0)
         page_aspect_ratio = page_width / page_height
-        print(f'page_aspect_ratio: {page_aspect_ratio}') # 0.4443916244715609
+        if debug_print:
+            print(f'page_aspect_ratio: {page_aspect_ratio}') # 0.4443916244715609
         
         self.params.page_width_height_tuple = page_width_height_tuple
         self.params.page_aspect_ratio = page_aspect_ratio
 
-    def desired_widget_size(self, desired_page_height = 600.0, desired_page_width = None, debug_print=True):
+    def desired_widget_size(self, desired_page_height = 600.0, desired_page_width = None, debug_print=False):
         """ Requires that self.compute_desired_page_aspect_ratio has already been called on the target 
         """
         ## Apply the computed page_aspect_ratio to an arbitrary desired height to get the appropriate width of the widget

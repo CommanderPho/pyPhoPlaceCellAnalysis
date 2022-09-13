@@ -183,6 +183,14 @@ class PipelineWithDisplayPipelineStageMixin:
         self.stage.display_output = value
     
     @property
+    def filtered_contexts(self):
+        """ filtered_contexts holds the corresponding contexts for each filtered config."""
+        return self.stage.filtered_contexts
+    @filtered_contexts.setter
+    def filtered_contexts(self, value):
+        self.stage.filtered_contexts = value
+    
+    @property
     def registered_display_functions(self):
         """The registered_display_functions property."""
         return self.stage.registered_display_functions
@@ -213,8 +221,16 @@ class PipelineWithDisplayPipelineStageMixin:
     def prepare_for_display(self, root_output_dir=r'R:\data\Output', should_smooth_maze=True):
         assert (self.is_computed), "Current self.is_computed must be true. Call self.perform_computations to reach this step."
         self.stage = DisplayPipelineStage(self.stage)  # build the Display stage
+        
+        active_identifying_session_ctx = self.sess.get_context() # 'bapun_RatN_Day4_2019-10-15_11-30-06'
+        
         # Loops through all the configs and ensure that they have the neuron identity info if they need it.
         for an_active_config_name in self.active_configs.keys():
+            ## Add the filter to the active context (IdentifyingContext)
+            self.filtered_contexts[an_active_config_name] = active_identifying_session_ctx.adding_context('filter', filter_name=an_active_config_name) # 'bapun_RatN_Day4_2019-10-15_11-30-06_maze'
+            # self.display_output[active_identifying_session_ctx][self.filtered_contexts[an_active_config_name]] = DynamicParameters()
+            self.display_output[self.filtered_contexts[an_active_config_name]] = DynamicParameters() # One display_output for each context
+            
             # Note that there may be different numbers of neurons included in the different configs (which include different epochs/filters) so a single one-size-fits-all approach to assigning color identities won't work here.
             if an_active_config_name in self.computation_results:
                 self.active_configs[an_active_config_name] = add_neuron_identity_info_if_needed(self.computation_results[an_active_config_name], self.active_configs[an_active_config_name])
@@ -272,7 +288,7 @@ class DisplayPipelineStage(DefaultRegisteredDisplayFunctions, ComputedPipelineSt
     """ The concrete pipeline stage for displaying the output computed in previous stages."""
     identity: PipelineStage = PipelineStage.Displayed
     
-    def __init__(self, computed_stage: ComputedPipelineStage, display_output=dict(), render_actions=dict()):
+    def __init__(self, computed_stage: ComputedPipelineStage, display_output=None, render_actions=None, filtered_contexts=None):
         # super(DisplayPipelineStage, self).__init__()
         # ComputedPipelineStage fields:
         self.stage_name = computed_stage.stage_name
@@ -285,8 +301,9 @@ class DisplayPipelineStage(DefaultRegisteredDisplayFunctions, ComputedPipelineSt
         self.registered_computation_function_dict = computed_stage.registered_computation_function_dict
 
         # Initialize custom fields:
-        self.display_output = display_output
-        self.render_actions = render_actions    
+        self.display_output = display_output or DynamicParameters()
+        self.render_actions = render_actions or DynamicParameters()
+        self.filtered_contexts = filtered_contexts or DynamicParameters() # None by default, otherwise IdentifyingContext
         self.registered_display_function_dict = OrderedDict()
         self.register_default_known_display_functions() # registers the default display functions
         

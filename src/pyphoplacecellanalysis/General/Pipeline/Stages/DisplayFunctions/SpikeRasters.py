@@ -80,6 +80,8 @@ class SpikeRastersDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Displa
         active_plotting_config = active_config.plotting_config
         active_config_name = kwargs.get('active_config_name', 'Unknown')
         # active_config_name = active_config.
+        active_identifying_context = kwargs.get('active_context', None)
+        
         
         # spike_raster_window = Spike3DRasterWindowWidget(computation_result.sess.spikes_df)
         # spike_raster_window = Spike3DRasterWindowWidget(computation_result.sess.spikes_df, neuron_colors=provided_neuron_id_to_color_map, neuron_sort_order=None, type_of_3d_plotter=type_of_3d_plotter, application_name=f'Spike Raster Window - {active_config_name}')
@@ -100,7 +102,11 @@ class SpikeRastersDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Displa
         spike_raster_window.main_menu_window = curr_main_menu_window # to retain the changes
         
         if owning_pipeline_reference is not None:
-            display_output = owning_pipeline_reference.display_output
+            print(f'active_config: {active_config}')
+            # display_output = owning_pipeline_reference.display_output
+            assert active_identifying_context is not None
+            display_output = owning_pipeline_reference.display_output[active_identifying_context]
+            # print(f'display_output: {display_output}')
             curr_main_menu_window, menuCreateNewConnectedWidget, createNewConnected_actions_dict = CreateNewConnectedWidgetMenuHelper.try_add_create_new_connected_widget_menu(spike_raster_window, owning_pipeline_reference, active_config, display_output)
             spike_raster_window.main_menu_window = curr_main_menu_window # to retain the changes
             
@@ -133,7 +139,9 @@ class SpikeRastersDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Displa
             _createLinkedWidget_menu_provider = CreateLinkedWidget_MenuProvider(render_widget=spike_raster_window)
             _createLinkedWidget_menu_provider.CreateLinkedWidget_MenuProvider_on_init()
             if owning_pipeline_reference is not None:
-                display_output = owning_pipeline_reference.display_output
+                # display_output = owning_pipeline_reference.display_output
+                assert active_identifying_context is not None
+                display_output = owning_pipeline_reference.display_output[active_identifying_context]
                 _createLinkedWidget_menu_provider.CreateLinkedWidget_MenuProvider_on_buildUI(spike_raster_window=spike_raster_window, active_pf_2D_dt=active_pf_2D_dt, display_output=display_output)
             else:
                 print(f'WARNING: owning_pipeline_reference is NONE in  _display_spike_rasters_window!')
