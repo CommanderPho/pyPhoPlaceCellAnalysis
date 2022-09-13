@@ -82,7 +82,9 @@ class CreateLinkedWidget_MenuProvider(BaseMenuProviderMixin):
         """
         spike_raster_window = kwargs.get('spike_raster_window', None)
         active_pf_2D_dt = kwargs.get('active_pf_2D_dt', None)
+        active_context = kwargs.get('context', None)
         display_output = kwargs.get('display_output', None)
+        
         
         ## Add menu to the main menu bar:
         curr_window = self.root_window
@@ -103,30 +105,16 @@ class CreateLinkedWidget_MenuProvider(BaseMenuProviderMixin):
         # curr_actions_dict['actionTimeSynchronizedDecoderPlotter'] = widget.ui.actionTimeSynchronizedDecoderPlotter
         # curr_actions_dict['actionCombineTimeSynchronizedPlotterWindow'] = widget.ui.actionCombineTimeSynchronizedPlotterWindow
         
-        curr_actions_dict['actionTimeSynchronizedOccupancyPlotter'].triggered.connect(CreateNewTimeSynchronizedPlotterCommand(spike_raster_window, active_pf_2D_dt, plotter_type='occupancy', display_output=display_output))
-        curr_actions_dict['actionTimeSynchronizedPlacefieldsPlotter'].triggered.connect(CreateNewTimeSynchronizedPlotterCommand(spike_raster_window, active_pf_2D_dt, plotter_type='placefields', display_output=display_output))
-        curr_actions_dict['actionTimeSynchronizedDecoderPlotter'].triggered.connect(CreateNewTimeSynchronizedPlotterCommand(spike_raster_window, active_pf_2D_dt, plotter_type='decoder', display_output=display_output))
-        curr_actions_dict['actionCombineTimeSynchronizedPlotterWindow'].triggered.connect(CreateNewTimeSynchronizedCombinedPlotterCommand(spike_raster_window, active_pf_2D_dt, display_output))
+        curr_actions_dict['actionTimeSynchronizedOccupancyPlotter'].triggered.connect(CreateNewTimeSynchronizedPlotterCommand(spike_raster_window, active_pf_2D_dt, plotter_type='occupancy', active_context=active_context, display_output=display_output))
+        curr_actions_dict['actionTimeSynchronizedPlacefieldsPlotter'].triggered.connect(CreateNewTimeSynchronizedPlotterCommand(spike_raster_window, active_pf_2D_dt, plotter_type='placefields', active_context=active_context, display_output=display_output))
+        curr_actions_dict['actionTimeSynchronizedDecoderPlotter'].triggered.connect(CreateNewTimeSynchronizedPlotterCommand(spike_raster_window, active_pf_2D_dt, plotter_type='decoder', active_context=active_context, display_output=display_output))
+        curr_actions_dict['actionCombineTimeSynchronizedPlotterWindow'].triggered.connect(CreateNewTimeSynchronizedCombinedPlotterCommand(spike_raster_window, active_pf_2D_dt, active_context=active_context, display_output=display_output))
         
         curr_window.ui.actionMenuCreateLinkedWidget = curr_menubar.addMenu(self.activeMenuReference.top_level_menu)  # add it to the menubar
 
         # Save references in the curr_window
         self.activeMenuReference.actions_dict['actionMenuCreateLinkedWidget'] = curr_window.ui.actionMenuCreateLinkedWidget 
-        
-        
-        # Debugging Reference
-        # self.activeMenuReference.all_refs = active_2d_plot_renderable_menus
-        
-        # self.activeMenuReference.all_refs = widget
-        
-        # widget.close()
-        # self.activeMenuReference.all_refs = None
-    
         return self.activeMenuReference.top_level_menu, self.activeMenuReference.actions_dict
-        
-        # return self.activeMenuReference.top_level_menu, self.activeMenuReference.actions_dict, self.activeMenuReference.all_refs
-    
-        
 
     @QtCore.Slot()
     def CreateLinkedWidget_MenuProvider_on_destroy(self):
@@ -159,10 +147,11 @@ class CreateNewTimeSynchronizedPlotterCommand(BaseMenuCommand):
     """ build_combined_time_synchronized_plotters_window
     A command to create a plotter as needed
     """
-    def __init__(self, spike_raster_window, active_pf_2D_dt, plotter_type='occupancy', display_output={}) -> None:
+    def __init__(self, spike_raster_window, active_pf_2D_dt, plotter_type='occupancy', active_context=None, display_output={}) -> None:
         super(CreateNewTimeSynchronizedPlotterCommand, self).__init__()
         self._spike_raster_window = spike_raster_window
         self._active_pf_2D_dt = active_pf_2D_dt
+        self._context = active_context
         self._display_output = display_output
         self._plotter_type = plotter_type
         
@@ -190,17 +179,16 @@ class CreateNewTimeSynchronizedCombinedPlotterCommand(BaseMenuCommand):
     """ build_combined_time_synchronized_plotters_window
     A command to create a plotter as needed
     """
-    def __init__(self, spike_raster_window, active_pf_2D_dt, display_output={}) -> None:
+    def __init__(self, spike_raster_window, active_pf_2D_dt, active_context=None, display_output={}) -> None:
         super(CreateNewTimeSynchronizedCombinedPlotterCommand, self).__init__()
         self._spike_raster_window = spike_raster_window
         self._active_pf_2D_dt = active_pf_2D_dt
+        self._context = active_context
         self._display_output = display_output
-        
         
     def execute(self, filename: str) -> None:
         """ Implicitly captures spike_raster_window """
-        _out_synchronized_plotter = build_combined_time_synchronized_plotters_window(active_pf_2D_dt=self._active_pf_2D_dt, controlling_widget=self._spike_raster_window.spike_raster_plt_2d, create_new_controlling_widget=False)
-        
+        _out_synchronized_plotter = build_combined_time_synchronized_plotters_window(active_pf_2D_dt=self._active_pf_2D_dt, controlling_widget=self._spike_raster_window.spike_raster_plt_2d, context=self._context, create_new_controlling_widget=False)
         self._display_output['comboSynchronizedPlotter'] = _out_synchronized_plotter
         # (controlling_widget, curr_sync_occupancy_plotter, curr_placefields_plotter), root_dockAreaWindow, app = _out_synchronized_plotter
         

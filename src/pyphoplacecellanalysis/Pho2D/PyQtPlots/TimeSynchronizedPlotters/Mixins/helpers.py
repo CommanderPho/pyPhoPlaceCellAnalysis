@@ -12,7 +12,7 @@ from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.DockAreaWrapper import DockArea
 
 
 
-def build_combined_time_synchronized_plotters_window(active_pf_2D_dt, fixed_window_duration = 15.0, controlling_widget=None, create_new_controlling_widget=True):
+def build_combined_time_synchronized_plotters_window(active_pf_2D_dt, fixed_window_duration = 15.0, controlling_widget=None, context=None, create_new_controlling_widget=True):
     """ Builds a single window with time_synchronized (time-dependent placefield) plotters controlled by an internal 2DRasterPlot widget.
     
     Usage:
@@ -20,12 +20,17 @@ def build_combined_time_synchronized_plotters_window(active_pf_2D_dt, fixed_wind
         active_pf_2D_dt.update(t=45.0, start_relative_t=True)
         all_plotters, root_dockAreaWindow, app = build_combined_time_synchronized_plotters_window(active_pf_2D_dt, fixed_window_duration = 15.0)
     """
+    if context is not None:
+        ## Finally, add the display function to the active context
+        active_display_fn_identifying_ctx = context.adding_context('combined_time_synchronized_plotters', display_fn_name='combined_time_synchronized_plotters')
+        active_display_fn_identifying_ctx_string = active_display_fn_identifying_ctx.get_description(separator='|') # Get final discription string:
+        title = f'All Time Synchronized Plotters <{active_display_fn_identifying_ctx_string}>'
+    else:
+        title = 'All Time Synchronized Plotters'
+    
+    
     def _merge_plotters(a_controlling_widget, curr_sync_occupancy_plotter, curr_placefields_plotter, is_controlling_widget_external=False, debug_print=False):
-        # root_dockAreaWindow, app = DockAreaWrapper.wrap_with_dockAreaWindow(curr_sync_occupancy_plotter, spike_raster_plt_2d, title='All Time Synchronized Plotters')
-        # curr_placefields_plotter, dDisplayItem = root_dockAreaWindow.add_display_dock(identifier='Time Dependent Placefields', widget=curr_placefields_plotter, dockAddLocationOpts=['left'])
-        # root_dockAreaWindow, app = DockAreaWrapper.wrap_with_dockAreaWindow(curr_sync_occupancy_plotter, curr_placefields_plotter, title='All Time Synchronized Plotters')
-        
-        
+        """ implicitly captures title from the outer function """
         out_Width_Height_Tuple = curr_placefields_plotter.desired_widget_size(desired_page_height = 600.0, debug_print=True)
         if debug_print:
             print(f'out_Width_Height_Tuple: {out_Width_Height_Tuple}')
@@ -35,7 +40,7 @@ def build_combined_time_synchronized_plotters_window(active_pf_2D_dt, fixed_wind
             print(f'final_desired_width: {final_desired_width}, final_desired_height: {final_desired_height}')
         
         # build a win of type PhoDockAreaContainingWindow
-        root_dockAreaWindow, app = DockAreaWrapper._build_default_dockAreaWindow(title='All Time Synchronized Plotters', defer_show=True)
+        root_dockAreaWindow, app = DockAreaWrapper._build_default_dockAreaWindow(title=title, defer_show=True)
         _, dDisplayItem1 = root_dockAreaWindow.add_display_dock("Placefields", dockSize=(final_desired_width, final_desired_height), dockIsClosable=False, widget=curr_placefields_plotter, dockAddLocationOpts=['left'])
         _, dDisplayItem2 = root_dockAreaWindow.add_display_dock("Occupancy", dockSize=(final_desired_width, final_desired_height), dockIsClosable=False, widget=curr_sync_occupancy_plotter, dockAddLocationOpts=['right'])
         
@@ -49,7 +54,6 @@ def build_combined_time_synchronized_plotters_window(active_pf_2D_dt, fixed_wind
         # root_dockAreaWindow.connection_man.register_drivable(curr_sync_occupancy_plotter)
         # root_dockAreaWindow.connection_man.register_drivable(curr_placefields_plotter)
         # Note needed now that DockAreaWrapper sets up drivables/drivers automatically from widgets
-        
         root_dockAreaWindow.try_register_any_control_widgets()
         
         if a_controlling_widget is not None:
