@@ -109,9 +109,7 @@ class SpikeRastersDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Displa
         if owning_pipeline_reference is not None:
             # print(f'active_config: {active_config}')
             # display_output = owning_pipeline_reference.display_output
-            
             # display_output = owning_pipeline_reference.display_output[active_identifying_context]
-            
             if active_display_fn_identifying_ctx not in owning_pipeline_reference.display_output:
                 owning_pipeline_reference.display_output[active_display_fn_identifying_ctx] = PhoUIContainer() # create a new context
             
@@ -129,11 +127,7 @@ class SpikeRastersDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Displa
         _debug_menu_provider = DebugMenuProviderMixin(render_widget=spike_raster_window)
         _debug_menu_provider.DebugMenuProviderMixin_on_init()
         _debug_menu_provider.DebugMenuProviderMixin_on_buildUI()
-        
-        # menu_provider_obj_list.append(_debug_menu_provider)
-        # curr_root_window = PhoMenuHelper.try_get_menu_window(spike_raster_window)
-        # curr_root_window.ui.menu.global_window_menus.debug.menu_provider_obj = _debug_menu_provider
-        
+                
         ## Adds the custom renderable menu to the top-level menu of the plots in Spike2DRaster
         active_pf_2D_dt = computation_result.computed_data.get('pf2D_dt', None)
         if active_pf_2D_dt is not None:
@@ -156,14 +150,6 @@ class SpikeRastersDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Displa
             else:
                 print(f'WARNING: owning_pipeline_reference is NONE in  _display_spike_rasters_window!')
                 
-            # spike_raster_window.main_menu_window.ui.menu.global_window_menus.create_linked_widget.menu_provider_obj = _createLinkedWidget_menu_provider
-            # spike_raster_window.root_window.ui.menu.global_window_menus.create_linked_widget.menu_provider_obj = _createLinkedWidget_menu_provider
-            
-            # curr_root_window = PhoMenuHelper.try_get_menu_window(spike_raster_window)
-            # curr_root_window.ui.menu.global_window_menus.create_linked_widget.menu_provider_obj = _createLinkedWidget_menu_provider
-            
-            # menu_provider_obj_list.append(_createLinkedWidget_menu_provider)
-            
             
         else:
             print(f'active_pf_2D_dt is None! Skipping Create Paired Widget Menu...')
