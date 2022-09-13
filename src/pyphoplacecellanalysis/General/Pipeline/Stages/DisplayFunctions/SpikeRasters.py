@@ -79,25 +79,19 @@ class SpikeRastersDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Displa
         type_of_3d_plotter = kwargs.get('type_of_3d_plotter', 'pyqtgraph')
         active_plotting_config = active_config.plotting_config
         active_config_name = kwargs.get('active_config_name', 'Unknown')
-        # active_config_name = active_config.
         active_identifying_context = kwargs.get('active_context', None)
         assert active_identifying_context is not None
         owning_pipeline_reference = kwargs.get('owning_pipeline', None) # A reference to the pipeline upon which this display function is being called
         
-        
-        
         ## Finally, add the display function to the active context
         active_display_fn_identifying_ctx = active_identifying_context.adding_context('display_fn', display_fn_name='display_spike_rasters_window')
         active_display_fn_identifying_ctx_string = active_display_fn_identifying_ctx.get_description(separator='|') # Get final discription string:
-        
         
         spike_raster_window = Spike3DRasterWindowWidget(computation_result.sess.spikes_df, type_of_3d_plotter=type_of_3d_plotter, application_name=f'Spike Raster Window - {active_display_fn_identifying_ctx_string}')
         
         # Set Window Title Options:
         spike_raster_window.setWindowFilePath(str(computation_result.sess.filePrefix.resolve()))
         spike_raster_window.setWindowTitle(f'Spike Raster Window - {active_config_name} - {str(computation_result.sess.filePrefix.resolve())}')
-        
-        # menu_provider_obj_list = []
         
         ## Adds the custom renderable menu to the top-level menu of the plots in Spike2DRaster
         _active_2d_plot_renderable_menus = LocalMenus_AddRenderable.add_renderable_context_menu(spike_raster_window.spike_raster_plt_2d, computation_result.sess)  # Adds the custom context menus for SpikeRaster2D        

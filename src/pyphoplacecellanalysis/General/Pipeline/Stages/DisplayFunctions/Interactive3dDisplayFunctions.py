@@ -77,7 +77,7 @@ class Interactive3dDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Displ
             # no controls
             pane = None
         
-        # return pane
+        
         return {'ipcDataExplorer': ipcDataExplorer, 'plotter': pActiveTuningCurvesPlotter, 'pane': pane}
             
         
