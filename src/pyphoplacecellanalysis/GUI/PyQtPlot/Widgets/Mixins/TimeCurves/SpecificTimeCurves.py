@@ -333,7 +333,7 @@ class Specific3DTimeCurvesHelper:
             spike_visualization_mode: str - must be ('count', 'rate', 'mov_average')
         
         Usage:
-            from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.Mixins.TimeCurves.Specific3DTimeCurves import Specific3DTimeCurvesHelper
+            from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.Mixins.TimeCurves.SpecificTimeCurves import Specific3DTimeCurvesHelper
             curr_computations_results = curr_active_pipeline.computation_results[active_config_name]
             
             active_curve_plotter_3d = spike_raster_window.spike_raster_plt_3d # from a spike_raster_window

@@ -193,6 +193,7 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
         self.params.config_items = IndexedOrderedDict()
         curr_neuron_ids_list = self.find_cell_ids_from_neuron_IDXs(self.fragile_linear_neuron_IDXs)
         
+        # builds one config for each neuron color:
         for i, fragile_linear_neuron_IDX in enumerate(self.fragile_linear_neuron_IDXs):
             curr_neuron_id = curr_neuron_ids_list[i] # aclu value
             
@@ -444,7 +445,7 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
         self._build_cell_configs()
 
         # ALL Spikes in the preview window:
-        curr_spike_x, curr_spike_y, curr_spike_pens, curr_n = self._build_all_spikes_data_values()        
+        curr_spike_x, curr_spike_y, curr_spike_pens, curr_n = self._build_all_spikes_data_values()
         pos = np.vstack((curr_spike_x, curr_spike_y)) # np.shape(curr_spike_t): (11,), np.shape(curr_spike_x): (11,), np.shape(curr_spike_y): (11,), curr_n: 11
         self.plots_data.all_spots = [{'pos': pos[:,i], 'data': i, 'pen': curr_spike_pens[i]} for i in range(curr_n)] # update self.plots_data.all_spots
         # Update preview_overview_scatter_plot

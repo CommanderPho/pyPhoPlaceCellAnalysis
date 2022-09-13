@@ -30,11 +30,12 @@ class Render2DScrollWindowPlotMixin:
         
         Uses the df['visualization_raster_y_location'] field added to the spikes dataframe to get the y-value for the spike
         
+        Note that the colors are built using the self.config_fragile_linear_neuron_IDX_map property
+        
         """
         # All units at once approach:
         # Filter the dataframe using that column and value from the list
         curr_spike_t = self.spikes_window.df[self.spikes_window.df.spikes.time_variable_name].to_numpy() # this will map
-        # curr_spike_x = np.interp(curr_spike_t, (self.spikes_window.active_window_start_time, self.spikes_window.active_window_end_time), (0.0, +self.temporal_axis_length))
         curr_spike_y = self.spikes_window.df['visualization_raster_y_location'].to_numpy() # this will map
         curr_spike_pens = [self.config_fragile_linear_neuron_IDX_map[a_fragile_linear_neuron_IDX][2] for a_fragile_linear_neuron_IDX in self.spikes_window.df['fragile_linear_neuron_IDX'].to_numpy()] # get the pens for each spike from the configs map
         curr_n = len(curr_spike_t) # curr number of spikes
@@ -76,7 +77,7 @@ class Render2DScrollWindowPlotMixin:
         ## Bottom Windowed Scroll Plot/Widget:
 
         # ALL Spikes in the preview window:
-        curr_spike_x, curr_spike_y, curr_spike_pens, curr_n = self._build_all_spikes_data_values()        
+        curr_spike_x, curr_spike_y, curr_spike_pens, curr_n = self._build_all_spikes_data_values()
         pos = np.vstack((curr_spike_x, curr_spike_y)) # np.shape(curr_spike_t): (11,), np.shape(curr_spike_x): (11,), np.shape(curr_spike_y): (11,), curr_n: 11
         self.plots_data.all_spots = [{'pos': pos[:,i], 'data': i, 'pen': curr_spike_pens[i]} for i in range(curr_n)]
         
