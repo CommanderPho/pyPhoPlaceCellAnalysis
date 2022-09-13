@@ -46,8 +46,11 @@ def build_combined_time_synchronized_plotters_window(active_pf_2D_dt, fixed_wind
         root_dockAreaWindow.show()
         
         ## Register the children items as drivables/drivers:
-        root_dockAreaWindow.connection_man.register_drivable(curr_sync_occupancy_plotter)
-        root_dockAreaWindow.connection_man.register_drivable(curr_placefields_plotter)
+        # root_dockAreaWindow.connection_man.register_drivable(curr_sync_occupancy_plotter)
+        # root_dockAreaWindow.connection_man.register_drivable(curr_placefields_plotter)
+        # Note needed now that DockAreaWrapper sets up drivables/drivers automatically from widgets
+        
+        root_dockAreaWindow.try_register_any_control_widgets()
         
         if a_controlling_widget is not None:
             root_dockAreaWindow.connection_man.register_driver(a_controlling_widget)
