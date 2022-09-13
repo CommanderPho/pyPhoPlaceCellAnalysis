@@ -73,6 +73,10 @@ class TimeSynchronizedOccupancyPlotter(AnimalTrajectoryPlottingMixin, TimeSynchr
         # self.setup_spike_rendering_mixin() # NeuronIdentityAccessingMixin
         self.app = pg.mkQApp(self.applicationName)
         self.params = VisualizationParameters(self.applicationName)
+        # self.params.shared_axis_order = 'row-major'
+        self.params.shared_axis_order = 'col-major'
+        # self.params.shared_axis_order = None
+        
         ## Build the colormap to be used:
         # self.params.cmap = pg.ColorMap(pos=np.linspace(0.0, 1.0, 6), color=colors)
         self.params.cmap = pg.colormap.get('jet','matplotlib') # prepare a linear color map
@@ -170,8 +174,11 @@ class TimeSynchronizedOccupancyPlotter(AnimalTrajectoryPlottingMixin, TimeSynchr
             image[np.where(image < self.params.drop_below_threshold)] = np.nan # null out the occupancy
         
         # self.ui.imv.setImage(image, xvals=self.active_time_dependent_placefields.xbin)
-        self.ui.imv.setImage(image, rect=self.params.image_bounds_extent)
-        
+        if self.params.shared_axis_order is None:
+            self.ui.imv.setImage(image, rect=self.params.image_bounds_extent)
+        else:
+            self.ui.imv.setImage(image, rect=self.params.image_bounds_extent, axisOrder=self.params.shared_axis_order)
+            
         self.AnimalTrajectoryPlottingMixin_update_plots()
         
         # self.setWindowTitle(f'{self.windowName} - {image_title} t = {curr_t}')

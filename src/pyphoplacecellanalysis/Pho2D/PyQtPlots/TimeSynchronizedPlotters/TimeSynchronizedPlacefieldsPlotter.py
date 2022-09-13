@@ -58,6 +58,10 @@ class TimeSynchronizedPlacefieldsPlotter(AnimalTrajectoryPlottingMixin, TimeSync
         # self.setup_spike_rendering_mixin() # NeuronIdentityAccessingMixin
         self.app = pg.mkQApp(self.applicationName)
         self.params = VisualizationParameters(self.applicationName)
+        # self.params.shared_axis_order = 'row-major'
+        self.params.shared_axis_order = 'col-major'
+        # self.params.shared_axis_order = None
+        
         ## Build the colormap to be used:
         # self.params.cmap = pg.ColorMap(pos=np.linspace(0.0, 1.0, 6), color=colors)
         self.params.cmap = pg.colormap.get('jet','matplotlib') # prepare a linear color map
@@ -155,7 +159,11 @@ class TimeSynchronizedPlacefieldsPlotter(AnimalTrajectoryPlottingMixin, TimeSync
             curr_plot.addItem(curr_trajectory_curve)
             
             # Update the image:
-            img_item.setImage(image, rect=self.params.image_bounds_extent, autoLevels=False) # rect: [x, y, w, h] # , axisOrder='row-major'
+            if self.params.shared_axis_order is None:
+                img_item.setImage(image, rect=self.params.image_bounds_extent, autoLevels=False) # rect: [x, y, w, h]
+            else:
+                img_item.setImage(image, rect=self.params.image_bounds_extent, autoLevels=False, axisOrder=self.params.shared_axis_order) # rect: [x, y, w, h] # , axisOrder='row-major'
+                        
             img_item.setLookupTable(self.params.cmap.getLookupTable(nPts=256), update=False)
 
             curr_plot.setRange(xRange=self.params.x_range, yRange=self.params.y_range, padding=0.0, update=False, disableAutoRange=True)
@@ -223,7 +231,11 @@ class TimeSynchronizedPlacefieldsPlotter(AnimalTrajectoryPlottingMixin, TimeSync
                 if self.params.drop_below_threshold is not None:
                     image[np.where(occupancy < self.params.drop_below_threshold)] = np.nan # null out the occupancy
             # an_img_item.setImage(np.squeeze(images[i,:,:]))
-            an_img_item.setImage(image, autoLevels=False)
+            
+            if self.params.shared_axis_order is None:
+                an_img_item.setImage(image, autoLevels=False)
+            else:
+                an_img_item.setImage(image, autoLevels=False, axisOrder=self.params.shared_axis_order)
             
             ## Update the current position dot on the figure:
             curr_trajectory_curve = self.ui.other_components_array[i].get('trajectory_curve', None)
@@ -231,8 +243,6 @@ class TimeSynchronizedPlacefieldsPlotter(AnimalTrajectoryPlottingMixin, TimeSync
                 curr_position_row = self.curr_position
                 curr_trajectory_curve.setData(x=curr_position_row.x.to_numpy(), y=curr_position_row.y.to_numpy()) 
             
-            
-        # self.setWindowTitle(f'{self.windowName} - {image_title} t = {curr_t}')
         self.setWindowTitle(f'{image_title} t = {curr_t}')
     
 
