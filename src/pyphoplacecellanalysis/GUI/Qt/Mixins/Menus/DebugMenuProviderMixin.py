@@ -49,7 +49,7 @@ class DebugMenuProviderMixin(BaseMenuProviderMixin):
         """ perform any parameters setting/checking during init """
         BaseMenuProviderMixin.BaseMenuProviderMixin_on_init(self)
         # Define the core object
-        self.activeMenuReference = PhoUIContainer.init_from_dict({'top_level_menu': None, 'actions_dict': {}})
+        self.activeMenuReference = PhoUIContainer.init_from_dict({'top_level_menu': None, 'actions_dict': {}, 'menu_provider_obj': None})
     
     @QtCore.Slot()
     def DebugMenuProviderMixin_on_setup(self):
@@ -97,6 +97,24 @@ class DebugMenuProviderMixin(BaseMenuProviderMixin):
         self._DebugMenuProviderMixin_build_menus()
         self._DebugMenuProviderMixin_build_actions() # the actions actually depend on the existance of the menus for this dynamic menu case
     
+    
+    def _DebugMenuProviderMixin_clear_menu_actions(self):
+        """ empties all submenus of their actions so that they can be freshly updated via self.DebugMenuProviderMixin_on_menus_update() """
+        actions_to_remove = self.activeMenuReference.active_drivers_menu.actions()
+        for an_old_action in actions_to_remove:
+            an_old_action.triggered.disconnect()
+            self.activeMenuReference.active_drivers_menu.removeAction(an_old_action)
+            
+        actions_to_remove = self.activeMenuReference.active_drivables_menu.actions()
+        for an_old_action in actions_to_remove:
+            an_old_action.triggered.disconnect()
+            self.activeMenuReference.active_drivables_menu.removeAction(an_old_action)
+            
+        actions_to_remove = self.activeMenuReference.active_connections_menu.actions()
+        for an_old_action in actions_to_remove:
+            an_old_action.triggered.disconnect()
+            self.activeMenuReference.active_connections_menu.removeAction(an_old_action)
+            
 
     @QtCore.Slot()
     def DebugMenuProviderMixin_on_destroy(self):
@@ -122,6 +140,8 @@ class DebugMenuProviderMixin(BaseMenuProviderMixin):
         """ called to perform updates when the active window changes. Redraw, recompute data, etc.
         TODO: finish implementation
         """
+        self._DebugMenuProviderMixin_clear_menu_actions() # clear the existing menu actions
+        
         ## Update Drivers Menu:
         curr_drivers_items = list(self.connection_man.registered_available_drivers.keys())
         for a_driver_key in curr_drivers_items:

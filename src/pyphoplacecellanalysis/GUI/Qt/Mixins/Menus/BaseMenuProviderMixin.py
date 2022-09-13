@@ -65,17 +65,7 @@ class BaseMenuProviderMixin(QtCore.QObject):
     def root_menu_bar(self):
         """The root_menu_bar property."""
         return self.root_window.menuBar()
-    
-    # @property
-    # def BaseMenuProviderMixin_actionsDict(self):
-    #     raise NotImplementedError # implementor must override with the dictionary name
-    #     return self.root_window.ui.menuDebugActionsDict
-    # @BaseMenuProviderMixin_actionsDict.setter
-    # def BaseMenuProviderMixin_actionsDict(self, value):
-    #     raise NotImplementedError # implementor must override with the dictionary name
-    #     self.root_window.ui.menuDebugActionsDict = value
-    
-    
+
     def __init__(self, render_widget: QtWidgets.QWidget, parent=None, **kwargs):
         """ the __init__ form allows adding menus to extant widgets without modifying their class to inherit from this mixin """
         super(BaseMenuProviderMixin, self).__init__(parent)

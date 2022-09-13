@@ -56,7 +56,7 @@ class CreateLinkedWidget_MenuProvider(BaseMenuProviderMixin):
         
         assert self.has_root_window, "No root window!"
         # Define the core object
-        self.activeMenuReference = PhoUIContainer.init_from_dict({'top_level_menu': None, 'actions_dict': {}})
+        self.activeMenuReference = PhoUIContainer.init_from_dict({'top_level_menu': None, 'actions_dict': {}, 'menu_provider_obj': None})
     
     @QtCore.Slot()
     def CreateLinkedWidget_MenuProvider_on_setup(self):

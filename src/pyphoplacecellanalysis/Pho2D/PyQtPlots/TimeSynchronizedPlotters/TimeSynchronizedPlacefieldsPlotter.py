@@ -39,12 +39,13 @@ class TimeSynchronizedPlacefieldsPlotter(AnimalTrajectoryPlottingMixin, TimeSync
     applicationName = 'TimeSynchronizedPlacefieldsPlotterApp'
     windowName = 'TimeSynchronizedPlacefieldsPlotterWindow'
     
+    
     enable_debug_print = False
     
-    def __init__(self, active_time_dependent_placefields2D, drop_below_threshold: float=0.0000001, max_num_columns = 5, application_name=None, parent=None):
+    def __init__(self, active_time_dependent_placefields2D, drop_below_threshold: float=0.0000001, max_num_columns = 5, application_name=None, window_name=None, parent=None):
         """_summary_
         """
-        super().__init__(application_name=application_name, parent=parent) # Call the inherited classes __init__ method
+        super().__init__(application_name=application_name, window_name=(window_name or TimeSynchronizedPlacefieldsPlotter.windowName), parent=parent) # Call the inherited classes __init__ method
         
         self.active_time_dependent_placefields = active_time_dependent_placefields2D
         
@@ -99,7 +100,6 @@ class TimeSynchronizedPlacefieldsPlotter(AnimalTrajectoryPlottingMixin, TimeSync
         # Paging Management: Constrain the subplots values to just those that you need
         subplot_no_pagination_configuration, self.params.included_combined_indicies_pages, self.params.page_grid_sizes = compute_paginated_grid_config(nMapsToShow, max_num_columns=self.params.max_num_columns, max_subplots_per_page=None, data_indicies=included_unit_indicies, last_figure_subplots_same_layout=True)
         page_idx = 0 # page_idx is zero here because we only have one page:
-        
         
         self.compute_desired_page_aspect_ratio()
         
@@ -276,9 +276,7 @@ class TimeSynchronizedPlacefieldsPlotter(AnimalTrajectoryPlottingMixin, TimeSync
         
         self.params.page_width_height_tuple = page_width_height_tuple
         self.params.page_aspect_ratio = page_aspect_ratio
-         
 
-        
     def desired_widget_size(self, desired_page_height = 600.0, desired_page_width = None, debug_print=True):
         """ Requires that self.compute_desired_page_aspect_ratio has already been called on the target 
         """

@@ -39,7 +39,7 @@ class TimeSynchronizedPlotterBase(QtWidgets.QWidget):
         return self.active_time_dependent_placefields.last_t
 
 
-    def __init__(self, application_name=None, parent=None):
+    def __init__(self, application_name=None, window_name=None, parent=None):
         """_summary_
         """
         super().__init__(parent=parent) # Call the inherited classes __init__ method
@@ -47,9 +47,15 @@ class TimeSynchronizedPlotterBase(QtWidgets.QWidget):
         if application_name is not None:
             self.applicationName = application_name
         else:
-            self.applicationName = TimeSynchronizedPlotterBase.applicationName
+            # self.applicationName = TimeSynchronizedPlotterBase.applicationName
+            self.applicationName = self.applicationName
+            
+        if window_name is not None:
+            self.windowName = window_name
+        else:
+            # self.windowName = TimeSynchronizedPlotterBase.windowName
+            self.windowName = self.windowName
         
-        self.windowName = TimeSynchronizedPlotterBase.windowName
         self.enable_debug_print = TimeSynchronizedPlotterBase.enable_debug_print
         # self.setup()        
         # self.buildUI()

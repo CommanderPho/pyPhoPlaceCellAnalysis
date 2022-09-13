@@ -49,14 +49,14 @@ class TimeSynchronizedPositionDecoderPlotter(AnimalTrajectoryPlottingMixin, Time
         self._update_plots()
     
     
-    def __init__(self, active_one_step_decoder, active_two_step_decoder, drop_below_threshold: float=0.0000001, posterior_variable_to_render='p_x_given_n', application_name=None, parent=None):
+    def __init__(self, active_one_step_decoder, active_two_step_decoder, drop_below_threshold: float=0.0000001, posterior_variable_to_render='p_x_given_n', application_name=None, window_name=None, parent=None):
         """_summary_
         
         ## allows toggling between the various computed occupancies: such as raw counts,  normalized location, and seconds_occupancy
             occupancy_mode_to_render: ['seconds_occupancy', 'num_pos_samples_occupancy', 'num_pos_samples_smoothed_occupancy', 'normalized_occupancy']
         
         """
-        super().__init__(application_name=application_name, parent=parent) # Call the inherited classes __init__ method
+        super().__init__(application_name=application_name, window_name=(window_name or TimeSynchronizedPositionDecoderPlotter.windowName), parent=parent) # Call the inherited classes __init__ method
     
         self.last_window_index = None
         self.last_window_time = None

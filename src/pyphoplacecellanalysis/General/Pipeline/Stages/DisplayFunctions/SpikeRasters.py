@@ -20,6 +20,8 @@ from pyphoplacecellanalysis.GUI.Qt.Mixins.Menus.CreateNewConnectedWidgetMenuMixi
 from pyphoplacecellanalysis.GUI.Qt.Mixins.Menus.DebugMenuProviderMixin import DebugMenuProviderMixin
 from pyphoplacecellanalysis.GUI.Qt.Mixins.Menus.CreateLinkedWidget_MenuProvider import CreateLinkedWidget_MenuProvider
 
+from pyphoplacecellanalysis.GUI.Qt.Mixins.PhoMenuHelper import PhoMenuHelper
+
 
 ## TODO: update these to use the correct format! This format has been invalidated!
 
@@ -87,6 +89,9 @@ class SpikeRastersDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Displa
         spike_raster_window.setWindowFilePath(str(computation_result.sess.filePrefix.resolve()))
         spike_raster_window.setWindowTitle(f'Spike Raster Window - {active_config_name} - {str(computation_result.sess.filePrefix.resolve())}')
         
+        menu_provider_obj_list = []
+        
+        
         ## Adds the custom renderable menu to the top-level menu of the plots in Spike2DRaster
         _active_2d_plot_renderable_menus = LocalMenus_AddRenderable.add_renderable_context_menu(spike_raster_window.spike_raster_plt_2d, computation_result.sess)  # Adds the custom context menus for SpikeRaster2D        
         owning_pipeline_reference = kwargs.get('owning_pipeline', None) # A reference to the pipeline upon which this display function is being called
@@ -105,9 +110,18 @@ class SpikeRastersDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Displa
             createNewConnected_actions_dict = None
             
         # Debug Menu
+        
+        
         _debug_menu_provider = DebugMenuProviderMixin(render_widget=spike_raster_window)
         _debug_menu_provider.DebugMenuProviderMixin_on_init()
         _debug_menu_provider.DebugMenuProviderMixin_on_buildUI()
+        
+        menu_provider_obj_list.append(_debug_menu_provider)
+        # curr_root_window = PhoMenuHelper.try_get_menu_window(spike_raster_window)
+        # curr_root_window.ui.menu.global_window_menus.debug.menu_provider_obj = _debug_menu_provider
+        
+        
+        
         
         ## Adds the custom renderable menu to the top-level menu of the plots in Spike2DRaster
         active_pf_2D_dt = computation_result.computed_data.get('pf2D_dt', None)
@@ -123,12 +137,23 @@ class SpikeRastersDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Displa
                 _createLinkedWidget_menu_provider.CreateLinkedWidget_MenuProvider_on_buildUI(spike_raster_window=spike_raster_window, active_pf_2D_dt=active_pf_2D_dt, display_output=display_output)
             else:
                 print(f'WARNING: owning_pipeline_reference is NONE in  _display_spike_rasters_window!')
+                
+            # spike_raster_window.main_menu_window.ui.menu.global_window_menus.create_linked_widget.menu_provider_obj = _createLinkedWidget_menu_provider
+            # spike_raster_window.root_window.ui.menu.global_window_menus.create_linked_widget.menu_provider_obj = _createLinkedWidget_menu_provider
+            
+            # curr_root_window = PhoMenuHelper.try_get_menu_window(spike_raster_window)
+            # curr_root_window.ui.menu.global_window_menus.create_linked_widget.menu_provider_obj = _createLinkedWidget_menu_provider
+            
+            menu_provider_obj_list.append(_createLinkedWidget_menu_provider)
             
             
         else:
             print(f'active_pf_2D_dt is None! Skipping Create Paired Widget Menu...')
     
-            
-        return {'spike_raster_plt_2d':spike_raster_window.spike_raster_plt_2d, 'spike_raster_plt_3d':spike_raster_window.spike_raster_plt_3d, 'spike_raster_window': spike_raster_window}
+        spike_raster_window.main_menu_window.ui.menus.global_window_menus.debug.menu_provider_obj = _debug_menu_provider
+        spike_raster_window.main_menu_window.ui.menus.global_window_menus.create_linked_widget.menu_provider_obj = _createLinkedWidget_menu_provider
+
+
+        return {'spike_raster_plt_2d':spike_raster_window.spike_raster_plt_2d, 'spike_raster_plt_3d':spike_raster_window.spike_raster_plt_3d, 'spike_raster_window': spike_raster_window, 'menu_provider_obj_list': menu_provider_obj_list}
 
 

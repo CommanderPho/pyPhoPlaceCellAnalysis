@@ -69,6 +69,20 @@ class DynamicDockDisplayAreaContentMixin:
         self.clear_all_display_docks()
 
 
+
+    def get_flat_widgets_list(self, debug_print=False):
+        """ extracts the 'widget' property that is the contents of each added dock item from the self.dynamic_display_dict and returns it as a flat list """
+        all_collected_widgets = []
+        for an_id, an_item in self.dynamic_display_dict.items():
+            if debug_print:
+                print(f'an_id: {an_id}, an_item: {an_item}')
+            for a_sub_id, a_sub_item in an_item.items():
+                if debug_print:
+                    print(f'\ta_sub_id: {a_sub_id}, a_sub_item: {a_sub_item}')
+                a_widget = a_sub_item.get('widget', None)
+                all_collected_widgets.append(a_widget)
+                
+        return all_collected_widgets
     
     def add_display_dock(self, identifier = None, widget = None, dockSize=(300,200), dockIsClosable=True, dockAddLocationOpts=['bottom']):
         """ adds a dynamic display dock with an appropriate widget of type 'viewContentsType' to the dock area container on the main window. """
@@ -232,6 +246,7 @@ class DynamicDockDisplayAreaContentMixin:
         return returned_helper_widget, returned_dock
  
         
+    
 # ==================================================================================================================== #
 class PhoDockAreaContainingWindow(DynamicDockDisplayAreaContentMixin, PhoMainAppWindowBase):
     """ a custom PhoMainAppWindowBase (QMainWindow) subclass that contains a DockArea as its central view.
@@ -262,10 +277,10 @@ class PhoDockAreaContainingWindow(DynamicDockDisplayAreaContentMixin, PhoMainApp
     def buildUI(self):
         self.DynamicDockDisplayAreaContentMixin_on_buildUI()
         
-        
-    
     def closeEvent(self, event):
         # Enables closing all secondary windows when this (main) window is closed.
+        print(f'PhoDockAreaContainingWindow.closeEvent(event: {event})')
+        
         self.GlobalConnectionManagerAccessingMixin_on_destroy()
         self.DynamicDockDisplayAreaContentMixin_on_destroy()
         
@@ -276,19 +291,42 @@ class PhoDockAreaContainingWindow(DynamicDockDisplayAreaContentMixin, PhoMainApp
     ## For GlobalConnectionManagerAccessingMixin conformance:
     ########################################################
     
+    def try_register_widget_if_control(self, a_widget, debug_print=False):
+        if self.connection_man.is_known_driver(a_widget):
+            print(f'\t\ta_widget: {a_widget} is registering as a driver...')
+            self.connection_man.register_driver(a_widget)
+        if self.connection_man.is_known_drivable(a_widget):
+            print(f'\t\ta_widget: {a_widget} is registering as a drivable...')
+            self.connection_man.register_drivable(a_widget)
+    
+    # @QtCore.pyqtSlot()
+    def try_register_any_control_widgets(self):
+        """ called whenever the widgets are updated to try and register widgets as controls """
+        print(f'PhoDockAreaContainingWindow.try_register_any_control_widgets()')
+        flat_widgets_list = self.get_flat_widgets_list()
+        print(f'\tflat_widgets_list contains {len(flat_widgets_list)} items')
+        for a_widget in flat_widgets_list:
+            self.try_register_widget_if_control(a_widget)
+
+    
     # @QtCore.pyqtSlot()
     def GlobalConnectionManagerAccessingMixin_on_setup(self):
         """ perfrom registration of drivers/drivables:"""
         ## TODO: register children
-        pass
-
+        print(f'PhoDockAreaContainingWindow.GlobalConnectionManagerAccessingMixin_on_setup()')
+        self.try_register_any_control_widgets()
+        
+    
     # @QtCore.pyqtSlot()
     def GlobalConnectionManagerAccessingMixin_on_destroy(self):
         """ perfrom teardown/destruction of anything that needs to be manually removed or released """
         ## TODO: unregister children
-        pass
-        
-        
+        print(f'PhoDockAreaContainingWindow.GlobalConnectionManagerAccessingMixin_on_destroy()')
+        flat_widgets_list = self.get_flat_widgets_list()
+        print(f'\tflat_widgets_list contains {len(flat_widgets_list)} items')
+        for a_widget in flat_widgets_list:
+            self.connection_man.unregister_object(a_widget, debug_print=False)
+
             
             
 # ==================================================================================================================== #
