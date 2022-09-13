@@ -25,6 +25,8 @@ from pyphoplacecellanalysis.Pho3D.PyVista.spikeAndPositions import build_active_
 from pyphoplacecellanalysis.GUI.PyVista.InteractivePlotter.InteractiveDataExplorerBase import InteractiveDataExplorerBase
 from pyphoplacecellanalysis.PhoPositionalData.plotting.visualization_window import VisualizationWindow # Used to build "Windows" into the data points such as the window defining the fixed time period preceeding the current time where spikes had recently fired, etc.
 
+from neuropy.utils.debug_helpers import safely_accepts_kwargs
+
 
 class InteractivePlaceCellDataExplorer(GlobalConnectionManagerAccessingMixin, InteractiveDataExplorerBase):
     """ This 3D PyVista GUI displays a map of the animal's environment alongside animatable behavioral data (animal position on the maze, etc) and neural data (spikes, sleep state, ripple status, etc)
@@ -37,6 +39,7 @@ class InteractivePlaceCellDataExplorer(GlobalConnectionManagerAccessingMixin, In
     
     
     """
+    @safely_accepts_kwargs
     def __init__(self, active_config, active_session, extant_plotter=None):
         # super().__init__(active_config, active_session, extant_plotter)
         super(InteractivePlaceCellDataExplorer, self).__init__(active_config, active_session, extant_plotter, data_explorer_name='CellSpikePositionDataExplorer')

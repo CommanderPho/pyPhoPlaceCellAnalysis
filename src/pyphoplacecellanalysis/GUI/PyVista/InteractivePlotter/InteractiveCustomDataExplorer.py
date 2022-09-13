@@ -12,6 +12,7 @@ from pyvistaqt.plotting import MultiPlotter
 from pyphoplacecellanalysis.Pho3D.PyVista.spikeAndPositions import perform_plot_flat_arena
 from pyphoplacecellanalysis.GUI.PyVista.InteractivePlotter.InteractiveDataExplorerBase import InteractiveDataExplorerBase
 
+# from neuropy.utils.debug_helpers import safely_accepts_kwargs
 
 class InteractiveCustomDataExplorer(InteractiveDataExplorerBase):
     """ This class is the minimal concrete implementation of the abstract InteractiveDataExplorerBase.
