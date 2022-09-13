@@ -5,7 +5,7 @@ import numpy as np
 
 from neuropy.core.neuron_identities import NeuronIdentity, build_units_colormap, PlotStringBrevityModeEnum
 from neuropy.utils.result_context import IdentifyingContext
-
+from pyphocorehelpers.DataStructure.dynamic_parameters import DynamicParameters # to replace simple PlacefieldComputationParameters
 
 from pyphoplacecellanalysis.General.Pipeline.Stages.Computation import ComputedPipelineStage
 from pyphoplacecellanalysis.General.Pipeline.Stages.BaseNeuropyPipelineStage import PipelineStage
@@ -222,6 +222,10 @@ class PipelineWithDisplayPipelineStageMixin:
         assert (self.is_computed), "Current self.is_computed must be true. Call self.perform_computations to reach this step."
         self.stage = DisplayPipelineStage(self.stage)  # build the Display stage
         
+        # Empty the dicts:
+        self.filtered_contexts = DynamicParameters()
+        self.display_output = DynamicParameters()
+        
         active_identifying_session_ctx = self.sess.get_context() # 'bapun_RatN_Day4_2019-10-15_11-30-06'
         
         # Loops through all the configs and ensure that they have the neuron identity info if they need it.
@@ -276,13 +280,8 @@ class PipelineWithDisplayPipelineStageMixin:
         if kwarg_active_config_name is not None:
             assert kwarg_active_config_name == active_session_configuration_name # they better be equal or else there is a conflict.
 
-            
-                
         return display_function(self.computation_results[active_session_configuration_name], self.active_configs[active_session_configuration_name], owning_pipeline=self, active_config_name=active_session_configuration_name, **kwargs)
     
-    
-        # return display_function(self.computation_results[active_session_filter_configuration], self.active_configs[active_session_filter_configuration], **kwargs)
-
 
 class DisplayPipelineStage(DefaultRegisteredDisplayFunctions, ComputedPipelineStage):
     """ The concrete pipeline stage for displaying the output computed in previous stages."""
