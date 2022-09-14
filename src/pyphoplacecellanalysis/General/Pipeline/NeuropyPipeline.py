@@ -286,6 +286,9 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
     def __setstate__(self, state):
         # Restore instance attributes (i.e., _mapping and _keys_at_init).
         self.__dict__.update(state)
+        # Call the superclass __init__() (from https://stackoverflow.com/a/48325758)
+        super(NeuropyPipeline, self).__init__() # from 
+        
         # Restore unpickable properties:
         self.logger = pipeline_module_logger
         self.logger.info(f'NeuropyPipeline.__setstate__(state="{state}")')
