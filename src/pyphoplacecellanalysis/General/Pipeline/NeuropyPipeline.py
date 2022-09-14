@@ -255,6 +255,7 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
             if debug_print:
                 print(f'common_filter_names: {common_filter_names}')
             if len(novel_filter_names) > 0:
+                self.logger.info(f'novel_filter_names: {novel_filter_names}')
                 print(f'novel_filter_names: {novel_filter_names}')
             ## Deal with filters with the same name, but different filter functions:
             changed_filters_names_list = [a_config_name for a_config_name in common_filter_names if (inspect.getsource(prev_session_filter_configurations[a_config_name]) != inspect.getsource(active_session_filter_configurations[a_config_name]))] # changed_filters_names_list: a list of filter names for filters that have changed but have the same name
@@ -268,11 +269,11 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
                 unprocessed_filters[a_novel_filter_name] = active_session_filter_configurations[a_novel_filter_name]
 
             ## TODO: filter for the new and changed filters here:
-            self.stage.select_filters(unprocessed_filters, clear_filtered_results=False) # select filters when done
+            self.stage.select_filters(unprocessed_filters, clear_filtered_results=False, progress_logger=self.logger) # select filters when done
     
         else:
             self.stage = ComputedPipelineStage(self.stage)
-            self.stage.select_filters(active_session_filter_configurations) # select filters when done
+            self.stage.select_filters(active_session_filter_configurations, progress_logger=self.logger) # select filters when done
        
     
 
@@ -306,44 +307,8 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
         ## Build Pickle Path:
         finalized_loaded_sess_pickle_path = Path(self.sess.basepath).joinpath(active_pickle_filename).resolve()
         print(f'finalized_loaded_sess_pickle_path: {finalized_loaded_sess_pickle_path}')
+        self.logger.info(f'finalized_loaded_sess_pickle_path: {finalized_loaded_sess_pickle_path}')
         # Save reloaded pipeline out to pickle for future loading
         saveData(finalized_loaded_sess_pickle_path, db=self) # Save the pipeline out to pickle.
         return finalized_loaded_sess_pickle_path
         
-
-    @staticmethod
-    def try_load_pickled_pipeline_or_reload_if_needed(active_data_mode_name, active_data_mode_type_properties, basedir, override_post_load_functions=None, force_reload=False, active_pickle_filename='loadedSessPickle.pkl', skip_save=False, debug_print=False):
-        """ After a session has completed the loading stage prior to filtering (after all objects are built and such), it can be pickled to a file to drastically speed up future loading requests (as would have to be done when the notebook is restarted, etc) 
-        Tries to find an extant pickled pipeline, and if it exists it loads and returns that. Otherwise, it loads/rebuilds the pipeline from scratch (from the initial raw data files) and then saves a pickled copy out to disk to speed up future loading attempts.
-        
-        # skip_save: Bool - if True, the resultant pipeline is not saved to the pickle when done
-        
-        """
-        ## Build Pickle Path:
-        finalized_loaded_sess_pickle_path = Path(basedir).joinpath(active_pickle_filename).resolve()
-        print(f'finalized_loaded_sess_pickle_path: {finalized_loaded_sess_pickle_path}')
-
-        if not force_reload:
-            try:
-                loaded_pipeline = loadData(finalized_loaded_sess_pickle_path, debug_print=debug_print)
-            except (FileNotFoundError):
-                # loading failed
-                print(f'Failure loading {finalized_loaded_sess_pickle_path}.')
-                loaded_pipeline = None
-
-        else:
-            # Otherwise force recompute:
-            print(f'Skipping loading from pickled file because force_reload == True.')
-            loaded_pipeline = None
-
-        if loaded_pipeline is not None:
-            print(f'Loading pickled pipeline success: {finalized_loaded_sess_pickle_path}.')
-            curr_active_pipeline = loaded_pipeline
-        else:
-            # Otherwise load failed, perform the fallback computation
-            print(f'Must reload/rebuild.')
-            curr_active_pipeline = NeuropyPipeline.init_from_known_data_session_type(active_data_mode_name, active_data_mode_type_properties, override_basepath=Path(basedir), override_post_load_functions=override_post_load_functions)
-            # Save reloaded pipeline out to pickle for future loading
-            if not skip_save:
-                saveData(finalized_loaded_sess_pickle_path, db=curr_active_pipeline) # 589 MB
-        return curr_active_pipeline, finalized_loaded_sess_pickle_path

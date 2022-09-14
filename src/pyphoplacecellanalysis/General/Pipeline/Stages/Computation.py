@@ -22,108 +22,10 @@ import pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions
 # from General.Pipeline.Stages.ComputationFunctions import ComputationFunctionRegistryHolder # should include ComputationFunctionRegistryHolder and all specifics
 from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.ComputationFunctionRegistryHolder import ComputationFunctionRegistryHolder
 
-class PipelineWithComputedPipelineStageMixin:
-    """ To be added to the pipeline to enable conveninece access ot its pipeline stage post Computed stage. """
-    ## Computed Properties:
-    @property
-    def is_computed(self):
-        """The is_computed property. TODO: Needs validation/Testing """
-        return (self.can_compute and (self.computation_results is not None) and (len(self.computation_results) > 0))
-        # return (self.stage is not None) and (isinstance(self.stage, ComputedPipelineStage) and (self.computation_results is not None) and (len(self.computation_results) > 0))
 
-    @property
-    def can_compute(self):
-        """The can_compute property."""
-        return (self.last_completed_stage >= PipelineStage.Filtered)
-
-    @property
-    def computation_results(self):
-        """The computation_results property, accessed through the stage."""
-        return self.stage.computation_results
-    
-    @property
-    def active_completed_computation_result_names(self):
-        """The this list of all computed configs."""        
-        # return self.stage._get_valid_computation_results_config_names()
-        return self.stage._get_computation_results_progress()[0] # get [0] because it returns complete_computed_config_names_list, incomplete_computed_config_dict
-    
-    @property
-    def active_incomplete_computation_result_status_dicts(self):
-        """The this dict containing all the incompletely computed configs and their reason for being incomplete."""
-        return self.stage._get_computation_results_progress()[1] # get [0] because it returns complete_computed_config_names_list, incomplete_computed_config_dict
-    
-    @property
-    def registered_computation_functions(self):
-        """The registered_computation_functions property."""
-        return self.stage.registered_computation_functions
-        
-    @property
-    def registered_computation_function_names(self):
-        """The registered_computation_function_names property."""
-        return self.stage.registered_computation_function_names
-    
-    @property
-    def registered_computation_function_dict(self):
-        """The registered_computation_function_dict property can be used to get the corresponding function from the string name."""
-        return self.stage.registered_computation_function_dict
-    
-    @property
-    def registered_computation_function_docs_dict(self):
-        """Returns the doc strings for each registered computation function. This is taken from their docstring at the start of the function defn, and provides an overview into what the function will do."""
-        return {a_fn_name:a_fn.__doc__ for a_fn_name, a_fn in self.registered_computation_function_dict.items()}
-    
-    def reload_default_computation_functions(self):
-        """ reloads/re-registers the default display functions after adding a new one """
-        self.stage.reload_default_computation_functions()
-        
-    def register_computation(self, registered_name, computation_function):
-        assert (self.can_compute), "Current self.stage must already be a ComputedPipelineStage. Call self.filter_sessions with filter configs to reach this step."
-        self.stage.register_computation(registered_name, computation_function)
-
-        
-    ## Computation Helpers: 
-    def perform_computations(self, active_computation_params: Optional[DynamicParameters]=None, enabled_filter_names=None, overwrite_extant_results=False, computation_functions_name_whitelist=None, computation_functions_name_blacklist=None, fail_on_exception:bool=False, debug_print=False):
-        assert (self.can_compute), "Current self.stage must already be a ComputedPipelineStage. Call self.filter_sessions with filter configs to reach this step."
-        
-        
-        self.stage.evaluate_single_computation_params(active_computation_params, enabled_filter_names=enabled_filter_names, overwrite_extant_results=overwrite_extant_results, computation_functions_name_whitelist=computation_functions_name_whitelist, computation_functions_name_blacklist=computation_functions_name_blacklist, fail_on_exception=fail_on_exception, progress_logger_callback=(lambda x: self.logger.info(x)), debug_print=debug_print)
-        
-    def perform_registered_computations(self, previous_computation_result=None, computation_functions_name_whitelist=None, computation_functions_name_blacklist=None, fail_on_exception:bool=False, debug_print=False):
-        assert (self.can_compute), "Current self.stage must already be a ComputedPipelineStage. Call self.perform_computations to reach this step."
-        self.stage.perform_registered_computations(previous_computation_result, computation_functions_name_whitelist=computation_functions_name_whitelist, computation_functions_name_blacklist=computation_functions_name_blacklist, fail_on_exception=fail_on_exception, debug_print=debug_print)
-    
-    def rerun_failed_computations(self, previous_computation_result, fail_on_exception:bool=False, debug_print=False):
-        """ retries the computation functions that previously failed and resulted in accumulated_errors in the previous_computation_result """
-        return self.stage.rerun_failed_computations(previous_computation_result, fail_on_exception=fail_on_exception, debug_print=debug_print)
-    
-    
-    # Utility/Debugging Functions:
-    def perform_drop_computed_items(self, config_names_to_drop = ['maze1_rippleOnly', 'maze2_rippleOnly']):
-        """ Loops through all the configs and ensure that they have the neuron identity info if they need it.
-        2022-09-13 - Unfinished 
-        """
-        # config_names_to_drop
-        print(f'_drop_computed_items(config_names_to_drop: {config_names_to_drop}):\n\tpre keys: {list(self.active_configs.keys())}')
-        
-        for a_config_name in config_names_to_drop:
-            a_config_to_drop = self.active_configs.pop(a_config_name, None)
-            if a_config_to_drop is not None:
-                print(f'\tpreparing to drop: {a_config_name}')
-                ## TODO: filtered_sessions, filtered_epochs
-                # curr_active_pipeline.active_configs
-                # curr_active_pipeline.filtered_contexts[a_config_name]
-                _dropped_computation_results = self.computation_results.pop(a_config_name, None)
-                a_filter_context_to_drop = self.filtered_contexts.pop(a_config_name, None)
-                if a_filter_context_to_drop is not None:
-                    _dropped_display_items = self.display_output.pop(a_filter_context_to_drop, None)
-
-            print(f'\t dropped.')
-            
-        print(f'\tpost keys: {list(self.active_configs.keys())}')
-
-
-
-
+# ==================================================================================================================== #
+# PIPELINE STAGE                                                                                                       #
+# ==================================================================================================================== #
 class ComputedPipelineStage(LoadableInput, LoadableSessionInput, FilterablePipelineStage, BaseNeuropyPipelineStage):
     """Docstring for ComputedPipelineStage."""
     identity: PipelineStage = PipelineStage.Computed
@@ -409,6 +311,108 @@ class ComputedPipelineStage(LoadableInput, LoadableSessionInput, FilterablePipel
             if debug_print:
                 print(f'No registered_computation_functions, skipping extended computations.')
             return previous_computation_result # just return the unaltered result
+
+# ==================================================================================================================== #
+# PIPELINE MIXIN                                                                                                       #
+# ==================================================================================================================== #
+class PipelineWithComputedPipelineStageMixin:
+    """ To be added to the pipeline to enable conveninece access ot its pipeline stage post Computed stage. """
+    ## Computed Properties:
+    @property
+    def is_computed(self):
+        """The is_computed property. TODO: Needs validation/Testing """
+        return (self.can_compute and (self.computation_results is not None) and (len(self.computation_results) > 0))
+        # return (self.stage is not None) and (isinstance(self.stage, ComputedPipelineStage) and (self.computation_results is not None) and (len(self.computation_results) > 0))
+
+    @property
+    def can_compute(self):
+        """The can_compute property."""
+        return (self.last_completed_stage >= PipelineStage.Filtered)
+
+    @property
+    def computation_results(self):
+        """The computation_results property, accessed through the stage."""
+        return self.stage.computation_results
+    
+    @property
+    def active_completed_computation_result_names(self):
+        """The this list of all computed configs."""        
+        # return self.stage._get_valid_computation_results_config_names()
+        return self.stage._get_computation_results_progress()[0] # get [0] because it returns complete_computed_config_names_list, incomplete_computed_config_dict
+    
+    @property
+    def active_incomplete_computation_result_status_dicts(self):
+        """The this dict containing all the incompletely computed configs and their reason for being incomplete."""
+        return self.stage._get_computation_results_progress()[1] # get [0] because it returns complete_computed_config_names_list, incomplete_computed_config_dict
+    
+    @property
+    def registered_computation_functions(self):
+        """The registered_computation_functions property."""
+        return self.stage.registered_computation_functions
+        
+    @property
+    def registered_computation_function_names(self):
+        """The registered_computation_function_names property."""
+        return self.stage.registered_computation_function_names
+    
+    @property
+    def registered_computation_function_dict(self):
+        """The registered_computation_function_dict property can be used to get the corresponding function from the string name."""
+        return self.stage.registered_computation_function_dict
+    
+    @property
+    def registered_computation_function_docs_dict(self):
+        """Returns the doc strings for each registered computation function. This is taken from their docstring at the start of the function defn, and provides an overview into what the function will do."""
+        return {a_fn_name:a_fn.__doc__ for a_fn_name, a_fn in self.registered_computation_function_dict.items()}
+    
+    def reload_default_computation_functions(self):
+        """ reloads/re-registers the default display functions after adding a new one """
+        self.stage.reload_default_computation_functions()
+        
+    def register_computation(self, registered_name, computation_function):
+        assert (self.can_compute), "Current self.stage must already be a ComputedPipelineStage. Call self.filter_sessions with filter configs to reach this step."
+        self.stage.register_computation(registered_name, computation_function)
+
+        
+    ## Computation Helpers: 
+    def perform_computations(self, active_computation_params: Optional[DynamicParameters]=None, enabled_filter_names=None, overwrite_extant_results=False, computation_functions_name_whitelist=None, computation_functions_name_blacklist=None, fail_on_exception:bool=False, debug_print=False):
+        assert (self.can_compute), "Current self.stage must already be a ComputedPipelineStage. Call self.filter_sessions with filter configs to reach this step."
+        
+        
+        self.stage.evaluate_single_computation_params(active_computation_params, enabled_filter_names=enabled_filter_names, overwrite_extant_results=overwrite_extant_results, computation_functions_name_whitelist=computation_functions_name_whitelist, computation_functions_name_blacklist=computation_functions_name_blacklist, fail_on_exception=fail_on_exception, progress_logger_callback=(lambda x: self.logger.info(x)), debug_print=debug_print)
+        
+    def perform_registered_computations(self, previous_computation_result=None, computation_functions_name_whitelist=None, computation_functions_name_blacklist=None, fail_on_exception:bool=False, debug_print=False):
+        assert (self.can_compute), "Current self.stage must already be a ComputedPipelineStage. Call self.perform_computations to reach this step."
+        self.stage.perform_registered_computations(previous_computation_result, computation_functions_name_whitelist=computation_functions_name_whitelist, computation_functions_name_blacklist=computation_functions_name_blacklist, fail_on_exception=fail_on_exception, debug_print=debug_print)
+    
+    def rerun_failed_computations(self, previous_computation_result, fail_on_exception:bool=False, debug_print=False):
+        """ retries the computation functions that previously failed and resulted in accumulated_errors in the previous_computation_result """
+        return self.stage.rerun_failed_computations(previous_computation_result, fail_on_exception=fail_on_exception, debug_print=debug_print)
+    
+    
+    # Utility/Debugging Functions:
+    def perform_drop_computed_items(self, config_names_to_drop = ['maze1_rippleOnly', 'maze2_rippleOnly']):
+        """ Loops through all the configs and ensure that they have the neuron identity info if they need it.
+        2022-09-13 - Unfinished 
+        """
+        # config_names_to_drop
+        print(f'_drop_computed_items(config_names_to_drop: {config_names_to_drop}):\n\tpre keys: {list(self.active_configs.keys())}')
+        
+        for a_config_name in config_names_to_drop:
+            a_config_to_drop = self.active_configs.pop(a_config_name, None)
+            if a_config_to_drop is not None:
+                print(f'\tpreparing to drop: {a_config_name}')
+                ## TODO: filtered_sessions, filtered_epochs
+                # curr_active_pipeline.active_configs
+                # curr_active_pipeline.filtered_contexts[a_config_name]
+                _dropped_computation_results = self.computation_results.pop(a_config_name, None)
+                a_filter_context_to_drop = self.filtered_contexts.pop(a_config_name, None)
+                if a_filter_context_to_drop is not None:
+                    _dropped_display_items = self.display_output.pop(a_filter_context_to_drop, None)
+
+            print(f'\t dropped.')
+            
+        print(f'\tpost keys: {list(self.active_configs.keys())}')
 
     
         

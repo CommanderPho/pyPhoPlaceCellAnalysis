@@ -115,26 +115,63 @@ def update_figure_files_output_path(computation_result, active_config, root_outp
     return active_config
     
 
-class DefaultRegisteredDisplayFunctions:
-    """ Simply enables specifying the default computation functions that will be defined in this file and automatically registered. 
+# ==================================================================================================================== #
+# PIPELINE STAGE                                                                                                       #
+# ==================================================================================================================== #
+class DisplayPipelineStage(ComputedPipelineStage):
+    """ The concrete pipeline stage for displaying the output computed in previous stages."""
+    identity: PipelineStage = PipelineStage.Displayed
     
-    Known Uses:
-        DisplayPipelineStage conforms to DefaultRegisteredDisplayFunctions to allow it to call self.register_default_known_display_functions() during its .__init__(...)
-    """
+    def __init__(self, computed_stage: ComputedPipelineStage, display_output=None, render_actions=None, filtered_contexts=None):
+        # super(DisplayPipelineStage, self).__init__()
+        # ComputedPipelineStage fields:
+        self.stage_name = computed_stage.stage_name
+        self.basedir = computed_stage.basedir
+        self.loaded_data = computed_stage.loaded_data
+        self.filtered_sessions = computed_stage.filtered_sessions
+        self.filtered_epochs = computed_stage.filtered_epochs
+        self.active_configs = computed_stage.active_configs # active_config corresponding to each filtered session/epoch
+        self.computation_results = computed_stage.computation_results
+        self.registered_computation_function_dict = computed_stage.registered_computation_function_dict
+
+        # Initialize custom fields:
+        self.display_output = display_output or DynamicParameters()
+        self.render_actions = render_actions or DynamicParameters()
+        self.filtered_contexts = filtered_contexts or DynamicParameters() # None by default, otherwise IdentifyingContext
+        self.registered_display_function_dict = OrderedDict()
+        self.register_default_known_display_functions() # registers the default display functions
+        
+    @property
+    def registered_display_functions(self):
+        """The registered_display_functions property."""
+        return list(self.registered_display_function_dict.values()) 
+        
+    @property
+    def registered_display_function_names(self):
+        """The registered_display_function_names property."""
+        return list(self.registered_display_function_dict.keys()) 
     
     def register_default_known_display_functions(self):
         """ Registers all known display functions 
-        
         Called in:
             DisplayPipelineStage.__init__(...): to register display functions
         """
         for (a_display_class_name, a_display_class) in DisplayFunctionRegistryHolder.get_registry().items():
             for (a_display_fn_name, a_display_fn) in a_display_class.get_all_functions(use_definition_order=False):
                 self.register_display_function(a_display_fn_name, a_display_fn)
-        
-    
-  
 
+    def reload_default_display_functions(self):
+        """ reloads/re-registers the default display functions after adding a new one """
+        self.register_default_known_display_functions()
+        
+        
+    def register_display_function(self, registered_name, display_function):
+        """ registers a new custom display function"""
+        self.registered_display_function_dict[registered_name] = display_function
+        
+# ==================================================================================================================== #
+# PIPELINE MIXIN                                                                                                       #
+# ==================================================================================================================== #
 class PipelineWithDisplayPipelineStageMixin:
     """ To be added to the pipeline to enable conveninece access ot its pipeline stage post Display stage. """
     ## Display Stage Properties:
@@ -256,46 +293,3 @@ class PipelineWithDisplayPipelineStageMixin:
 
         return display_function(self.computation_results[active_session_configuration_name], self.active_configs[active_session_configuration_name], owning_pipeline=self, active_config_name=active_session_configuration_name, **kwargs)
     
-
-class DisplayPipelineStage(DefaultRegisteredDisplayFunctions, ComputedPipelineStage):
-    """ The concrete pipeline stage for displaying the output computed in previous stages."""
-    identity: PipelineStage = PipelineStage.Displayed
-    
-    def __init__(self, computed_stage: ComputedPipelineStage, display_output=None, render_actions=None, filtered_contexts=None):
-        # super(DisplayPipelineStage, self).__init__()
-        # ComputedPipelineStage fields:
-        self.stage_name = computed_stage.stage_name
-        self.basedir = computed_stage.basedir
-        self.loaded_data = computed_stage.loaded_data
-        self.filtered_sessions = computed_stage.filtered_sessions
-        self.filtered_epochs = computed_stage.filtered_epochs
-        self.active_configs = computed_stage.active_configs # active_config corresponding to each filtered session/epoch
-        self.computation_results = computed_stage.computation_results
-        self.registered_computation_function_dict = computed_stage.registered_computation_function_dict
-
-        # Initialize custom fields:
-        self.display_output = display_output or DynamicParameters()
-        self.render_actions = render_actions or DynamicParameters()
-        self.filtered_contexts = filtered_contexts or DynamicParameters() # None by default, otherwise IdentifyingContext
-        self.registered_display_function_dict = OrderedDict()
-        self.register_default_known_display_functions() # registers the default display functions
-        
-    @property
-    def registered_display_functions(self):
-        """The registered_display_functions property."""
-        return list(self.registered_display_function_dict.values()) 
-        
-    @property
-    def registered_display_function_names(self):
-        """The registered_display_function_names property."""
-        return list(self.registered_display_function_dict.keys()) 
-    
-    
-    def reload_default_display_functions(self):
-        """ reloads/re-registers the default display functions after adding a new one """
-        self.register_default_known_display_functions()
-        
-    def register_display_function(self, registered_name, display_function):
-        """ registers a new custom display function"""
-        self.registered_display_function_dict[registered_name] = display_function
-        

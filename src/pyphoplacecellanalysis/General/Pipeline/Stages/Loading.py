@@ -48,7 +48,8 @@ def loadData(pkl_path, debug_print=False):
 # BEGIN STAGE/PIPELINE IMPLEMENTATION                                                                                  #
 # ==================================================================================================================== #
 
-
+# ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ #
+# COMMON INPUT/LOADING MIXINS IMPLEMENTATION                                                                           #
 class LoadableInput:
     def _check(self):
         assert (self.load_function is not None), "self.load_function must be a valid single-argument load function that isn't None!"
@@ -67,8 +68,6 @@ class LoadableInput:
         self.loaded_data["sess"] = self.load_function(self.basedir)
         
         pass
-
-
 
 class LoadableSessionInput:
     """ Provides session (self.sess) and other helper properties to Stages that load a session """
@@ -99,10 +98,14 @@ class LoadableSessionInput:
     def session_name(self, value):
         self.sess.name = value
 
+# ____________________________________________________________________________________________________________________ #
 
 
-
-
+# ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ #
+# INPUT STAGE IMPLEMENTATION                                                                                           #
+# ==================================================================================================================== #
+# PIPELINE STAGE                                                                                                       #
+# ==================================================================================================================== #
 @dataclass
 class InputPipelineStage(LoadableInput, BaseNeuropyPipelineStage):
     """Docstring for InputPipelineStage.
@@ -113,37 +116,9 @@ class InputPipelineStage(LoadableInput, BaseNeuropyPipelineStage):
     basedir: Path = Path("")
     load_function: Callable = None
     post_load_functions: List[Callable] = dataclasses.field(default_factory=list)
-
-
-
-class LoadedPipelineStage(LoadableInput, LoadableSessionInput, BaseNeuropyPipelineStage):
-    """Docstring for LoadedPipelineStage."""
-    identity: PipelineStage = PipelineStage.Loaded
-    loaded_data: dict = None
-
-    def __init__(self, input_stage: InputPipelineStage):
-        self.stage_name = input_stage.stage_name
-        self.basedir = input_stage.basedir
-        self.loaded_data = input_stage.loaded_data
-        self.post_load_functions = input_stage.post_load_functions # the functions to be called post load
-
-
-    def post_load(self, debug_print=False):
-        """ Called after load is complete to post-process the data """
-        if (len(self.post_load_functions) > 0):
-            if debug_print:
-                print(f'Performing on_post_load(...) with {len(self.post_load_functions)} post_load_functions...')
-            # self.sess = compose_functions(self.post_load_functions, self.sess)
-            composed_post_load_function = compose_functions(*self.post_load_functions) # functions are composed left-to-right
-            self.sess = composed_post_load_function(self.sess)
-            
-        else:
-            if debug_print:
-                print(f'No post_load_functions, skipping post_load.')
-
-        
-
-
+# ==================================================================================================================== #
+# PIPELINE MIXIN                                                                                                       #
+# ==================================================================================================================== #
 class PipelineWithInputStage:
     """ Has an input stage. """
     def set_input(self, session_data_type:str='', basedir="", load_function: Callable = None, post_load_functions: List[Callable] = [], auto_load=True, **kwargs):
@@ -177,8 +152,45 @@ class PipelineWithInputStage:
         if auto_load:
             self.load()
 
+# ____________________________________________________________________________________________________________________ #
 
-       
+
+# ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ #
+# LOADING STAGE IMPLEMENTATION                                                                                         #
+# ==================================================================================================================== #
+# PIPELINE STAGE                                                                                                       #
+# ==================================================================================================================== #
+class LoadedPipelineStage(LoadableInput, LoadableSessionInput, BaseNeuropyPipelineStage):
+    """Docstring for LoadedPipelineStage."""
+    identity: PipelineStage = PipelineStage.Loaded
+    loaded_data: dict = None
+
+    def __init__(self, input_stage: InputPipelineStage):
+        self.stage_name = input_stage.stage_name
+        self.basedir = input_stage.basedir
+        self.loaded_data = input_stage.loaded_data
+        self.post_load_functions = input_stage.post_load_functions # the functions to be called post load
+
+
+    def post_load(self, progress_logger=None, debug_print=False):
+        """ Called after load is complete to post-process the data """
+        if (len(self.post_load_functions) > 0):
+            if debug_print:
+                print(f'Performing on_post_load(...) with {len(self.post_load_functions)} post_load_functions...')
+            if progress_logger is not None:
+                progress_logger.debug(f'Performing on_post_load(...) with {len(self.post_load_functions)} post_load_functions...')
+            # self.sess = compose_functions(self.post_load_functions, self.sess)
+            composed_post_load_function = compose_functions(*self.post_load_functions) # functions are composed left-to-right
+            self.sess = composed_post_load_function(self.sess)
+            
+        else:
+            if debug_print:
+                print(f'No post_load_functions, skipping post_load.')
+            if progress_logger is not None:
+                progress_logger.debug(f'No post_load_functions, skipping post_load.')
+# ==================================================================================================================== #
+# PIPELINE MIXIN                                                                                                       #
+# ==================================================================================================================== #
 class PipelineWithLoadableStage:
     """ Has a lodable stage. """
     
@@ -200,5 +212,7 @@ class PipelineWithLoadableStage:
     def load(self):
         self.stage.load()  # perform the load operation:
         self.stage = LoadedPipelineStage(self.stage)  # build the loaded stage
-        self.stage.post_load()
+        self.stage.post_load(progress_logger=self.logger)
+
+        
 
