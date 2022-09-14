@@ -12,24 +12,29 @@ import inspect # used for filter_sessions(...)'s inspect.getsource to compare fi
 
 import numpy as np
 import pandas as pd
-from pyphoplacecellanalysis.General.Pipeline.Stages.Computation import PipelineWithComputedPipelineStageMixin, ComputedPipelineStage
-from pyphoplacecellanalysis.General.Pipeline.Stages.Display import PipelineWithDisplayPipelineStageMixin
-from pyphoplacecellanalysis.General.Pipeline.Stages.Filtering import FilteredPipelineMixin
-from pyphoplacecellanalysis.General.Pipeline.Stages.Loading import PipelineWithInputStage, PipelineWithLoadableStage, loadData, saveData
-
-# from pyphoplacecellanalysis.General.SessionSelectionAndFiltering import batch_filter_session
-from neuropy.core.session.KnownDataSessionTypeProperties import KnownDataSessionTypeProperties
-from pyphoplacecellanalysis.General.Pipeline.Stages.BaseNeuropyPipelineStage import PipelineStage
 
 # NeuroPy (Diba Lab Python Repo) Loading
 from neuropy import core
 importlib.reload(core)
 
 from neuropy.core.session.Formats.BaseDataSessionFormats import DataSessionFormatRegistryHolder # hopefully this works without all the other imports
+from neuropy.core.session.KnownDataSessionTypeProperties import KnownDataSessionTypeProperties
 
+from pyphoplacecellanalysis.General.Pipeline.Stages.Computation import PipelineWithComputedPipelineStageMixin, ComputedPipelineStage
+from pyphoplacecellanalysis.General.Pipeline.Stages.Display import PipelineWithDisplayPipelineStageMixin
+from pyphoplacecellanalysis.General.Pipeline.Stages.Filtering import FilteredPipelineMixin
+from pyphoplacecellanalysis.General.Pipeline.Stages.Loading import PipelineWithInputStage, PipelineWithLoadableStage, loadData, saveData
+from pyphoplacecellanalysis.General.Pipeline.Stages.BaseNeuropyPipelineStage import PipelineStage
 
+from qtpy import QtCore, QtWidgets, QtGui
 
-class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, FilteredPipelineMixin, PipelineWithComputedPipelineStageMixin, PipelineWithDisplayPipelineStageMixin):
+# Pipeline Logging:
+import logging
+# from pyphoplacecellanalysis.General.Pipeline.Stages.BaseNeuropyPipelineStage import pipeline_module_logger
+from pyphocorehelpers.print_helpers import build_module_logger
+pipeline_module_logger = build_module_logger('Spike3D.pipeline')
+
+class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, FilteredPipelineMixin, PipelineWithComputedPipelineStageMixin, PipelineWithDisplayPipelineStageMixin, QtCore.QObject):
     """ 
     
     Exposes the active sessions via its .sess member.
@@ -49,11 +54,16 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
 
     """
     
-    def __init__(self, name="pipeline", session_data_type='kdiba', basedir=None, load_function: Callable = None, post_load_functions: List[Callable] = []):
-        # super(NeuropyPipeline, self).__init__()
+    sigStageChanged = QtCore.Signal() # Emitted when the pipeline stage changes
+    
+    
+    def __init__(self, name="pipeline", session_data_type='kdiba', basedir=None, load_function: Callable = None, post_load_functions: List[Callable] = [], parent=None, **kwargs):
+        super(NeuropyPipeline, self).__init__(parent, **kwargs)
         self.pipeline_name = name
         self.session_data_type = None
         self.stage = None
+        self.logger = pipeline_module_logger
+        self.logger.info(f'NeuropyPipeline.__init__(name="{name}", session_data_type="{session_data_type}", basedir="{basedir}")')
         self.set_input(name=name, session_data_type=session_data_type, basedir=basedir, load_function=load_function, post_load_functions=post_load_functions)
 
 
@@ -74,9 +84,12 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
 
 
     @classmethod
-    def try_init_from_saved_pickle_or_reload_if_needed(cls, type_name: str, known_type_properties: KnownDataSessionTypeProperties, override_basepath=None, override_post_load_functions=None, force_reload=False, active_pickle_filename='loadedSessPickle.pkl'):
+    def try_init_from_saved_pickle_or_reload_if_needed(cls, type_name: str, known_type_properties: KnownDataSessionTypeProperties, override_basepath=None, override_post_load_functions=None, force_reload=False, active_pickle_filename='loadedSessPickle.pkl', skip_save=False):
         """ After a session has completed the loading stage prior to filtering (after all objects are built and such), it can be pickled to a file to drastically speed up future loading requests (as would have to be done when the notebook is restarted, etc) 
         Tries to find an extant pickled pipeline, and if it exists it loads and returns that. Otherwise, it loads/rebuilds the pipeline from scratch (from the initial raw data files) and then saves a pickled copy out to disk to speed up future loading attempts.
+        
+        # skip_save: Bool - if True, the resultant pipeline is not saved to the pickle when done
+        
         """
         def _ensure_unpickled_pipeline_up_to_date(curr_active_pipeline, active_data_mode_name, basedir, desired_time_variable_name, debug_print=False):
             """ Ensures that all sessions in the pipeline are valid after unpickling, and updates them if they aren't.
@@ -169,7 +182,10 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
             print(f'Must reload/rebuild.')
             curr_active_pipeline = cls.init_from_known_data_session_type(type_name, known_type_properties, override_basepath=Path(basepath), override_post_load_functions=post_load_functions)
             # Save reloaded pipeline out to pickle for future loading
-            saveData(finalized_loaded_sess_pickle_path, db=curr_active_pipeline) # 589 MB
+            if not skip_save:
+                saveData(finalized_loaded_sess_pickle_path, db=curr_active_pipeline) # 589 MB
+            else:
+                print('skip_save is True so resultant pipeline will not be saved to the pickle file.')
         # finalized_loaded_sess_pickle_path
         return curr_active_pipeline
     
@@ -244,6 +260,23 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
     # Session Pickling for Loading/Saving                                                                                  #
     # ==================================================================================================================== #
 
+    ## For serialization/pickling:
+    def __getstate__(self):
+        # Copy the object's state from self.__dict__ which contains
+        # all our instance attributes (_mapping and _keys_at_init). Always use the dict.copy()
+        # method to avoid modifying the original state.
+        state = self.__dict__.copy()
+        # Remove the unpicklable entries.
+        # del state['file']
+        return state
+
+    def __setstate__(self, state):
+        # Restore instance attributes (i.e., _mapping and _keys_at_init).
+        self.__dict__.update(state)
+        
+        
+        
+
     def save_pipeline(self, active_pickle_filename='loadedSessPickle.pkl'):
         ## Build Pickle Path:
         finalized_loaded_sess_pickle_path = Path(self.sess.basepath).joinpath(active_pickle_filename).resolve()
@@ -254,9 +287,11 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
         
 
     @staticmethod
-    def try_load_pickled_pipeline_or_reload_if_needed(active_data_mode_name, active_data_mode_type_properties, basedir, override_post_load_functions=None, force_reload=False, active_pickle_filename='loadedSessPickle.pkl'):
+    def try_load_pickled_pipeline_or_reload_if_needed(active_data_mode_name, active_data_mode_type_properties, basedir, override_post_load_functions=None, force_reload=False, active_pickle_filename='loadedSessPickle.pkl', skip_save=False, debug_print=False):
         """ After a session has completed the loading stage prior to filtering (after all objects are built and such), it can be pickled to a file to drastically speed up future loading requests (as would have to be done when the notebook is restarted, etc) 
         Tries to find an extant pickled pipeline, and if it exists it loads and returns that. Otherwise, it loads/rebuilds the pipeline from scratch (from the initial raw data files) and then saves a pickled copy out to disk to speed up future loading attempts.
+        
+        # skip_save: Bool - if True, the resultant pipeline is not saved to the pickle when done
         
         """
         ## Build Pickle Path:
@@ -265,7 +300,7 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
 
         if not force_reload:
             try:
-                loaded_pipeline = loadData(finalized_loaded_sess_pickle_path, debug_print=False)
+                loaded_pipeline = loadData(finalized_loaded_sess_pickle_path, debug_print=debug_print)
             except (FileNotFoundError):
                 # loading failed
                 print(f'Failure loading {finalized_loaded_sess_pickle_path}.')
@@ -284,5 +319,6 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
             print(f'Must reload/rebuild.')
             curr_active_pipeline = NeuropyPipeline.init_from_known_data_session_type(active_data_mode_name, active_data_mode_type_properties, override_basepath=Path(basedir), override_post_load_functions=override_post_load_functions)
             # Save reloaded pipeline out to pickle for future loading
-            saveData(finalized_loaded_sess_pickle_path, db=curr_active_pipeline) # 589 MB
+            if not skip_save:
+                saveData(finalized_loaded_sess_pickle_path, db=curr_active_pipeline) # 589 MB
         return curr_active_pipeline, finalized_loaded_sess_pickle_path
