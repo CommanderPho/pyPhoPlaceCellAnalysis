@@ -4,10 +4,28 @@ import pandas as pd
 
 # from pyphoplacecellanalysis.PhoPositionalData.plotting.mixins.spikes_mixins import SpikesDataframeOwningMixin, SpikeRenderingMixin, HideShowSpikeRenderingMixin
 from pyphocorehelpers.indexing_helpers import safe_get
+from pyphocorehelpers.DataStructure.enum_helpers import OrderedEnum
 
 from qtpy import QtGui # for QColor
 
 
+class SpikeEmphasisState(OrderedEnum):
+    """ The visual state of a given spike, indicating whether it's visible, and its level of emphasis/de-emphasis.
+    
+    Currently only used in Spike2DRaster to control emphasis of spikes, but general enough that I thought I'd factor it out
+    
+    See Spike2DRaster._build_cell_configs(...) for more info and how it's used
+    
+    from pyphoplacecellanalysis.General.Mixins.SpikesRenderingBaseMixin import SpikeEmphasisState
+    
+    """
+    Hidden = 0
+    Deemphasized = 1
+    Default = 2
+    Emphasized = 3
+    
+    
+    
 class SpikesDataframeOwningMixin:
     """ Implementors own a spikes_df object """
     @property

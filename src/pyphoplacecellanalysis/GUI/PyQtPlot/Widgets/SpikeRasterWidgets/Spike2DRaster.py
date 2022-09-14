@@ -10,6 +10,7 @@ import pyphoplacecellanalysis.External.pyqtgraph.opengl as gl # for 3D raster pl
 import numpy as np
 
 # import qdarkstyle
+from pyphocorehelpers.gui.Qt.color_helpers import build_adjusted_color # required for the different emphasis states in ._build_cell_configs()
 
 from pyphoplacecellanalysis.General.DataSeriesToSpatial import DataSeriesToSpatial
 from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.SpikeRasterWidgets.SpikeRasterBase import SpikeRasterBase
@@ -19,21 +20,9 @@ from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.Mixins.Render2DNeuronIdentityLi
 from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.Mixins.RenderTimeEpochs.EpochRenderingMixin import EpochRenderingMixin
 from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.Mixins.RenderTimeEpochs.Specific2DRenderTimeEpochs import General2DRenderTimeEpochs, SessionEpochs2DRenderTimeEpochs, PBE_2DRenderTimeEpochs, Laps2DRenderTimeEpochs
 
-
 from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.Mixins.TimeCurves.RenderTimeCurvesMixin import PyQtGraphSpecificTimeCurvesMixin
-
 from pyphoplacecellanalysis.General.Mixins.DisplayHelpers import debug_print_QRect, debug_print_axes_locations, debug_print_temporal_info
-from pyphocorehelpers.gui.Qt.color_helpers import build_adjusted_color
-
-from pyphocorehelpers.DataStructure.enum_helpers import OrderedEnum
-
-class SpikeEmphasisState(OrderedEnum):
-    """ The visual state of a given spike, indicating whether it's visible, and its level of emphasis/de-emphasis. """
-    Hidden = 0
-    Deemphasized = 1
-    Default = 2
-    Emphasized = 3
-    
+from pyphoplacecellanalysis.General.Mixins.SpikesRenderingBaseMixin import SpikeEmphasisState # required for the different emphasis states in ._build_cell_configs()
 
 class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Render2DScrollWindowPlotMixin, SpikeRasterBase):
     """ Displays a 2D version of a raster plot with the spikes occuring along a plane. 
@@ -246,8 +235,20 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
     
         self.config_fragile_linear_neuron_IDX_map = dict(zip(self.fragile_linear_neuron_IDXs, self.params.config_items.values()))
         
-        
 
+            
+        
+    def reset_spike_emphasis(self, defer_render=False):
+        """ resets the emphasis state of all spikes to the default (SpikeEmphasisState.Default) and then rebuilds the all_spots """
+        self.spikes_df['visualization_raster_emphasis_state'] = SpikeEmphasisState.Default
+        # TODO: PERFORMANCE: Rebuild the all_spots for all spikes after the update: (FUTURE) if more efficient, could just modify those that changed
+        self.plots_data.all_spots = self._build_all_spikes_all_spots()
+            
+        # Once the dataframe is updated, rebuild the all_spots and update the plotters
+        if not defer_render:
+            # Update preview_overview_scatter_plot
+            self.update_rasters()
+                
     def update_spike_emphasis(self, spike_indicies=None, new_emphasis_state: SpikeEmphasisState=SpikeEmphasisState.Default, defer_render=False):
         """ sets the emphasis state for the spikes specified by spike_indices to new_emphasis_state 
         
@@ -271,10 +272,7 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
             
         # Once the dataframe is updated, rebuild the all_spots and update the plotters
         if not defer_render:
-            # Update preview_overview_scatter_plot
-            self.plots.preview_overview_scatter_plot.setData(self.plots_data.all_spots)
-            if self.Includes2DActiveWindowScatter:
-                self.plots.scatter_plot.setData(self.plots_data.all_spots)
+            self.update_rasters()
         
 
             
@@ -327,7 +325,6 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
             vtick.moveTo(0, -0.5)
             vtick.lineTo(0, 0.5)
 
-            
             self.plots.main_plot_widget.setLabel('left', 'Cell ID', units='')
             self.plots.main_plot_widget.setLabel('bottom', 'Time', units='s')
             self.plots.main_plot_widget.setMouseEnabled(x=False, y=False)
@@ -523,12 +520,9 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
         # self.plots_data.all_spots = [{'pos': pos[:,i], 'data': i, 'pen': curr_spike_pens[i]} for i in range(curr_n)] # update self.plots_data.all_spots        
         self.plots_data.all_spots = self._build_all_spikes_all_spots()
         # Update preview_overview_scatter_plot
-        self.plots.preview_overview_scatter_plot.setData(self.plots_data.all_spots)
-        if self.Includes2DActiveWindowScatter:
-            self.plots.scatter_plot.setData(self.plots_data.all_spots)
+        self.update_rasters()
         
-    
-    
+        
     ######################################################
     # EpochRenderingMixin Convencince methods:
     #####################################################

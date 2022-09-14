@@ -204,7 +204,15 @@ class Render2DScrollWindowPlotMixin:
         # self.update_scroll_window_region(confirmed_valid_window_start_t, confirmed_valid_window_end_t, block_signals=False)
         self.Render2DScrollWindowPlot_on_window_update(confirmed_valid_window_start_t, confirmed_valid_window_end_t)
         
-
+        
+    def update_rasters(self):
+        """ updates all rasters (which are scatter plots) from the self.plot_data.all_spots variable """
+        # Update preview_overview_scatter_plot
+        self.plots.preview_overview_scatter_plot.setData(self.plots_data.all_spots)
+        if self.Includes2DActiveWindowScatter:
+            self.plots.scatter_plot.setData(self.plots_data.all_spots)
+            
+            
 
     @QtCore.pyqtSlot()
     def _Render2DScrollWindowPlot_on_linear_region_item_update(self) -> None:
