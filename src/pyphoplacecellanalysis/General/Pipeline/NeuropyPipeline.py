@@ -262,19 +262,18 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
 
     ## For serialization/pickling:
     def __getstate__(self):
-        # Copy the object's state from self.__dict__ which contains
-        # all our instance attributes (_mapping and _keys_at_init). Always use the dict.copy()
-        # method to avoid modifying the original state.
+        # Copy the object's state from self.__dict__ which contains all our instance attributes. Always use the dict.copy() method to avoid modifying the original state.
         state = self.__dict__.copy()
         # Remove the unpicklable entries.
-        # del state['file']
+        del state['logger']
         return state
 
     def __setstate__(self, state):
         # Restore instance attributes (i.e., _mapping and _keys_at_init).
         self.__dict__.update(state)
-        
-        
+        # Restore unpickable properties:
+        self.logger = pipeline_module_logger
+        self.logger.info(f'NeuropyPipeline.__setstate__(state="{state}")')
         
 
     def save_pipeline(self, active_pickle_filename='loadedSessPickle.pkl'):
