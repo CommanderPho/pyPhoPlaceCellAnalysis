@@ -41,10 +41,14 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
     
     Stages:
     1. Input/Loading
+        .set_input(...)
     2. Filtering
+        .filter_sessions(...)
     3. Computation
+        .perform_computations(...)
     4. Display
-    
+        .prepare_for_display(...)
+        
     Usage:
     > From properties:
         curr_kdiba_pipeline = NeuropyPipeline(name='kdiba_pipeline', session_data_type='kdiba', basedir=known_data_session_type_dict['kdiba'].basedir, load_function=known_data_session_type_dict['kdiba'].load_function)
@@ -52,16 +56,18 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
     > From KnownDataSessionTypeProperties object:
         curr_kdiba_pipeline = NeuropyPipeline.init_from_known_data_session_type('kdiba', known_data_session_type_dict['kdiba'])
 
+
+
     """
     
-    sigStageChanged = QtCore.Signal() # Emitted when the pipeline stage changes
+    sigStageChanged = QtCore.Signal(object) # Emitted when the pipeline stage changes
     
     
     def __init__(self, name="pipeline", session_data_type='kdiba', basedir=None, load_function: Callable = None, post_load_functions: List[Callable] = [], parent=None, **kwargs):
         super(NeuropyPipeline, self).__init__(parent, **kwargs)
         self.pipeline_name = name
         self.session_data_type = None
-        self.stage = None
+        self._stage = None
         self.logger = pipeline_module_logger
         self.logger.info(f'NeuropyPipeline.__init__(name="{name}", session_data_type="{session_data_type}", basedir="{basedir}")')
         self.set_input(name=name, session_data_type=session_data_type, basedir=basedir, load_function=load_function, post_load_functions=post_load_functions)
@@ -205,6 +211,15 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
         """The session_name property."""
         return self.sess.name
 
+
+    @property
+    def stage(self):
+        """The stage property."""
+        return self._stage
+    @stage.setter
+    def stage(self, value):
+        self._stage = value
+        self.sigStageChanged.emit(self._stage) # pass the new stage
     
     @property
     def last_completed_stage(self) -> PipelineStage:
