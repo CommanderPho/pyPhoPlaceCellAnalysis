@@ -94,6 +94,33 @@ class PipelineWithComputedPipelineStageMixin:
         """ retries the computation functions that previously failed and resulted in accumulated_errors in the previous_computation_result """
         return self.stage.rerun_failed_computations(previous_computation_result, fail_on_exception=fail_on_exception, debug_print=debug_print)
     
+    
+    # Utility/Debugging Functions:
+    def perform_drop_computed_items(self, config_names_to_drop = ['maze1_rippleOnly', 'maze2_rippleOnly']):
+        """ Loops through all the configs and ensure that they have the neuron identity info if they need it.
+        2022-09-13 - Unfinished 
+        """
+        # config_names_to_drop
+        print(f'_drop_computed_items(config_names_to_drop: {config_names_to_drop}):\n\tpre keys: {list(self.active_configs.keys())}')
+        
+        for a_config_name in config_names_to_drop:
+            a_config_to_drop = self.active_configs.pop(a_config_name, None)
+            if a_config_to_drop is not None:
+                print(f'\tpreparing to drop: {a_config_name}')
+                ## TODO: filtered_sessions, filtered_epochs
+                # curr_active_pipeline.active_configs
+                # curr_active_pipeline.filtered_contexts[a_config_name]
+                _dropped_computation_results = self.computation_results.pop(a_config_name, None)
+                a_filter_context_to_drop = self.filtered_contexts.pop(a_config_name, None)
+                if a_filter_context_to_drop is not None:
+                    _dropped_display_items = self.display_output.pop(a_filter_context_to_drop, None)
+
+            print(f'\t dropped.')
+            
+        print(f'\tpost keys: {list(self.active_configs.keys())}')
+
+
+
 
 class ComputedPipelineStage(LoadableInput, LoadableSessionInput, FilterablePipelineStage, BaseNeuropyPipelineStage):
     """Docstring for ComputedPipelineStage."""
@@ -309,7 +336,6 @@ class ComputedPipelineStage(LoadableInput, LoadableSessionInput, FilterablePipel
 
         ## Then look for previously complete computation results that are missing computations that have been registered after they were computed, or that were previously part of the blacklist but now are not:
 
-
     
     # ==================================================================================================================== #
     # CLASS/STATIC METHODS                                                                                                 #
@@ -362,3 +388,4 @@ class ComputedPipelineStage(LoadableInput, LoadableSessionInput, FilterablePipel
             return previous_computation_result # just return the unaltered result
 
     
+        
