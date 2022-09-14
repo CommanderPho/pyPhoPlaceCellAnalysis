@@ -25,23 +25,81 @@ class Render2DScrollWindowPlotMixin:
     ## Scrollable Window Signals
     window_scrolled = QtCore.pyqtSignal(float, float) # signal is emitted on updating the 2D sliding window, where the first argument is the new start value and the 2nd is the new end value
     
-    def _build_all_spikes_data_values(self):
+    @classmethod
+    def build_spikes_data_values_from_df(cls, spikes_df, config_fragile_linear_neuron_IDX_map, is_spike_included=None, **kwargs):
         """ build global spikes for entire dataframe (not just the current window) 
         
         Uses the df['visualization_raster_y_location'] field added to the spikes dataframe to get the y-value for the spike
         
         Note that the colors are built using the self.config_fragile_linear_neuron_IDX_map property
         
+        config_fragile_linear_neuron_IDX_map: a map from fragile_linear_neuron_IDX to config values
+        is_included_indicies: Optional np.array of bools indicating whether each spike is included in the generated points
+        
         """
         # All units at once approach:
+        active_time_variable_name = spikes_df.spikes.time_variable_name
+        filtered_spikes_df = spikes_df[[active_time_variable_name, 'visualization_raster_y_location', 'fragile_linear_neuron_IDX']].copy()
+        if is_spike_included is not None:
+            assert len(is_spike_included) == np.shape(spikes_df)[0], f"if specified, is_included_indicies must be the same length as the number of spikes but np.shape(spikes_df)[0]: {np.shape(spikes_df)[0]} and len(is_included_indicies): {len(is_spike_included)}"
+            ## filter them by the is_included_indicies:
+            filtered_spikes_df = filtered_spikes_df[is_spike_included]
+        
         # Filter the dataframe using that column and value from the list
-        curr_spike_t = self.spikes_window.df[self.spikes_window.df.spikes.time_variable_name].to_numpy() # this will map
-        curr_spike_y = self.spikes_window.df['visualization_raster_y_location'].to_numpy() # this will map
-        curr_spike_pens = [self.config_fragile_linear_neuron_IDX_map[a_fragile_linear_neuron_IDX][2] for a_fragile_linear_neuron_IDX in self.spikes_window.df['fragile_linear_neuron_IDX'].to_numpy()] # get the pens for each spike from the configs map
+        curr_spike_t = filtered_spikes_df[active_time_variable_name].to_numpy() # this will map
+        curr_spike_y = filtered_spikes_df['visualization_raster_y_location'].to_numpy() # this will map
+        
+        # config_fragile_linear_neuron_IDX_map values are of the form: (i, fragile_linear_neuron_IDX, curr_pen, self.lower_y[i], self.upper_y[i])
+        curr_spike_pens = [config_fragile_linear_neuron_IDX_map[a_fragile_linear_neuron_IDX][2] for a_fragile_linear_neuron_IDX in filtered_spikes_df['fragile_linear_neuron_IDX'].to_numpy()] # get the pens for each spike from the configs map
         curr_n = len(curr_spike_t) # curr number of spikes
-        return curr_spike_t, curr_spike_y, curr_spike_pens, curr_n
+        # builds the 'all_spots' tuples suitable for setting self.plots_data.all_spots from ALL Spikes
+        pos = np.vstack((curr_spike_t, curr_spike_y))
+        all_spots = [{'pos': pos[:,i], 'data': i, 'pen': curr_spike_pens[i]} for i in range(curr_n)]
+        return curr_spike_t, curr_spike_y, curr_spike_pens, all_spots, curr_n
+    
+    @classmethod
+    def build_spikes_all_spots_from_df(cls, spikes_df, config_fragile_linear_neuron_IDX_map, is_spike_included=None, **kwargs):
+        """ builds the 'all_spots' tuples suitable for setting self.plots_data.all_spots from ALL Spikes """
+        curr_spike_x, curr_spike_y, curr_spike_pens, all_spots, curr_n = cls.build_spikes_data_values_from_df(spikes_df, config_fragile_linear_neuron_IDX_map, is_spike_included=is_spike_included, **kwargs)
+        return all_spots
     
     
+    # def update_scatter_plots(self):
+    #     # Update preview_overview_scatter_plot
+    #     self.plots.preview_overview_scatter_plot.setData(self.plots_data.all_spots)
+    #     if self.Includes2DActiveWindowScatter:
+    #         self.plots.scatter_plot.setData(self.plots_data.all_spots)
+    
+    
+    def _build_all_spikes_data_values(self, is_included_indicies=None, **kwargs):
+        """ build global spikes for entire dataframe (not just the current window) 
+        
+        Uses the df['visualization_raster_y_location'] field added to the spikes dataframe to get the y-value for the spike
+        
+        Note that the colors are built using the self.config_fragile_linear_neuron_IDX_map property
+        
+        is_included_indicies: Optional np.array of bools indicating whether each spike is included in the generated points
+        
+        
+        """
+        # All units at once approach:
+        return Render2DScrollWindowPlotMixin.build_spikes_data_values_from_df(self.spikes_window.df, self.config_fragile_linear_neuron_IDX_map, is_spike_included=is_included_indicies, **kwargs)
+        
+    def _build_all_spikes_all_spots(self, is_included_indicies=None, **kwargs):
+        """ build the all_spots from the global spikes for entire dataframe (not just the current window) 
+        
+        Example:
+            ## Rebuild Raster Plot Points:
+            self._build_cell_configs()
+
+            # ALL Spikes in the preview window:
+            self.plots_data.all_spots = self._build_all_spikes_all_spots()
+            # Update preview_overview_scatter_plot
+            self.plots.preview_overview_scatter_plot.setData(self.plots_data.all_spots)
+            if self.Includes2DActiveWindowScatter:
+                self.plots.scatter_plot.setData(self.plots_data.all_spots)     
+        """
+        return Render2DScrollWindowPlotMixin.build_spikes_all_spots_from_df(self.spikes_window.df, self.config_fragile_linear_neuron_IDX_map, is_spike_included=is_included_indicies, **kwargs)
     
     # def ScrollRasterPreviewWindow_on_BuildUI(self, graphics_layout_widget: pg.GraphicsLayoutWidget=None, layout_row=0, layout_col=0):
     def ScrollRasterPreviewWindow_on_BuildUI(self, background_static_scroll_window_plot):
@@ -77,9 +135,7 @@ class Render2DScrollWindowPlotMixin:
         ## Bottom Windowed Scroll Plot/Widget:
 
         # ALL Spikes in the preview window:
-        curr_spike_x, curr_spike_y, curr_spike_pens, curr_n = self._build_all_spikes_data_values()
-        pos = np.vstack((curr_spike_x, curr_spike_y)) # np.shape(curr_spike_t): (11,), np.shape(curr_spike_x): (11,), np.shape(curr_spike_y): (11,), curr_n: 11
-        self.plots_data.all_spots = [{'pos': pos[:,i], 'data': i, 'pen': curr_spike_pens[i]} for i in range(curr_n)]
+        curr_spike_x, curr_spike_y, curr_spike_pens, self.plots_data.all_spots, curr_n = self._build_all_spikes_data_values()
         
         self.plots.preview_overview_scatter_plot = pg.ScatterPlotItem(name='spikeRasterOverviewWindowScatterPlotItem', pxMode=True, symbol=vtick, size=5, pen={'color': 'w', 'width': 1})
         self.plots.preview_overview_scatter_plot.setObjectName('preview_overview_scatter_plot') # this seems necissary, the 'name' parameter in addPlot(...) seems to only change some internal property related to the legend AND drastically slows down the plotting
