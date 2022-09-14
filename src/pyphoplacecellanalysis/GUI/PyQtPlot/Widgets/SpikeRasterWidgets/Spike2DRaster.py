@@ -23,7 +23,7 @@ from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.Mixins.RenderTimeEpochs.Specifi
 from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.Mixins.TimeCurves.RenderTimeCurvesMixin import PyQtGraphSpecificTimeCurvesMixin
 
 from pyphoplacecellanalysis.General.Mixins.DisplayHelpers import debug_print_QRect, debug_print_axes_locations, debug_print_temporal_info
-
+from pyphocorehelpers.gui.Qt.color_helpers import build_adjusted_color
 
 from pyphocorehelpers.DataStructure.enum_helpers import OrderedEnum
 
@@ -216,6 +216,14 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
                        SpikeEmphasisState.Default: 0.5,
                        SpikeEmphasisState.Emphasized: 1.0,
         }
+        
+        # state_color_adjust_fcns: functions that take the base color and call build_adjusted_color to get the adjusted color for each state
+        state_color_adjust_fcns = {SpikeEmphasisState.Hidden: lambda x: build_adjusted_color(x),
+                       SpikeEmphasisState.Deemphasized: lambda x: build_adjusted_color(x, saturation_scale=0.35, value_scale=0.8),
+                       SpikeEmphasisState.Default: lambda x: build_adjusted_color(x),
+                       SpikeEmphasisState.Emphasized: lambda x: build_adjusted_color(x, value_scale=1.25),
+        }
+        
         # self._build_neuron_id_graphics(self.ui.main_gl_widget, self.y)
         self.params.config_items = IndexedOrderedDict()
         curr_neuron_ids_list = self.find_cell_ids_from_neuron_IDXs(self.fragile_linear_neuron_IDXs)
@@ -228,6 +236,7 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
             for an_emphasis_state, alpha_value in state_alpha.items():
                 curr_color = self.params.neuron_qcolors_map[fragile_linear_neuron_IDX]
                 curr_color.setAlphaF(alpha_value)
+                curr_color = state_color_adjust_fcns[an_emphasis_state](curr_color)
                 curr_pen = pg.mkPen(curr_color)
                 curr_state_pen_dict[an_emphasis_state] = curr_pen
             
@@ -237,6 +246,8 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
     
         self.config_fragile_linear_neuron_IDX_map = dict(zip(self.fragile_linear_neuron_IDXs, self.params.config_items.values()))
         
+        
+
     def update_spike_emphasis(self, spike_indicies=None, new_emphasis_state: SpikeEmphasisState=SpikeEmphasisState.Default, defer_render=False):
         """ sets the emphasis state for the spikes specified by spike_indices to new_emphasis_state 
         
@@ -249,7 +260,9 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
 
         if spike_indicies is None:
             # If no particular indicies are specified, change all spikes by default
-            spike_indicies = self.spikes_df.indicies
+            # spike_indicies = self.spikes_df.indicies
+            # spike_indicies = np.arange(np.shape(self.spikes_df)[0]) # build all indicies
+            spike_indicies = np.full((np.shape(self.spikes_df)[0],), True)
         
         # Set the non-included spikes as SpikeEmphasisState.Deemphasized
         self.spikes_df.loc[spike_indicies, 'visualization_raster_emphasis_state'] = new_emphasis_state
