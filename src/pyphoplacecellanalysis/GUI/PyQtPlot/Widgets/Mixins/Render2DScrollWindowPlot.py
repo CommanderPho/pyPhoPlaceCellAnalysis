@@ -39,7 +39,15 @@ class Render2DScrollWindowPlotMixin:
         """
         # All units at once approach:
         active_time_variable_name = spikes_df.spikes.time_variable_name
-        filtered_spikes_df = spikes_df[[active_time_variable_name, 'visualization_raster_y_location', 'fragile_linear_neuron_IDX']].copy()
+        # Copy only the relevent columns so filtering is easier:
+        filtered_spikes_df = spikes_df[[active_time_variable_name, 'visualization_raster_y_location',  'visualization_raster_emphasis_state', 'fragile_linear_neuron_IDX']].copy()
+        
+        spike_emphasis_states = kwargs.get('spike_emphasis_state', None)
+        if spike_emphasis_states is not None:
+            assert len(spike_emphasis_states) == np.shape(spikes_df)[0], f"if specified, spike_emphasis_states must be the same length as the number of spikes but np.shape(spikes_df)[0]: {np.shape(spikes_df)[0]} and len(is_included_indicies): {len(spike_emphasis_states)}"
+            # Can set it on the dataframe:
+            # 'visualization_raster_y_location'
+        
         if is_spike_included is not None:
             assert len(is_spike_included) == np.shape(spikes_df)[0], f"if specified, is_included_indicies must be the same length as the number of spikes but np.shape(spikes_df)[0]: {np.shape(spikes_df)[0]} and len(is_included_indicies): {len(is_spike_included)}"
             ## filter them by the is_included_indicies:
@@ -50,7 +58,9 @@ class Render2DScrollWindowPlotMixin:
         curr_spike_y = filtered_spikes_df['visualization_raster_y_location'].to_numpy() # this will map
         
         # config_fragile_linear_neuron_IDX_map values are of the form: (i, fragile_linear_neuron_IDX, curr_pen, self.lower_y[i], self.upper_y[i])
-        curr_spike_pens = [config_fragile_linear_neuron_IDX_map[a_fragile_linear_neuron_IDX][2] for a_fragile_linear_neuron_IDX in filtered_spikes_df['fragile_linear_neuron_IDX'].to_numpy()] # get the pens for each spike from the configs map
+        # Emphasis/Deemphasis-Dependent Pens:
+        curr_spike_pens = [config_fragile_linear_neuron_IDX_map[a_fragile_linear_neuron_IDX][2][a_spike_emphasis_state] for a_fragile_linear_neuron_IDX, a_spike_emphasis_state in zip(filtered_spikes_df['fragile_linear_neuron_IDX'].to_numpy(), filtered_spikes_df['visualization_raster_emphasis_state'].to_numpy())] # get the pens for each spike from the configs map
+        
         curr_n = len(curr_spike_t) # curr number of spikes
         # builds the 'all_spots' tuples suitable for setting self.plots_data.all_spots from ALL Spikes
         pos = np.vstack((curr_spike_t, curr_spike_y))

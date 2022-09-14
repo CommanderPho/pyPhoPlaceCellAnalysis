@@ -27,6 +27,11 @@ from pyphoplacecellanalysis.GUI.Qt.Mixins.RenderWindowControlsMixin import Rende
 from pyphoplacecellanalysis.General.Mixins.TimeWindowPlaybackMixin import TimeWindowPlaybackPropertiesMixin, TimeWindowPlaybackController
 from pyphoplacecellanalysis.General.Mixins.DataSeriesColorHelpers import DataSeriesColorHelpers
 
+# Pipeline Logging:
+import logging
+# from pyphoplacecellanalysis.General.Pipeline.Stages.BaseNeuropyPipelineStage import pipeline_module_logger
+from pyphocorehelpers.print_helpers import build_module_logger
+spike_raster_logger = build_module_logger('Spike3D.display.SpikeRasterBase')
 
 """ 
 FPS     Milliseconds Per Frame
@@ -93,12 +98,10 @@ self._update_plots()
 def trap_exc_during_debug(*args):
     # when app raises uncaught exception, print info
     print(args)
-
+    spike_raster_logger.error(f'in trap_exc_during_debug(*args: {args})\n this was installed as the sys.excepthook in SpikeRasterBase above the main class.')
 
 # install exception hook: without this, uncaught exception would cause application to exit
 sys.excepthook = trap_exc_during_debug
-
-
 
     
 class UnitSortableMixin:
@@ -235,6 +238,14 @@ class SpikeRasterBase(UnitSortableMixin, DataSeriesToSpatialTransformingMixin, N
     def temporal_zoom_factor(self, value):
         self.params.temporal_zoom_factor = value
         self.temporal_mapping_changed.emit()
+        
+    @property
+    def logger(self):
+        """The logger property."""
+        return self._logger
+    @logger.setter
+    def logger(self, value):
+        self._logger = value
 
         
     def __init__(self, params=None, spikes_window=None, playback_controller=None, neuron_colors=None, neuron_sort_order=None, application_name=None, should_show=True, **kwargs):
@@ -245,6 +256,9 @@ class SpikeRasterBase(UnitSortableMixin, DataSeriesToSpatialTransformingMixin, N
         """
         super(SpikeRasterBase, self).__init__(**kwargs)
         # Initialize member variables:
+        self._logger = spike_raster_logger
+        self.logger.info(f'SpikeRasterBase.__init__(...)')
+        
         
         # Helper container variables
         self.params = params
@@ -437,6 +451,7 @@ class SpikeRasterBase(UnitSortableMixin, DataSeriesToSpatialTransformingMixin, N
     
     
     def setup(self):
+        self.logger.info(f'SpikeRasterBase.setup()')
         # self.setup_spike_rendering_mixin() # NeuronIdentityAccessingMixin
         raise NotImplementedError # Inheriting classes must override setup to perform particular setup
         # self.app = pg.mkQApp("SpikeRasterBase")
@@ -450,6 +465,7 @@ class SpikeRasterBase(UnitSortableMixin, DataSeriesToSpatialTransformingMixin, N
         """ for QGridLayout
             addWidget(widget, row, column, rowSpan, columnSpan, Qt.Alignment alignment = 0)
         """
+        self.logger.info(f'SpikeRasterBase.buildUI()')
         self.ui = PhoUIContainer()
         
         self.ui.layout = QtWidgets.QGridLayout()
@@ -489,12 +505,14 @@ class SpikeRasterBase(UnitSortableMixin, DataSeriesToSpatialTransformingMixin, N
         
     def _buildGraphics(self):
         """ Implementors must override this method to build the main graphics object and add it at layout position (0, 0)"""
+        self.logger.info(f'SpikeRasterBase._buildGraphics()')
         raise NotImplementedError
     
       
                   
     def _update_plots(self):
         """ Implementor must override! """
+        self.logger.info(f'SpikeRasterBase._update_plots()')
         raise NotImplementedError
     
     
@@ -505,6 +523,7 @@ class SpikeRasterBase(UnitSortableMixin, DataSeriesToSpatialTransformingMixin, N
     def debug_print_instance_info(self):
         print('debug_print_instance_info():')
         print(f'\t.applicationName: {self.applicationName}\n\t.windowName: {self.windowName}\n')
+        self.logger.info(f'SpikeRasterBase: \t.applicationName: {self.applicationName}\n\t.windowName: {self.windowName}\n')
     
     
     
@@ -532,6 +551,7 @@ class SpikeRasterBase(UnitSortableMixin, DataSeriesToSpatialTransformingMixin, N
     def onClose(self):
         ## TODO: this seems to get called excessively, at least for Spike3DRaster. It happens even when accessing invalid properties and stuff. Not sure what's up, something is broken.
         print(f'onClose()')
+        self.logger.info(f'onClose()')
         self.debug_print_instance_info()
         
 

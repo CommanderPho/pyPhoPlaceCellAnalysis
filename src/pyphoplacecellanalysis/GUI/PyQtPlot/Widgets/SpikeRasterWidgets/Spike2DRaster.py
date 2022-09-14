@@ -25,6 +25,15 @@ from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.Mixins.TimeCurves.RenderTimeCur
 from pyphoplacecellanalysis.General.Mixins.DisplayHelpers import debug_print_QRect, debug_print_axes_locations, debug_print_temporal_info
 
 
+from pyphocorehelpers.DataStructure.enum_helpers import OrderedEnum
+
+class SpikeEmphasisState(OrderedEnum):
+    """ The visual state of a given spike, indicating whether it's visible, and its level of emphasis/de-emphasis. """
+    Hidden = 0
+    Deemphasized = 1
+    Default = 2
+    Emphasized = 3
+    
 
 class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Render2DScrollWindowPlotMixin, SpikeRasterBase):
     """ Displays a 2D version of a raster plot with the spikes occuring along a plane. 
@@ -96,6 +105,7 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
 
     def __init__(self, params=None, spikes_window=None, playback_controller=None, neuron_colors=None, neuron_sort_order=None, application_name=None, **kwargs):
         super(Spike2DRaster, self).__init__(params=params, spikes_window=spikes_window, playback_controller=playback_controller, neuron_colors=neuron_colors, neuron_sort_order=neuron_sort_order, application_name=application_name, **kwargs)
+        self.logger.info(f'Spike2DRaster.__init__(...)\t.applicationName: "{self.applicationName}"\n\t.windowName: "{self.windowName}")\n')
         
         # Init the TimeCurvesViewMixin for 3D Line plots:
         ### No plots will actually be added until self.add_3D_time_curves(plot_dataframe) is called with a valid dataframe.
@@ -123,6 +133,8 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
         
     
     def setup(self):
+        self.logger.info(f'Spike2DRaster.setup()')
+        
         # self.setup_spike_rendering_mixin() # NeuronIdentityAccessingMixin
         # self.app = pg.mkQApp("Spike2DRaster")
         self.app = pg.mkQApp(self.applicationName)
@@ -133,6 +145,7 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
             pg.setConfigOption('useOpenGL', True)
             pg.setConfigOption('enableExperimental', True)
         except Exception as e:
+            self.logger.error(f"Enabling OpenGL failed with {e}. Will result in slow rendering. Try installing PyOpenGL.")
             print(f"Enabling OpenGL failed with {e}. Will result in slow rendering. Try installing PyOpenGL.")
             
         pg.setConfigOptions(antialias = True)
@@ -159,11 +172,18 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
 
         # Compute the y for all windows, not just the current one:
         if 'visualization_raster_y_location' not in self.spikes_df.columns:
-            print('Spike2DRaster.setup(): adding "visualization_raster_y_location" column to spikes_df...')
-            # all_y = [y[i] for i, a_cell_id in enumerate(curr_spikes_df['fragile_linear_neuron_IDX'].to_numpy())]
+            self.logger.info('Spike2DRaster.setup(): adding "visualization_raster_y_location" column to spikes_df...')
             all_y = [self.y_fragile_linear_neuron_IDX_map[a_cell_IDX] for a_cell_IDX in self.spikes_df['fragile_linear_neuron_IDX'].to_numpy()]
             self.spikes_df['visualization_raster_y_location'] = all_y # adds as a column to the dataframe. Only needs to be updated when the number of active units changes. BUG? NO, RESOLVED: actually, this should be updated when anything that would change .y_fragile_linear_neuron_IDX_map would change, right? Meaning: .y, ... oh, I see. self.y doesn't change because self.params.center_mode, self.params.bin_position_mode, and self.params.side_bin_margins aren't expected to change. 
-            print('done.')
+            self.logger.info('\tdone.')
+            
+        self.logger.debug(f'self.spikes_df.columns: {self.spikes_df.columns}')
+        if 'visualization_raster_emphasis_state' not in self.spikes_df.columns:
+            self.logger.info('Spike2DRaster.setup(): adding "visualization_raster_emphasis_state" column to spikes_df...')
+            self.spikes_df['visualization_raster_emphasis_state'] = SpikeEmphasisState.Default
+            self.logger.info(f'\tdone.')
+        else:
+            self.logger.info('\t"visualization_raster_emphasis_state" column already exists.')
             
         self.EpochRenderingMixin_on_setup()
 
@@ -189,6 +209,13 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
         Known Calls:
             From self._buildGraphics()
         """
+        
+        # SpikeEmphasisState
+        state_alpha = {SpikeEmphasisState.Hidden: 0.01,
+                       SpikeEmphasisState.Deemphasized: 0.1,
+                       SpikeEmphasisState.Default: 0.5,
+                       SpikeEmphasisState.Emphasized: 1.0,
+        }
         # self._build_neuron_id_graphics(self.ui.main_gl_widget, self.y)
         self.params.config_items = IndexedOrderedDict()
         curr_neuron_ids_list = self.find_cell_ids_from_neuron_IDXs(self.fragile_linear_neuron_IDXs)
@@ -197,16 +224,47 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
         for i, fragile_linear_neuron_IDX in enumerate(self.fragile_linear_neuron_IDXs):
             curr_neuron_id = curr_neuron_ids_list[i] # aclu value
             
-            curr_color = self.params.neuron_qcolors_map[fragile_linear_neuron_IDX]
-            curr_color.setAlphaF(0.5)
-            curr_pen = pg.mkPen(curr_color)
-            curr_config_item = (i, fragile_linear_neuron_IDX, curr_pen, self.lower_y[i], self.upper_y[i])
+            curr_state_pen_dict = dict()
+            for an_emphasis_state, alpha_value in state_alpha.items():
+                curr_color = self.params.neuron_qcolors_map[fragile_linear_neuron_IDX]
+                curr_color.setAlphaF(alpha_value)
+                curr_pen = pg.mkPen(curr_color)
+                curr_state_pen_dict[an_emphasis_state] = curr_pen
+            
+            curr_config_item = (i, fragile_linear_neuron_IDX, curr_state_pen_dict, self.lower_y[i], self.upper_y[i])
             self.params.config_items[curr_neuron_id] = curr_config_item # add the current config item to the config items 
             
     
         self.config_fragile_linear_neuron_IDX_map = dict(zip(self.fragile_linear_neuron_IDXs, self.params.config_items.values()))
         
+    def update_spike_emphasis(self, spike_indicies=None, new_emphasis_state: SpikeEmphasisState=SpikeEmphasisState.Default, defer_render=False):
+        """ sets the emphasis state for the spikes specified by spike_indices to new_emphasis_state 
         
+        spike_indicies: e.g. np.logical_not(is_spike_included)
+        defer_render: if false, the all_spots will be rebuilt after updating the dataframe and the changes rendered out
+        """
+        if 'visualization_raster_emphasis_state' not in self.spikes_df.columns:
+            print('Spike2DRaster.update_spike_emphasis(): adding "visualization_raster_emphasis_state" column to spikes_df...')
+            self.spikes_df['visualization_raster_emphasis_state'] = SpikeEmphasisState.Default
+
+        if spike_indicies is None:
+            # If no particular indicies are specified, change all spikes by default
+            spike_indicies = self.spikes_df.indicies
+        
+        # Set the non-included spikes as SpikeEmphasisState.Deemphasized
+        self.spikes_df.loc[spike_indicies, 'visualization_raster_emphasis_state'] = new_emphasis_state
+        # TODO: PERFORMANCE: Rebuild the all_spots for all spikes after the update: (FUTURE) if more efficient, could just modify those that changed
+        self.plots_data.all_spots = self._build_all_spikes_all_spots()
+            
+        # Once the dataframe is updated, rebuild the all_spots and update the plotters
+        if not defer_render:
+            # Update preview_overview_scatter_plot
+            self.plots.preview_overview_scatter_plot.setData(self.plots_data.all_spots)
+            if self.Includes2DActiveWindowScatter:
+                self.plots.scatter_plot.setData(self.plots_data.all_spots)
+        
+
+            
   
     def _buildGraphics(self):
         """ 
@@ -218,6 +276,7 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
             
             
         """
+        self.logger.debug(f'Spike2DRaster._buildGraphics()')
         ##### Main Raster Plot Content Top ##########
         
         self.ui.main_graphics_layout_widget = pg.GraphicsLayoutWidget()
@@ -374,6 +433,7 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
         """
         
         """
+        self.logger.debug(f'Spike2DRaster._update_plots()')
         if self.enable_debug_print:
             print(f'Spike2DRaster._update_plots()')
         # assert (len(self.ui.plots) == self.n_cells), f"after all operations the length of the plots array should be the same as the n_cells, but len(self.ui.plots): {len(self.ui.plots)} and self.n_cells: {self.n_cells}!"
