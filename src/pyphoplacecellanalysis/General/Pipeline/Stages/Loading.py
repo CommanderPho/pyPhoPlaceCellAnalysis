@@ -155,17 +155,16 @@ class PipelineWithInputStage:
         
         """
         if not isinstance(basedir, Path):
-            print(f"basedir is not Path. Converting...")
+            self.logger.info(f"basedir is not Path. Converting...")
             active_basedir = Path(basedir)
         else:
-            print(f"basedir is already Path object.")
+            self.logger.info(f"basedir is already Path object.")
             active_basedir = basedir
 
         if not active_basedir.exists():
-            print(f'active_basedir: "{active_basedir}" does not exist!')
+            self.logger.info(f'active_basedir: "{active_basedir}" does not exist!')
             raise FileExistsError
 
-        
         self.session_data_type = session_data_type
         
         # Set first pipeline stage to input:

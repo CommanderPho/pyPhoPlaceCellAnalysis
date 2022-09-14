@@ -70,8 +70,13 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
         self._stage = None
         self.logger = pipeline_module_logger
         self.logger.info(f'NeuropyPipeline.__init__(name="{name}", session_data_type="{session_data_type}", basedir="{basedir}")')
+        _stage_changed_connection = self.sigStageChanged.connect(self.on_stage_changed)
         self.set_input(name=name, session_data_type=session_data_type, basedir=basedir, load_function=load_function, post_load_functions=post_load_functions)
 
+
+    def on_stage_changed(self, new_stage):
+        print(f'NeuropyPipeline.on_stage_changed(new_stage="{new_stage.identity}")')
+        self.logger.info(f'NeuropyPipeline.on_stage_changed(new_stage="{new_stage.identity}")')
 
     @classmethod
     def init_from_known_data_session_type(cls, type_name: str, known_type_properties: KnownDataSessionTypeProperties, override_basepath=None, override_post_load_functions=None):
@@ -293,6 +298,9 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
         self.logger = pipeline_module_logger
         self.logger.info(f'NeuropyPipeline.__setstate__(state="{state}")')
         
+        
+        _stage_changed_connection = self.sigStageChanged.connect(self.on_stage_changed)
+         
 
     def save_pipeline(self, active_pickle_filename='loadedSessPickle.pkl'):
         ## Build Pickle Path:
