@@ -84,7 +84,9 @@ class PipelineWithComputedPipelineStageMixin:
     ## Computation Helpers: 
     def perform_computations(self, active_computation_params: Optional[DynamicParameters]=None, enabled_filter_names=None, overwrite_extant_results=False, computation_functions_name_whitelist=None, computation_functions_name_blacklist=None, fail_on_exception:bool=False, debug_print=False):
         assert (self.can_compute), "Current self.stage must already be a ComputedPipelineStage. Call self.filter_sessions with filter configs to reach this step."
-        self.stage.evaluate_single_computation_params(active_computation_params, enabled_filter_names=enabled_filter_names, overwrite_extant_results=overwrite_extant_results, computation_functions_name_whitelist=computation_functions_name_whitelist, computation_functions_name_blacklist=computation_functions_name_blacklist, fail_on_exception=fail_on_exception, debug_print=debug_print)
+        
+        
+        self.stage.evaluate_single_computation_params(active_computation_params, enabled_filter_names=enabled_filter_names, overwrite_extant_results=overwrite_extant_results, computation_functions_name_whitelist=computation_functions_name_whitelist, computation_functions_name_blacklist=computation_functions_name_blacklist, fail_on_exception=fail_on_exception, progress_logger_callback=(lambda x: self.logger.info(x)), debug_print=debug_print)
         
     def perform_registered_computations(self, previous_computation_result=None, computation_functions_name_whitelist=None, computation_functions_name_blacklist=None, fail_on_exception:bool=False, debug_print=False):
         assert (self.can_compute), "Current self.stage must already be a ComputedPipelineStage. Call self.perform_computations to reach this step."
@@ -168,7 +170,7 @@ class ComputedPipelineStage(LoadableInput, LoadableSessionInput, FilterablePipel
     def register_computation(self, registered_name, computation_function):
         self.registered_computation_function_dict[registered_name] = computation_function
         
-    def perform_registered_computations(self, previous_computation_result=None, computation_functions_name_whitelist=None, computation_functions_name_blacklist=None, fail_on_exception:bool=False, debug_print=False):
+    def perform_registered_computations(self, previous_computation_result=None, computation_functions_name_whitelist=None, computation_functions_name_blacklist=None, fail_on_exception:bool=False, progress_logger_callback=None, debug_print=False):
         """ Executes all registered computations for a single filter
         
         The return value should be set to the self.computation_results[a_select_config_name]
@@ -189,7 +191,7 @@ class ComputedPipelineStage(LoadableInput, LoadableSessionInput, FilterablePipel
             active_computation_functions = self.registered_computation_functions
         
         # Perform the computations:
-        return ComputedPipelineStage._execute_computation_functions(active_computation_functions, previous_computation_result=previous_computation_result, fail_on_exception=fail_on_exception, debug_print=debug_print)
+        return ComputedPipelineStage._execute_computation_functions(active_computation_functions, previous_computation_result=previous_computation_result, fail_on_exception=fail_on_exception, progress_logger_callback=progress_logger_callback, debug_print=debug_print)
     
     def rerun_failed_computations(self, previous_computation_result, fail_on_exception:bool=False, debug_print=False):
         """ retries the computation functions that previously failed and resulted in accumulated_errors in the previous_computation_result """
@@ -235,7 +237,7 @@ class ComputedPipelineStage(LoadableInput, LoadableSessionInput, FilterablePipel
                 
         return complete_computed_config_names_list, incomplete_computed_config_dict
     
-    def evaluate_single_computation_params(self, active_computation_params: Optional[DynamicParameters]=None, enabled_filter_names=None, overwrite_extant_results=False, computation_functions_name_whitelist=None, computation_functions_name_blacklist=None, fail_on_exception:bool=False, debug_print=False):
+    def evaluate_single_computation_params(self, active_computation_params: Optional[DynamicParameters]=None, enabled_filter_names=None, overwrite_extant_results=False, computation_functions_name_whitelist=None, computation_functions_name_blacklist=None, fail_on_exception:bool=False, progress_logger_callback=None, debug_print=False):
         """ 'single' here refers to the fact that it evaluates only one of the active_computation_params
         
         Takes its filtered_session and applies the provided active_computation_params to it. The results are stored in self.computation_results under the same key as the filtered session. 
@@ -252,6 +254,9 @@ class ComputedPipelineStage(LoadableInput, LoadableSessionInput, FilterablePipel
         for a_select_config_name, a_filtered_session in self.filtered_sessions.items():                
             if a_select_config_name in enabled_filter_names:
                 print(f'Performing evaluate_single_computation_params on filtered_session with filter named "{a_select_config_name}"...')
+                if progress_logger_callback is not None:
+                    progress_logger_callback(f'Performing evaluate_single_computation_params on filtered_session with filter named "{a_select_config_name}"...')
+                
                 if active_computation_params is None:
                     active_computation_params = self.active_configs[a_select_config_name].computation_config # get the previously set computation configs
                 else:
@@ -266,6 +271,10 @@ class ComputedPipelineStage(LoadableInput, LoadableSessionInput, FilterablePipel
                     skip_computations_for_this_result = False # need to compute the result
                 else:
                     # Otherwise it already exists and is not None, so don't overwrite it:
+                    if progress_logger_callback is not None:
+                        progress_logger_callback(f'WARNING: skipping computation because overwrite_extant_results={overwrite_extant_results} and self.computation_results[{a_select_config_name}] already exists and is non-None')
+                        progress_logger_callback('\t TODO: this will prevent recomputation even when the blacklist/whitelist or computation function definitions change. Rework so that this is smarter.')
+                    
                     print(f'WARNING: skipping computation because overwrite_extant_results={overwrite_extant_results} and self.computation_results[{a_select_config_name}] already exists and is non-None')
                     print('\t TODO: this will prevent recomputation even when the blacklist/whitelist or computation function definitions change. Rework so that this is smarter.')                    
                     # self.computation_results.setdefault(a_select_config_name, ComputedPipelineStage._build_initial_computationResult(a_filtered_session, active_computation_params)) # returns a computation result. This stores the computation config used to compute it.
@@ -273,7 +282,7 @@ class ComputedPipelineStage(LoadableInput, LoadableSessionInput, FilterablePipel
 
                 if not skip_computations_for_this_result:
                     # call to perform any registered computations:
-                    self.computation_results[a_select_config_name] = self.perform_registered_computations(self.computation_results[a_select_config_name], computation_functions_name_whitelist=computation_functions_name_whitelist, computation_functions_name_blacklist=computation_functions_name_blacklist, fail_on_exception=fail_on_exception, debug_print=debug_print)
+                    self.computation_results[a_select_config_name] = self.perform_registered_computations(self.computation_results[a_select_config_name], computation_functions_name_whitelist=computation_functions_name_whitelist, computation_functions_name_blacklist=computation_functions_name_blacklist, fail_on_exception=fail_on_exception, progress_logger_callback=progress_logger_callback, debug_print=debug_print)
             else:
                 # this filter is excluded from the enabled list, no computations will we performed on it
                 if overwrite_extant_results:
@@ -357,20 +366,22 @@ class ComputedPipelineStage(LoadableInput, LoadableSessionInput, FilterablePipel
         return output_result
     
     @staticmethod
-    def _execute_computation_functions(active_computation_functions, previous_computation_result=None, fail_on_exception:bool = False, debug_print=False):
+    def _execute_computation_functions(active_computation_functions, previous_computation_result=None, fail_on_exception:bool = False, progress_logger_callback=None, debug_print=False):
         """ actually performs the provided computations in active_computation_functions """
         if (len(active_computation_functions) > 0):
             if debug_print:
                 print(f'Performing _execute_computation_functions(...) with {len(active_computation_functions)} registered_computation_functions...')
+            if progress_logger_callback is not None:
+                progress_logger_callback(f'Performing _execute_computation_functions(...) with {len(active_computation_functions)} registered_computation_functions...')
             
             if fail_on_exception:
                 ## normal version that fails on any exception:
-                composed_registered_computations_function = compose_functions(*active_computation_functions) # functions are composed left-to-right
+                composed_registered_computations_function = compose_functions(*active_computation_functions, progress_logger=progress_logger_callback, error_logger=None) # functions are composed left-to-right
                 previous_computation_result = composed_registered_computations_function(previous_computation_result)
                 accumulated_errors = None
             else:
                 ## Use exception-tolerant version of function composition (functions are composed left-to-right):
-                composed_registered_computations_function = compose_functions_with_error_handling(*active_computation_functions) # functions are composed left-to-right, exception-tolerant version
+                composed_registered_computations_function = compose_functions_with_error_handling(*active_computation_functions, progress_logger=progress_logger_callback, error_logger=(lambda x: progress_logger_callback(f'ERROR: {x}'))) # functions are composed left-to-right, exception-tolerant version
                 previous_computation_result, accumulated_errors = composed_registered_computations_function(previous_computation_result)
             
             if debug_print:
@@ -378,11 +389,23 @@ class ComputedPipelineStage(LoadableInput, LoadableSessionInput, FilterablePipel
             # Add the function to the computation result:
             previous_computation_result.accumulated_errors = accumulated_errors
             if len(accumulated_errors or {}) > 0:
+                if progress_logger_callback is not None:
+                    progress_logger_callback(f'WARNING: there were {len(accumulated_errors)} that occurred during computation. Check these out by looking at computation_result.accumulated_errors.')
+                    
                 warn(f'WARNING: there were {len(accumulated_errors)} that occurred during computation. Check these out by looking at computation_result.accumulated_errors.')
+                error_desc_str = f'{len(accumulated_errors or {})} errors.'
+            else:
+                error_desc_str = f'no errors!'
             
+            if progress_logger_callback is not None:
+                progress_logger_callback(f'\t all computations complete! (Computed {len(active_computation_functions)} with {error_desc_str}.')
+                                
             return previous_computation_result
             
         else:
+            if progress_logger_callback is not None:
+                progress_logger_callback(f'No registered_computation_functions, skipping extended computations.')
+                
             if debug_print:
                 print(f'No registered_computation_functions, skipping extended computations.')
             return previous_computation_result # just return the unaltered result

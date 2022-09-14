@@ -27,7 +27,7 @@ def saveData(pkl_path, db, should_append=False):
     with ProgressMessagePrinter(pkl_path, f"Saving (file mode '{file_mode}')", 'loaded session pickle file'):
         with open(pkl_path, file_mode) as dbfile: 
             # source, destination
-            pickle.dump(db, dbfile)                     
+            pickle.dump(db, dbfile)
             dbfile.close()
 
 def loadData(pkl_path, debug_print=False):
