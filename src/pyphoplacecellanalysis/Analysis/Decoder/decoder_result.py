@@ -8,7 +8,7 @@ import pandas as pd
 from neuropy.analyses.placefields import PfND # for build_position_df_discretized_binned_positions
 from neuropy.utils.mixins.binning_helpers import BinnedPositionsMixin, bin_pos_nD, build_df_discretized_binned_position_columns
 
-from ...Analysis.reconstruction import BayesianPlacemapPositionDecoder
+from .reconstruction import BayesianPlacemapPositionDecoder
 from pyphocorehelpers.indexing_helpers import find_neighbours
 
 
