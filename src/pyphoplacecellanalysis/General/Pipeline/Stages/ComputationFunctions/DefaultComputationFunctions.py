@@ -7,7 +7,7 @@ from pyphocorehelpers.DataStructure.dynamic_parameters import DynamicParameters
 from pyphoplacecellanalysis.General.Model.ComputationResults import ComputationResult
 
 
-from pyphoplacecellanalysis.General.Decoder.decoder_result import build_position_df_discretized_binned_positions, build_position_df_resampled_to_time_windows
+from pyphoplacecellanalysis.General.Decoder.decoder_result import build_position_df_discretized_binned_positions
 from pyphocorehelpers.mixins.member_enumerating import AllFunctionEnumeratingMixin
 from pyphoplacecellanalysis.Analysis.reconstruction import BayesianPlacemapPositionDecoder, Zhang_Two_Step
 
@@ -19,15 +19,18 @@ from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.Computa
 class DefaultComputationFunctions(AllFunctionEnumeratingMixin, metaclass=ComputationFunctionRegistryHolder):
     _computationPrecidence = 1 # must be done after PlacefieldComputations
 
-    def _perform_position_decoding_computation(computation_result: ComputationResult):
+    def _perform_position_decoding_computation(computation_result: ComputationResult, **kwargs):
         """ Builds the 2D Placefield Decoder 
         
             TODO: CORRECTNESS: Consider whether spikes_df or just the spikes_df used to compute the pf2D should be passed. Only the cells used to build the decoder should be used to decode, that much is certain.
         
         """
         def position_decoding_computation(active_session, pf_computation_config, prev_output_result: ComputationResult):
-            ## TODO: IMPORTANT!! POTENTIAL_BUG: Should this passed-in spikes_df actually be the filtered spikes_df that was used to compute the placefields in PfND? That would be `prev_output_result.computed_data['pf2D'].filtered_spikes_df`
-            prev_output_result.computed_data['pf2D_Decoder'] = BayesianPlacemapPositionDecoder(pf_computation_config.time_bin_size, prev_output_result.computed_data['pf2D'], active_session.spikes_df.copy(), debug_print=False)
+            ## - [ ] TODO: IMPORTANT!! POTENTIAL_BUG: Should this passed-in spikes_df actually be the filtered spikes_df that was used to compute the placefields in PfND? That would be `prev_output_result.computed_data['pf2D'].filtered_spikes_df`
+            ## filtered_spikes_df version:
+            prev_output_result.computed_data['pf2D_Decoder'] = BayesianPlacemapPositionDecoder(pf_computation_config.time_bin_size, prev_output_result.computed_data['pf2D'], prev_output_result.computed_data['pf2D'].filtered_spikes_df.copy(), debug_print=False)
+            ## original `active_session.spikes_df` version:
+            # prev_output_result.computed_data['pf2D_Decoder'] = BayesianPlacemapPositionDecoder(pf_computation_config.time_bin_size, prev_output_result.computed_data['pf2D'], active_session.spikes_df.copy(), debug_print=False)
             # %timeit pho_custom_decoder.compute_all():  18.8 s ± 149 ms per loop (mean ± std. dev. of 7 runs, 1 loop each)
             prev_output_result.computed_data['pf2D_Decoder'].compute_all() #  --> n = self.
             return prev_output_result
@@ -36,7 +39,7 @@ class DefaultComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Computa
         return position_decoding_computation(computation_result.sess, placefield_computation_config, computation_result)
     
     
-    def _perform_two_step_position_decoding_computation(computation_result: ComputationResult, debug_print=False):
+    def _perform_two_step_position_decoding_computation(computation_result: ComputationResult, debug_print=False, **kwargs):
         """ Builds the Zhang Velocity/Position For 2-step Bayesian Decoder for 2D Placefields """
         def _compute_avg_speed_at_each_position_bin(active_position_df, active_pf_computation_config, xbin, ybin, show_plots=False, debug_print=False):
             """ compute the average speed at each position x: """

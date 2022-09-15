@@ -32,7 +32,7 @@ def build_position_df_time_window_idx(active_pos_df, curr_active_time_windows, d
 def build_position_df_discretized_binned_positions(active_pos_df, active_computation_config, xbin_values=None, ybin_values=None, debug_print=False):
     """ Adds the binned_x and binned_y columns to the position dataframe 
     
-    TODO: CORRECTNESS: POTENTIAL_BUG: I notice that the *bin_centers are being passed here from its call as opposed to the .xbin, .ybin themselves. Is this an issue?
+    - [ ] TODO: CORRECTNESS: POTENTIAL_BUG: I notice that the *bin_centers are being passed here from its call as opposed to the .xbin, .ybin themselves. Is this an issue?
     """
     # # bin the dataframe's x and y positions into bins, with binned_x and binned_y containing the index of the bin that the given position is contained within.
     # if (xbin_values is None) or (ybin_values is None):

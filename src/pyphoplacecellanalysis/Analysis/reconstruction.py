@@ -495,6 +495,7 @@ class BayesianPlacemapPositionDecoder(PlacemapPositionDecoder):
     
     # Main computation functions:
     def perform_compute_single_time_bin(self, time_window_idx):
+        """ the main computation function for a single time_window_idx """
         n = self.unit_specific_time_binned_spike_counts[:, time_window_idx] # this gets the specific n_t for this time window
         
         if self.debug_print:
@@ -535,6 +536,3 @@ class BayesianPlacemapPositionDecoder(PlacemapPositionDecoder):
         # np.shape(self.most_likely_position_indicies) # (2, 85841)
         # self.most_likely_position_indicies
         
-
-    ## NICE MEME!
-    
