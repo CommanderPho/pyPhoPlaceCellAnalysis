@@ -101,9 +101,6 @@ class SpikeRastersDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Displa
         spike_raster_window.main_menu_window = curr_main_menu_window # to retain the changes
         
         if owning_pipeline_reference is not None:
-            # print(f'active_config: {active_config}')
-            # display_output = owning_pipeline_reference.display_output
-            # display_output = owning_pipeline_reference.display_output[active_identifying_context]
             if active_display_fn_identifying_ctx not in owning_pipeline_reference.display_output:
                 owning_pipeline_reference.display_output[active_display_fn_identifying_ctx] = PhoUIContainer() # create a new context
             
@@ -132,10 +129,6 @@ class SpikeRastersDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Displa
             _createLinkedWidget_menu_provider = CreateLinkedWidget_MenuProvider(render_widget=spike_raster_window)
             _createLinkedWidget_menu_provider.CreateLinkedWidget_MenuProvider_on_init()
             if owning_pipeline_reference is not None:
-                # display_output = owning_pipeline_reference.display_output
-                # assert active_identifying_context is not None
-                # display_output = owning_pipeline_reference.display_output[active_identifying_context]
-                
                 if active_display_fn_identifying_ctx not in owning_pipeline_reference.display_output:
                     owning_pipeline_reference.display_output[active_display_fn_identifying_ctx] = PhoUIContainer() # create a new context
             

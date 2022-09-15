@@ -108,20 +108,6 @@ class SpikeAnalysisComputations(AllFunctionEnumeratingMixin, metaclass=Computati
         
         
         """
-        
-        # computation_config = computation_result.computation_config.spike_analysis
-        # {
-        #     'max_num_spikes_per_neuron': 20000,
-        #     'kleinberg_parameters': DynamicParameters(s=2, gamma=0.1),
-        #     'use_progress_bar': False,
-        #     'debug_print': False
-        # }
-        # max_num_spikes_per_neuron = 20000 # the number of spikes to truncate each neuron's timeseries to
-        # kleinberg_parameters = DynamicParameters(s=2, gamma=0.1)
-        # use_progress_bar = False # whether to use a tqdm progress bar
-        # debug_print = False # whether to print debug-level progress using traditional print(...) statements
-
-
         default_spike_analysis_config = DynamicParameters(max_num_spikes_per_neuron=20000, kleinberg_parameters=DynamicParameters(s=2, gamma=0.1), use_progress_bar=False, debug_print=False)
         
         active_spike_analysis_config = computation_result.computation_config.get('spike_analysis', default_spike_analysis_config)
@@ -129,20 +115,6 @@ class SpikeAnalysisComputations(AllFunctionEnumeratingMixin, metaclass=Computati
         
         ## Set the config values from the defaults to ensure we have access to them later:
         computation_result.computation_config['spike_analysis'] = active_spike_analysis_config
-        
-        # print(f'computation_result.computation_config: {computation_result.computation_config.}')
-        
-        # # Get sampling rate:
-        # sampling_rate = computation_result.sess.recinfo.dat_sampling_rate # 32552
-        # # sampling_rate = computation_result.sess.recinfo.eeg_sampling_rate # 1252
-        # is_burst = detect_bursts_dual_threshold(sig, fs=sampling_rate, dual_thresh=(1, 2), f_range=(8, 12))
-        # time_binned_position_resampler = build_position_df_resampled_to_time_windows(computation_result.sess.position.to_dataframe(), time_bin_size=computation_result.computation_config.time_bin_size) # TimedeltaIndexResampler
-        # time_binned_position_df = time_binned_position_resampler.nearest() # an actual dataframe
-        # computation_result.computed_data['burst_detection'] = {
-        #  'is_burst': is_burst
-        # }
-        
-                
         out_pyburst_intervals = _compute_pybursts_burst_interval_detection(computation_result.sess, **active_spike_analysis_config)        
         computation_result.computed_data[SpikeAnalysisComputations._computationGroupName] = DynamicParameters.init_from_dict({'burst_intervals': out_pyburst_intervals})
             
