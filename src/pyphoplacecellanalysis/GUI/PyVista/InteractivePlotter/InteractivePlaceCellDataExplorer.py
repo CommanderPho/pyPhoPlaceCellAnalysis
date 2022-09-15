@@ -39,6 +39,10 @@ class InteractivePlaceCellDataExplorer(GlobalConnectionManagerAccessingMixin, In
     
     
     """
+    
+    sigOnUpdateMeshes = QtCore.Signal(float, float) # Emitted after meshes are updated to allow connected slots to be called to perform their own updates. args: t_start, t_stop
+    
+    
     @safely_accepts_kwargs
     def __init__(self, active_config, active_session, extant_plotter=None):
         # super().__init__(active_config, active_session, extant_plotter)
@@ -225,8 +229,8 @@ class InteractivePlaceCellDataExplorer(GlobalConnectionManagerAccessingMixin, In
     # z_fixed,
     # active_trail_opacity_values, active_trail_size_values
     def on_active_window_update_mesh(self, t_start, t_stop, enable_position_mesh_updates=False, render=True, debug_print=False):
-        """ called to update the meshs with t_start, t_stop times representing the start and end of the new active window:
-        
+        """ The main update function - called to update the meshs with t_start, t_stop times representing the start and end of the new active window:
+        This function is called from both slider-based updating (with an integer window index) and pyqt signal-style (update_window_start_end(new_start, new_end)) updating
         """
         # curr_text_rendering_string = 'curr_i: {:d}; (t_start: {:.2f}, t_stop: {:.2f})'.format(curr_i, t_start, t_stop) # :.3f
         # self.p.add_text(curr_text_rendering_string, name='lblCurrent_spike_range', position='lower_right', color='white', shadow=True, font_size=10)
@@ -234,7 +238,6 @@ class InteractivePlaceCellDataExplorer(GlobalConnectionManagerAccessingMixin, In
         curr_text_rendering_string = '(t_start: {:.2f}, t_stop: {:.2f})'.format(t_start, t_stop) # :.3f
         self.p.add_text(curr_text_rendering_string, name='lblCurrent_spike_range', position='lower_right', color='white', shadow=True, font_size=10)
         
-
         ## Historical Spikes:
         # active_included_all_historical_indicies = (flattened_spikes.flattened_spike_times < t_stop) # Accumulate Spikes mode. All spikes occuring prior to the end of the frame (meaning the current time) are plotted
         historical_t_start = (t_stop - self.params.longer_spikes_window.duration_seconds) # Get the earliest time that will be included in the search
@@ -259,8 +262,6 @@ class InteractivePlaceCellDataExplorer(GlobalConnectionManagerAccessingMixin, In
         ## Recent Spikes:
         recent_spikes_t_start = (t_stop - self.params.recent_spikes_window.duration_seconds) # Get the earliest time that will be included in the recent spikes
         # print('recent_spikes_t_start: {}; t_start: {}'.format(recent_spikes_t_start, t_start))
-
-        
 
         active_included_recent_only_indicies = ((flattened_spike_times > recent_spikes_t_start) & (flattened_spike_times < t_stop)) # Two Sided Range Mode
         
@@ -320,8 +321,8 @@ class InteractivePlaceCellDataExplorer(GlobalConnectionManagerAccessingMixin, In
             curr_animal_point = [self.x[active_included_all_window_position_indicies[-1]], self.y[active_included_all_window_position_indicies[-1]], self.z_fixed[-1]]
             self.perform_plot_location_point('animal_current_location_point', curr_animal_point, render=False)
 
-
-
+        self.sigOnUpdateMeshes.emit(t_start, t_stop) # TODO: efficiency - defer rendering optionally , False
+        
         if render:
             self.p.render() # renders to ensure it's updated after changing the ScalarVisibility above
 
