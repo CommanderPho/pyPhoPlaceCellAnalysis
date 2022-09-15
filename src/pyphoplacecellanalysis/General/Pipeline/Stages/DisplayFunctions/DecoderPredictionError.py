@@ -91,7 +91,7 @@ class DefaultDecoderDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Disp
     #     return # end
 
 
-    def _display_decoder_result(computation_result, active_config):
+    def _display_decoder_result(computation_result, active_config, **kwargs):
         renderer = DecoderResultDisplayingPlot2D(computation_result.computed_data['pf2D_Decoder'], computation_result.sess.position.to_dataframe())
         def animate(i):
             # print(f'animate({i})')
