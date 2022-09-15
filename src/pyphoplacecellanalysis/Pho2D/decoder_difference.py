@@ -7,7 +7,11 @@ from matplotlib import patheffects
 from pyphocorehelpers.gui.interaction_helpers import CallbackWrapper
 
 def display_predicted_position_difference(active_one_step_decoder, active_two_step_decoder, active_resampled_measured_positions):
-    # Draw difference between predicted and measured position:
+    """ Draw difference between predicted and measured position 
+    
+    NOT YET USED
+    
+    """
     
     def _temp_debug_two_step_plots_animated_imshow(active_one_step_decoder, active_two_step_decoder, variable_name='p_x_given_n_and_x_prev', override_variable_value=None, update_callback_function=None):
         if override_variable_value is None:
