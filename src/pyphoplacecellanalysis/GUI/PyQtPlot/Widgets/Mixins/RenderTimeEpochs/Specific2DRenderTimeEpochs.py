@@ -152,6 +152,7 @@ class Laps2DRenderTimeEpochs(General2DRenderTimeEpochs):
             height = 1.0
             pen_color = pg.mkColor('red')
             brush_color = pg.mkColor('red')
+            brush_color.setAlphaF(0.5)
             
             ## Add the missing parameters to the dataframe:
             active_df = cls._add_missing_df_columns(active_df, y_location, height, pen_color, brush_color, **kwargs)
@@ -192,7 +193,10 @@ class PBE_2DRenderTimeEpochs(General2DRenderTimeEpochs):
             y_location = 0.0
             height = 2.5
             pen_color = pg.mkColor('w')
+            pen_color.setAlphaF(0.8)
+            
             brush_color = pg.mkColor('grey')
+            brush_color.setAlphaF(0.5)
             
             ## Add the missing parameters to the dataframe:
             active_df = cls._add_missing_df_columns(active_df, y_location, height, pen_color, brush_color, **kwargs)
@@ -255,6 +259,8 @@ class Ripples_2DRenderTimeEpochs(General2DRenderTimeEpochs):
             height = 8.5
             pen_color = pg.mkColor('blue')
             brush_color = pg.mkColor('blue')
+            brush_color.setAlphaF(0.5)
+            
             ## Add the missing parameters to the dataframe:
             active_df = cls._add_missing_df_columns(active_df, y_location, height, pen_color, brush_color, **kwargs)
             return active_df
