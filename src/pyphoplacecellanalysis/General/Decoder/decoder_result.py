@@ -189,6 +189,12 @@ class DecoderResultDisplayingPlot2D(DecoderResultDisplayingBaseClass):
         curr_p_x_given_n = p_x_given_n.copy()
         if drop_below_threshold is not None:
             curr_p_x_given_n[np.where(curr_p_x_given_n < drop_below_threshold)] = np.nan # null out the p_x_given_n below certain values
+            
+            
+        ## 2022-09-15 - Testing
+        curr_p_x_given_n = np.nan_to_num(curr_p_x_given_n, nan=0.0, posinf=1.0, neginf=0.0) # IDK if this is smart or not
+            
+            
         ## Seems to work:
         curr_p_x_given_n = np.rot90(curr_p_x_given_n, k=-1)
         curr_p_x_given_n = np.fliplr(curr_p_x_given_n)
