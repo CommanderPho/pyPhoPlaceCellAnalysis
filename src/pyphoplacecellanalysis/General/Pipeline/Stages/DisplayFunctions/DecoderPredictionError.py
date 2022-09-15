@@ -46,7 +46,7 @@ class DefaultDecoderDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Disp
         
     
     def _display_plot_most_likely_position_comparisons(computation_result, active_config, **kwargs):
-        """ renders the computed posterior for the position from the Bayesian decoder and overlays the animal's actual position over the top. """
+        """ renders a 2D plot with separate subplots for the (x and y position axes): the computed posterior for the position from the Bayesian decoder and overlays the animal's actual position over the top. """
         def plot_most_likely_position_comparsions(pho_custom_decoder, position_df, show_posterior=True, show_one_step_most_likely_positions_plots=True, debug_print=False):
             """
             Usage:
@@ -172,6 +172,11 @@ class DefaultDecoderDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Disp
             axs[1].plot(active_time_window_variable, active_most_likely_positions_y, lw=1.0, color='#00ff7f99', alpha=0.6, label='2-step: most likely positions y') # (Num windows x 2)
             
 
+
+# ==================================================================================================================== #
+# Private Implementations                                                                                              #
+# ==================================================================================================================== #
+
 def _temp_debug_two_step_plots(active_one_step_decoder, active_two_step_decoder, variable_name='all_scaling_factors_k', override_variable_value=None):
     """ Handles plots using the plot command """
     if override_variable_value is None:
@@ -233,6 +238,9 @@ def _temp_debug_two_step_plots_imshow(active_one_step_decoder, active_two_step_d
 # MAIN IMPLEMENTATION FUNCTION:
 def _temp_debug_two_step_plots_animated_imshow(active_one_step_decoder, active_two_step_decoder, variable_name='p_x_given_n_and_x_prev', override_variable_value=None, update_callback_function=None):
     """Matplotlib-based imshow plot with interactive slider for displaying two-step bayesian decoding results
+
+    Called from the display function '_display_two_step_decoder_prediction_error_2D' defined above to implement its core functionality
+    
 
     Args:
         active_one_step_decoder ([type]): [description]
