@@ -7,7 +7,9 @@ from pyphocorehelpers.DataStructure.dynamic_parameters import DynamicParameters
 from pyphoplacecellanalysis.General.Model.ComputationResults import ComputationResult
 
 
-from pyphoplacecellanalysis.Analysis.Decoder.decoder_result import build_position_df_discretized_binned_positions
+# from pyphoplacecellanalysis.Analysis.Decoder.decoder_result import build_position_df_discretized_binned_positions # old weird re-implementation
+from neuropy.utils.mixins.binning_helpers import build_df_discretized_binned_position_columns
+
 from pyphocorehelpers.mixins.member_enumerating import AllFunctionEnumeratingMixin
 from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BayesianPlacemapPositionDecoder, Zhang_Two_Step
 
@@ -22,11 +24,13 @@ class DefaultComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Computa
     def _perform_position_decoding_computation(computation_result: ComputationResult, **kwargs):
         """ Builds the 2D Placefield Decoder 
         
-            TODO: CORRECTNESS: Consider whether spikes_df or just the spikes_df used to compute the pf2D should be passed. Only the cells used to build the decoder should be used to decode, that much is certain.
+            ## - [ ] TODO: IMPORTANT!! POTENTIAL_BUG: Should this passed-in spikes_df actually be the filtered spikes_df that was used to compute the placefields in PfND? That would be `prev_output_result.computed_data['pf2D'].filtered_spikes_df`
+                TODO: CORRECTNESS: Consider whether spikes_df or just the spikes_df used to compute the pf2D should be passed. Only the cells used to build the decoder should be used to decode, that much is certain.
+                    - 2022-09-15: it appears that the 'filtered_spikes_df version' improves issues with decoder jumpiness and general inaccuracy that was present when using the session spikes_df: previously it was just jumping to random points far from the animal's location and then sticking there for a long time.
         
         """
         def position_decoding_computation(active_session, pf_computation_config, prev_output_result: ComputationResult):
-            ## - [ ] TODO: IMPORTANT!! POTENTIAL_BUG: Should this passed-in spikes_df actually be the filtered spikes_df that was used to compute the placefields in PfND? That would be `prev_output_result.computed_data['pf2D'].filtered_spikes_df`
+            
             ## filtered_spikes_df version:
             prev_output_result.computed_data['pf2D_Decoder'] = BayesianPlacemapPositionDecoder(pf_computation_config.time_bin_size, prev_output_result.computed_data['pf2D'], prev_output_result.computed_data['pf2D'].filtered_spikes_df.copy(), debug_print=False)
             ## original `active_session.spikes_df` version:
@@ -72,8 +76,17 @@ class DefaultComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Computa
 
 
         prev_one_step_bayesian_decoder = computation_result.computed_data['pf2D_Decoder']
-        # makes sure to use the xbin_center and ybin_center from the previous one_step decoder to bin the positions:
-        computation_result.sess.position.df, xbin, ybin, bin_info = build_position_df_discretized_binned_positions(computation_result.sess.position.df, computation_result.computation_config.pf_params, xbin_values=prev_one_step_bayesian_decoder.xbin_centers, ybin_values=prev_one_step_bayesian_decoder.ybin_centers, debug_print=debug_print) # update the session's position dataframe with the new columns.
+        # active_pos_df: computation_result.sess.position.df
+        # xbin_values = prev_one_step_bayesian_decoder.xbin_centers.copy()
+        # ybin_values = prev_one_step_bayesian_decoder.ybin_centers.copy()
+                
+        # ## Old pyphoplacecellanalysis.Analysis.Decoder.decoder_result.build_position_df_discretized_binned_positions(...) version:
+        # # makes sure to use the xbin_center and ybin_center from the previous one_step decoder to bin the positions:
+        # computation_result.sess.position.df, xbin, ybin, bin_info = build_position_df_discretized_binned_positions(computation_result.sess.position.df, computation_result.computation_config.pf_params, xbin_values=xbin_values, ybin_values=ybin_values, debug_print=debug_print) # update the session's position dataframe with the new columns.
+        
+        ## New 2022-09-15 direct neuropy.utils.mixins.binning_helpers.build_df_discretized_binned_position_columns version:
+        computation_result.sess.position.df, (xbin, ybin), bin_infos = build_df_discretized_binned_position_columns(computation_result.sess.position.df, bin_values=(prev_one_step_bayesian_decoder.xbin_centers, prev_one_step_bayesian_decoder.ybin_centers), active_computation_config=computation_result.computation_config.pf_params, force_recompute=False, debug_print=debug_print)
+        # computation_result.sess.position.df, (xbin, ybin), bin_infos = build_df_discretized_binned_position_columns(computation_result.sess.position.df, bin_values=(xbin_values, ybin_values), active_computation_config=computation_result.computation_config.pf_params, force_recompute=False, debug_print=debug_print)
         
         active_xbins = xbin
         active_ybins = ybin      
