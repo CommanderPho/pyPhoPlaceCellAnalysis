@@ -75,6 +75,95 @@ class DefaultDecoderDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Disp
 # ==================================================================================================================== #
 # Private Implementations                                                                                              #
 # ==================================================================================================================== #
+def plot_1D_most_likely_position_comparsions(measured_position_df, time_window_centers, xbin, ax=None, posterior=None, active_most_likely_positions_1D=None, enable_flat_line_drawing=False, debug_print=False):
+    """ renders a 2D plot in MATPLOTLIB with separate subplots for the (x and y position axes): the computed posterior for the position from the Bayesian decoder and overlays the animal's actual position over the top.
+    
+    Input:
+    
+        enable_flat_line_drawing
+    
+    Usage:
+    
+        from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import plot_1D_most_likely_position_comparsions
+    
+        ## Test Plotting just a single dimension of the 2D posterior:
+        pho_custom_decoder = new_decoder
+        active_posterior = pho_custom_decoder.p_x_given_n
+        # Collapse the 2D position posterior into two separate 1D (X & Y) marginal posteriors. Be sure to re-normalize each marginal after summing
+        marginal_posterior_x = np.squeeze(np.sum(active_posterior, 1)) # sum over all y. Result should be [x_bins x time_bins]
+        marginal_posterior_x = marginal_posterior_x / np.sum(marginal_posterior_x, axis=0) # sum over all positions for each time_bin (so there's a normalized distribution at each timestep)
+        # np.shape(marginal_posterior_x) # (41, 3464)
+        fig, ax = plot_1D_most_likely_position_comparsions(sess.position.to_dataframe(), time_window_centers=pho_custom_decoder.active_time_window_centers, xbin=pho_custom_decoder.xbin,
+                                                        posterior=marginal_posterior_x,
+                                                        active_most_likely_positions_1D=pho_custom_decoder.most_likely_positions[:,0].T,
+                                                        enable_flat_line_drawing=False, debug_print=False)
+        fig.show()
+            
+            
+    """
+    with plt.ion():
+        if ax is None:
+            fig, ax = plt.subplots(ncols=1, nrows=1, figsize=(15,15), clear=True, sharex=True, sharey=False, constrained_layout=True)
+        else:
+            fig = plt.gcf()
+        
+        # Actual Position Plots:
+        ax.plot(measured_position_df['t'].to_numpy(), measured_position_df['x'].to_numpy(), label='measured x', color='#ff0000ff') # Opaque RED
+        ax.set_title('x')
+       
+        if posterior is not None:
+            # Compute extents for imshow:
+            main_plot_kwargs = {
+                'origin': 'lower',
+                'vmin': 0,
+                'vmax': 1,
+                'cmap': 'turbo',
+                'interpolation':'nearest',
+                'aspect':'auto',
+            }
+                
+            # Posterior distribution heatmaps at each point.
+
+            # X
+            xmin, xmax, ymin, ymax = (time_window_centers[0], time_window_centers[-1], xbin[0], xbin[-1])           
+            x_first_extent = (xmin, xmax, ymin, ymax)
+            active_extent = x_first_extent
+            im_posterior_x = ax.imshow(posterior, extent=active_extent, **main_plot_kwargs)
+            ax.set_xlim((xmin, xmax))
+            ax.set_ylim((ymin, ymax))
+
+        if active_most_likely_positions_1D is not None:
+            # Most likely position plots:
+
+            if enable_flat_line_drawing:
+                # Enable drawing flat lines for each time bin interval instead of just displaying the single point in the middle:
+                #   build separate points for the start and end of each bin interval, and the repeat every element of the x and y values to line them up.
+                time_bin_size = (time_window_centers[1]-time_window_centers[0])
+                active_half_time_bin_seconds = time_bin_size / 2.0
+                active_time_window_start_points = np.expand_dims(time_window_centers - active_half_time_bin_seconds, axis=1)
+                active_time_window_end_points = np.expand_dims(time_window_centers + active_half_time_bin_seconds, axis=1)
+                active_time_window_start_end_points = interleave_elements(active_time_window_start_points, active_time_window_end_points) # from pyphocorehelpers.indexing_helpers import interleave_elements
+                
+                if debug_print:
+                    print(f'np.shape(active_time_window_end_points): {np.shape(active_time_window_end_points)}\nnp.shape(active_time_window_start_end_points): {np.shape(active_time_window_start_end_points)}') 
+                    # np.shape(active_time_window_end_points): (5783, 1)
+                    # np.shape(active_time_window_start_end_points): (11566, 1)
+
+                active_time_window_variable = active_time_window_start_end_points
+                active_most_likely_positions_1D = np.repeat(active_most_likely_positions_1D, 2, axis=0) # repeat each element twice
+            else:
+                active_time_window_variable = time_window_centers
+            
+            ax.plot(active_time_window_variable, active_most_likely_positions_1D, lw=1.0, color='gray', alpha=0.4, label='1-step: most likely positions x') # (Num windows x 2)
+            
+            
+        return fig, ax
+
+
+
+
+
+
 
 def plot_most_likely_position_comparsions(pho_custom_decoder, position_df, show_posterior=True, show_one_step_most_likely_positions_plots=True, debug_print=False):
     """ renders a 2D plot in MATPLOTLIB with separate subplots for the (x and y position axes): the computed posterior for the position from the Bayesian decoder and overlays the animal's actual position over the top.
