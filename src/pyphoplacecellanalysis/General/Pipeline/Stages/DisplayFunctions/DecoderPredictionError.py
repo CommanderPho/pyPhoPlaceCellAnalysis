@@ -90,32 +90,25 @@ def plot_most_likely_position_comparsions(pho_custom_decoder, position_df, show_
         else:
             nrows=4
         fig, axs = plt.subplots(ncols=1, nrows=nrows, figsize=(15,15), clear=True, sharex=True, sharey=False, constrained_layout=True)
-        # active_window = pho_custom_decoder.active_time_windows[window_idx] # a tuple with a start time and end time
-        # active_p_x_given_n = np.squeeze(pho_custom_decoder.p_x_given_n[:,:,window_idx]) # same size as occupancy
+
+
         # Actual Position Plots:
         axs[0].plot(position_df['t'].to_numpy(), position_df['x'].to_numpy(), label='measured x', color='#ff0000ff') # Opaque RED
         axs[0].set_title('x')
         axs[1].plot(position_df['t'].to_numpy(), position_df['y'].to_numpy(), label='measured y', color='#ff0000ff') # Opaque RED
         axs[1].set_title('y')
-        # # Most likely position plots:
-        # axs[2].plot(pho_custom_decoder.active_time_window_centers, np.squeeze(pho_custom_decoder.most_likely_positions[:,0]), lw=0.5) # (Num windows x 2)
-        # axs[2].set_title('most likely positions x')
-        # axs[3].plot(pho_custom_decoder.active_time_window_centers, np.squeeze(pho_custom_decoder.most_likely_positions[:,1]), lw=0.5) # (Num windows x 2)
-        # axs[3].set_title('most likely positions y')
-        
+       
         if show_posterior:
             active_posterior = pho_custom_decoder.p_x_given_n
-            # active_posterior = pho_custom_decoder['p_x_given_n_and_x_prev'] # dict-style
             
-            # re-normalize each marginal after summing
+            # Collapse the 2D position posterior into two separate 1D (X & Y) marginal posteriors. Be sure to re-normalize each marginal after summing
             marginal_posterior_y = np.squeeze(np.sum(active_posterior, 0)) # sum over all x. Result should be [y_bins x time_bins]
             marginal_posterior_y = marginal_posterior_y / np.sum(marginal_posterior_y, axis=0) # sum over all positions for each time_bin (so there's a normalized distribution at each timestep)
             marginal_posterior_x = np.squeeze(np.sum(active_posterior, 1)) # sum over all y. Result should be [x_bins x time_bins]
             marginal_posterior_x = marginal_posterior_x / np.sum(marginal_posterior_x, axis=0) # sum over all positions for each time_bin (so there's a normalized distribution at each timestep)
 
-            # Compute extents foir imshow:
+            # Compute extents for imshow:
             
-            # im = ax.imshow(curr_p_x_given_n, **main_plot_kwargs) # add the curr_px_given_n image
             main_plot_kwargs = {
                 'origin': 'lower',
                 'vmin': 0,
@@ -126,16 +119,15 @@ def plot_most_likely_position_comparsions(pho_custom_decoder, position_df, show_
             }
                 
             # Posterior distribution heatmaps at each point.
+
             # X
             xmin, xmax, ymin, ymax = (pho_custom_decoder.active_time_window_centers[0], pho_custom_decoder.active_time_window_centers[-1], pho_custom_decoder.xbin[0], pho_custom_decoder.xbin[-1])           
-            # xmin, xmax = axs[0].get_xlim()
             x_first_extent = (xmin, xmax, ymin, ymax)
-            # y_first_extent = (ymin, ymax, xmin, xmax)
             active_extent = x_first_extent
             im_posterior_x = axs[0].imshow(marginal_posterior_x, extent=active_extent, **main_plot_kwargs)
-            # axs[0].axis("off")
             axs[0].set_xlim((xmin, xmax))
             axs[0].set_ylim((ymin, ymax))
+
             # Y
             xmin, xmax, ymin, ymax = (pho_custom_decoder.active_time_window_centers[0], pho_custom_decoder.active_time_window_centers[-1], pho_custom_decoder.ybin[0], pho_custom_decoder.ybin[-1])
             x_first_extent = (xmin, xmax, ymin, ymax)
@@ -145,7 +137,6 @@ def plot_most_likely_position_comparsions(pho_custom_decoder, position_df, show_
             # axs[1].axis("off")
             axs[1].set_xlim((xmin, xmax))
             axs[1].set_ylim((ymin, ymax))
-            
             
         if show_one_step_most_likely_positions_plots:
             # Most likely position plots:
