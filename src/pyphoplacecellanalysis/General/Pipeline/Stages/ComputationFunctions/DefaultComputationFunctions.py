@@ -30,7 +30,7 @@ class DefaultComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Computa
         
         """
         def position_decoding_computation(active_session, pf_computation_config, prev_output_result: ComputationResult):
-            
+            """ uses the pf2D property of "prev_output_result.computed_data['pf2D'] """
             ## filtered_spikes_df version:
             prev_output_result.computed_data['pf2D_Decoder'] = BayesianPlacemapPositionDecoder(pf_computation_config.time_bin_size, prev_output_result.computed_data['pf2D'], prev_output_result.computed_data['pf2D'].filtered_spikes_df.copy(), debug_print=False)
             ## original `active_session.spikes_df` version:
