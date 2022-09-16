@@ -11,6 +11,10 @@ from pyphocorehelpers.print_helpers import WrappingMessagePrinter, SimplePrintab
 from pyphocorehelpers.mixins.serialized import SerializedAttributesSpecifyingClass
 
 
+from pyphocorehelpers.print_helpers import print_value_overview_only, print_keys_if_possible, debug_dump_object_member_shapes, safe_get_variable_shape
+
+
+
 # cut_bins = np.linspace(59200, 60800, 9)
 # pd.cut(df['column_name'], bins=cut_bins)
 
@@ -250,7 +254,23 @@ class Zhang_Two_Step:
 
     
 class PlacemapPositionDecoder(SerializedAttributesSpecifyingClass, SimplePrintable, object, metaclass=OrderedMeta):
-    """docstring for PlacemapPositionDecoder."""
+    """docstring for PlacemapPositionDecoder.
+    
+    Call flow:
+        ## Init/Setup Section:
+        .__init__()
+            .setup()
+            .post_load() - Called after deserializing/loading saved result from disk to rebuild the needed computed variables. 
+                self._setup_concatenated_F()
+                self._setup_time_bin_spike_counts_N_i()
+                self._setup_time_window_centers()
+    
+    
+        ## Computation Section
+        .compute_all()
+            .perform_compute_single_time_bin(...)
+            .perform_compute_most_likely_positions(...)
+    """     
     
     def __init__(self, time_bin_size: float, pf, spikes_df: pd.DataFrame, setup_on_init:bool=True, post_load_on_init:bool=False, debug_print:bool=False):
         super(PlacemapPositionDecoder, self).__init__()
@@ -349,12 +369,14 @@ class PlacemapPositionDecoder(SerializedAttributesSpecifyingClass, SimplePrintab
         # spike_counts = np.asarray([np.histogram(_, bins=bins)[0] for _ in self.spiketrains])
         
 class BayesianPlacemapPositionDecoder(PlacemapPositionDecoder):
-    """docstring for BayesianPlacemapPositionDecoder."""
+    """docstring for BayesianPlacemapPositionDecoder.
     
-    def __init__(self, time_bin_size: float, pf, spikes_df: pd.DataFrame, setup_on_init:bool=True, post_load_on_init:bool=False, debug_print:bool=True):
-        super(BayesianPlacemapPositionDecoder, self).__init__(time_bin_size, pf, spikes_df, setup_on_init=setup_on_init, post_load_on_init=post_load_on_init, debug_print=debug_print)
-        
-        
+    
+    Called after deserializing/loading saved result from disk to rebuild the needed computed variables. 
+    
+    """
+    
+    
     @property
     def flat_position_size(self):
         """The flat_position_size property."""
@@ -411,7 +433,6 @@ class BayesianPlacemapPositionDecoder(PlacemapPositionDecoder):
     def ybin_centers(self):
         return self.ratemap.ybin_centers
     
-    
     @classmethod
     def serialized_keys(cls):
         input_keys = ['time_bin_size', 'pf', 'spikes_df', 'debug_print']
@@ -425,13 +446,22 @@ class BayesianPlacemapPositionDecoder(PlacemapPositionDecoder):
         return new_obj
     
     
+    
+    # ==================================================================================================================== #
+    # Methods                                                                                                              #
+    # ==================================================================================================================== #
+    
+    def __init__(self, time_bin_size: float, pf, spikes_df: pd.DataFrame, setup_on_init:bool=True, post_load_on_init:bool=False, debug_print:bool=True):
+        super(BayesianPlacemapPositionDecoder, self).__init__(time_bin_size, pf, spikes_df, setup_on_init=setup_on_init, post_load_on_init=post_load_on_init, debug_print=debug_print)
+        
+
     def post_load(self):
         """ Called after deserializing/loading saved result from disk to rebuild the needed computed variables. """
         with WrappingMessagePrinter(f'post_load() called.', begin_line_ending='... ', finished_message='all rebuilding completed.', enable_print=self.debug_print):
             self._setup_concatenated_F()
             self._setup_time_bin_spike_counts_N_i()
             self._setup_time_window_centers()
-            self.p_x_given_n = self.reshaped_output(self.flat_p_x_given_n)
+            self.p_x_given_n = self._reshaped_output(self.flat_p_x_given_n)
             self.perform_compute_most_likely_positions()
     
     
@@ -454,6 +484,27 @@ class BayesianPlacemapPositionDecoder(PlacemapPositionDecoder):
         # pre-allocate outputs:
         self._setup_preallocate_outputs()
         
+        
+    def debug_dump_print(self):
+        """ dumps the state for debugging purposes """
+        variable_names_dict = dict(time_variable_names = ['time_bin_size', 'time_window_edges', 'time_window_edges_binning_info', 'total_spike_counts_per_window', 'time_window_centers','time_window_center_binning_info'],
+            binned_spikes = ['unit_specific_time_binned_spike_counts', 'total_spike_counts_per_window'],
+            intermediate_computations = ['F', 'P_x'],
+            posteriors = ['p_x_given_n'],
+            other_variables = ['neuron_IDXs', 'neuron_IDs']
+        )
+        for a_category_name, variable_names_list in variable_names_dict.items():
+            print(f'# {a_category_name}:')
+            # print(f'\t {variable_names_list}:')
+            for a_variable_name in variable_names_list:
+                a_var_value = getattr(self, a_variable_name)
+                a_var_shape = safe_get_variable_shape(a_var_value) or 'SCALAR'
+                print(f'\t {a_variable_name}: {a_var_shape}')
+
+        
+    # ==================================================================================================================== #
+    # Private Methods                                                                                                      #
+    # ==================================================================================================================== #
     def _setup_concatenated_F(self):
         """
             maps: (40, 48, 6)
@@ -476,7 +527,6 @@ class BayesianPlacemapPositionDecoder(PlacemapPositionDecoder):
         assert np.shape(self.unit_specific_time_binned_spike_counts)[0] == len(self.neuron_IDXs), f"in _setup_time_bin_spike_counts_N_i(): output should equal self.neuronIDXs but np.shape(self.unit_specific_time_binned_spike_counts)[0]: {np.shape(self.unit_specific_time_binned_spike_counts)[0]} and len(self.neuron_IDXs): {len(self.neuron_IDXs)}"
         self.total_spike_counts_per_window = np.sum(self.unit_specific_time_binned_spike_counts, axis=0) # gets the total number of spikes during each window (across all placefields)
 
-
     def _setup_preallocate_outputs(self):
         with WrappingMessagePrinter(f'pre-allocating final_p_x_given_n: np.shape(final_p_x_given_n) will be: ({self.flat_position_size} x {self.num_time_windows})...', begin_line_ending='... ', enable_print=self.debug_print):
             # if self.debug_print:
@@ -491,9 +541,13 @@ class BayesianPlacemapPositionDecoder(PlacemapPositionDecoder):
         actual_time_window_size = self.time_window_centers[2] - self.time_window_centers[1]
         self.time_window_center_binning_info = BinningInfo(self.time_window_edges_binning_info.variable_extents, actual_time_window_size, len(self.time_window_centers), np.arange(len(self.time_window_centers)))
         
+    def _reshaped_output(self, output_probability):
+       return np.reshape(output_probability, (self.original_position_data_shape[0], self.original_position_data_shape[1], self.num_time_windows))
+
     
-    
-    # Main computation functions:
+    # ==================================================================================================================== #
+    # Main computation functions:                                                                                          #
+    # ==================================================================================================================== #
     def perform_compute_single_time_bin(self, time_window_idx):
         """ the main computation function for a single time_window_idx """
         n = self.unit_specific_time_binned_spike_counts[:, time_window_idx] # this gets the specific n_t for this time window
@@ -517,7 +571,7 @@ class BayesianPlacemapPositionDecoder(PlacemapPositionDecoder):
             # Reshape the output variable:
             
             # np.shape(self.final_p_x_given_n) # (288, 85842)
-            self.p_x_given_n = self.reshaped_output(self.flat_p_x_given_n)
+            self.p_x_given_n = self._reshaped_output(self.flat_p_x_given_n)
             self.perform_compute_most_likely_positions()
 
             # self.p_x_given_n = np.reshape(self.flat_p_x_given_n, (self.original_position_data_shape[0], self.original_position_data_shape[1], self.num_time_windows))            
@@ -525,9 +579,6 @@ class BayesianPlacemapPositionDecoder(PlacemapPositionDecoder):
             # if self.debug_print:
             #     print('compute_all completed!')
             
-    def reshaped_output(self, output_probability):
-       return np.reshape(output_probability, (self.original_position_data_shape[0], self.original_position_data_shape[1], self.num_time_windows))
-
     def perform_compute_most_likely_positions(self):
         """ Computes the most likely positions at each timestep from self.flat_p_x_given_n """
         self.most_likely_position_flat_indicies = np.argmax(self.flat_p_x_given_n, axis=0)
