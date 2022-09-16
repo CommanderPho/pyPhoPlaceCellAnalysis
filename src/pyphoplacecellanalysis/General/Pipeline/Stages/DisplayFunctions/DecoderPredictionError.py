@@ -75,7 +75,7 @@ class DefaultDecoderDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Disp
 # ==================================================================================================================== #
 # Private Implementations                                                                                              #
 # ==================================================================================================================== #
-def plot_1D_most_likely_position_comparsions(measured_position_df, time_window_centers, xbin, ax=None, posterior=None, active_most_likely_positions_1D=None, enable_flat_line_drawing=False, debug_print=False):
+def plot_1D_most_likely_position_comparsions(measured_position_df, time_window_centers, xbin, ax=None, posterior=None, active_most_likely_positions_1D=None, enable_flat_line_drawing=False, variable_name = 'x', debug_print=False):
     """ renders a 2D plot in MATPLOTLIB with separate subplots for the (x and y position axes): the computed posterior for the position from the Bayesian decoder and overlays the animal's actual position over the top.
     
     Input:
@@ -108,8 +108,8 @@ def plot_1D_most_likely_position_comparsions(measured_position_df, time_window_c
             fig = plt.gcf()
         
         # Actual Position Plots:
-        ax.plot(measured_position_df['t'].to_numpy(), measured_position_df['x'].to_numpy(), label='measured x', color='#ff0000ff') # Opaque RED
-        ax.set_title('x')
+        ax.plot(measured_position_df['t'].to_numpy(), measured_position_df[variable_name].to_numpy(), label=f'measured {variable_name}', color='#ff0000ff') # Opaque RED
+        ax.set_title(variable_name)
        
         if posterior is not None:
             # Compute extents for imshow:
@@ -154,7 +154,7 @@ def plot_1D_most_likely_position_comparsions(measured_position_df, time_window_c
             else:
                 active_time_window_variable = time_window_centers
             
-            ax.plot(active_time_window_variable, active_most_likely_positions_1D, lw=1.0, color='gray', alpha=0.4, label='1-step: most likely positions x') # (Num windows x 2)
+            ax.plot(active_time_window_variable, active_most_likely_positions_1D, lw=1.0, color='gray', alpha=0.4, label=f'1-step: most likely positions {variable_name}') # (Num windows x 2)
             
             
         return fig, ax
@@ -180,81 +180,40 @@ def plot_most_likely_position_comparsions(pho_custom_decoder, position_df, show_
             nrows=4
         fig, axs = plt.subplots(ncols=1, nrows=nrows, figsize=(15,15), clear=True, sharex=True, sharey=False, constrained_layout=True)
 
-
-        # Actual Position Plots:
-        axs[0].plot(position_df['t'].to_numpy(), position_df['x'].to_numpy(), label='measured x', color='#ff0000ff') # Opaque RED
-        axs[0].set_title('x')
-        axs[1].plot(position_df['t'].to_numpy(), position_df['y'].to_numpy(), label='measured y', color='#ff0000ff') # Opaque RED
-        axs[1].set_title('y')
        
+        if show_one_step_most_likely_positions_plots:
+            active_most_likely_positions_x = pho_custom_decoder.most_likely_positions[:,0].T
+            active_most_likely_positions_y = pho_custom_decoder.most_likely_positions[:,1].T
+        else:
+            active_most_likely_positions_x = None
+            active_most_likely_positions_y = None
+
+
         if show_posterior:
             active_posterior = pho_custom_decoder.p_x_given_n
-            
             # Collapse the 2D position posterior into two separate 1D (X & Y) marginal posteriors. Be sure to re-normalize each marginal after summing
             marginal_posterior_y = np.squeeze(np.sum(active_posterior, 0)) # sum over all x. Result should be [y_bins x time_bins]
             marginal_posterior_y = marginal_posterior_y / np.sum(marginal_posterior_y, axis=0) # sum over all positions for each time_bin (so there's a normalized distribution at each timestep)
             marginal_posterior_x = np.squeeze(np.sum(active_posterior, 1)) # sum over all y. Result should be [x_bins x time_bins]
             marginal_posterior_x = marginal_posterior_x / np.sum(marginal_posterior_x, axis=0) # sum over all positions for each time_bin (so there's a normalized distribution at each timestep)
+        else:
+            marginal_posterior_x = None
+            marginal_posterior_y = None
 
-            # Compute extents for imshow:
-            
-            main_plot_kwargs = {
-                'origin': 'lower',
-                'vmin': 0,
-                'vmax': 1,
-                'cmap': 'turbo',
-                'interpolation':'nearest',
-                'aspect':'auto',
-            }
+
+        ## NEW: Perform the plot_1D_most_likely_position_comparsions(...) calls for x & y:
+        # X:
+        _, axs[0] = plot_1D_most_likely_position_comparsions(position_df, variable_name='x', time_window_centers=pho_custom_decoder.active_time_window_centers, xbin=pho_custom_decoder.xbin,
+                                                    posterior=marginal_posterior_x,
+                                                    active_most_likely_positions_1D=active_most_likely_positions_x, ax=axs[0],
+                                                    enable_flat_line_drawing=True, debug_print=debug_print)
+        
+        # Y:
+        _, axs[1] = plot_1D_most_likely_position_comparsions(position_df, variable_name='y', time_window_centers=pho_custom_decoder.active_time_window_centers, xbin=pho_custom_decoder.ybin,
+                                                    posterior=marginal_posterior_y,
+                                                    active_most_likely_positions_1D=active_most_likely_positions_y, ax=axs[1],
+                                                    enable_flat_line_drawing=True, debug_print=debug_print)
                 
-            # Posterior distribution heatmaps at each point.
-
-            # X
-            xmin, xmax, ymin, ymax = (pho_custom_decoder.active_time_window_centers[0], pho_custom_decoder.active_time_window_centers[-1], pho_custom_decoder.xbin[0], pho_custom_decoder.xbin[-1])           
-            x_first_extent = (xmin, xmax, ymin, ymax)
-            active_extent = x_first_extent
-            im_posterior_x = axs[0].imshow(marginal_posterior_x, extent=active_extent, **main_plot_kwargs)
-            axs[0].set_xlim((xmin, xmax))
-            axs[0].set_ylim((ymin, ymax))
-
-            # Y
-            xmin, xmax, ymin, ymax = (pho_custom_decoder.active_time_window_centers[0], pho_custom_decoder.active_time_window_centers[-1], pho_custom_decoder.ybin[0], pho_custom_decoder.ybin[-1])
-            x_first_extent = (xmin, xmax, ymin, ymax)
-            # y_first_extent = (ymin, ymax, xmin, xmax)
-            active_extent = x_first_extent
-            im_posterior_y = axs[1].imshow(marginal_posterior_y, extent=active_extent, **main_plot_kwargs)
-            # axs[1].axis("off")
-            axs[1].set_xlim((xmin, xmax))
-            axs[1].set_ylim((ymin, ymax))
-            
-        if show_one_step_most_likely_positions_plots:
-            # Most likely position plots:
-            active_time_window_variable = pho_custom_decoder.active_time_window_centers
-            active_most_likely_positions_x = pho_custom_decoder.most_likely_positions[:,0].T
-            active_most_likely_positions_y = pho_custom_decoder.most_likely_positions[:,1].T
-            
-            # Enable drawing flat lines for each time bin interval instead of just displaying the single point in the middle:
-            #   build separate points for the start and end of each bin interval, and the repeat every element of the x and y values to line them up.
-            active_half_time_bin_seconds = pho_custom_decoder.time_bin_size / 2.0
-            active_time_window_start_points = np.expand_dims(pho_custom_decoder.active_time_window_centers - active_half_time_bin_seconds, axis=1)
-            active_time_window_end_points = np.expand_dims(pho_custom_decoder.active_time_window_centers + active_half_time_bin_seconds, axis=1)
-            active_time_window_start_end_points = interleave_elements(active_time_window_start_points, active_time_window_end_points) # from pyphocorehelpers.indexing_helpers import interleave_elements
-            
-            if debug_print:
-                print(f'np.shape(active_time_window_end_points): {np.shape(active_time_window_end_points)}\nnp.shape(active_time_window_start_end_points): {np.shape(active_time_window_start_end_points)}') 
-                # np.shape(active_time_window_end_points): (5783, 1)
-                # np.shape(active_time_window_start_end_points): (11566, 1)
-
-            active_time_window_variable = active_time_window_start_end_points
-            active_most_likely_positions_x = np.repeat(active_most_likely_positions_x, 2, axis=0) # repeat each element twice
-            active_most_likely_positions_y = np.repeat(active_most_likely_positions_y, 2, axis=0) # repeat each element twice    
-            
-            axs[0].plot(active_time_window_variable, active_most_likely_positions_x, lw=1.0, color='gray', alpha=0.4, label='1-step: most likely positions x') # (Num windows x 2)
-            # axs[0].set_title('most likely positions x')
-            axs[1].plot(active_time_window_variable, active_most_likely_positions_y, lw=1.0, color='gray', alpha=0.4, label='1-step: most likely positions y') # (Num windows x 2)
-            # axs[1].set_title('most likely positions y')
-            
-            
         fig.suptitle(f'Decoded Position data component comparison')
         return fig, axs
 
