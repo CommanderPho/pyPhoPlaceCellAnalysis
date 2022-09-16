@@ -77,7 +77,7 @@ class DefaultDecoderDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Disp
 # ==================================================================================================================== #
 
 def plot_most_likely_position_comparsions(pho_custom_decoder, position_df, show_posterior=True, show_one_step_most_likely_positions_plots=True, debug_print=False):
-    """ renders a 2D plot with separate subplots for the (x and y position axes): the computed posterior for the position from the Bayesian decoder and overlays the animal's actual position over the top.
+    """ renders a 2D plot in MATPLOTLIB with separate subplots for the (x and y position axes): the computed posterior for the position from the Bayesian decoder and overlays the animal's actual position over the top.
     Usage:
         fig, axs = plot_most_likely_position_comparsions(pho_custom_decoder, sess.position.to_dataframe())
     """
@@ -89,7 +89,7 @@ def plot_most_likely_position_comparsions(pho_custom_decoder, position_df, show_
             nrows=2
         else:
             nrows=4
-        fig, axs = plt.subplots(ncols=1, nrows=nrows, figsize=(15,15), clear=True, sharex=True, sharey=False, constrained_layout=False)
+        fig, axs = plt.subplots(ncols=1, nrows=nrows, figsize=(15,15), clear=True, sharex=True, sharey=False, constrained_layout=True)
         # active_window = pho_custom_decoder.active_time_windows[window_idx] # a tuple with a start time and end time
         # active_p_x_given_n = np.squeeze(pho_custom_decoder.p_x_given_n[:,:,window_idx]) # same size as occupancy
         # Actual Position Plots:
