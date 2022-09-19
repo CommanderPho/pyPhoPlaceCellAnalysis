@@ -548,8 +548,8 @@ class BayesianPlacemapPositionDecoder(PlacemapPositionDecoder):
         # Check if we already have self.time_window_edges and self.time_window_edges_binning_info to use
         if (self.time_window_edges is not None) and (self.time_window_edges_binning_info is not None):
             ## Already have time_window_edges to use, do not create new ones:
-            assert self.time_window_center_binning_info.step == self.time_bin_size
-            self.unit_specific_time_binned_spike_counts, _, _ = ZhangReconstructionImplementation.time_bin_spike_counts_N_i(self.spikes_df, self.time_bin_size, debug_print=self.debug_print) # unit_specific_binned_spike_counts.to_numpy(): (40, 85841)
+            assert self.time_window_edges_binning_info.step == self.time_bin_size
+            self.unit_specific_time_binned_spike_counts, _, _ = ZhangReconstructionImplementation.time_bin_spike_counts_N_i(self.spikes_df, self.time_bin_size, time_window_edges=self.time_window_edges, time_window_edges_binning_info=self.time_window_edges_binning_info, debug_print=self.debug_print) # unit_specific_binned_spike_counts.to_numpy(): (40, 85841)
             
         else:
             ## need to create new time_window_edges from the self.time_bin_size:
