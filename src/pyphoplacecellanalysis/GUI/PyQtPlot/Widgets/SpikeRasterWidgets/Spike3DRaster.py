@@ -535,9 +535,6 @@ class Spike3DRaster(PyQtGraphSpecificTimeCurvesMixin, RenderTimeEpoch3DMeshesMix
             curr_paired_x = curr_x.repeat(2)
             
             # Z-positions:
-            # spike_bottom_zs = np.full_like(curr_x, self.params.spike_start_z)
-            # spike_top_zs = np.full_like(curr_x, self.params.spike_end_z)
-            # curr_paired_spike_zs = np.squeeze(interleave_elements(np.atleast_2d(spike_bottom_zs).T, np.atleast_2d(spike_top_zs).T)) # alternating top and bottom z-positions
             curr_paired_spike_zs = np.squeeze(np.tile(np.array([self.params.spike_start_z, self.params.spike_end_z]), curr_unit_n_spikes)) # repeat pair of z values once for each spike
         
             # Build lines:

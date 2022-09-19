@@ -109,6 +109,10 @@ class ZhangReconstructionImplementation:
         neuron_IDs = pf.ratemap.neuron_ids
         neuron_IDXs = np.arange(len(neuron_IDs))
         maps = pf.ratemap.normalized_tuning_curves  # (40, 48) for 1D, (40, 48, 10) for 2D
+        
+        ## 2022-09-19 - TODO: should this be the non-normalized tuning curves instead of the normalized ones?
+        # e.g. maps = pf.ratemap.tuning_curves
+        
         if debug_print:
             print(f'maps: {np.shape(maps)}') # maps: (40, 48, 10)
         f_i = [np.squeeze(maps[i,:,:]) for i in neuron_IDXs] # produces a list of (48 x 10) maps
