@@ -1,9 +1,12 @@
 import numpy as np
-import pyphoplacecellanalysis.External.pyqtgraph as pg
-from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtWidgets, QtCore, QtGui
 
 from pyphocorehelpers.DataStructure.general_parameter_containers import VisualizationParameters, RenderPlotsData, RenderPlots
 from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer
+
+import pyphoplacecellanalysis.External.pyqtgraph as pg
+from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtWidgets, QtCore, QtGui
+from pyphoplacecellanalysis.GUI.Qt.Mixins.PhoMainAppWindowBase import PhoMainAppWindowBase # for pyqtplot_plot_image
+
 
 
 def pyqtplot_build_image_bounds_extent(xbin_edges, ybin_edges, margin = 2.0, debug_print=False):
@@ -38,7 +41,68 @@ def pyqtplot_build_image_bounds_extent(xbin_edges, ybin_edges, margin = 2.0, deb
 
     return image_bounds_extent, x_range, y_range
     
+
+def pyqtplot_plot_image(xbin_edges, ybin_edges, image, enable_LUT_Histogram=False, app=None, parent_root_widget=None, root_render_widget=None, debug_print=False):
+    """ Single image plot using pyqtplot: 
+    Holy crap! It actually works to plot the maze, and the adjustable slider works as well!
     
+    # Example: test single image plot:
+        curr_im = np.squeeze(active_one_step_decoder.ratemap.normalized_tuning_curves[0,:,:]) # (43, 63, 63)
+        app, win, imv = pyqtplot_plot_image(active_one_step_decoder.xbin, active_one_step_decoder.ybin, curr_im)
+        win.show()
+    """
+    # Interpret image data as row-major instead of col-major
+    pg.setConfigOptions(imageAxisOrder='row-major')
+    if app is None:
+        app = pg.mkQApp("pyqtplot_plot_image Figure")
+        
+        
+    # image_bounds_extent, x_range, y_range = pyqtplot_build_image_bounds_extent(xbin_edges, ybin_edges, margin=2.0, debug_print=debug_print)
+    
+        
+    if root_render_widget is None:
+        if parent_root_widget is None:
+            # Create window to hold the image:
+            
+            # parent_root_widget = QtGui.QMainWindow()
+            parent_root_widget = PhoMainAppWindowBase()
+            parent_root_widget.resize(800,800)
+        
+        # Build a single image view to display the image:
+        root_render_widget = pg.ImageView()
+        parent_root_widget.setCentralWidget(root_render_widget)
+        # imv.setImage(image, xvals=np.linspace(1., 3., data.shape[0]))
+        parent_root_widget.show()
+        parent_root_widget.setWindowTitle('pyqtplot image')
+
+    ## Display the data and assign each frame a time value from 1.0 to 3.0
+    root_render_widget.setImage(image, xvals=xbin_edges)
+    # Set the color map:
+    # cmap = pg.ColorMap(pos=np.linspace(0.0, 1.0, 6), color=colors)
+    cmap = pg.colormap.get('jet','matplotlib') # prepare a linear color map
+    root_render_widget.setColorMap(cmap)
+    
+    # if enable_LUT_Histogram:
+    #     lut = pg.HistogramLUTItem(orientation="horizontal")
+    #     imv.addItem(lut)
+    #     imv.setLookupTable(lut, autoLevel=True)
+    #     h = imv.getHistogram()
+    #     lut.plot.setData(*h)
+
+    # bar = pg.ColorBarItem( values= (0, 20_000), cmap=cm ) # prepare interactive color bar
+    # Have ColorBarItem control colors of img and appear in 'plot':
+    # bar.setImageItem(image, insert_in=imv) 
+
+    return app, parent_root_widget, root_render_widget
+ 
+ 
+ 
+ 
+ 
+
+# ==================================================================================================================== #
+# UI Building Helpers                                                                                                  #
+# ==================================================================================================================== #
 def build_root_graphics_layout_widget_ui(name, window_title=None, ui=None):
     """ Updates or builds the ui properties to display a GraphicsLayoutWidget with scrollable rows:
     Usage:
@@ -59,7 +123,6 @@ def build_root_graphics_layout_widget_ui(name, window_title=None, ui=None):
     ui.graphics_layout.resize(1000, 800)
     # lw.ci.setBorder((50, 50, 100))
     return ui
-
 
 def build_scrollable_graphics_layout_widget_ui(name, window_title=None, ui=None):
     """ Updates or builds the ui properties to display a GraphicsLayoutWidget with scrollable rows:
@@ -91,7 +154,6 @@ def build_scrollable_graphics_layout_widget_ui(name, window_title=None, ui=None)
     
     # ui.rootWindow.show()
     return ui
-
 
 def build_scrollable_graphics_layout_widget_with_nested_viewbox_ui(name, window_title=None, ui=None):
     """ Updates or builds the ui properties to display a GraphicsLayoutWidget with scrollable rows:
@@ -126,7 +188,9 @@ def build_scrollable_graphics_layout_widget_with_nested_viewbox_ui(name, window_
 
 
 
-
+# ==================================================================================================================== #
+# Stacked Epoch Slices View                                                                                            #
+# ==================================================================================================================== #
 def stacked_epoch_slices_view(epoch_slices, position_times_list, position_traces_list, epoch_description_list, name='stacked_epoch_slices_view', debug_print=False):
     """ 
     
