@@ -181,47 +181,47 @@ class ZhangReconstructionImplementation:
 
 
     # Bayesian Probabilistic Approach:
-    @staticmethod
-    def bayesian_prob(tau, P_x, F, n, debug_print=False):
-        # n_i: the number of spikes fired by each cell during the time window of consideration
-        assert(len(n) == np.shape(F)[1]), f'n must be a column vector with an entry for each place cell (neuron). Instead it is of np.shape(n): {np.shape(n)}. np.shape(F): {np.shape(F)}'
+    # @staticmethod
+    # def bayesian_prob(tau, P_x, F, n, debug_print=False):
+    #     """ this seems to be broken as of 2022-09-20. Replaced by .neuropy_bayesian_prob(...) which does seem to work for 2D and was extracted from Neuropy """
+    #     # n_i: the number of spikes fired by each cell during the time window of consideration
+    #     assert(len(n) == np.shape(F)[1]), f'n must be a column vector with an entry for each place cell (neuron). Instead it is of np.shape(n): {np.shape(n)}. np.shape(F): {np.shape(F)}'
         
-        # total_number_spikes_n = np.sum(n) # the total number of spikes across all placecells during this timewindow
+    #     # total_number_spikes_n = np.sum(n) # the total number of spikes across all placecells during this timewindow
         
-        # take n as a row vector, and repeat it vertically for each column.
-        element_wise_n = np.tile(n, (np.shape(F)[0], 1)) # repeat n for each row (coresponding to a position x) in F.
-        # repeats_array = np.tile(an_array, (repetitions, 1))
-        if debug_print:
-            print(f'np.shape(element_wise_n): {np.shape(element_wise_n)}') # np.shape(element_wise_n): (288, 40)
+    #     # take n as a row vector, and repeat it vertically for each column.
+    #     element_wise_n = np.tile(n, (np.shape(F)[0], 1)) # repeat n for each row (coresponding to a position x) in F.
+    #     # repeats_array = np.tile(an_array, (repetitions, 1))
+    #     if debug_print:
+    #         print(f'np.shape(element_wise_n): {np.shape(element_wise_n)}') # np.shape(element_wise_n): (288, 40)
 
-        # the inner expression np.power(F, element_wise_n) performs the element-wise exponentiation of F with the values in element_wise_n.
-        # result = P_x * np.prod(np.power(F, element_wise_n), axis=1) # the product is over the neurons, so the second dimension
-        term1 = np.squeeze(P_x) # np.shape(P_x): (48, 6)
-        if debug_print:
-            print(f'np.shape(term1): {np.shape(term1)}') # np.shape(P_x): (48, 6)
-        term2 = np.prod(np.power(F, element_wise_n), axis=1) # np.shape(term2): (288,)
-        if debug_print:
-            print(f'np.shape(term2): {np.shape(term2)}') # np.shape(P_x): (48, 6)
+    #     # the inner expression np.power(F, element_wise_n) performs the element-wise exponentiation of F with the values in element_wise_n.
+    #     # result = P_x * np.prod(np.power(F, element_wise_n), axis=1) # the product is over the neurons, so the second dimension
+    #     term1 = np.squeeze(P_x) # np.shape(P_x): (48, 6)
+    #     if debug_print:
+    #         print(f'np.shape(term1): {np.shape(term1)}') # np.shape(P_x): (48, 6)
+    #     term2 = np.prod(np.power(F, element_wise_n), axis=1) # np.shape(term2): (288,)
+    #     if debug_print:
+    #         print(f'np.shape(term2): {np.shape(term2)}') # np.shape(P_x): (48, 6)
 
-        # result = C_tau_n * P_x
-        term3 = np.exp(-tau * np.sum(F, axis=1)) # sum over all columns (corresponding to over all cells)
-        if debug_print:
-            print(f'np.shape(term3): {np.shape(term3)}') # np.shape(P_x): (48, 6)
+    #     # result = C_tau_n * P_x
+    #     term3 = np.exp(-tau * np.sum(F, axis=1)) # sum over all columns (corresponding to over all cells)
+    #     if debug_print:
+    #         print(f'np.shape(term3): {np.shape(term3)}') # np.shape(P_x): (48, 6)
 
-        # each column_i of F, F[:,i] should be raised to the power of n_i[i]
-        un_normalized_result = term1 * term2 * term3
-        C_tau_n = 1.0 / np.sum(un_normalized_result) # normalize the result
-        result = C_tau_n * un_normalized_result
-        if debug_print:
-            print(f'np.shape(result): {np.shape(result)}') # np.shape(P_x): (48, 6)
-        """
-            np.shape(term1): (288, 1)
-            np.shape(term2): (288,)
-            np.shape(term3): (288,)
-            np.shape(result): (288, 288)
-        """
-        return result
-    
+    #     # each column_i of F, F[:,i] should be raised to the power of n_i[i]
+    #     un_normalized_result = term1 * term2 * term3
+    #     C_tau_n = 1.0 / np.sum(un_normalized_result) # normalize the result
+    #     result = C_tau_n * un_normalized_result
+    #     if debug_print:
+    #         print(f'np.shape(result): {np.shape(result)}') # np.shape(P_x): (48, 6)
+    #     """
+    #         np.shape(term1): (288, 1)
+    #         np.shape(term2): (288,)
+    #         np.shape(term3): (288,)
+    #         np.shape(result): (288, 288)
+    #     """
+    #     return result
     
     @staticmethod
     def neuropy_bayesian_prob(tau, P_x, F, n, debug_print=False):
@@ -244,18 +244,22 @@ class ZhangReconstructionImplementation:
         F = F.T # Transpose F so it's of the right form
         cell_prob = np.zeros((nFlatPositionBins, nTimeBins, nCells))
         for cell in range(nCells):
+            """ Comparing to the Zhang paper: the output posterior is P_n_given_x (Eqn 35)
+                cell_ratemap: [f_{i}(x) for i in range(nCells)]
+                cell_spkcnt: [n_{i} for i in range(nCells)]            
+            """
             # cell_spkcnt = spkcount[cell, :][np.newaxis, :]
             # cell_ratemap = ratemaps[cell, :][:, np.newaxis]
             cell_spkcnt = n[cell, :][np.newaxis, :]
             cell_ratemap = F[cell, :][:, np.newaxis]
-            coeff = 1 / (factorial(cell_spkcnt))
+            coeff = 1 / (factorial(cell_spkcnt)) # 1/factorial(n_{i}) term
             # broadcasting
             cell_prob[:, :, cell] = (((tau * cell_ratemap) ** cell_spkcnt) * coeff) * (
                 np.exp(-tau * cell_ratemap)
             )
 
         posterior = np.prod(cell_prob, axis=2)
-        posterior /= np.sum(posterior, axis=0)
+        posterior /= np.sum(posterior, axis=0) # C(tau, n) = np.sum(posterior, axis=0): normalization condition mentioned in eqn 36 to convert to P_x_given_n
 
         return posterior
         
@@ -302,7 +306,6 @@ class Zhang_Two_Step:
         out_k = np.append(np.nan, np.nansum(flat_p_x_given_n, axis=0)[:-1]) # we'll have one for each time_window_bin_idx [:, time_window_bin_idx]. Want all except the last element ([:-1])
         return out_k
         
-    
     @classmethod
     def compute_bayesian_two_step_prob_single_timestep(cls, one_step_p_x_given_n, x_prev, all_x, sigma_t, C, k):
         return k * one_step_p_x_given_n * cls.compute_conditional_probability_x_prev_given_x_t(x_prev, all_x, sigma_t, C)

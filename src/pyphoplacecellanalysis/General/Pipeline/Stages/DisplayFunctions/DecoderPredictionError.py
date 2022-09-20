@@ -108,7 +108,7 @@ def plot_1D_most_likely_position_comparsions(measured_position_df, time_window_c
             fig = plt.gcf()
         
         # Actual Position Plots:
-        ax.plot(measured_position_df['t'].to_numpy(), measured_position_df[variable_name].to_numpy(), label=f'measured {variable_name}', color='#ff0000ff') # Opaque RED
+        ax.plot(measured_position_df['t'].to_numpy(), measured_position_df[variable_name].to_numpy(), label=f'measured {variable_name}', color='#ff000066', alpha=0.8, marker='+', markersize=4) # Opaque RED # , linestyle='dashed', linewidth=2, color='#ff0000ff'
         ax.set_title(variable_name)
        
         if posterior is not None:
@@ -154,7 +154,8 @@ def plot_1D_most_likely_position_comparsions(measured_position_df, time_window_c
             else:
                 active_time_window_variable = time_window_centers
             
-            ax.plot(active_time_window_variable, active_most_likely_positions_1D, lw=1.0, color='gray', alpha=0.4, label=f'1-step: most likely positions {variable_name}') # (Num windows x 2)
+            ax.plot(active_time_window_variable, active_most_likely_positions_1D, lw=1.0, color='gray', alpha=0.8, marker='+', markersize=6, label=f'1-step: most likely positions {variable_name}') # (Num windows x 2)
+            # ax.plot(active_time_window_variable, active_most_likely_positions_1D, lw=1.0, color='gray', alpha=0.4, label=f'1-step: most likely positions {variable_name}') # (Num windows x 2)
             
             
         return fig, ax
@@ -165,7 +166,7 @@ def plot_1D_most_likely_position_comparsions(measured_position_df, time_window_c
 
 
 
-def plot_most_likely_position_comparsions(pho_custom_decoder, position_df, axs=None, show_posterior=True, show_one_step_most_likely_positions_plots=True, debug_print=False):
+def plot_most_likely_position_comparsions(pho_custom_decoder, position_df, axs=None, show_posterior=True, show_one_step_most_likely_positions_plots=True, enable_flat_line_drawing=True, debug_print=False):
     """ renders a 2D plot in MATPLOTLIB with separate subplots for the (x and y position axes): the computed posterior for the position from the Bayesian decoder and overlays the animal's actual position over the top.
     Usage:
         fig, axs = plot_most_likely_position_comparsions(pho_custom_decoder, sess.position.to_dataframe())
@@ -211,13 +212,13 @@ def plot_most_likely_position_comparsions(pho_custom_decoder, position_df, axs=N
         _, axs[0] = plot_1D_most_likely_position_comparsions(position_df, variable_name='x', time_window_centers=pho_custom_decoder.active_time_window_centers, xbin=pho_custom_decoder.xbin,
                                                     posterior=marginal_posterior_x,
                                                     active_most_likely_positions_1D=active_most_likely_positions_x, ax=axs[0],
-                                                    enable_flat_line_drawing=True, debug_print=debug_print)
+                                                    enable_flat_line_drawing=enable_flat_line_drawing, debug_print=debug_print)
         
         # Y:
         _, axs[1] = plot_1D_most_likely_position_comparsions(position_df, variable_name='y', time_window_centers=pho_custom_decoder.active_time_window_centers, xbin=pho_custom_decoder.ybin,
                                                     posterior=marginal_posterior_y,
                                                     active_most_likely_positions_1D=active_most_likely_positions_y, ax=axs[1],
-                                                    enable_flat_line_drawing=True, debug_print=debug_print)    
+                                                    enable_flat_line_drawing=enable_flat_line_drawing, debug_print=debug_print)    
         if created_new_figure:
             # Only update if we created a new figure:
             fig.suptitle(f'Decoded Position data component comparison')
