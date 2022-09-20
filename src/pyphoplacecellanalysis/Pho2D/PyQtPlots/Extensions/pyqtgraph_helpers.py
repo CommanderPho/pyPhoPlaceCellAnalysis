@@ -93,17 +93,65 @@ def build_scrollable_graphics_layout_widget_ui(name, window_title=None, ui=None)
     return ui
 
 
-
+def build_scrollable_graphics_layout_widget_with_nested_viewbox_ui(name, window_title=None, ui=None):
+    """ Updates or builds the ui properties to display a GraphicsLayoutWidget with scrollable rows:
+    Usage:
+    ## Build scrollable UI version:
+    ui = build_scrollable_graphics_layout_widget_ui(name, window_title=params.window_title, ui=ui)
+    ui.rootWindow.show()
     
+    """
+    if ui is None:
+        ui = PhoUIContainer(name=name)
+        ui.connections = PhoUIContainer(name=name)
+        
+    if window_title is None:
+        window_title = name
+    
+    ui = build_scrollable_graphics_layout_widget_ui(name, window_title=window_title, ui=ui)
+    ## Adds the root_viewbox to the graphics layout
+    # ui.root_viewbox = ui.graphics_layout.addViewBox(enableMouse=False) # lockAspect=True
+    
+    # ui.root_viewbox = ui.graphics_layout.addViewBox(enableMouse=False, defaultPadding=0.0, enableMenu=False, border='r') # lockAspect=True
+    # pg.mkColor('r')
+    # ui.root_viewbox.setBackgroundColor('r')
+    
+    # ui.root_viewbox = ui.graphics_layout.addLayout(enableMouse=False, defaultPadding=0.0, enableMenu=False, border='r') # lockAspect=True
+    
+    ui.nested_graphics_layout = ui.graphics_layout.addLayout(border=(50,0,0))
+    ui.nested_graphics_layout.setContentsMargins(10, 10, 10, 10)
+    return ui
+
+
+
+
+
+
 def stacked_epoch_slices_view(epoch_slices, position_times_list, position_traces_list, epoch_description_list, name='stacked_epoch_slices_view', debug_print=False):
     """ 
     
     epoch_description_list: list of length 
     
-    from pyphoplacecellanalysis.Pho2D.PyQtPlots.Extensions.pyqtgraph_helpers import stacked_epoch_slices_view
+    
+    Usage:
+        ## Laps 
+        from pyphoplacecellanalysis.GUI.PyVista.InteractivePlotter.Mixins.LapsVisualizationMixin import LapsVisualizationMixin
+        curr_position_df, lap_specific_position_dfs = LapsVisualizationMixin._compute_laps_specific_position_dfs(curr_active_pipeline.sess)
+        lap_specific_position_dfs = [curr_position_df.groupby('lap').get_group(i)[['t','x','y','lin_pos']] for i in sess.laps.lap_id] # dataframes split for each ID:
 
-    stacked_epoch_slices_view_laps_containers = stacked_epoch_slices_view(epoch_slices, laps_position_times_list, laps_position_traces_list, name='stacked_epoch_slices_view_laps')
-    params, plots_data, plots, ui = stacked_epoch_slices_view_laps_containers
+        laps_position_times_list = [np.squeeze(lap_pos_df[['t']].to_numpy()) for lap_pos_df in lap_specific_position_dfs]
+        laps_position_traces_list = [lap_pos_df[['x','y']].to_numpy().T for lap_pos_df in lap_specific_position_dfs]
+
+        epochs = sess.laps.to_dataframe()
+        epoch_slices = epochs[['start', 'stop']].to_numpy()
+        epoch_description_list = [f'lap {epoch_tuple.lap_id} (maze: {epoch_tuple.maze_id}, direction: {epoch_tuple.lap_dir})' for epoch_tuple in epochs[['lap_id','maze_id','lap_dir']].itertuples()]
+        print(f'epoch_description_list: {epoch_description_list}')
+
+
+        from pyphoplacecellanalysis.Pho2D.PyQtPlots.Extensions.pyqtgraph_helpers import stacked_epoch_slices_view
+
+        stacked_epoch_slices_view_laps_containers = stacked_epoch_slices_view(epoch_slices, laps_position_times_list, laps_position_traces_list, name='stacked_epoch_slices_view_laps')
+        params, plots_data, plots, ui = stacked_epoch_slices_view_laps_containers
 
     """
     num_slices = np.shape(epoch_slices)[0]
@@ -125,6 +173,10 @@ def stacked_epoch_slices_view(epoch_slices, position_times_list, position_traces
     params._debug_test_max_num_slices = 70
     params.active_num_slices = min(num_slices, params._debug_test_max_num_slices)
 
+    params.global_epoch_start_t = np.nanmin(epoch_slices[:, 0], axis=0)
+    params.global_epoch_end_t = np.nanmax(epoch_slices[:, 1], axis=0)
+    # params.global_epoch_start_t, params.global_epoch_end_t # (1238.0739798661089, 2067.4688883359777)
+
     params.single_plot_fixed_height = 200.0
     params.all_plots_height = float(params.active_num_slices) * float(params.single_plot_fixed_height)
     
@@ -133,6 +185,8 @@ def stacked_epoch_slices_view(epoch_slices, position_times_list, position_traces
     # ui = build_root_graphics_layout_widget_ui(name, window_title=params.window_title, ui=ui)
     ## Build scrollable UI version:
     ui = build_scrollable_graphics_layout_widget_ui(name, window_title=params.window_title, ui=ui)
+    _add_plot_target = ui.graphics_layout
+    _layout_next_row_target_command = lambda x: ui.graphics_layout.nextRow()    
     ui.rootWindow.show()
     
     for a_slice_idx in np.arange(params.active_num_slices):
@@ -171,19 +225,11 @@ def stacked_epoch_slices_view(epoch_slices, position_times_list, position_traces
         curr_plot.setDefaultPadding(0.0)  # plot without padding data range
         curr_plot.setMouseEnabled(x=False, y=False)
         curr_plot.setMenuEnabled(enableMenu=False)
-            
-        # curr_plot.showAxis('right')
-        # curr_plot.getAxis('left').setLabel('left axis label')
-        # curr_plot.getAxis('bottom').setLabel('bottom axis label')
-        # curr_plot.getAxis('right').setLabel('right axis label')
         
         curr_plot.getAxis('left').setLabel(f'Epoch[{a_slice_idx}]: {curr_slice_t_start}')
         curr_plot.getAxis('bottom').setLabel('t')
         curr_plot.getAxis('right').setLabel(f'Epoch[{a_slice_idx}]: {curr_slice_t_end}')
         
-        
-        
-            
         curr_plotItem = curr_plot.plot(times, x_values, defaultPadding=0.0)
         # curr_plot.addItem(img_item, defaultPadding=0.0)  # add ImageItem to PlotItem
 
@@ -202,11 +248,186 @@ def stacked_epoch_slices_view(epoch_slices, position_times_list, position_traces
         plots[curr_name] = local_plots
         plots[curr_name].mainPlotItem = curr_plotItem
         
-        ui.graphics_layout.nextRow()
+        ui.graphics_layout.nextRow() 
     
     ui.graphics_layout.setFixedHeight(params.all_plots_height)
     
     return params, plots_data, plots, ui
+
+
+
+def stacked_epoch_slices_view_viewbox(epoch_slices, position_times_list, position_traces_list, epoch_description_list, name='stacked_epoch_slices_view_viewbox', debug_print=False):
+    """ The viewbox version 
+    
+    epoch_description_list: list of length 
+    
+    
+    Usage:
+        ## Laps 
+        from pyphoplacecellanalysis.GUI.PyVista.InteractivePlotter.Mixins.LapsVisualizationMixin import LapsVisualizationMixin
+        curr_position_df, lap_specific_position_dfs = LapsVisualizationMixin._compute_laps_specific_position_dfs(curr_active_pipeline.sess)
+        lap_specific_position_dfs = [curr_position_df.groupby('lap').get_group(i)[['t','x','y','lin_pos']] for i in sess.laps.lap_id] # dataframes split for each ID:
+
+        laps_position_times_list = [np.squeeze(lap_pos_df[['t']].to_numpy()) for lap_pos_df in lap_specific_position_dfs]
+        laps_position_traces_list = [lap_pos_df[['x','y']].to_numpy().T for lap_pos_df in lap_specific_position_dfs]
+
+        epochs = sess.laps.to_dataframe()
+        epoch_slices = epochs[['start', 'stop']].to_numpy()
+        epoch_description_list = [f'lap {epoch_tuple.lap_id} (maze: {epoch_tuple.maze_id}, direction: {epoch_tuple.lap_dir})' for epoch_tuple in epochs[['lap_id','maze_id','lap_dir']].itertuples()]
+        print(f'epoch_description_list: {epoch_description_list}')
+
+
+        from pyphoplacecellanalysis.Pho2D.PyQtPlots.Extensions.pyqtgraph_helpers import stacked_epoch_slices_view
+
+        stacked_epoch_slices_view_laps_containers = stacked_epoch_slices_view(epoch_slices, laps_position_times_list, laps_position_traces_list, name='stacked_epoch_slices_view_laps')
+        params, plots_data, plots, ui = stacked_epoch_slices_view_laps_containers
+
+    """
+    num_slices = np.shape(epoch_slices)[0]
+    assert len(epoch_description_list) == num_slices
+    assert len(position_times_list) == num_slices
+    assert len(position_times_list) == num_slices
+    
+    ## Init containers:
+    params = VisualizationParameters(name=name)
+    plots_data = RenderPlotsData(name=name)
+    plots = RenderPlots(name=name)
+    ui = PhoUIContainer(name=name)
+    ui.connections = PhoUIContainer(name=name)    
+
+    params.name = name
+    params.window_title = 'Stacked Epoch Slices View - PlotItem Version'
+    params.num_slices = num_slices
+    
+    params._debug_test_max_num_slices = 70
+    params.active_num_slices = min(num_slices, params._debug_test_max_num_slices)
+    params.global_epoch_start_t = np.nanmin(epoch_slices[:, 0], axis=0)
+    params.global_epoch_end_t = np.nanmax(epoch_slices[:, 1], axis=0)
+    # params.global_epoch_start_t, params.global_epoch_end_t # (1238.0739798661089, 2067.4688883359777)
+
+
+    params.single_plot_fixed_height = 200.0
+    params.all_plots_height = float(params.active_num_slices) * float(params.single_plot_fixed_height)
+    
+    ## Build scrollable UI version with a nested viewbox: 
+    ui = build_scrollable_graphics_layout_widget_with_nested_viewbox_ui(name, window_title=params.window_title, ui=ui)
+    ui.rootWindow.show()
+    
+    # ui.root_viewbox.setBackgroundColor('r')
+    # box2.setParentItem(box1)
+    # box2.setPos(5, 5)
+    # box2.setScale(0.2)
+
+    for a_slice_idx in np.arange(params.active_num_slices):
+        if debug_print:
+            print(f'a_slice_idx: {a_slice_idx}')
+        
+        ## Get values:
+        curr_row = a_slice_idx
+        curr_col = 0
+        curr_plot_identifier_string = f'{params.window_title} - item[{curr_row}][{curr_col}]'
+        
+        if epoch_description_list is not None:
+            curr_name = epoch_description_list[a_slice_idx]
+        else:
+            # curr_name = f'a_slice_idx: {a_slice_idx}'
+            curr_name = f'[slice_idx: {a_slice_idx}][row: {curr_row}][col: {curr_col}]'
+    
+        curr_epoch_identifier_string = curr_name    
+        curr_slice_t_start, curr_slice_t_end = epoch_slices[a_slice_idx, :]
+        times = position_times_list[a_slice_idx] # (173,)
+        values = position_traces_list[a_slice_idx] # (2, 173)    
+        x_values = np.squeeze(values[0, :])
+        y_values = np.squeeze(values[1, :])
+        # lw.addLabel(curr_name)
+        
+        ## Build main plot:
+        # imi = pg.ImageItem(bar_data)
+        # imi.setLookupTable(cm.getLookupTable(alpha=True))
+        
+        curr_label = ui.nested_graphics_layout.addLabel(curr_name, row=a_slice_idx, col=1)
+                
+        ## Add ViewBox
+        # ui.root_viewbox.addItem(
+    
+        # curr_vb = ui.graphics_layout.addViewBox(row=a_slice_idx, col=1)
+        # curr_vb = ui.graphics_layout.addViewBox(enableMouse=False, defaultPadding=0, enableMenu=False, border='w') # lockAspect=True, parent=ui.root_viewbox
+        
+
+        # curr_vb = ui.nested_graphics_layout.addViewBox(enableMouse=False, defaultPadding=0, enableMenu=False, border='w') # lockAspect=True, parent=ui.root_viewbox
+        curr_vb = ui.nested_graphics_layout.addViewBox(row=a_slice_idx, col=2, enableMouse=False, defaultPadding=0, enableMenu=False, border='w') # lockAspect=True, parent=ui.root_viewbox
+        
+        # curr_vb.showAxRect(True)
+        # curr_vb.setMouseEnabled(x=False, y=True)
+        curr_vb.enableAutoRange(x=False, y=True)
+        # curr_vb.setXRange(curr_slice_t_start, curr_slice_t_end) # Local Data Series (Slice t_start, t_end)
+        curr_vb.setXRange(params.global_epoch_start_t, params.global_epoch_end_t) # Local Data Series (Slice t_start, t_end)
+        curr_vb.setAutoVisible(x=False, y=True)
+        # curr_vb.setLimits(xMin=curr_slice_t_start, xMax=curr_slice_t_end, 
+        #          minXRange=20, maxXRange=500, 
+        #          yMin=-10, yMax=10,
+        #          minYRange=1, maxYRange=10)
+        
+    
+
+        
+        
+        # # plot mode:
+        
+        # curr_plot = ui.graphics_layout.addPlot(row=curr_row, col=curr_col, title=curr_epoch_identifier_string) # , name=curr_plot_identifier_string 
+        # curr_plot.setObjectName(curr_plot_identifier_string)
+        # # curr_plot.showAxes(True)
+        # curr_plot.showAxes(True, showValues=(True, True, True, False)) # showValues=(left: True, bottom: True, right: False, top: False) # , size=10       
+        # curr_plot.hideButtons() # Hides the auto-scale button
+        # curr_plot.setDefaultPadding(0.0)  # plot without padding data range
+        # curr_plot.setMouseEnabled(x=False, y=False)
+        # curr_plot.setMenuEnabled(enableMenu=False)
+            
+        # # curr_plot.showAxis('right')
+        # # curr_plot.getAxis('left').setLabel('left axis label')
+        # # curr_plot.getAxis('bottom').setLabel('bottom axis label')
+        # # curr_plot.getAxis('right').setLabel('right axis label')
+        
+        # curr_plot.getAxis('left').setLabel(f'Epoch[{a_slice_idx}]: {curr_slice_t_start}')
+        # curr_plot.getAxis('bottom').setLabel('t')
+        # curr_plot.getAxis('right').setLabel(f'Epoch[{a_slice_idx}]: {curr_slice_t_end}')
+        
+        
+        
+            
+        # curr_plotItem = curr_plot.plot(times, x_values, defaultPadding=0.0)
+        # curr_plot.addItem(img_item, defaultPadding=0.0)  # add ImageItem to PlotItem
+
+        curr_plotItem = pg.PlotDataItem(times, x_values)
+        
+        
+        
+        curr_vb.addItem(curr_plotItem) # PlotItem
+
+        ## Local plots_data and plots:
+        local_plots_data = RenderPlotsData(name=curr_name)
+        local_plots_data.times = times.copy()
+        local_plots_data.x_values = x_values.copy()
+        local_plots_data.y_values = y_values.copy()
+                
+        local_plots = RenderPlots(name=curr_name)
+        local_plots.viewbox = curr_vb
+        local_plots.plot_item = curr_plotItem
+        
+        # Set global/output variables
+        plots_data[curr_name] = local_plots_data                
+        plots[curr_name] = local_plots
+        plots[curr_name].mainPlotItem = curr_plotItem
+        
+        # ui.graphics_layout.nextRow()
+        ui.nested_graphics_layout.nextRow()
+    
+    ui.nested_graphics_layout.setFixedHeight(params.all_plots_height)
+    ui.graphics_layout.setFixedHeight(params.all_plots_height)
+    
+    return params, plots_data, plots, ui
+
+
     
     
 # def build_vertically_scrollable_graphics_area():
