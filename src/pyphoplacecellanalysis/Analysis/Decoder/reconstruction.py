@@ -532,6 +532,12 @@ class BayesianPlacemapPositionDecoder(PlacemapPositionDecoder):
         self.neuron_IDXs, self.neuron_IDs, f_i, F_i, self.F, self.P_x = ZhangReconstructionImplementation.build_concatenated_F(self.pf, debug_print=self.debug_print)
         
     def _setup_time_bin_spike_counts_N_i(self):
+        """ updates: 
+        
+        .unit_specific_time_binned_spike_counts
+        .total_spike_counts_per_window
+        
+        """
         # Check if we already have self.time_window_edges and self.time_window_edges_binning_info to use
         if (self.time_window_edges is not None) and (self.time_window_edges_binning_info is not None):
             ## Already have time_window_edges to use, do not create new ones:
@@ -540,6 +546,7 @@ class BayesianPlacemapPositionDecoder(PlacemapPositionDecoder):
             
         else:
             ## need to create new time_window_edges from the self.time_bin_size:
+            print(f'WARNING: _setup_time_bin_spike_counts_N_i(): updating self.time_window_edges and self.time_window_edges_binning_info ...')
             self.unit_specific_time_binned_spike_counts, self.time_window_edges, self.time_window_edges_binning_info = ZhangReconstructionImplementation.time_bin_spike_counts_N_i(self.spikes_df, self.time_bin_size, debug_print=self.debug_print) # unit_specific_binned_spike_counts.to_numpy(): (40, 85841)
         
         # Here we should filter the outputs by the actual self.neuron_IDXs
