@@ -460,14 +460,80 @@ def stacked_epoch_slices_view_viewbox(epoch_slices, position_times_list, positio
     return params, plots_data, plots, ui
 
 
-def stacked_epoch_slices_matplotlib_view(epoch_slices, name='stacked_epoch_slices_matplotlib_INSET_subplots_laps', plot_function_name=None, debug_test_max_num_slices=12, debug_print=False):
-    """ 
-    
+
+def stacked_epoch_slices_matplotlib_build_view(epoch_slices, name='stacked_epoch_slices_matplotlib_subplots_laps', plot_function_name=None, debug_test_max_num_slices=12, debug_print=False):
+    """ Builds a matplotlib figure view with empty subplots that can be plotted after the fact by iterating through plots.axs
+        
     epoch_description_list: list of length 
     
     
     Usage:
+        from pyphoplacecellanalysis.Pho2D.PyQtPlots.Extensions.pyqtgraph_helpers import stacked_epoch_slices_matplotlib_build_view
+        plot_function_name = 'Stacked Epoch Slices View - MATPLOTLIB subplots Version'
+        params, plots_data, plots, ui = stacked_epoch_slices_matplotlib_build_view(epoch_slices, name='stacked_epoch_slices_matplotlib_subplots_laps', plot_function_name=plot_function_name, debug_test_max_num_slices=12, debug_print=False)
 
+        ## Test Plotting just a single dimension of the 2D posterior:
+        pho_custom_decoder = active_one_step_decoder
+        active_posterior = pho_custom_decoder.p_x_given_n
+        # Collapse the 2D position posterior into two separate 1D (X & Y) marginal posteriors. Be sure to re-normalize each marginal after summing
+        marginal_posterior_x = np.squeeze(np.sum(active_posterior, 1)) # sum over all y. Result should be [x_bins x time_bins]
+        marginal_posterior_x = marginal_posterior_x / np.sum(marginal_posterior_x, axis=0) # sum over all positions for each time_bin (so there's a normalized distribution at each timestep)
+        for i, curr_ax in enumerate(plots.axs):
+            plots.fig, curr_ax = plot_1D_most_likely_position_comparsions(sess.position.to_dataframe(), ax=curr_ax, time_window_centers=pho_custom_decoder.active_time_window_centers, xbin=pho_custom_decoder.xbin,
+                                                            posterior=marginal_posterior_x,
+                                                            active_most_likely_positions_1D=pho_custom_decoder.most_likely_positions[:,0].T,
+                                                            enable_flat_line_drawing=True, debug_print=False)
+            curr_ax.set_xlim(*plots_data.epoch_slices[i,:])
+    """
+    ## Inset Subplots Version:
+    if plot_function_name is not None:
+        plot_function_name = 'Stacked Epoch Slices View - MATPLOTLIB subplots Version'
+    params, plots_data, plots, ui = stacked_epoch_basic_setup(epoch_slices, name=name, plot_function_name=plot_function_name, debug_test_max_num_slices=debug_test_max_num_slices, debug_print=debug_print)
+    plots.figure_id = 'stacked_epoch_slices_matplotlib'
+    plots.fig, plots.axs = plt.subplots(num=plots.figure_id, ncols=1, nrows=params.active_num_slices, figsize=(15,15), clear=True, sharex=False, sharey=False, constrained_layout=True)
+    plots.fig.suptitle(plots.name)
+    
+    for a_slice_idx, curr_ax in enumerate(plots.axs):
+        if debug_print:
+            print(f'a_slice_idx: {a_slice_idx}')
+        
+        ## Get values:
+        # Create inset in data coordinates using ax.transData as transform
+        curr_ax.set_xlim(*plots_data.epoch_slices[a_slice_idx,:])
+        curr_ax.tick_params(labelleft=False, labelbottom=True)
+        curr_ax.set_title('') # remove the title
+    
+    return params, plots_data, plots, ui
+
+
+
+
+
+def stacked_epoch_slices_matplotlib_build_insets_view(epoch_slices, name='stacked_epoch_slices_matplotlib_INSET_subplots_laps', plot_function_name=None, debug_test_max_num_slices=12, debug_print=False):
+    """ Builds a matplotlib figure view with empty subplots that can be plotted after the fact by iterating through plots.axs
+        
+    epoch_description_list: list of length 
+    
+    
+    Usage:
+        from pyphoplacecellanalysis.Pho2D.PyQtPlots.Extensions.pyqtgraph_helpers import stacked_epoch_basic_setup, stacked_epoch_slices_matplotlib_view
+
+        plot_function_name = 'Stacked Epoch Slices View - MATPLOTLIB INSET SUBPLOTS Version'
+        params, plots_data, plots, ui = stacked_epoch_slices_matplotlib_build_insets_view(epoch_slices, name='stacked_epoch_slices_matplotlib_INSET_subplots_laps', plot_function_name=plot_function_name, debug_test_max_num_slices=12, debug_print=False)
+
+        ## Test Plotting just a single dimension of the 2D posterior:
+        pho_custom_decoder = active_one_step_decoder
+        active_posterior = pho_custom_decoder.p_x_given_n
+        # Collapse the 2D position posterior into two separate 1D (X & Y) marginal posteriors. Be sure to re-normalize each marginal after summing
+        marginal_posterior_x = np.squeeze(np.sum(active_posterior, 1)) # sum over all y. Result should be [x_bins x time_bins]
+        marginal_posterior_x = marginal_posterior_x / np.sum(marginal_posterior_x, axis=0) # sum over all positions for each time_bin (so there's a normalized distribution at each timestep)
+
+        for a_slice_idx, curr_ax in enumerate(plots.axs):
+            plots.fig, curr_ax = plot_1D_most_likely_position_comparsions(sess.position.to_dataframe(), ax=curr_ax, time_window_centers=pho_custom_decoder.active_time_window_centers, xbin=pho_custom_decoder.xbin,
+                                                                posterior=marginal_posterior_x,
+                                                                active_most_likely_positions_1D=pho_custom_decoder.most_likely_positions[:,0].T,
+                                                                enable_flat_line_drawing=True,  debug_print=False)
+            curr_ax.set_xlim(*plots_data.epoch_slices[a_slice_idx,:])
     """
     ## Inset Subplots Version:
     # debug_print = False
@@ -493,28 +559,11 @@ def stacked_epoch_slices_matplotlib_view(epoch_slices, name='stacked_epoch_slice
     plots.fig.suptitle(plots.name)
     plots.parent_ax.set(xlim=(0.0, epoch_slices_max_duration), ylim=(0, float(params.active_num_slices)))
 
-    # ## Test Plotting just a single dimension of the 2D posterior:
-    # pho_custom_decoder = active_one_step_decoder
-    # active_posterior = pho_custom_decoder.p_x_given_n
-    # # Collapse the 2D position posterior into two separate 1D (X & Y) marginal posteriors. Be sure to re-normalize each marginal after summing
-    # marginal_posterior_x = np.squeeze(np.sum(active_posterior, 1)) # sum over all y. Result should be [x_bins x time_bins]
-    # marginal_posterior_x = marginal_posterior_x / np.sum(marginal_posterior_x, axis=0) # sum over all positions for each time_bin (so there's a normalized distribution at each timestep)
-    
     for a_slice_idx in np.arange(params.active_num_slices):
         if debug_print:
             print(f'a_slice_idx: {a_slice_idx}')
         
         ## Get values:
-        curr_row = a_slice_idx
-        curr_col = 0
-        # curr_plot_identifier_string = f'{params.window_title} - item[{curr_row}][{curr_col}]'
-        
-        # if epoch_description_list is not None:
-        #     curr_name = epoch_description_list[a_slice_idx]
-        # else:
-        #     # curr_name = f'a_slice_idx: {a_slice_idx}'
-        #     curr_name = f'[slice_idx: {a_slice_idx}][row: {curr_row}][col: {curr_col}]'
-    
         if debug_print:
             print(f'plotting axis[{a_slice_idx}]: {a_slice_idx}')
         # Create inset in data coordinates using ax.transData as transform
@@ -527,12 +576,6 @@ def stacked_epoch_slices_matplotlib_view(epoch_slices, name='stacked_epoch_slice
         curr_ax = inset_axes(plots.parent_ax, width=curr_percent_width, height=curr_percent_height,
                             bbox_transform=plots.parent_ax.transData, bbox_to_anchor=(0.0, float(a_slice_idx), epoch_durations[a_slice_idx], 1.0), # [left, bottom, width, height]
                             loc='lower left', borderpad=1.0)
-        
-        
-        # plots.fig, curr_ax = plot_1D_most_likely_position_comparsions(sess.position.to_dataframe(), ax=curr_ax, time_window_centers=pho_custom_decoder.active_time_window_centers, xbin=pho_custom_decoder.xbin,
-        #                                                 posterior=marginal_posterior_x,
-        #                                                 active_most_likely_positions_1D=pho_custom_decoder.most_likely_positions[:,0].T,
-        #                                                 enable_flat_line_drawing=True,  debug_print=False)
         
         curr_ax.set_xlim(*plots_data.epoch_slices[a_slice_idx,:])
         curr_ax.tick_params(labelleft=False, labelbottom=False)
