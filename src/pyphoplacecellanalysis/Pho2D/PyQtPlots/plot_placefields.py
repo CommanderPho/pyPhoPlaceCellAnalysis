@@ -18,6 +18,8 @@ from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtCore, QtGui
 from pyphoplacecellanalysis.GUI.PyQtPlot.pyqtplot_basic import pyqtplot_common_setup
 from pyphoplacecellanalysis.GUI.Qt.Mixins.PhoMainAppWindowBase import PhoMainAppWindowBase
 
+from pyphoplacecellanalysis.Pho2D.PyQtPlots.Extensions.pyqtgraph_helpers import pyqtplot_build_image_bounds_extent
+
 # class PlotLocationIdentifier(object):
 #     """docstring for PlotLocationIdentifier."""
 #     def __init__(self, arg):
@@ -25,36 +27,6 @@ from pyphoplacecellanalysis.GUI.Qt.Mixins.PhoMainAppWindowBase import PhoMainApp
 #     arg
 
 
-
-def _pyqtplot_build_image_bounds_extent(xbin_edges, ybin_edges, margin = 2.0, debug_print=False):
-    """ Returns the proper bounds for the image, and the proper x_range and y_range given the margin.
-    Used by pyqtplot_plot_image_array(...) to plot binned data.
-
-    Usage:
-
-        # curr_plot.setXRange(global_min_x-margin, global_max_x+margin)
-        # curr_plot.setYRange(global_min_y-margin, global_max_y+margin)
-    
-    """
-    global_min_x = np.nanmin(xbin_edges)
-    global_max_x = np.nanmax(xbin_edges)
-
-    global_min_y = np.nanmin(ybin_edges)
-    global_max_y = np.nanmax(ybin_edges)
-
-    global_width = global_max_x - global_min_x
-    global_height = global_max_y - global_min_y
-
-    if debug_print:
-        print(f'global_min_x: {global_min_x}, global_max_x: {global_max_x}, global_min_y: {global_min_y}, global_max_y: {global_max_y}\nglobal_width: {global_width}, global_height: {global_height}')
-    # Get rect image extent in the form [x, y, w, h]:
-    image_bounds_extent = [global_min_x, global_min_y, global_width, global_height]
-
-    x_range = (global_min_x-margin, global_max_x+margin)
-    y_range = (global_min_y-margin, global_max_y+margin)
-
-    return image_bounds_extent, x_range, y_range
-    
 
 def pyqtplot_plot_image_array(xbin_edges, ybin_edges, images, occupancy, max_num_columns = 5, drop_below_threshold: float=0.0000001, enable_LUT_Histogram=False, app=None, parent_root_widget=None, root_render_widget=None, debug_print=False):
     """ Plots an array of images provided in 'images' argument
@@ -75,7 +47,7 @@ def pyqtplot_plot_image_array(xbin_edges, ybin_edges, images, occupancy, max_num
     # cmap = pg.ColorMap(pos=np.linspace(0.0, 1.0, 6), color=colors)
     cmap = pg.colormap.get('jet','matplotlib') # prepare a linear color map
 
-    image_bounds_extent, x_range, y_range = _pyqtplot_build_image_bounds_extent(xbin_edges, ybin_edges, margin=2.0, debug_print=debug_print)
+    image_bounds_extent, x_range, y_range = pyqtplot_build_image_bounds_extent(xbin_edges, ybin_edges, margin=2.0, debug_print=debug_print)
     # image_aspect_ratio, image_width_height_tuple = compute_data_aspect_ratio(x_range, y_range)
     # print(f'image_aspect_ratio: {image_aspect_ratio} - xScale/yScale: {float(image_width_height_tuple.width) / float(image_width_height_tuple.height)}')
     

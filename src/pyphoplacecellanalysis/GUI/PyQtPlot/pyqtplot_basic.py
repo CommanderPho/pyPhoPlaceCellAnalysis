@@ -9,14 +9,14 @@
 import numpy as np
 import pyphoplacecellanalysis.External.pyqtgraph as pg
 from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtCore, QtGui
-from dataclasses import dataclass
+# from dataclasses import dataclass
 
-@dataclass
-class BasicPyQtPlotApp(object):
-    """Docstring for BasicPyQtPlotApp."""
-    app: QtGui.QApplication
-    win: QtGui.QMainWindow
-    # w: pg.GraphicsLayoutWidget
+# @dataclass
+# class BasicPyQtPlotApp(object):
+#     """Docstring for BasicPyQtPlotApp."""
+#     app: QtGui.QApplication
+#     win: QtGui.QMainWindow
+#     # w: pg.GraphicsLayoutWidget
 
 
 def pyqtplot_common_setup(a_title, app=None, parent_root_widget=None, root_render_widget=None):

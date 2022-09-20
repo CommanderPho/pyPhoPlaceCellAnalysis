@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 
 from pyphocorehelpers.mixins.member_enumerating import AllFunctionEnumeratingMixin
 from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DisplayFunctionRegistryHolder import DisplayFunctionRegistryHolder
-from pyphoplacecellanalysis.Pho2D.PyQtPlots.plot_placefields import pyqtplot_plot_image_array, pyqtplot_common_setup
+from pyphoplacecellanalysis.Pho2D.PyQtPlots.plot_placefields import pyqtplot_plot_image_array
 from pyphocorehelpers.DataStructure.dynamic_parameters import DynamicParameters
 
 ## Required for _display_2d_placefield_result_plot_ratemaps_2D and _display_normal
