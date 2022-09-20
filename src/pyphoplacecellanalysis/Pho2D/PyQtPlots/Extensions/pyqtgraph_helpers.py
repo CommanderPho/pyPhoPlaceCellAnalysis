@@ -96,9 +96,42 @@ def pyqtplot_plot_image(xbin_edges, ybin_edges, image, enable_LUT_Histogram=Fals
     return app, parent_root_widget, root_render_widget
  
  
- 
- 
- 
+def stacked_epoch_basic_setup(epoch_slices, name='stacked_epoch_slices_view', plot_function_name='Stacked Epoch Slices View - PlotItem Version', debug_test_max_num_slices=70, debug_print=False):
+    """ Builds the common setup/containers for all stacked-epoch type plots:
+    
+    epoch_description_list: list of length 
+    
+    Usage:
+        plot_function_name = 'Stacked Epoch Slices View - Viewbox Version'
+        params, plots_data, plots, ui = stacked_epoch_basic_setup(epoch_slices, name=name, plot_function_name=plot_function_name, debug_print=debug_print)
+    
+
+    """
+    num_slices = np.shape(epoch_slices)[0]
+    
+    ## Init containers:
+    params = VisualizationParameters(name=name)
+    plots_data = RenderPlotsData(name=name)
+    plots = RenderPlots(name=name)
+    ui = PhoUIContainer(name=name)
+    ui.connections = PhoUIContainer(name=name)    
+
+    params.name = name
+    params.window_title = plot_function_name
+    params.num_slices = num_slices
+    
+    params._debug_test_max_num_slices = debug_test_max_num_slices
+    params.active_num_slices = min(num_slices, params._debug_test_max_num_slices)
+    params.global_epoch_start_t = np.nanmin(epoch_slices[:, 0], axis=0)
+    params.global_epoch_end_t = np.nanmax(epoch_slices[:, 1], axis=0)
+    # params.global_epoch_start_t, params.global_epoch_end_t # (1238.0739798661089, 2067.4688883359777)
+    params.single_plot_fixed_height = 200.0
+    params.all_plots_height = float(params.active_num_slices) * float(params.single_plot_fixed_height)
+
+    plots_data.epoch_slices = epoch_slices
+    
+    return params, plots_data, plots, ui
+
 
 # ==================================================================================================================== #
 # UI Building Helpers                                                                                                  #
@@ -218,31 +251,11 @@ def stacked_epoch_slices_view(epoch_slices, position_times_list, position_traces
         params, plots_data, plots, ui = stacked_epoch_slices_view_laps_containers
 
     """
-    num_slices = np.shape(epoch_slices)[0]
-    assert len(epoch_description_list) == num_slices
-    assert len(position_times_list) == num_slices
-    assert len(position_times_list) == num_slices
-    
-    ## Init containers:
-    params = VisualizationParameters(name=name)
-    plots_data = RenderPlotsData(name=name)
-    plots = RenderPlots(name=name)
-    ui = PhoUIContainer(name=name)
-    ui.connections = PhoUIContainer(name=name)    
-
-    params.name = name
-    params.window_title = 'Stacked Epoch Slices View - PlotItem Version'
-    params.num_slices = num_slices
-    
-    params._debug_test_max_num_slices = 70
-    params.active_num_slices = min(num_slices, params._debug_test_max_num_slices)
-
-    params.global_epoch_start_t = np.nanmin(epoch_slices[:, 0], axis=0)
-    params.global_epoch_end_t = np.nanmax(epoch_slices[:, 1], axis=0)
-    # params.global_epoch_start_t, params.global_epoch_end_t # (1238.0739798661089, 2067.4688883359777)
-
-    params.single_plot_fixed_height = 200.0
-    params.all_plots_height = float(params.active_num_slices) * float(params.single_plot_fixed_height)
+    plot_function_name = 'Stacked Epoch Slices View - PlotItem Version'
+    params, plots_data, plots, ui = stacked_epoch_basic_setup(epoch_slices, name=name, plot_function_name=plot_function_name, debug_print=debug_print)
+    assert len(epoch_description_list) == params.num_slices
+    assert len(position_times_list) == params.num_slices
+    # assert len(position_traces_list) == params.num_slices
     
     ## Plot Version:
     ## Build non-scrollable UI version:
@@ -347,31 +360,11 @@ def stacked_epoch_slices_view_viewbox(epoch_slices, position_times_list, positio
         params, plots_data, plots, ui = stacked_epoch_slices_view_laps_containers
 
     """
-    num_slices = np.shape(epoch_slices)[0]
-    assert len(epoch_description_list) == num_slices
-    assert len(position_times_list) == num_slices
-    assert len(position_times_list) == num_slices
-    
-    ## Init containers:
-    params = VisualizationParameters(name=name)
-    plots_data = RenderPlotsData(name=name)
-    plots = RenderPlots(name=name)
-    ui = PhoUIContainer(name=name)
-    ui.connections = PhoUIContainer(name=name)    
-
-    params.name = name
-    params.window_title = 'Stacked Epoch Slices View - PlotItem Version'
-    params.num_slices = num_slices
-    
-    params._debug_test_max_num_slices = 70
-    params.active_num_slices = min(num_slices, params._debug_test_max_num_slices)
-    params.global_epoch_start_t = np.nanmin(epoch_slices[:, 0], axis=0)
-    params.global_epoch_end_t = np.nanmax(epoch_slices[:, 1], axis=0)
-    # params.global_epoch_start_t, params.global_epoch_end_t # (1238.0739798661089, 2067.4688883359777)
-
-
-    params.single_plot_fixed_height = 200.0
-    params.all_plots_height = float(params.active_num_slices) * float(params.single_plot_fixed_height)
+    plot_function_name = 'Stacked Epoch Slices View - Viewbox Version'
+    params, plots_data, plots, ui = stacked_epoch_basic_setup(epoch_slices, name=name, plot_function_name=plot_function_name, debug_print=debug_print)
+    assert len(epoch_description_list) == params.num_slices
+    assert len(position_times_list) == params.num_slices
+    # assert len(position_traces_list) == params.num_slices
     
     ## Build scrollable UI version with a nested viewbox: 
     ui = build_scrollable_graphics_layout_widget_with_nested_viewbox_ui(name, window_title=params.window_title, ui=ui)
@@ -432,39 +425,11 @@ def stacked_epoch_slices_view_viewbox(epoch_slices, position_times_list, positio
         #          yMin=-10, yMax=10,
         #          minYRange=1, maxYRange=10)
         
-    
-
         
-        
-        # # plot mode:
-        
-        # curr_plot = ui.graphics_layout.addPlot(row=curr_row, col=curr_col, title=curr_epoch_identifier_string) # , name=curr_plot_identifier_string 
-        # curr_plot.setObjectName(curr_plot_identifier_string)
-        # # curr_plot.showAxes(True)
-        # curr_plot.showAxes(True, showValues=(True, True, True, False)) # showValues=(left: True, bottom: True, right: False, top: False) # , size=10       
-        # curr_plot.hideButtons() # Hides the auto-scale button
-        # curr_plot.setDefaultPadding(0.0)  # plot without padding data range
-        # curr_plot.setMouseEnabled(x=False, y=False)
-        # curr_plot.setMenuEnabled(enableMenu=False)
-            
-        # # curr_plot.showAxis('right')
-        # # curr_plot.getAxis('left').setLabel('left axis label')
-        # # curr_plot.getAxis('bottom').setLabel('bottom axis label')
-        # # curr_plot.getAxis('right').setLabel('right axis label')
-        
-        # curr_plot.getAxis('left').setLabel(f'Epoch[{a_slice_idx}]: {curr_slice_t_start}')
-        # curr_plot.getAxis('bottom').setLabel('t')
-        # curr_plot.getAxis('right').setLabel(f'Epoch[{a_slice_idx}]: {curr_slice_t_end}')
-        
-        
-        
-            
         # curr_plotItem = curr_plot.plot(times, x_values, defaultPadding=0.0)
         # curr_plot.addItem(img_item, defaultPadding=0.0)  # add ImageItem to PlotItem
 
         curr_plotItem = pg.PlotDataItem(times, x_values)
-        
-        
         
         curr_vb.addItem(curr_plotItem) # PlotItem
 

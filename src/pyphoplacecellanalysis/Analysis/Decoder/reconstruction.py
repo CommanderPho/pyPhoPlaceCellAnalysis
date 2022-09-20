@@ -258,41 +258,7 @@ class ZhangReconstructionImplementation:
         posterior /= np.sum(posterior, axis=0)
 
         return posterior
-        # # total_number_spikes_n = np.sum(n) # the total number of spikes across all placecells during this timewindow
         
-        # # take n as a row vector, and repeat it vertically for each column.
-        # element_wise_n = np.tile(n, (np.shape(F)[0], 1)) # repeat n for each row (coresponding to a position x) in F.
-        # # repeats_array = np.tile(an_array, (repetitions, 1))
-        # if debug_print:
-        #     print(f'np.shape(element_wise_n): {np.shape(element_wise_n)}') # np.shape(element_wise_n): (288, 40)
-
-        # # the inner expression np.power(F, element_wise_n) performs the element-wise exponentiation of F with the values in element_wise_n.
-        # # result = P_x * np.prod(np.power(F, element_wise_n), axis=1) # the product is over the neurons, so the second dimension
-        # term1 = np.squeeze(P_x) # np.shape(P_x): (48, 6)
-        # if debug_print:
-        #     print(f'np.shape(term1): {np.shape(term1)}') # np.shape(P_x): (48, 6)
-        # term2 = np.prod(np.power(F, element_wise_n), axis=1) # np.shape(term2): (288,)
-        # if debug_print:
-        #     print(f'np.shape(term2): {np.shape(term2)}') # np.shape(P_x): (48, 6)
-
-        # # result = C_tau_n * P_x
-        # term3 = np.exp(-tau * np.sum(F, axis=1)) # sum over all columns (corresponding to over all cells)
-        # if debug_print:
-        #     print(f'np.shape(term3): {np.shape(term3)}') # np.shape(P_x): (48, 6)
-
-        # # each column_i of F, F[:,i] should be raised to the power of n_i[i]
-        # un_normalized_result = term1 * term2 * term3
-        # C_tau_n = 1.0 / np.sum(un_normalized_result) # normalize the result
-        # result = C_tau_n * un_normalized_result
-        # if debug_print:
-        #     print(f'np.shape(result): {np.shape(result)}') # np.shape(P_x): (48, 6)
-        # """
-        #     np.shape(term1): (288, 1)
-        #     np.shape(term2): (288,)
-        #     np.shape(term3): (288,)
-        #     np.shape(result): (288, 288)
-        # """
-        # return result
     
     
 
@@ -340,15 +306,6 @@ class Zhang_Two_Step:
     @classmethod
     def compute_bayesian_two_step_prob_single_timestep(cls, one_step_p_x_given_n, x_prev, all_x, sigma_t, C, k):
         return k * one_step_p_x_given_n * cls.compute_conditional_probability_x_prev_given_x_t(x_prev, all_x, sigma_t, C)
-
-
-    
-    
-# input_keys = ['pf']
-# recomputed_input_keys = ['neuron_IDXs', 'neuron_IDs', 'F', 'P_x']
-# intermediate_keys = ['original_position_data_shape']
-# saved_result_keys = ['flat_p_x_given_n']
-# recomputed_keys = ['p_x_given_n']
 
     
 class PlacemapPositionDecoder(SerializedAttributesSpecifyingClass, SimplePrintable, object, metaclass=OrderedMeta):
@@ -401,17 +358,9 @@ class PlacemapPositionDecoder(SerializedAttributesSpecifyingClass, SimplePrintab
         return input_keys
     
     def to_dict(self):
-        # return {member:self.__dict__[member] for member in PlacemapPositionDecoder._orderedKeys}  
         return self.__dict__
-        # for member in PlacemapPositionDecoder._orderedKeys:
-        #     if not getattr(PlacemapPositionDecoder, member):
-        #         print(member)
-        
-    # @classmethod
-    # def from_dict(cls, val_dict):
-    #     return cls(val_dict.get('time_bin_size', 0.25), val_dict.get('pf', None), val_dict.get('spikes_df', None), setup_on_init=val_dict.get('setup_on_init', True), post_load_on_init=val_dict.get('post_load_on_init', False), debug_print=val_dict.get('debug_print', False))
 
-        
+
     ## FileRepresentable protocol:
     @classmethod
     def from_file(cls, f):
@@ -444,7 +393,6 @@ class PlacemapPositionDecoder(SerializedAttributesSpecifyingClass, SimplePrintab
                 with WrappingMessagePrinter(f'parent path: {str(f.parent)} does not exist. Creating', begin_line_ending='... ', finished_message=f"{str(f.parent)} created.", enable_print=status_print):
                     f.parent.mkdir(parents=True, exist_ok=True) 
             np.save(f, data)
-
             
     def save(self, f, status_print=True, debug_print=False):
         active_serialization_keys = self.__class__.serialized_keys()
@@ -455,31 +403,13 @@ class PlacemapPositionDecoder(SerializedAttributesSpecifyingClass, SimplePrintab
         self.__class__.to_file(data, f, status_print=status_print)
     
         
-        # """Get binned spike counts
-
-        # Parameters
-        # ----------
-        # bin_size : float, optional
-        #     bin size in seconds, by default 0.25
-
-        # Returns
-        # -------
-        # neuropy.core.BinnedSpiketrains
-
-        # """
-
-        # bins = np.arange(self.t_start, self.t_stop + bin_size, bin_size)
-        # spike_counts = np.asarray([np.histogram(_, bins=bins)[0] for _ in self.spiketrains])
-        
 class BayesianPlacemapPositionDecoder(PlacemapPositionDecoder):
     """docstring for BayesianPlacemapPositionDecoder.
     
     
     Called after deserializing/loading saved result from disk to rebuild the needed computed variables. 
     
-    """
-    
-    
+    """    
     @property
     def flat_position_size(self):
         """The flat_position_size property."""
@@ -489,7 +419,6 @@ class BayesianPlacemapPositionDecoder(PlacemapPositionDecoder):
         """The original_position_data_shape property."""
         return np.shape(self.pf.occupancy)
 
-   
     @property
     def num_time_windows(self):
         """The num_time_windows property."""
