@@ -95,12 +95,21 @@ def build_scrollable_graphics_layout_widget_ui(name, window_title=None, ui=None)
 
 
     
-def stacked_epoch_slices_view(epoch_slices, laps_position_times_list, laps_position_traces_list, name='stacked_epoch_slices_view'):
+def stacked_epoch_slices_view(epoch_slices, position_times_list, position_traces_list, epoch_description_list, name='stacked_epoch_slices_view', debug_print=False):
     """ 
     
-    params, plots_data, plots, ui = stacked_epoch_slices_view(epoch_slices, laps_position_times_list, laps_position_traces_list, name='stacked_epoch_slices_view')
+    epoch_description_list: list of length 
+    
+    from pyphoplacecellanalysis.Pho2D.PyQtPlots.Extensions.pyqtgraph_helpers import stacked_epoch_slices_view
+
+    stacked_epoch_slices_view_laps_containers = stacked_epoch_slices_view(epoch_slices, laps_position_times_list, laps_position_traces_list, name='stacked_epoch_slices_view_laps')
+    params, plots_data, plots, ui = stacked_epoch_slices_view_laps_containers
+
     """
     num_slices = np.shape(epoch_slices)[0]
+    assert len(epoch_description_list) == num_slices
+    assert len(position_times_list) == num_slices
+    assert len(position_times_list) == num_slices
     
     ## Init containers:
     params = VisualizationParameters(name=name)
@@ -127,20 +136,24 @@ def stacked_epoch_slices_view(epoch_slices, laps_position_times_list, laps_posit
     ui.rootWindow.show()
     
     for a_slice_idx in np.arange(params.active_num_slices):
-        print(f'a_slice_idx: {a_slice_idx}')
+        if debug_print:
+            print(f'a_slice_idx: {a_slice_idx}')
         
         ## Get values:
         curr_row = a_slice_idx
         curr_col = 0
-        
         curr_plot_identifier_string = f'{params.window_title} - item[{curr_row}][{curr_col}]'
-        # curr_name = f'a_slice_idx: {a_slice_idx}'
-        curr_name = f'[slice_idx: {a_slice_idx}][row: {curr_row}][col: {curr_col}]'
-        curr_cell_identifier_string = curr_name
         
+        if epoch_description_list is not None:
+            curr_name = epoch_description_list[a_slice_idx]
+        else:
+            # curr_name = f'a_slice_idx: {a_slice_idx}'
+            curr_name = f'[slice_idx: {a_slice_idx}][row: {curr_row}][col: {curr_col}]'
+    
+        curr_epoch_identifier_string = curr_name    
         curr_slice_t_start, curr_slice_t_end = epoch_slices[a_slice_idx, :]
-        times = laps_position_times_list[a_slice_idx] # (173,)
-        values = laps_position_traces_list[a_slice_idx] # (2, 173)    
+        times = position_times_list[a_slice_idx] # (173,)
+        values = position_traces_list[a_slice_idx] # (2, 173)    
         x_values = np.squeeze(values[0, :])
         y_values = np.squeeze(values[1, :])
         # lw.addLabel(curr_name)
@@ -150,7 +163,7 @@ def stacked_epoch_slices_view(epoch_slices, laps_position_times_list, laps_posit
         # imi.setLookupTable(cm.getLookupTable(alpha=True))
         
         # # plot mode:
-        curr_plot = ui.graphics_layout.addPlot(row=curr_row, col=curr_col, title=curr_cell_identifier_string) # , name=curr_plot_identifier_string 
+        curr_plot = ui.graphics_layout.addPlot(row=curr_row, col=curr_col, title=curr_epoch_identifier_string) # , name=curr_plot_identifier_string 
         curr_plot.setObjectName(curr_plot_identifier_string)
         curr_plot.showAxes(True)
         curr_plot.hideButtons() # Hides the auto-scale button
