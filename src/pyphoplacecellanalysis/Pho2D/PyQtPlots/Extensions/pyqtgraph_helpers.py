@@ -40,6 +40,12 @@ def pyqtplot_build_image_bounds_extent(xbin_edges, ybin_edges, margin = 2.0, deb
     
     
 def build_root_graphics_layout_widget_ui(name, window_title=None, ui=None):
+    """ Updates or builds the ui properties to display a GraphicsLayoutWidget with scrollable rows:
+    Usage:
+    ## Build non-scrollable UI version:
+    ui = build_root_graphics_layout_widget_ui(name, window_title=params.window_title, ui=ui)
+    
+    """
     if ui is None:
         ui = PhoUIContainer(name=name)
         ui.connections = PhoUIContainer(name=name)
@@ -56,6 +62,13 @@ def build_root_graphics_layout_widget_ui(name, window_title=None, ui=None):
 
 
 def build_scrollable_graphics_layout_widget_ui(name, window_title=None, ui=None):
+    """ Updates or builds the ui properties to display a GraphicsLayoutWidget with scrollable rows:
+    Usage:
+    ## Build scrollable UI version:
+    ui = build_scrollable_graphics_layout_widget_ui(name, window_title=params.window_title, ui=ui)
+    ui.rootWindow.show()
+    
+    """
     if ui is None:
         ui = PhoUIContainer(name=name)
         ui.connections = PhoUIContainer(name=name)
@@ -106,21 +119,13 @@ def stacked_epoch_slices_view(epoch_slices, laps_position_times_list, laps_posit
     params.single_plot_fixed_height = 200.0
     params.all_plots_height = float(params.active_num_slices) * float(params.single_plot_fixed_height)
     
-    
-    # out_slice_layouts = []
-    
     ## Plot Version:
-    
+    ## Build non-scrollable UI version:
     # ui = build_root_graphics_layout_widget_ui(name, window_title=params.window_title, ui=ui)
-    
+    ## Build scrollable UI version:
     ui = build_scrollable_graphics_layout_widget_ui(name, window_title=params.window_title, ui=ui)
     ui.rootWindow.show()
     
-    # ui.graphics_layout = pg.GraphicsLayoutWidget(show=True)
-    # ui.graphics_layout.setWindowTitle(params.window_title)
-    # ui.graphics_layout.resize(1000, 800)
-    # lw.ci.setBorder((50, 50, 100))
-
     for a_slice_idx in np.arange(params.active_num_slices):
         print(f'a_slice_idx: {a_slice_idx}')
         
@@ -181,73 +186,73 @@ def stacked_epoch_slices_view(epoch_slices, laps_position_times_list, laps_posit
     return params, plots_data, plots, ui
     
     
-def build_vertically_scrollable_graphics_area():
-    """ copied from pyphoplacecellanalysis.External.pyqtgraph.examples.colorMaps example """
-    app = pg.mkQApp()
+# def build_vertically_scrollable_graphics_area():
+#     """ copied from pyphoplacecellanalysis.External.pyqtgraph.examples.colorMaps example """
+#     app = pg.mkQApp()
     
-    ui = PhoUIContainer('')
+#     ui = PhoUIContainer('')
 
-    ui.rootWindow = QtWidgets.QMainWindow()
-    ui.rootWindow.resize(1000,800)
+#     ui.rootWindow = QtWidgets.QMainWindow()
+#     ui.rootWindow.resize(1000,800)
 
-    ui.graphics_layout = pg.GraphicsLayoutWidget()
-    ui.graphics_layout.setFixedWidth(1000)
-    ui.graphics_layout.setSizePolicy(QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Expanding)
+#     ui.graphics_layout = pg.GraphicsLayoutWidget()
+#     ui.graphics_layout.setFixedWidth(1000)
+#     ui.graphics_layout.setSizePolicy(QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Expanding)
 
-    ui.scrollAreaWidget = QtWidgets.QScrollArea()
-    ui.scrollAreaWidget.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarPolicy.ScrollBarAlwaysOn)
-    ui.scrollAreaWidget.setWidget(ui.graphics_layout)
-    ui.rootWindow.setCentralWidget(ui.scrollAreaWidget)
-    ui.rootWindow.setWindowTitle('pyqtgraph example: Color maps')
-    ui.rootWindow.show()
+#     ui.scrollAreaWidget = QtWidgets.QScrollArea()
+#     ui.scrollAreaWidget.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarPolicy.ScrollBarAlwaysOn)
+#     ui.scrollAreaWidget.setWidget(ui.graphics_layout)
+#     ui.rootWindow.setCentralWidget(ui.scrollAreaWidget)
+#     ui.rootWindow.setWindowTitle('pyqtgraph example: Color maps')
+#     ui.rootWindow.show()
 
-    # bar_width = 32
-    # bar_data = pg.colormap.modulatedBarData(width=bar_width)
+#     # bar_width = 32
+#     # bar_data = pg.colormap.modulatedBarData(width=bar_width)
 
-    # num_bars = 0
+#     # num_bars = 0
 
-    # def add_heading(lw, name):
-    #     global num_bars
-    #     lw.addLabel('=== '+name+' ===')
-    #     num_bars += 1
-    #     lw.nextRow()
+#     # def add_heading(lw, name):
+#     #     global num_bars
+#     #     lw.addLabel('=== '+name+' ===')
+#     #     num_bars += 1
+#     #     lw.nextRow()
 
-    # def add_bar(lw, name, cm):
-    #     global num_bars
-    #     lw.addLabel(name)
-    #     imi = pg.ImageItem( bar_data )
-    #     imi.setLookupTable( cm.getLookupTable(alpha=True) )
-    #     vb = lw.addViewBox(lockAspect=True, enableMouse=False)
-    #     vb.addItem( imi )
-    #     num_bars += 1
-    #     lw.nextRow()
+#     # def add_bar(lw, name, cm):
+#     #     global num_bars
+#     #     lw.addLabel(name)
+#     #     imi = pg.ImageItem( bar_data )
+#     #     imi.setLookupTable( cm.getLookupTable(alpha=True) )
+#     #     vb = lw.addViewBox(lockAspect=True, enableMouse=False)
+#     #     vb.addItem( imi )
+#     #     num_bars += 1
+#     #     lw.nextRow()
 
-    # # Run the setup:
-    # add_heading(lw, 'local color maps')
-    # list_of_maps = pg.colormap.listMaps()
-    # list_of_maps = sorted( list_of_maps, key=lambda x: x.swapcase() )
-    # for map_name in list_of_maps:
-    #     cm = pg.colormap.get(map_name)
-    #     add_bar(lw, map_name, cm)
+#     # # Run the setup:
+#     # add_heading(lw, 'local color maps')
+#     # list_of_maps = pg.colormap.listMaps()
+#     # list_of_maps = sorted( list_of_maps, key=lambda x: x.swapcase() )
+#     # for map_name in list_of_maps:
+#     #     cm = pg.colormap.get(map_name)
+#     #     add_bar(lw, map_name, cm)
 
-    # add_heading(lw, 'Matplotlib import')
-    # list_of_maps = pg.colormap.listMaps('matplotlib')
-    # list_of_maps = sorted( list_of_maps, key=lambda x: x.lower() )
-    # for map_name in list_of_maps:
-    #     cm = pg.colormap.get(map_name, source='matplotlib', skipCache=True)
-    #     if cm is not None:
-    #         add_bar(lw, map_name, cm)
+#     # add_heading(lw, 'Matplotlib import')
+#     # list_of_maps = pg.colormap.listMaps('matplotlib')
+#     # list_of_maps = sorted( list_of_maps, key=lambda x: x.lower() )
+#     # for map_name in list_of_maps:
+#     #     cm = pg.colormap.get(map_name, source='matplotlib', skipCache=True)
+#     #     if cm is not None:
+#     #         add_bar(lw, map_name, cm)
 
-    # add_heading(lw, 'ColorCET import')
-    # list_of_maps = pg.colormap.listMaps('colorcet')
-    # list_of_maps = sorted( list_of_maps, key=lambda x: x.lower() )
-    # for map_name in list_of_maps:
-    #     cm = pg.colormap.get(map_name, source='colorcet', skipCache=True)
-    #     if cm is not None:
-    #         add_bar(lw, map_name, cm)
+#     # add_heading(lw, 'ColorCET import')
+#     # list_of_maps = pg.colormap.listMaps('colorcet')
+#     # list_of_maps = sorted( list_of_maps, key=lambda x: x.lower() )
+#     # for map_name in list_of_maps:
+#     #     cm = pg.colormap.get(map_name, source='colorcet', skipCache=True)
+#     #     if cm is not None:
+#     #         add_bar(lw, map_name, cm)
 
-    # ui.graphics_layout.setFixedHeight(num_bars * (bar_width+5) )
-    # return ui, add_heading, add_bar
-    return ui
+#     # ui.graphics_layout.setFixedHeight(num_bars * (bar_width+5) )
+#     # return ui, add_heading, add_bar
+#     return ui
 
 
