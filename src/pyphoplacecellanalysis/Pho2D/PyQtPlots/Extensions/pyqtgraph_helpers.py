@@ -165,11 +165,24 @@ def stacked_epoch_slices_view(epoch_slices, position_times_list, position_traces
         # # plot mode:
         curr_plot = ui.graphics_layout.addPlot(row=curr_row, col=curr_col, title=curr_epoch_identifier_string) # , name=curr_plot_identifier_string 
         curr_plot.setObjectName(curr_plot_identifier_string)
-        curr_plot.showAxes(True)
+        # curr_plot.showAxes(True)
+        curr_plot.showAxes(True, showValues=(True, True, True, False)) # showValues=(left: True, bottom: True, right: False, top: False) # , size=10       
         curr_plot.hideButtons() # Hides the auto-scale button
         curr_plot.setDefaultPadding(0.0)  # plot without padding data range
         curr_plot.setMouseEnabled(x=False, y=False)
         curr_plot.setMenuEnabled(enableMenu=False)
+            
+        # curr_plot.showAxis('right')
+        # curr_plot.getAxis('left').setLabel('left axis label')
+        # curr_plot.getAxis('bottom').setLabel('bottom axis label')
+        # curr_plot.getAxis('right').setLabel('right axis label')
+        
+        curr_plot.getAxis('left').setLabel(f'Epoch[{a_slice_idx}]: {curr_slice_t_start}')
+        curr_plot.getAxis('bottom').setLabel('t')
+        curr_plot.getAxis('right').setLabel(f'Epoch[{a_slice_idx}]: {curr_slice_t_end}')
+        
+        
+        
             
         curr_plotItem = curr_plot.plot(times, x_values, defaultPadding=0.0)
         # curr_plot.addItem(img_item, defaultPadding=0.0)  # add ImageItem to PlotItem
@@ -188,9 +201,6 @@ def stacked_epoch_slices_view(epoch_slices, position_times_list, position_traces
         plots_data[curr_name] = local_plots_data                
         plots[curr_name] = local_plots
         plots[curr_name].mainPlotItem = curr_plotItem
-        
-        ## Build output
-        # out_slice_layouts.append((curr_plot, curr_plotItem))
         
         ui.graphics_layout.nextRow()
     
