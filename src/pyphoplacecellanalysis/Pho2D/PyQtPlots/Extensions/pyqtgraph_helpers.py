@@ -39,6 +39,49 @@ def pyqtplot_build_image_bounds_extent(xbin_edges, ybin_edges, margin = 2.0, deb
     return image_bounds_extent, x_range, y_range
     
     
+def build_root_graphics_layout_widget_ui(name, window_title=None, ui=None):
+    if ui is None:
+        ui = PhoUIContainer(name=name)
+        ui.connections = PhoUIContainer(name=name)
+        
+    if window_title is None:
+        window_title = name
+    
+    ## Plot Version:
+    ui.graphics_layout = pg.GraphicsLayoutWidget(show=True)
+    ui.graphics_layout.setWindowTitle(window_title)
+    ui.graphics_layout.resize(1000, 800)
+    # lw.ci.setBorder((50, 50, 100))
+    return ui
+
+
+def build_scrollable_graphics_layout_widget_ui(name, window_title=None, ui=None):
+    if ui is None:
+        ui = PhoUIContainer(name=name)
+        ui.connections = PhoUIContainer(name=name)
+        
+    if window_title is None:
+        window_title = name
+    
+    ui.rootWindow = QtWidgets.QMainWindow()
+    ui.rootWindow.resize(1000, 800)
+
+    ui.graphics_layout = pg.GraphicsLayoutWidget()
+    ui.graphics_layout.setFixedWidth(1000)
+    ui.graphics_layout.setSizePolicy(QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Expanding)
+
+    ui.scrollAreaWidget = QtWidgets.QScrollArea()
+    ui.scrollAreaWidget.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarPolicy.ScrollBarAlwaysOn)
+    ui.scrollAreaWidget.setWidget(ui.graphics_layout)
+    ui.rootWindow.setCentralWidget(ui.scrollAreaWidget)
+    ui.rootWindow.setWindowTitle(window_title)
+    
+    # ui.rootWindow.show()
+    return ui
+
+
+
+    
 def stacked_epoch_slices_view(epoch_slices, laps_position_times_list, laps_position_traces_list, name='stacked_epoch_slices_view'):
     """ 
     
@@ -57,17 +100,26 @@ def stacked_epoch_slices_view(epoch_slices, laps_position_times_list, laps_posit
     params.window_title = 'Stacked Epoch Slices View - PlotItem Version'
     params.num_slices = num_slices
     
-    _debug_test_max_num_slices = 8
-    params.active_num_slices = min(num_slices, _debug_test_max_num_slices)
+    params._debug_test_max_num_slices = 70
+    params.active_num_slices = min(num_slices, params._debug_test_max_num_slices)
 
+    params.single_plot_fixed_height = 200.0
+    params.all_plots_height = float(params.active_num_slices) * float(params.single_plot_fixed_height)
+    
+    
     # out_slice_layouts = []
     
     ## Plot Version:
-    ui.graphics_layout = pg.GraphicsLayoutWidget(show=True)
-    ui.graphics_layout.setWindowTitle(params.window_title)
-    ui.graphics_layout.resize(1000, 800)
+    
+    # ui = build_root_graphics_layout_widget_ui(name, window_title=params.window_title, ui=ui)
+    
+    ui = build_scrollable_graphics_layout_widget_ui(name, window_title=params.window_title, ui=ui)
+    ui.rootWindow.show()
+    
+    # ui.graphics_layout = pg.GraphicsLayoutWidget(show=True)
+    # ui.graphics_layout.setWindowTitle(params.window_title)
+    # ui.graphics_layout.resize(1000, 800)
     # lw.ci.setBorder((50, 50, 100))
-
 
     for a_slice_idx in np.arange(params.active_num_slices):
         print(f'a_slice_idx: {a_slice_idx}')
@@ -98,6 +150,8 @@ def stacked_epoch_slices_view(epoch_slices, laps_position_times_list, laps_posit
         curr_plot.showAxes(True)
         curr_plot.hideButtons() # Hides the auto-scale button
         curr_plot.setDefaultPadding(0.0)  # plot without padding data range
+        curr_plot.setMouseEnabled(x=False, y=False)
+        curr_plot.setMenuEnabled(enableMenu=False)
             
         curr_plotItem = curr_plot.plot(times, x_values, defaultPadding=0.0)
         # curr_plot.addItem(img_item, defaultPadding=0.0)  # add ImageItem to PlotItem
@@ -121,8 +175,9 @@ def stacked_epoch_slices_view(epoch_slices, laps_position_times_list, laps_posit
         # out_slice_layouts.append((curr_plot, curr_plotItem))
         
         ui.graphics_layout.nextRow()
-        
-    # return out_slice_layouts
+    
+    ui.graphics_layout.setFixedHeight(params.all_plots_height)
+    
     return params, plots_data, plots, ui
     
     
@@ -132,40 +187,40 @@ def build_vertically_scrollable_graphics_area():
     
     ui = PhoUIContainer('')
 
-    ui.win = QtWidgets.QMainWindow()
-    ui.win.resize(1000,800)
+    ui.rootWindow = QtWidgets.QMainWindow()
+    ui.rootWindow.resize(1000,800)
 
-    ui.rootLayoutWidget = pg.GraphicsLayoutWidget()
-    ui.rootLayoutWidget.setFixedWidth(1000)
-    ui.rootLayoutWidget.setSizePolicy(QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Expanding)
+    ui.graphics_layout = pg.GraphicsLayoutWidget()
+    ui.graphics_layout.setFixedWidth(1000)
+    ui.graphics_layout.setSizePolicy(QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Expanding)
 
     ui.scrollAreaWidget = QtWidgets.QScrollArea()
     ui.scrollAreaWidget.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarPolicy.ScrollBarAlwaysOn)
-    ui.scrollAreaWidget.setWidget(ui.rootLayoutWidget)
-    ui.win.setCentralWidget(ui.scrollAreaWidget)
-    ui.win.setWindowTitle('pyqtgraph example: Color maps')
-    ui.win.show()
+    ui.scrollAreaWidget.setWidget(ui.graphics_layout)
+    ui.rootWindow.setCentralWidget(ui.scrollAreaWidget)
+    ui.rootWindow.setWindowTitle('pyqtgraph example: Color maps')
+    ui.rootWindow.show()
 
-    bar_width = 32
-    bar_data = pg.colormap.modulatedBarData(width=bar_width)
+    # bar_width = 32
+    # bar_data = pg.colormap.modulatedBarData(width=bar_width)
 
-    num_bars = 0
+    # num_bars = 0
 
-    def add_heading(lw, name):
-        global num_bars
-        lw.addLabel('=== '+name+' ===')
-        num_bars += 1
-        lw.nextRow()
+    # def add_heading(lw, name):
+    #     global num_bars
+    #     lw.addLabel('=== '+name+' ===')
+    #     num_bars += 1
+    #     lw.nextRow()
 
-    def add_bar(lw, name, cm):
-        global num_bars
-        lw.addLabel(name)
-        imi = pg.ImageItem( bar_data )
-        imi.setLookupTable( cm.getLookupTable(alpha=True) )
-        vb = lw.addViewBox(lockAspect=True, enableMouse=False)
-        vb.addItem( imi )
-        num_bars += 1
-        lw.nextRow()
+    # def add_bar(lw, name, cm):
+    #     global num_bars
+    #     lw.addLabel(name)
+    #     imi = pg.ImageItem( bar_data )
+    #     imi.setLookupTable( cm.getLookupTable(alpha=True) )
+    #     vb = lw.addViewBox(lockAspect=True, enableMouse=False)
+    #     vb.addItem( imi )
+    #     num_bars += 1
+    #     lw.nextRow()
 
     # # Run the setup:
     # add_heading(lw, 'local color maps')
@@ -191,6 +246,8 @@ def build_vertically_scrollable_graphics_area():
     #     if cm is not None:
     #         add_bar(lw, map_name, cm)
 
-    ui.rootLayoutWidget.setFixedHeight(num_bars * (bar_width+5) )
-    return ui, add_heading, add_bar
+    # ui.graphics_layout.setFixedHeight(num_bars * (bar_width+5) )
+    # return ui, add_heading, add_bar
+    return ui
+
 
