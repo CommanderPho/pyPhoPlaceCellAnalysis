@@ -60,21 +60,8 @@ class ZhangReconstructionImplementation:
 
         """
         time_variable_name = spikes_df.spikes.time_variable_name # 't_rel_seconds'
-
         time_window_edges, time_window_edges_binning_info = compute_spanning_bins(spikes_df[time_variable_name].to_numpy(), bin_size=max_time_bin_size) # np.shape(out_digitized_variable_bins)[0] == np.shape(spikes_df)[0]
-        
-        if not (np.shape(time_window_edges)[0] < np.shape(spikes_df)[0]):
-            print('WARNING: PREVIOUSLY ASSERT: ')
-            print(f'\t spikes_df[time_variable_name]: {np.shape(spikes_df[time_variable_name])} should be less than time_window_edges: {np.shape(time_window_edges)}!')
-        # assert np.shape(time_window_edges)[0] < np.shape(spikes_df)[0], f'spikes_df[time_variable_name]: {np.shape(spikes_df[time_variable_name])} should be less than time_window_edges: {np.shape(time_window_edges)}!'
-        
-        if debug_print:
-            print(f'spikes_df[time_variable_name]: {np.shape(spikes_df[time_variable_name])}\ntime_window_edges: {np.shape(time_window_edges)}')
-            # assert (np.shape(out_digitized_variable_bins)[0] == np.shape(spikes_df)[0]), f'np.shape(out_digitized_variable_bins)[0]: {np.shape(out_digitized_variable_bins)[0]} should equal np.shape(spikes_df)[0]: {np.shape(spikes_df)[0]}'
-            print(time_window_edges_binning_info)
-
-        spikes_df['binned_time'] = pd.cut(spikes_df[time_variable_name].to_numpy(), bins=time_window_edges, include_lowest=True, labels=time_window_edges_binning_info.bin_indicies[1:]) # same shape as the input data (time_binned_spikes_df: (69142,))
-        
+        spikes_df = spikes_df.spikes.add_binned_time_column(time_window_edges, time_window_edges_binning_info, debug_print=debug_print)
         return time_window_edges, time_window_edges_binning_info, spikes_df
         
     
