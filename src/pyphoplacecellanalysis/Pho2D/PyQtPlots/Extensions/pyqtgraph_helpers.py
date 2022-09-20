@@ -345,7 +345,7 @@ def stacked_epoch_slices_view_viewbox(epoch_slices, position_times_list, positio
         # imi = pg.ImageItem(bar_data)
         # imi.setLookupTable(cm.getLookupTable(alpha=True))
         
-        curr_label = ui.nested_graphics_layout.addLabel(curr_name, row=a_slice_idx, col=1)
+        curr_label = ui.nested_graphics_layout.addLabel(curr_name, row=a_slice_idx, col=1, angle=-90) # -90 makes the label vertical
                 
         ## Add ViewBox
         # ui.root_viewbox.addItem(
