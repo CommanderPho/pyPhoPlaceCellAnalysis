@@ -7,6 +7,8 @@ import pyphoplacecellanalysis.External.pyqtgraph as pg
 from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtWidgets, QtCore, QtGui
 from pyphoplacecellanalysis.GUI.Qt.Mixins.PhoMainAppWindowBase import PhoMainAppWindowBase # for pyqtplot_plot_image
 
+import matplotlib.pyplot as plt # for stacked_epoch_slices_matplotlib_view(...)
+from mpl_toolkits.axes_grid1.inset_locator import inset_axes  # for stacked_epoch_slices_matplotlib_view(...)
 
 
 def pyqtplot_build_image_bounds_extent(xbin_edges, ybin_edges, margin = 2.0, debug_print=False):
@@ -102,6 +104,7 @@ def stacked_epoch_basic_setup(epoch_slices, name='stacked_epoch_slices_view', pl
     epoch_description_list: list of length 
     
     Usage:
+        from pyphoplacecellanalysis.Pho2D.PyQtPlots.Extensions.pyqtgraph_helpers import stacked_epoch_basic_setup
         plot_function_name = 'Stacked Epoch Slices View - Viewbox Version'
         params, plots_data, plots, ui = stacked_epoch_basic_setup(epoch_slices, name=name, plot_function_name=plot_function_name, debug_print=debug_print)
     
@@ -457,6 +460,91 @@ def stacked_epoch_slices_view_viewbox(epoch_slices, position_times_list, positio
     return params, plots_data, plots, ui
 
 
+def stacked_epoch_slices_matplotlib_view(epoch_slices, name='stacked_epoch_slices_matplotlib_INSET_subplots_laps', plot_function_name=None, debug_test_max_num_slices=12, debug_print=False):
+    """ 
+    
+    epoch_description_list: list of length 
+    
+    
+    Usage:
+
+    """
+    ## Inset Subplots Version:
+    # debug_print = False
+    if plot_function_name is not None:
+        plot_function_name = 'Stacked Epoch Slices View - MATPLOTLIB INSET SUBPLOTS Version'
+    params, plots_data, plots, ui = stacked_epoch_basic_setup(epoch_slices, name=name, plot_function_name=plot_function_name, debug_test_max_num_slices=debug_test_max_num_slices, debug_print=debug_print)
+
+    global_xrange = (params.global_epoch_start_t, params.global_epoch_end_t)
+    global_xduration = params.global_epoch_end_t - params.global_epoch_start_t
+    epoch_durations = np.squeeze(np.diff(plots_data.epoch_slices, axis=1))
+    # epoch_durations
+    epoch_slices_max_duration = np.max(epoch_durations) # 28.95714869396761
+    epoch_slice_relative_durations = epoch_durations / epoch_slices_max_duration # computes the relative duration/xlength foe ach epoch slice as a range from 0.0-1.0 to determine relative sizes to parent
+    # epoch_slice_relative_durations
+    inset_plot_heights = np.full((params.active_num_slices,), (100.0 / float(params.active_num_slices))) # array([11.1111, 11.1111, 11.1111, 11.1111, 11.1111, 11.1111, 11.1111, 11.1111, 11.1111])
+    # inset_plot_heights
+    inset_plot_widths = epoch_slice_relative_durations * 100.0 # convert to percent width of parent
+    # inset_plot_widths.shape
+
+    plots.figure_id = 'stacked_epoch_slices_INSET_matplotlib'
+    plots.fig, plots.parent_ax = plt.subplots(num=plots.figure_id, ncols=1, nrows=1, figsize=(15,15), clear=True, sharex=False, sharey=False, constrained_layout=True)
+    plots.axs = [] # an empty list of core axes
+    plots.fig.suptitle(plots.name)
+    plots.parent_ax.set(xlim=(0.0, epoch_slices_max_duration), ylim=(0, float(params.active_num_slices)))
+
+    # ## Test Plotting just a single dimension of the 2D posterior:
+    # pho_custom_decoder = active_one_step_decoder
+    # active_posterior = pho_custom_decoder.p_x_given_n
+    # # Collapse the 2D position posterior into two separate 1D (X & Y) marginal posteriors. Be sure to re-normalize each marginal after summing
+    # marginal_posterior_x = np.squeeze(np.sum(active_posterior, 1)) # sum over all y. Result should be [x_bins x time_bins]
+    # marginal_posterior_x = marginal_posterior_x / np.sum(marginal_posterior_x, axis=0) # sum over all positions for each time_bin (so there's a normalized distribution at each timestep)
+    
+    for a_slice_idx in np.arange(params.active_num_slices):
+        if debug_print:
+            print(f'a_slice_idx: {a_slice_idx}')
+        
+        ## Get values:
+        curr_row = a_slice_idx
+        curr_col = 0
+        # curr_plot_identifier_string = f'{params.window_title} - item[{curr_row}][{curr_col}]'
+        
+        # if epoch_description_list is not None:
+        #     curr_name = epoch_description_list[a_slice_idx]
+        # else:
+        #     # curr_name = f'a_slice_idx: {a_slice_idx}'
+        #     curr_name = f'[slice_idx: {a_slice_idx}][row: {curr_row}][col: {curr_col}]'
+    
+        if debug_print:
+            print(f'plotting axis[{a_slice_idx}]: {a_slice_idx}')
+        # Create inset in data coordinates using ax.transData as transform
+        curr_percent_width="100%"
+        curr_percent_height="95%"
+        # curr_percent_width=f"{inset_plot_widths[i]}%"
+        # curr_percent_height=f"{inset_plot_heights[i]}%"
+        if debug_print:
+            print(f'\tcurr_percent_width: {curr_percent_width}, curr_percent_height: {curr_percent_height}')
+        curr_ax = inset_axes(plots.parent_ax, width=curr_percent_width, height=curr_percent_height,
+                            bbox_transform=plots.parent_ax.transData, bbox_to_anchor=(0.0, float(a_slice_idx), epoch_durations[a_slice_idx], 1.0), # [left, bottom, width, height]
+                            loc='lower left', borderpad=1.0)
+        
+        
+        # plots.fig, curr_ax = plot_1D_most_likely_position_comparsions(sess.position.to_dataframe(), ax=curr_ax, time_window_centers=pho_custom_decoder.active_time_window_centers, xbin=pho_custom_decoder.xbin,
+        #                                                 posterior=marginal_posterior_x,
+        #                                                 active_most_likely_positions_1D=pho_custom_decoder.most_likely_positions[:,0].T,
+        #                                                 enable_flat_line_drawing=True,  debug_print=False)
+        
+        curr_ax.set_xlim(*plots_data.epoch_slices[a_slice_idx,:])
+        curr_ax.tick_params(labelleft=False, labelbottom=False)
+        curr_ax.set_title('') # remove the title
+        # Appends:
+        plots.axs.append(curr_ax)
+    
+    return params, plots_data, plots, ui
+
+
+
+    
     
     
 # def build_vertically_scrollable_graphics_area():
