@@ -4,6 +4,7 @@ import pathlib
 import numpy as np
 import pandas as pd
 from scipy.stats import multivariate_normal
+from scipy.special import factorial
 
 from pyphocorehelpers.general_helpers import OrderedMeta
 from pyphocorehelpers.indexing_helpers import BinningInfo, compute_spanning_bins, get_bin_centers, build_spanning_grid_matrix
@@ -115,12 +116,14 @@ class ZhangReconstructionImplementation:
 
     @staticmethod
     def build_concatenated_F(pf, debug_print=False):
+        """ returns flattened versions of the occupancy (P_x), and the tuning_curves (F) """
         neuron_IDs = pf.ratemap.neuron_ids
         neuron_IDXs = np.arange(len(neuron_IDs))
-        maps = pf.ratemap.normalized_tuning_curves  # (40, 48) for 1D, (40, 48, 10) for 2D
+        # maps = pf.ratemap.normalized_tuning_curves  # (40, 48) for 1D, (40, 48, 10) for 2D
         
         ## 2022-09-19 - TODO: should this be the non-normalized tuning curves instead of the normalized ones?
         # e.g. maps = pf.ratemap.tuning_curves
+        maps = pf.ratemap.tuning_curves  # (40, 48) for 1D, (40, 48, 10) for 2D
         
         if debug_print:
             print(f'maps: {np.shape(maps)}') # maps: (40, 48, 10)
@@ -218,6 +221,80 @@ class ZhangReconstructionImplementation:
             np.shape(result): (288, 288)
         """
         return result
+    
+    
+    @staticmethod
+    def neuropy_bayesian_prob(tau, P_x, F, n, debug_print=False):
+        # n_i: the number of spikes fired by each cell during the time window of consideration
+        assert(len(n) == np.shape(F)[1]), f'n must be a column vector with an entry for each place cell (neuron). Instead it is of np.shape(n): {np.shape(n)}. np.shape(F): {np.shape(F)}'        
+        # nCells = spkcount.shape[0]
+        # nCells = len(n)
+        # nTimeBins = spkcount.shape[1]
+        # nFlatPositionBins = ratemaps.shape[1]
+        # nTimeBins = 1 # only one timeBin currently
+        
+        print(f'np.shape(P_x): {np.shape(P_x)}, np.shape(F): {np.shape(F)}, np.shape(n): {np.shape(n)}')
+        # np.shape(P_x): (1066, 1), np.shape(F): (1066, 66), np.shape(n): (66, 3530)
+        
+        # P_x = np.squeeze(P_x)
+        nCells = n.shape[0]
+        nTimeBins = n.shape[1] # many time_bins
+        nFlatPositionBins = np.shape(P_x)[0]
+
+        F = F.T # Transpose F so it's of the right form
+        cell_prob = np.zeros((nFlatPositionBins, nTimeBins, nCells))
+        for cell in range(nCells):
+            # cell_spkcnt = spkcount[cell, :][np.newaxis, :]
+            # cell_ratemap = ratemaps[cell, :][:, np.newaxis]
+            cell_spkcnt = n[cell, :][np.newaxis, :]
+            cell_ratemap = F[cell, :][:, np.newaxis]
+            coeff = 1 / (factorial(cell_spkcnt))
+            # broadcasting
+            cell_prob[:, :, cell] = (((tau * cell_ratemap) ** cell_spkcnt) * coeff) * (
+                np.exp(-tau * cell_ratemap)
+            )
+
+        posterior = np.prod(cell_prob, axis=2)
+        posterior /= np.sum(posterior, axis=0)
+
+        return posterior
+        # # total_number_spikes_n = np.sum(n) # the total number of spikes across all placecells during this timewindow
+        
+        # # take n as a row vector, and repeat it vertically for each column.
+        # element_wise_n = np.tile(n, (np.shape(F)[0], 1)) # repeat n for each row (coresponding to a position x) in F.
+        # # repeats_array = np.tile(an_array, (repetitions, 1))
+        # if debug_print:
+        #     print(f'np.shape(element_wise_n): {np.shape(element_wise_n)}') # np.shape(element_wise_n): (288, 40)
+
+        # # the inner expression np.power(F, element_wise_n) performs the element-wise exponentiation of F with the values in element_wise_n.
+        # # result = P_x * np.prod(np.power(F, element_wise_n), axis=1) # the product is over the neurons, so the second dimension
+        # term1 = np.squeeze(P_x) # np.shape(P_x): (48, 6)
+        # if debug_print:
+        #     print(f'np.shape(term1): {np.shape(term1)}') # np.shape(P_x): (48, 6)
+        # term2 = np.prod(np.power(F, element_wise_n), axis=1) # np.shape(term2): (288,)
+        # if debug_print:
+        #     print(f'np.shape(term2): {np.shape(term2)}') # np.shape(P_x): (48, 6)
+
+        # # result = C_tau_n * P_x
+        # term3 = np.exp(-tau * np.sum(F, axis=1)) # sum over all columns (corresponding to over all cells)
+        # if debug_print:
+        #     print(f'np.shape(term3): {np.shape(term3)}') # np.shape(P_x): (48, 6)
+
+        # # each column_i of F, F[:,i] should be raised to the power of n_i[i]
+        # un_normalized_result = term1 * term2 * term3
+        # C_tau_n = 1.0 / np.sum(un_normalized_result) # normalize the result
+        # result = C_tau_n * un_normalized_result
+        # if debug_print:
+        #     print(f'np.shape(result): {np.shape(result)}') # np.shape(P_x): (48, 6)
+        # """
+        #     np.shape(term1): (288, 1)
+        #     np.shape(term2): (288,)
+        #     np.shape(term3): (288,)
+        #     np.shape(result): (288, 288)
+        # """
+        # return result
+    
+    
 
 
 
@@ -491,7 +568,7 @@ class BayesianPlacemapPositionDecoder(PlacemapPositionDecoder):
             self.perform_compute_most_likely_positions()
     
     
-    def setup(self):        
+    def setup(self):
         self._setup_concatenated_F()
         # Could pre-filter the self.spikes_df by the 
         
@@ -585,7 +662,9 @@ class BayesianPlacemapPositionDecoder(PlacemapPositionDecoder):
         
         if self.debug_print:
             print(f'np.shape(n): {np.shape(n)}') # np.shape(n): (40,)
-        final_p_x_given_n = ZhangReconstructionImplementation.bayesian_prob(self.time_bin_size, self.P_x, self.F, n, debug_print=self.debug_print) # np.shape(final_p_x_given_n): (288,)
+        # final_p_x_given_n = ZhangReconstructionImplementation.bayesian_prob(self.time_bin_size, self.P_x, self.F, n, debug_print=self.debug_print) # np.shape(final_p_x_given_n): (288,)
+        # NeuroPy's decoder method:
+        final_p_x_given_n = ZhangReconstructionImplementation.neuropy_bayesian_prob(self.time_bin_size, self.P_x, self.F, n, debug_print=self.debug_print)
         if self.debug_print:
             print(f'np.shape(final_p_x_given_n): {np.shape(self.flat_p_x_given_n)}') # np.shape(final_p_x_given_n): (288,)
         return final_p_x_given_n
@@ -593,11 +672,14 @@ class BayesianPlacemapPositionDecoder(PlacemapPositionDecoder):
             
     def compute_all(self):
         with WrappingMessagePrinter(f'compute_all final_p_x_given_n called. Computing {np.shape(self.flat_p_x_given_n)[0]} windows for self.final_p_x_given_n...', begin_line_ending='... ', finished_message='compute_all completed.', enable_print=self.debug_print):
-            for bin_idx in np.arange(self.num_time_windows):
-                with WrappingMessagePrinter(f'\t computing single final_p_x_given_n[:, {bin_idx}] for bin_idx {bin_idx}', begin_line_ending='... ', finished_message='', finished_line_ending='\n', enable_print=self.debug_print):
-                    self.flat_p_x_given_n[:, bin_idx] = self.perform_compute_single_time_bin(bin_idx)
-                    
-            
+            # for bin_idx in np.arange(self.num_time_windows):
+            #     with WrappingMessagePrinter(f'\t computing single final_p_x_given_n[:, {bin_idx}] for bin_idx {bin_idx}', begin_line_ending='... ', finished_message='', finished_line_ending='\n', enable_print=self.debug_print):
+            #         self.flat_p_x_given_n[:, bin_idx] = self.perform_compute_single_time_bin(bin_idx)
+
+            # Single sweep decoding:
+            self.flat_p_x_given_n[:, :] = ZhangReconstructionImplementation.neuropy_bayesian_prob(self.time_bin_size, self.P_x, self.F, self.unit_specific_time_binned_spike_counts, debug_print=self.debug_print)
+            print(f'self.flat_p_x_given_n.shape: {self.flat_p_x_given_n.shape}')
+                        
             # all computed
             # Reshape the output variable:
             
