@@ -12,6 +12,8 @@ from pybursts import pybursts
 # For Progress bars:
 from tqdm.notebook import tqdm
 
+from neuropy.utils.misc import safe_pandas_get_group # for _compute_pybursts_burst_interval_detection
+
 
 from pyphocorehelpers.mixins.member_enumerating import AllFunctionEnumeratingMixin
 from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.ComputationFunctionRegistryHolder import ComputationFunctionRegistryHolder
@@ -65,7 +67,7 @@ class SpikeAnalysisComputations(AllFunctionEnumeratingMixin, metaclass=Computati
                 if i == 0 or True:
                     if debug_print:
                         print(f'computing burst intervals for {a_cell_id}...')
-                    curr_df = sess.spikes_df.groupby('aclu').get_group(a_cell_id)
+                    curr_df = safe_pandas_get_group(sess.spikes_df.groupby('aclu'), a_cell_id)
                     curr_spike_train = curr_df[curr_df.spikes.time_variable_name].to_numpy()
                     num_curr_spikes = len(curr_spike_train)
                     if debug_print:
