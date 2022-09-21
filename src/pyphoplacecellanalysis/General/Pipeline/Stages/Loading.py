@@ -24,7 +24,7 @@ def saveData(pkl_path, db, should_append=False):
         file_mode = 'ab' # 'ab' opens the file as binary and appends to the end
     else:
         file_mode = 'w+b' # 'w+b' opens and truncates the file to 0 bytes (overwritting)
-    with ProgressMessagePrinter(pkl_path, f"Saving (file mode '{file_mode}')", 'loaded session pickle file'):
+    with ProgressMessagePrinter(pkl_path, f"Saving (file mode '{file_mode}')", 'saved session pickle file'):
         with open(pkl_path, file_mode) as dbfile: 
             # source, destination
             pickle.dump(db, dbfile)
@@ -33,7 +33,7 @@ def saveData(pkl_path, db, should_append=False):
 def loadData(pkl_path, debug_print=False):
     # for reading also binary mode is important
     db = None
-    with ProgressMessagePrinter(pkl_path, 'Loading', 'saved session pickle file'):
+    with ProgressMessagePrinter(pkl_path, 'Loading', 'loaded session pickle file'):
         with open(pkl_path, 'rb') as dbfile:
             db = pickle.load(dbfile)
             if debug_print:
