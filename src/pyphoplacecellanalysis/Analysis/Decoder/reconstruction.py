@@ -11,7 +11,6 @@ from pyphocorehelpers.indexing_helpers import BinningInfo, compute_spanning_bins
 from pyphocorehelpers.print_helpers import WrappingMessagePrinter, SimplePrintable
 from pyphocorehelpers.mixins.serialized import SerializedAttributesSpecifyingClass
 
-
 from pyphocorehelpers.print_helpers import print_value_overview_only, print_keys_if_possible, debug_dump_object_member_shapes, safe_get_variable_shape
 
 
@@ -492,16 +491,13 @@ class BayesianPlacemapPositionDecoder(PlacemapPositionDecoder):
         new_obj = BayesianPlacemapPositionDecoder(val_dict.get('time_bin_size', 0.25), val_dict.get('pf', None), val_dict.get('spikes_df', None), setup_on_init=val_dict.get('setup_on_init', True), post_load_on_init=val_dict.get('post_load_on_init', False), debug_print=val_dict.get('debug_print', False))
         return new_obj
     
-    
-    
     # ==================================================================================================================== #
     # Methods                                                                                                              #
     # ==================================================================================================================== #
     
     def __init__(self, time_bin_size: float, pf, spikes_df: pd.DataFrame, manual_time_window_edges=None, manual_time_window_edges_binning_info:BinningInfo=None, setup_on_init:bool=True, post_load_on_init:bool=False, debug_print:bool=True):
         super(BayesianPlacemapPositionDecoder, self).__init__(time_bin_size, pf, spikes_df, manual_time_window_edges=manual_time_window_edges, manual_time_window_edges_binning_info=manual_time_window_edges_binning_info, setup_on_init=setup_on_init, post_load_on_init=post_load_on_init, debug_print=debug_print)
-        
-
+    
     def post_load(self):
         """ Called after deserializing/loading saved result from disk to rebuild the needed computed variables. """
         with WrappingMessagePrinter(f'post_load() called.', begin_line_ending='... ', finished_message='all rebuilding completed.', enable_print=self.debug_print):
@@ -520,7 +516,6 @@ class BayesianPlacemapPositionDecoder(PlacemapPositionDecoder):
         self._setup_time_window_centers()
         # pre-allocate outputs:
         self._setup_preallocate_outputs()
-        
         
     def debug_dump_print(self):
         """ dumps the state for debugging purposes """
@@ -595,8 +590,6 @@ class BayesianPlacemapPositionDecoder(PlacemapPositionDecoder):
         
     def _reshape_output(self, output_probability):
         return np.reshape(output_probability, (*self.original_position_data_shape, self.num_time_windows)) # changed for compatibility with 1D decoder
-    #    return np.reshape(output_probability, (self.original_position_data_shape[0], self.original_position_data_shape[1], self.num_time_windows))
-
     
     # ==================================================================================================================== #
     # Main computation functions:                                                                                          #
@@ -632,11 +625,6 @@ class BayesianPlacemapPositionDecoder(PlacemapPositionDecoder):
             self.p_x_given_n = self._reshape_output(self.flat_p_x_given_n)
             self.compute_most_likely_positions()
 
-            # self.p_x_given_n = np.reshape(self.flat_p_x_given_n, (self.original_position_data_shape[0], self.original_position_data_shape[1], self.num_time_windows))            
-            # np.shape(rehsaped_final_p_x_given_n) # (48, 6, 85842) 
-            # if self.debug_print:
-            #     print('compute_all completed!')
-            
     def compute_most_likely_positions(self):
         """ Computes the most likely positions at each timestep from self.flat_p_x_given_n """        
         self.most_likely_position_flat_indicies, self.most_likely_position_indicies = self.perform_compute_most_likely_positions(self.flat_p_x_given_n, self.original_position_data_shape)
