@@ -513,8 +513,8 @@ class BayesianPlacemapPositionDecoder(PlacemapPositionDecoder):
             self._setup_concatenated_F()
             self._setup_time_bin_spike_counts_N_i()
             self._setup_time_window_centers()
-            self.p_x_given_n = self._reshaped_output(self.flat_p_x_given_n)
-            self.perform_compute_most_likely_positions()
+            self.p_x_given_n = self._reshape_output(self.flat_p_x_given_n)
+            self.compute_most_likely_positions()
     
     
     def setup(self):
@@ -634,19 +634,64 @@ class BayesianPlacemapPositionDecoder(PlacemapPositionDecoder):
             # Reshape the output variable:
             
             # np.shape(self.final_p_x_given_n) # (288, 85842)
-            self.p_x_given_n = self._reshaped_output(self.flat_p_x_given_n)
-            self.perform_compute_most_likely_positions()
+            self.p_x_given_n = self._reshape_output(self.flat_p_x_given_n)
+            self.compute_most_likely_positions()
 
             # self.p_x_given_n = np.reshape(self.flat_p_x_given_n, (self.original_position_data_shape[0], self.original_position_data_shape[1], self.num_time_windows))            
             # np.shape(rehsaped_final_p_x_given_n) # (48, 6, 85842) 
             # if self.debug_print:
             #     print('compute_all completed!')
             
-    def perform_compute_most_likely_positions(self):
-        """ Computes the most likely positions at each timestep from self.flat_p_x_given_n """
-        self.most_likely_position_flat_indicies = np.argmax(self.flat_p_x_given_n, axis=0)
+    def compute_most_likely_positions(self):
+        """ Computes the most likely positions at each timestep from self.flat_p_x_given_n """        
+        self.most_likely_position_flat_indicies, self.most_likely_position_indicies = self.perform_compute_most_likely_positions(self.flat_p_x_given_n, self.original_position_data_shape)
         # np.shape(self.most_likely_position_flat_indicies) # (85841,)
-        self.most_likely_position_indicies = np.array(np.unravel_index(self.most_likely_position_flat_indicies, self.original_position_data_shape)) # convert back to an array
         # np.shape(self.most_likely_position_indicies) # (2, 85841)
-        # self.most_likely_position_indicies
         
+        
+            
+    def decode(self, unit_specific_time_binned_spike_counts, time_bin_size, debug_print=True):
+        """ decodes the neural activity from its internal placefields, returning its posterior and the predicted position 
+        Does not alter the internal state of the decoder (doesn't change internal most_likely_positions or posterior, etc)
+        
+        unit_specific_time_binned_spike_counts: np.array of shape (num_cells, num_time_bins) - e.g. (69, 20717)
+        """
+        # raise NotImplementedError
+        with WrappingMessagePrinter(f'decode(...) called. Computing {np.shape(self.flat_p_x_given_n)[0]} windows for self.final_p_x_given_n...', begin_line_ending='... ', finished_message='compute_all completed.', enable_print=self.debug_print):
+            if time_bin_size is None:
+                print(f'time_bin_size is None, using internal self.time_bin_size.')
+                time_bin_size = self.time_bin_size
+                
+            # for bin_idx in np.arange(self.num_time_windows):
+            #     with WrappingMessagePrinter(f'\t computing single final_p_x_given_n[:, {bin_idx}] for bin_idx {bin_idx}', begin_line_ending='... ', finished_message='', finished_line_ending='\n', enable_print=self.debug_print):
+            #         curr_flat_p_x_given_n[:, bin_idx] = self.perform_compute_single_time_bin(bin_idx)
+
+            # Single sweep decoding:
+            curr_flat_p_x_given_n = ZhangReconstructionImplementation.neuropy_bayesian_prob(time_bin_size, self.P_x, self.F, unit_specific_time_binned_spike_counts, debug_print=(debug_print or self.debug_print))
+            if debug_print:
+                print(f'curr_flat_p_x_given_n.shape: {curr_flat_p_x_given_n.shape}')
+            # all computed
+            # Reshape the output variables:    
+            # np.shape(self.final_p_x_given_n) # (288, 85842)
+            p_x_given_n = self._reshape_output(curr_flat_p_x_given_n)
+            most_likely_position_flat_indicies, most_likely_position_indicies = self.perform_compute_most_likely_positions(curr_flat_p_x_given_n, self.original_position_data_shape)
+
+            if self.ndim > 1:
+                most_likely_positions = np.vstack((self.xbin_centers[most_likely_position_indicies[0,:]], self.ybin_centers[most_likely_position_indicies[1,:]])).T # much more efficient than the other implementation. Result is # (85844, 2)
+            else:
+                # 1D Decoder case:
+                # self.most_likely_position_indicies.shape # (1, 20717)
+                most_likely_positions = np.squeeze(self.xbin_centers[most_likely_position_indicies[0,:]]) # not sure if I actually want to squeeze the values # (20717,)
+        
+            return most_likely_positions, p_x_given_n, most_likely_position_indicies
+            
+            
+        
+    @classmethod
+    def perform_compute_most_likely_positions(cls, flat_p_x_given_n, original_position_data_shape):
+        """ Computes the most likely positions at each timestep from flat_p_x_given_n and the shape of the original position data """
+        most_likely_position_flat_indicies = np.argmax(flat_p_x_given_n, axis=0)        
+        most_likely_position_indicies = np.array(np.unravel_index(most_likely_position_flat_indicies, original_position_data_shape)) # convert back to an array
+        # np.shape(most_likely_position_flat_indicies) # (85841,)
+        # np.shape(most_likely_position_indicies) # (2, 85841)
+        return most_likely_position_flat_indicies, most_likely_position_indicies
