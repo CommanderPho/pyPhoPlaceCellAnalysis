@@ -4,6 +4,7 @@
 @author: pho
 NeuropyPipeline.py
 """
+from copy import deepcopy
 import importlib
 import sys
 from pathlib import Path
@@ -16,6 +17,10 @@ import pandas as pd
 # NeuroPy (Diba Lab Python Repo) Loading
 from neuropy import core
 importlib.reload(core)
+
+
+from pyphocorehelpers.hashing_helpers import get_hash_tuple, freeze
+from pyphocorehelpers.mixins.diffable import DiffableObject
 
 from neuropy.core.session.Formats.BaseDataSessionFormats import DataSessionFormatRegistryHolder # hopefully this works without all the other imports
 from neuropy.core.session.KnownDataSessionTypeProperties import KnownDataSessionTypeProperties
@@ -33,6 +38,22 @@ import logging
 # from pyphoplacecellanalysis.General.Pipeline.Stages.BaseNeuropyPipelineStage import pipeline_module_logger
 from pyphocorehelpers.print_helpers import build_module_logger
 pipeline_module_logger = build_module_logger('Spike3D.pipeline')
+
+
+class LoadedObjectPersistanceState(object):
+    """Keeps track of the persistance state for an object that has been loaded from disk to keep track of how the object's state relates to the version on disk (the persisted version) """
+    def __init__(self, file_path, compare_state_on_load):
+        super(LoadedObjectPersistanceState, self).__init__()
+        self.file_path = file_path
+        self.load_compare_state = deepcopy(compare_state_on_load)
+        
+    def needs_save(self, curr_object) -> bool:
+        """ compares the curr_object's state to its state when loaded from disk to see if anything changed and it needs to be re-persisted (by saving) """
+        # lhs_compare_dict = NeuropyPipeline.build_pipeline_compare_dict(curr_object)
+        curr_diff = DiffableObject.compute_diff(curr_object.pipeline_compare_dict, self.load_compare_state)        
+        return len(curr_diff) > 0
+
+    
 
 class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, FilteredPipelineMixin, PipelineWithComputedPipelineStageMixin, PipelineWithDisplayPipelineStageMixin, QtCore.QObject):
     """ 
@@ -70,6 +91,9 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
         self._stage = None
         self.logger = pipeline_module_logger
         self.logger.info(f'NeuropyPipeline.__init__(name="{name}", session_data_type="{session_data_type}", basedir="{basedir}")')
+        
+        self._persistance_state = None # indicate that this pipeline doesn't have a corresponding pickle file that it was loaded from
+        
         _stage_changed_connection = self.sigStageChanged.connect(self.on_stage_changed)
         self.set_input(name=name, session_data_type=session_data_type, basedir=basedir, load_function=load_function, post_load_functions=post_load_functions)
 
@@ -137,9 +161,10 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
             did_add_property = False
             did_add_property = did_add_property or _ensure_unpickled_session_up_to_date(curr_active_pipeline.sess, active_data_mode_name=active_data_mode_name, basedir=basedir, desired_time_variable_name=desired_time_variable_name, debug_print=debug_print)
             ## Apply to all of the pipeline's filtered sessions:
-            for a_sess in curr_active_pipeline.filtered_sessions.values():
-                did_add_property = did_add_property or _ensure_unpickled_session_up_to_date(a_sess, active_data_mode_name=active_data_mode_name, basedir=basedir, desired_time_variable_name=desired_time_variable_name, debug_print=debug_print)
-            return did_add_property
+            if hasattr(curr_active_pipeline, 'filtered_sessions'):
+                for a_sess in curr_active_pipeline.filtered_sessions.values():
+                    did_add_property = did_add_property or _ensure_unpickled_session_up_to_date(a_sess, active_data_mode_name=active_data_mode_name, basedir=basedir, desired_time_variable_name=desired_time_variable_name, debug_print=debug_print)
+                return did_add_property
 
         ## BEGIN FUNCTION BODY
         if override_basepath is not None:
@@ -159,6 +184,7 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
         if not force_reload:
             try:
                 loaded_pipeline = loadData(finalized_loaded_sess_pickle_path, debug_print=False)
+                
             except (FileNotFoundError):
                 # loading failed
                 print(f'Failure loading {finalized_loaded_sess_pickle_path}.')
@@ -182,6 +208,8 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
             active_data_mode_registered_class = active_data_session_types_registered_classes_dict[type_name]
             desired_time_variable_name = active_data_mode_registered_class._time_variable_name # Requires desired_time_variable_name
             pipeline_needs_resave = _ensure_unpickled_pipeline_up_to_date(curr_active_pipeline, active_data_mode_name=type_name, basedir=Path(basepath), desired_time_variable_name=desired_time_variable_name, debug_print=False)
+            
+            curr_active_pipeline._persistance_state = LoadedObjectPersistanceState(finalized_loaded_sess_pickle_path, compare_state_on_load=curr_active_pipeline.pipeline_compare_dict)
             ## Save out the changes to the pipeline after computation to the pickle file for easy loading in the future
             if pipeline_needs_resave:
                 curr_active_pipeline.save_pipeline(active_pickle_filename=active_pickle_filename)
@@ -200,6 +228,86 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
         # finalized_loaded_sess_pickle_path
         return curr_active_pipeline
     
+    @classmethod
+    def build_pipeline_compare_dict(cls, a_pipeline):
+        """ Builds a dictionary that can be used to compare the progress of two neuropy_pipeline objects
+        {'maze1_PYR': {'computation_config': DynamicContainer({'pf_params': <PlacefieldComputationParameters: {'speed_thresh': 10.0, 'grid_bin': (3.793023081021702, 1.607897707662558), 'smooth': (2.0, 2.0), 'frate_thresh': 0.2, 'time_bin_size': 0.1, 'computation_epochs': None};>, 'spike_analysis': DynamicContainer({'max_num_spikes_per_neuron': 20000, 'kleinberg_parameters': DynamicContainer({'s': 2, 'gamma': 0.2}), 'use_progress_bar': False, 'debug_print': False})}),
+        'computed_data': ['pf1D',
+        'pf2D',
+        'pf1D_dt',
+        'pf2D_dt',
+        'pf2D_Decoder',
+        'pf2D_TwoStepDecoder',
+        'extended_stats']},
+        'maze2_PYR': {'computation_config': DynamicContainer({'pf_params': <PlacefieldComputationParameters: {'speed_thresh': 10.0, 'grid_bin': (3.793023081021702, 1.607897707662558), 'smooth': (2.0, 2.0), 'frate_thresh': 0.2, 'time_bin_size': 0.1, 'computation_epochs': None};>, 'spike_analysis': DynamicContainer({'max_num_spikes_per_neuron': 20000, 'kleinberg_parameters': DynamicContainer({'s': 2, 'gamma': 0.2}), 'use_progress_bar': False, 'debug_print': False})}),
+        'computed_data': ['pf1D',
+        'pf2D',
+        'pf1D_dt',
+        'pf2D_dt',
+        'pf2D_Decoder',
+        'pf2D_TwoStepDecoder',
+        'extended_stats']},
+        'maze_PYR': {'computation_config': DynamicContainer({'pf_params': <PlacefieldComputationParameters: {'speed_thresh': 10.0, 'grid_bin': (3.793023081021702, 1.607897707662558), 'smooth': (2.0, 2.0), 'frate_thresh': 0.2, 'time_bin_size': 0.1, 'computation_epochs': None};>, 'spike_analysis': DynamicContainer({'max_num_spikes_per_neuron': 20000, 'kleinberg_parameters': DynamicContainer({'s': 2, 'gamma': 0.2}), 'use_progress_bar': False, 'debug_print': False})}),
+        'computed_data': ['pf1D',
+        'pf2D',
+        'pf1D_dt',
+        'pf2D_dt',
+        'pf2D_Decoder',
+        'pf2D_TwoStepDecoder',
+        'extended_stats']}}
+
+        Usage:
+            compare_dict = build_pipeline_compare_dict(curr_active_pipeline)   
+            compare_dict
+
+        """
+        out_results_dict = dict(last_completed_stage = a_pipeline.last_completed_stage,
+                        active_config_names = None,
+                        filtered_epochs = None,
+                        filtered_session_names = None,
+                        active_completed_computation_result_names = None,
+                        active_incomplete_computation_result_status_dicts= None,
+                        computation_result_computed_data_names = None,
+            )
+        
+        # If prior to the filtered stage, not much to compare
+        if a_pipeline.is_filtered:
+            out_results_dict.update(active_config_names = tuple(a_pipeline.active_config_names),
+                filtered_epochs = freeze(a_pipeline.filtered_epochs),
+                filtered_session_names = tuple(a_pipeline.filtered_session_names)
+            )
+            
+            
+        if a_pipeline.is_computed:    
+            if hasattr(a_pipeline, 'computation_results'):
+                comp_config_results_list = {}
+                for a_name, a_result in a_pipeline.computation_results.items():
+                    # ['sess', 'computation_config', 'computed_data', 'accumulated_errors']
+                    comp_config_results_list[a_name] = dict(computation_config=a_result['computation_config'], computed_data=tuple(a_result['computed_data'].keys()))
+            else:
+                comp_config_results_list = None
+
+            out_results_dict.update(active_completed_computation_result_names = tuple(a_pipeline.active_completed_computation_result_names), # ['maze1_PYR', 'maze2_PYR', 'maze_PYR']
+                active_incomplete_computation_result_status_dicts= freeze(a_pipeline.active_incomplete_computation_result_status_dicts),
+                computation_result_computed_data_names = freeze(comp_config_results_list)
+            )
+            
+        return out_results_dict
+
+    @classmethod
+    def compare_pipelines(cls, lhs, rhs, debug_print=False):
+        lhs_compare_dict = cls.build_pipeline_compare_dict(lhs)
+        rhs_compare_dict = cls.build_pipeline_compare_dict(rhs)
+        curr_diff = DiffableObject.compute_diff(lhs_compare_dict, rhs_compare_dict)
+        if debug_print:
+            print(f'curr_diff: {curr_diff}')
+        return curr_diff
+
+
+    
+    # ==================================================================================================================== #
+    # Properties                                                                                                           #
+    # ==================================================================================================================== #
 
     @property
     def sess(self):
@@ -215,6 +323,40 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
     def session_name(self):
         """The session_name property."""
         return self.sess.name
+
+    @property
+    def pipeline_compare_dict(self):
+        """The pipeline_compare_dict property."""
+        return NeuropyPipeline.build_pipeline_compare_dict(self)
+
+
+    @property
+    def persistance_state(self):
+        """The persistance_state property."""
+        return self._persistance_state
+    
+    @property
+    def pickle_path(self):
+        """ indicates that this pipeline doesn't have a corresponding pickle file that it was loaded from"""
+        if self.persistance_state is None:
+            return None
+        else:
+            return self.persistance_state.file_path
+
+    @property
+    def has_associated_pickle(self):
+        """ True if this pipeline has a corresponding pickle file that it was loaded from"""
+        return (self.pickle_path is not None)
+
+    @property
+    def updated_since_last_pickle(self):
+        """ True if this pipeline has a been previously loaded/saved from a pickle file and has changed since this time
+        TODO: currently due to object-level comparison between configs this seems to always return True
+        """
+        if self.persistance_state is None:
+            return True # No previous known file (indicating it's never been saved), so return True.
+        return self.persistance_state.needs_save(curr_object=self)
+
 
 
     @property
@@ -287,6 +429,8 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
         state = self.__dict__.copy()
         # Remove the unpicklable entries.
         del state['logger']
+        del state['_persistance_state']
+        # del state['_pickle_path']
         return state
 
     def __setstate__(self, state):
@@ -298,17 +442,30 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
         # Restore unpickable properties:
         self.logger = pipeline_module_logger
         self.logger.info(f'NeuropyPipeline.__setstate__(state="{state}")')
-        
+
+        self._persistance_state = None # the pickle_path has to be set manually after loading
         
         _stage_changed_connection = self.sigStageChanged.connect(self.on_stage_changed)
          
 
     def save_pipeline(self, active_pickle_filename='loadedSessPickle.pkl'):
         ## Build Pickle Path:
-        finalized_loaded_sess_pickle_path = Path(self.sess.basepath).joinpath(active_pickle_filename).resolve()
+        used_existing_pickle_path = False
+        if active_pickle_filename is None:
+            assert self.has_associated_pickle
+            finalized_loaded_sess_pickle_path = self.pickle_path # get the internal pickle path that it was loaded from if none specified
+            used_existing_pickle_path = True
+        else:        
+            finalized_loaded_sess_pickle_path = Path(self.sess.basepath).joinpath(active_pickle_filename).resolve()
+            used_existing_pickle_path = (finalized_loaded_sess_pickle_path == self.pickle_path) # used the existing path if they're the same
+        
         print(f'finalized_loaded_sess_pickle_path: {finalized_loaded_sess_pickle_path}')
         self.logger.info(f'finalized_loaded_sess_pickle_path: {finalized_loaded_sess_pickle_path}')
         # Save reloaded pipeline out to pickle for future loading
         saveData(finalized_loaded_sess_pickle_path, db=self) # Save the pipeline out to pickle.
+        if not used_existing_pickle_path:
+            # the pickle path changed, so set it on the pipeline:
+            self._persistance_state = LoadedObjectPersistanceState(finalized_loaded_sess_pickle_path, compare_state_on_load=self.pipeline_compare_dict)
+        
         return finalized_loaded_sess_pickle_path
         
