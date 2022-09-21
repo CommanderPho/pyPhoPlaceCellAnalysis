@@ -124,10 +124,17 @@ class ZhangReconstructionImplementation:
         ## 2022-09-19 - TODO: should this be the non-normalized tuning curves instead of the normalized ones?
         # e.g. maps = pf.ratemap.tuning_curves
         maps = pf.ratemap.tuning_curves  # (40, 48) for 1D, (40, 48, 10) for 2D
-        
         if debug_print:
             print(f'maps: {np.shape(maps)}') # maps: (40, 48, 10)
-        f_i = [np.squeeze(maps[i,:,:]) for i in neuron_IDXs] # produces a list of (48 x 10) maps
+        
+        try:
+            f_i = [np.squeeze(maps[i,:,:]) for i in neuron_IDXs] # produces a list of (48 x 10) maps
+        except IndexError as e:
+            # Happens when called on a 1D decoder
+            assert np.ndim(maps) == 2, f"Currently only handles special 1D decoder case but np.shape(maps): {np.shape(maps)} and np.ndim(maps): {np.ndim(maps)} != 2"
+            f_i = [np.squeeze(maps[i,:]) for i in neuron_IDXs] # produces a list of (48, ) maps
+        except Exception as e:
+            raise e        
         if debug_print:
             print(f'np.shape(f_i[i]): {np.shape(f_i[0])}') # (48, 6)
         F_i = [np.reshape(f_i[i], (-1, 1)) for i in neuron_IDXs] # Convert each function to a column vector
@@ -447,12 +454,21 @@ class BayesianPlacemapPositionDecoder(PlacemapPositionDecoder):
     @property
     def most_likely_positions(self):
         """The most_likely_positions for each window."""
-        return np.vstack((self.xbin_centers[self.most_likely_position_indicies[0,:]], self.ybin_centers[self.most_likely_position_indicies[1,:]])).T # much more efficient than the other implementation. Result is # (85844, 2)
-    
+        if self.ndim > 1:
+            return np.vstack((self.xbin_centers[self.most_likely_position_indicies[0,:]], self.ybin_centers[self.most_likely_position_indicies[1,:]])).T # much more efficient than the other implementation. Result is # (85844, 2)
+        else:
+            # 1D Decoder case:
+            # self.most_likely_position_indicies.shape # (1, 20717)
+            return np.squeeze(self.xbin_centers[self.most_likely_position_indicies[0,:]]) # not sure if I actually want to squeeze the values # (20717,)
+            
     # placefield properties:
     @property
     def ratemap(self):
         return self.pf.ratemap
+    @property
+    def ndim(self):
+        return self.pf.ndim
+    
             
     # ratemap properties (xbin & ybin)  
     @property
@@ -582,24 +598,25 @@ class BayesianPlacemapPositionDecoder(PlacemapPositionDecoder):
         self.time_window_center_binning_info = BinningInfo(self.time_window_edges_binning_info.variable_extents, actual_time_window_size, len(self.time_window_centers), np.arange(len(self.time_window_centers)))
         
     def _reshaped_output(self, output_probability):
-       return np.reshape(output_probability, (self.original_position_data_shape[0], self.original_position_data_shape[1], self.num_time_windows))
+        return np.reshape(output_probability, (*self.original_position_data_shape, self.num_time_windows)) # changed for compatibility with 1D decoder
+    #    return np.reshape(output_probability, (self.original_position_data_shape[0], self.original_position_data_shape[1], self.num_time_windows))
 
     
     # ==================================================================================================================== #
     # Main computation functions:                                                                                          #
     # ==================================================================================================================== #
-    def perform_compute_single_time_bin(self, time_window_idx):
-        """ the main computation function for a single time_window_idx """
-        n = self.unit_specific_time_binned_spike_counts[:, time_window_idx] # this gets the specific n_t for this time window
+    # def perform_compute_single_time_bin(self, time_window_idx):
+    #     """ the main computation function for a single time_window_idx """
+    #     n = self.unit_specific_time_binned_spike_counts[:, time_window_idx] # this gets the specific n_t for this time window
         
-        if self.debug_print:
-            print(f'np.shape(n): {np.shape(n)}') # np.shape(n): (40,)
-        # final_p_x_given_n = ZhangReconstructionImplementation.bayesian_prob(self.time_bin_size, self.P_x, self.F, n, debug_print=self.debug_print) # np.shape(final_p_x_given_n): (288,)
-        # NeuroPy's decoder method:
-        final_p_x_given_n = ZhangReconstructionImplementation.neuropy_bayesian_prob(self.time_bin_size, self.P_x, self.F, n, debug_print=self.debug_print)
-        if self.debug_print:
-            print(f'np.shape(final_p_x_given_n): {np.shape(self.flat_p_x_given_n)}') # np.shape(final_p_x_given_n): (288,)
-        return final_p_x_given_n
+    #     if self.debug_print:
+    #         print(f'np.shape(n): {np.shape(n)}') # np.shape(n): (40,)
+    #     # final_p_x_given_n = ZhangReconstructionImplementation.bayesian_prob(self.time_bin_size, self.P_x, self.F, n, debug_print=self.debug_print) # np.shape(final_p_x_given_n): (288,)
+    #     # NeuroPy's decoder method:
+    #     final_p_x_given_n = ZhangReconstructionImplementation.neuropy_bayesian_prob(self.time_bin_size, self.P_x, self.F, n, debug_print=self.debug_print)
+    #     if self.debug_print:
+    #         print(f'np.shape(final_p_x_given_n): {np.shape(self.flat_p_x_given_n)}') # np.shape(final_p_x_given_n): (288,)
+    #     return final_p_x_given_n
 
             
     def compute_all(self):
