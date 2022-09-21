@@ -234,13 +234,8 @@ class ZhangReconstructionImplementation:
     def neuropy_bayesian_prob(tau, P_x, F, n, debug_print=False):
         # n_i: the number of spikes fired by each cell during the time window of consideration
         assert(len(n) == np.shape(F)[1]), f'n must be a column vector with an entry for each place cell (neuron). Instead it is of np.shape(n): {np.shape(n)}. np.shape(F): {np.shape(F)}'        
-        # nCells = spkcount.shape[0]
-        # nCells = len(n)
-        # nTimeBins = spkcount.shape[1]
-        # nFlatPositionBins = ratemaps.shape[1]
-        # nTimeBins = 1 # only one timeBin currently
-        
-        print(f'np.shape(P_x): {np.shape(P_x)}, np.shape(F): {np.shape(F)}, np.shape(n): {np.shape(n)}')
+        if debug_print:
+            print(f'np.shape(P_x): {np.shape(P_x)}, np.shape(F): {np.shape(F)}, np.shape(n): {np.shape(n)}')
         # np.shape(P_x): (1066, 1), np.shape(F): (1066, 66), np.shape(n): (66, 3530)
         
         # P_x = np.squeeze(P_x)
@@ -656,12 +651,16 @@ class BayesianPlacemapPositionDecoder(PlacemapPositionDecoder):
         
         unit_specific_time_binned_spike_counts: np.array of shape (num_cells, num_time_bins) - e.g. (69, 20717)
         """
-        # raise NotImplementedError
-        with WrappingMessagePrinter(f'decode(...) called. Computing {np.shape(self.flat_p_x_given_n)[0]} windows for self.final_p_x_given_n...', begin_line_ending='... ', finished_message='compute_all completed.', enable_print=self.debug_print):
+        num_cells = np.shape(unit_specific_time_binned_spike_counts)[0]    
+        num_time_windows = np.shape(unit_specific_time_binned_spike_counts)[1]
+        if debug_print:
+            print(f'num_cells: {num_cells}, num_time_windows: {num_time_windows}')
+        with WrappingMessagePrinter(f'decode(...) called. Computing {num_time_windows} windows for final_p_x_given_n...', begin_line_ending='... ', finished_message='decode completed.', enable_print=(debug_print or self.debug_print)):
             if time_bin_size is None:
                 print(f'time_bin_size is None, using internal self.time_bin_size.')
                 time_bin_size = self.time_bin_size
-                
+            
+            
             # for bin_idx in np.arange(self.num_time_windows):
             #     with WrappingMessagePrinter(f'\t computing single final_p_x_given_n[:, {bin_idx}] for bin_idx {bin_idx}', begin_line_ending='... ', finished_message='', finished_line_ending='\n', enable_print=self.debug_print):
             #         curr_flat_p_x_given_n[:, bin_idx] = self.perform_compute_single_time_bin(bin_idx)
@@ -673,7 +672,7 @@ class BayesianPlacemapPositionDecoder(PlacemapPositionDecoder):
             # all computed
             # Reshape the output variables:    
             # np.shape(self.final_p_x_given_n) # (288, 85842)
-            p_x_given_n = self._reshape_output(curr_flat_p_x_given_n)
+            p_x_given_n = np.reshape(curr_flat_p_x_given_n, (*self.original_position_data_shape, num_time_windows)) # changed for compatibility with 1D decoder
             most_likely_position_flat_indicies, most_likely_position_indicies = self.perform_compute_most_likely_positions(curr_flat_p_x_given_n, self.original_position_data_shape)
 
             if self.ndim > 1:
