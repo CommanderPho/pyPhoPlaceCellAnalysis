@@ -361,6 +361,7 @@ class PlacemapPositionDecoder(SerializedAttributesSpecifyingClass, SimplePrintab
     
     def post_load(self):
         raise NotImplementedError
+
         
     @classmethod
     def serialized_keys(cls):
@@ -597,7 +598,7 @@ class BayesianPlacemapPositionDecoder(PlacemapPositionDecoder):
         actual_time_window_size = self.time_window_centers[2] - self.time_window_centers[1]
         self.time_window_center_binning_info = BinningInfo(self.time_window_edges_binning_info.variable_extents, actual_time_window_size, len(self.time_window_centers), np.arange(len(self.time_window_centers)))
         
-    def _reshaped_output(self, output_probability):
+    def _reshape_output(self, output_probability):
         return np.reshape(output_probability, (*self.original_position_data_shape, self.num_time_windows)) # changed for compatibility with 1D decoder
     #    return np.reshape(output_probability, (self.original_position_data_shape[0], self.original_position_data_shape[1], self.num_time_windows))
 
