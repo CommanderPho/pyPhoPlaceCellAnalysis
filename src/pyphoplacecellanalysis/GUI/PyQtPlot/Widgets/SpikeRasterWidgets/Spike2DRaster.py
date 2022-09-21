@@ -503,7 +503,7 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
     def update_scroll_window_region(self, new_start, new_end, block_signals: bool=True):
         """ called to update the interactive scrolling window control """
         if block_signals:
-            self.ui.scroll_window_region.blockSignals(True) # Block signals so it doesn't recurrsively update
+            self.ui.scroll_window_region.blockSignals(True) # Block signals so it doesn't recursively update
         self.ui.scroll_window_region.setRegion([new_start, new_end]) # adjust scroll control
         if block_signals:
             self.ui.scroll_window_region.blockSignals(False)
