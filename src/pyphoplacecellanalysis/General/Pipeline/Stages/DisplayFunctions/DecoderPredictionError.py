@@ -439,7 +439,7 @@ def _temp_debug_draw_update_predicted_position_difference(predicted_positions, m
 
 
 
-def plot_decoded_epoch_slices(filter_epochs, filter_epochs_decoder_result, global_pos_df, xbin=None, enable_flat_line_drawing=False, debug_test_max_num_slices=20, debug_print=False):
+def plot_decoded_epoch_slices(filter_epochs, filter_epochs_decoder_result, global_pos_df, xbin=None, enable_flat_line_drawing=False, debug_test_max_num_slices=20, name='stacked_epoch_slices_matplotlib_subplots', debug_print=False):
     """ plots the decoded epoch results in a stacked slices view 
     
     Usage:    
@@ -469,10 +469,10 @@ def plot_decoded_epoch_slices(filter_epochs, filter_epochs_decoder_result, globa
     # if 'label' not in epochs_df.columns:
     epochs_df['label'] = epochs_df.index.to_numpy() # integer ripple indexing    
     epoch_slices = epochs_df[['start', 'stop']].to_numpy()
-    epoch_description_list = [f'ripple {epoch_tuple.label} (peakpower: {epoch_tuple.peakpower})' for epoch_tuple in epochs_df[['label', 'peakpower']].itertuples()]
+    # epoch_description_list = [f'ripple {epoch_tuple.label} (peakpower: {epoch_tuple.peakpower})' for epoch_tuple in epochs_df[['label', 'peakpower']].itertuples()]
 
     plot_function_name = 'Stacked Epoch Slices View - MATPLOTLIB subplots Version'
-    params, plots_data, plots, ui = stacked_epoch_slices_matplotlib_build_view(epoch_slices, name='stacked_epoch_slices_matplotlib_subplots_RIPPLES', plot_function_name=plot_function_name, debug_test_max_num_slices=debug_test_max_num_slices, debug_print=debug_print)
+    params, plots_data, plots, ui = stacked_epoch_slices_matplotlib_build_view(epoch_slices, name=name, plot_function_name=plot_function_name, debug_test_max_num_slices=debug_test_max_num_slices, debug_print=debug_print)
 
     for i, curr_ax in enumerate(plots.axs):
         # curr_time_bins = filter_epochs_decoder_result.time_bin_centers[i]

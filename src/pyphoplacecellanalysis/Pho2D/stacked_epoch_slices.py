@@ -325,10 +325,11 @@ def stacked_epoch_slices_matplotlib_build_view(epoch_slices, name='stacked_epoch
             curr_ax.set_xlim(*plots_data.epoch_slices[i,:])
     """
     ## Inset Subplots Version:
-    if plot_function_name is not None:
+    if plot_function_name is None:
         plot_function_name = 'Stacked Epoch Slices View - MATPLOTLIB subplots Version'
     params, plots_data, plots, ui = stacked_epoch_basic_setup(epoch_slices, name=name, plot_function_name=plot_function_name, debug_test_max_num_slices=debug_test_max_num_slices, debug_print=debug_print)
-    plots.figure_id = 'stacked_epoch_slices_matplotlib'
+    # plots.figure_id = 'stacked_epoch_slices_matplotlib'    
+    plots.figure_id = plots.name # copy the name as the figure_id
     plots.fig, plots.axs = plt.subplots(num=plots.figure_id, ncols=1, nrows=params.active_num_slices, figsize=(15,15), clear=True, sharex=False, sharey=False, constrained_layout=True)
     plots.fig.suptitle(plots.name)
     
