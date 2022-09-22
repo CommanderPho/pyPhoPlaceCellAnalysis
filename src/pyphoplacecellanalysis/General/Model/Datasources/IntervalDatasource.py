@@ -117,6 +117,13 @@ class IntervalsDatasource(BaseDatasource):
         assert np.isin(IntervalsDatasource._required_interval_time_columns, df.columns).all(), f"dataframe is missing required columns:\n Required: {IntervalsDatasource._required_interval_time_columns}, current: {df.columns} "
         
         
+    def update_visualization_properties(self, dataframe_vis_columns_function):
+        """ called to update the current visualization columns of the df by applying the provided function """
+        self._df = dataframe_vis_columns_function(self._df)
+        self.source_data_changed_signal.emit() # Emit the data changed signal
+
+        
+        
     @classmethod
     def add_missing_reciprocal_columns_if_needed(cls, df):
         """ computes the missing column ('t_duration' or 't_end') from the other two columns. """

@@ -22,35 +22,42 @@ class General2DRenderTimeEpochs(object):
     default_datasource_name = 'GeneralEpochs'
     
     @classmethod
-    def _update_df_visualization_columns(cls, active_df, y_location, height, pen_color, brush_color, **kwargs):
-        ## Add the missing parameters to the dataframe:
+    def _update_df_visualization_columns(cls, active_df, y_location=None, height=None, pen_color=None, brush_color=None, **kwargs):
+        """ updates the columns of the provided active_df given the values specified. If values aren't provided, they aren't changed. """        
+        # Update only the provided columns while leaving the others intact
+        if y_location is not None:
             ## y_location:
             if isinstance(y_location, (list, tuple)):
                 active_df['series_vertical_offset'] = kwargs.setdefault('series_vertical_offset', [a_y_location for a_y_location in y_location])
             else:
                 # Scalar value assignment:
                 active_df['series_vertical_offset'] = kwargs.setdefault('series_vertical_offset', y_location)
+                
+        if height is not None:
             ## series_height:
             if isinstance(height, (list, tuple)):
                 active_df['series_height'] = kwargs.setdefault('series_height', [a_height for a_height in height])
             else:
                 # Scalar value assignment:
                 active_df['series_height'] = kwargs.setdefault('series_height', height)
-                
+
+        if pen_color is not None:
             ## pen_color:
             if isinstance(pen_color, (list, tuple)):
                 active_df['pen'] = kwargs.setdefault('pen', [pg.mkPen(a_pen_color) for a_pen_color in pen_color])
             else:
                 # Scalar value assignment:
                 active_df['pen'] = kwargs.setdefault('pen', pg.mkPen(pen_color)) 
+            
+        if brush_color is not None:
             ## brush_color:
             if isinstance(brush_color, (list, tuple)):
                 active_df['brush'] = kwargs.setdefault('brush', [pg.mkBrush(a_color) for a_color in brush_color])  
             else:
                 # Scalar value assignment:
                 active_df['brush'] = kwargs.setdefault('brush', pg.mkBrush(brush_color))
-            
-            return active_df #, kwargs
+        
+        return active_df #, kwargs
     
     @classmethod
     def build_epochs_dataframe_formatter(cls, **kwargs):
@@ -74,8 +81,17 @@ class General2DRenderTimeEpochs(object):
 
     @classmethod
     def build_render_time_epochs_datasource(cls, active_epochs_obj, **kwargs):
+        """ allows specifying a custom formatter function """
+        custom_epochs_df_formatter = kwargs.pop('epochs_dataframe_formatter', None)
+        
+        if custom_epochs_df_formatter is None:
+            active_epochs_df_formatter = cls.build_epochs_dataframe_formatter(**kwargs)
+        else:
+            print(f'overriding default epochs_df_formatter...')
+            active_epochs_df_formatter = custom_epochs_df_formatter(cls, **kwargs)
+        
         if isinstance(active_epochs_obj, Epoch):
-            general_epochs_interval_datasource = IntervalsDatasource.init_from_epoch_object(active_epochs_obj, cls.build_epochs_dataframe_formatter(**kwargs), datasource_name='intervals_datasource_from_general_Epochs_obj')
+            general_epochs_interval_datasource = IntervalsDatasource.init_from_epoch_object(active_epochs_obj, active_epochs_df_formatter, datasource_name='intervals_datasource_from_general_Epochs_obj')
             
         elif isinstance(active_epochs_obj, pd.DataFrame):
             ## NOTE that build_epochs_dataframe_formatter is never called if a dataframe is passed in directly, and the dataframe's columns must be named exactly correctly
@@ -85,8 +101,7 @@ class General2DRenderTimeEpochs(object):
             assert len(active_epochs_obj) == 3
             # raise NotImplementedError # These do not work because they don't get the required columns added via cls.build_epochs_dataframe_formatter(**kwargs)
             # must be a tuple containing (t_starts, t_durations, optional_values/ids)
-            _temp_formatter = cls.build_epochs_dataframe_formatter(**kwargs)
-            general_epochs_interval_datasource = IntervalsDatasource.init_from_times_values(*active_epochs_obj, cls.build_epochs_dataframe_formatter(**kwargs), datasource_name='intervals_datasource_from_general_times_tuple_obj')
+            general_epochs_interval_datasource = IntervalsDatasource.init_from_times_values(*active_epochs_obj, active_epochs_df_formatter, datasource_name='intervals_datasource_from_general_times_tuple_obj')
             
             
         else:
