@@ -685,7 +685,7 @@ class BayesianPlacemapPositionDecoder(PlacemapPositionDecoder):
     # ==================================================================================================================== #
         
     @classmethod
-    def perform_decode_specific_epochs(cls, new_2D_decoder, spikes_df, filter_epochs, decoding_time_bin_size = 0.05, debug_print=False):
+    def perform_decode_specific_epochs(cls, active_decoder, spikes_df, filter_epochs, decoding_time_bin_size = 0.05, debug_print=False):
         """Uses the decoder to decode the nerual activity (provided in spikes_df) for each epoch in filter_epochs
 
         Args:
@@ -699,7 +699,7 @@ class BayesianPlacemapPositionDecoder(PlacemapPositionDecoder):
             _type_: _description_
         """
         # build output result object:
-        filter_epochs_decoder_result = DynamicContainer(most_likely_positions_list=[], p_x_given_n_list=[], marginal_x_p_x_given_n_list=[], most_likely_position_indicies_list=[])
+        filter_epochs_decoder_result = DynamicContainer(most_likely_positions_list=[], p_x_given_n_list=[], marginal_x_list=[], most_likely_position_indicies_list=[])
 
         if debug_print:
             print(f'filter_epochs: {filter_epochs.n_epochs}')
@@ -714,12 +714,12 @@ class BayesianPlacemapPositionDecoder(PlacemapPositionDecoder):
             print(f'np.shape(filter_epoch_spikes_df): {np.shape(filter_epoch_spikes_df)}')
 
         ## NOW 🟢 TODO: 2022-09-21: final step is to time_bin (relative to the start of each epoch) the time values of remaining spikes
-        spkcount, nbins, time_bins = epochs_spkcount(filter_epoch_spikes_df, filter_epochs, decoding_time_bin_size, slideby=decoding_time_bin_size, export_time_bins=True, included_neuron_ids=new_2D_decoder.neuron_IDs, debug_print=debug_print) ## time_bins returned are not correct, they're subsampled at a rate of 1000
+        spkcount, nbins, bad_time_bins = epochs_spkcount(filter_epoch_spikes_df, filter_epochs, decoding_time_bin_size, slideby=decoding_time_bin_size, export_time_bins=True, included_neuron_ids=active_decoder.neuron_IDs, debug_print=debug_print) ## time_bins returned are not correct, they're subsampled at a rate of 1000
         num_filter_epochs = len(nbins) # one for each epoch in filter_epochs
 
         filter_epochs_decoder_result.spkcount = spkcount
         filter_epochs_decoder_result.nbins = nbins
-        filter_epochs_decoder_result.time_bins = time_bins ## time_bins returned are not correct, they're subsampled at a rate of 1000
+        # filter_epochs_decoder_result.time_bins = time_bins ## time_bins returned are not correct, they're subsampled at a rate of 1000
         filter_epochs_decoder_result.decoding_time_bin_size = decoding_time_bin_size
         filter_epochs_decoder_result.num_filter_epochs = num_filter_epochs
         if debug_print:
@@ -728,35 +728,55 @@ class BayesianPlacemapPositionDecoder(PlacemapPositionDecoder):
         # bins = np.arange(epoch.start, epoch.stop, 0.001)
         filter_epochs_decoder_result.most_likely_positions_list = []
         filter_epochs_decoder_result.p_x_given_n_list = []
-        filter_epochs_decoder_result.marginal_x_p_x_given_n_list = []
+        # filter_epochs_decoder_result.marginal_x_p_x_given_n_list = []
         filter_epochs_decoder_result.most_likely_position_indicies_list = []
         filter_epochs_decoder_result.time_bin_centers = []
         filter_epochs_decoder_result.time_bin_edges = []
+        
+
+        filter_epochs_decoder_result.marginal_x_list = []
+
+                
+
 
         half_decoding_time_bin_size = (decoding_time_bin_size/2.0)
-        for i, curr_unit_spkcount, curr_unit_timebins, curr_unit_num_bins in zip(np.arange(num_filter_epochs), spkcount, time_bins, nbins):
+        for i, curr_unit_spkcount, curr_unit_num_bins in zip(np.arange(num_filter_epochs), spkcount, nbins):
             # print(f'curr_unit_spkcount: {curr_unit_spkcount.shape}')
             # correct_time_bins = np.arange(epoch.start, epoch.stop, 0.001)
             curr_unit_correct_time_bin_edges, curr_binning_info = compute_spanning_bins(None, variable_start_value=filter_epochs.starts[i], variable_end_value=filter_epochs.stops[i], num_bins=curr_unit_num_bins)
             filter_epochs_decoder_result.time_bin_edges.append(curr_unit_correct_time_bin_edges)
             filter_epochs_decoder_result.time_bin_centers.append(get_bin_centers(curr_unit_correct_time_bin_edges))
 
-            most_likely_positions, p_x_given_n, most_likely_position_indicies = new_2D_decoder.decode(curr_unit_spkcount, time_bin_size=decoding_time_bin_size, debug_print=debug_print)
+            most_likely_positions, p_x_given_n, most_likely_position_indicies = active_decoder.decode(curr_unit_spkcount, time_bin_size=decoding_time_bin_size, debug_print=debug_print)
             filter_epochs_decoder_result.most_likely_positions_list.append(most_likely_positions)
             filter_epochs_decoder_result.p_x_given_n_list.append(p_x_given_n)
             filter_epochs_decoder_result.most_likely_position_indicies_list.append(most_likely_position_indicies)
             # Compute Marginal 1D Posterior:
+            ## Build a container to hold the marginal distribution and its related values:
+            curr_unit_marginal_x = DynamicContainer(p_x_given_n=None, most_likely_positions_1D=None)
+            
+            
             # Collapse the 2D position posterior into two separate 1D (X & Y) marginal posteriors. Be sure to re-normalize each marginal after summing
-            marginal_posterior_x = np.squeeze(np.sum(p_x_given_n, 1)) # sum over all y. Result should be [x_bins x time_bins]
-            marginal_posterior_x = marginal_posterior_x / np.sum(marginal_posterior_x, axis=0) # sum over all positions for each time_bin (so there's a normalized distribution at each timestep)
+            curr_unit_marginal_x.p_x_given_n = np.squeeze(np.sum(p_x_given_n, 1)) # sum over all y. Result should be [x_bins x time_bins]
+            curr_unit_marginal_x.p_x_given_n = curr_unit_marginal_x.p_x_given_n / np.sum(curr_unit_marginal_x.p_x_given_n, axis=0) # sum over all positions for each time_bin (so there's a normalized distribution at each timestep)
             ## Ensures that the marginal posterior is at least 2D:
-            if marginal_posterior_x.ndim == 0:
-                marginal_posterior_x = marginal_posterior_x.reshape(1, 1)
-            elif marginal_posterior_x.ndim == 1:
-                marginal_posterior_x = marginal_posterior_x[:, np.newaxis]
+            if curr_unit_marginal_x.p_x_given_n.ndim == 0:
+                curr_unit_marginal_x.p_x_given_n = curr_unit_marginal_x.p_x_given_n.reshape(1, 1)
+            elif curr_unit_marginal_x.p_x_given_n.ndim == 1:
+                curr_unit_marginal_x.p_x_given_n = curr_unit_marginal_x.p_x_given_n[:, np.newaxis]
                 if debug_print:
-                    print(f'\t added dimension to curr_posterior: {marginal_posterior_x.shape}')        
-            filter_epochs_decoder_result.marginal_x_p_x_given_n_list.append(marginal_posterior_x)
+                    print(f'\t added dimension to curr_posterior: {curr_unit_marginal_x.p_x_given_n.shape}')
+                    
+            ## Add the most-likely positions to the posterior_x container:
+            if most_likely_positions.ndim < 2:
+                curr_unit_marginal_x.most_likely_positions_1D = np.atleast_1d(most_likely_positions).T # already 1D positions, don't need to extract x-component
+            else:
+                curr_unit_marginal_x.most_likely_positions_1D = most_likely_positions[:,0].T
+            
+            
+            # Add the marginal container to the list
+            filter_epochs_decoder_result.marginal_x_list.append(curr_unit_marginal_x)
+            # filter_epochs_decoder_result.marginal_x_p_x_given_n_list.append(curr_unit_marginal_x.p_x_given_n)
 
         return filter_epochs_decoder_result
         

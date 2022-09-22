@@ -5,6 +5,7 @@ from matplotlib.widgets import Slider
 from matplotlib.patches import FancyArrowPatch, FancyArrow
 from matplotlib import patheffects
 
+from neuropy.core import Epoch
 from neuropy.utils.dynamic_container import overriding_dict_with # required for safely_accepts_kwargs
 from pyphocorehelpers.gui.interaction_helpers import CallbackWrapper
 from pyphocorehelpers.indexing_helpers import interleave_elements
@@ -14,6 +15,8 @@ from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DisplayFunc
 
 from pyphoplacecellanalysis.Analysis.Decoder.decoder_result import DecoderResultDisplayingPlot2D
 from pyphoplacecellanalysis.Analysis.Decoder.decoder_result import build_position_df_resampled_to_time_windows, build_position_df_time_window_idx
+
+from pyphoplacecellanalysis.Pho2D.stacked_epoch_slices import stacked_epoch_slices_matplotlib_build_view
 
 
 class DefaultDecoderDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=DisplayFunctionRegistryHolder):
@@ -430,6 +433,72 @@ def _temp_debug_draw_update_predicted_position_difference(predicted_positions, m
     # fig.canvas.draw_idle() # TODO: is this somehow better?
 
 
+# ==================================================================================================================== #
+# Functions for rendering a stack of decoded epochs in a stacked_epoch_slices-style manner                             #
+# ==================================================================================================================== #
+
+
+
+def plot_decoded_epoch_slices(filter_epochs, filter_epochs_decoder_result, global_pos_df, xbin=None, enable_flat_line_drawing=False, debug_test_max_num_slices=20, debug_print=False):
+    """ plots the decoded epoch results in a stacked slices view 
+    
+    Usage:    
+        from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import plot_decoded_epoch_slices
+
+        decoding_time_bin_size = 0.05
+
+        ## Testing PBE Decoding
+        # active_decoder = new_2D_decoder
+        active_decoder = new_1D_decoder
+        # filter_epochs = sess.laps.as_epoch_obj() # epoch object
+        filter_epochs = sess.ripple # epoch object
+        filter_epochs_decoder_result = active_decoder.decode_specific_epochs(sess.spikes_df, filter_epochs=filter_epochs, decoding_time_bin_size=decoding_time_bin_size, debug_print=False)
+
+        params, plots_data, plots, ui = plot_decoded_epoch_slices(filter_epochs, filter_epochs_decoder_result, global_pos_df=sess.position.to_dataframe(), xbin=active_decoder.xbin, enable_flat_line_drawing=False, debug_test_max_num_slices=20, debug_print=False)
+
+
+    """
+    ## Build Epochs:
+    if isinstance(filter_epochs, pd.DataFrame):
+        epochs_df = filter_epochs
+    elif isinstance(filter_epochs, Epoch):
+        epochs_df = filter_epochs.to_dataframe()
+    else:
+        raise NotImplementedError
+    
+    # if 'label' not in epochs_df.columns:
+    epochs_df['label'] = epochs_df.index.to_numpy() # integer ripple indexing    
+    epoch_slices = epochs_df[['start', 'stop']].to_numpy()
+    epoch_description_list = [f'ripple {epoch_tuple.label} (peakpower: {epoch_tuple.peakpower})' for epoch_tuple in epochs_df[['label', 'peakpower']].itertuples()]
+
+    plot_function_name = 'Stacked Epoch Slices View - MATPLOTLIB subplots Version'
+    params, plots_data, plots, ui = stacked_epoch_slices_matplotlib_build_view(epoch_slices, name='stacked_epoch_slices_matplotlib_subplots_RIPPLES', plot_function_name=plot_function_name, debug_test_max_num_slices=debug_test_max_num_slices, debug_print=debug_print)
+
+    for i, curr_ax in enumerate(plots.axs):
+        # curr_time_bins = filter_epochs_decoder_result.time_bin_centers[i]
+        curr_time_bins = filter_epochs_decoder_result.time_bin_edges[i]
+        curr_posterior_container = filter_epochs_decoder_result.marginal_x_list[i]
+        curr_posterior = curr_posterior_container.p_x_given_n
+        # curr_most_likely_positions = filter_epochs_decoder_result.most_likely_positions_list[i][:,0].T
+        curr_most_likely_positions = curr_posterior_container.most_likely_positions_1D
+        
+        if debug_print:
+            print(f'i : {i}, curr_posterior.shape: {curr_posterior.shape}')
+        # if curr_posterior.ndim == 0:
+        #     curr_posterior = curr_posterior.reshape(1, 1)
+        # elif curr_posterior.ndim == 1:
+        #     curr_posterior = curr_posterior[:, np.newaxis]
+        #     if debug_print:
+        #         print(f'\t added dimension to curr_posterior: {curr_posterior.shape}')
+
+        plots.fig, curr_ax = plot_1D_most_likely_position_comparsions(global_pos_df, ax=curr_ax, time_window_centers=curr_time_bins, xbin=xbin,
+                                                           posterior=curr_posterior,
+                                                           active_most_likely_positions_1D=curr_most_likely_positions,
+                                                           enable_flat_line_drawing=enable_flat_line_drawing, debug_print=debug_print)
+        curr_ax.set_xlim(*plots_data.epoch_slices[i,:])
+        curr_ax.set_title('')
+
+    return params, plots_data, plots, ui
 
 
 

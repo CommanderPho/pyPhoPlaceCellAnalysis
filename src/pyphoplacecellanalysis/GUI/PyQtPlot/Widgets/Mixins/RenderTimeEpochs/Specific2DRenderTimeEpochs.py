@@ -22,7 +22,7 @@ class General2DRenderTimeEpochs(object):
     default_datasource_name = 'GeneralEpochs'
     
     @classmethod
-    def _add_missing_df_columns(cls, active_df, y_location, height, pen_color, brush_color, **kwargs):
+    def _update_df_visualization_columns(cls, active_df, y_location, height, pen_color, brush_color, **kwargs):
         ## Add the missing parameters to the dataframe:
             ## y_location:
             if isinstance(y_location, (list, tuple)):
@@ -67,7 +67,7 @@ class General2DRenderTimeEpochs(object):
 
             ## parameters:            
             ## Add the missing parameters to the dataframe:
-            active_df = cls._add_missing_df_columns(active_df, y_location, height, pen_color, brush_color, **kwargs)
+            active_df = cls._update_df_visualization_columns(active_df, y_location, height, pen_color, brush_color, **kwargs)
             return active_df
 
         return _add_interval_dataframe_visualization_columns_general_epoch
@@ -129,7 +129,7 @@ class SessionEpochs2DRenderTimeEpochs(General2DRenderTimeEpochs):
             brush_color = [pg.mkColor('red'), pg.mkColor('cyan')]
             
             ## Add the missing parameters to the dataframe:
-            active_df = cls._add_missing_df_columns(active_df, y_location, height, pen_color, brush_color, **kwargs)
+            active_df = cls._update_df_visualization_columns(active_df, y_location, height, pen_color, brush_color, **kwargs)
             
             return active_df
 
@@ -155,7 +155,7 @@ class Laps2DRenderTimeEpochs(General2DRenderTimeEpochs):
             brush_color.setAlphaF(0.5)
             
             ## Add the missing parameters to the dataframe:
-            active_df = cls._add_missing_df_columns(active_df, y_location, height, pen_color, brush_color, **kwargs)
+            active_df = cls._update_df_visualization_columns(active_df, y_location, height, pen_color, brush_color, **kwargs)
             
             return active_df
 
@@ -199,7 +199,7 @@ class PBE_2DRenderTimeEpochs(General2DRenderTimeEpochs):
             brush_color.setAlphaF(0.5)
             
             ## Add the missing parameters to the dataframe:
-            active_df = cls._add_missing_df_columns(active_df, y_location, height, pen_color, brush_color, **kwargs)
+            active_df = cls._update_df_visualization_columns(active_df, y_location, height, pen_color, brush_color, **kwargs)
             
             return active_df
 
@@ -222,7 +222,7 @@ class Replays_2DRenderTimeEpochs(General2DRenderTimeEpochs):
             brush_color = pg.mkColor('orange')
             
             ## Add the missing parameters to the dataframe:
-            active_df = cls._add_missing_df_columns(active_df, y_location, height, pen_color, brush_color, **kwargs)
+            active_df = cls._update_df_visualization_columns(active_df, y_location, height, pen_color, brush_color, **kwargs)
             return active_df
 
         return _add_interval_dataframe_visualization_columns_general_epoch
@@ -262,7 +262,7 @@ class Ripples_2DRenderTimeEpochs(General2DRenderTimeEpochs):
             brush_color.setAlphaF(0.5)
             
             ## Add the missing parameters to the dataframe:
-            active_df = cls._add_missing_df_columns(active_df, y_location, height, pen_color, brush_color, **kwargs)
+            active_df = cls._update_df_visualization_columns(active_df, y_location, height, pen_color, brush_color, **kwargs)
             return active_df
 
         return _add_interval_dataframe_visualization_columns_general_epoch
