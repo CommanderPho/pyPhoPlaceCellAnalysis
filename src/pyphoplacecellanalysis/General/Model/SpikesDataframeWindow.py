@@ -136,8 +136,8 @@ class SpikesDataframeWindow(LiveWindowedData):
         self.dataSource.source_data_changed_signal.connect(self.on_general_datasource_changed)
         # self.window_changed_signal.connect(self.on_window_changed)
         
-    @QtCore.pyqtSlot()
-    def on_general_datasource_changed(self):
+    @QtCore.pyqtSlot(object)
+    def on_general_datasource_changed(self, datasource):
         """ emit our own custom signal when the general datasource update method returns """
         self.spike_dataframe_changed_signal.emit()
     

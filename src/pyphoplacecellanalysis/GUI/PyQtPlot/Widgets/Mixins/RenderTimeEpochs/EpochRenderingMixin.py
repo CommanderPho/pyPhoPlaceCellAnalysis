@@ -7,6 +7,10 @@ from pyphocorehelpers.print_helpers import SimplePrintable, PrettyPrintable, iPy
 from pyphocorehelpers.DataStructure.dynamic_parameters import DynamicParameters
 
 from pyphocorehelpers.DataStructure.general_parameter_containers import DebugHelper, VisualizationParameters, RenderPlots, RenderPlotsData
+from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer
+from pyphocorehelpers.gui.Qt.connections_container import ConnectionsContainer
+
+
 from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.GraphicsObjects.IntervalRectsItem import IntervalRectsItem, RectangleRenderTupleHelpers
 from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.Mixins.RenderTimeEpochs.Render2DEventRectanglesHelper import Render2DEventRectanglesHelper
 
@@ -43,7 +47,8 @@ class EpochRenderingMixin:
     Provides:
         self.plots_data['interval_datasources']: RenderPlotsData
         self.plots.rendered_epochs: RenderPlots
-        
+        self.ui
+        self.ui.connections
     
     Known Conformances:
         RasterPlot2D: to render laps, PBEs, and more on the 2D plots
@@ -77,9 +82,15 @@ class EpochRenderingMixin:
     
     @property
     def interval_datasources(self):
-        """The interval_datasources property."""
+        """The interval_datasources property. A RenderPlotsData object """
         return self.plots_data['interval_datasources']
  
+    @property
+    def interval_datasource_updating_connections(self):
+        """The interval_datasource_updating_connections property. A ConnectionsContainer object """
+        return self.ui.connections
+    
+    
     @property
     def rendered_epochs(self):
         """The interval_datasources property."""
@@ -91,6 +102,10 @@ class EpochRenderingMixin:
     def EpochRenderingMixin_on_init(self):
         """ perform any parameters setting/checking during init """
         self.plots_data['interval_datasources'] = RenderPlotsData('EpochRenderingMixin')
+        
+        
+
+        # self.plots_data['interval_datasource_updating_connections'] = ConnectionsContainer('EpochRenderingMixin')
     
     @QtCore.Slot()
     def EpochRenderingMixin_on_setup(self):
@@ -100,7 +115,17 @@ class EpochRenderingMixin:
     @QtCore.Slot()
     def EpochRenderingMixin_on_buildUI(self):
         """ perfrom setup/creation of widget/graphical/data objects. Only the core objects are expected to exist on the implementor (root widget, etc) """
-        pass
+        # Adds the self.ui and self.ui.connections if they don't exist
+        if not hasattr(self, 'ui'):
+            # if the window has no .ui property, create one:
+            setattr(self, 'ui', PhoUIContainer())
+            
+        if isinstance(self.ui, DynamicParameters):            
+            # Need this workaround because hasattr fails for DynamicParameters/PhoUIContainer right now:
+            self.ui.setdefault('connections', ConnectionsContainer())
+        else:
+            if not hasattr(self.ui, 'connections'):
+                self.ui.connections = ConnectionsContainer()
 
     @QtCore.Slot()
     def EpochRenderingMixin_on_destroy(self):
@@ -127,10 +152,15 @@ class EpochRenderingMixin:
     
     #######################################################################################################################################
     
-    
-    
+    @QtCore.Slot(object)
+    def EpochRenderingMixin_on_interval_datasource_changed(self, datasource):
+        """ emit our own custom signal when the general datasource update method returns """
+        print(f'datasource: {datasource.custom_datasource_name}')
+        self.add_rendered_intervals(datasource, name=datasource.custom_datasource_name, debug_print=False) # updates the rendered intervals on the change
+        
+        
     def add_rendered_intervals(self, interval_datasource, name=None, child_plots=None, debug_print=True):
-        """ adds the intervals specified by the interval_datasource to the plots 
+        """ adds or updates the intervals specified by the interval_datasource to the plots 
         
         Inputs: 
             interval_datasource: IntervalDatasource
@@ -151,35 +181,36 @@ class EpochRenderingMixin:
         
         """
         assert isinstance(interval_datasource, IntervalsDatasource), f"interval_datasource: must be an IntervalsDatasource object but instead is of type: {type(interval_datasource)}"
-        if child_plots is None:
-            child_plots = self.interval_rendering_plots
-
-        num_plot_items = len(child_plots)
-        if debug_print:
-            print(f'num_plot_items: {num_plot_items}')
-            
-
         if name is None:
             print(f'WARNING: no name provided for rendered intervals. Defaulting to datasource name: "{interval_datasource.custom_datasource_name}"')
             name = interval_datasource.custom_datasource_name
+            
+        # Update the custom datasource name with the provided name
+        interval_datasource.custom_datasource_name = name
         
         extant_datasource = self.interval_datasources.get(name, None)
         if extant_datasource is None:
             # no extant datasource with this name, create it:
             self.interval_datasources[name] = interval_datasource # add new datasource.
-
+            # Connect the source_data_changed_signal to handle changes to the datasource:
+            
+            self.interval_datasources[name].source_data_changed_signal.connect(self.EpochRenderingMixin_on_interval_datasource_changed)
+        
         else:
             # extant_datasource exists!
             print(f'WARNING: extant_datasource with the name ({name}) already exists. Attempting to update.')
             if extant_datasource == interval_datasource:
                 # already the same datasource
-                print(f'\t already the same datasource!')
-                return
+                print(f'\t already the same datasource. Continuing to try and update.')
+                # return
             else:
                 # Otherwise the datasource should be replaced:
                 print(f'\t replacing extant datasource.')
-                # TODO: remove plots associated with replaced datasource
+                # TODO: remove plots associated with replaced datasource? DONE: as long as name doesn't change, this is done below
+                # TODO: disconnect the previous datasource from the update signal?
                 self.interval_datasources[name] = interval_datasource
+                # Connect the source_data_changed_signal to handle changes to the datasource:
+                self.interval_datasources[name].source_data_changed_signal.connect(self.EpochRenderingMixin_on_interval_datasource_changed)
                         
         
         returned_rect_items = {}
@@ -189,6 +220,11 @@ class EpochRenderingMixin:
         new_interval_rects_item.setToolTip(name)
         
         ######### PLOTS:
+        if child_plots is None:
+            child_plots = self.interval_rendering_plots
+        num_plot_items = len(child_plots)
+        if debug_print:
+            print(f'num_plot_items: {num_plot_items}')
         
         extant_rects_plot_items_container = self.rendered_epochs.get(name, None)
         if extant_rects_plot_items_container is not None:

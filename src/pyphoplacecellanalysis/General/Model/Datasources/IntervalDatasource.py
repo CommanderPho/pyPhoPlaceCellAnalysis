@@ -13,7 +13,7 @@ class IntervalsDatasource(BaseDatasource):
     Contains a dataframe.
         
     Signals:
-        source_data_changed_signal = QtCore.pyqtSignal() # signal emitted when the internal model data has changed.
+        source_data_changed_signal = QtCore.pyqtSignal(object) # signal emitted when the internal model data has changed.
      
      Slots:
         @QtCore.pyqtSlot(float, float) 
@@ -106,7 +106,7 @@ class IntervalsDatasource(BaseDatasource):
     @df.setter
     def df(self, value):
         self._df = value
-        self.source_data_changed_signal.emit()
+        self.source_data_changed_signal.emit(self)
         
 
     def __init__(self, df, datasource_name='default_intervals_datasource'):
@@ -118,9 +118,34 @@ class IntervalsDatasource(BaseDatasource):
         
         
     def update_visualization_properties(self, dataframe_vis_columns_function):
-        """ called to update the current visualization columns of the df by applying the provided function """
+        """ called to update the current visualization columns of the df by applying the provided function
+        
+        Usage:
+        
+            from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.Mixins.RenderTimeEpochs.Specific2DRenderTimeEpochs import General2DRenderTimeEpochs, Ripples_2DRenderTimeEpochs
+
+            def _updated_custom_interval_dataframe_visualization_columns_general_epoch(active_df, **kwargs):
+                num_intervals = np.shape(active_df)[0]
+                ## parameters:
+                y_location = 0.0
+                height = 40.5
+                pen_color = pg.mkColor('white')
+                pen_color.setAlphaF(0.8)
+
+                brush_color = pg.mkColor('white')
+                brush_color.setAlphaF(0.5)
+
+                ## Update the dataframe's visualization columns:
+                active_df = General2DRenderTimeEpochs._update_df_visualization_columns(active_df, y_location=y_location, height=height, pen_color=pen_color, brush_color=brush_color, **kwargs)
+                return active_df
+
+            # get the existing dataframe to be updated:
+            datasource_to_update = active_2d_plot.interval_datasources.Ripples
+            datasource_to_update.update_visualization_properties(_updated_custom_interval_dataframe_visualization_columns_general_epoch)
+
+        """
         self._df = dataframe_vis_columns_function(self._df)
-        self.source_data_changed_signal.emit() # Emit the data changed signal
+        self.source_data_changed_signal.emit(self) # Emit the data changed signal
 
         
         

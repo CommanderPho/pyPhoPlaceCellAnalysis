@@ -15,15 +15,15 @@ class BaseDatasource(SimplePrintable, PrettyPrintable, QtCore.QObject):
         
         
     Signals:
-        source_data_changed_signal = QtCore.pyqtSignal() # signal emitted when the internal model data has changed.
+        source_data_changed_signal = QtCore.pyqtSignal(object) # signal emitted when the internal model data has changed.
      
      Slots:
         @QtCore.pyqtSlot(float, float) 
         def get_updated_data_window(self, new_start, new_end):
 
     """
-    source_data_changed_signal = QtCore.pyqtSignal() # signal emitted when the internal model data has changed.
-        
+    source_data_changed_signal = QtCore.pyqtSignal(object) # signal emitted when the internal model data has changed.
+
     @property
     def total_datasource_start_end_times(self):
         """[earliest_df_time, latest_df_time]: The earliest and latest times in the total df """
@@ -58,7 +58,7 @@ class DataframeDatasource(BaseDatasource):
     Contains a dataframe.
         
     Signals:
-        source_data_changed_signal = QtCore.pyqtSignal() # signal emitted when the internal model data has changed.
+        source_data_changed_signal = QtCore.pyqtSignal(object) # signal emitted when the internal model data has changed.
      
      Slots:
         @QtCore.pyqtSlot(float, float) 
@@ -137,7 +137,7 @@ class DataframeDatasource(BaseDatasource):
     @df.setter
     def df(self, value):
         self._df = value
-        self.source_data_changed_signal.emit()
+        self.source_data_changed_signal.emit(self)
         
 
     def __init__(self, df, datasource_name='default_plot_datasource'):
@@ -173,7 +173,7 @@ class SpikesDataframeDatasource(DataframeDatasource):
     """ Provides neural spiking data for one or more neuron (unit) and the timestamps at which they occur 't'.
     
     Signals:
-    	source_data_changed_signal = QtCore.pyqtSignal() # signal emitted when the internal model data has changed.
+    	source_data_changed_signal = QtCore.pyqtSignal(object) # signal emitted when the internal model data has changed.
      
      Slots:
         @QtCore.pyqtSlot(float, float) 

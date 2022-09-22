@@ -23,6 +23,10 @@ class IntervalRectsItem(pg.GraphicsObject):
         Note that this is analagous to the position arguments of `QRectF`:
             (left, top, width, height) and (pen, brush)
             
+            
+    TODO: BUG: Right click currently invokes the custom example context menu that allows you to select between blue/green etc. This is triggered even when you right click on an area that's between the actual interval rect items (when you click in the blank-space between rects). Want this to only be triggered when on an interval. And pass through to its parent otherwise. 
+     
+            
         
             
     Usage:
