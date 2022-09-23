@@ -612,6 +612,29 @@ class BayesianPlacemapPositionDecoder(PlacemapPositionDecoder):
     #         print(f'np.shape(final_p_x_given_n): {np.shape(self.flat_p_x_given_n)}') # np.shape(final_p_x_given_n): (288,)
     #     return final_p_x_given_n
 
+    def hyper_perform_decode(self, spikes_df, decoding_time_bin_size=0.1, t_start=None, t_end=None, debug_print=False):
+        # Range of the maze epoch (where position is valid):
+        if t_start is None:
+            t_maze_start = spikes_df[spikes_df.spikes.time_variable_name].loc[spikes_df.x.first_valid_index()] # 1048
+            t_start = t_maze_start
+    
+        if t_end is None:
+            t_maze_end = spikes_df[spikes_df.spikes.time_variable_name].loc[spikes_df.x.last_valid_index()] # 68159707
+            t_end = t_maze_end
+        
+        epochs_df = pd.DataFrame({'start':[t_start],'stop':[t_end],'label':['epoch']})
+
+        ## final step is to time_bin (relative to the start of each epoch) the time values of remaining spikes
+        spkcount, nbins, bad_time_bins = epochs_spkcount(spikes_df, epochs_df, decoding_time_bin_size, slideby=decoding_time_bin_size, export_time_bins=False, included_neuron_ids=self.neuron_IDs, debug_print=debug_print) ## time_bins returned are not correct, they're subsampled at a rate of 1000
+        spkcount = spkcount[0]
+        nbins = nbins[0]
+        
+        time_bin_edges, curr_binning_info = compute_spanning_bins(None, variable_start_value=t_start, variable_end_value=t_end, num_bins=nbins)
+        most_likely_positions, p_x_given_n, most_likely_position_indicies = self.decode(spkcount, time_bin_size=decoding_time_bin_size, debug_print=debug_print)
+        curr_unit_marginal_x = self.perform_build_marginals(p_x_given_n, most_likely_positions, debug_print=debug_print)
+        return time_bin_edges, p_x_given_n, most_likely_positions, curr_unit_marginal_x
+    
+    
             
     def compute_all(self):
         with WrappingMessagePrinter(f'compute_all final_p_x_given_n called. Computing {np.shape(self.flat_p_x_given_n)[0]} windows for self.final_p_x_given_n...', begin_line_ending='... ', finished_message='compute_all completed.', enable_print=self.debug_print):
@@ -748,34 +771,39 @@ class BayesianPlacemapPositionDecoder(PlacemapPositionDecoder):
             filter_epochs_decoder_result.most_likely_positions_list.append(most_likely_positions)
             filter_epochs_decoder_result.p_x_given_n_list.append(p_x_given_n)
             filter_epochs_decoder_result.most_likely_position_indicies_list.append(most_likely_position_indicies)
-            # Compute Marginal 1D Posterior:
-            ## Build a container to hold the marginal distribution and its related values:
-            curr_unit_marginal_x = DynamicContainer(p_x_given_n=None, most_likely_positions_1D=None)
-            
-            # Collapse the 2D position posterior into two separate 1D (X & Y) marginal posteriors. Be sure to re-normalize each marginal after summing
-            curr_unit_marginal_x.p_x_given_n = np.squeeze(np.sum(p_x_given_n, 1)) # sum over all y. Result should be [x_bins x time_bins]
-            curr_unit_marginal_x.p_x_given_n = curr_unit_marginal_x.p_x_given_n / np.sum(curr_unit_marginal_x.p_x_given_n, axis=0) # sum over all positions for each time_bin (so there's a normalized distribution at each timestep)
-            ## Ensures that the marginal posterior is at least 2D:
-            if curr_unit_marginal_x.p_x_given_n.ndim == 0:
-                curr_unit_marginal_x.p_x_given_n = curr_unit_marginal_x.p_x_given_n.reshape(1, 1)
-            elif curr_unit_marginal_x.p_x_given_n.ndim == 1:
-                curr_unit_marginal_x.p_x_given_n = curr_unit_marginal_x.p_x_given_n[:, np.newaxis]
-                if debug_print:
-                    print(f'\t added dimension to curr_posterior: {curr_unit_marginal_x.p_x_given_n.shape}')
-                    
-            ## Add the most-likely positions to the posterior_x container:
-            if most_likely_positions.ndim < 2:
-                curr_unit_marginal_x.most_likely_positions_1D = np.atleast_1d(most_likely_positions).T # already 1D positions, don't need to extract x-component
-            else:
-                curr_unit_marginal_x.most_likely_positions_1D = most_likely_positions[:,0].T
-            
-            # Add the marginal container to the list
-            filter_epochs_decoder_result.marginal_x_list.append(curr_unit_marginal_x)
-            # filter_epochs_decoder_result.marginal_x_p_x_given_n_list.append(curr_unit_marginal_x.p_x_given_n)
 
-        return filter_epochs_decoder_result
+        # Add the marginal container to the list
+        curr_unit_marginal_x = cls.perform_build_marginals(p_x_given_n, most_likely_positions, debug_print=debug_print)
+        filter_epochs_decoder_result.marginal_x_list.append(curr_unit_marginal_x)
         
+        return filter_epochs_decoder_result
     
+    
+    @classmethod
+    def perform_build_marginals(cls, p_x_given_n, most_likely_positions, debug_print=False):
+        # Compute Marginal 1D Posterior:
+        ## Build a container to hold the marginal distribution and its related values:
+        curr_unit_marginal_x = DynamicContainer(p_x_given_n=None, most_likely_positions_1D=None)
+        
+        # Collapse the 2D position posterior into two separate 1D (X & Y) marginal posteriors. Be sure to re-normalize each marginal after summing
+        curr_unit_marginal_x.p_x_given_n = np.squeeze(np.sum(p_x_given_n, 1)) # sum over all y. Result should be [x_bins x time_bins]
+        curr_unit_marginal_x.p_x_given_n = curr_unit_marginal_x.p_x_given_n / np.sum(curr_unit_marginal_x.p_x_given_n, axis=0) # sum over all positions for each time_bin (so there's a normalized distribution at each timestep)
+        ## Ensures that the marginal posterior is at least 2D:
+        if curr_unit_marginal_x.p_x_given_n.ndim == 0:
+            curr_unit_marginal_x.p_x_given_n = curr_unit_marginal_x.p_x_given_n.reshape(1, 1)
+        elif curr_unit_marginal_x.p_x_given_n.ndim == 1:
+            curr_unit_marginal_x.p_x_given_n = curr_unit_marginal_x.p_x_given_n[:, np.newaxis]
+            if debug_print:
+                print(f'\t added dimension to curr_posterior: {curr_unit_marginal_x.p_x_given_n.shape}')
+                
+        ## Add the most-likely positions to the posterior_x container:
+        if most_likely_positions.ndim < 2:
+            curr_unit_marginal_x.most_likely_positions_1D = np.atleast_1d(most_likely_positions).T # already 1D positions, don't need to extract x-component
+        else:
+            curr_unit_marginal_x.most_likely_positions_1D = most_likely_positions[:,0].T
+        
+        return curr_unit_marginal_x
+        
         
     @classmethod
     def perform_compute_most_likely_positions(cls, flat_p_x_given_n, original_position_data_shape):
