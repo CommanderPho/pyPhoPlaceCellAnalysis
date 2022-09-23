@@ -451,15 +451,16 @@ class BayesianPlacemapPositionDecoder(PlacemapPositionDecoder):
         return active_window_midpoints
     
     
-    @property
-    def most_likely_positions(self):
-        """The most_likely_positions for each window."""
-        if self.ndim > 1:
-            return np.vstack((self.xbin_centers[self.most_likely_position_indicies[0,:]], self.ybin_centers[self.most_likely_position_indicies[1,:]])).T # much more efficient than the other implementation. Result is # (85844, 2)
-        else:
-            # 1D Decoder case:
-            # self.most_likely_position_indicies.shape # (1, 20717)
-            return np.squeeze(self.xbin_centers[self.most_likely_position_indicies[0,:]]) # not sure if I actually want to squeeze the values # (20717,)
+    # @property
+    # def most_likely_positions(self):
+    #     """The most_likely_positions for each window."""
+    #     if self.ndim > 1:
+    #         return np.vstack((self.xbin_centers[self.most_likely_position_indicies[0,:]], self.ybin_centers[self.most_likely_position_indicies[1,:]])).T # much more efficient than the other implementation. Result is # (85844, 2)
+    #     else:
+    #         # 1D Decoder case:
+    #         # self.most_likely_position_indicies.shape # (1, 20717)
+    #         return np.squeeze(self.xbin_centers[self.most_likely_position_indicies[0,:]]) # not sure if I actually want to squeeze the values # (20717,)
+            
             
     # placefield properties:
     @property
@@ -642,16 +643,24 @@ class BayesianPlacemapPositionDecoder(PlacemapPositionDecoder):
             #     with WrappingMessagePrinter(f'\t computing single final_p_x_given_n[:, {bin_idx}] for bin_idx {bin_idx}', begin_line_ending='... ', finished_message='', finished_line_ending='\n', enable_print=self.debug_print):
             #         self.flat_p_x_given_n[:, bin_idx] = self.perform_compute_single_time_bin(bin_idx)
 
-            # Single sweep decoding:
-            self.flat_p_x_given_n[:, :] = ZhangReconstructionImplementation.neuropy_bayesian_prob(self.time_bin_size, self.P_x, self.F, self.unit_specific_time_binned_spike_counts, debug_print=self.debug_print)
-            print(f'self.flat_p_x_given_n.shape: {self.flat_p_x_given_n.shape}')
-                        
-            # all computed
-            # Reshape the output variable:
+
+            # self.spikes_df
             
-            # np.shape(self.final_p_x_given_n) # (288, 85842)
-            self.p_x_given_n = self._reshape_output(self.flat_p_x_given_n)
-            self.compute_most_likely_positions()
+            
+            ## 2022-09-23 - Epochs-style encoding (that works):
+            self.time_bin_edges, self.p_x_given_n, self.most_likely_positions, curr_unit_marginal_x = self.hyper_perform_decode(self.spikes_df, decoding_time_bin_size=self.time_bin_size, debug_print=False)
+
+
+            # # Single sweep decoding:
+            # self.flat_p_x_given_n[:, :] = ZhangReconstructionImplementation.neuropy_bayesian_prob(self.time_bin_size, self.P_x, self.F, self.unit_specific_time_binned_spike_counts, debug_print=self.debug_print)
+            # print(f'self.flat_p_x_given_n.shape: {self.flat_p_x_given_n.shape}')
+                        
+            # # all computed
+            # # Reshape the output variable:
+            
+            # # np.shape(self.final_p_x_given_n) # (288, 85842)
+            # self.p_x_given_n = self._reshape_output(self.flat_p_x_given_n)
+            # self.compute_most_likely_positions()
 
     def compute_most_likely_positions(self):
         """ Computes the most likely positions at each timestep from self.flat_p_x_given_n """        
