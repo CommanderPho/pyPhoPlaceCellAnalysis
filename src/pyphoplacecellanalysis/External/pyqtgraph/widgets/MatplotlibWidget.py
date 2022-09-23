@@ -19,19 +19,39 @@ class MatplotlibWidget(QtWidgets.QWidget):
         mw.draw()
     """
     
-    def __init__(self, size=(5.0, 4.0), dpi=100):
+    def __init__(self, disable_toolbar=True, size=(5.0, 4.0), dpi=100, **kwargs):
         QtWidgets.QWidget.__init__(self)
-        self.fig = Figure(size, dpi=dpi)
+        self.fig = Figure(size, dpi=dpi, **kwargs)
         self.canvas = FigureCanvas(self.fig)
         self.canvas.setParent(self)
-        self.toolbar = NavigationToolbar(self.canvas, self)
+        
+        if not disable_toolbar:
+            self.toolbar = NavigationToolbar(self.canvas, self)
+        else:
+            self.toolbar = None
         
         self.vbox = QtWidgets.QVBoxLayout()
-        self.vbox.addWidget(self.toolbar)
-        self.vbox.addWidget(self.canvas)
+        self.vbox.setContentsMargins(0, 0, 0, 0)
         
+        if not disable_toolbar:
+            self.vbox.addWidget(self.toolbar)
+        self.vbox.addWidget(self.canvas)
         self.setLayout(self.vbox)
-
+        
+        
+    @property
+    def axes(self):
+        """The axes that have been added to the figure (via add_subplot(111) or similar)."""
+        return self.fig.get_axes()
+    
+    @property
+    def ax(self):
+        """The first axes property."""
+        if len(self.axes) > 0:
+            return self.axes[0]
+        else:
+            return None
+         
     def getFigure(self):
         return self.fig
         

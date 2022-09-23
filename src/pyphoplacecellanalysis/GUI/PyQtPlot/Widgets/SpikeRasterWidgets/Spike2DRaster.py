@@ -237,7 +237,7 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
         
 
             
-        
+    # Spike Emphasis Functions ___________________________________________________________________________________________ #
     def reset_spike_emphasis(self, defer_render=False):
         """ resets the emphasis state of all spikes to the default (SpikeEmphasisState.Default) and then rebuilds the all_spots """
         self.spikes_df['visualization_raster_emphasis_state'] = SpikeEmphasisState.Default
