@@ -643,6 +643,11 @@ class BayesianPlacemapPositionDecoder(PlacemapPositionDecoder):
         Does not alter the internal state of the decoder (doesn't change internal most_likely_positions or posterior, etc)
         
         unit_specific_time_binned_spike_counts: np.array of shape (num_cells, num_time_bins) - e.g. (69, 20717)
+        
+        
+        Usages: 
+            Used by BayesianPlacemapPositionDecoder.perform_decode_specific_epochs(...) to do the actual decoding after building the appropriate spike counts.
+        
         """
         num_cells = np.shape(unit_specific_time_binned_spike_counts)[0]    
         num_time_windows = np.shape(unit_specific_time_binned_spike_counts)[1]
@@ -653,18 +658,12 @@ class BayesianPlacemapPositionDecoder(PlacemapPositionDecoder):
                 print(f'time_bin_size is None, using internal self.time_bin_size.')
                 time_bin_size = self.time_bin_size
             
-            
-            # for bin_idx in np.arange(self.num_time_windows):
-            #     with WrappingMessagePrinter(f'\t computing single final_p_x_given_n[:, {bin_idx}] for bin_idx {bin_idx}', begin_line_ending='... ', finished_message='', finished_line_ending='\n', enable_print=self.debug_print):
-            #         curr_flat_p_x_given_n[:, bin_idx] = self.perform_compute_single_time_bin(bin_idx)
-
             # Single sweep decoding:
             curr_flat_p_x_given_n = ZhangReconstructionImplementation.neuropy_bayesian_prob(time_bin_size, self.P_x, self.F, unit_specific_time_binned_spike_counts, debug_print=(debug_print or self.debug_print))
             if debug_print:
                 print(f'curr_flat_p_x_given_n.shape: {curr_flat_p_x_given_n.shape}')
             # all computed
             # Reshape the output variables:    
-            # np.shape(self.final_p_x_given_n) # (288, 85842)
             p_x_given_n = np.reshape(curr_flat_p_x_given_n, (*self.original_position_data_shape, num_time_windows)) # changed for compatibility with 1D decoder
             most_likely_position_flat_indicies, most_likely_position_indicies = self.perform_compute_most_likely_positions(curr_flat_p_x_given_n, self.original_position_data_shape)
 
@@ -672,12 +671,12 @@ class BayesianPlacemapPositionDecoder(PlacemapPositionDecoder):
                 most_likely_positions = np.vstack((self.xbin_centers[most_likely_position_indicies[0,:]], self.ybin_centers[most_likely_position_indicies[1,:]])).T # much more efficient than the other implementation. Result is # (85844, 2)
             else:
                 # 1D Decoder case:
-                # self.most_likely_position_indicies.shape # (1, 20717)
-                most_likely_positions = np.squeeze(self.xbin_centers[most_likely_position_indicies[0,:]]) # not sure if I actually want to squeeze the values # (20717,)
+                most_likely_positions = np.squeeze(self.xbin_centers[most_likely_position_indicies[0,:]])
         
             return most_likely_positions, p_x_given_n, most_likely_position_indicies
             
     def decode_specific_epochs(self, spikes_df, filter_epochs, decoding_time_bin_size = 0.05, debug_print=False):
+        """ TODO: CRITICAL: THIS IS THE ONLY VERSION OF THE DECODING THAT WORKS. The version perfomred by "compute_all" fails miserably! """
         return self.perform_decode_specific_epochs(self, spikes_df=spikes_df, filter_epochs=filter_epochs, decoding_time_bin_size=decoding_time_bin_size, debug_print=debug_print)
 
     # ==================================================================================================================== #
@@ -688,6 +687,9 @@ class BayesianPlacemapPositionDecoder(PlacemapPositionDecoder):
     def perform_decode_specific_epochs(cls, active_decoder, spikes_df, filter_epochs, decoding_time_bin_size = 0.05, debug_print=False):
         """Uses the decoder to decode the nerual activity (provided in spikes_df) for each epoch in filter_epochs
 
+        NOTE: Uses active_decoder.decode(...) to actually do the decoding
+        
+        
         Args:
             new_2D_decoder (_type_): _description_
             spikes_df (_type_): _description_
@@ -713,8 +715,8 @@ class BayesianPlacemapPositionDecoder(PlacemapPositionDecoder):
         if debug_print:
             print(f'np.shape(filter_epoch_spikes_df): {np.shape(filter_epoch_spikes_df)}')
 
-        ## NOW 🟢 TODO: 2022-09-21: final step is to time_bin (relative to the start of each epoch) the time values of remaining spikes
-        spkcount, nbins, bad_time_bins = epochs_spkcount(filter_epoch_spikes_df, filter_epochs, decoding_time_bin_size, slideby=decoding_time_bin_size, export_time_bins=True, included_neuron_ids=active_decoder.neuron_IDs, debug_print=debug_print) ## time_bins returned are not correct, they're subsampled at a rate of 1000
+        ## final step is to time_bin (relative to the start of each epoch) the time values of remaining spikes
+        spkcount, nbins, bad_time_bins = epochs_spkcount(filter_epoch_spikes_df, filter_epochs, decoding_time_bin_size, slideby=decoding_time_bin_size, export_time_bins=False, included_neuron_ids=active_decoder.neuron_IDs, debug_print=debug_print) ## time_bins returned are not correct, they're subsampled at a rate of 1000
         num_filter_epochs = len(nbins) # one for each epoch in filter_epochs
 
         filter_epochs_decoder_result.spkcount = spkcount
@@ -733,16 +735,11 @@ class BayesianPlacemapPositionDecoder(PlacemapPositionDecoder):
         filter_epochs_decoder_result.time_bin_centers = []
         filter_epochs_decoder_result.time_bin_edges = []
         
-
         filter_epochs_decoder_result.marginal_x_list = []
 
-                
-
-
-        half_decoding_time_bin_size = (decoding_time_bin_size/2.0)
+        # half_decoding_time_bin_size = (decoding_time_bin_size/2.0)
         for i, curr_unit_spkcount, curr_unit_num_bins in zip(np.arange(num_filter_epochs), spkcount, nbins):
             # print(f'curr_unit_spkcount: {curr_unit_spkcount.shape}')
-            # correct_time_bins = np.arange(epoch.start, epoch.stop, 0.001)
             curr_unit_correct_time_bin_edges, curr_binning_info = compute_spanning_bins(None, variable_start_value=filter_epochs.starts[i], variable_end_value=filter_epochs.stops[i], num_bins=curr_unit_num_bins)
             filter_epochs_decoder_result.time_bin_edges.append(curr_unit_correct_time_bin_edges)
             filter_epochs_decoder_result.time_bin_centers.append(get_bin_centers(curr_unit_correct_time_bin_edges))
@@ -754,7 +751,6 @@ class BayesianPlacemapPositionDecoder(PlacemapPositionDecoder):
             # Compute Marginal 1D Posterior:
             ## Build a container to hold the marginal distribution and its related values:
             curr_unit_marginal_x = DynamicContainer(p_x_given_n=None, most_likely_positions_1D=None)
-            
             
             # Collapse the 2D position posterior into two separate 1D (X & Y) marginal posteriors. Be sure to re-normalize each marginal after summing
             curr_unit_marginal_x.p_x_given_n = np.squeeze(np.sum(p_x_given_n, 1)) # sum over all y. Result should be [x_bins x time_bins]
@@ -772,7 +768,6 @@ class BayesianPlacemapPositionDecoder(PlacemapPositionDecoder):
                 curr_unit_marginal_x.most_likely_positions_1D = np.atleast_1d(most_likely_positions).T # already 1D positions, don't need to extract x-component
             else:
                 curr_unit_marginal_x.most_likely_positions_1D = most_likely_positions[:,0].T
-            
             
             # Add the marginal container to the list
             filter_epochs_decoder_result.marginal_x_list.append(curr_unit_marginal_x)
