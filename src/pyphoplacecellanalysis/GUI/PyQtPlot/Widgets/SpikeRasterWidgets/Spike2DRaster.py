@@ -6,6 +6,7 @@ from indexed import IndexedOrderedDict
 import pyphoplacecellanalysis.External.pyqtgraph as pg
 from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtCore, QtGui, QtWidgets
 import pyphoplacecellanalysis.External.pyqtgraph.opengl as gl # for 3D raster plot
+from pyphoplacecellanalysis.Pho2D.matplotlib.MatplotlibTimeSynchronizedWidget import MatplotlibTimeSynchronizedWidget
 
 import numpy as np
 
@@ -740,6 +741,38 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
         
         return new_curves_separate_plot
         
+        
+    # matplotlib render subplot __________________________________________________________________________________________ #
+    def add_new_matplotlib_render_plot_widget(self, row=1, col=0, name='matplotlib_view_widget'):
+        """ creates a new MatplotlibTimeSynchronizedWidget, a container widget that holds a matplotlib figure, and adds it as a row to the main layout
+        
+        """
+        self.ui.matplotlib_view_widget = MatplotlibTimeSynchronizedWidget() # Matplotlib widget directly
+        self.ui.matplotlib_view_widget.setObjectName(name)
+        self.ui.matplotlib_view_widget.fig.subplots_adjust(top=1.0, bottom=0.0, left=0.0, right=1.0, hspace=0.0, wspace=0.0)
+        self.ui.layout.addWidget(self.ui.matplotlib_view_widget, row, col)
+        ## Add the plot:
+        fig = self.ui.matplotlib_view_widget.getFigure()
+        ax = self.ui.matplotlib_view_widget.getFigure().add_subplot(111) # Adds a single axes to the figure
+        
+        # self.sync_matplotlib_render_plot_widget()
+        
+        return self.ui.matplotlib_view_widget, fig, ax
+        
+    def remove_matplotlib_render_plot_widget(self):
+        """ removes the subplot - does not work yet """
+        self.ui.layout.removeWidget(self.ui.matplotlib_view_widget) # Remove the matplotlib widget
+        self.ui.matplotlib_view_widget = None # Set the matplotlib_view_widget to None ## TODO: this doesn't actually remove it from the UI container does it?
+
+
+    def sync_matplotlib_render_plot_widget(self):
+        """ """
+        # Perform Initial (one-time) update from source -> controlled:
+        self.ui.matplotlib_view_widget.on_window_changed(self.spikes_window.active_window_start_time, self.spikes_window.active_window_end_time)
+        sync_connection = self.window_scrolled.connect(self.ui.matplotlib_view_widget.on_window_changed)
+        return sync_connection
+    
+
         
     # Overrides for Render3DTimeCurvesBaseGridMixin, since this 2D class can't draw a 3D background grid _________________ #
     def init_3D_time_curves_baseline_grid_mesh(self):
