@@ -631,11 +631,15 @@ class BayesianPlacemapPositionDecoder(PlacemapPositionDecoder):
         epochs_df = pd.DataFrame({'start':[t_start],'stop':[t_end],'label':['epoch']})
 
         ## final step is to time_bin (relative to the start of each epoch) the time values of remaining spikes
-        spkcount, nbins, time_bin_centers_list = epochs_spkcount(spikes_df, epochs_df, decoding_time_bin_size, slideby=decoding_time_bin_size, export_time_bins=False, included_neuron_ids=self.neuron_IDs, debug_print=debug_print) ## time_bins returned are not correct, they're subsampled at a rate of 1000
+        spkcount, nbins, time_bin_containers_list = epochs_spkcount(spikes_df, epochs_df, decoding_time_bin_size, slideby=decoding_time_bin_size, export_time_bins=True, included_neuron_ids=self.neuron_IDs, debug_print=debug_print) ## time_bins returned are not correct, they're subsampled at a rate of 1000
         spkcount = spkcount[0]
         nbins = nbins[0]
-        time_bin_centers = time_bin_centers_list[0]
-        
+        # time_bin_centers = time_bin_containers_list[0]
+        time_bin_container = time_bin_containers_list[0] #
+
+        # time_bin_centers = time_bin_container.centers
+        time_bin_edges = time_bin_container.edges
+                
         # time_bin_edges, curr_binning_info = compute_spanning_bins(None, variable_start_value=t_start, variable_end_value=t_end, num_bins=nbins)
         
         most_likely_positions, p_x_given_n, most_likely_position_indicies = self.decode(spkcount, time_bin_size=decoding_time_bin_size, debug_print=debug_print)
