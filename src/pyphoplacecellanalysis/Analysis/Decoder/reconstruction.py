@@ -737,6 +737,14 @@ class BayesianPlacemapPositionDecoder(PlacemapPositionDecoder):
         """ decodes the neural activity from its internal placefields, returning its posterior and the predicted position 
         Does not alter the internal state of the decoder (doesn't change internal most_likely_positions or posterior, etc)
         
+        Requires:
+            .P_x
+            .F
+            .debug_print
+            .xbin_centers, .ybin_centers
+            .original_position_data_shape
+            
+        
         unit_specific_time_binned_spike_counts: np.array of shape (num_cells, num_time_bins) - e.g. (69, 20717)
         
         
@@ -811,12 +819,12 @@ class BayesianPlacemapPositionDecoder(PlacemapPositionDecoder):
             print(f'np.shape(filter_epoch_spikes_df): {np.shape(filter_epoch_spikes_df)}')
 
         ## final step is to time_bin (relative to the start of each epoch) the time values of remaining spikes
-        spkcount, nbins, time_bin_centers_list = epochs_spkcount(filter_epoch_spikes_df, filter_epochs, decoding_time_bin_size, slideby=decoding_time_bin_size, export_time_bins=False, included_neuron_ids=active_decoder.neuron_IDs, debug_print=debug_print) ## time_bins returned are not correct, they're subsampled at a rate of 1000
+        spkcount, nbins, time_bin_containers_list = epochs_spkcount(filter_epoch_spikes_df, filter_epochs, decoding_time_bin_size, slideby=decoding_time_bin_size, export_time_bins=False, included_neuron_ids=active_decoder.neuron_IDs, debug_print=debug_print) ## time_bins returned are not correct, they're subsampled at a rate of 1000
         num_filter_epochs = len(nbins) # one for each epoch in filter_epochs
 
         filter_epochs_decoder_result.spkcount = spkcount
         filter_epochs_decoder_result.nbins = nbins
-        filter_epochs_decoder_result.time_bin_centers = time_bin_centers_list
+        filter_epochs_decoder_result.time_bin_centers = time_bin_containers_list
         filter_epochs_decoder_result.decoding_time_bin_size = decoding_time_bin_size
         filter_epochs_decoder_result.num_filter_epochs = num_filter_epochs
         if debug_print:
@@ -833,14 +841,14 @@ class BayesianPlacemapPositionDecoder(PlacemapPositionDecoder):
         filter_epochs_decoder_result.marginal_x_list = []
 
         # half_decoding_time_bin_size = (decoding_time_bin_size/2.0)
-        for i, curr_unit_spkcount, curr_unit_num_bins, curr_unit_time_bin_centers in zip(np.arange(num_filter_epochs), spkcount, nbins, time_bin_centers_list):
+        for i, curr_unit_spkcount, curr_unit_num_bins, curr_unit_time_bin_container in zip(np.arange(num_filter_epochs), spkcount, nbins, time_bin_containers_list):
             # print(f'curr_unit_spkcount: {curr_unit_spkcount.shape}')
             # curr_unit_correct_time_bin_edges, curr_binning_info = compute_spanning_bins(None, variable_start_value=filter_epochs.starts[i], variable_end_value=filter_epochs.stops[i], num_bins=curr_unit_num_bins)
             # filter_epochs_decoder_result.time_bin_edges.append(curr_unit_correct_time_bin_edges)
             # filter_epochs_decoder_result.time_bin_centers.append(get_bin_centers(curr_unit_correct_time_bin_edges))
             
             ## New 2022-09-26 method with working time_bin_centers_list returned from epochs_spkcount
-            filter_epochs_decoder_result.time_bin_edges.append(get_bin_edges(curr_unit_time_bin_centers))
+            filter_epochs_decoder_result.time_bin_edges.append(curr_unit_time_bin_container.edges)
 
             most_likely_positions, p_x_given_n, most_likely_position_indicies = active_decoder.decode(curr_unit_spkcount, time_bin_size=decoding_time_bin_size, debug_print=debug_print)
             filter_epochs_decoder_result.most_likely_positions_list.append(most_likely_positions)

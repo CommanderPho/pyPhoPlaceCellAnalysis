@@ -10,6 +10,7 @@
     <file>chain-unchain.png</file>
   </qresource>
   <qresource prefix="Render">
+    <file>Icons/actions/categories.png</file>
     <file>Icons/actions/wifi-channel_2@1x.png</file>
     <file>Icons/actions/add-chart_2@1x.png</file>
     <file>Icons/actions/area-chart_2@1x.png</file>

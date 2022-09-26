@@ -29,6 +29,11 @@ class LocalMenus_AddRenderable(QtWidgets.QMainWindow):
         actionTimeSynchronizedOccupancyPlotter
         actionTimeSynchronizedPlacefieldsPlotter
 
+
+    menuAdd_Matplotlib_Plot
+        actionAddMatplotlibPlot_DecodedPosition
+        actionClear_all_Matplotlib_Plots
+    
     
     """
     def __init__(self, parent=None):
