@@ -525,7 +525,7 @@ class BayesianPlacemapPositionDecoder(PlacemapPositionDecoder):
         
     def debug_dump_print(self):
         """ dumps the state for debugging purposes """
-        variable_names_dict = dict(time_variable_names = ['time_bin_size', 'time_window_edges', 'time_window_edges_binning_info', 'total_spike_counts_per_window', 'time_window_centers','time_window_center_binning_info'],
+        variable_names_dict = dict(time_variable_names = ['time_bin_size', 'time_window_edges', 'time_window_edges_binning_info', 'time_window_centers','time_window_center_binning_info'],
             binned_spikes = ['unit_specific_time_binned_spike_counts', 'total_spike_counts_per_window'],
             intermediate_computations = ['F', 'P_x'],
             posteriors = ['p_x_given_n'],
@@ -614,6 +614,11 @@ class BayesianPlacemapPositionDecoder(PlacemapPositionDecoder):
     #     return final_p_x_given_n
 
     def hyper_perform_decode(self, spikes_df, decoding_time_bin_size=0.1, t_start=None, t_end=None, debug_print=False):
+        """ makes use of:
+        
+            self.neuron_IDs
+            self.perform_build_marginals(...)
+        """
         # Range of the maze epoch (where position is valid):
         if t_start is None:
             t_maze_start = spikes_df[spikes_df.spikes.time_variable_name].loc[spikes_df.x.first_valid_index()] # 1048
