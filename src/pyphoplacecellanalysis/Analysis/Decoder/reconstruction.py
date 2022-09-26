@@ -7,9 +7,11 @@ import pandas as pd
 from scipy.stats import multivariate_normal
 from scipy.special import factorial
 
+# import neuropy
 from neuropy.utils.dynamic_container import DynamicContainer # for decode_specific_epochs
 from neuropy.utils.mixins.time_slicing import add_epochs_id_identity # for decode_specific_epochs
 from neuropy.analyses.decoders import epochs_spkcount # for decode_specific_epochs
+from neuropy.utils.mixins.binning_helpers import BinningContainer # for epochs_spkcount getting the correct time bins
 
 from pyphocorehelpers.general_helpers import OrderedMeta
 from pyphocorehelpers.indexing_helpers import BinningInfo, compute_spanning_bins, get_bin_centers, get_bin_edges, build_spanning_grid_matrix
@@ -515,13 +517,40 @@ class BayesianPlacemapPositionDecoder(PlacemapPositionDecoder):
     
     
     def setup(self):
+        self.neuron_IDXs = None
+        self.neuron_IDs = None
+        self.F = None
+        self.P_x = None
+        
         self._setup_concatenated_F()
         # Could pre-filter the self.spikes_df by the 
         
+        
+        self.time_binning_container = None
+        self.time_window_edges = None
+        self.time_window_edges_binning_info = None
+        self.time_window_centers = None
+        self.time_window_center_binning_info = None
+        
+        # self.time_window_edges = None
+        # self.time_window_edges_binning_info = None        
+        self.unit_specific_time_binned_spike_counts = None
+        self.total_spike_counts_per_window = None
+        
         self._setup_time_bin_spike_counts_N_i()
+        
+        
+        self.time_window_centers = None
+        self.time_window_center_binning_info = None
+        
         self._setup_time_window_centers()
+        
         # pre-allocate outputs:
-        self._setup_preallocate_outputs()
+        self.flat_p_x_given_n = None # np.zeros((self.flat_position_size, self.num_time_windows))
+        self.p_x_given_n = None
+        self.most_likely_position_flat_indicies = None
+        self.most_likely_position_indicies = None
+        # self._setup_preallocate_outputs()
         
     def debug_dump_print(self):
         """ dumps the state for debugging purposes """
@@ -556,6 +585,9 @@ class BayesianPlacemapPositionDecoder(PlacemapPositionDecoder):
     def _setup_time_bin_spike_counts_N_i(self):
         """ updates: 
         
+        .time_window_edges, 
+        .time_window_edges_binning_info
+        
         .unit_specific_time_binned_spike_counts
         .total_spike_counts_per_window
         
@@ -581,6 +613,7 @@ class BayesianPlacemapPositionDecoder(PlacemapPositionDecoder):
         self.total_spike_counts_per_window = np.sum(self.unit_specific_time_binned_spike_counts, axis=0) # gets the total number of spikes during each window (across all placefields)
 
     def _setup_preallocate_outputs(self):
+        raise NotImplementedError
         with WrappingMessagePrinter(f'pre-allocating final_p_x_given_n: np.shape(final_p_x_given_n) will be: ({self.flat_position_size} x {self.num_time_windows})...', begin_line_ending='... ', enable_print=self.debug_print):
             # if self.debug_print:
             #     print(f'pre-allocating final_p_x_given_n: np.shape(final_p_x_given_n) will be: ({self.flat_position_size} x {self.time_binning_info.num_bins})...', end=' ') # np.shape(final_p_x_given_n): (288,)
@@ -590,6 +623,17 @@ class BayesianPlacemapPositionDecoder(PlacemapPositionDecoder):
             self.most_likely_position_indicies = None
 
     def _setup_time_window_centers(self):
+        """ 
+        Requires:
+        
+            .time_window_edges
+            
+        Updates:
+        
+            .time_window_centers
+            .time_window_center_binning_info
+        
+        """
         self.time_window_centers = get_bin_centers(self.time_window_edges)
         actual_time_window_size = self.time_window_centers[2] - self.time_window_centers[1]
         self.time_window_center_binning_info = BinningInfo(self.time_window_edges_binning_info.variable_extents, actual_time_window_size, len(self.time_window_centers), np.arange(len(self.time_window_centers)))
@@ -635,27 +679,40 @@ class BayesianPlacemapPositionDecoder(PlacemapPositionDecoder):
         spkcount = spkcount[0]
         nbins = nbins[0]
         # time_bin_centers = time_bin_containers_list[0]
-        time_bin_container = time_bin_containers_list[0] #
-
-        # time_bin_centers = time_bin_container.centers
-        time_bin_edges = time_bin_container.edges
-                
+        time_bin_container = time_bin_containers_list[0] # neuropy.utils.mixins.binning_helpers.BinningContainer
+        
         # time_bin_edges, curr_binning_info = compute_spanning_bins(None, variable_start_value=t_start, variable_end_value=t_end, num_bins=nbins)
         
         most_likely_positions, p_x_given_n, most_likely_position_indicies = self.decode(spkcount, time_bin_size=decoding_time_bin_size, debug_print=debug_print)
         curr_unit_marginal_x = self.perform_build_marginals(p_x_given_n, most_likely_positions, debug_print=debug_print)
-        return time_bin_edges, p_x_given_n, most_likely_positions, curr_unit_marginal_x
+        return time_bin_container, p_x_given_n, most_likely_positions, curr_unit_marginal_x
     
     
             
     def compute_all(self):
-        with WrappingMessagePrinter(f'compute_all final_p_x_given_n called. Computing {np.shape(self.flat_p_x_given_n)[0]} windows for self.final_p_x_given_n...', begin_line_ending='... ', finished_message='compute_all completed.', enable_print=self.debug_print):
+        # with WrappingMessagePrinter(f'compute_all final_p_x_given_n called. Computing {np.shape(self.flat_p_x_given_n)[0]} windows for self.final_p_x_given_n...', begin_line_ending='... ', finished_message='compute_all completed.', enable_print=self.debug_print):
+        with WrappingMessagePrinter(f'compute_all final_p_x_given_n called. Computing windows...', begin_line_ending='... ', finished_message='compute_all completed.', enable_print=self.debug_print):
             ## Single sweep decoding:
 
             ## 2022-09-23 - Epochs-style encoding (that works):
-            self.time_bin_edges, self.p_x_given_n, self.most_likely_positions, curr_unit_marginal_x = self.hyper_perform_decode(self.spikes_df, decoding_time_bin_size=self.time_bin_size, debug_print=False)
+            self.time_binning_container, self.p_x_given_n, self.most_likely_positions, curr_unit_marginal_x = self.hyper_perform_decode(self.spikes_df, decoding_time_bin_size=self.time_bin_size, debug_print=False)
 
-
+            assert isinstance(self.time_binning_container, BinningContainer) # Should be neuropy.utils.mixins.binning_helpers.BinningContainer
+            # unit_specific_binned_spike_counts = unit_specific_binned_spike_counts.T # Want the outputs to have each time window as a column, with a single time window giving a column vector for each neuron
+            # print(f'unit_specific_binned_spike_counts.to_numpy(): {np.shape(unit_specific_binned_spike_counts.to_numpy())}') # (85841, 40)
+            
+            # time_bin_centers = self.time_binning_container.centers
+            # self.time_bin_edges = 
+            
+            self.time_window_edges = self.time_binning_container.edges
+            self.time_window_edges_binning_info = self.time_binning_container.edge_info
+                        
+            self.time_window_centers = self.time_binning_container.centers
+            self.time_window_center_binning_info = self.time_binning_container.center_info
+            
+            
+                   
+            
             # self.time_window_edges = manual_time_window_edges
             # self.time_window_edges_binning_info = manual_time_window_edges_binning_info
 
