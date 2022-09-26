@@ -639,28 +639,19 @@ class BayesianPlacemapPositionDecoder(PlacemapPositionDecoder):
             
     def compute_all(self):
         with WrappingMessagePrinter(f'compute_all final_p_x_given_n called. Computing {np.shape(self.flat_p_x_given_n)[0]} windows for self.final_p_x_given_n...', begin_line_ending='... ', finished_message='compute_all completed.', enable_print=self.debug_print):
-            # for bin_idx in np.arange(self.num_time_windows):
-            #     with WrappingMessagePrinter(f'\t computing single final_p_x_given_n[:, {bin_idx}] for bin_idx {bin_idx}', begin_line_ending='... ', finished_message='', finished_line_ending='\n', enable_print=self.debug_print):
-            #         self.flat_p_x_given_n[:, bin_idx] = self.perform_compute_single_time_bin(bin_idx)
+            ## Single sweep decoding:
 
-
-            # self.spikes_df
-            
-            
             ## 2022-09-23 - Epochs-style encoding (that works):
             self.time_bin_edges, self.p_x_given_n, self.most_likely_positions, curr_unit_marginal_x = self.hyper_perform_decode(self.spikes_df, decoding_time_bin_size=self.time_bin_size, debug_print=False)
 
-
-            # # Single sweep decoding:
+            ## Older Zhang-style decoding:
             # self.flat_p_x_given_n[:, :] = ZhangReconstructionImplementation.neuropy_bayesian_prob(self.time_bin_size, self.P_x, self.F, self.unit_specific_time_binned_spike_counts, debug_print=self.debug_print)
-            # print(f'self.flat_p_x_given_n.shape: {self.flat_p_x_given_n.shape}')
-                        
-            # # all computed
-            # # Reshape the output variable:
-            
-            # # np.shape(self.final_p_x_given_n) # (288, 85842)
+            # print(f'self.flat_p_x_given_n.shape: {self.flat_p_x_given_n.shape}')                        
+            # Reshape the output variable:
+            # np.shape(self.final_p_x_given_n) # (288, 85842)
             # self.p_x_given_n = self._reshape_output(self.flat_p_x_given_n)
             # self.compute_most_likely_positions()
+
 
     def compute_most_likely_positions(self):
         """ Computes the most likely positions at each timestep from self.flat_p_x_given_n """        
