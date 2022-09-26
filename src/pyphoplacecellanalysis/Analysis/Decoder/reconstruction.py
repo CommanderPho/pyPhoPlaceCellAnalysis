@@ -12,7 +12,7 @@ from neuropy.utils.mixins.time_slicing import add_epochs_id_identity # for decod
 from neuropy.analyses.decoders import epochs_spkcount # for decode_specific_epochs
 
 from pyphocorehelpers.general_helpers import OrderedMeta
-from pyphocorehelpers.indexing_helpers import BinningInfo, compute_spanning_bins, get_bin_centers, build_spanning_grid_matrix
+from pyphocorehelpers.indexing_helpers import BinningInfo, compute_spanning_bins, get_bin_centers, get_bin_edges, build_spanning_grid_matrix
 from pyphocorehelpers.print_helpers import WrappingMessagePrinter, SimplePrintable
 from pyphocorehelpers.mixins.serialized import SerializedAttributesSpecifyingClass
 
@@ -631,11 +631,13 @@ class BayesianPlacemapPositionDecoder(PlacemapPositionDecoder):
         epochs_df = pd.DataFrame({'start':[t_start],'stop':[t_end],'label':['epoch']})
 
         ## final step is to time_bin (relative to the start of each epoch) the time values of remaining spikes
-        spkcount, nbins, bad_time_bins = epochs_spkcount(spikes_df, epochs_df, decoding_time_bin_size, slideby=decoding_time_bin_size, export_time_bins=False, included_neuron_ids=self.neuron_IDs, debug_print=debug_print) ## time_bins returned are not correct, they're subsampled at a rate of 1000
+        spkcount, nbins, time_bin_centers_list = epochs_spkcount(spikes_df, epochs_df, decoding_time_bin_size, slideby=decoding_time_bin_size, export_time_bins=False, included_neuron_ids=self.neuron_IDs, debug_print=debug_print) ## time_bins returned are not correct, they're subsampled at a rate of 1000
         spkcount = spkcount[0]
         nbins = nbins[0]
+        time_bin_centers = time_bin_centers_list[0]
         
-        time_bin_edges, curr_binning_info = compute_spanning_bins(None, variable_start_value=t_start, variable_end_value=t_end, num_bins=nbins)
+        # time_bin_edges, curr_binning_info = compute_spanning_bins(None, variable_start_value=t_start, variable_end_value=t_end, num_bins=nbins)
+        
         most_likely_positions, p_x_given_n, most_likely_position_indicies = self.decode(spkcount, time_bin_size=decoding_time_bin_size, debug_print=debug_print)
         curr_unit_marginal_x = self.perform_build_marginals(p_x_given_n, most_likely_positions, debug_print=debug_print)
         return time_bin_edges, p_x_given_n, most_likely_positions, curr_unit_marginal_x
@@ -648,6 +650,10 @@ class BayesianPlacemapPositionDecoder(PlacemapPositionDecoder):
 
             ## 2022-09-23 - Epochs-style encoding (that works):
             self.time_bin_edges, self.p_x_given_n, self.most_likely_positions, curr_unit_marginal_x = self.hyper_perform_decode(self.spikes_df, decoding_time_bin_size=self.time_bin_size, debug_print=False)
+
+
+            # self.time_window_edges = manual_time_window_edges
+            # self.time_window_edges_binning_info = manual_time_window_edges_binning_info
 
             ## Older Zhang-style decoding:
             # self.flat_p_x_given_n[:, :] = ZhangReconstructionImplementation.neuropy_bayesian_prob(self.time_bin_size, self.P_x, self.F, self.unit_specific_time_binned_spike_counts, debug_print=self.debug_print)
@@ -744,12 +750,12 @@ class BayesianPlacemapPositionDecoder(PlacemapPositionDecoder):
             print(f'np.shape(filter_epoch_spikes_df): {np.shape(filter_epoch_spikes_df)}')
 
         ## final step is to time_bin (relative to the start of each epoch) the time values of remaining spikes
-        spkcount, nbins, bad_time_bins = epochs_spkcount(filter_epoch_spikes_df, filter_epochs, decoding_time_bin_size, slideby=decoding_time_bin_size, export_time_bins=False, included_neuron_ids=active_decoder.neuron_IDs, debug_print=debug_print) ## time_bins returned are not correct, they're subsampled at a rate of 1000
+        spkcount, nbins, time_bin_centers_list = epochs_spkcount(filter_epoch_spikes_df, filter_epochs, decoding_time_bin_size, slideby=decoding_time_bin_size, export_time_bins=False, included_neuron_ids=active_decoder.neuron_IDs, debug_print=debug_print) ## time_bins returned are not correct, they're subsampled at a rate of 1000
         num_filter_epochs = len(nbins) # one for each epoch in filter_epochs
 
         filter_epochs_decoder_result.spkcount = spkcount
         filter_epochs_decoder_result.nbins = nbins
-        # filter_epochs_decoder_result.time_bins = time_bins ## time_bins returned are not correct, they're subsampled at a rate of 1000
+        filter_epochs_decoder_result.time_bin_centers = time_bin_centers_list
         filter_epochs_decoder_result.decoding_time_bin_size = decoding_time_bin_size
         filter_epochs_decoder_result.num_filter_epochs = num_filter_epochs
         if debug_print:
@@ -760,17 +766,20 @@ class BayesianPlacemapPositionDecoder(PlacemapPositionDecoder):
         filter_epochs_decoder_result.p_x_given_n_list = []
         # filter_epochs_decoder_result.marginal_x_p_x_given_n_list = []
         filter_epochs_decoder_result.most_likely_position_indicies_list = []
-        filter_epochs_decoder_result.time_bin_centers = []
+        # filter_epochs_decoder_result.time_bin_centers = []
         filter_epochs_decoder_result.time_bin_edges = []
         
         filter_epochs_decoder_result.marginal_x_list = []
 
         # half_decoding_time_bin_size = (decoding_time_bin_size/2.0)
-        for i, curr_unit_spkcount, curr_unit_num_bins in zip(np.arange(num_filter_epochs), spkcount, nbins):
+        for i, curr_unit_spkcount, curr_unit_num_bins, curr_unit_time_bin_centers in zip(np.arange(num_filter_epochs), spkcount, nbins, time_bin_centers_list):
             # print(f'curr_unit_spkcount: {curr_unit_spkcount.shape}')
-            curr_unit_correct_time_bin_edges, curr_binning_info = compute_spanning_bins(None, variable_start_value=filter_epochs.starts[i], variable_end_value=filter_epochs.stops[i], num_bins=curr_unit_num_bins)
-            filter_epochs_decoder_result.time_bin_edges.append(curr_unit_correct_time_bin_edges)
-            filter_epochs_decoder_result.time_bin_centers.append(get_bin_centers(curr_unit_correct_time_bin_edges))
+            # curr_unit_correct_time_bin_edges, curr_binning_info = compute_spanning_bins(None, variable_start_value=filter_epochs.starts[i], variable_end_value=filter_epochs.stops[i], num_bins=curr_unit_num_bins)
+            # filter_epochs_decoder_result.time_bin_edges.append(curr_unit_correct_time_bin_edges)
+            # filter_epochs_decoder_result.time_bin_centers.append(get_bin_centers(curr_unit_correct_time_bin_edges))
+            
+            ## New 2022-09-26 method with working time_bin_centers_list returned from epochs_spkcount
+            filter_epochs_decoder_result.time_bin_edges.append(get_bin_edges(curr_unit_time_bin_centers))
 
             most_likely_positions, p_x_given_n, most_likely_position_indicies = active_decoder.decode(curr_unit_spkcount, time_bin_size=decoding_time_bin_size, debug_print=debug_print)
             filter_epochs_decoder_result.most_likely_positions_list.append(most_likely_positions)
