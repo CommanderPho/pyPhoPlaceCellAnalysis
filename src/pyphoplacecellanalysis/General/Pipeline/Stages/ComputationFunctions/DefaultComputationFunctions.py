@@ -1,3 +1,4 @@
+from copy import deepcopy
 import sys
 import numpy as np
 import pandas as pd
@@ -14,6 +15,12 @@ from pyphocorehelpers.mixins.member_enumerating import AllFunctionEnumeratingMix
 from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BayesianPlacemapPositionDecoder, Zhang_Two_Step
 
 from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.ComputationFunctionRegistryHolder import ComputationFunctionRegistryHolder
+
+
+from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BayesianPlacemapPositionDecoder # For _perform_new_position_decoding_computation
+from pyphocorehelpers.indexing_helpers import BinningInfo, compute_spanning_bins, get_bin_centers, get_bin_edges, debug_print_1D_bin_infos, interleave_elements # For _perform_new_position_decoding_computation
+from pyphocorehelpers.indexing_helpers import build_spanning_grid_matrix # For _perform_new_position_decoding_computation
+
 
 
 """-------------- Specific Computation Functions to be registered --------------"""
@@ -42,6 +49,51 @@ class DefaultComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Computa
         placefield_computation_config = computation_result.computation_config.pf_params # should be a PlacefieldComputationParameters
         return position_decoding_computation(computation_result.sess, placefield_computation_config, computation_result)
     
+    
+    
+    def _perform_new_position_decoding_computation(computation_result: ComputationResult, **kwargs):
+        """ Builds the 2D Placefield Decoder using 2022-09-26 modern methods. 
+        
+        """
+        
+        placefield_computation_config = computation_result.computation_config.pf_params # should be a PlacefieldComputationParameters
+        sess = computation_result.sess
+        pf_computation_config = placefield_computation_config
+        prev_output_result = computation_result
+         
+        
+        ## BEGIN ALGORITHM:
+
+        # time_bin_size = 0.25
+        time_bin_size = 0.1
+        manual_time_bin_start_t = sess.t_start
+        manual_time_bin_end_t = sess.t_stop
+
+        print(f'time_bin_size: {time_bin_size}, manual_time_bins: (start_t: {manual_time_bin_start_t}, end_t: {manual_time_bin_end_t})')
+        manual_time_window_edges, manual_time_window_edges_binning_info = compute_spanning_bins(None, bin_size=time_bin_size, variable_start_value=manual_time_bin_start_t, variable_end_value=manual_time_bin_end_t) # np.shape(out_digitized_variable_bins)[0] == np.shape(spikes_df)[0]
+        debug_print_1D_bin_infos(manual_time_window_edges, 'manual_time_window_edges')
+
+        ## Build the new decoder with custom params:
+        new_decoder_pf_params = deepcopy(active_computation_config.pf_params) # should be a PlacefieldComputationParameters
+        # override some settings before computation:
+        new_decoder_pf_params.time_bin_size = time_bin_size
+
+        ## 1D Decoder
+        new_decoder_pf1D = active_pf_1D
+        new_1D_decoder_spikes_df = new_decoder_pf1D.filtered_spikes_df.copy()
+        new_1D_decoder_spikes_df = new_1D_decoder_spikes_df.spikes.add_binned_time_column(manual_time_window_edges, manual_time_window_edges_binning_info, debug_print=False)
+        new_1D_decoder = BayesianPlacemapPositionDecoder(new_decoder_pf_params.time_bin_size, new_decoder_pf1D, new_1D_decoder_spikes_df, manual_time_window_edges=manual_time_window_edges, manual_time_window_edges_binning_info=manual_time_window_edges_binning_info, debug_print=False)
+        new_1D_decoder.compute_all() #  --> n = self.
+
+        ## Custom Manual 2D Decoder:
+        new_decoder_pf2D = active_pf_2D # 
+        new_decoder_spikes_df = new_decoder_pf2D.filtered_spikes_df.copy()
+        new_decoder_spikes_df = new_decoder_spikes_df.spikes.add_binned_time_column(manual_time_window_edges, manual_time_window_edges_binning_info, debug_print=False)
+        new_2D_decoder = BayesianPlacemapPositionDecoder(new_decoder_pf_params.time_bin_size, new_decoder_pf2D, new_decoder_spikes_df, manual_time_window_edges=manual_time_window_edges, manual_time_window_edges_binning_info=manual_time_window_edges_binning_info, debug_print=False)
+        new_2D_decoder.compute_all() #  --> n = self.
+    
+
+
     
     def _perform_two_step_position_decoding_computation(computation_result: ComputationResult, debug_print=False, **kwargs):
         """ Builds the Zhang Velocity/Position For 2-step Bayesian Decoder for 2D Placefields """
@@ -172,14 +224,7 @@ class DefaultComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Computa
             
             computation_result.computed_data['pf2D_TwoStepDecoder']['p_x_given_n_and_x_prev'][:,:,time_window_bin_idx] = np.reshape(computation_result.computed_data['pf2D_TwoStepDecoder']['flat_p_x_given_n_and_x_prev'][:,time_window_bin_idx], (original_data_shape[0], original_data_shape[1]))
             
-            # Compute the most-likely positions from the p_x_given_n_and_x_prev:
-            # active_argmax_idx = np.argmax(computation_result.computed_data['pf2D_TwoStepDecoder']['p_x_given_n_and_x_prev'][:,:,time_window_bin_idx], axis=None)
-            # active_unreaveled_argmax_idx = np.array(np.unravel_index(active_argmax_idx, computation_result.computed_data['pf2D_TwoStepDecoder']['p_x_given_n_and_x_prev'].shape))
-            # active_unreaveled_argmax_idx = np.array(np.unravel_index(active_argmax_idx, prev_one_step_bayesian_decoder.original_position_data_shape))
-            # print(f'active_argmax_idx: {active_argmax_idx}, active_unreaveled_argmax_idx: {active_unreaveled_argmax_idx}')
-            # computation_result.computed_data['pf2D_TwoStepDecoder']['most_likely_position_indicies'][:, time_window_bin_idx] = active_unreaveled_argmax_idx # build the multi-dimensional maximum index for the position (not using the flat notation used in the other class)            
-            # computation_result.computed_data['pf2D_TwoStepDecoder']['most_likely_positions'][0, time_window_bin_idx] = prev_one_step_bayesian_decoder.xbin_centers[int(computation_result.computed_data['pf2D_TwoStepDecoder']['most_likely_position_indicies'][0, time_window_bin_idx])]
-            # computation_result.computed_data['pf2D_TwoStepDecoder']['most_likely_positions'][1, time_window_bin_idx] = prev_one_step_bayesian_decoder.ybin_centers[int(computation_result.computed_data['pf2D_TwoStepDecoder']['most_likely_position_indicies'][1, time_window_bin_idx])]
+
             
 
         # POST-hoc most-likely computations: Compute the most-likely positions from the p_x_given_n_and_x_prev:
