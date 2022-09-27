@@ -540,27 +540,18 @@ def plot_decoded_epoch_slices(filter_epochs, filter_epochs_decoder_result, globa
 
 class AddNewDecodedPosition_MatplotlibPlotCommand(BaseMenuCommand):
     """ analagous to CreateNewDataExplorer_ipspikes_PlotterCommand, holds references to the variables needed to perform the entire action (such as the reference to the decoder) which aren't accessible during the building of the menus. """
-    # def __init__(self, spike_raster_window, curr_active_pipeline, active_config_name, display_output={}) -> None:
-    #     super(AddNewDecodedPosition_MatplotlibPlotCommand, self).__init__()
-    #     self._spike_raster_window = spike_raster_window
-    #     self._curr_active_pipeline = curr_active_pipeline
-    #     self._active_config_name = active_config_name
-    #     self._display_output = display_output
-    
-    def __init__(self, active_2d_plot, curr_active_pipeline, active_config_name) -> None:
+    def __init__(self, spike_raster_window, curr_active_pipeline, active_config_name, display_output={}) -> None:
         super(AddNewDecodedPosition_MatplotlibPlotCommand, self).__init__()
-        self._active_2d_plot = active_2d_plot
+        self._spike_raster_window = spike_raster_window
         self._curr_active_pipeline = curr_active_pipeline
         self._active_config_name = active_config_name
+        self._display_output = display_output
         print(f'AddNewDecodedPosition_MatplotlibPlotCommand.__init__(...)')
-        
 
     def execute(self, *args, **kwargs) -> None:
         ## To begin, the destination plot must have a matplotlib widget plot to render to:
         print(f'AddNewDecodedPosition_MatplotlibPlotCommand.execute(...)')
-        
-        # active_2d_plot = self._spike_raster_window.spike_raster_plt_2d # <pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.SpikeRasterWidgets.Spike2DRaster.Spike2DRaster at 0x196c7244280>
-        active_2d_plot = self._active_2d_plot
+        active_2d_plot = self._spike_raster_window.spike_raster_plt_2d
         # If no plot to render on, do this:
         widget, matplotlib_fig, matplotlib_fig_ax = active_2d_plot.add_new_matplotlib_render_plot_widget()
         # active_2d_plot.ui.matplotlib_view_widget.ax

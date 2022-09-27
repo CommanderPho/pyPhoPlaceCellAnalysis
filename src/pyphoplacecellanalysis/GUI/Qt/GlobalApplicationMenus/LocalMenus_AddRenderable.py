@@ -105,9 +105,6 @@ class LocalMenus_AddRenderable(QtWidgets.QMainWindow):
         
         ## Matplotlib Plots:
         # self.ui.menuAddRenderable_Matplotlib_Plot        
-        
-        
-        
         submenu_addMatplotlibPlot = [widget.ui.actionAddMatplotlibPlot_DecodedPosition, widget.ui.actionAddMatplotlibPlot_Custom]
         submenu_addMatplotlibPlotCallbacks = [lambda evt=None: AddNewDecodedPosition_MatplotlibPlotCommand(destination_plot, curr_active_pipeline, active_config_name), # DecodedPositionMatplotlibSubplotRenderer.add_render_time_curves(curr_sess=sess, destination_plot=destination_plot), 
                                             lambda evt=None: print(f'actionaddMatplotlibPlot_Custom not yet supported')]
@@ -120,11 +117,13 @@ class LocalMenus_AddRenderable(QtWidgets.QMainWindow):
         # Connect Clear actions:
         widget.ui.actionClear_all_Time_Curves.triggered.connect(destination_plot.clear_all_3D_time_curves)
         widget.ui.actionClear_all_Time_Intervals.triggered.connect(destination_plot.clear_all_rendered_intervals)
-        widget.ui.actionClear_all_Matplotlib_Plots.triggered.connect(destination_plot.clear_all_matplotlib_plots) # TODO: implement .clear_all_matplotlib_plots()
+        widget.ui.actionClear_all_Matplotlib_Plots.triggered.connect(destination_plot.clear_all_matplotlib_plots)
         
         def _clear_all_both():
             destination_plot.clear_all_3D_time_curves()
             destination_plot.clear_all_rendered_intervals()
+            destination_plot.clear_all_matplotlib_plots()
+            
         widget.ui.actionClear_all_Renderables.triggered.connect(_clear_all_both)
         
         return widget, renderable_menu, (submenu_addTimeIntervals, submenu_addTimeIntervalCallbacks, submenu_addTimeIntervals_Connections), (submenu_addTimeCurves, submenu_addTimeCurvesCallbacks, submenu_addTimeCurves_Connections), (submenu_addMatplotlibPlot, submenu_addMatplotlibPlotCallbacks, submenu_addMatplotlibPlot_Connections)

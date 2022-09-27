@@ -6,6 +6,8 @@ from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer
 from pyphoplacecellanalysis.GUI.Qt.Mixins.PhoMenuHelper import PhoMenuHelper
 from pyphoplacecellanalysis.GUI.Qt.Mixins.Menus.BaseMenuProviderMixin import BaseMenuCommand
 from pyphoplacecellanalysis.GUI.Qt.Mixins.Menus.BaseMenuProviderMixin import initialize_global_menu_ui_variables_if_needed
+
+from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import AddNewDecodedPosition_MatplotlibPlotCommand
 # GuiResources_rc
 
 
@@ -68,6 +70,7 @@ class CreateNewConnectedWidgetMenuHelper(object):
         curr_window.ui.menus.global_window_menus.create_new_connected_widget.actions_dict['actionNewConnected3DRaster_Vedo'].triggered.connect(CreateNewVedoPlotterCommand(spike_raster_window))
         curr_window.ui.menus.global_window_menus.create_new_connected_widget.actions_dict['actionNewConnectedDataExplorer_ipc'].triggered.connect(CreateNewDataExplorer_ipc_PlotterCommand(spike_raster_window, curr_active_pipeline, active_config_name, display_output))
         curr_window.ui.menus.global_window_menus.create_new_connected_widget.actions_dict['actionNewConnectedDataExplorer_ipspikes'].triggered.connect(CreateNewDataExplorer_ipspikes_PlotterCommand(spike_raster_window, curr_active_pipeline, active_config_name, display_output))
+        curr_window.ui.menus.global_window_menus.create_new_connected_widget.actions_dict['actionAddMatplotlibPlot_DecodedPosition'].triggered.connect(AddNewDecodedPosition_MatplotlibPlotCommand(spike_raster_window, curr_active_pipeline, active_config_name, display_output))
 
             
     @classmethod
@@ -96,6 +99,11 @@ class CreateNewConnectedWidgetMenuHelper(object):
             curr_action_key = PhoMenuHelper.add_action_item(a_main_window, "New Connected Tuning Curves Explorer (ipcDataExplorer)", name="actionNewConnectedDataExplorer_ipc", tooltip="Create a new 3D Interactive Tuning Curve Data Explorer Plotter and connect it to this window", icon_path=":/Icons/Icons/InteractivePlaceCellDataExplorerIconWithLabel.ico", actions_dict=a_main_window.ui.menus.global_window_menus.create_new_connected_widget.actions_dict)
             
             curr_action_key = PhoMenuHelper.add_action_item(a_main_window, "New Connected Spikes+Behavior Explorer (ipspikesDataExplorer)", name="actionNewConnectedDataExplorer_ipspikes", tooltip="Create a new 3D Interactive Spike and Behavior Plotter and connect it to this window", icon_path=":/Icons/Icons/TuningMapDataExplorerIconWithLabel.ico", actions_dict=a_main_window.ui.menus.global_window_menus.create_new_connected_widget.actions_dict)
+            
+            ## MATPLOTLIB Plot Widget Testing:
+            curr_action_key = PhoMenuHelper.add_action_item(a_main_window, "New Embedded Matplotlib Position Decoder", name="actionAddMatplotlibPlot_DecodedPosition", tooltip="Create a docked matplotlib plot containing the decoded position and connect it to this window", icon_path=":/Graphics/Icons/graphics/ic_blur_linear_48px.png", actions_dict=a_main_window.ui.menus.global_window_menus.create_new_connected_widget.actions_dict)
+            
+            
             
             
             ## Now Create the Menus for each QAction:
