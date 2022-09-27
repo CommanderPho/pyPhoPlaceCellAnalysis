@@ -115,6 +115,7 @@ class Ui_LocalMenus_AddRenderable(object):
         self.actionTimeSynchronizedDecoderPlotter.setText("TimeSynchronizedDecoderPlotter")
         self.actionTimeSynchronizedDecoderPlotter.setObjectName("actionTimeSynchronizedDecoderPlotter")
         self.actionAddMatplotlibPlot_DecodedPosition = QtWidgets.QAction(LocalMenus_AddRenderable)
+        self.actionAddMatplotlibPlot_DecodedPosition.setEnabled(False)
         icon8 = QtGui.QIcon()
         icon8.addPixmap(QtGui.QPixmap(":/Graphics/Icons/graphics/ic_blur_linear_48px.png"), QtGui.QIcon.Normal, QtGui.QIcon.Off)
         self.actionAddMatplotlibPlot_DecodedPosition.setIcon(icon8)
@@ -170,6 +171,7 @@ class Ui_LocalMenus_AddRenderable(object):
         self.actionAddTimeIntervals_Replays.setText(_translate("LocalMenus_AddRenderable", "Replays"))
         self.actionCreate_paired_time_synchronized_widget.setText(_translate("LocalMenus_AddRenderable", "Create paired time synchronized widget"))
         self.actionAddMatplotlibPlot_DecodedPosition.setText(_translate("LocalMenus_AddRenderable", "Add Position Decoding"))
+        self.actionAddMatplotlibPlot_DecodedPosition.setStatusTip(_translate("LocalMenus_AddRenderable", "Use from \"Create Connected Widget\" menu"))
         self.actionClear_all_Matplotlib_Plots.setText(_translate("LocalMenus_AddRenderable", "Clear all Matplotlib Plots"))
         self.actionAddMatplotlibPlot_Custom.setText(_translate("LocalMenus_AddRenderable", "Custom Matplotlib Plot..."))
 from pyphoplacecellanalysis.Resources import ActionIcons

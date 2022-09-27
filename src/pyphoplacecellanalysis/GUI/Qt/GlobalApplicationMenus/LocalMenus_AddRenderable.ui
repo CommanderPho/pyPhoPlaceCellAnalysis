@@ -221,12 +221,18 @@
    </property>
   </action>
   <action name="actionAddMatplotlibPlot_DecodedPosition">
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
    <property name="icon">
     <iconset resource="../../../Resources/ActionIcons.qrc">
      <normaloff>:/Graphics/Icons/graphics/ic_blur_linear_48px.png</normaloff>:/Graphics/Icons/graphics/ic_blur_linear_48px.png</iconset>
    </property>
    <property name="text">
     <string>Add Position Decoding</string>
+   </property>
+   <property name="statusTip">
+    <string>Use from &quot;Create Connected Widget&quot; menu</string>
    </property>
   </action>
   <action name="actionClear_all_Matplotlib_Plots">
