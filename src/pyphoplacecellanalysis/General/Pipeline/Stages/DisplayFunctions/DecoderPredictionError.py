@@ -580,12 +580,6 @@ class AddNewDecodedPosition_MatplotlibPlotCommand(BaseMenuCommand):
         active_2d_plot.sync_matplotlib_render_plot_widget() # Sync it with the active window:
         
         
-        
-        
-        
-        
-
-
 # class DecodedPositionMatplotlibSubplotRenderer(object):
 #     """ Inspired by `PositionRenderTimeCurves` (which inherited from `GeneralRenderTimeCurves`) as a standalone class that can be called from the menu with the destination plot and the session.
     
