@@ -6,6 +6,13 @@ from indexed import IndexedOrderedDict
 import pyphoplacecellanalysis.External.pyqtgraph as pg
 from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtCore, QtGui, QtWidgets
 import pyphoplacecellanalysis.External.pyqtgraph.opengl as gl # for 3D raster plot
+
+# For Dynamic Plot Widget Adding
+# from pyphoplacecellanalysis.External.pyqtgraph.dockarea.DockArea import DockArea
+# from pyphoplacecellanalysis.GUI.PyQtPlot.DockingWidgets.DynamicDockDisplayAreaContent import DynamicDockDisplayAreaContentMixin
+from pyphoplacecellanalysis.GUI.PyQtPlot.DockingWidgets.NestedDockAreaWidget import NestedDockAreaWidget
+
+# For a specific type of dynamic plot widget
 from pyphoplacecellanalysis.Pho2D.matplotlib.MatplotlibTimeSynchronizedWidget import MatplotlibTimeSynchronizedWidget
 
 import numpy as np
@@ -24,6 +31,8 @@ from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.Mixins.RenderTimeEpochs.Specifi
 from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.Mixins.TimeCurves.RenderTimeCurvesMixin import PyQtGraphSpecificTimeCurvesMixin
 from pyphoplacecellanalysis.General.Mixins.DisplayHelpers import debug_print_QRect, debug_print_axes_locations, debug_print_temporal_info
 from pyphoplacecellanalysis.General.Mixins.SpikesRenderingBaseMixin import SpikeEmphasisState # required for the different emphasis states in ._build_cell_configs()
+
+from pyphoplacecellanalysis.GUI.PyQtPlot.DockingWidgets.DynamicDockDisplayAreaContent import CustomDockDisplayConfig 
 
 class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Render2DScrollWindowPlotMixin, SpikeRasterBase):
     """ Displays a 2D version of a raster plot with the spikes occuring along a plane. 
@@ -337,6 +346,14 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
 
         # For this 2D Implementation of TimeCurvesViewMixin/PyQtGraphSpecificTimeCurvesMixin
         self.ui.main_time_curves_view_widget = None
+        
+        
+        ## Add the container to hold dynamic matplotlib plot widgets:
+        self.ui.dynamic_docked_widget_container = NestedDockAreaWidget()
+        self.ui.dynamic_docked_widget_container.setObjectName("dynamic_docked_widget_container")
+        self.ui.layout.addWidget(self.ui.dynamic_docked_widget_container, 1, 0) # Add the dynamic container as the second row
+        
+        
     
         
     def _run_delayed_gui_load_code(self):
@@ -705,10 +722,31 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
         """ creates a new MatplotlibTimeSynchronizedWidget, a container widget that holds a matplotlib figure, and adds it as a row to the main layout
         
         """
+        
+        ## TODO: hardcoded single-widget:
         self.ui.matplotlib_view_widget = MatplotlibTimeSynchronizedWidget() # Matplotlib widget directly
         self.ui.matplotlib_view_widget.setObjectName(name)
         self.ui.matplotlib_view_widget.fig.subplots_adjust(top=1.0, bottom=0.0, left=0.0, right=1.0, hspace=0.0, wspace=0.0)
-        self.ui.layout.addWidget(self.ui.matplotlib_view_widget, row, col)
+        
+        ## Add directly to the main grid layout:
+        # self.ui.layout.addWidget(self.ui.matplotlib_view_widget, row, col)
+        
+        ## Add to dynamic_docked_widget_container:
+        min_width = 500
+        min_height = 100
+        # if _last_dock_outer_nested_item is not None:
+        #     #NOTE: to stack two dock widgets on top of each other, do area.moveDock(d6, 'above', d4)   ## move d6 to stack on top of d4
+        #     dockAddLocationOpts = ['above', _last_dock_outer_nested_item] # position relative to the _last_dock_outer_nested_item for this figure
+        # else:
+        dockAddLocationOpts = ['bottom'] #no previous dock for this filter, so use absolute positioning
+        _, dDisplayItem = self.ui.dynamic_docked_widget_container.add_display_dock(name, dockSize=(min_width, min_height), display_config=FigureWidgetDockDisplayConfig(showCloseButton=True),
+                                                                                   widget=self.ui.matplotlib_view_widget, dockAddLocationOpts=dockAddLocationOpts, autoOrientation=False)
+        # dDisplayItem.setOrientation('horizontal') # want orientation of outer dockarea to be opposite of that of the inner one. # 'auto', 'horizontal', or 'vertical'.
+        # dDisplayItem.setOrientation('vertical', force=True)
+        dDisplayItem.setOrientation('horizontal', force=True)
+        dDisplayItem.updateStyle()
+        dDisplayItem.update()
+        
         ## Add the plot:
         fig = self.ui.matplotlib_view_widget.getFigure()
         ax = self.ui.matplotlib_view_widget.getFigure().add_subplot(111) # Adds a single axes to the figure
@@ -899,6 +937,30 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
         debug_print_axes_locations(self)
 
 
+class FigureWidgetDockDisplayConfig(CustomDockDisplayConfig):
+    """docstring for FigureWidgetDockDisplayConfig."""
+    def __init__(self, showCloseButton=True, fontSize='10px', corner_radius='3px'):
+        super(FigureWidgetDockDisplayConfig, self).__init__(showCloseButton=showCloseButton, fontSize=fontSize, corner_radius=corner_radius)
+
+    def get_colors(self, orientation, is_dim):
+        # Common to all:
+        if is_dim:
+            fg_color = '#aaa' # Grey
+        else:
+            fg_color = '#fff' # White
+            
+        # Red-based:
+        if is_dim:
+            bg_color = '#aa4444' # (0°, 60%, 67%)
+            border_color = '#993232' # (0°, 67%, 60%)
+        else:
+            bg_color = '#cc6666' # (0°, 50, 80)
+            border_color = '#ba5454' # (0°, 55%, 73%)
+ 
+        return fg_color, bg_color, border_color
+    
+    
+    
 # Start Qt event loop unless running in interactive mode.
 # if __name__ == '__main__':
 #     # v = Visualizer()

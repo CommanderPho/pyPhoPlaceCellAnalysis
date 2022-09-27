@@ -72,7 +72,7 @@ class Dock(QtWidgets.QWidget, DockDrop):
     sigStretchChanged = QtCore.Signal()
     sigClosed = QtCore.Signal(object)
 
-    def __init__(self, name, area=None, size=(10, 10), widget=None, hideTitle=False, autoOrientation=True, closable=False, fontSize="12px", display_config:Optional[DockDisplayConfig]=None): # , closable=False, fontSize="12px"
+    def __init__(self, name, area=None, size=(10, 10), widget=None, hideTitle=False, autoOrientation=True, display_config:Optional[DockDisplayConfig]=None): # , closable=False, fontSize="12px"
         QtWidgets.QWidget.__init__(self)
         DockDrop.__init__(self)
         self._container = None
@@ -82,7 +82,8 @@ class Dock(QtWidgets.QWidget, DockDrop):
         
         if display_config is None:
             print(f"WARNING: Dock.__init__(...): display_config is None... using old-mode fallback. This will be eventually depricated.")
-            display_config = DockDisplayConfig(closable, fontSize=fontSize, corner_radius='3px')
+            # display_config = DockDisplayConfig(closable, fontSize=fontSize, corner_radius='3px')
+            raise NotImplementedError
         else:
             print(f"WARNING: Dock.__init__(...): display_config is set, so the explicitly passed parameters 'closable' and 'fontSize' will be ignored.")
         
@@ -357,48 +358,7 @@ class DockLabel(VerticalLabel):
         else:
             self.hStyle = updated_stylesheet
             self.setStyleSheet(self.hStyle)
-                    
-        ## Old (non-config) method:
-        # corner_radius = '3px'
-        # if self.dim:
-        #     fg_color = '#aaa'
-        #     bg_color = '#44a'
-        #     border_color = '#339'
-        # else:
-        #     fg_color = '#fff'
-        #     bg_color = '#66c'
-        #     border_color = '#55B'
 
-        # if self.orientation == 'vertical':
-        #     self.vStyle = """DockLabel {
-        #         background-color : %s;
-        #         color : %s;
-        #         border-top-right-radius: 0px;
-        #         border-top-left-radius: %s;
-        #         border-bottom-right-radius: 0px;
-        #         border-bottom-left-radius: %s;
-        #         border-width: 0px;
-        #         border-right: 2px solid %s;
-        #         padding-top: 3px;
-        #         padding-bottom: 3px;
-        #         font-size: %s;
-        #     }""" % (bg_color, fg_color, corner_radius, corner_radius, border_color, self.fontSize)
-        #     self.setStyleSheet(self.vStyle)
-        # else:
-        #     self.hStyle = """DockLabel {
-        #         background-color : %s;
-        #         color : %s;
-        #         border-top-right-radius: %s;
-        #         border-top-left-radius: %s;
-        #         border-bottom-right-radius: 0px;
-        #         border-bottom-left-radius: 0px;
-        #         border-width: 0px;
-        #         border-bottom: 2px solid %s;
-        #         padding-left: 3px;
-        #         padding-right: 3px;
-        #         font-size: %s;
-        #     }""" % (bg_color, fg_color, corner_radius, corner_radius, border_color, self.fontSize)
-        #     self.setStyleSheet(self.hStyle)
 
     def setDim(self, d):
         """ Note that `self.dim` refers to whether the tab is a background tab or not. """
@@ -434,7 +394,7 @@ class DockLabel(VerticalLabel):
         if ev.button() == QtCore.Qt.MouseButton.LeftButton:
             self.dock.float()
 
-    def resizeEvent (self, ev):
+    def resizeEvent(self, ev):
         if self.closeButton:
             if self.orientation == 'vertical':
                 size = ev.size().width()
