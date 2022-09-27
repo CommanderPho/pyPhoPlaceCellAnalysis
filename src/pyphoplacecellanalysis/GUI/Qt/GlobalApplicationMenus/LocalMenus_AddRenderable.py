@@ -95,15 +95,29 @@ class LocalMenus_AddRenderable(QtWidgets.QMainWindow):
             _curr_conn = an_action.triggered.connect(a_callback)
             submenu_addTimeCurves_Connections.append(_curr_conn)
             
+        
+        ## Matplotlib Plots:
+        # self.ui.menuAddRenderable_Matplotlib_Plot        
+        submenu_addMatplotlibPlot = [widget.ui.actionAddMatplotlibPlot_DecodedPosition, widget.ui.actionAddMatplotlibPlot_Custom]
+        submenu_addMatplotlibPlotCallbacks = [lambda evt=None: PositionRenderTimeCurves.add_render_time_curves(curr_sess=sess, destination_plot=destination_plot),  # TODO: build and call the real action for the Matplotlib plots
+                                            lambda evt=None: print(f'actionaddMatplotlibPlot_Custom not yet supported')]
+        submenu_addMatplotlibPlot_Connections = []
+        for an_action, a_callback in zip(submenu_addMatplotlibPlot, submenu_addMatplotlibPlotCallbacks):
+            _curr_conn = an_action.triggered.connect(a_callback)
+            submenu_addMatplotlibPlot_Connections.append(_curr_conn)
+            
+        
         # Connect Clear actions:
         widget.ui.actionClear_all_Time_Curves.triggered.connect(destination_plot.clear_all_3D_time_curves)
         widget.ui.actionClear_all_Time_Intervals.triggered.connect(destination_plot.clear_all_rendered_intervals)
+        widget.ui.actionClear_all_Matplotlib_Plots.triggered.connect(destination_plot.clear_all_matplotlib_plots) # TODO: implement .clear_all_matplotlib_plots()
+        
         def _clear_all_both():
             destination_plot.clear_all_3D_time_curves()
             destination_plot.clear_all_rendered_intervals()
         widget.ui.actionClear_all_Renderables.triggered.connect(_clear_all_both)
         
-        return widget, renderable_menu, (submenu_addTimeIntervals, submenu_addTimeIntervalCallbacks, submenu_addTimeIntervals_Connections), (submenu_addTimeCurves, submenu_addTimeCurvesCallbacks, submenu_addTimeCurves_Connections)
+        return widget, renderable_menu, (submenu_addTimeIntervals, submenu_addTimeIntervalCallbacks, submenu_addTimeIntervals_Connections), (submenu_addTimeCurves, submenu_addTimeCurvesCallbacks, submenu_addTimeCurves_Connections), (submenu_addMatplotlibPlot, submenu_addMatplotlibPlotCallbacks, submenu_addMatplotlibPlot_Connections)
 
 
     @classmethod
@@ -155,59 +169,6 @@ class LocalMenus_AddRenderable(QtWidgets.QMainWindow):
         active_2d_plot.ui.menus = PhoUIContainer.init_from_dict({'custom_context_menus': PhoUIContainer.init_from_dict({'add_renderables': active_2d_plot_renderable_menus})})
         
         return menuAdd_Renderable # try returning just the menu and not the stupid references to everything # Works when we hold a reference
-
-
-
-    # @classmethod
-    # def add_Create_Paired_Widget_menu(cls, destination_window, active_pf_2D_dt):
-    #     """ Adds the "Create Paired Widget" main-menu to the destination_window's menubar
-
-    #     active_pf_2D_dt: time-dependent placefield
-        
-    #     self.ui.menuCreate_Paired_Widget
-    #         self.ui.actionTimeSynchronizedOccupancyPlotter
-    #         self.ui.actionTimeSynchronizedPlacefieldsPlotter
-            
-    #     menuCreate_Paired_Widget
-    #         actionTimeSynchronizedOccupancyPlotter
-    #         actionTimeSynchronizedPlacefieldsPlotter
-
-    #     """
-    #     curr_window = PhoMenuHelper.try_get_menu_window(a_content_widget=destination_window)
-    #     curr_menubar = PhoMenuHelper.try_get_menu_bar(a_content_widget=destination_window)
-    
-    #     activeMenuReference = PhoUIContainer.init_from_dict({'top_level_menu': None, 'actions_dict': {}})
-    #     curr_window.ui.menus.global_window_menus.create_linked_widget = activeMenuReference
-        
-    #     CreateLinkedWidget_MenuProvider_actionsDict = activeMenuReference.actions_dict
-        
-    #     widget = LocalMenus_AddRenderable() # get the UI widget containing the menu items:
-    #     renderable_menu = widget.ui.menuCreate_Paired_Widget
-
-    #     ## Time Intervals/Epochs:
-    #     submenu_addTimeSynchronizedPlotterMenuItems = [widget.ui.actionTimeSynchronizedOccupancyPlotter,
-    #                                 widget.ui.actionTimeSynchronizedPlacefieldsPlotter,
-    #                                 ]
-    #     submenu_addTimeSynchronizedPlotterCallbacks = [lambda evt=None: print(f'actionTimeSynchronizedOccupancyPlotter callback'),
-    #                                         lambda evt=None: print(f'actionTimeSynchronizedPlacefieldsPlotter callback'),
-    #                                         ]
-    #     submenu_addTimeSynchronizedPlotter_Connections = []
-    #     for an_action, a_callback in zip(submenu_addTimeSynchronizedPlotterMenuItems, submenu_addTimeSynchronizedPlotterCallbacks):
-    #         _curr_conn = an_action.triggered.connect(a_callback)
-    #         submenu_addTimeSynchronizedPlotter_Connections.append(_curr_conn)
-            
-    #     active_2d_plot_renderable_menus = widget, renderable_menu, (submenu_addTimeSynchronizedPlotterMenuItems, submenu_addTimeSynchronizedPlotterCallbacks, submenu_addTimeSynchronizedPlotter_Connections)
-    #     widget_2d_menu = active_2d_plot_renderable_menus[0]
-    #     # menuAdd_Renderable = widget_2d_menu.ui.menuAdd_Renderable
-        
-    #     print(f'renderable_menu: {renderable_menu}') 
-    #     curr_menubar.addMenu(renderable_menu) # add it to the menubar
-
-    #     # Save references in the curr_window
-    #     activeMenuReference.top_level_menu = renderable_menu
-    #     print(f'activeMenuReference: {activeMenuReference}')
-        
-    #     return active_2d_plot_renderable_menus, curr_window, curr_menubar
 
 
     @classmethod

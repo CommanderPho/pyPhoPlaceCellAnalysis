@@ -609,6 +609,9 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
             if (self._numScheduledScalings * numSteps < 0):
                 self._numScheduledScalings = numSteps # if user moved the wheel in another direction, we reset previously scheduled scalings
                 
+            ## TODO: this is why the scrolling control of the active window isn't smooth:
+            
+            
             self.shift_animation_frame_val(self._numScheduledScalings) # TODO: this isn't quite right
             
             
