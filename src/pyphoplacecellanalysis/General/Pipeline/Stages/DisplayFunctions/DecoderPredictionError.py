@@ -76,7 +76,7 @@ class DefaultDecoderDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Disp
         
         ## TODO: what are we supposed to return from these display functions?
         # destination_plot.ui.matplotlib_view_widget.draw()
-        # destination_plot.sync_matplotlib_render_plot_widget()        
+        # destination_plot.sync_matplotlib_render_plot_widget()
         return fig, curr_ax
 
             
@@ -540,35 +540,44 @@ def plot_decoded_epoch_slices(filter_epochs, filter_epochs_decoder_result, globa
 
 class AddNewDecodedPosition_MatplotlibPlotCommand(BaseMenuCommand):
     """ analagous to CreateNewDataExplorer_ipspikes_PlotterCommand, holds references to the variables needed to perform the entire action (such as the reference to the decoder) which aren't accessible during the building of the menus. """
-    def __init__(self, spike_raster_window, curr_active_pipeline, active_config_name, display_output={}) -> None:
+    # def __init__(self, spike_raster_window, curr_active_pipeline, active_config_name, display_output={}) -> None:
+    #     super(AddNewDecodedPosition_MatplotlibPlotCommand, self).__init__()
+    #     self._spike_raster_window = spike_raster_window
+    #     self._curr_active_pipeline = curr_active_pipeline
+    #     self._active_config_name = active_config_name
+    #     self._display_output = display_output
+    
+    def __init__(self, active_2d_plot, curr_active_pipeline, active_config_name) -> None:
         super(AddNewDecodedPosition_MatplotlibPlotCommand, self).__init__()
-        self._spike_raster_window = spike_raster_window
+        self._active_2d_plot = active_2d_plot
         self._curr_active_pipeline = curr_active_pipeline
         self._active_config_name = active_config_name
-        self._display_output = display_output
         
+
     def execute(self, *args, **kwargs) -> None:
+        ## To begin, the destination plot must have a matplotlib widget plot to render to:
+        # active_2d_plot = self._spike_raster_window.spike_raster_plt_2d # <pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.SpikeRasterWidgets.Spike2DRaster.Spike2DRaster at 0x196c7244280>
+        active_2d_plot = self._active_2d_plot
+        # If no plot to render on, do this:
+        widget, matplotlib_fig, matplotlib_fig_ax = active_2d_plot.add_new_matplotlib_render_plot_widget()
+        # active_2d_plot.ui.matplotlib_view_widget.ax
+        
         # pActiveSpikesBehaviorPlotter = None
-        # # display_output = {}
-        # self._display_output = self._display_output | self._curr_active_pipeline.display('_display_3d_interactive_spike_and_behavior_browser', self._active_config_name, extant_plotter=self._display_output.get('pActiveSpikesBehaviorPlotter', None)) # Works now!
+        # display_output = {}
+        # self._display_output = self._display_output | self._curr_active_pipeline.display('_display_plot_marginal_1D_most_likely_position_comparisons', self._active_config_name, variable_name='x', ax=matplotlib_fig_ax)
         # ipspikesDataExplorer = self._display_output['ipspikesDataExplorer']
-        # self._display_output['pActiveSpikesBehaviorPlotter'] = self._display_output.pop('plotter') # rename the key from the generic "plotter" to "pActiveSpikesBehaviorPlotter" to avoid collisions with others
-        # pActiveSpikesBehaviorPlotter = self._display_output['pActiveSpikesBehaviorPlotter']
-        # ## Sync ipspikesDataExplorer to raster window:
-        # extra_interactive_spike_behavior_browser_sync_connection = self._spike_raster_window.connect_additional_controlled_plotter(controlled_plt=ipspikesDataExplorer)
-        # # test_independent_vedo_raster_widget.show()
+        fig, curr_ax = self._curr_active_pipeline.display('_display_plot_marginal_1D_most_likely_position_comparisons', self._active_config_name, variable_name='x', ax=matplotlib_fig_ax)
         
-        
-        active_decoder = active_one_step_decoder
-        marginals_x = active_decoder.perform_build_marginals(p_x_given_n=active_decoder.p_x_given_n, most_likely_positions=active_decoder.most_likely_positions)
+        # active_decoder = active_one_step_decoder
+        # marginals_x = active_decoder.perform_build_marginals(p_x_given_n=active_decoder.p_x_given_n, most_likely_positions=active_decoder.most_likely_positions)
 
-        ## Get the previously created matplotlib_view_widget figure/ax:
-        fig, curr_ax = plot_1D_most_likely_position_comparsions(curr_sess.position.to_dataframe(), ax=destination_plot.ui.matplotlib_view_widget.ax, time_window_centers=active_decoder.time_window_centers, xbin=active_decoder.xbin,
-                                                        posterior=marginals_x.p_x_given_n,
-                                                        active_most_likely_positions_1D=marginals_x.most_likely_positions_1D,
-                                                        enable_flat_line_drawing=False, debug_print=False)
-        destination_plot.ui.matplotlib_view_widget.draw()
-        destination_plot.sync_matplotlib_render_plot_widget()
+        # ## Get the previously created matplotlib_view_widget figure/ax:
+        # fig, curr_ax = plot_1D_most_likely_position_comparsions(curr_sess.position.to_dataframe(), ax=destination_plot.ui.matplotlib_view_widget.ax, time_window_centers=active_decoder.time_window_centers, xbin=active_decoder.xbin,
+        #                                                 posterior=marginals_x.p_x_given_n,
+        #                                                 active_most_likely_positions_1D=marginals_x.most_likely_positions_1D,
+        #                                                 enable_flat_line_drawing=False, debug_print=False)
+        active_2d_plot.ui.matplotlib_view_widget.draw()
+        active_2d_plot.sync_matplotlib_render_plot_widget() # Sync it with the active window:
         
         
         
@@ -577,47 +586,47 @@ class AddNewDecodedPosition_MatplotlibPlotCommand(BaseMenuCommand):
         
 
 
-class DecodedPositionMatplotlibSubplotRenderer(object):
-    """ Inspired by `PositionRenderTimeCurves` (which inherited from `GeneralRenderTimeCurves`) as a standalone class that can be called from the menu with the destination plot and the session.
+# class DecodedPositionMatplotlibSubplotRenderer(object):
+#     """ Inspired by `PositionRenderTimeCurves` (which inherited from `GeneralRenderTimeCurves`) as a standalone class that can be called from the menu with the destination plot and the session.
     
-    add_render_time_curves
-        build_pre_spatial_to_spatial_mappings
-        build_render_time_curves_datasource
-            prepare_dataframe
-            data_series_pre_spatial_list
+#     add_render_time_curves
+#         build_pre_spatial_to_spatial_mappings
+#         build_render_time_curves_datasource
+#             prepare_dataframe
+#             data_series_pre_spatial_list
     
-    """
-    default_datasource_name = 'DecodedPosition'
+#     """
+#     default_datasource_name = 'DecodedPosition'
     
-    def __init__(self):
-        super(DecodedPositionMatplotlibSubplotRenderer, self).__init__()
+#     def __init__(self):
+#         super(DecodedPositionMatplotlibSubplotRenderer, self).__init__()
         
-    @classmethod
-    def add_render_time_curves(cls, curr_sess, destination_plot, **kwargs):
-        """ directly-called method 
-        destination_plot should implement add_rendered_intervals
+#     @classmethod
+#     def add_render_time_curves(cls, curr_sess, destination_plot, **kwargs):
+#         """ directly-called method 
+#         destination_plot should implement add_rendered_intervals
         
-        ## TODO: figure out how data should be provided to enable maximum generality. It seems that all datasources are currently dataframe based. 
+#         ## TODO: figure out how data should be provided to enable maximum generality. It seems that all datasources are currently dataframe based. 
         
-        curr_sess: The session containing the data to be plotted. 
+#         curr_sess: The session containing the data to be plotted. 
         
-        """
-        # plot_df = curr_sess.position.to_dataframe()
-        # data_series_pre_spatial_to_spatial_mappings = cls.build_pre_spatial_to_spatial_mappings(destination_plot)
-        # active_plot_curve_datasource = cls.build_render_time_curves_datasource(plot_df, data_series_pre_spatial_to_spatial_mappings)
-        # destination_plot.add_3D_time_curves(curve_datasource=active_plot_curve_datasource) # Add the curves from the datasource
-        # return active_plot_curve_datasource
+#         """
+#         # plot_df = curr_sess.position.to_dataframe()
+#         # data_series_pre_spatial_to_spatial_mappings = cls.build_pre_spatial_to_spatial_mappings(destination_plot)
+#         # active_plot_curve_datasource = cls.build_render_time_curves_datasource(plot_df, data_series_pre_spatial_to_spatial_mappings)
+#         # destination_plot.add_3D_time_curves(curve_datasource=active_plot_curve_datasource) # Add the curves from the datasource
+#         # return active_plot_curve_datasource
     
-        active_decoder = active_one_step_decoder
-        marginals_x = active_decoder.perform_build_marginals(p_x_given_n=active_decoder.p_x_given_n, most_likely_positions=active_decoder.most_likely_positions)
+#         active_decoder = active_one_step_decoder
+#         marginals_x = active_decoder.perform_build_marginals(p_x_given_n=active_decoder.p_x_given_n, most_likely_positions=active_decoder.most_likely_positions)
 
-        ## Get the previously created matplotlib_view_widget figure/ax:
-        fig, curr_ax = plot_1D_most_likely_position_comparsions(curr_sess.position.to_dataframe(), ax=destination_plot.ui.matplotlib_view_widget.ax, time_window_centers=active_decoder.time_window_centers, xbin=active_decoder.xbin,
-                                                        posterior=marginals_x.p_x_given_n,
-                                                        active_most_likely_positions_1D=marginals_x.most_likely_positions_1D,
-                                                        enable_flat_line_drawing=False, debug_print=False)
-        destination_plot.ui.matplotlib_view_widget.draw()
-        destination_plot.sync_matplotlib_render_plot_widget()
+#         ## Get the previously created matplotlib_view_widget figure/ax:
+#         fig, curr_ax = plot_1D_most_likely_position_comparsions(curr_sess.position.to_dataframe(), ax=destination_plot.ui.matplotlib_view_widget.ax, time_window_centers=active_decoder.time_window_centers, xbin=active_decoder.xbin,
+#                                                         posterior=marginals_x.p_x_given_n,
+#                                                         active_most_likely_positions_1D=marginals_x.most_likely_positions_1D,
+#                                                         enable_flat_line_drawing=False, debug_print=False)
+#         destination_plot.ui.matplotlib_view_widget.draw()
+#         destination_plot.sync_matplotlib_render_plot_widget()
 
     
     

@@ -722,35 +722,43 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
         """ creates a new MatplotlibTimeSynchronizedWidget, a container widget that holds a matplotlib figure, and adds it as a row to the main layout
         
         """
+        dDisplayItem = self.ui.dynamic_docked_widget_container.find_display_dock(identifier=name) # Dock
+        if dDisplayItem is None:
+            # No extant matplotlib_view_widget and display_dock currently, create a new one:
+                
+            ## TODO: hardcoded single-widget:
+            self.ui.matplotlib_view_widget = MatplotlibTimeSynchronizedWidget() # Matplotlib widget directly
+            self.ui.matplotlib_view_widget.setObjectName(name)
+            self.ui.matplotlib_view_widget.fig.subplots_adjust(top=1.0, bottom=0.0, left=0.0, right=1.0, hspace=0.0, wspace=0.0)
+            
+            ## Add directly to the main grid layout:
+            # self.ui.layout.addWidget(self.ui.matplotlib_view_widget, row, col)
+            
+            ## Add to dynamic_docked_widget_container:
+            min_width = 500
+            min_height = 100
+            # if _last_dock_outer_nested_item is not None:
+            #     #NOTE: to stack two dock widgets on top of each other, do area.moveDock(d6, 'above', d4)   ## move d6 to stack on top of d4
+            #     dockAddLocationOpts = ['above', _last_dock_outer_nested_item] # position relative to the _last_dock_outer_nested_item for this figure
+            # else:
+            dockAddLocationOpts = ['bottom'] #no previous dock for this filter, so use absolute positioning
+            _, dDisplayItem = self.ui.dynamic_docked_widget_container.add_display_dock(name, dockSize=(min_width, min_height), display_config=FigureWidgetDockDisplayConfig(showCloseButton=True),
+                                                                                    widget=self.ui.matplotlib_view_widget, dockAddLocationOpts=dockAddLocationOpts, autoOrientation=False)
+            dDisplayItem.setOrientation('horizontal', force=True)
+            dDisplayItem.updateStyle()
+            dDisplayItem.update()
+            
+            ## Add the plot:
+            fig = self.ui.matplotlib_view_widget.getFigure()
+            ax = self.ui.matplotlib_view_widget.getFigure().add_subplot(111) # Adds a single axes to the figure
         
-        ## TODO: hardcoded single-widget:
-        self.ui.matplotlib_view_widget = MatplotlibTimeSynchronizedWidget() # Matplotlib widget directly
-        self.ui.matplotlib_view_widget.setObjectName(name)
-        self.ui.matplotlib_view_widget.fig.subplots_adjust(top=1.0, bottom=0.0, left=0.0, right=1.0, hspace=0.0, wspace=0.0)
-        
-        ## Add directly to the main grid layout:
-        # self.ui.layout.addWidget(self.ui.matplotlib_view_widget, row, col)
-        
-        ## Add to dynamic_docked_widget_container:
-        min_width = 500
-        min_height = 100
-        # if _last_dock_outer_nested_item is not None:
-        #     #NOTE: to stack two dock widgets on top of each other, do area.moveDock(d6, 'above', d4)   ## move d6 to stack on top of d4
-        #     dockAddLocationOpts = ['above', _last_dock_outer_nested_item] # position relative to the _last_dock_outer_nested_item for this figure
-        # else:
-        dockAddLocationOpts = ['bottom'] #no previous dock for this filter, so use absolute positioning
-        _, dDisplayItem = self.ui.dynamic_docked_widget_container.add_display_dock(name, dockSize=(min_width, min_height), display_config=FigureWidgetDockDisplayConfig(showCloseButton=True),
-                                                                                   widget=self.ui.matplotlib_view_widget, dockAddLocationOpts=dockAddLocationOpts, autoOrientation=False)
-        # dDisplayItem.setOrientation('horizontal') # want orientation of outer dockarea to be opposite of that of the inner one. # 'auto', 'horizontal', or 'vertical'.
-        # dDisplayItem.setOrientation('vertical', force=True)
-        dDisplayItem.setOrientation('horizontal', force=True)
-        dDisplayItem.updateStyle()
-        dDisplayItem.update()
-        
-        ## Add the plot:
-        fig = self.ui.matplotlib_view_widget.getFigure()
-        ax = self.ui.matplotlib_view_widget.getFigure().add_subplot(111) # Adds a single axes to the figure
-        
+        else:
+            # Already had the widget
+            print(f'already had the valid matplotlib view widget and its display dock. Returning extant.')
+            fig = self.ui.matplotlib_view_widget.getFigure()
+            ax = self.ui.matplotlib_view_widget.ax
+
+
         # self.sync_matplotlib_render_plot_widget()
         
         return self.ui.matplotlib_view_widget, fig, ax
@@ -768,7 +776,12 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
         sync_connection = self.window_scrolled.connect(self.ui.matplotlib_view_widget.on_window_changed)
         return sync_connection
     
-
+    def clear_all_matplotlib_plots(self):
+        """ required by the menu function """
+        print(f'clear_all_matplotlib_plots()')
+        raise NotImplementedError
+    
+    
         
     # Overrides for Render3DTimeCurvesBaseGridMixin, since this 2D class can't draw a 3D background grid _________________ #
     def init_3D_time_curves_baseline_grid_mesh(self):

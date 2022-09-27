@@ -15,7 +15,7 @@ from pyphoplacecellanalysis.GUI.Qt.GlobalApplicationMenus.Uic_AUTOGEN_LocalMenus
 from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.Mixins.RenderTimeEpochs.Specific2DRenderTimeEpochs import General2DRenderTimeEpochs, Replays_2DRenderTimeEpochs, Ripples_2DRenderTimeEpochs, SessionEpochs2DRenderTimeEpochs, PBE_2DRenderTimeEpochs, Laps2DRenderTimeEpochs # Time Intervals/Epochs
 from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.Mixins.TimeCurves.SpecificTimeCurves import GeneralRenderTimeCurves, PositionRenderTimeCurves, MUA_RenderTimeCurves ## Time Curves
 
-from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import DecodedPositionMatplotlibSubplotRenderer ## MatplotlibSubplots
+from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import AddNewDecodedPosition_MatplotlibPlotCommand ## MatplotlibSubplots
 
 ## IMPORTS:
 # from ...pyPhoPlaceCellAnalysis.src.pyphoplacecellanalysis.GUI.Qt.GlobalApplicationMenus import LocalMenus_AddRenderable
@@ -99,8 +99,11 @@ class LocalMenus_AddRenderable(QtWidgets.QMainWindow):
         
         ## Matplotlib Plots:
         # self.ui.menuAddRenderable_Matplotlib_Plot        
+        
+        
+        
         submenu_addMatplotlibPlot = [widget.ui.actionAddMatplotlibPlot_DecodedPosition, widget.ui.actionAddMatplotlibPlot_Custom]
-        submenu_addMatplotlibPlotCallbacks = [lambda evt=None: DecodedPositionMatplotlibSubplotRenderer.add_render_time_curves(curr_sess=sess, destination_plot=destination_plot),  # TODO: build and call the real action for the Matplotlib plots
+        submenu_addMatplotlibPlotCallbacks = [lambda evt=None: AddNewDecodedPosition_MatplotlibPlotCommand(destination_plot, curr_active_pipeline, active_config_name), # DecodedPositionMatplotlibSubplotRenderer.add_render_time_curves(curr_sess=sess, destination_plot=destination_plot), 
                                             lambda evt=None: print(f'actionaddMatplotlibPlot_Custom not yet supported')]
         submenu_addMatplotlibPlot_Connections = []
         for an_action, a_callback in zip(submenu_addMatplotlibPlot, submenu_addMatplotlibPlotCallbacks):
