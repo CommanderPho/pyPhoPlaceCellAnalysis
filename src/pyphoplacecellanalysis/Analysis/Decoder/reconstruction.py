@@ -684,8 +684,8 @@ class BayesianPlacemapPositionDecoder(PlacemapPositionDecoder):
         # time_bin_edges, curr_binning_info = compute_spanning_bins(None, variable_start_value=t_start, variable_end_value=t_end, num_bins=nbins)
         
         most_likely_positions, p_x_given_n, most_likely_position_indicies = self.decode(spkcount, time_bin_size=decoding_time_bin_size, debug_print=debug_print)
-        curr_unit_marginal_x = self.perform_build_marginals(p_x_given_n, most_likely_positions, debug_print=debug_print)
-        return time_bin_container, p_x_given_n, most_likely_positions, curr_unit_marginal_x
+        curr_unit_marginal_x, curr_unit_marginal_y = self.perform_build_marginals(p_x_given_n, most_likely_positions, debug_print=debug_print)
+        return time_bin_container, p_x_given_n, most_likely_positions, curr_unit_marginal_x, curr_unit_marginal_y
     
     
             
@@ -695,23 +695,17 @@ class BayesianPlacemapPositionDecoder(PlacemapPositionDecoder):
             ## Single sweep decoding:
 
             ## 2022-09-23 - Epochs-style encoding (that works):
-            self.time_binning_container, self.p_x_given_n, self.most_likely_positions, curr_unit_marginal_x = self.hyper_perform_decode(self.spikes_df, decoding_time_bin_size=self.time_bin_size, debug_print=False)
+            self.time_binning_container, self.p_x_given_n, self.most_likely_positions, curr_unit_marginal_x, curr_unit_marginal_y = self.hyper_perform_decode(self.spikes_df, decoding_time_bin_size=self.time_bin_size, debug_print=False)
 
             assert isinstance(self.time_binning_container, BinningContainer) # Should be neuropy.utils.mixins.binning_helpers.BinningContainer
             # unit_specific_binned_spike_counts = unit_specific_binned_spike_counts.T # Want the outputs to have each time window as a column, with a single time window giving a column vector for each neuron
             # print(f'unit_specific_binned_spike_counts.to_numpy(): {np.shape(unit_specific_binned_spike_counts.to_numpy())}') # (85841, 40)
-            
-            # time_bin_centers = self.time_binning_container.centers
-            # self.time_bin_edges = 
             
             self.time_window_edges = self.time_binning_container.edges
             self.time_window_edges_binning_info = self.time_binning_container.edge_info
                         
             self.time_window_centers = self.time_binning_container.centers
             self.time_window_center_binning_info = self.time_binning_container.center_info
-            
-            
-                   
             
             # self.time_window_edges = manual_time_window_edges
             # self.time_window_edges_binning_info = manual_time_window_edges_binning_info
@@ -804,7 +798,7 @@ class BayesianPlacemapPositionDecoder(PlacemapPositionDecoder):
             _type_: _description_
         """
         # build output result object:
-        filter_epochs_decoder_result = DynamicContainer(most_likely_positions_list=[], p_x_given_n_list=[], marginal_x_list=[], most_likely_position_indicies_list=[])
+        filter_epochs_decoder_result = DynamicContainer(most_likely_positions_list=[], p_x_given_n_list=[], marginal_x_list=[], marginal_y_list=[], most_likely_position_indicies_list=[])
 
         if debug_print:
             print(f'filter_epochs: {filter_epochs.n_epochs}')
@@ -839,14 +833,10 @@ class BayesianPlacemapPositionDecoder(PlacemapPositionDecoder):
         filter_epochs_decoder_result.time_bin_edges = []
         
         filter_epochs_decoder_result.marginal_x_list = []
+        filter_epochs_decoder_result.marginal_y_list = []
 
         # half_decoding_time_bin_size = (decoding_time_bin_size/2.0)
         for i, curr_unit_spkcount, curr_unit_num_bins, curr_unit_time_bin_container in zip(np.arange(num_filter_epochs), spkcount, nbins, time_bin_containers_list):
-            # print(f'curr_unit_spkcount: {curr_unit_spkcount.shape}')
-            # curr_unit_correct_time_bin_edges, curr_binning_info = compute_spanning_bins(None, variable_start_value=filter_epochs.starts[i], variable_end_value=filter_epochs.stops[i], num_bins=curr_unit_num_bins)
-            # filter_epochs_decoder_result.time_bin_edges.append(curr_unit_correct_time_bin_edges)
-            # filter_epochs_decoder_result.time_bin_centers.append(get_bin_centers(curr_unit_correct_time_bin_edges))
-            
             ## New 2022-09-26 method with working time_bin_centers_list returned from epochs_spkcount
             filter_epochs_decoder_result.time_bin_edges.append(curr_unit_time_bin_container.edges)
 
@@ -856,14 +846,17 @@ class BayesianPlacemapPositionDecoder(PlacemapPositionDecoder):
             filter_epochs_decoder_result.most_likely_position_indicies_list.append(most_likely_position_indicies)
 
         # Add the marginal container to the list
-        curr_unit_marginal_x = cls.perform_build_marginals(p_x_given_n, most_likely_positions, debug_print=debug_print)
+        curr_unit_marginal_x, curr_unit_marginal_y = cls.perform_build_marginals(p_x_given_n, most_likely_positions, debug_print=debug_print)
         filter_epochs_decoder_result.marginal_x_list.append(curr_unit_marginal_x)
+        filter_epochs_decoder_result.marginal_y_list.append(curr_unit_marginal_y)
         
         return filter_epochs_decoder_result
     
     
     @classmethod
     def perform_build_marginals(cls, p_x_given_n, most_likely_positions, debug_print=False):
+        is_1D_decoder = (most_likely_positions.ndim < 2) # check if we're dealing with a 1D decoder, in which case there is no y-marginal (y doesn't exist)
+        
         # Compute Marginal 1D Posterior:
         ## Build a container to hold the marginal distribution and its related values:
         curr_unit_marginal_x = DynamicContainer(p_x_given_n=None, most_likely_positions_1D=None)
@@ -871,21 +864,41 @@ class BayesianPlacemapPositionDecoder(PlacemapPositionDecoder):
         # Collapse the 2D position posterior into two separate 1D (X & Y) marginal posteriors. Be sure to re-normalize each marginal after summing
         curr_unit_marginal_x.p_x_given_n = np.squeeze(np.sum(p_x_given_n, 1)) # sum over all y. Result should be [x_bins x time_bins]
         curr_unit_marginal_x.p_x_given_n = curr_unit_marginal_x.p_x_given_n / np.sum(curr_unit_marginal_x.p_x_given_n, axis=0) # sum over all positions for each time_bin (so there's a normalized distribution at each timestep)
-        ## Ensures that the marginal posterior is at least 2D:
+         ## Ensures that the marginal posterior is at least 2D:
         if curr_unit_marginal_x.p_x_given_n.ndim == 0:
             curr_unit_marginal_x.p_x_given_n = curr_unit_marginal_x.p_x_given_n.reshape(1, 1)
         elif curr_unit_marginal_x.p_x_given_n.ndim == 1:
             curr_unit_marginal_x.p_x_given_n = curr_unit_marginal_x.p_x_given_n[:, np.newaxis]
             if debug_print:
-                print(f'\t added dimension to curr_posterior: {curr_unit_marginal_x.p_x_given_n.shape}')
+                print(f'\t added dimension to curr_posterior for marginal_x: {curr_unit_marginal_x.p_x_given_n.shape}')
+                
+        if not is_1D_decoder:
+            # a 2D decoder
+            curr_unit_marginal_y = DynamicContainer(p_x_given_n=None, most_likely_positions_1D=None)
+            curr_unit_marginal_y.p_x_given_n = np.squeeze(np.sum(p_x_given_n, 0)) # sum over all x. Result should be [y_bins x time_bins]
+            curr_unit_marginal_y.p_x_given_n = curr_unit_marginal_y.p_x_given_n / np.sum(curr_unit_marginal_y.p_x_given_n, axis=0) # sum over all positions for each time_bin (so there's a normalized distribution at each timestep)
+            ## Ensures that the marginal posterior is at least 2D:
+            if curr_unit_marginal_y.p_x_given_n.ndim == 0:
+                curr_unit_marginal_y.p_x_given_n = curr_unit_marginal_y.p_x_given_n.reshape(1, 1)
+            elif curr_unit_marginal_y.p_x_given_n.ndim == 1:
+                curr_unit_marginal_y.p_x_given_n = curr_unit_marginal_y.p_x_given_n[:, np.newaxis]
+                if debug_print:
+                    print(f'\t added dimension to curr_posterior for marginal_y: {curr_unit_marginal_y.p_x_given_n.shape}')
+                    
+        else:
+            # for the 1D decoder case, there are no y-positions
+            curr_unit_marginal_y = None
+       
                 
         ## Add the most-likely positions to the posterior_x container:
         if most_likely_positions.ndim < 2:
+            ## 1D Decoder Case, there is no y marginal (y doesn't exist)
             curr_unit_marginal_x.most_likely_positions_1D = np.atleast_1d(most_likely_positions).T # already 1D positions, don't need to extract x-component
         else:
             curr_unit_marginal_x.most_likely_positions_1D = most_likely_positions[:,0].T
+            curr_unit_marginal_y.most_likely_positions_1D = most_likely_positions[:,1].T
         
-        return curr_unit_marginal_x
+        return curr_unit_marginal_x, curr_unit_marginal_y
         
         
     @classmethod

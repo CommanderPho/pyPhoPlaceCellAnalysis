@@ -18,6 +18,8 @@ from pyphoplacecellanalysis.Analysis.Decoder.decoder_result import build_positio
 
 from pyphoplacecellanalysis.Pho2D.stacked_epoch_slices import stacked_epoch_slices_matplotlib_build_view
 
+from pyphoplacecellanalysis.GUI.Qt.Mixins.Menus.BaseMenuProviderMixin import BaseMenuCommand # for AddNewDecodedPosition_MatplotlibPlotCommand
+
 
 class DefaultDecoderDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=DisplayFunctionRegistryHolder):
     """ Functions related to visualizing Bayesian Decoder performance. """
@@ -47,7 +49,38 @@ class DefaultDecoderDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Disp
             # print(f'animate({i})')
             return renderer.display(i)
         
-    
+    def _display_plot_marginal_1D_most_likely_position_comparisons(computation_result, active_config, variable_name='x', **kwargs):
+        """ renders a plot with the 1D Marginals either (x and y position axes): the computed posterior for the position from the Bayesian decoder and overlays the animal's actual position over the top. 
+        
+        , ax=None
+        
+        
+        ax = destination_plot.ui.matplotlib_view_widget.ax,
+        variable_name = 'x',
+        
+        """
+        active_decoder = computation_result.computed_data['pf2D_Decoder']
+        marginals_x, marginals_y = active_decoder.perform_build_marginals(p_x_given_n=active_decoder.p_x_given_n, most_likely_positions=active_decoder.most_likely_positions)
+        if variable_name == 'x':
+            active_marginals = marginals_x
+            active_bins = active_decoder.xbin
+        else:
+            active_marginals = marginals_y
+            active_bins = active_decoder.ybin
+        
+        ## Get the previously created matplotlib_view_widget figure/ax:
+        fig, curr_ax = plot_1D_most_likely_position_comparsions(computation_result.sess.position.to_dataframe(), time_window_centers=active_decoder.time_window_centers, xbin=active_bins,
+                                                        posterior=active_marginals.p_x_given_n,
+                                                        active_most_likely_positions_1D=active_marginals.most_likely_positions_1D,
+                                                        **overriding_dict_with(lhs_dict={'ax':None, 'variable_name':variable_name, 'enable_flat_line_drawing':False, 'debug_print': False}, **kwargs))
+        
+        ## TODO: what are we supposed to return from these display functions?
+        # destination_plot.ui.matplotlib_view_widget.draw()
+        # destination_plot.sync_matplotlib_render_plot_widget()        
+        return fig, curr_ax
+
+            
+            
     def _display_plot_most_likely_position_comparisons(computation_result, active_config, **kwargs):
         """ renders a 2D plot with separate subplots for the (x and y position axes): the computed posterior for the position from the Bayesian decoder and overlays the animal's actual position over the top. """
         
@@ -505,6 +538,45 @@ def plot_decoded_epoch_slices(filter_epochs, filter_epochs_decoder_result, globa
 
 
 
+class AddNewDecodedPosition_MatplotlibPlotCommand(BaseMenuCommand):
+    """ analagous to CreateNewDataExplorer_ipspikes_PlotterCommand, holds references to the variables needed to perform the entire action (such as the reference to the decoder) which aren't accessible during the building of the menus. """
+    def __init__(self, spike_raster_window, curr_active_pipeline, active_config_name, display_output={}) -> None:
+        super(AddNewDecodedPosition_MatplotlibPlotCommand, self).__init__()
+        self._spike_raster_window = spike_raster_window
+        self._curr_active_pipeline = curr_active_pipeline
+        self._active_config_name = active_config_name
+        self._display_output = display_output
+        
+    def execute(self, *args, **kwargs) -> None:
+        # pActiveSpikesBehaviorPlotter = None
+        # # display_output = {}
+        # self._display_output = self._display_output | self._curr_active_pipeline.display('_display_3d_interactive_spike_and_behavior_browser', self._active_config_name, extant_plotter=self._display_output.get('pActiveSpikesBehaviorPlotter', None)) # Works now!
+        # ipspikesDataExplorer = self._display_output['ipspikesDataExplorer']
+        # self._display_output['pActiveSpikesBehaviorPlotter'] = self._display_output.pop('plotter') # rename the key from the generic "plotter" to "pActiveSpikesBehaviorPlotter" to avoid collisions with others
+        # pActiveSpikesBehaviorPlotter = self._display_output['pActiveSpikesBehaviorPlotter']
+        # ## Sync ipspikesDataExplorer to raster window:
+        # extra_interactive_spike_behavior_browser_sync_connection = self._spike_raster_window.connect_additional_controlled_plotter(controlled_plt=ipspikesDataExplorer)
+        # # test_independent_vedo_raster_widget.show()
+        
+        
+        active_decoder = active_one_step_decoder
+        marginals_x = active_decoder.perform_build_marginals(p_x_given_n=active_decoder.p_x_given_n, most_likely_positions=active_decoder.most_likely_positions)
+
+        ## Get the previously created matplotlib_view_widget figure/ax:
+        fig, curr_ax = plot_1D_most_likely_position_comparsions(curr_sess.position.to_dataframe(), ax=destination_plot.ui.matplotlib_view_widget.ax, time_window_centers=active_decoder.time_window_centers, xbin=active_decoder.xbin,
+                                                        posterior=marginals_x.p_x_given_n,
+                                                        active_most_likely_positions_1D=marginals_x.most_likely_positions_1D,
+                                                        enable_flat_line_drawing=False, debug_print=False)
+        destination_plot.ui.matplotlib_view_widget.draw()
+        destination_plot.sync_matplotlib_render_plot_widget()
+        
+        
+        
+        
+        
+        
+
+
 class DecodedPositionMatplotlibSubplotRenderer(object):
     """ Inspired by `PositionRenderTimeCurves` (which inherited from `GeneralRenderTimeCurves`) as a standalone class that can be called from the menu with the destination plot and the session.
     
@@ -520,53 +592,6 @@ class DecodedPositionMatplotlibSubplotRenderer(object):
     def __init__(self):
         super(DecodedPositionMatplotlibSubplotRenderer, self).__init__()
         
-    
-    
-    @classmethod
-    def data_series_pre_spatial_list(cls, *args, **kwargs):
-        """ returns the pre_spatial list for the dataseries. Usually just returns a constant, only a function in case a class wants to do separate setup based on a class property. """
-        return [{'name':'linear position','t':'t','v_alt':None,'v_main':'lin_pos','color_name':'yellow', 'line_width':1.25, 'z_scaling_factor':1.0},
-            {'name':'x position','t':'t','v_alt':None,'v_main':'x', 'color_name':'red', 'line_width':0.5, 'z_scaling_factor':1.0},
-            {'name':'y position','t':'t','v_alt':None,'v_main':'y', 'color_name':'green', 'line_width':0.5, 'z_scaling_factor':1.0}
-        ]
-         
-    @classmethod
-    def prepare_dataframe(cls, plot_df, *args, **kwargs):
-        """ preforms and pre-processing of the dataframe needed (such as scaling/renaming columns/etc and returns a COPY """
-        z_scaler = MinMaxScaler()
-        transformed_df = plot_df[['t','x','y','lin_pos']].copy()
-        transformed_df[['x','y']] = z_scaler.fit_transform(transformed_df[['x','y']]) # scale x and y positions
-        transformed_df[['lin_pos']] = z_scaler.fit_transform(transformed_df[['lin_pos']]) # scale lin_pos position separately
-        return transformed_df
-
-
-    @classmethod
-    def build_pre_spatial_to_spatial_mappings(cls, destination_plot, *args, **kwargs):
-        """ builds and returns the mappings from the pre-spatial values to the spatial values, frequently using information from the destination_plot and passed-in variables. """
-        
-        if destination_plot.time_curve_render_dimensionality == 2:
-            # SpikeRaster2D needs different x_map_fn than the 3D plots:
-            x_map_fn = lambda t: t
-        else:            
-            x_map_fn = lambda t: destination_plot.temporal_to_spatial(t)
-
-        y_map_fn = lambda v: np.full_like(v, -destination_plot.n_half_cells)
-        z_map_fn = lambda v_main: v_main
-        return [{'name':'name','x':'t','y':'v_alt','z':'v_main','x_map_fn':x_map_fn,'y_map_fn':y_map_fn,'z_map_fn':z_map_fn},
-            {'name':'name','x':'t','y':'v_alt','z':'v_main','x_map_fn':x_map_fn,'y_map_fn':y_map_fn,'z_map_fn':z_map_fn},
-            {'name':'name','x':'t','y':'v_alt','z':'v_main','x_map_fn':x_map_fn,'y_map_fn':y_map_fn,'z_map_fn':z_map_fn}
-        ]
-    
-    
-    
-    @classmethod
-    def build_render_time_curves_datasource(cls, plot_df, pre_spatial_to_spatial_mappings, **kwargs):
-        """ typically shouldn't need to be overriden, just set up this way for customizability """
-        data_series_pre_spatial_list = cls.data_series_pre_spatial_list()
-        active_plot_curve_dataframe = cls.prepare_dataframe(plot_df)
-        general_curve_interval_datasource = CurveDatasource(active_plot_curve_dataframe, data_series_specs=RenderDataseries.init_from_pre_spatial_data_series_list(data_series_pre_spatial_list, pre_spatial_to_spatial_mappings))
-        return general_curve_interval_datasource
-
     @classmethod
     def add_render_time_curves(cls, curr_sess, destination_plot, **kwargs):
         """ directly-called method 
