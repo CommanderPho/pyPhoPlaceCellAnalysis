@@ -52,11 +52,17 @@ class LocalMenus_AddRenderable(QtWidgets.QMainWindow):
 
 
     @classmethod
-    def _build_renderable_menu(cls, destination_plot, sess):
+    def _build_renderable_menu(cls, destination_plot, curr_active_pipeline, active_config_name):
         """ Builds the callbacks needed and connects them to the QActions and QMenus for the specific destination_plot to be used as context menus. 
         sess: Session
         destination_plot: e.g. active_2d_plot, active_3d_plot
         """
+        # Extract sess from the more general curr_active_pipeline:
+        computation_result = curr_active_pipeline.computation_results[active_config_name]
+        sess = computation_result.sess
+        
+        
+        
         widget = LocalMenus_AddRenderable() # get the UI widget containing the menu items:
         renderable_menu = widget.ui.menuAdd_Renderable
         
@@ -125,7 +131,7 @@ class LocalMenus_AddRenderable(QtWidgets.QMainWindow):
 
 
     @classmethod
-    def add_renderable_context_menu(cls, active_2d_plot, sess):
+    def add_renderable_context_menu(cls, active_2d_plot, curr_active_pipeline, active_config_name):
         """ 
         Usage:
             active_2d_plot = spike_raster_window.spike_raster_plt_2d 
@@ -157,7 +163,9 @@ class LocalMenus_AddRenderable(QtWidgets.QMainWindow):
                 
          ## Build `partial` versions of the functions specific to each raster plotter that can be called with no arguments (capturing the destination plotter and the session
         # build_renderable_menu_to_Spike2DRaster = partial(cls.build_renderable_menu, active_2d_plot, sess) # destination_plot
-        active_2d_plot_renderable_menus = cls._build_renderable_menu(active_2d_plot, sess)
+        # active_2d_plot_renderable_menus = cls._build_renderable_menu(active_2d_plot, sess)
+        
+        active_2d_plot_renderable_menus = cls._build_renderable_menu(active_2d_plot, curr_active_pipeline, active_config_name)
         widget_2d_menu = active_2d_plot_renderable_menus[0]
         menuAdd_Renderable = widget_2d_menu.ui.menuAdd_Renderable
         
