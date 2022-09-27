@@ -554,24 +554,11 @@ class AddNewDecodedPosition_MatplotlibPlotCommand(BaseMenuCommand):
         active_2d_plot = self._spike_raster_window.spike_raster_plt_2d
         # If no plot to render on, do this:
         widget, matplotlib_fig, matplotlib_fig_ax = active_2d_plot.add_new_matplotlib_render_plot_widget()
-        # active_2d_plot.ui.matplotlib_view_widget.ax
-        
-        # pActiveSpikesBehaviorPlotter = None
-        # display_output = {}
-        # self._display_output = self._display_output | self._curr_active_pipeline.display('_display_plot_marginal_1D_most_likely_position_comparisons', self._active_config_name, variable_name='x', ax=matplotlib_fig_ax)
-        # ipspikesDataExplorer = self._display_output['ipspikesDataExplorer']
-        fig, curr_ax = self._curr_active_pipeline.display('_display_plot_marginal_1D_most_likely_position_comparisons', self._active_config_name, variable_name='x', ax=matplotlib_fig_ax)
-        
-        # active_decoder = active_one_step_decoder
-        # marginals_x = active_decoder.perform_build_marginals(p_x_given_n=active_decoder.p_x_given_n, most_likely_positions=active_decoder.most_likely_positions)
-
-        # ## Get the previously created matplotlib_view_widget figure/ax:
-        # fig, curr_ax = plot_1D_most_likely_position_comparsions(curr_sess.position.to_dataframe(), ax=destination_plot.ui.matplotlib_view_widget.ax, time_window_centers=active_decoder.time_window_centers, xbin=active_decoder.xbin,
-        #                                                 posterior=marginals_x.p_x_given_n,
-        #                                                 active_most_likely_positions_1D=marginals_x.most_likely_positions_1D,
-        #                                                 enable_flat_line_drawing=False, debug_print=False)
+        fig, curr_ax = self._curr_active_pipeline.display('_display_plot_marginal_1D_most_likely_position_comparisons', self._active_config_name, variable_name='x', ax=active_2d_plot.ui.matplotlib_view_widget.ax)
+        print(f'\t AddNewDecodedPosition_MatplotlibPlotCommand.execute(...) finished with the display call...')
         active_2d_plot.ui.matplotlib_view_widget.draw()
         active_2d_plot.sync_matplotlib_render_plot_widget() # Sync it with the active window:
+        print(f'\t AddNewDecodedPosition_MatplotlibPlotCommand.execute() is done.')
         
         
 # class DecodedPositionMatplotlibSubplotRenderer(object):

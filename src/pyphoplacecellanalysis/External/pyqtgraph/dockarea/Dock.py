@@ -85,8 +85,8 @@ class Dock(QtWidgets.QWidget, DockDrop):
             # display_config = DockDisplayConfig(closable, fontSize=fontSize, corner_radius='3px')
             raise NotImplementedError
         else:
-            print(f"WARNING: Dock.__init__(...): display_config is set, so the explicitly passed parameters 'closable' and 'fontSize' will be ignored.")
-        
+            # print(f"WARNING: Dock.__init__(...): display_config is set, so the explicitly passed parameters 'closable' and 'fontSize' will be ignored.")
+            pass
         self.label = DockLabel(name, self, display_config)
         if display_config.showCloseButton:
             self.label.sigCloseClicked.connect(self.close)

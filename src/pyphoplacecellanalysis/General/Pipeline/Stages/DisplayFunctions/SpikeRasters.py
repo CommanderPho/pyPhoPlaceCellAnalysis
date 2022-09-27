@@ -125,7 +125,8 @@ class SpikeRastersDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Displa
             
             display_output = owning_pipeline_reference.display_output[active_display_fn_identifying_ctx]
             # print(f'display_output: {display_output}')
-            curr_main_menu_window, menuCreateNewConnectedWidget, createNewConnected_actions_dict = CreateNewConnectedWidgetMenuHelper.try_add_create_new_connected_widget_menu(spike_raster_window, owning_pipeline_reference, active_config, display_output)
+            # curr_main_menu_window, menuCreateNewConnectedWidget, createNewConnected_actions_dict = CreateNewConnectedWidgetMenuHelper.try_add_create_new_connected_widget_menu(spike_raster_window, owning_pipeline_reference, active_config, display_output)
+            curr_main_menu_window, menuCreateNewConnectedWidget, createNewConnected_actions_dict = CreateNewConnectedWidgetMenuHelper.try_add_create_new_connected_widget_menu(spike_raster_window, owning_pipeline_reference, active_config_name, display_output) # Encountered error where I was passing active_config (a `InteractivePlaceCellConfig` type object) instead of active_config_name (a string)
             spike_raster_window.main_menu_window = curr_main_menu_window # to retain the changes
             
         else:

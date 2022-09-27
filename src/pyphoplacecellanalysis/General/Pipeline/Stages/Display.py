@@ -282,7 +282,9 @@ class PipelineWithDisplayPipelineStageMixin:
             kwargs.setdefault('active_context', active_session_configuration_context) # add 'active_context' to the kwargs for the display function if possible
             
         else:
+            print(f'WARNING: active_session_configuration_context: {active_session_configuration_context} with type: {type(active_session_configuration_context)}')
             raise NotImplementedError
+        
         
         ## Sanity checking:
         assert (active_session_configuration_name in self.computation_results), f"self.computation_results doesn't contain a key for the provided active_session_filter_configuration ('{active_session_configuration_name}'). Did you only enable computation with enabled_filter_names in perform_computation that didn't include this key?"
