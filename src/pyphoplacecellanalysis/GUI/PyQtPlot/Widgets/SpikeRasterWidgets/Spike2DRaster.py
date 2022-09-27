@@ -236,48 +236,6 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
     
         self.config_fragile_linear_neuron_IDX_map = dict(zip(self.fragile_linear_neuron_IDXs, self.params.config_items.values()))
         
-
-            
-    # Spike Emphasis Functions ___________________________________________________________________________________________ #
-    def reset_spike_emphasis(self, defer_render=False):
-        """ resets the emphasis state of all spikes to the default (SpikeEmphasisState.Default) and then rebuilds the all_spots """
-        self.spikes_df['visualization_raster_emphasis_state'] = SpikeEmphasisState.Default
-        # TODO: PERFORMANCE: Rebuild the all_spots for all spikes after the update: (FUTURE) if more efficient, could just modify those that changed
-        self.plots_data.all_spots = self._build_all_spikes_all_spots()
-            
-        # Once the dataframe is updated, rebuild the all_spots and update the plotters
-        if not defer_render:
-            # Update preview_overview_scatter_plot
-            self.update_rasters()
-                
-    def update_spike_emphasis(self, spike_indicies=None, new_emphasis_state: SpikeEmphasisState=SpikeEmphasisState.Default, defer_render=False):
-        """ sets the emphasis state for the spikes specified by spike_indices to new_emphasis_state 
-        
-        spike_indicies: e.g. np.logical_not(is_spike_included)
-        defer_render: if false, the all_spots will be rebuilt after updating the dataframe and the changes rendered out
-        """
-        if 'visualization_raster_emphasis_state' not in self.spikes_df.columns:
-            print('Spike2DRaster.update_spike_emphasis(): adding "visualization_raster_emphasis_state" column to spikes_df...')
-            self.spikes_df['visualization_raster_emphasis_state'] = SpikeEmphasisState.Default
-
-        if spike_indicies is None:
-            # If no particular indicies are specified, change all spikes by default
-            # spike_indicies = self.spikes_df.indicies
-            # spike_indicies = np.arange(np.shape(self.spikes_df)[0]) # build all indicies
-            spike_indicies = np.full((np.shape(self.spikes_df)[0],), True)
-        
-        # Set the non-included spikes as SpikeEmphasisState.Deemphasized
-        self.spikes_df.loc[spike_indicies, 'visualization_raster_emphasis_state'] = new_emphasis_state
-        # TODO: PERFORMANCE: Rebuild the all_spots for all spikes after the update: (FUTURE) if more efficient, could just modify those that changed
-        self.plots_data.all_spots = self._build_all_spikes_all_spots()
-            
-        # Once the dataframe is updated, rebuild the all_spots and update the plotters
-        if not defer_render:
-            self.update_rasters()
-        
-
-            
-  
     def _buildGraphics(self):
         """ 
         plots.main_plot_widget: 2D display 
@@ -794,6 +752,48 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
     def remove_3D_time_curves_baseline_grid_mesh(self):
         return False # nothing to remove
         # return BaseGrid3DTimeCurvesHelper.remove_3D_time_curves_baseline_grid_mesh(self)
+    
+            
+    # Spike Emphasis Functions ___________________________________________________________________________________________ #
+    def reset_spike_emphasis(self, defer_render=False):
+        """ resets the emphasis state of all spikes to the default (SpikeEmphasisState.Default) and then rebuilds the all_spots """
+        self.spikes_df['visualization_raster_emphasis_state'] = SpikeEmphasisState.Default
+        # TODO: PERFORMANCE: Rebuild the all_spots for all spikes after the update: (FUTURE) if more efficient, could just modify those that changed
+        self.plots_data.all_spots = self._build_all_spikes_all_spots()
+            
+        # Once the dataframe is updated, rebuild the all_spots and update the plotters
+        if not defer_render:
+            # Update preview_overview_scatter_plot
+            self.update_rasters()
+                
+    def update_spike_emphasis(self, spike_indicies=None, new_emphasis_state: SpikeEmphasisState=SpikeEmphasisState.Default, defer_render=False):
+        """ sets the emphasis state for the spikes specified by spike_indices to new_emphasis_state 
+        
+        spike_indicies: e.g. np.logical_not(is_spike_included)
+        defer_render: if false, the all_spots will be rebuilt after updating the dataframe and the changes rendered out
+        """
+        if 'visualization_raster_emphasis_state' not in self.spikes_df.columns:
+            print('Spike2DRaster.update_spike_emphasis(): adding "visualization_raster_emphasis_state" column to spikes_df...')
+            self.spikes_df['visualization_raster_emphasis_state'] = SpikeEmphasisState.Default
+
+        if spike_indicies is None:
+            # If no particular indicies are specified, change all spikes by default
+            # spike_indicies = self.spikes_df.indicies
+            # spike_indicies = np.arange(np.shape(self.spikes_df)[0]) # build all indicies
+            spike_indicies = np.full((np.shape(self.spikes_df)[0],), True)
+        
+        # Set the non-included spikes as SpikeEmphasisState.Deemphasized
+        self.spikes_df.loc[spike_indicies, 'visualization_raster_emphasis_state'] = new_emphasis_state
+        # TODO: PERFORMANCE: Rebuild the all_spots for all spikes after the update: (FUTURE) if more efficient, could just modify those that changed
+        self.plots_data.all_spots = self._build_all_spikes_all_spots()
+            
+        # Once the dataframe is updated, rebuild the all_spots and update the plotters
+        if not defer_render:
+            self.update_rasters()
+        
+
+
+
     
     def debug_print_spike_raster_2D_specific_plots_info(self, indent_string = '\t'):
         """ Prints a bunch of debugging info related to its specific plots and what they're displaying.
