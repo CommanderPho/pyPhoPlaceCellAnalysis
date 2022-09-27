@@ -260,4 +260,3 @@ class DecoderResultDisplayingPlot2D(DecoderResultDisplayingBaseClass):
         # return (self.active_im,)
         return self.fig # returns fig
 
-

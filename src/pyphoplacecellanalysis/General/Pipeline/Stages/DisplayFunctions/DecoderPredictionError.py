@@ -163,12 +163,6 @@ def plot_1D_most_likely_position_comparsions(measured_position_df, time_window_c
             
         return fig, ax
 
-
-
-
-
-
-
 def plot_most_likely_position_comparsions(pho_custom_decoder, position_df, axs=None, show_posterior=True, show_one_step_most_likely_positions_plots=True, enable_flat_line_drawing=True, debug_print=False):
     """ renders a 2D plot in MATPLOTLIB with separate subplots for the (x and y position axes): the computed posterior for the position from the Bayesian decoder and overlays the animal's actual position over the top.
     Usage:
@@ -437,8 +431,6 @@ def _temp_debug_draw_update_predicted_position_difference(predicted_positions, m
 # Functions for rendering a stack of decoded epochs in a stacked_epoch_slices-style manner                             #
 # ==================================================================================================================== #
 
-
-
 def plot_decoded_epoch_slices(filter_epochs, filter_epochs_decoder_result, global_pos_df, xbin=None, enable_flat_line_drawing=False, debug_test_max_num_slices=20, name='stacked_epoch_slices_matplotlib_subplots', debug_print=False):
     """ plots the decoded epoch results in a stacked slices view 
     
@@ -502,5 +494,102 @@ def plot_decoded_epoch_slices(filter_epochs, filter_epochs_decoder_result, globa
 
 
 
+# ==================================================================================================================== #
+# Matplotlib-based 1D Position Decoder that can be added and synced to RasterPlot2D via its menu                       #
+# ==================================================================================================================== #
 
 
+from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import plot_most_likely_position_comparsions, plot_1D_most_likely_position_comparsions
+
+active_decoder = active_one_step_decoder
+marginals_x = active_decoder.perform_build_marginals(p_x_given_n=active_decoder.p_x_given_n, most_likely_positions=active_decoder.most_likely_positions)
+
+## Get the previously created matplotlib_view_widget figure/ax:
+fig, curr_ax = plot_1D_most_likely_position_comparsions(sess.position.to_dataframe(), ax=active_2d_plot.ui.matplotlib_view_widget.ax, time_window_centers=active_decoder.time_window_centers, xbin=active_decoder.xbin,
+                                                   posterior=marginals_x.p_x_given_n,
+                                                   active_most_likely_positions_1D=marginals_x.most_likely_positions_1D,
+                                                   enable_flat_line_drawing=False, debug_print=False)
+active_2d_plot.ui.matplotlib_view_widget.draw()
+active_2d_plot.sync_matplotlib_render_plot_widget()
+
+
+
+class DecodedPositionMatplotlibSubplotRenderer(object):
+    """ Inspired by `PositionRenderTimeCurves` (which inherited from `GeneralRenderTimeCurves`) as a standalone class that can be called from the menu with the destination plot and the session.
+    
+    add_render_time_curves
+        build_pre_spatial_to_spatial_mappings
+        build_render_time_curves_datasource
+            prepare_dataframe
+            data_series_pre_spatial_list
+    
+    """
+    default_datasource_name = 'DecodedPosition'
+    
+    def __init__(self):
+        super(DecodedPositionMatplotlibSubplotRenderer, self).__init__()
+        
+    
+    
+    @classmethod
+    def data_series_pre_spatial_list(cls, *args, **kwargs):
+        """ returns the pre_spatial list for the dataseries. Usually just returns a constant, only a function in case a class wants to do separate setup based on a class property. """
+        return [{'name':'linear position','t':'t','v_alt':None,'v_main':'lin_pos','color_name':'yellow', 'line_width':1.25, 'z_scaling_factor':1.0},
+            {'name':'x position','t':'t','v_alt':None,'v_main':'x', 'color_name':'red', 'line_width':0.5, 'z_scaling_factor':1.0},
+            {'name':'y position','t':'t','v_alt':None,'v_main':'y', 'color_name':'green', 'line_width':0.5, 'z_scaling_factor':1.0}
+        ]
+         
+    @classmethod
+    def prepare_dataframe(cls, plot_df, *args, **kwargs):
+        """ preforms and pre-processing of the dataframe needed (such as scaling/renaming columns/etc and returns a COPY """
+        z_scaler = MinMaxScaler()
+        transformed_df = plot_df[['t','x','y','lin_pos']].copy()
+        transformed_df[['x','y']] = z_scaler.fit_transform(transformed_df[['x','y']]) # scale x and y positions
+        transformed_df[['lin_pos']] = z_scaler.fit_transform(transformed_df[['lin_pos']]) # scale lin_pos position separately
+        return transformed_df
+
+
+    @classmethod
+    def build_pre_spatial_to_spatial_mappings(cls, destination_plot, *args, **kwargs):
+        """ builds and returns the mappings from the pre-spatial values to the spatial values, frequently using information from the destination_plot and passed-in variables. """
+        
+        if destination_plot.time_curve_render_dimensionality == 2:
+            # SpikeRaster2D needs different x_map_fn than the 3D plots:
+            x_map_fn = lambda t: t
+        else:            
+            x_map_fn = lambda t: destination_plot.temporal_to_spatial(t)
+
+        y_map_fn = lambda v: np.full_like(v, -destination_plot.n_half_cells)
+        z_map_fn = lambda v_main: v_main
+        return [{'name':'name','x':'t','y':'v_alt','z':'v_main','x_map_fn':x_map_fn,'y_map_fn':y_map_fn,'z_map_fn':z_map_fn},
+            {'name':'name','x':'t','y':'v_alt','z':'v_main','x_map_fn':x_map_fn,'y_map_fn':y_map_fn,'z_map_fn':z_map_fn},
+            {'name':'name','x':'t','y':'v_alt','z':'v_main','x_map_fn':x_map_fn,'y_map_fn':y_map_fn,'z_map_fn':z_map_fn}
+        ]
+    
+    
+    
+    @classmethod
+    def build_render_time_curves_datasource(cls, plot_df, pre_spatial_to_spatial_mappings, **kwargs):
+        """ typically shouldn't need to be overriden, just set up this way for customizability """
+        data_series_pre_spatial_list = cls.data_series_pre_spatial_list()
+        active_plot_curve_dataframe = cls.prepare_dataframe(plot_df)
+        general_curve_interval_datasource = CurveDatasource(active_plot_curve_dataframe, data_series_specs=RenderDataseries.init_from_pre_spatial_data_series_list(data_series_pre_spatial_list, pre_spatial_to_spatial_mappings))
+        return general_curve_interval_datasource
+
+    @classmethod
+    def add_render_time_curves(cls, curr_sess, destination_plot, **kwargs):
+        """ directly-called method 
+        destination_plot should implement add_rendered_intervals
+        
+        ## TODO: figure out how data should be provided to enable maximum generality. It seems that all datasources are currently dataframe based. 
+        
+        curr_sess: The session containing the data to be plotted. 
+        
+        """
+        plot_df = curr_sess.position.to_dataframe()
+        data_series_pre_spatial_to_spatial_mappings = cls.build_pre_spatial_to_spatial_mappings(destination_plot)
+        active_plot_curve_datasource = cls.build_render_time_curves_datasource(plot_df, data_series_pre_spatial_to_spatial_mappings)
+        destination_plot.add_3D_time_curves(curve_datasource=active_plot_curve_datasource) # Add the curves from the datasource
+        return active_plot_curve_datasource
+    
+    
