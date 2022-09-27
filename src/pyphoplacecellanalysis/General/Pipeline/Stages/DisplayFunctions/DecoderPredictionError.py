@@ -552,10 +552,13 @@ class AddNewDecodedPosition_MatplotlibPlotCommand(BaseMenuCommand):
         self._active_2d_plot = active_2d_plot
         self._curr_active_pipeline = curr_active_pipeline
         self._active_config_name = active_config_name
+        print(f'AddNewDecodedPosition_MatplotlibPlotCommand.__init__(...)')
         
 
     def execute(self, *args, **kwargs) -> None:
         ## To begin, the destination plot must have a matplotlib widget plot to render to:
+        print(f'AddNewDecodedPosition_MatplotlibPlotCommand.execute(...)')
+        
         # active_2d_plot = self._spike_raster_window.spike_raster_plt_2d # <pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.SpikeRasterWidgets.Spike2DRaster.Spike2DRaster at 0x196c7244280>
         active_2d_plot = self._active_2d_plot
         # If no plot to render on, do this:
