@@ -1,3 +1,4 @@
+from typing import Optional
 import warnings
 
 from ..Qt import QtCore, QtGui, QtWidgets
@@ -5,19 +6,84 @@ from ..widgets.VerticalLabel import VerticalLabel
 from .DockDrop import DockDrop
 
 
+class DockDisplayConfig(object):
+    """docstring for DockDisplayConfig."""
+    def __init__(self, showCloseButton, fontSize, corner_radius='3px'):
+        super(DockDisplayConfig, self).__init__()
+        self.fontSize = fontSize
+        self.showCloseButton = showCloseButton
+        self.corner_radius = corner_radius
+        
+        
+    def get_stylesheet(self, orientation, is_dim):
+        """ Gets the appropriate stylesheet for the given state. This method can be overriden to customize the appearance 
+        
+        Usage:
+            updated_stylesheet = config.get_stylesheet(self, orientation=self.orientation, is_dim=self.dim)
+            
+        """
+        if is_dim:
+            fg_color = '#aaa'
+            bg_color = '#44a'
+            border_color = '#339'
+        else:
+            fg_color = '#fff'
+            bg_color = '#66c'
+            border_color = '#55B'
+
+        if orientation == 'vertical':
+            return """DockLabel {
+                background-color : %s;
+                color : %s;
+                border-top-right-radius: 0px;
+                border-top-left-radius: %s;
+                border-bottom-right-radius: 0px;
+                border-bottom-left-radius: %s;
+                border-width: 0px;
+                border-right: 2px solid %s;
+                padding-top: 3px;
+                padding-bottom: 3px;
+                font-size: %s;
+            }""" % (bg_color, fg_color, self.corner_radius, self.corner_radius, border_color, self.fontSize)
+            
+        else:
+            return """DockLabel {
+                background-color : %s;
+                color : %s;
+                border-top-right-radius: %s;
+                border-top-left-radius: %s;
+                border-bottom-right-radius: 0px;
+                border-bottom-left-radius: 0px;
+                border-width: 0px;
+                border-bottom: 2px solid %s;
+                padding-left: 3px;
+                padding-right: 3px;
+                font-size: %s;
+            }""" % (bg_color, fg_color, self.corner_radius, self.corner_radius, border_color, self.fontSize)
+
+    
+
 class Dock(QtWidgets.QWidget, DockDrop):
 
     sigStretchChanged = QtCore.Signal()
     sigClosed = QtCore.Signal(object)
 
-    def __init__(self, name, area=None, size=(10, 10), widget=None, hideTitle=False, autoOrientation=True, closable=False, fontSize="12px"):
+    def __init__(self, name, area=None, size=(10, 10), widget=None, hideTitle=False, autoOrientation=True, closable=False, fontSize="12px", display_config:Optional[DockDisplayConfig]=None): # , closable=False, fontSize="12px"
         QtWidgets.QWidget.__init__(self)
         DockDrop.__init__(self)
         self._container = None
         self._name = name
         self.area = area
-        self.label = DockLabel(name, self, closable, fontSize)
-        if closable:
+        # self.label = DockLabel(name, self, closable, fontSize)
+        
+        if display_config is None:
+            print(f"WARNING: Dock.__init__(...): display_config is None... using old-mode fallback. This will be eventually depricated.")
+            display_config = DockDisplayConfig(closable, fontSize=fontSize, corner_radius='3px')
+        else:
+            print(f"WARNING: Dock.__init__(...): display_config is set, so the explicitly passed parameters 'closable' and 'fontSize' will be ignored.")
+        
+        self.label = DockLabel(name, self, display_config)
+        if display_config.showCloseButton:
             self.label.sigCloseClicked.connect(self.close)
         self.labelHidden = False
         self.moveLabel = True  ## If false, the dock is no longer allowed to move the label.
@@ -262,10 +328,10 @@ class DockLabel(VerticalLabel):
     sigClicked = QtCore.Signal(object, object)
     sigCloseClicked = QtCore.Signal()
 
-    def __init__(self, text, dock, showCloseButton, fontSize):
+    def __init__(self, text, dock, display_config:DockDisplayConfig):
         self.dim = False
         self.fixedWidth = False
-        self.fontSize = fontSize
+        self.config = display_config
         VerticalLabel.__init__(self, text, orientation='horizontal', forceWidth=False)
         self.setAlignment(QtCore.Qt.AlignmentFlag.AlignTop|QtCore.Qt.AlignmentFlag.AlignHCenter)
         self.dock = dock
@@ -274,54 +340,64 @@ class DockLabel(VerticalLabel):
         self.mouseMoved = False
 
         self.closeButton = None
-        if showCloseButton:
+        if display_config.showCloseButton:
             self.closeButton = QtWidgets.QToolButton(self)
             self.closeButton.clicked.connect(self.sigCloseClicked)
             self.closeButton.setIcon(QtWidgets.QApplication.style().standardIcon(QtWidgets.QStyle.StandardPixmap.SP_TitleBarCloseButton))
 
     def updateStyle(self):
-        r = '3px'
-        if self.dim:
-            fg = '#aaa'
-            bg = '#44a'
-            border = '#339'
-        else:
-            fg = '#fff'
-            bg = '#66c'
-            border = '#55B'
-
+        updated_stylesheet = self.config.get_stylesheet(orientation=self.orientation, is_dim=self.dim)
         if self.orientation == 'vertical':
-            self.vStyle = """DockLabel {
-                background-color : %s;
-                color : %s;
-                border-top-right-radius: 0px;
-                border-top-left-radius: %s;
-                border-bottom-right-radius: 0px;
-                border-bottom-left-radius: %s;
-                border-width: 0px;
-                border-right: 2px solid %s;
-                padding-top: 3px;
-                padding-bottom: 3px;
-                font-size: %s;
-            }""" % (bg, fg, r, r, border, self.fontSize)
+            self.vStyle = updated_stylesheet
             self.setStyleSheet(self.vStyle)
         else:
-            self.hStyle = """DockLabel {
-                background-color : %s;
-                color : %s;
-                border-top-right-radius: %s;
-                border-top-left-radius: %s;
-                border-bottom-right-radius: 0px;
-                border-bottom-left-radius: 0px;
-                border-width: 0px;
-                border-bottom: 2px solid %s;
-                padding-left: 3px;
-                padding-right: 3px;
-                font-size: %s;
-            }""" % (bg, fg, r, r, border, self.fontSize)
+            self.hStyle = updated_stylesheet
             self.setStyleSheet(self.hStyle)
+                    
+        ## Old (non-config) method:
+        # corner_radius = '3px'
+        # if self.dim:
+        #     fg_color = '#aaa'
+        #     bg_color = '#44a'
+        #     border_color = '#339'
+        # else:
+        #     fg_color = '#fff'
+        #     bg_color = '#66c'
+        #     border_color = '#55B'
+
+        # if self.orientation == 'vertical':
+        #     self.vStyle = """DockLabel {
+        #         background-color : %s;
+        #         color : %s;
+        #         border-top-right-radius: 0px;
+        #         border-top-left-radius: %s;
+        #         border-bottom-right-radius: 0px;
+        #         border-bottom-left-radius: %s;
+        #         border-width: 0px;
+        #         border-right: 2px solid %s;
+        #         padding-top: 3px;
+        #         padding-bottom: 3px;
+        #         font-size: %s;
+        #     }""" % (bg_color, fg_color, corner_radius, corner_radius, border_color, self.fontSize)
+        #     self.setStyleSheet(self.vStyle)
+        # else:
+        #     self.hStyle = """DockLabel {
+        #         background-color : %s;
+        #         color : %s;
+        #         border-top-right-radius: %s;
+        #         border-top-left-radius: %s;
+        #         border-bottom-right-radius: 0px;
+        #         border-bottom-left-radius: 0px;
+        #         border-width: 0px;
+        #         border-bottom: 2px solid %s;
+        #         padding-left: 3px;
+        #         padding-right: 3px;
+        #         font-size: %s;
+        #     }""" % (bg_color, fg_color, corner_radius, corner_radius, border_color, self.fontSize)
+        #     self.setStyleSheet(self.hStyle)
 
     def setDim(self, d):
+        """ Note that `self.dim` refers to whether the tab is a background tab or not. """
         if self.dim != d:
             self.dim = d
             self.updateStyle()
