@@ -8,20 +8,14 @@ from .DockDrop import DockDrop
 
 class DockDisplayConfig(object):
     """docstring for DockDisplayConfig."""
-    def __init__(self, showCloseButton, fontSize, corner_radius='3px'):
+    def __init__(self, showCloseButton=True, fontSize='12px', corner_radius='3px'):
         super(DockDisplayConfig, self).__init__()
         self.fontSize = fontSize
         self.showCloseButton = showCloseButton
         self.corner_radius = corner_radius
         
-        
-    def get_stylesheet(self, orientation, is_dim):
-        """ Gets the appropriate stylesheet for the given state. This method can be overriden to customize the appearance 
-        
-        Usage:
-            updated_stylesheet = config.get_stylesheet(self, orientation=self.orientation, is_dim=self.dim)
-            
-        """
+    def get_colors(self, orientation, is_dim):
+        """ point of customization """
         if is_dim:
             fg_color = '#aaa'
             bg_color = '#44a'
@@ -30,6 +24,16 @@ class DockDisplayConfig(object):
             fg_color = '#fff'
             bg_color = '#66c'
             border_color = '#55B'
+        return fg_color, bg_color, border_color
+    
+    def get_stylesheet(self, orientation, is_dim):
+        """ Gets the appropriate stylesheet for the given state. This method can be overriden to customize the appearance 
+        
+        Usage:
+            updated_stylesheet = config.get_stylesheet(self, orientation=self.orientation, is_dim=self.dim)
+            
+        """            
+        fg_color, bg_color, border_color = self.get_colors(orientation, is_dim)
 
         if orientation == 'vertical':
             return """DockLabel {

@@ -8,7 +8,7 @@ from pyphoplacecellanalysis.External.pyqtgraph.dockarea.DockArea import DockArea
 
 from pyphoplacecellanalysis.GUI.Qt.Mixins.PhoMainAppWindowBase import PhoMainAppWindowBase
 
-from pyphoplacecellanalysis.GUI.PyQtPlot.DockingWidgets.DynamicDockDisplayAreaContent import DynamicDockDisplayAreaContentMixin
+from pyphoplacecellanalysis.GUI.PyQtPlot.DockingWidgets.DynamicDockDisplayAreaContent import CustomDockDisplayConfig, DynamicDockDisplayAreaContentMixin
 
     
 # ==================================================================================================================== #
@@ -156,10 +156,11 @@ class DockAreaWrapper(object):
         
         
         # Build Using 
-        _, dDisplayItem2 = win.add_display_dock("Dock2 - Content", dockSize=(main_width, main_height), dockIsClosable=False, widget=main_window, dockAddLocationOpts=['bottom'])
-        _, dDisplayItem1 = win.add_display_dock("Dock1 - Controls", dockSize=(secondary_width, secondary_height), dockIsClosable=False, widget=auxilary_controls_window, dockAddLocationOpts=['top', dDisplayItem2])
-        # _, dDisplayItem1 = win.add_display_dock("Dock1 - Controls", dockSize=(secondary_width, secondary_height), dockIsClosable=False, widget=auxilary_controls_window, dockAddLocationOpts=['bottom'])
-
+        display_config2 = CustomDockDisplayConfig(showCloseButton=False)
+        _, dDisplayItem2 = win.add_display_dock("Dock2 - Content", dockSize=(main_width, main_height), widget=main_window, dockAddLocationOpts=['bottom'], display_config=display_config2)
+        display_config1 = CustomDockDisplayConfig(showCloseButton=False)
+        _, dDisplayItem1 = win.add_display_dock("Dock1 - Controls", dockSize=(secondary_width, secondary_height), widget=auxilary_controls_window, dockAddLocationOpts=['top', dDisplayItem2], display_config=display_config1)
+        # _, dDisplayItem1 = win.add_display_dock("Dock1 - Controls", dockSize=(secondary_width, secondary_height), widget=auxilary_controls_window, dockAddLocationOpts=['bottom'])
         win.show()
 
         win.area.moveDock(dDisplayItem1, 'top', dDisplayItem2)     ## move d4 to top edge of d2

@@ -10,6 +10,8 @@ from pyphoplacecellanalysis.Pho2D.PyQtPlots.TimeSynchronizedPlotters.TimeSynchro
 from pyphoplacecellanalysis.Pho2D.PyQtPlots.TimeSynchronizedPlotters.TimeSynchronizedPositionDecoderPlotter import TimeSynchronizedPositionDecoderPlotter
 from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.DockAreaWrapper import DockAreaWrapper
 
+from pyphoplacecellanalysis.GUI.PyQtPlot.DockingWidgets.DynamicDockDisplayAreaContent import CustomDockDisplayConfig
+
 
 
 def build_combined_time_synchronized_plotters_window(active_pf_2D_dt, fixed_window_duration = 15.0, controlling_widget=None, context=None, create_new_controlling_widget=True):
@@ -41,8 +43,11 @@ def build_combined_time_synchronized_plotters_window(active_pf_2D_dt, fixed_wind
         
         # build a win of type PhoDockAreaContainingWindow
         root_dockAreaWindow, app = DockAreaWrapper._build_default_dockAreaWindow(title=title, defer_show=True)
-        _, dDisplayItem1 = root_dockAreaWindow.add_display_dock("Placefields", dockSize=(final_desired_width, final_desired_height), dockIsClosable=False, widget=curr_placefields_plotter, dockAddLocationOpts=['left'])
-        _, dDisplayItem2 = root_dockAreaWindow.add_display_dock("Occupancy", dockSize=(final_desired_width, final_desired_height), dockIsClosable=False, widget=curr_sync_occupancy_plotter, dockAddLocationOpts=['right'])
+        
+        display_config1 = CustomDockDisplayConfig(showCloseButton=False)
+        _, dDisplayItem1 = root_dockAreaWindow.add_display_dock("Placefields", dockSize=(final_desired_width, final_desired_height), widget=curr_placefields_plotter, dockAddLocationOpts=['left'], display_config=display_config1)
+        display_config2 = CustomDockDisplayConfig(showCloseButton=False)
+        _, dDisplayItem2 = root_dockAreaWindow.add_display_dock("Occupancy", dockSize=(final_desired_width, final_desired_height), widget=curr_sync_occupancy_plotter, dockAddLocationOpts=['right'], display_config=display_config2)
         
         if a_controlling_widget is not None:
             if not is_controlling_widget_external:

@@ -1,2 +1,2 @@
-from .Dock import Dock
+from .Dock import Dock, DockDisplayConfig
 from .DockArea import DockArea

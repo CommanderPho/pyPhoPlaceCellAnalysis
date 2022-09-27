@@ -4,10 +4,90 @@ from collections import OrderedDict
 # import pyphoplacecellanalysis.External.pyqtgraph as pg
 from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtCore, QtGui, QtWidgets
 
-from pyphoplacecellanalysis.External.pyqtgraph.dockarea.Dock import Dock
+from pyphoplacecellanalysis.External.pyqtgraph.dockarea.Dock import Dock, DockDisplayConfig
 # from pyphoplacecellanalysis.External.pyqtgraph.dockarea.DockArea import DockArea
 from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.DockPlanningHelperWidget.DockPlanningHelperWidget import DockPlanningHelperWidget
 
+
+class CustomDockDisplayConfig(DockDisplayConfig):
+    """docstring for DockDisplayConfig."""
+    def __init__(self, showCloseButton=True, fontSize='12px', corner_radius='3px'):
+        super(CustomDockDisplayConfig, self).__init__(showCloseButton=showCloseButton, fontSize=fontSize, corner_radius=corner_radius)
+
+    def get_colors(self, orientation, is_dim):
+        # Common to all:
+        if is_dim:
+            fg_color = '#aaa' # Grey
+        else:
+            fg_color = '#fff' # White
+        
+        # # Blue/Purple-based:
+        # if is_dim:
+        #     bg_color = '#4444aa' # Dark Blue - (240°, 60, 66.66)
+        #     border_color = '#339' # More Vibrant Dark Blue - (240°, 66.66, 60)
+        # else:
+        #     bg_color = '#6666cc' # Default Purple Color - (240°, 50, 80)
+        #     border_color = '#55B' # Similar Purple Color - (240°, 54.54, 73.33)
+            
+        # Green-based:
+        if is_dim:
+            bg_color = '#44aa44' # (120°, 60%, 67%)
+            border_color = '#339933' # (120°, 67%, 60%)
+        else:
+            bg_color = '#66cc66' # (120°, 50, 80)
+            border_color = '#54ba54' # (120°, 55%, 73%)
+            
+        # # Red-based:
+        # if is_dim:
+        #     bg_color = '#aa4444' # (0°, 60%, 67%)
+        #     border_color = '#993232' # (0°, 67%, 60%)
+        # else:
+        #     bg_color = '#cc6666' # (0°, 50, 80)
+        #     border_color = '#ba5454' # (0°, 55%, 73%)
+ 
+        return fg_color, bg_color, border_color
+    
+
+    # def get_stylesheet(self, orientation, is_dim):
+    #     """ Gets the appropriate stylesheet for the given state. This method can be overriden to customize the appearance 
+        
+    #     Usage:
+    #         updated_stylesheet = config.get_stylesheet(self, orientation=self.orientation, is_dim=self.dim)
+            
+    #     """ 
+    #     fg_color, bg_color, border_color = self.get_colors(orientation, is_dim)
+
+    #     if orientation == 'vertical':
+    #         return """DockLabel {
+    #             background-color : %s;
+    #             color : %s;
+    #             border-top-right-radius: 0px;
+    #             border-top-left-radius: %s;
+    #             border-bottom-right-radius: 0px;
+    #             border-bottom-left-radius: %s;
+    #             border-width: 0px;
+    #             border-right: 2px solid %s;
+    #             padding-top: 3px;
+    #             padding-bottom: 3px;
+    #             font-size: %s;
+    #         }""" % (bg_color, fg_color, self.corner_radius, self.corner_radius, border_color, self.fontSize)
+            
+    #     else:
+    #         return """DockLabel {
+    #             background-color : %s;
+    #             color : %s;
+    #             border-top-right-radius: %s;
+    #             border-top-left-radius: %s;
+    #             border-bottom-right-radius: 0px;
+    #             border-bottom-left-radius: 0px;
+    #             border-width: 0px;
+    #             border-bottom: 2px solid %s;
+    #             padding-left: 3px;
+    #             padding-right: 3px;
+    #             font-size: %s;
+    #         }""" % (bg_color, fg_color, self.corner_radius, self.corner_radius, border_color, self.fontSize)
+
+    
 
 
 class DynamicDockDisplayAreaContentMixin:
@@ -79,7 +159,7 @@ class DynamicDockDisplayAreaContentMixin:
                 
         return all_collected_widgets
     
-    def add_display_dock(self, identifier=None, widget=None, dockSize=(300,200), dockIsClosable=True, dockAddLocationOpts=['bottom']):
+    def add_display_dock(self, identifier=None, widget=None, dockSize=(300,200), dockAddLocationOpts=['bottom'], display_config:CustomDockDisplayConfig=None):
         """ adds a dynamic display dock with an appropriate widget of type 'viewContentsType' to the dock area container on the main window. """
         # Add the sample display dock items to the nested dynamic display dock:
         display_dock_area = self.displayDockArea
@@ -99,7 +179,12 @@ class DynamicDockDisplayAreaContentMixin:
             unique_identifier = identifier
 
         # Build the new dock item:        
-        dDisplayItem = Dock(unique_identifier, size=dockSize, closable=dockIsClosable, widget=widget) # add the new display item
+        # dDisplayItem = Dock(unique_identifier, size=dockSize, closable=dockIsClosable, widget=widget, display_config=CustomDockDisplayConfig()) # add the new display item
+        
+        if display_config is None:
+            display_config = CustomDockDisplayConfig()
+            
+        dDisplayItem = Dock(unique_identifier, size=dockSize, widget=widget, display_config=display_config) # add the new display item
         
         if len(dockAddLocationOpts) < 1:
             dockAddLocationOpts = [dDisplayItem, 'bottom']
@@ -212,8 +297,10 @@ class DynamicDockDisplayAreaContentMixin:
         
         create_planning_helper_dock(identifier='New Test Dock Widget', dockAddLocationOpts=['bottom'])
         """
+        
+        display_config = CustomDockDisplayConfig(showCloseButton=True)
         test_dock_planning_widget = DockPlanningHelperWidget(dock_title=identifier, dock_id=identifier, defer_show=True) # don't show yet
-        test_dock_planning_widget, dDisplayItem = self.add_display_dock(identifier=test_dock_planning_widget.identifier, widget=test_dock_planning_widget, dockAddLocationOpts=dockAddLocationOpts, dockIsClosable=True)
+        test_dock_planning_widget, dDisplayItem = self.add_display_dock(identifier=test_dock_planning_widget.identifier, widget=test_dock_planning_widget, dockAddLocationOpts=dockAddLocationOpts, display_config=display_config)
         # connect the helper widget's add relative widget signal to the perform_create_new_relative_dock function
         test_dock_planning_widget.action_create_new_dock.connect(self.perform_create_new_relative_dock) 
         
