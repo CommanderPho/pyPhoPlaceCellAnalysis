@@ -499,18 +499,9 @@ def plot_decoded_epoch_slices(filter_epochs, filter_epochs_decoder_result, globa
 # ==================================================================================================================== #
 
 
-from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import plot_most_likely_position_comparsions, plot_1D_most_likely_position_comparsions
+# from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import plot_most_likely_position_comparsions, plot_1D_most_likely_position_comparsions
 
-active_decoder = active_one_step_decoder
-marginals_x = active_decoder.perform_build_marginals(p_x_given_n=active_decoder.p_x_given_n, most_likely_positions=active_decoder.most_likely_positions)
 
-## Get the previously created matplotlib_view_widget figure/ax:
-fig, curr_ax = plot_1D_most_likely_position_comparsions(sess.position.to_dataframe(), ax=active_2d_plot.ui.matplotlib_view_widget.ax, time_window_centers=active_decoder.time_window_centers, xbin=active_decoder.xbin,
-                                                   posterior=marginals_x.p_x_given_n,
-                                                   active_most_likely_positions_1D=marginals_x.most_likely_positions_1D,
-                                                   enable_flat_line_drawing=False, debug_print=False)
-active_2d_plot.ui.matplotlib_view_widget.draw()
-active_2d_plot.sync_matplotlib_render_plot_widget()
 
 
 
@@ -586,10 +577,24 @@ class DecodedPositionMatplotlibSubplotRenderer(object):
         curr_sess: The session containing the data to be plotted. 
         
         """
-        plot_df = curr_sess.position.to_dataframe()
-        data_series_pre_spatial_to_spatial_mappings = cls.build_pre_spatial_to_spatial_mappings(destination_plot)
-        active_plot_curve_datasource = cls.build_render_time_curves_datasource(plot_df, data_series_pre_spatial_to_spatial_mappings)
-        destination_plot.add_3D_time_curves(curve_datasource=active_plot_curve_datasource) # Add the curves from the datasource
-        return active_plot_curve_datasource
+        # plot_df = curr_sess.position.to_dataframe()
+        # data_series_pre_spatial_to_spatial_mappings = cls.build_pre_spatial_to_spatial_mappings(destination_plot)
+        # active_plot_curve_datasource = cls.build_render_time_curves_datasource(plot_df, data_series_pre_spatial_to_spatial_mappings)
+        # destination_plot.add_3D_time_curves(curve_datasource=active_plot_curve_datasource) # Add the curves from the datasource
+        # return active_plot_curve_datasource
+    
+        active_decoder = active_one_step_decoder
+        marginals_x = active_decoder.perform_build_marginals(p_x_given_n=active_decoder.p_x_given_n, most_likely_positions=active_decoder.most_likely_positions)
+
+        ## Get the previously created matplotlib_view_widget figure/ax:
+        fig, curr_ax = plot_1D_most_likely_position_comparsions(curr_sess.position.to_dataframe(), ax=destination_plot.ui.matplotlib_view_widget.ax, time_window_centers=active_decoder.time_window_centers, xbin=active_decoder.xbin,
+                                                        posterior=marginals_x.p_x_given_n,
+                                                        active_most_likely_positions_1D=marginals_x.most_likely_positions_1D,
+                                                        enable_flat_line_drawing=False, debug_print=False)
+        destination_plot.ui.matplotlib_view_widget.draw()
+        destination_plot.sync_matplotlib_render_plot_widget()
+
+    
+    
     
     

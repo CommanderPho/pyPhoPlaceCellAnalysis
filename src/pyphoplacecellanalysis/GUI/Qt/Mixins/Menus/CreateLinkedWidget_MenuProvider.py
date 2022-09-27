@@ -156,7 +156,7 @@ class CreateNewTimeSynchronizedPlotterCommand(BaseMenuCommand):
         self._plotter_type = plotter_type
         
         
-    def execute(self, filename: str) -> None:
+    def execute(self, *args, **kwargs) -> None:
         """ Implicitly captures spike_raster_window """
         print(f'CreateNewTimeSynchronizedPlotterCommand(): {self._plotter_type} callback')
         
@@ -186,7 +186,7 @@ class CreateNewTimeSynchronizedCombinedPlotterCommand(BaseMenuCommand):
         self._context = active_context
         self._display_output = display_output
         
-    def execute(self, filename: str) -> None:
+    def execute(self, *args, **kwargs) -> None:
         """ Implicitly captures spike_raster_window """
         _out_synchronized_plotter = build_combined_time_synchronized_plotters_window(active_pf_2D_dt=self._active_pf_2D_dt, controlling_widget=self._spike_raster_window.spike_raster_plt_2d, context=self._context, create_new_controlling_widget=False)
         self._display_output['comboSynchronizedPlotter'] = _out_synchronized_plotter

@@ -27,12 +27,12 @@ class BaseMenuCommand:
     def is_enabled(self):
         return True
         
-    def execute(self, filename: str) -> None:
+    def execute(self, *args, **kwargs) -> None:
         """ Implicitly captures spike_raster_window """
         raise NotImplementedError # implementors must override        
     
     def __call__(self, *args, **kwds):
-        return self.execute('')
+        return self.execute(*args, **kwds)
 
 
 class BaseMenuProviderMixin(QtCore.QObject):
