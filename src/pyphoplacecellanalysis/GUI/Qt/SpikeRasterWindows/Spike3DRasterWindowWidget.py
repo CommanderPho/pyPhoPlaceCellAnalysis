@@ -146,7 +146,24 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
         desired_playback_rate_multiplier = value
         self.animation_time_step = self.playback_update_frequency * desired_playback_rate_multiplier
 
-    
+    def compute_animation_frame_shift_duration(self, shift_frames: int):
+        """ Computes the equivalent time duration for a specified number of animation shift_frames
+            Does not modify any internal animation state.
+            extracted from Spike3DRasterWindowWidget.shift_animation_frame_val(...)
+        """
+        return (self.animation_playback_direction_multiplier * self.animation_time_step * float(shift_frames)) # compute the amount of time equivalent to the shift_frames
+
+    def compute_frame_shifted_start_timestamp(self, shift_frames: int):
+        """ Computes the next start timestamp given the specified number of animation shift frames.
+            Does not modify any internal animation state.
+            extracted from Spike3DRasterWindowWidget.shift_animation_frame_val(...) 
+        """
+        if self.enable_debug_print:
+            print(f'Spike3DRasterWindowWidget.compute_frame_shifted_start_timestamp(shift_frames: {shift_frames})')
+        curr_start_time = self.animation_active_time_window.active_window_start_time
+        shift_time = self.compute_animation_frame_shift_duration(shift_frames) # compute the amount of time equivalent to the shift_frames
+        next_start_timestamp = curr_start_time + shift_time
+        return next_start_timestamp
         
         
     ## Other Properties:
@@ -202,9 +219,6 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
         self.params.type_of_3d_plotter = type_of_3d_plotter
         
         # Helper Mixins: INIT:
-        self._scheduledAnimationSteps = 0
-        self.params.scrollStepMultiplier = 30.0 # The multiplier by which each scroll step is multiplied. Decrease this value to increase scrolling precision (making the same rotation of the mousewheel scroll less in time).
-        
         
         self.SpikeRasterBottomFrameControlsMixin_on_init()
         self.SpikeRasterLeftSidebarControlsMixin_on_init()
@@ -298,7 +312,9 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
             # self.setWindowFilePath(str(sess.filePrefix.resolve()))
             self.setWindowTitle(f'{self.applicationName}') # f'Spike Raster Window - {secondary_active_config_name} - {str(sess.filePrefix.resolve())}'
 
-
+        ## Scrolling Properties:
+        self._scheduledAnimationSteps = 0
+        self.params.scrollStepMultiplier = 30.0 # The multiplier by which each scroll step is multiplied. Decrease this value to increase scrolling precision (making the same rotation of the mousewheel scroll less in time).
         if self.enable_smooth_scrolling_animation:
             ## Add the QPropertyAnimation for smooth scrolling, but do not start it:
             self.ui.scrollAnim = QtCore.QPropertyAnimation(self, b"numScheduledScalings") # the animation will act on the self.numScheduledScalings pyqtProperty
@@ -417,24 +433,7 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
     #### EVENT HANDLERS
     ##################################
     
-    def compute_animation_frame_shift_duration(self, shift_frames: int):
-        """ Computes the equivalent time duration for a specified number of animation shift_frames
-            Does not modify any internal animation state.
-            extracted from Spike3DRasterWindowWidget.shift_animation_frame_val(...)
-        """
-        return (self.animation_playback_direction_multiplier * self.animation_time_step * float(shift_frames)) # compute the amount of time equivalent to the shift_frames
 
-    def compute_frame_shifted_start_timestamp(self, shift_frames: int):
-        """ Computes the next start timestamp given the specified number of animation shift frames.
-            Does not modify any internal animation state.
-            extracted from Spike3DRasterWindowWidget.shift_animation_frame_val(...) 
-        """
-        if self.enable_debug_print:
-            print(f'Spike3DRasterWindowWidget.compute_frame_shifted_start_timestamp(shift_frames: {shift_frames})')
-        curr_start_time = self.animation_active_time_window.active_window_start_time
-        shift_time = self.compute_animation_frame_shift_duration(shift_frames) # compute the amount of time equivalent to the shift_frames
-        next_start_timestamp = curr_start_time + shift_time
-        return next_start_timestamp
     
     @QtCore.Slot(float)
     def update_animation(self, next_start_timestamp: float):
