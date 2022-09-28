@@ -15,6 +15,7 @@ from neuropy.utils.mixins.binning_helpers import BinningContainer # for epochs_s
 
 from pyphocorehelpers.general_helpers import OrderedMeta
 from pyphocorehelpers.indexing_helpers import BinningInfo, compute_spanning_bins, get_bin_centers, get_bin_edges, build_spanning_grid_matrix
+from pyphocorehelpers.indexing_helpers import np_ffill_1D # for compute_corrected_positions(...)
 from pyphocorehelpers.print_helpers import WrappingMessagePrinter, SimplePrintable
 from pyphocorehelpers.mixins.serialized import SerializedAttributesSpecifyingClass
 
@@ -473,14 +474,12 @@ class BayesianPlacemapPositionDecoder(PlacemapPositionDecoder):
     
     
     # @property
-    # def most_likely_positions(self):
-    #     """The most_likely_positions for each window."""
-    #     if self.ndim > 1:
-    #         return np.vstack((self.xbin_centers[self.most_likely_position_indicies[0,:]], self.ybin_centers[self.most_likely_position_indicies[1,:]])).T # much more efficient than the other implementation. Result is # (85844, 2)
-    #     else:
-    #         # 1D Decoder case:
-    #         # self.most_likely_position_indicies.shape # (1, 20717)
-    #         return np.squeeze(self.xbin_centers[self.most_likely_position_indicies[0,:]]) # not sure if I actually want to squeeze the values # (20717,)
+    # def non_firing_time_bin_indices(self):
+    @property
+    def is_non_firing_time_bin(self):
+        """A boolean array that indicates whether each time window has no spikes. Requires self.total_spike_counts_per_window"""
+        return (self.total_spike_counts_per_window == 0)
+        # return np.where(self.total_spike_counts_per_window == 0)[0]
             
             
     # placefield properties:
@@ -546,29 +545,16 @@ class BayesianPlacemapPositionDecoder(PlacemapPositionDecoder):
         
         
         self.time_binning_container = None
-        # self.time_window_edges = None
-        # self.time_window_edges_binning_info = None
-        # self.time_window_centers = None
-        # self.time_window_center_binning_info = None
-        
-        # self.time_window_edges = None
-        # self.time_window_edges_binning_info = None        
         self.unit_specific_time_binned_spike_counts = None
         self.total_spike_counts_per_window = None
         
         self._setup_time_bin_spike_counts_N_i()
-        
-        # self.time_window_centers = None
-        # self.time_window_center_binning_info = None
-        
-        # self._setup_time_window_centers()
         
         # pre-allocate outputs:
         self.flat_p_x_given_n = None # np.zeros((self.flat_position_size, self.num_time_windows))
         self.p_x_given_n = None
         self.most_likely_position_flat_indicies = None
         self.most_likely_position_indicies = None
-        # self._setup_preallocate_outputs()        
         self.marginal = None 
         
     def debug_dump_print(self):
@@ -612,20 +598,14 @@ class BayesianPlacemapPositionDecoder(PlacemapPositionDecoder):
         .total_spike_counts_per_window
         
         """
-        # Check if we already have self.time_window_edges and self.time_window_edges_binning_info to use
-        # if (self.time_window_edges is not None) and (self.time_window_edges_binning_info is not None):
-        #     ## Already have time_window_edges to use, do not create new ones:
-        #     assert self.time_window_edges_binning_info.step == self.time_bin_size
-            
-        #     raise NotImplementedError # We don't use the manual bins anymore!
-        #     self.unit_specific_time_binned_spike_counts, _, _ = ZhangReconstructionImplementation.time_bin_spike_counts_N_i(self.spikes_df, self.time_bin_size, time_window_edges=self.time_window_edges, time_window_edges_binning_info=self.time_window_edges_binning_info, debug_print=self.debug_print) # unit_specific_binned_spike_counts.to_numpy(): (40, 85841)
-            
-        # else:
-
         ## need to create new time_window_edges from the self.time_bin_size:
         print(f'WARNING: _setup_time_bin_spike_counts_N_i(): updating self.time_window_edges and self.time_window_edges_binning_info ...')
         self.unit_specific_time_binned_spike_counts, time_window_edges, time_window_edges_binning_info = ZhangReconstructionImplementation.time_bin_spike_counts_N_i(self.spikes_df, self.time_bin_size, debug_print=self.debug_print) # unit_specific_binned_spike_counts.to_numpy(): (40, 85841)
 
+        print(f'from ._setup_time_bin_spike_counts_N_i():')
+        print(f'\ttime_window_edges.shape: {time_window_edges.shape}') #  (11882,)
+        print(f'unit_specific_time_binned_spike_counts.shape: {self.unit_specific_time_binned_spike_counts.shape}') # (70, 11881)
+        
         self.time_binning_container = BinningContainer(edges=time_window_edges, edge_info=time_window_edges_binning_info)
         
         
@@ -698,18 +678,10 @@ class BayesianPlacemapPositionDecoder(PlacemapPositionDecoder):
             self.time_binning_container, self.p_x_given_n, self.most_likely_positions, curr_unit_marginal_x, curr_unit_marginal_y = self.hyper_perform_decode(self.spikes_df, decoding_time_bin_size=self.time_bin_size, debug_print=False)
             self.marginal = DynamicContainer(x=curr_unit_marginal_x, y=curr_unit_marginal_y)
             assert isinstance(self.time_binning_container, BinningContainer) # Should be neuropy.utils.mixins.binning_helpers.BinningContainer
-            # unit_specific_binned_spike_counts = unit_specific_binned_spike_counts.T # Want the outputs to have each time window as a column, with a single time window giving a column vector for each neuron
+            self.compute_corrected_positions()
+            
             # print(f'unit_specific_binned_spike_counts.to_numpy(): {np.shape(unit_specific_binned_spike_counts.to_numpy())}') # (85841, 40)
             
-            # self.time_window_edges = self.time_binning_container.edges
-            # self.time_window_edges_binning_info = self.time_binning_container.edge_info
-                        
-            # self.time_window_centers = self.time_binning_container.centers
-            # self.time_window_center_binning_info = self.time_binning_container.center_info
-            
-            # self.time_window_edges = manual_time_window_edges
-            # self.time_window_edges_binning_info = manual_time_window_edges_binning_info
-
             ## Older Zhang-style decoding:
             # self.flat_p_x_given_n[:, :] = ZhangReconstructionImplementation.neuropy_bayesian_prob(self.time_bin_size, self.P_x, self.F, self.unit_specific_time_binned_spike_counts, debug_print=self.debug_print)
             # print(f'self.flat_p_x_given_n.shape: {self.flat_p_x_given_n.shape}')                        
@@ -775,6 +747,56 @@ class BayesianPlacemapPositionDecoder(PlacemapPositionDecoder):
     def decode_specific_epochs(self, spikes_df, filter_epochs, decoding_time_bin_size = 0.05, debug_print=False):
         """ TODO: CRITICAL: THIS IS THE ONLY VERSION OF THE DECODING THAT WORKS. The version perfomred by "compute_all" fails miserably! """
         return self.perform_decode_specific_epochs(self, spikes_df=spikes_df, filter_epochs=filter_epochs, decoding_time_bin_size=decoding_time_bin_size, debug_print=debug_print)
+
+    @staticmethod
+    def perform_compute_forward_filled_positions(most_likely_positions: np.ndarray, is_non_firing_bin: np.ndarray) -> np.ndarray:
+        """ applies the forward fill to a copy of the positions based on the is_non_firing_bin boolean array
+        zero_bin_indicies.shape # (9307,)
+        self.most_likely_positions.shape # (11880, 2)
+        
+        # NaN out the position bins that were determined without any spikes
+        # Forward fill the now NaN positions with the last good value (for the both axes)
+        
+        """
+        revised_most_likely_positions = most_likely_positions.copy()
+        # NaN out the position bins that were determined without any spikes
+        if (most_likely_positions.ndim < 2):
+            revised_most_likely_positions[is_non_firing_bin] = np.nan 
+        else:
+            revised_most_likely_positions[is_non_firing_bin, :] = np.nan 
+        # Forward fill the now NaN positions with the last good value (for the both axes):
+        revised_most_likely_positions = np_ffill_1D(revised_most_likely_positions.T).T
+        return revised_most_likely_positions
+
+    def compute_corrected_positions(self):
+        """ computes the revised most likely positions by taking into account the time-bins that had zero spikes and extrapolating position from the prior successfully decoded time bin
+        
+        Requires:
+            .total_spike_counts_per_window
+            .most_likely_positions
+            
+        Updates:
+            .revised_most_likely_positions
+            .marginal's .x & .y .revised_most_likely_positions_1D
+        
+        """
+        ## Find the bins that don't have any spikes in them:
+        # zero_bin_indicies = np.where(self.total_spike_counts_per_window == 0)[0]
+        # is_non_firing_bin = self.is_non_firing_time_bin
+        
+        is_non_firing_bin = np.where(self.is_non_firing_time_bin)[0] # TEMP: do this to get around the indexing issue. TODO: IndexError: boolean index did not match indexed array along dimension 0; dimension is 11880 but corresponding boolean dimension is 11881
+        self.revised_most_likely_positions = self.perform_compute_forward_filled_positions(self.most_likely_positions, is_non_firing_bin=is_non_firing_bin)
+        
+        if self.marginal is not None:
+            _revised_marginals = self.perform_build_marginals(self.p_x_given_n, self.revised_most_likely_positions, debug_print=False) # Stupid way of doing this, but w/e
+            if self.marginal.x is not None:
+                # self.marginal.x.revised_most_likely_positions_1D = self.perform_compute_forward_filled_positions(self.marginal.x.most_likely_positions_1D, is_non_firing_bin=is_non_firing_bin)
+                self.marginal.x.revised_most_likely_positions_1D = _revised_marginals[0].most_likely_positions_1D.copy()
+            if self.marginal.y is not None:
+                # self.marginal.y.revised_most_likely_positions_1D = self.perform_compute_forward_filled_positions(self.marginal.y.most_likely_positions_1D, is_non_firing_bin=is_non_firing_bin)
+                self.marginal.y.revised_most_likely_positions_1D =  _revised_marginals[1].most_likely_positions_1D.copy()
+
+        return self.revised_most_likely_positions
 
     # ==================================================================================================================== #
     # Class/Static Methods                                                                                                 #

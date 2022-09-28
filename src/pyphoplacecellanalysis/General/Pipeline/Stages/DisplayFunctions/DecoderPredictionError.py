@@ -60,18 +60,21 @@ class DefaultDecoderDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Disp
         
         """
         active_decoder = computation_result.computed_data['pf2D_Decoder']
-        marginals_x, marginals_y = active_decoder.perform_build_marginals(p_x_given_n=active_decoder.p_x_given_n, most_likely_positions=active_decoder.most_likely_positions)
+        # marginals_x, marginals_y = active_decoder.perform_build_marginals(p_x_given_n=active_decoder.p_x_given_n, most_likely_positions=active_decoder.most_likely_positions)
         if variable_name == 'x':
-            active_marginals = marginals_x
+            active_marginals = active_decoder.marginal.x
             active_bins = active_decoder.xbin
         else:
-            active_marginals = marginals_y
+            active_marginals = active_decoder.marginal.y
             active_bins = active_decoder.ybin
         
+        # active_most_likely_positions = active_marginals.most_likely_positions_1D # Raw decoded positions
+        active_most_likely_positions = active_marginals.revised_most_likely_positions_1D # Interpolated most likely positions computed by active_decoder.compute_corrected_positions()
+                
         ## Get the previously created matplotlib_view_widget figure/ax:
         fig, curr_ax = plot_1D_most_likely_position_comparsions(computation_result.sess.position.to_dataframe(), time_window_centers=active_decoder.time_window_centers, xbin=active_bins,
                                                         posterior=active_marginals.p_x_given_n,
-                                                        active_most_likely_positions_1D=active_marginals.most_likely_positions_1D,
+                                                        active_most_likely_positions_1D=active_most_likely_positions,
                                                         **overriding_dict_with(lhs_dict={'ax':None, 'variable_name':variable_name, 'enable_flat_line_drawing':False, 'debug_print': False}, **kwargs))
         
         ## TODO: what are we supposed to return from these display functions?
