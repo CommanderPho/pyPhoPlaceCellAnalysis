@@ -289,6 +289,20 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
         self.ui.scrollAnim = QtCore.QPropertyAnimation(self, b"numScheduledScalings") # the animation will act on the self.numScheduledScalings pyqtProperty
         # self.ui.scrollAnim.setEndValue(0) # Update the end value
         self.ui.scrollAnim.setDuration(250) # set duration in milliseconds
+        
+        
+        ## QTimeLine-style smooth scrolling:
+        self.ui.scrollAnimTimeline = QtCore.QTimeLine(250, parent=self) # Make a new QTimeLine with a 250ms animation duration
+        self.ui.scrollAnimTimeline.setUpdateInterval(20)
+        self.ui.scrollAnimTimeline.setCurveShape(QtCore.QTimeLine.CurveShape.LinearCurve)
+        self.ui.scrollAnimTimeline.setFrameRange(0, 100)
+        self.ui.scrollAnimTimeline.frameChanged.connect(self.onScrollingTimelineFired)
+        # self.ui.scrollAnimTimeline.valueChanged.connect(self.onScrollingTimelineFired)
+        self.ui.scrollAnimTimeline.finished.connect(self.onScrollingTimelineAnimationFinished)
+        # self.ui.scrollAnimTimeline.start() # Do not start it
+        
+        
+        
 
 
     def connect_plotter_time_windows(self):
@@ -384,23 +398,48 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
     ###################################
     #### EVENT HANDLERS
     ##################################
+    
+    def compute_animation_frame_shift_duration(self, shift_frames: int):
+        """ Computes the equivalent time duration for a specified number of animation shift_frames
+            Does not modify any internal animation state.
+            extracted from Spike3DRasterWindowWidget.shift_animation_frame_val(...)
+        """
+        return (self.animation_playback_direction_multiplier * self.animation_time_step * float(shift_frames)) # compute the amount of time equivalent to the shift_frames
+
+    def compute_frame_shifted_start_timestamp(self, shift_frames: int):
+        """ Computes the next start timestamp given the specified number of animation shift frames.
+            Does not modify any internal animation state.
+            extracted from Spike3DRasterWindowWidget.shift_animation_frame_val(...) 
+        """
+        if self.enable_debug_print:
+            print(f'Spike3DRasterWindowWidget.compute_frame_shifted_start_timestamp(shift_frames: {shift_frames})')
+        curr_start_time = self.animation_active_time_window.active_window_start_time
+        shift_time = self.compute_animation_frame_shift_duration(shift_frames) # compute the amount of time equivalent to the shift_frames
+        next_start_timestamp = curr_start_time + shift_time
+        return next_start_timestamp
+    
+    @QtCore.Slot(float)
+    def update_animation(self, next_start_timestamp: float):
+        """ Actually updates the animation given the next_start_timestep
+            extracted from Spike3DRasterWindowWidget.shift_animation_frame_val(...)
+        """
+        if self.enable_debug_print:
+            print(f'Spike3DRasterWindowWidget.update_animation(next_start_timestamp: {next_start_timestamp})')
+        # self.animation_active_time_window.update_window_start(next_start_timestamp) # calls update_window_start, so any subscribers should be notified.
+        # Update the windows once before showing the UI:
+        self.spike_raster_plt_2d.update_scroll_window_region(next_start_timestamp, next_start_timestamp+self.animation_active_time_window.window_duration, block_signals=True) # self.spike_raster_plt_2d.window_scrolled should be emitted        
+        # signal emit:
+        self.spike_raster_plt_2d.window_scrolled.emit(next_start_timestamp, next_start_timestamp+self.animation_active_time_window.window_duration)
+        # update_scroll_window_region
+        # self.ui.spike_raster_plt_3d.spikes_window.update_window_start_end(self.ui.spike_raster_plt_2d.spikes_window.active_time_window[0], self.ui.spike_raster_plt_2d.spikes_window.active_time_window[1])
+        
+
     @QtCore.Slot(int)
     def shift_animation_frame_val(self, shift_frames: int):
         if self.enable_debug_print:
             print(f'Spike3DRasterWindowWidget.shift_animation_frame_val(shift_frames: {shift_frames})')
-        # if self.spike_raster_plt_2d is not None:
-        #     self.spike_raster_plt_2d.shift_an
-        next_start_timestamp = self.animation_active_time_window.active_window_start_time + (self.animation_playback_direction_multiplier * self.animation_time_step * float(shift_frames))
-        # self.animation_active_time_window.update_window_start(next_start_timestamp) # calls update_window_start, so any subscribers should be notified.
-        # Update the windows once before showing the UI:
-        self.spike_raster_plt_2d.update_scroll_window_region(next_start_timestamp, next_start_timestamp+self.animation_active_time_window.window_duration, block_signals=True) # self.spike_raster_plt_2d.window_scrolled should be emitted
-        
-        # signal emit:
-        self.spike_raster_plt_2d.window_scrolled.emit(next_start_timestamp, next_start_timestamp+self.animation_active_time_window.window_duration)
-
-        # update_scroll_window_region
-        # self.ui.spike_raster_plt_3d.spikes_window.update_window_start_end(self.ui.spike_raster_plt_2d.spikes_window.active_time_window[0], self.ui.spike_raster_plt_2d.spikes_window.active_time_window[1])
-        
+        next_start_timestamp = self.animation_active_time_window.active_window_start_time + (self.animation_playback_direction_multiplier * self.animation_time_step * float(shift_frames)) # Equivalent to self.compute_frame_shifted_start_timestamp(shift_frames)
+        self.update_animation(next_start_timestamp)
         
 
     # Called from SliderRunner's thread when it emits the update_signal:        
@@ -584,9 +623,35 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
             # Only update if the value has changed from the previous one:
             self._numScheduledScalings = value
             # TODO: maybe use a rate-limited signal that's emitted instead so this isn't called too often during interpolation?
-            self.shift_animation_frame_val(self._numScheduledScalings) # TODO: this isn't quite right
+            # self.shift_animation_frame_val(self._numScheduledScalings) # TODO: this isn't quite right
             
+    def onScrollingTimelineAnimationFinished(self):
+        """ used for the QTimeline version of the smooth scrolling animation """
+        print(f'onScrollingTimelineAnimationFinished()')
+        print(f'\t self._numScheduledScalings: {self._numScheduledScalings}')
+        self.numScheduledScalings = 0 # updated method that actually zeros out the scheduled scalings        
+        print('\t zeroing out.')
+        # if self._numScheduledScalings > 0:
+        #     self._numScheduledScalings -= 1
+        # else:
+        #     self._numScheduledScalings += 1
+        
 
+    def onScrollingTimelineFired(self, x):
+        """ used for the QTimeline version of the smooth scrolling animation 
+        
+        # OLD VERSION: x appears to be a float between 0.0-1.0 by default that indicates how far along in the animation it is
+        
+        x is an int indicating the number of frames for the timeline that were set with between 0.0-1.0 by default that indicates how far along in the animation it is
+        
+        """
+        print(f'onScrollingTimelineFired(x: {x})')
+        # self.shift_animation_frame_val(x)        
+        curr_shifted_next_start_time = self.compute_frame_shifted_start_timestamp(x)
+        print(f'\t curr_shifted_next_start_time: {curr_shifted_next_start_time}')
+        self.update_animation(curr_shifted_next_start_time)
+        self._numScheduledScalings = self._numScheduledScalings - x # subtract off the frames that have been shifted
+        
     def eventFilter(self, watched, event):
         """  has to be installed on an item like:
             self.grid = pg.GraphicsLayoutWidget()
@@ -652,12 +717,18 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
             # Old way would just do:
             # self._numScheduledScalings = updatedNumScheduledScalings
             # self.shift_animation_frame_val(self._numScheduledScalings) # TODO: this isn't quite right
+
+            # ## pyqt Property Animation Method:            
+            # self.ui.scrollAnim.setEndValue(updatedNumScheduledScalings) # Update the end value
+            # self.ui.scrollAnim.start() # start the animation
             
-            # self.ui.scrollAnim = QtCore.QPropertyAnimation(self, b"numScheduledScalings") # the animation will act on the self.numScheduledScalings pyqtProperty
-            self.ui.scrollAnim.setEndValue(updatedNumScheduledScalings) # Update the end value
-            # self.ui.scrollAnim.setDuration(250) # set duration in milliseconds
-            self.ui.scrollAnim.start() # start the animation
+            ## QTimeline version:
+            self._numScheduledScalings = updatedNumScheduledScalings # Set the updated number of scalings:
             
+            self.ui.scrollAnimTimeline.setEndFrame(self._numScheduledScalings)
+            
+            self.ui.scrollAnimTimeline.start() # Start the timeline's animation event
+
             return True
         else:
             if self.should_debug_print_interaction_events:
