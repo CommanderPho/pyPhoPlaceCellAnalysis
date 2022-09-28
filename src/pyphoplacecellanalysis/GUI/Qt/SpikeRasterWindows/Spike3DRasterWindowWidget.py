@@ -44,11 +44,10 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
     applicationName = 'Spike3DRasterWindow'
     windowName = 'Spike3DRasterWindow'
     
-    enable_debug_print = True
-    # enable_debug_print = False
-    enable_interaction_events_debug_print = True
-    # enable_interaction_events_debug_print = False
-    
+    # enable_debug_print = True
+    enable_debug_print = False
+    # enable_interaction_events_debug_print = True
+    enable_interaction_events_debug_print = False
     
     enable_smooth_scrolling_animation = False # if True, scrolling will be animated
     
