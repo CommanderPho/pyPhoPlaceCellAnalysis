@@ -25,6 +25,12 @@ from pyphoplacecellanalysis.General.Model.SpikesDataframeWindow import SpikesDat
 class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRasterLeftSidebarControlsMixin, SpikeRasterBottomFrameControlsMixin, SpikesWindowOwningMixin, QtWidgets.QWidget):
     """ A main raster window loaded from a Qt .ui file. 
     
+    
+    Properties/Parameters:
+    
+        self.params.scrollStepMultiplier: (default: 30.0) - The multiplier by which each scroll step is multiplied. Decrease this value to increase scrolling precision (making the same rotation of the mousewheel scroll less in time).
+        
+    
     Usage:
     
     from pyphoplacecellanalysis.GUI.Qt.SpikeRasterWindows.Spike3DRasterWindowWidget import Spike3DRasterWindowWidget
@@ -196,7 +202,10 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
         self.params.type_of_3d_plotter = type_of_3d_plotter
         
         # Helper Mixins: INIT:
-        self._numScheduledScalings = 0
+        self._scheduledAnimationSteps = 0
+        self.params.scrollStepMultiplier = 30.0 # The multiplier by which each scroll step is multiplied. Decrease this value to increase scrolling precision (making the same rotation of the mousewheel scroll less in time).
+        
+        
         self.SpikeRasterBottomFrameControlsMixin_on_init()
         self.SpikeRasterLeftSidebarControlsMixin_on_init()
         
@@ -295,7 +304,6 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
             self.ui.scrollAnim = QtCore.QPropertyAnimation(self, b"numScheduledScalings") # the animation will act on the self.numScheduledScalings pyqtProperty
             # self.ui.scrollAnim.setEndValue(0) # Update the end value
             self.ui.scrollAnim.setDuration(250) # set duration in milliseconds
-            
             
             ## QTimeLine-style smooth scrolling:
             self.ui.scrollAnimTimeline = QtCore.QTimeLine(250, parent=self) # Make a new QTimeLine with a 250ms animation duration
@@ -630,27 +638,27 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
     ##-----------------------------------------
     
     @QtCore.Property(int) # Note that this ia *pyqt*Property, meaning it's available to pyqt
-    def numScheduledScalings(self):
-        """The numScheduledScalings property."""
-        return self._numScheduledScalings
-    @numScheduledScalings.setter
-    def numScheduledScalings(self, value):
-        if self._numScheduledScalings != value:
+    def scheduledAnimationSteps(self):
+        """The scheduledAnimationSteps property."""
+        return self._scheduledAnimationSteps
+    @scheduledAnimationSteps.setter
+    def scheduledAnimationSteps(self, value):
+        if self._scheduledAnimationSteps != value:
             # Only update if the value has changed from the previous one:
-            self._numScheduledScalings = value
+            self._scheduledAnimationSteps = value
             # TODO: maybe use a rate-limited signal that's emitted instead so this isn't called too often during interpolation?
-            # self.shift_animation_frame_val(self._numScheduledScalings) # TODO: this isn't quite right
+            # self.shift_animation_frame_val(self._scheduledAnimationSteps) # TODO: this isn't quite right
             
     def onScrollingTimelineAnimationFinished(self):
         """ used for the QTimeline version of the smooth scrolling animation """
         print(f'onScrollingTimelineAnimationFinished()')
-        print(f'\t self._numScheduledScalings: {self._numScheduledScalings}')
-        self.numScheduledScalings = 0 # updated method that actually zeros out the scheduled scalings        
+        print(f'\t self._scheduledAnimationSteps: {self._scheduledAnimationSteps}')
+        self.scheduledAnimationSteps = 0 # updated method that actually zeros out the scheduled scalings        
         print('\t zeroing out.')
-        # if self._numScheduledScalings > 0:
-        #     self._numScheduledScalings -= 1
+        # if self._scheduledAnimationSteps > 0:
+        #     self._scheduledAnimationSteps -= 1
         # else:
-        #     self._numScheduledScalings += 1
+        #     self._scheduledAnimationSteps += 1
         
 
     def onScrollingTimelineFired(self, x):
@@ -666,7 +674,7 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
         curr_shifted_next_start_time = self.compute_frame_shifted_start_timestamp(x)
         print(f'\t curr_shifted_next_start_time: {curr_shifted_next_start_time}')
         self.update_animation(curr_shifted_next_start_time)
-        self._numScheduledScalings = self._numScheduledScalings - x # subtract off the frames that have been shifted
+        self._scheduledAnimationSteps = self._scheduledAnimationSteps - x # subtract off the frames that have been shifted
         
     def eventFilter(self, watched, event):
         """  has to be installed on an item like:
@@ -721,12 +729,13 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
                 
             # computing the "intensity" of wheel move and adding it to _numScheduledScalings
             # see https://wiki.qt.io/Smooth_Zoom_In_QGraphicsView
-            # numDegrees = event.delta() / 8
-            # numSteps = numDegrees / 15 # see QWheelEvent documentation
             
-            numSteps = event.delta()
-            
-            updatedNumScheduledScalings = self._numScheduledScalings + numSteps
+            # event.delta() (gives values like +/- 120, 240, etc)
+            numDegrees = event.delta() / 8
+            numSteps = numDegrees / 15 # see QWheelEvent documentation
+            numSteps = int(round(float(self.params.scrollStepMultiplier) * float(numSteps)))
+                       
+            updatedNumScheduledScalings = self._scheduledAnimationSteps + numSteps
             if (updatedNumScheduledScalings * numSteps < 0):
                 updatedNumScheduledScalings = numSteps # if user moved the wheel in another direction, we reset previously scheduled scalings
             
@@ -736,15 +745,14 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
                 # self.ui.scrollAnim.start() # start the animation
                 
                 ## QTimeline version:
-                self._numScheduledScalings = updatedNumScheduledScalings # Set the updated number of scalings:
-                self.ui.scrollAnimTimeline.setEndFrame(self._numScheduledScalings)
+                self._scheduledAnimationSteps = updatedNumScheduledScalings # Set the updated number of scalings:
+                self.ui.scrollAnimTimeline.setEndFrame(self._scheduledAnimationSteps)
                 self.ui.scrollAnimTimeline.start() # Start the timeline's animation event
             else:
-                # No animation, just update directly
-                # Old way would just do:
-                self._numScheduledScalings = updatedNumScheduledScalings
-                self.shift_animation_frame_val(self._numScheduledScalings) # TODO: this isn't quite right
-                self._numScheduledScalings = 0 # New method: zero it out instead of having it compound
+                # No animation, just update directly ("old way")
+                self._scheduledAnimationSteps = updatedNumScheduledScalings
+                self.shift_animation_frame_val(self._scheduledAnimationSteps)
+                self._scheduledAnimationSteps = 0 # New method: zero it out instead of having it compound
 
             return True
         else:
