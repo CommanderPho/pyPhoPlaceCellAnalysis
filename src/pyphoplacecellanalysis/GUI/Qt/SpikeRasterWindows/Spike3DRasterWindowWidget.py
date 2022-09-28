@@ -38,10 +38,10 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
     applicationName = 'Spike3DRasterWindow'
     windowName = 'Spike3DRasterWindow'
     
-    # enable_debug_print = True
-    enable_debug_print = False
-    # enable_interaction_events_debug_print = True
-    enable_interaction_events_debug_print = False
+    enable_debug_print = True
+    # enable_debug_print = False
+    enable_interaction_events_debug_print = True
+    # enable_interaction_events_debug_print = False
     
     # TODO: add signals here:
     
@@ -285,6 +285,11 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
             # self.setWindowFilePath(str(sess.filePrefix.resolve()))
             self.setWindowTitle(f'{self.applicationName}') # f'Spike Raster Window - {secondary_active_config_name} - {str(sess.filePrefix.resolve())}'
 
+        ## Add the QPropertyAnimation for smooth scrolling, but do not start it:
+        self.ui.scrollAnim = QtCore.QPropertyAnimation(self, b"numScheduledScalings") # the animation will act on the self.numScheduledScalings pyqtProperty
+        # self.ui.scrollAnim.setEndValue(0) # Update the end value
+        self.ui.scrollAnim.setDuration(250) # set duration in milliseconds
+
 
     def connect_plotter_time_windows(self):
         """ connects the controlled plotter (usually the 3D plotter) to the 2D plotter that controls it. """
@@ -507,7 +512,6 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
         if self.enable_debug_print:
             print(f'Spike3DRasterWindowWidget.on_window_duration_changed(start_t: {start_t}, end_t: {end_t}, duration: {duration})')
 
-
     @QtCore.Slot(float, float)
     def on_window_changed(self, start_t, end_t):
         # called when the window is updated
@@ -518,8 +522,6 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
         self._update_plots()
         if self.enable_debug_print:
             profiler('Finished calling _update_plots()')
-        
-        
     
     @QtCore.Slot(float, float, float, object)
     def on_windowed_data_window_duration_changed(self, start_t, end_t, duration, updated_data_value):
@@ -537,8 +539,6 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
         self._update_plots()
         if self.enable_debug_print:
             profiler('Finished calling _update_plots()')
-    
-    
     
     def update_neurons_color_data(self, updated_neuron_render_configs):
         """ Propagates the neuron color updates to any valid children that need these updates.
@@ -573,6 +573,20 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
         # self.keyPressed.emit(event)
 
     ##-----------------------------------------
+    
+    @QtCore.Property(int) # Note that this ia *pyqt*Property, meaning it's available to pyqt
+    def numScheduledScalings(self):
+        """The numScheduledScalings property."""
+        return self._numScheduledScalings
+    @numScheduledScalings.setter
+    def numScheduledScalings(self, value):
+        if self._numScheduledScalings != value:
+            # Only update if the value has changed from the previous one:
+            self._numScheduledScalings = value
+            # TODO: maybe use a rate-limited signal that's emitted instead so this isn't called too often during interpolation?
+            self.shift_animation_frame_val(self._numScheduledScalings) # TODO: this isn't quite right
+            
+
     def eventFilter(self, watched, event):
         """  has to be installed on an item like:
             self.grid = pg.GraphicsLayoutWidget()
@@ -590,6 +604,31 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
 
         	event.orientation(): 1 for alternative scroll wheel dir and 2 for primary scroll wheel dir
  
+            ## TODO: this is why the scrolling control of the active window isn't smooth:
+            ## This _numScheduledScalings become larger and larger as the user continues scrolling in the same direction, meaning the same amount of forward scroll by the user results in increasingly larger jumps.
+            # Spike3DRasterWindowWidget.shift_animation_frame_val(shift_frames: -360)
+            # Spike3DRasterWindowWidget.shift_animation_frame_val(shift_frames: 120)
+            # Spike3DRasterWindowWidget.shift_animation_frame_val(shift_frames: 240)
+            # Spike3DRasterWindowWidget.shift_animation_frame_val(shift_frames: 360)
+            # Spike3DRasterWindowWidget.shift_animation_frame_val(shift_frames: 480)
+            # ...
+            # Spike3DRasterWindowWidget.shift_animation_frame_val(shift_frames: 720)
+            # Spike3DRasterWindowWidget.shift_animation_frame_val(shift_frames: 840)
+            # Spike3DRasterWindowWidget.shift_animation_frame_val(shift_frames: 960)
+            # Spike3DRasterWindowWidget.shift_animation_frame_val(shift_frames: 1080)
+            # Spike3DRasterWindowWidget.shift_animation_frame_val(shift_frames: 1200)
+            # Spike3DRasterWindowWidget.shift_animation_frame_val(shift_frames: 1320)
+            # Spike3DRasterWindowWidget.shift_animation_frame_val(shift_frames: 1440)
+            # Spike3DRasterWindowWidget.shift_animation_frame_val(shift_frames: 1560)
+            # Spike3DRasterWindowWidget.shift_animation_frame_val(shift_frames: 1680)
+            # Spike3DRasterWindowWidget.shift_animation_frame_val(shift_frames: 1800)
+            # Spike3DRasterWindowWidget.shift_animation_frame_val(shift_frames: 1920)
+            # Spike3DRasterWindowWidget.shift_animation_frame_val(shift_frames: 2040)
+            # Spike3DRasterWindowWidget.shift_animation_frame_val(shift_frames: 2160)
+            # Spike3DRasterWindowWidget.shift_animation_frame_val(shift_frames: 2280)
+            # Spike3DRasterWindowWidget.shift_animation_frame_val(shift_frames: 2400)
+            # Spike3DRasterWindowWidget.shift_animation_frame_val(shift_frames: 2520)
+            
             """
             if self.should_debug_print_interaction_events:
                 print(f'Spike3DRasterWindowWidget.eventFilter(...)\n\t detected event.type() == QtCore.QEvent.GraphicsSceneWheel')
@@ -605,15 +644,19 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
             # numSteps = numDegrees / 15 # see QWheelEvent documentation
             
             numSteps = event.delta()
-            self._numScheduledScalings = self._numScheduledScalings + numSteps
-            if (self._numScheduledScalings * numSteps < 0):
-                self._numScheduledScalings = numSteps # if user moved the wheel in another direction, we reset previously scheduled scalings
+            
+            updatedNumScheduledScalings = self._numScheduledScalings + numSteps
+            if (updatedNumScheduledScalings * numSteps < 0):
+                updatedNumScheduledScalings = numSteps # if user moved the wheel in another direction, we reset previously scheduled scalings
                 
-            ## TODO: this is why the scrolling control of the active window isn't smooth:
+            # Old way would just do:
+            # self._numScheduledScalings = updatedNumScheduledScalings
+            # self.shift_animation_frame_val(self._numScheduledScalings) # TODO: this isn't quite right
             
-            
-            self.shift_animation_frame_val(self._numScheduledScalings) # TODO: this isn't quite right
-            
+            # self.ui.scrollAnim = QtCore.QPropertyAnimation(self, b"numScheduledScalings") # the animation will act on the self.numScheduledScalings pyqtProperty
+            self.ui.scrollAnim.setEndValue(updatedNumScheduledScalings) # Update the end value
+            # self.ui.scrollAnim.setDuration(250) # set duration in milliseconds
+            self.ui.scrollAnim.start() # start the animation
             
             return True
         else:
