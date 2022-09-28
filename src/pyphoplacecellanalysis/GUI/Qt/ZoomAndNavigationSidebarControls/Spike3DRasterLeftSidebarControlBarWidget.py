@@ -79,38 +79,6 @@ class Spike3DRasterLeftSidebarControlBar(QtWidgets.QWidget):
         print(f'\t float_slider_val: {float_slider_val}')
         # TODO: emit the temporal changed signal:    
         # self.temporal_zoom_factor_changed.emit(float_slider_val)
-        
-    # def disable_render_window_controls(self):
-    #     # Wrapped in try block so it won't throw an error if these controls were never added (self.setup_render_window_controls() was never called)
-    #     try:
-    #         self.ui.verticalSliderZoom.blockSignals(True)
-    #         self.ui.spinAnimationTimeStep.blockSignals(True)
-    #         self.ui.spinTemporalZoomFactor.blockSignals(True)
-    #         self.ui.spinRenderWindowDuration.blockSignals(True)
-            
-    #         # self.ui.spinAnimationTimeStep.setEnabled(False)
-    #         # self.ui.spinTemporalZoomFactor.setValue(10.0)
-    #         self.ui.spinTemporalZoomFactor.setValue(1.0)
-    #         self.temporal_zoom_factor = 1.0
-            
-    #         self.ui.spinRenderWindowDuration.setValue(self.render_window_duration) # set to render window duration
-
-    #         self.ui.spinTemporalZoomFactor.setReadOnly(True)
-    #         self.ui.spinRenderWindowDuration.setReadOnly(True)
-
-    #         # self.ui.spinAnimationTimeStep.setEnabled(False)
-    #         # self.ui.spinTemporalZoomFactor.setEnabled(False)
-    #         self.ui.spinRenderWindowDuration.setEnabled(False)
-            
-    #         self.ui.spinAnimationTimeStep.blockSignals(False)
-    #         self.ui.spinTemporalZoomFactor.blockSignals(False)
-    #         self.ui.spinRenderWindowDuration.blockSignals(False)
-    #         self.ui.verticalSliderZoom.blockSignals(False)
-
-    #     except Exception as e:
-    #         print(f'disable_render_window_controls(): called but do not seem to have RenderWindowControls enabled: err: {e}')
-    #         # raise e
-    #         return
                         
     def __str__(self):
          return

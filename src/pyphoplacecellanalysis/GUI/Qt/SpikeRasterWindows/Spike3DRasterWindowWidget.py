@@ -43,6 +43,10 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
     enable_interaction_events_debug_print = True
     # enable_interaction_events_debug_print = False
     
+    
+    enable_smooth_scrolling_animation = False # if True, scrolling will be animated
+    
+    
     # TODO: add signals here:
     
     
@@ -285,22 +289,28 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
             # self.setWindowFilePath(str(sess.filePrefix.resolve()))
             self.setWindowTitle(f'{self.applicationName}') # f'Spike Raster Window - {secondary_active_config_name} - {str(sess.filePrefix.resolve())}'
 
-        ## Add the QPropertyAnimation for smooth scrolling, but do not start it:
-        self.ui.scrollAnim = QtCore.QPropertyAnimation(self, b"numScheduledScalings") # the animation will act on the self.numScheduledScalings pyqtProperty
-        # self.ui.scrollAnim.setEndValue(0) # Update the end value
-        self.ui.scrollAnim.setDuration(250) # set duration in milliseconds
-        
-        
-        ## QTimeLine-style smooth scrolling:
-        self.ui.scrollAnimTimeline = QtCore.QTimeLine(250, parent=self) # Make a new QTimeLine with a 250ms animation duration
-        self.ui.scrollAnimTimeline.setUpdateInterval(20)
-        self.ui.scrollAnimTimeline.setCurveShape(QtCore.QTimeLine.CurveShape.LinearCurve)
-        self.ui.scrollAnimTimeline.setFrameRange(0, 100)
-        self.ui.scrollAnimTimeline.frameChanged.connect(self.onScrollingTimelineFired)
-        # self.ui.scrollAnimTimeline.valueChanged.connect(self.onScrollingTimelineFired)
-        self.ui.scrollAnimTimeline.finished.connect(self.onScrollingTimelineAnimationFinished)
-        # self.ui.scrollAnimTimeline.start() # Do not start it
-        
+
+        if self.enable_smooth_scrolling_animation:
+            ## Add the QPropertyAnimation for smooth scrolling, but do not start it:
+            self.ui.scrollAnim = QtCore.QPropertyAnimation(self, b"numScheduledScalings") # the animation will act on the self.numScheduledScalings pyqtProperty
+            # self.ui.scrollAnim.setEndValue(0) # Update the end value
+            self.ui.scrollAnim.setDuration(250) # set duration in milliseconds
+            
+            
+            ## QTimeLine-style smooth scrolling:
+            self.ui.scrollAnimTimeline = QtCore.QTimeLine(250, parent=self) # Make a new QTimeLine with a 250ms animation duration
+            self.ui.scrollAnimTimeline.setUpdateInterval(20)
+            self.ui.scrollAnimTimeline.setCurveShape(QtCore.QTimeLine.CurveShape.LinearCurve)
+            self.ui.scrollAnimTimeline.setFrameRange(0, 100)
+            self.ui.scrollAnimTimeline.frameChanged.connect(self.onScrollingTimelineFired)
+            # self.ui.scrollAnimTimeline.valueChanged.connect(self.onScrollingTimelineFired)
+            self.ui.scrollAnimTimeline.finished.connect(self.onScrollingTimelineAnimationFinished)
+            # self.ui.scrollAnimTimeline.start() # Do not start it
+
+        else:
+            self.ui.scrollAnim = None
+            self.ui.scrollAnimTimeline = None
+            
         
         
 
@@ -486,16 +496,22 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
     ########################################################
     @QtCore.Slot(float)
     def on_animation_timestep_valueChanged(self, updated_val):
+        if self.enable_debug_print:
+            print(f'Spike3DRasterWindowWidget.on_animation_timestep_valueChanged(updated_val: {updated_val})')
         old_value = self.animation_time_step
         self.animation_time_step = updated_val
         
     @QtCore.Slot(float)
     def on_temporal_zoom_factor_valueChanged(self, updated_val):
+        if self.enable_debug_print:
+            print(f'Spike3DRasterWindowWidget.on_temporal_zoom_factor_valueChanged(updated_val: {updated_val})')
         old_value = self.temporal_zoom_factor        
         self.temporal_zoom_factor = updated_val
                 
     @QtCore.Slot(float)
     def on_render_window_duration_valueChanged(self, updated_val):
+        if self.enable_debug_print:
+            print(f'Spike3DRasterWindowWidget.on_render_window_duration_valueChanged(updated_val: {updated_val})')
         old_value = self.render_window_duration
         self.render_window_duration = updated_val
         
@@ -713,21 +729,22 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
             updatedNumScheduledScalings = self._numScheduledScalings + numSteps
             if (updatedNumScheduledScalings * numSteps < 0):
                 updatedNumScheduledScalings = numSteps # if user moved the wheel in another direction, we reset previously scheduled scalings
+            
+            if self.enable_smooth_scrolling_animation:
+                # ## pyqt Property Animation Method:            
+                # self.ui.scrollAnim.setEndValue(updatedNumScheduledScalings) # Update the end value
+                # self.ui.scrollAnim.start() # start the animation
                 
-            # Old way would just do:
-            # self._numScheduledScalings = updatedNumScheduledScalings
-            # self.shift_animation_frame_val(self._numScheduledScalings) # TODO: this isn't quite right
-
-            # ## pyqt Property Animation Method:            
-            # self.ui.scrollAnim.setEndValue(updatedNumScheduledScalings) # Update the end value
-            # self.ui.scrollAnim.start() # start the animation
-            
-            ## QTimeline version:
-            self._numScheduledScalings = updatedNumScheduledScalings # Set the updated number of scalings:
-            
-            self.ui.scrollAnimTimeline.setEndFrame(self._numScheduledScalings)
-            
-            self.ui.scrollAnimTimeline.start() # Start the timeline's animation event
+                ## QTimeline version:
+                self._numScheduledScalings = updatedNumScheduledScalings # Set the updated number of scalings:
+                self.ui.scrollAnimTimeline.setEndFrame(self._numScheduledScalings)
+                self.ui.scrollAnimTimeline.start() # Start the timeline's animation event
+            else:
+                # No animation, just update directly
+                # Old way would just do:
+                self._numScheduledScalings = updatedNumScheduledScalings
+                self.shift_animation_frame_val(self._numScheduledScalings) # TODO: this isn't quite right
+                self._numScheduledScalings = 0 # New method: zero it out instead of having it compound
 
             return True
         else:

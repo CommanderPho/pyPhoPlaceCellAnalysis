@@ -157,7 +157,7 @@ selection-background-color: rgb(75, 83, 65);
          </sizepolicy>
         </property>
         <property name="toolTip">
-         <string>Toggle Play/Pause</string>
+         <string notr="true">Toggle Play/Pause</string>
         </property>
         <property name="text">
          <string>Play/Pause</string>
@@ -169,6 +169,12 @@ selection-background-color: rgb(75, 83, 65);
       </item>
       <item row="1" column="4">
        <widget class="QDoubleSpinBox" name="doubleSpinBoxPlaybackSpeed">
+        <property name="toolTip">
+         <string notr="true">Playback Speed Multiplier</string>
+        </property>
+        <property name="whatsThis">
+         <string notr="true">Playback Speed Multiplier</string>
+        </property>
         <property name="styleSheet">
          <string notr="true">QDoubleSpinBox {
 	background: rgb(62, 57, 52);
@@ -251,7 +257,7 @@ QDoubleSpinBox::down-arrow {
          </sizepolicy>
         </property>
         <property name="toolTip">
-         <string>Slow down the video</string>
+         <string notr="true">Slow down the playback</string>
         </property>
         <property name="text">
          <string>Slow Down</string>
@@ -263,6 +269,12 @@ QDoubleSpinBox::down-arrow {
       </item>
       <item row="1" column="16">
        <widget class="QSpinBox" name="spinBoxFrameJumpMultiplier">
+        <property name="toolTip">
+         <string notr="true" extracomment="Larger means bigger jumps">Frame Jump Multiplier</string>
+        </property>
+        <property name="whatsThis">
+         <string notr="true" extracomment="Larger means bigger jumps">Frame Jump Multiplier</string>
+        </property>
         <property name="styleSheet">
          <string notr="true">QSpinBox {
 	background: rgb(62, 57, 52);
@@ -320,7 +332,7 @@ QSpinBox::hover {
          </sizepolicy>
         </property>
         <property name="toolTip">
-         <string>Speed up the video</string>
+         <string notr="true">Speed up the playback</string>
         </property>
         <property name="text">
          <string>Speed Up</string>
