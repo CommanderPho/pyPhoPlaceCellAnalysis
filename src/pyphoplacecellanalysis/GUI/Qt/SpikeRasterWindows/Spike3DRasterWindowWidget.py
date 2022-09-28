@@ -626,7 +626,7 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
             print('event received @ Spike3DRasterWindowWidget')
         super(Spike3DRasterWindowWidget, self).keyPressEvent(event)
         if self.should_debug_print_interaction_events:
-            if event.key() == Qt.Key_Space:
+            if event.key() == QtCore.Qt.Key_Space:
                 print(f'\t detected event: {event.key()}')
             elif event.key() == QtCore.Qt.Key_0:
                 print(f'\t detected event: {event.key()}')
@@ -687,35 +687,10 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
             # QtCore.QEvent.GraphicsSceneWheel
             """ 
             
-            event.delta(): -120 # Returns the distance that the wheel is rotated, in eighths (1/8s) of a degree. A positive value indicates that the wheel was rotated forwards away from the user; a negative value indicates that the wheel was rotated backwards toward the user.
+            event.delta(): (gives values like +/- 120, 240, etc) # Returns the distance that the wheel is rotated, in eighths (1/8s) of a degree. A positive value indicates that the wheel was rotated forwards away from the user; a negative value indicates that the wheel was rotated backwards toward the user.
                 Most mouse types work in steps of 15 degrees, in which case the delta value is a multiple of 120 (== 15 * 8).
 
-        	event.orientation(): 1 for alternative scroll wheel dir and 2 for primary scroll wheel dir
- 
-            ## TODO: this is why the scrolling control of the active window isn't smooth:
-            ## This _numScheduledScalings become larger and larger as the user continues scrolling in the same direction, meaning the same amount of forward scroll by the user results in increasingly larger jumps.
-            # Spike3DRasterWindowWidget.shift_animation_frame_val(shift_frames: -360)
-            # Spike3DRasterWindowWidget.shift_animation_frame_val(shift_frames: 120)
-            # Spike3DRasterWindowWidget.shift_animation_frame_val(shift_frames: 240)
-            # Spike3DRasterWindowWidget.shift_animation_frame_val(shift_frames: 360)
-            # Spike3DRasterWindowWidget.shift_animation_frame_val(shift_frames: 480)
-            # ...
-            # Spike3DRasterWindowWidget.shift_animation_frame_val(shift_frames: 720)
-            # Spike3DRasterWindowWidget.shift_animation_frame_val(shift_frames: 840)
-            # Spike3DRasterWindowWidget.shift_animation_frame_val(shift_frames: 960)
-            # Spike3DRasterWindowWidget.shift_animation_frame_val(shift_frames: 1080)
-            # Spike3DRasterWindowWidget.shift_animation_frame_val(shift_frames: 1200)
-            # Spike3DRasterWindowWidget.shift_animation_frame_val(shift_frames: 1320)
-            # Spike3DRasterWindowWidget.shift_animation_frame_val(shift_frames: 1440)
-            # Spike3DRasterWindowWidget.shift_animation_frame_val(shift_frames: 1560)
-            # Spike3DRasterWindowWidget.shift_animation_frame_val(shift_frames: 1680)
-            # Spike3DRasterWindowWidget.shift_animation_frame_val(shift_frames: 1800)
-            # Spike3DRasterWindowWidget.shift_animation_frame_val(shift_frames: 1920)
-            # Spike3DRasterWindowWidget.shift_animation_frame_val(shift_frames: 2040)
-            # Spike3DRasterWindowWidget.shift_animation_frame_val(shift_frames: 2160)
-            # Spike3DRasterWindowWidget.shift_animation_frame_val(shift_frames: 2280)
-            # Spike3DRasterWindowWidget.shift_animation_frame_val(shift_frames: 2400)
-            # Spike3DRasterWindowWidget.shift_animation_frame_val(shift_frames: 2520)
+            event.orientation(): 1 for alternative scroll wheel dir and 2 for primary scroll wheel dir
             
             """
             if self.should_debug_print_interaction_events:
@@ -726,10 +701,7 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
                 # print(f'\tevent.phase(): {event.phase()}')
                 # print(f'\tevent.pixelDelta(): {event.pixelDelta()}')
                 
-            # computing the "intensity" of wheel move and adding it to _numScheduledScalings
-            # see https://wiki.qt.io/Smooth_Zoom_In_QGraphicsView
             
-            # event.delta() (gives values like +/- 120, 240, etc)
             numDegrees = event.delta() / 8
             numSteps = numDegrees / 15 # see QWheelEvent documentation
             numSteps = int(round(float(self.params.scrollStepMultiplier) * float(numSteps)))
