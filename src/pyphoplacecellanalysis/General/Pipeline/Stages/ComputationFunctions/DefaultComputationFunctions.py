@@ -202,7 +202,30 @@ class DefaultComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Computa
         
         
         ## In this new mode we'll add the two-step properties to the original one-step decoder:
-        
+        ## Adds the directly accessible properties to the active_one_step_decoder after they're computed in the active_two_step_decoder so that they can be plotted with the same functions/etc.
+
+        # None initialize two-step properties on the one_step_decoder:
+        prev_one_step_bayesian_decoder.p_x_given_n_and_x_prev = None
+        prev_one_step_bayesian_decoder.two_step_most_likely_positions = None
+
+        prev_one_step_bayesian_decoder.marginal.x.p_x_given_n_and_x_prev = None
+        prev_one_step_bayesian_decoder.marginal.x.two_step_most_likely_positions_1D = None
+
+        prev_one_step_bayesian_decoder.marginal.y.p_x_given_n_and_x_prev = None
+        prev_one_step_bayesian_decoder.marginal.y.two_step_most_likely_positions_1D = None
+
+        # Set the two-step properties on the one-step decoder:
+        prev_one_step_bayesian_decoder.p_x_given_n_and_x_prev = computation_result.computed_data['pf2D_TwoStepDecoder'].p_x_given_n_and_x_prev.copy()
+        prev_one_step_bayesian_decoder.two_step_most_likely_positions = computation_result.computed_data['pf2D_TwoStepDecoder'].most_likely_positions.copy()
+
+        prev_one_step_bayesian_decoder.marginal.x.p_x_given_n_and_x_prev = computation_result.computed_data['pf2D_TwoStepDecoder'].marginal.x.p_x_given_n.copy()
+        prev_one_step_bayesian_decoder.marginal.x.two_step_most_likely_positions_1D = computation_result.computed_data['pf2D_TwoStepDecoder'].marginal.x.most_likely_positions_1D.copy()
+
+        if prev_one_step_bayesian_decoder.marginal.y is not None:
+            prev_one_step_bayesian_decoder.marginal.y.p_x_given_n_and_x_prev = computation_result.computed_data['pf2D_TwoStepDecoder'].marginal.y.p_x_given_n.copy()
+            prev_one_step_bayesian_decoder.marginal.y.two_step_most_likely_positions_1D = computation_result.computed_data['pf2D_TwoStepDecoder'].marginal.y.most_likely_positions_1D.copy()
+
+
         
         
         
