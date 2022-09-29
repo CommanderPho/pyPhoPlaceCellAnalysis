@@ -7,7 +7,8 @@ from pyphoplacecellanalysis.GUI.Qt.Mixins.PhoMenuHelper import PhoMenuHelper
 from pyphoplacecellanalysis.GUI.Qt.Mixins.Menus.BaseMenuProviderMixin import BaseMenuCommand
 from pyphoplacecellanalysis.GUI.Qt.Mixins.Menus.BaseMenuProviderMixin import initialize_global_menu_ui_variables_if_needed
 
-from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import AddNewDecodedPosition_MatplotlibPlotCommand
+from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import AddNewDecodedPosition_MatplotlibPlotCommand, CreateNewStackedDecodedEpochSlicesPlotCommand
+
 # GuiResources_rc
 
 
@@ -71,6 +72,13 @@ class CreateNewConnectedWidgetMenuHelper(object):
         curr_window.ui.menus.global_window_menus.create_new_connected_widget.actions_dict['actionNewConnectedDataExplorer_ipc'].triggered.connect(CreateNewDataExplorer_ipc_PlotterCommand(spike_raster_window, curr_active_pipeline, active_config_name, display_output))
         curr_window.ui.menus.global_window_menus.create_new_connected_widget.actions_dict['actionNewConnectedDataExplorer_ipspikes'].triggered.connect(CreateNewDataExplorer_ipspikes_PlotterCommand(spike_raster_window, curr_active_pipeline, active_config_name, display_output))
         curr_window.ui.menus.global_window_menus.create_new_connected_widget.actions_dict['actionAddMatplotlibPlot_DecodedPosition'].triggered.connect(AddNewDecodedPosition_MatplotlibPlotCommand(spike_raster_window, curr_active_pipeline, active_config_name, display_output))
+        
+        
+        curr_window.ui.menus.global_window_menus.create_new_connected_widget.actions_dict['actionDecoded_Epoch_Slices_Laps'].triggered.connect(CreateNewStackedDecodedEpochSlicesPlotCommand(spike_raster_window, curr_active_pipeline, active_config_name=active_config_name, filter_epochs='laps', display_output=display_output))
+        # curr_window.ui.menus.global_window_menus.create_new_connected_widget.actions_dict['actionDecoded_Epoch_Slices_PBEs'].triggered.connect(CreateNewStackedDecodedEpochSlicesPlotCommand(spike_raster_window, curr_active_pipeline, active_config_name=active_config_name, filter_epochs='pbes', display_output=display_output))
+        curr_window.ui.menus.global_window_menus.create_new_connected_widget.actions_dict['actionDecoded_Epoch_Slices_Ripple'].triggered.connect(CreateNewStackedDecodedEpochSlicesPlotCommand(spike_raster_window, curr_active_pipeline, active_config_name=active_config_name, filter_epochs='ripple', display_output=display_output))
+        curr_window.ui.menus.global_window_menus.create_new_connected_widget.actions_dict['actionDecoded_Epoch_Slices_Replay'].triggered.connect(CreateNewStackedDecodedEpochSlicesPlotCommand(spike_raster_window, curr_active_pipeline, active_config_name=active_config_name, filter_epochs='replay', display_output=display_output))
+        # curr_window.ui.menus.global_window_menus.create_new_connected_widget.actions_dict['actionDecoded_Epoch_Slices_Custom'].triggered.connect(CreateNewStackedDecodedEpochSlicesPlotCommand(spike_raster_window, curr_active_pipeline, active_config_name=active_config_name, filter_epochs='custom', display_output=display_output))        
 
             
     @classmethod
@@ -101,7 +109,23 @@ class CreateNewConnectedWidgetMenuHelper(object):
             ## MATPLOTLIB Plot Widget Testing:
             curr_action_key = PhoMenuHelper.add_action_item(a_main_window, "New Embedded Matplotlib Position Decoder", name="actionAddMatplotlibPlot_DecodedPosition", tooltip="Create a docked matplotlib plot containing the decoded position and connect it to this window", icon_path=":/Graphics/Icons/graphics/ic_blur_linear_48px.png", actions_dict=a_main_window.ui.menus.global_window_menus.create_new_connected_widget.actions_dict)
             
+            ## Stacked Epoch Slices Widget:
             
+            decoding_action_keys = ["actionDecoded_Epoch_Slices_Laps",
+            "actionDecoded_Epoch_Slices_PBEs",
+            "actionDecoded_Epoch_Slices_Ripple",
+            "actionDecoded_Epoch_Slices_Replay",
+            "actionDecoded_Epoch_Slices_Custom"]
+
+            decoding_action_titles = ["Laps",
+            "PBEs",
+            "Ripple",
+            "Replay",
+            "Custom..."]
+
+            # curr_action_key = PhoMenuHelper.add_action_item(a_main_window, "Stacked Laps", name="actionDecoded_Epoch_Slices_Laps", actions_dict=a_main_window.ui.menus.global_window_menus.create_new_connected_widget.actions_dict)
+            for a_decoding_action_title, a_decoding_action_key in zip(decoding_action_titles, decoding_action_keys):
+                _curr_action_key = PhoMenuHelper.add_action_item(a_main_window, a_decoding_action_title, name=a_decoding_action_key, actions_dict=a_main_window.ui.menus.global_window_menus.create_new_connected_widget.actions_dict)
             
             
             ## Now Create the Menus for each QAction:
@@ -114,10 +138,25 @@ class CreateNewConnectedWidgetMenuHelper(object):
             a_main_window.ui.menus.global_window_menus.create_new_connected_widget.top_level_menu.setTitle("Create Connected Widget")
 
             ## Add the actions to the QMenu item:
-            a_main_window.ui.menus.global_window_menus.create_new_connected_widget.top_level_menu.addActions(a_main_window.ui.menus.global_window_menus.create_new_connected_widget.actions_dict.values())
+            # non_epoch_slices_actions = a_main_window.ui.menus.global_window_menus.create_new_connected_widget.actions_dict.values()
+            # Get the actions except for the ones that belong to the decoded epoch slices submenu:
+            # non_epoch_slices_actions = {k:v for k, v in a_main_window.ui.menus.global_window_menus.create_new_connected_widget.actions_dict.items() if k not in decoding_action_keys}
+            non_epoch_slices_actions = [v for k, v in a_main_window.ui.menus.global_window_menus.create_new_connected_widget.actions_dict.items() if k not in decoding_action_keys]
+            
+            # a_main_window.ui.menus.global_window_menus.create_new_connected_widget.top_level_menu.addActions(a_main_window.ui.menus.global_window_menus.create_new_connected_widget.actions_dict.values())
+            a_main_window.ui.menus.global_window_menus.create_new_connected_widget.top_level_menu.addActions(non_epoch_slices_actions)
+            
+            ## Add the "Decoded Epoch Slices" submenu:
+            a_main_window.ui.menus.global_window_menus.create_new_connected_widget.menuCreateNewConnectedDecodedEpochSlices = QtWidgets.QMenu(a_main_window.ui.menus.global_window_menus.create_new_connected_widget.top_level_menu) # A QMenu
+            a_main_window.ui.actionMenuCreateNewConnectedDecodedEpochSlices = a_main_window.ui.menus.global_window_menus.create_new_connected_widget.top_level_menu.addMenu(a_main_window.ui.menus.global_window_menus.create_new_connected_widget.menuCreateNewConnectedDecodedEpochSlices) # Used to remove the menu, a QAction
+            a_main_window.ui.menus.global_window_menus.create_new_connected_widget.menuCreateNewConnectedDecodedEpochSlices.setObjectName("menuCreateNewConnectedDecodedEpochSlices")
+            a_main_window.ui.menus.global_window_menus.create_new_connected_widget.menuCreateNewConnectedDecodedEpochSlices.setTitle("Decoded Epoch Slices")
+
+            a_main_window.ui.menus.global_window_menus.create_new_connected_widget.menuCreateNewConnectedDecodedEpochSlices.addActions([a_main_window.ui.menus.global_window_menus.create_new_connected_widget.actions_dict[k] for k in decoding_action_keys])
             
             ## TODO: is this even needed? I think it's done to remove it, but can't I just use a_main_window.ui.actionMenuCreateNewConnectedWidget directly?
-            a_main_window.ui.menus.global_window_menus.create_new_connected_widget.actions_dict['actionMenuCreateNewConnectedWidget'] = a_main_window.ui.actionMenuCreateNewConnectedWidget            
+            a_main_window.ui.menus.global_window_menus.create_new_connected_widget.actions_dict['actionMenuCreateNewConnectedWidget'] = a_main_window.ui.actionMenuCreateNewConnectedWidget
+            a_main_window.ui.menus.global_window_menus.create_new_connected_widget.actions_dict['actionMenuCreateNewConnectedDecodedEpochSlices'] = a_main_window.ui.actionMenuCreateNewConnectedDecodedEpochSlices
             
             return a_main_window.ui.menus.global_window_menus.create_new_connected_widget.top_level_menu, a_main_window.ui.menus.global_window_menus.create_new_connected_widget.actions_dict
 

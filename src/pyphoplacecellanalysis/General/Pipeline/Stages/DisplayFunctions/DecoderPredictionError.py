@@ -709,6 +709,33 @@ def plot_spike_count_and_firing_rate_normalizations(pho_custom_decoder, axs=None
 
 
 
+
+class CreateNewStackedDecodedEpochSlicesPlotCommand(BaseMenuCommand):
+    """ build_combined_time_synchronized_plotters_window
+    A command to create a plotter as needed
+    """
+    def __init__(self, spike_raster_window, active_pipeline, active_config_name=None, active_context=None, filter_epochs='laps', display_output={}) -> None:
+        super(CreateNewStackedDecodedEpochSlicesPlotCommand, self).__init__()
+        self._spike_raster_window = spike_raster_window
+        self._active_pipeline = active_pipeline
+        self._active_config_name = active_config_name
+        self._context = active_context
+        self._display_output = display_output
+        self._filter_epochs = filter_epochs
+        
+        
+    def execute(self, *args, **kwargs) -> None:
+        """  """
+        # print(f'CreateNewStackedDecodedEpochSlicesPlotCommand(): {self._filter_epochs} callback')
+        _out_plot_tuple = self._active_pipeline.display('_display_plot_decoded_epoch_slices', self._active_config_name, filter_epochs=self._filter_epochs, debug_test_max_num_slices=16)
+        _out_params, _out_plots_data, _out_plots, _out_ui = _out_plot_tuple
+        # _out_display_key = f'stackedEpochSlicesMatplotlibSubplots_{_out_params.name}'
+        _out_display_key = f'{_out_params.name}'
+        # print(f'_out_display_key: {_out_display_key}')
+        self._display_output[_out_display_key] = _out_plot_tuple
+        
+
+
 class AddNewDecodedPosition_MatplotlibPlotCommand(BaseMenuCommand):
     """ analagous to CreateNewDataExplorer_ipspikes_PlotterCommand, holds references to the variables needed to perform the entire action (such as the reference to the decoder) which aren't accessible during the building of the menus. """
     def __init__(self, spike_raster_window, curr_active_pipeline, active_config_name, display_output={}) -> None:

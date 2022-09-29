@@ -117,10 +117,12 @@
      <property name="title">
       <string>Decoded Epoch Slices</string>
      </property>
-     <addaction name="actionLaps"/>
-     <addaction name="actionPBEs"/>
-     <addaction name="actionRipple"/>
-     <addaction name="actionReplay"/>
+     <addaction name="actionDecoded_Epoch_Slices_Laps"/>
+     <addaction name="actionDecoded_Epoch_Slices_PBEs"/>
+     <addaction name="actionDecoded_Epoch_Slices_Ripple"/>
+     <addaction name="actionDecoded_Epoch_Slices_Replay"/>
+     <addaction name="separator"/>
+     <addaction name="actionDecoded_Epoch_Slices_Custom"/>
     </widget>
     <addaction name="menuDecoded_Epoch_Slices"/>
    </widget>
@@ -307,24 +309,32 @@
     <string>Context Nested Docks</string>
    </property>
   </action>
-  <action name="actionLaps">
+  <action name="actionDecoded_Epoch_Slices_Laps">
    <property name="text">
     <string>Laps</string>
    </property>
   </action>
-  <action name="actionPBEs">
+  <action name="actionDecoded_Epoch_Slices_PBEs">
    <property name="text">
     <string>PBEs</string>
    </property>
   </action>
-  <action name="actionRipple">
+  <action name="actionDecoded_Epoch_Slices_Ripple">
    <property name="text">
     <string>Ripple</string>
    </property>
   </action>
-  <action name="actionReplay">
+  <action name="actionDecoded_Epoch_Slices_Replay">
    <property name="text">
     <string>Replay</string>
+   </property>
+  </action>
+  <action name="actionDecoded_Epoch_Slices_Custom">
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="text">
+    <string>Custom...</string>
    </property>
   </action>
  </widget>
