@@ -557,7 +557,8 @@ def plot_decoded_epoch_slices(filter_epochs, filter_epochs_decoder_result, globa
     params, plots_data, plots, ui = stacked_epoch_slices_matplotlib_build_view(epoch_slices, name=name, plot_function_name=plot_function_name, debug_test_max_num_slices=debug_test_max_num_slices, debug_print=debug_print)
 
     for i, curr_ax in enumerate(plots.axs):
-        curr_time_bins = filter_epochs_decoder_result.time_bin_edges[i]
+        curr_time_bin_container = filter_epochs_decoder_result.time_bin_containers[i]
+        curr_time_bins = curr_time_bin_container.centers
         curr_posterior_container = filter_epochs_decoder_result.marginal_x_list[i]
         curr_posterior = curr_posterior_container.p_x_given_n
         curr_most_likely_positions = curr_posterior_container.most_likely_positions_1D

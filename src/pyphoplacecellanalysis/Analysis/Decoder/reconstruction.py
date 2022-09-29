@@ -841,13 +841,18 @@ class BayesianPlacemapPositionDecoder(PlacemapPositionDecoder):
         """
         # build output result object:
         filter_epochs_decoder_result = DynamicContainer(most_likely_positions_list=[], p_x_given_n_list=[], marginal_x_list=[], marginal_y_list=[], most_likely_position_indicies_list=[])
-
+        
+        if isinstance(filter_epochs, pd.DataFrame):
+            filter_epochs_df = filter_epochs
+        else:
+            filter_epochs_df = filter_epochs.to_dataframe()
+            
         if debug_print:
             print(f'filter_epochs: {filter_epochs.n_epochs}')
         ## Get the spikes during these epochs to attempt to decode from:
         filter_epoch_spikes_df = deepcopy(spikes_df)
         ## Add the epoch ids to each spike so we can easily filter on them:
-        filter_epoch_spikes_df = add_epochs_id_identity(filter_epoch_spikes_df, filter_epochs.to_dataframe(), epoch_id_key_name='temp_epoch_id', epoch_label_column_name=None, no_interval_fill_value=-1)
+        filter_epoch_spikes_df = add_epochs_id_identity(filter_epoch_spikes_df, filter_epochs_df, epoch_id_key_name='temp_epoch_id', epoch_label_column_name=None, no_interval_fill_value=-1)
         if debug_print:
             print(f'np.shape(filter_epoch_spikes_df): {np.shape(filter_epoch_spikes_df)}')
         filter_epoch_spikes_df = filter_epoch_spikes_df[filter_epoch_spikes_df['temp_epoch_id'] != -1] # Drop all non-included spikes
@@ -855,12 +860,12 @@ class BayesianPlacemapPositionDecoder(PlacemapPositionDecoder):
             print(f'np.shape(filter_epoch_spikes_df): {np.shape(filter_epoch_spikes_df)}')
 
         ## final step is to time_bin (relative to the start of each epoch) the time values of remaining spikes
-        spkcount, nbins, time_bin_containers_list = epochs_spkcount(filter_epoch_spikes_df, filter_epochs, decoding_time_bin_size, slideby=decoding_time_bin_size, export_time_bins=False, included_neuron_ids=active_decoder.neuron_IDs, debug_print=debug_print) ## time_bins returned are not correct, they're subsampled at a rate of 1000
+        spkcount, nbins, time_bin_containers_list = epochs_spkcount(filter_epoch_spikes_df, filter_epochs, decoding_time_bin_size, slideby=decoding_time_bin_size, export_time_bins=True, included_neuron_ids=active_decoder.neuron_IDs, debug_print=debug_print) ## time_bins returned are not correct, they're subsampled at a rate of 1000
         num_filter_epochs = len(nbins) # one for each epoch in filter_epochs
 
         filter_epochs_decoder_result.spkcount = spkcount
         filter_epochs_decoder_result.nbins = nbins
-        filter_epochs_decoder_result.time_bin_centers = time_bin_containers_list
+        filter_epochs_decoder_result.time_bin_containers = time_bin_containers_list
         filter_epochs_decoder_result.decoding_time_bin_size = decoding_time_bin_size
         filter_epochs_decoder_result.num_filter_epochs = num_filter_epochs
         if debug_print:
@@ -886,10 +891,10 @@ class BayesianPlacemapPositionDecoder(PlacemapPositionDecoder):
             filter_epochs_decoder_result.p_x_given_n_list.append(p_x_given_n)
             filter_epochs_decoder_result.most_likely_position_indicies_list.append(most_likely_position_indicies)
 
-        # Add the marginal container to the list
-        curr_unit_marginal_x, curr_unit_marginal_y = cls.perform_build_marginals(p_x_given_n, most_likely_positions, debug_print=debug_print)
-        filter_epochs_decoder_result.marginal_x_list.append(curr_unit_marginal_x)
-        filter_epochs_decoder_result.marginal_y_list.append(curr_unit_marginal_y)
+            # Add the marginal container to the list
+            curr_unit_marginal_x, curr_unit_marginal_y = cls.perform_build_marginals(p_x_given_n, most_likely_positions, debug_print=debug_print)
+            filter_epochs_decoder_result.marginal_x_list.append(curr_unit_marginal_x)
+            filter_epochs_decoder_result.marginal_y_list.append(curr_unit_marginal_y)
         
         return filter_epochs_decoder_result
     
