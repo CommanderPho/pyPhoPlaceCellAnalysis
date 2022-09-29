@@ -52,11 +52,11 @@ class DefaultDecoderDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Disp
             # print(f'animate({i})')
             return renderer.display(i)
         
-    def _display_plot_marginal_1D_most_likely_position_comparisons(computation_result, active_config, variable_name='x', most_likely_positions_mode='standard', **kwargs):
+    def _display_plot_marginal_1D_most_likely_position_comparisons(computation_result, active_config, variable_name='x', posterior_name='p_x_given_n_and_x_prev', most_likely_positions_mode='standard', **kwargs):
         """ renders a plot with the 1D Marginals either (x and y position axes): the computed posterior for the position from the Bayesian decoder and overlays the animal's actual position over the top. 
         
         most_likely_positions_mode: 'standard'|'corrected'
-        
+        posterior_name: 'p_x_given_n'|'p_x_given_n_and_x_prev'
         
         ax = destination_plot.ui.matplotlib_view_widget.ax,
         variable_name = 'x',
@@ -78,10 +78,20 @@ class DefaultDecoderDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Disp
             active_most_likely_positions = active_marginals.revised_most_likely_positions_1D # Interpolated most likely positions computed by active_decoder.compute_corrected_positions()
         else:
             raise NotImplementedError
+        
+    
+        # posterior_name must be either ['p_x_given_n', 'p_x_given_n_and_x_prev']
+        if posterior_name == 'p_x_given_n':
+            active_posterior = active_marginals.p_x_given_n
+        elif posterior_name == 'p_x_given_n_and_x_prev':
+            active_posterior = active_marginals.p_x_given_n_and_x_prev
+        else:
+            raise NotImplementedError
+        
                 
         ## Get the previously created matplotlib_view_widget figure/ax:
         fig, curr_ax = plot_1D_most_likely_position_comparsions(computation_result.sess.position.to_dataframe(), time_window_centers=active_decoder.time_window_centers, xbin=active_bins,
-                                                        posterior=active_marginals.p_x_given_n,
+                                                        posterior=active_posterior,
                                                         active_most_likely_positions_1D=active_most_likely_positions,
                                                         **overriding_dict_with(lhs_dict={'ax':None, 'variable_name':variable_name, 'enable_flat_line_drawing':False, 'debug_print': False}, **kwargs))
         

@@ -201,6 +201,9 @@ class DefaultComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Computa
         computation_result.computed_data['pf2D_TwoStepDecoder']['marginal'] = DynamicContainer(x=curr_unit_marginal_x, y=curr_unit_marginal_y)
         
         
+        ## In this new mode we'll add the two-step properties to the original one-step decoder:
+        
+        
         
         
         return computation_result

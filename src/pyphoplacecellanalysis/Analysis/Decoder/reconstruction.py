@@ -178,7 +178,6 @@ class ZhangReconstructionImplementation:
             print(f'unit_specific_binned_spike_counts.to_numpy(): {np.shape(unit_specific_binned_spike_counts.to_numpy())}') # (85841, 40)
         return unit_specific_binned_spike_counts.to_numpy(), time_window_edges, time_window_edges_binning_info
 
-
     # Optimal Functions:
     @staticmethod
     def compute_optimal_functions_G(F):
@@ -257,8 +256,6 @@ class ZhangReconstructionImplementation:
                 cell_ratemap: [f_{i}(x) for i in range(nCells)]
                 cell_spkcnt: [n_{i} for i in range(nCells)]            
             """
-            # cell_spkcnt = spkcount[cell, :][np.newaxis, :]
-            # cell_ratemap = ratemaps[cell, :][:, np.newaxis]
             cell_spkcnt = n[cell, :][np.newaxis, :]
             cell_ratemap = F[cell, :][:, np.newaxis]
             coeff = 1 / (factorial(cell_spkcnt)) # 1/factorial(n_{i}) term
