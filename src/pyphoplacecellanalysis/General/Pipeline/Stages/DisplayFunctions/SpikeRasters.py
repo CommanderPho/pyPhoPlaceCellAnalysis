@@ -19,6 +19,7 @@ from pyphoplacecellanalysis.GUI.Qt.Mixins.Menus.ConnectionControlsMenuMixin impo
 from pyphoplacecellanalysis.GUI.Qt.Mixins.Menus.CreateNewConnectedWidgetMenuMixin import CreateNewConnectedWidgetMenuHelper
 from pyphoplacecellanalysis.GUI.Qt.Mixins.Menus.DebugMenuProviderMixin import DebugMenuProviderMixin
 from pyphoplacecellanalysis.GUI.Qt.Mixins.Menus.CreateLinkedWidget_MenuProvider import CreateLinkedWidget_MenuProvider
+from pyphoplacecellanalysis.GUI.Qt.Mixins.Menus.DockedWidgets_MenuProvider import DockedWidgets_MenuProvider
 
 from pyphoplacecellanalysis.GUI.Qt.Mixins.PhoMenuHelper import PhoMenuHelper
 
@@ -136,6 +137,13 @@ class SpikeRastersDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Displa
         # Debug Menu
         _debug_menu_provider = DebugMenuProviderMixin(render_widget=spike_raster_window)
         spike_raster_window.main_menu_window.ui.menus.global_window_menus.debug.menu_provider_obj = _debug_menu_provider
+        
+        
+        _docked_menu_provider = DockedWidgets_MenuProvider(render_widget=spike_raster_window)
+        _docked_menu_provider.DockedWidgets_MenuProvider_on_buildUI(spike_raster_window=spike_raster_window, owning_pipeline_reference=owning_pipeline_reference, context=active_display_fn_identifying_ctx, display_output=owning_pipeline_reference.display_output[active_display_fn_identifying_ctx])
+        spike_raster_window.main_menu_window.ui.menus.global_window_menus.docked_widgets.menu_provider_obj = _docked_menu_provider
+        
+        
         
         
         ## Adds the custom renderable menu to the top-level menu of the plots in Spike2DRaster
