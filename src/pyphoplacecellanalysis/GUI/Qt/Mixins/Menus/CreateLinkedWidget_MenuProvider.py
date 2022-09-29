@@ -24,6 +24,10 @@ class CreateLinkedWidget_MenuProvider(BaseMenuProviderMixin):
     .ui.menus.global_window_menus.actionCombineTimeSynchronizedPlotterWindow
     
     
+    Can be used in two forms:
+        1. Via inherting the desired Window widget class from this as a mixin
+        2. Via initializing via the __init__(...) method
+    
     """
     top_level_menu_name = 'actionMenuCreateLinkedWidget'
     
@@ -76,8 +80,6 @@ class CreateLinkedWidget_MenuProvider(BaseMenuProviderMixin):
         self.ui.actionTimeSynchronizedDecoderPlotter
         
         self.ui.actionCombineTimeSynchronizedPlotterWindow
-        
-        
         
         """
         spike_raster_window = kwargs.get('spike_raster_window', None)
@@ -137,7 +139,7 @@ class CreateLinkedWidget_MenuProvider(BaseMenuProviderMixin):
         pass
     
     
-    
+
 # build_combined_time_synchronized_plotters_window, build_connected_time_synchronized_occupancy_plotter, build_connected_time_synchronized_placefields_plotter, build_connected_time_synchronized_decoder_plotter
     
 ## Actions to be executed to create new plotters:

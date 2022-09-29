@@ -87,8 +87,6 @@ class CreateNewConnectedWidgetMenuHelper(object):
             a_main_window.ui.menus.global_window_menus.create_new_connected_widget = PhoUIContainer.init_from_dict({'top_level_menu': None, 'actions_dict': {}})
             
             ## Only creates the QActions now, no QMenus:
-            # Define dictionary for actions:
-            # a_main_window.ui.menus.global_window_menus.create_new_connected_widget.actions_dict = {}
                  
             curr_action_key = PhoMenuHelper.add_action_item(a_main_window, "New Connected 2D Raster", name="actionNewConnected2DRaster", tooltip="Create a new 2D Raster plotter and connect it to this window", icon_path=":/Icons/Icons/SpikeRaster2DIcon.ico", actions_dict=a_main_window.ui.menus.global_window_menus.create_new_connected_widget.actions_dict)
             
