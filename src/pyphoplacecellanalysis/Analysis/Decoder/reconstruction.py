@@ -320,6 +320,9 @@ class Zhang_Two_Step:
         return k * one_step_p_x_given_n * cls.compute_conditional_probability_x_prev_given_x_t(x_prev, all_x, sigma_t, C)
 
     
+# ==================================================================================================================== #
+# Placemap Position Decoders                                                                                           #
+# ==================================================================================================================== #
 class PlacemapPositionDecoder(SerializedAttributesSpecifyingClass, SimplePrintable, object, metaclass=OrderedMeta):
     """docstring for PlacemapPositionDecoder.
     
@@ -431,9 +434,6 @@ class BayesianPlacemapPositionDecoder(PlacemapPositionDecoder):
     @property
     def time_window_edges(self):
         return self.time_binning_container.edges
-    # @time_window_edges.setter
-    # def time_window_edges(self, value):
-    #     self.time_binning_container.edges = value
     @property
     def time_window_edges_binning_info(self):
         return self.time_binning_container.edge_info
@@ -441,15 +441,10 @@ class BayesianPlacemapPositionDecoder(PlacemapPositionDecoder):
     @property
     def time_window_centers(self):
         return self.time_binning_container.centers
-    # @time_window_centers.setter
-    # def time_window_centers(self, value):
-    #     self.time_binning_container.centers = value
 
     @property
     def time_window_center_binning_info(self):
         return self.time_binning_container.center_info
-
-
 
     @property
     def num_time_windows(self):
@@ -472,9 +467,6 @@ class BayesianPlacemapPositionDecoder(PlacemapPositionDecoder):
         active_window_midpoints = window_starts + ((window_ends - window_starts) / 2.0)
         return active_window_midpoints
     
-    
-    # @property
-    # def non_firing_time_bin_indices(self):
     @property
     def is_non_firing_time_bin(self):
         """A boolean array that indicates whether each time window has no spikes. Requires self.total_spike_counts_per_window"""
@@ -748,26 +740,6 @@ class BayesianPlacemapPositionDecoder(PlacemapPositionDecoder):
         """ TODO: CRITICAL: THIS IS THE ONLY VERSION OF THE DECODING THAT WORKS. The version perfomred by "compute_all" fails miserably! """
         return self.perform_decode_specific_epochs(self, spikes_df=spikes_df, filter_epochs=filter_epochs, decoding_time_bin_size=decoding_time_bin_size, debug_print=debug_print)
 
-    @staticmethod
-    def perform_compute_forward_filled_positions(most_likely_positions: np.ndarray, is_non_firing_bin: np.ndarray) -> np.ndarray:
-        """ applies the forward fill to a copy of the positions based on the is_non_firing_bin boolean array
-        zero_bin_indicies.shape # (9307,)
-        self.most_likely_positions.shape # (11880, 2)
-        
-        # NaN out the position bins that were determined without any spikes
-        # Forward fill the now NaN positions with the last good value (for the both axes)
-        
-        """
-        revised_most_likely_positions = most_likely_positions.copy()
-        # NaN out the position bins that were determined without any spikes
-        if (most_likely_positions.ndim < 2):
-            revised_most_likely_positions[is_non_firing_bin] = np.nan 
-        else:
-            revised_most_likely_positions[is_non_firing_bin, :] = np.nan 
-        # Forward fill the now NaN positions with the last good value (for the both axes):
-        revised_most_likely_positions = np_ffill_1D(revised_most_likely_positions.T).T
-        return revised_most_likely_positions
-
     def compute_corrected_positions(self):
         """ computes the revised most likely positions by taking into account the time-bins that had zero spikes and extrapolating position from the prior successfully decoded time bin
         
@@ -931,3 +903,60 @@ class BayesianPlacemapPositionDecoder(PlacemapPositionDecoder):
         # np.shape(most_likely_position_flat_indicies) # (85841,)
         # np.shape(most_likely_position_indicies) # (2, 85841)
         return most_likely_position_flat_indicies, most_likely_position_indicies
+    
+    @classmethod
+    def perform_compute_forward_filled_positions(cls, most_likely_positions: np.ndarray, is_non_firing_bin: np.ndarray) -> np.ndarray:
+        """ applies the forward fill to a copy of the positions based on the is_non_firing_bin boolean array
+        zero_bin_indicies.shape # (9307,)
+        self.most_likely_positions.shape # (11880, 2)
+        
+        # NaN out the position bins that were determined without any spikes
+        # Forward fill the now NaN positions with the last good value (for the both axes)
+        
+        """
+        revised_most_likely_positions = most_likely_positions.copy()
+        # NaN out the position bins that were determined without any spikes
+        if (most_likely_positions.ndim < 2):
+            revised_most_likely_positions[is_non_firing_bin] = np.nan 
+        else:
+            revised_most_likely_positions[is_non_firing_bin, :] = np.nan 
+        # Forward fill the now NaN positions with the last good value (for the both axes):
+        revised_most_likely_positions = np_ffill_1D(revised_most_likely_positions.T).T
+        return revised_most_likely_positions
+    
+    
+    
+    @classmethod
+    def perform_compute_spike_count_and_firing_rate_normalizations(cls, pho_custom_decoder):
+        """ Computes several different normalizations of binned firing rate and spike counts
+        
+        Usage:
+            pho_custom_decoder = curr_kdiba_pipeline.computation_results['maze1'].computed_data['pf2D_Decoder']
+            unit_specific_time_binned_outputs = perform_compute_spike_count_and_firing_rate_normalizations(pho_custom_decoder)
+            spike_proportion_global_fr_normalized, firing_rate, firing_rate_global_fr_normalized = unit_specific_time_binned_outputs # unwrap the output tuple
+            
+            
+        TESTING CODE:
+        
+            pho_custom_decoder = curr_kdiba_pipeline.computation_results['maze1'].computed_data['pf2D_Decoder']
+            print(f'most_likely_positions: {np.shape(pho_custom_decoder.most_likely_positions)}') # most_likely_positions: (3434, 2)
+            unit_specific_time_binned_outputs = perform_compute_spike_count_and_firing_rate_normalizations(pho_custom_decoder)
+            spike_proportion_global_fr_normalized, firing_rate, firing_rate_global_fr_normalized = unit_specific_time_binned_outputs # unwrap the output tuple:
+
+            # pho_custom_decoder.unit_specific_time_binned_spike_counts.shape # (64, 1717)
+            unit_specific_binned_spike_count_mean = np.nanmean(pho_custom_decoder.unit_specific_time_binned_spike_counts, axis=1)
+            unit_specific_binned_spike_count_var = np.nanvar(pho_custom_decoder.unit_specific_time_binned_spike_counts, axis=1)
+            unit_specific_binned_spike_count_median = np.nanmedian(pho_custom_decoder.unit_specific_time_binned_spike_counts, axis=1)
+
+            unit_specific_binned_spike_count_mean
+            unit_specific_binned_spike_count_median
+            # unit_specific_binned_spike_count_mean.shape # (64, )
+
+        """
+        # produces a fraction which indicates which proportion of the window's firing belonged to each unit (accounts for global changes in firing rate (each window is scaled by the toial spikes of all cells in that window)
+        unit_specific_time_binned_spike_proportion_global_fr_normalized = pho_custom_decoder.unit_specific_time_binned_spike_counts / pho_custom_decoder.total_spike_counts_per_window
+        unit_specific_time_binned_firing_rate = pho_custom_decoder.unit_specific_time_binned_spike_counts / pho_custom_decoder.time_window_edges_binning_info.step
+        # produces a unit firing rate for each window that accounts for global changes in firing rate (each window is scaled by the firing rate of all cells in that window
+        unit_specific_time_binned_firing_rate_global_fr_normalized = unit_specific_time_binned_spike_proportion_global_fr_normalized / pho_custom_decoder.time_window_edges_binning_info.step
+        # Return the computed values, leaving the original data unchanged.
+        return unit_specific_time_binned_spike_proportion_global_fr_normalized, unit_specific_time_binned_firing_rate, unit_specific_time_binned_firing_rate_global_fr_normalized

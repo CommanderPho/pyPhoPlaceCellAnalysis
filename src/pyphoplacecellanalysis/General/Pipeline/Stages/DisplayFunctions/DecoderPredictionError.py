@@ -20,6 +20,8 @@ from pyphoplacecellanalysis.Pho2D.stacked_epoch_slices import stacked_epoch_slic
 
 from pyphoplacecellanalysis.GUI.Qt.Mixins.Menus.BaseMenuProviderMixin import BaseMenuCommand # for AddNewDecodedPosition_MatplotlibPlotCommand
 
+from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BayesianPlacemapPositionDecoder 
+
 
 class DefaultDecoderDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=DisplayFunctionRegistryHolder):
     """ Functions related to visualizing Bayesian Decoder performance. """
@@ -527,6 +529,49 @@ def plot_decoded_epoch_slices(filter_epochs, filter_epochs_decoder_result, globa
         curr_ax.set_title('')
 
     return params, plots_data, plots, ui
+
+
+
+
+
+def plot_spike_count_and_firing_rate_normalizations(pho_custom_decoder, enable_plots=True):
+    """ Plots several different normalizations of binned firing rate and spike counts, optionally plotting them. 
+    History: Extracted from 2022-06-22 Notebook 93
+    
+    TODO: add ax argument to update existing plots
+    
+    Usage:
+        from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import plot_spike_count_and_firing_rate_normalizations
+        pho_custom_decoder = curr_kdiba_pipeline.computation_results['maze1'].computed_data['pf2D_Decoder']
+        plot_spike_count_and_firing_rate_normalizations(pho_custom_decoder)
+    """
+
+    spike_proportion_global_fr_normalized, firing_rate, firing_rate_global_fr_normalized = BayesianPlacemapPositionDecoder.perform_compute_spike_count_and_firing_rate_normalizations(pho_custom_decoder)
+
+    # produces a fraction which indicates which proportion of the window's firing belonged to each unit (accounts for global changes in firing rate (each window is scaled by the toial spikes of all cells in that window)    
+    if enable_plots:
+        plt.figure(num=5)
+        plt.imshow(spike_proportion_global_fr_normalized, cmap='turbo', aspect='auto')
+        plt.title('Unit Specific Proportion of Window Spikes')
+        plt.xlabel('Binned Time Window')
+        plt.ylabel('Neuron Proportion Activity')
+
+    if enable_plots:
+        plt.figure(num=6)
+        plt.imshow(firing_rate, cmap='turbo', aspect='auto')
+        plt.title('Unit Specific Binned Firing Rates')
+        plt.xlabel('Binned Time Window')
+        plt.ylabel('Neuron Firing Rate')
+
+    # produces a unit firing rate for each window that accounts for global changes in firing rate (each window is scaled by the firing rate of all cells in that window
+    if enable_plots:
+        plt.figure(num=7)
+        plt.imshow(firing_rate_global_fr_normalized, cmap='turbo', aspect='auto')
+        plt.title('Unit Specific Binned Firing Rates (Global Normalized)')
+        plt.xlabel('Binned Time Window')
+        plt.ylabel('Neuron Proportion Firing Rate')
+        
+
 
 
 
