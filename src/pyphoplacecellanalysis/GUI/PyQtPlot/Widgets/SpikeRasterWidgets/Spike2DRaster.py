@@ -346,7 +346,7 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
 
         # For this 2D Implementation of TimeCurvesViewMixin/PyQtGraphSpecificTimeCurvesMixin
         self.ui.main_time_curves_view_widget = None
-        
+        self.ui.main_time_curves_view_legend = None
         
         ## Add the container to hold dynamic matplotlib plot widgets:
         self.ui.dynamic_docked_widget_container = NestedDockAreaWidget()
@@ -577,6 +577,8 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
         for (aUID, plt) in self.plots.time_curves.items():
             self.ui.main_time_curves_view_widget.removeItem(plt) # this should automatically work for 2D curves as well
             # plt.delete_later() #?
+            
+        self.ui.main_time_curves_view_legend.clear() # remove all items from the legend
         # Clear the dict
         self.plots.time_curves.clear()
         ## This part might be 3D only, but we do have a working 2D version so maybe just bring that in?
@@ -613,6 +615,8 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
                     
                     curr_plot_column_name = curr_data_series_dict.get('name', f'series[{curr_data_series_index}]') # get either the specified name or the generic 'series[i]' name otherwise
                     curr_plot_name = self.params.time_curves_datasource.datasource_UIDs[curr_data_series_index]
+                    curr_plot_legend_name = self.params.time_curves_datasource.data_column_names[curr_data_series_index] # ['lin_pos', 'x', 'y']
+                    
                     # points for the current plot:
                     pts = np.column_stack([curr_data_series_dict['x'], curr_data_series_dict['y'], curr_data_series_dict['z']])
                     
@@ -621,7 +625,9 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
                     extra_plot_options_dict = {'color_name':curr_data_series_dict.get('color_name', 'white'),
                                                'color':curr_data_series_dict.get('color', None),
                                                'line_width':curr_data_series_dict.get('line_width', 0.5),
-                                               'z_scaling_factor':curr_data_series_dict.get('z_scaling_factor', 0.5)}
+                                               'z_scaling_factor':curr_data_series_dict.get('z_scaling_factor', 0.5),
+                                               'legend_name':curr_data_series_dict.get('legend_name', curr_plot_legend_name)
+                                               }
                     
                 else:
                     raise NotImplementedError # gave up
@@ -631,6 +637,18 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
                 # end for curr_data_series_index in np.arange(num_data_series)
 
             self.add_3D_time_curves_baseline_grid_mesh() # from Render3DTimeCurvesBaseGridMixin
+
+    def _build_or_update_time_curves_legend(self):
+        """ Build a legend for each of the curves """
+        legend = pg.LegendItem((80,60), offset=(70,20)) # do this instead of # .addLegend
+        legend.setParentItem(self.ui.main_time_curves_view_widget.graphicsItem())
+
+        # desired_series_legend_names = list(self.params.time_curves_datasource.data_column_names) # ['lin_pos', 'x', 'y']
+        # for legend_name, (curve_name, curveDataItem) in zip(desired_series_legend_names, self.plots['time_curves'].items()):
+        #     print(f'legend_name: {legend_name}, curve_name: {curve_name}')
+        #     legend.addItem(curveDataItem, legend_name)
+        return legend
+    
 
     def _build_or_update_time_curves_plot(self, plot_name, points, **kwargs):
         """ For 2D
@@ -644,11 +662,17 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
             # row_index = (self.params.main_graphics_plot_widget_rowspan * 2)+1 # row 2 if they were all rowspan 2
             row_index = None # just auto get the next index
             self.ui.main_time_curves_view_widget = self.create_separate_render_plot_item(row=row_index, col=0, rowspan=1, colspan=1, name='new_curves_separate_plot') # PlotItem
-        
+            # self.ui.main_time_curves_view_legend = self._build_or_update_time_curves_legend()
         
         # build the plot arguments (color, line thickness, etc)        
         plot_args = ({'color_name':'white','line_width':0.5,'z_scaling_factor':1.0} | kwargs)
         
+        curr_plot_legend_name = plot_args.pop('legend_name', None) # See if a legend entry is needed for this plot
+        if curr_plot_legend_name is not None:
+            if self.ui.main_time_curves_view_legend is None:
+                # build the legend if needed
+                self.ui.main_time_curves_view_legend = self._build_or_update_time_curves_legend()
+
         ## Drop the y-value from the 3D version to get the appropriate 2D coordinates (x,y)
         if np.shape(points)[1] == 3:
             # same data from 3D version, drop the y-value accordingly:
@@ -666,6 +690,11 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
             # Plot already exists, update it instead.
             plt = self.plots.time_curves[plot_name]
             plt.setData(points)
+            if curr_plot_legend_name is not None:
+                # Update the legend entry:
+                curr_label = self.ui.main_time_curves_view_legend.getLabel(plt)
+                curr_label.setText(curr_plot_legend_name) # update the legend name if needed
+                
         else:
             # plot doesn't exist, built it fresh.
             
@@ -680,7 +709,11 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
             plt = self.ui.main_time_curves_view_widget.plot(points, pen=line_color, name=plot_name) # TODO: is this the slow version of name =?
             # end for curr_data_series_index in np.arange(num_data_series)
             self.plots.time_curves[plot_name] = plt # add it to the dictionary.
-
+            
+            if curr_plot_legend_name is not None:
+                # Create the legend entry
+                self.ui.main_time_curves_view_legend.addItem(plt, curr_plot_legend_name)
+            
             # TODO: set line_width?
             # TODO: scaling like the 3D version?
             
