@@ -509,6 +509,35 @@ class BayesianPlacemapPositionDecoder(PlacemapPositionDecoder):
         new_obj = BayesianPlacemapPositionDecoder(val_dict.get('time_bin_size', 0.25), val_dict.get('pf', None), val_dict.get('spikes_df', None), setup_on_init=val_dict.get('setup_on_init', True), post_load_on_init=val_dict.get('post_load_on_init', False), debug_print=val_dict.get('debug_print', False))
         return new_obj
     
+    
+    ## Compatibility properties:
+    # @property
+    # def flat_p_x_given_n(self):
+    #     """The flattened outputs """
+    #     return self._flatten_output(self.p_x_given_n)
+    
+    # @property
+    # def most_likely_position_flat_indicies(self):
+    #     """The flattened outputs for position:
+        
+    #     np.shape(self.most_likely_position_flat_indicies) # (85841,)
+    #     np.shape(self.most_likely_position_indicies) # (2, 85841)
+        
+    #     """
+    #     return self._flatten_output(self.p_x_given_n)
+    
+    # @property
+    # def flat_most_likely_position(self):
+    #     """The flattened outputs for position:
+        
+    #     np.shape(self.most_likely_position_flat_indicies) # (85841,)
+    #     np.shape(self.most_likely_position_indicies) # (2, 85841)
+        
+    #     """
+    #     return self._flatten_output(self.most_likely_positions)
+    
+    
+    
     # ==================================================================================================================== #
     # Methods                                                                                                              #
     # ==================================================================================================================== #
@@ -613,6 +642,12 @@ class BayesianPlacemapPositionDecoder(PlacemapPositionDecoder):
     def _reshape_output(self, output_probability):
         return np.reshape(output_probability, (*self.original_position_data_shape, self.num_time_windows)) # changed for compatibility with 1D decoder
     
+    def _flatten_output(self, output):
+        """ the inverse of _reshape_output(output) to flatten the position coordinates into a single flat dimension """
+        return np.reshape(output, (self.flat_position_size, self.num_time_windows)) # Trying to flatten the position coordinates into a single flat dimension
+    
+    
+    
     # ==================================================================================================================== #
     # Main computation functions:                                                                                          #
     # ==================================================================================================================== #
@@ -629,7 +664,7 @@ class BayesianPlacemapPositionDecoder(PlacemapPositionDecoder):
     #         print(f'np.shape(final_p_x_given_n): {np.shape(self.flat_p_x_given_n)}') # np.shape(final_p_x_given_n): (288,)
     #     return final_p_x_given_n
 
-    def hyper_perform_decode(self, spikes_df, decoding_time_bin_size=0.1, t_start=None, t_end=None, debug_print=False):
+    def hyper_perform_decode(self, spikes_df, decoding_time_bin_size=0.1, t_start=None, t_end=None, output_flat_versions=False, debug_print=False):
         """ makes use of:
         
             self.neuron_IDs
@@ -650,28 +685,31 @@ class BayesianPlacemapPositionDecoder(PlacemapPositionDecoder):
         spkcount, nbins, time_bin_containers_list = epochs_spkcount(spikes_df, epochs_df, decoding_time_bin_size, slideby=decoding_time_bin_size, export_time_bins=True, included_neuron_ids=self.neuron_IDs, debug_print=debug_print) ## time_bins returned are not correct, they're subsampled at a rate of 1000
         spkcount = spkcount[0]
         nbins = nbins[0]
-        # time_bin_centers = time_bin_containers_list[0]
         time_bin_container = time_bin_containers_list[0] # neuropy.utils.mixins.binning_helpers.BinningContainer
         
-        # time_bin_edges, curr_binning_info = compute_spanning_bins(None, variable_start_value=t_start, variable_end_value=t_end, num_bins=nbins)
-        
-        most_likely_positions, p_x_given_n, most_likely_position_indicies = self.decode(spkcount, time_bin_size=decoding_time_bin_size, debug_print=debug_print)
+        most_likely_positions, p_x_given_n, most_likely_position_indicies, flat_outputs_container = self.decode(spkcount, time_bin_size=decoding_time_bin_size, output_flat_versions=output_flat_versions, debug_print=debug_print)
         curr_unit_marginal_x, curr_unit_marginal_y = self.perform_build_marginals(p_x_given_n, most_likely_positions, debug_print=debug_print)
-        return time_bin_container, p_x_given_n, most_likely_positions, curr_unit_marginal_x, curr_unit_marginal_y
+        return time_bin_container, p_x_given_n, most_likely_positions, curr_unit_marginal_x, curr_unit_marginal_y, flat_outputs_container
     
     
             
-    def compute_all(self):
+    def compute_all(self, debug_print=False):
         # with WrappingMessagePrinter(f'compute_all final_p_x_given_n called. Computing {np.shape(self.flat_p_x_given_n)[0]} windows for self.final_p_x_given_n...', begin_line_ending='... ', finished_message='compute_all completed.', enable_print=self.debug_print):
-        with WrappingMessagePrinter(f'compute_all final_p_x_given_n called. Computing windows...', begin_line_ending='... ', finished_message='compute_all completed.', enable_print=self.debug_print):
+        with WrappingMessagePrinter(f'compute_all final_p_x_given_n called. Computing windows...', begin_line_ending='... ', finished_message='compute_all completed.', enable_print=(debug_print or self.debug_print)):
             ## Single sweep decoding:
 
             ## 2022-09-23 - Epochs-style encoding (that works):
-            self.time_binning_container, self.p_x_given_n, self.most_likely_positions, curr_unit_marginal_x, curr_unit_marginal_y = self.hyper_perform_decode(self.spikes_df, decoding_time_bin_size=self.time_bin_size, debug_print=False)
+            self.time_binning_container, self.p_x_given_n, self.most_likely_positions, curr_unit_marginal_x, curr_unit_marginal_y, flat_outputs_container = self.hyper_perform_decode(self.spikes_df, decoding_time_bin_size=self.time_bin_size, output_flat_versions=True, debug_print=(debug_print or self.debug_print))
             self.marginal = DynamicContainer(x=curr_unit_marginal_x, y=curr_unit_marginal_y)
             assert isinstance(self.time_binning_container, BinningContainer) # Should be neuropy.utils.mixins.binning_helpers.BinningContainer
             self.compute_corrected_positions()
             
+            ## set flat properties for compatibility (I guess)
+            self.flat_p_x_given_n = flat_outputs_container.flat_p_x_given_n
+            self.most_likely_position_flat_indicies = flat_outputs_container.most_likely_position_flat_indicies
+            # self.flat_p_x_given_n = flat_outputs_container.flat_p_x_given_n
+            
+        
             # print(f'unit_specific_binned_spike_counts.to_numpy(): {np.shape(unit_specific_binned_spike_counts.to_numpy())}') # (85841, 40)
             
             ## Older Zhang-style decoding:
@@ -685,15 +723,18 @@ class BayesianPlacemapPositionDecoder(PlacemapPositionDecoder):
 
     def compute_most_likely_positions(self):
         """ Computes the most likely positions at each timestep from self.flat_p_x_given_n """        
+        raise NotImplementedError
         self.most_likely_position_flat_indicies, self.most_likely_position_indicies = self.perform_compute_most_likely_positions(self.flat_p_x_given_n, self.original_position_data_shape)
         # np.shape(self.most_likely_position_flat_indicies) # (85841,)
         # np.shape(self.most_likely_position_indicies) # (2, 85841)
         
         
             
-    def decode(self, unit_specific_time_binned_spike_counts, time_bin_size, debug_print=True):
+    def decode(self, unit_specific_time_binned_spike_counts, time_bin_size, output_flat_versions=False, debug_print=True):
         """ decodes the neural activity from its internal placefields, returning its posterior and the predicted position 
         Does not alter the internal state of the decoder (doesn't change internal most_likely_positions or posterior, etc)
+        
+        flat_outputs_container is returned IFF output_flat_versions is True
         
         Requires:
             .P_x
@@ -728,13 +769,20 @@ class BayesianPlacemapPositionDecoder(PlacemapPositionDecoder):
             p_x_given_n = np.reshape(curr_flat_p_x_given_n, (*self.original_position_data_shape, num_time_windows)) # changed for compatibility with 1D decoder
             most_likely_position_flat_indicies, most_likely_position_indicies = self.perform_compute_most_likely_positions(curr_flat_p_x_given_n, self.original_position_data_shape)
 
+            ## Flat properties:
+            if output_flat_versions:
+                flat_outputs_container = DynamicContainer(flat_p_x_given_n=curr_flat_p_x_given_n, most_likely_position_flat_indicies=most_likely_position_flat_indicies)
+            else:
+                # No flat versions
+                flat_outputs_container = None
+                
             if self.ndim > 1:
                 most_likely_positions = np.vstack((self.xbin_centers[most_likely_position_indicies[0,:]], self.ybin_centers[most_likely_position_indicies[1,:]])).T # much more efficient than the other implementation. Result is # (85844, 2)
             else:
                 # 1D Decoder case:
                 most_likely_positions = np.squeeze(self.xbin_centers[most_likely_position_indicies[0,:]])
         
-            return most_likely_positions, p_x_given_n, most_likely_position_indicies
+            return most_likely_positions, p_x_given_n, most_likely_position_indicies, flat_outputs_container
             
     def decode_specific_epochs(self, spikes_df, filter_epochs, decoding_time_bin_size = 0.05, debug_print=False):
         """ TODO: CRITICAL: THIS IS THE ONLY VERSION OF THE DECODING THAT WORKS. The version perfomred by "compute_all" fails miserably! """
@@ -832,9 +880,8 @@ class BayesianPlacemapPositionDecoder(PlacemapPositionDecoder):
         # half_decoding_time_bin_size = (decoding_time_bin_size/2.0)
         for i, curr_unit_spkcount, curr_unit_num_bins, curr_unit_time_bin_container in zip(np.arange(num_filter_epochs), spkcount, nbins, time_bin_containers_list):
             ## New 2022-09-26 method with working time_bin_centers_list returned from epochs_spkcount
-            filter_epochs_decoder_result.time_bin_edges.append(curr_unit_time_bin_container.edges)
-
-            most_likely_positions, p_x_given_n, most_likely_position_indicies = active_decoder.decode(curr_unit_spkcount, time_bin_size=decoding_time_bin_size, debug_print=debug_print)
+            filter_epochs_decoder_result.time_bin_edges.append(curr_unit_time_bin_container.edges)            
+            most_likely_positions, p_x_given_n, most_likely_position_indicies, flat_outputs_container = active_decoder.decode(curr_unit_spkcount, time_bin_size=decoding_time_bin_size, output_flat_versions=False, debug_print=debug_print)
             filter_epochs_decoder_result.most_likely_positions_list.append(most_likely_positions)
             filter_epochs_decoder_result.p_x_given_n_list.append(p_x_given_n)
             filter_epochs_decoder_result.most_likely_position_indicies_list.append(most_likely_position_indicies)
