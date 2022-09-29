@@ -13,6 +13,20 @@ class DebugMenuProviderMixin(BaseMenuProviderMixin):
     .ui.menus.global_window_menus.debug.actions_dict
     .ui.menus.global_window_menus.debug.actions_dict
     
+    
+    Can be used in two forms:
+        1. Via inherting the desired Window widget class to DebugMenuProviderMixin
+        2. Via initializing via the __init__(...) method: DebugMenuProviderMixin(render_widget)
+            from pyphoplacecellanalysis.GUI.Qt.Mixins.Menus.DebugMenuProviderMixin import DebugMenuProviderMixin
+            # Debug Menu
+            _debug_menu_provider = DebugMenuProviderMixin(render_widget=spike_raster_window)
+            _debug_menu_provider.DebugMenuProviderMixin_on_init()
+            _debug_menu_provider.DebugMenuProviderMixin_on_buildUI()
+            ...
+            # Set the returned provider object:
+            spike_raster_window.main_menu_window.ui.menus.global_window_menus.debug.menu_provider_obj = _debug_menu_provider
+            
+            
     """
     top_level_menu_name = 'actionMenuDebug'
     
@@ -37,11 +51,15 @@ class DebugMenuProviderMixin(BaseMenuProviderMixin):
         """The connection_man property."""
         return self.root_window.connection_man
 
+
+    # __init__ ___________________________________________________________________________________________________________ #
     def __init__(self, render_widget: QtWidgets.QWidget, parent=None, **kwargs):
         """ the __init__ form allows adding menus to extant widgets without modifying their class to inherit from this mixin """
         super(DebugMenuProviderMixin, self).__init__(render_widget=render_widget, parent=parent, **kwargs)
         # Setup member variables:
-        pass
+        self.DebugMenuProviderMixin_on_init()
+        self.DebugMenuProviderMixin_on_setup()
+        self.DebugMenuProviderMixin_on_buildUI()
         
         
     @QtCore.Slot()
@@ -49,13 +67,14 @@ class DebugMenuProviderMixin(BaseMenuProviderMixin):
         """ perform any parameters setting/checking during init """
         BaseMenuProviderMixin.BaseMenuProviderMixin_on_init(self)
         # Define the core object
-        self.activeMenuReference = PhoUIContainer.init_from_dict({'top_level_menu': None, 'actions_dict': {}, 'menu_provider_obj': None})
+        self.activeMenuReference = PhoUIContainer.init_from_dict({'top_level_menu': None, 'actions_dict': {}, 'menu_provider_obj': None})        
     
     @QtCore.Slot()
     def DebugMenuProviderMixin_on_setup(self):
         """ perfrom setup/creation of widget/graphical/data objects. Only the core objects are expected to exist on the implementor (root widget, etc) """
         pass
     
+    # build QActions _____________________________________________________________________________________________________ #
     def _DebugMenuProviderMixin_build_actions(self):
         """ build QActions """
         ## Add the dynamic menu entries:
@@ -77,9 +96,10 @@ class DebugMenuProviderMixin(BaseMenuProviderMixin):
         curr_connections_descriptions = list([a_conn_ref.description for a_conn_ref in connection_man.active_connections.values()])
         for a_connection_key in curr_connections_descriptions:
             self.activeMenuReference.active_connections_menu.addAction(a_connection_key)
-        # self.activeMenuReference.active_connections_menu.triggered.connect(lambda action: print(connection_man.active_connections.get(action.text(), f'Connection KeyNotFound: {action.text()}')))
         self.activeMenuReference.active_connections_menu.triggered.connect(lambda action: print((connection_man.find_active_connection(action.text()) or f'Connection KeyNotFound: {action.text()}')))
         
+        
+    # build QMenus _______________________________________________________________________________________________________ #
     def _DebugMenuProviderMixin_build_menus(self):
         """ build QMenus """
         an_action_key, self.activeMenuReference.top_level_menu = PhoMenuHelper.add_menu(a_main_window=self.root_window, text="Debug", name=self.top_level_menu_name, parent_menu=self.root_menu_bar, menu_actions_dict=self.DebugMenuProviderMixin_actionsDict)

@@ -125,8 +125,7 @@ class SpikeRastersDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Displa
             
             display_output = owning_pipeline_reference.display_output[active_display_fn_identifying_ctx]
             # print(f'display_output: {display_output}')
-            # curr_main_menu_window, menuCreateNewConnectedWidget, createNewConnected_actions_dict = CreateNewConnectedWidgetMenuHelper.try_add_create_new_connected_widget_menu(spike_raster_window, owning_pipeline_reference, active_config, display_output)
-            curr_main_menu_window, menuCreateNewConnectedWidget, createNewConnected_actions_dict = CreateNewConnectedWidgetMenuHelper.try_add_create_new_connected_widget_menu(spike_raster_window, owning_pipeline_reference, active_config_name, display_output) # Encountered error where I was passing active_config (a `InteractivePlaceCellConfig` type object) instead of active_config_name (a string)
+            curr_main_menu_window, menuCreateNewConnectedWidget, createNewConnected_actions_dict = CreateNewConnectedWidgetMenuHelper.try_add_create_new_connected_widget_menu(spike_raster_window, owning_pipeline_reference, active_config_name, display_output) 
             spike_raster_window.main_menu_window = curr_main_menu_window # to retain the changes
             
         else:
@@ -136,9 +135,9 @@ class SpikeRastersDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Displa
             
         # Debug Menu
         _debug_menu_provider = DebugMenuProviderMixin(render_widget=spike_raster_window)
-        _debug_menu_provider.DebugMenuProviderMixin_on_init()
-        _debug_menu_provider.DebugMenuProviderMixin_on_buildUI()
-                
+        spike_raster_window.main_menu_window.ui.menus.global_window_menus.debug.menu_provider_obj = _debug_menu_provider
+        
+        
         ## Adds the custom renderable menu to the top-level menu of the plots in Spike2DRaster
         active_pf_2D_dt = computation_result.computed_data.get('pf2D_dt', None)
         if active_pf_2D_dt is not None:
@@ -147,7 +146,6 @@ class SpikeRastersDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Displa
 
             # _createLinkedWidget_menus = LocalMenus_AddRenderable.add_Create_Paired_Widget_menu(spike_raster_window, active_pf_2D_dt)  # Adds the custom context menus for SpikeRaster2D
             _createLinkedWidget_menu_provider = CreateLinkedWidget_MenuProvider(render_widget=spike_raster_window)
-            _createLinkedWidget_menu_provider.CreateLinkedWidget_MenuProvider_on_init()
             if owning_pipeline_reference is not None:
                 if active_display_fn_identifying_ctx not in owning_pipeline_reference.display_output:
                     owning_pipeline_reference.display_output[active_display_fn_identifying_ctx] = PhoUIContainer() # create a new context
@@ -161,7 +159,7 @@ class SpikeRastersDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Displa
         else:
             print(f'active_pf_2D_dt is None! Skipping Create Paired Widget Menu...')
     
-        spike_raster_window.main_menu_window.ui.menus.global_window_menus.debug.menu_provider_obj = _debug_menu_provider
+        
         spike_raster_window.main_menu_window.ui.menus.global_window_menus.create_linked_widget.menu_provider_obj = _createLinkedWidget_menu_provider
 
         return {'spike_raster_plt_2d':spike_raster_window.spike_raster_plt_2d, 'spike_raster_plt_3d':spike_raster_window.spike_raster_plt_3d, 'spike_raster_window': spike_raster_window}

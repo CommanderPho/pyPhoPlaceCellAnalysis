@@ -47,6 +47,8 @@ class CreateLinkedWidget_MenuProvider(BaseMenuProviderMixin):
         """ the __init__ form allows adding menus to extant widgets without modifying their class to inherit from this mixin """
         super(CreateLinkedWidget_MenuProvider, self).__init__(render_widget=render_widget, parent=parent, **kwargs)
         # Setup member variables:
+        self.CreateLinkedWidget_MenuProvider_on_init()
+        self.CreateLinkedWidget_MenuProvider_on_setup()
         
         
     @QtCore.Slot()
@@ -63,8 +65,6 @@ class CreateLinkedWidget_MenuProvider(BaseMenuProviderMixin):
         """ perfrom setup/creation of widget/graphical/data objects. Only the core objects are expected to exist on the implementor (root widget, etc) """
         pass
     
-    
-    @QtCore.Slot()
     def CreateLinkedWidget_MenuProvider_on_buildUI(self, **kwargs):
         """ perfrom setup/creation of widget/graphical/data objects. Only the core objects are expected to exist on the implementor (root widget, etc)
         
