@@ -25,10 +25,15 @@ from pyphoplacecellanalysis.Pho2D.PyQtPlots.Extensions.pyqtgraph_helpers import 
 
 
 
-def pyqtplot_plot_image_array(xbin_edges, ybin_edges, images, occupancy, max_num_columns = 5, drop_below_threshold: float=0.0000001, enable_LUT_Histogram=False, app=None, parent_root_widget=None, root_render_widget=None, debug_print=False):
+def pyqtplot_plot_image_array(xbin_edges, ybin_edges, images, occupancy, max_num_columns = 5, drop_below_threshold: float=0.0000001, app=None, parent_root_widget=None, root_render_widget=None, debug_print=False):
     """ Plots an array of images provided in 'images' argument
     images should be an nd.array with dimensions like: (10, 63, 63), where (N_Images, X_Dim, Y_Dim)
         or (2, 5, 63, 63), where (N_Rows, N_Cols, X_Dim, Y_Dim)
+        
+    NOTES:
+        2022-09-29 - Extracted from Notebook
+            🚧 Needs subplot labels changed from Cell[i] to the appropriate standardized titles. Needs other minor refinements.
+            🚧 pyqtplot_plot_image_array needs major improvements to achieve feature pairity with display_all_pf_2D_pyqtgraph_binned_image_rendering, so probably just use display_all_pf_2D_pyqtgraph_binned_image_rendering.
         
     Example:
         # Get flat list of images:
@@ -38,8 +43,27 @@ def pyqtplot_plot_image_array(xbin_edges, ybin_edges, images, occupancy, max_num
 
         app, win, plot_array, img_item_array, other_components_array = pyqtplot_plot_image_array(active_one_step_decoder.xbin, active_one_step_decoder.ybin, images, occupancy)
         win.show()
+        
+        
+    # 🚧 TODO: COMPATIBILITY: replace compute_paginated_grid_config with standardized `_determine_best_placefield_2D_layout` block (see below):
+    ```
+    from neuropy.utils.matplotlib_helpers import _build_variable_max_value_label, enumTuningMap2DPlotMode, enumTuningMap2DPlotVariables, _determine_best_placefield_2D_layout
+    nfigures, num_pages, included_combined_indicies_pages, page_grid_sizes, data_aspect_ratio, page_figure_sizes = _determine_best_placefield_2D_layout(xbin=active_pf_2D.xbin, ybin=active_pf_2D.ybin, included_unit_indicies=np.arange(active_pf_2D.ratemap.n_neurons),
+        **overriding_dict_with(lhs_dict={'subplots': (40, 3), 'fig_column_width': 8.0, 'fig_row_height': 1.0, 'resolution_multiplier': 1.0, 'max_screen_figure_size': (None, None), 'last_figure_subplots_same_layout': True, 'debug_print': True}, **figure_format_config)) 
+
+    print(f'nfigures: {nfigures}\ndata_aspect_ratio: {data_aspect_ratio}')
+    # Loop through each page/figure that's required:
+    for page_fig_ind, page_fig_size, page_grid_size in zip(np.arange(nfigures), page_figure_sizes, page_grid_sizes):
+        print(f'\tpage_fig_ind: {page_fig_ind}, page_fig_size: {page_fig_size}, page_grid_size: {page_grid_size}')
+        # print(f'\tincluded_combined_indicies_pages: {included_combined_indicies_pages}\npage_grid_sizes: {page_grid_sizes}\npage_figure_sizes: {page_figure_sizes}')
+    ```
+        
+        
+        
     """
-    root_render_widget, parent_root_widget, app = pyqtplot_common_setup(f'pyqtplot_plot_image_array: {np.shape(images)}', app=app, parent_root_widget=parent_root_widget, root_render_widget=root_render_widget)
+    root_render_widget, parent_root_widget, app = pyqtplot_common_setup(f'pyqtplot_plot_image_array: {np.shape(images)}', app=app, parent_root_widget=parent_root_widget, root_render_widget=root_render_widget) ## 🚧 TODO: BUG: this makes a new QMainWindow to hold this item, which is inappropriate if it's to be rendered as a child of another control
+    
+    pg.setConfigOptions(imageAxisOrder='col-major') # this causes the placefields to be rendered horizontally, like they were in _temp_pyqtplot_plot_image_array
     
     # cmap = pg.ColorMap(pos=np.linspace(0.0, 1.0, 6), color=colors)
     cmap = pg.colormap.get('jet','matplotlib') # prepare a linear color map

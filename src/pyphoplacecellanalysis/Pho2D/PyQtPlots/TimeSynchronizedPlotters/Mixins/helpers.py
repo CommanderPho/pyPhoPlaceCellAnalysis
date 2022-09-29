@@ -1,4 +1,4 @@
-import pyphoplacecellanalysis.External.pyqtgraph as pg # required for _temp_pyqtplot_plot_image_array
+import pyphoplacecellanalysis.External.pyqtgraph as pg
 
 
 # ==================================================================================================================== #
