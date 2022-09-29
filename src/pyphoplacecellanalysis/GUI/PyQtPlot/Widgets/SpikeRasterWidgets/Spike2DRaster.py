@@ -640,7 +640,9 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
 
     def _build_or_update_time_curves_legend(self):
         """ Build a legend for each of the curves """
-        legend = pg.LegendItem((80,60), offset=(70,20)) # do this instead of # .addLegend
+        # legend_size = (80,60) # fixed size legend
+        legend_size = None # auto-sizing legend to contents
+        legend = pg.LegendItem(legend_size, offset=(-1,0)) # do this instead of # .addLegend
         legend.setParentItem(self.ui.main_time_curves_view_widget.graphicsItem())
 
         # desired_series_legend_names = list(self.params.time_curves_datasource.data_column_names) # ['lin_pos', 'x', 'y']
