@@ -51,20 +51,19 @@ class DefaultDecoderDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Disp
             # print(f'animate({i})')
             return renderer.display(i)
         
-    def _display_plot_marginal_1D_most_likely_position_comparisons(computation_result, active_config, variable_name='x', **kwargs):
+    def _display_plot_marginal_1D_most_likely_position_comparisons(computation_result, active_config, variable_name='x', most_likely_positions_mode='standard', **kwargs):
         """ renders a plot with the 1D Marginals either (x and y position axes): the computed posterior for the position from the Bayesian decoder and overlays the animal's actual position over the top. 
         
-        , ax=None
+        most_likely_positions_mode: 'standard'|'corrected'
         
         
         ax = destination_plot.ui.matplotlib_view_widget.ax,
         variable_name = 'x',
         
         """
-        print(f'_display_plot_marginal_1D_most_likely_position_comparisons(...): active_config: {active_config}, kwargs: {kwargs}')
+        # print(f'_display_plot_marginal_1D_most_likely_position_comparisons(...): active_config: {active_config}, kwargs: {kwargs}')
         
         active_decoder = computation_result.computed_data['pf2D_Decoder']
-        # marginals_x, marginals_y = active_decoder.perform_build_marginals(p_x_given_n=active_decoder.p_x_given_n, most_likely_positions=active_decoder.most_likely_positions)
         if variable_name == 'x':
             active_marginals = active_decoder.marginal.x
             active_bins = active_decoder.xbin
@@ -72,8 +71,12 @@ class DefaultDecoderDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Disp
             active_marginals = active_decoder.marginal.y
             active_bins = active_decoder.ybin
         
-        # active_most_likely_positions = active_marginals.most_likely_positions_1D # Raw decoded positions
-        active_most_likely_positions = active_marginals.revised_most_likely_positions_1D # Interpolated most likely positions computed by active_decoder.compute_corrected_positions()
+        if most_likely_positions_mode == 'standard':
+            active_most_likely_positions = active_marginals.most_likely_positions_1D # Raw decoded positions
+        elif most_likely_positions_mode == 'corrected':
+            active_most_likely_positions = active_marginals.revised_most_likely_positions_1D # Interpolated most likely positions computed by active_decoder.compute_corrected_positions()
+        else:
+            raise NotImplementedError
                 
         ## Get the previously created matplotlib_view_widget figure/ax:
         fig, curr_ax = plot_1D_most_likely_position_comparsions(computation_result.sess.position.to_dataframe(), time_window_centers=active_decoder.time_window_centers, xbin=active_bins,
@@ -602,18 +605,19 @@ class AddNewDecodedPosition_MatplotlibPlotCommand(BaseMenuCommand):
         self._curr_active_pipeline = curr_active_pipeline
         self._active_config_name = active_config_name
         self._display_output = display_output
-        print(f'AddNewDecodedPosition_MatplotlibPlotCommand.__init__(...)')
+        # print(f'AddNewDecodedPosition_MatplotlibPlotCommand.__init__(...)')
 
     def execute(self, *args, **kwargs) -> None:
         ## To begin, the destination plot must have a matplotlib widget plot to render to:
-        print(f'AddNewDecodedPosition_MatplotlibPlotCommand.execute(...)')
+        # print(f'AddNewDecodedPosition_MatplotlibPlotCommand.execute(...)')
         active_2d_plot = self._spike_raster_window.spike_raster_plt_2d
         # If no plot to render on, do this:
         widget, matplotlib_fig, matplotlib_fig_ax = active_2d_plot.add_new_matplotlib_render_plot_widget()
-        fig, curr_ax = self._curr_active_pipeline.display('_display_plot_marginal_1D_most_likely_position_comparisons', self._active_config_name, variable_name='x', ax=active_2d_plot.ui.matplotlib_view_widget.ax)
-        print(f'\t AddNewDecodedPosition_MatplotlibPlotCommand.execute(...) finished with the display call...')
+        # most_likely_positions_mode: 'standard'|'corrected'
+        fig, curr_ax = self._curr_active_pipeline.display('_display_plot_marginal_1D_most_likely_position_comparisons', self._active_config_name, variable_name='x', most_likely_positions_mode='corrected', ax=active_2d_plot.ui.matplotlib_view_widget.ax)
+        # print(f'\t AddNewDecodedPosition_MatplotlibPlotCommand.execute(...) finished with the display call...')
         active_2d_plot.ui.matplotlib_view_widget.draw()
         active_2d_plot.sync_matplotlib_render_plot_widget() # Sync it with the active window:
-        print(f'\t AddNewDecodedPosition_MatplotlibPlotCommand.execute() is done.')
+        # print(f'\t AddNewDecodedPosition_MatplotlibPlotCommand.execute() is done.')
         
         
