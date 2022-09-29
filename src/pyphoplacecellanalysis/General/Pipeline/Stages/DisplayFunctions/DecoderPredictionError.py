@@ -61,6 +61,8 @@ class DefaultDecoderDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Disp
         variable_name = 'x',
         
         """
+        print(f'_display_plot_marginal_1D_most_likely_position_comparisons(...): active_config: {active_config}, kwargs: {kwargs}')
+        
         active_decoder = computation_result.computed_data['pf2D_Decoder']
         # marginals_x, marginals_y = active_decoder.perform_build_marginals(p_x_given_n=active_decoder.p_x_given_n, most_likely_positions=active_decoder.most_likely_positions)
         if variable_name == 'x':
@@ -79,9 +81,6 @@ class DefaultDecoderDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Disp
                                                         active_most_likely_positions_1D=active_most_likely_positions,
                                                         **overriding_dict_with(lhs_dict={'ax':None, 'variable_name':variable_name, 'enable_flat_line_drawing':False, 'debug_print': False}, **kwargs))
         
-        ## TODO: what are we supposed to return from these display functions?
-        # destination_plot.ui.matplotlib_view_widget.draw()
-        # destination_plot.sync_matplotlib_render_plot_widget()
         return fig, curr_ax
 
             
