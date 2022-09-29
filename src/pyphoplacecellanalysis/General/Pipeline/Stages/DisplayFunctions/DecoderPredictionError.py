@@ -1,5 +1,6 @@
 import numpy as np
 import pandas as pd
+from copy import deepcopy
 import matplotlib.pyplot as plt
 from matplotlib.widgets import Slider
 from matplotlib.patches import FancyArrowPatch, FancyArrow
@@ -113,6 +114,61 @@ class DefaultDecoderDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Disp
             axs[0].plot(active_time_window_variable, active_most_likely_positions_x, lw=1.0, color='#00ff7f99', alpha=0.6, label='2-step: most likely positions x') # (Num windows x 2)
             axs[1].plot(active_time_window_variable, active_most_likely_positions_y, lw=1.0, color='#00ff7f99', alpha=0.6, label='2-step: most likely positions y') # (Num windows x 2)
             
+
+    def _display_plot_decoded_epoch_slices(computation_result, active_config, filter_epochs='ripple', **kwargs):
+            """ renders a plot with the 1D Marginals either (x and y position axes): the computed posterior for the position from the Bayesian decoder and overlays the animal's actual position over the top. 
+            
+            most_likely_positions_mode: 'standard'|'corrected'
+            
+            
+            ax = destination_plot.ui.matplotlib_view_widget.ax,
+            variable_name = 'x',
+            
+            """
+            decoding_time_bin_size = kwargs.pop('decoding_time_bin_size', 0.02)
+            default_figure_name = 'stacked_epoch_slices_matplotlib_subplots'
+            active_decoder = computation_result.computed_data['pf2D_Decoder']
+            
+            if isinstance(filter_epochs, str):
+                if filter_epochs == 'laps':
+                    ## Lap-Epochs Decoding:
+                    laps_copy = deepcopy(computation_result.sess.laps)
+                    active_filter_epochs = laps_copy.filtered_by_lap_flat_index(np.arange(6)).as_epoch_obj() # epoch object
+                    default_figure_name = f'{default_figure_name}_Laps'
+                    
+                elif filter_epochs == 'ripple':
+                    ## Ripple-Epochs Decoding:
+                    active_filter_epochs = deepcopy(computation_result.sess.ripple) # epoch object
+                    default_figure_name = f'{default_figure_name}_Ripples'
+                    
+                elif filter_epochs == 'replay':
+                    active_filter_epochs = deepcopy(computation_result.sess.replay) # epoch object
+                    active_filter_epochs = active_filter_epochs.drop_duplicates("start") # tries to remove duplicate replays to take care of `AssertionError: Intervals in start_stop_times_arr must be non-overlapping`, but it hasn't worked.
+                    # filter_epochs.columns # ['epoch_id', 'rel_id', 'start', 'end', 'replay_r', 'replay_p', 'template_id', 'flat_replay_idx', 'duration']
+                    if not 'stop' in active_filter_epochs.columns:
+                        # Make sure it has the 'stop' column which is expected as opposed to the 'end' column
+                        active_filter_epochs['stop'] = active_filter_epochs['end'].copy()
+                    default_figure_name = f'{default_figure_name}_Replay'
+                else:
+                    raise NotImplementedError
+            else:
+                # Use it raw, hope it's right
+                active_filter_epochs = filter_epochs
+                default_figure_name = f'{default_figure_name}_CUSTOM'
+            
+            filter_epochs_decoder_result = active_decoder.decode_specific_epochs(computation_result.sess.spikes_df, filter_epochs=active_filter_epochs, decoding_time_bin_size=decoding_time_bin_size, debug_print=False)
+
+            # params, plots_data, plots, ui = plot_decoded_epoch_slices(active_filter_epochs, filter_epochs_decoder_result, global_pos_df=computation_result.sess.position.to_dataframe(), xbin=active_decoder.xbin,
+            #                                                         enable_flat_line_drawing=enable_flat_line_drawing, debug_test_max_num_slices=debug_test_max_num_slices, name='stacked_epoch_slices_matplotlib_subplots_RIPPLES', debug_print=debug_print)
+            out_plot_tuple = plot_decoded_epoch_slices(active_filter_epochs, filter_epochs_decoder_result, global_pos_df=computation_result.sess.position.to_dataframe(), xbin=active_decoder.xbin,
+                                                                    **overriding_dict_with(lhs_dict={'name':default_figure_name, 'debug_test_max_num_slices':8, 'enable_flat_line_drawing':False, 'debug_print': False}, **kwargs))
+            # params, plots_data, plots, ui = out_plot_tuple
+            
+            return out_plot_tuple
+        
+    
+
+
 
 
 # ==================================================================================================================== #
@@ -523,6 +579,9 @@ def plot_decoded_epoch_slices(filter_epochs, filter_epochs_decoder_result, globa
 
 
     # Laps Example:
+        ## Lap-Epochs Decoding:
+        laps_copy = deepcopy(sess.laps)
+        laps_filter_epochs = laps_copy.filtered_by_lap_flat_index(np.arange(6)).as_epoch_obj() # epoch object
         laps_filter_epochs_decoder_result = active_decoder.decode_specific_epochs(sess.spikes_df, filter_epochs=laps_filter_epochs, decoding_time_bin_size=decoding_time_bin_size, debug_print=False)
         laps_plot_tuple = plot_decoded_epoch_slices(laps_filter_epochs, laps_filter_epochs_decoder_result, global_pos_df=sess.position.to_dataframe(), xbin=active_decoder.xbin,
                                                                 enable_flat_line_drawing=enable_flat_line_drawing, debug_test_max_num_slices=debug_test_max_num_slices, name='stacked_epoch_slices_matplotlib_subplots_LAPS', debug_print=debug_print)
