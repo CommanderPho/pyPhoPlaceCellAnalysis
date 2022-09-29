@@ -507,21 +507,13 @@ def plot_decoded_epoch_slices(filter_epochs, filter_epochs_decoder_result, globa
     params, plots_data, plots, ui = stacked_epoch_slices_matplotlib_build_view(epoch_slices, name=name, plot_function_name=plot_function_name, debug_test_max_num_slices=debug_test_max_num_slices, debug_print=debug_print)
 
     for i, curr_ax in enumerate(plots.axs):
-        # curr_time_bins = filter_epochs_decoder_result.time_bin_centers[i]
         curr_time_bins = filter_epochs_decoder_result.time_bin_edges[i]
         curr_posterior_container = filter_epochs_decoder_result.marginal_x_list[i]
         curr_posterior = curr_posterior_container.p_x_given_n
-        # curr_most_likely_positions = filter_epochs_decoder_result.most_likely_positions_list[i][:,0].T
         curr_most_likely_positions = curr_posterior_container.most_likely_positions_1D
         
         if debug_print:
             print(f'i : {i}, curr_posterior.shape: {curr_posterior.shape}')
-        # if curr_posterior.ndim == 0:
-        #     curr_posterior = curr_posterior.reshape(1, 1)
-        # elif curr_posterior.ndim == 1:
-        #     curr_posterior = curr_posterior[:, np.newaxis]
-        #     if debug_print:
-        #         print(f'\t added dimension to curr_posterior: {curr_posterior.shape}')
 
         plots.fig, curr_ax = plot_1D_most_likely_position_comparsions(global_pos_df, ax=curr_ax, time_window_centers=curr_time_bins, xbin=xbin,
                                                            posterior=curr_posterior,
