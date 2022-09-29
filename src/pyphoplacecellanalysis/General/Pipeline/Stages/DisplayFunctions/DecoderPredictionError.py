@@ -530,15 +530,12 @@ def plot_decoded_epoch_slices(filter_epochs, filter_epochs_decoder_result, globa
 
     return params, plots_data, plots, ui
 
-
-
-
-
-def plot_spike_count_and_firing_rate_normalizations(pho_custom_decoder, enable_plots=True):
+# ==================================================================================================================== #
+# Rendering various different methods of normalizing spike counts and firing rates  (Matplotlib-based)                 #
+# ==================================================================================================================== #
+def plot_spike_count_and_firing_rate_normalizations(pho_custom_decoder, axs=None):
     """ Plots several different normalizations of binned firing rate and spike counts, optionally plotting them. 
     History: Extracted from 2022-06-22 Notebook 93
-    
-    TODO: add ax argument to update existing plots
     
     Usage:
         from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import plot_spike_count_and_firing_rate_normalizations
@@ -546,33 +543,45 @@ def plot_spike_count_and_firing_rate_normalizations(pho_custom_decoder, enable_p
         plot_spike_count_and_firing_rate_normalizations(pho_custom_decoder)
     """
 
+    created_new_figure = False
+    if axs is None:
+        created_new_figure = True
+        fig, axs = plt.subplots(ncols=1, nrows=3, figsize=(15,15), clear=True, sharex=True, sharey=False, constrained_layout=True)
+        
+    else:
+        fig = plt.gcf()
+        assert len(axs) == 3
+
     spike_proportion_global_fr_normalized, firing_rate, firing_rate_global_fr_normalized = BayesianPlacemapPositionDecoder.perform_compute_spike_count_and_firing_rate_normalizations(pho_custom_decoder)
 
     # produces a fraction which indicates which proportion of the window's firing belonged to each unit (accounts for global changes in firing rate (each window is scaled by the toial spikes of all cells in that window)    
-    if enable_plots:
-        plt.figure(num=5)
-        plt.imshow(spike_proportion_global_fr_normalized, cmap='turbo', aspect='auto')
-        plt.title('Unit Specific Proportion of Window Spikes')
-        plt.xlabel('Binned Time Window')
-        plt.ylabel('Neuron Proportion Activity')
+    # plt.figure(num=5)
+    curr_ax = axs[0]
+    plt.imshow(spike_proportion_global_fr_normalized, cmap='turbo', aspect='auto')
+    curr_ax.set_title('Unit Specific Proportion of Window Spikes')
+    curr_ax.set_xlabel('Binned Time Window')
+    curr_ax.set_ylabel('Neuron Proportion Activity')
 
-    if enable_plots:
-        plt.figure(num=6)
-        plt.imshow(firing_rate, cmap='turbo', aspect='auto')
-        plt.title('Unit Specific Binned Firing Rates')
-        plt.xlabel('Binned Time Window')
-        plt.ylabel('Neuron Firing Rate')
+    # plt.figure(num=6)
+    curr_ax = axs[1]
+    curr_ax.imshow(firing_rate, cmap='turbo', aspect='auto')
+    curr_ax.set_title('Unit Specific Binned Firing Rates')
+    curr_ax.set_xlabel('Binned Time Window')
+    curr_ax.set_ylabel('Neuron Firing Rate')
 
     # produces a unit firing rate for each window that accounts for global changes in firing rate (each window is scaled by the firing rate of all cells in that window
-    if enable_plots:
-        plt.figure(num=7)
-        plt.imshow(firing_rate_global_fr_normalized, cmap='turbo', aspect='auto')
-        plt.title('Unit Specific Binned Firing Rates (Global Normalized)')
-        plt.xlabel('Binned Time Window')
-        plt.ylabel('Neuron Proportion Firing Rate')
+    # plt.figure(num=7)
+    curr_ax = axs[2]
+    curr_ax.imshow(firing_rate_global_fr_normalized, cmap='turbo', aspect='auto')
+    curr_ax.set_title('Unit Specific Binned Firing Rates (Global Normalized)')
+    curr_ax.set_xlabel('Binned Time Window')
+    curr_ax.set_ylabel('Neuron Proportion Firing Rate')
+
+    if created_new_figure:
+        # Only update if we created a new figure:
+        fig.suptitle(f'Spike Count and Firing Rate Normalizations')
         
-
-
+    return fig, axs
 
 
 # ==================================================================================================================== #

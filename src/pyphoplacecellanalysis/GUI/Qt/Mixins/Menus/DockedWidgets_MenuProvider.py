@@ -15,7 +15,7 @@ from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPred
     
 
 class DockedWidgets_MenuProvider(BaseMenuProviderMixin):
-    """ 
+    """ The most up-to-date (as of 2022-09-29) method of building custom menu items. 
     
     .ui.menus.global_window_menus.debug_menu_provider.top_level_menu
     
