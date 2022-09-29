@@ -324,18 +324,29 @@ def _temp_debug_two_step_plots_imshow(active_one_step_decoder, active_two_step_d
 
     
 # MAIN IMPLEMENTATION FUNCTION:
-def _temp_debug_two_step_plots_animated_imshow(active_one_step_decoder, active_two_step_decoder, variable_name='p_x_given_n_and_x_prev', override_variable_value=None, update_callback_function=None):
+def _temp_debug_two_step_plots_animated_imshow(active_one_step_decoder, active_two_step_decoder, time_binned_position_df: pd.DataFrame, variable_name='p_x_given_n_and_x_prev', override_variable_value=None, update_callback_function=None):
     """Matplotlib-based imshow plot with interactive slider for displaying two-step bayesian decoding results
 
     Called from the display function '_display_two_step_decoder_prediction_error_2D' defined above to implement its core functionality
-    
 
+    ## Added _update_measured_animal_position_point(...)
+    DEPENDS ON active_computed_data.extended_stats.time_binned_position_df
+    
     Args:
         active_one_step_decoder ([type]): [description]
         active_two_step_decoder ([type]): [description]
+        time_binned_position_df: should be obtained from `active_computed_data.extended_stats.time_binned_position_df` by default
         variable_name (str, optional): [description]. Defaults to 'p_x_given_n_and_x_prev'.
         override_variable_value ([type], optional): [description]. Defaults to None.
         update_callback_function ([type], optional): [description]. Defaults to None.
+        
+        
+    Usage:
+        # Simple plot type 1:
+        # plotted_variable_name = kwargs.get('variable_name', 'p_x_given_n') # Tries to get the user-provided variable name, otherwise defaults to 'p_x_given_n'
+        plotted_variable_name = 'p_x_given_n' # Tries to get the user-provided variable name, otherwise defaults to 'p_x_given_n'
+        _temp_debug_two_step_plots_animated_imshow(active_one_step_decoder, active_two_step_decoder, active_computed_data.extended_stats.time_binned_position_df, variable_name=plotted_variable_name) # Works
+
     """
     if override_variable_value is None:
         try:
@@ -348,7 +359,7 @@ def _temp_debug_two_step_plots_animated_imshow(active_one_step_decoder, active_t
         variable_value = override_variable_value
 
     num_frames = np.shape(variable_value)[-1]
-    debug_print = False
+    debug_print = True
     if debug_print:
         print(f'_temp_debug_two_step_plots_animated_imshow: variable_name="{variable_name}", np.shape: {np.shape(variable_value)}, num_frames: {num_frames}')
 
@@ -357,11 +368,9 @@ def _temp_debug_two_step_plots_animated_imshow(active_one_step_decoder, active_t
 
     frame = 0
     
-    # Get extents:
-    # xmin, xmax, ymin, ymax = (xbin_edges[0], xbin_edges[-1], ybin_edges[0], ybin_edges[-1]) # from example imshow    
+    # Get extents:    
     xmin, xmax, ymin, ymax = (active_one_step_decoder.xbin[0], active_one_step_decoder.xbin[-1], active_one_step_decoder.ybin[0], active_one_step_decoder.ybin[-1])
     x_first_extent = (xmin, xmax, ymin, ymax) # traditional order of the extant axes
-    # y_first_extent = (ymin, ymax, xmin, xmax) # swapped the order of the extent axes.
     active_extent = x_first_extent # for 'x == horizontal orientation'
     # active_extent = y_first_extent # for 'x == vertical orientation'
 
@@ -376,6 +385,25 @@ def _temp_debug_two_step_plots_animated_imshow(active_one_step_decoder, active_t
     curr_val = np.swapaxes(curr_val, 0, 1) # x_horizontal_matrix: swap the first two axes while leaving the last intact. Returns a view into the matrix so it doesn't modify the value
     
     im_out = ax.imshow(curr_val, **main_plot_kwargs)
+    
+    ## Setup Auxillary Plots:
+    plot_measured_animal_position = (time_binned_position_df is not None)
+    
+    if plot_measured_animal_position:
+        active_resampled_pos_df = time_binned_position_df.copy() # active_computed_data.extended_stats.time_binned_position_df  # 1717 rows × 16 columns
+        active_resampled_measured_positions = active_resampled_pos_df[['x','y']].to_numpy() # The measured positions resampled (interpolated) at the window centers. 
+        measured_point = np.squeeze(active_resampled_measured_positions[frame,:])
+        ## decided on using scatter
+        # measured_positions_scatter = ax.scatter(measured_point[0], measured_point[1], color='white') # PathCollection
+        measured_positions_scatter, = ax.plot(measured_point[0], measured_point[1], color='white', marker='o', ls='') # PathCollection
+        
+        def _update_measured_animal_position_point(time_window_idx, ax=None):
+            """ captures `active_resampled_measured_positions` and `measured_positions_scatter` """
+            measured_point = np.squeeze(active_resampled_measured_positions[time_window_idx,:])
+            ## TODO: this would need to use set_offsets(...) if we wanted to stick with scatter plot.
+            measured_positions_scatter.set_xdata(measured_point[0])
+            measured_positions_scatter.set_ydata(measured_point[1])
+    
     
     # for 'x == horizontal orientation':
     ax.set_xlabel('x')
@@ -396,6 +424,9 @@ def _temp_debug_two_step_plots_animated_imshow(active_one_step_decoder, active_t
         im_out.set_data(curr_val)
         # ax.relim()
         # ax.autoscale_view()
+        if plot_measured_animal_position:
+            _update_measured_animal_position_point(new_frame, ax=ax)
+        
         if update_callback_function is not None:
             update_callback_function(new_frame, ax=ax)
         plt.draw()
@@ -403,6 +434,8 @@ def _temp_debug_two_step_plots_animated_imshow(active_one_step_decoder, active_t
     sframe.on_changed(update)
     plt.draw()
     # plt.show()
+    
+    
     
 # ==================================================================================================================== #
 # Functions for drawing the decoded position and the animal position as a callback                                     #
