@@ -109,9 +109,25 @@
     <addaction name="menuAdd_Docked_Widget"/>
     <addaction name="actionTest"/>
    </widget>
+   <widget class="QMenu" name="menuDecoder">
+    <property name="title">
+     <string>Decoder</string>
+    </property>
+    <widget class="QMenu" name="menuDecoded_Epoch_Slices">
+     <property name="title">
+      <string>Decoded Epoch Slices</string>
+     </property>
+     <addaction name="actionLaps"/>
+     <addaction name="actionPBEs"/>
+     <addaction name="actionRipple"/>
+     <addaction name="actionReplay"/>
+    </widget>
+    <addaction name="menuDecoded_Epoch_Slices"/>
+   </widget>
    <addaction name="menuAdd_Renderable"/>
    <addaction name="menuCreate_Paired_Widget"/>
    <addaction name="menuDocked_Widgets"/>
+   <addaction name="menuDecoder"/>
   </widget>
   <action name="actionAddTimeCurves_Position">
    <property name="text">
@@ -272,6 +288,9 @@
    <property name="text">
     <string>Matplotlib View</string>
    </property>
+   <property name="toolTip">
+    <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Matplotlib View&lt;img src=&quot;:/Graphics/Icons/graphics/ic_timeline_48px.png&quot;/&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+   </property>
   </action>
   <action name="actionCustom">
    <property name="text">
@@ -286,6 +305,26 @@
   <action name="actionContext_Nested_Docks">
    <property name="text">
     <string>Context Nested Docks</string>
+   </property>
+  </action>
+  <action name="actionLaps">
+   <property name="text">
+    <string>Laps</string>
+   </property>
+  </action>
+  <action name="actionPBEs">
+   <property name="text">
+    <string>PBEs</string>
+   </property>
+  </action>
+  <action name="actionRipple">
+   <property name="text">
+    <string>Ripple</string>
+   </property>
+  </action>
+  <action name="actionReplay">
+   <property name="text">
+    <string>Replay</string>
    </property>
   </action>
  </widget>
