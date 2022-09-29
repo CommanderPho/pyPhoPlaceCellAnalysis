@@ -278,20 +278,31 @@ class PipelineWithDisplayPipelineStageMixin:
             
         elif isinstance(active_session_configuration_context, IdentifyingContext):
             # NEW 2022-09-12-style call with an identifying context (IdentifyingContext) object
-            active_session_configuration_name = active_session_configuration_context.filter_name
             kwargs.setdefault('active_context', active_session_configuration_context) # add 'active_context' to the kwargs for the display function if possible
+
+            # Check if the context is filtered or at the session level:
+            if not hasattr(active_session_configuration_context, 'filter_name'):
+                ## Global session-level context (not filtered, so not corresponding to a specific config name):
+                active_session_configuration_name = None
+                ## For a global-style display function, pass ALL of the computation_results and active_configs just to preserve the argument style.
+                return display_function(self.computation_results, self.active_configs, owning_pipeline=self, active_config_name=None, **kwargs)
             
+            else:
+                ## The expected filtered context:
+                active_session_configuration_name = active_session_configuration_context.filter_name            
+                ## Sanity checking:
+                assert (active_session_configuration_name in self.computation_results), f"self.computation_results doesn't contain a key for the provided active_session_filter_configuration ('{active_session_configuration_name}'). Did you only enable computation with enabled_filter_names in perform_computation that didn't include this key?"
+                # We pop the active_config_name parameter from the kwargs, as this was an outdated workaround to optionally get the display functions this string but now it's passed directly by the call below        
+                kwarg_active_config_name = kwargs.pop('active_config_name', None)
+                if kwarg_active_config_name is not None:
+                    assert kwarg_active_config_name == active_session_configuration_name # they better be equal or else there is a conflict.
+
+                return display_function(self.computation_results[active_session_configuration_name], self.active_configs[active_session_configuration_name], owning_pipeline=self, active_config_name=active_session_configuration_name, **kwargs)
+        
         else:
             print(f'WARNING: active_session_configuration_context: {active_session_configuration_context} with type: {type(active_session_configuration_context)}')
             raise NotImplementedError
         
         
-        ## Sanity checking:
-        assert (active_session_configuration_name in self.computation_results), f"self.computation_results doesn't contain a key for the provided active_session_filter_configuration ('{active_session_configuration_name}'). Did you only enable computation with enabled_filter_names in perform_computation that didn't include this key?"
-        # We pop the active_config_name parameter from the kwargs, as this was an outdated workaround to optionally get the display functions this string but now it's passed directly by the call below        
-        kwarg_active_config_name = kwargs.pop('active_config_name', None)
-        if kwarg_active_config_name is not None:
-            assert kwarg_active_config_name == active_session_configuration_name # they better be equal or else there is a conflict.
 
-        return display_function(self.computation_results[active_session_configuration_name], self.active_configs[active_session_configuration_name], owning_pipeline=self, active_config_name=active_session_configuration_name, **kwargs)
     
