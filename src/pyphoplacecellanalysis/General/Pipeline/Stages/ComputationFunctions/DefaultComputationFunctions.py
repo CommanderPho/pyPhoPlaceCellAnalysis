@@ -10,6 +10,7 @@ from pyphoplacecellanalysis.General.Model.ComputationResults import ComputationR
 
 # from pyphoplacecellanalysis.Analysis.Decoder.decoder_result import build_position_df_discretized_binned_positions # old weird re-implementation
 from neuropy.utils.mixins.binning_helpers import build_df_discretized_binned_position_columns
+from neuropy.utils.dynamic_container import DynamicContainer # for _perform_two_step_position_decoding_computation
 
 from pyphocorehelpers.mixins.member_enumerating import AllFunctionEnumeratingMixin
 from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BayesianPlacemapPositionDecoder, Zhang_Two_Step
@@ -180,8 +181,6 @@ class DefaultComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Computa
             computation_result.computed_data['pf2D_TwoStepDecoder']['p_x_given_n_and_x_prev'][:,:,time_window_bin_idx] = np.reshape(computation_result.computed_data['pf2D_TwoStepDecoder']['flat_p_x_given_n_and_x_prev'][:,time_window_bin_idx], (original_data_shape[0], original_data_shape[1]))
             
 
-            
-
         # POST-hoc most-likely computations: Compute the most-likely positions from the p_x_given_n_and_x_prev:
         # computation_result.computed_data['pf2D_TwoStepDecoder']['most_likely_position_indicies'] = np.array(np.unravel_index(np.argmax(computation_result.computed_data['pf2D_TwoStepDecoder']['p_x_given_n_and_x_prev'], axis=None), computation_result.computed_data['pf2D_TwoStepDecoder']['p_x_given_n_and_x_prev'].shape)) # build the multi-dimensional maximum index for the position (not using the flat notation used in the other class)
         # # np.shape(self.most_likely_position_indicies) # (2, 85841)
@@ -193,5 +192,16 @@ class DefaultComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Computa
         computation_result.computed_data['pf2D_TwoStepDecoder']['most_likely_positions'][0, :] = prev_one_step_bayesian_decoder.xbin_centers[computation_result.computed_data['pf2D_TwoStepDecoder']['most_likely_position_indicies'][0, :]]
         computation_result.computed_data['pf2D_TwoStepDecoder']['most_likely_positions'][1, :] = prev_one_step_bayesian_decoder.ybin_centers[computation_result.computed_data['pf2D_TwoStepDecoder']['most_likely_position_indicies'][1, :]]
         # computation_result.computed_data['pf2D_TwoStepDecoder']['sigma_t_all'] = sigma_t_all # set sigma_t_all                
+
+        ## For some reason we set up the two-step decoder's most_likely_positions with the tranposed shape compared to the one-step decoder:
+        computation_result.computed_data['pf2D_TwoStepDecoder']['most_likely_positions'] = computation_result.computed_data['pf2D_TwoStepDecoder']['most_likely_positions'].T
+        
+        ## Once done, compute marginals for the two-step:
+        curr_unit_marginal_x, curr_unit_marginal_y = prev_one_step_bayesian_decoder.perform_build_marginals(computation_result.computed_data['pf2D_TwoStepDecoder']['p_x_given_n_and_x_prev'], computation_result.computed_data['pf2D_TwoStepDecoder']['most_likely_positions'], debug_print=debug_print)
+        computation_result.computed_data['pf2D_TwoStepDecoder']['marginal'] = DynamicContainer(x=curr_unit_marginal_x, y=curr_unit_marginal_y)
+        
+        
+        
+        
         return computation_result
 
