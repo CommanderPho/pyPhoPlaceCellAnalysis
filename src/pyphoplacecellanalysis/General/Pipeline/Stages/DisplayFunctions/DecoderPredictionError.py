@@ -100,10 +100,10 @@ class DefaultDecoderDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Disp
         active_two_step_decoder = computation_result.computed_data.get('pf2D_TwoStepDecoder', None)
         if active_two_step_decoder is not None:
             # have valid two_step_decoder, plot those predictions as well:
-            # active_two_step_decoder['most_likely_positions'][:, time_window_bin_idx]
+            # active_two_step_decoder['most_likely_positions'][time_window_bin_idx,:]
             active_time_window_variable = computation_result.computed_data['pf2D_Decoder'].active_time_window_centers
-            active_most_likely_positions_x = active_two_step_decoder['most_likely_positions'][0,:]
-            active_most_likely_positions_y = active_two_step_decoder['most_likely_positions'][1,:]
+            active_most_likely_positions_x = active_two_step_decoder['most_likely_positions'][:,0]
+            active_most_likely_positions_y = active_two_step_decoder['most_likely_positions'][:,1]
             two_step_options_dict = { # Green?
                 'color':'#00ff7f99',
                 'face_color':'#55ff0099',
