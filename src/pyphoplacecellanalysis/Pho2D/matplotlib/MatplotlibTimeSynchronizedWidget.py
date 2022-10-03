@@ -1,5 +1,7 @@
+# from pyphocorehelpers.DataStructure.general_parameter_containers import VisualizationParameters, RenderPlotsData, RenderPlots
+from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer
 import pyphoplacecellanalysis.External.pyqtgraph as pg
-from qtpy import QtCore
+from qtpy import QtCore, QtWidgets, QtGui
 from pyphoplacecellanalysis.External.pyqtgraph.widgets.MatplotlibWidget import MatplotlibWidget
 
 
@@ -38,3 +40,66 @@ class MatplotlibTimeSynchronizedWidget(MatplotlibWidget):
         self.on_window_changed(*evt)
         
         
+        
+
+class ScrollableMatplotlibTimeSynchronizedWidget(QtWidgets.QMainWindow):
+
+    def __init__(self, name, ui=None, window_title=None, scrollAreaContentsWidget=None):
+        super().__init__()
+        self.name = name
+        if ui is None:
+            ui = PhoUIContainer(name=name)
+            ui.connections = PhoUIContainer(name=name)
+        
+        self.ui = ui
+            
+        if window_title is None:
+            window_title = name
+        self.window_title = window_title
+        
+        self.ui.scrollAreaContentsWidget = scrollAreaContentsWidget
+        
+        self.initUI()
+
+    def initUI(self):
+        
+        self.ui.scrollAreaWidget = QtWidgets.QScrollArea() # Scroll Area which contains the widgets, set as the centralWidget
+        self.ui.scrollAreaWidget.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarPolicy.ScrollBarAlwaysOn)
+        # self.ui.scrollAreaWidget.setWidget(self.ui.graphics_layout)
+    
+        # self.scroll = QScrollArea()             # Scroll Area which contains the widgets, set as the centralWidget
+
+        #Scroll Area Properties
+        self.ui.scrollAreaWidget.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarPolicy.ScrollBarAlwaysOn) #  Qt.ScrollBarAlwaysOn
+        self.ui.scrollAreaWidget.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarPolicy.ScrollBarAlwaysOff) # Qt.ScrollBarAlwaysOff
+        self.ui.scrollAreaWidget.setWidgetResizable(True)
+        
+        if self.ui.scrollAreaContentsWidget is not None:
+            self.ui.scrollAreaWidget.setWidget(self.ui.scrollAreaContentsWidget)
+
+        self.setCentralWidget(self.ui.scrollAreaWidget)
+
+        self.setGeometry(600, 100, 1000, 900)
+        self.setWindowTitle('Scroll Area Demonstration')
+        self.show()
+
+        return
+    
+    
+    def setScrollAreaContents(self, widget: QtWidgets.QWidget):
+        """_summary_
+
+        Args:
+            widget (_type_): _description_
+        """
+        self.ui.scrollAreaContentsWidget = widget # Widget that contains the collection of Vertical Box
+        self.ui.scrollAreaWidget.setWidget(self.ui.scrollAreaContentsWidget)
+        
+        # self.widget = QWidget()                 # Widget that contains the collection of Vertical Box
+        # self.vbox = QVBoxLayout()               # The Vertical Box that contains the Horizontal Boxes of  labels and buttons
+
+        # for i in range(1,50):
+        #     object = QLabel("TextLabel")
+        #     self.vbox.addWidget(object)
+
+        # self.widget.setLayout(self.vbox)
