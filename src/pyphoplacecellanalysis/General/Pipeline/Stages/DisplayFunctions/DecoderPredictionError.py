@@ -154,7 +154,8 @@ class DefaultDecoderDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Disp
                     # # epochs = sess.laps.to_dataframe()
                     # epochs = active_filter_epochs.to_dataframe()
                     # epoch_slices = epochs[['start', 'stop']].to_numpy()
-                    # epoch_description_list = [f'lap {epoch_tuple.lap_id} (maze: {epoch_tuple.maze_id}, direction: {epoch_tuple.lap_dir})' for epoch_tuple in epochs[['lap_id','maze_id','lap_dir']].itertuples()]
+                    # epoch_description_list = [f'lap {epoch_tuple.lap_id} (maze: {epoch_tuple.maze_id}, direction: {epoch_tuple.lap_dir})' for epoch_tuple in active_filter_epochs.to_dataframe()[['lap_id','maze_id','lap_dir']].itertuples()] # LONG
+                    epoch_description_list = [f'lap[{epoch_tuple.lap_id}]' for epoch_tuple in active_filter_epochs.to_dataframe()[['lap_id']].itertuples()] # Short
                     
                     
                 elif filter_epochs == 'pbe':
@@ -168,6 +169,9 @@ class DefaultDecoderDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Disp
                     active_filter_epochs = deepcopy(computation_result.sess.ripple) # epoch object
                     # default_figure_name = f'{default_figure_name}_Ripples'
                     default_figure_name = f'Ripples'
+                    # epoch_description_list = [f'ripple {epoch_tuple.label} (peakpower: {epoch_tuple.peakpower})' for epoch_tuple in active_filter_epochs.to_dataframe()[['label', 'peakpower']].itertuples()] # LONG
+                    epoch_description_list = [f'ripple[{epoch_tuple.label}]' for epoch_tuple in active_filter_epochs.to_dataframe()[['label']].itertuples()] # SHORT
+                    
                     
                 elif filter_epochs == 'replay':
                     active_filter_epochs = deepcopy(computation_result.sess.replay) # epoch object
@@ -178,14 +182,21 @@ class DefaultDecoderDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Disp
                         active_filter_epochs['stop'] = active_filter_epochs['end'].copy()
                     # default_figure_name = f'{default_figure_name}_Replay'
                     default_figure_name = f'Replay'
+                    epoch_description_list = [f'{default_figure_name} {epoch_tuple.label}' for epoch_tuple in active_filter_epochs.to_dataframe()[['label']].itertuples()]
+                    
                 else:
                     raise NotImplementedError
             else:
                 # Use it raw, hope it's right
                 active_filter_epochs = filter_epochs
                 default_figure_name = f'{default_figure_name}_CUSTOM'
-            
+                epoch_description_list = [f'{default_figure_name} {epoch_tuple.label}' for epoch_tuple in active_filter_epochs.to_dataframe()[['label']].itertuples()]
+                
+                
+                
             filter_epochs_decoder_result = active_decoder.decode_specific_epochs(computation_result.sess.spikes_df, filter_epochs=active_filter_epochs, decoding_time_bin_size=decoding_time_bin_size, debug_print=False)
+            filter_epochs_decoder_result.epoch_description_list = epoch_description_list
+
 
             out_plot_tuple = plot_decoded_epoch_slices(active_filter_epochs, filter_epochs_decoder_result, global_pos_df=computation_result.sess.position.to_dataframe(), xbin=active_decoder.xbin,
                                                                     **overriding_dict_with(lhs_dict={'name':default_figure_name, 'debug_test_max_num_slices':8, 'enable_flat_line_drawing':False, 'debug_print': False}, **kwargs))
@@ -635,12 +646,15 @@ def plot_decoded_epoch_slices(filter_epochs, filter_epochs_decoder_result, globa
         raise NotImplementedError
     
     # if 'label' not in epochs_df.columns:
-    epochs_df['label'] = epochs_df.index.to_numpy() # integer ripple indexing    
+    epochs_df['label'] = epochs_df.index.to_numpy() # integer ripple indexing
     epoch_slices = epochs_df[['start', 'stop']].to_numpy()
     # epoch_description_list = [f'ripple {epoch_tuple.label} (peakpower: {epoch_tuple.peakpower})' for epoch_tuple in epochs_df[['label', 'peakpower']].itertuples()]
 
+    epoch_labels = filter_epochs_decoder_result.epoch_description_list.copy()
+    print(f'epoch_labels: {epoch_labels}')
+    
     plot_function_name = 'Stacked Epoch Slices View - MATPLOTLIB subplots Version'
-    params, plots_data, plots, ui = stacked_epoch_slices_matplotlib_build_view(epoch_slices, name=name, plot_function_name=plot_function_name, debug_test_max_num_slices=debug_test_max_num_slices, debug_print=debug_print)
+    params, plots_data, plots, ui = stacked_epoch_slices_matplotlib_build_view(epoch_slices, epoch_labels=epoch_labels, name=name, plot_function_name=plot_function_name, debug_test_max_num_slices=debug_test_max_num_slices, debug_print=debug_print)
 
     for i, curr_ax in enumerate(plots.axs):
         curr_time_bin_container = filter_epochs_decoder_result.time_bin_containers[i]

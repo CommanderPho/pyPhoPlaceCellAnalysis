@@ -24,7 +24,7 @@ These functions help render a vertically stacked column of subplots that represe
 # ==================================================================================================================== #
 # Stacked Epoch Slices View                                                                                            #
 # ==================================================================================================================== #
-def stacked_epoch_basic_setup(epoch_slices, name='stacked_epoch_slices_view', plot_function_name='Stacked Epoch Slices View - PlotItem Version', single_plot_fixed_height=100.0, debug_test_max_num_slices=70, debug_print=False):
+def stacked_epoch_basic_setup(epoch_slices, epoch_labels=None, name='stacked_epoch_slices_view', plot_function_name='Stacked Epoch Slices View - PlotItem Version', single_plot_fixed_height=100.0, debug_test_max_num_slices=70, debug_print=False):
     """ Builds the common setup/containers for all stacked-epoch type plots:
     
     epoch_description_list: list of length 
@@ -57,6 +57,15 @@ def stacked_epoch_basic_setup(epoch_slices, name='stacked_epoch_slices_view', pl
     params.single_plot_fixed_height = single_plot_fixed_height
     params.all_plots_height = float(params.active_num_slices) * float(params.single_plot_fixed_height)
 
+
+    if epoch_labels is None:
+        # Build defaults for the plots
+        epoch_labels = [f'epoch[{a_slice_idx}]' for a_slice_idx in np.arange(num_slices)]
+    else:
+        assert len(epoch_labels) == params.num_slices
+
+    params.epoch_labels = epoch_labels
+    
     plots_data.epoch_slices = epoch_slices
     
     return params, plots_data, plots, ui
@@ -92,7 +101,7 @@ def stacked_epoch_slices_view(epoch_slices, position_times_list, position_traces
 
     """
     plot_function_name = 'Stacked Epoch Slices View - PlotItem Version'
-    params, plots_data, plots, ui = stacked_epoch_basic_setup(epoch_slices, name=name, plot_function_name=plot_function_name, debug_print=debug_print)
+    params, plots_data, plots, ui = stacked_epoch_basic_setup(epoch_slices, epoch_labels=epoch_description_list, name=name, plot_function_name=plot_function_name, debug_print=debug_print)
     assert len(epoch_description_list) == params.num_slices
     assert len(position_times_list) == params.num_slices
     # assert len(position_traces_list) == params.num_slices
@@ -200,7 +209,7 @@ def stacked_epoch_slices_view_viewbox(epoch_slices, position_times_list, positio
 
     """
     plot_function_name = 'Stacked Epoch Slices View - Viewbox Version'
-    params, plots_data, plots, ui = stacked_epoch_basic_setup(epoch_slices, name=name, plot_function_name=plot_function_name, debug_print=debug_print)
+    params, plots_data, plots, ui = stacked_epoch_basic_setup(epoch_slices, epoch_labels=epoch_description_list, name=name, plot_function_name=plot_function_name, debug_print=debug_print)
     assert len(epoch_description_list) == params.num_slices
     assert len(position_times_list) == params.num_slices
     # assert len(position_traces_list) == params.num_slices
@@ -302,7 +311,7 @@ def stacked_epoch_slices_view_viewbox(epoch_slices, position_times_list, positio
 # ==================================================================================================================== #
 
 # Helper Figure/Plots Builders _______________________________________________________________________________________ #
-def stacked_epoch_slices_matplotlib_build_view(epoch_slices, name='stacked_epoch_slices_matplotlib_subplots_laps', plot_function_name=None, single_plot_fixed_height=100.0, debug_test_max_num_slices=127, debug_print=False):
+def stacked_epoch_slices_matplotlib_build_view(epoch_slices, name='stacked_epoch_slices_matplotlib_subplots_laps', plot_function_name=None, epoch_labels=None, single_plot_fixed_height=100.0, debug_test_max_num_slices=127, debug_print=False):
     """ Builds a matplotlib figure view with empty subplots that can be plotted after the fact by iterating through plots.axs
         
     epoch_description_list: list of length 
@@ -329,7 +338,7 @@ def stacked_epoch_slices_matplotlib_build_view(epoch_slices, name='stacked_epoch
     ## Inset Subplots Version:
     if plot_function_name is None:
         plot_function_name = 'Stacked Epoch Slices View - MATPLOTLIB subplots Version'
-    params, plots_data, plots, ui = stacked_epoch_basic_setup(epoch_slices, name=name, plot_function_name=plot_function_name, debug_test_max_num_slices=debug_test_max_num_slices, single_plot_fixed_height=single_plot_fixed_height, debug_print=debug_print)
+    params, plots_data, plots, ui = stacked_epoch_basic_setup(epoch_slices, epoch_labels=epoch_labels, name=name, plot_function_name=plot_function_name, debug_test_max_num_slices=debug_test_max_num_slices, single_plot_fixed_height=single_plot_fixed_height, debug_print=debug_print)
     # plots.figure_id = 'stacked_epoch_slices_matplotlib'    
     plots.figure_id = plots.name # copy the name as the figure_id
     
@@ -352,14 +361,15 @@ def stacked_epoch_slices_matplotlib_build_view(epoch_slices, name='stacked_epoch
         # Create inset in data coordinates using ax.transData as transform
         a_slice_start_t = plots_data.epoch_slices[a_slice_idx, 0]
         a_slice_end_t = plots_data.epoch_slices[a_slice_idx, 1]
+        a_slice_label = params.epoch_labels[a_slice_idx]
         if debug_print:
-            print(f'a_slice_start_t: {a_slice_start_t}, a_slice_end_t: {a_slice_end_t}')
+            print(f'a_slice_start_t: {a_slice_start_t}, a_slice_end_t: {a_slice_end_t}, a_slice_label: {a_slice_label}')
         curr_ax.set_xlim(*plots_data.epoch_slices[a_slice_idx,:])
         curr_ax.tick_params(labelleft=False, labelbottom=True)
         curr_ax.set_title('') # remove the title
         
         # Left side y-label for the start time
-        curr_ax.set_ylabel(f'{a_slice_start_t:.2f}') # format to two decimal places
+        curr_ax.set_ylabel(f'{a_slice_label}\n{a_slice_start_t:.2f}') # format to two decimal places
         
         ## Add the right-aligned axis
         # From http://notes.brooks.nu/2008/03/plotting-on-left-and-right-axis-simulateously-using-matplotlib-and-numpy
@@ -376,7 +386,7 @@ def stacked_epoch_slices_matplotlib_build_view(epoch_slices, name='stacked_epoch
     
     return params, plots_data, plots, ui
 
-def stacked_epoch_slices_matplotlib_build_insets_view(epoch_slices, name='stacked_epoch_slices_matplotlib_INSET_subplots_laps', plot_function_name=None, debug_test_max_num_slices=12, debug_print=False):
+def stacked_epoch_slices_matplotlib_build_insets_view(epoch_slices, name='stacked_epoch_slices_matplotlib_INSET_subplots_laps', plot_function_name=None, epoch_labels=None, debug_test_max_num_slices=12, debug_print=False):
     """ Builds a matplotlib figure view with empty subplots that can be plotted after the fact by iterating through plots.axs
         
     epoch_description_list: list of length 
@@ -406,7 +416,7 @@ def stacked_epoch_slices_matplotlib_build_insets_view(epoch_slices, name='stacke
     # debug_print = False
     if plot_function_name is not None:
         plot_function_name = 'Stacked Epoch Slices View - MATPLOTLIB INSET SUBPLOTS Version'
-    params, plots_data, plots, ui = stacked_epoch_basic_setup(epoch_slices, name=name, plot_function_name=plot_function_name, debug_test_max_num_slices=debug_test_max_num_slices, debug_print=debug_print)
+    params, plots_data, plots, ui = stacked_epoch_basic_setup(epoch_slices, epoch_labels=epoch_labels, name=name, plot_function_name=plot_function_name, debug_test_max_num_slices=debug_test_max_num_slices, debug_print=debug_print)
 
     global_xrange = (params.global_epoch_start_t, params.global_epoch_end_t)
     global_xduration = params.global_epoch_end_t - params.global_epoch_start_t

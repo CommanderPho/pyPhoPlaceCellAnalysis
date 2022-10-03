@@ -61,8 +61,8 @@
     <addaction name="actionNew_Tuning_Curves_Explorer_ipcDataExplorer"/>
     <addaction name="actionNew_Spikes_Behavior_Explorer_ipspikesDataExplorer"/>
     <addaction name="separator"/>
-    <addaction name="separator"/>
     <addaction name="actionNew_1D_Ratemaps_Plot"/>
+    <addaction name="separator"/>
    </widget>
    <widget class="QMenu" name="menuAdd_Renderable">
     <property name="title">
