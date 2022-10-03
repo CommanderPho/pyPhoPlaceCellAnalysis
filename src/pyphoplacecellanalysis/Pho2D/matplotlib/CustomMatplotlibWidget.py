@@ -25,7 +25,16 @@ class CustomMatplotlibWidget(QtWidgets.QWidget):
         mw.draw()
     """
     
-    def __init__(self, name='CustomMatplotlibWidget', disable_toolbar=True, size=(5.0, 4.0), dpi=72, **kwargs):
+    def __init__(self, name='CustomMatplotlibWidget', disable_toolbar=True, scrollable_figure=True, size=(5.0, 4.0), dpi=72, **kwargs):
+        """_summary_
+
+        Args:
+            name (str, optional): _description_. Defaults to 'CustomMatplotlibWidget'.
+            disable_toolbar (bool, optional): _description_. Defaults to True.
+            scrollable_figure (bool, optional): If True, the figure (the canvas that renders it) is embedded in a QScrollArea to allow the user to scroll. Defaults to True.
+            size (tuple, optional): _description_. Defaults to (5.0, 4.0).
+            dpi (int, optional): _description_. Defaults to 72.
+        """
         QtWidgets.QWidget.__init__(self)
         
         ## Init containers:
@@ -38,9 +47,15 @@ class CustomMatplotlibWidget(QtWidgets.QWidget):
         self.params.name = name
         self.params.window_title = kwargs.pop('plot_function_name', name)
         self.params.disable_toolbar = disable_toolbar
+        self.params.scrollable_figure = scrollable_figure
+        self.params.scrollAreaContents_MinimumHeight = kwargs.pop('scrollAreaContents_MinimumHeight', None)
+        
+        # Extract figure_kwargs:
         self.params.figure_kwargs = kwargs
         self.params.figure_kwargs['figsize'] = size
         self.params.figure_kwargs['dpi'] = dpi
+        
+        
         
         self.setup()
         self.buildUI()
@@ -51,35 +66,41 @@ class CustomMatplotlibWidget(QtWidgets.QWidget):
     
     def buildUI(self):
         ## Init Figure and components
-        # self.fig = Figure(size, dpi=dpi, **kwargs)
         self.plots.fig = Figure(**self.params.figure_kwargs)
-        
         self.ui.canvas = FigureCanvas(self.plots.fig)
         self.ui.canvas.setParent(self)
-        
         if not self.params.disable_toolbar:
             self.ui.toolbar = NavigationToolbar(self.ui.canvas, self)
         else:
             self.ui.toolbar = None
             
-        self.buildMainContentWidget()
+        if self.params.scrollable_figure:
+            self._buildUI_buildScrollableWidget()
+        else:
+            self._buildUI_buildNonScrollableWidget()
 
-
-
-    def buildMainContentWidget(self):
-        self.ui.vbox = QtWidgets.QVBoxLayout()
-        self.ui.vbox.setContentsMargins(0, 0, 0, 0)
-        self.ui.vbox.setObjectName('root_vbox')
+    def _buildUI_buildNonScrollableWidget(self):
+        """ sets up the widget to contain a basic layout with no scrollability """
+        self.ui.root_vbox = QtWidgets.QVBoxLayout()
+        self.ui.root_vbox.setContentsMargins(0, 0, 0, 0)
+        self.ui.root_vbox.setObjectName('root_vbox_layout')
+        ## Non-scrollable version:
+        target_vbox = self.ui.root_vbox
+        ## Add the real widgets:
+        if not self.params.disable_toolbar:
+            target_vbox.addWidget(self.ui.toolbar)
+        target_vbox.addWidget(self.ui.canvas)
+        ## Common:
+        self.setLayout(self.ui.root_vbox)
         
-        # ## Non-scrollable version:
-        # target_vbox = self.ui.vbox
-        # ## Add the real widgets:
-        # if not self.params.disable_toolbar:
-        #     target_vbox.addWidget(self.ui.toolbar)
-        # target_vbox.addWidget(self.ui.canvas)
 
-        ## Scrollable Version:
+    def _buildUI_buildScrollableWidget(self):
+        """ sets up the widget to contain a QScrollArea that contains the main figure """
+        self.ui.root_vbox = QtWidgets.QVBoxLayout()
+        self.ui.root_vbox.setContentsMargins(0, 0, 0, 0)
+        self.ui.root_vbox.setObjectName('root_vbox')
         
+        ### Scrollable Version:
         ## Build the contents widget and inner_contents_vbox:
         self.ui.scrollAreaContentsWidget = QtWidgets.QWidget()
         self.ui.scrollAreaContentsWidget.setObjectName('scrollAreaContentsWidget')
@@ -104,9 +125,12 @@ class CustomMatplotlibWidget(QtWidgets.QWidget):
         if self.ui.scrollAreaContentsWidget is not None:
             # Set contents widget if we have it:
             self.ui.scrollAreaWidget.setWidget(self.ui.scrollAreaContentsWidget)
-        
-        self.ui.vbox.addWidget(self.ui.scrollAreaWidget)
-        self.setLayout(self.ui.vbox)
+        self.ui.root_vbox.addWidget(self.ui.scrollAreaWidget)
+
+        self.setLayout(self.ui.root_vbox)
+        # Set the minimumHeight to the
+        if self.params.scrollAreaContents_MinimumHeight is not None:
+            self.ui.scrollAreaContentsWidget.setMinimumHeight(self.params.scrollAreaContents_MinimumHeight)
         
         
     @property

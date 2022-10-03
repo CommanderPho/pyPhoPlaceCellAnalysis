@@ -339,7 +339,7 @@ def stacked_epoch_slices_matplotlib_build_view(epoch_slices, name='stacked_epoch
     # plots.fig, plots.axs = plt.subplots(num=plots.figure_id, ncols=1, nrows=params.active_num_slices, figsize=(15,15), clear=True, sharex=False, sharey=False, constrained_layout=True)
     
     ## MatplotlibTimeSynchronizedWidget-embedded Version:
-    ui.mw = MatplotlibTimeSynchronizedWidget(size=(15,15), dpi=72, constrained_layout=True)
+    ui.mw = MatplotlibTimeSynchronizedWidget(size=(15,15), dpi=72, constrained_layout=True, scrollable_figure=True, scrollAreaContents_MinimumHeight=params.all_plots_height)
     plots.fig = ui.mw.getFigure()
     plots.fig.suptitle(plots.name)
     plots.axs = plots.fig.subplots(ncols=1, nrows=params.active_num_slices, sharex=False, sharey=False)
@@ -363,17 +363,15 @@ def stacked_epoch_slices_matplotlib_build_view(epoch_slices, name='stacked_epoch
         
         ## Add the right-aligned axis
         # From http://notes.brooks.nu/2008/03/plotting-on-left-and-right-axis-simulateously-using-matplotlib-and-numpy
-        # Create right axis and plots.  It is the frameon=False that makes this
-        # plot transparent so that you can see the left axis plot that will be
-        # underneath it.  The sharex option causes them to share the x axis.
-        secax_y = curr_ax.secondary_yaxis('right', functions=None) # functions=(celsius_to_fahrenheit, fahrenheit_to_celsius)
+        # Create right axis and plots.  It is the frameon=False that makes this plot transparent so that you can see the left axis plot that will be underneath it. The sharex option causes
+        secax_y = curr_ax.secondary_yaxis('right', functions=None)
         secax_y.set_ylabel(f'{a_slice_end_t:.2f}')
         secax_y.tick_params(labelleft=False, labelbottom=False, labelright=False) # Turn off all ticks for the secondary axis
         # Do I need to save this temporary axes? No, it appears that's not needed
 
     ## Required only for MatplotlibTimeSynchronizedWidget-embedded version:
     ui.mw.draw()
-    ui.mw.ui.scrollAreaContentsWidget.setMinimumHeight(params.all_plots_height)
+    # ui.mw.ui.scrollAreaContentsWidget.setMinimumHeight(params.all_plots_height)
     ui.mw.show()
     
     return params, plots_data, plots, ui
