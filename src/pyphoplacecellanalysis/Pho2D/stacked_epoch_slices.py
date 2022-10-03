@@ -11,6 +11,8 @@ from mpl_toolkits.axes_grid1.inset_locator import inset_axes  # for stacked_epoc
 
 from pyphoplacecellanalysis.Pho2D.PyQtPlots.Extensions.pyqtgraph_helpers import build_scrollable_graphics_layout_widget_ui, build_scrollable_graphics_layout_widget_with_nested_viewbox_ui
 
+from pyphoplacecellanalysis.Pho2D.matplotlib.MatplotlibTimeSynchronizedWidget import MatplotlibTimeSynchronizedWidget
+
 """ 
 These functions help render a vertically stacked column of subplots that represent (potentially non-contiguous) slices of a time range. 
 
@@ -330,7 +332,19 @@ def stacked_epoch_slices_matplotlib_build_view(epoch_slices, name='stacked_epoch
     params, plots_data, plots, ui = stacked_epoch_basic_setup(epoch_slices, name=name, plot_function_name=plot_function_name, debug_test_max_num_slices=debug_test_max_num_slices, debug_print=debug_print)
     # plots.figure_id = 'stacked_epoch_slices_matplotlib'    
     plots.figure_id = plots.name # copy the name as the figure_id
-    plots.fig, plots.axs = plt.subplots(num=plots.figure_id, ncols=1, nrows=params.active_num_slices, figsize=(15,15), clear=True, sharex=False, sharey=False, constrained_layout=True)
+    
+    ## Create the main figure and plot axes:
+    # plots.fig, plots.axs = plt.subplots(num=plots.figure_id, ncols=1, nrows=params.active_num_slices, figsize=(15,15), clear=True, sharex=False, sharey=False, constrained_layout=True)
+    
+    ui.mw = MatplotlibTimeSynchronizedWidget(size=(15,15))
+    plots.fig = ui.mw.getFigure()
+    plots.axs = plots.fig.subplots(ncols=1, nrows=params.active_num_slices, sharex=False, sharey=False) # , figsize=(15,15), clear=True, constrained_layout=True
+        
+    # subplot = mw.getFigure().add_subplot(111)
+    # subplot.plot(x,y)
+    # mw.draw()
+    
+    
     plots.fig.suptitle(plots.name)
     
     for a_slice_idx, curr_ax in enumerate(plots.axs):
@@ -359,6 +373,8 @@ def stacked_epoch_slices_matplotlib_build_view(epoch_slices, name='stacked_epoch
         secax_y.tick_params(labelleft=False, labelbottom=False, labelright=False) # Turn off all ticks for the secondary axis
         # Do I need to save this temporary axes? No, it appears that's not needed
 
+    ui.mw.draw()
+    ui.mw.show()
     
     return params, plots_data, plots, ui
 
