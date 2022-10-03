@@ -356,15 +356,8 @@ def stacked_epoch_slices_matplotlib_build_view(epoch_slices, name='stacked_epoch
         # underneath it.  The sharex option causes them to share the x axis.
         secax_y = curr_ax.secondary_yaxis('right', functions=None) # functions=(celsius_to_fahrenheit, fahrenheit_to_celsius)
         secax_y.set_ylabel(f'{a_slice_end_t:.2f}')
-        secax_y.tick_params(labelleft=False, labelbottom=False) # Turn off all ticks for the secondary axis
-        
-
-        # axR = plt.subplot(1,1,1, sharex=curr_ax, frameon=False)
-        # axR.yaxis.tick_right()
-        # axR.yaxis.set_label_position("right")
-        # # plot(yRight, '.-g')
-        # axR.set_ylabel("Right Y-Axis Data")
-        # Do I need to save this temporary axes?
+        secax_y.tick_params(labelleft=False, labelbottom=False, labelright=False) # Turn off all ticks for the secondary axis
+        # Do I need to save this temporary axes? No, it appears that's not needed
 
     
     return params, plots_data, plots, ui
