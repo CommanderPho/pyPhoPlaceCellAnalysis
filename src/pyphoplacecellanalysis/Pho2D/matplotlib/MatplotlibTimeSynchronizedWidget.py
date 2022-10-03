@@ -2,9 +2,6 @@
 from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer
 import pyphoplacecellanalysis.External.pyqtgraph as pg
 from qtpy import QtCore, QtWidgets, QtGui
-# from pyphoplacecellanalysis.External.pyqtgraph.widgets.MatplotlibWidget import MatplotlibWidget
-
-# from pyphoplacecellanalysis.External.pyqtgraph.widgets.MatplotlibWidget import MatplotlibWidget
 from pyphoplacecellanalysis.Pho2D.matplotlib.CustomMatplotlibWidget import CustomMatplotlibWidget
 
 class MatplotlibTimeSynchronizedWidget(CustomMatplotlibWidget):
@@ -45,7 +42,7 @@ class MatplotlibTimeSynchronizedWidget(CustomMatplotlibWidget):
         
 
 class ScrollableMatplotlibTimeSynchronizedWidget(QtWidgets.QMainWindow):
-    """
+    """ NOT NEEDED
     
     Usage:
         from pyphoplacecellanalysis.Pho2D.matplotlib.MatplotlibTimeSynchronizedWidget import MatplotlibTimeSynchronizedWidget, ScrollableMatplotlibTimeSynchronizedWidget

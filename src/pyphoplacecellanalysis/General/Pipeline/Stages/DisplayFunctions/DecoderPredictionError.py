@@ -146,6 +146,12 @@ class DefaultDecoderDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Disp
                     active_filter_epochs = laps_copy.filtered_by_lap_flat_index(np.arange(6)).as_epoch_obj() # epoch object
                     default_figure_name = f'{default_figure_name}_Laps'
                     
+                    
+                elif filter_epochs == 'pbe':
+                    ## PBEs-Epochs Decoding:
+                    active_filter_epochs = deepcopy(computation_result.sess.pbe) # epoch object
+                    default_figure_name = f'{default_figure_name}_PBEs'
+                
                 elif filter_epochs == 'ripple':
                     ## Ripple-Epochs Decoding:
                     active_filter_epochs = deepcopy(computation_result.sess.ripple) # epoch object
@@ -168,8 +174,6 @@ class DefaultDecoderDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Disp
             
             filter_epochs_decoder_result = active_decoder.decode_specific_epochs(computation_result.sess.spikes_df, filter_epochs=active_filter_epochs, decoding_time_bin_size=decoding_time_bin_size, debug_print=False)
 
-            # params, plots_data, plots, ui = plot_decoded_epoch_slices(active_filter_epochs, filter_epochs_decoder_result, global_pos_df=computation_result.sess.position.to_dataframe(), xbin=active_decoder.xbin,
-            #                                                         enable_flat_line_drawing=enable_flat_line_drawing, debug_test_max_num_slices=debug_test_max_num_slices, name='stacked_epoch_slices_matplotlib_subplots_RIPPLES', debug_print=debug_print)
             out_plot_tuple = plot_decoded_epoch_slices(active_filter_epochs, filter_epochs_decoder_result, global_pos_df=computation_result.sess.position.to_dataframe(), xbin=active_decoder.xbin,
                                                                     **overriding_dict_with(lhs_dict={'name':default_figure_name, 'debug_test_max_num_slices':8, 'enable_flat_line_drawing':False, 'debug_print': False}, **kwargs))
             # params, plots_data, plots, ui = out_plot_tuple
