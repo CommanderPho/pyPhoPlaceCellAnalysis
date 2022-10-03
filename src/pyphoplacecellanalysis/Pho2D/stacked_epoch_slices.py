@@ -336,7 +336,7 @@ def stacked_epoch_slices_matplotlib_build_view(epoch_slices, name='stacked_epoch
     ## Create the main figure and plot axes:
     # plots.fig, plots.axs = plt.subplots(num=plots.figure_id, ncols=1, nrows=params.active_num_slices, figsize=(15,15), clear=True, sharex=False, sharey=False, constrained_layout=True)
     
-    ui.mw = MatplotlibTimeSynchronizedWidget(size=(15,15))
+    ui.mw = MatplotlibTimeSynchronizedWidget(size=(15,15), dpi=72, constrained_layout=True) # , clear=True
     plots.fig = ui.mw.getFigure()
     plots.axs = plots.fig.subplots(ncols=1, nrows=params.active_num_slices, sharex=False, sharey=False) # , figsize=(15,15), clear=True, constrained_layout=True
         
