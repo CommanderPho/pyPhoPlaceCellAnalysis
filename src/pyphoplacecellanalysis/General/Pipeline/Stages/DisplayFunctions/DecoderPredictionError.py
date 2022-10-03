@@ -359,63 +359,6 @@ def plot_most_likely_position_comparsions(pho_custom_decoder, position_df, axs=N
 
         
         
-        
-def _temp_debug_two_step_plots(active_one_step_decoder, active_two_step_decoder, variable_name='all_scaling_factors_k', override_variable_value=None):
-    """ Handles plots using the plot command """
-    if override_variable_value is None:
-        try:
-            variable_value = active_two_step_decoder[variable_name]
-        except (TypeError, KeyError):
-            # fallback to the one_step_decoder
-            variable_value = getattr(active_one_step_decoder, variable_name, None)
-    else:
-        # if override_variable_value is set, ignore the input info and use it.
-        variable_value = override_variable_value
-    debug_print = False
-    if debug_print:
-        print(f'_temp_debug_two_step_plots: variable_name="{variable_name}", np.shape: {np.shape(variable_value)}')
-    plt.figure(num=f'debug_two_step: variable_name={variable_name}', clear=True)
-    plt.plot(variable_value, marker='d', markersize=1.0, linestyle='None') # 'd' is a thin diamond marker
-    plt.xlabel('time window')
-    plt.ylabel(variable_name)
-    plt.title(f'debug_two_step: variable_name={variable_name}')
-    
-    
-def _temp_debug_two_step_plots_imshow(active_one_step_decoder, active_two_step_decoder, variable_name='p_x_given_n_and_x_prev', override_variable_value=None, timewindow: int=None):
-    if override_variable_value is None:
-        try:
-            variable_value = active_two_step_decoder[variable_name]
-        except (TypeError, KeyError):
-            # fallback to the one_step_decoder
-            variable_value = getattr(active_one_step_decoder, variable_name, None)
-    else:
-        # if override_variable_value is set, ignore the input info and use it.
-        variable_value = override_variable_value
-    debug_print = False
-    if debug_print:
-        print(f'_temp_debug_two_step_plots_imshow: variable_name="{variable_name}", np.shape: {np.shape(variable_value)}')
-
-    if timewindow is not None:
-        variable_value = variable_value[:,:,timewindow] # reduce it to 2D if it's 3D
-
-    # plt.figure(num=f'debug_two_step: variable_name={variable_name}', clear=True)
-    fig, axs = plt.subplots(ncols=1, nrows=1, num=f'debug_two_step: variable_name={variable_name}', figsize=(15,15), clear=True, constrained_layout=True)
-
-    main_plot_kwargs = {
-        'origin': 'lower',
-        'cmap': 'turbo',
-        'aspect':'auto',
-    }
-
-    xmin, xmax, ymin, ymax = (active_one_step_decoder.active_time_window_centers[0], active_one_step_decoder.active_time_window_centers[-1], active_one_step_decoder.xbin[0], active_one_step_decoder.xbin[-1])
-    extent = (xmin, xmax, ymin, ymax)
-    im_out = axs.imshow(variable_value, extent=extent, **main_plot_kwargs)
-    axs.axis("off")
-    # plt.xlabel('time window')
-    # plt.ylabel(variable_name)
-    plt.title(f'debug_two_step: {variable_name}')
-    # return im_out
-
 
     
 # MAIN IMPLEMENTATION FUNCTION:
@@ -530,70 +473,6 @@ def _temp_debug_two_step_plots_animated_imshow(active_one_step_decoder, active_t
     plt.draw()
     # plt.show()
     
-    
-    
-# ==================================================================================================================== #
-# Functions for drawing the decoded position and the animal position as a callback                                     #
-# ==================================================================================================================== #
-
-def _temp_debug_draw_predicted_position_difference(predicted_positions, measured_positions, time_window, ax=None):
-    """ Draws the decoded position and the actual animal's position, and an arrow between them. """
-    if ax is None:
-        raise NotImplementedError
-        # ax = plt.gca()
-    debug_print = False
-    if debug_print:
-        print(f'predicted_positions[{time_window},:]: {predicted_positions[time_window,:]}, measured_positions[{time_window},:]: {measured_positions[time_window,:]}')
-    # predicted_point = predicted_positions[time_window,:]
-    # measured_point = measured_positions[time_window,:]
-    predicted_point = np.squeeze(predicted_positions[time_window,:])
-    measured_point = np.squeeze(measured_positions[time_window,:])
-    if debug_print:
-        print(f'\tpredicted_point: {predicted_point}, measured_point: {measured_point}')
-    
-    # ## For 'x == vertical orientation' only: Need to transform the point (swap y and x) as is typical in an imshow plot:
-    # predicted_point = [predicted_point[-1], predicted_point[0]] # reverse the x and y coords
-    # measured_point = [measured_point[-1], measured_point[0]] # reverse the x and y coords
-    
-    # Draw displacement arrow:
-    # active_arrow = FancyArrowPatch(posA=tuple(predicted_point), posB=tuple(measured_point), path=None, arrowstyle=']->', connectionstyle='arc3', shrinkA=2, shrinkB=2, mutation_scale=8, mutation_aspect=1, color='C2') 
-    active_arrow = FancyArrowPatch(posA=tuple(predicted_point), posB=tuple(measured_point), path=None, arrowstyle='simple', connectionstyle='arc3', shrinkA=1, shrinkB=1, mutation_scale=20, mutation_aspect=1,
-                                   color='k', alpha=0.5, path_effects=[patheffects.withStroke(linewidth=3, foreground='white')]) 
-    ax.add_patch(active_arrow)
-    # Draw the points on top:
-    predicted_line, = ax.plot(predicted_point[0], predicted_point[1], marker='d', markersize=6.0, linestyle='None', label='predicted', markeredgecolor='#ffffffc8', markerfacecolor='#e0ffeac8') # 'd' is a thin diamond marker
-    measured_line, = ax.plot(measured_point[0], measured_point[1], marker='o', markersize=6.0, linestyle='None', label='measured', markeredgecolor='#ff7f0efa', markerfacecolor='#ff7f0ea0') # 'o' is a circle marker
-    fig = plt.gcf()
-    fig.legend((predicted_line, measured_line), ('Predicted', 'Measured'), 'upper right')
-    return {'ax':ax, 'predicted_line':predicted_line, 'measured_line':measured_line, 'active_arrow':active_arrow}
-    # update function:
-    
-    
-    
-def _temp_debug_draw_update_predicted_position_difference(predicted_positions, measured_positions, time_window, ax=None, predicted_line=None, measured_line=None, active_arrow=None):
-    assert measured_line is not None, "measured_line is required!"
-    assert predicted_line is not None, "predicted_line is required!"
-    debug_print = False
-    if debug_print:
-        print(f'predicted_positions[{time_window},:]: {predicted_positions[time_window,:]}, measured_positions[{time_window},:]: {measured_positions[time_window,:]}')
-    # predicted_point = predicted_positions[time_window,:]
-    # measured_point = measured_positions[time_window,:]
-    predicted_point = np.squeeze(predicted_positions[time_window,:])
-    measured_point = np.squeeze(measured_positions[time_window,:])
-    if debug_print:
-        print(f'\tpredicted_point: {predicted_point}, measured_point: {measured_point}')
-    # ## For 'x == vertical orientation' only: Need to transform the point (swap y and x) as is typical in an imshow plot:
-    # predicted_point = [predicted_point[-1], predicted_point[0]] # reverse the x and y coords
-    # measured_point = [measured_point[-1], measured_point[0]] # reverse the x and y coords
-    predicted_line.set_xdata(predicted_point[0])
-    predicted_line.set_ydata(predicted_point[1])
-    measured_line.set_xdata(measured_point[0])
-    measured_line.set_ydata(measured_point[1])
-    if active_arrow is not None:
-        active_arrow.set_positions(tuple(predicted_point), tuple(measured_point))
-    plt.draw()
-    # fig.canvas.draw_idle() # TODO: is this somehow better?
-
 
 # ==================================================================================================================== #
 # Functions for rendering a stack of decoded epochs in a stacked_epoch_slices-style manner                             #
@@ -744,7 +623,9 @@ def plot_spike_count_and_firing_rate_normalizations(pho_custom_decoder, axs=None
 
 
 
-
+# ==================================================================================================================== #
+# Menu Commands                                                                                                        #
+# ==================================================================================================================== #
 
 class CreateNewStackedDecodedEpochSlicesPlotCommand(BaseMenuCommand):
     """ Creates a stacked decoded epoch slices view by calling _display_plot_decoded_epoch_slices
@@ -796,3 +677,128 @@ class AddNewDecodedPosition_MatplotlibPlotCommand(BaseMenuCommand):
         # print(f'\t AddNewDecodedPosition_MatplotlibPlotCommand.execute() is done.')
         
         
+# ==================================================================================================================== #
+# Potentially Unused                                                                                                   #
+# ==================================================================================================================== #
+
+        
+def _temp_debug_two_step_plots(active_one_step_decoder, active_two_step_decoder, variable_name='all_scaling_factors_k', override_variable_value=None):
+    """ Handles plots using the plot command """
+    if override_variable_value is None:
+        try:
+            variable_value = active_two_step_decoder[variable_name]
+        except (TypeError, KeyError):
+            # fallback to the one_step_decoder
+            variable_value = getattr(active_one_step_decoder, variable_name, None)
+    else:
+        # if override_variable_value is set, ignore the input info and use it.
+        variable_value = override_variable_value
+    debug_print = False
+    if debug_print:
+        print(f'_temp_debug_two_step_plots: variable_name="{variable_name}", np.shape: {np.shape(variable_value)}')
+    plt.figure(num=f'debug_two_step: variable_name={variable_name}', clear=True)
+    plt.plot(variable_value, marker='d', markersize=1.0, linestyle='None') # 'd' is a thin diamond marker
+    plt.xlabel('time window')
+    plt.ylabel(variable_name)
+    plt.title(f'debug_two_step: variable_name={variable_name}')
+    
+    
+def _temp_debug_two_step_plots_imshow(active_one_step_decoder, active_two_step_decoder, variable_name='p_x_given_n_and_x_prev', override_variable_value=None, timewindow: int=None):
+    if override_variable_value is None:
+        try:
+            variable_value = active_two_step_decoder[variable_name]
+        except (TypeError, KeyError):
+            # fallback to the one_step_decoder
+            variable_value = getattr(active_one_step_decoder, variable_name, None)
+    else:
+        # if override_variable_value is set, ignore the input info and use it.
+        variable_value = override_variable_value
+    debug_print = False
+    if debug_print:
+        print(f'_temp_debug_two_step_plots_imshow: variable_name="{variable_name}", np.shape: {np.shape(variable_value)}')
+
+    if timewindow is not None:
+        variable_value = variable_value[:,:,timewindow] # reduce it to 2D if it's 3D
+
+    # plt.figure(num=f'debug_two_step: variable_name={variable_name}', clear=True)
+    fig, axs = plt.subplots(ncols=1, nrows=1, num=f'debug_two_step: variable_name={variable_name}', figsize=(15,15), clear=True, constrained_layout=True)
+
+    main_plot_kwargs = {
+        'origin': 'lower',
+        'cmap': 'turbo',
+        'aspect':'auto',
+    }
+
+    xmin, xmax, ymin, ymax = (active_one_step_decoder.active_time_window_centers[0], active_one_step_decoder.active_time_window_centers[-1], active_one_step_decoder.xbin[0], active_one_step_decoder.xbin[-1])
+    extent = (xmin, xmax, ymin, ymax)
+    im_out = axs.imshow(variable_value, extent=extent, **main_plot_kwargs)
+    axs.axis("off")
+    # plt.xlabel('time window')
+    # plt.ylabel(variable_name)
+    plt.title(f'debug_two_step: {variable_name}')
+    # return im_out
+
+    
+    
+# ==================================================================================================================== #
+# Functions for drawing the decoded position and the animal position as a callback                                     #
+# ==================================================================================================================== #
+
+def _temp_debug_draw_predicted_position_difference(predicted_positions, measured_positions, time_window, ax=None):
+    """ Draws the decoded position and the actual animal's position, and an arrow between them. """
+    if ax is None:
+        raise NotImplementedError
+        # ax = plt.gca()
+    debug_print = False
+    if debug_print:
+        print(f'predicted_positions[{time_window},:]: {predicted_positions[time_window,:]}, measured_positions[{time_window},:]: {measured_positions[time_window,:]}')
+    # predicted_point = predicted_positions[time_window,:]
+    # measured_point = measured_positions[time_window,:]
+    predicted_point = np.squeeze(predicted_positions[time_window,:])
+    measured_point = np.squeeze(measured_positions[time_window,:])
+    if debug_print:
+        print(f'\tpredicted_point: {predicted_point}, measured_point: {measured_point}')
+    
+    # ## For 'x == vertical orientation' only: Need to transform the point (swap y and x) as is typical in an imshow plot:
+    # predicted_point = [predicted_point[-1], predicted_point[0]] # reverse the x and y coords
+    # measured_point = [measured_point[-1], measured_point[0]] # reverse the x and y coords
+    
+    # Draw displacement arrow:
+    # active_arrow = FancyArrowPatch(posA=tuple(predicted_point), posB=tuple(measured_point), path=None, arrowstyle=']->', connectionstyle='arc3', shrinkA=2, shrinkB=2, mutation_scale=8, mutation_aspect=1, color='C2') 
+    active_arrow = FancyArrowPatch(posA=tuple(predicted_point), posB=tuple(measured_point), path=None, arrowstyle='simple', connectionstyle='arc3', shrinkA=1, shrinkB=1, mutation_scale=20, mutation_aspect=1,
+                                   color='k', alpha=0.5, path_effects=[patheffects.withStroke(linewidth=3, foreground='white')]) 
+    ax.add_patch(active_arrow)
+    # Draw the points on top:
+    predicted_line, = ax.plot(predicted_point[0], predicted_point[1], marker='d', markersize=6.0, linestyle='None', label='predicted', markeredgecolor='#ffffffc8', markerfacecolor='#e0ffeac8') # 'd' is a thin diamond marker
+    measured_line, = ax.plot(measured_point[0], measured_point[1], marker='o', markersize=6.0, linestyle='None', label='measured', markeredgecolor='#ff7f0efa', markerfacecolor='#ff7f0ea0') # 'o' is a circle marker
+    fig = plt.gcf()
+    fig.legend((predicted_line, measured_line), ('Predicted', 'Measured'), 'upper right')
+    return {'ax':ax, 'predicted_line':predicted_line, 'measured_line':measured_line, 'active_arrow':active_arrow}
+    # update function:
+    
+    
+    
+def _temp_debug_draw_update_predicted_position_difference(predicted_positions, measured_positions, time_window, ax=None, predicted_line=None, measured_line=None, active_arrow=None):
+    assert measured_line is not None, "measured_line is required!"
+    assert predicted_line is not None, "predicted_line is required!"
+    debug_print = False
+    if debug_print:
+        print(f'predicted_positions[{time_window},:]: {predicted_positions[time_window,:]}, measured_positions[{time_window},:]: {measured_positions[time_window,:]}')
+    # predicted_point = predicted_positions[time_window,:]
+    # measured_point = measured_positions[time_window,:]
+    predicted_point = np.squeeze(predicted_positions[time_window,:])
+    measured_point = np.squeeze(measured_positions[time_window,:])
+    if debug_print:
+        print(f'\tpredicted_point: {predicted_point}, measured_point: {measured_point}')
+    # ## For 'x == vertical orientation' only: Need to transform the point (swap y and x) as is typical in an imshow plot:
+    # predicted_point = [predicted_point[-1], predicted_point[0]] # reverse the x and y coords
+    # measured_point = [measured_point[-1], measured_point[0]] # reverse the x and y coords
+    predicted_line.set_xdata(predicted_point[0])
+    predicted_line.set_ydata(predicted_point[1])
+    measured_line.set_xdata(measured_point[0])
+    measured_line.set_ydata(measured_point[1])
+    if active_arrow is not None:
+        active_arrow.set_positions(tuple(predicted_point), tuple(measured_point))
+    plt.draw()
+    # fig.canvas.draw_idle() # TODO: is this somehow better?
+
