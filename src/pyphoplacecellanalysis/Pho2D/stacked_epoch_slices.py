@@ -43,7 +43,7 @@ def stacked_epoch_basic_setup(epoch_slices, name='stacked_epoch_slices_view', pl
     plots_data = RenderPlotsData(name=name)
     plots = RenderPlots(name=name)
     ui = PhoUIContainer(name=name)
-    ui.connections = PhoUIContainer(name=name)    
+    ui.connections = PhoUIContainer(name=name)
 
     params.name = name
     params.window_title = plot_function_name
@@ -373,6 +373,7 @@ def stacked_epoch_slices_matplotlib_build_view(epoch_slices, name='stacked_epoch
 
     ## Required only for MatplotlibTimeSynchronizedWidget-embedded version:
     ui.mw.draw()
+    ui.mw.ui.scrollAreaContentsWidget.setMinimumHeight(params.all_plots_height)
     ui.mw.show()
     
     return params, plots_data, plots, ui

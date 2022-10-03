@@ -18,7 +18,7 @@ class MatplotlibTimeSynchronizedWidget(CustomMatplotlibWidget):
         mw.draw()
     """
     
-    def __init__(self, disable_toolbar=True, size=(5.0, 4.0), dpi=100, **kwargs):
+    def __init__(self, disable_toolbar=True, size=(5.0, 4.0), dpi=72, **kwargs):
         super(MatplotlibTimeSynchronizedWidget, self).__init__(disable_toolbar=disable_toolbar, size=size, dpi=dpi, **kwargs)
         
         

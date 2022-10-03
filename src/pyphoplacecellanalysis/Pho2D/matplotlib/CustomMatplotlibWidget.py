@@ -36,7 +36,7 @@ class CustomMatplotlibWidget(QtWidgets.QWidget):
         self.ui.connections = PhoUIContainer(name=name)
 
         self.params.name = name
-        self.params.window_title = kwargs.get('plot_function_name', name)
+        self.params.window_title = kwargs.pop('plot_function_name', name)
         self.params.disable_toolbar = disable_toolbar
         self.params.figure_kwargs = kwargs
         self.params.figure_kwargs['figsize'] = size
@@ -61,15 +61,53 @@ class CustomMatplotlibWidget(QtWidgets.QWidget):
             self.ui.toolbar = NavigationToolbar(self.ui.canvas, self)
         else:
             self.ui.toolbar = None
-        
-        self.vbox = QtWidgets.QVBoxLayout()
-        self.vbox.setContentsMargins(0, 0, 0, 0)
-        
-        if not self.params.disable_toolbar:
-            self.vbox.addWidget(self.ui.toolbar)
-        self.vbox.addWidget(self.ui.canvas)
-        self.setLayout(self.vbox)
+            
+        self.buildMainContentWidget()
 
+
+
+    def buildMainContentWidget(self):
+        self.ui.vbox = QtWidgets.QVBoxLayout()
+        self.ui.vbox.setContentsMargins(0, 0, 0, 0)
+        self.ui.vbox.setObjectName('root_vbox')
+        
+        # ## Non-scrollable version:
+        # target_vbox = self.ui.vbox
+        # ## Add the real widgets:
+        # if not self.params.disable_toolbar:
+        #     target_vbox.addWidget(self.ui.toolbar)
+        # target_vbox.addWidget(self.ui.canvas)
+
+        ## Scrollable Version:
+        
+        ## Build the contents widget and inner_contents_vbox:
+        self.ui.scrollAreaContentsWidget = QtWidgets.QWidget()
+        self.ui.scrollAreaContentsWidget.setObjectName('scrollAreaContentsWidget')
+        self.ui.inner_contents_vbox = QtWidgets.QVBoxLayout()
+        self.ui.inner_contents_vbox.setContentsMargins(0, 0, 0, 0)
+        self.ui.inner_contents_vbox.setObjectName('inner_contents_vbox')
+        target_vbox = self.ui.inner_contents_vbox
+        ## Add the real widgets:
+        if not self.params.disable_toolbar:
+            target_vbox.addWidget(self.ui.toolbar)
+        target_vbox.addWidget(self.ui.canvas)
+        self.ui.scrollAreaContentsWidget.setLayout(self.ui.inner_contents_vbox)
+        
+        ## Optional Scroll Area Widget:
+        self.ui.scrollAreaWidget = QtWidgets.QScrollArea() # Scroll Area which contains the widgets, set as the centralWidget
+        
+        #Scroll Area Properties
+        self.ui.scrollAreaWidget.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarPolicy.ScrollBarAlwaysOn) #  Qt.ScrollBarAlwaysOn
+        self.ui.scrollAreaWidget.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarPolicy.ScrollBarAlwaysOff) # Qt.ScrollBarAlwaysOff
+        self.ui.scrollAreaWidget.setWidgetResizable(True)
+        # self.ui.scrollAreaContentsWidget = widget # Widget that contains the collection of Vertical Box
+        if self.ui.scrollAreaContentsWidget is not None:
+            # Set contents widget if we have it:
+            self.ui.scrollAreaWidget.setWidget(self.ui.scrollAreaContentsWidget)
+        
+        self.ui.vbox.addWidget(self.ui.scrollAreaWidget)
+        self.setLayout(self.ui.vbox)
+        
         
     @property
     def fig(self):
@@ -95,7 +133,7 @@ class CustomMatplotlibWidget(QtWidgets.QWidget):
     def draw(self):
         self.ui.canvas.draw()
         
-        
+
     # ==================================================================================================================== #
     # QT Slots                                                                                                             #
     # ==================================================================================================================== #
