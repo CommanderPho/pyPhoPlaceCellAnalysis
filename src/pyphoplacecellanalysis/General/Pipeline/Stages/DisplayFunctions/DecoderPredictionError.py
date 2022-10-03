@@ -652,7 +652,8 @@ def plot_decoded_epoch_slices(filter_epochs, filter_epochs_decoder_result, globa
     # epoch_description_list = [f'ripple {epoch_tuple.label} (peakpower: {epoch_tuple.peakpower})' for epoch_tuple in epochs_df[['label', 'peakpower']].itertuples()]
 
     epoch_labels = filter_epochs_decoder_result.epoch_description_list.copy()
-    print(f'epoch_labels: {epoch_labels}')
+    if debug_print:
+        print(f'epoch_labels: {epoch_labels}')
     
     plot_function_name = 'Stacked Epoch Slices View - MATPLOTLIB subplots Version'
     params, plots_data, plots, ui = stacked_epoch_slices_matplotlib_build_view(epoch_slices, epoch_labels=epoch_labels, name=name, plot_function_name=plot_function_name, debug_test_max_num_slices=debug_test_max_num_slices, debug_print=debug_print)
