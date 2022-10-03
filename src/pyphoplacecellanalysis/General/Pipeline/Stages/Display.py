@@ -276,24 +276,36 @@ class PipelineWithDisplayPipelineStageMixin:
             ## Old strictly name-based version (pre 2022-09-12):
             active_session_configuration_name = active_session_configuration_context
             
+            ## TODO: get the appropriate IdentifyingContext from the config name
+            assert active_session_configuration_name in self.filtered_contexts, f'active_session_configuration_name: {active_session_configuration_name} is NOT in the self.filtered_contexts dict: {list(self.filtered_contexts.keys())}'
+            active_session_configuration_context = self.filtered_contexts[active_session_configuration_name]
+            
+            
         elif isinstance(active_session_configuration_context, IdentifyingContext):
             # NEW 2022-09-12-style call with an identifying context (IdentifyingContext) object
-            kwargs.setdefault('active_context', active_session_configuration_context) # add 'active_context' to the kwargs for the display function if possible
-
-            # Check if the context is filtered or at the session level:
-            if not hasattr(active_session_configuration_context, 'filter_name'):
-                ## Global session-level context (not filtered, so not corresponding to a specific config name):
-                print(f'WARNING: .display(...) function called with GLOBAL (non-filtered) context. This should be the case only for one function (`_display_context_nested_docks`) currently. ')
-                ## For a global-style display function, pass ALL of the computation_results and active_configs just to preserve the argument style.
-                return display_function(self.computation_results, self.active_configs, owning_pipeline=self, active_config_name=None, **kwargs)
-            
-            else:
-                ## The expected filtered context:
-                active_session_configuration_name = active_session_configuration_context.filter_name            
-                
+            active_session_configuration_name = None    
         else:
             print(f'WARNING: active_session_configuration_context: {active_session_configuration_context} with type: {type(active_session_configuration_context)}')
             raise NotImplementedError
+        
+        
+        assert isinstance(active_session_configuration_context, IdentifyingContext)
+        ## Now we're certain that we have an active_session_configuration_context:
+        kwargs.setdefault('active_context', active_session_configuration_context) # add 'active_context' to the kwargs for the display function if possible
+
+        # Check if the context is filtered or at the session level:
+        if not hasattr(active_session_configuration_context, 'filter_name'):
+            ## Global session-level context (not filtered, so not corresponding to a specific config name):
+            print(f'WARNING: .display(...) function called with GLOBAL (non-filtered) context. This should be the case only for one function (`_display_context_nested_docks`) currently. ')
+            ## For a global-style display function, pass ALL of the computation_results and active_configs just to preserve the argument style.
+            return display_function(self.computation_results, self.active_configs, owning_pipeline=self, active_config_name=None, **kwargs)
+        
+        else:
+            ## The expected filtered context:
+            if active_session_configuration_name is not None:
+                assert active_session_configuration_context.filter_name == active_session_configuration_name
+    
+            active_session_configuration_name = active_session_configuration_context.filter_name
         
         ## Sanity checking:
         assert (active_session_configuration_name in self.computation_results), f"self.computation_results doesn't contain a key for the provided active_session_filter_configuration ('{active_session_configuration_name}'). Did you only enable computation with enabled_filter_names in perform_computation that didn't include this key?"
