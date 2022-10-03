@@ -19,7 +19,7 @@ class MatplotlibWidget(QtWidgets.QWidget):
         mw.draw()
     """
     
-    def __init__(self, disable_toolbar=True, size=(5.0, 4.0), dpi=100, **kwargs):
+    def __init__(self, disable_toolbar=True, size=(5.0, 4.0), dpi=72, **kwargs):
         QtWidgets.QWidget.__init__(self)
         self.fig = Figure(size, dpi=dpi, **kwargs)
         self.canvas = FigureCanvas(self.fig)

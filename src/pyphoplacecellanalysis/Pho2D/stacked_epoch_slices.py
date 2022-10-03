@@ -334,18 +334,15 @@ def stacked_epoch_slices_matplotlib_build_view(epoch_slices, name='stacked_epoch
     plots.figure_id = plots.name # copy the name as the figure_id
     
     ## Create the main figure and plot axes:
+    
+    ## Basic Matplotlib Version:
     # plots.fig, plots.axs = plt.subplots(num=plots.figure_id, ncols=1, nrows=params.active_num_slices, figsize=(15,15), clear=True, sharex=False, sharey=False, constrained_layout=True)
     
+    ## MatplotlibTimeSynchronizedWidget-embedded Version:
     ui.mw = MatplotlibTimeSynchronizedWidget(size=(15,15), dpi=72, constrained_layout=True) # , clear=True
     plots.fig = ui.mw.getFigure()
-    plots.axs = plots.fig.subplots(ncols=1, nrows=params.active_num_slices, sharex=False, sharey=False) # , figsize=(15,15), clear=True, constrained_layout=True
-        
-    # subplot = mw.getFigure().add_subplot(111)
-    # subplot.plot(x,y)
-    # mw.draw()
-    
-    
     plots.fig.suptitle(plots.name)
+    plots.axs = plots.fig.subplots(ncols=1, nrows=params.active_num_slices, sharex=False, sharey=False) # , figsize=(15,15), clear=True, constrained_layout=True
     
     for a_slice_idx, curr_ax in enumerate(plots.axs):
         if debug_print:
@@ -354,8 +351,9 @@ def stacked_epoch_slices_matplotlib_build_view(epoch_slices, name='stacked_epoch
         ## Get values:
         # Create inset in data coordinates using ax.transData as transform
         a_slice_start_t = plots_data.epoch_slices[a_slice_idx, 0]
-        a_slice_end_t = plots_data.epoch_slices[a_slice_idx, 1]        
-        print(f'a_slice_start_t: {a_slice_start_t}, a_slice_end_t: {a_slice_end_t}')
+        a_slice_end_t = plots_data.epoch_slices[a_slice_idx, 1]
+        if debug_print:
+            print(f'a_slice_start_t: {a_slice_start_t}, a_slice_end_t: {a_slice_end_t}')
         curr_ax.set_xlim(*plots_data.epoch_slices[a_slice_idx,:])
         curr_ax.tick_params(labelleft=False, labelbottom=True)
         curr_ax.set_title('') # remove the title
@@ -373,6 +371,7 @@ def stacked_epoch_slices_matplotlib_build_view(epoch_slices, name='stacked_epoch
         secax_y.tick_params(labelleft=False, labelbottom=False, labelright=False) # Turn off all ticks for the secondary axis
         # Do I need to save this temporary axes? No, it appears that's not needed
 
+    ## Required only for MatplotlibTimeSynchronizedWidget-embedded version:
     ui.mw.draw()
     ui.mw.show()
     
@@ -423,7 +422,15 @@ def stacked_epoch_slices_matplotlib_build_insets_view(epoch_slices, name='stacke
     # inset_plot_widths.shape
 
     plots.figure_id = 'stacked_epoch_slices_INSET_matplotlib'
-    plots.fig, plots.parent_ax = plt.subplots(num=plots.figure_id, ncols=1, nrows=1, figsize=(15,15), clear=True, sharex=False, sharey=False, constrained_layout=True)
+    
+    ## Basic Matplotlib Version:
+    # plots.fig, plots.parent_ax = plt.subplots(num=plots.figure_id, ncols=1, nrows=1, figsize=(15,15), clear=True, sharex=False, sharey=False, constrained_layout=True)
+
+    ## MatplotlibTimeSynchronizedWidget-embedded Version:
+    ui.mw = MatplotlibTimeSynchronizedWidget(size=(15,15), dpi=72, constrained_layout=True) # , clear=True
+    plots.fig = ui.mw.getFigure()
+    plots.parent_ax = plots.fig.subplots(ncols=1, nrows=1, sharex=False, sharey=False) # , figsize=(15,15), clear=True, constrained_layout=True
+
     plots.axs = [] # an empty list of core axes
     plots.fig.suptitle(plots.name)
     plots.parent_ax.set(xlim=(0.0, epoch_slices_max_duration), ylim=(0, float(params.active_num_slices)))
@@ -451,6 +458,10 @@ def stacked_epoch_slices_matplotlib_build_insets_view(epoch_slices, name='stacke
         curr_ax.set_title('') # remove the title
         # Appends:
         plots.axs.append(curr_ax)
+    
+    ## Required only for MatplotlibTimeSynchronizedWidget-embedded version:
+    ui.mw.draw()
+    ui.mw.show()
     
     return params, plots_data, plots, ui
 
