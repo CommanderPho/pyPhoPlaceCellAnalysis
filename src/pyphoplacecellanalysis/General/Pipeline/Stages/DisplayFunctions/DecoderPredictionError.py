@@ -242,7 +242,8 @@ def plot_1D_most_likely_position_comparsions(measured_position_df, time_window_c
         if ax is None:
             fig, ax = plt.subplots(ncols=1, nrows=1, figsize=(15,15), clear=True, sharex=True, sharey=False, constrained_layout=True)
         else:
-            fig = plt.gcf()
+            fig = None # Calling plt.gcf() creates an empty figure and returns the wrong value 
+            # fig = plt.gcf()
         
         # Actual Position Plots:
         ax.plot(measured_position_df['t'].to_numpy(), measured_position_df[variable_name].to_numpy(), label=f'measured {variable_name}', color='#ff000066', alpha=0.8, marker='+', markersize=4) # Opaque RED # , linestyle='dashed', linewidth=2, color='#ff0000ff'
@@ -666,10 +667,13 @@ def plot_decoded_epoch_slices(filter_epochs, filter_epochs_decoder_result, globa
         if debug_print:
             print(f'i : {i}, curr_posterior.shape: {curr_posterior.shape}')
 
-        plots.fig, curr_ax = plot_1D_most_likely_position_comparsions(global_pos_df, ax=curr_ax, time_window_centers=curr_time_bins, xbin=xbin,
+        _temp_fig, curr_ax = plot_1D_most_likely_position_comparsions(global_pos_df, ax=curr_ax, time_window_centers=curr_time_bins, xbin=xbin,
                                                            posterior=curr_posterior,
                                                            active_most_likely_positions_1D=curr_most_likely_positions,
                                                            enable_flat_line_drawing=enable_flat_line_drawing, debug_print=debug_print)
+        if _temp_fig is not None:
+            plots.fig = _temp_fig
+        
         curr_ax.set_xlim(*plots_data.epoch_slices[i,:])
         curr_ax.set_title('')
 
