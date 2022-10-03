@@ -2,11 +2,13 @@
 from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer
 import pyphoplacecellanalysis.External.pyqtgraph as pg
 from qtpy import QtCore, QtWidgets, QtGui
-from pyphoplacecellanalysis.External.pyqtgraph.widgets.MatplotlibWidget import MatplotlibWidget
+# from pyphoplacecellanalysis.External.pyqtgraph.widgets.MatplotlibWidget import MatplotlibWidget
 
+# from pyphoplacecellanalysis.External.pyqtgraph.widgets.MatplotlibWidget import MatplotlibWidget
+from pyphoplacecellanalysis.Pho2D.matplotlib.CustomMatplotlibWidget import CustomMatplotlibWidget
 
-class MatplotlibTimeSynchronizedWidget(MatplotlibWidget):
-    """ Extends MatplotlibWidget with time-synchronization properties 
+class MatplotlibTimeSynchronizedWidget(CustomMatplotlibWidget):
+    """ Extends CustomMatplotlibWidget with time-synchronization properties 
     
     Example::
     
@@ -43,7 +45,19 @@ class MatplotlibTimeSynchronizedWidget(MatplotlibWidget):
         
 
 class ScrollableMatplotlibTimeSynchronizedWidget(QtWidgets.QMainWindow):
+    """
+    
+    Usage:
+        from pyphoplacecellanalysis.Pho2D.matplotlib.MatplotlibTimeSynchronizedWidget import MatplotlibTimeSynchronizedWidget, ScrollableMatplotlibTimeSynchronizedWidget
 
+        _temp_out = curr_active_pipeline.display('_display_plot_decoded_epoch_slices', active_config_name, debug_test_max_num_slices=16)
+        params, plots_data, plots, ui = _temp_out
+        ui.mw.setMinimumHeight(params.all_plots_height)
+
+        scrollable_mw_window = ScrollableMatplotlibTimeSynchronizedWidget(params.name, ui=ui, window_title=params.window_title, scrollAreaContentsWidget=ui.mw)
+
+        
+    """
     def __init__(self, name, ui=None, window_title=None, scrollAreaContentsWidget=None):
         super().__init__()
         self.name = name
@@ -64,17 +78,14 @@ class ScrollableMatplotlibTimeSynchronizedWidget(QtWidgets.QMainWindow):
     def initUI(self):
         
         self.ui.scrollAreaWidget = QtWidgets.QScrollArea() # Scroll Area which contains the widgets, set as the centralWidget
-        self.ui.scrollAreaWidget.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarPolicy.ScrollBarAlwaysOn)
-        # self.ui.scrollAreaWidget.setWidget(self.ui.graphics_layout)
-    
-        # self.scroll = QScrollArea()             # Scroll Area which contains the widgets, set as the centralWidget
-
+        
         #Scroll Area Properties
         self.ui.scrollAreaWidget.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarPolicy.ScrollBarAlwaysOn) #  Qt.ScrollBarAlwaysOn
         self.ui.scrollAreaWidget.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarPolicy.ScrollBarAlwaysOff) # Qt.ScrollBarAlwaysOff
         self.ui.scrollAreaWidget.setWidgetResizable(True)
         
         if self.ui.scrollAreaContentsWidget is not None:
+            # Set contents widget if we have it:
             self.ui.scrollAreaWidget.setWidget(self.ui.scrollAreaContentsWidget)
 
         self.setCentralWidget(self.ui.scrollAreaWidget)
@@ -87,7 +98,7 @@ class ScrollableMatplotlibTimeSynchronizedWidget(QtWidgets.QMainWindow):
     
     
     def setScrollAreaContents(self, widget: QtWidgets.QWidget):
-        """_summary_
+        """Sets the widget contained in the scrollArea after the fact
 
         Args:
             widget (_type_): _description_
@@ -95,11 +106,3 @@ class ScrollableMatplotlibTimeSynchronizedWidget(QtWidgets.QMainWindow):
         self.ui.scrollAreaContentsWidget = widget # Widget that contains the collection of Vertical Box
         self.ui.scrollAreaWidget.setWidget(self.ui.scrollAreaContentsWidget)
         
-        # self.widget = QWidget()                 # Widget that contains the collection of Vertical Box
-        # self.vbox = QVBoxLayout()               # The Vertical Box that contains the Horizontal Boxes of  labels and buttons
-
-        # for i in range(1,50):
-        #     object = QLabel("TextLabel")
-        #     self.vbox.addWidget(object)
-
-        # self.widget.setLayout(self.vbox)
