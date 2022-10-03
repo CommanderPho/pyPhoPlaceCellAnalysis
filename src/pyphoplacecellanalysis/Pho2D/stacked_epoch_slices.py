@@ -171,7 +171,7 @@ def stacked_epoch_slices_view(epoch_slices, position_times_list, position_traces
 
 
 def stacked_epoch_slices_view_viewbox(epoch_slices, position_times_list, position_traces_list, epoch_description_list, name='stacked_epoch_slices_view_viewbox', debug_print=False):
-    """ The viewbox version 
+    """ The viewbox version - not primarily used
     
     epoch_description_list: list of length 
     
@@ -339,9 +339,33 @@ def stacked_epoch_slices_matplotlib_build_view(epoch_slices, name='stacked_epoch
         
         ## Get values:
         # Create inset in data coordinates using ax.transData as transform
+        a_slice_start_t = plots_data.epoch_slices[a_slice_idx, 0]
+        a_slice_end_t = plots_data.epoch_slices[a_slice_idx, 1]        
+        print(f'a_slice_start_t: {a_slice_start_t}, a_slice_end_t: {a_slice_end_t}')
         curr_ax.set_xlim(*plots_data.epoch_slices[a_slice_idx,:])
         curr_ax.tick_params(labelleft=False, labelbottom=True)
         curr_ax.set_title('') # remove the title
+        
+        # Left side y-label for the start time
+        curr_ax.set_ylabel(f'{a_slice_start_t:.2f}') # format to two decimal places
+        
+        ## Add the right-aligned axis
+        # From http://notes.brooks.nu/2008/03/plotting-on-left-and-right-axis-simulateously-using-matplotlib-and-numpy
+        # Create right axis and plots.  It is the frameon=False that makes this
+        # plot transparent so that you can see the left axis plot that will be
+        # underneath it.  The sharex option causes them to share the x axis.
+        secax_y = curr_ax.secondary_yaxis('right', functions=None) # functions=(celsius_to_fahrenheit, fahrenheit_to_celsius)
+        secax_y.set_ylabel(f'{a_slice_end_t:.2f}')
+        secax_y.tick_params(labelleft=False, labelbottom=False) # Turn off all ticks for the secondary axis
+        
+
+        # axR = plt.subplot(1,1,1, sharex=curr_ax, frameon=False)
+        # axR.yaxis.tick_right()
+        # axR.yaxis.set_label_position("right")
+        # # plot(yRight, '.-g')
+        # axR.set_ylabel("Right Y-Axis Data")
+        # Do I need to save this temporary axes?
+
     
     return params, plots_data, plots, ui
 
