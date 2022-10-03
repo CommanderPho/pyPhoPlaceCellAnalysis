@@ -9,6 +9,11 @@
     <file>chain-small.png</file>
     <file>chain-unchain.png</file>
   </qresource>
+  <qresource prefix="State">
+    <file>Icons/actions/eye.png</file>
+    <file>Icons/actions/eye-close.png</file>
+    <file>Icons/actions/eye-half.png</file>
+  </qresource>
   <qresource prefix="Graphics">
     <file>Icons/graphics/ic_blur_linear_48px.png</file>
     <file>Icons/graphics/ic_blur_linear_48px-dark.png</file>

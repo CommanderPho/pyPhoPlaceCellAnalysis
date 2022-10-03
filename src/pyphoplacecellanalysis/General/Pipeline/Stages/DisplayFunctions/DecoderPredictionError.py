@@ -143,19 +143,31 @@ class DefaultDecoderDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Disp
                 if filter_epochs == 'laps':
                     ## Lap-Epochs Decoding:
                     laps_copy = deepcopy(computation_result.sess.laps)
-                    active_filter_epochs = laps_copy.filtered_by_lap_flat_index(np.arange(6)).as_epoch_obj() # epoch object
-                    default_figure_name = f'{default_figure_name}_Laps'
+                    
+                    
+                    # active_filter_epochs = laps_copy.filtered_by_lap_flat_index(np.arange(6)).as_epoch_obj() # epoch object
+                    active_filter_epochs = laps_copy.as_epoch_obj() # epoch object
+                    # default_figure_name = f'{default_figure_name}_Laps'
+                    default_figure_name = f'Laps'
+                    
+                    # ## Build Epochs:
+                    # # epochs = sess.laps.to_dataframe()
+                    # epochs = active_filter_epochs.to_dataframe()
+                    # epoch_slices = epochs[['start', 'stop']].to_numpy()
+                    # epoch_description_list = [f'lap {epoch_tuple.lap_id} (maze: {epoch_tuple.maze_id}, direction: {epoch_tuple.lap_dir})' for epoch_tuple in epochs[['lap_id','maze_id','lap_dir']].itertuples()]
                     
                     
                 elif filter_epochs == 'pbe':
                     ## PBEs-Epochs Decoding:
                     active_filter_epochs = deepcopy(computation_result.sess.pbe) # epoch object
-                    default_figure_name = f'{default_figure_name}_PBEs'
+                    # default_figure_name = f'{default_figure_name}_PBEs'
+                    default_figure_name = f'PBEs'
                 
                 elif filter_epochs == 'ripple':
                     ## Ripple-Epochs Decoding:
                     active_filter_epochs = deepcopy(computation_result.sess.ripple) # epoch object
-                    default_figure_name = f'{default_figure_name}_Ripples'
+                    # default_figure_name = f'{default_figure_name}_Ripples'
+                    default_figure_name = f'Ripples'
                     
                 elif filter_epochs == 'replay':
                     active_filter_epochs = deepcopy(computation_result.sess.replay) # epoch object
@@ -164,7 +176,8 @@ class DefaultDecoderDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Disp
                     if not 'stop' in active_filter_epochs.columns:
                         # Make sure it has the 'stop' column which is expected as opposed to the 'end' column
                         active_filter_epochs['stop'] = active_filter_epochs['end'].copy()
-                    default_figure_name = f'{default_figure_name}_Replay'
+                    # default_figure_name = f'{default_figure_name}_Replay'
+                    default_figure_name = f'Replay'
                 else:
                     raise NotImplementedError
             else:
@@ -715,8 +728,8 @@ def plot_spike_count_and_firing_rate_normalizations(pho_custom_decoder, axs=None
 
 
 class CreateNewStackedDecodedEpochSlicesPlotCommand(BaseMenuCommand):
-    """ build_combined_time_synchronized_plotters_window
-    A command to create a plotter as needed
+    """ Creates a stacked decoded epoch slices view by calling _display_plot_decoded_epoch_slices
+    
     """
     def __init__(self, spike_raster_window, active_pipeline, active_config_name=None, active_context=None, filter_epochs='laps', display_output={}) -> None:
         super(CreateNewStackedDecodedEpochSlicesPlotCommand, self).__init__()
