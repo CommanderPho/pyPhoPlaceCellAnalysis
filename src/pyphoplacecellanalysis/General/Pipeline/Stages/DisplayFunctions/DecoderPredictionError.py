@@ -202,14 +202,26 @@ class DefaultDecoderDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Disp
                     
                 elif filter_epochs == 'replay':
                     active_filter_epochs = deepcopy(computation_result.sess.replay) # epoch object
-                    active_filter_epochs = active_filter_epochs.drop_duplicates("start") # tries to remove duplicate replays to take care of `AssertionError: Intervals in start_stop_times_arr must be non-overlapping`, but it hasn't worked.
+                    # active_filter_epochs = active_filter_epochs.drop_duplicates("start") # tries to remove duplicate replays to take care of `AssertionError: Intervals in start_stop_times_arr must be non-overlapping`, but it hasn't worked.
+
                     # filter_epochs.columns # ['epoch_id', 'rel_id', 'start', 'end', 'replay_r', 'replay_p', 'template_id', 'flat_replay_idx', 'duration']
                     if not 'stop' in active_filter_epochs.columns:
                         # Make sure it has the 'stop' column which is expected as opposed to the 'end' column
                         active_filter_epochs['stop'] = active_filter_epochs['end'].copy()
                     # default_figure_name = f'{default_figure_name}_Replay'
                     default_figure_name = f'Replay'
-                    epoch_description_list = [f'{default_figure_name} {epoch_tuple.label}' for epoch_tuple in active_filter_epochs.to_dataframe()[['label']].itertuples()]
+
+                    # TODO 2022-10-04 - CORRECTNESS - AssertionError: Intervals in start_stop_times_arr must be non-overlapping. I believe this is due to the stop values overlapping somewhere
+                    print(f'active_filter_epochs: {active_filter_epochs}')
+                    ## HANDLE OVERLAPPING EPOCHS: Note that there is a problem that occurs here with overlapping epochs for laps. Below we remove any overlapping epochs and leave only the valid ones.
+                    is_non_overlapping = get_non_overlapping_epochs(active_filter_epochs[['start','stop']].to_numpy()) # returns a boolean array of the same length as the number of epochs 
+                    # Just drop the rows of the dataframe that are overlapping:
+                    # active_filter_epochs = active_filter_epochs[is_non_overlapping, :]
+                    active_filter_epochs = active_filter_epochs.loc[is_non_overlapping]
+                    print(f'active_filter_epochs: {active_filter_epochs}')
+
+                    # epoch_description_list = [f'{default_figure_name} {epoch_tuple.epoch_id}' for epoch_tuple in active_filter_epochs[['epoch_id']].itertuples()]
+                    epoch_description_list = [f'{default_figure_name} {epoch_tuple.flat_replay_idx}' for epoch_tuple in active_filter_epochs[['flat_replay_idx']].itertuples()]
                     
                 else:
                     raise NotImplementedError
