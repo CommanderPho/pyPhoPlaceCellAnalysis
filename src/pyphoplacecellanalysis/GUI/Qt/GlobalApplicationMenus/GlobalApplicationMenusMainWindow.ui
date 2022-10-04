@@ -237,6 +237,10 @@
    </property>
   </action>
   <action name="actionNew_1D_Ratemaps_Plot">
+   <property name="icon">
+    <iconset resource="../../../Resources/ActionIcons.qrc">
+     <normaloff>:/Graphics/Icons/graphics/Spikes.png</normaloff>:/Graphics/Icons/graphics/Spikes.png</iconset>
+   </property>
    <property name="text">
     <string>New 1D Ratemaps Plot</string>
    </property>

@@ -15,6 +15,11 @@
     <file>Icons/actions/eye-half.png</file>
   </qresource>
   <qresource prefix="Graphics">
+    <file>Icons/graphics/Pho Symbol.svg</file>
+    <file>Icons/graphics/MultiAxesPlot.png</file>
+    <file>Icons/graphics/Rectangles.png</file>
+    <file>Icons/graphics/SimplePlot.png</file>
+    <file>Icons/graphics/Spikes.png</file>
     <file>Icons/graphics/ic_blur_linear_48px.png</file>
     <file>Icons/graphics/ic_blur_linear_48px-dark.png</file>
     <file>Icons/graphics/ic_insert_chart_48px.png</file>

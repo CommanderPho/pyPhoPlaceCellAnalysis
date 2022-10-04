@@ -117,6 +117,10 @@
      <property name="title">
       <string>Decoded Epoch Slices</string>
      </property>
+     <property name="icon">
+      <iconset resource="../../../Resources/ActionIcons.qrc">
+       <normaloff>:/Graphics/Icons/graphics/Rectangles.png</normaloff>:/Graphics/Icons/graphics/Rectangles.png</iconset>
+     </property>
      <addaction name="actionDecoded_Epoch_Slices_Laps"/>
      <addaction name="actionDecoded_Epoch_Slices_PBEs"/>
      <addaction name="actionDecoded_Epoch_Slices_Ripple"/>
@@ -310,6 +314,10 @@
    </property>
   </action>
   <action name="actionDecoded_Epoch_Slices_Laps">
+   <property name="icon">
+    <iconset resource="../../../Resources/ActionIcons.qrc">
+     <normaloff>:/Graphics/Icons/graphics/Rectangles.png</normaloff>:/Graphics/Icons/graphics/Rectangles.png</iconset>
+   </property>
    <property name="text">
     <string>Laps</string>
    </property>
