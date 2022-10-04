@@ -146,7 +146,7 @@ class DefaultDecoderDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Disp
             
             ## Finally, add the display function to the active context
             active_display_fn_identifying_ctx = active_identifying_context.adding_context('display_fn', display_fn_name='display_plot_decoded_epoch_slices')
-            active_display_fn_identifying_ctx_string = active_display_fn_identifying_ctx.get_description(separator='|') # Get final discription string:
+            # active_display_fn_identifying_ctx_string = active_display_fn_identifying_ctx.get_description(separator='|') # Get final discription string:
             
             ## Display function specific variables:
             decoding_time_bin_size = kwargs.pop('decoding_time_bin_size', 0.02)
@@ -217,6 +217,15 @@ class DefaultDecoderDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Disp
                                                                     **overriding_dict_with(lhs_dict={'name':default_figure_name, 'debug_test_max_num_slices':8, 'enable_flat_line_drawing':False, 'debug_print': False}, **kwargs))
             params, plots_data, plots, ui = out_plot_tuple
             
+            
+            ## Build the final context:
+            
+            # Add in the desired display variable:
+            active_identifying_ctx = active_display_fn_identifying_ctx.adding_context('filter_epochs', filter_epochs=filter_epochs) # filter_epochs: 'ripple'
+            active_identifying_ctx_string = active_identifying_ctx.get_description(separator='|') # Get final discription string
+            print(f'active_identifying_ctx_string: "{active_identifying_ctx_string}"')
+            
+            
             ## TODO: use active_display_fn_identifying_ctx to add it to the display function:
             
             # active_display_fn_identifying_ctx
@@ -224,8 +233,9 @@ class DefaultDecoderDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Disp
             # figure, ax
             # return {active_display_fn_identifying_ctx: dict(params=params, plots_data=plots_data, plots=plots, ui=ui)}
             
-            
-            return {active_display_fn_identifying_ctx: dict(params=params, plots_data=plots_data, plots=plots, ui=ui)}
+            final_context = active_identifying_ctx
+            # final_context = active_display_fn_identifying_ctx
+            return {final_context: dict(params=params, plots_data=plots_data, plots=plots, ui=ui)}
         
             # return out_plot_tuple
         

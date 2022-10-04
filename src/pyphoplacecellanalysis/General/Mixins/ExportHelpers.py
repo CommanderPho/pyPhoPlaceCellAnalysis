@@ -105,6 +105,42 @@ def build_pdf_export_metadata(session_descriptor_string, filter_name, out_path=N
     
     return _build_pdf_pages_output_info, out_path
 
+
+# ==================================================================================================================== #
+# Modern 2022-10-04 PDF                                                                                                #
+# from pyphoplacecellanalysis.General.Mixins.ExportHelpers import create_daily_programmatic_display_function_testing_folder_if_needed, build_pdf_metadata_from_display_context
+# ==================================================================================================================== #
+def create_daily_programmatic_display_function_testing_folder_if_needed(out_path=None):
+    if out_path is None:   
+        out_day_date_folder_name = datetime.today().strftime('%Y-%m-%d') # A string with the day's date like '2022-01-16'
+        out_path = Path(r'EXTERNAL/Screenshots/ProgrammaticDisplayFunctionTesting').joinpath(out_day_date_folder_name).resolve()
+    else:
+        out_path = Path(out_path) # make sure it's a Path
+    out_path.mkdir(exist_ok=True)
+    return out_path
+
+def build_pdf_metadata_from_display_context(active_identifying_ctx, debug_print=False):
+    """ 
+    Usage:
+        curr_built_pdf_metadata, curr_pdf_save_filename = build_pdf_metadata_from_display_context(active_identifying_ctx)
+    
+    """
+    session_descriptor_string = '_'.join([active_identifying_ctx.format_name, active_identifying_ctx.session_name]) # 'kdiba_2006-6-08_14-26-15'
+    if debug_print:
+        print(f'session_descriptor_string: "{session_descriptor_string}"')
+    built_pdf_metadata = {'Creator': 'Spike3D - TestNeuroPyPipeline227', 'Author': 'Pho Hale', 'Title': session_descriptor_string, 'Subject': '', 'Keywords': [session_descriptor_string]}
+    context_tuple = [session_descriptor_string, active_identifying_ctx.filter_name, active_identifying_ctx.display_fn_name]
+    built_pdf_metadata['Title'] = '_'.join(context_tuple)
+    built_pdf_metadata['Subject'] = active_identifying_ctx.display_fn_name
+    built_pdf_metadata['Keywords'] = ' | '.join(context_tuple)
+    curr_pdf_save_filename = '_'.join(context_tuple) + '.pdf'
+    if debug_print:
+        print(f'curr_pdf_save_filename: "{curr_pdf_save_filename}"')
+    # curr_pdf_save_path = out_path.joinpath(curr_pdf_save_filename)
+    return built_pdf_metadata, curr_pdf_save_filename
+
+
+
 # ==================================================================================================================== #
 # DATA EXPORT                                                                                                          #
 # ==================================================================================================================== #
