@@ -43,22 +43,6 @@ class SpikesDataframeWindow(LiveWindowedData):
     """
     spike_dataframe_changed_signal = QtCore.pyqtSignal() # signal emitted when the spike dataframe is changed, which might change the number of units, number of spikes, and other properties.
     
-    # @property
-    # def active_live_data_window(self):
-    #     """The number of spikes (across all units) in the active window."""
-    #     return self._liveWindowedData
-    
-    # @property
-    # def timeWindow(self):
-    #     """ the TimeWindow object"""
-    #     return self.active_live_data_window.timeWindow
-
-    # @property
-    # def dataSource(self):
-    #     """ The datasource """
-    #     return self.active_live_data_window.dataSource
-    
-    
     ## TimeWindow Convenince properties:
     @property
     def active_time_window(self):
@@ -79,7 +63,6 @@ class SpikesDataframeWindow(LiveWindowedData):
     def active_window_start_time(self):
         """The current start time of the sliding time window"""
         return self.timeWindow.active_window_start_time
-    
     
     
     # Require TimeWindow and Datasource:
@@ -147,7 +130,9 @@ class SpikesDataframeWindow(LiveWindowedData):
         print(f'{indent_string}{prefix_string}window_duration: {self.window_duration}')
         
 
-
+# ==================================================================================================================== #
+# SpikesWindowOwningMixin                                                                                              #
+# ==================================================================================================================== #
 class SpikesWindowOwningMixin:
     """ Implementors own a SpikesWindow and can use it to get the current windowed dataframe
     

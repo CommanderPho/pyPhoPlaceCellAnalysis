@@ -158,8 +158,6 @@ class DefaultDecoderDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Disp
                 if filter_epochs == 'laps':
                     ## Lap-Epochs Decoding:
                     laps_copy = deepcopy(computation_result.sess.laps)
-                    
-                    
                     # active_filter_epochs = laps_copy.filtered_by_lap_flat_index(np.arange(6)).as_epoch_obj() # epoch object
                     active_filter_epochs = laps_copy.as_epoch_obj() # epoch object
                     # default_figure_name = f'{default_figure_name}_Laps'
@@ -184,9 +182,11 @@ class DefaultDecoderDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Disp
                     active_filter_epochs = deepcopy(computation_result.sess.ripple) # epoch object
                     # default_figure_name = f'{default_figure_name}_Ripples'
                     default_figure_name = f'Ripples'
+                    active_epoch_df = active_filter_epochs.to_dataframe()
+                    # if 'label' not in active_epoch_df.columns:
+                    active_epoch_df['label'] = active_epoch_df.index.to_numpy() # integer ripple indexing
                     # epoch_description_list = [f'ripple {epoch_tuple.label} (peakpower: {epoch_tuple.peakpower})' for epoch_tuple in active_filter_epochs.to_dataframe()[['label', 'peakpower']].itertuples()] # LONG
-                    epoch_description_list = [f'ripple[{epoch_tuple.label}]' for epoch_tuple in active_filter_epochs.to_dataframe()[['label']].itertuples()] # SHORT
-                    
+                    epoch_description_list = [f'ripple[{epoch_tuple.label}]' for epoch_tuple in active_epoch_df[['label']].itertuples()] # SHORT
                     
                 elif filter_epochs == 'replay':
                     active_filter_epochs = deepcopy(computation_result.sess.replay) # epoch object
@@ -222,7 +222,11 @@ class DefaultDecoderDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Disp
             # active_display_fn_identifying_ctx
             
             # figure, ax
-            return {active_display_fn_identifying_ctx: dict(params=params, plots_data=plots_data, plots=plots, ui=ui)}}
+            # return {active_display_fn_identifying_ctx: dict(params=params, plots_data=plots_data, plots=plots, ui=ui)}
+            
+            
+            return {active_display_fn_identifying_ctx: dict(params=params, plots_data=plots_data, plots=plots, ui=ui)}
+        
             # return out_plot_tuple
         
     

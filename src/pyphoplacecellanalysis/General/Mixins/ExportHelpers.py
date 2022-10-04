@@ -35,7 +35,7 @@ def export_pyqtgraph_plot(a_plot, debug_print=True):
 
 
 def build_pdf_export_metadata(session_descriptor_string, filter_name, out_path=None, debug_print=False):
-    """ Builds the PDF metadata generating function from the passed info
+    """ OLD - Pre 2022-10-04 - Builds the PDF metadata generating function from the passed info
     
         session_descriptor_string: a string describing the context of the session like 'sess_kdiba_2006-6-07_11-26-53'
             Can be obtained from pipleine via `curr_active_pipeline.sess.get_description()`
@@ -50,7 +50,15 @@ def build_pdf_export_metadata(session_descriptor_string, filter_name, out_path=N
         
     Usage:
         session_descriptor_string = curr_active_pipeline.sess.get_description()
+        ## PDF Output, NOTE this is single plot stuff: uses active_config_name
+        from matplotlib.backends import backend_pdf, backend_pgf, backend_ps
+        from pyphoplacecellanalysis.General.Mixins.ExportHelpers import build_pdf_export_metadata
+
+        filter_name = active_config_name
         _build_pdf_pages_output_info, out_parent_path = build_pdf_export_metadata(session_descriptor_string, filter_name=active_config_name, out_path=None)
+        _build_pdf_pages_output_info, programmatic_display_function_testing_output_parent_path = build_pdf_export_metadata(curr_active_pipeline.sess.get_description(), filter_name=filter_name)
+        print(f'Figure Output path: {str(programmatic_display_function_testing_output_parent_path)}')
+
         
         curr_display_function_name = '_display_1d_placefield_validations'
         built_pdf_metadata, curr_pdf_save_path = _build_pdf_pages_output_info(curr_display_function_name)
@@ -69,10 +77,7 @@ def build_pdf_export_metadata(session_descriptor_string, filter_name, out_path=N
     """
     if out_path is None:   
         out_day_date_folder_name = datetime.today().strftime('%Y-%m-%d') # A string with the day's date like '2022-01-16'
-        # out_path = Path(r'C:\Users\pho\repos\PhoPy3DPositionAnalysis2021\EXTERNAL\Screenshots\ProgrammaticDisplayFunctionTesting\2022-07-11')
-        
         out_path = Path(r'EXTERNAL/Screenshots/ProgrammaticDisplayFunctionTesting').joinpath(out_day_date_folder_name).resolve()
-        # out_path = Path(r'EXTERNAL\Screenshots\ProgrammaticDisplayFunctionTesting\2022-07-11').resolve()
     else:
         out_path = Path(out_path) # make sure it's a Path
     out_path.mkdir(exist_ok=True)
