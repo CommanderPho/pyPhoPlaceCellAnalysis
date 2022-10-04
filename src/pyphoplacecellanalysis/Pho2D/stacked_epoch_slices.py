@@ -352,7 +352,11 @@ def stacked_epoch_slices_matplotlib_build_view(epoch_slices, name='stacked_epoch
     plots.fig = ui.mw.getFigure()
     plots.fig.suptitle(plots.name)
     plots.axs = plots.fig.subplots(ncols=1, nrows=params.active_num_slices, sharex=False, sharey=False)
-    
+    if not isinstance(plots.axs, (list, tuple, np.ndarray)):
+        # if it's not wrapped in a list-like container, wrap it (this should only happen when (params.active_num_slices == 1)
+        print(f'type(plots.axs): {type(plots.axs)}: {plots.axs}')
+        plots.axs = [plots.axs]
+
     for a_slice_idx, curr_ax in enumerate(plots.axs):
         if debug_print:
             print(f'a_slice_idx: {a_slice_idx}')

@@ -147,6 +147,7 @@ def build_pdf_metadata_from_display_context(active_identifying_ctx, debug_print=
     return built_pdf_metadata, curr_pdf_save_filename
 
 
+import matplotlib.pyplot as plt
 ## PDF Output, NOTE this is single plot stuff: uses active_config_name
 from matplotlib.backends import backend_pdf, backend_pgf, backend_ps # Needed for
 # from pyphoplacecellanalysis.General.Mixins.ExportHelpers import create_daily_programmatic_display_function_testing_folder_if_needed, build_pdf_metadata_from_display_context
@@ -158,54 +159,66 @@ def programmatic_display_to_PDF(curr_active_pipeline, curr_display_function_name
     curr_display_function_name = '_display_plot_decoded_epoch_slices' """
     pdf_parent_out_path = create_daily_programmatic_display_function_testing_folder_if_needed()
 
-    
-    active_display_fn_kwargs = overriding_dict_with(lhs_dict=dict(filter_epochs='ripple', debug_test_max_num_slices=128), **kwargs)
+    with plt.ioff():
+        ## Disables showing the figure by default from within the context manager.
+        active_display_fn_kwargs = overriding_dict_with(lhs_dict=dict(filter_epochs='ripple', debug_test_max_num_slices=128), **kwargs)
 
-    # Perform for each filtered context:
-    for filter_name, a_filtered_context in curr_active_pipeline.filtered_contexts.items():
-        if debug_print:
-            print(f'filter_name: {filter_name}: "{a_filtered_context.get_description()}"')
-        # Get the desired display function context:
-        
-        active_identifying_display_ctx = a_filtered_context.adding_context('display_fn', display_fn_name=curr_display_function_name)
-
-        # final_context = active_identifying_display_ctx # Display only context    
-
-        # # Add in the desired display variable:
-        # active_identifying_ctx = active_identifying_display_ctx.adding_context('filter_epochs', filter_epochs='ripple') # 
-        active_identifying_ctx = active_identifying_display_ctx.adding_context('filter_epochs', **active_display_fn_kwargs) # , filter_epochs='ripple'
-        final_context = active_identifying_ctx # Display/Variable context mode
-
-        active_identifying_ctx_string = final_context.get_description(separator='|') # Get final discription string
-        if debug_print:
-            print(f'active_identifying_ctx_string: "{active_identifying_ctx_string}"')
-
-        ## Build PDF Output Info
-        active_pdf_metadata, active_pdf_save_filename = build_pdf_metadata_from_display_context(final_context)
-        active_pdf_save_path = pdf_parent_out_path.joinpath(active_pdf_save_filename) # build the final output pdf path from the pdf_parent_out_path (which is the daily folder)
-
-        ## BEGIN DISPLAY/SAVE
-        with backend_pdf.PdfPages(active_pdf_save_path, keep_empty=False, metadata=active_pdf_metadata) as pdf:    
-            out_fig_list = [] # Separate PDFs mode:
-
+        # Perform for each filtered context:
+        for filter_name, a_filtered_context in curr_active_pipeline.filtered_contexts.items():
             if debug_print:
-                print(f'active_pdf_save_path: {active_pdf_save_path}\nactive_pdf_metadata: {active_pdf_metadata}')
-                print(f'active_display_fn_kwargs: {active_display_fn_kwargs}')
-            # out_display_dict = curr_active_pipeline.display(curr_display_function_name, a_filtered_context, filter_epochs='ripple', debug_test_max_num_slices=128) #
-            out_display_dict = curr_active_pipeline.display(curr_display_function_name, a_filtered_context, **active_display_fn_kwargs) # , filter_epochs='ripple', debug_test_max_num_slices=128
-            # , fignum=active_identifying_ctx_string, **figure_format_config
-            main_out_display_context = list(out_display_dict.keys())[0]
+                print(f'filter_name: {filter_name}: "{a_filtered_context.get_description()}"')
+            # Get the desired display function context:
+            active_identifying_display_ctx = a_filtered_context.adding_context('display_fn', display_fn_name=curr_display_function_name)
+            # final_context = active_identifying_display_ctx # Display only context    
+
+            # # Add in the desired display variable:
+            active_identifying_ctx = active_identifying_display_ctx.adding_context('filter_epochs', **active_display_fn_kwargs) # , filter_epochs='ripple'
+            final_context = active_identifying_ctx # Display/Variable context mode
+
+            active_identifying_ctx_string = final_context.get_description(separator='|') # Get final discription string
             if debug_print:
-                print(f'main_out_display_context: "{main_out_display_context}"')
-            main_out_display_dict = out_display_dict[main_out_display_context]
-            ui = main_out_display_dict['ui']
-            # out_plot_tuple = curr_active_pipeline.display(curr_display_function_name, filter_name, filter_epochs='ripple', fignum=active_identifying_ctx_string, **figure_format_config)
-            # params, plots_data, plots, ui = out_plot_tuple 
-            out_fig = ui.mw.getFigure()
-            out_fig_list.append(out_fig)
-            for i, a_fig in enumerate(out_fig_list):
-                pdf.savefig(a_fig, transparent=True)
-                pdf.attach_note(f'Page {i + 1}: "{active_identifying_ctx_string}"')
+                print(f'active_identifying_ctx_string: "{active_identifying_ctx_string}"')
+
+            ## Build PDF Output Info
+            active_pdf_metadata, active_pdf_save_filename = build_pdf_metadata_from_display_context(final_context)
+            active_pdf_save_path = pdf_parent_out_path.joinpath(active_pdf_save_filename) # build the final output pdf path from the pdf_parent_out_path (which is the daily folder)
+
+            ## BEGIN DISPLAY/SAVE
+            with backend_pdf.PdfPages(active_pdf_save_path, keep_empty=False, metadata=active_pdf_metadata) as pdf:    
+                out_fig_list = [] # Separate PDFs mode:
+
+                if debug_print:
+                    print(f'active_pdf_save_path: {active_pdf_save_path}\nactive_pdf_metadata: {active_pdf_metadata}')
+                    print(f'active_display_fn_kwargs: {active_display_fn_kwargs}')
+                out_display_dict = curr_active_pipeline.display(curr_display_function_name, a_filtered_context, **active_display_fn_kwargs) # , filter_epochs='ripple', debug_test_max_num_slices=128
+                # , fignum=active_identifying_ctx_string, **figure_format_config
+                main_out_display_context = list(out_display_dict.keys())[0]
+                if debug_print:
+                    print(f'main_out_display_context: "{main_out_display_context}"')
+                main_out_display_dict = out_display_dict[main_out_display_context]
+                ui = main_out_display_dict['ui']
+                # out_plot_tuple = curr_active_pipeline.display(curr_display_function_name, filter_name, filter_epochs='ripple', fignum=active_identifying_ctx_string, **figure_format_config)
+                # params, plots_data, plots, ui = out_plot_tuple 
+                out_fig = ui.mw.getFigure()
+                out_fig_list.append(out_fig)
+                for i, a_fig in enumerate(out_fig_list):
+                    pdf.savefig(a_fig, transparent=True)
+                    pdf.attach_note(f'Page {i + 1}: "{active_identifying_ctx_string}"')
+
+
+
+# ==================================================================================================================== #
+# Output PDF Merging/Manipulation                                                                                      #
+# ==================================================================================================================== #
+from PyPDF2 import PdfMerger
+
+def merge_output_pdfs(out_file_path='merged-pdf.pdf', *input_files):
+    """ merges the input PDF files into a single output """
+    merger = PdfMerger()
+    for pdf in input_files: # ["file1.pdf", "file2.pdf", "file3.pdf"]
+        merger.append(pdf)
+    merger.write(out_file_path)
+    merger.close()
 
 
 # ==================================================================================================================== #
