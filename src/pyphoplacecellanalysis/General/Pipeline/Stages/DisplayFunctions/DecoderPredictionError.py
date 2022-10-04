@@ -8,6 +8,8 @@ from matplotlib import patheffects
 
 from neuropy.core import Epoch
 from neuropy.utils.dynamic_container import overriding_dict_with # required for safely_accepts_kwargs
+from neuropy.utils.efficient_interval_search import get_non_overlapping_epochs # used in _display_plot_decoded_epoch_slices to get only the valid (non-overlapping) epochs
+
 from pyphocorehelpers.gui.interaction_helpers import CallbackWrapper
 from pyphocorehelpers.indexing_helpers import interleave_elements
 
@@ -135,8 +137,6 @@ class DefaultDecoderDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Disp
             variable_name = 'x',
             
             """
-            
-        
             active_config_name = kwargs.get('active_config_name', 'Unknown')
             active_identifying_context = kwargs.get('active_context', None)
             assert active_identifying_context is not None
@@ -160,9 +160,21 @@ class DefaultDecoderDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Disp
                     laps_copy = deepcopy(computation_result.sess.laps)
                     # active_filter_epochs = laps_copy.filtered_by_lap_flat_index(np.arange(6)).as_epoch_obj() # epoch object
                     active_filter_epochs = laps_copy.as_epoch_obj() # epoch object
+                    pre_exclude_n_epochs = active_filter_epochs.n_epochs
+
                     # default_figure_name = f'{default_figure_name}_Laps'
                     default_figure_name = f'Laps'
-                    
+
+                    ## HANDLE OVERLAPPING EPOCHS: Note that there is a problem that occurs here with overlapping epochs for laps. Below we remove any overlapping epochs and leave only the valid ones.
+                    is_non_overlapping = get_non_overlapping_epochs(active_filter_epochs.to_dataframe()[['start','stop']].to_numpy()) # returns a boolean array of the same length as the number of epochs
+                    non_overlapping_labels = active_filter_epochs.labels[is_non_overlapping] # array(['41', '42', '43', '44', '45', '46', '47', '48', '49', '50', '51', '52', '53', '54', '55', '56', '57', '58', '59', '60', '61', '62', '63', '64', '65', '66', '67', '68', '69', '70', '71', '72', '73', '74'], dtype=object)
+                    # Slice by the valid (non-overlapping) labels to get the new epoch object:
+                    active_filter_epochs = active_filter_epochs.label_slice(non_overlapping_labels)
+                    post_exclude_n_epochs = active_filter_epochs.n_epochs                    
+                    num_excluded_epochs = post_exclude_n_epochs - pre_exclude_n_epochs
+                    if num_excluded_epochs > 0:
+                        print(f'num_excluded_epochs: {num_excluded_epochs} due to overlap.')
+
                     # ## Build Epochs:
                     # # epochs = sess.laps.to_dataframe()
                     # epochs = active_filter_epochs.to_dataframe()
