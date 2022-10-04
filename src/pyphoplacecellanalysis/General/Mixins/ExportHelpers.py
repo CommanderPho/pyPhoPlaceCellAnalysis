@@ -3,6 +3,10 @@ from datetime import datetime # for getting the current date to set the ouptut f
 from pathlib import Path
 import pandas as pd
 import numpy as np
+
+
+from neuropy.utils.dynamic_container import overriding_dict_with # required for programmatic_display_to_PDF
+
 from pyphocorehelpers.DataStructure.dynamic_parameters import DynamicParameters
 
 # ==================================================================================================================== #
@@ -130,7 +134,9 @@ def build_pdf_metadata_from_display_context(active_identifying_ctx, debug_print=
         print(f'session_descriptor_string: "{session_descriptor_string}"')
     built_pdf_metadata = {'Creator': 'Spike3D - TestNeuroPyPipeline227', 'Author': 'Pho Hale', 'Title': session_descriptor_string, 'Subject': '', 'Keywords': [session_descriptor_string]}
     # context_tuple = [session_descriptor_string, active_identifying_ctx.filter_name, active_identifying_ctx.display_fn_name]
-    context_tuple = list(active_identifying_ctx.as_tuple())
+
+    ## Note that active_identifying_ctx.as_tuple() can have non-string elements (e.g. debug_test_max_num_slices=128, which is an int). This is what we want, but for setting the metadata we need to convert them to strings
+    context_tuple = [str(v) for v in list(active_identifying_ctx.as_tuple())]
     built_pdf_metadata['Title'] = '_'.join(context_tuple)
     built_pdf_metadata['Subject'] = active_identifying_ctx.display_fn_name
     built_pdf_metadata['Keywords'] = ' | '.join(context_tuple)
@@ -146,11 +152,14 @@ from matplotlib.backends import backend_pdf, backend_pgf, backend_ps # Needed fo
 # from pyphoplacecellanalysis.General.Mixins.ExportHelpers import create_daily_programmatic_display_function_testing_folder_if_needed, build_pdf_metadata_from_display_context
 
 ## 2022-10-04 Modern Programmatic PDF outputs:
-def programmatic_display_to_PDF(curr_active_pipeline, curr_display_function_name='_display_plot_decoded_epoch_slices',  debug_print=False):
+def programmatic_display_to_PDF(curr_active_pipeline, curr_display_function_name='_display_plot_decoded_epoch_slices',  debug_print=False, **kwargs):
     """
     2022-10-04 Modern Programmatic PDF outputs
     curr_display_function_name = '_display_plot_decoded_epoch_slices' """
     pdf_parent_out_path = create_daily_programmatic_display_function_testing_folder_if_needed()
+
+    
+    active_display_fn_kwargs = overriding_dict_with(lhs_dict=dict(filter_epochs='ripple', debug_test_max_num_slices=128), **kwargs)
 
     # Perform for each filtered context:
     for filter_name, a_filtered_context in curr_active_pipeline.filtered_contexts.items():
@@ -163,7 +172,8 @@ def programmatic_display_to_PDF(curr_active_pipeline, curr_display_function_name
         # final_context = active_identifying_display_ctx # Display only context    
 
         # # Add in the desired display variable:
-        active_identifying_ctx = active_identifying_display_ctx.adding_context('filter_epochs', filter_epochs='ripple')
+        # active_identifying_ctx = active_identifying_display_ctx.adding_context('filter_epochs', filter_epochs='ripple') # 
+        active_identifying_ctx = active_identifying_display_ctx.adding_context('filter_epochs', **active_display_fn_kwargs) # , filter_epochs='ripple'
         final_context = active_identifying_ctx # Display/Variable context mode
 
         active_identifying_ctx_string = final_context.get_description(separator='|') # Get final discription string
@@ -177,7 +187,13 @@ def programmatic_display_to_PDF(curr_active_pipeline, curr_display_function_name
         ## BEGIN DISPLAY/SAVE
         with backend_pdf.PdfPages(active_pdf_save_path, keep_empty=False, metadata=active_pdf_metadata) as pdf:    
             out_fig_list = [] # Separate PDFs mode:
-            out_display_dict = curr_active_pipeline.display(curr_display_function_name, a_filtered_context, filter_epochs='ripple', debug_test_max_num_slices=128) # , fignum=active_identifying_ctx_string, **figure_format_config
+
+            if debug_print:
+                print(f'active_pdf_save_path: {active_pdf_save_path}\nactive_pdf_metadata: {active_pdf_metadata}')
+                print(f'active_display_fn_kwargs: {active_display_fn_kwargs}')
+            # out_display_dict = curr_active_pipeline.display(curr_display_function_name, a_filtered_context, filter_epochs='ripple', debug_test_max_num_slices=128) #
+            out_display_dict = curr_active_pipeline.display(curr_display_function_name, a_filtered_context, **active_display_fn_kwargs) # , filter_epochs='ripple', debug_test_max_num_slices=128
+            # , fignum=active_identifying_ctx_string, **figure_format_config
             main_out_display_context = list(out_display_dict.keys())[0]
             if debug_print:
                 print(f'main_out_display_context: "{main_out_display_context}"')
