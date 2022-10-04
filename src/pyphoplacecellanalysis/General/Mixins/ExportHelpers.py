@@ -129,7 +129,8 @@ def build_pdf_metadata_from_display_context(active_identifying_ctx, debug_print=
     if debug_print:
         print(f'session_descriptor_string: "{session_descriptor_string}"')
     built_pdf_metadata = {'Creator': 'Spike3D - TestNeuroPyPipeline227', 'Author': 'Pho Hale', 'Title': session_descriptor_string, 'Subject': '', 'Keywords': [session_descriptor_string]}
-    context_tuple = [session_descriptor_string, active_identifying_ctx.filter_name, active_identifying_ctx.display_fn_name]
+    # context_tuple = [session_descriptor_string, active_identifying_ctx.filter_name, active_identifying_ctx.display_fn_name]
+    context_tuple = list(active_identifying_ctx.as_tuple())
     built_pdf_metadata['Title'] = '_'.join(context_tuple)
     built_pdf_metadata['Subject'] = active_identifying_ctx.display_fn_name
     built_pdf_metadata['Keywords'] = ' | '.join(context_tuple)
@@ -139,6 +140,56 @@ def build_pdf_metadata_from_display_context(active_identifying_ctx, debug_print=
     # curr_pdf_save_path = out_path.joinpath(curr_pdf_save_filename)
     return built_pdf_metadata, curr_pdf_save_filename
 
+
+## PDF Output, NOTE this is single plot stuff: uses active_config_name
+from matplotlib.backends import backend_pdf, backend_pgf, backend_ps # Needed for
+# from pyphoplacecellanalysis.General.Mixins.ExportHelpers import create_daily_programmatic_display_function_testing_folder_if_needed, build_pdf_metadata_from_display_context
+
+## 2022-10-04 Modern Programmatic PDF outputs:
+def programmatic_display_to_PDF(curr_active_pipeline, curr_display_function_name='_display_plot_decoded_epoch_slices',  debug_print=False):
+    """
+    2022-10-04 Modern Programmatic PDF outputs
+    curr_display_function_name = '_display_plot_decoded_epoch_slices' """
+    pdf_parent_out_path = create_daily_programmatic_display_function_testing_folder_if_needed()
+
+    # Perform for each filtered context:
+    for filter_name, a_filtered_context in curr_active_pipeline.filtered_contexts.items():
+        if debug_print:
+            print(f'filter_name: {filter_name}: "{a_filtered_context.get_description()}"')
+        # Get the desired display function context:
+        
+        active_identifying_display_ctx = a_filtered_context.adding_context('display_fn', display_fn_name=curr_display_function_name)
+
+        # final_context = active_identifying_display_ctx # Display only context    
+
+        # # Add in the desired display variable:
+        active_identifying_ctx = active_identifying_display_ctx.adding_context('filter_epochs', filter_epochs='ripple')
+        final_context = active_identifying_ctx # Display/Variable context mode
+
+        active_identifying_ctx_string = final_context.get_description(separator='|') # Get final discription string
+        if debug_print:
+            print(f'active_identifying_ctx_string: "{active_identifying_ctx_string}"')
+
+        ## Build PDF Output Info
+        active_pdf_metadata, active_pdf_save_filename = build_pdf_metadata_from_display_context(final_context)
+        active_pdf_save_path = pdf_parent_out_path.joinpath(active_pdf_save_filename) # build the final output pdf path from the pdf_parent_out_path (which is the daily folder)
+
+        ## BEGIN DISPLAY/SAVE
+        with backend_pdf.PdfPages(active_pdf_save_path, keep_empty=False, metadata=active_pdf_metadata) as pdf:    
+            out_fig_list = [] # Separate PDFs mode:
+            out_display_dict = curr_active_pipeline.display(curr_display_function_name, a_filtered_context, filter_epochs='ripple', debug_test_max_num_slices=128) # , fignum=active_identifying_ctx_string, **figure_format_config
+            main_out_display_context = list(out_display_dict.keys())[0]
+            if debug_print:
+                print(f'main_out_display_context: "{main_out_display_context}"')
+            main_out_display_dict = out_display_dict[main_out_display_context]
+            ui = main_out_display_dict['ui']
+            # out_plot_tuple = curr_active_pipeline.display(curr_display_function_name, filter_name, filter_epochs='ripple', fignum=active_identifying_ctx_string, **figure_format_config)
+            # params, plots_data, plots, ui = out_plot_tuple 
+            out_fig = ui.mw.getFigure()
+            out_fig_list.append(out_fig)
+            for i, a_fig in enumerate(out_fig_list):
+                pdf.savefig(a_fig, transparent=True)
+                pdf.attach_note(f'Page {i + 1}: "{active_identifying_ctx_string}"')
 
 
 # ==================================================================================================================== #
