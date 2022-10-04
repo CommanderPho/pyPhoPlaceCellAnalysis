@@ -55,8 +55,6 @@ class CustomMatplotlibWidget(QtWidgets.QWidget):
         self.params.figure_kwargs['figsize'] = size
         self.params.figure_kwargs['dpi'] = dpi
         
-        
-        
         self.setup()
         self.buildUI()
         

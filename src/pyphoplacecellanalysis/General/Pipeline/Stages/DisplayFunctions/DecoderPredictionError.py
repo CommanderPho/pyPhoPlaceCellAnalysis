@@ -135,7 +135,22 @@ class DefaultDecoderDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Disp
             variable_name = 'x',
             
             """
+            
+        
+            active_config_name = kwargs.get('active_config_name', 'Unknown')
+            active_identifying_context = kwargs.get('active_context', None)
+            assert active_identifying_context is not None
+            # ## Owning Pipeline:
+            # owning_pipeline_reference = kwargs.get('owning_pipeline', None) # A reference to the pipeline upon which this display function is being called
+            # assert owning_pipeline_reference is not None
+            
+            ## Finally, add the display function to the active context
+            active_display_fn_identifying_ctx = active_identifying_context.adding_context('display_fn', display_fn_name='display_plot_decoded_epoch_slices')
+            active_display_fn_identifying_ctx_string = active_display_fn_identifying_ctx.get_description(separator='|') # Get final discription string:
+            
+            ## Display function specific variables:
             decoding_time_bin_size = kwargs.pop('decoding_time_bin_size', 0.02)
+
             default_figure_name = 'stacked_epoch_slices_matplotlib_subplots'
             active_decoder = computation_result.computed_data['pf2D_Decoder']
             
@@ -200,9 +215,15 @@ class DefaultDecoderDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Disp
 
             out_plot_tuple = plot_decoded_epoch_slices(active_filter_epochs, filter_epochs_decoder_result, global_pos_df=computation_result.sess.position.to_dataframe(), xbin=active_decoder.xbin,
                                                                     **overriding_dict_with(lhs_dict={'name':default_figure_name, 'debug_test_max_num_slices':8, 'enable_flat_line_drawing':False, 'debug_print': False}, **kwargs))
-            # params, plots_data, plots, ui = out_plot_tuple
+            params, plots_data, plots, ui = out_plot_tuple
             
-            return out_plot_tuple
+            ## TODO: use active_display_fn_identifying_ctx to add it to the display function:
+            
+            # active_display_fn_identifying_ctx
+            
+            # figure, ax
+            return {active_display_fn_identifying_ctx: dict(params=params, plots_data=plots_data, plots=plots, ui=ui)}}
+            # return out_plot_tuple
         
     
 
