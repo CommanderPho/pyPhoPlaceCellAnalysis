@@ -11,39 +11,11 @@ from PyQt5.QtCore import Qt, QPoint, QRect, QObject, QEvent, pyqtSignal, pyqtSlo
 
 ## IMPORTS:
 from pyphoplacecellanalysis.GUI.PyQtPlot.Flowchart.CustomNodes.Mixins.CtrlNodeMixins import ComboBoxCtrlOwnerMixin
-
+from pyphoplacecellanalysis.GUI.Qt.Mixins.PipelineOwningMixin import PipelineOwningMixin
 
 ## Define the .ui file path
 path = os.path.dirname(os.path.abspath(__file__))
 uiFile = os.path.join(path, 'IdentifyingContextSelectorWidget.ui')
-
-class PipelineOwningMixin:
-
-    @property
-    def owning_pipeline(self):
-        """The owning_pipeline property."""
-        return self._owning_pipeline
-    @owning_pipeline.setter
-    def owning_pipeline(self, value):
-        self._owning_pipeline = value
-
-    @property
-    def all_filtered_session_keys(self):
-        """Gets the names of the filters applied and updates the config rows with them."""
-        return list(self.owning_pipeline.filtered_sessions.keys())
-
-
-    @property
-    def all_filtered_session_contexts(self):
-        """Gets the names of the filters applied and updates the config rows with them."""
-        return self.owning_pipeline.filtered_contexts
-
-    @property
-    def all_filtered_session_context_descriptions(self):
-        """Gets the names of the filters applied and updates the config rows with them."""
-        return [a_context.get_description() for a_context in self.owning_pipeline.filtered_contexts.values()]
-
-
 
 # ==================================================================================================================== #
 # IdentifyingContextSelectorWidget                                                                                     #
@@ -51,11 +23,13 @@ class PipelineOwningMixin:
 class IdentifyingContextSelectorWidget(ComboBoxCtrlOwnerMixin, PipelineOwningMixin, QWidget): 
     """_summary_
 
+    pyphoplacecellanalysis.GUI.Qt.Widgets.IdentifyingContextSelector.IdentifyingContextSelectorWidget.IdentifyingContextSelectorWidget
+    
     Usage:
         from pyphoplacecellanalysis.GUI.Qt.IdentifyingContextSelector.IdentifyingContextSelectorWidget import IdentifyingContextSelectorWidget
 
     """
-    def __init__(self, owning_pipeline=None, parent=None):
+    def __init__(self, parent=None, owning_pipeline=None):
         super().__init__(parent=parent) # Call the inherited classes __init__ method
         self.ui = uic.loadUi(uiFile, self) # Load the .ui file
 
@@ -63,12 +37,13 @@ class IdentifyingContextSelectorWidget(ComboBoxCtrlOwnerMixin, PipelineOwningMix
         self._owning_pipeline = owning_pipeline
 
         self.initUI()
-        self.show() # Show the GUI
+        # self.show() # Show the GUI
 
     def initUI(self):
         # self.ui.cmbIdentifyingContext.set = self.all_filtered_session_keys
         # self.ui.btnConfirm.clicked.
-        self.updateUi()
+        # self.updateUi()
+        pass
 
 
     def updateUi(self):
