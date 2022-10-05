@@ -359,7 +359,7 @@
   <customwidget>
    <class>PhoBaseMainWindow</class>
    <extends>QMainWindow</extends>
-   <header location="global">pyphoplacecellanalysis.GUI.Qt.MainApplicationWindows.MainWindowWrapper.PhoBaseMainWindow</header>
+   <header location="global">pyphoplacecellanalysis.GUI.Qt.MainApplicationWindows.MainWindowWrapper</header>
   </customwidget>
   <customwidget>
    <class>SingleGroupOptionalMembersCtrl</class>
