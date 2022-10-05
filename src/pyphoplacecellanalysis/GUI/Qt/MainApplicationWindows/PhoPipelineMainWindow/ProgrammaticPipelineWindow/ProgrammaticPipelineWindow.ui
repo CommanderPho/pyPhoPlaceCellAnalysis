@@ -355,6 +355,29 @@
    </property>
   </action>
  </widget>
+<customwidgets>
+  <customwidget>
+   <class>PhoBaseMainWindow</class>
+   <extends>QMainWindow</extends>
+   <header location="global">pyphoplacecellanalysis.GUI.Qt.MainApplicationWindows.MainWindowWrapper.PhoBaseMainWindow</header>
+  </customwidget>
+  <customwidget>
+   <class>SingleGroupOptionalMembersCtrl</class>
+   <extends>QWidget</extends>
+   <header location="global">pyphoplacecellanalysis.GUI.Qt.FigureFormatConfigControls.SingleGroupOptionalMembersCtrl</header>
+   <container>1</container>
+   <slots>
+    <signal>value_changed(object,bool,int,bool,int)</signal>
+    <slot>on_update_values()</slot>
+   </slots>
+  </customwidget>
+  <customwidget>
+   <class>InlineFilesystemPathSelectWidget</class>
+   <extends>QWidget</extends>
+   <header location="global">pyphocorehelpers.gui.Qt.InlineFilesystemPathSelectWidget.InlineFilesystemPathSelectWidget</header>
+   <container>1</container>
+  </customwidget>
+</customwidgets>
  <resources>
   <include location="../../../../../Resources/GuiResources.qrc"/>
   <include location="../../../../../Resources/ActionIcons.qrc"/>
