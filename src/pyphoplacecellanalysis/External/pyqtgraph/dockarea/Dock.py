@@ -72,7 +72,7 @@ class Dock(QtWidgets.QWidget, DockDrop):
     sigStretchChanged = QtCore.Signal()
     sigClosed = QtCore.Signal(object)
 
-    def __init__(self, name, area=None, size=(10, 10), widget=None, hideTitle=False, autoOrientation=True, display_config:Optional[DockDisplayConfig]=None): # , closable=False, fontSize="12px"
+    def __init__(self, name, area=None, size=(10, 10), widget=None, hideTitle=False, autoOrientation=True, display_config:Optional[DockDisplayConfig]=None, **kwargs): # , closable=False, fontSize="12px"
         QtWidgets.QWidget.__init__(self)
         DockDrop.__init__(self)
         self._container = None
@@ -82,8 +82,8 @@ class Dock(QtWidgets.QWidget, DockDrop):
         
         if display_config is None:
             print(f"WARNING: Dock.__init__(...): display_config is None... using old-mode fallback. This will be eventually depricated.")
-            # display_config = DockDisplayConfig(closable, fontSize=fontSize, corner_radius='3px')
-            raise NotImplementedError
+            display_config = DockDisplayConfig(kwargs.get('closable', False), fontSize=kwargs.get('fontSize', "12px"), corner_radius='3px')
+            # raise NotImplementedError
         else:
             # print(f"WARNING: Dock.__init__(...): display_config is set, so the explicitly passed parameters 'closable' and 'fontSize' will be ignored.")
             pass

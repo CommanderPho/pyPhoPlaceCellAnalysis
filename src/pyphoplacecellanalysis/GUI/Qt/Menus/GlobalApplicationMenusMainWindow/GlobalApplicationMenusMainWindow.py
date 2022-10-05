@@ -15,7 +15,7 @@ from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtCore, QtGui, QtWidget
 # from pyphoplacecellanalysis.Resources import ActionIcons
 # from pyphoplacecellanalysis.Resources import GuiResources
 from pyphoplacecellanalysis.Resources import GuiResources, ActionIcons
-from pyphoplacecellanalysis.GUI.Qt.GlobalApplicationMenus.Uic_AUTOGEN_GlobalApplicationMenusMainWindow import Ui_GlobalApplicationMenusMainWindow
+from pyphoplacecellanalysis.GUI.Qt.Menus.GlobalApplicationMenusMainWindow.Uic_AUTOGEN_GlobalApplicationMenusMainWindow import Ui_GlobalApplicationMenusMainWindow
 
 # .Uic_AUTOGEN_FigureFormatConfigControls import Ui_Form
 

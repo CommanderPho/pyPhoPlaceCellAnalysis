@@ -2,8 +2,8 @@ from qtpy import QtCore, QtGui, QtWidgets
 from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer
 from pyphoplacecellanalysis.Resources import GuiResources, ActionIcons
 
-from pyphoplacecellanalysis.GUI.Qt.Mixins.PhoMenuHelper import PhoMenuHelper
-from pyphoplacecellanalysis.GUI.Qt.Mixins.Menus.BaseMenuProviderMixin import initialize_global_menu_ui_variables_if_needed
+from pyphoplacecellanalysis.GUI.Qt.Menus.PhoMenuHelper import PhoMenuHelper
+from pyphoplacecellanalysis.GUI.Qt.Menus.BaseMenuProviderMixin import initialize_global_menu_ui_variables_if_needed
 
 class ConnectionControlsMenuMixin(object):
     """Adds a dynamically generated menubar to a QMainWindow for the purpose of connecting various separate windows
