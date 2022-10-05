@@ -5,7 +5,7 @@ from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer
 from pyphoplacecellanalysis.GUI.Qt.MainApplicationWindows.MainWindowWrapper import PhoBaseMainWindow
 from pyphoplacecellanalysis.Resources import GuiResources, ActionIcons
 
-# from pyphoplacecellanalysis.GUI.Qt.Mixins.Menus.BaseMenuProviderMixin import initialize_global_menu_ui_variables_if_needed
+# from pyphoplacecellanalysis.GUI.Qt.Menus.BaseMenuProviderMixin import initialize_global_menu_ui_variables_if_needed
 
 
 class PhoMenuHelper(object):

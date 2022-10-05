@@ -17,7 +17,7 @@ class DebugMenuProviderMixin(BaseMenuProviderMixin):
     Can be used in two forms:
         1. Via inherting the desired Window widget class to DebugMenuProviderMixin
         2. Via initializing via the __init__(...) method: DebugMenuProviderMixin(render_widget)
-            from pyphoplacecellanalysis.GUI.Qt.Mixins.Menus.DebugMenuProviderMixin import DebugMenuProviderMixin
+            from pyphoplacecellanalysis.GUI.Qt.Menus.SpecificMenus.DebugMenuProviderMixin import DebugMenuProviderMixin
             # Debug Menu
             _debug_menu_provider = DebugMenuProviderMixin(render_widget=spike_raster_window)
             _debug_menu_provider.DebugMenuProviderMixin_on_init()
