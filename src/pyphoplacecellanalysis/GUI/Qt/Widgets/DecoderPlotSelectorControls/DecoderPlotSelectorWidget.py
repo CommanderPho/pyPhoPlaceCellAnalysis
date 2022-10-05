@@ -20,7 +20,7 @@ from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer
 ## IMPORTS:
 # from ...pyPhoPlaceCellAnalysis.src.pyphoplacecellanalysis.GUI.Qt.DecoderPlotSelectorWidget import DecoderPlotSelectorWidget
 
-from pyphoplacecellanalysis.GUI.Qt.DecoderPlotSelectorControls.Uic_AUTOGEN_DecoderPlotSelectorWidget import Ui_Form
+from pyphoplacecellanalysis.GUI.Qt.Widgets.DecoderPlotSelectorControls.Uic_AUTOGEN_DecoderPlotSelectorWidget import Ui_Form
 # from .Uic_AUTOGEN_DecoderPlotSelectorWidget import Ui_Form
 
 # Interpret image data as row-major instead of col-major
@@ -28,7 +28,7 @@ pg.setConfigOptions(imageAxisOrder='row-major')
 
 
 class DecoderPlotSelectorWidget(QtWidgets.QWidget):
-    """ 
+    """ Not quite finished
 
     Usage:    
         from pyphoplacecellanalysis.GUI.Qt.DecoderPlotSelectorControls.DecoderPlotSelectorWidget import DecoderPlotSelectorWidget

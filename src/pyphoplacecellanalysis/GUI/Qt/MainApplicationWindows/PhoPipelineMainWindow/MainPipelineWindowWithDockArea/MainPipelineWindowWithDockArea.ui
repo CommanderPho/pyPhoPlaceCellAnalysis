@@ -15,7 +15,7 @@
    <string>MainWindow</string>
   </property>
   <property name="windowIcon">
-   <iconset resource="../../../Resources/GuiResources.qrc">
+   <iconset resource="../../../../../Resources/GuiResources.qrc">
     <normaloff>:/Icons/Icons/ProcessIcon.ico</normaloff>:/Icons/Icons/ProcessIcon.ico</iconset>
   </property>
   <property name="iconSize">
@@ -31,7 +31,7 @@
      <x>0</x>
      <y>0</y>
      <width>796</width>
-     <height>22</height>
+     <height>21</height>
     </rect>
    </property>
    <widget class="QMenu" name="menuFile">
@@ -85,8 +85,8 @@
   </action>
  </widget>
  <resources>
-  <include location="../../../Resources/GuiResources.qrc"/>
-  <include location="../../../External/breeze_style_sheets/dist/qrc/breeze.qrc"/>
+  <include location="../../../../../Resources/GuiResources.qrc"/>
+  <include location="../../../../../External/breeze_style_sheets/dist/qrc/breeze.qrc"/>
  </resources>
  <connections/>
 </ui>

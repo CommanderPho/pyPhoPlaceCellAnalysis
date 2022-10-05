@@ -20,8 +20,6 @@ from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPred
 ## IMPORTS:
 # from ...pyPhoPlaceCellAnalysis.src.pyphoplacecellanalysis.GUI.Qt.GlobalApplicationMenus import LocalMenus_AddRenderable
 
-
-# class LocalMenus_AddRenderable(QtWidgets.QWidget):
 class LocalMenus_AddRenderable(QtWidgets.QMainWindow):
     """ 
     

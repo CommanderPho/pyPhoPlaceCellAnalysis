@@ -73,7 +73,7 @@
       <string>Add Time Curves...</string>
      </property>
      <property name="icon">
-      <iconset resource="../../../Resources/ActionIcons.qrc">
+      <iconset resource="../../../../Resources/ActionIcons.qrc">
        <normaloff>:/Render/Icons/actions/chart-up-color.png</normaloff>:/Render/Icons/actions/chart-up-color.png</iconset>
      </property>
      <addaction name="actionAddTimeCurves_Position"/>
@@ -85,7 +85,7 @@
       <string>Add Time Intervals...</string>
      </property>
      <property name="icon">
-      <iconset resource="../../../Resources/ActionIcons.qrc">
+      <iconset resource="../../../../Resources/ActionIcons.qrc">
        <normaloff>:/Render/Icons/actions/spectrum-emission.png</normaloff>:/Render/Icons/actions/spectrum-emission.png</iconset>
      </property>
      <addaction name="actionAddTimeIntervals_PBEs"/>
@@ -153,7 +153,7 @@
   </action>
   <action name="actionNew_3D_Raster_PyQtGraph">
    <property name="icon">
-    <iconset resource="../../../Resources/GuiResources.qrc">
+    <iconset resource="../../../../Resources/GuiResources.qrc">
      <normaloff>:/Icons/Icons/SpikeRaster3DIcon.ico</normaloff>:/Icons/Icons/SpikeRaster3DIcon.ico</iconset>
    </property>
    <property name="text">
@@ -162,7 +162,7 @@
   </action>
   <action name="actionNew_Tuning_Curves_Explorer_ipcDataExplorer">
    <property name="icon">
-    <iconset resource="../../../Resources/GuiResources.qrc">
+    <iconset resource="../../../../Resources/GuiResources.qrc">
      <normaloff>:/Icons/Icons/TuningMapDataExplorerIconWithLabel.ico</normaloff>:/Icons/Icons/TuningMapDataExplorerIconWithLabel.ico</iconset>
    </property>
    <property name="text">
@@ -171,7 +171,7 @@
   </action>
   <action name="actionNew_Spikes_Behavior_Explorer_ipspikesDataExplorer">
    <property name="icon">
-    <iconset resource="../../../Resources/GuiResources.qrc">
+    <iconset resource="../../../../Resources/GuiResources.qrc">
      <normaloff>:/Icons/Icons/InteractivePlaceCellDataExplorerIconWithLabel.ico</normaloff>:/Icons/Icons/InteractivePlaceCellDataExplorerIconWithLabel.ico</iconset>
    </property>
    <property name="text">
@@ -180,7 +180,7 @@
   </action>
   <action name="actionNew_3D_Raster_Vedo">
    <property name="icon">
-    <iconset resource="../../../Resources/GuiResources.qrc">
+    <iconset resource="../../../../Resources/GuiResources.qrc">
      <normaloff>:/Icons/Icons/SpikeRaster3D_VedoIcon.ico</normaloff>:/Icons/Icons/SpikeRaster3D_VedoIcon.ico</iconset>
    </property>
    <property name="text">
@@ -189,7 +189,7 @@
   </action>
   <action name="actionNew_2D_Raster_PyQtGraph">
    <property name="icon">
-    <iconset resource="../../../Resources/GuiResources.qrc">
+    <iconset resource="../../../../Resources/GuiResources.qrc">
      <normaloff>:/Icons/Icons/SpikeRaster2DIcon.ico</normaloff>:/Icons/Icons/SpikeRaster2DIcon.ico</iconset>
    </property>
    <property name="text">
@@ -238,7 +238,7 @@
   </action>
   <action name="actionNew_1D_Ratemaps_Plot">
    <property name="icon">
-    <iconset resource="../../../Resources/ActionIcons.qrc">
+    <iconset resource="../../../../Resources/ActionIcons.qrc">
      <normaloff>:/Graphics/Icons/graphics/Spikes.png</normaloff>:/Graphics/Icons/graphics/Spikes.png</iconset>
    </property>
    <property name="text">
@@ -247,9 +247,9 @@
   </action>
  </widget>
  <resources>
-  <include location="../../../Resources/GuiResources.qrc"/>
-  <include location="../../../Resources/ActionIcons.qrc"/>
-  <include location="../../../External/breeze_style_sheets/dist/qrc/breeze.qrc"/>
+  <include location="../../../../Resources/GuiResources.qrc"/>
+  <include location="../../../../Resources/ActionIcons.qrc"/>
+  <include location="../../../../External/breeze_style_sheets/dist/qrc/breeze.qrc"/>
  </resources>
  <connections/>
 </ui>

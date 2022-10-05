@@ -138,4 +138,4 @@ class Ui_Form(object):
         self.toolBox.setItemText(self.toolBox.indexOf(self.page_debugging), _translate("Form", "Extra/Debugging"))
 from pyphocorehelpers.gui.Qt.InlineFilesystemPathSelectWidget.FilesystemPathLineEdit import FilesystemPathLineEdit
 from pyphocorehelpers.gui.Qt.InlineFilesystemPathSelectWidget.InlineFilesystemPathSelectWidget import InlineFilesystemPathSelectWidget
-from pyphoplacecellanalysis.GUI.Qt.FigureFormatConfigControls.SingleGroupOptionalMembersCtrl import SingleGroupOptionalMembersCtrl
+from pyphoplacecellanalysis.GUI.Qt.Widgets.SingleGroupOptionalMembersCtrl.SingleGroupOptionalMembersCtrl import SingleGroupOptionalMembersCtrl

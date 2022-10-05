@@ -5,7 +5,7 @@ from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtCore, QtGui, QtWidget
 
 ## IMPORTS:
 # from ...pyPhoPlaceCellAnalysis.src.pyphoplacecellanalysis.GUI.Qt.FigureFormatConfigControls import SingleGroupOptionalMembersCtrl
-from pyphoplacecellanalysis.GUI.Qt.FigureFormatConfigControls.Uic_AUTOGEN_SingleGroupOptionalMembersCtrl import Ui_SingleGroupOptionalMembersCtrl
+from pyphoplacecellanalysis.GUI.Qt.Widgets.SingleGroupOptionalMembersCtrl.Uic_AUTOGEN_SingleGroupOptionalMembersCtrl import Ui_SingleGroupOptionalMembersCtrl
 
 
 class SingleGroupOptionalMembersCtrl(QtWidgets.QWidget):

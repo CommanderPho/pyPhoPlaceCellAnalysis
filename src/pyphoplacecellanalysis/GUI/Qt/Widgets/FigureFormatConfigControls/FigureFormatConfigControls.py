@@ -10,7 +10,7 @@ from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtCore, QtGui, QtWidget
 
 ## IMPORTS:
 # from pyPhoPlaceCellAnalysis.GUI.Qt.FigureFormatConfigControls  import FigureFormatConfigControls
-from pyphoplacecellanalysis.GUI.Qt.FigureFormatConfigControls.Uic_AUTOGEN_FigureFormatConfigControls import Ui_Form
+from pyphoplacecellanalysis.GUI.Qt.Widgets.FigureFormatConfigControls.Uic_AUTOGEN_FigureFormatConfigControls import Ui_Form
 
 # def pair_optional_value_widget(checkBox, valueWidget):
 #     self.checkBox.toggled['bool'].connect(self.spinBox.setEnabled) # type: ignore
