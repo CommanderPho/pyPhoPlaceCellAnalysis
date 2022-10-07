@@ -229,7 +229,7 @@ class PipelineWithDisplayPipelineStageMixin:
         """ reloads/re-registers the default display functions after adding a new one """
         self.stage.reload_default_display_functions() 
         
-    def prepare_for_display(self, root_output_dir=r'R:\data\Output', should_smooth_maze=True):
+    def prepare_for_display(self, root_output_dir=r'W:\data\Output', should_smooth_maze=True):
         assert (self.is_computed), "Current self.is_computed must be true. Call self.perform_computations to reach this step."
         self.stage = DisplayPipelineStage(self.stage)  # build the Display stage
         

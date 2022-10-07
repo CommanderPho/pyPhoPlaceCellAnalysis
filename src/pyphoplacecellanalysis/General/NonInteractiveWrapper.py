@@ -54,7 +54,9 @@ class NonInteractiveWrapper(object):
 		super(NonInteractiveWrapper, self).__init__()
 		self.enable_saving_to_disk = enable_saving_to_disk
 		# common_parent_foldername = Path(r'R:\Dropbox (Personal)\Active\Kamran Diba Lib\Pho-Kamran-Meetings\Final Placemaps 2021-01-14')
-		self.common_parent_foldername = Path(r'R:\Dropbox (Personal)\Active\Kamran Diba Lib\Pho-Kamran-Meetings\2022-01-16')
+		# self.common_parent_foldername = Path(r'R:\Dropbox (Personal)\Active\Kamran Diba Lib\Pho-Kamran-Meetings\2022-01-16')
+		self.common_parent_foldername = Path(r'C:\Users\pho\repos\PhoPy3DPositionAnalysis2021\output')
+
 		
 	
 	@staticmethod
