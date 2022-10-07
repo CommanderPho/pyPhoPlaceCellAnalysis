@@ -335,7 +335,10 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
             self.ui.scrollAnimTimeline = None
             
         
-        
+          
+    def __str__(self):
+         return
+      
 
 
     def connect_plotter_time_windows(self):
@@ -356,11 +359,6 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
         """ try to connect the controlled_plt to the current controller (usually the 2D plot). """
         return self.connection_man.connect_drivable_to_driver(drivable=controlled_plt, driver=self.spike_raster_plt_2d,
                                                        custom_connect_function=(lambda driver, drivable: pg.SignalProxy(driver.window_scrolled, delay=0.2, rateLimit=60, slot=drivable.spikes_window.update_window_start_end_rate_limited)))
-        
-      
-    def __str__(self):
-         return
-     
      
     def create_new_connected_widget(self, type_of_3d_plotter='vedo'):
         """ called to create a new/independent widget instance that's connected to this window's driver. """
@@ -465,7 +463,6 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
             print(f'Spike3DRasterWindowWidget.increase_animation_frame_val()')
         self.shift_animation_frame_val(1)
         
-        
     ## Update Functions:
     @QtCore.Slot(bool)
     def play_pause(self, is_playing):
@@ -551,10 +548,7 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
         if self.ui.spike_raster_plt_3d is not None:
             self.connection_man.unregister_object(self.ui.spike_raster_plt_3d)
         
-        
-        
-        
-        
+
     ########################################################
     ## For Other conformances:
     ########################################################

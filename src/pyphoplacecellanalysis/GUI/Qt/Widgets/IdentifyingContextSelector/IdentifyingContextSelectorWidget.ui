@@ -21,7 +21,20 @@
      </property>
      <layout class="QHBoxLayout" name="horizontalLayout">
       <item>
-       <widget class="QComboBox" name="cmbIdentifyingContext"/>
+       <widget class="QComboBox" name="cmbIdentifyingContext">
+        <property name="minimumSize">
+         <size>
+          <width>0</width>
+          <height>22</height>
+         </size>
+        </property>
+        <property name="baseSize">
+         <size>
+          <width>0</width>
+          <height>22</height>
+         </size>
+        </property>
+       </widget>
       </item>
       <item>
        <widget class="QToolButton" name="btnRevert">

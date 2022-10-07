@@ -144,8 +144,6 @@ class SpikeRastersDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Displa
         spike_raster_window.main_menu_window.ui.menus.global_window_menus.docked_widgets.menu_provider_obj = _docked_menu_provider
         
         
-        
-        
         ## Adds the custom renderable menu to the top-level menu of the plots in Spike2DRaster
         active_pf_2D_dt = computation_result.computed_data.get('pf2D_dt', None)
         if active_pf_2D_dt is not None:
@@ -167,7 +165,6 @@ class SpikeRastersDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Displa
         else:
             print(f'active_pf_2D_dt is None! Skipping Create Paired Widget Menu...')
     
-        
         spike_raster_window.main_menu_window.ui.menus.global_window_menus.create_linked_widget.menu_provider_obj = _createLinkedWidget_menu_provider
 
         return {'spike_raster_plt_2d':spike_raster_window.spike_raster_plt_2d, 'spike_raster_plt_3d':spike_raster_window.spike_raster_plt_3d, 'spike_raster_window': spike_raster_window}

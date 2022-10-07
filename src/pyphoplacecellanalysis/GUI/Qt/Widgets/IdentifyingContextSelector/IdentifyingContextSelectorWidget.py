@@ -29,6 +29,10 @@ class IdentifyingContextSelectorWidget(ComboBoxCtrlOwnerMixin, PipelineOwningMix
         from pyphoplacecellanalysis.GUI.Qt.IdentifyingContextSelector.IdentifyingContextSelectorWidget import IdentifyingContextSelectorWidget
 
     """
+
+    sigContextChanged = pyqtSignal(object, object)
+
+
     @property
     def current_selected_context_key(self):
         """The current_selected_context property."""
@@ -70,9 +74,10 @@ class IdentifyingContextSelectorWidget(ComboBoxCtrlOwnerMixin, PipelineOwningMix
 
     def initUI(self):
         # self.ui.cmbIdentifyingContext.set = self.all_filtered_session_keys
+        self.ui.cmbIdentifyingContext.currentIndexChanged.connect(self.on_selected_context_index_changed)
         # self.ui.btnConfirm.clicked.
         # self.updateUi()
-        pass
+        
 
 
     def updateUi(self):
@@ -99,7 +104,17 @@ class IdentifyingContextSelectorWidget(ComboBoxCtrlOwnerMixin, PipelineOwningMix
         ## Unblock the signals:
         curr_combo_box.blockSignals(False)
 
-
+    @pyqtSlot(int)
+    def on_selected_context_index_changed(self, new_index):
+        if new_index < 0:
+            new_key = None
+            new_context = None
+        else:
+            new_key = self.all_filtered_session_keys[new_index]
+            new_description = self.all_filtered_session_context_descriptions[new_index]
+            new_context = self.all_filtered_session_contexts[new_key]
+        print(f'on_selected_context_index_changed: {new_index}, {new_key}, {new_description}, {new_context}')
+        self.sigContextChanged.emit(new_key, new_context)
 
 
 ## Start Qt event loop

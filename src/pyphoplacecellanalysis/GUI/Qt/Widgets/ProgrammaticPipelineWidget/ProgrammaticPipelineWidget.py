@@ -51,6 +51,15 @@ class ProgrammaticPipelineWidget(PipelineOwningMixin, QWidget):
         if self.owning_pipeline is not None:
             self.programmatically_add_display_function_buttons()
 
+        self.ui.contextSelectorWidget.sigContextChanged.connect(self.on_context_changed)
+
+    @pyqtSlot(object, object)
+    def on_context_changed(self, new_context_key, new_context):
+        print(f'on_context_changed(self, new_context_key: {new_context_key}, new_context: {new_context})')
+        has_valid_context = new_context_key is not None
+        # TODO: Disable all the action buttons if the new context is None
+        
+
 
 
     # ==================================================================================================================== #
