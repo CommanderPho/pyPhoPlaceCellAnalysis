@@ -32,9 +32,10 @@ class DefaultRatemapDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Disp
 
         # TODO: add it to the active context
         # owning_pipeline.display_output[active_display_fn_identifying_ctx] = (active_figure, ax_pf_1D)
-        owning_pipeline.display_output[active_display_fn_identifying_ctx] = dict(fig=active_figure, ax=ax_pf_1D)
+        # owning_pipeline.display_output[active_display_fn_identifying_ctx] = dict(fig=active_figure, ax=ax_pf_1D)
 
-        return {active_display_fn_identifying_ctx: owning_pipeline.display_output[active_display_fn_identifying_ctx]}
+        return dict(fig=active_figure, ax=ax_pf_1D)
+        # return {active_display_fn_identifying_ctx: owning_pipeline.display_output[active_display_fn_identifying_ctx]}
         # return {active_display_fn_identifying_ctx: dict(fig=active_figure, ax=ax_pf_1D)}
         # return active_figure, ax_pf_1D
 
