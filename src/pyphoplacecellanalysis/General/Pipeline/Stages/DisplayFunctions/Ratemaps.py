@@ -20,6 +20,26 @@ from neuropy.utils.mixins.unwrap_placefield_computation_parameters import unwrap
 class DefaultRatemapDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=DisplayFunctionRegistryHolder):
     """ Functions related to visualizing Bayesian Decoder performance. """
     
+    def _display_1d_placefields(computation_result, active_config, owning_pipeline=None, active_context=None, **kwargs):
+        assert active_context is not None
+        assert owning_pipeline is not None
+
+        ## Finally, add the display function to the active context
+        active_display_fn_identifying_ctx = active_context.adding_context('display_fn', display_fn_name='_display_1d_placefields')
+        # _build_safe_kwargs
+        ax_pf_1D = computation_result.computed_data['pf1D'].plot_ratemaps_1D()
+        active_figure = plt.gcf()
+
+        # TODO: add it to the active context
+        # owning_pipeline.display_output[active_display_fn_identifying_ctx] = (active_figure, ax_pf_1D)
+        owning_pipeline.display_output[active_display_fn_identifying_ctx] = dict(fig=active_figure, ax=ax_pf_1D)
+
+        return {active_display_fn_identifying_ctx: owning_pipeline.display_output[active_display_fn_identifying_ctx]}
+        # return {active_display_fn_identifying_ctx: dict(fig=active_figure, ax=ax_pf_1D)}
+        # return active_figure, ax_pf_1D
+
+
+
     def _display_2d_placefield_result_plot_ratemaps_2D(computation_result, active_config, enable_saving_to_disk=False, **kwargs):
         """ displays 2D placefields in a MATPLOTLIB window 
         
@@ -46,7 +66,6 @@ class DefaultRatemapDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Disp
         # print(f'fig_label: {fig_label}')
         active_figure.set_label(fig_label)
         active_figure.canvas.manager.set_window_title(fig_label) # sets the window's title
-        
         
         active_pf_2D_figures = [active_figure]            
         
