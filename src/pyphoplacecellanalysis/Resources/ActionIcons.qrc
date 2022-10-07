@@ -16,6 +16,8 @@
   </qresource>
   <qresource prefix="Graphics">
     <file>Icons/graphics/Pho Symbol.svg</file>
+    <file>Icons/graphics/Crosshairs.svg</file>
+    <file>Icons/graphics/Decoder.svg</file>
     <file>Icons/graphics/MultiAxesPlot.png</file>
     <file>Icons/graphics/Rectangles.png</file>
     <file>Icons/graphics/SimplePlot.png</file>
@@ -34,6 +36,10 @@
     <file>Icons/graphics/ic_timeline_48px-dark.png</file>
   </qresource>
   <qresource prefix="Render">
+    <file>Icons/Icon/Decode.png</file>
+    <file>Icons/Icon/Heatmap.png</file>
+    <file>Icons/Icon/HeatmapUgly.png</file>
+    <file>Icons/Icon/Occupancy.png</file>
     <file>Icons/actions/chart.png</file>
     <file>Icons/actions/chart-down.png</file>
     <file>Icons/actions/chart-down-color.png</file>

@@ -29,7 +29,7 @@
      <string notr="true">Add Renderable</string>
     </property>
     <property name="icon">
-     <iconset resource="../../../Resources/ActionIcons.qrc">
+     <iconset resource="../../../../Resources/ActionIcons.qrc">
       <normaloff>:/Render/Icons/actions/categories.png</normaloff>:/Render/Icons/actions/categories.png</iconset>
     </property>
     <widget class="QMenu" name="menuAddRenderable_Time_Curves">
@@ -37,7 +37,7 @@
       <string notr="true">Add Time Curves...</string>
      </property>
      <property name="icon">
-      <iconset resource="../../../Resources/ActionIcons.qrc">
+      <iconset resource="../../../../Resources/ActionIcons.qrc">
        <normaloff>:/Render/Icons/actions/chart-up-color.png</normaloff>:/Render/Icons/actions/chart-up-color.png</iconset>
      </property>
      <addaction name="actionAddTimeCurves_Position"/>
@@ -51,7 +51,7 @@
       <string notr="true">Add Time Intervals...</string>
      </property>
      <property name="icon">
-      <iconset resource="../../../Resources/ActionIcons.qrc">
+      <iconset resource="../../../../Resources/ActionIcons.qrc">
        <normaloff>:/Render/Icons/actions/spectrum-emission.png</normaloff>:/Render/Icons/actions/spectrum-emission.png</iconset>
      </property>
      <addaction name="actionAddTimeIntervals_Session_Epochs"/>
@@ -68,7 +68,7 @@
       <string>Add Matplotlib Plot...</string>
      </property>
      <property name="icon">
-      <iconset resource="../../../Resources/ActionIcons.qrc">
+      <iconset resource="../../../../Resources/ActionIcons.qrc">
        <normaloff>:/Graphics/Icons/graphics/ic_multiline_chart_48px.png</normaloff>:/Graphics/Icons/graphics/ic_multiline_chart_48px.png</iconset>
      </property>
      <addaction name="actionAddMatplotlibPlot_DecodedPosition"/>
@@ -118,7 +118,7 @@
       <string>Decoded Epoch Slices</string>
      </property>
      <property name="icon">
-      <iconset resource="../../../Resources/ActionIcons.qrc">
+      <iconset resource="../../../../Resources/ActionIcons.qrc">
        <normaloff>:/Graphics/Icons/graphics/Rectangles.png</normaloff>:/Graphics/Icons/graphics/Rectangles.png</iconset>
      </property>
      <addaction name="actionDecoded_Epoch_Slices_Laps"/>
@@ -186,7 +186,7 @@
   </action>
   <action name="actionClear_all_Time_Curves">
    <property name="icon">
-    <iconset resource="../../../Resources/ActionIcons.qrc">
+    <iconset resource="../../../../Resources/ActionIcons.qrc">
      <normaloff>:/Render/Icons/actions/chart--minus.png</normaloff>:/Render/Icons/actions/chart--minus.png</iconset>
    </property>
    <property name="text">
@@ -195,7 +195,7 @@
   </action>
   <action name="actionClear_all_Time_Intervals">
    <property name="icon">
-    <iconset resource="../../../Resources/ActionIcons.qrc">
+    <iconset resource="../../../../Resources/ActionIcons.qrc">
      <normaloff>:/Render/Icons/actions/chart--minus.png</normaloff>:/Render/Icons/actions/chart--minus.png</iconset>
    </property>
    <property name="text">
@@ -224,7 +224,7 @@
   </action>
   <action name="actionTimeSynchronizedOccupancyPlotter">
    <property name="icon">
-    <iconset resource="../../../Resources/ActionIcons.qrc">
+    <iconset resource="../../../../Resources/ActionIcons.qrc">
      <normaloff>:/Render/Icons/actions/bar-chart_2@1x.png</normaloff>:/Render/Icons/actions/bar-chart_2@1x.png</iconset>
    </property>
    <property name="text">
@@ -233,7 +233,7 @@
   </action>
   <action name="actionTimeSynchronizedPlacefieldsPlotter">
    <property name="icon">
-    <iconset resource="../../../Resources/ActionIcons.qrc">
+    <iconset resource="../../../../Resources/ActionIcons.qrc">
      <normaloff>:/Render/Icons/actions/wifi-channel_2@1x.png</normaloff>:/Render/Icons/actions/wifi-channel_2@1x.png</iconset>
    </property>
    <property name="text">
@@ -242,7 +242,7 @@
   </action>
   <action name="actionCombineTimeSynchronizedPlotterWindow">
    <property name="icon">
-    <iconset resource="../../../Resources/ActionIcons.qrc">
+    <iconset resource="../../../../Resources/ActionIcons.qrc">
      <normaloff>:/Graphics/Icons/graphics/ic_multiline_chart_48px.png</normaloff>:/Graphics/Icons/graphics/ic_multiline_chart_48px.png</iconset>
    </property>
    <property name="text">
@@ -251,7 +251,7 @@
   </action>
   <action name="actionTimeSynchronizedDecoderPlotter">
    <property name="icon">
-    <iconset resource="../../../Resources/ActionIcons.qrc">
+    <iconset resource="../../../../Resources/ActionIcons.qrc">
      <normaloff>:/Render/Icons/actions/area-chart_2@1x.png</normaloff>:/Render/Icons/actions/area-chart_2@1x.png</iconset>
    </property>
    <property name="text">
@@ -263,7 +263,7 @@
     <bool>false</bool>
    </property>
    <property name="icon">
-    <iconset resource="../../../Resources/ActionIcons.qrc">
+    <iconset resource="../../../../Resources/ActionIcons.qrc">
      <normaloff>:/Graphics/Icons/graphics/ic_blur_linear_48px.png</normaloff>:/Graphics/Icons/graphics/ic_blur_linear_48px.png</iconset>
    </property>
    <property name="text">
@@ -275,7 +275,7 @@
   </action>
   <action name="actionClear_all_Matplotlib_Plots">
    <property name="icon">
-    <iconset resource="../../../Resources/ActionIcons.qrc">
+    <iconset resource="../../../../Resources/ActionIcons.qrc">
      <normaloff>:/Render/Icons/actions/chart--minus.png</normaloff>:/Render/Icons/actions/chart--minus.png</iconset>
    </property>
    <property name="text">
@@ -315,7 +315,7 @@
   </action>
   <action name="actionDecoded_Epoch_Slices_Laps">
    <property name="icon">
-    <iconset resource="../../../Resources/ActionIcons.qrc">
+    <iconset resource="../../../../Resources/ActionIcons.qrc">
      <normaloff>:/Graphics/Icons/graphics/Rectangles.png</normaloff>:/Graphics/Icons/graphics/Rectangles.png</iconset>
    </property>
    <property name="text">
@@ -347,9 +347,9 @@
   </action>
  </widget>
  <resources>
-  <include location="../../../Resources/GuiResources.qrc"/>
-  <include location="../../../Resources/ActionIcons.qrc"/>
-  <include location="../../../External/breeze_style_sheets/dist/qrc/breeze.qrc"/>
+  <include location="../../../../Resources/GuiResources.qrc"/>
+  <include location="../../../../Resources/ActionIcons.qrc"/>
+  <include location="../../../../External/breeze_style_sheets/dist/qrc/breeze.qrc"/>
  </resources>
  <connections/>
 </ui>
