@@ -29,6 +29,35 @@ class IdentifyingContextSelectorWidget(ComboBoxCtrlOwnerMixin, PipelineOwningMix
         from pyphoplacecellanalysis.GUI.Qt.IdentifyingContextSelector.IdentifyingContextSelectorWidget import IdentifyingContextSelectorWidget
 
     """
+    @property
+    def current_selected_context_key(self):
+        """The current_selected_context property."""
+        ## Capture the previous selection:
+        active_keys_list = self.all_filtered_session_keys.copy()
+        selected_index, selected_item_text = self.get_current_combo_item_selection(self.ui.cmbIdentifyingContext)
+        if selected_index < 0:
+            return None # no selection currently
+        else:
+            curr_selected_key = active_keys_list[selected_index]
+            return curr_selected_key
+    
+    @property
+    def has_valid_selection(self):
+        """ Whether there is a currently an item selected or not. """
+        if self.current_selected_context_key is None:
+            return False
+        else:
+            return True
+
+
+    @property
+    def current_selected_context(self):
+        """The IdentifyingContext that's currently selected, or None."""
+        if self.current_selected_context_key is None:
+            return None
+        else:
+            return self.all_filtered_session_contexts[self.current_selected_context_key]
+
     def __init__(self, parent=None, owning_pipeline=None):
         super().__init__(parent=parent) # Call the inherited classes __init__ method
         self.ui = uic.loadUi(uiFile, self) # Load the .ui file

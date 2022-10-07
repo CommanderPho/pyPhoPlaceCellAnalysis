@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>491</width>
-    <height>363</height>
+    <width>553</width>
+    <height>554</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -26,12 +26,26 @@
      <property name="sizeHint" stdset="0">
       <size>
        <width>20</width>
-       <height>40</height>
+       <height>12</height>
       </size>
      </property>
     </spacer>
    </item>
-   <item row="1" column="0">
+   <item row="0" column="0">
+    <widget class="IdentifyingContextSelectorWidget" name="contextSelectorWidget" native="true">
+     <property name="minimumSize">
+      <size>
+       <width>0</width>
+       <height>61</height>
+      </size>
+     </property>
+     <property name="styleSheet">
+      <string notr="true">border-color: rgb(170, 0, 127);
+background-color: rgb(255, 250, 242);</string>
+     </property>
+    </widget>
+   </item>
+   <item row="1" column="0" rowspan="2">
     <widget class="QWidget" name="widget" native="true">
      <property name="minimumSize">
       <size>
@@ -48,30 +62,16 @@
      <layout class="QVBoxLayout" name="verticalLayout">
       <item>
        <widget class="QGroupBox" name="VisualizationsGroup">
+        <property name="enabled">
+         <bool>false</bool>
+        </property>
         <property name="title">
          <string>Visualizations</string>
         </property>
+        <property name="flat">
+         <bool>true</bool>
+        </property>
         <layout class="QGridLayout" name="gridLayout_2">
-         <item row="0" column="0">
-          <widget class="QToolButton" name="toolButton">
-           <property name="text">
-            <string>...</string>
-           </property>
-           <property name="icon">
-            <iconset resource="../../../../Resources/GuiResources.qrc">
-             <normaloff>:/Icons/Icons/SpikeRaster3DIcon.ico</normaloff>:/Icons/Icons/SpikeRaster3DIcon.ico</iconset>
-           </property>
-           <property name="iconSize">
-            <size>
-             <width>30</width>
-             <height>30</height>
-            </size>
-           </property>
-           <attribute name="buttonGroup">
-            <string notr="true">buttonGroup</string>
-           </attribute>
-          </widget>
-         </item>
          <item row="0" column="2">
           <widget class="QToolButton" name="toolButton_3">
            <property name="text">
@@ -92,27 +92,14 @@
            </attribute>
           </widget>
          </item>
-         <item row="0" column="5">
-          <spacer name="horizontalSpacer">
-           <property name="orientation">
-            <enum>Qt::Horizontal</enum>
-           </property>
-           <property name="sizeHint" stdset="0">
-            <size>
-             <width>40</width>
-             <height>20</height>
-            </size>
-           </property>
-          </spacer>
-         </item>
-         <item row="0" column="1">
-          <widget class="QToolButton" name="toolButton_2">
+         <item row="0" column="0">
+          <widget class="QToolButton" name="toolButton">
            <property name="text">
             <string>...</string>
            </property>
            <property name="icon">
             <iconset resource="../../../../Resources/GuiResources.qrc">
-             <normaloff>:/Icons/Icons/SpikeRaster3D_VedoIcon.ico</normaloff>:/Icons/Icons/SpikeRaster3D_VedoIcon.ico</iconset>
+             <normaloff>:/Icons/Icons/SpikeRaster3DIcon.ico</normaloff>:/Icons/Icons/SpikeRaster3DIcon.ico</iconset>
            </property>
            <property name="iconSize">
             <size>
@@ -125,6 +112,19 @@
            </attribute>
           </widget>
          </item>
+         <item row="0" column="8">
+          <spacer name="horizontalSpacer">
+           <property name="orientation">
+            <enum>Qt::Horizontal</enum>
+           </property>
+           <property name="sizeHint" stdset="0">
+            <size>
+             <width>40</width>
+             <height>20</height>
+            </size>
+           </property>
+          </spacer>
+         </item>
          <item row="0" column="3">
           <widget class="QToolButton" name="toolButton_4">
            <property name="text">
@@ -133,6 +133,26 @@
            <property name="icon">
             <iconset resource="../../../../Resources/GuiResources.qrc">
              <normaloff>:/Icons/Icons/InteractivePlaceCellDataExplorerIconWithLabel.ico</normaloff>:/Icons/Icons/InteractivePlaceCellDataExplorerIconWithLabel.ico</iconset>
+           </property>
+           <property name="iconSize">
+            <size>
+             <width>30</width>
+             <height>30</height>
+            </size>
+           </property>
+           <attribute name="buttonGroup">
+            <string notr="true">buttonGroup</string>
+           </attribute>
+          </widget>
+         </item>
+         <item row="0" column="1">
+          <widget class="QToolButton" name="toolButton_2">
+           <property name="text">
+            <string>...</string>
+           </property>
+           <property name="icon">
+            <iconset resource="../../../../Resources/GuiResources.qrc">
+             <normaloff>:/Icons/Icons/SpikeRaster3D_VedoIcon.ico</normaloff>:/Icons/Icons/SpikeRaster3D_VedoIcon.ico</iconset>
            </property>
            <property name="iconSize">
             <size>
@@ -167,6 +187,12 @@
       </item>
       <item>
        <widget class="QToolBox" name="toolBox">
+        <property name="sizePolicy">
+         <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
+          <horstretch>1</horstretch>
+          <verstretch>1</verstretch>
+         </sizepolicy>
+        </property>
         <property name="frameShape">
          <enum>QFrame::Box</enum>
         </property>
@@ -184,9 +210,15 @@
           <rect>
            <x>0</x>
            <y>0</y>
-           <width>449</width>
-           <height>69</height>
+           <width>511</width>
+           <height>72</height>
           </rect>
+         </property>
+         <property name="sizePolicy">
+          <sizepolicy hsizetype="Expanding" vsizetype="Preferred">
+           <horstretch>1</horstretch>
+           <verstretch>0</verstretch>
+          </sizepolicy>
          </property>
          <attribute name="icon">
           <iconset resource="../../../../Resources/ActionIcons.qrc">
@@ -195,130 +227,259 @@
          <attribute name="label">
           <string>Visualizations</string>
          </attribute>
-         <widget class="QGroupBox" name="VisualizationsContent">
-          <property name="geometry">
-           <rect>
-            <x>0</x>
-            <y>0</y>
-            <width>275</width>
-            <height>72</height>
-           </rect>
+         <layout class="QGridLayout" name="gridLayout_3">
+          <property name="leftMargin">
+           <number>0</number>
           </property>
-          <property name="title">
-           <string>Visualizations</string>
+          <property name="topMargin">
+           <number>0</number>
           </property>
-          <layout class="QHBoxLayout" name="tooltab_Visualization_Layout">
-           <item>
-            <widget class="QToolButton" name="toolButton_9">
-             <property name="text">
-              <string>...</string>
+          <property name="rightMargin">
+           <number>0</number>
+          </property>
+          <property name="bottomMargin">
+           <number>0</number>
+          </property>
+          <item row="0" column="0">
+           <widget class="QFrame" name="VisualizationsContent">
+            <property name="sizePolicy">
+             <sizepolicy hsizetype="Expanding" vsizetype="Preferred">
+              <horstretch>1</horstretch>
+              <verstretch>0</verstretch>
+             </sizepolicy>
+            </property>
+            <layout class="QHBoxLayout" name="tooltab_Visualization_Layout">
+             <property name="leftMargin">
+              <number>2</number>
              </property>
-             <property name="icon">
-              <iconset resource="../../../../Resources/GuiResources.qrc">
-               <normaloff>:/Icons/Icons/SpikeRaster2DIcon.ico</normaloff>:/Icons/Icons/SpikeRaster2DIcon.ico</iconset>
+             <property name="topMargin">
+              <number>2</number>
              </property>
-             <property name="iconSize">
-              <size>
-               <width>30</width>
-               <height>30</height>
-              </size>
+             <property name="rightMargin">
+              <number>2</number>
              </property>
-            </widget>
-           </item>
-           <item>
-            <widget class="QToolButton" name="toolButton_5">
-             <property name="text">
-              <string>...</string>
+             <property name="bottomMargin">
+              <number>2</number>
              </property>
-             <property name="icon">
-              <iconset resource="../../../../Resources/GuiResources.qrc">
-               <normaloff>:/Icons/Icons/SpikeRaster3DIcon.ico</normaloff>:/Icons/Icons/SpikeRaster3DIcon.ico</iconset>
-             </property>
-             <property name="iconSize">
-              <size>
-               <width>30</width>
-               <height>30</height>
-              </size>
-             </property>
-            </widget>
-           </item>
-           <item>
-            <widget class="QToolButton" name="toolButton_6">
-             <property name="text">
-              <string>...</string>
-             </property>
-             <property name="icon">
-              <iconset resource="../../../../Resources/GuiResources.qrc">
-               <normaloff>:/Icons/Icons/SpikeRaster3D_VedoIcon.ico</normaloff>:/Icons/Icons/SpikeRaster3D_VedoIcon.ico</iconset>
-             </property>
-             <property name="iconSize">
-              <size>
-               <width>30</width>
-               <height>30</height>
-              </size>
-             </property>
-             <property name="toolButtonStyle">
-              <enum>Qt::ToolButtonIconOnly</enum>
-             </property>
-            </widget>
-           </item>
-           <item>
-            <widget class="QToolButton" name="toolButton_8">
-             <property name="text">
-              <string>...</string>
-             </property>
-             <property name="icon">
-              <iconset resource="../../../../Resources/GuiResources.qrc">
-               <normaloff>:/Icons/Icons/TuningMapDataExplorerIconWithLabel.ico</normaloff>:/Icons/Icons/TuningMapDataExplorerIconWithLabel.ico</iconset>
-             </property>
-             <property name="iconSize">
-              <size>
-               <width>30</width>
-               <height>30</height>
-              </size>
-             </property>
-            </widget>
-           </item>
-           <item>
-            <widget class="QToolButton" name="toolButton_7">
-             <property name="text">
-              <string>...</string>
-             </property>
-             <property name="icon">
-              <iconset resource="../../../../Resources/GuiResources.qrc">
-               <normaloff>:/Icons/Icons/InteractivePlaceCellDataExplorerIconWithLabel.ico</normaloff>:/Icons/Icons/InteractivePlaceCellDataExplorerIconWithLabel.ico</iconset>
-             </property>
-             <property name="iconSize">
-              <size>
-               <width>30</width>
-               <height>30</height>
-              </size>
-             </property>
-            </widget>
-           </item>
-           <item>
-            <spacer name="horizontalSpacer_2">
-             <property name="orientation">
-              <enum>Qt::Horizontal</enum>
-             </property>
-             <property name="sizeHint" stdset="0">
-              <size>
-               <width>40</width>
-               <height>20</height>
-              </size>
-             </property>
-            </spacer>
-           </item>
-          </layout>
-         </widget>
+             <item>
+              <widget class="QToolButton" name="toolButton_9">
+               <property name="text">
+                <string>...</string>
+               </property>
+               <property name="icon">
+                <iconset resource="../../../../Resources/GuiResources.qrc">
+                 <normaloff>:/Icons/Icons/SpikeRaster2DIcon.ico</normaloff>:/Icons/Icons/SpikeRaster2DIcon.ico</iconset>
+               </property>
+               <property name="iconSize">
+                <size>
+                 <width>30</width>
+                 <height>30</height>
+                </size>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <widget class="QToolButton" name="toolButton_5">
+               <property name="text">
+                <string>...</string>
+               </property>
+               <property name="icon">
+                <iconset resource="../../../../Resources/GuiResources.qrc">
+                 <normaloff>:/Icons/Icons/SpikeRaster3DIcon.ico</normaloff>:/Icons/Icons/SpikeRaster3DIcon.ico</iconset>
+               </property>
+               <property name="iconSize">
+                <size>
+                 <width>30</width>
+                 <height>30</height>
+                </size>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <widget class="QToolButton" name="toolButton_6">
+               <property name="text">
+                <string>...</string>
+               </property>
+               <property name="icon">
+                <iconset resource="../../../../Resources/GuiResources.qrc">
+                 <normaloff>:/Icons/Icons/SpikeRaster3D_VedoIcon.ico</normaloff>:/Icons/Icons/SpikeRaster3D_VedoIcon.ico</iconset>
+               </property>
+               <property name="iconSize">
+                <size>
+                 <width>30</width>
+                 <height>30</height>
+                </size>
+               </property>
+               <property name="toolButtonStyle">
+                <enum>Qt::ToolButtonIconOnly</enum>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <widget class="QToolButton" name="toolButton_8">
+               <property name="text">
+                <string>...</string>
+               </property>
+               <property name="icon">
+                <iconset resource="../../../../Resources/GuiResources.qrc">
+                 <normaloff>:/Icons/Icons/TuningMapDataExplorerIconWithLabel.ico</normaloff>:/Icons/Icons/TuningMapDataExplorerIconWithLabel.ico</iconset>
+               </property>
+               <property name="iconSize">
+                <size>
+                 <width>30</width>
+                 <height>30</height>
+                </size>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <widget class="QToolButton" name="toolButton_7">
+               <property name="text">
+                <string>...</string>
+               </property>
+               <property name="icon">
+                <iconset resource="../../../../Resources/GuiResources.qrc">
+                 <normaloff>:/Icons/Icons/InteractivePlaceCellDataExplorerIconWithLabel.ico</normaloff>:/Icons/Icons/InteractivePlaceCellDataExplorerIconWithLabel.ico</iconset>
+               </property>
+               <property name="iconSize">
+                <size>
+                 <width>30</width>
+                 <height>30</height>
+                </size>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <spacer name="horizontalSpacer_4">
+               <property name="orientation">
+                <enum>Qt::Horizontal</enum>
+               </property>
+               <property name="sizeType">
+                <enum>QSizePolicy::Fixed</enum>
+               </property>
+               <property name="sizeHint" stdset="0">
+                <size>
+                 <width>8</width>
+                 <height>20</height>
+                </size>
+               </property>
+              </spacer>
+             </item>
+             <item>
+              <widget class="QToolButton" name="toolButton_11">
+               <property name="text">
+                <string>...</string>
+               </property>
+               <property name="icon">
+                <iconset resource="../../../../Resources/ActionIcons.qrc">
+                 <normaloff>:/Render/Icons/Icon/HeatmapUgly.png</normaloff>:/Render/Icons/Icon/HeatmapUgly.png</iconset>
+               </property>
+               <property name="iconSize">
+                <size>
+                 <width>30</width>
+                 <height>30</height>
+                </size>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <widget class="QToolButton" name="toolButton_14">
+               <property name="text">
+                <string>...</string>
+               </property>
+               <property name="icon">
+                <iconset resource="../../../../Resources/ActionIcons.qrc">
+                 <normaloff>:/Render/Icons/Icon/Occupancy.png</normaloff>:/Render/Icons/Icon/Occupancy.png</iconset>
+               </property>
+               <property name="iconSize">
+                <size>
+                 <width>30</width>
+                 <height>30</height>
+                </size>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <widget class="QToolButton" name="toolButton_13">
+               <property name="text">
+                <string>...</string>
+               </property>
+               <property name="icon">
+                <iconset resource="../../../../Resources/ActionIcons.qrc">
+                 <normaloff>:/Render/Icons/Icon/Heatmap.png</normaloff>:/Render/Icons/Icon/Heatmap.png</iconset>
+               </property>
+               <property name="iconSize">
+                <size>
+                 <width>30</width>
+                 <height>30</height>
+                </size>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <widget class="QToolButton" name="toolButton_15">
+               <property name="text">
+                <string>...</string>
+               </property>
+               <property name="icon">
+                <iconset resource="../../../../Resources/ActionIcons.qrc">
+                 <normaloff>:/Render/Icons/Icon/Decode.png</normaloff>:/Render/Icons/Icon/Decode.png</iconset>
+               </property>
+               <property name="iconSize">
+                <size>
+                 <width>30</width>
+                 <height>30</height>
+                </size>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <spacer name="horizontalSpacer_2">
+               <property name="orientation">
+                <enum>Qt::Horizontal</enum>
+               </property>
+               <property name="sizeHint" stdset="0">
+                <size>
+                 <width>40</width>
+                 <height>20</height>
+                </size>
+               </property>
+              </spacer>
+             </item>
+            </layout>
+           </widget>
+          </item>
+         </layout>
+        </widget>
+        <widget class="QWidget" name="tooltab_Display">
+         <attribute name="icon">
+          <iconset resource="../../../../Resources/ActionIcons.qrc">
+           <normaloff>:/Render/Icons/actions/category-item.png</normaloff>:/Render/Icons/actions/category-item.png</iconset>
+         </attribute>
+         <attribute name="label">
+          <string>Display</string>
+         </attribute>
+         <layout class="QHBoxLayout" name="tooltab_Display_Layout">
+          <item>
+           <layout class="QVBoxLayout" name="tooltab_ProgrammaticDisplayLayout">
+            <item>
+             <widget class="QPushButton" name="pushButton">
+              <property name="text">
+               <string>PushButton</string>
+              </property>
+             </widget>
+            </item>
+           </layout>
+          </item>
+         </layout>
         </widget>
         <widget class="QWidget" name="tooltab_Utilities">
          <property name="geometry">
           <rect>
            <x>0</x>
            <y>0</y>
-           <width>98</width>
-           <height>28</height>
+           <width>511</width>
+           <height>72</height>
           </rect>
          </property>
          <attribute name="icon">
@@ -328,137 +489,78 @@
          <attribute name="label">
           <string>Utilities</string>
          </attribute>
-         <widget class="QGroupBox" name="UtilitiesContent">
-          <property name="geometry">
-           <rect>
-            <x>10</x>
-            <y>0</y>
-            <width>426</width>
-            <height>72</height>
-           </rect>
+         <layout class="QGridLayout" name="gridLayout_4">
+          <property name="leftMargin">
+           <number>0</number>
           </property>
-          <property name="title">
-           <string>Utilities</string>
+          <property name="topMargin">
+           <number>0</number>
           </property>
-          <layout class="QHBoxLayout" name="tooltab_Utilities_Layout">
-           <item>
-            <widget class="QToolButton" name="toolButton_12">
-             <property name="text">
-              <string>...</string>
+          <property name="rightMargin">
+           <number>0</number>
+          </property>
+          <property name="bottomMargin">
+           <number>0</number>
+          </property>
+          <item row="0" column="0">
+           <widget class="QFrame" name="UtilitiesContent">
+            <property name="sizePolicy">
+             <sizepolicy hsizetype="Expanding" vsizetype="Preferred">
+              <horstretch>1</horstretch>
+              <verstretch>0</verstretch>
+             </sizepolicy>
+            </property>
+            <layout class="QHBoxLayout" name="tooltab_Utilities_Layout">
+             <property name="leftMargin">
+              <number>2</number>
              </property>
-             <property name="icon">
-              <iconset resource="../../../../Resources/ActionIcons.qrc">
-               <normaloff>:/Graphics/Icons/graphics/Pho Symbol.svg</normaloff>:/Graphics/Icons/graphics/Pho Symbol.svg</iconset>
+             <property name="topMargin">
+              <number>2</number>
              </property>
-             <property name="iconSize">
-              <size>
-               <width>30</width>
-               <height>30</height>
-              </size>
+             <property name="rightMargin">
+              <number>2</number>
              </property>
-            </widget>
-           </item>
-           <item>
-            <widget class="QToolButton" name="toolButton_11">
-             <property name="text">
-              <string>...</string>
+             <property name="bottomMargin">
+              <number>2</number>
              </property>
-             <property name="icon">
-              <iconset resource="../../../../Resources/ActionIcons.qrc">
-               <normaloff>:/Render/Icons/Icon/HeatmapUgly.png</normaloff>:/Render/Icons/Icon/HeatmapUgly.png</iconset>
-             </property>
-             <property name="iconSize">
-              <size>
-               <width>30</width>
-               <height>30</height>
-              </size>
-             </property>
-            </widget>
-           </item>
-           <item>
-            <widget class="QToolButton" name="toolButton_13">
-             <property name="text">
-              <string>...</string>
-             </property>
-             <property name="icon">
-              <iconset resource="../../../../Resources/ActionIcons.qrc">
-               <normaloff>:/Render/Icons/Icon/Heatmap.png</normaloff>:/Render/Icons/Icon/Heatmap.png</iconset>
-             </property>
-             <property name="iconSize">
-              <size>
-               <width>30</width>
-               <height>30</height>
-              </size>
-             </property>
-            </widget>
-           </item>
-           <item>
-            <widget class="QToolButton" name="toolButton_14">
-             <property name="text">
-              <string>...</string>
-             </property>
-             <property name="icon">
-              <iconset resource="../../../../Resources/ActionIcons.qrc">
-               <normaloff>:/Render/Icons/Icon/Occupancy.png</normaloff>:/Render/Icons/Icon/Occupancy.png</iconset>
-             </property>
-             <property name="iconSize">
-              <size>
-               <width>30</width>
-               <height>30</height>
-              </size>
-             </property>
-            </widget>
-           </item>
-           <item>
-            <widget class="QToolButton" name="toolButton_15">
-             <property name="text">
-              <string>...</string>
-             </property>
-             <property name="icon">
-              <iconset resource="../../../../Resources/ActionIcons.qrc">
-               <normaloff>:/Render/Icons/Icon/Decode.png</normaloff>:/Render/Icons/Icon/Decode.png</iconset>
-             </property>
-             <property name="iconSize">
-              <size>
-               <width>30</width>
-               <height>30</height>
-              </size>
-             </property>
-            </widget>
-           </item>
-           <item>
-            <spacer name="horizontalSpacer_3">
-             <property name="orientation">
-              <enum>Qt::Horizontal</enum>
-             </property>
-             <property name="sizeHint" stdset="0">
-              <size>
-               <width>188</width>
-               <height>20</height>
-              </size>
-             </property>
-            </spacer>
-           </item>
-          </layout>
-         </widget>
+             <item>
+              <widget class="QToolButton" name="toolButton_12">
+               <property name="text">
+                <string>...</string>
+               </property>
+               <property name="icon">
+                <iconset resource="../../../../Resources/ActionIcons.qrc">
+                 <normaloff>:/Graphics/Icons/graphics/Pho Symbol.svg</normaloff>:/Graphics/Icons/graphics/Pho Symbol.svg</iconset>
+               </property>
+               <property name="iconSize">
+                <size>
+                 <width>30</width>
+                 <height>30</height>
+                </size>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <spacer name="horizontalSpacer_3">
+               <property name="orientation">
+                <enum>Qt::Horizontal</enum>
+               </property>
+               <property name="sizeHint" stdset="0">
+                <size>
+                 <width>188</width>
+                 <height>20</height>
+                </size>
+               </property>
+              </spacer>
+             </item>
+            </layout>
+           </widget>
+          </item>
+         </layout>
         </widget>
        </widget>
       </item>
      </layout>
-    </widget>
-   </item>
-   <item row="0" column="0">
-    <widget class="IdentifyingContextSelectorWidget" name="contextSelectorWidget" native="true">
-     <property name="minimumSize">
-      <size>
-       <width>0</width>
-       <height>61</height>
-      </size>
-     </property>
-     <property name="styleSheet">
-      <string notr="true">border-color: rgb(170, 0, 127);
-background-color: rgb(255, 250, 242);</string>
-     </property>
     </widget>
    </item>
   </layout>
