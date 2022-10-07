@@ -61,25 +61,7 @@ def single_context_nested_docks(curr_active_pipeline, active_config_name, app, m
         # Get relevant variables for this particular context:
         # curr_active_pipeline is set above, and usable here
         sess = curr_active_pipeline.filtered_sessions[active_config_name]
-
-        # active_computation_results = curr_active_pipeline.computation_results[active_config_name]
-        # active_computed_data = curr_active_pipeline.computation_results[active_config_name].computed_data
-        # active_computation_config = curr_active_pipeline.computation_results[active_config_name].computation_config
-        # active_computation_errors = curr_active_pipeline.computation_results[active_config_name].accumulated_errors
-        # active_pf_1D = curr_active_pipeline.computation_results[active_config_name].computed_data['pf1D']
-        # active_pf_2D = curr_active_pipeline.computation_results[active_config_name].computed_data['pf2D']    
-        # active_pf_1D_dt = curr_active_pipeline.computation_results[active_config_name].computed_data.get('pf1D_dt', None)
-        # active_pf_2D_dt = curr_active_pipeline.computation_results[active_config_name].computed_data.get('pf2D_dt', None)
-        # active_firing_rate_trends = curr_active_pipeline.computation_results[active_config_name].computed_data.get('firing_rate_trends', None)
         active_one_step_decoder = curr_active_pipeline.computation_results[active_config_name].computed_data.get('pf2D_Decoder', None)
-        # active_two_step_decoder = curr_active_pipeline.computation_results[active_config_name].computed_data.get('pf2D_TwoStepDecoder', None)
-        # active_extended_stats = curr_active_pipeline.computation_results[active_config_name].computed_data.get('extended_stats', None)
-        # active_eloy_analysis = curr_active_pipeline.computation_results[active_config_name].computed_data.get('EloyAnalysis', None)
-        # active_simpler_pf_densities_analysis = curr_active_pipeline.computation_results[active_config_name].computed_data.get('SimplerNeuronMeetingThresholdFiringAnalysis', None)
-        # active_ratemap_peaks_analysis = curr_active_pipeline.computation_results[active_config_name].computed_data.get('RatemapPeaksAnalysis', None)
-        # active_peak_prominence_2d_results = curr_active_pipeline.computation_results[active_config_name].computed_data.get('RatemapPeaksAnalysis', {}).get('PeakProminence2D', None)
-        # active_measured_positions = curr_active_pipeline.computation_results[active_config_name].sess.position.to_dataframe()
-        # curr_spikes_df = sess.spikes_df
 
         curr_active_config = curr_active_pipeline.active_configs[active_config_name]
         # curr_active_display_config = curr_active_config.plotting_config

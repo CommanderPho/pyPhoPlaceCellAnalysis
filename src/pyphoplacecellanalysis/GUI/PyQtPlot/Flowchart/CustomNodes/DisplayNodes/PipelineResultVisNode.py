@@ -207,23 +207,7 @@ class PipelineResultVisNode(AssociatedOutputWidgetNodeMixin, AddRemoveActionNode
     def process(self, mode=None, computation_configs=None, filter_configs=None, pipeline=None, display=True):
         # Get the list of available display functions:
         all_display_functions_list = pipeline.registered_display_function_names
-        """
-            ['_display_1d_placefield_validations',
-            '_display_2d_placefield_result_plot_ratemaps_2D',
-            '_display_2d_placefield_result_plot_raw',
-            '_display_3d_image_plotter',
-            '_display_3d_interactive_custom_data_explorer',
-            '_display_3d_interactive_spike_and_behavior_browser',
-            '_display_3d_interactive_tuning_curves_plotter',
-            '_display_normal',
-            '_display_placemaps_pyqtplot_2D',
-            '_display_decoder_result',
-            '_display_plot_most_likely_position_comparisons',
-            '_display_two_step_decoder_prediction_error_2D',
-            '_display_two_step_decoder_prediction_error_animated_2D']
-        """
         self.updateKeys('display_function', all_display_functions_list)
-        
         
         if (pipeline is None) or (not display):
             return {'display_outputs': None}
