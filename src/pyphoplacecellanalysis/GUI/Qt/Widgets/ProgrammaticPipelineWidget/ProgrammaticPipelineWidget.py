@@ -52,8 +52,12 @@ class ProgrammaticPipelineWidget(PipelineOwningMixin, QWidget):
             self.programmatically_add_display_function_buttons()
 
 
+
+    # ==================================================================================================================== #
+    # Helper Functions                                                                                                     #
+    # ==================================================================================================================== #
     def add_dynamic_button(self, label="", tooltip="", icon_string=None):
-        """ 
+        """ Adds a dynamically generated button to the "display" tab interface
 
         icon_string: ":/Render/Icons/Icon/Occupancy.png"
 
@@ -78,10 +82,10 @@ class ProgrammaticPipelineWidget(PipelineOwningMixin, QWidget):
         all_display_functions_readable_names_list = [name.replace('_display_', '') for name in all_display_functions_list]
         for (readable_name, function_name) in zip(all_display_functions_readable_names_list, all_display_functions_list):
             newToolButton = self.add_dynamic_button(label=f'{readable_name}', tooltip=function_name)
-            print(f'function_name: {function_name}')
+            # print(f'function_name: {function_name}')
             # _newToolFunction = lambda bound_function_name=function_name: self._perform_run_display_function(bound_function_name)
             _newToolFunction = lambda isChecked, bound_function_name=function_name: self._perform_run_display_function(bound_function_name)
-            print(f'_newToolFunction: {_newToolFunction}')
+            # print(f'_newToolFunction: {_newToolFunction}')
             newToolButton.clicked.connect(_newToolFunction)
             
 
@@ -92,7 +96,7 @@ class ProgrammaticPipelineWidget(PipelineOwningMixin, QWidget):
         # else:
         #     custom_args = {} # no custom args, just pass empty dictionary
         custom_args = {} # TODO
-        print(f'_perform_run_display_function(curr_display_fcn: {curr_display_fcn}): context: {self.ui.contextSelectorWidget.current_selected_context}')
+        # print(f'_perform_run_display_function(curr_display_fcn: {curr_display_fcn}): context: {self.ui.contextSelectorWidget.current_selected_context}')
         display_outputs = self.owning_pipeline.display(curr_display_fcn, self.ui.contextSelectorWidget.current_selected_context, **custom_args)
         return display_outputs
 
