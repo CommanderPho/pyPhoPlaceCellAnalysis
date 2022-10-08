@@ -156,7 +156,10 @@ from matplotlib.backends import backend_pdf, backend_pgf, backend_ps # Needed fo
 def programmatic_display_to_PDF(curr_active_pipeline, curr_display_function_name='_display_plot_decoded_epoch_slices',  debug_print=False, **kwargs):
     """
     2022-10-04 Modern Programmatic PDF outputs
-    curr_display_function_name = '_display_plot_decoded_epoch_slices' """
+    curr_display_function_name = '_display_plot_decoded_epoch_slices' 
+
+    Looks it this is done for EACH filtered context (in the loop below)
+    """
     pdf_parent_out_path = create_daily_programmatic_display_function_testing_folder_if_needed()
 
     with plt.ioff():
@@ -172,7 +175,7 @@ def programmatic_display_to_PDF(curr_active_pipeline, curr_display_function_name
             # final_context = active_identifying_display_ctx # Display only context    
 
             # # Add in the desired display variable:
-            active_identifying_ctx = active_identifying_display_ctx.adding_context('filter_epochs', **active_display_fn_kwargs) # , filter_epochs='ripple'
+            active_identifying_ctx = active_identifying_display_ctx.adding_context('filter_epochs', **active_display_fn_kwargs) # , filter_epochs='ripple' ## TODO: this is only right for a single function!
             final_context = active_identifying_ctx # Display/Variable context mode
 
             active_identifying_ctx_string = final_context.get_description(separator='|') # Get final discription string
@@ -190,17 +193,36 @@ def programmatic_display_to_PDF(curr_active_pipeline, curr_display_function_name
                 if debug_print:
                     print(f'active_pdf_save_path: {active_pdf_save_path}\nactive_pdf_metadata: {active_pdf_metadata}')
                     print(f'active_display_fn_kwargs: {active_display_fn_kwargs}')
-                out_display_dict = curr_active_pipeline.display(curr_display_function_name, a_filtered_context, **active_display_fn_kwargs) # , filter_epochs='ripple', debug_test_max_num_slices=128
+                out_display_var = curr_active_pipeline.display(curr_display_function_name, a_filtered_context, **active_display_fn_kwargs) # , filter_epochs='ripple', debug_test_max_num_slices=128
                 # , fignum=active_identifying_ctx_string, **figure_format_config
-                main_out_display_context = list(out_display_dict.keys())[0]
-                if debug_print:
-                    print(f'main_out_display_context: "{main_out_display_context}"')
-                main_out_display_dict = out_display_dict[main_out_display_context]
-                ui = main_out_display_dict['ui']
-                # out_plot_tuple = curr_active_pipeline.display(curr_display_function_name, filter_name, filter_epochs='ripple', fignum=active_identifying_ctx_string, **figure_format_config)
-                # params, plots_data, plots, ui = out_plot_tuple 
-                out_fig = ui.mw.getFigure()
-                out_fig_list.append(out_fig)
+                
+                if isinstance(out_display_var, dict):
+                    main_out_display_context = list(out_display_var.keys())[0]
+                    if debug_print:
+                        print(f'main_out_display_context: "{main_out_display_context}"')
+                    main_out_display_dict = out_display_var[main_out_display_context]
+                    ui = main_out_display_dict['ui']
+                    # out_plot_tuple = curr_active_pipeline.display(curr_display_function_name, filter_name, filter_epochs='ripple', fignum=active_identifying_ctx_string, **figure_format_config)
+                    # params, plots_data, plots, ui = out_plot_tuple 
+                    out_fig = ui.mw.getFigure() # TODO: Only works for MatplotlibWidget wrapped figures
+                    out_fig_list.append(out_fig)
+
+                else:
+                    # Non-dictionary type item, older style:
+                    if not isinstance(out_display_var, (list, tuple)):
+                        # not a list, just a scalar object
+                        plots = [out_display_var] # make a single-element list
+                    else:
+                        # it is a list
+                        if len(out_display_var) == 2:
+                            fig0, figList1 = out_display_var # unpack
+                            plots = [fig0, *figList1]
+                        else:
+                            # otherwise just try and set the plots to the list
+                            plots = out_display_var
+
+
+                # Finally iterate through and do the saving to PDF
                 for i, a_fig in enumerate(out_fig_list):
                     pdf.savefig(a_fig, transparent=True)
                     pdf.attach_note(f'Page {i + 1}: "{active_identifying_ctx_string}"')
@@ -219,6 +241,19 @@ def merge_output_pdfs(out_file_path='merged-pdf.pdf', *input_files):
         merger.append(pdf)
     merger.write(out_file_path)
     merger.close()
+
+
+
+
+# ==================================================================================================================== #
+# Potentially obsolite PDF wrapper method                                                                              #
+
+# ==================================================================================================================== #
+
+
+from pyphocorehelpers.plotting.figure_management import PhoActiveFigureManager2D, capture_new_figures_decorator
+fig_man = PhoActiveFigureManager2D(name=f'fig_man') # Initialize a new figure manager
+from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.DockAreaWrapper import DockAreaWrapper
 
 
 # ==================================================================================================================== #
