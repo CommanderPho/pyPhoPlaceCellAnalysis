@@ -328,4 +328,7 @@ class PipelineWithDisplayPipelineStageMixin:
         # return display_function(self.computation_results[active_session_configuration_name], self.active_configs[active_session_configuration_name], owning_pipeline=self, active_config_name=active_session_configuration_name, **kwargs)
         
 
+
+    # def _pdf_display(self, display_function, active_session_configuration_context, **kwargs):
+    #     ## TODO:
     
