@@ -45,7 +45,7 @@ class DefaultDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=DisplayFunc
         assert owning_pipeline_reference is not None
         # 
         out_items = {}
-        master_dock_win, app, out_items = context_nested_docks(owning_pipeline_reference, **overriding_dict_with(lhs_dict={'enable_gui': False, 'debug_print': False}, **kwargs))
+        master_dock_win, app, out_items = _context_nested_docks(owning_pipeline_reference, **overriding_dict_with(lhs_dict={'enable_gui': False, 'debug_print': False}, **kwargs))
         
         # return master_dock_win, app, out_items
         return {'master_dock_win': master_dock_win, 'app': app, 'out_items': out_items}
@@ -55,7 +55,7 @@ class DefaultDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=DisplayFunc
 # ==================================================================================================================== #
 # Private Display Helpers                                                                                              #
 # ==================================================================================================================== #
-def single_context_nested_docks(curr_active_pipeline, active_config_name, app, master_dock_win, enable_gui=False, debug_print=True):
+def _single_context_nested_docks(curr_active_pipeline, active_config_name, app, master_dock_win, enable_gui=False, debug_print=True):
         """ 2022-08-18 - Called for each config name in context_nested_docks's for loop.
         
         
@@ -64,17 +64,21 @@ def single_context_nested_docks(curr_active_pipeline, active_config_name, app, m
         
         # Get relevant variables for this particular context:
         # curr_active_pipeline is set above, and usable here
-        sess = curr_active_pipeline.filtered_sessions[active_config_name]
+        # sess = curr_active_pipeline.filtered_sessions[active_config_name]
         active_one_step_decoder = curr_active_pipeline.computation_results[active_config_name].computed_data.get('pf2D_Decoder', None)
 
         curr_active_config = curr_active_pipeline.active_configs[active_config_name]
         # curr_active_display_config = curr_active_config.plotting_config
 
         ## Build the active context by starting with the session context:
-        active_identifying_session_ctx = sess.get_context() # 'bapun_RatN_Day4_2019-10-15_11-30-06'
+        # active_identifying_session_ctx = sess.get_context() # 'bapun_RatN_Day4_2019-10-15_11-30-06'
         ## Add the filter to the active context
-        active_identifying_session_ctx.add_context('filter', filter_name=active_config_name) # 'bapun_RatN_Day4_2019-10-15_11-30-06_maze'
+        # active_identifying_session_ctx.add_context('filter', filter_name=active_config_name) # 'bapun_RatN_Day4_2019-10-15_11-30-06_maze'
+        # active_identifying_session_ctx = curr_active_pipeline.filtered_contexts[active_config_name]
+        active_identifying_filtered_session_ctx = curr_active_pipeline.filtered_contexts[active_config_name] # 'bapun_RatN_Day4_2019-10-15_11-30-06_maze'
 
+        # ==================================================================================================================== #
+        ## Figure Formatting Config GUI (FigureFormatConfigControls):
         def on_finalize_figure_format_config(updated_figure_format_config):
                 if debug_print:
                     print('on_finalize_figure_format_config')
@@ -83,7 +87,7 @@ def single_context_nested_docks(curr_active_pipeline, active_config_name, app, m
                 pass
                 
         ## Finally, add the display function to the active context
-        active_identifying_ctx = active_identifying_session_ctx.adding_context('display_fn', display_fn_name='figure_format_config_widget')
+        active_identifying_ctx = active_identifying_filtered_session_ctx.adding_context('display_fn', display_fn_name='figure_format_config_widget')
         active_identifying_ctx_string = active_identifying_ctx.get_description(separator='|') # Get final discription string:
         if debug_print:
             print(f'active_identifying_ctx_string: {active_identifying_ctx_string}')
@@ -104,8 +108,9 @@ def single_context_nested_docks(curr_active_pipeline, active_config_name, app, m
             # out_display_items[active_identifying_ctx] = None
              out_display_items[active_identifying_ctx] = (PhoUIContainer(figure_format_config=curr_active_config))
         
-        ## Finally, add the display function to the active context
-        active_identifying_ctx = active_identifying_session_ctx.adding_context('display_fn', display_fn_name='2D Position Decoder')
+        # ==================================================================================================================== #
+        ## 2D Position Decoder Section (DecoderPlotSelectorWidget):
+        active_identifying_ctx = active_identifying_filtered_session_ctx.adding_context('display_fn', display_fn_name='2D Position Decoder')
         active_identifying_ctx_string = active_identifying_ctx.get_description(separator='|') # Get final discription string:
         if debug_print:
             print(f'active_identifying_ctx_string: {active_identifying_ctx_string}')
@@ -118,7 +123,8 @@ def single_context_nested_docks(curr_active_pipeline, active_config_name, app, m
         else:
             out_display_items[active_identifying_ctx] = None
 
-        
+        # ==================================================================================================================== #
+        ## GUI Placefields (pyqtplot_plot_image_array):
 
         # Get the decoders from the computation result:
         # active_one_step_decoder = computation_result.computed_data['pf2D_Decoder'] # doesn't actually require the Decoder, could just use computation_result.computed_data['pf2D']            
@@ -127,7 +133,7 @@ def single_context_nested_docks(curr_active_pipeline, active_config_name, app, m
         # images = active_one_step_decoder.ratemap.normalized_tuning_curves[0:40,:,:] # (43, 63, 63)
         occupancy = active_one_step_decoder.ratemap.occupancy
 
-        active_identifying_ctx = active_identifying_session_ctx.adding_context('display_fn', display_fn_name='pyqtplot_plot_image_array')
+        active_identifying_ctx = active_identifying_filtered_session_ctx.adding_context('display_fn', display_fn_name='pyqtplot_plot_image_array')
         active_identifying_ctx_string = active_identifying_ctx.get_description(separator='|') # Get final discription string:
         if debug_print:
             print(f'active_identifying_ctx_string: {active_identifying_ctx_string}')
@@ -141,11 +147,11 @@ def single_context_nested_docks(curr_active_pipeline, active_config_name, app, m
         else:
             out_display_items[active_identifying_ctx] = None
         
-        return active_identifying_session_ctx, out_display_items
+        return active_identifying_filtered_session_ctx, out_display_items
         # END single_context_nested_docks(...)
         
         
-def context_nested_docks(curr_active_pipeline, enable_gui=False, debug_print=True):
+def _context_nested_docks(curr_active_pipeline, enable_gui=False, debug_print=True):
     """ 2022-08-18 - builds a series of nested contexts for each active_config 
     
     Usage:
@@ -162,7 +168,7 @@ def context_nested_docks(curr_active_pipeline, enable_gui=False, debug_print=Tru
 
     out_items = {}
     for a_config_name in active_config_names:
-        active_identifying_session_ctx, out_display_items = single_context_nested_docks(curr_active_pipeline=curr_active_pipeline, active_config_name=a_config_name, app=app, master_dock_win=master_dock_win, enable_gui=enable_gui, debug_print=debug_print)
+        active_identifying_session_ctx, out_display_items = _single_context_nested_docks(curr_active_pipeline=curr_active_pipeline, active_config_name=a_config_name, app=app, master_dock_win=master_dock_win, enable_gui=enable_gui, debug_print=debug_print)
         out_items[a_config_name] = (active_identifying_session_ctx, out_display_items)
         
     return master_dock_win, app, out_items
