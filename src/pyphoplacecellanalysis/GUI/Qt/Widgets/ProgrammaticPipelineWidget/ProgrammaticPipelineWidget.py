@@ -28,6 +28,21 @@ class ProgrammaticPipelineWidget(PipelineOwningMixin, QWidget):
             'tooltab_Display_Layout'
             'tooltab_ProgrammaticDisplayLayout'
     """
+
+
+
+    @property
+    def active_figure_format_config(self):
+        """The figure_Format that overrides the defaults if it exists."""
+        if self.ui.active_figure_format_config_widget is None:
+            return None # No active override config
+        else:
+            # Otherwise we have a config widget:
+            figure_format_config = self.ui.active_figure_format_config_widget.figure_format_config
+            return figure_format_config
+
+
+
     def __init__(self, parent=None, owning_pipeline=None):
         super().__init__(parent=parent) # Call the inherited classes __init__ method
 
@@ -55,7 +70,7 @@ class ProgrammaticPipelineWidget(PipelineOwningMixin, QWidget):
         # Update UI for children controls:
         self.ui.contextSelectorWidget.updateUi()
         if self.owning_pipeline is not None:
-            self.programmatically_add_display_function_buttons()
+            self._programmatically_add_display_function_buttons()
         self.updateButtonsEnabled(False) # disable all buttons to start
         self.ui.contextSelectorWidget.sigContextChanged.connect(self.on_context_changed)
 
@@ -86,7 +101,7 @@ class ProgrammaticPipelineWidget(PipelineOwningMixin, QWidget):
     @pyqtSlot(bool)
     def onShowProgrammaticDisplayConfig(self, is_shown:bool):
         print(f'on_programmatic_display_settings_clicked(is_shown: {is_shown})')
-        self.on_build_programmatic_display_config()
+        self._on_build_programmatic_display_config_gui()
 
 
     @pyqtSlot(bool)
@@ -104,11 +119,15 @@ class ProgrammaticPipelineWidget(PipelineOwningMixin, QWidget):
         # Update the current display config
         active_config_name = self.ui.contextSelectorWidget.current_selected_context_key
         assert active_config_name is not None
-        self.owning_pipeline.active_configs[active_config_name] = figure_format_config # update the figure format config for this context
-        print(f'config at owning_pipeline.active_configs[{active_config_name}] has been updated from GUI.')
+        # self.owning_pipeline.active_configs[active_config_name] = figure_format_config # update the figure format config for this context
+        # print(f'config at owning_pipeline.active_configs[{active_config_name}] has been updated from GUI.')
+        ## TODO: update the GUI defaults perminantly? Currently the plot functions will use the overriden values anyway, but not all of the functions accept these kwargs
 
+    # ==================================================================================================================== #
+    # Helper Functions                                                                                                     #
+    # ==================================================================================================================== #
 
-    def on_build_programmatic_display_config(self):
+    def _on_build_programmatic_display_config_gui(self):
         """ builds the programmatic display format config GUI panel, or displays the existing one if already shown. """
         if self.ui.active_figure_format_config_widget is None:
             # Create a new one:
@@ -127,10 +146,9 @@ class ProgrammaticPipelineWidget(PipelineOwningMixin, QWidget):
             self.ui.active_figure_format_config_widget.show()
 
 
-    # ==================================================================================================================== #
-    # Helper Functions                                                                                                     #
-    # ==================================================================================================================== #
-    def add_dynamic_button(self, label="", tooltip="", icon_string=None):
+
+
+    def _add_dynamic_button(self, label="", tooltip="", icon_string=None):
         """ Adds a dynamically generated button to the "display" tab interface
 
         icon_string: ":/Render/Icons/Icon/Occupancy.png"
@@ -151,11 +169,11 @@ class ProgrammaticPipelineWidget(PipelineOwningMixin, QWidget):
         return newToolButton # return the newly created button
 
 
-    def programmatically_add_display_function_buttons(self):
+    def _programmatically_add_display_function_buttons(self):
         all_display_functions_list = self.owning_pipeline.registered_display_function_names
         all_display_functions_readable_names_list = [name.replace('_display_', '') for name in all_display_functions_list]
         for (readable_name, function_name) in zip(all_display_functions_readable_names_list, all_display_functions_list):
-            newToolButton = self.add_dynamic_button(label=f'{readable_name}', tooltip=function_name)
+            newToolButton = self._add_dynamic_button(label=f'{readable_name}', tooltip=function_name)
             # print(f'function_name: {function_name}')
             # _newToolFunction = lambda bound_function_name=function_name: self._perform_run_display_function(bound_function_name)
             _newToolFunction = lambda isChecked, bound_function_name=function_name: self._perform_run_display_function(bound_function_name)
@@ -164,12 +182,8 @@ class ProgrammaticPipelineWidget(PipelineOwningMixin, QWidget):
             
 
     def _perform_run_display_function(self, curr_display_fcn):
-        # has_valid_selection
-        # if self.display_results is not None:
-        #     custom_args = self.display_results.get('kwargs', {})
-        # else:
-        #     custom_args = {} # no custom args, just pass empty dictionary
-        custom_args = {} # TODO
+        # custom_args = {} # TODO
+        custom_args = self.active_figure_format_config or {}
         # print(f'_perform_run_display_function(curr_display_fcn: {curr_display_fcn}): context: {self.ui.contextSelectorWidget.current_selected_context}')
         display_outputs = self.owning_pipeline.display(curr_display_fcn, self.ui.contextSelectorWidget.current_selected_context, **custom_args)
         return display_outputs
