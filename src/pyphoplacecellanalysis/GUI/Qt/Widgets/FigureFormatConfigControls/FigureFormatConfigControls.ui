@@ -75,7 +75,7 @@
       <number>1</number>
      </property>
      <property name="currentIndex">
-      <number>0</number>
+      <number>1</number>
      </property>
      <widget class="QWidget" name="page_figExport">
       <property name="geometry">
@@ -95,46 +95,52 @@
       <attribute name="label">
        <string>Figure Output/Export</string>
       </attribute>
-      <widget class="QWidget" name="layoutWidget">
-       <property name="geometry">
-        <rect>
-         <x>1</x>
-         <y>2</y>
-         <width>411</width>
-         <height>51</height>
-        </rect>
+      <layout class="QHBoxLayout" name="horizontalLayout">
+       <property name="leftMargin">
+        <number>4</number>
        </property>
-       <layout class="QVBoxLayout" name="verticalLayout_3">
-        <item>
-         <widget class="InlineFilesystemPathSelectWidget" name="filepkr_FigureOutputPath" native="true">
-          <property name="sizePolicy">
-           <sizepolicy hsizetype="Expanding" vsizetype="Preferred">
-            <horstretch>1</horstretch>
-            <verstretch>0</verstretch>
-           </sizepolicy>
-          </property>
-         </widget>
-        </item>
-        <item>
-         <widget class="InlineFilesystemPathSelectWidget" name="filepkr_ProgrammaticDisplayFcnOutputPath" native="true">
-          <property name="sizePolicy">
-           <sizepolicy hsizetype="Expanding" vsizetype="Preferred">
-            <horstretch>1</horstretch>
-            <verstretch>0</verstretch>
-           </sizepolicy>
-          </property>
-         </widget>
-        </item>
-       </layout>
-      </widget>
+       <property name="topMargin">
+        <number>0</number>
+       </property>
+       <property name="rightMargin">
+        <number>4</number>
+       </property>
+       <property name="bottomMargin">
+        <number>0</number>
+       </property>
+       <item>
+        <layout class="QVBoxLayout" name="verticalLayout_3">
+         <item>
+          <widget class="InlineFilesystemPathSelectWidget" name="filepkr_FigureOutputPath" native="true">
+           <property name="sizePolicy">
+            <sizepolicy hsizetype="Expanding" vsizetype="Preferred">
+             <horstretch>1</horstretch>
+             <verstretch>0</verstretch>
+            </sizepolicy>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="InlineFilesystemPathSelectWidget" name="filepkr_ProgrammaticDisplayFcnOutputPath" native="true">
+           <property name="sizePolicy">
+            <sizepolicy hsizetype="Expanding" vsizetype="Preferred">
+             <horstretch>1</horstretch>
+             <verstretch>0</verstretch>
+            </sizepolicy>
+           </property>
+          </widget>
+         </item>
+        </layout>
+       </item>
+      </layout>
      </widget>
      <widget class="QWidget" name="page_debugging">
       <property name="geometry">
        <rect>
         <x>0</x>
         <y>0</y>
-        <width>411</width>
-        <height>69</height>
+        <width>394</width>
+        <height>149</height>
        </rect>
       </property>
       <property name="sizePolicy">
@@ -146,38 +152,32 @@
       <attribute name="label">
        <string>Extra/Debugging</string>
       </attribute>
-      <widget class="QWidget" name="gridLayoutWidget">
-       <property name="geometry">
-        <rect>
-         <x>10</x>
-         <y>0</y>
-         <width>401</width>
-         <height>131</height>
-        </rect>
-       </property>
-       <layout class="QGridLayout" name="gridLayout">
-        <item row="1" column="0">
-         <widget class="QTextBrowser" name="textBrowser"/>
-        </item>
-        <item row="2" column="0">
-         <widget class="QPushButton" name="pushButton_2">
-          <property name="text">
-           <string>PushButton</string>
-          </property>
-         </widget>
-        </item>
-        <item row="0" column="0">
-         <widget class="FilesystemPathLineEdit" name="lineEdit">
-          <property name="text">
-           <string>C:\Users\pho\repos\PhoPy3DPositionAnalysis2021\EXTERNAL\Screenshots\ProgrammaticDisplayFunctionTesting</string>
-          </property>
-          <property name="clearButtonEnabled">
-           <bool>true</bool>
-          </property>
-         </widget>
-        </item>
-       </layout>
-      </widget>
+      <layout class="QHBoxLayout" name="horizontalLayout_2">
+       <item>
+        <layout class="QGridLayout" name="gridLayout">
+         <item row="1" column="0">
+          <widget class="QTextBrowser" name="textBrowser"/>
+         </item>
+         <item row="2" column="0">
+          <widget class="QPushButton" name="pushButton_2">
+           <property name="text">
+            <string>PushButton</string>
+           </property>
+          </widget>
+         </item>
+         <item row="0" column="0">
+          <widget class="FilesystemPathLineEdit" name="lineEdit">
+           <property name="text">
+            <string>C:\Users\pho\repos\PhoPy3DPositionAnalysis2021\EXTERNAL\Screenshots\ProgrammaticDisplayFunctionTesting</string>
+           </property>
+           <property name="clearButtonEnabled">
+            <bool>true</bool>
+           </property>
+          </widget>
+         </item>
+        </layout>
+       </item>
+      </layout>
      </widget>
     </widget>
    </item>
@@ -206,7 +206,7 @@
   <customwidget>
    <class>SingleGroupOptionalMembersCtrl</class>
    <extends>QWidget</extends>
-   <header location="global">pyphoplacecellanalysis.GUI.Qt.FigureFormatConfigControls.SingleGroupOptionalMembersCtrl</header>
+   <header location="global">pyphoplacecellanalysis.GUI.Qt.Widgets.SingleGroupOptionalMembersCtrl.SingleGroupOptionalMembersCtrl</header>
    <container>1</container>
    <slots>
     <signal>value_changed(object,bool,int,bool,int)</signal>

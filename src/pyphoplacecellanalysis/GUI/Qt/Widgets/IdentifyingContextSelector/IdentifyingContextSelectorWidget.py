@@ -62,6 +62,8 @@ class IdentifyingContextSelectorWidget(ComboBoxCtrlOwnerMixin, PipelineOwningMix
         else:
             return self.all_filtered_session_contexts[self.current_selected_context_key]
 
+
+    # ==================================================================================================================== #
     def __init__(self, parent=None, owning_pipeline=None):
         super().__init__(parent=parent) # Call the inherited classes __init__ method
         self.ui = uic.loadUi(uiFile, self) # Load the .ui file
@@ -77,22 +79,24 @@ class IdentifyingContextSelectorWidget(ComboBoxCtrlOwnerMixin, PipelineOwningMix
         self.ui.cmbIdentifyingContext.currentIndexChanged.connect(self.on_selected_context_index_changed)
         # self.ui.btnConfirm.clicked.
         # self.updateUi()
-        
 
 
-    def updateUi(self):
+    def _tryUpdateComboItemsUi(self):
+        """ tries to update the combo box items. If an item was previously selected before the update, it tries to re-select the same item. """
+
         ## Update Combo box items:
-        ## Freeze signals:
         curr_combo_box = self.ui.cmbIdentifyingContext # QComboBox 
+
+        ## Freeze signals:
         curr_combo_box.blockSignals(True)
         
         ## Capture the previous selection:
         selected_index, selected_item_text = self.get_current_combo_item_selection(curr_combo_box)
+        had_previous_selected_item = (selected_item_text is not None)
 
         # Build updated list:
         # active_list_items = self.all_filtered_session_keys
         active_list_items = self.all_filtered_session_context_descriptions
-        self.num_known_types = len(active_list_items)
         ## Build updated list:
         updated_list = active_list_items
         # updated_list.append('Custom...')
@@ -100,9 +104,22 @@ class IdentifyingContextSelectorWidget(ComboBoxCtrlOwnerMixin, PipelineOwningMix
         self.replace_combo_items(curr_combo_box, updated_list)
         
         ## Re-select the previously selected item if possible:
+        if not had_previous_selected_item:
+            # no previously selected item. Instead, select the first item.
+            if (len(updated_list) > 0):
+                selected_item_text = updated_list[0] # get the first item text to try and select.
+            else:
+                print(f'could not select any default items because the list was empty.')
         found_desired_index = self.try_select_combo_item_with_text(curr_combo_box, selected_item_text)
         ## Unblock the signals:
         curr_combo_box.blockSignals(False)
+
+
+    def updateUi(self):
+        self._tryUpdateComboItemsUi()
+
+
+    
 
     @pyqtSlot(int)
     def on_selected_context_index_changed(self, new_index):

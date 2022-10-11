@@ -42,8 +42,9 @@ class ProgrammaticPipelineWidget(PipelineOwningMixin, QWidget):
         # self.ui.btnConfirm.clicked.
         # self.ui.contextSelectorWidget._owning_pipeline = self.owning_pipeline
         # self.updateUi()
+        # self.ui.btnProgrammaticDisplayConfig.clicked.connect(self.onShowProgrammaticDisplayConfig)
+        # self.ui.btnProgrammaticDisplay.pressed.connect(self.onProgrammaticDisplay)
         self.ui.dynamicButtonsList = []
-
 
     def updateUi(self):
         # Update UI for children controls:
@@ -58,7 +59,19 @@ class ProgrammaticPipelineWidget(PipelineOwningMixin, QWidget):
         print(f'on_context_changed(self, new_context_key: {new_context_key}, new_context: {new_context})')
         has_valid_context = new_context_key is not None
         # TODO: Disable all the action buttons if the new context is None
-        
+        for a_button in self.ui.dynamicButtonsList:
+            a_button.SetEnabled(has_valid_context)
+
+
+    @pyqtSlot(bool)
+    def onShowProgrammaticDisplayConfig(self, is_shown:bool):
+        print(f'on_programmatic_display_settings_clicked(is_shown: {is_shown})')
+
+
+    @pyqtSlot(bool)
+    def onProgrammaticDisplay(self, is_shown:bool):
+        print(f'on_programmatic_display_clicked(is_shown: {is_shown})')
+
 
 
 
@@ -108,6 +121,8 @@ class ProgrammaticPipelineWidget(PipelineOwningMixin, QWidget):
         # print(f'_perform_run_display_function(curr_display_fcn: {curr_display_fcn}): context: {self.ui.contextSelectorWidget.current_selected_context}')
         display_outputs = self.owning_pipeline.display(curr_display_fcn, self.ui.contextSelectorWidget.current_selected_context, **custom_args)
         return display_outputs
+
+
 
 
 ## Start Qt event loop

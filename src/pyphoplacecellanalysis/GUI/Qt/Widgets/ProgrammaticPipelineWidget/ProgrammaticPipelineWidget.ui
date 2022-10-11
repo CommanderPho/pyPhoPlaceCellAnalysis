@@ -167,6 +167,9 @@ background-color: rgb(255, 250, 242);</string>
          </item>
          <item row="0" column="4">
           <widget class="QToolButton" name="toolButton_10">
+           <property name="enabled">
+            <bool>false</bool>
+           </property>
            <property name="text">
             <string>...</string>
            </property>
@@ -203,7 +206,7 @@ background-color: rgb(255, 250, 242);</string>
          <number>1</number>
         </property>
         <property name="currentIndex">
-         <number>0</number>
+         <number>1</number>
         </property>
         <widget class="QWidget" name="tooltab_Visualization">
          <property name="geometry">
@@ -211,7 +214,7 @@ background-color: rgb(255, 250, 242);</string>
            <x>0</x>
            <y>0</y>
            <width>511</width>
-           <height>72</height>
+           <height>69</height>
           </rect>
          </property>
          <property name="sizePolicy">
@@ -452,6 +455,14 @@ background-color: rgb(255, 250, 242);</string>
          </layout>
         </widget>
         <widget class="QWidget" name="tooltab_Display">
+         <property name="geometry">
+          <rect>
+           <x>0</x>
+           <y>0</y>
+           <width>494</width>
+           <height>74</height>
+          </rect>
+         </property>
          <attribute name="icon">
           <iconset resource="../../../../Resources/ActionIcons.qrc">
            <normaloff>:/Render/Icons/actions/category-item.png</normaloff>:/Render/Icons/actions/category-item.png</iconset>
@@ -463,9 +474,23 @@ background-color: rgb(255, 250, 242);</string>
           <item>
            <layout class="QVBoxLayout" name="tooltab_ProgrammaticDisplayLayout">
             <item>
-             <widget class="QPushButton" name="pushButton">
+             <widget class="QPushButton" name="btnProgrammaticDisplayConfig">
               <property name="text">
-               <string>PushButton</string>
+               <string>Configuration</string>
+              </property>
+              <property name="icon">
+               <iconset resource="../../../../Resources/ActionIcons.qrc">
+                <normaloff>:/Render/Icons/actions/chart--pencil.png</normaloff>:/Render/Icons/actions/chart--pencil.png</iconset>
+              </property>
+              <property name="flat">
+               <bool>false</bool>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QPushButton" name="btnProgrammaticDisplay">
+              <property name="text">
+               <string>Programmatic Display</string>
               </property>
              </widget>
             </item>
@@ -479,7 +504,7 @@ background-color: rgb(255, 250, 242);</string>
            <x>0</x>
            <y>0</y>
            <width>511</width>
-           <height>72</height>
+           <height>69</height>
           </rect>
          </property>
          <attribute name="icon">
@@ -688,6 +713,14 @@ background-color: rgb(255, 250, 242);</string>
     <string>New 1D Ratemaps Plot</string>
    </property>
   </action>
+  <action name="actionProgrammaticDisplayConfiguration">
+   <property name="text">
+    <string>Programmatic Display Configuration</string>
+   </property>
+   <property name="toolTip">
+    <string>Show Programmatic Display Config GUI</string>
+   </property>
+  </action>
  </widget>
  <customwidgets>
   <customwidget>
@@ -701,7 +734,44 @@ background-color: rgb(255, 250, 242);</string>
   <include location="../../../../Resources/GuiResources.qrc"/>
   <include location="../../../../Resources/ActionIcons.qrc"/>
  </resources>
- <connections/>
+ <connections>
+  <connection>
+   <sender>btnProgrammaticDisplay</sender>
+   <signal>clicked()</signal>
+   <receiver>Form</receiver>
+   <slot>onProgrammaticDisplay()</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>352</x>
+     <y>278</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>361</x>
+     <y>340</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>btnProgrammaticDisplayConfig</sender>
+   <signal>clicked()</signal>
+   <receiver>Form</receiver>
+   <slot>onShowProgrammaticDisplayConfig()</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>168</x>
+     <y>251</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>192</x>
+     <y>340</y>
+    </hint>
+   </hints>
+  </connection>
+ </connections>
+ <slots>
+  <slot>onProgrammaticDisplay()</slot>
+  <slot>onShowProgrammaticDisplayConfig()</slot>
+ </slots>
  <buttongroups>
   <buttongroup name="buttonGroup"/>
  </buttongroups>
