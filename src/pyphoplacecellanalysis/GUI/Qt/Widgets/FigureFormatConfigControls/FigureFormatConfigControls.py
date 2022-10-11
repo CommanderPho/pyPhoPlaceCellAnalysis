@@ -45,6 +45,14 @@ class FigureFormatConfigControls(QtWidgets.QWidget):
     @enable_debug_print.setter
     def enable_debug_print(self, value):
         self.ui.chkDebugPrint.setChecked(value)
+
+    @property
+    def optional_argument_text(self):
+        """The additional arguments as a string."""
+        return self.ui.txtEditExtraArguments.toPlainText()
+    @optional_argument_text.setter
+    def optional_argument_text(self, value):
+        self.ui.txtEditExtraArguments.setPlainText(value)
         
     @property
     def figure_format_config(self):
@@ -95,6 +103,11 @@ class FigureFormatConfigControls(QtWidgets.QWidget):
         self.ui.tupleCtrl_2.control_name = 'col_width/row_height'
         self.ui.tupleCtrl_2.tuple_values = (5, 5)
         self.ui.tupleCtrl_2.tuple_values = (None, None)
+
+        self.ui.txtEditExtraArguments.setPlainText('')
+
+        # Add the statusbar
+        # self.window().statusBar().showMessage('Message in statusbar.')
         
         # self.ui.filepkr_FigureOutputPath.path
         try:

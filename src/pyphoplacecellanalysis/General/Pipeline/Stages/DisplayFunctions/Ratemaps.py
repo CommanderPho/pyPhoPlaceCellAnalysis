@@ -86,11 +86,10 @@ class DefaultRatemapDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Disp
         ax_pf_1D, occupancy_fig, active_pf_2D_figures, active_pf_2D_gs = plot_all_placefields(None, computation_result.computed_data['pf2D'], active_config, **({'should_save_to_disk': False} | kwargs))
 
         # return occupancy_fig, active_pf_2D_figures
-        return MatplotlibRenderPlots(figures=(occupancy_fig, active_pf_2D_figures))   
+        return MatplotlibRenderPlots(figures=[occupancy_fig, active_pf_2D_figures])   
 
     def _display_placemaps_pyqtplot_2D(computation_result, active_config, enable_saving_to_disk=False, **kwargs):
-        """ Plots the prediction error for the two_step decoder at each point in time.
-            Based off of "_temp_debug_two_step_plots_animated_imshow"
+        """  displays 2D placefields in a pyqtgraph window
         """
         # Get the decoders from the computation result:
         active_one_step_decoder = computation_result.computed_data['pf2D_Decoder'] # doesn't actually require the Decoder, could just use computation_result.computed_data['pf2D']            
