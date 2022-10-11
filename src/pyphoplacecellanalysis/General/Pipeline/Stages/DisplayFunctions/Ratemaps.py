@@ -15,6 +15,7 @@ from neuropy.plotting.placemaps import plot_all_placefields
 from neuropy.utils.matplotlib_helpers import enumTuningMap2DPlotVariables # for getting the variant name from the dict
 from neuropy.utils.mixins.unwrap_placefield_computation_parameters import unwrap_placefield_computation_parameters
 
+from pyphocorehelpers.DataStructure.RenderPlots.MatplotLibRenderPlots import MatplotlibRenderPlots
 
 
 class DefaultRatemapDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=DisplayFunctionRegistryHolder):
@@ -30,15 +31,8 @@ class DefaultRatemapDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Disp
         ax_pf_1D = computation_result.computed_data['pf1D'].plot_ratemaps_1D()
         active_figure = plt.gcf()
 
-        # TODO: add it to the active context
-        # owning_pipeline.display_output[active_display_fn_identifying_ctx] = (active_figure, ax_pf_1D)
-        # owning_pipeline.display_output[active_display_fn_identifying_ctx] = dict(fig=active_figure, ax=ax_pf_1D)
-
-        return dict(fig=active_figure, ax=ax_pf_1D)
-        # return {active_display_fn_identifying_ctx: owning_pipeline.display_output[active_display_fn_identifying_ctx]}
-        # return {active_display_fn_identifying_ctx: dict(fig=active_figure, ax=ax_pf_1D)}
-        # return active_figure, ax_pf_1D
-
+        # return dict(fig=active_figure, ax=ax_pf_1D)
+        return MatplotlibRenderPlots(figures=[active_figure], axes=[ax_pf_1D])   
 
 
     def _display_2d_placefield_result_plot_ratemaps_2D(computation_result, active_config, enable_saving_to_disk=False, **kwargs):
@@ -75,7 +69,9 @@ class DefaultRatemapDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Disp
         if should_save_to_disk:
             _save_displayed_figure_if_needed(active_config.plotting_config, plot_type_name='_display_2d_placefield_result_plot_ratemaps_2D', active_variant_name=plot_variable_name, active_figures=active_pf_2D_figures)
         
-        return active_pf_2D_figures
+        # return active_pf_2D_figures
+        return MatplotlibRenderPlots(figures=active_pf_2D_figures)
+
     
     def _display_normal(computation_result, active_config, **kwargs):
         """
@@ -88,9 +84,10 @@ class DefaultRatemapDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Disp
         if active_config.computation_config is None:
             active_config.computation_config = computation_result.computation_config
         ax_pf_1D, occupancy_fig, active_pf_2D_figures, active_pf_2D_gs = plot_all_placefields(None, computation_result.computed_data['pf2D'], active_config, **({'should_save_to_disk': False} | kwargs))
-        
-        return occupancy_fig, active_pf_2D_figures
-        
+
+        # return occupancy_fig, active_pf_2D_figures
+        return MatplotlibRenderPlots(figures=(occupancy_fig, active_pf_2D_figures))   
+
     def _display_placemaps_pyqtplot_2D(computation_result, active_config, enable_saving_to_disk=False, **kwargs):
         """ Plots the prediction error for the two_step decoder at each point in time.
             Based off of "_temp_debug_two_step_plots_animated_imshow"

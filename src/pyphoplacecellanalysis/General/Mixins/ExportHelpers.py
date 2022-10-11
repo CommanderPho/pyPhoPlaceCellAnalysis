@@ -158,7 +158,7 @@ def programmatic_display_to_PDF(curr_active_pipeline, curr_display_function_name
     2022-10-04 Modern Programmatic PDF outputs
     curr_display_function_name = '_display_plot_decoded_epoch_slices' 
 
-    Looks it this is done for EACH filtered context (in the loop below)
+    Looks it this is done for EACH filtered context (in the loop below) whereas the original just did a single specific context
     """
     pdf_parent_out_path = create_daily_programmatic_display_function_testing_folder_if_needed()
 

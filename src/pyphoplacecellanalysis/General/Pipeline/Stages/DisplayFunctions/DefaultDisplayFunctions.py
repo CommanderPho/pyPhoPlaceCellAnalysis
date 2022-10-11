@@ -4,6 +4,7 @@ from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DisplayFunc
 
 from pyphoplacecellanalysis.PhoPositionalData.plotting.placefield import plot_1d_placecell_validations
 
+from pyphocorehelpers.DataStructure.RenderPlots.MatplotLibRenderPlots import MatplotlibRenderPlots
 from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer  # for context_nested_docks/single_context_nested_docks
 from pyphoplacecellanalysis.GUI.PyQtPlot.DockingWidgets.DynamicDockDisplayAreaContent import CustomDockDisplayConfig # for context_nested_docks/single_context_nested_docks
 from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.DockAreaWrapper import DockAreaWrapper # for context_nested_docks/single_context_nested_docks
@@ -17,12 +18,15 @@ class DefaultDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=DisplayFunc
     def _display_1d_placefield_validations(computation_result, active_config, **kwargs):
         """ Renders all of the flat 1D place cell validations with the yellow lines that trace across to their horizontally drawn placefield (rendered on the right of the plot) """
         out_figures_list = plot_1d_placecell_validations(computation_result.computed_data['pf1D'], active_config.plotting_config, **overriding_dict_with(lhs_dict={'modifier_string': 'lap_only', 'should_save': False}, **kwargs))
-        return out_figures_list
+        # return out_figures_list
+        return MatplotlibRenderPlots(out_figures_list)
 
     def _display_2d_placefield_result_plot_raw(computation_result, active_config, **kwargs):
         """ produces a stupid figure """
-        out_figures_list = computation_result.computed_data['pf2D'].plot_raw(**overriding_dict_with(lhs_dict={'label_cells': True}, **kwargs)); # Plots an overview of each cell all in one figure
-        return out_figures_list
+        fig = computation_result.computed_data['pf2D'].plot_raw(**overriding_dict_with(lhs_dict={'label_cells': True}, **kwargs)); # Plots an overview of each cell all in one figure
+        # out_figures_list = [fig]
+        # return out_figures_list
+        return MatplotlibRenderPlots([fig])
 
 
     def _display_context_nested_docks(computation_result, active_config, **kwargs):
