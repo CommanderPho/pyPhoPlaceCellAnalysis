@@ -30,7 +30,7 @@ class IdentifyingContextSelectorWidget(ComboBoxCtrlOwnerMixin, PipelineOwningMix
 
     """
 
-    sigContextChanged = pyqtSignal(object, object)
+    sigContextChanged = pyqtSignal(object, object) # newKey: str, newContext: IdentifyingContext
 
 
     @property

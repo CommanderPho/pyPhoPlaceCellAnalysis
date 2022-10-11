@@ -88,7 +88,7 @@ background-color: rgb(255, 250, 242);</string>
             </size>
            </property>
            <attribute name="buttonGroup">
-            <string notr="true">buttonGroup</string>
+            <string notr="true">buttonGroup_Outer_Vis</string>
            </attribute>
           </widget>
          </item>
@@ -108,7 +108,7 @@ background-color: rgb(255, 250, 242);</string>
             </size>
            </property>
            <attribute name="buttonGroup">
-            <string notr="true">buttonGroup</string>
+            <string notr="true">buttonGroup_Outer_Vis</string>
            </attribute>
           </widget>
          </item>
@@ -141,7 +141,7 @@ background-color: rgb(255, 250, 242);</string>
             </size>
            </property>
            <attribute name="buttonGroup">
-            <string notr="true">buttonGroup</string>
+            <string notr="true">buttonGroup_Outer_Vis</string>
            </attribute>
           </widget>
          </item>
@@ -161,7 +161,7 @@ background-color: rgb(255, 250, 242);</string>
             </size>
            </property>
            <attribute name="buttonGroup">
-            <string notr="true">buttonGroup</string>
+            <string notr="true">buttonGroup_Outer_Vis</string>
            </attribute>
           </widget>
          </item>
@@ -206,7 +206,7 @@ background-color: rgb(255, 250, 242);</string>
          <number>1</number>
         </property>
         <property name="currentIndex">
-         <number>1</number>
+         <number>0</number>
         </property>
         <widget class="QWidget" name="tooltab_Visualization">
          <property name="geometry">
@@ -279,6 +279,9 @@ background-color: rgb(255, 250, 242);</string>
                  <height>30</height>
                 </size>
                </property>
+               <attribute name="buttonGroup">
+                <string notr="true">buttonGroup_Vis_Raster</string>
+               </attribute>
               </widget>
              </item>
              <item>
@@ -296,6 +299,9 @@ background-color: rgb(255, 250, 242);</string>
                  <height>30</height>
                 </size>
                </property>
+               <attribute name="buttonGroup">
+                <string notr="true">buttonGroup_Vis_Raster</string>
+               </attribute>
               </widget>
              </item>
              <item>
@@ -316,6 +322,9 @@ background-color: rgb(255, 250, 242);</string>
                <property name="toolButtonStyle">
                 <enum>Qt::ToolButtonIconOnly</enum>
                </property>
+               <attribute name="buttonGroup">
+                <string notr="true">buttonGroup_Vis_Raster</string>
+               </attribute>
               </widget>
              </item>
              <item>
@@ -333,6 +342,9 @@ background-color: rgb(255, 250, 242);</string>
                  <height>30</height>
                 </size>
                </property>
+               <attribute name="buttonGroup">
+                <string notr="true">buttonGroup_Vis_Raster</string>
+               </attribute>
               </widget>
              </item>
              <item>
@@ -350,6 +362,9 @@ background-color: rgb(255, 250, 242);</string>
                  <height>30</height>
                 </size>
                </property>
+               <attribute name="buttonGroup">
+                <string notr="true">buttonGroup_Vis_Raster</string>
+               </attribute>
               </widget>
              </item>
              <item>
@@ -383,6 +398,9 @@ background-color: rgb(255, 250, 242);</string>
                  <height>30</height>
                 </size>
                </property>
+               <attribute name="buttonGroup">
+                <string notr="true">buttonGroup_Vis_Maps</string>
+               </attribute>
               </widget>
              </item>
              <item>
@@ -400,6 +418,9 @@ background-color: rgb(255, 250, 242);</string>
                  <height>30</height>
                 </size>
                </property>
+               <attribute name="buttonGroup">
+                <string notr="true">buttonGroup_Vis_Maps</string>
+               </attribute>
               </widget>
              </item>
              <item>
@@ -417,6 +438,9 @@ background-color: rgb(255, 250, 242);</string>
                  <height>30</height>
                 </size>
                </property>
+               <attribute name="buttonGroup">
+                <string notr="true">buttonGroup_Vis_Maps</string>
+               </attribute>
               </widget>
              </item>
              <item>
@@ -434,6 +458,9 @@ background-color: rgb(255, 250, 242);</string>
                  <height>30</height>
                 </size>
                </property>
+               <attribute name="buttonGroup">
+                <string notr="true">buttonGroup_Vis_Maps</string>
+               </attribute>
               </widget>
              </item>
              <item>
@@ -459,7 +486,7 @@ background-color: rgb(255, 250, 242);</string>
           <rect>
            <x>0</x>
            <y>0</y>
-           <width>494</width>
+           <width>511</width>
            <height>74</height>
           </rect>
          </property>
@@ -773,6 +800,20 @@ background-color: rgb(255, 250, 242);</string>
   <slot>onShowProgrammaticDisplayConfig()</slot>
  </slots>
  <buttongroups>
-  <buttongroup name="buttonGroup"/>
+  <buttongroup name="buttonGroup_Outer_Vis">
+   <property name="exclusive">
+    <bool>false</bool>
+   </property>
+  </buttongroup>
+  <buttongroup name="buttonGroup_Vis_Maps">
+   <property name="exclusive">
+    <bool>false</bool>
+   </property>
+  </buttongroup>
+  <buttongroup name="buttonGroup_Vis_Raster">
+   <property name="exclusive">
+    <bool>false</bool>
+   </property>
+  </buttongroup>
  </buttongroups>
 </ui>

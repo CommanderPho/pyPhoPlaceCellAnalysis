@@ -13,6 +13,9 @@ from PyQt5.QtCore import Qt, QPoint, QRect, QObject, QEvent, pyqtSignal, pyqtSlo
 # 
 from pyphoplacecellanalysis.GUI.Qt.Widgets.ProgrammaticPipelineWidget.Uic_AUTOGEN_ProgrammaticPipelineWidget import Ui_Form
 from pyphoplacecellanalysis.GUI.Qt.Mixins.PipelineOwningMixin import PipelineOwningMixin
+from pyphoplacecellanalysis.GUI.Qt.Widgets.FigureFormatConfigControls.FigureFormatConfigControls import FigureFormatConfigControls # for context_nested_docks/single_context_nested_docks
+
+
 
 class ProgrammaticPipelineWidget(PipelineOwningMixin, QWidget):
     """ 
@@ -44,28 +47,46 @@ class ProgrammaticPipelineWidget(PipelineOwningMixin, QWidget):
         # self.updateUi()
         # self.ui.btnProgrammaticDisplayConfig.clicked.connect(self.onShowProgrammaticDisplayConfig)
         # self.ui.btnProgrammaticDisplay.pressed.connect(self.onProgrammaticDisplay)
+        self.ui.active_figure_format_config_widget = None
         self.ui.dynamicButtonsList = []
+        
 
     def updateUi(self):
         # Update UI for children controls:
         self.ui.contextSelectorWidget.updateUi()
         if self.owning_pipeline is not None:
             self.programmatically_add_display_function_buttons()
-
+        self.updateButtonsEnabled(False) # disable all buttons to start
         self.ui.contextSelectorWidget.sigContextChanged.connect(self.on_context_changed)
+
+    @pyqtSlot(bool)
+    def updateButtonsEnabled(self, isEnabled: bool):
+        """ updates whether the buttons are enabled/disabled"""
+        self.ui.btnProgrammaticDisplay.setEnabled(isEnabled)
+        self.ui.btnProgrammaticDisplayConfig.setEnabled(isEnabled)
+        
+        for a_button in self.ui.buttonGroup_Outer_Vis.buttons():
+            a_button.setEnabled(isEnabled)
+        for a_button in self.ui.buttonGroup_Vis_Maps.buttons():
+            a_button.setEnabled(isEnabled)
+        for a_button in self.ui.buttonGroup_Vis_Raster.buttons():
+            a_button.setEnabled(isEnabled)
+        for a_button in self.ui.dynamicButtonsList:
+            a_button.setEnabled(isEnabled)
+
 
     @pyqtSlot(object, object)
     def on_context_changed(self, new_context_key, new_context):
         print(f'on_context_changed(self, new_context_key: {new_context_key}, new_context: {new_context})')
         has_valid_context = new_context_key is not None
         # TODO: Disable all the action buttons if the new context is None
-        for a_button in self.ui.dynamicButtonsList:
-            a_button.SetEnabled(has_valid_context)
+        self.updateButtonsEnabled(has_valid_context)
 
 
     @pyqtSlot(bool)
     def onShowProgrammaticDisplayConfig(self, is_shown:bool):
         print(f'on_programmatic_display_settings_clicked(is_shown: {is_shown})')
+        self.on_build_programmatic_display_config()
 
 
     @pyqtSlot(bool)
@@ -73,6 +94,37 @@ class ProgrammaticPipelineWidget(PipelineOwningMixin, QWidget):
         print(f'on_programmatic_display_clicked(is_shown: {is_shown})')
 
 
+    @pyqtSlot()
+    def on_finalize_figure_format_config(self):
+        # Called when figure_format_config is updated
+        assert self.ui.active_figure_format_config_widget is not None
+        ## Get the figure_format_config from the figure_format_config widget:
+        figure_format_config = self.ui.active_figure_format_config_widget.figure_format_config
+        print(f'on_finalize_figure_format_config(): {figure_format_config}')
+        # Update the current display config
+        active_config_name = self.ui.contextSelectorWidget.current_selected_context_key
+        assert active_config_name is not None
+        self.owning_pipeline.active_configs[active_config_name] = figure_format_config # update the figure format config for this context
+        print(f'config at owning_pipeline.active_configs[{active_config_name}] has been updated from GUI.')
+
+
+    def on_build_programmatic_display_config(self):
+        """ builds the programmatic display format config GUI panel, or displays the existing one if already shown. """
+        if self.ui.active_figure_format_config_widget is None:
+            # Create a new one:
+            # curr_selected_context = self.ui.contextSelectorWidget.current_selected_context
+            active_config_name = self.ui.contextSelectorWidget.current_selected_context_key
+            curr_active_config = self.owning_pipeline.active_configs[active_config_name] # Get default config for this config name
+            # print(f'active_config_name: {active_config_name}, curr_active_config: {curr_active_config}')
+            self.ui.active_figure_format_config_widget = FigureFormatConfigControls(config=curr_active_config)
+            self.ui.active_figure_format_config_widget.figure_format_config_finalized.connect(self.on_finalize_figure_format_config)
+            self.ui.active_figure_format_config_widget.show() # even without .show() being called, the figure still appears
+
+            ## Get the figure_format_config from the figure_format_config widget:
+            figure_format_config = self.ui.active_figure_format_config_widget.figure_format_config
+        else:
+            print(f'figure GUI already exists. Just showing again.')
+            self.ui.active_figure_format_config_widget.show()
 
 
     # ==================================================================================================================== #
