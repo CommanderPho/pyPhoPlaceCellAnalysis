@@ -111,6 +111,7 @@ class ProgrammaticPipelineWidget(PipelineOwningMixin, QWidget):
 
     @pyqtSlot()
     def on_finalize_figure_format_config(self):
+        """ called only when figure_format_config is finalized by clicking the Apply button. """
         # Called when figure_format_config is updated
         assert self.ui.active_figure_format_config_widget is not None
         ## Get the figure_format_config from the figure_format_config widget:
@@ -191,6 +192,8 @@ class ProgrammaticPipelineWidget(PipelineOwningMixin, QWidget):
     def _perform_run_display_function(self, curr_display_fcn):
         # custom_args = {} # TODO
         custom_args = self.active_figure_format_config or {}
+        print(f'custom_args: {custom_args}')
+        # 'optional_kwargs'
         # print(f'_perform_run_display_function(curr_display_fcn: {curr_display_fcn}): context: {self.ui.contextSelectorWidget.current_selected_context}')
         display_outputs = self.owning_pipeline.display(curr_display_fcn, self.ui.contextSelectorWidget.current_selected_context, **custom_args)
         return display_outputs

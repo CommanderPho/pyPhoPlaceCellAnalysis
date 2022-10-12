@@ -13,14 +13,22 @@ from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtCore, QtGui, QtWidget
 from pyphoplacecellanalysis.GUI.Qt.Widgets.FigureFormatConfigControls.Uic_AUTOGEN_FigureFormatConfigControls import Ui_Form
 
 # For Code Editor
+from pyqode.core import backend
 from pyqode.core import api
 from pyqode.core import modes
 from pyqode.core import panels
 
-
+from pyqode.python.widgets.code_edit import PyCodeEdit
 # def pair_optional_value_widget(checkBox, valueWidget):
 #     self.checkBox.toggled['bool'].connect(self.spinBox.setEnabled) # type: ignore
     
+
+## Code Editor Type Imports
+from neuropy.core.neuron_identities import PlotStringBrevityModeEnum
+from neuropy.core.epoch import NamedTimerange
+from neuropy.utils.matplotlib_helpers import enumTuningMap2DPlotMode, enumTuningMap2DPlotVariables
+from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer
+
 
 class FigureFormatConfigControls(QtWidgets.QWidget):
     _debug_print = False
@@ -69,6 +77,10 @@ class FigureFormatConfigControls(QtWidgets.QWidget):
         ## Add explicit column/row widths to fix window sizing issue:
         figure_format_config = (dict(fig_column_width=self.ui.tupleCtrl_2.tuple_values[0], fig_row_height=self.ui.tupleCtrl_2.tuple_values[1]) | figure_format_config)
         figure_format_config = (dict(enable_spike_overlay=self.enable_spike_overlay, debug_print=self.enable_debug_print, enable_saving_to_disk=self.enable_saving_to_disk) | figure_format_config)
+
+        ## Expand optional arguments inline:
+        figure_format_config = (self.build_optional_arguments_dict() | figure_format_config)
+        # figure_format_config['optional_kwargs'] = self.build_optional_arguments_dict()
         return figure_format_config
     @figure_format_config.setter
     def figure_format_config(self, value):
@@ -173,10 +185,16 @@ class FigureFormatConfigControls(QtWidgets.QWidget):
     # def __str__(self):
     #      return 
 
-    def _init_UI_Code_Editor(self, editor):
+    def _init_UI_Code_Editor(self, editor: PyCodeEdit):
         """ editor: CodeEdit """
-        # start the backend as soon as possible
-        editor.backend.start('server.py')
+        # configure the code completion providers, here we just use a basic one
+        # backend.CodeCompletionWorker.providers.append(backend.DocumentWordsProvider())
+        # backend.serve_forever()
+
+        # start the backend as soon as possible        
+        print(f'backend.server.__file__: {backend.server.__file__}')
+        # editor.backend.start('server.py')
+        editor.backend.start(backend.server.__file__)
 
         # append some modes and panels
         editor.modes.append(modes.CodeCompletionMode())
@@ -186,13 +204,46 @@ class FigureFormatConfigControls(QtWidgets.QWidget):
                         api.Panel.Position.BOTTOM)
 
         # open a file
-        editor.file.open(__file__)
-
+        # editor.file.open(__file__)
+        _example_code = """
+{
+'subplots': (None, 3),
+'resolution_multiplier': 1.0,
+'enable_spike_overlay': False,
+'brev_mode': PlotStringBrevityModeEnum.MINIMAL,
+'plot_variable': enumTuningMap2DPlotVariables.TUNING_MAPS
+}
+        """
+        editor.setPlainText(_example_code)
 
 
     def build_optional_arguments_dict(self):
         """ builds the python dict from the text value """
-        self.ui.codeConsoleWidget
+        l = locals()
+        # l.update(args)
+        ## try eval first, then exec
+        try:  
+            code_str = self.ui.txtEditExtraArguments.toPlainText()
+            code_str = code_str.replace('\n', ' ')
+            print(f'code_str: {code_str}')
+            output = eval(code_str, globals(), l)
+            print(f'parsed output: {output}')
+
+        except SyntaxError:
+            fn = "def fn(**args):\n"
+            run = "\noutput=fn(**args)\n"
+            code_str = fn + "\n".join(["    "+l for l in self.ui.txtEditExtraArguments.toPlainText().split('\n')]) + run
+            ldict = locals()
+            exec(code_str, globals(), ldict)
+            output = ldict['output']
+        except:
+            print(f"Error parsing optional arguments.")
+            output = {} # empty dictionary
+
+        return output
+
+
+
 
     # ==================================================================================================================== #
     # Figure Output Section                                                                                                #

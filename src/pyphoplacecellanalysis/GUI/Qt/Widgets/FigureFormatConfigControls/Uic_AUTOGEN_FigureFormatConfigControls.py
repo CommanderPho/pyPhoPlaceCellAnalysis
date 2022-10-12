@@ -54,8 +54,13 @@ class Ui_Form(object):
         self.chkEnableSavingToDisk.setChecked(True)
         self.chkEnableSavingToDisk.setObjectName("chkEnableSavingToDisk")
         self.verticalLayout_2.addWidget(self.chkEnableSavingToDisk)
-        self.horizontalLayout_3.addWidget(self.horizontalWidget)
+        self.horizontalLayout_3.addWidget(self.horizontalWidget, 0, QtCore.Qt.AlignTop)
         self.frame = QtWidgets.QFrame(self.horizontalFrame_2)
+        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Preferred, QtWidgets.QSizePolicy.Expanding)
+        sizePolicy.setHorizontalStretch(0)
+        sizePolicy.setVerticalStretch(0)
+        sizePolicy.setHeightForWidth(self.frame.sizePolicy().hasHeightForWidth())
+        self.frame.setSizePolicy(sizePolicy)
         self.frame.setFrameShape(QtWidgets.QFrame.StyledPanel)
         self.frame.setFrameShadow(QtWidgets.QFrame.Raised)
         self.frame.setObjectName("frame")
@@ -65,11 +70,16 @@ class Ui_Form(object):
         self.scrollArea.setWidgetResizable(True)
         self.scrollArea.setObjectName("scrollArea")
         self.scrollAreaWidgetContents = QtWidgets.QWidget()
-        self.scrollAreaWidgetContents.setGeometry(QtCore.QRect(0, 0, 333, 382))
+        self.scrollAreaWidgetContents.setGeometry(QtCore.QRect(0, 0, 340, 210))
+        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Preferred, QtWidgets.QSizePolicy.Expanding)
+        sizePolicy.setHorizontalStretch(0)
+        sizePolicy.setVerticalStretch(0)
+        sizePolicy.setHeightForWidth(self.scrollAreaWidgetContents.sizePolicy().hasHeightForWidth())
+        self.scrollAreaWidgetContents.setSizePolicy(sizePolicy)
         self.scrollAreaWidgetContents.setObjectName("scrollAreaWidgetContents")
         self.gridLayout_3 = QtWidgets.QGridLayout(self.scrollAreaWidgetContents)
         self.gridLayout_3.setObjectName("gridLayout_3")
-        self.txtEditExtraArguments = CodeEdit(self.scrollAreaWidgetContents)
+        self.txtEditExtraArguments = PyCodeEdit(self.scrollAreaWidgetContents)
         self.txtEditExtraArguments.setObjectName("txtEditExtraArguments")
         self.gridLayout_3.addWidget(self.txtEditExtraArguments, 0, 0, 1, 1)
         self.scrollArea.setWidget(self.scrollAreaWidgetContents)
@@ -91,7 +101,7 @@ class Ui_Form(object):
         self.toolBox.setMidLineWidth(1)
         self.toolBox.setObjectName("toolBox")
         self.page_figExport = QtWidgets.QWidget()
-        self.page_figExport.setGeometry(QtCore.QRect(0, 0, 516, 69))
+        self.page_figExport.setGeometry(QtCore.QRect(0, 0, 516, 127))
         sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Preferred)
         sizePolicy.setHorizontalStretch(1)
         sizePolicy.setVerticalStretch(0)
@@ -124,7 +134,7 @@ class Ui_Form(object):
         icon1.addPixmap(QtGui.QPixmap(":/light/desktop.svg"), QtGui.QIcon.Normal, QtGui.QIcon.Off)
         self.toolBox.addItem(self.page_figExport, icon1, "")
         self.page_debugging = QtWidgets.QWidget()
-        self.page_debugging.setGeometry(QtCore.QRect(0, 0, 516, 207))
+        self.page_debugging.setGeometry(QtCore.QRect(0, 0, 104, 146))
         sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Preferred)
         sizePolicy.setHorizontalStretch(1)
         sizePolicy.setVerticalStretch(0)
@@ -179,5 +189,5 @@ class Ui_Form(object):
 from pyphocorehelpers.gui.Qt.InlineFilesystemPathSelectWidget.FilesystemPathLineEdit import FilesystemPathLineEdit
 from pyphocorehelpers.gui.Qt.InlineFilesystemPathSelectWidget.InlineFilesystemPathSelectWidget import InlineFilesystemPathSelectWidget
 from pyphoplacecellanalysis.GUI.Qt.Widgets.SingleGroupOptionalMembersCtrl.SingleGroupOptionalMembersCtrl import SingleGroupOptionalMembersCtrl
-from pyqode.core.api import CodeEdit
+from pyqode.python.widgets.code_edit import PyCodeEdit
 from pyphoplacecellanalysis.Resources import breeze

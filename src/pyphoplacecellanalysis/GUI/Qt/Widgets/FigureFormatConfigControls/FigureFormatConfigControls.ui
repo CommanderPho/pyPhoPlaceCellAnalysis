@@ -107,8 +107,8 @@
              <rect>
               <x>0</x>
               <y>0</y>
-              <width>333</width>
-              <height>382</height>
+              <width>340</width>
+              <height>210</height>
              </rect>
             </property>
             <property name="sizePolicy">
@@ -119,7 +119,7 @@
             </property>
             <layout class="QGridLayout" name="gridLayout_3">
              <item row="0" column="0">
-              <widget class="CodeEdit" name="txtEditExtraArguments">
+              <widget class="PyCodeEdit" name="txtEditExtraArguments">
                <property name="toolTip">
                 <string>Extra Arguments</string>
                </property>
@@ -186,7 +186,7 @@
         <x>0</x>
         <y>0</y>
         <width>516</width>
-        <height>69</height>
+        <height>127</height>
        </rect>
       </property>
       <property name="sizePolicy">
@@ -246,8 +246,8 @@
        <rect>
         <x>0</x>
         <y>0</y>
-        <width>516</width>
-        <height>207</height>
+        <width>104</width>
+        <height>146</height>
        </rect>
       </property>
       <property name="sizePolicy">
@@ -331,9 +331,9 @@
    <container>1</container>
   </customwidget>
   <customwidget>
-   <class>CodeEdit</class>
+   <class>PyCodeEdit</class>
    <extends>QPlainTextEdit</extends>
-   <header location="global">pyqode.core.api</header>
+   <header location="global">pyqode.python.widgets.code_edit</header>
   </customwidget>
  </customwidgets>
  <resources>
