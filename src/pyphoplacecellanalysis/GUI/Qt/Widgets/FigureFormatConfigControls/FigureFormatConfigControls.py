@@ -12,6 +12,12 @@ from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtCore, QtGui, QtWidget
 # from pyPhoPlaceCellAnalysis.GUI.Qt.FigureFormatConfigControls  import FigureFormatConfigControls
 from pyphoplacecellanalysis.GUI.Qt.Widgets.FigureFormatConfigControls.Uic_AUTOGEN_FigureFormatConfigControls import Ui_Form
 
+# For Code Editor
+from pyqode.core import api
+from pyqode.core import modes
+from pyqode.core import panels
+
+
 # def pair_optional_value_widget(checkBox, valueWidget):
 #     self.checkBox.toggled['bool'].connect(self.spinBox.setEnabled) # type: ignore
     
@@ -104,12 +110,10 @@ class FigureFormatConfigControls(QtWidgets.QWidget):
         self.ui.tupleCtrl_2.tuple_values = (5, 5)
         self.ui.tupleCtrl_2.tuple_values = (None, None)
 
-        self.ui.txtEditExtraArguments.setPlainText('')
+        # self.ui.txtEditExtraArguments.setPlainText('')
         # Code Console Mode:
-        self.ui.txtEditExtraArguments.setVisible(False)
-        self.ui.codeConsoleWidget.setVisible(True)
-        # self.ui.codeConsoleWidget
-
+        # self.ui.txtEditExtraArguments is now a CodeEditor
+        self._init_UI_Code_Editor(self.ui.txtEditExtraArguments)
         # Add the statusbar
         # self.window().statusBar().showMessage('Message in statusbar.')
         
@@ -168,6 +172,23 @@ class FigureFormatConfigControls(QtWidgets.QWidget):
         
     # def __str__(self):
     #      return 
+
+    def _init_UI_Code_Editor(self, editor):
+        """ editor: CodeEdit """
+        # start the backend as soon as possible
+        editor.backend.start('server.py')
+
+        # append some modes and panels
+        editor.modes.append(modes.CodeCompletionMode())
+        editor.modes.append(modes.PygmentsSyntaxHighlighter(editor.document()))
+        editor.modes.append(modes.CaretLineHighlighterMode())
+        editor.panels.append(panels.SearchAndReplacePanel(),
+                        api.Panel.Position.BOTTOM)
+
+        # open a file
+        editor.file.open(__file__)
+
+
 
     def build_optional_arguments_dict(self):
         """ builds the python dict from the text value """

@@ -123,6 +123,13 @@ class ProgrammaticPipelineWidget(PipelineOwningMixin, QWidget):
         # print(f'config at owning_pipeline.active_configs[{active_config_name}] has been updated from GUI.')
         ## TODO: update the GUI defaults perminantly? Currently the plot functions will use the overriden values anyway, but not all of the functions accept these kwargs
 
+
+    # def closeEvent(self, event):
+    #     # super().closeEvent(self, event)
+    #     if self.ui.active_figure_format_config_widget is not None:
+    #         self.ui.active_figure_format_config_widget.close() # close the spanwed widget
+    #     # self.sigClosed.emit(self)
+
     # ==================================================================================================================== #
     # Helper Functions                                                                                                     #
     # ==================================================================================================================== #

@@ -37,7 +37,7 @@
    <item>
     <widget class="QFrame" name="horizontalFrame_2">
      <layout class="QHBoxLayout" name="horizontalLayout_3">
-      <item>
+      <item alignment="Qt::AlignTop">
        <widget class="QWidget" name="horizontalWidget" native="true">
         <layout class="QVBoxLayout" name="verticalLayout_2">
          <property name="spacing">
@@ -84,6 +84,12 @@
       </item>
       <item>
        <widget class="QFrame" name="frame">
+        <property name="sizePolicy">
+         <sizepolicy hsizetype="Preferred" vsizetype="Expanding">
+          <horstretch>0</horstretch>
+          <verstretch>0</verstretch>
+         </sizepolicy>
+        </property>
         <property name="frameShape">
          <enum>QFrame::StyledPanel</enum>
         </property>
@@ -105,45 +111,20 @@
               <height>382</height>
              </rect>
             </property>
+            <property name="sizePolicy">
+             <sizepolicy hsizetype="Preferred" vsizetype="Expanding">
+              <horstretch>0</horstretch>
+              <verstretch>0</verstretch>
+             </sizepolicy>
+            </property>
             <layout class="QGridLayout" name="gridLayout_3">
              <item row="0" column="0">
-              <widget class="QPlainTextEdit" name="txtEditExtraArguments">
+              <widget class="CodeEdit" name="txtEditExtraArguments">
                <property name="toolTip">
                 <string>Extra Arguments</string>
                </property>
                <property name="statusTip">
                 <string>Extra Arguments</string>
-               </property>
-               <property name="plainText">
-                <string notr="true"/>
-               </property>
-               <property name="backgroundVisible">
-                <bool>false</bool>
-               </property>
-               <property name="placeholderText">
-                <string>Optional Arguments</string>
-               </property>
-              </widget>
-             </item>
-             <item row="1" column="0">
-              <widget class="PhoCodeConsoleWidget" name="codeConsoleWidget" native="true">
-               <property name="sizePolicy">
-                <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
-                 <horstretch>1</horstretch>
-                 <verstretch>1</verstretch>
-                </sizepolicy>
-               </property>
-               <property name="minimumSize">
-                <size>
-                 <width>0</width>
-                 <height>200</height>
-                </size>
-               </property>
-               <property name="baseSize">
-                <size>
-                 <width>300</width>
-                 <height>200</height>
-                </size>
                </property>
               </widget>
              </item>
@@ -350,10 +331,9 @@
    <container>1</container>
   </customwidget>
   <customwidget>
-   <class>PhoCodeConsoleWidget</class>
-   <extends>QWidget</extends>
-   <header location="global">pyphoplacecellanalysis.GUI.Qt.Widgets.PhoCodeConsoleWidget</header>
-   <container>1</container>
+   <class>CodeEdit</class>
+   <extends>QPlainTextEdit</extends>
+   <header location="global">pyqode.core.api</header>
   </customwidget>
  </customwidgets>
  <resources>

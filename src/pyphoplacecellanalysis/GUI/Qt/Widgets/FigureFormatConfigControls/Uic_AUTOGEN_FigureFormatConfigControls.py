@@ -69,21 +69,9 @@ class Ui_Form(object):
         self.scrollAreaWidgetContents.setObjectName("scrollAreaWidgetContents")
         self.gridLayout_3 = QtWidgets.QGridLayout(self.scrollAreaWidgetContents)
         self.gridLayout_3.setObjectName("gridLayout_3")
-        self.txtEditExtraArguments = QtWidgets.QPlainTextEdit(self.scrollAreaWidgetContents)
-        self.txtEditExtraArguments.setPlainText("")
-        self.txtEditExtraArguments.setBackgroundVisible(False)
+        self.txtEditExtraArguments = CodeEdit(self.scrollAreaWidgetContents)
         self.txtEditExtraArguments.setObjectName("txtEditExtraArguments")
         self.gridLayout_3.addWidget(self.txtEditExtraArguments, 0, 0, 1, 1)
-        self.codeConsoleWidget = PhoCodeConsoleWidget(self.scrollAreaWidgetContents)
-        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)
-        sizePolicy.setHorizontalStretch(1)
-        sizePolicy.setVerticalStretch(1)
-        sizePolicy.setHeightForWidth(self.codeConsoleWidget.sizePolicy().hasHeightForWidth())
-        self.codeConsoleWidget.setSizePolicy(sizePolicy)
-        self.codeConsoleWidget.setMinimumSize(QtCore.QSize(0, 200))
-        self.codeConsoleWidget.setBaseSize(QtCore.QSize(300, 200))
-        self.codeConsoleWidget.setObjectName("codeConsoleWidget")
-        self.gridLayout_3.addWidget(self.codeConsoleWidget, 1, 0, 1, 1)
         self.scrollArea.setWidget(self.scrollAreaWidgetContents)
         self.gridLayout_2.addWidget(self.scrollArea, 1, 0, 1, 1)
         self.horizontalLayout_3.addWidget(self.frame)
@@ -184,13 +172,12 @@ class Ui_Form(object):
         self.chkEnableSavingToDisk.setText(_translate("Form", "enable_saving_to_disk"))
         self.txtEditExtraArguments.setToolTip(_translate("Form", "Extra Arguments"))
         self.txtEditExtraArguments.setStatusTip(_translate("Form", "Extra Arguments"))
-        self.txtEditExtraArguments.setPlaceholderText(_translate("Form", "Optional Arguments"))
         self.toolBox.setItemText(self.toolBox.indexOf(self.page_figExport), _translate("Form", "Figure Output/Export"))
         self.pushButton_2.setText(_translate("Form", "PushButton"))
         self.lineEdit.setText(_translate("Form", "C:\\Users\\pho\\repos\\PhoPy3DPositionAnalysis2021\\EXTERNAL\\Screenshots\\ProgrammaticDisplayFunctionTesting"))
         self.toolBox.setItemText(self.toolBox.indexOf(self.page_debugging), _translate("Form", "Extra/Debugging"))
 from pyphocorehelpers.gui.Qt.InlineFilesystemPathSelectWidget.FilesystemPathLineEdit import FilesystemPathLineEdit
 from pyphocorehelpers.gui.Qt.InlineFilesystemPathSelectWidget.InlineFilesystemPathSelectWidget import InlineFilesystemPathSelectWidget
-from pyphoplacecellanalysis.GUI.Qt.Widgets.PhoCodeConsoleWidget import PhoCodeConsoleWidget
 from pyphoplacecellanalysis.GUI.Qt.Widgets.SingleGroupOptionalMembersCtrl.SingleGroupOptionalMembersCtrl import SingleGroupOptionalMembersCtrl
+from pyqode.core.api import CodeEdit
 from pyphoplacecellanalysis.Resources import breeze
