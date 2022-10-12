@@ -105,6 +105,10 @@ class FigureFormatConfigControls(QtWidgets.QWidget):
         self.ui.tupleCtrl_2.tuple_values = (None, None)
 
         self.ui.txtEditExtraArguments.setPlainText('')
+        # Code Console Mode:
+        self.ui.txtEditExtraArguments.setVisible(False)
+        self.ui.codeConsoleWidget.setVisible(True)
+        # self.ui.codeConsoleWidget
 
         # Add the statusbar
         # self.window().statusBar().showMessage('Message in statusbar.')
@@ -165,6 +169,9 @@ class FigureFormatConfigControls(QtWidgets.QWidget):
     # def __str__(self):
     #      return 
 
+    def build_optional_arguments_dict(self):
+        """ builds the python dict from the text value """
+        self.ui.codeConsoleWidget
 
     # ==================================================================================================================== #
     # Figure Output Section                                                                                                #

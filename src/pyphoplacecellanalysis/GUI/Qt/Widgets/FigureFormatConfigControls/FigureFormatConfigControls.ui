@@ -91,7 +91,7 @@
          <enum>QFrame::Raised</enum>
         </property>
         <layout class="QGridLayout" name="gridLayout_2">
-         <item row="0" column="0">
+         <item row="1" column="0">
           <widget class="QScrollArea" name="scrollArea">
            <property name="widgetResizable">
             <bool>true</bool>
@@ -101,8 +101,8 @@
              <rect>
               <x>0</x>
               <y>0</y>
-              <width>349</width>
-              <height>185</height>
+              <width>333</width>
+              <height>382</height>
              </rect>
             </property>
             <layout class="QGridLayout" name="gridLayout_3">
@@ -122,6 +122,28 @@
                </property>
                <property name="placeholderText">
                 <string>Optional Arguments</string>
+               </property>
+              </widget>
+             </item>
+             <item row="1" column="0">
+              <widget class="PhoCodeConsoleWidget" name="codeConsoleWidget" native="true">
+               <property name="sizePolicy">
+                <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
+                 <horstretch>1</horstretch>
+                 <verstretch>1</verstretch>
+                </sizepolicy>
+               </property>
+               <property name="minimumSize">
+                <size>
+                 <width>0</width>
+                 <height>200</height>
+                </size>
+               </property>
+               <property name="baseSize">
+                <size>
+                 <width>300</width>
+                 <height>200</height>
+                </size>
                </property>
               </widget>
              </item>
@@ -183,7 +205,7 @@
         <x>0</x>
         <y>0</y>
         <width>516</width>
-        <height>147</height>
+        <height>69</height>
        </rect>
       </property>
       <property name="sizePolicy">
@@ -244,7 +266,7 @@
         <x>0</x>
         <y>0</y>
         <width>516</width>
-        <height>270</height>
+        <height>207</height>
        </rect>
       </property>
       <property name="sizePolicy">
@@ -325,6 +347,12 @@
    <class>InlineFilesystemPathSelectWidget</class>
    <extends>QWidget</extends>
    <header location="global">pyphocorehelpers.gui.Qt.InlineFilesystemPathSelectWidget.InlineFilesystemPathSelectWidget</header>
+   <container>1</container>
+  </customwidget>
+  <customwidget>
+   <class>PhoCodeConsoleWidget</class>
+   <extends>QWidget</extends>
+   <header location="global">pyphoplacecellanalysis.GUI.Qt.Widgets.PhoCodeConsoleWidget</header>
    <container>1</container>
   </customwidget>
  </customwidgets>
