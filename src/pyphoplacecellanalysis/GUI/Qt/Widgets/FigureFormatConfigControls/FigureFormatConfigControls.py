@@ -192,7 +192,7 @@ class FigureFormatConfigControls(QtWidgets.QWidget):
         # backend.serve_forever()
 
         # start the backend as soon as possible        
-        print(f'backend.server.__file__: {backend.server.__file__}')
+        # print(f'backend.server.__file__: {backend.server.__file__}')
         # editor.backend.start('server.py')
         editor.backend.start(backend.server.__file__)
 
@@ -207,10 +207,7 @@ class FigureFormatConfigControls(QtWidgets.QWidget):
         # editor.file.open(__file__)
         _example_code = """
 {
-'subplots': (None, 3),
-'resolution_multiplier': 1.0,
-'enable_spike_overlay': False,
-'brev_mode': PlotStringBrevityModeEnum.MINIMAL,
+'brev_mode': PlotStringBrevityModeEnum.NONE,
 'plot_variable': enumTuningMap2DPlotVariables.TUNING_MAPS
 }
         """

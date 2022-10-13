@@ -42,6 +42,14 @@ class ProgrammaticPipelineWidget(PipelineOwningMixin, QWidget):
             return figure_format_config
 
 
+    @property
+    def last_added_display_output(self):
+        """The last_added_display_output property."""
+        last_added_context = list(self.owning_pipeline.display_output.keys())[-1]
+        last_added_display_output = self.owning_pipeline.display_output[last_added_context]
+        return last_added_display_output
+
+
 
     def __init__(self, parent=None, owning_pipeline=None):
         super().__init__(parent=parent) # Call the inherited classes __init__ method
