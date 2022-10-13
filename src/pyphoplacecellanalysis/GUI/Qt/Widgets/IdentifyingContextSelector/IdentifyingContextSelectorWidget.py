@@ -21,7 +21,7 @@ uiFile = os.path.join(path, 'IdentifyingContextSelectorWidget.ui')
 # IdentifyingContextSelectorWidget                                                                                     #
 # ==================================================================================================================== #
 class IdentifyingContextSelectorWidget(ComboBoxCtrlOwnerMixin, PipelineOwningMixin, QWidget): 
-    """_summary_
+    """ Allows selecting an IdentifyingContext from a dropdown list
 
     pyphoplacecellanalysis.GUI.Qt.Widgets.IdentifyingContextSelector.IdentifyingContextSelectorWidget.IdentifyingContextSelectorWidget
     

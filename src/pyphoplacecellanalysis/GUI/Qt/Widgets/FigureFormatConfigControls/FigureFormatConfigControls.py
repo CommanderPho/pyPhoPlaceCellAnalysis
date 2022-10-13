@@ -31,6 +31,7 @@ from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer
 
 
 class FigureFormatConfigControls(QtWidgets.QWidget):
+    """ A widget that displays many options related to customizing the display of figures, including a code editor that allows specifying custom arguments to be passed to a display function as a dictionary. """
     _debug_print = False
     
     ## Signals
@@ -214,7 +215,7 @@ class FigureFormatConfigControls(QtWidgets.QWidget):
         editor.setPlainText(_example_code)
 
 
-    def build_optional_arguments_dict(self):
+    def build_optional_arguments_dict(self, debug_print=False):
         """ builds the python dict from the text value """
         l = locals()
         # l.update(args)
@@ -222,9 +223,11 @@ class FigureFormatConfigControls(QtWidgets.QWidget):
         try:  
             code_str = self.ui.txtEditExtraArguments.toPlainText()
             code_str = code_str.replace('\n', ' ')
-            print(f'code_str: {code_str}')
+            if debug_print:
+                print(f'code_str: {code_str}')
             output = eval(code_str, globals(), l)
-            print(f'parsed output: {output}')
+            if debug_print:
+                print(f'parsed output: {output}')
 
         except SyntaxError:
             fn = "def fn(**args):\n"

@@ -18,7 +18,7 @@ from pyphoplacecellanalysis.GUI.Qt.Widgets.FigureFormatConfigControls.FigureForm
 
 
 class ProgrammaticPipelineWidget(PipelineOwningMixin, QWidget):
-    """ 
+    """ Displays a UI that allows selecting a filter/computation context from a dropdown list, launching a plots configuration panel, and plotting any of the display functions for the currently selected context.
 
         'tooltab_Visualization'
             'tooltab_Visualization_Layout'
@@ -197,10 +197,11 @@ class ProgrammaticPipelineWidget(PipelineOwningMixin, QWidget):
             newToolButton.clicked.connect(_newToolFunction)
             
 
-    def _perform_run_display_function(self, curr_display_fcn):
+    def _perform_run_display_function(self, curr_display_fcn, debug_print=False):
         # custom_args = {} # TODO
         custom_args = self.active_figure_format_config or {}
-        print(f'custom_args: {custom_args}')
+        if debug_print:
+            print(f'custom_args: {custom_args}')
         # 'optional_kwargs'
         # print(f'_perform_run_display_function(curr_display_fcn: {curr_display_fcn}): context: {self.ui.contextSelectorWidget.current_selected_context}')
         display_outputs = self.owning_pipeline.display(curr_display_fcn, self.ui.contextSelectorWidget.current_selected_context, **custom_args)

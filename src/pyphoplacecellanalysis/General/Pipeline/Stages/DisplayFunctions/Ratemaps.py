@@ -16,6 +16,7 @@ from neuropy.utils.matplotlib_helpers import enumTuningMap2DPlotVariables # for 
 from neuropy.utils.mixins.unwrap_placefield_computation_parameters import unwrap_placefield_computation_parameters
 
 from pyphocorehelpers.DataStructure.RenderPlots.MatplotLibRenderPlots import MatplotlibRenderPlots
+from pyphocorehelpers.DataStructure.RenderPlots.PyqtgraphRenderPlots import PyqtgraphRenderPlots
 
 
 class DefaultRatemapDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=DisplayFunctionRegistryHolder):
@@ -88,7 +89,7 @@ class DefaultRatemapDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Disp
         # return occupancy_fig, active_pf_2D_figures
         return MatplotlibRenderPlots(figures=[occupancy_fig, active_pf_2D_figures])   
 
-    def _display_placemaps_pyqtplot_2D(computation_result, active_config, enable_saving_to_disk=False, **kwargs):
+    def _display_placemaps_pyqtplot_2D(computation_result, active_config, enable_saving_to_disk=False, defer_show:bool=False, **kwargs):
         """  displays 2D placefields in a pyqtgraph window
         """
         # Get the decoders from the computation result:
@@ -101,7 +102,12 @@ class DefaultRatemapDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Disp
                                                                                 app=kwargs.get('app',None), parent_root_widget=kwargs.get('parent_root_widget',None), root_render_widget=kwargs.get('root_render_widget',None), max_num_columns=kwargs.get('max_num_columns', 8))
         # win.show()
         display_outputs = DynamicParameters(root_render_widget=root_render_widget, plot_array=plot_array, img_item_array=img_item_array, other_components_array=other_components_array)
+
+        if not defer_show:
+            parent_root_widget.show()
+
+        return PyqtgraphRenderPlots(app=app, parent_root_widget=parent_root_widget, display_outputs=display_outputs)
         # return app, parent_root_widget, root_render_widget
-        return app, parent_root_widget, display_outputs
+        # return app, parent_root_widget, display_outputs
 
 

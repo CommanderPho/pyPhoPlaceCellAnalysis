@@ -107,7 +107,7 @@
              <rect>
               <x>0</x>
               <y>0</y>
-              <width>340</width>
+              <width>333</width>
               <height>210</height>
              </rect>
             </property>
@@ -154,7 +154,7 @@
    <item>
     <widget class="QToolBox" name="toolBox">
      <property name="sizePolicy">
-      <sizepolicy hsizetype="Expanding" vsizetype="Preferred">
+      <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
        <horstretch>1</horstretch>
        <verstretch>0</verstretch>
       </sizepolicy>
@@ -186,7 +186,7 @@
         <x>0</x>
         <y>0</y>
         <width>516</width>
-        <height>127</height>
+        <height>126</height>
        </rect>
       </property>
       <property name="sizePolicy">
@@ -246,8 +246,8 @@
        <rect>
         <x>0</x>
         <y>0</y>
-        <width>104</width>
-        <height>146</height>
+        <width>516</width>
+        <height>275</height>
        </rect>
       </property>
       <property name="sizePolicy">
