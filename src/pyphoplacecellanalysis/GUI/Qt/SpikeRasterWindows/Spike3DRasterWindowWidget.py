@@ -25,6 +25,7 @@ from pyphoplacecellanalysis.General.Model.SpikesDataframeWindow import SpikesDat
 class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRasterLeftSidebarControlsMixin, SpikeRasterBottomFrameControlsMixin, SpikesWindowOwningMixin, QtWidgets.QWidget):
     """ A main raster window loaded from a Qt .ui file. 
     
+    Manages the main raster views in addition to the shared window-related functions such as menu management, connections, etc.
     
     Properties/Parameters:
     
