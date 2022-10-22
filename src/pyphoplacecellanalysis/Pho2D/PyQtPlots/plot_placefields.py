@@ -219,12 +219,14 @@ def display_all_pf_2D_pyqtgraph_binned_image_rendering(active_pf_2D, figure_form
     included_unit_neuron_IDs = figure_format_config.get('included_unit_neuron_IDs', None)
 
     if included_unit_neuron_IDs is not None:
-        print(f'included_unit_neuron_IDs: {included_unit_neuron_IDs}')
+        if debug_print:
+            print(f'included_unit_neuron_IDs: {included_unit_neuron_IDs}')
         if not isinstance(included_unit_neuron_IDs, np.ndarray):
             included_unit_neuron_IDs = np.array(included_unit_neuron_IDs) # convert to np.array if needed
 
         n_neurons = np.size(included_unit_neuron_IDs)
-        print(f'\t n_neurons: {n_neurons}')
+        if debug_print:
+            print(f'\t n_neurons: {n_neurons}')
         if included_unit_indicies is None:
             included_unit_indicies = np.arange(n_neurons) # include all unless otherwise specified
 
@@ -239,28 +241,16 @@ def display_all_pf_2D_pyqtgraph_binned_image_rendering(active_pf_2D, figure_form
         else:
             raise ValueError
 
-        print(f'_local_active_maps.shape: {np.shape(_local_active_maps)}, type: {type(_local_active_maps)}') # _local_active_maps.shape: (67, 63, 16), type: <class 'numpy.ndarray'>
+        if debug_print:
+            print(f'_local_active_maps.shape: {np.shape(_local_active_maps)}, type: {type(_local_active_maps)}') # _local_active_maps.shape: (67, 63, 16), type: <class 'numpy.ndarray'>
         active_maps = np.zeros((n_neurons, np.shape(_local_active_maps)[1], np.shape(_local_active_maps)[2])) # fully allocated new array of zeros
-        # active_maps = [] # empty list
         for idx, a_local_IDX in enumerate(shared_IDXs_map):
             if a_local_IDX is not None:
-                # curr_value = _local_active_maps[a_local_IDX].copy()
                 active_maps[idx,:,:] = _local_active_maps[a_local_IDX,:,:].copy()
 
-            # else:
-            #     # it is None, meaning we don't have this neuron
-            #     curr_value = np.zeros_like(_local_active_maps[0]) # build array of all zeros
-            # ## Append to the correctly sized active_maps array
-            # active_maps.append(curr_value)
+        if debug_print:
+            print(f'active_maps.shape: {np.shape(active_maps)}, type: {type(active_maps)}') # _local_active_maps.shape: (70, 63, 16), type: <class 'numpy.ndarray'>
 
-        print(f'active_maps.shape: {np.shape(active_maps)}, type: {type(active_maps)}') # _local_active_maps.shape: (70, 63, 16), type: <class 'numpy.ndarray'>
-
-    # shared_comparison_unit_info = figure_format_config.get('shared_comparison_unit_info', None)
-    # if shared_comparison_unit_info is not None:
-        # if included_unit_indicies is None:
-        #     included_unit_indicies = shared_comparison_unit_info.shared.shared_fragile_neuron_IDXs # include all unless otherwise specified
-        # for idx, a_pair in enumerate(shared_comparison_unit_info.shared.pairs):
-    
     else:
         # normal (non-shared mode)
         shared_IDXs_map = None
@@ -336,11 +326,12 @@ def display_all_pf_2D_pyqtgraph_binned_image_rendering(active_pf_2D, figure_form
             else:
                 out.add_data(row=curr_page_relative_row, col=curr_page_relative_col, matrix=pfmap, xbins=active_xbins, ybins=active_ybins, name=f'pf[{final_title}]', title=final_title, variable_label=curr_extended_id_string)
         
-    out.plots_data.included_unit_neuron_IDs = included_unit_neuron_IDs
-    out.plots_data.included_unit_indicies = included_unit_indicies
-    out.plots_data.shared_IDXs_map = shared_IDXs_map
-    out.plots_data._local_active_maps = _local_active_maps
-    out.plots_data.active_maps = active_maps
+    # ## Debugging only:
+    # out.plots_data.included_unit_neuron_IDs = included_unit_neuron_IDs
+    # out.plots_data.included_unit_indicies = included_unit_indicies
+    # out.plots_data.shared_IDXs_map = shared_IDXs_map
+    # out.plots_data._local_active_maps = _local_active_maps
+    # out.plots_data.active_maps = active_maps
 
     return out
     
