@@ -43,8 +43,7 @@
       </size>
      </property>
      <property name="styleSheet">
-      <string notr="true">border-color: rgb(170, 0, 127);
-background-color: rgb(255, 250, 242);</string>
+      <string notr="true">border-color: rgb(170, 0, 127);</string>
      </property>
     </widget>
    </item>
@@ -279,7 +278,7 @@ background-color: rgb(255, 250, 242);</string>
            <x>0</x>
            <y>0</y>
            <width>511</width>
-           <height>257</height>
+           <height>260</height>
           </rect>
          </property>
          <attribute name="icon">
@@ -339,8 +338,8 @@ background-color: rgb(255, 250, 242);</string>
           <rect>
            <x>0</x>
            <y>0</y>
-           <width>511</width>
-           <height>257</height>
+           <width>405</width>
+           <height>40</height>
           </rect>
          </property>
          <property name="sizePolicy">
@@ -612,8 +611,8 @@ background-color: rgb(255, 250, 242);</string>
           <rect>
            <x>0</x>
            <y>0</y>
-           <width>511</width>
-           <height>257</height>
+           <width>98</width>
+           <height>28</height>
           </rect>
          </property>
          <attribute name="icon">
@@ -898,17 +897,17 @@ background-color: rgb(255, 250, 242);</string>
   <slot>onShowProgrammaticDisplayConfig()</slot>
  </slots>
  <buttongroups>
+  <buttongroup name="buttonGroup_Vis_Maps">
+   <property name="exclusive">
+    <bool>false</bool>
+   </property>
+  </buttongroup>
   <buttongroup name="buttonGroup_Outer_Vis">
    <property name="exclusive">
     <bool>false</bool>
    </property>
   </buttongroup>
   <buttongroup name="buttonGroup_Vis_Raster">
-   <property name="exclusive">
-    <bool>false</bool>
-   </property>
-  </buttongroup>
-  <buttongroup name="buttonGroup_Vis_Maps">
    <property name="exclusive">
     <bool>false</bool>
    </property>
