@@ -106,14 +106,25 @@ class IdentifyingContextSelectorWidget(ComboBoxCtrlOwnerMixin, PipelineOwningMix
         ## Re-select the previously selected item if possible:
         if not had_previous_selected_item:
             # no previously selected item. Instead, select the first item.
-            if (len(updated_list) > 0):
-                selected_item_text = updated_list[0] # get the first item text to try and select.
-            else:
-                print(f'could not select any default items because the list was empty.')
+            self._trySelectFirstComboItem()
         found_desired_index = self.try_select_combo_item_with_text(curr_combo_box, selected_item_text)
         ## Unblock the signals:
         curr_combo_box.blockSignals(False)
 
+
+    def _trySelectFirstComboItem(self):
+        """ tries to select the first item (index 0) if possible. Otherwise, fails gracefully.
+        Internally calls self.try_select_combo_item_with_text(...)
+         """
+        # no previously selected item. Instead, select the first item.
+        current_list = self.all_filtered_session_context_descriptions
+        if (len(current_list) > 0):
+            selected_item_text = current_list[0] # get the first item text to try and select.
+            found_desired_index = self.try_select_combo_item_with_text(self.ui.cmbIdentifyingContext, selected_item_text)
+        else:
+            print(f'WARNING: could not select any default items because the list was empty.')
+            found_desired_index = None
+        return found_desired_index
 
     def updateUi(self):
         self._tryUpdateComboItemsUi()

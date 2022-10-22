@@ -3,7 +3,7 @@
 import sys
 import os
 
-from PyQt5 import QtGui, QtWidgets, uic
+from PyQt5 import QtGui, QtWidgets, QtCore, uic
 from PyQt5.QtWidgets import QMessageBox, QToolTip, QStackedWidget, QHBoxLayout, QVBoxLayout, QSplitter, QFormLayout, QLabel, QFrame, QPushButton, QTableWidget, QTableWidgetItem
 from PyQt5.QtWidgets import QApplication, QFileSystemModel, QTreeView, QWidget, QHeaderView
 from PyQt5.QtGui import QPainter, QBrush, QPen, QColor, QFont, QIcon
@@ -62,6 +62,14 @@ class ProgrammaticPipelineWidget(PipelineOwningMixin, QWidget):
         self.initUI()
         self.show() # Show the GUI
         self.updateUi()
+
+        ## Schedule delayed_gui_timer
+        ## Starts the delayed_gui_itemer which will run after 0.5-seconds to update the GUI:
+        self._delayed_gui_timer = QtCore.QTimer(self)
+        self._delayed_gui_timer.timeout.connect(self._run_delayed_gui_load_code)
+        #Set the interval and start the timer.
+        self._delayed_gui_timer.start(500)
+
 
     def initUI(self):
         # self.ui.cmbIdentifyingContext.set = self.all_filtered_session_keys
@@ -131,6 +139,16 @@ class ProgrammaticPipelineWidget(PipelineOwningMixin, QWidget):
         # self.owning_pipeline.active_configs[active_config_name] = figure_format_config # update the figure format config for this context
         # print(f'config at owning_pipeline.active_configs[{active_config_name}] has been updated from GUI.')
         ## TODO: update the GUI defaults perminantly? Currently the plot functions will use the overriden values anyway, but not all of the functions accept these kwargs
+
+
+    @pyqtSlot()
+    def _run_delayed_gui_load_code(self):
+        """ called when the self._delayed_gui_timer QTimer fires. """
+        #Stop the timer.
+        self._delayed_gui_timer.stop()
+        print(f'_run_delayed_gui_load_code() called!')
+        # Try to select the first combo item after they've loaded
+        self.ui.contextSelectorWidget._trySelectFirstComboItem()
 
 
     # def closeEvent(self, event):
