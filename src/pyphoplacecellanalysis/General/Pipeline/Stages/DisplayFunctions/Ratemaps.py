@@ -18,6 +18,10 @@ from neuropy.utils.mixins.unwrap_placefield_computation_parameters import unwrap
 from pyphocorehelpers.DataStructure.RenderPlots.MatplotLibRenderPlots import MatplotlibRenderPlots
 from pyphocorehelpers.DataStructure.RenderPlots.PyqtgraphRenderPlots import PyqtgraphRenderPlots
 
+# from pyphoplacecellanalysis.GUI.PyQtPlot.BinnedImageRenderingWindow import BasicBinnedImageRenderingWindow, add_bin_ticks, build_binned_imageItem
+from neuropy.utils.matplotlib_helpers import _build_variable_max_value_label, enumTuningMap2DPlotMode, enumTuningMap2DPlotVariables, _determine_best_placefield_2D_layout, _scale_current_placefield_to_acceptable_range
+from pyphoplacecellanalysis.Pho2D.PyQtPlots.plot_placefields import display_all_pf_2D_pyqtgraph_binned_image_rendering
+
 
 class DefaultRatemapDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=DisplayFunctionRegistryHolder):
     """ Functions related to visualizing Bayesian Decoder performance. """
@@ -89,24 +93,37 @@ class DefaultRatemapDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Disp
         # return occupancy_fig, active_pf_2D_figures
         return MatplotlibRenderPlots(figures=[occupancy_fig, active_pf_2D_figures])   
 
-    def _display_placemaps_pyqtplot_2D(computation_result, active_config, enable_saving_to_disk=False, defer_show:bool=False, **kwargs):
+    def _display_placemaps_pyqtplot_2D(computation_result, active_config, enable_saving_to_disk=False, active_context=None, defer_show:bool=False, **kwargs):
         """  displays 2D placefields in a pyqtgraph window
         """
         # Get the decoders from the computation result:
-        active_one_step_decoder = computation_result.computed_data['pf2D_Decoder'] # doesn't actually require the Decoder, could just use computation_result.computed_data['pf2D']            
-        # Get flat list of images:
-        images = active_one_step_decoder.ratemap.normalized_tuning_curves # (43, 63, 63)
-        # images = active_one_step_decoder.ratemap.normalized_tuning_curves[0:40,:,:] # (43, 63, 63)
-        occupancy = active_one_step_decoder.ratemap.occupancy
-        app, parent_root_widget, root_render_widget, plot_array, img_item_array, other_components_array = pyqtplot_plot_image_array(active_one_step_decoder.xbin, active_one_step_decoder.ybin, images, occupancy, 
-                                                                                app=kwargs.get('app',None), parent_root_widget=kwargs.get('parent_root_widget',None), root_render_widget=kwargs.get('root_render_widget',None), max_num_columns=kwargs.get('max_num_columns', 8))
-        # win.show()
-        display_outputs = DynamicParameters(root_render_widget=root_render_widget, plot_array=plot_array, img_item_array=img_item_array, other_components_array=other_components_array)
+        # active_one_step_decoder = computation_result.computed_data['pf2D_Decoder'] # doesn't actually require the Decoder, could just use computation_result.computed_data['pf2D']            
+        # # Get flat list of images:
+        # images = active_one_step_decoder.ratemap.normalized_tuning_curves # (43, 63, 63)
+        # # images = active_one_step_decoder.ratemap.normalized_tuning_curves[0:40,:,:] # (43, 63, 63)
+        # occupancy = active_one_step_decoder.ratemap.occupancy
+        # app, parent_root_widget, root_render_widget, plot_array, img_item_array, other_components_array = pyqtplot_plot_image_array(active_one_step_decoder.xbin, active_one_step_decoder.ybin, images, occupancy, 
+        #                                                                         app=kwargs.get('app',None), parent_root_widget=kwargs.get('parent_root_widget',None), root_render_widget=kwargs.get('root_render_widget',None), max_num_columns=kwargs.get('max_num_columns', 8))
+        # display_outputs = DynamicParameters(root_render_widget=root_render_widget, plot_array=plot_array, img_item_array=img_item_array, other_components_array=other_components_array)
+        # if not defer_show:
+        #     parent_root_widget.show()
+
+        # return PyqtgraphRenderPlots(app=app, parent_root_widget=parent_root_widget, display_outputs=display_outputs)
+
+        ## Post 2022-10-22 display_all_pf_2D_pyqtgraph_binned_image_rendering-based method:
+        assert active_context is not None
+        active_pf_2D = computation_result.computed_data['pf2D']
+        figure_format_config = {} # empty dict for config
+        out_all_pf_2D_pyqtgraph_binned_image_fig = display_all_pf_2D_pyqtgraph_binned_image_rendering(active_pf_2D, figure_format_config) # output is BasicBinnedImageRenderingWindow
+
+        # Set the window title from the context
+        out_all_pf_2D_pyqtgraph_binned_image_fig.setWindowTitle(f'{active_context.get_description()}')
 
         if not defer_show:
-            parent_root_widget.show()
+            out_all_pf_2D_pyqtgraph_binned_image_fig.show()
 
-        return PyqtgraphRenderPlots(app=app, parent_root_widget=parent_root_widget, display_outputs=display_outputs)
+        return PyqtgraphRenderPlots(parent_root_widget=out_all_pf_2D_pyqtgraph_binned_image_fig)
+        
         # return app, parent_root_widget, root_render_widget
         # return app, parent_root_widget, display_outputs
 

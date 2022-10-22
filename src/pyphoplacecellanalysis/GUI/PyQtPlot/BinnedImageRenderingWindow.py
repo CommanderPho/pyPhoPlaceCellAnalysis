@@ -9,7 +9,7 @@ from pyphocorehelpers.DataStructure.general_parameter_containers import Visualiz
 from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer
 
 
-def add_bin_ticks(plot_item, xbins=None, ybins=None):
+def _add_bin_ticks(plot_item, xbins=None, ybins=None):
     """ adds the ticks/grid for xbins and ybins to the plot_item """
     # show full frame, label tick marks at top and left sides, with some extra space for labels:
     plot_item.showAxes(True, showValues=(True, True, False, False), size=10)
@@ -26,7 +26,7 @@ def add_bin_ticks(plot_item, xbins=None, ybins=None):
     return plot_item
 
 
-def build_binned_imageItem(plot_item, params, xbins=None, ybins=None, matrix=None, name='avg_velocity', data_label='Avg Velocity', color_bar_mode=None):
+def _build_binned_imageItem(plot_item, params, xbins=None, ybins=None, matrix=None, name='avg_velocity', data_label='Avg Velocity', color_bar_mode=None):
     """ 
     color_bar_mode: options for the colorbar of each image
         ### curr_cbar_mode: 'each', 'one', None
@@ -139,14 +139,14 @@ class BasicBinnedImageRenderingWindow(QtWidgets.QMainWindow):
         newPlotItem = self.ui.graphics_layout.addPlot(title=title, row=row, col=col) # add PlotItem to the main GraphicsLayoutWidget
         newPlotItem.setDefaultPadding(0.0)  # plot without padding data range
         newPlotItem.setMouseEnabled(x=False, y=False)
-        newPlotItem = add_bin_ticks(plot_item=newPlotItem, xbins=xbins, ybins=ybins)
+        newPlotItem = _add_bin_ticks(plot_item=newPlotItem, xbins=xbins, ybins=ybins)
 
         if drop_below_threshold is not None:
             matrix = matrix.astype(float) # required because NaN isn't available in Integer dtype arrays (in case the matrix is of integer type, this prevents a ValueError)
             matrix[np.where(matrix < drop_below_threshold)] = np.nan # null out the occupancy
             
         
-        local_plots, local_plots_data = build_binned_imageItem(newPlotItem, self.params, xbins=xbins, ybins=ybins, matrix=matrix, name=name, data_label=variable_label, color_bar_mode=self.params.color_bar_mode)
+        local_plots, local_plots_data = _build_binned_imageItem(newPlotItem, self.params, xbins=xbins, ybins=ybins, matrix=matrix, name=name, data_label=variable_label, color_bar_mode=self.params.color_bar_mode)
         self.plots_data[name] = local_plots_data
         self.plots[name] = local_plots
         self.plots[name].mainPlotItem = newPlotItem
