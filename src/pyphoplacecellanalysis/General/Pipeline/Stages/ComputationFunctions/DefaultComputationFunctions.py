@@ -228,14 +228,13 @@ class DefaultComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Computa
             prev_one_step_bayesian_decoder.marginal.y.p_x_given_n_and_x_prev = computation_result.computed_data['pf2D_TwoStepDecoder'].marginal.y.p_x_given_n.copy()
             prev_one_step_bayesian_decoder.marginal.y.two_step_most_likely_positions_1D = computation_result.computed_data['pf2D_TwoStepDecoder'].marginal.y.most_likely_positions_1D.copy()
 
-
-        
-        
-        
         return computation_result
 
 
     def _perform_recursive_latent_placefield_decoding(computation_result: ComputationResult, **kwargs):
+        """ note that currently the pf1D_Decoders are not built or used. 
+
+        """
         def _subfn_build_recurrsive_placefields(active_one_step_decoder, next_order_computation_config, spikes_df=None, pos_df=None, pos_linearization_method='isomap'):
             if spikes_df is None:
                 spikes_df = active_one_step_decoder.spikes_df
@@ -302,7 +301,9 @@ class DefaultComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Computa
         pos_linearization_method='isomap'
         prev_one_step_bayesian_decoder = computation_result.computed_data['pf2D_Decoder']
         ## Builds a duplicate of the current computation config but sets the speed_thresh to 0.0:
-        next_order_computation_config = deepcopy(active_session_computation_configs[0]) # make a deepcopy of the active computation config
+
+        next_order_computation_config = deepcopy(computation_result.computation_config) # make a deepcopy of the active computation config
+        # next_order_computation_config = deepcopy(active_session_computation_configs[0]) # make a deepcopy of the active computation config
         next_order_computation_config.pf_params.speed_thresh = 0.0 # no speed thresholding because the speeds aren't real for the second-order fields
 
         # Start with empty lists, which will accumulate the different levels of recurrsive depth:
@@ -310,7 +311,7 @@ class DefaultComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Computa
         computation_result.computed_data['pf2D_RecursiveLatent'] = []
 
         # 1st Order:
-        computation_result.computed_data['pf1D_RecursiveLatent'].append(DynamicContainer.init_from_dict({'pf1D':computation_result.computed_data['pf1D'], 'pf1D_Decoder':computation_result.computed_data['pf1D_Decoder']}))
+        computation_result.computed_data['pf1D_RecursiveLatent'].append(DynamicContainer.init_from_dict({'pf1D':computation_result.computed_data['pf1D'], 'pf1D_Decoder':computation_result.computed_data.get('pf1D_Decoder', None)}))
         computation_result.computed_data['pf2D_RecursiveLatent'].append(DynamicContainer.init_from_dict({'pf2D':computation_result.computed_data['pf2D'], 'pf2D_Decoder':computation_result.computed_data['pf2D_Decoder']}))
 
         # 2nd Order:
