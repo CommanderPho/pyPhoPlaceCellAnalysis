@@ -113,7 +113,8 @@ class DefaultRatemapDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Disp
         ## Post 2022-10-22 display_all_pf_2D_pyqtgraph_binned_image_rendering-based method:
         assert active_context is not None
         active_pf_2D = computation_result.computed_data['pf2D']
-        figure_format_config = {} # empty dict for config
+        # figure_format_config = {} # empty dict for config
+        figure_format_config = kwargs # kwargs as default figure_format_config
         out_all_pf_2D_pyqtgraph_binned_image_fig = display_all_pf_2D_pyqtgraph_binned_image_rendering(active_pf_2D, figure_format_config) # output is BasicBinnedImageRenderingWindow
 
         # Set the window title from the context

@@ -188,7 +188,7 @@ def pyqtplot_plot_image_array(xbin_edges, ybin_edges, images, occupancy, max_num
 
 
 
-def display_all_pf_2D_pyqtgraph_binned_image_rendering(active_pf_2D, figure_format_config, debug_print=True):
+def display_all_pf_2D_pyqtgraph_binned_image_rendering(active_pf_2D, figure_format_config, debug_print=True): # , **kwargs
     """ 2022-08-16 - A fresh implementation of a pf_2D placefield renderer that uses the BasicBinnedImageRenderingWindow subclass. 
     
     Uses the common `_determine_best_placefield_2D_layout(...)` setup so that its returned subplots layout is the same as the matplotlib version in NeuroPy.neuropy.plotting.ratemaps.plot_ratemap_2D(...) (the main Matplotlib version that works)
@@ -207,8 +207,8 @@ def display_all_pf_2D_pyqtgraph_binned_image_rendering(active_pf_2D, figure_form
     # color_bar_mode = figure_format_config.get('color_bar_mode', 'each')
     color_bar_mode = figure_format_config.get('color_bar_mode', None) # no colorbars rendered  
     use_special_overlayed_title = True
-    brev_mode = PlotStringBrevityModeEnum.CONCISE
-    plot_variable = enumTuningMap2DPlotVariables.TUNING_MAPS
+    brev_mode = figure_format_config.get('brev_mode', PlotStringBrevityModeEnum.CONCISE)
+    plot_variable = figure_format_config.get('plot_variable', enumTuningMap2DPlotVariables.TUNING_MAPS)
     drop_below_threshold = figure_format_config.get('drop_below_threshold', 0.0000001) # try to get the 'drop_below_threshold' argument
     ## from matplotlib version:
     # drop_below_threshold: float=0.0000001, brev_mode: PlotStringBrevityModeEnum=PlotStringBrevityModeEnum.CONCISE, plot_variable: enumTuningMap2DPlotVariables=enumTuningMap2DPlotVariables.TUNING_MAPS

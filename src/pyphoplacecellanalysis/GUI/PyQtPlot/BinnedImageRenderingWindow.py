@@ -8,6 +8,10 @@ from pyphoplacecellanalysis.External.pyqtgraph.graphicsItems.NonUniformImage imp
 from pyphocorehelpers.DataStructure.general_parameter_containers import VisualizationParameters, RenderPlotsData, RenderPlots
 from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer
 
+# For scrollable BasicBinnedImageRenderingWindow
+from pyphoplacecellanalysis.Pho2D.PyQtPlots.Extensions.pyqtgraph_helpers import _perform_build_root_graphics_layout_widget_ui
+from pyphoplacecellanalysis.Pho2D.PyQtPlots.Extensions.pyqtgraph_helpers import build_scrollable_graphics_layout_widget_ui, build_scrollable_graphics_layout_widget_with_nested_viewbox_ui
+
 
 def _add_bin_ticks(plot_item, xbins=None, ybins=None):
     """ adds the ticks/grid for xbins and ybins to the plot_item """
@@ -93,7 +97,8 @@ class BasicBinnedImageRenderingWindow(QtWidgets.QMainWindow):
 
     """
     
-    def __init__(self, matrix=None, xbins=None, ybins=None, name='avg_velocity', title="Avg Velocity per Pos (X, Y)", variable_label='Avg Velocity', drop_below_threshold: float=0.0000001, color_map='viridis', color_bar_mode=None, wants_crosshairs=True, defer_show=False, **kwargs):
+    def __init__(self, matrix=None, xbins=None, ybins=None, name='avg_velocity', title="Avg Velocity per Pos (X, Y)", variable_label='Avg Velocity',
+                 drop_below_threshold: float=0.0000001, color_map='viridis', color_bar_mode=None, wants_crosshairs=True, defer_show=False, **kwargs):
         super(BasicBinnedImageRenderingWindow, self).__init__(**kwargs)
         self.params = VisualizationParameters(name='BasicBinnedImageRenderingWindow')
         self.plots_data = RenderPlotsData(name='BasicBinnedImageRenderingWindow')
@@ -119,11 +124,17 @@ class BasicBinnedImageRenderingWindow(QtWidgets.QMainWindow):
 
         pg.setConfigOption('imageAxisOrder', 'row-major') # Switch default order to Row-major
 
-        ## Create:        
-        self.ui.graphics_layout = pg.GraphicsLayoutWidget(show=True)
-        self.setCentralWidget(self.ui.graphics_layout)
+        ## Old (non-scrollable) way:        
+        # self.ui.graphics_layout = pg.GraphicsLayoutWidget(show=True)
+        # self.setCentralWidget(self.ui.graphics_layout)
+
+        ## Build scrollable UI version:
+        self.ui = _perform_build_root_graphics_layout_widget_ui(self.ui, is_scrollable=True)
+        self.setCentralWidget(self.ui.scrollAreaWidget)
+
+        # Shared:
         self.setWindowTitle(title)
-        self.resize(600,500)
+        self.resize(1000, 800)
         
         ## Add Label for debugging:
         self.ui.mainLabel = pg.LabelItem(justify='right')
@@ -157,8 +168,17 @@ class BasicBinnedImageRenderingWindow(QtWidgets.QMainWindow):
         
         if self.params.wants_crosshairs:
             self.add_crosshairs(newPlotItem, matrix, name=name)
+
+
+        ## Scrollable-support:
+        active_num_rows = row+1 # get the number of rows after adding the data (adding one to go from an index to a count)
+        self.params.single_plot_fixed_height = 100.0
+        self.params.all_plots_height = float(active_num_rows) * float(self.params.single_plot_fixed_height)
+        self.ui.graphics_layout.setFixedHeight(self.params.all_plots_height)
+        # self.ui.graphics_layout.setMinimumHeight(self.params.all_plots_height)
         
-        
+
+
     def _update_global_shared_colorbaritem(self):
         ## Add Global Colorbar for single colorbar mode:
         # Get all data for the purpose of computing global min/max:
