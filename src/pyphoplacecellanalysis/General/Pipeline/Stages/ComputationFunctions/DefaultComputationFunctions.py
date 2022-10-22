@@ -4,13 +4,11 @@ import numpy as np
 import pandas as pd
 
 # NeuroPy (Diba Lab Python Repo) Loading
-from pyphocorehelpers.DataStructure.dynamic_parameters import DynamicParameters
-from pyphoplacecellanalysis.General.Model.ComputationResults import ComputationResult
-
-
-# from pyphoplacecellanalysis.Analysis.Decoder.decoder_result import build_position_df_discretized_binned_positions # old weird re-implementation
 from neuropy.utils.mixins.binning_helpers import build_df_discretized_binned_position_columns
 from neuropy.utils.dynamic_container import DynamicContainer # for _perform_two_step_position_decoding_computation
+
+from pyphocorehelpers.DataStructure.dynamic_parameters import DynamicParameters
+from pyphoplacecellanalysis.General.Model.ComputationResults import ComputationResult
 
 from pyphocorehelpers.mixins.member_enumerating import AllFunctionEnumeratingMixin
 from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BayesianPlacemapPositionDecoder, Zhang_Two_Step
@@ -21,6 +19,12 @@ from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.Computa
 from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BayesianPlacemapPositionDecoder # For _perform_new_position_decoding_computation
 from pyphocorehelpers.indexing_helpers import BinningInfo, compute_spanning_bins, get_bin_centers, get_bin_edges, debug_print_1D_bin_infos, interleave_elements # For _perform_new_position_decoding_computation
 from pyphocorehelpers.indexing_helpers import build_spanning_grid_matrix # For _perform_new_position_decoding_computation
+
+### For _perform_recursive_latent_placefield_decoding
+from neuropy.utils import position_util
+from neuropy.core import Position
+from neuropy.analyses.placefields import PlacefieldComputationParameters, perform_compute_placefields
+from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BayesianPlacemapPositionDecoder
 
 
 
@@ -200,7 +204,6 @@ class DefaultComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Computa
         curr_unit_marginal_x, curr_unit_marginal_y = prev_one_step_bayesian_decoder.perform_build_marginals(computation_result.computed_data['pf2D_TwoStepDecoder']['p_x_given_n_and_x_prev'], computation_result.computed_data['pf2D_TwoStepDecoder']['most_likely_positions'], debug_print=debug_print)
         computation_result.computed_data['pf2D_TwoStepDecoder']['marginal'] = DynamicContainer(x=curr_unit_marginal_x, y=curr_unit_marginal_y)
         
-        
         ## In this new mode we'll add the two-step properties to the original one-step decoder:
         ## Adds the directly accessible properties to the active_one_step_decoder after they're computed in the active_two_step_decoder so that they can be plotted with the same functions/etc.
 
@@ -231,3 +234,93 @@ class DefaultComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Computa
         
         return computation_result
 
+
+    def _perform_recursive_latent_placefield_decoding(computation_result: ComputationResult, **kwargs):
+        def _subfn_build_recurrsive_placefields(active_one_step_decoder, next_order_computation_config, spikes_df=None, pos_df=None, pos_linearization_method='isomap'):
+            if spikes_df is None:
+                spikes_df = active_one_step_decoder.spikes_df
+            if pos_df is None:
+                pos_df = active_one_step_decoder.pf.filtered_pos_df
+            
+            def _prepare_pos_df_for_recurrsive_decoding(active_one_step_decoder, pos_df, pos_linearization_method='isomap'):
+                """ duplicates pos_df and builds a new pseudo-pos_df for building second-order placefields/decoder 
+                pos_df comes in with columns: ['t', 'x', 'y', 'lin_pos', 'speed', 'binned_x', 'binned_y']
+
+                ISSUE/POTENTIAL BUG: 'lin_pos' which is computed for the second-order pos_df seems completely off when compared to the incoming pos_df.
+                    - [ ] Actually the 'x' and 'y' values seem pretty off too. Not sure if this is being computed correctly.
+                """
+                ## Build the new second-order pos_df from the decoded positions:
+                active_second_order_pos_df = pd.DataFrame({'t': active_one_step_decoder.active_time_window_centers, 'x': active_one_step_decoder.most_likely_positions[:,0], 'y': active_one_step_decoder.most_likely_positions[:,1]})
+
+                ## Build the linear position for the second-order pos_df:
+                _temp_pos_obj = Position(active_second_order_pos_df) # position_util.linearize_position(...) expects a neuropy Position object instead of a raw DataFrame, so build a temporary one to make it happy
+                linear_pos = position_util.linearize_position(_temp_pos_obj, method=pos_linearization_method)
+                active_second_order_pos_df['lin_pos'] = linear_pos.x
+                return active_second_order_pos_df
+
+            def _prepare_spikes_df_for_recurrsive_decoding(active_one_step_decoder, spikes_df):
+                """ duplicates spikes_df and builds a new pseudo-spikes_df for building second-order placefields/decoder """
+                active_second_order_spikes_df = deepcopy(spikes_df)
+                # TODO: figure it out instead of hacking -- Just drop the last time bin because something is off 
+                invalid_timestamp = np.nanmax(active_second_order_spikes_df['binned_time'].astype(int).to_numpy()) # 11881
+                active_second_order_spikes_df = active_second_order_spikes_df[active_second_order_spikes_df['binned_time'].astype(int) < invalid_timestamp] # drop the last time-bin as a workaround
+                # backup measured columns because they will be replaced by the new values:
+                active_second_order_spikes_df['x_measured'] = active_second_order_spikes_df['x'].copy()
+                active_second_order_spikes_df['y_measured'] = active_second_order_spikes_df['y'].copy()
+                spike_binned_time_idx = (active_second_order_spikes_df['binned_time'].astype(int)-1) # subtract one to get to a zero-based index
+                # replace the x and y measured positions with the most-likely decoded ones for the next round of decoding
+                active_second_order_spikes_df['x'] = active_one_step_decoder.most_likely_positions[spike_binned_time_idx.to_numpy(),0] # x-pos
+                active_second_order_spikes_df['y'] = active_one_step_decoder.most_likely_positions[spike_binned_time_idx.to_numpy(),1] # y-pos
+                return active_second_order_spikes_df
+
+            def _next_order_decode(active_pf_1D, active_pf_2D, pf_computation_config, manual_time_window_edges=None, manual_time_window_edges_binning_info=None):
+                ## 1D Decoder
+                new_decoder_pf1D = active_pf_1D
+                new_1D_decoder_spikes_df = new_decoder_pf1D.filtered_spikes_df.copy()
+                # new_1D_decoder_spikes_df = new_1D_decoder_spikes_df.spikes.add_binned_time_column(manual_time_window_edges, manual_time_window_edges_binning_info, debug_print=False)
+                new_1D_decoder = BayesianPlacemapPositionDecoder(pf_computation_config.time_bin_size, new_decoder_pf1D, new_1D_decoder_spikes_df, debug_print=False) # , manual_time_window_edges=manual_time_window_edges, manual_time_window_edges_binning_info=manual_time_window_edges_binning_info
+                # new_1D_decoder.compute_all() #  --> n = self.
+
+                ## Custom Manual 2D Decoder:
+                new_decoder_pf2D = active_pf_2D # 
+                new_decoder_spikes_df = new_decoder_pf2D.filtered_spikes_df.copy()
+                # new_decoder_spikes_df = new_decoder_spikes_df.spikes.add_binned_time_column(manual_time_window_edges, manual_time_window_edges_binning_info, debug_print=False)
+                new_2D_decoder = BayesianPlacemapPositionDecoder(pf_computation_config.time_bin_size, new_decoder_pf2D, new_decoder_spikes_df, debug_print=False) # , manual_time_window_edges=manual_time_window_edges, manual_time_window_edges_binning_info=manual_time_window_edges_binning_info
+                new_2D_decoder.compute_all() #  --> n = self.
+                
+                return new_1D_decoder, new_2D_decoder
+
+            active_second_order_spikes_df = _prepare_spikes_df_for_recurrsive_decoding(active_one_step_decoder, spikes_df)
+            active_second_order_pos_df = _prepare_pos_df_for_recurrsive_decoding(active_one_step_decoder, pos_df)
+            active_second_order_pf_1D, active_second_order_pf_2D = perform_compute_placefields(active_second_order_spikes_df, Position(active_second_order_pos_df),
+                                                                                            next_order_computation_config.pf_params, None, None, included_epochs=None, should_force_recompute_placefields=True)
+            # build the second_order decoders:
+            active_second_order_1D_decoder, active_second_order_2D_decoder = _next_order_decode(active_second_order_pf_1D, active_second_order_pf_2D, next_order_computation_config.pf_params) # , manual_time_window_edges=active_one_step_decoder.time_window_edges, manual_time_window_edges_binning_info=active_one_step_decoder.time_window_edges_binning_info
+            
+            return active_second_order_pf_1D, active_second_order_pf_2D, active_second_order_1D_decoder, active_second_order_2D_decoder
+
+        pos_linearization_method='isomap'
+        prev_one_step_bayesian_decoder = computation_result.computed_data['pf2D_Decoder']
+        ## Builds a duplicate of the current computation config but sets the speed_thresh to 0.0:
+        next_order_computation_config = deepcopy(active_session_computation_configs[0]) # make a deepcopy of the active computation config
+        next_order_computation_config.pf_params.speed_thresh = 0.0 # no speed thresholding because the speeds aren't real for the second-order fields
+
+        # Start with empty lists, which will accumulate the different levels of recurrsive depth:
+        computation_result.computed_data['pf1D_RecursiveLatent'] = []
+        computation_result.computed_data['pf2D_RecursiveLatent'] = []
+
+        # 1st Order:
+        computation_result.computed_data['pf1D_RecursiveLatent'].append(DynamicContainer.init_from_dict({'pf1D':computation_result.computed_data['pf1D'], 'pf1D_Decoder':computation_result.computed_data['pf1D_Decoder']}))
+        computation_result.computed_data['pf2D_RecursiveLatent'].append(DynamicContainer.init_from_dict({'pf2D':computation_result.computed_data['pf2D'], 'pf2D_Decoder':computation_result.computed_data['pf2D_Decoder']}))
+
+        # 2nd Order:
+        active_second_order_pf_1D, active_second_order_pf_2D, active_second_order_1D_decoder, active_second_order_2D_decoder = _subfn_build_recurrsive_placefields(prev_one_step_bayesian_decoder, next_order_computation_config=next_order_computation_config, spikes_df=prev_one_step_bayesian_decoder.spikes_df, pos_df=prev_one_step_bayesian_decoder.pf.filtered_pos_df, pos_linearization_method=pos_linearization_method)
+        computation_result.computed_data['pf1D_RecursiveLatent'].append(DynamicContainer.init_from_dict({'pf1D':active_second_order_pf_1D, 'pf1D_Decoder':active_second_order_1D_decoder}))
+        computation_result.computed_data['pf2D_RecursiveLatent'].append(DynamicContainer.init_from_dict({'pf2D':active_second_order_pf_2D, 'pf2D_Decoder':active_second_order_2D_decoder}))
+
+        # 3rd Order:
+        active_third_order_pf_1D, active_third_order_pf_2D, active_third_order_1D_decoder, active_third_order_2D_decoder = _subfn_build_recurrsive_placefields(active_second_order_2D_decoder, next_order_computation_config=next_order_computation_config, spikes_df=active_second_order_2D_decoder.spikes_df, pos_df=active_second_order_2D_decoder.pf.filtered_pos_df, pos_linearization_method=pos_linearization_method)
+        computation_result.computed_data['pf1D_RecursiveLatent'].append(DynamicContainer.init_from_dict({'pf1D':active_third_order_pf_1D, 'pf1D_Decoder':active_third_order_1D_decoder}))
+        computation_result.computed_data['pf2D_RecursiveLatent'].append(DynamicContainer.init_from_dict({'pf2D':active_third_order_pf_2D, 'pf2D_Decoder':active_third_order_2D_decoder}))
+
+        return computation_result
