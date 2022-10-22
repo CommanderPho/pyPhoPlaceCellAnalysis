@@ -241,12 +241,17 @@ def display_all_pf_2D_pyqtgraph_binned_image_rendering(active_pf_2D, figure_form
         else:
             raise ValueError
 
+        ## Non-pre-build method where shared_IDXs_map is directly passed as included_unit_indicies so it's returned in the main loop:
+        included_unit_indicies = shared_IDXs_map
+        active_maps = _local_active_maps
+
+        ## Pre-build correct active_maps that include any extra neuron_IDs that aren't typically defined.
         if debug_print:
             print(f'_local_active_maps.shape: {np.shape(_local_active_maps)}, type: {type(_local_active_maps)}') # _local_active_maps.shape: (67, 63, 16), type: <class 'numpy.ndarray'>
-        active_maps = np.zeros((n_neurons, np.shape(_local_active_maps)[1], np.shape(_local_active_maps)[2])) # fully allocated new array of zeros
-        for idx, a_local_IDX in enumerate(shared_IDXs_map):
-            if a_local_IDX is not None:
-                active_maps[idx,:,:] = _local_active_maps[a_local_IDX,:,:].copy()
+        # active_maps = np.zeros((n_neurons, np.shape(_local_active_maps)[1], np.shape(_local_active_maps)[2])) # fully allocated new array of zeros
+        # for idx, a_local_IDX in enumerate(shared_IDXs_map):
+        #     if a_local_IDX is not None:
+        #         active_maps[idx,:,:] = _local_active_maps[a_local_IDX,:,:].copy()
 
         if debug_print:
             print(f'active_maps.shape: {np.shape(active_maps)}, type: {type(active_maps)}') # _local_active_maps.shape: (70, 63, 16), type: <class 'numpy.ndarray'>
@@ -292,17 +297,16 @@ def display_all_pf_2D_pyqtgraph_binned_image_rendering(active_pf_2D, figure_form
             curr_page_relative_col = np.mod(curr_col, page_grid_sizes[page_idx].num_columns)
             # print(f'a_linear_index: {a_linear_index}, curr_page_relative_linear_index: {curr_page_relative_linear_index}, curr_row: {curr_row}, curr_col: {curr_col}, curr_page_relative_row: {curr_page_relative_row}, curr_page_relative_col: {curr_page_relative_col}, curr_included_unit_index: {curr_included_unit_index}')
 
-            ## pfmap will work in both modes now, as we built zeros maps above for active_maps:
-            # pfmap = np.squeeze(active_pf_2D.ratemap.tuning_curves[a_linear_index,:,:]).copy()
-            pfmap = np.squeeze(active_maps[a_linear_index,:,:]).copy() # matplotlib-version approach with active_maps
-            # matplotlib actually just does:
-            # pfmap = active_maps[a_linear_index].copy()
+            # ## pfmap will work in both modes now, as we built zeros maps above for active_maps:
+            # # pfmap = np.squeeze(active_pf_2D.ratemap.tuning_curves[a_linear_index,:,:]).copy()
+            # pfmap = np.squeeze(active_maps[a_linear_index,:,:]).copy() # matplotlib-version approach with active_maps
+            # # matplotlib actually just does:
+            # # pfmap = active_maps[a_linear_index].copy()
 
-            if included_unit_neuron_IDs is not None:
-                # neuron_IDX = shared_IDXs_map[a_linear_index]
-                curr_extended_id_string = f'{included_unit_neuron_IDs[a_linear_index]}' # get the aclu value (which is all that's known about the missing cell and use that as the curr_extended_id_string
-                final_title = f'{curr_extended_id_string} <shared>'
-            else:
+            ## non-pre create version:
+            if curr_included_unit_index is not None:
+                # valid neuron ID, access like normal
+                pfmap = np.squeeze(active_maps[curr_included_unit_index,:,:]).copy() # matplotlib-version approach with active_maps
                 # normal (non-shared mode)
                 neuron_IDX = curr_included_unit_index
                 curr_extended_id_string = active_pf_2D.ratemap.get_extended_neuron_id_string(neuron_i=neuron_IDX) 
@@ -316,6 +320,32 @@ def display_all_pf_2D_pyqtgraph_binned_image_rendering(active_pf_2D, figure_form
                     formatted_max_value_string = max_value_formatter(np.nanmax(pfmap))
                     
                 final_title = _build_neuron_identity_label(neuron_extended_id=active_pf_2D.ratemap.neuron_extended_ids[neuron_IDX], brev_mode=brev_mode, formatted_max_value_string=formatted_max_value_string, use_special_overlayed_title=use_special_overlayed_title)
+
+            else:
+                # invalid neuron ID, generate blank entry
+                pfmap = np.zeros((np.shape(active_maps)[1], np.shape(active_maps)[2])) # fully allocated new array of zeros
+                curr_extended_id_string = f'{included_unit_neuron_IDs[a_linear_index]}' # get the aclu value (which is all that's known about the missing cell and use that as the curr_extended_id_string
+                final_title = f'{curr_extended_id_string} <shared>'
+
+
+            # if included_unit_neuron_IDs is not None:
+            #     # neuron_IDX = shared_IDXs_map[a_linear_index]
+            #     curr_extended_id_string = f'{included_unit_neuron_IDs[a_linear_index]}' # get the aclu value (which is all that's known about the missing cell and use that as the curr_extended_id_string
+            #     final_title = f'{curr_extended_id_string} <shared>'
+            # else:
+            #     # normal (non-shared mode)
+            #     neuron_IDX = curr_included_unit_index
+            #     curr_extended_id_string = active_pf_2D.ratemap.get_extended_neuron_id_string(neuron_i=neuron_IDX) 
+            #     # ratemap.neuron_extended_ids[neuron_IDX] # the matplotlib version just uses ratemap.neuron_extended_ids[neuron_IDX], but this should work too
+            
+            #     ## Labeling:
+            #     formatted_max_value_string = None
+            #     if brev_mode.should_show_firing_rate_label:
+            #         assert max_value_formatter is not None
+            #         ## NOTE: must set max_value_formatter on the pfmap BEFORE the `_scale_current_placefield_to_acceptable_range` is called to have it show accurate labels!
+            #         formatted_max_value_string = max_value_formatter(np.nanmax(pfmap))
+                    
+            #     final_title = _build_neuron_identity_label(neuron_extended_id=active_pf_2D.ratemap.neuron_extended_ids[neuron_IDX], brev_mode=brev_mode, formatted_max_value_string=formatted_max_value_string, use_special_overlayed_title=use_special_overlayed_title)
 
             ## Once the max_value_formatter is called with the unscaled pfmap, we can call _scale_current_placefield_to_acceptable_range to scale it appropriately:
             pfmap = _scale_current_placefield_to_acceptable_range(pfmap, occupancy=active_pf_2D.occupancy, drop_below_threshold=drop_below_threshold)                       
