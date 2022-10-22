@@ -6,12 +6,16 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>431</width>
-    <height>323</height>
+    <width>536</width>
+    <height>753</height>
    </rect>
   </property>
   <property name="windowTitle">
-   <string>Form</string>
+   <string>Figure Format Configuration</string>
+  </property>
+  <property name="windowIcon">
+   <iconset resource="../../../../External/breeze_style_sheets/dist/qrc/breeze.qrc">
+    <normaloff>:/light/file_dialog_detailed.svg</normaloff>:/light/file_dialog_detailed.svg</iconset>
   </property>
   <layout class="QVBoxLayout" name="verticalLayout">
    <item>
@@ -24,30 +28,6 @@
     <widget class="SingleGroupOptionalMembersCtrl" name="tupleCtrl_2" native="true"/>
    </item>
    <item>
-    <widget class="QCheckBox" name="chkEnableSpikeOverlay">
-     <property name="text">
-      <string>enable_spike_overlay</string>
-     </property>
-    </widget>
-   </item>
-   <item>
-    <widget class="QCheckBox" name="chkDebugPrint">
-     <property name="text">
-      <string>debug_print</string>
-     </property>
-    </widget>
-   </item>
-   <item>
-    <widget class="QCheckBox" name="chkEnableSavingToDisk">
-     <property name="text">
-      <string>enable_saving_to_disk</string>
-     </property>
-     <property name="checked">
-      <bool>true</bool>
-     </property>
-    </widget>
-   </item>
-   <item>
     <widget class="Line" name="line">
      <property name="orientation">
       <enum>Qt::Horizontal</enum>
@@ -55,12 +35,135 @@
     </widget>
    </item>
    <item>
+    <widget class="QFrame" name="horizontalFrame_2">
+     <layout class="QHBoxLayout" name="horizontalLayout_3">
+      <item alignment="Qt::AlignTop">
+       <widget class="QWidget" name="horizontalWidget" native="true">
+        <layout class="QVBoxLayout" name="verticalLayout_2">
+         <property name="spacing">
+          <number>2</number>
+         </property>
+         <property name="leftMargin">
+          <number>0</number>
+         </property>
+         <property name="topMargin">
+          <number>0</number>
+         </property>
+         <property name="rightMargin">
+          <number>0</number>
+         </property>
+         <property name="bottomMargin">
+          <number>0</number>
+         </property>
+         <item>
+          <widget class="QCheckBox" name="chkEnableSpikeOverlay">
+           <property name="text">
+            <string>enable_spike_overlay</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QCheckBox" name="chkDebugPrint">
+           <property name="text">
+            <string>debug_print</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QCheckBox" name="chkEnableSavingToDisk">
+           <property name="text">
+            <string>enable_saving_to_disk</string>
+           </property>
+           <property name="checked">
+            <bool>true</bool>
+           </property>
+          </widget>
+         </item>
+        </layout>
+       </widget>
+      </item>
+      <item>
+       <widget class="QFrame" name="frame">
+        <property name="sizePolicy">
+         <sizepolicy hsizetype="Preferred" vsizetype="Expanding">
+          <horstretch>0</horstretch>
+          <verstretch>0</verstretch>
+         </sizepolicy>
+        </property>
+        <property name="frameShape">
+         <enum>QFrame::StyledPanel</enum>
+        </property>
+        <property name="frameShadow">
+         <enum>QFrame::Raised</enum>
+        </property>
+        <layout class="QGridLayout" name="gridLayout_2">
+         <item row="1" column="0">
+          <widget class="QScrollArea" name="scrollArea">
+           <property name="widgetResizable">
+            <bool>true</bool>
+           </property>
+           <widget class="QWidget" name="scrollAreaWidgetContents">
+            <property name="geometry">
+             <rect>
+              <x>0</x>
+              <y>0</y>
+              <width>333</width>
+              <height>210</height>
+             </rect>
+            </property>
+            <property name="sizePolicy">
+             <sizepolicy hsizetype="Preferred" vsizetype="Expanding">
+              <horstretch>0</horstretch>
+              <verstretch>0</verstretch>
+             </sizepolicy>
+            </property>
+            <layout class="QGridLayout" name="gridLayout_3">
+             <item row="0" column="0">
+              <widget class="PyCodeEdit" name="txtEditExtraArguments">
+               <property name="toolTip">
+                <string>Extra Arguments</string>
+               </property>
+               <property name="statusTip">
+                <string>Extra Arguments</string>
+               </property>
+              </widget>
+             </item>
+            </layout>
+           </widget>
+          </widget>
+         </item>
+        </layout>
+       </widget>
+      </item>
+     </layout>
+    </widget>
+   </item>
+   <item>
+    <spacer name="verticalSpacer">
+     <property name="orientation">
+      <enum>Qt::Vertical</enum>
+     </property>
+     <property name="sizeHint" stdset="0">
+      <size>
+       <width>20</width>
+       <height>40</height>
+      </size>
+     </property>
+    </spacer>
+   </item>
+   <item>
     <widget class="QToolBox" name="toolBox">
      <property name="sizePolicy">
-      <sizepolicy hsizetype="Expanding" vsizetype="Preferred">
+      <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
        <horstretch>1</horstretch>
        <verstretch>0</verstretch>
       </sizepolicy>
+     </property>
+     <property name="baseSize">
+      <size>
+       <width>400</width>
+       <height>200</height>
+      </size>
      </property>
      <property name="frameShape">
       <enum>QFrame::StyledPanel</enum>
@@ -82,8 +185,8 @@
        <rect>
         <x>0</x>
         <y>0</y>
-        <width>411</width>
-        <height>69</height>
+        <width>516</width>
+        <height>126</height>
        </rect>
       </property>
       <property name="sizePolicy">
@@ -92,49 +195,59 @@
         <verstretch>0</verstretch>
        </sizepolicy>
       </property>
+      <attribute name="icon">
+       <iconset resource="../../../../External/breeze_style_sheets/dist/qrc/breeze.qrc">
+        <normaloff>:/light/desktop.svg</normaloff>:/light/desktop.svg</iconset>
+      </attribute>
       <attribute name="label">
        <string>Figure Output/Export</string>
       </attribute>
-      <widget class="QWidget" name="layoutWidget">
-       <property name="geometry">
-        <rect>
-         <x>1</x>
-         <y>2</y>
-         <width>411</width>
-         <height>51</height>
-        </rect>
+      <layout class="QHBoxLayout" name="horizontalLayout">
+       <property name="leftMargin">
+        <number>4</number>
        </property>
-       <layout class="QVBoxLayout" name="verticalLayout_3">
-        <item>
-         <widget class="InlineFilesystemPathSelectWidget" name="filepkr_FigureOutputPath" native="true">
-          <property name="sizePolicy">
-           <sizepolicy hsizetype="Expanding" vsizetype="Preferred">
-            <horstretch>1</horstretch>
-            <verstretch>0</verstretch>
-           </sizepolicy>
-          </property>
-         </widget>
-        </item>
-        <item>
-         <widget class="InlineFilesystemPathSelectWidget" name="filepkr_ProgrammaticDisplayFcnOutputPath" native="true">
-          <property name="sizePolicy">
-           <sizepolicy hsizetype="Expanding" vsizetype="Preferred">
-            <horstretch>1</horstretch>
-            <verstretch>0</verstretch>
-           </sizepolicy>
-          </property>
-         </widget>
-        </item>
-       </layout>
-      </widget>
+       <property name="topMargin">
+        <number>0</number>
+       </property>
+       <property name="rightMargin">
+        <number>4</number>
+       </property>
+       <property name="bottomMargin">
+        <number>0</number>
+       </property>
+       <item>
+        <layout class="QVBoxLayout" name="verticalLayout_3">
+         <item>
+          <widget class="InlineFilesystemPathSelectWidget" name="filepkr_FigureOutputPath" native="true">
+           <property name="sizePolicy">
+            <sizepolicy hsizetype="Expanding" vsizetype="Preferred">
+             <horstretch>1</horstretch>
+             <verstretch>0</verstretch>
+            </sizepolicy>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="InlineFilesystemPathSelectWidget" name="filepkr_ProgrammaticDisplayFcnOutputPath" native="true">
+           <property name="sizePolicy">
+            <sizepolicy hsizetype="Expanding" vsizetype="Preferred">
+             <horstretch>1</horstretch>
+             <verstretch>0</verstretch>
+            </sizepolicy>
+           </property>
+          </widget>
+         </item>
+        </layout>
+       </item>
+      </layout>
      </widget>
      <widget class="QWidget" name="page_debugging">
       <property name="geometry">
        <rect>
         <x>0</x>
         <y>0</y>
-        <width>411</width>
-        <height>69</height>
+        <width>516</width>
+        <height>275</height>
        </rect>
       </property>
       <property name="sizePolicy">
@@ -143,41 +256,39 @@
         <verstretch>0</verstretch>
        </sizepolicy>
       </property>
+      <attribute name="icon">
+       <iconset resource="../../../../External/breeze_style_sheets/dist/qrc/breeze.qrc">
+        <normaloff>:/light/file_dialog_list.svg</normaloff>:/light/file_dialog_list.svg</iconset>
+      </attribute>
       <attribute name="label">
        <string>Extra/Debugging</string>
       </attribute>
-      <widget class="QWidget" name="gridLayoutWidget">
-       <property name="geometry">
-        <rect>
-         <x>10</x>
-         <y>0</y>
-         <width>401</width>
-         <height>131</height>
-        </rect>
-       </property>
-       <layout class="QGridLayout" name="gridLayout">
-        <item row="1" column="0">
-         <widget class="QTextBrowser" name="textBrowser"/>
-        </item>
-        <item row="2" column="0">
-         <widget class="QPushButton" name="pushButton_2">
-          <property name="text">
-           <string>PushButton</string>
-          </property>
-         </widget>
-        </item>
-        <item row="0" column="0">
-         <widget class="FilesystemPathLineEdit" name="lineEdit">
-          <property name="text">
-           <string>C:\Users\pho\repos\PhoPy3DPositionAnalysis2021\EXTERNAL\Screenshots\ProgrammaticDisplayFunctionTesting</string>
-          </property>
-          <property name="clearButtonEnabled">
-           <bool>true</bool>
-          </property>
-         </widget>
-        </item>
-       </layout>
-      </widget>
+      <layout class="QHBoxLayout" name="horizontalLayout_2">
+       <item>
+        <layout class="QGridLayout" name="gridLayout">
+         <item row="1" column="0">
+          <widget class="QTextBrowser" name="textBrowser"/>
+         </item>
+         <item row="2" column="0">
+          <widget class="QPushButton" name="pushButton_2">
+           <property name="text">
+            <string>PushButton</string>
+           </property>
+          </widget>
+         </item>
+         <item row="0" column="0">
+          <widget class="FilesystemPathLineEdit" name="lineEdit">
+           <property name="text">
+            <string>C:\Users\pho\repos\PhoPy3DPositionAnalysis2021\EXTERNAL\Screenshots\ProgrammaticDisplayFunctionTesting</string>
+           </property>
+           <property name="clearButtonEnabled">
+            <bool>true</bool>
+           </property>
+          </widget>
+         </item>
+        </layout>
+       </item>
+      </layout>
      </widget>
     </widget>
    </item>
@@ -206,7 +317,7 @@
   <customwidget>
    <class>SingleGroupOptionalMembersCtrl</class>
    <extends>QWidget</extends>
-   <header location="global">pyphoplacecellanalysis.GUI.Qt.FigureFormatConfigControls.SingleGroupOptionalMembersCtrl</header>
+   <header location="global">pyphoplacecellanalysis.GUI.Qt.Widgets.SingleGroupOptionalMembersCtrl.SingleGroupOptionalMembersCtrl</header>
    <container>1</container>
    <slots>
     <signal>value_changed(object,bool,int,bool,int)</signal>
@@ -219,58 +330,16 @@
    <header location="global">pyphocorehelpers.gui.Qt.InlineFilesystemPathSelectWidget.InlineFilesystemPathSelectWidget</header>
    <container>1</container>
   </customwidget>
+  <customwidget>
+   <class>PyCodeEdit</class>
+   <extends>QPlainTextEdit</extends>
+   <header location="global">pyqode.python.widgets.code_edit</header>
+  </customwidget>
  </customwidgets>
- <resources/>
- <connections>
-  <connection>
-   <sender>chkEnableSpikeOverlay</sender>
-   <signal>toggled(bool)</signal>
-   <receiver>Form</receiver>
-   <slot>on_update_values()</slot>
-   <hints>
-    <hint type="sourcelabel">
-     <x>57</x>
-     <y>230</y>
-    </hint>
-    <hint type="destinationlabel">
-     <x>85</x>
-     <y>5</y>
-    </hint>
-   </hints>
-  </connection>
-  <connection>
-   <sender>chkDebugPrint</sender>
-   <signal>toggled(bool)</signal>
-   <receiver>Form</receiver>
-   <slot>on_update_values()</slot>
-   <hints>
-    <hint type="sourcelabel">
-     <x>26</x>
-     <y>251</y>
-    </hint>
-    <hint type="destinationlabel">
-     <x>33</x>
-     <y>0</y>
-    </hint>
-   </hints>
-  </connection>
-  <connection>
-   <sender>chkEnableSavingToDisk</sender>
-   <signal>toggled(bool)</signal>
-   <receiver>Form</receiver>
-   <slot>on_update_values()</slot>
-   <hints>
-    <hint type="sourcelabel">
-     <x>106</x>
-     <y>279</y>
-    </hint>
-    <hint type="destinationlabel">
-     <x>3</x>
-     <y>4</y>
-    </hint>
-   </hints>
-  </connection>
- </connections>
+ <resources>
+  <include location="../../../../External/breeze_style_sheets/dist/qrc/breeze.qrc"/>
+ </resources>
+ <connections/>
  <slots>
   <slot>on_update_values()</slot>
  </slots>

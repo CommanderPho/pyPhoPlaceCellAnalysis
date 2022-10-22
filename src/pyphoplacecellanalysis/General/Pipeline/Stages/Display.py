@@ -314,7 +314,21 @@ class PipelineWithDisplayPipelineStageMixin:
         if kwarg_active_config_name is not None:
             assert kwarg_active_config_name == active_session_configuration_name # they better be equal or else there is a conflict.
 
-        return display_function(self.computation_results[active_session_configuration_name], self.active_configs[active_session_configuration_name], owning_pipeline=self, active_config_name=active_session_configuration_name, **kwargs)
+        ## Build the final display context: 
+        found_display_fcn_index = self.registered_display_functions.index(display_function)
+        display_fn_name = self.registered_display_function_names[found_display_fcn_index]
+        active_display_fn_identifying_ctx = active_session_configuration_context.adding_context('display_fn', display_fn_name=display_fn_name) # display_fn_name should be like '_display_1d_placefields'
+
+        # Add the display outputs to the active context. Each display function should return a structure like: dict(fig=active_figure, ax=ax_pf_1D)
+        # owning_pipeline.display_output[active_display_fn_identifying_ctx] = (active_figure, ax_pf_1D)
+        curr_display_output = display_function(self.computation_results[active_session_configuration_name], self.active_configs[active_session_configuration_name], owning_pipeline=self, active_config_name=active_session_configuration_name, **kwargs)
+        self.display_output[active_display_fn_identifying_ctx] = curr_display_output # sets the internal display reference to that item
+        return curr_display_output
+
+        # return display_function(self.computation_results[active_session_configuration_name], self.active_configs[active_session_configuration_name], owning_pipeline=self, active_config_name=active_session_configuration_name, **kwargs)
         
 
+
+    # def _pdf_display(self, display_function, active_session_configuration_context, **kwargs):
+    #     ## TODO:
     

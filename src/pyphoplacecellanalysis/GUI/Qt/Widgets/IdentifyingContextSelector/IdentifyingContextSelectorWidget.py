@@ -21,7 +21,7 @@ uiFile = os.path.join(path, 'IdentifyingContextSelectorWidget.ui')
 # IdentifyingContextSelectorWidget                                                                                     #
 # ==================================================================================================================== #
 class IdentifyingContextSelectorWidget(ComboBoxCtrlOwnerMixin, PipelineOwningMixin, QWidget): 
-    """_summary_
+    """ Allows selecting an IdentifyingContext from a dropdown list
 
     pyphoplacecellanalysis.GUI.Qt.Widgets.IdentifyingContextSelector.IdentifyingContextSelectorWidget.IdentifyingContextSelectorWidget
     
@@ -29,6 +29,10 @@ class IdentifyingContextSelectorWidget(ComboBoxCtrlOwnerMixin, PipelineOwningMix
         from pyphoplacecellanalysis.GUI.Qt.IdentifyingContextSelector.IdentifyingContextSelectorWidget import IdentifyingContextSelectorWidget
 
     """
+
+    sigContextChanged = pyqtSignal(object, object) # newKey: str, newContext: IdentifyingContext
+
+
     @property
     def current_selected_context_key(self):
         """The current_selected_context property."""
@@ -58,6 +62,8 @@ class IdentifyingContextSelectorWidget(ComboBoxCtrlOwnerMixin, PipelineOwningMix
         else:
             return self.all_filtered_session_contexts[self.current_selected_context_key]
 
+
+    # ==================================================================================================================== #
     def __init__(self, parent=None, owning_pipeline=None):
         super().__init__(parent=parent) # Call the inherited classes __init__ method
         self.ui = uic.loadUi(uiFile, self) # Load the .ui file
@@ -70,24 +76,27 @@ class IdentifyingContextSelectorWidget(ComboBoxCtrlOwnerMixin, PipelineOwningMix
 
     def initUI(self):
         # self.ui.cmbIdentifyingContext.set = self.all_filtered_session_keys
+        self.ui.cmbIdentifyingContext.currentIndexChanged.connect(self.on_selected_context_index_changed)
         # self.ui.btnConfirm.clicked.
         # self.updateUi()
-        pass
 
 
-    def updateUi(self):
+    def _tryUpdateComboItemsUi(self):
+        """ tries to update the combo box items. If an item was previously selected before the update, it tries to re-select the same item. """
+
         ## Update Combo box items:
-        ## Freeze signals:
         curr_combo_box = self.ui.cmbIdentifyingContext # QComboBox 
+
+        ## Freeze signals:
         curr_combo_box.blockSignals(True)
         
         ## Capture the previous selection:
         selected_index, selected_item_text = self.get_current_combo_item_selection(curr_combo_box)
+        had_previous_selected_item = (selected_item_text is not None)
 
         # Build updated list:
         # active_list_items = self.all_filtered_session_keys
         active_list_items = self.all_filtered_session_context_descriptions
-        self.num_known_types = len(active_list_items)
         ## Build updated list:
         updated_list = active_list_items
         # updated_list.append('Custom...')
@@ -95,11 +104,45 @@ class IdentifyingContextSelectorWidget(ComboBoxCtrlOwnerMixin, PipelineOwningMix
         self.replace_combo_items(curr_combo_box, updated_list)
         
         ## Re-select the previously selected item if possible:
+        if not had_previous_selected_item:
+            # no previously selected item. Instead, select the first item.
+            self._trySelectFirstComboItem()
         found_desired_index = self.try_select_combo_item_with_text(curr_combo_box, selected_item_text)
         ## Unblock the signals:
         curr_combo_box.blockSignals(False)
 
 
+    def _trySelectFirstComboItem(self):
+        """ tries to select the first item (index 0) if possible. Otherwise, fails gracefully.
+        Internally calls self.try_select_combo_item_with_text(...)
+         """
+        # no previously selected item. Instead, select the first item.
+        current_list = self.all_filtered_session_context_descriptions
+        if (len(current_list) > 0):
+            selected_item_text = current_list[0] # get the first item text to try and select.
+            found_desired_index = self.try_select_combo_item_with_text(self.ui.cmbIdentifyingContext, selected_item_text)
+        else:
+            print(f'WARNING: could not select any default items because the list was empty.')
+            found_desired_index = None
+        return found_desired_index
+
+    def updateUi(self):
+        self._tryUpdateComboItemsUi()
+
+
+    
+
+    @pyqtSlot(int)
+    def on_selected_context_index_changed(self, new_index):
+        if new_index < 0:
+            new_key = None
+            new_context = None
+        else:
+            new_key = self.all_filtered_session_keys[new_index]
+            new_description = self.all_filtered_session_context_descriptions[new_index]
+            new_context = self.all_filtered_session_contexts[new_key]
+        print(f'on_selected_context_index_changed: {new_index}, {new_key}, {new_description}, {new_context}')
+        self.sigContextChanged.emit(new_key, new_context)
 
 
 ## Start Qt event loop

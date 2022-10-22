@@ -15,11 +15,27 @@ from neuropy.plotting.placemaps import plot_all_placefields
 from neuropy.utils.matplotlib_helpers import enumTuningMap2DPlotVariables # for getting the variant name from the dict
 from neuropy.utils.mixins.unwrap_placefield_computation_parameters import unwrap_placefield_computation_parameters
 
+from pyphocorehelpers.DataStructure.RenderPlots.MatplotLibRenderPlots import MatplotlibRenderPlots
+from pyphocorehelpers.DataStructure.RenderPlots.PyqtgraphRenderPlots import PyqtgraphRenderPlots
 
 
 class DefaultRatemapDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=DisplayFunctionRegistryHolder):
     """ Functions related to visualizing Bayesian Decoder performance. """
     
+    def _display_1d_placefields(computation_result, active_config, owning_pipeline=None, active_context=None, **kwargs):
+        assert active_context is not None
+        assert owning_pipeline is not None
+
+        ## Finally, add the display function to the active context
+        active_display_fn_identifying_ctx = active_context.adding_context('display_fn', display_fn_name='_display_1d_placefields')
+        # _build_safe_kwargs
+        ax_pf_1D = computation_result.computed_data['pf1D'].plot_ratemaps_1D()
+        active_figure = plt.gcf()
+
+        # return dict(fig=active_figure, ax=ax_pf_1D)
+        return MatplotlibRenderPlots(figures=[active_figure], axes=[ax_pf_1D])   
+
+
     def _display_2d_placefield_result_plot_ratemaps_2D(computation_result, active_config, enable_saving_to_disk=False, **kwargs):
         """ displays 2D placefields in a MATPLOTLIB window 
         
@@ -31,7 +47,7 @@ class DefaultRatemapDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Disp
         TODO: plot the information about the source of the data, such as the session information? Or perhaps we could just leave that encoded in the exported file name? It is hard to track the figures though
         
         """
-        computation_result.computed_data['pf2D'].plot_ratemaps_2D(**({'subplots': (None, 3), 'resolution_multiplier': 1.0, 'enable_spike_overlay': False, 'brev_mode': PlotStringBrevityModeEnum.MINIMAL} | kwargs))
+        display_outputs = computation_result.computed_data['pf2D'].plot_ratemaps_2D(**({'subplots': (None, 3), 'resolution_multiplier': 1.0, 'enable_spike_overlay': False, 'brev_mode': PlotStringBrevityModeEnum.MINIMAL} | kwargs))
         
         # plot_variable_name = ({'plot_variable': None} | kwargs)
         plot_variable_name = kwargs.get('plot_variable', enumTuningMap2DPlotVariables.TUNING_MAPS).name
@@ -47,7 +63,6 @@ class DefaultRatemapDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Disp
         active_figure.set_label(fig_label)
         active_figure.canvas.manager.set_window_title(fig_label) # sets the window's title
         
-        
         active_pf_2D_figures = [active_figure]            
         
         # Save the figure out to disk if we need to:
@@ -55,7 +70,9 @@ class DefaultRatemapDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Disp
         if should_save_to_disk:
             _save_displayed_figure_if_needed(active_config.plotting_config, plot_type_name='_display_2d_placefield_result_plot_ratemaps_2D', active_variant_name=plot_variable_name, active_figures=active_pf_2D_figures)
         
-        return active_pf_2D_figures
+        # return active_pf_2D_figures
+        return MatplotlibRenderPlots(figures=active_pf_2D_figures, axes=display_outputs[1], graphics=display_outputs[2])
+
     
     def _display_normal(computation_result, active_config, **kwargs):
         """
@@ -68,12 +85,12 @@ class DefaultRatemapDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Disp
         if active_config.computation_config is None:
             active_config.computation_config = computation_result.computation_config
         ax_pf_1D, occupancy_fig, active_pf_2D_figures, active_pf_2D_gs = plot_all_placefields(None, computation_result.computed_data['pf2D'], active_config, **({'should_save_to_disk': False} | kwargs))
-        
-        return occupancy_fig, active_pf_2D_figures
-        
-    def _display_placemaps_pyqtplot_2D(computation_result, active_config, enable_saving_to_disk=False, **kwargs):
-        """ Plots the prediction error for the two_step decoder at each point in time.
-            Based off of "_temp_debug_two_step_plots_animated_imshow"
+
+        # return occupancy_fig, active_pf_2D_figures
+        return MatplotlibRenderPlots(figures=[occupancy_fig, active_pf_2D_figures])   
+
+    def _display_placemaps_pyqtplot_2D(computation_result, active_config, enable_saving_to_disk=False, defer_show:bool=False, **kwargs):
+        """  displays 2D placefields in a pyqtgraph window
         """
         # Get the decoders from the computation result:
         active_one_step_decoder = computation_result.computed_data['pf2D_Decoder'] # doesn't actually require the Decoder, could just use computation_result.computed_data['pf2D']            
@@ -85,7 +102,12 @@ class DefaultRatemapDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Disp
                                                                                 app=kwargs.get('app',None), parent_root_widget=kwargs.get('parent_root_widget',None), root_render_widget=kwargs.get('root_render_widget',None), max_num_columns=kwargs.get('max_num_columns', 8))
         # win.show()
         display_outputs = DynamicParameters(root_render_widget=root_render_widget, plot_array=plot_array, img_item_array=img_item_array, other_components_array=other_components_array)
+
+        if not defer_show:
+            parent_root_widget.show()
+
+        return PyqtgraphRenderPlots(app=app, parent_root_widget=parent_root_widget, display_outputs=display_outputs)
         # return app, parent_root_widget, root_render_widget
-        return app, parent_root_widget, display_outputs
+        # return app, parent_root_widget, display_outputs
 
 

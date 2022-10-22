@@ -12,11 +12,26 @@ from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtCore, QtGui, QtWidget
 # from pyPhoPlaceCellAnalysis.GUI.Qt.FigureFormatConfigControls  import FigureFormatConfigControls
 from pyphoplacecellanalysis.GUI.Qt.Widgets.FigureFormatConfigControls.Uic_AUTOGEN_FigureFormatConfigControls import Ui_Form
 
+# For Code Editor
+from pyqode.core import backend
+from pyqode.core import api
+from pyqode.core import modes
+from pyqode.core import panels
+
+from pyqode.python.widgets.code_edit import PyCodeEdit
 # def pair_optional_value_widget(checkBox, valueWidget):
 #     self.checkBox.toggled['bool'].connect(self.spinBox.setEnabled) # type: ignore
     
 
+## Code Editor Type Imports
+from neuropy.core.neuron_identities import PlotStringBrevityModeEnum
+from neuropy.core.epoch import NamedTimerange
+from neuropy.utils.matplotlib_helpers import enumTuningMap2DPlotMode, enumTuningMap2DPlotVariables
+from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer
+
+
 class FigureFormatConfigControls(QtWidgets.QWidget):
+    """ A widget that displays many options related to customizing the display of figures, including a code editor that allows specifying custom arguments to be passed to a display function as a dictionary. """
     _debug_print = False
     
     ## Signals
@@ -45,6 +60,14 @@ class FigureFormatConfigControls(QtWidgets.QWidget):
     @enable_debug_print.setter
     def enable_debug_print(self, value):
         self.ui.chkDebugPrint.setChecked(value)
+
+    @property
+    def optional_argument_text(self):
+        """The additional arguments as a string."""
+        return self.ui.txtEditExtraArguments.toPlainText()
+    @optional_argument_text.setter
+    def optional_argument_text(self, value):
+        self.ui.txtEditExtraArguments.setPlainText(value)
         
     @property
     def figure_format_config(self):
@@ -55,6 +78,10 @@ class FigureFormatConfigControls(QtWidgets.QWidget):
         ## Add explicit column/row widths to fix window sizing issue:
         figure_format_config = (dict(fig_column_width=self.ui.tupleCtrl_2.tuple_values[0], fig_row_height=self.ui.tupleCtrl_2.tuple_values[1]) | figure_format_config)
         figure_format_config = (dict(enable_spike_overlay=self.enable_spike_overlay, debug_print=self.enable_debug_print, enable_saving_to_disk=self.enable_saving_to_disk) | figure_format_config)
+
+        ## Expand optional arguments inline:
+        figure_format_config = (self.build_optional_arguments_dict() | figure_format_config)
+        # figure_format_config['optional_kwargs'] = self.build_optional_arguments_dict()
         return figure_format_config
     @figure_format_config.setter
     def figure_format_config(self, value):
@@ -95,6 +122,13 @@ class FigureFormatConfigControls(QtWidgets.QWidget):
         self.ui.tupleCtrl_2.control_name = 'col_width/row_height'
         self.ui.tupleCtrl_2.tuple_values = (5, 5)
         self.ui.tupleCtrl_2.tuple_values = (None, None)
+
+        # self.ui.txtEditExtraArguments.setPlainText('')
+        # Code Console Mode:
+        # self.ui.txtEditExtraArguments is now a CodeEditor
+        self._init_UI_Code_Editor(self.ui.txtEditExtraArguments)
+        # Add the statusbar
+        # self.window().statusBar().showMessage('Message in statusbar.')
         
         # self.ui.filepkr_FigureOutputPath.path
         try:
@@ -151,6 +185,64 @@ class FigureFormatConfigControls(QtWidgets.QWidget):
         
     # def __str__(self):
     #      return 
+
+    def _init_UI_Code_Editor(self, editor: PyCodeEdit):
+        """ editor: CodeEdit """
+        # configure the code completion providers, here we just use a basic one
+        # backend.CodeCompletionWorker.providers.append(backend.DocumentWordsProvider())
+        # backend.serve_forever()
+
+        # start the backend as soon as possible        
+        # print(f'backend.server.__file__: {backend.server.__file__}')
+        # editor.backend.start('server.py')
+        editor.backend.start(backend.server.__file__)
+
+        # append some modes and panels
+        editor.modes.append(modes.CodeCompletionMode())
+        editor.modes.append(modes.PygmentsSyntaxHighlighter(editor.document()))
+        editor.modes.append(modes.CaretLineHighlighterMode())
+        editor.panels.append(panels.SearchAndReplacePanel(),
+                        api.Panel.Position.BOTTOM)
+
+        # open a file
+        # editor.file.open(__file__)
+        _example_code = """
+{
+'brev_mode': PlotStringBrevityModeEnum.NONE,
+'plot_variable': enumTuningMap2DPlotVariables.TUNING_MAPS
+}
+        """
+        editor.setPlainText(_example_code)
+
+
+    def build_optional_arguments_dict(self, debug_print=False):
+        """ builds the python dict from the text value """
+        l = locals()
+        # l.update(args)
+        ## try eval first, then exec
+        try:  
+            code_str = self.ui.txtEditExtraArguments.toPlainText()
+            code_str = code_str.replace('\n', ' ')
+            if debug_print:
+                print(f'code_str: {code_str}')
+            output = eval(code_str, globals(), l)
+            if debug_print:
+                print(f'parsed output: {output}')
+
+        except SyntaxError:
+            fn = "def fn(**args):\n"
+            run = "\noutput=fn(**args)\n"
+            code_str = fn + "\n".join(["    "+l for l in self.ui.txtEditExtraArguments.toPlainText().split('\n')]) + run
+            ldict = locals()
+            exec(code_str, globals(), ldict)
+            output = ldict['output']
+        except:
+            print(f"Error parsing optional arguments.")
+            output = {} # empty dictionary
+
+        return output
+
+
 
 
     # ==================================================================================================================== #

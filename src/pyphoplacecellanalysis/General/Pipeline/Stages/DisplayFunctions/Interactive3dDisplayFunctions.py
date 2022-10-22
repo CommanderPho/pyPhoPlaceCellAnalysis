@@ -2,6 +2,8 @@ from pathlib import Path
 import pyvista as pv
 import pyvistaqt as pvqt
 
+from neuropy.utils.dynamic_container import overriding_dict_with
+
 from pyphocorehelpers.gui.Qt.widget_positioning_helpers import WidgetPositioningHelpers
 from pyphoplacecellanalysis.General.Configs.DynamicConfigs import PlottingConfig, InteractivePlaceCellConfig
 from pyphocorehelpers.mixins.member_enumerating import AllFunctionEnumeratingMixin
@@ -116,7 +118,11 @@ class Interactive3dDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Displ
         # try: pActiveInteractiveLapsPlotter
         # except NameError: pActiveInteractiveLapsPlotter = None # Checks variable p's existance, and sets its value to None if it doesn't exist so it can be checked in the next step
         pActiveInteractiveLapsPlotter = kwargs.get('extant_plotter', None)
-        iplapsDataExplorer = InteractiveCustomDataExplorer(active_laps_config, computation_result.sess, **({'extant_plotter':None} | kwargs))
+        # iplapsDataExplorer = InteractiveCustomDataExplorer(active_laps_config, computation_result.sess, **({'extant_plotter':None} | kwargs))
+        # iplapsDataExplorer = InteractiveCustomDataExplorer(active_laps_config, computation_result.sess, **overriding_dict_with({'extant_plotter':None}, **kwargs))
+        iplapsDataExplorer = InteractiveCustomDataExplorer(active_laps_config, computation_result.sess, extant_plotter=kwargs.get('extant_plotter', None))
+
+        
         pActiveInteractiveLapsPlotter = iplapsDataExplorer.plot(pActivePlotter=pActiveInteractiveLapsPlotter)
         return {'iplapsDataExplorer': iplapsDataExplorer, 'plotter': pActiveInteractiveLapsPlotter}
 

@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Form implementation generated from reading ui file 'c:\Users\pho\repos\pyPhoPlaceCellAnalysis\src\pyphoplacecellanalysis\GUI\Qt\IdentifyingContextSelector\IdentifyingContextSelectorWidget.ui'
+# Form implementation generated from reading ui file 'c:\Users\pho\repos\pyPhoPlaceCellAnalysis\src\pyphoplacecellanalysis\GUI\Qt\Widgets\IdentifyingContextSelector\IdentifyingContextSelectorWidget.ui'
 #
 # Created by: PyQt5 UI code generator 5.15.4
 #
@@ -22,6 +22,8 @@ class Ui_Form(object):
         self.horizontalLayout = QtWidgets.QHBoxLayout(self.groupBox)
         self.horizontalLayout.setObjectName("horizontalLayout")
         self.cmbIdentifyingContext = QtWidgets.QComboBox(self.groupBox)
+        self.cmbIdentifyingContext.setMinimumSize(QtCore.QSize(0, 22))
+        self.cmbIdentifyingContext.setBaseSize(QtCore.QSize(0, 22))
         self.cmbIdentifyingContext.setObjectName("cmbIdentifyingContext")
         self.horizontalLayout.addWidget(self.cmbIdentifyingContext)
         self.btnRevert = QtWidgets.QToolButton(self.groupBox)
