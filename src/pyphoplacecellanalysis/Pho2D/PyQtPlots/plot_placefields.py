@@ -7,6 +7,7 @@
 # app = _instance
 import numpy as np
 
+from neuropy.utils.misc import safe_item
 from neuropy.utils.dynamic_container import overriding_dict_with # used in display_all_pf_2D_pyqtgraph_binned_image_rendering to only get the valid kwargs to pass from the display config
 from neuropy.utils.matplotlib_helpers import _build_variable_max_value_label, enumTuningMap2DPlotMode, enumTuningMap2DPlotVariables, _determine_best_placefield_2D_layout, _scale_current_placefield_to_acceptable_range, _build_neuron_identity_label # for display_all_pf_2D_pyqtgraph_binned_image_rendering
 from pyphoplacecellanalysis.GUI.PyQtPlot.BinnedImageRenderingWindow import BasicBinnedImageRenderingWindow # for display_all_pf_2D_pyqtgraph_binned_image_rendering
@@ -193,10 +194,14 @@ def display_all_pf_2D_pyqtgraph_binned_image_rendering(active_pf_2D, figure_form
     
     Uses the common `_determine_best_placefield_2D_layout(...)` setup so that its returned subplots layout is the same as the matplotlib version in NeuroPy.neuropy.plotting.ratemaps.plot_ratemap_2D(...) (the main Matplotlib version that works)
     
+    Analagous to:
+        NeuroPy.neuropy.plotting.ratemaps.plot_ratemap_2D: the matplotlib-based version
+
     Usage:
         out_all_pf_2D_pyqtgraph_binned_image_fig = display_all_pf_2D_pyqtgraph_binned_image_rendering(active_pf_2D, figure_format_config)
         
     """
+
     wants_crosshairs= figure_format_config.get('wants_crosshairs', False) 
     
     # cmap = pg.ColorMap(pos=np.linspace(0.0, 1.0, 6), color=colors)
@@ -210,15 +215,77 @@ def display_all_pf_2D_pyqtgraph_binned_image_rendering(active_pf_2D, figure_form
     brev_mode = figure_format_config.get('brev_mode', PlotStringBrevityModeEnum.CONCISE)
     plot_variable = figure_format_config.get('plot_variable', enumTuningMap2DPlotVariables.TUNING_MAPS)
     drop_below_threshold = figure_format_config.get('drop_below_threshold', 0.0000001) # try to get the 'drop_below_threshold' argument
-    ## from matplotlib version:
-    # drop_below_threshold: float=0.0000001, brev_mode: PlotStringBrevityModeEnum=PlotStringBrevityModeEnum.CONCISE, plot_variable: enumTuningMap2DPlotVariables=enumTuningMap2DPlotVariables.TUNING_MAPS
+    included_unit_indicies = figure_format_config.get('included_unit_indicies', None)
+    included_unit_neuron_IDs = figure_format_config.get('included_unit_neuron_IDs', None)
+
+    if included_unit_neuron_IDs is not None:
+        print(f'included_unit_neuron_IDs: {included_unit_neuron_IDs}')
+        if not isinstance(included_unit_neuron_IDs, np.ndarray):
+            included_unit_neuron_IDs = np.array(included_unit_neuron_IDs) # convert to np.array if needed
+
+        n_neurons = np.size(included_unit_neuron_IDs)
+        print(f'\t n_neurons: {n_neurons}')
+        if included_unit_indicies is None:
+            included_unit_indicies = np.arange(n_neurons) # include all unless otherwise specified
+
+        shared_IDXs_map = [safe_item(np.squeeze(np.argwhere(aclu == active_pf_2D.ratemap.neuron_ids)), default=None) for aclu in included_unit_neuron_IDs] # [0, 1, None, 2, 3, 4, 5, None, 6, 7, 8, None, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66]
+
+        if plot_variable.name is enumTuningMap2DPlotVariables.TUNING_MAPS.name:
+            _local_active_maps = active_pf_2D.ratemap.tuning_curves
+            title_substring = 'Placemaps'
+        elif plot_variable.name == enumTuningMap2DPlotVariables.SPIKES_MAPS.name:
+            _local_active_maps = active_pf_2D.ratemap.spikes_maps
+            title_substring = 'Spikes Maps'
+        else:
+            raise ValueError
+
+        print(f'_local_active_maps.shape: {np.shape(_local_active_maps)}, type: {type(_local_active_maps)}') # _local_active_maps.shape: (67, 63, 16), type: <class 'numpy.ndarray'>
+        active_maps = np.zeros((n_neurons, np.shape(_local_active_maps)[1], np.shape(_local_active_maps)[2])) # fully allocated new array of zeros
+        # active_maps = [] # empty list
+        for idx, a_local_IDX in enumerate(shared_IDXs_map):
+            if a_local_IDX is not None:
+                # curr_value = _local_active_maps[a_local_IDX].copy()
+                active_maps[idx,:,:] = _local_active_maps[a_local_IDX,:,:].copy()
+
+            # else:
+            #     # it is None, meaning we don't have this neuron
+            #     curr_value = np.zeros_like(_local_active_maps[0]) # build array of all zeros
+            # ## Append to the correctly sized active_maps array
+            # active_maps.append(curr_value)
+
+        print(f'active_maps.shape: {np.shape(active_maps)}, type: {type(active_maps)}') # _local_active_maps.shape: (70, 63, 16), type: <class 'numpy.ndarray'>
+
+    # shared_comparison_unit_info = figure_format_config.get('shared_comparison_unit_info', None)
+    # if shared_comparison_unit_info is not None:
+        # if included_unit_indicies is None:
+        #     included_unit_indicies = shared_comparison_unit_info.shared.shared_fragile_neuron_IDXs # include all unless otherwise specified
+        # for idx, a_pair in enumerate(shared_comparison_unit_info.shared.pairs):
+    
+    else:
+        # normal (non-shared mode)
+        shared_IDXs_map = None
+        _local_active_maps = None
+
+        if included_unit_indicies is None:
+            included_unit_indicies = np.arange(active_pf_2D.ratemap.n_neurons) # include all unless otherwise specified
+        
+        ## Get Data to plot:
+        if plot_variable.name is enumTuningMap2DPlotVariables.TUNING_MAPS.name:
+            active_maps = active_pf_2D.ratemap.tuning_curves[included_unit_indicies]
+            title_substring = 'Placemaps'
+        elif plot_variable.name == enumTuningMap2DPlotVariables.SPIKES_MAPS.name:
+            active_maps = active_pf_2D.ratemap.spikes_maps[included_unit_indicies]
+            title_substring = 'Spikes Maps'
+        else:
+            raise ValueError
+
     # Build the formatter for rendering the max values such as the peak firing rate or max spike counts:
     if brev_mode.should_show_firing_rate_label:
         max_value_formatter = _build_variable_max_value_label(plot_variable=plot_variable)
     else:
         max_value_formatter = None
         
-    nfigures, num_pages, included_combined_indicies_pages, page_grid_sizes, data_aspect_ratio, page_figure_sizes = _determine_best_placefield_2D_layout(xbin=active_pf_2D.xbin, ybin=active_pf_2D.ybin, included_unit_indicies=np.arange(active_pf_2D.ratemap.n_neurons),
+    nfigures, num_pages, included_combined_indicies_pages, page_grid_sizes, data_aspect_ratio, page_figure_sizes = _determine_best_placefield_2D_layout(xbin=active_pf_2D.xbin, ybin=active_pf_2D.ybin, included_unit_indicies=included_unit_indicies,
         **overriding_dict_with(lhs_dict={'subplots': (40, 3), 'fig_column_width': 8.0, 'fig_row_height': 1.0, 'resolution_multiplier': 1.0, 'max_screen_figure_size': (None, None), 'last_figure_subplots_same_layout': True, 'debug_print': True}, **figure_format_config))
 
     active_xbins = active_pf_2D.xbin
@@ -234,30 +301,47 @@ def display_all_pf_2D_pyqtgraph_binned_image_rendering(active_pf_2D, figure_form
             curr_page_relative_row = np.mod(curr_row, page_grid_sizes[page_idx].num_rows)
             curr_page_relative_col = np.mod(curr_col, page_grid_sizes[page_idx].num_columns)
             # print(f'a_linear_index: {a_linear_index}, curr_page_relative_linear_index: {curr_page_relative_linear_index}, curr_row: {curr_row}, curr_col: {curr_col}, curr_page_relative_row: {curr_page_relative_row}, curr_page_relative_col: {curr_page_relative_col}, curr_included_unit_index: {curr_included_unit_index}')
-            neuron_IDX = curr_included_unit_index
-            curr_extended_id_string = active_pf_2D.ratemap.get_extended_neuron_id_string(neuron_i=neuron_IDX) 
-            # ratemap.neuron_extended_ids[neuron_IDX] # the matplotlib version just uses ratemap.neuron_extended_ids[neuron_IDX], but this should work too
+
+            ## pfmap will work in both modes now, as we built zeros maps above for active_maps:
+            # pfmap = np.squeeze(active_pf_2D.ratemap.tuning_curves[a_linear_index,:,:]).copy()
+            pfmap = np.squeeze(active_maps[a_linear_index,:,:]).copy() # matplotlib-version approach with active_maps
+            # matplotlib actually just does:
+            # pfmap = active_maps[a_linear_index].copy()
+
+            if included_unit_neuron_IDs is not None:
+                # neuron_IDX = shared_IDXs_map[a_linear_index]
+                curr_extended_id_string = f'{included_unit_neuron_IDs[a_linear_index]}' # get the aclu value (which is all that's known about the missing cell and use that as the curr_extended_id_string
+                final_title = f'{curr_extended_id_string} <shared>'
+            else:
+                # normal (non-shared mode)
+                neuron_IDX = curr_included_unit_index
+                curr_extended_id_string = active_pf_2D.ratemap.get_extended_neuron_id_string(neuron_i=neuron_IDX) 
+                # ratemap.neuron_extended_ids[neuron_IDX] # the matplotlib version just uses ratemap.neuron_extended_ids[neuron_IDX], but this should work too
             
-            pfmap = np.squeeze(active_pf_2D.ratemap.tuning_curves[a_linear_index,:,:]).copy()
-            
-            ## Labeling:
-            formatted_max_value_string = None
-            if brev_mode.should_show_firing_rate_label:
-                assert max_value_formatter is not None
-                ## NOTE: must set max_value_formatter on the pfmap BEFORE the `_scale_current_placefield_to_acceptable_range` is called to have it show accurate labels!
-                formatted_max_value_string = max_value_formatter(np.nanmax(pfmap))
-            
+                ## Labeling:
+                formatted_max_value_string = None
+                if brev_mode.should_show_firing_rate_label:
+                    assert max_value_formatter is not None
+                    ## NOTE: must set max_value_formatter on the pfmap BEFORE the `_scale_current_placefield_to_acceptable_range` is called to have it show accurate labels!
+                    formatted_max_value_string = max_value_formatter(np.nanmax(pfmap))
+                    
+                final_title = _build_neuron_identity_label(neuron_extended_id=active_pf_2D.ratemap.neuron_extended_ids[neuron_IDX], brev_mode=brev_mode, formatted_max_value_string=formatted_max_value_string, use_special_overlayed_title=use_special_overlayed_title)
+
             ## Once the max_value_formatter is called with the unscaled pfmap, we can call _scale_current_placefield_to_acceptable_range to scale it appropriately:
-            pfmap = _scale_current_placefield_to_acceptable_range(pfmap, occupancy=active_pf_2D.occupancy, drop_below_threshold=drop_below_threshold)            
-                
-            final_title = _build_neuron_identity_label(neuron_extended_id=active_pf_2D.ratemap.neuron_extended_ids[neuron_IDX], brev_mode=brev_mode, formatted_max_value_string=formatted_max_value_string, use_special_overlayed_title=use_special_overlayed_title)
-            
+            pfmap = _scale_current_placefield_to_acceptable_range(pfmap, occupancy=active_pf_2D.occupancy, drop_below_threshold=drop_below_threshold)                       
+
             if out is None:
                 # first iteration only
                 out = BasicBinnedImageRenderingWindow(pfmap, active_xbins, active_ybins, name=f'pf[{final_title}]', title=final_title, variable_label=curr_extended_id_string, wants_crosshairs=wants_crosshairs, color_map=color_map, color_bar_mode=color_bar_mode)
             else:
                 out.add_data(row=curr_page_relative_row, col=curr_page_relative_col, matrix=pfmap, xbins=active_xbins, ybins=active_ybins, name=f'pf[{final_title}]', title=final_title, variable_label=curr_extended_id_string)
         
+    out.plots_data.included_unit_neuron_IDs = included_unit_neuron_IDs
+    out.plots_data.included_unit_indicies = included_unit_indicies
+    out.plots_data.shared_IDXs_map = shared_IDXs_map
+    out.plots_data._local_active_maps = _local_active_maps
+    out.plots_data.active_maps = active_maps
+
     return out
     
     

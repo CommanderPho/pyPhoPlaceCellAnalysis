@@ -209,7 +209,8 @@ class FigureFormatConfigControls(QtWidgets.QWidget):
         _example_code = """
 {
 'brev_mode': PlotStringBrevityModeEnum.NONE,
-'plot_variable': enumTuningMap2DPlotVariables.TUNING_MAPS
+'plot_variable': enumTuningMap2DPlotVariables.TUNING_MAPS,
+'included_unit_neuron_IDs': [2, 3, 4, 5, 8, 10, 11, 13, 14, 15, 16, 19, 21, 23, 24, 25, 26, 27, 28, 31, 32, 33, 34, 36, 37, 41, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 66, 67, 68, 69, 70, 73, 74, 75, 76, 78, 81, 82, 83, 85, 86, 87, 88, 89, 90, 92, 93, 96, 98, 100, 102, 105, 108, 109]
 }
         """
         editor.setPlainText(_example_code)
