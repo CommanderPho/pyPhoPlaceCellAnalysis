@@ -391,9 +391,10 @@ class PipelineWithComputedPipelineStageMixin:
     
     
     # Utility/Debugging Functions:
-    def perform_drop_computed_items(self, config_names_to_drop = ['maze1_rippleOnly', 'maze2_rippleOnly']):
-        """ Loops through all the configs and ensure that they have the neuron identity info if they need it.
+    def perform_drop_entire_computed_config(self, config_names_to_drop = ['maze1_rippleOnly', 'maze2_rippleOnly']):
+        """ Loops through all the configs and drops all results of the specified configs
         2022-09-13 - Unfinished 
+        2022-10-23 - This seems to drop ALL the computed items for a specified set of configs/contexts, not a specific computed item across configs/contexts        
         """
         # config_names_to_drop
         print(f'_drop_computed_items(config_names_to_drop: {config_names_to_drop}):\n\tpre keys: {list(self.active_configs.keys())}')
@@ -414,5 +415,40 @@ class PipelineWithComputedPipelineStageMixin:
             
         print(f'\tpost keys: {list(self.active_configs.keys())}')
 
-    
+
+
+    def perform_drop_computed_result(self, computed_data_keys_to_drop, config_names_whitelist=None, debug_print=False):
+        """ Loops through all computed items and drops a specific result across all configs/contexts  
+        Inputs:
+            computed_data_keys_to_drop: list of specific results to drop for each context
+            config_names_whitelist: optional list of names to operate on. No changes will be made to results for configs not in the whitelist
+        """
+        # config_names_to_drop
+        if debug_print:
+            print(f'perform_drop_computed_result(computed_data_keys_to_drop: {computed_data_keys_to_drop}, config_names_whitelist: {config_names_whitelist})')
+
+        if config_names_whitelist is None:
+            # if no whitelist specified, get all computed keys:
+            config_names_whitelist = self.active_completed_computation_result_names # ['maze1_PYR', 'maze2_PYR', 'maze_PYR']
         
+        ## Loop across all computed contexts
+        for a_config_name, curr_computed_results in self.computation_results.items():
+            if a_config_name in config_names_whitelist:            
+                # remove the results from this config
+                for a_key_to_drop in computed_data_keys_to_drop:
+                    a_result_to_drop = curr_computed_results.pop(a_key_to_drop, None)
+                    ## TODO: Should we drop from curr_computed_results.accumulated_errors in addition to curr_computed_results.computed_data? Probably fine not to.
+                    if a_result_to_drop is not None:
+                        # Successfully dropped
+                        print(f"\t Dropped computation_results['{a_config_name}'].computed_data['{a_key_to_drop}'].")
+                    else:
+                        print(f"\t computation_results['{a_config_name}'].computed_data['{a_key_to_drop}'] did not exist.")
+                        pass
+            else:
+                # Otherwise skip it if it isn't in the whitelist
+                if debug_print:
+                    print(f'skipping {a_config_name} because it is not in the context whitelist.')
+
+            
+        # print(f'\tpost keys: {list(self.active_configs.keys())}')
+
