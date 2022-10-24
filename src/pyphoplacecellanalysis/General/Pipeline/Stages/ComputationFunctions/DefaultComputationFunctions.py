@@ -312,14 +312,14 @@ class DefaultComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Computa
         computation_result.computed_data['pf1D_RecursiveLatent'] = []
         computation_result.computed_data['pf2D_RecursiveLatent'] = []
 
-        # # 1st Order:
-        # computation_result.computed_data['pf1D_RecursiveLatent'].append(DynamicContainer.init_from_dict({'pf1D':computation_result.computed_data['pf1D'], 'pf1D_Decoder':computation_result.computed_data.get('pf1D_Decoder', {})}))
-        # computation_result.computed_data['pf2D_RecursiveLatent'].append(DynamicContainer.init_from_dict({'pf2D':computation_result.computed_data['pf2D'], 'pf2D_Decoder':computation_result.computed_data['pf2D_Decoder']}))
+        # 1st Order:
+        computation_result.computed_data['pf1D_RecursiveLatent'].append(DynamicContainer.init_from_dict({'pf1D':computation_result.computed_data['pf1D'], 'pf1D_Decoder':computation_result.computed_data.get('pf1D_Decoder', {})}))
+        computation_result.computed_data['pf2D_RecursiveLatent'].append(DynamicContainer.init_from_dict({'pf2D':computation_result.computed_data['pf2D'], 'pf2D_Decoder':computation_result.computed_data['pf2D_Decoder']}))
 
-        # # 2nd Order:
-        # active_second_order_pf_1D, active_second_order_pf_2D, active_second_order_1D_decoder, active_second_order_2D_decoder = _subfn_build_recurrsive_placefields(prev_one_step_bayesian_decoder, next_order_computation_config=next_order_computation_config, spikes_df=prev_one_step_bayesian_decoder.spikes_df, pos_df=prev_one_step_bayesian_decoder.pf.filtered_pos_df, pos_linearization_method=pos_linearization_method)
-        # computation_result.computed_data['pf1D_RecursiveLatent'].append(DynamicContainer.init_from_dict({'pf1D':active_second_order_pf_1D, 'pf1D_Decoder':active_second_order_1D_decoder}))
-        # computation_result.computed_data['pf2D_RecursiveLatent'].append(DynamicContainer.init_from_dict({'pf2D':active_second_order_pf_2D, 'pf2D_Decoder':active_second_order_2D_decoder}))
+        # 2nd Order:
+        active_second_order_pf_1D, active_second_order_pf_2D, active_second_order_1D_decoder, active_second_order_2D_decoder = _subfn_build_recurrsive_placefields(prev_one_step_bayesian_decoder, next_order_computation_config=next_order_computation_config, spikes_df=prev_one_step_bayesian_decoder.spikes_df, pos_df=prev_one_step_bayesian_decoder.pf.filtered_pos_df, pos_linearization_method=pos_linearization_method)
+        computation_result.computed_data['pf1D_RecursiveLatent'].append(DynamicContainer.init_from_dict({'pf1D':active_second_order_pf_1D, 'pf1D_Decoder':active_second_order_1D_decoder}))
+        computation_result.computed_data['pf2D_RecursiveLatent'].append(DynamicContainer.init_from_dict({'pf2D':active_second_order_pf_2D, 'pf2D_Decoder':active_second_order_2D_decoder}))
 
         # # 3rd Order:
         # active_third_order_pf_1D, active_third_order_pf_2D, active_third_order_1D_decoder, active_third_order_2D_decoder = _subfn_build_recurrsive_placefields(active_second_order_2D_decoder, next_order_computation_config=next_order_computation_config, spikes_df=active_second_order_2D_decoder.spikes_df, pos_df=active_second_order_2D_decoder.pf.filtered_pos_df, pos_linearization_method=pos_linearization_method)
