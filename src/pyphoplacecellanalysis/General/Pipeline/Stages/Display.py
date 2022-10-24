@@ -18,7 +18,7 @@ from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.SpikeRaster
 from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.EloyAnalysis import EloyAnalysisDisplayFunctions
 from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.Interactive3dDisplayFunctions import Interactive3dDisplayFunctions
 from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.FiringStatisticsDisplayFunctions import FiringStatisticsDisplayFunctions
-
+from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.MultiContextComparingDisplayFunctions import MultiContextComparingDisplayFunctions
 
 
 def get_neuron_identities(active_placefields, debug_print=False):
@@ -261,6 +261,11 @@ class PipelineWithDisplayPipelineStageMixin:
         Inputs:
             display_function: either a Callable display function (e.g. DefaultDisplayFunctions._display_1d_placefield_validations) or a str containing the name of a registered display function (e.g. '_display_1d_placefield_validations')
             active_session_filter_configuration: the string that's a key into the computation results like 'maze1' or 'maze2' that specifies which result you want to display.
+
+        # Display Context:
+        The final display context needs to include all aspects that make it unique, e.g. the contexts being plotted, the results being used to generate the context, the computation fcn, etc.
+        Currently I think the display_outputs system uses the a simple display context (consisting of only the display function name) as the key, meaning it needs to be refined so that multiple version of the same figure can be produced.
+
         """
         assert self.can_display, "Current self.stage must already be a DisplayPipelineStage. Call self.prepare_for_display to reach this step."
         if display_function is None:
@@ -288,7 +293,7 @@ class PipelineWithDisplayPipelineStageMixin:
             print(f'WARNING: active_session_configuration_context: {active_session_configuration_context} with type: {type(active_session_configuration_context)}')
             raise NotImplementedError
         
-        
+        ## Sets the active_context kwarg that's passed in to the display function:
         assert isinstance(active_session_configuration_context, IdentifyingContext)
         ## Now we're certain that we have an active_session_configuration_context:
         kwargs.setdefault('active_context', active_session_configuration_context) # add 'active_context' to the kwargs for the display function if possible
@@ -298,7 +303,8 @@ class PipelineWithDisplayPipelineStageMixin:
             ## Global session-level context (not filtered, so not corresponding to a specific config name):
             print(f'WARNING: .display(...) function called with GLOBAL (non-filtered) context. This should be the case only for one function (`_display_context_nested_docks`) currently. ')
             ## For a global-style display function, pass ALL of the computation_results and active_configs just to preserve the argument style.
-            return display_function(self.computation_results, self.active_configs, owning_pipeline=self, active_config_name=None, **kwargs)
+            # NOTE: global-style display functions have re-arranged arguments of the form (owning_pipeline_reference, computation_results, active_configs, **kwargs). This differs from standard ones.
+            return display_function(self, self.computation_results, self.active_configs, active_config_name=None, **kwargs)
         
         else:
             ## The expected filtered context:
@@ -323,6 +329,8 @@ class PipelineWithDisplayPipelineStageMixin:
         # owning_pipeline.display_output[active_display_fn_identifying_ctx] = (active_figure, ax_pf_1D)
         curr_display_output = display_function(self.computation_results[active_session_configuration_name], self.active_configs[active_session_configuration_name], owning_pipeline=self, active_config_name=active_session_configuration_name, **kwargs)
         self.display_output[active_display_fn_identifying_ctx] = curr_display_output # sets the internal display reference to that item
+
+
         return curr_display_output
 
         # return display_function(self.computation_results[active_session_configuration_name], self.active_configs[active_session_configuration_name], owning_pipeline=self, active_config_name=active_session_configuration_name, **kwargs)
