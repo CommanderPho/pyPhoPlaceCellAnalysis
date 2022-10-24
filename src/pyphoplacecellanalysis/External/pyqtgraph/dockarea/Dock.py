@@ -7,7 +7,7 @@ from .DockDrop import DockDrop
 
 
 class DockDisplayConfig(object):
-    """docstring for DockDisplayConfig."""
+    """Holds the display and configuration options for a Dock, such as how to format its title bar (color and font), whether it's closable, etc."""
     def __init__(self, showCloseButton=True, fontSize='12px', corner_radius='3px'):
         super(DockDisplayConfig, self).__init__()
         self.fontSize = fontSize
