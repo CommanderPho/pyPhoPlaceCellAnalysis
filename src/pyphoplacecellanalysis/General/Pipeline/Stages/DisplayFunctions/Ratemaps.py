@@ -1,3 +1,4 @@
+from copy import deepcopy
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -142,7 +143,7 @@ class DefaultRatemapDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Disp
             Usage:
             
                 _out = curr_active_pipeline.display('_display_recurrsive_latent_placefield_comparisons', active_identifying_filtered_session_ctx)
-                curr_master_dock_win = _out['master_dock_win']
+                master_dock_win = _out['master_dock_win']
                 curr_out_items = _out['out_items']
 
             """
@@ -182,9 +183,51 @@ class DefaultRatemapDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Disp
             active_dock_config = CustomCyclicColorsDockDisplayConfig(named_color_scheme=NamedColorScheme.blue, showCloseButton=True)
             out_items = out_items | _plot_latent_recursive_pfs_depth_level(master_dock_win, active_decoder, active_identifying_ctx, active_dock_config=active_dock_config)
             
+            ## Layout all panels as we desire them: 
+            desired_restore_state, backup_state, dock_keys_dict = _layout_latent_recursive_pfs_docks(master_dock_win, debug_print=False)
+
             # return master_dock_win, app, out_items
             return {'master_dock_win': master_dock_win, 'app': app, 'out_items': out_items}
 
+
+
+def _layout_latent_recursive_pfs_docks(master_dock_win, debug_print=False):
+    """Layout all panels as we desire them."""
+    dock_all_keys = list(master_dock_win.dynamic_display_dict.keys())
+    # ['kdiba|2006-6-08_14-26-15|maze1_PYR|first|plot_occupancy',
+    #  'kdiba|2006-6-08_14-26-15|maze1_PYR|first|plot_ratemaps_2D',
+    #  'kdiba|2006-6-08_14-26-15|maze1_PYR|second|plot_occupancy',
+    #  'kdiba|2006-6-08_14-26-15|maze1_PYR|second|plot_ratemaps_2D',
+    #  'kdiba|2006-6-08_14-26-15|maze1_PYR|third|plot_occupancy',
+    #  'kdiba|2006-6-08_14-26-15|maze1_PYR|third|plot_ratemaps_2D']
+
+    # Get occupancy plots:
+    dock_occupancy_keys = [a_key for a_key in dock_all_keys if a_key.endswith('plot_occupancy')]
+    dock_ratemaps_keys = [a_key for a_key in dock_all_keys if a_key.endswith('plot_ratemaps_2D')]
+    # dock_keys_dict is returned in case want it later
+    dock_keys_dict = {'all': dock_all_keys, 'occupancy': dock_occupancy_keys, 'dock_ratemaps_keys': dock_ratemaps_keys}
+
+    if debug_print:
+        print(f'dock_occupancy_keys: {dock_occupancy_keys}\ndock_ratemaps_keys: {dock_ratemaps_keys}')
+    desired_restore_state = {'main': ('vertical',
+    [('horizontal',
+        [('dock', a_key, {}) for a_key in dock_occupancy_keys],
+        {'sizes': np.repeat(1144, len(dock_occupancy_keys))}),
+    ('horizontal',
+        [('dock', a_key, {}) for a_key in dock_ratemaps_keys],
+        {'sizes': np.repeat(1144, len(dock_occupancy_keys))})],
+    {'sizes': [274, 1098]}),
+    'float': []}
+
+    if debug_print:
+        print(f'desired_restore_state: {desired_restore_state}')
+    # backup the current state before trying to restore:
+    backup_state = deepcopy(master_dock_win.displayDockArea.saveState())
+    if debug_print:   
+        print(f'backup_state: {backup_state}')
+    ## Perfrom the restore (set up layout):
+    master_dock_win.displayDockArea.restoreState(state=desired_restore_state)
+    return desired_restore_state, backup_state, dock_keys_dict
 
 
 def _plot_latent_recursive_pfs_depth_level(master_dock_win, active_decoder, active_identifying_ctx, active_dock_config=None): # , recursive_depth = 1, recursive_depth_label = 'second'
