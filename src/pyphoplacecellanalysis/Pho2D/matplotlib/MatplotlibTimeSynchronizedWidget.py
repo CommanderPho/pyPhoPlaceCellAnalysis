@@ -8,8 +8,9 @@ class MatplotlibTimeSynchronizedWidget(CustomMatplotlibWidget):
     """ Extends CustomMatplotlibWidget with time-synchronization properties 
     
     Example::
-    
-        mw = MatplotlibTimeSynchronizedWidget()
+
+        from pyphoplacecellanalysis.Pho2D.matplotlib.MatplotlibTimeSynchronizedWidget import MatplotlibTimeSynchronizedWidget
+        mw = MatplotlibTimeSynchronizedWidget(size=(15,15), dpi=72, constrained_layout=True, scrollable_figure=True, scrollAreaContents_MinimumHeight=params.all_plots_height)
         subplot = mw.getFigure().add_subplot(111)
         subplot.plot(x,y)
         mw.draw()
@@ -39,67 +40,5 @@ class MatplotlibTimeSynchronizedWidget(CustomMatplotlibWidget):
         self.on_window_changed(*evt)
         
         
-        
-
-class ScrollableMatplotlibTimeSynchronizedWidget(QtWidgets.QMainWindow):
-    """ NOT NEEDED
     
-    Usage:
-        from pyphoplacecellanalysis.Pho2D.matplotlib.MatplotlibTimeSynchronizedWidget import MatplotlibTimeSynchronizedWidget, ScrollableMatplotlibTimeSynchronizedWidget
-
-        _temp_out = curr_active_pipeline.display('_display_plot_decoded_epoch_slices', active_config_name, debug_test_max_num_slices=16)
-        params, plots_data, plots, ui = _temp_out
-        ui.mw.setMinimumHeight(params.all_plots_height)
-
-        scrollable_mw_window = ScrollableMatplotlibTimeSynchronizedWidget(params.name, ui=ui, window_title=params.window_title, scrollAreaContentsWidget=ui.mw)
-
-        
-    """
-    def __init__(self, name, ui=None, window_title=None, scrollAreaContentsWidget=None):
-        super().__init__()
-        self.name = name
-        if ui is None:
-            ui = PhoUIContainer(name=name)
-            ui.connections = PhoUIContainer(name=name)
-        
-        self.ui = ui
-            
-        if window_title is None:
-            window_title = name
-        self.window_title = window_title
-        
-        self.ui.scrollAreaContentsWidget = scrollAreaContentsWidget
-        
-        self.initUI()
-
-    def initUI(self):
-        
-        self.ui.scrollAreaWidget = QtWidgets.QScrollArea() # Scroll Area which contains the widgets, set as the centralWidget
-        
-        #Scroll Area Properties
-        self.ui.scrollAreaWidget.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarPolicy.ScrollBarAlwaysOn) #  Qt.ScrollBarAlwaysOn
-        self.ui.scrollAreaWidget.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarPolicy.ScrollBarAlwaysOff) # Qt.ScrollBarAlwaysOff
-        self.ui.scrollAreaWidget.setWidgetResizable(True)
-        
-        if self.ui.scrollAreaContentsWidget is not None:
-            # Set contents widget if we have it:
-            self.ui.scrollAreaWidget.setWidget(self.ui.scrollAreaContentsWidget)
-
-        self.setCentralWidget(self.ui.scrollAreaWidget)
-
-        self.setGeometry(600, 100, 1000, 900)
-        self.setWindowTitle('Scroll Area Demonstration')
-        self.show()
-
-        return
-    
-    
-    def setScrollAreaContents(self, widget: QtWidgets.QWidget):
-        """Sets the widget contained in the scrollArea after the fact
-
-        Args:
-            widget (_type_): _description_
-        """
-        self.ui.scrollAreaContentsWidget = widget # Widget that contains the collection of Vertical Box
-        self.ui.scrollAreaWidget.setWidget(self.ui.scrollAreaContentsWidget)
         

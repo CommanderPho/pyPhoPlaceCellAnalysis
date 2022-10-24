@@ -44,26 +44,31 @@ class MultiContextComparingDisplayFunctions(AllFunctionEnumeratingMixin, metacla
         return {'master_dock_win': master_dock_win, 'app': app, 'out_items': out_items}
 
 
-    # def _display_recurrsive_latent_placefield_comparisons(owning_pipeline_reference, computation_results, active_configs, **kwargs):
-    #     """ Create `master_dock_win` - centralized plot output window to collect individual figures/controls in (2022-08-18) 
-    #     NOTE: Ignores `active_config` because context_nested_docks is for all contexts
+    def _display_recurrsive_latent_placefield_comparisons(owning_pipeline_reference, computation_results, active_configs, include_whitelist=None, **kwargs):
+        """ Create `master_dock_win` - centralized plot output window to collect individual figures/controls in (2022-08-18) 
+        NOTE: Ignores `active_config` because context_nested_docks is for all contexts
         
-    #     Usage:
+        Usage:
         
-    #     display_output = active_display_output | curr_active_pipeline.display('_display_context_nested_docks', active_identifying_filtered_session_ctx, enable_gui=False, debug_print=False) # returns {'master_dock_win': master_dock_win, 'app': app, 'out_items': out_items}
-    #     master_dock_win = display_output['master_dock_win']
-    #     app = display_output['app']
-    #     out_items = display_output['out_items']
+        display_output = active_display_output | curr_active_pipeline.display('_display_context_nested_docks', active_identifying_filtered_session_ctx, enable_gui=False, debug_print=False) # returns {'master_dock_win': master_dock_win, 'app': app, 'out_items': out_items}
+        master_dock_win = display_output['master_dock_win']
+        app = display_output['app']
+        out_items = display_output['out_items']
 
-    #     """
-    #     owning_pipeline_reference = kwargs.get('owning_pipeline', None) # A reference to the pipeline upon which this display function is being called
-    #     assert owning_pipeline_reference is not None
-    #     # 
-    #     out_items = {}
-    #     master_dock_win, app, out_items = _context_nested_docks(owning_pipeline_reference, **overriding_dict_with(lhs_dict={'enable_gui': False, 'debug_print': False}, **kwargs))
+        """
+        if include_whitelist is None:
+            include_whitelist = owning_pipeline_reference.active_completed_computation_result_names # ['maze', 'sprinkle']
+        master_dock_win, app = DockAreaWrapper._build_default_dockAreaWindow(title='recurrsive_latent_placefield_comparisons', defer_show=False)
+        master_dock_win.resize(1920, 1024)
         
-    #     # return master_dock_win, app, out_items
-    #     return {'master_dock_win': master_dock_win, 'app': app, 'out_items': out_items}
+        out_items = {}
+        # for a_config_name in include_whitelist:
+        #     ## TODO:            
+        #     active_identifying_session_ctx, out_display_items = _single_context_nested_docks(curr_active_pipeline=owning_pipeline_reference, active_config_name=a_config_name, app=app, master_dock_win=master_dock_win, enable_gui=True, debug_print=False)
+        #     out_items[a_config_name] = (active_identifying_session_ctx, out_display_items)
+
+        # return master_dock_win, app, out_items
+        return {'master_dock_win': master_dock_win, 'app': app, 'out_items': out_items}
 
 
 
@@ -176,7 +181,7 @@ def _context_nested_docks(curr_active_pipeline, active_config_names, enable_gui=
     
     if enable_gui:
         master_dock_win, app = DockAreaWrapper._build_default_dockAreaWindow(title='active_global_window', defer_show=False)
-        master_dock_win.resize(1920, 1200)
+        master_dock_win.resize(1920, 1024)
     else:
         master_dock_win = None
         app = None

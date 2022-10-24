@@ -160,7 +160,16 @@ class DynamicDockDisplayAreaContentMixin:
         return all_collected_widgets
     
     def add_display_dock(self, identifier=None, widget=None, dockSize=(300,200), dockAddLocationOpts=['bottom'], display_config:CustomDockDisplayConfig=None, **kwargs):
-        """ adds a dynamic display dock with an appropriate widget of type 'viewContentsType' to the dock area container on the main window. """
+        """ adds a dynamic display dock with an appropriate widget of type 'viewContentsType' to the dock area container on the main window. 
+
+        Input:
+
+        dockAddLocationOpts: []
+            Available options are:
+            ['bottom', 'top', 'left', 'right', 'above', 'below']. 
+                ['above', 'below']: refer to adding in a tab
+
+        """
         # Add the sample display dock items to the nested dynamic display dock:
         display_dock_area = self.displayDockArea
         # curr_display_dock_items = display_dock_area.children()

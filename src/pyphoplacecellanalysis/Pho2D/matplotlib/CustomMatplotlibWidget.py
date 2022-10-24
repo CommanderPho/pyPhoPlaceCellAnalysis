@@ -18,8 +18,9 @@ class CustomMatplotlibWidget(QtWidgets.QWidget):
     
     Based off of pyqtgraphs's MatplotlibWidget (pyphoplacecellanalysis.External.pyqtgraph.widgets.MatplotlibWidget)
     Example::
-    
-        mw = MatplotlibWidget()
+
+        from pyphoplacecellanalysis.Pho2D.matplotlib.CustomMatplotlibWidget import CustomMatplotlibWidget
+        mw = CustomMatplotlibWidget(size=(15,15), dpi=72, constrained_layout=True, scrollable_figure=True, scrollAreaContents_MinimumHeight=params.all_plots_height)
         subplot = mw.getFigure().add_subplot(111)
         subplot.plot(x,y)
         mw.draw()
