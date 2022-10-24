@@ -141,15 +141,12 @@ class DefaultRatemapDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Disp
             
             Usage:
             
-            display_output = active_display_output | curr_active_pipeline.display('_display_context_nested_docks', active_identifying_filtered_session_ctx, enable_gui=False, debug_print=False) # returns {'master_dock_win': master_dock_win, 'app': app, 'out_items': out_items}
-            master_dock_win = display_output['master_dock_win']
-            app = display_output['app']
-            out_items = display_output['out_items']
+                _out = curr_active_pipeline.display('_display_recurrsive_latent_placefield_comparisons', active_identifying_filtered_session_ctx)
+                curr_master_dock_win = _out['master_dock_win']
+                curr_out_items = _out['out_items']
 
             """
             assert active_context is not None
-            # active_identifying_session_ctx = curr_active_pipeline.sess.get_context() # 'bapun_RatN_Day4_2019-10-15_11-30-06'
-            # active_identifying_filtered_session_ctx = curr_active_pipeline.filtered_contexts[active_config_name] # 'bapun_RatN_Day4_2019-10-15_11-30-06_maze'
             active_recursive_latent_pf_2Ds = computation_result.computed_data['pf2D_RecursiveLatent']
 
             ## Build the outer window:
@@ -165,32 +162,7 @@ class DefaultRatemapDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Disp
             active_decoder = active_first_order_2D_decoder
             active_identifying_ctx = active_context.adding_context('display_fn', decoder_order=recursive_depth_label)
             active_dock_config = CustomCyclicColorsDockDisplayConfig(named_color_scheme=NamedColorScheme.red, showCloseButton=True)
-
-            ## Add the occupancy:
-            active_identifying_sub_ctx = active_identifying_ctx.adding_context('display_fn', display_fn_name='plot_occupancy')
-            active_identifying_sub_ctx_string = active_identifying_sub_ctx.get_description(separator='|')
-            mw = CustomMatplotlibWidget(size=(15,15), dpi=72, constrained_layout=True, scrollable_figure=False) # , scrollAreaContents_MinimumHeight=params.all_plots_height
-            subplot = mw.getFigure().add_subplot(111)
-            active_decoder.pf.plot_occupancy(fig=mw.getFigure(), ax=subplot)
-            mw.show()
-            ## Install the matplotlib-widget in the dock
-            _last_widget, _last_dock_item = master_dock_win.add_display_dock(identifier=active_identifying_sub_ctx_string, widget=mw, display_config=active_dock_config, dockSize=(10, 100))
-            out_items[active_identifying_sub_ctx] = (_last_dock_item, mw, mw.getFigure(), subplot)
-            # mw.draw()
-
-            ## Add the placemaps:
-            active_identifying_sub_ctx = active_identifying_ctx.adding_context('display_fn', display_fn_name='plot_ratemaps_2D')
-            active_identifying_sub_ctx_string = active_identifying_sub_ctx.get_description(separator='|')
-            mw = CustomMatplotlibWidget(size=(15,15*4), dpi=72, scrollable_figure=False) # , constrained_layout=True, scrollAreaContents_MinimumHeight=params.all_plots_height
-            _out_plot_ratemaps = active_decoder.pf.plot_ratemaps_2D(fig=mw.getFigure(), subplots=(None, 5))
-            mw.getFigure().tight_layout() ## This actually fixes the tiny figure in the middle
-            mw.show()
-            ## Install the matplotlib-widget in the dock
-            dockAddLocationOpts = ['bottom', _last_dock_item] # position relative to the _last_dock_outer_nested_item for this figure
-            # dockAddLocationOpts = ['above', _last_dock_item] # position relative to the _last_dock_outer_nested_item for this figure
-            _last_widget, _last_dock_item = master_dock_win.add_display_dock(identifier=active_identifying_sub_ctx_string, widget=mw, display_config=active_dock_config, dockSize=(10, 400), dockAddLocationOpts=dockAddLocationOpts)
-            out_items[active_identifying_sub_ctx] = (_last_dock_item, mw, mw.getFigure(), *_out_plot_ratemaps)
-            mw.draw()
+            out_items = out_items | _plot_latent_recursive_pfs_depth_level(master_dock_win, active_decoder, active_identifying_ctx, active_dock_config=active_dock_config)
 
             ## Second Order:
             recursive_depth = 1
@@ -199,7 +171,7 @@ class DefaultRatemapDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Disp
             active_dock_config = CustomCyclicColorsDockDisplayConfig(named_color_scheme=NamedColorScheme.green, showCloseButton=True)
             active_second_order_2D_decoder = active_recursive_latent_pf_2Ds[recursive_depth].get('pf2D_Decoder', None)
             active_decoder = active_second_order_2D_decoder
-            out_items = out_items | _plot_latent_recursive_pfs_depth_level(master_dock_win, active_decoder, active_identifying_ctx, active_dock_config=active_dock_config) # , recursive_depth=recursive_depth, recursive_depth_label=recursive_depth_label
+            out_items = out_items | _plot_latent_recursive_pfs_depth_level(master_dock_win, active_decoder, active_identifying_ctx, active_dock_config=active_dock_config) 
             
             ## Third Order:
             recursive_depth = 2
@@ -208,22 +180,16 @@ class DefaultRatemapDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Disp
             active_decoder = active_third_order_2D_decoder
             active_identifying_ctx = active_context.adding_context('display_fn', decoder_order=recursive_depth_label)
             active_dock_config = CustomCyclicColorsDockDisplayConfig(named_color_scheme=NamedColorScheme.blue, showCloseButton=True)
-            out_items = out_items | _plot_latent_recursive_pfs_depth_level(master_dock_win, active_decoder, active_identifying_ctx, active_dock_config=active_dock_config) # , recursive_depth=recursive_depth, recursive_depth_label=recursive_depth_label
+            out_items = out_items | _plot_latent_recursive_pfs_depth_level(master_dock_win, active_decoder, active_identifying_ctx, active_dock_config=active_dock_config)
             
-
-
-            # for a_config_name in include_whitelist:
-            #     ## TODO:            
-            #     active_identifying_session_ctx, out_display_items = _single_context_nested_docks(curr_active_pipeline=owning_pipeline_reference, active_config_name=a_config_name, app=app, master_dock_win=master_dock_win, enable_gui=True, debug_print=False)
-            #     out_items[a_config_name] = (active_identifying_session_ctx, out_display_items)
-
             # return master_dock_win, app, out_items
             return {'master_dock_win': master_dock_win, 'app': app, 'out_items': out_items}
 
 
 
 def _plot_latent_recursive_pfs_depth_level(master_dock_win, active_decoder, active_identifying_ctx, active_dock_config=None): # , recursive_depth = 1, recursive_depth_label = 'second'
-    """
+    """ Used by _display_recurrsive_latent_placefield_comparisons to plot a single depth level of the latent recursive pf analysis.
+
     active_second_order_2D_decoder = active_recursive_latent_pf_2Ds[recursive_depth].get('pf2D_Decoder', None)
     _plot_latent_recursive_pfs_depth_level(active_second_order_2D_decoder, active_context=active_identifying_filtered_session_ctx, recursive_depth = 1, recursive_depth_label = 'second')
     
