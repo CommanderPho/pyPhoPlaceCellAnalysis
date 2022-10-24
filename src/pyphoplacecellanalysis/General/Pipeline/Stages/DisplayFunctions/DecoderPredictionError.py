@@ -132,9 +132,7 @@ class DefaultDecoderDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Disp
             
             This display function is currently atypically implemented. 
 
-            It determines which epochs are being referred to (enabling specifying them by a simple string identifier, like 'ripple', 'pbe', or 'laps') and then gets the coresponding data that's needed to recompute the decoded data for them.
-            This decoding is done by calling:
-                active_decoder.decode_specific_epochs(...) which returns a result that can then be plotted.
+            Depends on `_compute_specific_decoded_epochs` to compute the decoder for the epochs.
             The final step, which is where most display functions start, is calling the actual plot function:
                 plot_decoded_epoch_slices(...)
 
@@ -146,7 +144,6 @@ class DefaultDecoderDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Disp
             variable_name = 'x',
             
             """
-            # active_identifying_context = kwargs.get('active_context', None)
             assert active_context is not None
             
             ## Finally, add the display function to the active context
@@ -156,7 +153,7 @@ class DefaultDecoderDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Disp
             decoding_time_bin_size = kwargs.pop('decoding_time_bin_size', 0.02)
 
             ## Do the computation:
-            filter_epochs_decoder_result, active_filter_epochs, default_figure_name = compute_decoded_epochs(computation_result, active_config, filter_epochs=filter_epochs, decoding_time_bin_size=decoding_time_bin_size)
+            filter_epochs_decoder_result, active_filter_epochs, default_figure_name = _compute_specific_decoded_epochs(computation_result, active_config, filter_epochs=filter_epochs, decoding_time_bin_size=decoding_time_bin_size)
 
             ## Actual plotting portion:
             out_plot_tuple = plot_decoded_epoch_slices(active_filter_epochs, filter_epochs_decoder_result, global_pos_df=computation_result.sess.position.to_dataframe(), xbin=active_decoder.xbin,
@@ -336,23 +333,12 @@ def plot_most_likely_position_comparsions(pho_custom_decoder, position_df, axs=N
         return fig, axs
 
 
-def compute_decoded_epochs(computation_result, active_config, filter_epochs='ripple', decoding_time_bin_size=0.02):
-    """ renders a plot with the 1D Marginals either (x and y position axes): the computed posterior for the position from the Bayesian decoder and overlays the animal's actual position over the top. 
+def _compute_specific_decoded_epochs(computation_result, active_config, filter_epochs='ripple', decoding_time_bin_size=0.02):
+    """ computes the decoders for the specific epochs. Required for `_display_plot_decoded_epoch_slices`
     
-    This display function is currently atypically implemented. 
-
     It determines which epochs are being referred to (enabling specifying them by a simple string identifier, like 'ripple', 'pbe', or 'laps') and then gets the coresponding data that's needed to recompute the decoded data for them.
     This decoding is done by calling:
         active_decoder.decode_specific_epochs(...) which returns a result that can then be plotted.
-    The final step, which is where most display functions start, is calling the actual plot function:
-        plot_decoded_epoch_slices(...)
-
-    Inputs:
-        most_likely_positions_mode: 'standard'|'corrected'
-    
-    
-    ax = destination_plot.ui.matplotlib_view_widget.ax,
-    variable_name = 'x',
     
     """    
     default_figure_name = 'stacked_epoch_slices_matplotlib_subplots'
