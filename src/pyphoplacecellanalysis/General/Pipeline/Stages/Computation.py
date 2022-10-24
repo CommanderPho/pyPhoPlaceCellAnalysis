@@ -139,7 +139,8 @@ class ComputedPipelineStage(LoadableInput, LoadableSessionInput, FilterablePipel
                 
         return complete_computed_config_names_list, incomplete_computed_config_dict
     
-    def evaluate_single_computation_params(self, active_computation_params: Optional[DynamicParameters]=None, enabled_filter_names=None, overwrite_extant_results=False, computation_functions_name_whitelist=None, computation_functions_name_blacklist=None, fail_on_exception:bool=False, progress_logger_callback=None, debug_print=False):
+    def evaluate_single_computation_params(self, active_computation_params: Optional[DynamicParameters]=None, enabled_filter_names=None, overwrite_extant_results=False, computation_functions_name_whitelist=None, computation_functions_name_blacklist=None,
+                                                 fail_on_exception:bool=False, progress_logger_callback=None, debug_print=False):
         """ 'single' here refers to the fact that it evaluates only one of the active_computation_params
         
         Takes its filtered_session and applies the provided active_computation_params to it. The results are stored in self.computation_results under the same key as the filtered session. 
@@ -376,12 +377,21 @@ class PipelineWithComputedPipelineStageMixin:
         
     ## Computation Helpers: 
     def perform_computations(self, active_computation_params: Optional[DynamicParameters]=None, enabled_filter_names=None, overwrite_extant_results=False, computation_functions_name_whitelist=None, computation_functions_name_blacklist=None, fail_on_exception:bool=False, debug_print=False):
+        """The main computation function for the pipeline.
+
+        Args:
+            active_computation_params (Optional[DynamicParameters], optional): _description_. Defaults to None.
+            enabled_filter_names (_type_, optional): _description_. Defaults to None.
+            overwrite_extant_results (bool, optional): _description_. Defaults to False.
+            computation_functions_name_whitelist (_type_, optional): _description_. Defaults to None.
+            computation_functions_name_blacklist (_type_, optional): _description_. Defaults to None.
+            fail_on_exception (bool, optional): _description_. Defaults to False.
+            debug_print (bool, optional): _description_. Defaults to False.
+        """
         assert (self.can_compute), "Current self.stage must already be a ComputedPipelineStage. Call self.filter_sessions with filter configs to reach this step."
-        
-        
         self.stage.evaluate_single_computation_params(active_computation_params, enabled_filter_names=enabled_filter_names, overwrite_extant_results=overwrite_extant_results, computation_functions_name_whitelist=computation_functions_name_whitelist, computation_functions_name_blacklist=computation_functions_name_blacklist, fail_on_exception=fail_on_exception, progress_logger_callback=(lambda x: self.logger.info(x)), debug_print=debug_print)
         
-    def perform_registered_computations(self, previous_computation_result=None, computation_functions_name_whitelist=None, computation_functions_name_blacklist=None, fail_on_exception:bool=False, debug_print=False):
+    def _perform_registered_computations(self, previous_computation_result=None, computation_functions_name_whitelist=None, computation_functions_name_blacklist=None, fail_on_exception:bool=False, debug_print=False):
         assert (self.can_compute), "Current self.stage must already be a ComputedPipelineStage. Call self.perform_computations to reach this step."
         self.stage.perform_registered_computations(previous_computation_result, computation_functions_name_whitelist=computation_functions_name_whitelist, computation_functions_name_blacklist=computation_functions_name_blacklist, fail_on_exception=fail_on_exception, debug_print=debug_print)
     

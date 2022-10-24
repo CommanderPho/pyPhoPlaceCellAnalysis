@@ -449,6 +449,14 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
          
 
     def save_pipeline(self, active_pickle_filename='loadedSessPickle.pkl'):
+        """ pickles (saves) the entire pipeline to a file that can be loaded later without recomputing.
+
+        Args:
+            active_pickle_filename (str, optional): _description_. Defaults to 'loadedSessPickle.pkl'.
+
+        Returns:
+            _type_: _description_
+        """
         ## Build Pickle Path:
         used_existing_pickle_path = False
         if active_pickle_filename is None:

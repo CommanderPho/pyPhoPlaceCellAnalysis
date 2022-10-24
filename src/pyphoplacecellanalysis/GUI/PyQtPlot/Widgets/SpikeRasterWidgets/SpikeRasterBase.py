@@ -31,7 +31,7 @@ from pyphoplacecellanalysis.General.Mixins.DataSeriesColorHelpers import DataSer
 import logging
 # from pyphoplacecellanalysis.General.Pipeline.Stages.BaseNeuropyPipelineStage import pipeline_module_logger
 from pyphocorehelpers.print_helpers import build_module_logger
-spike_raster_logger = build_module_logger('Spike3D.display.SpikeRasterBase')
+_GLOBAL_spike_raster_logger = None 
 
 """ 
 FPS     Milliseconds Per Frame
@@ -98,7 +98,7 @@ self._update_plots()
 def trap_exc_during_debug(*args):
     # when app raises uncaught exception, print info
     print(args)
-    spike_raster_logger.error(f'in trap_exc_during_debug(*args: {args})\n this was installed as the sys.excepthook in SpikeRasterBase above the main class.')
+    _GLOBAL_spike_raster_logger.error(f'in trap_exc_during_debug(*args: {args})\n this was installed as the sys.excepthook in SpikeRasterBase above the main class.')
 
 # install exception hook: without this, uncaught exception would cause application to exit
 sys.excepthook = trap_exc_during_debug
@@ -256,7 +256,8 @@ class SpikeRasterBase(UnitSortableMixin, DataSeriesToSpatialTransformingMixin, N
         """
         super(SpikeRasterBase, self).__init__(**kwargs)
         # Initialize member variables:
-        self._logger = spike_raster_logger
+        _GLOBAL_spike_raster_logger = build_module_logger('Spike3D.display.SpikeRasterBase') # Only now do we build the module logger. This way it isn't made when the SpikeRaster plots aren't even used.
+        self._logger = _GLOBAL_spike_raster_logger
         self.logger.info(f'SpikeRasterBase.__init__(...)')
         
         
