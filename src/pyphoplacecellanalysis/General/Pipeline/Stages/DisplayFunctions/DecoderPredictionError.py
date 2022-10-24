@@ -146,22 +146,14 @@ class DefaultDecoderDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Disp
             variable_name = 'x',
             
             """
-            active_config_name = kwargs.get('active_config_name', 'Unknown')
-            active_identifying_context = kwargs.get('active_context', None)
-            assert active_identifying_context is not None
-            # ## Owning Pipeline:
-            # owning_pipeline_reference = kwargs.get('owning_pipeline', None) # A reference to the pipeline upon which this display function is being called
-            # assert owning_pipeline_reference is not None
+            # active_identifying_context = kwargs.get('active_context', None)
+            assert active_context is not None
             
             ## Finally, add the display function to the active context
-            active_display_fn_identifying_ctx = active_identifying_context.adding_context('display_fn', display_fn_name='display_plot_decoded_epoch_slices')
-            # active_display_fn_identifying_ctx_string = active_display_fn_identifying_ctx.get_description(separator='|') # Get final discription string:
-            
-            ## Display function specific variables:
-            decoding_time_bin_size = kwargs.pop('decoding_time_bin_size', 0.02)
+            active_display_fn_identifying_ctx = active_context.adding_context('display_fn', display_fn_name='display_plot_decoded_epoch_slices')
 
-            default_figure_name = 'stacked_epoch_slices_matplotlib_subplots'
             active_decoder = computation_result.computed_data['pf2D_Decoder']
+            decoding_time_bin_size = kwargs.pop('decoding_time_bin_size', 0.02)
 
             ## Do the computation:
             filter_epochs_decoder_result, active_filter_epochs, default_figure_name = compute_decoded_epochs(computation_result, active_config, filter_epochs=filter_epochs, decoding_time_bin_size=decoding_time_bin_size)
