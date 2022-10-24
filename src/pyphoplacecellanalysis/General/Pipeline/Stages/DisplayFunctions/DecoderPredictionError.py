@@ -127,7 +127,7 @@ class DefaultDecoderDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Disp
             axs[1].plot(active_time_window_variable, active_most_likely_positions_y, lw=1.0, color='#00ff7f99', alpha=0.6, label='2-step: most likely positions y') # (Num windows x 2)
             
 
-    def _display_plot_decoded_epoch_slices(computation_result, active_config, filter_epochs='ripple', **kwargs):
+    def _display_plot_decoded_epoch_slices(computation_result, active_config, active_context=None, filter_epochs='ripple', **kwargs):
             """ renders a plot with the 1D Marginals either (x and y position axes): the computed posterior for the position from the Bayesian decoder and overlays the animal's actual position over the top. 
             
             This display function is currently atypically implemented. 
@@ -163,8 +163,10 @@ class DefaultDecoderDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Disp
             default_figure_name = 'stacked_epoch_slices_matplotlib_subplots'
             active_decoder = computation_result.computed_data['pf2D_Decoder']
 
-            filter_epochs_decoder_result, active_filter_epochs = compute_decoded_epochs(computation_result, active_config, filter_epochs=filter_epochs, decoding_time_bin_size=decoding_time_bin_size)
+            ## Do the computation:
+            filter_epochs_decoder_result, active_filter_epochs, default_figure_name = compute_decoded_epochs(computation_result, active_config, filter_epochs=filter_epochs, decoding_time_bin_size=decoding_time_bin_size)
 
+            ## Actual plotting portion:
             out_plot_tuple = plot_decoded_epoch_slices(active_filter_epochs, filter_epochs_decoder_result, global_pos_df=computation_result.sess.position.to_dataframe(), xbin=active_decoder.xbin,
                                                                     **overriding_dict_with(lhs_dict={'name':default_figure_name, 'debug_test_max_num_slices':8, 'enable_flat_line_drawing':False, 'debug_print': False}, **kwargs))
             params, plots_data, plots, ui = out_plot_tuple
@@ -177,7 +179,6 @@ class DefaultDecoderDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Disp
             active_identifying_ctx_string = active_identifying_ctx.get_description(separator='|') # Get final discription string
             print(f'active_identifying_ctx_string: "{active_identifying_ctx_string}"')
             
-            
             ## TODO: use active_display_fn_identifying_ctx to add it to the display function:
             
             # active_display_fn_identifying_ctx
@@ -188,8 +189,6 @@ class DefaultDecoderDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Disp
             final_context = active_identifying_ctx
             # final_context = active_display_fn_identifying_ctx
             return {final_context: dict(params=params, plots_data=plots_data, plots=plots, ui=ui)}
-        
-            # return out_plot_tuple
         
     
 
@@ -446,7 +445,7 @@ def compute_decoded_epochs(computation_result, active_config, filter_epochs='rip
         
     filter_epochs_decoder_result = active_decoder.decode_specific_epochs(computation_result.sess.spikes_df, filter_epochs=active_filter_epochs, decoding_time_bin_size=decoding_time_bin_size, debug_print=False)
     filter_epochs_decoder_result.epoch_description_list = epoch_description_list
-    return filter_epochs_decoder_result, active_filter_epochs
+    return filter_epochs_decoder_result, active_filter_epochs, default_figure_name
 
 
     
