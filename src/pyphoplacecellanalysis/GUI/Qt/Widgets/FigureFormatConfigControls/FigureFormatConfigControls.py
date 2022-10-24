@@ -27,6 +27,7 @@ from pyqode.python.widgets.code_edit import PyCodeEdit
 from neuropy.core.neuron_identities import PlotStringBrevityModeEnum
 from neuropy.core.epoch import NamedTimerange
 from neuropy.utils.matplotlib_helpers import enumTuningMap2DPlotMode, enumTuningMap2DPlotVariables
+from neuropy.plotting.ratemaps import BackgroundRenderingOptions
 from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer
 
 
