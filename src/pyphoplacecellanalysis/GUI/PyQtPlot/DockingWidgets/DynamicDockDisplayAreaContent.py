@@ -144,6 +144,19 @@ class DynamicDockDisplayAreaContentMixin:
         self.clear_all_display_docks()
 
 
+    def get_flat_dockitems_list(self, debug_print=False):
+        """ extracts the 'dock' property that is the contents of each added dock item from the self.dynamic_display_dict and returns it as a flat list """
+        all_collected_dock_items = []
+        for an_id, an_item in self.dynamic_display_dict.items():
+            if debug_print:
+                print(f'an_id: {an_id}, an_item: {an_item}')
+            for a_sub_id, a_sub_item in an_item.items():
+                if debug_print:
+                    print(f'\ta_sub_id: {a_sub_id}, a_sub_item: {a_sub_item}')
+                a_dock_item = a_sub_item.get('dock', None)
+                all_collected_dock_items.append(a_dock_item)
+                
+        return all_collected_dock_items
 
     def get_flat_widgets_list(self, debug_print=False):
         """ extracts the 'widget' property that is the contents of each added dock item from the self.dynamic_display_dict and returns it as a flat list """
@@ -237,6 +250,11 @@ class DynamicDockDisplayAreaContentMixin:
             self.dynamic_display_dict[identifier] = OrderedDict() # initialize an empty group for the dict
             self.dynamic_display_dict[identifier][unique_identifier] = {"dock":dDisplayItem, "widget":widget}
             
+
+        ## Respond to the close signal so that we can remove the item from the dynamic_display_dict when it is closed.
+        dDisplayItem.sigClosed.connect(self.on_dock_closed)
+
+
         # self.dynamic_display_dict[identifier] = {"dock":dDisplayItem, "widget":new_view_widget}        
         return widget, dDisplayItem
     
@@ -331,5 +349,38 @@ class DynamicDockDisplayAreaContentMixin:
         ## TODO: must hold a reference to the returned widgets else they're garbage collected            
         self.ui.dock_helper_widgets.append((returned_helper_widget, returned_dock))
         return returned_helper_widget, returned_dock
+ 
+
+    @QtCore.pyqtSlot(object)
+    def on_dock_closed(self, closing_dock_item):
+        print(f'on_dock_closed(closing_dock: {closing_dock_item})') ## Getting called with calling_widget == NONE for some reason.
+        closing_dock_identifier = closing_dock_item.title()
+        print(f'\t closing_dock_identifier: {closing_dock_identifier}')
+
+        _removed_item = self.dynamic_display_dict.pop(closing_dock_identifier, None)
+        if _removed_item is not None:
+            # Try to find simply by the title identifier
+            print('\t found by simple title identifier and removed!')
+            return
+        else:
+            # Continue searching for item
+            found_id = None
+            found_sub_id = None
+            for an_id, an_item in self.dynamic_display_dict.items():
+                for a_sub_id, a_sub_item in an_item.items():
+                    a_dock_item = a_sub_item.get('dock', None)
+                    if a_dock_item == closing_dock_item:
+                        # Found!
+                        found_id = an_id
+                        found_sub_id = a_sub_id
+                        print(f'\t FOUND closing dock item through more complex search! found_id: {found_id}, found_sub_id: {found_sub_id}')
+                        print(f'\t removing item...')
+                        _found_item = self.dynamic_display_dict[found_id].pop(found_sub_id, None)
+                        if len(self.dynamic_display_dict[found_id]) < 1:
+                            # if the item is now empty, remove the entire item
+                            self.dynamic_display_dict.pop(found_id, None)
+                        print(f'done.')
+                        return
+            print(f'\t WARNING: searched all items and could not find the closing_dock_item!!')
  
         
