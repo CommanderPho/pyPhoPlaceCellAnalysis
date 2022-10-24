@@ -15,6 +15,7 @@ from neuropy.core.neuron_identities import NeuronIdentity, build_units_colormap,
 from neuropy.plotting.placemaps import plot_all_placefields
 from neuropy.utils.matplotlib_helpers import enumTuningMap2DPlotVariables # for getting the variant name from the dict
 from neuropy.utils.mixins.unwrap_placefield_computation_parameters import unwrap_placefield_computation_parameters
+from neuropy.utils.dynamic_container import overriding_dict_with
 
 from pyphocorehelpers.DataStructure.RenderPlots.MatplotLibRenderPlots import MatplotlibRenderPlots
 from pyphocorehelpers.DataStructure.RenderPlots.PyqtgraphRenderPlots import PyqtgraphRenderPlots
@@ -191,6 +192,48 @@ class DefaultRatemapDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Disp
 
 
 
+def _plot_latent_recursive_pfs_depth_level(master_dock_win, active_decoder, active_identifying_ctx, active_dock_config=None, plot_ratemaps_2D_kwargs=None): # , recursive_depth = 1, recursive_depth_label = 'second'
+    """ Used by _display_recurrsive_latent_placefield_comparisons to plot a single depth level of the latent recursive pf analysis.
+
+    active_second_order_2D_decoder = active_recursive_latent_pf_2Ds[recursive_depth].get('pf2D_Decoder', None)
+    _plot_latent_recursive_pfs_depth_level(active_second_order_2D_decoder, active_context=active_identifying_filtered_session_ctx, recursive_depth = 1, recursive_depth_label = 'second')
+    
+    """
+    ## Nth Order:
+    curr_out_items = {}
+    ## Add the occupancy:
+    active_identifying_sub_ctx = active_identifying_ctx.adding_context('display_fn', display_fn_name='plot_occupancy')
+    active_identifying_sub_ctx_string = active_identifying_sub_ctx.get_description(separator='|')
+    mw = CustomMatplotlibWidget(size=(15,15), dpi=72, constrained_layout=True, scrollable_figure=False) # , scrollAreaContents_MinimumHeight=params.all_plots_height
+    subplot = mw.getFigure().add_subplot(111)
+    active_decoder.pf.plot_occupancy(fig=mw.getFigure(), ax=subplot)
+    mw.show()
+    ## Install the matplotlib-widget in the dock
+    # dockAddLocationOpts = ['right', _last_dock_item] # position relative to the _last_dock_outer_nested_item for this figure
+    dockAddLocationOpts = ['bottom']
+    _last_widget, _last_dock_item = master_dock_win.add_display_dock(identifier=active_identifying_sub_ctx_string, widget=mw, display_config=active_dock_config, dockSize=(10, 100), dockAddLocationOpts=dockAddLocationOpts)
+    curr_out_items[active_identifying_sub_ctx] = (mw, mw.getFigure(), subplot)
+    # mw.draw()
+
+    ## Add the placemaps:
+    active_identifying_sub_ctx = active_identifying_ctx.adding_context('display_fn', display_fn_name='plot_ratemaps_2D')
+    active_identifying_sub_ctx_string = active_identifying_sub_ctx.get_description(separator='|')
+    mw = CustomMatplotlibWidget(size=(15,15*4), dpi=72, scrollable_figure=False) # , constrained_layout=True, scrollAreaContents_MinimumHeight=params.all_plots_height
+    if plot_ratemaps_2D_kwargs is None:
+        plot_ratemaps_2D_kwargs = {} 
+    # 'included_unit_neuron_IDs': [2, 3, 4, 5, 8, 10, 11, 13, 14, 15, 16, 19, 21, 23, 24, 25, 26, 27, 28, 31, 32, 33, 34, 36, 37, 41, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 66, 67, 68, 69, 70, 73, 74, 75, 76, 78, 81, 82, 83, 85, 86, 87, 88, 89, 90, 92, 93, 96, 98, 100, 102, 105, 108, 109]
+    _out_plot_ratemaps = active_decoder.pf.plot_ratemaps_2D(fig=mw.getFigure(), **overriding_dict_with(lhs_dict={'subplots': (None, 3), 'brev_mode': PlotStringBrevityModeEnum.NONE, 'plot_variable': enumTuningMap2DPlotVariables.TUNING_MAPS}, **plot_ratemaps_2D_kwargs)) # 5
+    mw.getFigure().tight_layout() ## This actually fixes the tiny figure in the middle
+    mw.show()
+    ## Install the matplotlib-widget in the dock
+    # dockAddLocationOpts = ['bottom', _last_dock_item] # position relative to the _last_dock_outer_nested_item for this figure
+    dockAddLocationOpts = ['bottom']
+    _last_widget, _last_dock_item = master_dock_win.add_display_dock(identifier=active_identifying_sub_ctx_string, widget=mw, display_config=active_dock_config, dockSize=(10, 400), dockAddLocationOpts=dockAddLocationOpts)
+    curr_out_items[active_identifying_sub_ctx] = (mw, mw.getFigure(), *_out_plot_ratemaps)
+    mw.draw()
+    return curr_out_items
+
+
 def _layout_latent_recursive_pfs_docks(master_dock_win, debug_print=False):
     """Layout all panels as we desire them."""
     dock_all_keys = list(master_dock_win.dynamic_display_dict.keys())
@@ -229,41 +272,3 @@ def _layout_latent_recursive_pfs_docks(master_dock_win, debug_print=False):
     master_dock_win.displayDockArea.restoreState(state=desired_restore_state)
     return desired_restore_state, backup_state, dock_keys_dict
 
-
-def _plot_latent_recursive_pfs_depth_level(master_dock_win, active_decoder, active_identifying_ctx, active_dock_config=None): # , recursive_depth = 1, recursive_depth_label = 'second'
-    """ Used by _display_recurrsive_latent_placefield_comparisons to plot a single depth level of the latent recursive pf analysis.
-
-    active_second_order_2D_decoder = active_recursive_latent_pf_2Ds[recursive_depth].get('pf2D_Decoder', None)
-    _plot_latent_recursive_pfs_depth_level(active_second_order_2D_decoder, active_context=active_identifying_filtered_session_ctx, recursive_depth = 1, recursive_depth_label = 'second')
-    
-    """
-    ## Second Order:
-    curr_out_items = {}
-    ## Add the occupancy:
-    active_identifying_sub_ctx = active_identifying_ctx.adding_context('display_fn', display_fn_name='plot_occupancy')
-    active_identifying_sub_ctx_string = active_identifying_sub_ctx.get_description(separator='|')
-    mw = CustomMatplotlibWidget(size=(15,15), dpi=72, constrained_layout=True, scrollable_figure=False) # , scrollAreaContents_MinimumHeight=params.all_plots_height
-    subplot = mw.getFigure().add_subplot(111)
-    active_decoder.pf.plot_occupancy(fig=mw.getFigure(), ax=subplot)
-    mw.show()
-    ## Install the matplotlib-widget in the dock
-    # dockAddLocationOpts = ['right', _last_dock_item] # position relative to the _last_dock_outer_nested_item for this figure
-    dockAddLocationOpts = ['bottom']
-    _last_widget, _last_dock_item = master_dock_win.add_display_dock(identifier=active_identifying_sub_ctx_string, widget=mw, display_config=active_dock_config, dockSize=(10, 100), dockAddLocationOpts=dockAddLocationOpts)
-    curr_out_items[active_identifying_sub_ctx] = (mw, mw.getFigure(), subplot)
-    # mw.draw()
-
-    ## Add the placemaps:
-    active_identifying_sub_ctx = active_identifying_ctx.adding_context('display_fn', display_fn_name='plot_ratemaps_2D')
-    active_identifying_sub_ctx_string = active_identifying_sub_ctx.get_description(separator='|')
-    mw = CustomMatplotlibWidget(size=(15,15*4), dpi=72, scrollable_figure=False) # , constrained_layout=True, scrollAreaContents_MinimumHeight=params.all_plots_height
-    _out_plot_ratemaps = active_decoder.pf.plot_ratemaps_2D(fig=mw.getFigure(), subplots=(None, 5))
-    mw.getFigure().tight_layout() ## This actually fixes the tiny figure in the middle
-    mw.show()
-    ## Install the matplotlib-widget in the dock
-    # dockAddLocationOpts = ['bottom', _last_dock_item] # position relative to the _last_dock_outer_nested_item for this figure
-    dockAddLocationOpts = ['bottom']
-    _last_widget, _last_dock_item = master_dock_win.add_display_dock(identifier=active_identifying_sub_ctx_string, widget=mw, display_config=active_dock_config, dockSize=(10, 400), dockAddLocationOpts=dockAddLocationOpts)
-    curr_out_items[active_identifying_sub_ctx] = (mw, mw.getFigure(), *_out_plot_ratemaps)
-    mw.draw()
-    return curr_out_items
