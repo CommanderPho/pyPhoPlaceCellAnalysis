@@ -150,14 +150,14 @@ class DefaultDecoderDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Disp
             active_display_fn_identifying_ctx = active_context.adding_context('display_fn', display_fn_name='display_plot_decoded_epoch_slices')
 
             active_decoder = computation_result.computed_data['pf2D_Decoder']
-            decoding_time_bin_size = kwargs.pop('decoding_time_bin_size', 0.02)
+            decoding_time_bin_size = kwargs.pop('decoding_time_bin_size', 1.0/30.0) # 0.03333333333333333
 
             ## Do the computation:
             filter_epochs_decoder_result, active_filter_epochs, default_figure_name = _compute_specific_decoded_epochs(computation_result, active_config, filter_epochs=filter_epochs, decoding_time_bin_size=decoding_time_bin_size)
 
             ## Actual plotting portion:
             out_plot_tuple = plot_decoded_epoch_slices(active_filter_epochs, filter_epochs_decoder_result, global_pos_df=computation_result.sess.position.to_dataframe(), xbin=active_decoder.xbin,
-                                                                    **overriding_dict_with(lhs_dict={'name':default_figure_name, 'debug_test_max_num_slices':8, 'enable_flat_line_drawing':False, 'debug_print': False}, **kwargs))
+                                                                    **overriding_dict_with(lhs_dict={'name':default_figure_name, 'debug_test_max_num_slices':256, 'enable_flat_line_drawing':False, 'debug_print': False}, **kwargs))
             params, plots_data, plots, ui = out_plot_tuple
             
             
@@ -177,6 +177,10 @@ class DefaultDecoderDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Disp
             
             final_context = active_identifying_ctx
             # final_context = active_display_fn_identifying_ctx
+
+            ## Use the context to appropriately set the window title for the plot:
+            ui.mw.setWindowTitle(f'{active_identifying_ctx_string}')
+
             return {final_context: dict(params=params, plots_data=plots_data, plots=plots, ui=ui)}
         
     
