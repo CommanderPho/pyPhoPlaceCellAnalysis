@@ -467,13 +467,16 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
             finalized_loaded_sess_pickle_path = Path(self.sess.basepath).joinpath(active_pickle_filename).resolve()
             used_existing_pickle_path = (finalized_loaded_sess_pickle_path == self.pickle_path) # used the existing path if they're the same
         
+        self.logger.info(f'save_pipeline(): Attempting to save pipeline to disk...')
+
         print(f'finalized_loaded_sess_pickle_path: {finalized_loaded_sess_pickle_path}')
-        self.logger.info(f'finalized_loaded_sess_pickle_path: {finalized_loaded_sess_pickle_path}')
+        self.logger.info(f'\tfinalized_loaded_sess_pickle_path: {finalized_loaded_sess_pickle_path}')
         # Save reloaded pipeline out to pickle for future loading
         saveData(finalized_loaded_sess_pickle_path, db=self) # Save the pipeline out to pickle.
         if not used_existing_pickle_path:
             # the pickle path changed, so set it on the pipeline:
             self._persistance_state = LoadedObjectPersistanceState(finalized_loaded_sess_pickle_path, compare_state_on_load=self.pipeline_compare_dict)
         
+        self.logger.info(f'\t save complete.')
         return finalized_loaded_sess_pickle_path
         
