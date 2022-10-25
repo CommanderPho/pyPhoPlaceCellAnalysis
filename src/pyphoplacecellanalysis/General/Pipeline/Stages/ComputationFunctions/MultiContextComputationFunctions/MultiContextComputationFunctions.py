@@ -18,7 +18,7 @@ class MultiContextComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Co
     _computationPrecidence = 1000
     _is_global = True
 
-    def _perform_jonathan_replay_firing_rate_analyses(owning_pipeline_reference, computation_results, active_configs, include_whitelist=None, debug_print=False):
+    def _perform_jonathan_replay_firing_rate_analyses(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_whitelist=None, debug_print=False):
         """ Ported from Jonathan's `Gould_22-09-29.ipynb` Notebook
         
         Requires:
@@ -57,7 +57,7 @@ class MultiContextComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Co
 
         assert aclu_to_idx_irdf == aclu_to_idx # technically, these might not match, which would be bad
 
-        computation_result.computed_data['jonathan_firing_rate_analysis'] = DynamicParameters.init_from_dict({
+        global_computation_results.computed_data['jonathan_firing_rate_analysis'] = DynamicParameters.init_from_dict({
             'rdf': DynamicParameters.init_from_dict({
                 'rdf': rdf,
                 'aclu_to_idx': aclu_to_idx, 
@@ -67,7 +67,7 @@ class MultiContextComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Co
                 'aclu_to_idx': aclu_to_idx_irdf,           
             }),
         })
-        return computation_result
+        return global_computation_results
 
 
 
