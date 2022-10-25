@@ -16,8 +16,9 @@ class MultiContextComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Co
     
     _computationGroupName = 'multi_context'
     _computationPrecidence = 1000
-    
-    def _perform_jonathan_replay_firing_rate_analyses(computation_result: ComputationResult, debug_print=False):
+    _is_global = True
+
+    def _perform_jonathan_replay_firing_rate_analyses(owning_pipeline_reference, computation_results, active_configs, include_whitelist=None, debug_print=False):
         """ Ported from Jonathan's `Gould_22-09-29.ipynb` Notebook
         
         Requires:
@@ -34,9 +35,12 @@ class MultiContextComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Co
                     ['jonathan_firing_rate_analysis']['irdf']['aclu_to_idx']
         
         """
+        if include_whitelist is None:
+            include_whitelist = owning_pipeline_reference.active_completed_computation_result_names # ['maze', 'sprinkle']
+
 
         # ## Compute for all the session spikes first:
-        sess = computation_result.sess
+        sess = owning_pipeline_reference.sess
 
         ### Make `rdf` (replay dataframe)
         rdf = make_rdf(sess) # this creates the replay dataframe variable

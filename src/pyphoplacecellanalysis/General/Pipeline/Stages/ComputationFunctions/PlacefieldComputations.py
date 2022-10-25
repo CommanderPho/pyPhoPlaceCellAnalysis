@@ -13,7 +13,9 @@ from pyphoplacecellanalysis.General.Model.ComputationResults import ComputationR
 
 class PlacefieldComputations(AllFunctionEnumeratingMixin, metaclass=ComputationFunctionRegistryHolder):
     _computationPrecidence = 0 # must be done after Defaults but before most others
-    
+    _is_global = False
+
+
     def _perform_baseline_placefield_computation(computation_result: ComputationResult, debug_print=False):
         """ Builds the initial 1D and 2D placefields 
         

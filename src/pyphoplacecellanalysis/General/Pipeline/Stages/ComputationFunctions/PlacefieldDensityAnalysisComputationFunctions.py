@@ -39,6 +39,8 @@ class PlacefieldDensityAnalysisComputationFunctions(AllFunctionEnumeratingMixin,
     
     """
     _computationPrecidence = 2 # must be done after PlacefieldComputations and DefaultComputationFunctions
+    _is_global = False
+
 
     def _perform_velocity_vs_pf_density_computation(computation_result: ComputationResult, debug_print=False):
             """ Builds the analysis to test Eloy's Pf-Density/Velocity Hypothesis for 2D Placefields

@@ -30,6 +30,7 @@ from pyphocorehelpers.indexing_helpers import build_spanning_grid_matrix # For _
 
 class DefaultComputationFunctions(AllFunctionEnumeratingMixin, metaclass=ComputationFunctionRegistryHolder):
     _computationPrecidence = 1 # must be done after PlacefieldComputations
+    _is_global = False
 
     def _perform_position_decoding_computation(computation_result: ComputationResult, **kwargs):
         """ Builds the 2D Placefield Decoder 

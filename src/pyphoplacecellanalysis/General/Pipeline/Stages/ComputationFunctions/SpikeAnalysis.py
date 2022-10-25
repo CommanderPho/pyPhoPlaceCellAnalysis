@@ -27,7 +27,9 @@ class SpikeAnalysisComputations(AllFunctionEnumeratingMixin, metaclass=Computati
     
     _computationGroupName = 'burst_detection'
     _computationPrecidence = 4
-    
+    _is_global = False
+
+
     def _perform_spike_burst_detection_computation(computation_result: ComputationResult, debug_print=False):
         """ Computes periods when the cells are firing in bursts in a hierarchical manner
         

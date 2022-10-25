@@ -6,3 +6,6 @@ from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.Placefi
 from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.ExtendedStats import ExtendedStatsComputations
 from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.SpikeAnalysis import SpikeAnalysisComputations
 
+# Global
+from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.MultiContextComputationFunctions import MultiContextComputationFunctions
+

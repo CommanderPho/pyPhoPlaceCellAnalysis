@@ -8,6 +8,19 @@ class ComputationFunctionRegistryHolder(RegistryHolder):
     def get_registry(cls):
         """ ensures that registry items are returned sorted by their ._computationPrecidence """
         return dict(sorted(dict(cls.REGISTRY).items(), key=lambda item: item[1]._computationPrecidence))
+
+
+
+    @classmethod
+    def get_non_global_registry_items(cls):
+        """ ensures that registry items are returned sorted by their ._computationPrecidence """
+        return {k:v for k,v in cls.get_registry().items() if not v._is_global}
+
+    @classmethod
+    def get_global_registry_items(cls):
+        """ ensures that registry items are returned sorted by their ._computationPrecidence """
+        return {k:v for k,v in cls.get_registry().items() if v._is_global}
+
     
     @classmethod
     def get_registry_items_functions_dict(cls, absolute_flat_path_keys=False, applying_disable_dict=None):

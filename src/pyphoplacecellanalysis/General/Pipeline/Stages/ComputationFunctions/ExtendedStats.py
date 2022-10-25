@@ -13,7 +13,9 @@ class ExtendedStatsComputations(AllFunctionEnumeratingMixin, metaclass=Computati
     
     _computationGroupName = 'extended_stats'
     _computationPrecidence = 3
-    
+    _is_global = False
+
+
     def _perform_extended_statistics_computation(computation_result: ComputationResult, debug_print=False):
         """ Computes extended statistics regarding firing rates and such from the various dataframes.
         
