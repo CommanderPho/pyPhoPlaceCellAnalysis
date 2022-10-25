@@ -43,6 +43,49 @@ class MultiContextComparingDisplayFunctions(AllFunctionEnumeratingMixin, metacla
         # return master_dock_win, app, out_items
         return {'master_dock_win': master_dock_win, 'app': app, 'out_items': out_items}
 
+    def _display_recurrsive_latent_placefield_comparisons(owning_pipeline_reference, computation_results, active_configs, include_whitelist=None, **kwargs):
+            """ Create `master_dock_win` - centralized plot output window to collect individual figures/controls in (2022-08-18) 
+            NOTE: Ignores `active_config` because context_nested_docks is for all contexts
+            
+            Usage:
+            
+            display_output = active_display_output | curr_active_pipeline.display('_display_context_nested_docks', active_identifying_filtered_session_ctx, enable_gui=False, debug_print=False) # returns {'master_dock_win': master_dock_win, 'app': app, 'out_items': out_items}
+            master_dock_win = display_output['master_dock_win']
+            app = display_output['app']
+            out_items = display_output['out_items']
+
+            """
+            if include_whitelist is None:
+                include_whitelist = owning_pipeline_reference.active_completed_computation_result_names # ['maze', 'sprinkle']
+
+            ['maze1_PYR', 'maze2_PYR']
+
+            pf1d = computation_results['maze1_PYR']['computed_data']['pf1D']
+
+            pf1d = computation_results['maze2_PYR']['computed_data']['pf1D']
+
+
+
+            computation_results
+
+            aclu_to_idx = computation_result.computed_data['jonathan_firing_rate_analysis']['rdf']['aclu_to_idx']
+            rdf = computation_result.computed_data['jonathan_firing_rate_analysis']['rdf']['rdf'],
+            irdf = computation_result.computed_data['jonathan_firing_rate_analysis']['irdf']['irdf']
+            pos_df = computation_result.sess.position.to_dataframe()
+            # compare_firing_rates(rdf, irdf)
+
+            neuron_df = make_interactive_plot(computation_results, pos_df, aclu_to_idx, rdf, irdf, show_inter_replay_frs=False)
+
+
+            out_items = {}
+            # for a_config_name in include_whitelist:
+            #     ## TODO:            
+            #     active_identifying_session_ctx, out_display_items = _single_context_nested_docks(curr_active_pipeline=owning_pipeline_reference, active_config_name=a_config_name, app=app, master_dock_win=master_dock_win, enable_gui=True, debug_print=False)
+            #     out_items[a_config_name] = (active_identifying_session_ctx, out_display_items)
+
+            # return master_dock_win, app, out_items
+            return {'master_dock_win': master_dock_win, 'app': app, 'out_items': out_items}
+
 
     # def _display_recurrsive_latent_placefield_comparisons(owning_pipeline_reference, computation_results, active_configs, include_whitelist=None, **kwargs):
     #     """ Create `master_dock_win` - centralized plot output window to collect individual figures/controls in (2022-08-18) 
@@ -192,3 +235,169 @@ def _context_nested_docks(curr_active_pipeline, active_config_names, enable_gui=
         out_items[a_config_name] = (active_identifying_session_ctx, out_display_items)
         
     return master_dock_win, app, out_items
+
+
+
+# def compare_firing_rates(rdf, irdf, show_nonzero=True):
+#     x1 = take_difference(irdf)
+#     y1 = take_difference(rdf)
+#     fig, ax = plt.subplots()
+
+#     ax.plot(x1,y1,'.',label="naieve difference")
+
+#     if show_nonzero:
+#         x2 = take_difference_nonzero(irdf)
+#         y2 = take_difference_nonzero(rdf)
+        
+#         # x2 = take_difference_adjust_for_time(irdf)
+#         # y2 = take_difference_nonzero(rdf)
+
+#         ax.plot(x2,y2,'.', label="nonzero difference")
+#         ax.plot(np.vstack([x1,x2]), np.vstack([y1,y2]), color = (0,0,0,.1))
+
+
+#     ax.set_xlabel("Mean FR change in all non-replay time (Hz)");
+#     ax.set_ylabel("Mean FR change in replay time (Hz)");
+#     ax.set_title("Firing rates are correlated in replay and non-replay time");
+#     if show_nonzero:
+#         ax.legend()
+    
+    # plt.axis("equal");
+    
+
+
+# # this cell really works best in qt
+# %matplotlib qt
+
+def make_interactive_plot(computation_results, pos_df, aclu_to_idx, rdf, irdf, show_inter_replay_frs=False):
+    fig, ax = plt.subplots(2,2, figsize=(12.11,4.06));
+    colors = plt.rcParams['axes.prop_cycle'].by_key()['color'];
+    
+    # calculations for ax[0,0]
+    # below we find where the tuning curve peak was for each cell in each context and store it in a dataframe
+    pf1d = computation_results['maze1_PYR']['computed_data']['pf1D']
+    l = [pf1d.xbin_centers[np.argmax(x)] for x in pf1d.ratemap.tuning_curves]
+    long_df = pd.DataFrame(l, columns=['long'], index=pf1d.cell_ids)
+
+    pf1d = computation_results['maze2_PYR']['computed_data']['pf1D']
+    l = [pf1d.xbin_centers[np.argmax(x)] for x in pf1d.ratemap.tuning_curves]
+    short_df = pd.DataFrame(l, columns=['short'],index=pf1d.cell_ids)
+
+    # df keeps most of the interesting data for these plots
+    # at this point, it has columns 'long' and 'short' holding the peak tuning curve positions for each context
+    # the index of this dataframe are the ACLU's for each neuron; this is why `how='outer'` works.
+    df = long_df.join(short_df, how='outer')
+    df["has_na"] = df.isna().any(axis=1)
+    
+    
+    # plotting for ax[0,0]     
+    ax[0,0].axis("equal");
+    
+    # I initially set the boundaries like this so I would know where to put the single-track cells
+    # I'm sure there's a better way, though
+    ylim = (-58.34521620102153, 104.37547397480944)
+    xlim = (-97.76920925869598, 160.914964866984)
+
+    # this fills in the nan's in the single-track cells so that they get plotted at the edges
+    # plotting everything in one go makes resizing points later simpler
+    df.long.fillna(xlim[0] + 1, inplace=True)
+    df.short.fillna(ylim[0] + 1, inplace=True)
+
+    remap_scatter = ax[0,0].scatter(df.long, df.short, s=7, picker=True, c=[colors[c] for c in df["has_na"]]);
+
+    ax[0,0].set_ylim(ylim);
+    ax[0,0].set_xlim(xlim);
+    ax[0,0].xaxis.set_tick_params(labelbottom=False)
+    ax[0,0].yaxis.set_tick_params(labelleft=False)
+    ax[0,0].set_xticks([])
+    ax[0,0].set_yticks([])
+
+    ax[0,0].set_xlabel("Distance along long track")
+    ax[0,0].set_ylabel("Distance along short track")
+    ax[0,0].set_title("Peak tuning on short vs. long track")
+    
+    # calculations for ax[1,0]
+    non_replay_diff = take_difference_nonzero(irdf)
+    replay_diff = take_difference_nonzero(rdf)
+    df["non_replay_diff"] = [non_replay_diff[aclu_to_idx[aclu]] for aclu in df.index]
+    df["replay_diff"] = [replay_diff[aclu_to_idx[aclu]] for aclu in df.index]
+
+    # plotting for ax[1,0]
+    diff_scatter = ax[1,0].scatter(df.non_replay_diff, df.replay_diff, s=7, picker=True);
+    ax[1,0].set_xlabel("Firing rate along long track")
+    ax[1,0].set_ylabel("Firing rate along short track")
+    ax[1,0].set_title("Firing rate on short vs. long track")
+    
+    #TODO
+    # diff_scatter = ax[1,0].scatter(scaled_participation, d_activity, s=7, picker=True);
+
+    g_index = 0 # this stands for global index
+    # it keeps track of the index of the neuron we have selected
+    # this is the index in the dataframe (if you were using `iloc`), and not the ACLU
+
+    # pos_df = sess.position.to_dataframe()
+
+    def on_index_change(new_index):
+        'This gets called when the selected neuron changes; it updates the graphs'
+        
+        index = new_index
+        aclu = int(df.index[index])
+        print(f"selected neuron has index: {index} aclu: {aclu}")
+        
+        # this changes the size of the neuron in ax[0,0]
+        remap_scatter.set_sizes([7 if i!= index else 30 for i in range(len(df))])
+
+        # this changes the size of the neuron in ax[1,0]
+        diff_scatter.set_sizes([7 if i!= index else 30 for i in range(len(df))])
+
+        # this redraws ax
+        ax[0,1].clear()
+
+        ax[0,1].vlines(sess.paradigm[0][0,1], ymin = 0, ymax=60, color=(0,0,0,.25))
+
+        centers = (rdf["start"] + rdf["end"])/2
+        heights = make_fr(rdf)[:, aclu_to_idx[aclu]]
+        ax[0,1].plot(centers, heights, '.')
+
+        if show_inter_replay_frs:
+            # this would show the inter-replay firing times in orange
+            # it's frankly distracting
+            centers = (irdf["start"] + irdf["end"])/2
+            heights = make_fr(irdf)[:, aclu_to_idx[aclu]]
+            ax[0,1].plot(centers, heights, '.', color=colors[1]+ "80")
+
+        ax[0,1].set_title(f"Replay firing rates for neuron {aclu}")
+        ax[0,1].set_xlabel("Time of replay (s)")
+        ax[0,1].set_ylabel("Firing Rate (Hz)")
+
+        # this plots where the neuron spiked
+        ax[1,1].clear()
+        ax[1,1].plot(pos_df.t, pos_df.x, color=[.75, .75, .75])
+        single_neuron_spikes = sess.spikes_df[sess.spikes_df.aclu == aclu]
+        ax[1,1].plot(single_neuron_spikes.t_rel_seconds, single_neuron_spikes.x, 'k.', ms=1)
+        ax[1,1].set_xlabel("t (s)")
+        ax[1,1].set_ylabel("Position")
+        ax[1,1].set_title("Animal position on track")
+    
+        fig.canvas.draw()
+
+
+    def on_keypress(event):
+        if event.key=='tab':
+            g_index += 1
+            g_index %= len(df)
+        elif event.key=='b':
+            g_index -= 1
+            g_index %= len(df)
+        on_index_change(g_index)
+
+
+    def on_pick(event):
+        on_index_change(int(event.ind[0]))
+
+    on_index_change(g_index)
+    fig.canvas.mpl_connect('pick_event', on_pick)
+    fig.canvas.mpl_connect('key_press_event', on_keypress)
+    return df
+
+
