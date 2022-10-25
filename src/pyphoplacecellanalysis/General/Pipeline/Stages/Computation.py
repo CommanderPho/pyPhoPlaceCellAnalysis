@@ -27,7 +27,10 @@ from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.Computa
 # PIPELINE STAGE                                                                                                       #
 # ==================================================================================================================== #
 class ComputedPipelineStage(LoadableInput, LoadableSessionInput, FilterablePipelineStage, BaseNeuropyPipelineStage):
-    """Docstring for ComputedPipelineStage."""
+    """Docstring for ComputedPipelineStage.
+
+    global_comparison_results has keys of type IdentifyingContext
+    """
     identity: PipelineStage = PipelineStage.Computed
     filtered_sessions: Optional[DynamicParameters] = None
     filtered_epochs: Optional[DynamicParameters] = None
@@ -66,8 +69,8 @@ class ComputedPipelineStage(LoadableInput, LoadableSessionInput, FilterablePipel
          Note: execution ORDER MATTERS for the computation functions, unlike the display functions, so they need to be enumerated in the correct order and not sorted alphabetically        
         # Sort by precidence:
             _computationPrecidence
-        """    
-        for (a_computation_class_name, a_computation_class) in reversed(ComputationFunctionRegistryHolder.get_registry().items()):
+        """
+        for (a_computation_class_name, a_computation_class) in reversed(ComputationFunctionRegistryHolder.get_non_global_registry_items().items()):
             for (a_computation_fn_name, a_computation_fn) in reversed(a_computation_class.get_all_functions(use_definition_order=True)):
                 self.register_computation(a_computation_fn_name, a_computation_fn)
         
@@ -401,10 +404,7 @@ class PipelineWithComputedPipelineStageMixin:
         assert (self.can_compute), "Current self.stage must already be a ComputedPipelineStage. Call self.filter_sessions with filter configs to reach this step."
         self.stage.evaluate_computations_for_single_params(active_computation_params, enabled_filter_names=enabled_filter_names, overwrite_extant_results=overwrite_extant_results, computation_functions_name_whitelist=computation_functions_name_whitelist, computation_functions_name_blacklist=computation_functions_name_blacklist, fail_on_exception=fail_on_exception, progress_logger_callback=(lambda x: self.logger.info(x)), debug_print=debug_print)
         
-    def _perform_registered_computations(self, previous_computation_result=None, computation_functions_name_whitelist=None, computation_functions_name_blacklist=None, fail_on_exception:bool=False, debug_print=False):
-        assert (self.can_compute), "Current self.stage must already be a ComputedPipelineStage. Call self.perform_computations to reach this step."
-        self.stage.perform_registered_computations(previous_computation_result, computation_functions_name_whitelist=computation_functions_name_whitelist, computation_functions_name_blacklist=computation_functions_name_blacklist, fail_on_exception=fail_on_exception, debug_print=debug_print)
-    
+
     def rerun_failed_computations(self, previous_computation_result, fail_on_exception:bool=False, debug_print=False):
         """ retries the computation functions that previously failed and resulted in accumulated_errors in the previous_computation_result """
         return self.stage.rerun_failed_computations(previous_computation_result, fail_on_exception=fail_on_exception, debug_print=debug_print)
