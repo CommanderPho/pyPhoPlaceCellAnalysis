@@ -20,7 +20,6 @@ from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.Computa
 from pyphoplacecellanalysis.General.Model.ComputationResults import ComputationResult
 from pyphocorehelpers.DataStructure.dynamic_parameters import DynamicParameters
 
-
 from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import ZhangReconstructionImplementation # for _perform_firing_rate_trends_computation
 
 
@@ -207,3 +206,5 @@ class SpikeAnalysisComputations(AllFunctionEnumeratingMixin, metaclass=Computati
             }),
         })
         return computation_result
+
+
