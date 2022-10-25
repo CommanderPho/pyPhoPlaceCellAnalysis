@@ -45,6 +45,8 @@ class ComputedPipelineStage(LoadableInput, LoadableSessionInput, FilterablePipel
         self.filtered_epochs = DynamicParameters()
         self.active_configs = DynamicParameters() # active_config corresponding to each filtered session/epoch
         self.computation_results = DynamicParameters()
+        self.global_computation_results = DynamicParameters()
+
         
         self.registered_computation_function_dict = OrderedDict()
         self.reload_default_computation_functions() # registers the default
@@ -335,6 +337,13 @@ class PipelineWithComputedPipelineStageMixin:
         """The computation_results property, accessed through the stage."""
         return self.stage.computation_results
     
+    @property
+    def global_computation_results(self):
+        """The global_computation_results property, accessed through the stage."""
+        return self.stage.global_computation_results
+    
+
+
     @property
     def active_completed_computation_result_names(self):
         """The this list of all computed configs."""        
