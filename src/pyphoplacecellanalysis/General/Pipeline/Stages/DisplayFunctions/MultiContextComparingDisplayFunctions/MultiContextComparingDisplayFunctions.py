@@ -1,3 +1,7 @@
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+
 from neuropy.utils.dynamic_container import overriding_dict_with # required for _display_2d_placefield_result_plot_raw
 from pyphocorehelpers.mixins.member_enumerating import AllFunctionEnumeratingMixin
 from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DisplayFunctionRegistryHolder import DisplayFunctionRegistryHolder
@@ -9,6 +13,9 @@ from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.DockAreaWrapper import DockArea
 from pyphoplacecellanalysis.GUI.Qt.Widgets.DecoderPlotSelectorControls.DecoderPlotSelectorWidget import DecoderPlotSelectorWidget # for context_nested_docks/single_context_nested_docks
 from pyphoplacecellanalysis.GUI.Qt.Widgets.FigureFormatConfigControls.FigureFormatConfigControls import FigureFormatConfigControls # for context_nested_docks/single_context_nested_docks
 from pyphoplacecellanalysis.Pho2D.PyQtPlots.plot_placefields import pyqtplot_plot_image_array # for context_nested_docks/single_context_nested_docks
+
+from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.MultiContextComputationFunctions import take_difference, take_difference_nonzero, make_fr
+
 
 
 class MultiContextComparingDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=DisplayFunctionRegistryHolder):
@@ -58,15 +65,13 @@ class MultiContextComparingDisplayFunctions(AllFunctionEnumeratingMixin, metacla
             if include_whitelist is None:
                 include_whitelist = owning_pipeline_reference.active_completed_computation_result_names # ['maze', 'sprinkle']
 
-            ['maze1_PYR', 'maze2_PYR']
-
-            pf1d = computation_results['maze1_PYR']['computed_data']['pf1D']
-
-            pf1d = computation_results['maze2_PYR']['computed_data']['pf1D']
+            # ['maze1_PYR', 'maze2_PYR']
 
 
 
-            computation_results
+            pf1d_long = computation_results['maze1_PYR']['computed_data']['pf1D']
+            pf1d_short = computation_results['maze2_PYR']['computed_data']['pf1D']
+
 
             aclu_to_idx = computation_result.computed_data['jonathan_firing_rate_analysis']['rdf']['aclu_to_idx']
             rdf = computation_result.computed_data['jonathan_firing_rate_analysis']['rdf']['rdf'],
@@ -74,7 +79,7 @@ class MultiContextComparingDisplayFunctions(AllFunctionEnumeratingMixin, metacla
             pos_df = computation_result.sess.position.to_dataframe()
             # compare_firing_rates(rdf, irdf)
 
-            neuron_df = make_interactive_plot(computation_results, pos_df, aclu_to_idx, rdf, irdf, show_inter_replay_frs=False)
+            neuron_df = make_interactive_plot(pf1d_short, pf1d_long, pos_df, aclu_to_idx, rdf, irdf, show_inter_replay_frs=False)
 
 
             out_items = {}
@@ -269,19 +274,21 @@ def _context_nested_docks(curr_active_pipeline, active_config_names, enable_gui=
 # # this cell really works best in qt
 # %matplotlib qt
 
-def make_interactive_plot(computation_results, pos_df, aclu_to_idx, rdf, irdf, show_inter_replay_frs=False):
+
+
+def make_interactive_plot(sess, pf1d_short, pf1d_long, pos_df, aclu_to_idx, rdf, irdf, show_inter_replay_frs=False):
     fig, ax = plt.subplots(2,2, figsize=(12.11,4.06));
     colors = plt.rcParams['axes.prop_cycle'].by_key()['color'];
     
     # calculations for ax[0,0]
     # below we find where the tuning curve peak was for each cell in each context and store it in a dataframe
-    pf1d = computation_results['maze1_PYR']['computed_data']['pf1D']
-    l = [pf1d.xbin_centers[np.argmax(x)] for x in pf1d.ratemap.tuning_curves]
-    long_df = pd.DataFrame(l, columns=['long'], index=pf1d.cell_ids)
+    # pf1d_long = computation_results['maze1_PYR']['computed_data']['pf1D']
+    l = [pf1d_long.xbin_centers[np.argmax(x)] for x in pf1d_long.ratemap.tuning_curves]
+    long_df = pd.DataFrame(l, columns=['long'], index=pf1d_long.cell_ids)
 
-    pf1d = computation_results['maze2_PYR']['computed_data']['pf1D']
-    l = [pf1d.xbin_centers[np.argmax(x)] for x in pf1d.ratemap.tuning_curves]
-    short_df = pd.DataFrame(l, columns=['short'],index=pf1d.cell_ids)
+    # pf1d_short = computation_results['maze2_PYR']['computed_data']['pf1D']
+    l = [pf1d_short.xbin_centers[np.argmax(x)] for x in pf1d_short.ratemap.tuning_curves]
+    short_df = pd.DataFrame(l, columns=['short'],index=pf1d_short.cell_ids)
 
     # df keeps most of the interesting data for these plots
     # at this point, it has columns 'long' and 'short' holding the peak tuning curve positions for each context
