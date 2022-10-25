@@ -72,7 +72,7 @@ class ComputedPipelineStage(LoadableInput, LoadableSessionInput, FilterablePipel
     def register_computation(self, registered_name, computation_function):
         self.registered_computation_function_dict[registered_name] = computation_function
         
-    def perform_registered_computations(self, previous_computation_result=None, computation_functions_name_whitelist=None, computation_functions_name_blacklist=None, fail_on_exception:bool=False, progress_logger_callback=None, debug_print=False):
+    def perform_specific_context_registered_computations(self, previous_computation_result=None, computation_functions_name_whitelist=None, computation_functions_name_blacklist=None, fail_on_exception:bool=False, progress_logger_callback=None, debug_print=False):
         """ Executes all registered computations for a single filter
         
         The return value should be set to the self.computation_results[a_select_config_name]
@@ -185,7 +185,7 @@ class ComputedPipelineStage(LoadableInput, LoadableSessionInput, FilterablePipel
 
                 if not skip_computations_for_this_result:
                     # call to perform any registered computations:
-                    self.computation_results[a_select_config_name] = self.perform_registered_computations(self.computation_results[a_select_config_name], computation_functions_name_whitelist=computation_functions_name_whitelist, computation_functions_name_blacklist=computation_functions_name_blacklist, fail_on_exception=fail_on_exception, progress_logger_callback=progress_logger_callback, debug_print=debug_print)
+                    self.computation_results[a_select_config_name] = self.perform_specific_context_registered_computations(self.computation_results[a_select_config_name], computation_functions_name_whitelist=computation_functions_name_whitelist, computation_functions_name_blacklist=computation_functions_name_blacklist, fail_on_exception=fail_on_exception, progress_logger_callback=progress_logger_callback, debug_print=debug_print)
             else:
                 # this filter is excluded from the enabled list, no computations will we performed on it
                 if overwrite_extant_results:
