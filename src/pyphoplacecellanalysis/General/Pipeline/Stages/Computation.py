@@ -211,7 +211,7 @@ class ComputedPipelineStage(LoadableInput, LoadableSessionInput, FilterablePipel
         """ continues computations for a pipeline 
 
             NOTE: TODO: this is not yet implemented.
-            Calls perform_registered_computations(...) to do the actual comptuations
+            Calls perform_specific_context_registered_computations(...) to do the actual comptuations
 
         
             TODO: the rest of the system can't work until we have a way of associating the previously computed results with the functions that compute them. As it stands we don't know anything about whether a new function was registered after the computations were complete, etc.
@@ -240,7 +240,7 @@ class ComputedPipelineStage(LoadableInput, LoadableSessionInput, FilterablePipel
                 curr_active_pipeline.computation_results.setdefault(an_incomplete_config_name, cls._build_initial_computationResult(a_filtered_session, active_computation_params)) # returns a computation result. This stores the computation config used to compute it.
 
             # call to perform any registered computations:
-            curr_active_pipeline.computation_results[an_incomplete_config_name] = curr_active_pipeline.perform_registered_computations(curr_active_pipeline.computation_results[an_incomplete_config_name], computation_functions_name_whitelist=computation_functions_name_whitelist, computation_functions_name_blacklist=computation_functions_name_blacklist, fail_on_exception=fail_on_exception, debug_print=debug_print)
+            curr_active_pipeline.computation_results[an_incomplete_config_name] = curr_active_pipeline.perform_specific_context_registered_computations(curr_active_pipeline.computation_results[an_incomplete_config_name], computation_functions_name_whitelist=computation_functions_name_whitelist, computation_functions_name_blacklist=computation_functions_name_blacklist, fail_on_exception=fail_on_exception, debug_print=debug_print)
 
         ## TODO: initially compute incomplete_computed_config_dict items...
 
