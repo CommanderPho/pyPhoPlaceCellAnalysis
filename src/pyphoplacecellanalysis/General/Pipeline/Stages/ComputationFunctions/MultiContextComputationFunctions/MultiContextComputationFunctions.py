@@ -41,21 +41,7 @@ class MultiContextComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Co
 
         # ## Compute for all the session spikes first:
         sess = owning_pipeline_reference.sess
-
-        ### Make `rdf` (replay dataframe)
-        rdf = make_rdf(sess) # this creates the replay dataframe variable
-        rdf = remove_repeated_replays(rdf)
-        rdf, aclu_to_idx = add_spike_counts(sess, rdf)
-
-        rdf = remove_nospike_replays(rdf)
-        print(f"RDF has {len(rdf)} rows.")
-
-        ### Make `irdf` (inter-replay dataframe)
-        irdf = make_irdf(sess, rdf)
-        irdf = remove_repeated_replays(irdf) # TODO: make the removal process more meaningful
-        irdf, aclu_to_idx_irdf = add_spike_counts(sess, irdf)
-
-        assert aclu_to_idx_irdf == aclu_to_idx # technically, these might not match, which would be bad
+        rdf, aclu_to_idx, irdf, aclu_to_idx_irdf = _final_compute_jonathan_replay_fr_analyses(sess)
 
         global_computation_results.computed_data['jonathan_firing_rate_analysis'] = DynamicParameters.init_from_dict({
             'rdf': DynamicParameters.init_from_dict({
@@ -74,6 +60,26 @@ class MultiContextComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Co
 # ==================================================================================================================== #
 # Jonathan's helper functions                                                                                          #
 # ==================================================================================================================== #
+def _final_compute_jonathan_replay_fr_analyses(sess):
+    ## Compute for all the session spikes first:
+
+    ### Make `rdf` (replay dataframe)
+    rdf = make_rdf(sess) # this creates the replay dataframe variable
+    rdf = remove_repeated_replays(rdf)
+    rdf, aclu_to_idx = add_spike_counts(sess, rdf)
+
+    rdf = remove_nospike_replays(rdf)
+    print(f"RDF has {len(rdf)} rows.")
+
+    ### Make `irdf` (inter-replay dataframe)
+    irdf = make_irdf(sess, rdf)
+    irdf = remove_repeated_replays(irdf) # TODO: make the removal process more meaningful
+    irdf, aclu_to_idx_irdf = add_spike_counts(sess, irdf)
+
+    assert aclu_to_idx_irdf == aclu_to_idx # technically, these might not match, which would be bad
+
+    return rdf, aclu_to_idx, irdf, aclu_to_idx_irdf
+
 def make_fr(rdf):
     return np.vstack(rdf.firing_rates)
 

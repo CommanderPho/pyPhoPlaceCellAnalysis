@@ -16,7 +16,8 @@ from pyphoplacecellanalysis.Pho2D.PyQtPlots.plot_placefields import pyqtplot_plo
 
 from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.MultiContextComputationFunctions import take_difference, take_difference_nonzero, make_fr
 
-
+# BAD DOn'T DO THIS:
+from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.MultiContextComputationFunctions import _final_compute_jonathan_replay_fr_analyses
 
 class MultiContextComparingDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=DisplayFunctionRegistryHolder):
     """ MultiContextComparingDisplayFunctions
@@ -50,7 +51,7 @@ class MultiContextComparingDisplayFunctions(AllFunctionEnumeratingMixin, metacla
         # return master_dock_win, app, out_items
         return {'master_dock_win': master_dock_win, 'app': app, 'out_items': out_items}
 
-    def _display_recurrsive_latent_placefield_comparisons(owning_pipeline_reference, computation_results, active_configs, include_whitelist=None, **kwargs):
+    def _display_jonathan_replay_firing_rate_comparison(owning_pipeline_reference, computation_results, active_configs, include_whitelist=None, **kwargs):
             """ Create `master_dock_win` - centralized plot output window to collect individual figures/controls in (2022-08-18) 
             NOTE: Ignores `active_config` because context_nested_docks is for all contexts
             
@@ -72,24 +73,21 @@ class MultiContextComparingDisplayFunctions(AllFunctionEnumeratingMixin, metacla
             pf1d_long = computation_results['maze1_PYR']['computed_data']['pf1D']
             pf1d_short = computation_results['maze2_PYR']['computed_data']['pf1D']
 
+            # ## Compute for all the session spikes first:
+            sess = owning_pipeline_reference.sess
+            # BAD DOn'T DO THIS:
+            rdf, aclu_to_idx, irdf, aclu_to_idx_irdf = _final_compute_jonathan_replay_fr_analyses(sess)
+            pos_df = sess.position.to_dataframe()
 
-            aclu_to_idx = computation_result.computed_data['jonathan_firing_rate_analysis']['rdf']['aclu_to_idx']
-            rdf = computation_result.computed_data['jonathan_firing_rate_analysis']['rdf']['rdf'],
-            irdf = computation_result.computed_data['jonathan_firing_rate_analysis']['irdf']['irdf']
-            pos_df = computation_result.sess.position.to_dataframe()
+            # aclu_to_idx = computation_result.computed_data['jonathan_firing_rate_analysis']['rdf']['aclu_to_idx']
+            # rdf = computation_result.computed_data['jonathan_firing_rate_analysis']['rdf']['rdf'],
+            # irdf = computation_result.computed_data['jonathan_firing_rate_analysis']['irdf']['irdf']
+            # pos_df = computation_result.sess.position.to_dataframe()
             # compare_firing_rates(rdf, irdf)
 
-            neuron_df = make_interactive_plot(pf1d_short, pf1d_long, pos_df, aclu_to_idx, rdf, irdf, show_inter_replay_frs=False)
+            neuron_df = _make_interactive_plot(sess, pf1d_short, pf1d_long, pos_df, aclu_to_idx, rdf, irdf, show_inter_replay_frs=False)
 
-
-            out_items = {}
-            # for a_config_name in include_whitelist:
-            #     ## TODO:            
-            #     active_identifying_session_ctx, out_display_items = _single_context_nested_docks(curr_active_pipeline=owning_pipeline_reference, active_config_name=a_config_name, app=app, master_dock_win=master_dock_win, enable_gui=True, debug_print=False)
-            #     out_items[a_config_name] = (active_identifying_session_ctx, out_display_items)
-
-            # return master_dock_win, app, out_items
-            return {'master_dock_win': master_dock_win, 'app': app, 'out_items': out_items}
+            return {'fig': neuron_df}
 
 
     # def _display_recurrsive_latent_placefield_comparisons(owning_pipeline_reference, computation_results, active_configs, include_whitelist=None, **kwargs):
@@ -276,7 +274,7 @@ def _context_nested_docks(curr_active_pipeline, active_config_names, enable_gui=
 
 
 
-def make_interactive_plot(sess, pf1d_short, pf1d_long, pos_df, aclu_to_idx, rdf, irdf, show_inter_replay_frs=False):
+def _make_interactive_plot(sess, pf1d_short, pf1d_long, pos_df, aclu_to_idx, rdf, irdf, show_inter_replay_frs=False):
     fig, ax = plt.subplots(2,2, figsize=(12.11,4.06));
     colors = plt.rcParams['axes.prop_cycle'].by_key()['color'];
     
