@@ -188,6 +188,12 @@ class ComputedPipelineStage(LoadableInput, LoadableSessionInput, FilterablePipel
         if enabled_filter_names is None:
             enabled_filter_names = list(self.filtered_sessions.keys()) # all filters if specific enabled names aren't specified
 
+        if are_global:
+            active_computation_results = self.global_computation_results
+        else:
+            active_computation_results = self.computation_results
+
+
         ## Here's where we loop through all possible configs:
         for a_select_config_name, a_filtered_session in self.filtered_sessions.items():                
             if a_select_config_name in enabled_filter_names:

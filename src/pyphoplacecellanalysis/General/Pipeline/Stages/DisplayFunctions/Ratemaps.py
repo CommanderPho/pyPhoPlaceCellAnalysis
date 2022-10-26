@@ -13,6 +13,7 @@ from pyphoplacecellanalysis.General.Mixins.DisplayHelpers import _display_add_co
 
 from neuropy.core.neuron_identities import NeuronIdentity, build_units_colormap, PlotStringBrevityModeEnum
 from neuropy.plotting.placemaps import plot_all_placefields
+from neuropy.plotting.ratemaps import BackgroundRenderingOptions # for _plot_latent_recursive_pfs_depth_level
 from neuropy.utils.matplotlib_helpers import enumTuningMap2DPlotVariables # for getting the variant name from the dict
 from neuropy.utils.mixins.unwrap_placefield_computation_parameters import unwrap_placefield_computation_parameters
 from neuropy.utils.dynamic_container import overriding_dict_with
@@ -136,6 +137,7 @@ class DefaultRatemapDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Disp
         # return app, parent_root_widget, root_render_widget
         # return app, parent_root_widget, display_outputs
 
+    from pyphoplacecellanalysis.General.Mixins.CrossComputationComparisonHelpers import _compare_computation_results
 
     def _display_recurrsive_latent_placefield_comparisons(computation_result, active_config, owning_pipeline_reference=None, enable_saving_to_disk=False, active_context=None, defer_show:bool=False, **kwargs):
             """ Create `master_dock_win` - centralized plot output window to collect individual figures/controls in (2022-08-18) 
@@ -154,8 +156,23 @@ class DefaultRatemapDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Disp
             ## Build the outer window:
             master_dock_win, app = DockAreaWrapper._build_default_dockAreaWindow(title='recurrsive_latent_placefield_comparisons', defer_show=False)
             master_dock_win.resize(1920, 1024)
-            
             out_items = {}
+
+            ## build plot_ratemaps_2D_kwargs:
+            plot_ratemaps_2D_kwargs = kwargs.copy()        
+
+            ## Compute neurons common to all deconding depths (for comparison across depths):
+            pf_neurons_either = plot_ratemaps_2D_kwargs.get('included_unit_neuron_IDs', None)
+            if pf_neurons_either is None:
+                ## If no user-specified set of neurons to plot, find all common to any of the plots:
+                active_first_order_2D_decoder = active_recursive_latent_pf_2Ds[0].get('pf2D_Decoder', None)
+                active_second_order_2D_decoder = active_recursive_latent_pf_2Ds[1].get('pf2D_Decoder', None)
+                active_third_order_2D_decoder = active_recursive_latent_pf_2Ds[2].get('pf2D_Decoder', None)
+
+                pf_neurons_either = np.union1d(active_first_order_2D_decoder.ratemap.neuron_ids, active_second_order_2D_decoder.ratemap.neuron_ids)
+                pf_neurons_either = np.union1d(pf_neurons_either, active_third_order_2D_decoder.ratemap.neuron_ids) 
+                
+                plot_ratemaps_2D_kwargs['included_unit_neuron_IDs'] = pf_neurons_either
 
             ## First Order:
             recursive_depth = 0
@@ -164,7 +181,7 @@ class DefaultRatemapDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Disp
             active_decoder = active_first_order_2D_decoder
             active_identifying_ctx = active_context.adding_context('display_fn', decoder_order=recursive_depth_label)
             active_dock_config = CustomCyclicColorsDockDisplayConfig(named_color_scheme=NamedColorScheme.red, showCloseButton=True)
-            out_items = out_items | _plot_latent_recursive_pfs_depth_level(master_dock_win, active_decoder, active_identifying_ctx, active_dock_config=active_dock_config)
+            out_items = out_items | _plot_latent_recursive_pfs_depth_level(master_dock_win, active_decoder, active_identifying_ctx, active_dock_config=active_dock_config, plot_ratemaps_2D_kwargs=plot_ratemaps_2D_kwargs)
 
             ## Second Order:
             recursive_depth = 1
@@ -173,7 +190,7 @@ class DefaultRatemapDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Disp
             active_dock_config = CustomCyclicColorsDockDisplayConfig(named_color_scheme=NamedColorScheme.green, showCloseButton=True)
             active_second_order_2D_decoder = active_recursive_latent_pf_2Ds[recursive_depth].get('pf2D_Decoder', None)
             active_decoder = active_second_order_2D_decoder
-            out_items = out_items | _plot_latent_recursive_pfs_depth_level(master_dock_win, active_decoder, active_identifying_ctx, active_dock_config=active_dock_config) 
+            out_items = out_items | _plot_latent_recursive_pfs_depth_level(master_dock_win, active_decoder, active_identifying_ctx, active_dock_config=active_dock_config, plot_ratemaps_2D_kwargs=plot_ratemaps_2D_kwargs) 
             
             ## Third Order:
             recursive_depth = 2
@@ -182,13 +199,14 @@ class DefaultRatemapDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Disp
             active_decoder = active_third_order_2D_decoder
             active_identifying_ctx = active_context.adding_context('display_fn', decoder_order=recursive_depth_label)
             active_dock_config = CustomCyclicColorsDockDisplayConfig(named_color_scheme=NamedColorScheme.blue, showCloseButton=True)
-            out_items = out_items | _plot_latent_recursive_pfs_depth_level(master_dock_win, active_decoder, active_identifying_ctx, active_dock_config=active_dock_config)
+            out_items = out_items | _plot_latent_recursive_pfs_depth_level(master_dock_win, active_decoder, active_identifying_ctx, active_dock_config=active_dock_config, plot_ratemaps_2D_kwargs=plot_ratemaps_2D_kwargs)
             
             ## Layout all panels as we desire them: 
             desired_restore_state, backup_state, dock_keys_dict = _layout_latent_recursive_pfs_docks(master_dock_win, debug_print=False)
 
             # return master_dock_win, app, out_items
             return {'master_dock_win': master_dock_win, 'app': app, 'out_items': out_items}
+
 
 
 
@@ -222,7 +240,9 @@ def _plot_latent_recursive_pfs_depth_level(master_dock_win, active_decoder, acti
     if plot_ratemaps_2D_kwargs is None:
         plot_ratemaps_2D_kwargs = {} 
     # 'included_unit_neuron_IDs': [2, 3, 4, 5, 8, 10, 11, 13, 14, 15, 16, 19, 21, 23, 24, 25, 26, 27, 28, 31, 32, 33, 34, 36, 37, 41, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 66, 67, 68, 69, 70, 73, 74, 75, 76, 78, 81, 82, 83, 85, 86, 87, 88, 89, 90, 92, 93, 96, 98, 100, 102, 105, 108, 109]
-    _out_plot_ratemaps = active_decoder.pf.plot_ratemaps_2D(fig=mw.getFigure(), **overriding_dict_with(lhs_dict={'subplots': (None, 3), 'brev_mode': PlotStringBrevityModeEnum.NONE, 'plot_variable': enumTuningMap2DPlotVariables.TUNING_MAPS}, **plot_ratemaps_2D_kwargs)) # 5
+    # _out_plot_ratemaps = active_decoder.pf.plot_ratemaps_2D(fig=mw.getFigure(), **overriding_dict_with(lhs_dict={'subplots': (None, 3), 'brev_mode': PlotStringBrevityModeEnum.NONE, 'plot_variable': enumTuningMap2DPlotVariables.TUNING_MAPS, 'bg_rendering_mode': 'NONE'}, **plot_ratemaps_2D_kwargs)) # 5
+    _out_plot_ratemaps = active_decoder.pf.plot_ratemaps_2D(fig=mw.getFigure(), **({'subplots': (None, 3), 'brev_mode': PlotStringBrevityModeEnum.NONE, 'plot_variable': enumTuningMap2DPlotVariables.TUNING_MAPS, 'bg_rendering_mode': BackgroundRenderingOptions.EMPTY} | plot_ratemaps_2D_kwargs)) # 5
+
     mw.getFigure().tight_layout() ## This actually fixes the tiny figure in the middle
     mw.show()
     ## Install the matplotlib-widget in the dock
