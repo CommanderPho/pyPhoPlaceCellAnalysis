@@ -361,20 +361,26 @@ class Specific3DTimeCurvesHelper:
         # Data Mapping:
         data_values_column_names = [str(an_id) for an_id in included_neuron_ids]
         
+        proper_time_windows = np.atleast_2d(curr_computations_results.computed_data['pf2D_Decoder'].time_window_centers) 
+        
+        ## TODO: HACK: This is wrong, it should be the time_window_centers, but for some reason there are too few of them now!
+        proper_time_windows = np.atleast_2d(curr_computations_results.computed_data['pf2D_Decoder'].time_window_edges) 
+
+
         if spike_visualization_mode == 'count':
-            active_plot_df = pd.DataFrame(np.concatenate((np.atleast_2d(curr_computations_results.computed_data['pf2D_Decoder'].time_window_centers), curr_computations_results.computed_data['pf2D_Decoder'].unit_specific_time_binned_spike_counts)).T,
+            active_plot_df = pd.DataFrame(np.concatenate((proper_time_windows, curr_computations_results.computed_data['pf2D_Decoder'].unit_specific_time_binned_spike_counts)).T,
                                                              columns=(['t'] + data_values_column_names))
         
         elif spike_visualization_mode == 'rate':
             ## Convert to spike rates (spike/sec) as a function of the bin and unit:
             curr_time_bin_size_seconds = curr_computations_results.computed_data['pf2D_Decoder'].time_bin_size # 1.0 (seconds)
-            active_plot_df = pd.DataFrame(np.concatenate((np.atleast_2d(curr_computations_results.computed_data['pf2D_Decoder'].time_window_centers), (curr_computations_results.computed_data['pf2D_Decoder'].unit_specific_time_binned_spike_counts / curr_time_bin_size_seconds))).T,
+            active_plot_df = pd.DataFrame(np.concatenate((proper_time_windows, (curr_computations_results.computed_data['pf2D_Decoder'].unit_specific_time_binned_spike_counts / curr_time_bin_size_seconds))).T,
                                                              columns=(['t'] + data_values_column_names))
             
         elif spike_visualization_mode == 'mov_average':
             ## Convert to spike rates (spike/sec) as a function of the bin and unit:
             curr_time_bin_size_seconds = curr_computations_results.computed_data['pf2D_Decoder'].time_bin_size # 1.0 (seconds)
-            active_plot_df = pd.DataFrame(np.concatenate((np.atleast_2d(curr_computations_results.computed_data['pf2D_Decoder'].time_window_centers), (curr_computations_results.computed_data['pf2D_Decoder'].unit_specific_time_binned_spike_counts / curr_time_bin_size_seconds))).T,
+            active_plot_df = pd.DataFrame(np.concatenate((proper_time_windows, (curr_computations_results.computed_data['pf2D_Decoder'].unit_specific_time_binned_spike_counts / curr_time_bin_size_seconds))).T,
                                                              columns=(['t'] + data_values_column_names))
             # Compute the time averaging:
             # REF: see https://www.statology.org/exponential-moving-average-pandas/
