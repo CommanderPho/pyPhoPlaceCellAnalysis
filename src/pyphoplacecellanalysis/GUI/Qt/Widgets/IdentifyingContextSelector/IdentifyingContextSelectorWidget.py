@@ -1,7 +1,9 @@
 # IdentifyingContextSelectorWidget.py
 # Generated from c:\Users\pho\repos\pyPhoPlaceCellAnalysis\src\pyphoplacecellanalysis\GUI\Qt\IdentifyingContextSelector\IdentifyingContextSelectorWidget.ui automatically by PhoPyQtClassGenerator VSCode Extension
+from copy import deepcopy
 import sys
 import os
+import numpy as np
 
 from PyQt5 import QtGui, QtWidgets, uic
 from PyQt5.QtWidgets import QMessageBox, QToolTip, QStackedWidget, QHBoxLayout, QVBoxLayout, QSplitter, QFormLayout, QLabel, QFrame, QPushButton, QTableWidget, QTableWidgetItem, QCheckBox
@@ -34,8 +36,38 @@ class IdentifyingContextSelectorWidget(ComboBoxCtrlOwnerMixin, PipelineOwningMix
     """
 
     sigContextChanged = pyqtSignal(object, object) # newKey: str, newContext: IdentifyingContext
+    sigMultiContextChanged = pyqtSignal(dict) #contexts: dict<str:IdentifyingContext> 
 
+    
+    # ==================================================================================================================== #
+    def __init__(self, parent=None, owning_pipeline=None):
+        super().__init__(parent=parent) # Call the inherited classes __init__ method
+        self.ui = uic.loadUi(uiFile, self) # Load the .ui file
 
+        ## Set member properties:
+        self._owning_pipeline = owning_pipeline
+
+        self.initUI()
+        # self.show() # Show the GUI
+
+    def initUI(self):
+        # self.ui.cmbIdentifyingContext.set = self.all_filtered_session_keys
+        self.ui.cmbIdentifyingContext.currentIndexChanged.connect(self.on_selected_context_index_changed)
+        # self.ui.btnConfirm.clicked.
+
+        ## Setup checktable:
+        self._programmaticallyBuildCheckTable()
+
+    
+    def updateUi(self):
+        self._tryUpdateComboItemsUi()
+        self._tryUpdateCheckTableUi()
+
+    
+    # ==================================================================================================================== #
+    # Single-context ComboBox Dropdown                                                                                         #
+    # ==================================================================================================================== #
+    
     @property
     def current_selected_context_key(self):
         """The current_selected_context property."""
@@ -56,7 +88,6 @@ class IdentifyingContextSelectorWidget(ComboBoxCtrlOwnerMixin, PipelineOwningMix
         else:
             return True
 
-
     @property
     def current_selected_context(self):
         """The IdentifyingContext that's currently selected, or None."""
@@ -65,42 +96,6 @@ class IdentifyingContextSelectorWidget(ComboBoxCtrlOwnerMixin, PipelineOwningMix
         else:
             return self.all_filtered_session_contexts[self.current_selected_context_key]
 
-
-    # ==================================================================================================================== #
-    def __init__(self, parent=None, owning_pipeline=None):
-        super().__init__(parent=parent) # Call the inherited classes __init__ method
-        self.ui = uic.loadUi(uiFile, self) # Load the .ui file
-
-        ## Set member properties:
-        self._owning_pipeline = owning_pipeline
-
-        self.initUI()
-        # self.show() # Show the GUI
-
-    def initUI(self):
-        # self.ui.cmbIdentifyingContext.set = self.all_filtered_session_keys
-        self.ui.cmbIdentifyingContext.currentIndexChanged.connect(self.on_selected_context_index_changed)
-        # self.ui.btnConfirm.clicked.
-        # self.updateUi()
-
-        ## Build Context Table
-        allChkBox = QCheckBox('Check all')
-        tableWidget = CheckBoxTableWidget()
-        tableWidget.setRowCount(10)
-        tableWidget.stretchEveryColumnExceptForCheckBox() # stretch every section of tablewidget except for check box section
-        for i in range(tableWidget.rowCount()):
-            item = QTableWidgetItem()
-            item.setTextAlignment(Qt.AlignCenter) # align
-            item.setText(str(i)*50) # text sample
-            tableWidget.setItem(i, 1, item)
-        allChkBox.stateChanged.connect(tableWidget.toggleState) # if allChkBox is checked, tablewidget checkboxes will also be checked 
-        
-        self.ui.verticalLayout.addWidget(allChkBox)
-        self.ui.verticalLayout.addWidget(tableWidget)
-
-        # lay = QVBoxLayout()
-        # lay.addWidget(allChkBox)
-        # lay.addWidget(tableWidget)
 
 
 
@@ -134,7 +129,6 @@ class IdentifyingContextSelectorWidget(ComboBoxCtrlOwnerMixin, PipelineOwningMix
         ## Unblock the signals:
         curr_combo_box.blockSignals(False)
 
-
     def _trySelectFirstComboItem(self):
         """ tries to select the first item (index 0) if possible. Otherwise, fails gracefully.
         Internally calls self.try_select_combo_item_with_text(...)
@@ -149,12 +143,6 @@ class IdentifyingContextSelectorWidget(ComboBoxCtrlOwnerMixin, PipelineOwningMix
             found_desired_index = None
         return found_desired_index
 
-    def updateUi(self):
-        self._tryUpdateComboItemsUi()
-
-
-    
-
     @pyqtSlot(int)
     def on_selected_context_index_changed(self, new_index):
         if new_index < 0:
@@ -166,6 +154,128 @@ class IdentifyingContextSelectorWidget(ComboBoxCtrlOwnerMixin, PipelineOwningMix
             new_context = self.all_filtered_session_contexts[new_key]
         print(f'on_selected_context_index_changed: {new_index}, {new_key}, {new_description}, {new_context}')
         self.sigContextChanged.emit(new_key, new_context)
+
+    # ==================================================================================================================== #
+    # Multi-context Checkbox Table                                                                                         #
+    # ==================================================================================================================== #
+
+    @property
+    def check_table_ctrl(self):
+        """ The multi-context checkbox table widget """
+        return self.ui.checkTable
+
+    @property
+    def current_selected_multi_context_indicies(self):
+        """The indicies of the currently selected contexts (in the multi-context checkbox list).
+            e.g. [0, 1]
+        """
+        return self.check_table_ctrl.getCheckedRows()
+
+    @property
+    def current_selected_multi_context_descriptions(self):
+        """The description strings for each contexts (that act as an indentifier).
+            e.g. ['kdiba_2006-6-13_14-42-6_maze1_PYR', 'kdiba_2006-6-13_14-42-6_maze2_PYR']
+        """
+        if self._last_context_table_rows is None:
+            return None
+        return [self._last_context_table_rows[i] for i in self.current_selected_multi_context_indicies]
+    
+
+    @property
+    def current_selected_multi_contexts(self):
+        """A dictionary of the actual context items.
+            e.g. {'maze1_PYR': <neuropy.utils.result_context.IdentifyingContext at 0x2d11d4d5640>,
+            'maze2_PYR': <neuropy.utils.result_context.IdentifyingContext at 0x2d11d4d56d0>}
+
+        """
+        return {list(self.owning_pipeline.filtered_contexts.keys())[i]:list(self.owning_pipeline.filtered_contexts.values())[i] for i in self.current_selected_multi_context_indicies}
+
+    def _programmaticallyBuildCheckTable(self, col_labels=['compute'], rows=[]):
+        """ builds a multi-context selection checkbox table to enable the user to specify multiple relevent contexts to operate on. """
+        ## Build Context Table
+        self._last_context_table_rows = None
+
+        self.ui.selectAllChkBox = QCheckBox('Check all')
+        self.ui.checkTable = CheckBoxTableWidget()
+
+        curr_active_context_descriptions = self.all_filtered_session_context_descriptions
+        self._tryRebuildCheckTableUi(curr_active_context_descriptions, checked_contexts=[]) # None checked by default
+        self.ui.selectAllChkBox.stateChanged.connect(self.ui.checkTable.toggleState) # if allChkBox is checked, tablewidget checkboxes will also be checked 
+        
+        self.ui.verticalLayout.addWidget(self.ui.selectAllChkBox)
+        self.ui.verticalLayout.addWidget(self.ui.checkTable)
+
+        self.ui.checkTable.checkedSignal.connect(self.on_checktable_checked_state_changed) # checkedSignal = pyqtSignal(int, Qt.CheckState)
+
+    def _tryRebuildCheckTableUi(self, curr_active_context_descriptions=[], checked_contexts=[]):
+        """ rebuilds the entire checkbox table from the updated list of contexts """
+        _curr_context_table_rows = self._last_context_table_rows
+        if _curr_context_table_rows is not None:
+            self.ui.checkTable.clearContents() # clears all extant rows
+            _curr_selected_table_rows = deepcopy(_curr_context_table_rows[np.array(self.check_table_ctrl.getCheckedRows())]) # gets the indicies of the checked rows
+            print(f'_curr_selected_table_rows: {_curr_selected_table_rows}')
+        else:
+            _curr_selected_table_rows = None
+
+        # Backup the new values that we'll be using
+        self._last_context_table_rows = deepcopy(curr_active_context_descriptions)
+        num_rows = len(self._last_context_table_rows)
+        self.ui.checkTable.setRowCount(num_rows)
+        self.ui.checkTable.stretchEveryColumnExceptForCheckBox() # stretch every section of tablewidget except for check box section
+        for i in range(self.ui.checkTable.rowCount()):
+            item = QTableWidgetItem()
+            item.setTextAlignment(Qt.AlignCenter) # align
+            item.setText(self._last_context_table_rows[i])
+            self.ui.checkTable.setItem(i, 1, item)
+            self.ui.checkTable.setCheckedAt(idx=i, f=True)
+
+        # Set the last row to unchecked by default:
+        self.ui.checkTable.setCheckedAt(idx=num_rows-1, f=False)
+
+
+        # Restore previously checked items after updating:
+        if _curr_selected_table_rows is not None:
+            # TODO: do selection
+            print(f'_curr_selected_table_rows: {_curr_selected_table_rows}')
+        else:
+            # by default select all but the last one
+            # _curr_selected_table_rows = [self._last_context_table_rows[i] for i in np.arange(num_rows-1)]
+            # for i in np.arange(num_rows-1):
+            #     self.ui.checkTable.setCheckedAt(idx=i, f=True)
+            # self.ui.checkTable.setCheckedAt(idx=num_rows, f=False)
+            pass
+
+    def _tryUpdateCheckTableUi(self):
+        """ tries to update the combo box items. If an item was previously selected before the update, it tries to re-select the same item. """
+        curr_checked_row_indicies = self.check_table_ctrl.getCheckedRows() # gets the indicies of the checked rows
+        print(f'_tryUpdateCheckTableUi():\n\curr_checked_row_indicies: {curr_checked_row_indicies}')
+        curr_context_rows = self._last_context_table_rows
+        if curr_context_rows is not None:
+            _curr_selected_table_rows = [curr_context_rows[i] for i in curr_checked_row_indicies] # gets the values of the checked rows
+            print(f'\t_curr_selected_table_rows: {_curr_selected_table_rows}')
+        else:
+            print(f'\tno rows selected.')
+            _curr_selected_table_rows = None
+
+        return
+        # curr_active_contexts = self.all_filtered_session_context_descriptions
+        # num_rows = len(curr_active_contexts)
+        # self.ui.checkTable.setRowCount(num_rows)
+        
+        # self.check_table_ctrl.setCheckedAt(idx: int, f: bool)
+        # for i in range(self.ui.checkTable.rowCount()):
+        #     item = self.ui.checkTable.getItem(i, 1)
+        #     item.setText(curr_active_contexts[i])
+            
+    # checkedSignal = pyqtSignal(int, Qt.CheckState) # (rowIndex: int, flag: Qt.CheckState)
+    @pyqtSlot(int, Qt.CheckState)
+    def on_checktable_checked_state_changed(self, row, state):
+        print(f'on_checktable_checked_state_changed(row:{row}, state:{state})')
+        # Emit sigMultiContextChanged = pyqtSignal(dict) #contexts: dict<str:IdentifyingContext> 
+        self.sigMultiContextChanged.emit(self.current_selected_multi_contexts) # emit the currently selected multi-contexts when any one of them change
+
+
+    # sigMultiContextChanged = pyqtSignal(list, dict) #names: list<str>, contexts: dict<str:IdentifyingContext> 
 
 
 ## Start Qt event loop
