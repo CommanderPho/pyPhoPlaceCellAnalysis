@@ -66,6 +66,13 @@ class CheckTableCtrlOwnerMixin:
         """ The checktable control """
         return self.ctrls['included_configs_table']
 
+
+    @property
+    def check_table_sibling_ctrls(self):
+        """check_table_sibling_ctrls are controls that will have .blockSignals(True), ..., .blockSignals(False) called on them when programmtically updating the check_table."""
+        return self.ctrls.values()
+
+
     @property
     def check_table_row_checkedstate(self):
         """ The checktable control """
@@ -109,13 +116,13 @@ class CheckTableCtrlOwnerMixin:
             print("Unknown data type:", type(data), data)
             return
             
-        for c in self.ctrls.values():
+        for c in self.check_table_sibling_ctrls:
             c.blockSignals(True)
         #for c in [self.ctrls['included_configs'], self.ctrls['y'], self.ctrls['size']]:
         for c in [self.check_table_ctrl]:
             c.updateRows(keys) # update the rows with the config rows
 
-        for c in self.ctrls.values():
+        for c in self.check_table_sibling_ctrls:
             c.blockSignals(False)
         # Update the self.keys value:
         self.configRows = keys
