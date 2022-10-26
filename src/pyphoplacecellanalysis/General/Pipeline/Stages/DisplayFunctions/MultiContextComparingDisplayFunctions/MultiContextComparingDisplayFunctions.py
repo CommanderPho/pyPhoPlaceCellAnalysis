@@ -63,11 +63,14 @@ class MultiContextComparingDisplayFunctions(AllFunctionEnumeratingMixin, metacla
                 include_whitelist = owning_pipeline_reference.active_completed_computation_result_names # ['maze', 'sprinkle']
 
             # ['maze1_PYR', 'maze2_PYR']
-
-
-
             pf1d_long = computation_results['maze1_PYR']['computed_data']['pf1D']
             pf1d_short = computation_results['maze2_PYR']['computed_data']['pf1D']
+
+            # pf2D_Decoder = computation_results['maze_PYR']['computed_data']['pf2D_Decoder']
+            active_firing_rate_trends = computation_results['maze_PYR']['computed_data']['firing_rate_trends']
+
+            time_bins = active_firing_rate_trends.all_session_spikes.time_binning_container.centers
+            time_binned_unit_specific_binned_spike_rate = active_firing_rate_trends.all_session_spikes.time_binned_unit_specific_binned_spike_rate
 
             # ## Compute for all the session spikes first:
             sess = owning_pipeline_reference.sess
@@ -82,36 +85,11 @@ class MultiContextComparingDisplayFunctions(AllFunctionEnumeratingMixin, metacla
             # pos_df = computation_result.sess.position.to_dataframe()
             # compare_firing_rates(rdf, irdf)
 
-            neuron_df = _make_jonathan_interactive_plot(sess, pf1d_short, pf1d_long, pos_df, aclu_to_idx, rdf, irdf, show_inter_replay_frs=False)
-
-            return {'fig': neuron_df}
-
-
-    # def _display_recurrsive_latent_placefield_comparisons(owning_pipeline_reference, computation_results, active_configs, include_whitelist=None, **kwargs):
-    #     """ Create `master_dock_win` - centralized plot output window to collect individual figures/controls in (2022-08-18) 
-    #     NOTE: Ignores `active_config` because context_nested_docks is for all contexts
-        
-    #     Usage:
-        
-    #     display_output = active_display_output | curr_active_pipeline.display('_display_context_nested_docks', active_identifying_filtered_session_ctx, enable_gui=False, debug_print=False) # returns {'master_dock_win': master_dock_win, 'app': app, 'out_items': out_items}
-    #     master_dock_win = display_output['master_dock_win']
-    #     app = display_output['app']
-    #     out_items = display_output['out_items']
-
-    #     """
-    #     if include_whitelist is None:
-    #         include_whitelist = owning_pipeline_reference.active_completed_computation_result_names # ['maze', 'sprinkle']
-    #     master_dock_win, app = DockAreaWrapper._build_default_dockAreaWindow(title='recurrsive_latent_placefield_comparisons', defer_show=False)
-    #     master_dock_win.resize(1920, 1024)
-        
-    #     out_items = {}
-    #     # for a_config_name in include_whitelist:
-    #     #     ## TODO:            
-    #     #     active_identifying_session_ctx, out_display_items = _single_context_nested_docks(curr_active_pipeline=owning_pipeline_reference, active_config_name=a_config_name, app=app, master_dock_win=master_dock_win, enable_gui=True, debug_print=False)
-    #     #     out_items[a_config_name] = (active_identifying_session_ctx, out_display_items)
-
-    #     # return master_dock_win, app, out_items
-    #     return {'master_dock_win': master_dock_win, 'app': app, 'out_items': out_items}
+            graphics_output_dict, neuron_df = _make_jonathan_interactive_plot(sess, time_bins, time_binned_unit_specific_binned_spike_rate, pf1d_short, pf1d_long, pos_df, aclu_to_idx, rdf, irdf, show_inter_replay_frs=False)
+            # output_dict = {'fig': fig, 'axs': ax, 'colors': colors}
+            graphics_output_dict['plot_data'] = {'df': neuron_df, 'rdf':rdf, 'aclu_to_idx':aclu_to_idx, 'irdf':irdf}
+            
+            return graphics_output_dict
 
 
 
@@ -271,10 +249,17 @@ def _context_nested_docks(curr_active_pipeline, active_config_names, enable_gui=
 
 
 
-def _make_jonathan_interactive_plot(sess, pf1d_short, pf1d_long, pos_df, aclu_to_idx, rdf, irdf, show_inter_replay_frs=False):
+def _make_jonathan_interactive_plot(sess, time_bins, unit_specific_time_binned_firing_rates, pf1d_short, pf1d_long, pos_df, aclu_to_idx, rdf, irdf, show_inter_replay_frs=False):
     fig, ax = plt.subplots(2,2, figsize=(12.11,4.06));
     colors = plt.rcParams['axes.prop_cycle'].by_key()['color'];
+
+    graphics_output_dict = {'fig': fig, 'axs': ax, 'colors': colors}
     
+    ## The actual firing rate we want:
+    
+    # unit_specific_time_binned_firing_rates = pf2D_Decoder.unit_specific_time_binned_spike_counts.astype(np.float32) / pf2D_Decoder.time_bin_size
+    print(f'np.shape(unit_specific_time_binned_firing_rates): {np.shape(unit_specific_time_binned_firing_rates)}')
+
     # calculations for ax[0,0]
     # below we find where the tuning curve peak was for each cell in each context and store it in a dataframe
     # pf1d_long = computation_results['maze1_PYR']['computed_data']['pf1D']
@@ -291,7 +276,10 @@ def _make_jonathan_interactive_plot(sess, pf1d_short, pf1d_long, pos_df, aclu_to
     df = long_df.join(short_df, how='outer')
     df["has_na"] = df.isna().any(axis=1)
     
-    
+    try:
+        pass
+    except ValueError as e:
+        raise e
     # plotting for ax[0,0]     
     ax[0,0].axis("equal");
     
@@ -306,7 +294,6 @@ def _make_jonathan_interactive_plot(sess, pf1d_short, pf1d_long, pos_df, aclu_to
     df.short.fillna(ylim[0] + 1, inplace=True)
 
     remap_scatter = ax[0,0].scatter(df.long, df.short, s=7, picker=True, c=[colors[c] for c in df["has_na"]]);
-
     ax[0,0].set_ylim(ylim);
     ax[0,0].set_xlim(xlim);
     ax[0,0].xaxis.set_tick_params(labelbottom=False)
@@ -317,7 +304,9 @@ def _make_jonathan_interactive_plot(sess, pf1d_short, pf1d_long, pos_df, aclu_to
     ax[0,0].set_xlabel("Distance along long track")
     ax[0,0].set_ylabel("Distance along short track")
     ax[0,0].set_title("Peak tuning on short vs. long track")
-    
+
+    graphics_output_dict['remap_scatter'] = remap_scatter
+
     # calculations for ax[1,0]
     non_replay_diff = take_difference_nonzero(irdf)
     replay_diff = take_difference_nonzero(rdf)
@@ -326,10 +315,12 @@ def _make_jonathan_interactive_plot(sess, pf1d_short, pf1d_long, pos_df, aclu_to
 
     # plotting for ax[1,0]
     diff_scatter = ax[1,0].scatter(df.non_replay_diff, df.replay_diff, s=7, picker=True);
-    ax[1,0].set_xlabel("Firing rate along long track")
-    ax[1,0].set_ylabel("Firing rate along short track")
+    # ax[1,0].set_xlabel("Firing rate along long track")
+    # ax[1,0].set_ylabel("Firing rate along short track")
     ax[1,0].set_title("Firing rate on short vs. long track")
     
+    graphics_output_dict['diff_scatter'] = diff_scatter
+
     #TODO
     # diff_scatter = ax[1,0].scatter(scaled_participation, d_activity, s=7, picker=True);
 
@@ -381,10 +372,31 @@ def _make_jonathan_interactive_plot(sess, pf1d_short, pf1d_long, pos_df, aclu_to
         ax[1,1].set_ylabel("Position")
         ax[1,1].set_title("Animal position on track")
     
+
+        # Pho's firing rate additions:
+        try:
+            # found_idx = pf2D_Decoder.neuron_IDs.index(aclu)
+            # print(f'found_idx: {found_idx}')
+            t = time_bins
+            v = unit_specific_time_binned_firing_rates[aclu].to_numpy() # index directly by ACLU
+            # print(f't: {np.shape(t)}, v: {np.shape(v)}')
+
+        except KeyError:
+        # except ValueError:
+            print(f'non-placefield neuron. Skipping.')
+            t, v = None, None
+            pass
+
+        if v is not None:
+            # Plot the continuous firing rates
+            ax[0,1].plot(t, v)
+
+
         fig.canvas.draw()
 
 
     def on_keypress(event):
+        global g_index
         if event.key=='tab':
             g_index += 1
             g_index %= len(df)
@@ -400,6 +412,6 @@ def _make_jonathan_interactive_plot(sess, pf1d_short, pf1d_long, pos_df, aclu_to
     on_index_change(g_index)
     fig.canvas.mpl_connect('pick_event', on_pick)
     fig.canvas.mpl_connect('key_press_event', on_keypress)
-    return df
+    return graphics_output_dict, df
 
 
