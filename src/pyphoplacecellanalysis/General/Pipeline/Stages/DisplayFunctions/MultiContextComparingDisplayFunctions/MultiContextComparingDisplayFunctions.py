@@ -52,15 +52,11 @@ class MultiContextComparingDisplayFunctions(AllFunctionEnumeratingMixin, metacla
         return {'master_dock_win': master_dock_win, 'app': app, 'out_items': out_items}
 
     def _display_jonathan_replay_firing_rate_comparison(owning_pipeline_reference, computation_results, active_configs, include_whitelist=None, **kwargs):
-            """ Create `master_dock_win` - centralized plot output window to collect individual figures/controls in (2022-08-18) 
-            NOTE: Ignores `active_config` because context_nested_docks is for all contexts
-            
-            Usage:
-            
-            display_output = active_display_output | curr_active_pipeline.display('_display_context_nested_docks', active_identifying_filtered_session_ctx, enable_gui=False, debug_print=False) # returns {'master_dock_win': master_dock_win, 'app': app, 'out_items': out_items}
-            master_dock_win = display_output['master_dock_win']
-            app = display_output['app']
-            out_items = display_output['out_items']
+            """ Jonathan's interactive display. Currently hacked up to directly compute the results to display within this function
+
+                Usage:
+                active_identifying_session_ctx = curr_active_pipeline.sess.get_context() # 'bapun_RatN_Day4_2019-10-15_11-30-06'
+                curr_active_pipeline.display('_display_jonathan_replay_firing_rate_comparison', active_identifying_session_ctx)
 
             """
             if include_whitelist is None:
@@ -79,13 +75,14 @@ class MultiContextComparingDisplayFunctions(AllFunctionEnumeratingMixin, metacla
             rdf, aclu_to_idx, irdf, aclu_to_idx_irdf = _final_compute_jonathan_replay_fr_analyses(sess)
             pos_df = sess.position.to_dataframe()
 
+            ## TODO: This is the proper way once global computations work:
             # aclu_to_idx = computation_result.computed_data['jonathan_firing_rate_analysis']['rdf']['aclu_to_idx']
             # rdf = computation_result.computed_data['jonathan_firing_rate_analysis']['rdf']['rdf'],
             # irdf = computation_result.computed_data['jonathan_firing_rate_analysis']['irdf']['irdf']
             # pos_df = computation_result.sess.position.to_dataframe()
             # compare_firing_rates(rdf, irdf)
 
-            neuron_df = _make_interactive_plot(sess, pf1d_short, pf1d_long, pos_df, aclu_to_idx, rdf, irdf, show_inter_replay_frs=False)
+            neuron_df = _make_jonathan_interactive_plot(sess, pf1d_short, pf1d_long, pos_df, aclu_to_idx, rdf, irdf, show_inter_replay_frs=False)
 
             return {'fig': neuron_df}
 
@@ -240,7 +237,7 @@ def _context_nested_docks(curr_active_pipeline, active_config_names, enable_gui=
     return master_dock_win, app, out_items
 
 
-
+# Jonathan's visualizations:
 # def compare_firing_rates(rdf, irdf, show_nonzero=True):
 #     x1 = take_difference(irdf)
 #     y1 = take_difference(rdf)
@@ -274,7 +271,7 @@ def _context_nested_docks(curr_active_pipeline, active_config_names, enable_gui=
 
 
 
-def _make_interactive_plot(sess, pf1d_short, pf1d_long, pos_df, aclu_to_idx, rdf, irdf, show_inter_replay_frs=False):
+def _make_jonathan_interactive_plot(sess, pf1d_short, pf1d_long, pos_df, aclu_to_idx, rdf, irdf, show_inter_replay_frs=False):
     fig, ax = plt.subplots(2,2, figsize=(12.11,4.06));
     colors = plt.rcParams['axes.prop_cycle'].by_key()['color'];
     
