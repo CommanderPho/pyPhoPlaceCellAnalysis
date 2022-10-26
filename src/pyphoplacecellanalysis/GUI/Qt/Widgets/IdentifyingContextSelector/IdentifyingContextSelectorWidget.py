@@ -4,7 +4,7 @@ import sys
 import os
 
 from PyQt5 import QtGui, QtWidgets, uic
-from PyQt5.QtWidgets import QMessageBox, QToolTip, QStackedWidget, QHBoxLayout, QVBoxLayout, QSplitter, QFormLayout, QLabel, QFrame, QPushButton, QTableWidget, QTableWidgetItem
+from PyQt5.QtWidgets import QMessageBox, QToolTip, QStackedWidget, QHBoxLayout, QVBoxLayout, QSplitter, QFormLayout, QLabel, QFrame, QPushButton, QTableWidget, QTableWidgetItem, QCheckBox
 from PyQt5.QtWidgets import QApplication, QFileSystemModel, QTreeView, QWidget, QHeaderView
 from PyQt5.QtGui import QPainter, QBrush, QPen, QColor, QFont, QIcon
 from PyQt5.QtCore import Qt, QPoint, QRect, QObject, QEvent, pyqtSignal, pyqtSlot, QSize, QDir
@@ -12,6 +12,9 @@ from PyQt5.QtCore import Qt, QPoint, QRect, QObject, QEvent, pyqtSignal, pyqtSlo
 ## IMPORTS:
 from pyphoplacecellanalysis.GUI.PyQtPlot.Flowchart.CustomNodes.Mixins.CtrlNodeMixins import ComboBoxCtrlOwnerMixin
 from pyphoplacecellanalysis.GUI.Qt.Mixins.PipelineOwningMixin import PipelineOwningMixin
+
+from pyqt_checkbox_table_widget.checkBoxTableWidget import CheckBoxTableWidget
+
 
 ## Define the .ui file path
 path = os.path.dirname(os.path.abspath(__file__))
@@ -79,6 +82,26 @@ class IdentifyingContextSelectorWidget(ComboBoxCtrlOwnerMixin, PipelineOwningMix
         self.ui.cmbIdentifyingContext.currentIndexChanged.connect(self.on_selected_context_index_changed)
         # self.ui.btnConfirm.clicked.
         # self.updateUi()
+
+        ## Build Context Table
+        allChkBox = QCheckBox('Check all')
+        tableWidget = CheckBoxTableWidget()
+        tableWidget.setRowCount(10)
+        tableWidget.stretchEveryColumnExceptForCheckBox() # stretch every section of tablewidget except for check box section
+        for i in range(tableWidget.rowCount()):
+            item = QTableWidgetItem()
+            item.setTextAlignment(Qt.AlignCenter) # align
+            item.setText(str(i)*50) # text sample
+            tableWidget.setItem(i, 1, item)
+        allChkBox.stateChanged.connect(tableWidget.toggleState) # if allChkBox is checked, tablewidget checkboxes will also be checked 
+        
+        self.ui.verticalLayout.addWidget(allChkBox)
+        self.ui.verticalLayout.addWidget(tableWidget)
+
+        # lay = QVBoxLayout()
+        # lay.addWidget(allChkBox)
+        # lay.addWidget(tableWidget)
+
 
 
     def _tryUpdateComboItemsUi(self):
