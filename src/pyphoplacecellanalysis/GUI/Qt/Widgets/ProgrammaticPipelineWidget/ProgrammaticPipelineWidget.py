@@ -15,7 +15,7 @@ from pyphoplacecellanalysis.GUI.Qt.Widgets.ProgrammaticPipelineWidget.Uic_AUTOGE
 from pyphoplacecellanalysis.GUI.Qt.Mixins.PipelineOwningMixin import PipelineOwningMixin
 from pyphoplacecellanalysis.GUI.Qt.Widgets.FigureFormatConfigControls.FigureFormatConfigControls import FigureFormatConfigControls # for context_nested_docks/single_context_nested_docks
 
-
+from pyphoplacecellanalysis.General.Mixins.CrossComputationComparisonHelpers import _find_any_context_neurons
 
 class ProgrammaticPipelineWidget(PipelineOwningMixin, QWidget):
     """ Displays a UI that allows selecting a filter/computation context from a dropdown list, launching a plots configuration panel, and plotting any of the display functions for the currently selected context.
@@ -61,6 +61,15 @@ class ProgrammaticPipelineWidget(PipelineOwningMixin, QWidget):
         self.ui.setupUi(self) # builds the design from the .ui onto this widget.
         self.initUI()
         self.show() # Show the GUI
+
+        ## This used to be in updateUi(), but that seems very wrong.
+        self.ui.contextSelectorWidget.updateUi()
+        if self.owning_pipeline is not None:
+            self._programmatically_add_display_function_buttons()
+        self.updateButtonsEnabled(False) # disable all buttons to start
+        self.ui.contextSelectorWidget.sigContextChanged.connect(self.on_context_changed)
+        self.ui.contextSelectorWidget.sigMultiContextChanged.connect(self.on_multi_context_changed)
+
         self.updateUi()
 
         ## Schedule delayed_gui_timer
@@ -80,15 +89,18 @@ class ProgrammaticPipelineWidget(PipelineOwningMixin, QWidget):
         # self.ui.btnProgrammaticDisplay.pressed.connect(self.onProgrammaticDisplay)
         self.ui.active_figure_format_config_widget = None
         self.ui.dynamicButtonsList = []
-        
+
+            
 
     def updateUi(self):
         # Update UI for children controls:
         self.ui.contextSelectorWidget.updateUi()
-        if self.owning_pipeline is not None:
-            self._programmatically_add_display_function_buttons()
-        self.updateButtonsEnabled(False) # disable all buttons to start
-        self.ui.contextSelectorWidget.sigContextChanged.connect(self.on_context_changed)
+        # if self.owning_pipeline is not None:
+        #     self._programmatically_add_display_function_buttons()
+        # self.updateButtonsEnabled(False) # disable all buttons to start
+        # self.ui.contextSelectorWidget.sigContextChanged.connect(self.on_context_changed)
+        pass
+
 
     @pyqtSlot(bool)
     def updateButtonsEnabled(self, isEnabled: bool):
@@ -112,6 +124,31 @@ class ProgrammaticPipelineWidget(PipelineOwningMixin, QWidget):
         has_valid_context = new_context_key is not None
         # TODO: Disable all the action buttons if the new context is None
         self.updateButtonsEnabled(has_valid_context)
+
+
+    @pyqtSlot(dict)
+    def on_multi_context_changed(self, selected_contexts_dict):
+        print(f'on_multi_context_changed(self, selected_contexts_dict: {selected_contexts_dict})')
+        has_valid_context = selected_contexts_dict is not None
+        # TODO: Disable all the action buttons if the new context is None
+        # self.updateButtonsEnabled(has_valid_context)
+        curr_any_context_neurons, curr_string_code_rep = self._build_multi_context_any_neurons_id_list()
+
+
+
+    def _build_multi_context_any_neurons_id_list(self):
+        """ requires from pyphoplacecellanalysis.General.Mixins.CrossComputationComparisonHelpers import _find_any_context_neurons
+        """
+        contextSelectorWidget = self.ui.contextSelectorWidget
+        curr_active_contexts = contextSelectorWidget.current_selected_multi_contexts # get the contexts dict from the contextSelectorWidget
+        curr_any_context_neurons = _find_any_context_neurons(*[self.owning_pipeline.computation_results[k].computed_data.pf2D.ratemap.neuron_ids for k in list(curr_active_contexts.keys())])
+        
+        # 'included_unit_neuron_IDs': [2, 3, 4, 5, 8, 10, 11, 13, 14, 15, 16, 19, 21, 23, 24, 25, 26, 27, 28, 31, 32, 33, 34, 36, 37, 41, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 66, 67, 68, 69, 70, 73, 74, 75, 76, 78, 81, 82, 83, 85, 86, 87, 88, 89, 90, 92, 93, 96, 98, 100, 102, 105, 108, 109]
+        curr_string_code_rep = "'included_unit_neuron_IDs': {curr_any_context_neurons},"
+        print(f'curr_string_code_rep: {curr_string_code_rep}')
+        return curr_any_context_neurons, curr_string_code_rep
+
+
 
 
     @pyqtSlot(bool)

@@ -96,9 +96,6 @@ class IdentifyingContextSelectorWidget(ComboBoxCtrlOwnerMixin, PipelineOwningMix
         else:
             return self.all_filtered_session_contexts[self.current_selected_context_key]
 
-
-
-
     def _tryUpdateComboItemsUi(self):
         """ tries to update the combo box items. If an item was previously selected before the update, it tries to re-select the same item. """
 
@@ -180,7 +177,6 @@ class IdentifyingContextSelectorWidget(ComboBoxCtrlOwnerMixin, PipelineOwningMix
             return None
         return [self._last_context_table_rows[i] for i in self.current_selected_multi_context_indicies]
     
-
     @property
     def current_selected_multi_contexts(self):
         """A dictionary of the actual context items.
