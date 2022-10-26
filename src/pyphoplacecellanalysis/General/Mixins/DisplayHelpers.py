@@ -219,7 +219,7 @@ def debug_print_active_firing_rate_trends_result_overview(active_firing_rate_tre
     """ 
     
     Usage:
-        from pyphoplacecellanalysis.General.Mixins.DisplayHelpers import _print_active_firing_rate_trends_result_overview
+        from pyphoplacecellanalysis.General.Mixins.DisplayHelpers import debug_print_active_firing_rate_trends_result_overview
         debug_print_active_firing_rate_trends_result_overview(active_firing_rate_trends)
     
     """

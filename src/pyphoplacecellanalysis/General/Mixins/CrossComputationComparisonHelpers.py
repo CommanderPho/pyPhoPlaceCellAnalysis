@@ -1,5 +1,6 @@
 # CrossComputationComparisonHelpers
 import numpy as np
+from functools import reduce # _find_any_context_neurons
 
 from neuropy.utils.dynamic_container import DynamicContainer, override_dict, overriding_dict_with, get_dict_subset
 from neuropy.utils.misc import safe_item
@@ -39,3 +40,15 @@ def _compare_computation_results(lhs_computation_results, rhs_computation_result
 
 
 
+def _find_any_context_neurons(*args):
+	"""Given lists of ids/IDXs are arguments, it finds all unique ids/IDXs present in any of the lists.
+	Returns:
+		_type_: np.array
+
+	Usage:
+		from pyphoplacecellanalysis.General.Mixins.CrossComputationComparisonHelpers import _find_any_context_neurons
+		all_results_neuron_ids_lists = [a_result.computed_data.pf2D.ratemap.neuron_ids for a_result in curr_active_pipeline.computation_results.values()]
+		_find_any_context_neurons(*all_results_neuron_ids_lists) # array([ 3,  4,  5,  6,  7,  8,  9, 10, 11, 14, 15, 16, 17, 18, 19, 20, 22, 23, 25, 26, 27, 28, 29, 32, 33, 34, 36, 37, 38, 41, 43, 44, 45, 46, 47, 49, 51, 52, 53, 54, 55, 56, 59])
+	"""
+	# reduce(np.union1d, ([1, 3, 4, 3], [3, 1, 2, 1], [6, 3, 4, 2]))
+	return reduce(np.union1d, tuple(args))
