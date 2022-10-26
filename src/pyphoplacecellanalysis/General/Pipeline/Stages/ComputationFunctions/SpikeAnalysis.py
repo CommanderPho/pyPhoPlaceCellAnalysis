@@ -13,7 +13,7 @@ from pybursts import pybursts
 from tqdm.notebook import tqdm
 
 from neuropy.utils.misc import safe_pandas_get_group # for _compute_pybursts_burst_interval_detection
-
+from neuropy.utils.mixins.binning_helpers import BinningContainer # used in _perform_firing_rate_trends_computation
 
 from pyphocorehelpers.mixins.member_enumerating import AllFunctionEnumeratingMixin
 from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.ComputationFunctionRegistryHolder import ComputationFunctionRegistryHolder
@@ -141,6 +141,7 @@ class SpikeAnalysisComputations(AllFunctionEnumeratingMixin, metaclass=Computati
                 ['firing_rate_trends']['time_bin_size_seconds']
                 
                 ['firing_rate_trends']['all_session_spikes']:
+                    ['firing_rate_trends']['all_session_spikes']['time_binning_container']
                     ['firing_rate_trends']['all_session_spikes']['time_window_edges']
                     ['firing_rate_trends']['all_session_spikes']['time_window_edges_binning_info']
                     ['firing_rate_trends']['all_session_spikes']['time_binned_unit_specific_binned_spike_rate']
@@ -150,6 +151,7 @@ class SpikeAnalysisComputations(AllFunctionEnumeratingMixin, metaclass=Computati
                     ['firing_rate_trends']['all_session_spikes']['max_spike_rates']
                     
                 ['firing_rate_trends']['pf_included_spikes_only']:
+                    ['firing_rate_trends']['pf_included_spikes_only']['time_binning_container']
                     ['firing_rate_trends']['pf_included_spikes_only']['time_window_edges']
                     ['firing_rate_trends']['pf_included_spikes_only']['time_window_edges_binning_info']
                     ['firing_rate_trends']['pf_included_spikes_only']['time_binned_unit_specific_binned_spike_rate']
@@ -171,6 +173,9 @@ class SpikeAnalysisComputations(AllFunctionEnumeratingMixin, metaclass=Computati
         ## Compute for all the session spikes first:
         active_session_spikes_df = computation_result.sess.spikes_df.copy()
         sess_unit_specific_binned_spike_rate, sess_time_window_edges, sess_time_window_edges_binning_info = _simple_time_binned_firing_rates(active_session_spikes_df)
+        sess_time_binning_container = BinningContainer(edges=sess_time_window_edges, edge_info=sess_time_window_edges_binning_info)
+
+
         sess_min_spike_rates = sess_unit_specific_binned_spike_rate.min()
         sess_mean_spike_rates = sess_unit_specific_binned_spike_rate.mean()
         sess_median_spike_rates = sess_unit_specific_binned_spike_rate.median()
@@ -181,6 +186,7 @@ class SpikeAnalysisComputations(AllFunctionEnumeratingMixin, metaclass=Computati
         active_pf_2D = computation_result.computed_data['pf2D']
         active_pf_included_spikes_only_spikes_df = active_pf_2D.filtered_spikes_df.copy()
         pf_only_unit_specific_binned_spike_rate, pf_only_time_window_edges, pf_only_time_window_edges_binning_info = _simple_time_binned_firing_rates(active_pf_included_spikes_only_spikes_df)
+        pf_only_time_binning_container = BinningContainer(edges=pf_only_time_window_edges, edge_info=pf_only_time_window_edges_binning_info)
         pf_only_min_spike_rates = pf_only_unit_specific_binned_spike_rate.min()
         pf_only_mean_spike_rates = pf_only_unit_specific_binned_spike_rate.mean()
         pf_only_median_spike_rates = pf_only_unit_specific_binned_spike_rate.median()
@@ -189,6 +195,7 @@ class SpikeAnalysisComputations(AllFunctionEnumeratingMixin, metaclass=Computati
         computation_result.computed_data['firing_rate_trends'] = DynamicParameters.init_from_dict({
             'time_bin_size_seconds': time_bin_size_seconds,
             'all_session_spikes': DynamicParameters.init_from_dict({
+                'time_binning_container': sess_time_binning_container,
                 'time_window_edges': sess_time_window_edges,
                 'time_window_edges_binning_info': sess_time_window_edges_binning_info,
                 'time_binned_unit_specific_binned_spike_rate': sess_unit_specific_binned_spike_rate,
@@ -198,6 +205,7 @@ class SpikeAnalysisComputations(AllFunctionEnumeratingMixin, metaclass=Computati
                 'max_spike_rates': sess_max_spike_rates,                
             }),
             'pf_included_spikes_only': DynamicParameters.init_from_dict({
+                'time_binning_container': pf_only_time_binning_container,
                 'time_window_edges': pf_only_time_window_edges,
                 'time_window_edges_binning_info': pf_only_time_window_edges_binning_info,
                 'time_binned_unit_specific_binned_spike_rate': pf_only_unit_specific_binned_spike_rate,
