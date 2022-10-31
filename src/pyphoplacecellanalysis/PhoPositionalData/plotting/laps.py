@@ -8,7 +8,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.collections import LineCollection, BrokenBarHCollection
 from matplotlib.colors import ListedColormap, BoundaryNorm
-from pyphoplacecellanalysis.Pho3D.PyVista.spikeAndPositions import _build_flat_arena_data, build_active_spikes_plot_data, perform_plot_flat_arena
+from pyphoplacecellanalysis.Pho3D.PyVista.spikeAndPositions import _build_flat_arena_data, perform_plot_flat_arena
 from pyphoplacecellanalysis.GUI.PyVista.InteractivePlotter.Mixins.LapsVisualizationMixin import LapsVisualizationMixin
 from pyphocorehelpers.gui.PyVista.PhoCustomVtkWidgets import PhoWidgetHelper
 import pyvista as pv
@@ -22,12 +22,16 @@ NOTE: This is a GOOD, general class that offers both 2D (matplot) and 3D (pyvist
 
 from pyphoplacecellanalysis.PhoPositionalData.plotting.laps import plot_lap_trajectories_2d
 # Complete Version:
-fig, axs, laps_pages = plot_lap_trajectories_2d(sess, curr_num_subplots=len(sess.laps.lap_id), active_page_index=0)
+fig, axs, laps_pages = plot_lap_trajectories_2d(curr_active_pipeline.sess, curr_num_subplots=len(curr_active_pipeline.sess.laps.lap_id), active_page_index=0)
 # Paginated Version:
-fig, axs, laps_pages = plot_lap_trajectories_2d(sess, curr_num_subplots=22, active_page_index=0)
-fig, axs, laps_pages = plot_lap_trajectories_2d(sess, curr_num_subplots=22, active_page_index=1)
+fig, axs, laps_pages = plot_lap_trajectories_2d(curr_active_pipeline.sess, curr_num_subplots=22, active_page_index=0)
+fig, axs, laps_pages = plot_lap_trajectories_2d(curr_active_pipeline.sess, curr_num_subplots=22, active_page_index=1)
 
 """
+
+# ==================================================================================================================== #
+# HELPER FUNCTIONS                                                                                                     #
+# ==================================================================================================================== #
 
 def _plot_helper_add_arrow(line, position=None, position_mode='rel', direction='right', size=15, color=None):
     """
@@ -170,7 +174,7 @@ def _plot_helper_render_laps(pos_t_rel_seconds, pos_value, crossing_beginings, c
         ax.scatter(pos_t_rel_seconds[curr_highlight_indicies], pos_value[curr_highlight_indicies], s=0.5, c=color)
         # ax.scatter(pos_t_rel_seconds[curr_included_mask], pos_value[curr_included_mask], s=0.5, c=color)
 
-def plot_position_curves_figure(position_obj, include_velocity=True, include_accel=False, figsize=(24, 10)):
+def _plot_position_curves_figure(position_obj, include_velocity=True, include_accel=False, figsize=(24, 10)):
     """ Renders a figure with a position curve and optionally its higher-order derivatives """
     num_subplots = 1
     out_axes_list = []
@@ -216,12 +220,17 @@ def plot_position_curves_figure(position_obj, include_velocity=True, include_acc
 
     
 
-    
+# ==================================================================================================================== #
+# MAIN FUNCTIONS                                                                                                       #
+# ==================================================================================================================== #
     
 def plot_laps_2d(sess, legacy_plotting_mode=True):
     """ This generates a position/velocity/acceleration curve for the animal and highlights the currently recognized track epochs using green and red span overlays (corresponding to egress and ingress directions) 
         TODO: currently legacy_plotting_mode=True does not function if the session has been filtered because the indicies no longer line up. 
             I think that perhaps excluding invalid laps (filtering sess.laps just like the other session members) would prevent this issue, but partially out-of-bounds laps might also need to be dealt with.
+
+    Called by:
+        estimation_session_laps
     """
     pos_df = sess.compute_position_laps() # ensures the laps are computed if they need to be:
     position_obj = sess.position
@@ -232,7 +241,7 @@ def plot_laps_2d(sess, legacy_plotting_mode=True):
     curr_laps_df = sess.laps.to_dataframe()
     
     
-    fig, out_axes_list = plot_position_curves_figure(position_obj, include_velocity=True, include_accel=True, figsize=(24, 10))    
+    fig, out_axes_list = _plot_position_curves_figure(position_obj, include_velocity=True, include_accel=True, figsize=(24, 10))    
 
     ## Draw on top of the existing position curves with the lap colors:
     if legacy_plotting_mode:
@@ -274,19 +283,33 @@ def plot_laps_2d(sess, legacy_plotting_mode=True):
     return fig, out_axes_list
 
 
-def plot_lap_trajectories_3d(sess, curr_num_subplots=1, active_page_index=0, included_lap_idxs=None, single_combined_plot=True, lap_start_z = 0.0, lap_id_dependent_z_offset = 1.0, plot_stacked_arena_guides=False, existing_plotter=None, debug_print=False):
+def plot_lap_trajectories_3d(sess, curr_num_subplots=1, active_page_index=0, included_lap_idxs=None, maximum_fixed_columns:int=5, single_combined_plot=True, lap_start_z = 0.0, lap_id_dependent_z_offset = 1.0, plot_stacked_arena_guides=False, existing_plotter=None, debug_print=False):
     """ Plots a PyVista Qt Multiplotter with either:
         1. several overhead 3D views, each showing a specific lap over the maze in one of its subplots
         2. a single 3D view with all of the laps displayed in a vertical stack
         
     Inputs:
-        lap_id_dependent_z_offset: only relevant when single_combined_plot is True. a float indicating how far each lap is offset in the z direction from the previous
-        plot_stacked_arena_guides: only relevant when single_combined_plot is True. If True, plots vertically stacked arenas for visual reference of where the lap is in the arena.
+        single_combined_plot: bool - determines whether the laps are plotted on a single 3D view (1.) or multiple subplots (2.)
+        single_combined_plot == True only:
+            lap_id_dependent_z_offset: only relevant when single_combined_plot is True. a float indicating how far each lap is offset in the z direction from the previous
+            plot_stacked_arena_guides: only relevant when single_combined_plot is True. If True, plots multiple vertically stacked arenas (arena == track/maze) for visual reference of where the lap is in the arena.
+        single_combined_plot == False only:
+            curr_num_subplots=1
+            active_page_index=0
+            maximum_fixed_columns:int=5 - the maximum number of columns to render subplots in (will wrap)
+        Both modes:
+            existing_plotter=None
+            debug_print=False
+
+
     Usage: 
-        p, laps_pages = plot_lap_trajectories_3d(sess, curr_num_subplots=10, active_page_index=1)
+        from pyphoplacecellanalysis.PhoPositionalData.plotting.laps import plot_lap_trajectories_3d
+        ## single_combined_plot == True mode (mode 1.):
+        p, laps_pages = plot_lap_trajectories_3d(curr_active_pipeline.sess, single_combined_plot=True)
         p.show()
-        
-        p, laps_pages = _plot_lap_trajectories_combined_plot_3d(curr_kdiba_pipeline.sess, curr_num_subplots=1, single_combined_plot=True)
+
+        ## single_combined_plot == False mode (mode 2.):        
+        p, laps_pages = plot_lap_trajectories_3d(curr_active_pipeline.sess, single_combined_plot=False, curr_num_subplots=len(curr_active_pipeline.sess.laps.lap_id), active_page_index=1)
         p.show()
 
 
@@ -302,6 +325,7 @@ def plot_lap_trajectories_3d(sess, curr_num_subplots=1, active_page_index=0, inc
 
         
     def _build_laps_multiplotter(nfields, single_combined_plot: bool, linear_plot_data=None, maximum_fixed_columns:int=5, debug_print=True):
+        """ builds the appropriate multiplotter """
         linear_plotter_indicies = np.arange(nfields)
         fixed_columns = min(maximum_fixed_columns, nfields)
         needed_rows = int(np.ceil(nfields / fixed_columns))
@@ -339,6 +363,13 @@ def plot_lap_trajectories_3d(sess, curr_num_subplots=1, active_page_index=0, inc
                     # mp[curr_row, curr_col].add_mesh(linear_plot_data[a_linear_index], name='maze_bg', color="black", render=False)
                     perform_plot_flat_arena(mp[curr_row, curr_col], linear_plot_data[a_linear_index], z=-0.01, name='maze_bg', render=False)
 
+            # Setup default camera to overhead view:
+            
+            mp[curr_row, curr_col].set_background('black') #.set_background('black', top='white')
+            # mp[curr_row, curr_col].camera.tight()
+            mp[curr_row, curr_col].camera_position = 'xy' # set to overhead view
+            # mp[curr_row, curr_col].camera.elevation = 10 # set elevation of camera (distance from maze)
+
         return mp, linear_plotter_indicies, row_column_indicies
 
     
@@ -373,7 +404,7 @@ def plot_lap_trajectories_3d(sess, curr_num_subplots=1, active_page_index=0, inc
         pdata_maze_shared, pc_maze_shared = _build_flat_arena_data(all_maze_positions[0,:], all_maze_positions[1,:], smoothing=False)
         all_maze_data = np.full((curr_num_subplots,), pc_maze_shared) # repeat the maze data for each subplot
 
-    p, linear_plotter_indicies, row_column_indicies = _build_laps_multiplotter(curr_num_subplots, single_combined_plot, all_maze_data)
+    p, linear_plotter_indicies, row_column_indicies = _build_laps_multiplotter(curr_num_subplots, single_combined_plot, all_maze_data, maximum_fixed_columns=maximum_fixed_columns, debug_print=debug_print)
     
     if included_lap_idxs is None:
         included_lap_idxs = np.arange(len(sess.laps.lap_id)) # all lap indicies are included by default
