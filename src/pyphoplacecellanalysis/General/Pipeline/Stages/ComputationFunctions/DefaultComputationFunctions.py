@@ -240,6 +240,8 @@ class DefaultComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Computa
         from neuropy.analyses.placefields import perform_compute_placefields
 
         def _subfn_build_recurrsive_placefields(active_one_step_decoder, next_order_computation_config, spikes_df=None, pos_df=None, pos_linearization_method='isomap'):
+            """ This subfunction is called to produce a specific depth level of placefields. 
+            """
             if spikes_df is None:
                 spikes_df = active_one_step_decoder.spikes_df
             if pos_df is None:
@@ -264,7 +266,7 @@ class DefaultComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Computa
             def _prepare_spikes_df_for_recurrsive_decoding(active_one_step_decoder, spikes_df):
                 """ duplicates spikes_df and builds a new pseudo-spikes_df for building second-order placefields/decoder """
                 active_second_order_spikes_df = deepcopy(spikes_df)
-                # TODO: figure it out instead of hacking -- Just drop the last time bin because something is off 
+                # TODO: figure it out instead of hacking -- Currently just dropping the last time bin because something is off 
                 invalid_timestamp = np.nanmax(active_second_order_spikes_df['binned_time'].astype(int).to_numpy()) # 11881
                 active_second_order_spikes_df = active_second_order_spikes_df[active_second_order_spikes_df['binned_time'].astype(int) < invalid_timestamp] # drop the last time-bin as a workaround
                 # backup measured columns because they will be replaced by the new values:
@@ -277,6 +279,7 @@ class DefaultComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Computa
                 return active_second_order_spikes_df
 
             def _next_order_decode(active_pf_1D, active_pf_2D, pf_computation_config, manual_time_window_edges=None, manual_time_window_edges_binning_info=None):
+                """ performs the actual decoding given the"""
                 ## 1D Decoder
                 new_decoder_pf1D = active_pf_1D
                 new_1D_decoder_spikes_df = new_decoder_pf1D.filtered_spikes_df.copy()
@@ -304,29 +307,37 @@ class DefaultComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Computa
 
         pos_linearization_method='isomap'
         prev_one_step_bayesian_decoder = computation_result.computed_data['pf2D_Decoder']
-        ## Builds a duplicate of the current computation config but sets the speed_thresh to 0.0:
 
+        ## Builds a duplicate of the current computation config but sets the speed_thresh to 0.0:
         next_order_computation_config = deepcopy(computation_result.computation_config) # make a deepcopy of the active computation config
-        # next_order_computation_config = deepcopy(active_session_computation_configs[0]) # make a deepcopy of the active computation config
         next_order_computation_config.pf_params.speed_thresh = 0.0 # no speed thresholding because the speeds aren't real for the second-order fields
+
+        enable_pf1D = False
+        enable_pf2D = True
 
         # Start with empty lists, which will accumulate the different levels of recurrsive depth:
         computation_result.computed_data['pf1D_RecursiveLatent'] = []
         computation_result.computed_data['pf2D_RecursiveLatent'] = []
 
         # 1st Order:
-        computation_result.computed_data['pf1D_RecursiveLatent'].append(DynamicContainer.init_from_dict({'pf1D':computation_result.computed_data['pf1D'], 'pf1D_Decoder':computation_result.computed_data.get('pf1D_Decoder', {})}))
-        computation_result.computed_data['pf2D_RecursiveLatent'].append(DynamicContainer.init_from_dict({'pf2D':computation_result.computed_data['pf2D'], 'pf2D_Decoder':computation_result.computed_data['pf2D_Decoder']}))
+        if enable_pf1D:
+            computation_result.computed_data['pf1D_RecursiveLatent'].append(DynamicContainer.init_from_dict({'pf1D':computation_result.computed_data['pf1D'], 'pf1D_Decoder':computation_result.computed_data.get('pf1D_Decoder', {})}))
+        if enable_pf2D:
+            computation_result.computed_data['pf2D_RecursiveLatent'].append(DynamicContainer.init_from_dict({'pf2D':computation_result.computed_data['pf2D'], 'pf2D_Decoder':computation_result.computed_data['pf2D_Decoder']}))
 
         # 2nd Order:
         active_second_order_pf_1D, active_second_order_pf_2D, active_second_order_1D_decoder, active_second_order_2D_decoder = _subfn_build_recurrsive_placefields(prev_one_step_bayesian_decoder, next_order_computation_config=next_order_computation_config, spikes_df=prev_one_step_bayesian_decoder.spikes_df, pos_df=prev_one_step_bayesian_decoder.pf.filtered_pos_df, pos_linearization_method=pos_linearization_method)
-        computation_result.computed_data['pf1D_RecursiveLatent'].append(DynamicContainer.init_from_dict({'pf1D':active_second_order_pf_1D, 'pf1D_Decoder':active_second_order_1D_decoder}))
-        computation_result.computed_data['pf2D_RecursiveLatent'].append(DynamicContainer.init_from_dict({'pf2D':active_second_order_pf_2D, 'pf2D_Decoder':active_second_order_2D_decoder}))
+        if enable_pf1D:
+            computation_result.computed_data['pf1D_RecursiveLatent'].append(DynamicContainer.init_from_dict({'pf1D':active_second_order_pf_1D, 'pf1D_Decoder':active_second_order_1D_decoder}))
+        if enable_pf2D:
+            computation_result.computed_data['pf2D_RecursiveLatent'].append(DynamicContainer.init_from_dict({'pf2D':active_second_order_pf_2D, 'pf2D_Decoder':active_second_order_2D_decoder}))
 
         # # 3rd Order:
         active_third_order_pf_1D, active_third_order_pf_2D, active_third_order_1D_decoder, active_third_order_2D_decoder = _subfn_build_recurrsive_placefields(active_second_order_2D_decoder, next_order_computation_config=next_order_computation_config, spikes_df=active_second_order_2D_decoder.spikes_df, pos_df=active_second_order_2D_decoder.pf.filtered_pos_df, pos_linearization_method=pos_linearization_method)
-        computation_result.computed_data['pf1D_RecursiveLatent'].append(DynamicContainer.init_from_dict({'pf1D':active_third_order_pf_1D, 'pf1D_Decoder':active_third_order_1D_decoder}))
-        computation_result.computed_data['pf2D_RecursiveLatent'].append(DynamicContainer.init_from_dict({'pf2D':active_third_order_pf_2D, 'pf2D_Decoder':active_third_order_2D_decoder}))
+        if enable_pf1D:
+            computation_result.computed_data['pf1D_RecursiveLatent'].append(DynamicContainer.init_from_dict({'pf1D':active_third_order_pf_1D, 'pf1D_Decoder':active_third_order_1D_decoder}))
+        if enable_pf2D:
+            computation_result.computed_data['pf2D_RecursiveLatent'].append(DynamicContainer.init_from_dict({'pf2D':active_third_order_pf_2D, 'pf2D_Decoder':active_third_order_2D_decoder}))
 
         return computation_result
 
