@@ -136,9 +136,6 @@ class DefaultRatemapDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Disp
             out_all_pf_2D_pyqtgraph_binned_image_fig.show()
 
         return PyqtgraphRenderPlots(parent_root_widget=out_all_pf_2D_pyqtgraph_binned_image_fig)
-        
-        # return app, parent_root_widget, root_render_widget
-        # return app, parent_root_widget, display_outputs
 
 
     def _display_recurrsive_latent_placefield_comparisons(computation_result, active_config, owning_pipeline_reference=None, enable_saving_to_disk=False, active_context=None, defer_show:bool=False, **kwargs):

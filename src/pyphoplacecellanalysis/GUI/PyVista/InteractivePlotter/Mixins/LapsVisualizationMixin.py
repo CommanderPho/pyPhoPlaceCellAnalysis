@@ -35,14 +35,11 @@ class LapsVisualizationMixin:
         lap_specific_position_dfs = [curr_position_df.groupby('lap').get_group(i)[['t','x','y','lin_pos']] for i in session.laps.lap_id] # dataframes split for each ID:
         return curr_position_df, lap_specific_position_dfs
 
-
     @classmethod
     def _compute_laps_position_data(cls, session):
         """ Given the session, extracts all position data by lap and returns it all """ 
         curr_position_df, lap_specific_position_dfs = cls._compute_laps_specific_position_dfs(session)
         return curr_position_df, lap_specific_position_dfs, *cls._lap_specific_positions_from_lap_position_dfs(lap_specific_position_dfs)
-    
-    
     
     @staticmethod
     def _lap_specific_positions_from_lap_position_dfs(lap_specific_position_dfs):
@@ -65,7 +62,6 @@ class LapsVisualizationMixin:
         # print('\t {} spikes.'.format(curr_lap_num_spikes))
         return curr_lap_position_traces
 
-
     @staticmethod
     def plot_lap_trajectory_path(interactiveDataExplorer, curr_lap_position_traces):
         num_lap_samples = np.shape(curr_lap_position_traces)[1]
@@ -79,8 +75,6 @@ class LapsVisualizationMixin:
                                                     trail_fade_values=trail_fade_values, trail_point_size_values=size_values,
                                                     render=True, color='red')
 
-
-    
     # @staticmethod
     # def plot_lap_trajectory_path_spline(p, curr_lap_position_traces):
     #     num_lap_samples = np.shape(curr_lap_position_traces)[1]
@@ -96,7 +90,6 @@ class LapsVisualizationMixin:
     #     tube = line.tube(radius=0.5)
     #     p.add_mesh(tube, name=plot_name, render_lines_as_tubes=True, show_scalar_bar=False, color='red')
 
-  
     @staticmethod
     def plot_lap_trajectory_path_spline(p, curr_lap_position_traces, curr_lap_id, lap_start_z=0.9, lap_id_dependent_z_offset=0.45, name=None, **kwargs):
         """[summary]
