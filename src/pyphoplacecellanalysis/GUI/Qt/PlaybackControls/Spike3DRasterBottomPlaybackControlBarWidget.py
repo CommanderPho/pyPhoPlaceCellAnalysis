@@ -14,7 +14,9 @@ from PyQt5.QtCore import Qt, QPoint, QRect, QObject, QEvent, pyqtSignal, pyqtSlo
 ## IMPORTS:
 # from ...pyPhoPlaceCellAnalysis.src.pyphoplacecellanalysis.GUI.Qt.PlaybackControls import Spike3DRasterBottomPlaybackControlBar
 
-from pyphoplacecellanalysis.GUI.Qt.PlaybackControls.Spike3DRasterBottomPlaybackControlBarBase import Ui_RootWidget  # Generated file from .ui
+# from pyphoplacecellanalysis.GUI.Qt.PlaybackControls.Spike3DRasterBottomPlaybackControlBarBase import Ui_RootWidget  # Generated file from .ui
+from pyphoplacecellanalysis.GUI.Qt.PlaybackControls.Uic_AUTOGEN_Spike3DRasterBottomPlaybackControlBarBase import Ui_RootWidget
+
 
 # Custom Widget classes
 from pyphocorehelpers.gui.Qt.HighlightedJumpSlider import HighlightedJumpSlider
@@ -29,6 +31,10 @@ import qtawesome as qta
 RenderWindowControlsMixin
 RenderPlaybackControlsMixin
 
+
+btnJumpToPrevious
+comboActiveJumpTargetSeries
+btnJumpToNext
 """
 
 
@@ -134,6 +140,9 @@ class Spike3DRasterBottomPlaybackControlBar(QWidget):
         self.ui.button_mark_start.hide()
         self.ui.button_mark_end.hide()
         
+        # Jump-to:
+        self.ui.btnJumpToUnused.hide()
+
         
         
     def __str__(self):
