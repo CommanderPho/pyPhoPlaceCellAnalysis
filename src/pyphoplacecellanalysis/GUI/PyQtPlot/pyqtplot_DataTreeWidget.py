@@ -17,8 +17,10 @@ Example:
     #     'active_extended_stats': active_extended_stats
     # }
 
+    import pyphoplacecellanalysis.External.pyqtgraph as pg
     from pyphoplacecellanalysis.GUI.PyQtPlot.pyqtplot_DataTreeWidget import plot_dataTreeWidget
     tree, app = plot_dataTreeWidget(data=d, title='PhoOutputDataTreeApp')
+    pg.exec() # required in an empty notebook to get the window to show instead of just launching and locking up
 
 """
 

@@ -282,4 +282,27 @@ class Ripples_2DRenderTimeEpochs(General2DRenderTimeEpochs):
 
         return _add_interval_dataframe_visualization_columns_general_epoch
         
+
+##########################################
+## Ripples
+class NewRipples_2DRenderTimeEpochs(General2DRenderTimeEpochs):
+    default_datasource_name = 'NewRipples'
+    
+    @classmethod
+    def build_epochs_dataframe_formatter(cls, **kwargs):
+        def _add_interval_dataframe_visualization_columns_general_epoch(active_df):
+            ## parameters:
+            y_location = 14.0
+            height = 10.5
+            pen_color = pg.mkColor('cyan')
+            brush_color = pg.mkColor('cyan')
+            brush_color.setAlphaF(0.5)
+            
+            ## Add the missing parameters to the dataframe:
+            active_df = cls._update_df_visualization_columns(active_df, y_location, height, pen_color, brush_color, **kwargs)
+            return active_df
+
+        return _add_interval_dataframe_visualization_columns_general_epoch
+        
+
 """ HISTORICAL NOTE: Specific2DRenderTimeEpochsHelper has been removed in favor of a class-based approach """
