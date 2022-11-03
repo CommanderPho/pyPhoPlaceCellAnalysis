@@ -110,10 +110,19 @@ class SpikeRastersDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Displa
         spike_raster_window.setWindowFilePath(str(computation_result.sess.filePrefix.resolve()))
         spike_raster_window.setWindowTitle(f'Spike Raster Window - {active_config_name} - {str(computation_result.sess.filePrefix.resolve())}')
         
+        ## Build the additional menus:
+        output_references = _build_additional_window_menus(spike_raster_window, owning_pipeline_reference, computation_result, active_display_fn_identifying_ctx)
+
+        return {'spike_raster_plt_2d':spike_raster_window.spike_raster_plt_2d, 'spike_raster_plt_3d':spike_raster_window.spike_raster_plt_3d, 'spike_raster_window': spike_raster_window}
+
+
+def _build_additional_window_menus(spike_raster_window, owning_pipeline_reference, computation_result, active_display_fn_identifying_ctx):
+        assert owning_pipeline_reference is not None
+        active_config_name = active_display_fn_identifying_ctx.filter_name # recover active_config_name from the context
+
         ## Adds the custom renderable menu to the top-level menu of the plots in Spike2DRaster
         # _active_2d_plot_renderable_menus = LocalMenus_AddRenderable.add_renderable_context_menu(spike_raster_window.spike_raster_plt_2d, computation_result.sess)  # Adds the custom context menus for SpikeRaster2D
         
-        assert owning_pipeline_reference is not None
         _active_2d_plot_renderable_menus = LocalMenus_AddRenderable.add_renderable_context_menu(spike_raster_window.spike_raster_plt_2d, owning_pipeline_reference, active_config_name)  # Adds the custom context menus for SpikeRaster2D
         
         ## Note that curr_main_menu_window is usually not the same as spike_raster_window, instead curr_main_menu_window wraps it and produces the final output window
@@ -138,12 +147,12 @@ class SpikeRastersDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Displa
         _debug_menu_provider = DebugMenuProviderMixin(render_widget=spike_raster_window)
         spike_raster_window.main_menu_window.ui.menus.global_window_menus.debug.menu_provider_obj = _debug_menu_provider
         
-        
+        # Docked Menu
         _docked_menu_provider = DockedWidgets_MenuProvider(render_widget=spike_raster_window)
         _docked_menu_provider.DockedWidgets_MenuProvider_on_buildUI(spike_raster_window=spike_raster_window, owning_pipeline_reference=owning_pipeline_reference, context=active_display_fn_identifying_ctx, active_config_name=active_config_name, display_output=owning_pipeline_reference.display_output[active_display_fn_identifying_ctx])
         spike_raster_window.main_menu_window.ui.menus.global_window_menus.docked_widgets.menu_provider_obj = _docked_menu_provider
         
-        
+        # Create Linked Widget Menu
         ## Adds the custom renderable menu to the top-level menu of the plots in Spike2DRaster
         active_pf_2D_dt = computation_result.computed_data.get('pf2D_dt', None)
         if active_pf_2D_dt is not None:
@@ -159,14 +168,17 @@ class SpikeRastersDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Displa
                 display_output = owning_pipeline_reference.display_output[active_display_fn_identifying_ctx]
                 _createLinkedWidget_menu_provider.CreateLinkedWidget_MenuProvider_on_buildUI(spike_raster_window=spike_raster_window, active_pf_2D_dt=active_pf_2D_dt, context=active_display_fn_identifying_ctx, display_output=display_output)
             else:
-                print(f'WARNING: owning_pipeline_reference is NONE in  _display_spike_rasters_window!')
-                
-            
+                print(f'WARNING: owning_pipeline_reference is NONE in  _display_spike_rasters_window!')   
         else:
             print(f'active_pf_2D_dt is None! Skipping Create Paired Widget Menu...')
+            _createLinkedWidget_menu_provider = None
     
         spike_raster_window.main_menu_window.ui.menus.global_window_menus.create_linked_widget.menu_provider_obj = _createLinkedWidget_menu_provider
 
-        return {'spike_raster_plt_2d':spike_raster_window.spike_raster_plt_2d, 'spike_raster_plt_3d':spike_raster_window.spike_raster_plt_3d, 'spike_raster_window': spike_raster_window}
-
-
+        output_references = [_active_2d_plot_renderable_menus, curr_main_menu_window, menuConnections, connections_actions_dict,
+            curr_main_menu_window, menuCreateNewConnectedWidget, createNewConnected_actions_dict,
+            _debug_menu_provider,
+            _docked_menu_provider,
+            _createLinkedWidget_menu_provider
+        ]
+        return output_references
