@@ -11,8 +11,7 @@ from neuropy.core.session.KnownDataSessionTypeProperties import KnownDataSession
 # pyPhoPlaceCellAnalysis:
 from pyphoplacecellanalysis.General.Pipeline.NeuropyPipeline import NeuropyPipeline # get_neuron_identities
 from pyphoplacecellanalysis.GUI.PyQtPlot.Flowchart.CustomNodes.MiscNodes.ExtendedCtrlNode import ExtendedCtrlNode
-from pyphoplacecellanalysis.GUI.PyQtPlot.Flowchart.CustomNodes.Mixins.CtrlNodeMixins import ComboBoxCtrlOwnerMixin
-
+from pyphoplacecellanalysis.GUI.Qt.Mixins.ComboBoxMixins import KeysListAccessingMixin, ComboBoxCtrlOwningMixin
 
 # Neuropy:
 # from neuropy.core.session.data_session_loader import DataSessionLoader
@@ -23,7 +22,7 @@ from neuropy.core.session.Formats.Specific.KDibaOldDataSessionFormat import KDib
 from neuropy.core.session.Formats.Specific.RachelDataSessionFormat import RachelDataSessionFormat
 
 
-class PipelineInputDataNode(ComboBoxCtrlOwnerMixin, ExtendedCtrlNode):
+class PipelineInputDataNode(ComboBoxCtrlOwningMixin, ExtendedCtrlNode):
     """Configure, Load, and Return the input pipeline data as defined by a known data type (such as kdiba or Bapun)."""
     nodeName = "PipelineInputDataNode"
     uiTemplate = [

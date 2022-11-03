@@ -21,7 +21,7 @@ from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPred
 # from ...pyPhoPlaceCellAnalysis.src.pyphoplacecellanalysis.GUI.Qt.GlobalApplicationMenus import LocalMenus_AddRenderable
 
 class LocalMenus_AddRenderable(QtWidgets.QMainWindow):
-    """ 
+    """ A context menu that adds renderables such as interval rectangles and plots to SpikeRaster2D
     
     
     menuCreate_Paired_Widget

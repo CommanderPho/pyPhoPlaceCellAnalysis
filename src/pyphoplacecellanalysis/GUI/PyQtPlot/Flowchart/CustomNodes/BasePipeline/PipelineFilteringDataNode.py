@@ -5,7 +5,7 @@ from pyphoplacecellanalysis.External.pyqtgraph.widgets.ProgressDialog import Pro
 # pyPhoPlaceCellAnalysis:
 from pyphoplacecellanalysis.General.NonInteractiveWrapper import NonInteractiveWrapper
 from pyphoplacecellanalysis.GUI.PyQtPlot.Flowchart.CustomNodes.MiscNodes.ExtendedCtrlNode import ExtendedCtrlNode
-from pyphoplacecellanalysis.GUI.PyQtPlot.Flowchart.CustomNodes.Mixins.CtrlNodeMixins import CheckTableCtrlOwnerMixin
+from pyphoplacecellanalysis.GUI.Qt.Mixins.CheckTableCtrlOwningMixin import CheckTableCtrlOwningMixin
 
 # from neuropy.core.session.Formats.Specific.BapunDataSessionFormat import BapunDataSessionFormatRegisteredClass
 # from neuropy.core.session.Formats.Specific.KDibaOldDataSessionFormat import KDibaOldDataSessionFormatRegisteredClass
@@ -13,7 +13,7 @@ from pyphoplacecellanalysis.GUI.PyQtPlot.Flowchart.CustomNodes.Mixins.CtrlNodeMi
 from neuropy.core.session.Formats.BaseDataSessionFormats import DataSessionFormatRegistryHolder
 
 
-class PipelineFilteringDataNode(CheckTableCtrlOwnerMixin, ExtendedCtrlNode):
+class PipelineFilteringDataNode(CheckTableCtrlOwningMixin, ExtendedCtrlNode):
     """Filters active pipeline"""
     nodeName = "PipelineFilteringDataNode"
     uiTemplate = [

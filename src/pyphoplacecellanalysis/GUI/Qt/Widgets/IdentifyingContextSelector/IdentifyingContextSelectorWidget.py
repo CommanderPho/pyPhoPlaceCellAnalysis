@@ -12,7 +12,7 @@ from PyQt5.QtGui import QPainter, QBrush, QPen, QColor, QFont, QIcon
 from PyQt5.QtCore import Qt, QPoint, QRect, QObject, QEvent, pyqtSignal, pyqtSlot, QSize, QDir
 
 ## IMPORTS:
-from pyphoplacecellanalysis.GUI.PyQtPlot.Flowchart.CustomNodes.Mixins.CtrlNodeMixins import ComboBoxCtrlOwnerMixin
+from pyphoplacecellanalysis.GUI.Qt.Mixins.ComboBoxMixins import KeysListAccessingMixin, ComboBoxCtrlOwningMixin
 from pyphoplacecellanalysis.GUI.Qt.Mixins.PipelineOwningMixin import PipelineOwningMixin
 
 from pyqt_checkbox_table_widget.checkBoxTableWidget import CheckBoxTableWidget
@@ -25,7 +25,7 @@ uiFile = os.path.join(path, 'IdentifyingContextSelectorWidget.ui')
 # ==================================================================================================================== #
 # IdentifyingContextSelectorWidget                                                                                     #
 # ==================================================================================================================== #
-class IdentifyingContextSelectorWidget(ComboBoxCtrlOwnerMixin, PipelineOwningMixin, QWidget): 
+class IdentifyingContextSelectorWidget(ComboBoxCtrlOwningMixin, PipelineOwningMixin, QWidget): 
     """ Allows selecting an IdentifyingContext from a dropdown list
 
     pyphoplacecellanalysis.GUI.Qt.Widgets.IdentifyingContextSelector.IdentifyingContextSelectorWidget.IdentifyingContextSelectorWidget

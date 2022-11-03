@@ -284,7 +284,7 @@ class Ripples_2DRenderTimeEpochs(General2DRenderTimeEpochs):
         
 
 ##########################################
-## Ripples
+## New Ripples
 class NewRipples_2DRenderTimeEpochs(General2DRenderTimeEpochs):
     default_datasource_name = 'NewRipples'
     

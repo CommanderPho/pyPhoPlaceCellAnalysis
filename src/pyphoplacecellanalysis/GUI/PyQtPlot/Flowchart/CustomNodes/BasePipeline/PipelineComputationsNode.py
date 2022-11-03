@@ -3,12 +3,12 @@ from pyphoplacecellanalysis.External.pyqtgraph.widgets.ProgressDialog import Pro
 
 # pyPhoPlaceCellAnalysis:
 from pyphoplacecellanalysis.General.NonInteractiveWrapper import NonInteractiveWrapper
-from pyphoplacecellanalysis.GUI.PyQtPlot.Flowchart.CustomNodes.Mixins.CtrlNodeMixins import CheckTableCtrlOwnerMixin
+from pyphoplacecellanalysis.GUI.Qt.Mixins.CheckTableCtrlOwningMixin import CheckTableCtrlOwningMixin
 from pyphoplacecellanalysis.GUI.PyQtPlot.Flowchart.CustomNodes.MiscNodes.ExtendedCtrlNode import ExtendedCtrlNode
 
 
 
-class PipelineComputationsNode(CheckTableCtrlOwnerMixin, ExtendedCtrlNode):
+class PipelineComputationsNode(CheckTableCtrlOwningMixin, ExtendedCtrlNode):
     """Performs computations on the active pipeline"""
     nodeName = "PipelineComputationsNode"
     uiTemplate = [

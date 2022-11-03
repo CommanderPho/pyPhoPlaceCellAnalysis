@@ -27,7 +27,8 @@ from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.Ratemaps im
 from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import DefaultDecoderDisplayFunctions
 
 from pyphoplacecellanalysis.GUI.PyQtPlot.Flowchart.CustomNodes.Mixins.AssociatedOutputWidgetNodeMixin import AddRemoveActionNodeMixin, AssociatedAppNodeMixin, AssociatedOutputWidgetNodeMixin
-from pyphoplacecellanalysis.GUI.PyQtPlot.Flowchart.CustomNodes.Mixins.CtrlNodeMixins import KeysListAccessingMixin
+from pyphoplacecellanalysis.GUI.Qt.Mixins.ComboBoxMixins import KeysListAccessingMixin
+
 from pyphoplacecellanalysis.GUI.PyQtPlot.Flowchart.CustomNodes.Mixins.DisplayNodeViewHelpers import DisplayMatplotlibWidgetMixin
 
 
