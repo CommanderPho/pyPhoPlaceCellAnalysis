@@ -314,6 +314,10 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
                 # This is the first thing that produces detected event.type() == QtCore.QEvent.GraphicsSceneWheel when the scrolling is done over the 2D active widnow raster plot 
                 self.ui.spike_raster_plt_2d.plots.preview_overview_scatter_plot.installEventFilter(self) # plots.preview_overview_scatter_plot is a ScatterPlotItem
 
+            # Connect BottomBar's combobox to the 2D plotters rendered intervals
+            self.ui.bottom_bar_connections.append(self.ui.spike_raster_plt_2d.sigRenderedIntervalsListChanged.connect(self.ui.bottomPlaybackControlBarWidget.on_rendered_intervals_list_changed))
+
+
         # Set Window Title Options:
         if self.applicationName is not None:
             # self.setWindowFilePath(str(sess.filePrefix.resolve()))

@@ -25,6 +25,8 @@ from pyphocorehelpers.gui.Qt.ToggleButton import ToggleButtonModel, ToggleButton
 # For extra button symbols:
 import qtawesome as qta
 
+from pyphoplacecellanalysis.GUI.Qt.Mixins.ComboBoxMixins import KeysListAccessingMixin, ComboBoxCtrlOwningMixin
+
 
 """ TODO: Refactor from pyphoplacecellanalysis\GUI\PyQtPlot\Widgets\Mixins\RenderWindowControlsMixin.py
 
@@ -38,7 +40,7 @@ btnJumpToNext
 """
 
 
-class Spike3DRasterBottomPlaybackControlBar(QWidget):
+class Spike3DRasterBottomPlaybackControlBar(ComboBoxCtrlOwningMixin, QWidget):
     """ A playback bar with buttons loaded from a Qt .ui file. """
     
     play_pause_toggled = QtCore.pyqtSignal(bool) # returns bool indicating whether is_playing
@@ -210,6 +212,77 @@ class Spike3DRasterBottomPlaybackControlBar(QWidget):
         else:
             # set background color back to default (dark grey) with grey text
             self.ui.button_reverse.setStyleSheet("color : rgb(180, 180, 180); background-color : rgb(65, 60, 54)")
+
+
+    # ==================================================================================================================== #
+    # Jump Target Controls                                                                                                 #
+    # ==================================================================================================================== #
+    # @property
+    # def combo_jump_target_series(self):
+    #     return self.ui.comboActiveJumpTargetSeries
+
+    # @property
+    # def all_filtered_session_keys(self):
+    #     """Gets the names of the filters applied and updates the config rows with them."""
+    #     if self.owning_pipeline is None:
+    #         return []
+    #     return list(self.owning_pipeline.filtered_sessions.keys())
+
+    # @property
+    # def all_filtered_session_contexts(self):
+    #     """Gets the names of the filters applied and updates the config rows with them."""
+    #     if self.owning_pipeline is None:
+    #         return []
+    #     return self.owning_pipeline.filtered_contexts
+
+    def update_jump_target_series_options(self, new_options):
+        return self._tryUpdateComboItemsUi(self.ui.comboActiveJumpTargetSeries, new_options)
+
+    def _tryUpdateComboItemsUi(self, curr_combo_box, new_options):
+        updated_list = KeysListAccessingMixin.get_keys_list(new_options)
+        # self.replace_combo_items(self.ui.comboActiveJumpTargetSeries, updated_list)
+        ## Update Combo box items:
+        # curr_combo_box = self.ui.comboActiveJumpTargetSeries # QComboBox 
+
+        ## Freeze signals:
+        curr_combo_box.blockSignals(True)
+        
+        ## Capture the previous selection:
+        selected_index, selected_item_text = self.get_current_combo_item_selection(curr_combo_box)
+        had_previous_selected_item = (selected_item_text is not None)
+
+        ## Perform the replacement:
+        self.replace_combo_items(curr_combo_box, updated_list)
+        
+        ## Re-select the previously selected item if possible:
+        if not had_previous_selected_item:
+            # no previously selected item. Instead, select the first item.
+            # self._trySelectFirstComboItem()
+            self._trySelectFirstComboItem(self.ui.comboActiveJumpTargetSeries, updated_list)
+        found_desired_index = self.try_select_combo_item_with_text(curr_combo_box, selected_item_text)
+        ## Unblock the signals:
+        curr_combo_box.blockSignals(False)
+
+    def _trySelectFirstComboItem(self, curr_combo_box, current_list):
+        """ tries to select the first item (index 0) if possible. Otherwise, fails gracefully.
+        Internally calls self.try_select_combo_item_with_text(...)
+         """
+        # no previously selected item. Instead, select the first item.
+        if (len(current_list) > 0):
+            selected_item_text = current_list[0] # get the first item text to try and select.
+            found_desired_index = self.try_select_combo_item_with_text(curr_combo_box, selected_item_text)
+        else:
+            print(f'WARNING: could not select any default items because the list was empty.')
+            found_desired_index = None
+        return found_desired_index
+
+
+    @QtCore.pyqtSlot(object)
+    def on_rendered_intervals_list_changed(self, interval_list_owning_object):
+        """ called when the list of rendered intervals changes """
+        self.update_jump_target_series_options(interval_list_owning_object.list_all_rendered_intervals())
+
+
 
     
 class SpikeRasterBottomFrameControlsMixin:
