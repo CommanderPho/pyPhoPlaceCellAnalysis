@@ -95,6 +95,10 @@ class TimeCurvesViewMixin(Render3DTimeCurvesBaseGridMixin):
     def add_3D_time_curves(self, curve_datasource: CurveDatasource=None, plot_dataframe:pd.DataFrame=None):
         assert (curve_datasource is not None) or (plot_dataframe is not None), "At least one of curve_datasource or plot_dataframe must be non-None."
     
+        # CHECK TYPES
+        if curve_datasource is not None:
+            assert isinstance(curve_datasource, CurveDatasource), f"curve_datasource was provided by is of type {type(curve_datasource)}. It should be of type CurveDatasource.\nIf you meant to pass a pd.DataFrame, use the `plot_dataframe=plot_df` keyword argument."
+
         if self.params.time_curves_datasource is not None:
             # TODO: detach any extant datasource:
             self.detach_3d_time_curves_datasource()
