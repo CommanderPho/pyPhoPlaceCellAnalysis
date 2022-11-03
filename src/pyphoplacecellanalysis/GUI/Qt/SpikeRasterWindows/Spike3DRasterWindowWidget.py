@@ -7,7 +7,8 @@ from pyphocorehelpers.DataStructure.general_parameter_containers import Visualiz
 from pyphocorehelpers.gui.Qt.GlobalConnectionManager import GlobalConnectionManager, GlobalConnectionManagerAccessingMixin
 from pyphocorehelpers.gui.Qt.qevent_lookup_helpers import QEventLookupHelpers
 
-from pyphoplacecellanalysis.GUI.Qt.SpikeRasterWindows.Spike3DRasterWindowBase import Ui_RootWidget # Generated file from .ui
+from pyphoplacecellanalysis.GUI.Qt.SpikeRasterWindows.Uic_AUTOGEN_Spike3DRasterWindowBase import Ui_RootWidget # Generated file from .ui
+
 
 from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.SpikeRasterWidgets.Spike2DRaster import Spike2DRaster
 from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.SpikeRasterWidgets.Spike3DRaster import Spike3DRaster
@@ -241,6 +242,7 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
         if type_of_3d_plotter is None:
             # No 3D plotter:
             self.ui.spike_raster_plt_3d = None 
+
             
         elif type_of_3d_plotter == 'pyqtgraph':
             self.ui.spike_raster_plt_3d = Spike3DRaster.init_from_independent_data(curr_spikes_df, window_duration=window_duration, window_start_time=window_start_time, neuron_colors=neuron_colors, neuron_sort_order=neuron_sort_order, application_name=self.applicationName, enable_independent_playback_controller=False, should_show=False, parent=None)
@@ -266,12 +268,17 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
         if self.ui.spike_raster_plt_3d is not None:
             self.ui.v_layout.addWidget(self.ui.spike_raster_plt_3d)
         self.ui.mainSpike3DRasterWidget.setLayout(self.ui.v_layout)
+
+        if self.ui.spike_raster_plt_3d is None:
+            # IF there's NOT any 3D Plotter, collapse `mainSpike3DRasterWidget`, the holder widget for it so the 2D plotter takes up the whole frame
+            self.ui.mainSpike3DRasterWidget.setVisible(False)
         
         self.ui.v_layout_secondary = QtWidgets.QVBoxLayout()
         self.ui.v_layout_secondary.setContentsMargins(0,0,0,0)
         self.ui.v_layout_secondary.addWidget(self.ui.spike_raster_plt_2d)
         self.ui.secondarySpikeRasterControlWidget.setLayout(self.ui.v_layout_secondary)
         
+        ## TODO: could easily wrap the two plotters (3D and 2D) in Docks if desired here
         
         self.GlobalConnectionManagerAccessingMixin_on_setup()
         

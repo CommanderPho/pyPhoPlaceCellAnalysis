@@ -171,9 +171,6 @@ border-color: rgb(0, 0, 0);</string>
            <height>200</height>
           </size>
          </property>
-         <property name="styleSheet">
-          <string notr="true">background-color: rgb(0, 85, 0);</string>
-         </property>
         </widget>
        </widget>
       </item>
