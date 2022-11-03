@@ -231,12 +231,6 @@ selection-background-color: rgb(75, 83, 65);
       </item>
       <item row="1" column="12" alignment="Qt::AlignVCenter">
        <widget class="QFrame" name="frame">
-        <property name="frameShape">
-         <enum>QFrame::StyledPanel</enum>
-        </property>
-        <property name="frameShadow">
-         <enum>QFrame::Raised</enum>
-        </property>
         <layout class="QHBoxLayout" name="horizontalLayout" stretch="0,0,0,0">
          <property name="topMargin">
           <number>0</number>
@@ -251,6 +245,9 @@ selection-background-color: rgb(75, 83, 65);
            </property>
            <property name="statusTip">
             <string>Jump to Previous</string>
+           </property>
+           <property name="styleSheet">
+            <string notr="true">background-color: qlineargradient(spread:pad, x1:0.00564972, y1:0.284, x2:0, y2:1, stop:0.0918367 rgba(255, 233, 191, 255), stop:0.136364 rgba(47, 43, 39, 255), stop:0.408163 rgba(84, 77, 70, 255));</string>
            </property>
            <property name="text">
             <string>Jump to Prev.</string>
@@ -315,6 +312,9 @@ selection-background-color: rgb(75, 83, 65);
            </property>
            <property name="statusTip">
             <string>Jump to Next</string>
+           </property>
+           <property name="styleSheet">
+            <string notr="true">background-color: qlineargradient(spread:pad, x1:0.00564972, y1:0.284, x2:0, y2:1, stop:0.0918367 rgba(255, 233, 191, 255), stop:0.136364 rgba(47, 43, 39, 255), stop:0.408163 rgba(84, 77, 70, 255));</string>
            </property>
            <property name="text">
             <string>Jump to Next</string>
@@ -381,11 +381,18 @@ selection-background-color: rgb(75, 83, 65);
           <height>25</height>
          </size>
         </property>
+        <property name="styleSheet">
+         <string notr="true">color: rgb(255, 255, 255);
+selection-color: rgb(85, 170, 255);
+selection-background-color: rgb(85, 170, 255);
+background-color: rgb(65, 60, 54);
+alternate-background-color: rgb(222, 222, 222);</string>
+        </property>
         <property name="text">
          <string>Reverse</string>
         </property>
-        <property name="checked">
-         <bool>false</bool>
+        <property name="checkable">
+         <bool>true</bool>
         </property>
        </widget>
       </item>

@@ -93,13 +93,12 @@ class Ui_RootWidget(object):
         spacerItem1 = QtWidgets.QSpacerItem(40, 20, QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Minimum)
         self.gridLayout_2.addItem(spacerItem1, 1, 15, 1, 1)
         self.frame = QtWidgets.QFrame(self.frame_media_control)
-        self.frame.setFrameShape(QtWidgets.QFrame.StyledPanel)
-        self.frame.setFrameShadow(QtWidgets.QFrame.Raised)
         self.frame.setObjectName("frame")
         self.horizontalLayout = QtWidgets.QHBoxLayout(self.frame)
         self.horizontalLayout.setContentsMargins(-1, 0, -1, 0)
         self.horizontalLayout.setObjectName("horizontalLayout")
         self.btnJumpToPrevious = QtWidgets.QToolButton(self.frame)
+        self.btnJumpToPrevious.setStyleSheet("background-color: qlineargradient(spread:pad, x1:0.00564972, y1:0.284, x2:0, y2:1, stop:0.0918367 rgba(255, 233, 191, 255), stop:0.136364 rgba(47, 43, 39, 255), stop:0.408163 rgba(84, 77, 70, 255));")
         icon = QtGui.QIcon()
         icon.addPixmap(QtGui.QPixmap(":/Icons/Icons/Icon/JumpToPrev.png"), QtGui.QIcon.Normal, QtGui.QIcon.Off)
         self.btnJumpToPrevious.setIcon(icon)
@@ -118,6 +117,7 @@ class Ui_RootWidget(object):
         self.comboActiveJumpTargetSeries.setObjectName("comboActiveJumpTargetSeries")
         self.horizontalLayout.addWidget(self.comboActiveJumpTargetSeries)
         self.btnJumpToNext = QtWidgets.QToolButton(self.frame)
+        self.btnJumpToNext.setStyleSheet("background-color: qlineargradient(spread:pad, x1:0.00564972, y1:0.284, x2:0, y2:1, stop:0.0918367 rgba(255, 233, 191, 255), stop:0.136364 rgba(47, 43, 39, 255), stop:0.408163 rgba(84, 77, 70, 255));")
         icon1 = QtGui.QIcon()
         icon1.addPixmap(QtGui.QPixmap(":/Icons/Icons/Icon/JumpToNext.png"), QtGui.QIcon.Normal, QtGui.QIcon.Off)
         self.btnJumpToNext.setIcon(icon1)
@@ -141,7 +141,12 @@ class Ui_RootWidget(object):
         self.gridLayout_2.addWidget(self.btnHelp, 1, 22, 1, 1)
         self.button_reverse = QtWidgets.QPushButton(self.frame_media_control)
         self.button_reverse.setMinimumSize(QtCore.QSize(30, 25))
-        self.button_reverse.setChecked(False)
+        self.button_reverse.setStyleSheet("color: rgb(255, 255, 255);\n"
+"selection-color: rgb(85, 170, 255);\n"
+"selection-background-color: rgb(85, 170, 255);\n"
+"background-color: rgb(65, 60, 54);\n"
+"alternate-background-color: rgb(222, 222, 222);")
+        self.button_reverse.setCheckable(True)
         self.button_reverse.setObjectName("button_reverse")
         self.gridLayout_2.addWidget(self.button_reverse, 1, 1, 1, 1)
         spacerItem3 = QtWidgets.QSpacerItem(40, 20, QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Minimum)

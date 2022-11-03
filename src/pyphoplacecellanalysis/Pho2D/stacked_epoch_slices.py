@@ -180,7 +180,6 @@ def stacked_epoch_slices_view(epoch_slices, position_times_list, position_traces
     
     return params, plots_data, plots, ui
 
-
 def stacked_epoch_slices_view_viewbox(epoch_slices, position_times_list, position_traces_list, epoch_description_list, name='stacked_epoch_slices_view_viewbox', debug_print=False):
     """ The viewbox version - not primarily used
     

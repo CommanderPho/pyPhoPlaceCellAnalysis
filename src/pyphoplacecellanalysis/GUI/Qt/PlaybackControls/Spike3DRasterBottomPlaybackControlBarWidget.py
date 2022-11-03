@@ -55,8 +55,6 @@ class Spike3DRasterBottomPlaybackControlBar(QWidget):
         self.initUI()
         self.show() # Show the GUI
 
-
-
     def initUI(self):
         self.ui.slider_progress.hide()
         
@@ -81,14 +79,7 @@ class Spike3DRasterBottomPlaybackControlBar(QWidget):
         
         
         self.is_playback_reversed = self.ui.button_reverse.isChecked()
-        if self.ui.button_reverse.isChecked():
-            # setting background color to light-blue
-            self.ui.button_reverse.setStyleSheet("background-color : lightblue")
-  
-        # if it is unchecked
-        else:
-            # set background color back to light-grey
-            self.ui.button_reverse.setStyleSheet("background-color : lightgrey")
+        self._format_button_reversed()
         self.ui.button_reverse.clicked.connect(self.on_reverse_held)
         
         self.ui.btnLeft.clicked.connect(self.on_jump_left)
@@ -205,19 +196,20 @@ class Spike3DRasterBottomPlaybackControlBar(QWidget):
         # Change the direction of playback by changing the sign of the updating.
         # if button is checked    
         self.is_playback_reversed = self.ui.button_reverse.isChecked()
-        if self.ui.button_reverse.isChecked():
-            # setting background color to light-blue
-            self.ui.button_reverse.setStyleSheet("background-color : lightblue")
-  
-        # if it is unchecked
-        else:
-            # set background color back to light-grey
-            self.ui.button_reverse.setStyleSheet("background-color : lightgrey")
+        self._format_button_reversed()
 
         self.reverse_toggled.emit(self.is_playback_reversed)
 
-
-
+    def _format_button_reversed(self):
+        """ formats the reverse button based on whether it is checked or not """
+        if self.ui.button_reverse.isChecked():
+            # setting background color to an energized blue with white text
+            self.ui.button_reverse.setStyleSheet("color : rgb(255, 255, 255); background-color : rgb(85, 170, 255);")
+  
+        # if it is unchecked
+        else:
+            # set background color back to default (dark grey) with grey text
+            self.ui.button_reverse.setStyleSheet("color : rgb(180, 180, 180); background-color : rgb(65, 60, 54)")
 
     
 class SpikeRasterBottomFrameControlsMixin:
