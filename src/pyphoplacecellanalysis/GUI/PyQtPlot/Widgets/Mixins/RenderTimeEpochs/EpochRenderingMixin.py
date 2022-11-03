@@ -74,6 +74,12 @@ class EpochRenderingMixin:
             active_2d_plot.clear_all_rendered_intervals()
         
     """
+
+
+    sigRenderedIntervalsListChanged = QtCore.Signal(object) # signal emitted whenever the list of rendered intervals changed (add/remove)
+
+
+
     @property
     def interval_rendering_plots(self):
         """ returns the list of child subplots/graphics (usually PlotItems) that participate in rendering intervals """
@@ -188,6 +194,7 @@ class EpochRenderingMixin:
         # Update the custom datasource name with the provided name
         interval_datasource.custom_datasource_name = name
         
+        rendered_intervals_list_did_change = False
         extant_datasource = self.interval_datasources.get(name, None)
         if extant_datasource is None:
             # no extant datasource with this name, create it:
@@ -195,7 +202,8 @@ class EpochRenderingMixin:
             # Connect the source_data_changed_signal to handle changes to the datasource:
             
             self.interval_datasources[name].source_data_changed_signal.connect(self.EpochRenderingMixin_on_interval_datasource_changed)
-        
+            rendered_intervals_list_did_change = True
+
         else:
             # extant_datasource exists!
             print(f'WARNING: extant_datasource with the name ({name}) already exists. Attempting to update.')
@@ -265,8 +273,11 @@ class EpochRenderingMixin:
                     
                     # Adjust the bounds to fit any children:
                     EpochRenderingMixin.compute_bounds_adjustment_for_rect_item(a_plot, a_rect_item)
-                                                
-                                                
+
+
+        if rendered_intervals_list_did_change:
+            self.sigRenderedIntervalsListChanged.emit(self) # Emit the intervals list changed signal when a truely new item is added
+
         return returned_rect_items 
 
     def remove_rendered_intervals(self, name, child_plots_removal_list=None, debug_print=True):
@@ -305,6 +316,7 @@ class EpochRenderingMixin:
                 print(f'self.rendered_epochs[{name}] now empty. Removing it and its datasource...')
             del self.rendered_epochs[name]
             del self.interval_datasources[name]
+            self.sigRenderedIntervalsListChanged.emit(self) # Emit the intervals list changed signal when the item is removed
     
         return items_to_remove_from_rendered_epochs
 

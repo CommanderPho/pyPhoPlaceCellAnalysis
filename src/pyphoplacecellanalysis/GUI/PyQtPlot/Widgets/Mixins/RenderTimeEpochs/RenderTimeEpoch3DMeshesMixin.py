@@ -211,10 +211,12 @@ class RenderTimeEpoch3DMeshesMixin(EpochRenderingMixin):
             print(f'WARNING: no name provided for rendered intervals. Defaulting to datasource name: "{interval_datasource.custom_datasource_name}"')
             name = interval_datasource.custom_datasource_name
         
+        rendered_intervals_list_did_change = False
         extant_datasource = self.interval_datasources.get(name, None)
         if extant_datasource is None:
             # no extant datasource with this name, create it:
             self.interval_datasources[name] = interval_datasource # add new datasource.
+            rendered_intervals_list_did_change = True
 
         else:
             # extant_datasource exists!
@@ -303,7 +305,10 @@ class RenderTimeEpoch3DMeshesMixin(EpochRenderingMixin):
                         
                     self._perform_add_render_item(a_plot, a_rect_item_meshes)
                     returned_mesh_list_items[a_plot.objectName()] = dict(plot=a_plot, rect_item=a_rect_item_meshes)                                                
-                                                
+
+        if rendered_intervals_list_did_change:
+            self.sigRenderedIntervalsListChanged.emit(self) # Emit the intervals list changed signal when a truely new item is added
+
         return returned_mesh_list_items 
 
 
