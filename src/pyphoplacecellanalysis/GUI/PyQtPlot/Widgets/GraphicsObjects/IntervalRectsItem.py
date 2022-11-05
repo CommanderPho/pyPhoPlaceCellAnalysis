@@ -162,6 +162,7 @@ class IntervalRectsItem(pg.GraphicsObject):
                 ev.accept() # note that I think this means it won't pass the right click along to its parent view, might messup widget-wide menus
 
     def raiseContextMenu(self, ev):
+        """ works to spawn the context menu in the appropriate location """
         print(f'IntervalRectsItem.raiseContextMenu(ev: {ev})')
         menu = self.getContextMenus()
         
@@ -176,6 +177,7 @@ class IntervalRectsItem(pg.GraphicsObject):
     # This method will be called when this item's _children_ want to raise
     # a context menu that includes their parents' menus.
     def getContextMenus(self, event=None):
+        """ builds the context menus as needed """
         if self.menu is None:
             self.menu = QtWidgets.QMenu()
             # self.menu.setTitle(self.name+ " options..")
