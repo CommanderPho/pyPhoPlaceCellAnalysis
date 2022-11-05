@@ -80,16 +80,11 @@ def _final_compute_jonathan_replay_fr_analyses(sess):
 
     return rdf, aclu_to_idx, irdf, aclu_to_idx_irdf
 
+# Common _____________________________________________________________________________________________________________ #
 def make_fr(rdf):
     return np.vstack(rdf.firing_rates)
 
-def make_rdf(sess):
-    rdf = sess.replay.copy()[["start", "end"]]
-    rdf["short_track"] = rdf["start"] > sess.paradigm[1][0,0]
-    return rdf
-
-def add_spike_counts(sess, rdf):
-    
+def add_spike_counts(sess, rdf):    
     aclus = np.sort(sess.spikes_df.aclu.unique())
     aclu_to_idx = {aclus[i] : i for i in range(len(aclus))}
 
@@ -110,6 +105,15 @@ def add_spike_counts(sess, rdf):
     rdf = rdf.assign(firing_rates=spike_counts_list)
     return rdf, aclu_to_idx
 
+# Make `rdf` (replay dataframe) ______________________________________________________________________________________ #
+def make_rdf(sess):
+    """ uses the `sess.replay` property"""
+    rdf = sess.replay.copy()[["start", "end"]]
+    rdf["short_track"] = rdf["start"] > sess.paradigm[1][0,0]
+    return rdf
+
+
+
 def remove_nospike_replays(rdf):
     to_drop = np.where(make_fr(rdf).sum(axis=1)==0)[0]
     rdf = rdf.drop(to_drop, axis=0)
@@ -120,9 +124,9 @@ def remove_low_p_replays(rdf):
     rdf = rdf.drop(to_drop, axis=0)
     return rdf
 
-def remove_repeated_replays(rdf):
-    return rdf.drop_duplicates("start")
 
+
+# Make `irdf` (inter-replay dataframe) _______________________________________________________________________________ #
 def make_irdf(sess, rdf):
     starts = [sess.paradigm[0][0,0]]
     ends = []
@@ -132,6 +136,9 @@ def make_irdf(sess, rdf):
     ends.append(sess.paradigm[1][0,1])
     short_track = [s > sess.paradigm[1][0,0] for s in starts]
     return pd.DataFrame(dict(start=starts, end=ends, short_track=short_track))
+
+def remove_repeated_replays(rdf):
+    return rdf.drop_duplicates("start")
 
 def take_difference(df):
     """this compares the average firing rate for each neuron before and after the context switch
