@@ -75,8 +75,10 @@ def stacked_epoch_basic_setup(epoch_slices, epoch_labels=None, name='stacked_epo
 # ==================================================================================================================== #
 def stacked_epoch_slices_view(epoch_slices, position_times_list, position_traces_list, epoch_description_list, name='stacked_epoch_slices_view', debug_print=False):
     """ 
-    
+    position_times_list: list of timestamps
+    position_traces_list: list of traces to be plotted. Must have the same first dimension as timestamps
     epoch_description_list: list of length 
+    
     
     
     Usage:
@@ -94,7 +96,7 @@ def stacked_epoch_slices_view(epoch_slices, position_times_list, position_traces
         print(f'epoch_description_list: {epoch_description_list}')
 
 
-        from pyphoplacecellanalysis.Pho2D.PyQtPlots.Extensions.pyqtgraph_helpers import stacked_epoch_slices_view
+        from pyphoplacecellanalysis.Pho2D.stacked_epoch_slices import stacked_epoch_slices_view
 
         stacked_epoch_slices_view_laps_containers = stacked_epoch_slices_view(epoch_slices, laps_position_times_list, laps_position_traces_list, name='stacked_epoch_slices_view_laps')
         params, plots_data, plots, ui = stacked_epoch_slices_view_laps_containers
@@ -317,7 +319,7 @@ def stacked_epoch_slices_matplotlib_build_view(epoch_slices, name='stacked_epoch
     
     
     Usage:
-        from pyphoplacecellanalysis.Pho2D.PyQtPlots.Extensions.pyqtgraph_helpers import stacked_epoch_slices_matplotlib_build_view
+        from pyphoplacecellanalysis.Pho2D.stacked_epoch_slices import stacked_epoch_slices_matplotlib_build_view
         plot_function_name = 'Stacked Epoch Slices View - MATPLOTLIB subplots Version'
         params, plots_data, plots, ui = stacked_epoch_slices_matplotlib_build_view(epoch_slices, name='stacked_epoch_slices_matplotlib_subplots_laps', plot_function_name=plot_function_name, debug_test_max_num_slices=12, debug_print=False)
 
@@ -478,4 +480,18 @@ def stacked_epoch_slices_matplotlib_build_insets_view(epoch_slices, name='stacke
     return params, plots_data, plots, ui
 
 
+# ==================================================================================================================== #
+# matplotview-based version                                                                                            #
+# ==================================================================================================================== #
 
+# from matplotview import view
+
+# # Create a view! Turn axes 2 into a view of axes 1.
+
+#  view(ax2, ax1)
+
+#  # Modify the second axes data limits so we get a slightly zoomed out view
+
+#  ax2.set_xlim(-5, 15)
+
+#  ax2.set_ylim(-5, 15)
