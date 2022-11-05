@@ -192,6 +192,24 @@ class PipelineWithDisplayPipelineStageMixin:
     @display_output.setter
     def display_output(self, value):
         self.stage.display_output = value
+
+    @property
+    def display_output_history_list(self):
+        """The list of contexts in the order they were added to the self.display_output (as the keys)."""
+        return list(self.display_output.keys())
+
+    @property
+    def display_output_last_added_context(self):
+        """The last context added to the self.display_output (as the key)."""
+        return self.display_output_history_list[-1]
+
+    @property
+    def last_added_display_output(self):
+        """The last_added_display_output value."""
+        last_added_display_output = self.display_output[self.display_output_last_added_context]
+        return last_added_display_output
+
+
     
     @property
     def filtered_contexts(self):
