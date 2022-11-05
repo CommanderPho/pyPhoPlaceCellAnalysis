@@ -24,9 +24,8 @@ class IntervalRectsItem(pg.GraphicsObject):
             (left, top, width, height) and (pen, brush)
             
             
-    TODO: BUG: Right click currently invokes the custom example context menu that allows you to select between blue/green etc. This is triggered even when you right click on an area that's between the actual interval rect items (when you click in the blank-space between rects). Want this to only be triggered when on an interval. And pass through to its parent otherwise. 
-     
-            
+    TODO: BUG: Right click currently invokes the custom example context menu that allows you to select between blue/green etc. This is triggered even when you right click on an area that's between the actual interval rect items (when you click in the blank-space between rects).
+        Want this to only be triggered when on an interval. And pass through to its parent otherwise.     
         
             
     Usage:
@@ -41,6 +40,14 @@ class IntervalRectsItem(pg.GraphicsObject):
         main_plot_widget.removeItem(active_interval_rects_item)
 
     """
+    pressed = False
+    clickable = True
+    hoverEnter = QtCore.pyqtSignal()
+    hoverExit = QtCore.pyqtSignal()
+    clicked = QtCore.pyqtSignal()
+    
+
+
     def __init__(self, data):
         # menu creation is deferred because it is expensive and often
         # the user will never see the menu anyway.
@@ -50,6 +57,7 @@ class IntervalRectsItem(pg.GraphicsObject):
         pg.GraphicsObject.__init__(self)
         self.data = data  ## data must have fields: start_t, series_vertical_offset, duration_t, series_height, pen, brush
         self.generatePicture()
+        self.setAcceptHoverEvents(True)
     
     def generatePicture(self):
         ## pre-computing a QPicture object allows paint() to run much more quickly, 
@@ -91,6 +99,32 @@ class IntervalRectsItem(pg.GraphicsObject):
         independent_data_copy = RectangleRenderTupleHelpers.copy_data(self.data)
         return IntervalRectsItem(independent_data_copy)
         # return IntervalRectsItem(copy.deepcopy(self.data, memo))
+
+
+    # ==================================================================================================================== #
+    # Events Copied from https://github.com/CommanderPho/pyqt-xcode/blob/master/menurect.py                                #
+    # ==================================================================================================================== #
+
+    def hoverEnterEvent(self, event):
+        if self.clickable:
+            self.hoverEnter.emit()
+
+
+    def hoverLeaveEvent(self, event):
+        if self.clickable:
+            self.hoverExit.emit()
+
+
+    def mousePressEvent(self, event):
+        if self.clickable:
+            pressed = True
+
+
+    def mouseReleaseEvent(self, event):
+        if self.clickable:
+            pressed = False
+            self.clicked.emit()
+
 
     # ==================================================================================================================== #
     # Context Menu and Interaction Handling                                                                                #
@@ -291,6 +325,8 @@ def main():
         
     
     item = IntervalRectsItem(data)
+
+    item.setFlag(QGraphicsItem.ItemIsMovable)
     plt = pg.plot()
     plt.addItem(item)
     plt.setWindowTitle('pyqtgraph example: customGraphicsItem')
