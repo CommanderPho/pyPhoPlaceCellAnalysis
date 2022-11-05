@@ -279,7 +279,11 @@ class RectangleRenderTupleHelpers:
         seralized_tuples_data = cls.get_serialized_data(tuples_data).copy()
         return cls.get_deserialized_data(seralized_tuples_data)
             
-        
+
+
+# ==================================================================================================================== #
+# MAIN TESTING                                                                                                         #
+# ==================================================================================================================== #
 def main():
     # data = [  ## fields are (series_offset, start_t, duration_t).
     #     (1., 10, 13),

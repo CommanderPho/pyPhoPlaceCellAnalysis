@@ -40,11 +40,11 @@ class CustomIntervalRectsItem(pg.GraphicsObject):
         main_plot_widget.removeItem(active_interval_rects_item)
 
     """
-    pressed = False
+    # pressed = False
     clickable = True
     hoverEnter = QtCore.pyqtSignal()
     hoverExit = QtCore.pyqtSignal()
-    clicked = QtCore.pyqtSignal()
+    clicked = QtCore.pyqtSignal(int)
     
 
     def __init__(self, data):
@@ -60,9 +60,19 @@ class CustomIntervalRectsItem(pg.GraphicsObject):
         # Build the UI:
         self.build_all_interval_rectangle_children(self.data)
 
+    def paint(self, p, *args):
+        # required for QGraphicsObject subclasses
+        pass # NOTE: no longer does anything here, as it owns children that are responsible for rendering
+
+    def boundingRect(self):
+        ## boundingRect _must_ indicate the entire area that will be drawn on or else we will get artifacts and possibly crashing.
+        return self.childrenBoundingRect() # NOTE: now the bounding rect is determined entirely by its children
 
 
-    def addIntervalRectangleChild(self, id, start_t, series_vertical_offset, duration_t, series_height, pen=None, brush=None):
+    # ==================================================================================================================== #
+    # Primary Data Function                                                                                                #
+    # ==================================================================================================================== #
+    def _perform_add_interval_rect_child(self, id, start_t, series_vertical_offset, duration_t, series_height, pen=None, brush=None):
         """ builds a new single interval item (rectangle) and attaches it as a child
 
             Doesn't return anything, as the child is stored in its internal buttons array
@@ -73,7 +83,8 @@ class CustomIntervalRectsItem(pg.GraphicsObject):
             oldItem = self.buttons.pop(id)
             if self.scene():
                 self.scene().removeItem(oldItem)
-            oldItem.setParent(None)
+            # oldItem.setParent(None) # AttributeError: 'QGraphicsPathItem' object has no attribute 'setParent'
+            oldItem.setParentItem(None)
 
         # compute the extents of the item
         itemExtentRect = QtCore.QRectF(start_t, series_vertical_offset, duration_t, series_height) # QRectF: (left, top, width, height)
@@ -92,29 +103,18 @@ class CustomIntervalRectsItem(pg.GraphicsObject):
         self.buttons[id] = item
 
 
-
     def build_all_interval_rectangle_children(self, buttonData):
-        """ the primary function called to set the data 
+        """ the primary function called to set the data. Called at initialization, but even if called later should successfully rebuild the items and reuse them as it can
 
         Usage:
             self.build_all_interval_rectangle_children(self.data)
         """
         for idx, (start_t, series_vertical_offset, duration_t, series_height, pen, brush) in enumerate(buttonData):
             ## Calls self.addIntervalRectangleChild to actually make or update the rectangle item:
-            self.addIntervalRectangleChild(idx, start_t, series_vertical_offset, duration_t, series_height, pen=pen, brush=brush)
-
-  
-    def paint(self, p, *args):
-        # required for QGraphicsObject subclasses
-        pass # NOTE: no longer does anything here, as it owns children that are responsible for rendering
+            self._perform_add_interval_rect_child(idx, start_t, series_vertical_offset, duration_t, series_height, pen=pen, brush=brush)
 
 
-    def boundingRect(self):
-        ## boundingRect _must_ indicate the entire area that will be drawn on or else we will get artifacts and possibly crashing.
-        return self.childrenBoundingRect() # NOTE: now the bounding rect is determined entirely by its children
-
-
-    ## Copy Constructors:
+    # Copy Constructors: _________________________________________________________________________________________________ #
     def __copy__(self):
         independent_data_copy = RectangleRenderTupleHelpers.copy_data(self.data)
         return CustomIntervalRectsItem(independent_data_copy)
@@ -173,14 +173,30 @@ class CustomIntervalRectsItem(pg.GraphicsObject):
 
     def hoverLeaveEvent(self, event):
         for button in self.buttons.values():
-            button.setPen(QtCore.Qt.transparent)
+            button.setPen(QtCore.Qt.transparent) # restore the non-hovered border
 
-    def mousePressEvent(self, event):
-        clickButton = self.itemAtPos(event.pos())
+    def mousePressEvent(self, ev):
+        clickButton = self.itemAtPos(ev.pos())
         if clickButton:
-            for id, btn in self.buttons.items():
-                if btn == clickButton:
-                    self.clicked.emit(id)
+            if ev.button() == QtCore.Qt.MouseButton.LeftButton:
+                ## On left click, do the normal click-reponse:
+                # find the button that was clicked so we can emit a clicked signal with its id
+                for id, btn in self.buttons.items():
+                    if btn == clickButton:
+                        self.clicked.emit(id)
+
+            elif ev.button() == QtCore.Qt.MouseButton.RightButton:
+                ## On right-click, raise the context menu:
+
+                # if self.mouseShape().contains(ev.pos()):
+                #     ev.accept()
+                #     self.sigClicked.emit(self, ev)
+
+                # TODO: like the LeftButton case, we want the context menu to be w.r.t. the clicked item, so we'll need to find and store the clicked button and save it for when the context menu returns                
+                if self.raiseContextMenu(ev):
+                    ev.accept() # note that I think this means it won't pass the right click along to its parent view, might messup widget-wide menus
+
+
 
 
     # # ==================================================================================================================== #
@@ -205,7 +221,6 @@ class CustomIntervalRectsItem(pg.GraphicsObject):
     
     
 
-
     # # On right-click, raise the context menu
     # def mouseClickEvent(self, ev):
     #     print(f'CustomIntervalRectsItem.mouseClickEvent(ev: {ev})')
@@ -218,85 +233,85 @@ class CustomIntervalRectsItem(pg.GraphicsObject):
     #         if self.raiseContextMenu(ev):
     #             ev.accept() # note that I think this means it won't pass the right click along to its parent view, might messup widget-wide menus
 
-    # def raiseContextMenu(self, ev):
-    #     """ works to spawn the context menu in the appropriate location """
-    #     print(f'CustomIntervalRectsItem.raiseContextMenu(ev: {ev})')
-    #     menu = self.getContextMenus()
+    def raiseContextMenu(self, ev):
+        """ works to spawn the context menu in the appropriate location """
+        print(f'CustomIntervalRectsItem.raiseContextMenu(ev: {ev})')
+        menu = self.getContextMenus()
         
-    #     # Let the scene add on to the end of our context menu
-    #     # (this is optional)
-    #     # menu = self.scene().addParentContextMenus(self, menu, ev)
+        # Let the scene add on to the end of our context menu
+        # (this is optional)
+        # menu = self.scene().addParentContextMenus(self, menu, ev)
         
-    #     pos = ev.screenPos()
-    #     menu.popup(QtCore.QPoint(int(pos.x()), int(pos.y())))
-    #     return True
+        pos = ev.screenPos()
+        menu.popup(QtCore.QPoint(int(pos.x()), int(pos.y())))
+        return True
 
-    # # This method will be called when this item's _children_ want to raise
-    # # a context menu that includes their parents' menus.
-    # def getContextMenus(self, event=None):
-    #     """ builds the context menus as needed """
-    #     if self.menu is None:
-    #         self.menu = QtWidgets.QMenu()
-    #         # self.menu.setTitle(self.name+ " options..")
-    #         self.menu.setTitle("IntervalRectItem options..")
+    # This method will be called when this item's _children_ want to raise
+    # a context menu that includes their parents' menus.
+    def getContextMenus(self, event=None):
+        """ builds the context menus as needed """
+        if self.menu is None:
+            self.menu = QtWidgets.QMenu()
+            # self.menu.setTitle(self.name+ " options..")
+            self.menu.setTitle("IntervalRectItem options..")
             
-    #         green = QtGui.QAction("Turn green", self.menu)
-    #         green.triggered.connect(self.setGreen)
-    #         self.menu.addAction(green)
-    #         self.menu.green = green
+            green = QtGui.QAction("Turn green", self.menu)
+            green.triggered.connect(self.setGreen)
+            self.menu.addAction(green)
+            self.menu.green = green
             
-    #         blue = QtGui.QAction("Turn blue", self.menu)
-    #         blue.triggered.connect(self.setBlue)
-    #         self.menu.addAction(blue)
-    #         self.menu.green = blue
+            blue = QtGui.QAction("Turn blue", self.menu)
+            blue.triggered.connect(self.setBlue)
+            self.menu.addAction(blue)
+            self.menu.green = blue
             
-    #         alpha = QtWidgets.QWidgetAction(self.menu)
-    #         alphaSlider = QtWidgets.QSlider()
-    #         alphaSlider.setOrientation(QtCore.Qt.Orientation.Horizontal)
-    #         alphaSlider.setMaximum(255)
-    #         alphaSlider.setValue(255)
-    #         alphaSlider.valueChanged.connect(self.setAlpha)
-    #         alpha.setDefaultWidget(alphaSlider)
-    #         self.menu.addAction(alpha)
-    #         self.menu.alpha = alpha
-    #         self.menu.alphaSlider = alphaSlider
-    #     return self.menu
+            alpha = QtWidgets.QWidgetAction(self.menu)
+            alphaSlider = QtWidgets.QSlider()
+            alphaSlider.setOrientation(QtCore.Qt.Orientation.Horizontal)
+            alphaSlider.setMaximum(255)
+            alphaSlider.setValue(255)
+            alphaSlider.valueChanged.connect(self.setAlpha)
+            alpha.setDefaultWidget(alphaSlider)
+            self.menu.addAction(alpha)
+            self.menu.alpha = alpha
+            self.menu.alphaSlider = alphaSlider
+        return self.menu
 
-    # # Define context menu callbacks
-    # def setGreen(self):
-    #     # self.pen = pg.mkPen('g')
-    #     print(f'.setGreen()...')
-    #     for i, a_tuple in enumerate(self.data):
-    #         # a_tuple : (start_t, series_vertical_offset, duration_t, series_height, pen, brush)
-    #         # list(a_tuple)
-    #         start_t, series_vertical_offset, duration_t, series_height, pen, brush = a_tuple
-    #         override_pen = pg.mkPen('g')
-    #         override_brush = pg.mkBrush('g')
-    #         self.data[i] = (start_t, series_vertical_offset, duration_t, series_height, override_pen, override_brush)
+    # Define context menu callbacks
+    def setGreen(self):
+        # self.pen = pg.mkPen('g')
+        print(f'.setGreen()...')
+        for i, a_tuple in enumerate(self.data):
+            # a_tuple : (start_t, series_vertical_offset, duration_t, series_height, pen, brush)
+            # list(a_tuple)
+            start_t, series_vertical_offset, duration_t, series_height, pen, brush = a_tuple
+            override_pen = pg.mkPen('g')
+            override_brush = pg.mkBrush('g')
+            self.data[i] = (start_t, series_vertical_offset, duration_t, series_height, override_pen, override_brush)
         
-    #     # Need to regenerate picture
-    #     self.generatePicture()
-    #     # inform Qt that this item must be redrawn.
-    #     self.update()
+        # Need to rebuild the children:
+        self.build_all_interval_rectangle_children(self.data)
+        # inform Qt that this item must be redrawn.
+        self.update()
 
-    # def setBlue(self):
-    #     # self.pen = pg.mkPen('b')
-    #     # override_pen = pg.mkPen('b')
-    #     print(f'.setBlue()...')
-    #     for i, a_tuple in enumerate(self.data):
-    #         # a_tuple : (start_t, series_vertical_offset, duration_t, series_height, pen, brush)
-    #         # list(a_tuple)
-    #         start_t, series_vertical_offset, duration_t, series_height, pen, brush = a_tuple
-    #         override_pen = pg.mkPen('b')
-    #         override_brush = pg.mkBrush('b')
-    #         self.data[i] = (start_t, series_vertical_offset, duration_t, series_height, override_pen, override_brush)
+    def setBlue(self):
+        # self.pen = pg.mkPen('b')
+        # override_pen = pg.mkPen('b')
+        print(f'.setBlue()...')
+        for i, a_tuple in enumerate(self.data):
+            # a_tuple : (start_t, series_vertical_offset, duration_t, series_height, pen, brush)
+            # list(a_tuple)
+            start_t, series_vertical_offset, duration_t, series_height, pen, brush = a_tuple
+            override_pen = pg.mkPen('b')
+            override_brush = pg.mkBrush('b')
+            self.data[i] = (start_t, series_vertical_offset, duration_t, series_height, override_pen, override_brush)
             
-    #     # Need to regenerate picture
-    #     self.generatePicture()
-    #     self.update()
+        # Need to rebuild the children:
+        self.build_all_interval_rectangle_children(self.data)
+        self.update()
 
-    # def setAlpha(self, a):
-    #     self.setOpacity(a/255.)
+    def setAlpha(self, a):
+        self.setOpacity(a/255.)
         
         
 
