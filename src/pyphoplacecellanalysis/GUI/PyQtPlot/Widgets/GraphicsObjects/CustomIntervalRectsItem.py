@@ -193,7 +193,9 @@ class CustomIntervalRectsItem(pg.GraphicsObject):
                 #     self.sigClicked.emit(self, ev)
 
                 # TODO: like the LeftButton case, we want the context menu to be w.r.t. the clicked item, so we'll need to find and store the clicked button and save it for when the context menu returns                
-                if self.raiseContextMenu(ev):
+                click_included_button_ids = [id for id, btn in self.buttons.items() if btn == clickButton]
+                # click_included_button_ids: a list of the IDs that were last clicked
+                if self.raiseContextMenu(ev, click_included_button_ids):
                     ev.accept() # note that I think this means it won't pass the right click along to its parent view, might messup widget-wide menus
 
 
@@ -233,9 +235,9 @@ class CustomIntervalRectsItem(pg.GraphicsObject):
     #         if self.raiseContextMenu(ev):
     #             ev.accept() # note that I think this means it won't pass the right click along to its parent view, might messup widget-wide menus
 
-    def raiseContextMenu(self, ev):
+    def raiseContextMenu(self, ev, click_included_button_ids):
         """ works to spawn the context menu in the appropriate location """
-        print(f'CustomIntervalRectsItem.raiseContextMenu(ev: {ev})')
+        print(f'CustomIntervalRectsItem.raiseContextMenu(ev: {ev}, click_included_button_ids: {click_included_button_ids})')
         menu = self.getContextMenus()
         
         # Let the scene add on to the end of our context menu
