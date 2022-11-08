@@ -8,6 +8,9 @@ from copy import deepcopy
 import importlib
 import sys
 from pathlib import Path
+import shutil # for _backup_extant_file(...)
+from datetime import datetime
+
 from typing import Callable, List
 import inspect # used for filter_sessions(...)'s inspect.getsource to compare filters:
 
@@ -21,6 +24,8 @@ importlib.reload(core)
 
 from pyphocorehelpers.hashing_helpers import get_hash_tuple, freeze
 from pyphocorehelpers.mixins.diffable import DiffableObject
+from pyphocorehelpers.print_helpers import print_filesystem_file_size, print_object_memory_usage
+
 
 from neuropy.core.session.Formats.BaseDataSessionFormats import DataSessionFormatRegistryHolder # hopefully this works without all the other imports
 from neuropy.core.session.KnownDataSessionTypeProperties import KnownDataSessionTypeProperties
@@ -179,9 +184,10 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
         
         ## Build Pickle Path:
         finalized_loaded_sess_pickle_path = Path(basepath).joinpath(active_pickle_filename).resolve()
-        print(f'finalized_loaded_sess_pickle_path: {finalized_loaded_sess_pickle_path}')
+        
 
         if not force_reload:
+            print(f'finalized_loaded_sess_pickle_path: {finalized_loaded_sess_pickle_path}')
             try:
                 loaded_pipeline = loadData(finalized_loaded_sess_pickle_path, debug_print=False)
                 
@@ -471,6 +477,18 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
 
         print(f'finalized_loaded_sess_pickle_path: {finalized_loaded_sess_pickle_path}')
         self.logger.info(f'\tfinalized_loaded_sess_pickle_path: {finalized_loaded_sess_pickle_path}')
+
+        new_obj_memory_usage_MB = print_object_memory_usage(self, enable_print=False)
+
+        if finalized_loaded_sess_pickle_path.exists():
+            # file already exists:
+            extant_file_size_MB = print_filesystem_file_size(finalized_loaded_sess_pickle_path, enable_print=False)
+            if (extant_file_size_MB >= new_obj_memory_usage_MB):
+                print(f'WARNING: extant_file_size_MB ({extant_file_size_MB} MB) >= new_obj_memory_usage_MB ({new_obj_memory_usage_MB} MB)! A backup will be made!')
+                # Backup old file:
+                _backup_extant_file(finalized_loaded_sess_pickle_path)
+                
+
         # Save reloaded pipeline out to pickle for future loading
         saveData(finalized_loaded_sess_pickle_path, db=self) # Save the pipeline out to pickle.
         if not used_existing_pickle_path:
@@ -479,4 +497,47 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
         
         self.logger.info(f'\t save complete.')
         return finalized_loaded_sess_pickle_path
-        
+
+
+
+def _backup_extant_file(file_to_backup_path, MAX_BACKUP_AMOUNT=2):
+    """creates a backup of an existing file that would otherwise be overwritten
+
+    Args:
+        file_to_backup_path (_type_): _description_
+        MAX_BACKUP_AMOUNT (int, optional):  The maximum amount of backups to have in BACKUP_DIRECTORY. Defaults to 2.
+    """
+    if not isinstance(file_to_backup_path, Path):
+        file_to_backup_path = Path(file_to_backup_path).resolve()
+    assert file_to_backup_path.exists(), f"file at {file_to_backup_path} must already exist to be backed-up!"
+    assert (not file_to_backup_path.is_dir()), f"file at {file_to_backup_path} must be a FILE, not a directory!"
+    backup_extension = '.bak' # simple '.bak' file
+
+    backup_directory_path = file_to_backup_path.parent # The location to store the backups in
+    assert file_to_backup_path.exists()  # Validate the object we are about to backup exists before we continue
+
+    # Validate the backup directory exists and create if required
+    backup_directory_path.mkdir(parents=True, exist_ok=True)
+
+    # Get the amount of past backup zips in the backup directory already
+    existing_backups = [
+        x for x in backup_directory_path.iterdir()
+        if x.is_file() and x.suffix == backup_extension and x.name.startswith('backup-')
+    ]
+
+    # Enforce max backups and delete oldest if there will be too many after the new backup
+    oldest_to_newest_backup_by_name = list(sorted(existing_backups, key=lambda f: f.name))
+    while len(oldest_to_newest_backup_by_name) >= MAX_BACKUP_AMOUNT:  # >= because we will have another soon
+        backup_to_delete = oldest_to_newest_backup_by_name.pop(0)
+        backup_to_delete.unlink()
+
+    # Create zip file (for both file and folder options)
+    backup_file_name = f'backup-{datetime.now().strftime("%Y%m%d%H%M%S")}-{file_to_backup_path.name}{backup_extension}'
+    to_file = backup_directory_path.joinpath(backup_file_name)
+    print(f"'{file_to_backup_path}' backing up -> to_file: '{to_file}'")
+    shutil.copy(file_to_backup_path, to_file)
+    return True
+    # dest = Path('dest')
+    # src = Path('src')
+    # dest.write_bytes(src.read_bytes()) #for binary files
+    # dest.write_text(src.read_text()) #for text files
