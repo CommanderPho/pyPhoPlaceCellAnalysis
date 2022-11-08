@@ -308,7 +308,7 @@ class Spike3DRasterBottomPlaybackControlBar(ComboBoxCtrlOwningMixin, QWidget):
             By default, snap the start of the active_time_window to the start of the next epoch event
         """
         curr_jump_series_name = self.current_selected_jump_target_series_name # 'PBEs'
-        # print(f'on_jump_next_series_item(): curr_jump_series_name: {curr_jump_series_name}')
+        print(f'on_jump_next_series_item(): curr_jump_series_name: {curr_jump_series_name}')
         self.jump_target_right.emit(curr_jump_series_name)
 
     @QtCore.pyqtSlot()
@@ -318,7 +318,7 @@ class Spike3DRasterBottomPlaybackControlBar(ComboBoxCtrlOwningMixin, QWidget):
             By default, snap the start of the active_time_window to the start of the next epoch event
         """
         curr_jump_series_name = self.current_selected_jump_target_series_name # 'PBEs'
-        # print(f'on_jump_prev_series_item(): curr_jump_series_name: {curr_jump_series_name}')
+        print(f'on_jump_prev_series_item(): curr_jump_series_name: {curr_jump_series_name}')
         self.jump_target_left.emit(curr_jump_series_name)
 
 
