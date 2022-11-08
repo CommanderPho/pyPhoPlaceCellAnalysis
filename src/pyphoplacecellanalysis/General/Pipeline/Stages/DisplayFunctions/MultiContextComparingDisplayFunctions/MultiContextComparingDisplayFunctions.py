@@ -256,6 +256,71 @@ def _context_nested_docks(curr_active_pipeline, active_config_names, enable_gui=
 # %matplotlib qt
 
 
+def _temp_draw_jonathan_ax(sess, time_bins, unit_specific_time_binned_firing_rates, joined_df, pos_df, aclu_to_idx, rdf, irdf, show_inter_replay_frs=False, ax=None, active_aclu:int=0):
+    """ 
+
+    Usage:
+
+    index = new_index
+    active_aclu = int(joined_df.index[index])
+    _temp_draw_jonathan_ax(ax[0,1])
+
+    """
+    assert ax is not None
+    colors = plt.rcParams['axes.prop_cycle'].by_key()['color'];
+    
+    # print(f"selected neuron has index: {index} aclu: {active_aclu}")
+
+    # this redraws ax
+    ax.clear()
+
+    # Draw the vertical epoch splitter line:
+    ax.vlines(sess.paradigm[0][0,1], ymin = 0, ymax=60, color=(0,0,0,.25))
+
+    centers = (rdf["start"] + rdf["end"])/2
+    heights = make_fr(rdf)[:, aclu_to_idx[active_aclu]]
+    ax.plot(centers, heights, '.')
+
+    if show_inter_replay_frs:
+        # this would show the inter-replay firing times in orange it's frankly distracting
+        centers = (irdf["start"] + irdf["end"])/2
+        heights = make_fr(irdf)[:, aclu_to_idx[active_aclu]]
+        ax.plot(centers, heights, '.', color=colors[1]+"80")
+
+    ax.set_title(f"Replay firing rates for neuron {active_aclu}")
+    ax.set_xlabel("Time of replay (s)")
+    ax.set_ylabel("Firing Rate (Hz)")
+
+    # Pho's firing rate additions:
+    try:
+        # found_idx = pf2D_Decoder.neuron_IDs.index(aclu)
+        # print(f'found_idx: {found_idx}')
+        t = time_bins
+        v = unit_specific_time_binned_firing_rates[active_aclu].to_numpy() # index directly by ACLU
+        # print(f't: {np.shape(t)}, v: {np.shape(v)}')
+
+    except KeyError:
+        print(f'non-placefield neuron. Skipping.')
+        t, v = None, None
+        pass
+
+    if v is not None:
+        # Plot the continuous firing rates
+        ax.plot(t, v)
+
+    plt.gcf().canvas.draw()
+    # fig.canvas.draw()
+
+
+
+
+
+
+
+
+
+
+
 
 def _make_jonathan_interactive_plot(sess, time_bins, unit_specific_time_binned_firing_rates, pf1d_short, pf1d_long, pos_df, aclu_to_idx, rdf, irdf, show_inter_replay_frs=False):
 
@@ -375,17 +440,6 @@ def _make_jonathan_interactive_plot(sess, time_bins, unit_specific_time_binned_f
         ax[0,1].set_title(f"Replay firing rates for neuron {aclu}")
         ax[0,1].set_xlabel("Time of replay (s)")
         ax[0,1].set_ylabel("Firing Rate (Hz)")
-
-        # this plots where the neuron spiked
-        ax[1,1].clear()
-        ax[1,1].plot(pos_df.t, pos_df.x, color=[.75, .75, .75])
-        single_neuron_spikes = sess.spikes_df[sess.spikes_df.aclu == aclu]
-        ax[1,1].plot(single_neuron_spikes.t_rel_seconds, single_neuron_spikes.x, 'k.', ms=1)
-        ax[1,1].set_xlabel("t (s)")
-        ax[1,1].set_ylabel("Position")
-        ax[1,1].set_title("Animal position on track")
-    
-
         # Pho's firing rate additions:
         try:
             # found_idx = pf2D_Decoder.neuron_IDs.index(aclu)
@@ -402,7 +456,18 @@ def _make_jonathan_interactive_plot(sess, time_bins, unit_specific_time_binned_f
 
         if v is not None:
             # Plot the continuous firing rates
-            ax[0,1].plot(t, v)
+            ax[0,1].plot(t, v, color='#aaaaff8c') # this color is a translucent lilac (purple) color
+
+
+
+        # this plots where the neuron spiked
+        ax[1,1].clear()
+        ax[1,1].plot(pos_df.t, pos_df.x, color=[.75, .75, .75])
+        single_neuron_spikes = sess.spikes_df[sess.spikes_df.aclu == aclu]
+        ax[1,1].plot(single_neuron_spikes.t_rel_seconds, single_neuron_spikes.x, 'k.', ms=1)
+        ax[1,1].set_xlabel("t (s)")
+        ax[1,1].set_ylabel("Position")
+        ax[1,1].set_title("Animal position on track")
 
 
         fig.canvas.draw()
