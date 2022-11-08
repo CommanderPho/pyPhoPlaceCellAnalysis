@@ -83,7 +83,7 @@ class MultiContextComparingDisplayFunctions(AllFunctionEnumeratingMixin, metacla
             # ## Compute for all the session spikes first:
             sess = owning_pipeline_reference.sess
             # BAD DOn'T DO THIS:
-            rdf, aclu_to_idx, irdf, aclu_to_idx_irdf = _final_compute_jonathan_replay_fr_analyses(sess)
+            rdf, aclu_to_idx, irdf, aclu_to_idx_irdf = _final_compute_jonathan_replay_fr_analyses(sess, sess.replay)
             pos_df = sess.position.to_dataframe()
 
             ## TODO: This is the proper way once global computations work:
