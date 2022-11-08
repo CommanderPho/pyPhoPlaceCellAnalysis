@@ -15,6 +15,10 @@ import pandas as pd
 from pathlib import Path
 from qtpy import QtGui # for QColor
 
+## Optional Plotting with Tabbed matplotlib figure:
+from mpl_multitab import MplMultiTab, MplMultiTab2D
+
+from pyphocorehelpers.DataStructure.RenderPlots.MatplotLibRenderPlots import MatplotlibRenderPlots
 from pyphocorehelpers.gui.PyVista.CascadingDynamicPlotsList import CascadingDynamicPlotsList
 
 # Fixed Geometry objects:
@@ -92,13 +96,22 @@ def plot_1d_placecell_validations(active_placefields1D, plotting_config, should_
         curr_parent_out_path = plotting_config.active_output_parent_dir.joinpath('1d Placecell Validation')
         curr_parent_out_path.mkdir(parents=True, exist_ok=True)        
         
+
+    # Tabbed Matplotlib Figure Mode:
+    # ui = MplMultiTab2D()
+    ui = MplMultiTab()
+
     for i in np.arange(n_cells):
         curr_cell_id = active_placefields1D.cell_ids[i]
-        fig, axs = plot_1D_placecell_validation(active_placefields1D, i)
+        # fig = ui.add_tab(f'Dataset {modifier_string}', f'Cell {curr_cell_id}') # Tabbed mode only
+        fig = ui.add_tab(f'Cell{curr_cell_id}')
+
+        fig, axs = plot_1D_placecell_validation(active_placefields1D, i, extant_fig=fig)
         out_figures_list.append(fig)
         out_axes_list.append(axs)
 
     # once done, save out as specified
+    common_basename = active_placefields1D.str_for_filename(prefix_string=modifier_string)
     if should_save:
         common_basename = active_placefields1D.str_for_filename(prefix_string=modifier_string)
         if save_mode == 'separate_files':
@@ -126,10 +139,15 @@ def plot_1d_placecell_validations(active_placefields1D, plotting_config, should_
         else:
             raise ValueError
         print('\t done.')
-    return out_figures_list
+
+
+    # ui.show() # Tabbed mode only
+    return MatplotlibRenderPlots(name=f'{common_basename}', figures=out_figures_list, axes=out_axes_list, ui=ui)
+    # return out_figures_list
+
 
 # 2d Placefield comparison figure:
-def plot_1D_placecell_validation(active_epoch_placefields1D, placefield_cell_index):
+def plot_1D_placecell_validation(active_epoch_placefields1D, placefield_cell_index, extant_fig=None):
     """ A single cell method of analyzing 1D placefields and the spikes that create them 
     
     placefield_cell_index: an flat index into active_epoch_placefields1D.cell_ids. Must be between 0 and len(active_epoch_placefields1D.cell_ids). NOT the cell's original ID!
@@ -142,12 +160,19 @@ def plot_1D_placecell_validation(active_epoch_placefields1D, placefield_cell_ind
     feature_range = (0, 1)
     should_plot_spike_indicator_points_on_placefield = True
     should_plot_spike_indicator_lines_on_trajectory = True
+    # spikes_color = (0, 0, 0.8)
+    spikes_color = (0, 0, 0)
+    spikes_alpha = 0.8
     spike_indicator_lines_alpha = 1.0
     spike_indcator_lines_linewidth = 0.3
     should_plot_bins_grid = False
 
-    fig = plt.figure(figsize=(23, 9.7))
-    # fig.set_size_inches([23, 9.7])
+    if extant_fig is not None:
+        fig = extant_fig # use the existing passed figure
+        fig.set_size_inches([23, 9.7])
+    else:
+        fig = plt.figure(figsize=(23, 9.7))
+    
     # Layout Subplots in Figure:
     gs = fig.add_gridspec(1, 8)
     gs.update(wspace=0, hspace=0.05) # set the spacing between axes.
@@ -158,7 +183,7 @@ def plot_1D_placecell_validation(active_epoch_placefields1D, placefield_cell_ind
     axs1.set_yticklabels([])
 
     ## The main position vs. spike curve:
-    active_epoch_placefields1D.plotRaw_v_time(placefield_cell_index, ax=axs0)
+    active_epoch_placefields1D.plotRaw_v_time(placefield_cell_index, ax=axs0, spikes_color=spikes_color, spikes_alpha=spikes_alpha)
     
     # Title and Subtitle:
     title_string = ' '.join(['pf1D', f'Cell {curr_cell_id:02d}'])
@@ -196,7 +221,7 @@ def plot_1D_placecell_validation(active_epoch_placefields1D, placefield_cell_ind
         axs1.scatter(curr_cell_jittered_spike_curve_values, curr_cell_interpolated_spike_positions, c='r', marker='_', alpha=0.5) # plot the points themselves
     axs1.axis('off')
     axs1.set_xlim((0, 1))
-    axs1.set_ylim((-72, 150))
+    # axs1.set_ylim((-72, 150))
     return fig, [axs0, axs1]
 
 

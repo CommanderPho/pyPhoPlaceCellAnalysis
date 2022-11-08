@@ -11,9 +11,9 @@ class DefaultDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=DisplayFunc
     
     def _display_1d_placefield_validations(computation_result, active_config, **kwargs):
         """ Renders all of the flat 1D place cell validations with the yellow lines that trace across to their horizontally drawn placefield (rendered on the right of the plot) """
-        out_figures_list = plot_1d_placecell_validations(computation_result.computed_data['pf1D'], active_config.plotting_config, **overriding_dict_with(lhs_dict={'modifier_string': 'lap_only', 'should_save': False}, **kwargs))
         # return out_figures_list
-        return MatplotlibRenderPlots(out_figures_list)
+        return plot_1d_placecell_validations(computation_result.computed_data['pf1D'], active_config.plotting_config, **overriding_dict_with(lhs_dict={'modifier_string': 'lap_only', 'should_save': False}, **kwargs))
+
 
     def _display_2d_placefield_result_plot_raw(computation_result, active_config, **kwargs):
         """ produces a stupid figure """
