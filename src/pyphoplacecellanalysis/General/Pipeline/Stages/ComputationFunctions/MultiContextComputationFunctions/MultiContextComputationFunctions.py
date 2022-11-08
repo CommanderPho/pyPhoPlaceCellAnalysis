@@ -41,7 +41,8 @@ class MultiContextComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Co
 
         # ## Compute for all the session spikes first:
         sess = owning_pipeline_reference.sess
-        rdf, aclu_to_idx, irdf, aclu_to_idx_irdf = _final_compute_jonathan_replay_fr_analyses(sess)
+        replays_df = sess.replay
+        rdf, aclu_to_idx, irdf, aclu_to_idx_irdf = _final_compute_jonathan_replay_fr_analyses(sess, replays_df)
 
         global_computation_results.computed_data['jonathan_firing_rate_analysis'] = DynamicParameters.init_from_dict({
             'rdf': DynamicParameters.init_from_dict({
@@ -60,11 +61,35 @@ class MultiContextComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Co
 # ==================================================================================================================== #
 # Jonathan's helper functions                                                                                          #
 # ==================================================================================================================== #
-def _final_compute_jonathan_replay_fr_analyses(sess):
+def _final_compute_jonathan_replay_fr_analyses(sess, replays_df):
+    """_summary_
+
+    Args:
+        sess (_type_): _description_
+        replays_df (pd.DataFrame): sess.replay dataframe. Must have [["start", "end"]] columns
+
+    Returns:
+        _type_: _description_
+
+    Usage:
+            from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.MultiContextComputationFunctions import _final_compute_jonathan_replay_fr_analyses
+            ## Compute for all the session spikes first:
+            sess = owning_pipeline_reference.sess
+            # BAD DOn'T DO THIS:
+            rdf, aclu_to_idx, irdf, aclu_to_idx_irdf = _final_compute_jonathan_replay_fr_analyses(sess)
+            pos_df = sess.position.to_dataframe()
+
+
+    """
     ## Compute for all the session spikes first:
+    # assert ["start", "end"] in replays_df.columns,
+
+    if 'end' not in replays_df.columns:
+        # Adds the 'end' column if needed
+        replays_df['end'] = replays_df['stop']
 
     ### Make `rdf` (replay dataframe)
-    rdf = make_rdf(sess) # this creates the replay dataframe variable
+    rdf = make_rdf(sess, replays_df) # this creates the replay dataframe variable
     rdf = remove_repeated_replays(rdf)
     rdf, aclu_to_idx = add_spike_counts(sess, rdf)
 
@@ -84,7 +109,8 @@ def _final_compute_jonathan_replay_fr_analyses(sess):
 def make_fr(rdf):
     return np.vstack(rdf.firing_rates)
 
-def add_spike_counts(sess, rdf):    
+def add_spike_counts(sess, rdf):
+    """ adds the spike counts vector to the dataframe """
     aclus = np.sort(sess.spikes_df.aclu.unique())
     aclu_to_idx = {aclus[i] : i for i in range(len(aclus))}
 
@@ -106,13 +132,12 @@ def add_spike_counts(sess, rdf):
     return rdf, aclu_to_idx
 
 # Make `rdf` (replay dataframe) ______________________________________________________________________________________ #
-def make_rdf(sess):
+def make_rdf(sess, replays_df):
     """ uses the `sess.replay` property"""
-    rdf = sess.replay.copy()[["start", "end"]]
+
+    rdf = replays_df.copy()[["start", "end"]]
     rdf["short_track"] = rdf["start"] > sess.paradigm[1][0,0]
     return rdf
-
-
 
 def remove_nospike_replays(rdf):
     to_drop = np.where(make_fr(rdf).sum(axis=1)==0)[0]
@@ -123,8 +148,6 @@ def remove_low_p_replays(rdf):
     to_drop = rdf.index[rdf["replay_p"] > .1]
     rdf = rdf.drop(to_drop, axis=0)
     return rdf
-
-
 
 # Make `irdf` (inter-replay dataframe) _______________________________________________________________________________ #
 def make_irdf(sess, rdf):

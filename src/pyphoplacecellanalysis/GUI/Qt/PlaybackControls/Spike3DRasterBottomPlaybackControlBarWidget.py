@@ -35,6 +35,8 @@ RenderPlaybackControlsMixin
 
 
 btnJumpToPrevious
+
+btnJumpToPrevious
 comboActiveJumpTargetSeries
 btnJumpToNext
 """
@@ -47,7 +49,11 @@ class Spike3DRasterBottomPlaybackControlBar(ComboBoxCtrlOwningMixin, QWidget):
     jump_left = QtCore.pyqtSignal()
     jump_right = QtCore.pyqtSignal()
     reverse_toggled = QtCore.pyqtSignal(bool) # returns bool indicating whether is_reversed
-    
+        
+    # Jump Target Items
+    jump_target_left = QtCore.pyqtSignal(str)
+    jump_target_right = QtCore.pyqtSignal(str)
+    jump_series_selection_changed = QtCore.pyqtSignal(str)
     
     def __init__(self, parent=None):
         super().__init__(parent=parent) # Call the inherited classes __init__ method
@@ -135,8 +141,10 @@ class Spike3DRasterBottomPlaybackControlBar(ComboBoxCtrlOwningMixin, QWidget):
         
         # Jump-to:
         self.ui.btnJumpToUnused.hide()
+        self.ui.btnJumpToPrevious.pressed.connect(self.on_jump_prev_series_item)
+        self.ui.btnJumpToNext.pressed.connect(self.on_jump_next_series_item)
+        self.ui.comboActiveJumpTargetSeries.currentTextChanged.connect(self.on_jump_combo_series_changed)
 
-        
         
     def __str__(self):
          return 
@@ -221,21 +229,26 @@ class Spike3DRasterBottomPlaybackControlBar(ComboBoxCtrlOwningMixin, QWidget):
     # def combo_jump_target_series(self):
     #     return self.ui.comboActiveJumpTargetSeries
 
-    # @property
-    # def all_filtered_session_keys(self):
-    #     """Gets the names of the filters applied and updates the config rows with them."""
-    #     if self.owning_pipeline is None:
-    #         return []
-    #     return list(self.owning_pipeline.filtered_sessions.keys())
+    @property
+    def current_selected_jump_target_series_name(self):
+        """The current_selected_jump_target_series_name property."""
+        selected_index, selected_item_text = self.get_current_jump_target_series_selection()
+        return selected_item_text
 
-    # @property
-    # def all_filtered_session_contexts(self):
-    #     """Gets the names of the filters applied and updates the config rows with them."""
-    #     if self.owning_pipeline is None:
-    #         return []
-    #     return self.owning_pipeline.filtered_contexts
+    @current_selected_jump_target_series_name.setter
+    def current_selected_jump_target_series_name(self, value):
+        self.try_select_combo_item_with_text(self.ui.comboActiveJumpTargetSeries, search_text=value, debug_print=False)
+
+
+    def get_current_jump_target_series_selection(self):
+        """ gets the currently selected jump-target series """
+        ## Capture the previous selection:
+        selected_index, selected_item_text = self.get_current_combo_item_selection(self.ui.comboActiveJumpTargetSeries, debug_print=False)
+        return (selected_index, selected_item_text)
+
 
     def update_jump_target_series_options(self, new_options):
+        """ called to update the list of jump-target options """
         return self._tryUpdateComboItemsUi(self.ui.comboActiveJumpTargetSeries, new_options)
 
     def _tryUpdateComboItemsUi(self, curr_combo_box, new_options):
@@ -281,6 +294,32 @@ class Spike3DRasterBottomPlaybackControlBar(ComboBoxCtrlOwningMixin, QWidget):
     def on_rendered_intervals_list_changed(self, interval_list_owning_object):
         """ called when the list of rendered intervals changes """
         self.update_jump_target_series_options(interval_list_owning_object.list_all_rendered_intervals())
+
+    @QtCore.pyqtSlot(str)
+    def on_jump_combo_series_changed(self, series_name):
+        print(f'on_jump_combo_series_changed(series_name: {series_name})')
+        curr_jump_series_name = self.current_selected_jump_target_series_name # 'PBEs'
+        self.jump_series_selection_changed.emit(curr_jump_series_name)
+
+    @QtCore.pyqtSlot()
+    def on_jump_next_series_item(self):
+        """ seeks the current active_time_Window to the start of the next epoch event (for the epoch event series specified in the bottom bar) 
+
+            By default, snap the start of the active_time_window to the start of the next epoch event
+        """
+        curr_jump_series_name = self.current_selected_jump_target_series_name # 'PBEs'
+        # print(f'on_jump_next_series_item(): curr_jump_series_name: {curr_jump_series_name}')
+        self.jump_target_right.emit(curr_jump_series_name)
+
+    @QtCore.pyqtSlot()
+    def on_jump_prev_series_item(self):
+        """ seeks the current active_time_Window to the start of the next epoch event (for the epoch event series specified in the bottom bar) 
+
+            By default, snap the start of the active_time_window to the start of the next epoch event
+        """
+        curr_jump_series_name = self.current_selected_jump_target_series_name # 'PBEs'
+        # print(f'on_jump_prev_series_item(): curr_jump_series_name: {curr_jump_series_name}')
+        self.jump_target_left.emit(curr_jump_series_name)
 
 
 

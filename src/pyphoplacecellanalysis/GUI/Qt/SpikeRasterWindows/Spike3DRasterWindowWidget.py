@@ -531,6 +531,40 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
         self.render_window_duration = updated_val
         
 
+
+    ########################################################
+    ## For SpikeRasterLeftSidebarControlsMixin conformance:
+    ########################################################
+
+    @QtCore.pyqtSlot()
+    def perform_jump_next_series_item(self):
+        """ seeks the current active_time_Window to the start of the next epoch event (for the epoch event series specified in the bottom bar) 
+
+            By default, snap the start of the active_time_window to the start of the next epoch event
+        """
+        curr_jump_series_idx, curr_jump_series_name = self.ui.bottomPlaybackControlBarWidget.get_current_jump_target_series_selection() # (0, 'PBEs')
+        print(f'perform_jump_next_series_item(): curr_jump_series_idx: {curr_jump_series_idx}, curr_jump_series_name: {curr_jump_series_name}')
+
+        ## Get Interval Datasources:
+        interval_datasources = self.active_2d_plot.interval_datasources
+        assert curr_jump_series_name in interval_datasources, f"curr_jump_series_name: '{curr_jump_series_name}' not in interval_datasources: {interval_datasources}"
+        selected_rendered_interval_series_ds = interval_datasources[curr_jump_series_name] # IntervalsDatasource
+        # selected_rendered_interval_series.time_column_names # ['t_start', 't_duration', 't_end']
+        selected_rendered_interval_series_times_df = selected_rendered_interval_series_ds.time_column_values # ['t_start', 't_duration', 't_end']
+        ## Get current time window:
+        curr_time_window = self.animation_active_time_window.active_time_window # (45.12114057149739, 60.12114057149739)
+        ## Find the events beyond that time:
+        filtered_times_df = selected_rendered_interval_series_times_df[(selected_rendered_interval_series_times_df['t_start'].to_numpy() > curr_time_window[0])] #.first(0) #.iat[0,:]
+        next_target_jump_time = filtered_times_df['t_start'].to_numpy()[0]
+        print(f'curr_time_window: {curr_time_window}, next_target_jump_time: {next_target_jump_time}')
+        # jump_change_time = next_target_jump_time - curr_time_window[0]
+        # print(f'jump_change_time: {jump_change_time}')
+        ## Update the window:
+        self.update_animation(next_start_timestamp=next_target_jump_time)
+
+
+
+
     ########################################################
     ## For GlobalConnectionManagerAccessingMixin conformance:
     ########################################################

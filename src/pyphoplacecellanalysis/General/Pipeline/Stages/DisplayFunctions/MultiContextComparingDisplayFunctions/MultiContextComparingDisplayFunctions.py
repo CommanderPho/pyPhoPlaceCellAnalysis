@@ -66,11 +66,19 @@ class MultiContextComparingDisplayFunctions(AllFunctionEnumeratingMixin, metacla
             pf1d_long = computation_results['maze1_PYR']['computed_data']['pf1D']
             pf1d_short = computation_results['maze2_PYR']['computed_data']['pf1D']
 
-            # pf2D_Decoder = computation_results['maze_PYR']['computed_data']['pf2D_Decoder']
-            active_firing_rate_trends = computation_results['maze_PYR']['computed_data']['firing_rate_trends']
 
-            time_bins = active_firing_rate_trends.all_session_spikes.time_binning_container.centers
-            time_binned_unit_specific_binned_spike_rate = active_firing_rate_trends.all_session_spikes.time_binned_unit_specific_binned_spike_rate
+            try:
+                # pf2D_Decoder = computation_results['maze_PYR']['computed_data']['pf2D_Decoder']
+                active_firing_rate_trends = computation_results['maze_PYR']['computed_data']['firing_rate_trends']
+
+                time_bins = active_firing_rate_trends.all_session_spikes.time_binning_container.centers
+                time_binned_unit_specific_binned_spike_rate = active_firing_rate_trends.all_session_spikes.time_binned_unit_specific_binned_spike_rate
+
+            except KeyError:
+                # except ValueError:
+                # print(f'non-placefield neuron. Skipping.')
+                time_bins, time_binned_unit_specific_binned_spike_rate = {}, {}
+
 
             # ## Compute for all the session spikes first:
             sess = owning_pipeline_reference.sess
@@ -250,37 +258,47 @@ def _context_nested_docks(curr_active_pipeline, active_config_names, enable_gui=
 
 
 def _make_jonathan_interactive_plot(sess, time_bins, unit_specific_time_binned_firing_rates, pf1d_short, pf1d_long, pos_df, aclu_to_idx, rdf, irdf, show_inter_replay_frs=False):
-    fig, ax = plt.subplots(2,2, figsize=(12.11,4.06));
-    colors = plt.rcParams['axes.prop_cycle'].by_key()['color'];
 
-    graphics_output_dict = {'fig': fig, 'axs': ax, 'colors': colors}
-    
+    # ==================================================================================================================== #
+    ## Calculating:
+
     ## The actual firing rate we want:
     
     # unit_specific_time_binned_firing_rates = pf2D_Decoder.unit_specific_time_binned_spike_counts.astype(np.float32) / pf2D_Decoder.time_bin_size
     print(f'np.shape(unit_specific_time_binned_firing_rates): {np.shape(unit_specific_time_binned_firing_rates)}')
 
-    # calculations for ax[0,0]
+    # calculations for ax[0,0] ___________________________________________________________________________________________ #
     # below we find where the tuning curve peak was for each cell in each context and store it in a dataframe
     # pf1d_long = computation_results['maze1_PYR']['computed_data']['pf1D']
-    l = [pf1d_long.xbin_centers[np.argmax(x)] for x in pf1d_long.ratemap.tuning_curves]
-    long_df = pd.DataFrame(l, columns=['long'], index=pf1d_long.cell_ids)
+    long_peaks = [pf1d_long.xbin_centers[np.argmax(x)] for x in pf1d_long.ratemap.tuning_curves]
+    long_df = pd.DataFrame(long_peaks, columns=['long'], index=pf1d_long.cell_ids)
 
     # pf1d_short = computation_results['maze2_PYR']['computed_data']['pf1D']
-    l = [pf1d_short.xbin_centers[np.argmax(x)] for x in pf1d_short.ratemap.tuning_curves]
-    short_df = pd.DataFrame(l, columns=['short'],index=pf1d_short.cell_ids)
+    short_peaks = [pf1d_short.xbin_centers[np.argmax(x)] for x in pf1d_short.ratemap.tuning_curves]
+    short_df = pd.DataFrame(short_peaks, columns=['short'],index=pf1d_short.cell_ids)
 
     # df keeps most of the interesting data for these plots
     # at this point, it has columns 'long' and 'short' holding the peak tuning curve positions for each context
     # the index of this dataframe are the ACLU's for each neuron; this is why `how='outer'` works.
     df = long_df.join(short_df, how='outer')
     df["has_na"] = df.isna().any(axis=1)
-    
-    try:
-        pass
-    except ValueError as e:
-        raise e
-    # plotting for ax[0,0]     
+
+    # calculations for ax[1,0] ___________________________________________________________________________________________ #
+    non_replay_diff = take_difference_nonzero(irdf)
+    replay_diff = take_difference_nonzero(rdf)
+    df["non_replay_diff"] = [non_replay_diff[aclu_to_idx[aclu]] for aclu in df.index]
+    df["replay_diff"] = [replay_diff[aclu_to_idx[aclu]] for aclu in df.index]
+
+
+
+    # ==================================================================================================================== #
+    ## Plotting/Graphics:
+    fig, ax = plt.subplots(2,2, figsize=(12.11,4.06));
+    colors = plt.rcParams['axes.prop_cycle'].by_key()['color'];
+
+    graphics_output_dict = {'fig': fig, 'axs': ax, 'colors': colors}
+  
+    # plotting for ax[0,0] _______________________________________________________________________________________________ #
     ax[0,0].axis("equal");
     
     # I initially set the boundaries like this so I would know where to put the single-track cells
@@ -290,7 +308,7 @@ def _make_jonathan_interactive_plot(sess, time_bins, unit_specific_time_binned_f
 
     # this fills in the nan's in the single-track cells so that they get plotted at the edges
     # plotting everything in one go makes resizing points later simpler
-    df.long.fillna(xlim[0] + 1, inplace=True)
+    df.long.fillna(xlim[0] + 1, inplace=True) # xlim[0] + 1 is the extreme edge of the plot
     df.short.fillna(ylim[0] + 1, inplace=True)
 
     remap_scatter = ax[0,0].scatter(df.long, df.short, s=7, picker=True, c=[colors[c] for c in df["has_na"]]);
@@ -307,13 +325,8 @@ def _make_jonathan_interactive_plot(sess, time_bins, unit_specific_time_binned_f
 
     graphics_output_dict['remap_scatter'] = remap_scatter
 
-    # calculations for ax[1,0]
-    non_replay_diff = take_difference_nonzero(irdf)
-    replay_diff = take_difference_nonzero(rdf)
-    df["non_replay_diff"] = [non_replay_diff[aclu_to_idx[aclu]] for aclu in df.index]
-    df["replay_diff"] = [replay_diff[aclu_to_idx[aclu]] for aclu in df.index]
 
-    # plotting for ax[1,0]
+    # plotting for ax[1,0]: ______________________________________________________________________________________________ #
     diff_scatter = ax[1,0].scatter(df.non_replay_diff, df.replay_diff, s=7, picker=True);
     # ax[1,0].set_xlabel("Firing rate along long track")
     # ax[1,0].set_ylabel("Firing rate along short track")
@@ -410,6 +423,10 @@ def _make_jonathan_interactive_plot(sess, time_bins, unit_specific_time_binned_f
         on_index_change(int(event.ind[0]))
 
     on_index_change(g_index)
+
+    graphics_output_dict['on_index_change'] = {'callback': on_index_change, 'g_index': g_index}
+
+
     fig.canvas.mpl_connect('pick_event', on_pick)
     fig.canvas.mpl_connect('key_press_event', on_keypress)
     return graphics_output_dict, df
