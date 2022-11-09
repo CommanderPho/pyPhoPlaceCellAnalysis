@@ -9,6 +9,12 @@ import itertools
 # PyBursts:
 from pybursts import pybursts
 
+# 2022-11-08 Firing Rate Calculations
+from elephant.statistics import mean_firing_rate, instantaneous_rate, time_histogram
+from quantities import ms, s, Hz
+from neo.core.spiketrain import SpikeTrain
+from elephant.kernels import GaussianKernel
+
 # For Progress bars:
 from tqdm.notebook import tqdm
 
@@ -168,6 +174,21 @@ class SpikeAnalysisComputations(AllFunctionEnumeratingMixin, metaclass=Computati
             unit_specific_binned_spike_rate = unit_specific_binned_spike_counts.astype('float') / time_bin_size_seconds
             return unit_specific_binned_spike_rate, time_window_edges, time_window_edges_binning_info
 
+
+        def _instantaneous_time_firing_rates(active_spikes_df, time_bin_size_seconds=0.5, t_start=0.0, t_stop=1000.0):
+            # unit_split_spiketrains = [SpikeTrain(t_start=computation_result.sess.t_start, t_stop=computation_result.sess.t_stop, times=spiketrain_times, units=s) for spiketrain_times in computation_result.sess.spikes_df.spikes.time_sliced(t_start=computation_result.sess.t_start, t_stop=computation_result.sess.t_stop).spikes.get_unit_spiketrains()]
+            unit_split_spiketrains = [SpikeTrain(t_start=t_start, t_stop=t_stop, times=spiketrain_times, units=s) for spiketrain_times in active_spikes_df.spikes.time_sliced(t_start=t_start, t_stop=t_stop).spikes.get_unit_spiketrains()]
+
+            # len(unit_split_spiketrains) # 52
+
+            # inst_rate = instantaneous_rate(unit_split_spiketrains, sampling_period=50*ms, kernel=GaussianKernel(200*ms))
+            inst_rate = instantaneous_rate(unit_split_spiketrains, sampling_period=time_bin_size_seconds*s, kernel=GaussianKernel(200*ms))
+            # print(type(inst_rate), f"of shape {inst_rate.shape}: {inst_rate.shape[0]} samples, {inst_rate.shape[1]} channel")
+            # print('sampling rate:', inst_rate.sampling_rate)
+            # print('times (first 10 samples): ', inst_rate.times[:10])
+            # print('instantaneous rate (first 10 samples):', inst_rate.T[0, :10])
+            return inst_rate, unit_split_spiketrains
+
         time_bin_size_seconds = 0.5
         
         ## Compute for all the session spikes first:
@@ -175,13 +196,17 @@ class SpikeAnalysisComputations(AllFunctionEnumeratingMixin, metaclass=Computati
         sess_unit_specific_binned_spike_rate, sess_time_window_edges, sess_time_window_edges_binning_info = _simple_time_binned_firing_rates(active_session_spikes_df)
         sess_time_binning_container = BinningContainer(edges=sess_time_window_edges, edge_info=sess_time_window_edges_binning_info)
 
-
         sess_min_spike_rates = sess_unit_specific_binned_spike_rate.min()
         sess_mean_spike_rates = sess_unit_specific_binned_spike_rate.mean()
         sess_median_spike_rates = sess_unit_specific_binned_spike_rate.median()
         sess_max_spike_rates = sess_unit_specific_binned_spike_rate.max()
-        
-        
+            
+        # Instantaneous versions:
+        sess_unit_specific_inst_spike_rate, sess_unit_split_spiketrains = _instantaneous_time_firing_rates(active_session_spikes_df, time_bin_size_seconds=time_bin_size_seconds, t_start=computation_result.sess.t_start, t_stop=computation_result.sess.t_stop)
+        print(f'sess_unit_specific_inst_spike_rate: {sess_unit_specific_inst_spike_rate}')
+
+
+
         # Compute for only the placefield included spikes as well:
         active_pf_2D = computation_result.computed_data['pf2D']
         active_pf_included_spikes_only_spikes_df = active_pf_2D.filtered_spikes_df.copy()
@@ -191,7 +216,7 @@ class SpikeAnalysisComputations(AllFunctionEnumeratingMixin, metaclass=Computati
         pf_only_mean_spike_rates = pf_only_unit_specific_binned_spike_rate.mean()
         pf_only_median_spike_rates = pf_only_unit_specific_binned_spike_rate.median()
         pf_only_max_spike_rates = pf_only_unit_specific_binned_spike_rate.max()
-        
+
         computation_result.computed_data['firing_rate_trends'] = DynamicParameters.init_from_dict({
             'time_bin_size_seconds': time_bin_size_seconds,
             'all_session_spikes': DynamicParameters.init_from_dict({
@@ -202,7 +227,8 @@ class SpikeAnalysisComputations(AllFunctionEnumeratingMixin, metaclass=Computati
                 'min_spike_rates': sess_min_spike_rates,
                 'mean_spike_rates': sess_mean_spike_rates,
                 'median_spike_rates': sess_median_spike_rates,
-                'max_spike_rates': sess_max_spike_rates,                
+                'max_spike_rates': sess_max_spike_rates,
+                'instantaneous_unit_specific_spike_rate': sess_unit_specific_inst_spike_rate,
             }),
             'pf_included_spikes_only': DynamicParameters.init_from_dict({
                 'time_binning_container': pf_only_time_binning_container,
