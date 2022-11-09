@@ -187,7 +187,11 @@ class SpikeAnalysisComputations(AllFunctionEnumeratingMixin, metaclass=Computati
             # print('sampling rate:', inst_rate.sampling_rate)
             # print('times (first 10 samples): ', inst_rate.times[:10])
             # print('instantaneous rate (first 10 samples):', inst_rate.T[0, :10])
-            return inst_rate, unit_split_spiketrains
+
+            neuron_IDs = np.unique(active_spikes_df.aclu)
+            # neuron_IDXs = np.arange(len(neuron_IDs))
+            instantaneous_unit_specific_spike_rate_values = pd.DataFrame(inst_rate.magnitude, columns=neuron_IDs) # builds a df with times along the rows and aclu values along the columns in the style of unit_specific_binned_spike_counts
+            return instantaneous_unit_specific_spike_rate_values, inst_rate, unit_split_spiketrains
 
         time_bin_size_seconds = 0.5
         
@@ -202,7 +206,7 @@ class SpikeAnalysisComputations(AllFunctionEnumeratingMixin, metaclass=Computati
         sess_max_spike_rates = sess_unit_specific_binned_spike_rate.max()
             
         # Instantaneous versions:
-        sess_unit_specific_inst_spike_rate, sess_unit_split_spiketrains = _instantaneous_time_firing_rates(active_session_spikes_df, time_bin_size_seconds=time_bin_size_seconds, t_start=computation_result.sess.t_start, t_stop=computation_result.sess.t_stop)
+        sess_unit_specific_inst_spike_rate_values_df, sess_unit_specific_inst_spike_rate, sess_unit_split_spiketrains = _instantaneous_time_firing_rates(active_session_spikes_df, time_bin_size_seconds=time_bin_size_seconds, t_start=computation_result.sess.t_start, t_stop=computation_result.sess.t_stop)
         print(f'sess_unit_specific_inst_spike_rate: {sess_unit_specific_inst_spike_rate}')
 
 
@@ -229,6 +233,7 @@ class SpikeAnalysisComputations(AllFunctionEnumeratingMixin, metaclass=Computati
                 'median_spike_rates': sess_median_spike_rates,
                 'max_spike_rates': sess_max_spike_rates,
                 'instantaneous_unit_specific_spike_rate': sess_unit_specific_inst_spike_rate,
+                'instantaneous_unit_specific_spike_rate_values_df': sess_unit_specific_inst_spike_rate_values_df,
             }),
             'pf_included_spikes_only': DynamicParameters.init_from_dict({
                 'time_binning_container': pf_only_time_binning_container,
