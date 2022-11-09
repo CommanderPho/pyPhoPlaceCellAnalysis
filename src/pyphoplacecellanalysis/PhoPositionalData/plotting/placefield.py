@@ -77,7 +77,7 @@ def _plot_helper_setup_gridlines(ax, bin_edges, bin_centers):
     ax.yaxis.grid(True, which='major', color = 'grey', linewidth = 0.5) # , color = 'green', linestyle = '--', linewidth = 0.5
     ax.yaxis.grid(True, which='minor', color = 'grey', linestyle = '--', linewidth = 0.25)
 
-def plot_1d_placecell_validations(active_placefields1D, plotting_config, should_save=False, modifier_string='', save_mode='separate_files'):
+def plot_1d_placecell_validations(active_placefields1D, plotting_config, should_save=False, modifier_string='', save_mode='separate_files', plot_kwargs=None):
     """ Uses plot_1D_placecell_validation(...) to plot a series of plots, one for each potential placecell, that allows you to see how the spiking corresponds to the animal's position/lap and how that contributes to the computed placemap
     
     Usage:
@@ -106,7 +106,7 @@ def plot_1d_placecell_validations(active_placefields1D, plotting_config, should_
         # fig = ui.add_tab(f'Dataset {modifier_string}', f'Cell {curr_cell_id}') # Tabbed mode only
         fig = ui.add_tab(f'Cell{curr_cell_id}')
 
-        fig, axs = plot_1D_placecell_validation(active_placefields1D, i, extant_fig=fig)
+        fig, axs = plot_1D_placecell_validation(active_placefields1D, i, extant_fig=fig, **(plot_kwargs or {}))
         out_figures_list.append(fig)
         out_axes_list.append(axs)
 
@@ -147,25 +147,29 @@ def plot_1d_placecell_validations(active_placefields1D, plotting_config, should_
 
 
 # 2d Placefield comparison figure:
-def plot_1D_placecell_validation(active_epoch_placefields1D, placefield_cell_index, extant_fig=None):
+def plot_1D_placecell_validation(active_epoch_placefields1D, placefield_cell_index, extant_fig=None, **kwargs):
     """ A single cell method of analyzing 1D placefields and the spikes that create them 
     
     placefield_cell_index: an flat index into active_epoch_placefields1D.cell_ids. Must be between 0 and len(active_epoch_placefields1D.cell_ids). NOT the cell's original ID!
+
+    Implementation:
+        Internally relies on plotRaw_v_time(...) to plot the main position vs. spike curve
+
     """
     
     curr_cell_id = active_epoch_placefields1D.cell_ids[placefield_cell_index]
     # jitter the curve_value for each spike based on the time it occured along the curve:
-    jitter_multiplier = 0.05
+    jitter_multiplier = kwargs.get('jitter_multiplier', 0.05)
     # feature_range = (-1, 1)
     feature_range = (0, 1)
-    should_plot_spike_indicator_points_on_placefield = True
-    should_plot_spike_indicator_lines_on_trajectory = True
+    should_plot_spike_indicator_points_on_placefield = kwargs.get('should_plot_spike_indicator_points_on_placefield', True)
+    should_plot_spike_indicator_lines_on_trajectory = kwargs.get('should_plot_spike_indicator_lines_on_trajectory', True)
     # spikes_color = (0, 0, 0.8)
-    spikes_color = (0, 0, 0)
-    spikes_alpha = 0.8
-    spike_indicator_lines_alpha = 1.0
-    spike_indcator_lines_linewidth = 0.3
-    should_plot_bins_grid = False
+    spikes_color = kwargs.get('spikes_color', (0, 0, 0))
+    spikes_alpha = kwargs.get('spikes_alpha', 0.8)
+    spike_indicator_lines_alpha = kwargs.get('spike_indicator_lines_alpha', 1.0)
+    spike_indcator_lines_linewidth = kwargs.get('spike_indcator_lines_linewidth', 0.3)
+    should_plot_bins_grid = kwargs.get('should_plot_bins_grid', False)
 
     if extant_fig is not None:
         fig = extant_fig # use the existing passed figure
@@ -183,7 +187,12 @@ def plot_1D_placecell_validation(active_epoch_placefields1D, placefield_cell_ind
     axs1.set_yticklabels([])
 
     ## The main position vs. spike curve:
-    active_epoch_placefields1D.plotRaw_v_time(placefield_cell_index, ax=axs0, spikes_color=spikes_color, spikes_alpha=spikes_alpha)
+    # spike_marker = 'tri_left' # '3'
+    # spike_marker = "TICKLEFT" # 'tickleft'
+    # spike_marker = "." # original
+    spike_marker = "_" # 'hline' "CARETRIGHTBASE" 'caretrightbase'
+    spike_plot_kwargs = {'linestyle':'none', 'markersize':6.0, 'marker': spike_marker, 'markerfacecolor':'#55aaffcc', 'markeredgecolor':'#55aaffcc'}
+    active_epoch_placefields1D.plotRaw_v_time(placefield_cell_index, ax=axs0, spikes_color=spikes_color, spikes_alpha=spikes_alpha, position_plot_kwargs={'color': '#393939c8', 'linewidth': 1.0}, spike_plot_kwargs=spike_plot_kwargs)
     
     # Title and Subtitle:
     title_string = ' '.join(['pf1D', f'Cell {curr_cell_id:02d}'])
@@ -201,7 +210,9 @@ def plot_1D_placecell_validation(active_epoch_placefields1D, placefield_cell_ind
     curr_cell_spike_times = active_epoch_placefields1D.ratemap_spiketrains[placefield_cell_index]  # (271,)
     curr_cell_spike_positions = active_epoch_placefields1D.ratemap_spiketrains_pos[placefield_cell_index]  # (271,)
     curr_cell_normalized_tuning_curve = active_epoch_placefields1D.ratemap.normalized_tuning_curves[placefield_cell_index, :].squeeze()
-
+    t_start = kwargs.get('t_start', active_epoch_placefields1D.t[0])
+    t_end = kwargs.get('t_end', active_epoch_placefields1D.t[-1])
+    
     # Interpolate the tuning curve for all the spike values:
     curr_cell_interpolated_spike_positions = np.interp(curr_cell_spike_positions, active_epoch_placefields1D.ratemap.xbin_centers, active_epoch_placefields1D.ratemap.xbin_centers) # (271,)
     curr_cell_interpolated_spike_curve_values = np.interp(curr_cell_spike_positions, active_epoch_placefields1D.ratemap.xbin_centers, curr_cell_normalized_tuning_curve) # (271,)
@@ -211,7 +222,7 @@ def plot_1D_placecell_validation(active_epoch_placefields1D, placefield_cell_ind
         # plot the orange lines that span across the position plot to the right
         axs0.hlines(y=curr_cell_interpolated_spike_positions, xmin=curr_cell_spike_times, xmax=curr_cell_spike_times[-1],
                     linestyles='solid', color='orange', alpha=spike_indicator_lines_alpha, linewidth=spike_indcator_lines_linewidth) # plot the lines that underlie the spike points
-    axs0.set_xlim((np.min(curr_cell_spike_times), np.max(curr_cell_spike_times)))
+    axs0.set_xlim((t_start, t_end)) # We don't want to clip to only the spiketimes for this cell, we want it for all cells, or even when the recording started/ended    
 
     ## The computed placefield on the right-hand side:
     axs1 = plot_placefield_tuning_curve(active_epoch_placefields1D.ratemap.xbin_centers, curr_cell_normalized_tuning_curve, axs1, is_horizontal=True)
