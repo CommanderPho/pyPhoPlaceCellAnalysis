@@ -480,23 +480,64 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
 
         new_obj_memory_usage_MB = print_object_memory_usage(self, enable_print=False)
 
+        _desired_finalized_loaded_sess_pickle_path = None
         if finalized_loaded_sess_pickle_path.exists():
             # file already exists:
-            extant_file_size_MB = print_filesystem_file_size(finalized_loaded_sess_pickle_path, enable_print=False)
-            if (extant_file_size_MB >= new_obj_memory_usage_MB):
-                print(f'WARNING: extant_file_size_MB ({extant_file_size_MB} MB) >= new_obj_memory_usage_MB ({new_obj_memory_usage_MB} MB)! A backup will be made!')
-                # Backup old file:
-                _backup_extant_file(finalized_loaded_sess_pickle_path)
+            ## Save under a temporary name in the same output directory, and then compare post-hoc
+            _desired_finalized_loaded_sess_pickle_path = finalized_loaded_sess_pickle_path
+            finalized_loaded_sess_pickle_path, _ = _build_unique_filename(finalized_loaded_sess_pickle_path)
+
+
                 
 
         # Save reloaded pipeline out to pickle for future loading
         saveData(finalized_loaded_sess_pickle_path, db=self) # Save the pipeline out to pickle.
+
+        # If we saved to a temporary name, now see if we should overwrite or backup and then replace:
+        if _desired_finalized_loaded_sess_pickle_path is not None:
+
+            prev_extant_file_size_MB = print_filesystem_file_size(_desired_finalized_loaded_sess_pickle_path, enable_print=False)
+            new_temporary_file_size_MB = print_filesystem_file_size(finalized_loaded_sess_pickle_path, enable_print=False)
+
+            if (prev_extant_file_size_MB >= new_temporary_file_size_MB):
+                print(f'WARNING: prev_extant_file_size_MB ({prev_extant_file_size_MB} MB) >= new_temporary_file_size_MB ({new_temporary_file_size_MB} MB)! A backup will be made!')
+                # Backup old file:
+                _backup_extant_file(_desired_finalized_loaded_sess_pickle_path) # only backup if the new file is smaller than the older one (meaning the older one has more info)
+            
+            # replace the old file with the new one:
+            print(f"moving new output at '{finalized_loaded_sess_pickle_path}' -> to desired location: '{_desired_finalized_loaded_sess_pickle_path}'")
+            shutil.move(finalized_loaded_sess_pickle_path, _desired_finalized_loaded_sess_pickle_path) # move the temporary file to the desired destination, overwriting it
+            # Finally restore the appropriate load path:
+            finalized_loaded_sess_pickle_path = _desired_finalized_loaded_sess_pickle_path
+
         if not used_existing_pickle_path:
             # the pickle path changed, so set it on the pipeline:
             self._persistance_state = LoadedObjectPersistanceState(finalized_loaded_sess_pickle_path, compare_state_on_load=self.pipeline_compare_dict)
         
         self.logger.info(f'\t save complete.')
         return finalized_loaded_sess_pickle_path
+
+
+
+def _build_unique_filename(file_to_save_path, additional_postfix_extension=None):
+    """ builds a unique filename for the file to be saved at file_to_save_path.
+    Usage:
+        from pyphoplacecellanalysis.General.Pipeline.NeuropyPipeline import _build_unique_filename
+        unique_save_path, unique_file_name = _build_unique_filename(curr_active_pipeline.pickle_path) # unique_file_name: '20221109173951-loadedSessPickle.pkl'
+        unique_save_path # 'W:/Data/KDIBA/gor01/one/2006-6-09_1-22-43/20221109173951-loadedSessPickle.pkl'
+    """
+    if not isinstance(file_to_save_path, Path):
+        file_to_save_path = Path(file_to_save_path)
+    parent_path = file_to_save_path.parent # The location to store the backups in
+
+    extensions = file_to_save_path.suffixes # e.g. ['.tar', '.gz']
+    if additional_postfix_extension is not None:
+        extensions.append(additional_postfix_extension)
+
+    unique_file_name = f'{datetime.now().strftime("%Y%m%d%H%M%S")}-{file_to_save_path.stem}{"".join(extensions)}'
+    unique_save_path = parent_path.joinpath(unique_file_name)
+    # print(f"'{file_to_save_path}' backing up -> to_file: '{unique_save_path}'")
+    return unique_save_path, unique_file_name
 
 
 
