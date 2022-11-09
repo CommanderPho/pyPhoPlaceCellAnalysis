@@ -66,13 +66,22 @@ class MultiContextComparingDisplayFunctions(AllFunctionEnumeratingMixin, metacla
             pf1d_long = computation_results['maze1_PYR']['computed_data']['pf1D']
             pf1d_short = computation_results['maze2_PYR']['computed_data']['pf1D']
 
-
             try:
                 # pf2D_Decoder = computation_results['maze_PYR']['computed_data']['pf2D_Decoder']
                 active_firing_rate_trends = computation_results['maze_PYR']['computed_data']['firing_rate_trends']
 
-                time_bins = active_firing_rate_trends.all_session_spikes.time_binning_container.centers
-                time_binned_unit_specific_binned_spike_rate = active_firing_rate_trends.all_session_spikes.time_binned_unit_specific_binned_spike_rate
+                ## time_binned_unit_specific_binned_spike_rate mode:
+                # time_bins = active_firing_rate_trends.all_session_spikes.time_binning_container.centers
+                # time_binned_unit_specific_binned_spike_rate = active_firing_rate_trends.all_session_spikes.time_binned_unit_specific_binned_spike_rate
+
+                ## instantaneous_unit_specific_spike_rate mode:
+                neuron_IDs = np.unique(computation_results['maze_PYR'].sess.spikes_df.aclu)
+                # neuron_IDXs = np.arange(len(neuron_IDs))
+                instantaneous_unit_specific_spike_rate = active_firing_rate_trends.all_session_spikes.instantaneous_unit_specific_spike_rate
+                # instantaneous_unit_specific_spike_rate = computation_results['maze_PYR']['computed_data']['firing_rate_trends'].all_session_spikes.instantaneous_unit_specific_spike_rate
+                instantaneous_unit_specific_spike_rate_values = pd.DataFrame(instantaneous_unit_specific_spike_rate.magnitude, columns=neuron_IDs) # builds a df with times along the rows and aclu values along the columns in the style of unit_specific_binned_spike_counts
+                time_bins = instantaneous_unit_specific_spike_rate.times.magnitude # .shape (3429,)
+                time_binned_unit_specific_binned_spike_rate = instantaneous_unit_specific_spike_rate_values # .shape (3429, 71)
 
             except KeyError:
                 # except ValueError:
