@@ -327,12 +327,7 @@ def _temp_draw_jonathan_ax(sess, time_bins, unit_specific_time_binned_firing_rat
 
 
 
-
-
-
-
-def _make_jonathan_interactive_plot(sess, time_bins, unit_specific_time_binned_firing_rates, pf1d_short, pf1d_long, pos_df, aclu_to_idx, rdf, irdf, show_inter_replay_frs=False):
-
+def _subfn_computations_make_jonathan_interactive_plot(unit_specific_time_binned_firing_rates, pf1d_short, pf1d_long, aclu_to_idx, rdf, irdf):
     # ==================================================================================================================== #
     ## Calculating:
 
@@ -363,7 +358,15 @@ def _make_jonathan_interactive_plot(sess, time_bins, unit_specific_time_binned_f
     df["non_replay_diff"] = [non_replay_diff[aclu_to_idx[aclu]] for aclu in df.index]
     df["replay_diff"] = [replay_diff[aclu_to_idx[aclu]] for aclu in df.index]
 
+    return df
 
+
+
+def _make_jonathan_interactive_plot(sess, time_bins, unit_specific_time_binned_firing_rates, pf1d_short, pf1d_long, pos_df, aclu_to_idx, rdf, irdf, show_inter_replay_frs=False):
+
+    # ==================================================================================================================== #
+    ## Calculating:
+    df = _subfn_computations_make_jonathan_interactive_plot(unit_specific_time_binned_firing_rates, pf1d_short, pf1d_long, aclu_to_idx, rdf, irdf)
 
     # ==================================================================================================================== #
     ## Plotting/Graphics:
