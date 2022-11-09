@@ -22,6 +22,13 @@ import pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions
 # from General.Pipeline.Stages.ComputationFunctions import ComputationFunctionRegistryHolder # should include ComputationFunctionRegistryHolder and all specifics
 from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.ComputationFunctionRegistryHolder import ComputationFunctionRegistryHolder
 
+from enum import Enum # for EvaluationActions
+
+class EvaluationActions(Enum):
+    """An enum specifying the available commands that can be performed in the ComputedPipelineStage in regards to computations. Allows generalizing a previously confusing set of functions."""
+    EVALUATE_COMPUTATIONS = "evaluate_computations" # replaces .evaluate_computations_for_single_params(...)
+    RUN_SPECIFIC = "run_specific" # replaces .run_specific_computations(...)
+    RERUN_FAILED = "rerun_failed" # replaces .rerun_failed_computations(...)
 
 # ==================================================================================================================== #
 # PIPELINE STAGE                                                                                                       #
@@ -99,9 +106,13 @@ class ComputedPipelineStage(LoadableInput, LoadableSessionInput, FilterablePipel
             self.registered_global_computation_function_dict[registered_name] = computation_function
         else:
             self.registered_computation_function_dict[registered_name] = computation_function
-
         
-    def perform_specific_context_registered_computations(self, previous_computation_result=None, computation_functions_name_whitelist=None, computation_functions_name_blacklist=None, fail_on_exception:bool=False, progress_logger_callback=None, are_global:bool=False, debug_print=False):
+
+
+    # ==================================================================================================================== #
+    # Specific Context Computation Helpers                                                                                 #
+    # ==================================================================================================================== #
+    def perform_registered_computations_single_context(self, previous_computation_result=None, computation_functions_name_whitelist=None, computation_functions_name_blacklist=None, fail_on_exception:bool=False, progress_logger_callback=None, are_global:bool=False, debug_print=False):
         """ Executes all registered computations for a single filter
         
         The return value should be set to the self.computation_results[a_select_config_name]
@@ -130,14 +141,33 @@ class ComputedPipelineStage(LoadableInput, LoadableSessionInput, FilterablePipel
         # Perform the computations:
         return ComputedPipelineStage._execute_computation_functions(active_computation_functions, previous_computation_result=previous_computation_result, fail_on_exception=fail_on_exception, progress_logger_callback=progress_logger_callback, are_global=are_global, debug_print=debug_print)
     
-    def rerun_failed_computations(self, previous_computation_result, fail_on_exception:bool=False, debug_print=False):
+    def rerun_failed_computations_single_context(self, previous_computation_result, fail_on_exception:bool=False, debug_print=False):
         """ retries the computation functions that previously failed and resulted in accumulated_errors in the previous_computation_result """
         active_computation_errors = previous_computation_result.accumulated_errors
         # Get potentially updated references to all computation functions that had failed in the previous run of the pipeline:
         potentially_updated_failed_functions = [self.registered_computation_function_dict[failed_computation_fn.__name__] for failed_computation_fn, error in active_computation_errors.items()]
         # Perform the computations:
         return ComputedPipelineStage._execute_computation_functions(potentially_updated_failed_functions, previous_computation_result=previous_computation_result, fail_on_exception=fail_on_exception, debug_print=debug_print)
-        
+
+    def run_specific_computations_single_context(self, previous_computation_result, computation_functions_name_whitelist, fail_on_exception:bool=False, progress_logger_callback=None, are_global:bool=False, debug_print=False):
+        """ re-runs just a specific computation provided by computation_functions_name_whitelist """
+        if are_global:
+            active_registered_computation_function_dict = self.registered_global_computation_function_dict
+        else:
+            active_registered_computation_function_dict = self.registered_computation_function_dict
+        active_computation_function_dict = {a_computation_fn_name:a_computation_fn for (a_computation_fn_name, a_computation_fn) in active_registered_computation_function_dict.items() if a_computation_fn_name in computation_functions_name_whitelist}
+        active_computation_functions = list(active_computation_function_dict.values())
+        print(f'run_specific_computations_single_context(including only {len(active_computation_functions)} out of {len(self.registered_computation_function_names)} registered computation functions): active_computation_functions: {active_computation_functions}...')
+        # Perform the computations:
+        return ComputedPipelineStage._execute_computation_functions(active_computation_functions, previous_computation_result=previous_computation_result, fail_on_exception=fail_on_exception, progress_logger_callback=progress_logger_callback, are_global=are_global, debug_print=debug_print)
+
+
+
+    # ==================================================================================================================== #
+    # Other                                                                                                                #
+    # ==================================================================================================================== #
+
+
     def _get_computation_results_progress(self, debug_print=False):
         """ returns the names of all the configs (usually epochs, like 'maze1' or 'maze2') that have been completely computed
         Returns:
@@ -174,12 +204,29 @@ class ComputedPipelineStage(LoadableInput, LoadableSessionInput, FilterablePipel
                 
         return complete_computed_config_names_list, incomplete_computed_config_dict
     
-    def evaluate_computations_for_single_params(self, active_computation_params: Optional[DynamicParameters]=None, enabled_filter_names=None, overwrite_extant_results=False, computation_functions_name_whitelist=None, computation_functions_name_blacklist=None,
+
+
+    def rerun_failed_computations(self, enabled_filter_names=None, fail_on_exception:bool=False, debug_print=False):
+        """ retries the computation functions that previously failed and resulted in accumulated_errors in the previous_computation_result """
+        if enabled_filter_names is None:
+            enabled_filter_names = list(self.filtered_sessions.keys()) # all filters if specific enabled names aren't specified
+        for a_select_config_name, a_filtered_session in self.filtered_sessions.items():                
+            if a_select_config_name in enabled_filter_names:
+                print(f'Performing rerun_failed_computations_single_context on filtered_session with filter named "{a_select_config_name}"...')
+                previous_computation_result = self.computation_results[a_select_config_name]
+                self.computation_results[a_select_config_name] = self.rerun_failed_computations_single_context(previous_computation_result, fail_on_exception=fail_on_exception, debug_print=debug_print)    
+
+    
+        
+
+
+    def perform_action_for_all_contexts(self, action: EvaluationActions, enabled_filter_names=None, active_computation_params: Optional[DynamicParameters]=None, overwrite_extant_results=False, computation_functions_name_whitelist=None, computation_functions_name_blacklist=None,
                                                  fail_on_exception:bool=False, progress_logger_callback=None, are_global:bool=False, debug_print=False):
-        """ 'single' here refers to the fact that it evaluates only one of the active_computation_params
-        
+        """ Aims to generalize the `evaluate_computations_for_single_params(...)` function's functionality (such as looping over each context and passing/updating appropriate results, to all three of the computation functions:
+
+
+        'single' here refers to the fact that it evaluates only one of the active_computation_params
         Takes its filtered_session and applies the provided active_computation_params to it. The results are stored in self.computation_results under the same key as the filtered session. 
-        
         Called only by the pipeline's .perform_computations(...) function
         
         """
@@ -193,13 +240,12 @@ class ComputedPipelineStage(LoadableInput, LoadableSessionInput, FilterablePipel
         else:
             active_computation_results = self.computation_results
 
-
         ## Here's where we loop through all possible configs:
         for a_select_config_name, a_filtered_session in self.filtered_sessions.items():                
             if a_select_config_name in enabled_filter_names:
-                print(f'Performing evaluate_computations_for_single_params on filtered_session with filter named "{a_select_config_name}"...')
+                print(f'Performing perform_action_for_all_contexts with action {action} on filtered_session with filter named "{a_select_config_name}"...')
                 if progress_logger_callback is not None:
-                    progress_logger_callback(f'Performing evaluate_computations_for_single_params on filtered_session with filter named "{a_select_config_name}"...')
+                    progress_logger_callback(f'Performing perform_action_for_all_contexts with action {action} on filtered_session with filter named "{a_select_config_name}"...')
                 
                 if active_computation_params is None:
                     active_computation_params = self.active_configs[a_select_config_name].computation_config # get the previously set computation configs
@@ -207,88 +253,66 @@ class ComputedPipelineStage(LoadableInput, LoadableSessionInput, FilterablePipel
                     # set/update the computation configs:
                     self.active_configs[a_select_config_name].computation_config = active_computation_params #TODO: if more than one computation config is passed in, the active_config should be duplicated for each computation config.
                 
-                
-                skip_computations_for_this_result = False
-                if overwrite_extant_results or (self.computation_results.get(a_select_config_name, None) is None):
-                    # If we're supposed to overwrite the previous result OR the previous result is already empty/not yet calculated, initialize a new one:
-                    self.computation_results[a_select_config_name] = ComputedPipelineStage._build_initial_computationResult(a_filtered_session, active_computation_params) # returns a computation result. This stores the computation config used to compute it.
-                    skip_computations_for_this_result = False # need to compute the result
-                else:
-                    # Otherwise it already exists and is not None, so don't overwrite it:
-                    if progress_logger_callback is not None:
-                        progress_logger_callback(f'WARNING: skipping computation because overwrite_extant_results={overwrite_extant_results} and self.computation_results[{a_select_config_name}] already exists and is non-None')
-                        progress_logger_callback('\t TODO: this will prevent recomputation even when the blacklist/whitelist or computation function definitions change. Rework so that this is smarter.')
-                    
-                    print(f'WARNING: skipping computation because overwrite_extant_results={overwrite_extant_results} and self.computation_results[{a_select_config_name}] already exists and is non-None')
-                    print('\t TODO: this will prevent recomputation even when the blacklist/whitelist or computation function definitions change. Rework so that this is smarter.')                    
-                    # self.computation_results.setdefault(a_select_config_name, ComputedPipelineStage._build_initial_computationResult(a_filtered_session, active_computation_params)) # returns a computation result. This stores the computation config used to compute it.
-                    skip_computations_for_this_result = True
+                if action.name == EvaluationActions.EVALUATE_COMPUTATIONS.name:
+                    # active_function = self.perform_registered_computations_single_context
+                    skip_computations_for_this_result = False
+                    if overwrite_extant_results or (active_computation_results.get(a_select_config_name, None) is None):
+                        # If we're supposed to overwrite the previous result OR the previous result is already empty/not yet calculated, initialize a new one:
+                        active_computation_results[a_select_config_name] = ComputedPipelineStage._build_initial_computationResult(a_filtered_session, active_computation_params) # returns a computation result. This stores the computation config used to compute it.
+                        skip_computations_for_this_result = False # need to compute the result
+                    else:
+                        # Otherwise it already exists and is not None, so don't overwrite it:
+                        if progress_logger_callback is not None:
+                            progress_logger_callback(f'WARNING: skipping computation because overwrite_extant_results={overwrite_extant_results} and active_computation_results[{a_select_config_name}] already exists and is non-None')
+                            progress_logger_callback('\t TODO: this will prevent recomputation even when the blacklist/whitelist or computation function definitions change. Rework so that this is smarter.')
+                        
+                        print(f'WARNING: skipping computation because overwrite_extant_results={overwrite_extant_results} and active_computation_results[{a_select_config_name}] already exists and is non-None')
+                        print('\t TODO: this will prevent recomputation even when the blacklist/whitelist or computation function definitions change. Rework so that this is smarter.')                    
+                        # active_computation_results.setdefault(a_select_config_name, ComputedPipelineStage._build_initial_computationResult(a_filtered_session, active_computation_params)) # returns a computation result. This stores the computation config used to compute it.
+                        skip_computations_for_this_result = True
 
-                if not skip_computations_for_this_result:
-                    # call to perform any registered computations:
-                    self.computation_results[a_select_config_name] = self.perform_specific_context_registered_computations(self.computation_results[a_select_config_name],
-                        computation_functions_name_whitelist=computation_functions_name_whitelist, computation_functions_name_blacklist=computation_functions_name_blacklist, fail_on_exception=fail_on_exception, progress_logger_callback=progress_logger_callback, are_global=are_global, debug_print=debug_print)
+                    if not skip_computations_for_this_result:
+                        # call to perform any registered computations:
+                        active_computation_results[a_select_config_name] = self.perform_registered_computations_single_context(active_computation_results[a_select_config_name],
+                            computation_functions_name_whitelist=computation_functions_name_whitelist, computation_functions_name_blacklist=computation_functions_name_blacklist, fail_on_exception=fail_on_exception, progress_logger_callback=progress_logger_callback, are_global=are_global, debug_print=debug_print)
+
+                elif action.name == EvaluationActions.RUN_SPECIFIC.name:
+                    print(f'Performing run_specific_computations_single_context on filtered_session with filter named "{a_select_config_name}"...')
+                    # active_function = self.run_specific_computations_single_context
+                    previous_computation_result = active_computation_results[a_select_config_name]
+                    active_computation_results[a_select_config_name] = self.run_specific_computations_single_context(previous_computation_result, computation_functions_name_whitelist, fail_on_exception=fail_on_exception, progress_logger_callback=progress_logger_callback, are_global=are_global, debug_print=debug_print)
+
+                elif action.name == EvaluationActions.RERUN_FAILED.name:
+                    # active_function = self.rerun_failed_computations_single_context
+                    print(f'Performing rerun_failed_computations_single_context on filtered_session with filter named "{a_select_config_name}"...')
+                    previous_computation_result = active_computation_results[a_select_config_name]
+                    active_computation_results[a_select_config_name] = self.rerun_failed_computations_single_context(previous_computation_result, fail_on_exception=fail_on_exception, debug_print=debug_print)    
+
+
+                else:
+                    active_function = None
+                    print(f'ERROR: {action}, {action.name}')
+                    raise NotImplementedError
+
+                    # # call to perform any registered computations:
+                    # active_computation_results[a_select_config_name] = self.perform_registered_computations_single_context(active_computation_results[a_select_config_name],
+                    #     computation_functions_name_whitelist=computation_functions_name_whitelist, computation_functions_name_blacklist=computation_functions_name_blacklist, fail_on_exception=fail_on_exception, progress_logger_callback=progress_logger_callback, are_global=are_global, debug_print=debug_print)
             else:
                 # this filter is excluded from the enabled list, no computations will we performed on it
                 if overwrite_extant_results:
-                    self.computation_results.pop(a_select_config_name, None) # remove the computation results from previous runs from the dictionary to indicate that it hasn't been computed
+                    active_computation_results.pop(a_select_config_name, None) # remove the computation results from previous runs from the dictionary to indicate that it hasn't been computed
                 else:
-                    # no *additional* computations will be performed on it, but it will be pass through and not removed form the self.computation_results
+                    # no *additional* computations will be performed on it, but it will be pass through and not removed form the active_computation_results
                     pass
 
-    def rerun_failed_computations(self, enabled_filter_names=None, fail_on_exception:bool=False, debug_print=False):
-        """ retries the computation functions that previously failed and resulted in accumulated_errors in the previous_computation_result """
-        if enabled_filter_names is None:
-            enabled_filter_names = list(self.filtered_sessions.keys()) # all filters if specific enabled names aren't specified
-        for a_select_config_name, a_filtered_session in self.filtered_sessions.items():                
-            if a_select_config_name in enabled_filter_names:
-                print(f'Performing rerun_failed_computations on filtered_session with filter named "{a_select_config_name}"...')
-                previous_computation_result = self.computation_results[a_select_config_name]
-                self.computation_results[a_select_config_name] = self.rerun_failed_computations(previous_computation_result, fail_on_exception=fail_on_exception, debug_print=debug_print)    
-                
-    @classmethod    
-    def continue_computations_if_needed(cls, curr_active_pipeline, active_computation_params=None, enabled_filter_names=None, overwrite_extant_results=False, computation_functions_name_whitelist=None, computation_functions_name_blacklist=None, fail_on_exception:bool=False, debug_print=False):
-        """ continues computations for a pipeline 
-
-            NOTE: TODO: this is not yet implemented.
-            Calls perform_specific_context_registered_computations(...) to do the actual comptuations
-
-        
-            TODO: the rest of the system can't work until we have a way of associating the previously computed results with the functions that compute them. As it stands we don't know anything about whether a new function was registered after the computations were complete, etc.
-                DESIGN GOAL: don't make this too complicated.
-        
-        Usage:
-            continue_computations_if_needed(curr_active_pipeline, active_session_computation_configs[0], overwrite_extant_results=False, computation_functions_name_blacklist=['_perform_spike_burst_detection_computation'], debug_print=True)
-
-        """
-        ## First look for incomplete computation results (that have never been computed):
-        # curr_incomplete_status_dicts = curr_active_pipeline.active_incomplete_computation_result_status_dicts
-        complete_computed_config_names_list, incomplete_computed_config_dict = curr_active_pipeline.stage._get_computation_results_progress()
-
-        for an_incomplete_config_name, a_reason in incomplete_computed_config_dict.items():
-            a_filtered_session = curr_active_pipeline.filtered_sessions[an_incomplete_config_name] # get the filtered session
-            if active_computation_params is None:
-                active_computation_params = curr_active_pipeline.active_configs[an_incomplete_config_name].computation_config # get the previously set computation configs
+            # Re-apply changes when done:
+            print(f'updating computation_results...')
+            if are_global:
+                self.global_computation_results = active_computation_results
             else:
-                # set/update the computation configs:
-                curr_active_pipeline.active_configs[an_incomplete_config_name].computation_config = active_computation_params #TODO: if more than one computation config is passed in, the active_config should be duplicated for each computation config.
-            
-            if overwrite_extant_results or (curr_active_pipeline.computation_results.get(an_incomplete_config_name, None) is None):
-                curr_active_pipeline.computation_results[an_incomplete_config_name] = cls._build_initial_computationResult(a_filtered_session, active_computation_params) # returns a computation result. This stores the computation config used to compute it.
-            else:
-                # Otherwise it already exists and is not None, so don't overwrite it:
-                curr_active_pipeline.computation_results.setdefault(an_incomplete_config_name, cls._build_initial_computationResult(a_filtered_session, active_computation_params)) # returns a computation result. This stores the computation config used to compute it.
+                self.computation_results = active_computation_results
+            print(f'done.')
 
-            # call to perform any registered computations:
-            curr_active_pipeline.computation_results[an_incomplete_config_name] = curr_active_pipeline.perform_specific_context_registered_computations(curr_active_pipeline.computation_results[an_incomplete_config_name], computation_functions_name_whitelist=computation_functions_name_whitelist, computation_functions_name_blacklist=computation_functions_name_blacklist, fail_on_exception=fail_on_exception, debug_print=debug_print)
-
-        ## TODO: initially compute incomplete_computed_config_dict items...
-
-        ## Next look for previously failed computation results:
-
-        ## Next look for previously complete computation results that lack computations for functions explicitly specified in the whitelist (if provided):
-
-        ## Then look for previously complete computation results that are missing computations that have been registered after they were computed, or that were previously part of the blacklist but now are not:
 
     
     # ==================================================================================================================== #
@@ -354,6 +378,50 @@ class ComputedPipelineStage(LoadableInput, LoadableSessionInput, FilterablePipel
             if debug_print:
                 print(f'No registered_computation_functions, skipping extended computations.')
             return previous_computation_result # just return the unaltered result
+                
+    @classmethod    
+    def continue_computations_if_needed(cls, curr_active_pipeline, active_computation_params=None, enabled_filter_names=None, overwrite_extant_results=False, computation_functions_name_whitelist=None, computation_functions_name_blacklist=None, fail_on_exception:bool=False, debug_print=False):
+        """ continues computations for a pipeline 
+
+            NOTE: TODO: this is not yet implemented.
+            Calls perform_specific_context_registered_computations(...) to do the actual comptuations
+
+        
+            TODO: the rest of the system can't work until we have a way of associating the previously computed results with the functions that compute them. As it stands we don't know anything about whether a new function was registered after the computations were complete, etc.
+                DESIGN GOAL: don't make this too complicated.
+        
+        Usage:
+            continue_computations_if_needed(curr_active_pipeline, active_session_computation_configs[0], overwrite_extant_results=False, computation_functions_name_blacklist=['_perform_spike_burst_detection_computation'], debug_print=True)
+
+        """
+        ## First look for incomplete computation results (that have never been computed):
+        # curr_incomplete_status_dicts = curr_active_pipeline.active_incomplete_computation_result_status_dicts
+        complete_computed_config_names_list, incomplete_computed_config_dict = curr_active_pipeline.stage._get_computation_results_progress()
+
+        for an_incomplete_config_name, a_reason in incomplete_computed_config_dict.items():
+            a_filtered_session = curr_active_pipeline.filtered_sessions[an_incomplete_config_name] # get the filtered session
+            if active_computation_params is None:
+                active_computation_params = curr_active_pipeline.active_configs[an_incomplete_config_name].computation_config # get the previously set computation configs
+            else:
+                # set/update the computation configs:
+                curr_active_pipeline.active_configs[an_incomplete_config_name].computation_config = active_computation_params #TODO: if more than one computation config is passed in, the active_config should be duplicated for each computation config.
+            
+            if overwrite_extant_results or (curr_active_pipeline.computation_results.get(an_incomplete_config_name, None) is None):
+                curr_active_pipeline.computation_results[an_incomplete_config_name] = cls._build_initial_computationResult(a_filtered_session, active_computation_params) # returns a computation result. This stores the computation config used to compute it.
+            else:
+                # Otherwise it already exists and is not None, so don't overwrite it:
+                curr_active_pipeline.computation_results.setdefault(an_incomplete_config_name, cls._build_initial_computationResult(a_filtered_session, active_computation_params)) # returns a computation result. This stores the computation config used to compute it.
+
+            # call to perform any registered computations:
+            curr_active_pipeline.computation_results[an_incomplete_config_name] = curr_active_pipeline.perform_specific_context_registered_computations(curr_active_pipeline.computation_results[an_incomplete_config_name], computation_functions_name_whitelist=computation_functions_name_whitelist, computation_functions_name_blacklist=computation_functions_name_blacklist, fail_on_exception=fail_on_exception, debug_print=debug_print)
+
+        ## TODO: initially compute incomplete_computed_config_dict items...
+
+        ## Next look for previously failed computation results:
+
+        ## Next look for previously complete computation results that lack computations for functions explicitly specified in the whitelist (if provided):
+
+        ## Then look for previously complete computation results that are missing computations that have been registered after they were computed, or that were previously part of the blacklist but now are not:
 
 # ==================================================================================================================== #
 # PIPELINE MIXIN                                                                                                       #
@@ -463,6 +531,10 @@ class PipelineWithComputedPipelineStageMixin:
     def perform_computations(self, active_computation_params: Optional[DynamicParameters]=None, enabled_filter_names=None, overwrite_extant_results=False, computation_functions_name_whitelist=None, computation_functions_name_blacklist=None, fail_on_exception:bool=False, debug_print=False):
         """The main computation function for the pipeline.
 
+        Internally updates the
+            .computation_results
+
+
         Args:
             active_computation_params (Optional[DynamicParameters], optional): _description_. Defaults to None.
             enabled_filter_names (_type_, optional): _description_. Defaults to None.
@@ -475,22 +547,25 @@ class PipelineWithComputedPipelineStageMixin:
         assert (self.can_compute), "Current self.stage must already be a ComputedPipelineStage. Call self.filter_sessions with filter configs to reach this step."
         progress_logger_callback=(lambda x: self.logger.info(x))
 
-
-        self.stage.evaluate_computations_for_single_params(active_computation_params, enabled_filter_names=enabled_filter_names, overwrite_extant_results=overwrite_extant_results,
+        self.stage.perform_action_for_all_contexts(EvaluationActions.EVALUATE_COMPUTATIONS, enabled_filter_names=enabled_filter_names, active_computation_params=active_computation_params, overwrite_extant_results=overwrite_extant_results,
             computation_functions_name_whitelist=computation_functions_name_whitelist, computation_functions_name_blacklist=computation_functions_name_blacklist, fail_on_exception=fail_on_exception, progress_logger_callback=progress_logger_callback, debug_print=debug_print)
+        # self.stage.evaluate_computations_for_single_params(active_computation_params, enabled_filter_names=enabled_filter_names, overwrite_extant_results=overwrite_extant_results,
+        #     computation_functions_name_whitelist=computation_functions_name_whitelist, computation_functions_name_blacklist=computation_functions_name_blacklist, fail_on_exception=fail_on_exception, progress_logger_callback=progress_logger_callback, debug_print=debug_print)
 
         # Global MultiContext computations will be done here:
         if progress_logger_callback is not None:
             progress_logger_callback(f'Performing global computations...')
 
-        self.stage.evaluate_computations_for_single_params(active_computation_params, enabled_filter_names=enabled_filter_names, overwrite_extant_results=overwrite_extant_results,
-            computation_functions_name_whitelist=computation_functions_name_whitelist, computation_functions_name_blacklist=computation_functions_name_blacklist, fail_on_exception=fail_on_exception, progress_logger_callback=(lambda x: self.logger.info(x)), debug_print=debug_print)
-
-
+        ## TODO: BUG: WHY IS THIS CALLED TWICE? Was this supposed to be the global implementation or something?
+        # self.stage.perform_action_for_all_contexts(EvaluationActions.EVALUATE_COMPUTATIONS, enabled_filter_names=enabled_filter_names, active_computation_params=active_computation_params, overwrite_extant_results=overwrite_extant_results,
+        #     computation_functions_name_whitelist=computation_functions_name_whitelist, computation_functions_name_blacklist=computation_functions_name_blacklist, fail_on_exception=fail_on_exception, progress_logger_callback=(lambda x: self.logger.info(x)), debug_print=debug_print)
+        # self.stage.evaluate_computations_for_single_params(active_computation_params, enabled_filter_names=enabled_filter_names, overwrite_extant_results=overwrite_extant_results,
+            # computation_functions_name_whitelist=computation_functions_name_whitelist, computation_functions_name_blacklist=computation_functions_name_blacklist, fail_on_exception=fail_on_exception, progress_logger_callback=(lambda x: self.logger.info(x)), debug_print=debug_print)
 
 
     def rerun_failed_computations(self, previous_computation_result, fail_on_exception:bool=False, debug_print=False):
         """ retries the computation functions that previously failed and resulted in accumulated_errors in the previous_computation_result """
+        # return self.stage.perform_action_for_all_contexts(EvaluationActions.EVALUATE_COMPUTATIONS, ... # TODO: refactor to use new layout
         return self.stage.rerun_failed_computations(previous_computation_result, fail_on_exception=fail_on_exception, debug_print=debug_print)
     
     
