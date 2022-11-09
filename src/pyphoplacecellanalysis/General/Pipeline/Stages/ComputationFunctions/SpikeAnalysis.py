@@ -155,6 +155,8 @@ class SpikeAnalysisComputations(AllFunctionEnumeratingMixin, metaclass=Computati
                     ['firing_rate_trends']['all_session_spikes']['mean_spike_rates']
                     ['firing_rate_trends']['all_session_spikes']['median_spike_rates']
                     ['firing_rate_trends']['all_session_spikes']['max_spike_rates']
+                    ['firing_rate_trends']['all_session_spikes']['instantaneous_unit_specific_spike_rate']
+                    ['firing_rate_trends']['all_session_spikes']['instantaneous_unit_specific_spike_rate_values_df']
                     
                 ['firing_rate_trends']['pf_included_spikes_only']:
                     ['firing_rate_trends']['pf_included_spikes_only']['time_binning_container']
@@ -207,9 +209,8 @@ class SpikeAnalysisComputations(AllFunctionEnumeratingMixin, metaclass=Computati
             
         # Instantaneous versions:
         sess_unit_specific_inst_spike_rate_values_df, sess_unit_specific_inst_spike_rate, sess_unit_split_spiketrains = _instantaneous_time_firing_rates(active_session_spikes_df, time_bin_size_seconds=time_bin_size_seconds, t_start=computation_result.sess.t_start, t_stop=computation_result.sess.t_stop)
-        print(f'sess_unit_specific_inst_spike_rate: {sess_unit_specific_inst_spike_rate}')
-
-
+        if debug_print:
+            print(f'sess_unit_specific_inst_spike_rate: {sess_unit_specific_inst_spike_rate}')
 
         # Compute for only the placefield included spikes as well:
         active_pf_2D = computation_result.computed_data['pf2D']

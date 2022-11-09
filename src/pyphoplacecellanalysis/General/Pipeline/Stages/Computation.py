@@ -243,7 +243,8 @@ class ComputedPipelineStage(LoadableInput, LoadableSessionInput, FilterablePipel
         ## Here's where we loop through all possible configs:
         for a_select_config_name, a_filtered_session in self.filtered_sessions.items():                
             if a_select_config_name in enabled_filter_names:
-                print(f'Performing perform_action_for_all_contexts with action {action} on filtered_session with filter named "{a_select_config_name}"...')
+                if debug_print:
+                    print(f'Performing perform_action_for_all_contexts with action {action} on filtered_session with filter named "{a_select_config_name}"...')
                 if progress_logger_callback is not None:
                     progress_logger_callback(f'Performing perform_action_for_all_contexts with action {action} on filtered_session with filter named "{a_select_config_name}"...')
                 
