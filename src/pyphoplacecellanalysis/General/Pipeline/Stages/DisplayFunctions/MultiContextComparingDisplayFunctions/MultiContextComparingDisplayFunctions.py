@@ -95,6 +95,10 @@ class MultiContextComparingDisplayFunctions(AllFunctionEnumeratingMixin, metacla
             rdf, aclu_to_idx, irdf, aclu_to_idx_irdf = _final_compute_jonathan_replay_fr_analyses(sess, sess.replay)
             pos_df = sess.position.to_dataframe()
 
+            # ==================================================================================================================== #
+            ## Calculating:
+            final_jonathan_df = _subfn_computations_make_jonathan_interactive_plot(time_binned_unit_specific_binned_spike_rate, pf1d_short, pf1d_long, aclu_to_idx, rdf, irdf)
+
             ## TODO: This is the proper way once global computations work:
             # aclu_to_idx = computation_result.computed_data['jonathan_firing_rate_analysis']['rdf']['aclu_to_idx']
             # rdf = computation_result.computed_data['jonathan_firing_rate_analysis']['rdf']['rdf'],
@@ -102,7 +106,7 @@ class MultiContextComparingDisplayFunctions(AllFunctionEnumeratingMixin, metacla
             # pos_df = computation_result.sess.position.to_dataframe()
             # compare_firing_rates(rdf, irdf)
 
-            graphics_output_dict, neuron_df = _make_jonathan_interactive_plot(sess, time_bins, time_binned_unit_specific_binned_spike_rate, pf1d_short, pf1d_long, pos_df, aclu_to_idx, rdf, irdf, show_inter_replay_frs=False)
+            graphics_output_dict, neuron_df = _make_jonathan_interactive_plot(sess, time_bins, final_jonathan_df, time_binned_unit_specific_binned_spike_rate, pos_df, aclu_to_idx, rdf, irdf, show_inter_replay_frs=False)
             # output_dict = {'fig': fig, 'axs': ax, 'colors': colors}
             graphics_output_dict['plot_data'] = {'df': neuron_df, 'rdf':rdf, 'aclu_to_idx':aclu_to_idx, 'irdf':irdf}
             
@@ -362,11 +366,7 @@ def _subfn_computations_make_jonathan_interactive_plot(unit_specific_time_binned
 
 
 
-def _make_jonathan_interactive_plot(sess, time_bins, unit_specific_time_binned_firing_rates, pf1d_short, pf1d_long, pos_df, aclu_to_idx, rdf, irdf, show_inter_replay_frs=False):
-
-    # ==================================================================================================================== #
-    ## Calculating:
-    df = _subfn_computations_make_jonathan_interactive_plot(unit_specific_time_binned_firing_rates, pf1d_short, pf1d_long, aclu_to_idx, rdf, irdf)
+def _make_jonathan_interactive_plot(sess, time_bins, final_jonathan_df, unit_specific_time_binned_firing_rates, pos_df, aclu_to_idx, rdf, irdf, show_inter_replay_frs=False):
 
     # ==================================================================================================================== #
     ## Plotting/Graphics:
@@ -385,10 +385,10 @@ def _make_jonathan_interactive_plot(sess, time_bins, unit_specific_time_binned_f
 
     # this fills in the nan's in the single-track cells so that they get plotted at the edges
     # plotting everything in one go makes resizing points later simpler
-    df.long.fillna(xlim[0] + 1, inplace=True) # xlim[0] + 1 is the extreme edge of the plot
-    df.short.fillna(ylim[0] + 1, inplace=True)
+    final_jonathan_df.long.fillna(xlim[0] + 1, inplace=True) # xlim[0] + 1 is the extreme edge of the plot
+    final_jonathan_df.short.fillna(ylim[0] + 1, inplace=True)
 
-    remap_scatter = ax[0,0].scatter(df.long, df.short, s=7, picker=True, c=[colors[c] for c in df["has_na"]]);
+    remap_scatter = ax[0,0].scatter(final_jonathan_df.long, final_jonathan_df.short, s=7, picker=True, c=[colors[c] for c in final_jonathan_df["has_na"]]);
     ax[0,0].set_ylim(ylim);
     ax[0,0].set_xlim(xlim);
     ax[0,0].xaxis.set_tick_params(labelbottom=False)
@@ -404,7 +404,7 @@ def _make_jonathan_interactive_plot(sess, time_bins, unit_specific_time_binned_f
 
 
     # plotting for ax[1,0]: ______________________________________________________________________________________________ #
-    diff_scatter = ax[1,0].scatter(df.non_replay_diff, df.replay_diff, s=7, picker=True);
+    diff_scatter = ax[1,0].scatter(final_jonathan_df.non_replay_diff, final_jonathan_df.replay_diff, s=7, picker=True);
     # ax[1,0].set_xlabel("Firing rate along long track")
     # ax[1,0].set_ylabel("Firing rate along short track")
     ax[1,0].set_title("Firing rate on short vs. long track")
@@ -424,14 +424,14 @@ def _make_jonathan_interactive_plot(sess, time_bins, unit_specific_time_binned_f
         'This gets called when the selected neuron changes; it updates the graphs'
         
         index = new_index
-        aclu = int(df.index[index])
+        aclu = int(final_jonathan_df.index[index])
         print(f"selected neuron has index: {index} aclu: {aclu}")
         
         # this changes the size of the neuron in ax[0,0]
-        remap_scatter.set_sizes([7 if i!= index else 30 for i in range(len(df))])
+        remap_scatter.set_sizes([7 if i!= index else 30 for i in range(len(final_jonathan_df))])
 
         # this changes the size of the neuron in ax[1,0]
-        diff_scatter.set_sizes([7 if i!= index else 30 for i in range(len(df))])
+        diff_scatter.set_sizes([7 if i!= index else 30 for i in range(len(final_jonathan_df))])
 
         # this redraws ax
         ax[0,1].clear()
@@ -489,10 +489,10 @@ def _make_jonathan_interactive_plot(sess, time_bins, unit_specific_time_binned_f
         global g_index
         if event.key=='tab':
             g_index += 1
-            g_index %= len(df)
+            g_index %= len(final_jonathan_df)
         elif event.key=='b':
             g_index -= 1
-            g_index %= len(df)
+            g_index %= len(final_jonathan_df)
         on_index_change(g_index)
 
 
@@ -506,6 +506,6 @@ def _make_jonathan_interactive_plot(sess, time_bins, unit_specific_time_binned_f
 
     fig.canvas.mpl_connect('pick_event', on_pick)
     fig.canvas.mpl_connect('key_press_event', on_keypress)
-    return graphics_output_dict, df
+    return graphics_output_dict, final_jonathan_df
 
 
