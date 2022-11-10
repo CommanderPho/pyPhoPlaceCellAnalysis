@@ -220,7 +220,7 @@ def plot_1D_placecell_validation(active_epoch_placefields1D, placefield_cell_ind
                                                                                      jitter_multiplier=jitter_multiplier, feature_range=feature_range, time_independent_jitter=False)
     if should_plot_spike_indicator_lines_on_trajectory:
         # plot the orange lines that span across the position plot to the right
-        axs0.hlines(y=curr_cell_interpolated_spike_positions, xmin=curr_cell_spike_times, xmax=curr_cell_spike_times[-1],
+        axs0.hlines(y=curr_cell_interpolated_spike_positions, xmin=curr_cell_spike_times, xmax=t_end,
                     linestyles='solid', color='orange', alpha=spike_indicator_lines_alpha, linewidth=spike_indcator_lines_linewidth) # plot the lines that underlie the spike points
     axs0.set_xlim((t_start, t_end)) # We don't want to clip to only the spiketimes for this cell, we want it for all cells, or even when the recording started/ended    
 
