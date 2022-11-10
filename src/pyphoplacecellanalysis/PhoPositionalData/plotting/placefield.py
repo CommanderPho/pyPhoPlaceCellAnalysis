@@ -147,7 +147,7 @@ def plot_1d_placecell_validations(active_placefields1D, plotting_config, should_
 
 
 # 2d Placefield comparison figure:
-def plot_1D_placecell_validation(active_epoch_placefields1D, placefield_cell_index, extant_fig=None, **kwargs):
+def plot_1D_placecell_validation(active_epoch_placefields1D, placefield_cell_index, extant_fig=None, extant_axes=None, **kwargs):
     """ A single cell method of analyzing 1D placefields and the spikes that create them 
     
     placefield_cell_index: an flat index into active_epoch_placefields1D.cell_ids. Must be between 0 and len(active_epoch_placefields1D.cell_ids). NOT the cell's original ID!
@@ -171,34 +171,46 @@ def plot_1D_placecell_validation(active_epoch_placefields1D, placefield_cell_ind
     spike_indcator_lines_linewidth = kwargs.get('spike_indcator_lines_linewidth', 0.3)
     should_plot_bins_grid = kwargs.get('should_plot_bins_grid', False)
 
+    should_include_labels = kwargs.get('should_include_labels', True) # whether the plot should include text labels, like the title, axes labels, etc
+
     if extant_fig is not None:
         fig = extant_fig # use the existing passed figure
-        fig.set_size_inches([23, 9.7])
+        # fig.set_size_inches([23, 9.7])
     else:
         fig = plt.figure(figsize=(23, 9.7))
-    
-    # Layout Subplots in Figure:
-    gs = fig.add_gridspec(1, 8)
-    gs.update(wspace=0, hspace=0.05) # set the spacing between axes.
-    axs0 = fig.add_subplot(gs[0, :-1])
-    axs1 = fig.add_subplot(gs[0, -1], sharey=axs0)
-    axs1.set_title('Normalized Placefield', fontsize='14')
-    axs1.set_xticklabels([])
-    axs1.set_yticklabels([])
+
+    if extant_axes is not None:
+        # user-supplied extant axes [axs0, axs1]
+        assert len(extant_axes) == 2
+        axs0, axs1 = extant_axes
+    else:
+        # Need axes:
+        # Layout Subplots in Figure:
+        gs = fig.add_gridspec(1, 8)
+        gs.update(wspace=0, hspace=0.05) # set the spacing between axes.
+        axs0 = fig.add_subplot(gs[0, :-1])
+        axs1 = fig.add_subplot(gs[0, -1], sharey=axs0)
+        if should_include_labels:
+            axs1.set_title('Normalized Placefield', fontsize='14')
+        axs1.set_xticklabels([])
+        axs1.set_yticklabels([])
 
     ## The main position vs. spike curve:
     # spike_marker = 'tri_left' # '3'
     # spike_marker = "TICKLEFT" # 'tickleft'
     # spike_marker = "." # original
-    spike_marker = "_" # 'hline' "CARETRIGHTBASE" 'caretrightbase'
-    spike_plot_kwargs = {'linestyle':'none', 'markersize':6.0, 'marker': spike_marker, 'markerfacecolor':'#55aaffcc', 'markeredgecolor':'#55aaffcc'}
-    active_epoch_placefields1D.plotRaw_v_time(placefield_cell_index, ax=axs0, spikes_color=spikes_color, spikes_alpha=spikes_alpha, position_plot_kwargs={'color': '#393939c8', 'linewidth': 1.0}, spike_plot_kwargs=spike_plot_kwargs)
+    spike_marker = "_" # 'hline' "CARETRIGHTBASE" 'caretrightbase' 9
+    # spike_plot_kwargs = {'linestyle':'none', 'markersize':6.0, 'marker': "_", 'markerfacecolor':'#55aaffcc', 'markeredgecolor':'#55aaffcc'}
+    # spike_plot_kwargs = {'linestyle':'none', 'markersize':2.0, 'marker': 9, 'markerfacecolor':'#1420ffcc', 'markeredgecolor':'#1420ffcc'}
+    spike_plot_kwargs = {'linestyle':'none', 'markersize':5.0, 'marker': '.', 'markerfacecolor':'#1420ffcc', 'markeredgecolor':'#1420ffcc'}
+    active_epoch_placefields1D.plotRaw_v_time(placefield_cell_index, ax=axs0, spikes_color=spikes_color, spikes_alpha=spikes_alpha, position_plot_kwargs={'color': '#393939c8', 'linewidth': 1.0}, spike_plot_kwargs=spike_plot_kwargs, should_include_labels=should_include_labels)
     
     # Title and Subtitle:
     title_string = ' '.join(['pf1D', f'Cell {curr_cell_id:02d}'])
     subtitle_string = ' '.join([f'{active_epoch_placefields1D.config.str_for_display(False)}'])
-    fig.suptitle(title_string, fontsize='22')
-    axs0.set_title(subtitle_string, fontsize='16')
+    if should_include_labels:
+        fig.suptitle(title_string, fontsize='22')
+        axs0.set_title(subtitle_string, fontsize='16')
     
     # axs0.yaxis.grid(True, color = 'green', linestyle = '--', linewidth = 0.5)
     if should_plot_bins_grid:
