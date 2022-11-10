@@ -269,7 +269,7 @@ def _context_nested_docks(curr_active_pipeline, active_config_names, enable_gui=
 # %matplotlib qt
 
 
-def _temp_draw_jonathan_ax(sess, time_bins, unit_specific_time_binned_firing_rates, aclu_to_idx, rdf, irdf, show_inter_replay_frs=False, colors=None, fig=None, ax=None, active_aclu:int=0, should_render=False):
+def _temp_draw_jonathan_ax(sess, time_bins, unit_specific_time_binned_firing_rates, aclu_to_idx, rdf, irdf, show_inter_replay_frs=False, colors=None, fig=None, ax=None, active_aclu:int=0, include_horizontal_labels=True, include_vertical_labels=True, should_render=False):
     """ 
 
     Usage:
@@ -291,8 +291,7 @@ def _temp_draw_jonathan_ax(sess, time_bins, unit_specific_time_binned_firing_rat
     # this redraws ax
     ax.clear()
 
-    # Draw the vertical epoch splitter line:
-    ax.vlines(sess.paradigm[0][0,1], ymin = 0, ymax=60, color=(0,0,0,.25))
+    
 
     centers = (rdf["start"] + rdf["end"])/2
     heights = make_fr(rdf)[:, aclu_to_idx[active_aclu]]
@@ -304,9 +303,12 @@ def _temp_draw_jonathan_ax(sess, time_bins, unit_specific_time_binned_firing_rat
         heights = make_fr(irdf)[:, aclu_to_idx[active_aclu]]
         ax.plot(centers, heights, '.', color=colors[1]+"80")
 
-    ax.set_title(f"Replay firing rates for neuron {active_aclu}")
-    ax.set_xlabel("Time of replay (s)")
-    ax.set_ylabel("Firing Rate (Hz)")
+    if include_horizontal_labels:
+        ax.set_title(f"Replay firing rates for neuron {active_aclu}")
+        ax.set_xlabel("Time of replay (s)")
+
+    if include_vertical_labels:
+        ax.set_ylabel("Firing Rate (Hz)")
 
     # Pho's firing rate additions:
     try:
@@ -314,11 +316,15 @@ def _temp_draw_jonathan_ax(sess, time_bins, unit_specific_time_binned_firing_rat
         v = unit_specific_time_binned_firing_rates[active_aclu].to_numpy() # index directly by ACLU
         if v is not None:
             # Plot the continuous firing rates
-            ax.plot(t, v)
+            ax.plot(t, v, color='#aaaaff8c') # this color is a translucent lilac (purple) color)
     except KeyError:
         print(f'non-placefield neuron. Skipping.')
         t, v = None, None
         pass
+
+    required_epoch_bar_height = ax.get_ylim()[-1]
+    # Draw the vertical epoch splitter line:
+    ax.vlines(sess.paradigm[0][0,1], ymin = 0, ymax=required_epoch_bar_height, color=(0,0,0,.25))
 
     if should_render:
         if fig is None:
@@ -436,42 +442,8 @@ def _make_jonathan_interactive_plot(sess, time_bins, final_jonathan_df, unit_spe
         diff_scatter.set_sizes([7 if i!= index else 30 for i in range(len(final_jonathan_df))])
 
         ## New ax[0,1] draw method:
-        _temp_draw_jonathan_ax(sess, time_bins, unit_specific_time_binned_firing_rates, aclu_to_idx, rdf, irdf, show_inter_replay_frs=show_inter_replay_frs, colors=colors, fig=fig, ax=ax[0,1], active_aclu=aclu)
-
-        # # this redraws ax
-        # ax[0,1].clear()
-
-        # ax[0,1].vlines(sess.paradigm[0][0,1], ymin = 0, ymax=60, color=(0,0,0,.25))
-
-        # centers = (rdf["start"] + rdf["end"])/2
-        # heights = make_fr(rdf)[:, aclu_to_idx[aclu]]
-        # ax[0,1].plot(centers, heights, '.')
-
-        # if show_inter_replay_frs:
-        #     # this would show the inter-replay firing times in orange
-        #     # it's frankly distracting
-        #     centers = (irdf["start"] + irdf["end"])/2
-        #     heights = make_fr(irdf)[:, aclu_to_idx[aclu]]
-        #     ax[0,1].plot(centers, heights, '.', color=colors[1]+ "80")
-
-        # ax[0,1].set_title(f"Replay firing rates for neuron {aclu}")
-        # ax[0,1].set_xlabel("Time of replay (s)")
-        # ax[0,1].set_ylabel("Firing Rate (Hz)")
-        # # Pho's firing rate additions:
-        # try:
-        #     t = time_bins
-        #     v = unit_specific_time_binned_firing_rates[aclu].to_numpy() # index directly by ACLU
-
-        # except KeyError:
-        #     print(f'non-placefield neuron. Skipping.')
-        #     t, v = None, None
-        #     pass
-
-        # if v is not None:
-        #     # Plot the continuous firing rates
-        #     ax[0,1].plot(t, v, color='#aaaaff8c') # this color is a translucent lilac (purple) color
-
-
+        _temp_draw_jonathan_ax(sess, time_bins, unit_specific_time_binned_firing_rates, aclu_to_idx, rdf, irdf, show_inter_replay_frs=show_inter_replay_frs, colors=colors, fig=fig, ax=ax[0,1], active_aclu=aclu, should_render=True)
+        
 
         # this plots where the neuron spiked on the track
         ax[1,1].clear()
