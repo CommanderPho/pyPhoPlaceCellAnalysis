@@ -16,8 +16,11 @@ from pyphoplacecellanalysis.Pho2D.PyQtPlots.plot_placefields import pyqtplot_plo
 
 from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.MultiContextComputationFunctions import take_difference, take_difference_nonzero, make_fr
 
+from pyphoplacecellanalysis.PhoPositionalData.plotting.placefield import plot_1D_placecell_validation # for _make_pho_jonathan_batch_plots
+
 # BAD DOn'T DO THIS:
 from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.MultiContextComputationFunctions import _final_compute_jonathan_replay_fr_analyses
+
 
 class MultiContextComparingDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=DisplayFunctionRegistryHolder):
     """ MultiContextComparingDisplayFunctions
@@ -62,9 +65,15 @@ class MultiContextComparingDisplayFunctions(AllFunctionEnumeratingMixin, metacla
             if include_whitelist is None:
                 include_whitelist = owning_pipeline_reference.active_completed_computation_result_names # ['maze', 'sprinkle']
 
-            # ['maze1_PYR', 'maze2_PYR']
-            pf1d_long = computation_results['maze1_PYR']['computed_data']['pf1D']
-            pf1d_short = computation_results['maze2_PYR']['computed_data']['pf1D']
+            long_epoch_name = include_whitelist[0] # 'maze1_PYR'
+            short_epoch_name = include_whitelist[1] # 'maze2_PYR'
+            if len(include_whitelist) > 2:
+                global_epoch_name = include_whitelist[-1] # 'maze_PYR'
+
+            print(f'include_whitelist: {include_whitelist}\nlong_epoch_name: {long_epoch_name}, short_epoch_name: {short_epoch_name}, global_epoch_name: {global_epoch_name}')
+            pf1d_long = computation_results[long_epoch_name]['computed_data']['pf1D']
+            pf1d_short = computation_results[short_epoch_name]['computed_data']['pf1D']
+            pf1d = computation_results[global_epoch_name]['computed_data']['pf1D']
 
             try:
                 # pf2D_Decoder = computation_results['maze_PYR']['computed_data']['pf2D_Decoder']
@@ -109,6 +118,71 @@ class MultiContextComparingDisplayFunctions(AllFunctionEnumeratingMixin, metacla
             graphics_output_dict, neuron_df = _make_jonathan_interactive_plot(sess, time_bins, final_jonathan_df, time_binned_unit_specific_binned_spike_rate, pos_df, aclu_to_idx, rdf, irdf, show_inter_replay_frs=False)
             # output_dict = {'fig': fig, 'axs': ax, 'colors': colors}
             graphics_output_dict['plot_data'] = {'df': neuron_df, 'rdf':rdf, 'aclu_to_idx':aclu_to_idx, 'irdf':irdf}
+            
+            return graphics_output_dict
+
+    def _display_batch_pho_jonathan_replay_firing_rate_comparison(owning_pipeline_reference, computation_results, active_configs, include_whitelist=None, **kwargs):
+            """ Stacked Jonathan-style firing-rate-across-epochs-plot. Pho's batch adaptation of the primary elements from Jonathan's interactive display. Currently hacked up to directly compute the results to display within this function
+                Usage:
+                
+
+            """
+            if include_whitelist is None:
+                include_whitelist = owning_pipeline_reference.active_completed_computation_result_names # ['maze', 'sprinkle']
+
+            long_epoch_name = include_whitelist[0] # 'maze1_PYR'
+            short_epoch_name = include_whitelist[1] # 'maze2_PYR'
+            assert len(include_whitelist) > 2
+            global_epoch_name = include_whitelist[-1] # 'maze_PYR'
+            print(f'include_whitelist: {include_whitelist}\nlong_epoch_name: {long_epoch_name}, short_epoch_name: {short_epoch_name}, global_epoch_name: {global_epoch_name}')
+            pf1d_long = computation_results[long_epoch_name]['computed_data']['pf1D']
+            pf1d_short = computation_results[short_epoch_name]['computed_data']['pf1D']
+            pf1D_all = computation_results[global_epoch_name]['computed_data']['pf1D']
+
+            try:
+                # pf2D_Decoder = computation_results['maze_PYR']['computed_data']['pf2D_Decoder']
+                active_firing_rate_trends = computation_results['maze_PYR']['computed_data']['firing_rate_trends']
+
+                ## time_binned_unit_specific_binned_spike_rate mode:
+                # time_bins = active_firing_rate_trends.all_session_spikes.time_binning_container.centers
+                # time_binned_unit_specific_binned_spike_rate = active_firing_rate_trends.all_session_spikes.time_binned_unit_specific_binned_spike_rate
+
+                ## instantaneous_unit_specific_spike_rate mode:
+                neuron_IDs = np.unique(computation_results['maze_PYR'].sess.spikes_df.aclu)
+                # neuron_IDXs = np.arange(len(neuron_IDs))
+                instantaneous_unit_specific_spike_rate = active_firing_rate_trends.all_session_spikes.instantaneous_unit_specific_spike_rate
+                # instantaneous_unit_specific_spike_rate = computation_results['maze_PYR']['computed_data']['firing_rate_trends'].all_session_spikes.instantaneous_unit_specific_spike_rate
+                instantaneous_unit_specific_spike_rate_values = pd.DataFrame(instantaneous_unit_specific_spike_rate.magnitude, columns=neuron_IDs) # builds a df with times along the rows and aclu values along the columns in the style of unit_specific_binned_spike_counts
+                time_bins = instantaneous_unit_specific_spike_rate.times.magnitude # .shape (3429,)
+                time_binned_unit_specific_binned_spike_rate = instantaneous_unit_specific_spike_rate_values # .shape (3429, 71)
+
+            except KeyError:
+                # except ValueError:
+                # print(f'non-placefield neuron. Skipping.')
+                time_bins, time_binned_unit_specific_binned_spike_rate = {}, {}
+
+
+            # ## Compute for all the session spikes first:
+            sess = owning_pipeline_reference.sess
+            # BAD DOn'T DO THIS:
+            rdf, aclu_to_idx, irdf, aclu_to_idx_irdf = _final_compute_jonathan_replay_fr_analyses(sess, sess.replay)
+            pos_df = sess.position.to_dataframe()
+
+            # ==================================================================================================================== #
+            ## Calculating:
+            final_jonathan_df = _subfn_computations_make_jonathan_interactive_plot(time_binned_unit_specific_binned_spike_rate, pf1d_short, pf1d_long, aclu_to_idx, rdf, irdf)
+
+            ## TODO: This is the proper way once global computations work:
+            # aclu_to_idx = computation_result.computed_data['jonathan_firing_rate_analysis']['rdf']['aclu_to_idx']
+            # rdf = computation_result.computed_data['jonathan_firing_rate_analysis']['rdf']['rdf'],
+            # irdf = computation_result.computed_data['jonathan_firing_rate_analysis']['irdf']['irdf']
+            # pos_df = computation_result.sess.position.to_dataframe()
+            # compare_firing_rates(rdf, irdf)
+
+            graphics_output_dict = _make_pho_jonathan_batch_plots(sess, time_bins, final_jonathan_df, time_binned_unit_specific_binned_spike_rate, pf1D_all, aclu_to_idx, rdf, irdf, show_inter_replay_frs=False, n_max_plot_rows=6)
+
+            # output_dict = {'fig': fig, 'axs': ax, 'colors': colors}
+            graphics_output_dict['plot_data'] = {'df': final_jonathan_df, 'rdf':rdf, 'aclu_to_idx':aclu_to_idx, 'irdf':irdf}
             
             return graphics_output_dict
 
@@ -291,8 +365,6 @@ def _temp_draw_jonathan_ax(sess, time_bins, unit_specific_time_binned_firing_rat
     # this redraws ax
     ax.clear()
 
-    
-
     centers = (rdf["start"] + rdf["end"])/2
     heights = make_fr(rdf)[:, aclu_to_idx[active_aclu]]
     ax.plot(centers, heights, '.')
@@ -332,14 +404,24 @@ def _temp_draw_jonathan_ax(sess, time_bins, unit_specific_time_binned_firing_rat
 
         fig.canvas.draw()
 
+def _temp_draw_jonathan_spikes_on_track(ax, pos_df, single_neuron_spikes):
+    """ this plots where the neuron spiked on the track
 
-
-
-
-
-
+    Usage:
+        single_neuron_spikes = sess.spikes_df[sess.spikes_df.aclu == aclu]
+        _temp_draw_jonathan_spikes_on_track(ax[1,1], pos_df, single_neuron_spikes)
+    """
+    ax.clear()
+    ax.plot(pos_df.t, pos_df.x, color=[.75, .75, .75])
+    
+    ax.plot(single_neuron_spikes.t_rel_seconds, single_neuron_spikes.x, 'k.', ms=1)
+    ax.set_xlabel("t (s)")
+    ax.set_ylabel("Position")
+    ax.set_title("Animal position on track")
 
 def _subfn_computations_make_jonathan_interactive_plot(unit_specific_time_binned_firing_rates, pf1d_short, pf1d_long, aclu_to_idx, rdf, irdf):
+    """ the computations that were factored out of _make_jonathan_interactive_plot(...) 
+    """
     # ==================================================================================================================== #
     ## Calculating:
 
@@ -371,8 +453,6 @@ def _subfn_computations_make_jonathan_interactive_plot(unit_specific_time_binned
     df["replay_diff"] = [replay_diff[aclu_to_idx[aclu]] for aclu in df.index]
 
     return df
-
-
 
 def _make_jonathan_interactive_plot(sess, time_bins, final_jonathan_df, unit_specific_time_binned_firing_rates, pos_df, aclu_to_idx, rdf, irdf, show_inter_replay_frs=False):
 
@@ -410,7 +490,6 @@ def _make_jonathan_interactive_plot(sess, time_bins, final_jonathan_df, unit_spe
 
     graphics_output_dict['remap_scatter'] = remap_scatter
 
-
     # plotting for ax[1,0]: ______________________________________________________________________________________________ #
     diff_scatter = ax[1,0].scatter(final_jonathan_df.non_replay_diff, final_jonathan_df.replay_diff, s=7, picker=True);
     # ax[1,0].set_xlabel("Firing rate along long track")
@@ -443,18 +522,11 @@ def _make_jonathan_interactive_plot(sess, time_bins, final_jonathan_df, unit_spe
 
         ## New ax[0,1] draw method:
         _temp_draw_jonathan_ax(sess, time_bins, unit_specific_time_binned_firing_rates, aclu_to_idx, rdf, irdf, show_inter_replay_frs=show_inter_replay_frs, colors=colors, fig=fig, ax=ax[0,1], active_aclu=aclu, should_render=True)
-        
 
         # this plots where the neuron spiked on the track
-        ax[1,1].clear()
-        ax[1,1].plot(pos_df.t, pos_df.x, color=[.75, .75, .75])
         single_neuron_spikes = sess.spikes_df[sess.spikes_df.aclu == aclu]
-        ax[1,1].plot(single_neuron_spikes.t_rel_seconds, single_neuron_spikes.x, 'k.', ms=1)
-        ax[1,1].set_xlabel("t (s)")
-        ax[1,1].set_ylabel("Position")
-        ax[1,1].set_title("Animal position on track")
-
-
+        _temp_draw_jonathan_spikes_on_track(ax[1,1], pos_df, single_neuron_spikes)
+        
         fig.canvas.draw()
 
 
@@ -482,3 +554,58 @@ def _make_jonathan_interactive_plot(sess, time_bins, final_jonathan_df, unit_spe
     return graphics_output_dict, final_jonathan_df
 
 
+
+
+def _make_pho_jonathan_batch_plots(sess, time_bins, final_jonathan_df, unit_specific_time_binned_firing_rates, pf1D_all, aclu_to_idx, rdf, irdf, show_inter_replay_frs=False, n_max_plot_rows:int=4):
+    """ Stacked Jonathan-style firing-rate-across-epochs-plot
+
+        n_max_plot_rows: the maximum number of rows to plot
+    """
+    fig = plt.figure(constrained_layout=True, figsize=(10, 4))
+    subfigs = fig.subfigures(n_max_plot_rows, 1, wspace=0.07)
+    colors = plt.rcParams['axes.prop_cycle'].by_key()['color'];
+    for i in np.arange(n_max_plot_rows):
+        is_first_row = (i==0)
+        is_last_row = (i == (n_max_plot_rows-1))
+        aclu = int(final_jonathan_df.index[i])
+        print(f"selected neuron has index: {i} aclu: {aclu}")
+        title_string = ' '.join(['pf1D', f'Cell {aclu:02d}'])
+        subtitle_string = ' '.join([f'{pf1D_all.config.str_for_display(False)}'])
+        print(f'\t{title_string}\n\t{subtitle_string}')
+            
+        # gridspec mode:
+        curr_fig = subfigs[i]
+        curr_fig.set_facecolor('0.75')
+        gs = curr_fig.add_gridspec(2, 8) # layout figure is usually a gridspec of (1,8)
+        gs.update(wspace=0, hspace=0.0) # set the spacing between axes.
+        curr_ax_firing_rate = curr_fig.add_subplot(gs[0, :]) # the whole top row
+        curr_ax_lap_spikes = curr_fig.add_subplot(gs[1, :-1]) # all up to excluding the last element of the row
+        curr_ax_placefield = curr_fig.add_subplot(gs[1, -1], sharey=curr_ax_lap_spikes) # only the last element of the row
+
+        ## New ax[0,1] draw method:
+        _temp_draw_jonathan_ax(sess, time_bins, unit_specific_time_binned_firing_rates, aclu_to_idx, rdf, irdf, show_inter_replay_frs=show_inter_replay_frs, colors=colors, fig=curr_fig, ax=curr_ax_firing_rate, active_aclu=aclu,
+                            include_horizontal_labels=False, include_vertical_labels=False, should_render=True)
+        # curr_ax_firing_rate includes only bottom and left spines, and only y-axis ticks and labels
+        curr_ax_firing_rate.set_xticklabels([])
+        curr_ax_firing_rate.spines['top'].set_visible(False)
+        curr_ax_firing_rate.spines['right'].set_visible(False)
+        # curr_ax_firing_rate.spines['bottom'].set_visible(False)
+        # curr_ax_firing_rate.spines['left'].set_visible(False)
+        curr_ax_firing_rate.get_xaxis().set_ticks([])
+        # curr_ax_firing_rate.get_yaxis().set_ticks([])
+        
+        # this plots where the neuron spiked on the track
+        curr_ax_lap_spikes.set_xticklabels([])
+        curr_ax_lap_spikes.set_yticklabels([])
+        curr_ax_lap_spikes.axis('off')
+        
+        curr_ax_placefield.set_xticklabels([])
+        curr_ax_placefield.set_yticklabels([])
+        curr_ax_placefield.sharey(curr_ax_lap_spikes)
+        _ = plot_1D_placecell_validation(pf1D_all, i, extant_fig=curr_fig, extant_axes=(curr_ax_lap_spikes, curr_ax_placefield), should_include_labels=False,
+                                        should_plot_spike_indicator_points_on_placefield=False, spike_indicator_lines_alpha=0.2)
+
+        
+    graphics_output_dict = {'fig': fig, 'subfigs': subfigs, 'axs': [], 'colors': colors}
+    fig.show()
+    return graphics_output_dict
