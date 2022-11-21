@@ -108,6 +108,31 @@ class ComputedPipelineStage(LoadableInput, LoadableSessionInput, FilterablePipel
             self.registered_computation_function_dict[registered_name] = computation_function
         
 
+    def find_registered_computation_functions(self, registered_names_list, are_global:bool, names_list_is_blacklist:bool=False):
+        ''' Finds the list of actual function objects associated with the registered_names_list by using the appropriate dictionary of registered functions depending on whether are_global is True or not.
+
+        registered_names_list: list<str> - a list of function names to be used to fetch the appropriate functions
+        are_global: bool - If True, the registered_global_computation_function_dict is used instead of the registered_computation_function_dict
+        names_list_is_blacklist: bool - if True, registered_names_list is treated as a blacklist, and all functions are returned EXCEPT those that are in registered_names_list
+
+        Usage:
+            active_computation_functions = self.find_registered_computation_functions(computation_functions_name_whitelist, are_global=are_global)
+        '''
+        # We want to reload the new/modified versions of the functions:
+        self.reload_default_computation_functions()
+        if are_global:
+            active_registered_computation_function_dict = self.registered_global_computation_function_dict
+        else:
+            active_registered_computation_function_dict = self.registered_computation_function_dict
+        if names_list_is_blacklist:
+            # blacklist-style operation: treat the registered_names_list as a blacklist and return all registered functions EXCEPT those that are in registered_names_list
+            active_computation_function_dict = {a_computation_fn_name:a_computation_fn for (a_computation_fn_name, a_computation_fn) in active_registered_computation_function_dict.items() if a_computation_fn_name not in registered_names_list}
+        else:
+            # default whitelist-style operation:
+            active_computation_function_dict = {a_computation_fn_name:a_computation_fn for (a_computation_fn_name, a_computation_fn) in active_registered_computation_function_dict.items() if a_computation_fn_name in registered_names_list}
+        return list(active_computation_function_dict.values())
+        
+
 
     # ==================================================================================================================== #
     # Specific Context Computation Helpers                                                                                 #
@@ -118,23 +143,18 @@ class ComputedPipelineStage(LoadableInput, LoadableSessionInput, FilterablePipel
         The return value should be set to the self.computation_results[a_select_config_name]
         """
         # Need to exclude any computation functions specified in omitted_computation_functions_dict
-        if are_global:
-            active_registered_computation_function_dict = self.registered_global_computation_function_dict
-        else:
-            active_registered_computation_function_dict = self.registered_computation_function_dict
-
-
         if computation_functions_name_whitelist is not None:
-            active_computation_function_dict = {a_computation_fn_name:a_computation_fn for (a_computation_fn_name, a_computation_fn) in active_registered_computation_function_dict.items() if a_computation_fn_name in computation_functions_name_whitelist}
-            active_computation_functions = list(active_computation_function_dict.values())
+            active_computation_functions = self.find_registered_computation_functions(computation_functions_name_whitelist, are_global=are_global, names_list_is_blacklist=False)
             print(f'due to whitelist, including only {len(active_computation_functions)} out of {len(self.registered_computation_function_names)} registered computation functions.')
 
         elif computation_functions_name_blacklist is not None:
-            active_computation_function_dict = {a_computation_fn_name:a_computation_fn for (a_computation_fn_name, a_computation_fn) in active_registered_computation_function_dict.items() if a_computation_fn_name not in computation_functions_name_blacklist}
-            active_computation_functions = list(active_computation_function_dict.values())
+            active_computation_functions = self.find_registered_computation_functions(computation_functions_name_whitelist, are_global=are_global, names_list_is_blacklist=True)
             print(f'due to blacklist, including only {len(active_computation_functions)} out of {len(self.registered_computation_function_names)} registered computation functions.')
             # TODO: do something about the previous_computation_result?
-            
+        else:
+            # Both are None:            
+            if are_global:
+                active_computation_functions = self.registered_global_computation_functions
         else:
             active_computation_functions = self.registered_computation_functions
         
@@ -142,7 +162,9 @@ class ComputedPipelineStage(LoadableInput, LoadableSessionInput, FilterablePipel
         return ComputedPipelineStage._execute_computation_functions(active_computation_functions, previous_computation_result=previous_computation_result, fail_on_exception=fail_on_exception, progress_logger_callback=progress_logger_callback, are_global=are_global, debug_print=debug_print)
     
     def rerun_failed_computations_single_context(self, previous_computation_result, fail_on_exception:bool=False, debug_print=False):
-        """ retries the computation functions that previously failed and resulted in accumulated_errors in the previous_computation_result """
+        """ retries the computation functions that previously failed and resulted in accumulated_errors in the previous_computation_result
+        TODO: doesn't yet work with global functions due to relying on self.registered_computation_function_dict
+         """
         active_computation_errors = previous_computation_result.accumulated_errors
         # Get potentially updated references to all computation functions that had failed in the previous run of the pipeline:
         potentially_updated_failed_functions = [self.registered_computation_function_dict[failed_computation_fn.__name__] for failed_computation_fn, error in active_computation_errors.items()]
@@ -151,13 +173,9 @@ class ComputedPipelineStage(LoadableInput, LoadableSessionInput, FilterablePipel
 
     def run_specific_computations_single_context(self, previous_computation_result, computation_functions_name_whitelist, fail_on_exception:bool=False, progress_logger_callback=None, are_global:bool=False, debug_print=False):
         """ re-runs just a specific computation provided by computation_functions_name_whitelist """
-        if are_global:
-            active_registered_computation_function_dict = self.registered_global_computation_function_dict
-        else:
-            active_registered_computation_function_dict = self.registered_computation_function_dict
-        active_computation_function_dict = {a_computation_fn_name:a_computation_fn for (a_computation_fn_name, a_computation_fn) in active_registered_computation_function_dict.items() if a_computation_fn_name in computation_functions_name_whitelist}
-        active_computation_functions = list(active_computation_function_dict.values())
-        print(f'run_specific_computations_single_context(including only {len(active_computation_functions)} out of {len(self.registered_computation_function_names)} registered computation functions): active_computation_functions: {active_computation_functions}...')
+        active_computation_functions = self.find_registered_computation_functions(computation_functions_name_whitelist, are_global=are_global)
+        if progress_logger_callback is not None:
+            progress_logger_callback(f'run_specific_computations_single_context(including only {len(active_computation_functions)} out of {len(self.registered_computation_function_names)} registered computation functions): active_computation_functions: {active_computation_functions}...')
         # Perform the computations:
         return ComputedPipelineStage._execute_computation_functions(active_computation_functions, previous_computation_result=previous_computation_result, fail_on_exception=fail_on_exception, progress_logger_callback=progress_logger_callback, are_global=are_global, debug_print=debug_print)
 
