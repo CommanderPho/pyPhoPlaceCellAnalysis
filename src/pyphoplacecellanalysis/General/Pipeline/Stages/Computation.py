@@ -103,9 +103,20 @@ class ComputedPipelineStage(LoadableInput, LoadableSessionInput, FilterablePipel
         
     def register_computation(self, registered_name, computation_function, is_global:bool):
         if is_global:
-            self.registered_global_computation_function_dict[registered_name] = computation_function
+            try:
+                self.registered_global_computation_function_dict[registered_name] = computation_function
+            except AttributeError as e:
+                # Create a new global dictionary if needed and then try re-register:
+                self.registered_global_computation_function_dict = OrderedDict()
+                self.registered_global_computation_function_dict[registered_name] = computation_function            
         else:
-            self.registered_computation_function_dict[registered_name] = computation_function
+            # non-global:
+            try:
+                self.registered_computation_function_dict[registered_name] = computation_function
+            except AttributeError as e:
+                # Create a new non-global dictionary if needed and then try re-register:
+                self.registered_computation_function_dict = OrderedDict()
+                self.registered_computation_function_dict[registered_name] = computation_function
         
 
     def find_registered_computation_functions(self, registered_names_list, are_global:bool, names_list_is_blacklist:bool=False):
@@ -155,9 +166,9 @@ class ComputedPipelineStage(LoadableInput, LoadableSessionInput, FilterablePipel
             # Both are None:            
             if are_global:
                 active_computation_functions = self.registered_global_computation_functions
-        else:
-            active_computation_functions = self.registered_computation_functions
-        
+            else:
+                active_computation_functions = self.registered_computation_functions
+
         # Perform the computations:
         return ComputedPipelineStage._execute_computation_functions(active_computation_functions, previous_computation_result=previous_computation_result, fail_on_exception=fail_on_exception, progress_logger_callback=progress_logger_callback, are_global=are_global, debug_print=debug_print)
     
