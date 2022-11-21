@@ -158,9 +158,10 @@ class MultiContextComparingDisplayFunctions(AllFunctionEnumeratingMixin, metacla
 
             except KeyError:
                 # except ValueError:
-                # print(f'non-placefield neuron. Skipping.')
+                print(f'Could not get firing_rate_trends from computation_results. Skipping.')
                 time_bins, time_binned_unit_specific_binned_spike_rate = {}, {}
 
+            print(f'np.shape(time_binned_unit_specific_binned_spike_rate): {time_binned_unit_specific_binned_spike_rate}')
 
             # ## Compute for all the session spikes first:
             sess = owning_pipeline_reference.sess
@@ -179,7 +180,7 @@ class MultiContextComparingDisplayFunctions(AllFunctionEnumeratingMixin, metacla
             # pos_df = computation_result.sess.position.to_dataframe()
             # compare_firing_rates(rdf, irdf)
 
-            graphics_output_dict = _make_pho_jonathan_batch_plots(sess, time_bins, final_jonathan_df, time_binned_unit_specific_binned_spike_rate, pf1D_all, aclu_to_idx, rdf, irdf, show_inter_replay_frs=False, n_max_plot_rows=6)
+            graphics_output_dict = _make_pho_jonathan_batch_plots(sess, time_bins, final_jonathan_df, time_binned_unit_specific_binned_spike_rate, pf1D_all, aclu_to_idx, rdf, irdf, show_inter_replay_frs=True, n_max_plot_rows=6)
 
             # output_dict = {'fig': fig, 'axs': ax, 'colors': colors}
             graphics_output_dict['plot_data'] = {'df': final_jonathan_df, 'rdf':rdf, 'aclu_to_idx':aclu_to_idx, 'irdf':irdf}
@@ -344,7 +345,7 @@ def _context_nested_docks(curr_active_pipeline, active_config_names, enable_gui=
 
 
 def _temp_draw_jonathan_ax(sess, time_bins, unit_specific_time_binned_firing_rates, aclu_to_idx, rdf, irdf, show_inter_replay_frs=False, colors=None, fig=None, ax=None, active_aclu:int=0, include_horizontal_labels=True, include_vertical_labels=True, should_render=False):
-    """ 
+    """ Draws the time binned firing rates and the replay firing rates for a single cell
 
     Usage:
 
@@ -556,10 +557,13 @@ def _make_jonathan_interactive_plot(sess, time_bins, final_jonathan_df, unit_spe
 
 
 
-def _make_pho_jonathan_batch_plots(sess, time_bins, final_jonathan_df, unit_specific_time_binned_firing_rates, pf1D_all, aclu_to_idx, rdf, irdf, show_inter_replay_frs=False, n_max_plot_rows:int=4):
+def _make_pho_jonathan_batch_plots(sess, time_bins, final_jonathan_df, unit_specific_time_binned_firing_rates, pf1D_all, aclu_to_idx, rdf, irdf, show_inter_replay_frs=False, n_max_plot_rows:int=4, **kwargs):
     """ Stacked Jonathan-style firing-rate-across-epochs-plot
+    Internally calls `plot_1D_placecell_validation` and `_temp_draw_jonathan_ax`
 
         n_max_plot_rows: the maximum number of rows to plot
+
+
     """
     fig = plt.figure(constrained_layout=True, figsize=(10, 4))
     subfigs = fig.subfigures(n_max_plot_rows, 1, wspace=0.07)
@@ -578,9 +582,14 @@ def _make_pho_jonathan_batch_plots(sess, time_bins, final_jonathan_df, unit_spec
         curr_fig.set_facecolor('0.75')
         gs = curr_fig.add_gridspec(2, 8) # layout figure is usually a gridspec of (1,8)
         gs.update(wspace=0, hspace=0.0) # set the spacing between axes.
-        curr_ax_firing_rate = curr_fig.add_subplot(gs[0, :]) # the whole top row
+        # curr_ax_firing_rate = curr_fig.add_subplot(gs[0, :]) # the whole top row
+        # curr_ax_lap_spikes = curr_fig.add_subplot(gs[1, :-1]) # all up to excluding the last element of the row
+        # curr_ax_placefield = curr_fig.add_subplot(gs[1, -1], sharey=curr_ax_lap_spikes) # only the last element of the row
+        curr_ax_firing_rate = curr_fig.add_subplot(gs[0, :-1]) # the whole top row except the last element (to match the firing rates below
         curr_ax_lap_spikes = curr_fig.add_subplot(gs[1, :-1]) # all up to excluding the last element of the row
         curr_ax_placefield = curr_fig.add_subplot(gs[1, -1], sharey=curr_ax_lap_spikes) # only the last element of the row
+
+
 
         ## New ax[0,1] draw method:
         _temp_draw_jonathan_ax(sess, time_bins, unit_specific_time_binned_firing_rates, aclu_to_idx, rdf, irdf, show_inter_replay_frs=show_inter_replay_frs, colors=colors, fig=curr_fig, ax=curr_ax_firing_rate, active_aclu=aclu,
@@ -602,9 +611,12 @@ def _make_pho_jonathan_batch_plots(sess, time_bins, final_jonathan_df, unit_spec
         curr_ax_placefield.set_xticklabels([])
         curr_ax_placefield.set_yticklabels([])
         curr_ax_placefield.sharey(curr_ax_lap_spikes)
-        _ = plot_1D_placecell_validation(pf1D_all, i, extant_fig=curr_fig, extant_axes=(curr_ax_lap_spikes, curr_ax_placefield), should_include_labels=False,
-                                        should_plot_spike_indicator_points_on_placefield=False, spike_indicator_lines_alpha=0.2)
+        _ = plot_1D_placecell_validation(pf1D_all, i, extant_fig=curr_fig, extant_axes=(curr_ax_lap_spikes, curr_ax_placefield), **({'should_include_labels': False, 'should_plot_spike_indicator_points_on_placefield': False, 'spike_indicator_lines_alpha': 0.2} | kwargs))
 
+
+        t_start, t_end = curr_ax_lap_spikes.get_xlim()
+        curr_ax_firing_rate.set_xlim((t_start, t_end)) # We don't want to clip to only the spiketimes for this cell, we want it for all cells, or even when the recording started/ended
+        curr_ax_lap_spikes.sharex(curr_ax_firing_rate) # Sync the time axes of the laps and the firing rates
         
     graphics_output_dict = {'fig': fig, 'subfigs': subfigs, 'axs': [], 'colors': colors}
     fig.show()
