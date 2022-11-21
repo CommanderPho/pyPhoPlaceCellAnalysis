@@ -333,7 +333,19 @@ class ComputedPipelineStage(LoadableInput, LoadableSessionInput, FilterablePipel
             print(f'done.')
 
 
-    
+    def perform_specific_computation(self, active_computation_params=None, enabled_filter_names=None, computation_functions_name_whitelist=None, fail_on_exception:bool=False, debug_print=False):
+        """ perform a specific computation (specified in computation_functions_name_whitelist) in a minimally destructive manner using the previously recomputed results:
+        Ideally would already have access to the:
+        - Previous computation result
+        - Previous computation config (the input parameters)
+
+        Internally calls the classmethod `cls._perform_specific_computation_for_pipeline`.
+
+        Updates:
+            curr_active_pipeline.computation_results
+        """
+        self._perform_specific_computation_for_pipeline(self, active_computation_params=active_computation_params, enabled_filter_names=enabled_filter_names, computation_functions_name_whitelist=computation_functions_name_whitelist, fail_on_exception=fail_on_exception, debug_print=debug_print)
+
     # ==================================================================================================================== #
     # CLASS/STATIC METHODS                                                                                                 #
     # ==================================================================================================================== #
@@ -442,6 +454,36 @@ class ComputedPipelineStage(LoadableInput, LoadableSessionInput, FilterablePipel
 
         ## Then look for previously complete computation results that are missing computations that have been registered after they were computed, or that were previously part of the blacklist but now are not:
 
+
+    @classmethod
+    def _perform_specific_computation_for_pipeline(cls, curr_active_pipeline, active_computation_params=None, enabled_filter_names=None, computation_functions_name_whitelist=None, fail_on_exception:bool=False, debug_print=False):
+        """ perform a specific computation (specified in computation_functions_name_whitelist) in a minimally destructive manner using the previously recomputed results:
+        Ideally would already have access to the:
+        - Previous computation result
+        - Previous computation config (the input parameters)
+
+        Internally calls: `run_specific_computations_single_context`.
+
+        Updates:
+            curr_active_pipeline.computation_results
+        """
+        if enabled_filter_names is None:
+            enabled_filter_names = list(curr_active_pipeline.filtered_sessions.keys()) # all filters if specific enabled names aren't specified
+        for a_select_config_name, a_filtered_session in curr_active_pipeline.filtered_sessions.items():                
+            if a_select_config_name in enabled_filter_names:
+                print(f'Performing run_specific_computations_single_context on filtered_session with filter named "{a_select_config_name}"...')
+                if active_computation_params is None:
+                    curr_active_computation_params = curr_active_pipeline.active_configs[a_select_config_name].computation_config # get the previously set computation configs
+                else:
+                    # set/update the computation configs:
+                    curr_active_computation_params = active_computation_params 
+                    curr_active_pipeline.active_configs[a_select_config_name].computation_config = curr_active_computation_params #TODO: if more than one computation config is passed in, the active_config should be duplicated for each computation config.
+
+                previous_computation_result = curr_active_pipeline.computation_results[a_select_config_name]
+                curr_active_pipeline.computation_results[a_select_config_name] = curr_active_pipeline.run_specific_computations_single_context(previous_computation_result, computation_functions_name_whitelist=computation_functions_name_whitelist, fail_on_exception=fail_on_exception, debug_print=debug_print)    
+
+            
+        
 # ==================================================================================================================== #
 # PIPELINE MIXIN                                                                                                       #
 # ==================================================================================================================== #
@@ -587,6 +629,15 @@ class PipelineWithComputedPipelineStageMixin:
         # return self.stage.perform_action_for_all_contexts(EvaluationActions.EVALUATE_COMPUTATIONS, ... # TODO: refactor to use new layout
         return self.stage.rerun_failed_computations(previous_computation_result, fail_on_exception=fail_on_exception, debug_print=debug_print)
     
+    def perform_specific_computation(self, active_computation_params=None, enabled_filter_names=None, computation_functions_name_whitelist=None, fail_on_exception:bool=False, debug_print=False):
+        """ perform a specific computation (specified in computation_functions_name_whitelist) in a minimally destructive manner using the previously recomputed results:
+        Passthrough wrapper to self.stage.perform_specific_computation(...) with the same arguments.
+
+        Updates:
+            curr_active_pipeline.computation_results
+        """
+        # self.stage is of type ComputedPipelineStage
+        return self.stage.perform_specific_computation(active_computation_params=active_computation_params, enabled_filter_names=enabled_filter_names, computation_functions_name_whitelist=computation_functions_name_whitelist, fail_on_exception=fail_on_exception, debug_print=debug_print)
     
     # Utility/Debugging Functions:
     def perform_drop_entire_computed_config(self, config_names_to_drop = ['maze1_rippleOnly', 'maze2_rippleOnly']):
