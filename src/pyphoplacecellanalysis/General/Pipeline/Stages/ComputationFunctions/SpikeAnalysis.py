@@ -180,16 +180,13 @@ class SpikeAnalysisComputations(AllFunctionEnumeratingMixin, metaclass=Computati
         def _instantaneous_time_firing_rates(active_spikes_df, time_bin_size_seconds=0.5, t_start=0.0, t_stop=1000.0):
             # unit_split_spiketrains = [SpikeTrain(t_start=computation_result.sess.t_start, t_stop=computation_result.sess.t_stop, times=spiketrain_times, units=s) for spiketrain_times in computation_result.sess.spikes_df.spikes.time_sliced(t_start=computation_result.sess.t_start, t_stop=computation_result.sess.t_stop).spikes.get_unit_spiketrains()]
             unit_split_spiketrains = [SpikeTrain(t_start=t_start, t_stop=t_stop, times=spiketrain_times, units=s) for spiketrain_times in active_spikes_df.spikes.time_sliced(t_start=t_start, t_stop=t_stop).spikes.get_unit_spiketrains()]
-
             # len(unit_split_spiketrains) # 52
-
             # inst_rate = instantaneous_rate(unit_split_spiketrains, sampling_period=50*ms, kernel=GaussianKernel(200*ms))
             inst_rate = instantaneous_rate(unit_split_spiketrains, sampling_period=time_bin_size_seconds*s, kernel=GaussianKernel(200*ms))
             # print(type(inst_rate), f"of shape {inst_rate.shape}: {inst_rate.shape[0]} samples, {inst_rate.shape[1]} channel")
             # print('sampling rate:', inst_rate.sampling_rate)
             # print('times (first 10 samples): ', inst_rate.times[:10])
             # print('instantaneous rate (first 10 samples):', inst_rate.T[0, :10])
-
             neuron_IDs = np.unique(active_spikes_df.aclu)
             # neuron_IDXs = np.arange(len(neuron_IDs))
             instantaneous_unit_specific_spike_rate_values = pd.DataFrame(inst_rate.magnitude, columns=neuron_IDs) # builds a df with times along the rows and aclu values along the columns in the style of unit_specific_binned_spike_counts
