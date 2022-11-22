@@ -29,14 +29,14 @@ class MultiContextComparingDisplayFunctions(AllFunctionEnumeratingMixin, metacla
     """
 
     def _display_context_nested_docks(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_whitelist=None, **kwargs):
-        """ Create `master_dock_win` - centralized plot output window to collect individual figures/controls in (2022-08-18) 
+        """ Create `master_dock_win` - centralized plot output window to collect individual figures/controls in (2022-08-18)
         NOTE: Ignores `active_config` because context_nested_docks is for all contexts
-        
+
         Input:
             owning_pipeline_reference: A reference to the pipeline upon which this display function is being called
-        
+
         Usage:
-        
+
         display_output = active_display_output | curr_active_pipeline.display('_display_context_nested_docks', active_identifying_filtered_session_ctx, enable_gui=False, debug_print=False) # returns {'master_dock_win': master_dock_win, 'app': app, 'out_items': out_items}
         master_dock_win = display_output['master_dock_win']
         app = display_output['app']
@@ -44,13 +44,13 @@ class MultiContextComparingDisplayFunctions(AllFunctionEnumeratingMixin, metacla
 
         """
         assert owning_pipeline_reference is not None
-        # 
+        #
         if include_whitelist is None:
             include_whitelist = owning_pipeline_reference.active_completed_computation_result_names # ['maze', 'sprinkle']
 
         out_items = {}
         master_dock_win, app, out_items = _context_nested_docks(owning_pipeline_reference, active_config_names=include_whitelist, **overriding_dict_with(lhs_dict={'enable_gui': False, 'debug_print': False}, **kwargs))
-        
+
         # return master_dock_win, app, out_items
         return {'master_dock_win': master_dock_win, 'app': app, 'out_items': out_items}
 
@@ -84,7 +84,7 @@ class MultiContextComparingDisplayFunctions(AllFunctionEnumeratingMixin, metacla
             rdf = global_computation_results.computed_data['jonathan_firing_rate_analysis']['rdf']['rdf']
             irdf = global_computation_results.computed_data['jonathan_firing_rate_analysis']['irdf']['irdf']
             pos_df = global_computation_results.sess.position.to_dataframe()
-            
+
             ## time_binned_unit_specific_binned_spike_rate mode:
             time_bins = global_computation_results.computed_data['jonathan_firing_rate_analysis']['time_binned_unit_specific_spike_rate']['time_bins']
             time_binned_unit_specific_binned_spike_rate = global_computation_results.computed_data['jonathan_firing_rate_analysis']['time_binned_unit_specific_spike_rate']['time_binned_unit_specific_binned_spike_rate']
@@ -97,7 +97,7 @@ class MultiContextComparingDisplayFunctions(AllFunctionEnumeratingMixin, metacla
             graphics_output_dict, neuron_df = _make_jonathan_interactive_plot(sess, time_bins, final_jonathan_df, time_binned_unit_specific_binned_spike_rate, pos_df, aclu_to_idx, rdf, irdf, show_inter_replay_frs=False)
             # output_dict = {'fig': fig, 'axs': ax, 'colors': colors}
             graphics_output_dict['plot_data'] = {'df': neuron_df, 'rdf':rdf, 'aclu_to_idx':aclu_to_idx, 'irdf':irdf}
-            
+
             return graphics_output_dict
 
     def _display_batch_pho_jonathan_replay_firing_rate_comparison(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_whitelist=None, **kwargs):
@@ -143,11 +143,14 @@ class MultiContextComparingDisplayFunctions(AllFunctionEnumeratingMixin, metacla
             final_jonathan_df = global_computation_results.computed_data['jonathan_firing_rate_analysis']['final_jonathan_df']
             # compare_firing_rates(rdf, irdf)
 
-            graphics_output_dict = _make_pho_jonathan_batch_plots(sess, time_bins, final_jonathan_df, time_binned_unit_specific_binned_spike_rate, pf1D_all, aclu_to_idx, rdf, irdf, show_inter_replay_frs=True, n_max_plot_rows=6)
+            n_max_plot_rows = kwargs.get('n_max_plot_rows', 6)
+            show_inter_replay_frs = kwargs.get('show_inter_replay_frs', True)
+
+            graphics_output_dict = _make_pho_jonathan_batch_plots(sess, time_bins, final_jonathan_df, time_binned_unit_specific_binned_spike_rate, pf1D_all, aclu_to_idx, rdf, irdf, show_inter_replay_frs=show_inter_replay_frs, n_max_plot_rows=n_max_plot_rows)
 
             # output_dict = {'fig': fig, 'axs': ax, 'colors': colors}
             graphics_output_dict['plot_data'] = {'df': final_jonathan_df, 'rdf':rdf, 'aclu_to_idx':aclu_to_idx, 'irdf':irdf}
-            
+
             return graphics_output_dict
 
 
@@ -157,11 +160,11 @@ class MultiContextComparingDisplayFunctions(AllFunctionEnumeratingMixin, metacla
 # ==================================================================================================================== #
 def _single_context_nested_docks(curr_active_pipeline, active_config_name, app, master_dock_win, enable_gui=False, debug_print=True):
         """ 2022-08-18 - Called for each config name in context_nested_docks's for loop.
-        
-        
+
+
         """
         out_display_items = dict()
-        
+
         # Get relevant variables for this particular context:
         # curr_active_pipeline is set above, and usable here
         # sess = curr_active_pipeline.filtered_sessions[active_config_name]
@@ -185,7 +188,7 @@ def _single_context_nested_docks(curr_active_pipeline, active_config_name, app, 
                     print(f'\t {updated_figure_format_config}')
                 # figure_format_config = updated_figure_format_config
                 pass
-                
+
         ## Finally, add the display function to the active context
         active_identifying_ctx = active_identifying_filtered_session_ctx.adding_context('display_fn', display_fn_name='figure_format_config_widget')
         active_identifying_ctx_string = active_identifying_ctx.get_description(separator='|') # Get final discription string:
@@ -204,17 +207,17 @@ def _single_context_nested_docks(curr_active_pipeline, active_config_name, app, 
             out_display_items[active_identifying_ctx] = (figure_format_config_widget)
 
         else:
-            
+
             # out_display_items[active_identifying_ctx] = None
              out_display_items[active_identifying_ctx] = (PhoUIContainer(figure_format_config=curr_active_config))
-        
+
         # ==================================================================================================================== #
         ## 2D Position Decoder Section (DecoderPlotSelectorWidget):
         active_identifying_ctx = active_identifying_filtered_session_ctx.adding_context('display_fn', display_fn_name='2D Position Decoder')
         active_identifying_ctx_string = active_identifying_ctx.get_description(separator='|') # Get final discription string:
         if debug_print:
             print(f'active_identifying_ctx_string: {active_identifying_ctx_string}')
-            
+
         if enable_gui:
             decoder_plot_widget = DecoderPlotSelectorWidget()
             decoder_plot_widget.show()
@@ -227,7 +230,7 @@ def _single_context_nested_docks(curr_active_pipeline, active_config_name, app, 
         ## GUI Placefields (pyqtplot_plot_image_array):
 
         # Get the decoders from the computation result:
-        # active_one_step_decoder = computation_result.computed_data['pf2D_Decoder'] # doesn't actually require the Decoder, could just use computation_result.computed_data['pf2D']            
+        # active_one_step_decoder = computation_result.computed_data['pf2D_Decoder'] # doesn't actually require the Decoder, could just use computation_result.computed_data['pf2D']
         # Get flat list of images:
         images = active_one_step_decoder.ratemap.normalized_tuning_curves # (43, 63, 63)
         # images = active_one_step_decoder.ratemap.normalized_tuning_curves[0:40,:,:] # (43, 63, 63)
@@ -237,7 +240,7 @@ def _single_context_nested_docks(curr_active_pipeline, active_config_name, app, 
         active_identifying_ctx_string = active_identifying_ctx.get_description(separator='|') # Get final discription string:
         if debug_print:
             print(f'active_identifying_ctx_string: {active_identifying_ctx_string}')
-            
+
         if enable_gui:
             ## Build the widget:
             app, pyqtplot_pf2D_parent_root_widget, pyqtplot_pf2D_root_render_widget, pyqtplot_pf2D_plot_array, pyqtplot_pf2D_img_item_array, pyqtplot_pf2D_other_components_array = pyqtplot_plot_image_array(active_one_step_decoder.xbin, active_one_step_decoder.ybin, images, occupancy, app=app, parent_root_widget=None, root_render_widget=None, max_num_columns=8)
@@ -246,19 +249,19 @@ def _single_context_nested_docks(curr_active_pipeline, active_config_name, app, 
             out_display_items[active_identifying_ctx] = (pyqtplot_pf2D_parent_root_widget, pyqtplot_pf2D_root_render_widget, pyqtplot_pf2D_plot_array, pyqtplot_pf2D_img_item_array, pyqtplot_pf2D_other_components_array)
         else:
             out_display_items[active_identifying_ctx] = None
-        
+
         return active_identifying_filtered_session_ctx, out_display_items
         # END single_context_nested_docks(...)
-        
-        
+
+
 def _context_nested_docks(curr_active_pipeline, active_config_names, enable_gui=False, debug_print=True):
-    """ 2022-08-18 - builds a series of nested contexts for each active_config 
-    
+    """ 2022-08-18 - builds a series of nested contexts for each active_config
+
     Usage:
         master_dock_win, app, out_items = context_nested_docks(curr_active_pipeline, enable_gui=False, debug_print=True)
     """
     # include_whitelist = curr_active_pipeline.active_completed_computation_result_names # ['maze', 'sprinkle']
-    
+
     if enable_gui:
         master_dock_win, app = DockAreaWrapper._build_default_dockAreaWindow(title='active_global_window', defer_show=False)
         master_dock_win.resize(1920, 1024)
@@ -270,7 +273,7 @@ def _context_nested_docks(curr_active_pipeline, active_config_names, enable_gui=
     for a_config_name in active_config_names:
         active_identifying_session_ctx, out_display_items = _single_context_nested_docks(curr_active_pipeline=curr_active_pipeline, active_config_name=a_config_name, app=app, master_dock_win=master_dock_win, enable_gui=enable_gui, debug_print=debug_print)
         out_items[a_config_name] = (active_identifying_session_ctx, out_display_items)
-        
+
     return master_dock_win, app, out_items
 
 
@@ -285,7 +288,7 @@ def _context_nested_docks(curr_active_pipeline, active_config_names, enable_gui=
 #     if show_nonzero:
 #         x2 = take_difference_nonzero(irdf)
 #         y2 = take_difference_nonzero(rdf)
-        
+
 #         # x2 = take_difference_adjust_for_time(irdf)
 #         # y2 = take_difference_nonzero(rdf)
 
@@ -298,9 +301,9 @@ def _context_nested_docks(curr_active_pipeline, active_config_names, enable_gui=
 #     ax.set_title("Firing rates are correlated in replay and non-replay time");
 #     if show_nonzero:
 #         ax.legend()
-    
+
     # plt.axis("equal");
-    
+
 
 
 # # this cell really works best in qt
@@ -323,7 +326,7 @@ def _temp_draw_jonathan_ax(sess, time_bins, unit_specific_time_binned_firing_rat
     assert ax is not None
     if colors is None:
         colors = plt.rcParams['axes.prop_cycle'].by_key()['color'];
-    
+
     # print(f"selected neuron has index: {index} aclu: {active_aclu}")
 
     # this redraws ax
@@ -377,7 +380,7 @@ def _temp_draw_jonathan_spikes_on_track(ax, pos_df, single_neuron_spikes):
     """
     ax.clear()
     ax.plot(pos_df.t, pos_df.x, color=[.75, .75, .75])
-    
+
     ax.plot(single_neuron_spikes.t_rel_seconds, single_neuron_spikes.x, 'k.', ms=1)
     ax.set_xlabel("t (s)")
     ax.set_ylabel("Position")
@@ -392,10 +395,10 @@ def _make_jonathan_interactive_plot(sess, time_bins, final_jonathan_df, unit_spe
     colors = plt.rcParams['axes.prop_cycle'].by_key()['color'];
 
     graphics_output_dict = {'fig': fig, 'axs': ax, 'colors': colors}
-  
+
     # plotting for ax[0,0] _______________________________________________________________________________________________ #
     ax[0,0].axis("equal");
-    
+
     # I initially set the boundaries like this so I would know where to put the single-track cells
     # I'm sure there's a better way, though
     ylim = (-58.34521620102153, 104.37547397480944)
@@ -425,7 +428,7 @@ def _make_jonathan_interactive_plot(sess, time_bins, final_jonathan_df, unit_spe
     # ax[1,0].set_xlabel("Firing rate along long track")
     # ax[1,0].set_ylabel("Firing rate along short track")
     ax[1,0].set_title("Firing rate on short vs. long track")
-    
+
     graphics_output_dict['diff_scatter'] = diff_scatter
 
     #TODO
@@ -439,11 +442,11 @@ def _make_jonathan_interactive_plot(sess, time_bins, final_jonathan_df, unit_spe
 
     def on_index_change(new_index):
         'This gets called when the selected neuron changes; it updates the graphs'
-        
+
         index = new_index
         aclu = int(final_jonathan_df.index[index])
         print(f"selected neuron has index: {index} aclu: {aclu}")
-        
+
         # this changes the size of the neuron in ax[0,0]
         remap_scatter.set_sizes([7 if i!= index else 30 for i in range(len(final_jonathan_df))])
 
@@ -456,7 +459,7 @@ def _make_jonathan_interactive_plot(sess, time_bins, final_jonathan_df, unit_spe
         # this plots where the neuron spiked on the track
         single_neuron_spikes = sess.spikes_df[sess.spikes_df.aclu == aclu]
         _temp_draw_jonathan_spikes_on_track(ax[1,1], pos_df, single_neuron_spikes)
-        
+
         fig.canvas.draw()
 
 
@@ -513,27 +516,28 @@ def _make_pho_jonathan_batch_plots(sess, time_bins, final_jonathan_df, unit_spec
         short_title_string = f'{aclu:02d}'
         if debug_print:
             print(f'\t{title_string}\n\t{subtitle_string}')
-        
 
         # gridspec mode:
-        curr_fig = subfigs[i]
+        try:
+            curr_fig = subfigs[i] 
+        except TypeError as e:
+            # TypeError: 'SubFigure' object is not subscriptable ->  # single subfigure, not subscriptable
+            curr_fig = subfigs
+        except Exception as e:
+            # Unhandled exception
+            raise e
+        
         curr_fig.set_facecolor('0.75')
-
-
 
         gs_kw = dict(width_ratios=np.repeat(1, num_gridspec_columns).tolist(), height_ratios=[1, 1], wspace=0.0, hspace=0.0)
         gs_kw['width_ratios'][-1] = 0.3 # make the last column (containing the 1D placefield plot) a fraction of the width of the others
 
         gs = curr_fig.add_gridspec(2, num_gridspec_columns, **gs_kw) # layout figure is usually a gridspec of (1,8)
-        # gs.update(wspace=0, hspace=0.0) # set the spacing between axes.
-        # curr_ax_firing_rate = curr_fig.add_subplot(gs[0, :]) # the whole top row
-        # curr_ax_lap_spikes = curr_fig.add_subplot(gs[1, :-1]) # all up to excluding the last element of the row
-        # curr_ax_placefield = curr_fig.add_subplot(gs[1, -1], sharey=curr_ax_lap_spikes) # only the last element of the row
         curr_ax_firing_rate = curr_fig.add_subplot(gs[0, :-1]) # the whole top row except the last element (to match the firing rates below)
         curr_ax_cell_label = curr_fig.add_subplot(gs[0, -1]) # the last element of the first row contains the labels that identify the cell
         curr_ax_lap_spikes = curr_fig.add_subplot(gs[1, :-1]) # all up to excluding the last element of the row
         curr_ax_placefield = curr_fig.add_subplot(gs[1, -1], sharey=curr_ax_lap_spikes) # only the last element of the row
-        
+
         # Setup title axis:
         title_axes_kwargs = dict(ha="center", va="center", fontsize=18, color="black")
         curr_ax_cell_label.text(0.5, 0.5, short_title_string, transform=curr_ax_cell_label.transAxes, **title_axes_kwargs)
@@ -541,7 +545,7 @@ def _make_pho_jonathan_batch_plots(sess, time_bins, final_jonathan_df, unit_spec
 
         ## New ax[0,1] draw method:
         _temp_draw_jonathan_ax(sess, time_bins, unit_specific_time_binned_firing_rates, aclu_to_idx, rdf, irdf, show_inter_replay_frs=show_inter_replay_frs, colors=colors, fig=curr_fig, ax=curr_ax_firing_rate, active_aclu=aclu,
-                            include_horizontal_labels=False, include_vertical_labels=False, should_render=True)
+                            include_horizontal_labels=False, include_vertical_labels=False, should_render=False)
         # curr_ax_firing_rate includes only bottom and left spines, and only y-axis ticks and labels
         curr_ax_firing_rate.set_xticklabels([])
         curr_ax_firing_rate.spines['top'].set_visible(False)
@@ -550,12 +554,12 @@ def _make_pho_jonathan_batch_plots(sess, time_bins, final_jonathan_df, unit_spec
         # curr_ax_firing_rate.spines['left'].set_visible(False)
         curr_ax_firing_rate.get_xaxis().set_ticks([])
         # curr_ax_firing_rate.get_yaxis().set_ticks([])
-        
+
         # this plots where the neuron spiked on the track
         curr_ax_lap_spikes.set_xticklabels([])
         curr_ax_lap_spikes.set_yticklabels([])
         curr_ax_lap_spikes.axis('off')
-        
+
         curr_ax_placefield.set_xticklabels([])
         curr_ax_placefield.set_yticklabels([])
         curr_ax_placefield.sharey(curr_ax_lap_spikes)
@@ -564,7 +568,7 @@ def _make_pho_jonathan_batch_plots(sess, time_bins, final_jonathan_df, unit_spec
         t_start, t_end = curr_ax_lap_spikes.get_xlim()
         curr_ax_firing_rate.set_xlim((t_start, t_end)) # We don't want to clip to only the spiketimes for this cell, we want it for all cells, or even when the recording started/ended
         curr_ax_lap_spikes.sharex(curr_ax_firing_rate) # Sync the time axes of the laps and the firing rates
-        
+
         # output the axes created:
         axs_list.append({'firing_rate':curr_ax_firing_rate, 'lap_spikes': curr_ax_lap_spikes, 'placefield': curr_ax_placefield, 'labels': curr_ax_cell_label})
 

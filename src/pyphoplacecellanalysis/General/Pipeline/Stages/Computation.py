@@ -612,7 +612,7 @@ class PipelineWithComputedPipelineStageMixin:
         """Returns the doc strings for each registered computation function. This is taken from their docstring at the start of the function defn, and provides an overview into what the function will do."""
         return {a_fn_name:a_fn.__doc__ for a_fn_name, a_fn in self.registered_computation_function_dict.items()}
 
-    
+    # Global Computation Properties ______________________________________________________________________________________ #
     @property
     def global_computation_results(self):
         """The global_computation_results property, accessed through the stage."""
