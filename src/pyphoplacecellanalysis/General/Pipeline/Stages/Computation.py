@@ -383,12 +383,46 @@ class ComputedPipelineStage(LoadableInput, LoadableSessionInput, FilterablePipel
         - Previous computation result
         - Previous computation config (the input parameters)
 
-        Internally calls the classmethod `cls._perform_specific_computation_for_pipeline`.
+        Internally calls: `run_specific_computations_single_context`.
 
         Updates:
             curr_active_pipeline.computation_results
         """
-        self._perform_specific_computation_for_pipeline(self, active_computation_params=active_computation_params, enabled_filter_names=enabled_filter_names, computation_functions_name_whitelist=computation_functions_name_whitelist, fail_on_exception=fail_on_exception, debug_print=debug_print)
+        # self._perform_specific_computation_for_pipeline(self, active_computation_params=active_computation_params, enabled_filter_names=enabled_filter_names, computation_functions_name_whitelist=computation_functions_name_whitelist, fail_on_exception=fail_on_exception, debug_print=debug_print)
+        if enabled_filter_names is None:
+            enabled_filter_names = list(self.filtered_sessions.keys()) # all filters if specific enabled names aren't specified
+
+        active_computation_functions = self.find_registered_computation_functions(computation_functions_name_whitelist, search_mode=FunctionsSearchMode.ANY) # find_registered_computation_functions is a pipeline.stage property
+        contains_any_global_functions = np.any([v.is_global for v in active_computation_functions])
+        if contains_any_global_functions:
+            if self.global_computation_results is None:
+                print(f'global_computation_results is None. Building initial global_computation_results...')
+                self.global_computation_results = DynamicParameters()
+                self.global_computation_results = ComputedPipelineStage._build_initial_computationResult(self.sess, active_computation_params) # returns a computation result. This stores the computation config used to compute it.
+
+        for a_select_config_name, a_filtered_session in self.filtered_sessions.items():                
+            if a_select_config_name in enabled_filter_names:
+                print(f'Performing run_specific_computations_single_context on filtered_session with filter named "{a_select_config_name}"...')
+                if active_computation_params is None:
+                    curr_active_computation_params = self.active_configs[a_select_config_name].computation_config # get the previously set computation configs
+                else:
+                    # set/update the computation configs:
+                    curr_active_computation_params = active_computation_params 
+                    self.active_configs[a_select_config_name].computation_config = curr_active_computation_params #TODO: if more than one computation config is passed in, the active_config should be duplicated for each computation config.
+
+                ## Here is an issue, we need to get the appropriate computation result depending on whether it's global or not 
+                # active_computation_functions = self.find_registered_computation_functions(computation_functions_name_whitelist, search_mode=FunctionsSearchMode.ANY) # find_registered_computation_functions is a pipeline.stage property
+                # contains_any_global_functions = np.any([v.is_global for v in active_computation_functions])
+                if contains_any_global_functions:
+                    previous_computation_result = self.global_computation_results # does this need the [a_select_config_name] since it's global?
+                    self.global_computation_results = self.run_specific_computations_single_context(previous_computation_result, computation_functions_name_whitelist=computation_functions_name_whitelist, are_global=True, fail_on_exception=fail_on_exception, debug_print=debug_print)
+                else:
+                    # No global functions:
+                    previous_computation_result = self.computation_results[a_select_config_name]
+                    self.computation_results[a_select_config_name] = self.run_specific_computations_single_context(previous_computation_result, computation_functions_name_whitelist=computation_functions_name_whitelist, are_global=False, fail_on_exception=fail_on_exception, debug_print=debug_print)
+            
+        ## IMPLEMENTATION FAULT: the global computations/results should not be ran within the filter/config loop. It applies to all config names and should be ran last. Also don't allow mixing local/global functions.
+
 
     # ==================================================================================================================== #
     # CLASS/STATIC METHODS                                                                                                 #
@@ -490,61 +524,18 @@ class ComputedPipelineStage(LoadableInput, LoadableSessionInput, FilterablePipel
             # call to perform any registered computations:
             curr_active_pipeline.computation_results[an_incomplete_config_name] = curr_active_pipeline.perform_specific_context_registered_computations(curr_active_pipeline.computation_results[an_incomplete_config_name], computation_functions_name_whitelist=computation_functions_name_whitelist, computation_functions_name_blacklist=computation_functions_name_blacklist, fail_on_exception=fail_on_exception, debug_print=debug_print)
 
-        ## TODO: initially compute incomplete_computed_config_dict items...
+            ## TODO: initially compute incomplete_computed_config_dict items...
 
-        ## Next look for previously failed computation results:
+            ## Next look for previously failed computation results:
 
-        ## Next look for previously complete computation results that lack computations for functions explicitly specified in the whitelist (if provided):
+            ## Next look for previously complete computation results that lack computations for functions explicitly specified in the whitelist (if provided):
 
-        ## Then look for previously complete computation results that are missing computations that have been registered after they were computed, or that were previously part of the blacklist but now are not:
+            ## Then look for previously complete computation results that are missing computations that have been registered after they were computed, or that were previously part of the blacklist but now are not:
 
 
     @classmethod
     def _perform_specific_computation_for_pipeline(cls, curr_active_pipeline, active_computation_params=None, enabled_filter_names=None, computation_functions_name_whitelist=None, fail_on_exception:bool=False, debug_print=False):
-        """ perform a specific computation (specified in computation_functions_name_whitelist) in a minimally destructive manner using the previously recomputed results:
-        Ideally would already have access to the:
-        - Previous computation result
-        - Previous computation config (the input parameters)
-
-        Internally calls: `run_specific_computations_single_context`.
-
-        Updates:
-            curr_active_pipeline.computation_results
-        """
-        if enabled_filter_names is None:
-            enabled_filter_names = list(curr_active_pipeline.filtered_sessions.keys()) # all filters if specific enabled names aren't specified
-
-        active_computation_functions = curr_active_pipeline.find_registered_computation_functions(computation_functions_name_whitelist, search_mode=FunctionsSearchMode.ANY) # find_registered_computation_functions is a pipeline.stage property
-        contains_any_global_functions = np.any([v.is_global for v in active_computation_functions])
-        if contains_any_global_functions:
-            if curr_active_pipeline.global_computation_results is None:
-                print(f'global_computation_results is None. Building initial global_computation_results...')
-                curr_active_pipeline.global_computation_results = DynamicParameters()
-                curr_active_pipeline.global_computation_results = ComputedPipelineStage._build_initial_computationResult(curr_active_pipeline.sess, active_computation_params) # returns a computation result. This stores the computation config used to compute it.
-
-        for a_select_config_name, a_filtered_session in curr_active_pipeline.filtered_sessions.items():                
-            if a_select_config_name in enabled_filter_names:
-                print(f'Performing run_specific_computations_single_context on filtered_session with filter named "{a_select_config_name}"...')
-                if active_computation_params is None:
-                    curr_active_computation_params = curr_active_pipeline.active_configs[a_select_config_name].computation_config # get the previously set computation configs
-                else:
-                    # set/update the computation configs:
-                    curr_active_computation_params = active_computation_params 
-                    curr_active_pipeline.active_configs[a_select_config_name].computation_config = curr_active_computation_params #TODO: if more than one computation config is passed in, the active_config should be duplicated for each computation config.
-
-                ## Here is an issue, we need to get the appropriate computation result depending on whether it's global or not 
-                # active_computation_functions = curr_active_pipeline.find_registered_computation_functions(computation_functions_name_whitelist, search_mode=FunctionsSearchMode.ANY) # find_registered_computation_functions is a pipeline.stage property
-                # contains_any_global_functions = np.any([v.is_global for v in active_computation_functions])
-                if contains_any_global_functions:
-                    previous_computation_result = curr_active_pipeline.global_computation_results # does this need the [a_select_config_name] since it's global?
-                    curr_active_pipeline.global_computation_results = curr_active_pipeline.run_specific_computations_single_context(previous_computation_result, computation_functions_name_whitelist=computation_functions_name_whitelist, are_global=True, fail_on_exception=fail_on_exception, debug_print=debug_print)
-                else:
-                    # No global functions:
-                    previous_computation_result = curr_active_pipeline.computation_results[a_select_config_name]
-                    curr_active_pipeline.computation_results[a_select_config_name] = curr_active_pipeline.run_specific_computations_single_context(previous_computation_result, computation_functions_name_whitelist=computation_functions_name_whitelist, are_global=False, fail_on_exception=fail_on_exception, debug_print=debug_print)
-            
-        ## IMPLEMENTATION FAULT: the global computations/results should not be ran within the filter/config loop. It applies to all config names and should be ran last. Also don't allow mixing local/global functions.
-
+        
             
         
 # ==================================================================================================================== #
