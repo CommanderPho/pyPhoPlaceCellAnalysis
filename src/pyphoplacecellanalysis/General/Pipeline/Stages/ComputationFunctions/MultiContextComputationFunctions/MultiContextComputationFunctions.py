@@ -123,7 +123,7 @@ class MultiContextComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Co
 # ==================================================================================================================== #
 # Jonathan's helper functions                                                                                          #
 # ==================================================================================================================== #
-def _final_compute_jonathan_replay_fr_analyses(sess, replays_df):
+def _final_compute_jonathan_replay_fr_analyses(sess, replays_df, debug_print=False):
     """_summary_
 
     Args:
@@ -156,19 +156,21 @@ def _final_compute_jonathan_replay_fr_analyses(sess, replays_df):
     rdf, aclu_to_idx = add_spike_counts(sess, rdf)
 
     rdf = remove_nospike_replays(rdf)
-    print(f"RDF has {len(rdf)} rows.")
+    rdf['duration'] = rdf['end'] - rdf['start']
+    if debug_print:
+        print(f"RDF has {len(rdf)} rows.")
 
     ### Make `irdf` (inter-replay dataframe)
     irdf = make_irdf(sess, rdf)
     irdf = remove_repeated_replays(irdf) # TODO: make the removal process more meaningful
     irdf, aclu_to_idx_irdf = add_spike_counts(sess, irdf)
-
+    irdf['duration'] = irdf['end'] - irdf['start']
     assert aclu_to_idx_irdf == aclu_to_idx # technically, these might not match, which would be bad
 
     return rdf, aclu_to_idx, irdf, aclu_to_idx_irdf
 
 
-def _subfn_computations_make_jonathan_firing_comparison_df(unit_specific_time_binned_firing_rates, pf1d_short, pf1d_long, aclu_to_idx, rdf, irdf):
+def _subfn_computations_make_jonathan_firing_comparison_df(unit_specific_time_binned_firing_rates, pf1d_short, pf1d_long, aclu_to_idx, rdf, irdf, debug_print=False):
     """ the computations that were factored out of _make_jonathan_interactive_plot(...) 
     Historical: used to be called `_subfn_computations_make_jonathan_interactive_plot(...)`
     """
@@ -178,7 +180,8 @@ def _subfn_computations_make_jonathan_firing_comparison_df(unit_specific_time_bi
     ## The actual firing rate we want:
     
     # unit_specific_time_binned_firing_rates = pf2D_Decoder.unit_specific_time_binned_spike_counts.astype(np.float32) / pf2D_Decoder.time_bin_size
-    print(f'np.shape(unit_specific_time_binned_firing_rates): {np.shape(unit_specific_time_binned_firing_rates)}')
+    if debug_print:
+        print(f'np.shape(unit_specific_time_binned_firing_rates): {np.shape(unit_specific_time_binned_firing_rates)}')
 
     # calculations for ax[0,0] ___________________________________________________________________________________________ #
     # below we find where the tuning curve peak was for each cell in each context and store it in a dataframe
@@ -201,6 +204,9 @@ def _subfn_computations_make_jonathan_firing_comparison_df(unit_specific_time_bi
     replay_diff = take_difference_nonzero(rdf)
     df["non_replay_diff"] = [non_replay_diff[aclu_to_idx[aclu]] for aclu in df.index]
     df["replay_diff"] = [replay_diff[aclu_to_idx[aclu]] for aclu in df.index]
+
+    ## Compare the number of replay events between the long and the short
+    
 
     return df
 
@@ -272,7 +278,7 @@ def take_difference(df):
     
     short_averages = np.zeros(short_fr.shape[1])
     for i in np.arange(short_fr.shape[1]):
-        row = [x for x in short_fr[:,i] if x >=0]
+        row = [x for x in short_fr[:,i] if x >= 0]
         short_averages[i] = np.mean(row)
         
     long_averages = np.zeros(long_fr.shape[1])
@@ -280,7 +286,7 @@ def take_difference(df):
         row = [x for x in long_fr[:,i] if x >= 0]
         long_averages[i] = np.mean(row)
         
-    return short_averages  - long_averages
+    return short_averages - long_averages
 
 
 def take_difference_nonzero(df):
@@ -294,15 +300,15 @@ def take_difference_nonzero(df):
     
     short_averages = np.zeros(short_fr.shape[1])
     for i in np.arange(short_fr.shape[1]):
-        row = [x for x in short_fr[:,i] if x >0]
+        row = [x for x in short_fr[:,i] if x > 0] # NOTE: the difference from take_difference(df) seems to be only the `x > 0` instead of `x >= 0`
         short_averages[i] = np.mean(row)
         
     long_averages = np.zeros(long_fr.shape[1])
     for i in np.arange(long_fr.shape[1]):
-        row = [x for x in long_fr[:,i] if x > 0]
+        row = [x for x in long_fr[:,i] if x > 0] # NOTE: the difference from take_difference(df) seems to be only the `x > 0` instead of `x >= 0`
         long_averages[i] = np.mean(row)
         
-    return short_averages  - long_averages
+    return short_averages - long_averages
 
 
 # # note: this is defined here, but not used anywhere

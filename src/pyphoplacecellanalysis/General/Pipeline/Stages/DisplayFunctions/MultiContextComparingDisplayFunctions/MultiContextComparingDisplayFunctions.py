@@ -95,8 +95,7 @@ class MultiContextComparingDisplayFunctions(AllFunctionEnumeratingMixin, metacla
             final_jonathan_df = global_computation_results.computed_data['jonathan_firing_rate_analysis']['final_jonathan_df']
 
             graphics_output_dict, neuron_df = _make_jonathan_interactive_plot(sess, time_bins, final_jonathan_df, time_binned_unit_specific_binned_spike_rate, pos_df, aclu_to_idx, rdf, irdf, show_inter_replay_frs=False)
-            # output_dict = {'fig': fig, 'axs': ax, 'colors': colors}
-            graphics_output_dict['plot_data'] = {'df': neuron_df, 'rdf':rdf, 'aclu_to_idx':aclu_to_idx, 'irdf':irdf}
+            graphics_output_dict['plot_data'] = {'df': final_jonathan_df, 'rdf':rdf, 'aclu_to_idx':aclu_to_idx, 'irdf':irdf, 'time_binned_unit_specific_spike_rate': global_computation_results.computed_data['jonathan_firing_rate_analysis']['time_binned_unit_specific_spike_rate']}
 
             return graphics_output_dict
 
@@ -127,7 +126,6 @@ class MultiContextComparingDisplayFunctions(AllFunctionEnumeratingMixin, metacla
             pf1d_short = computation_results[short_epoch_name]['computed_data']['pf1D']
             pf1D_all = computation_results[global_epoch_name]['computed_data']['pf1D']
 
-
             ## Proper global-computations based way:
             sess = owning_pipeline_reference.sess
             aclu_to_idx = global_computation_results.computed_data['jonathan_firing_rate_analysis']['rdf']['aclu_to_idx']
@@ -147,9 +145,7 @@ class MultiContextComparingDisplayFunctions(AllFunctionEnumeratingMixin, metacla
             show_inter_replay_frs = kwargs.get('show_inter_replay_frs', True)
 
             graphics_output_dict = _make_pho_jonathan_batch_plots(sess, time_bins, final_jonathan_df, time_binned_unit_specific_binned_spike_rate, pf1D_all, aclu_to_idx, rdf, irdf, show_inter_replay_frs=show_inter_replay_frs, n_max_plot_rows=n_max_plot_rows)
-
-            # output_dict = {'fig': fig, 'axs': ax, 'colors': colors}
-            graphics_output_dict['plot_data'] = {'df': final_jonathan_df, 'rdf':rdf, 'aclu_to_idx':aclu_to_idx, 'irdf':irdf}
+            graphics_output_dict['plot_data'] = {'df': final_jonathan_df, 'rdf':rdf, 'aclu_to_idx':aclu_to_idx, 'irdf':irdf, 'time_binned_unit_specific_spike_rate': global_computation_results.computed_data['jonathan_firing_rate_analysis']['time_binned_unit_specific_spike_rate']}
 
             return graphics_output_dict
 
