@@ -69,6 +69,9 @@ class MultiContextComparingDisplayFunctions(AllFunctionEnumeratingMixin, metacla
             short_epoch_name = include_whitelist[1] # 'maze2_PYR'
             if len(include_whitelist) > 2:
                 global_epoch_name = include_whitelist[-1] # 'maze_PYR'
+            else:
+                print(f'WARNING: no global_epoch detected.')
+                global_epoch_name = '' # None
 
             print(f'include_whitelist: {include_whitelist}\nlong_epoch_name: {long_epoch_name}, short_epoch_name: {short_epoch_name}, global_epoch_name: {global_epoch_name}')
             pf1d_long = computation_results[long_epoch_name]['computed_data']['pf1D']
@@ -76,18 +79,18 @@ class MultiContextComparingDisplayFunctions(AllFunctionEnumeratingMixin, metacla
             pf1d = computation_results[global_epoch_name]['computed_data']['pf1D']
 
             try:
-                # pf2D_Decoder = computation_results['maze_PYR']['computed_data']['pf2D_Decoder']
-                active_firing_rate_trends = computation_results['maze_PYR']['computed_data']['firing_rate_trends']
+                # pf2D_Decoder = computation_results[global_epoch_name]['computed_data']['pf2D_Decoder']
+                active_firing_rate_trends = computation_results[global_epoch_name]['computed_data']['firing_rate_trends']
 
                 ## time_binned_unit_specific_binned_spike_rate mode:
                 # time_bins = active_firing_rate_trends.all_session_spikes.time_binning_container.centers
                 # time_binned_unit_specific_binned_spike_rate = active_firing_rate_trends.all_session_spikes.time_binned_unit_specific_binned_spike_rate
 
                 ## instantaneous_unit_specific_spike_rate mode:
-                neuron_IDs = np.unique(computation_results['maze_PYR'].sess.spikes_df.aclu)
+                neuron_IDs = np.unique(computation_results[global_epoch_name].sess.spikes_df.aclu)
                 # neuron_IDXs = np.arange(len(neuron_IDs))
                 instantaneous_unit_specific_spike_rate = active_firing_rate_trends.all_session_spikes.instantaneous_unit_specific_spike_rate
-                # instantaneous_unit_specific_spike_rate = computation_results['maze_PYR']['computed_data']['firing_rate_trends'].all_session_spikes.instantaneous_unit_specific_spike_rate
+                # instantaneous_unit_specific_spike_rate = computation_results[global_epoch_name]['computed_data']['firing_rate_trends'].all_session_spikes.instantaneous_unit_specific_spike_rate
                 instantaneous_unit_specific_spike_rate_values = pd.DataFrame(instantaneous_unit_specific_spike_rate.magnitude, columns=neuron_IDs) # builds a df with times along the rows and aclu values along the columns in the style of unit_specific_binned_spike_counts
                 time_bins = instantaneous_unit_specific_spike_rate.times.magnitude # .shape (3429,)
                 time_binned_unit_specific_binned_spike_rate = instantaneous_unit_specific_spike_rate_values # .shape (3429, 71)
@@ -149,18 +152,18 @@ class MultiContextComparingDisplayFunctions(AllFunctionEnumeratingMixin, metacla
             pf1D_all = computation_results[global_epoch_name]['computed_data']['pf1D']
 
             try:
-                # pf2D_Decoder = computation_results['maze_PYR']['computed_data']['pf2D_Decoder']
-                active_firing_rate_trends = computation_results['maze_PYR']['computed_data']['firing_rate_trends']
+                # pf2D_Decoder = computation_results[global_epoch_name]['computed_data']['pf2D_Decoder']
+                active_firing_rate_trends = computation_results[global_epoch_name]['computed_data']['firing_rate_trends']
 
                 ## time_binned_unit_specific_binned_spike_rate mode:
                 # time_bins = active_firing_rate_trends.all_session_spikes.time_binning_container.centers
                 # time_binned_unit_specific_binned_spike_rate = active_firing_rate_trends.all_session_spikes.time_binned_unit_specific_binned_spike_rate
 
                 ## instantaneous_unit_specific_spike_rate mode:
-                neuron_IDs = np.unique(computation_results['maze_PYR'].sess.spikes_df.aclu)
+                neuron_IDs = np.unique(computation_results[global_epoch_name].sess.spikes_df.aclu)
                 # neuron_IDXs = np.arange(len(neuron_IDs))
                 instantaneous_unit_specific_spike_rate = active_firing_rate_trends.all_session_spikes.instantaneous_unit_specific_spike_rate
-                # instantaneous_unit_specific_spike_rate = computation_results['maze_PYR']['computed_data']['firing_rate_trends'].all_session_spikes.instantaneous_unit_specific_spike_rate
+                # instantaneous_unit_specific_spike_rate = computation_results[global_epoch_name]['computed_data']['firing_rate_trends'].all_session_spikes.instantaneous_unit_specific_spike_rate
                 instantaneous_unit_specific_spike_rate_values = pd.DataFrame(instantaneous_unit_specific_spike_rate.magnitude, columns=neuron_IDs) # builds a df with times along the rows and aclu values along the columns in the style of unit_specific_binned_spike_counts
                 time_bins = instantaneous_unit_specific_spike_rate.times.magnitude # .shape (3429,)
                 time_binned_unit_specific_binned_spike_rate = instantaneous_unit_specific_spike_rate_values # .shape (3429, 71)

@@ -45,7 +45,7 @@ class DefaultRatemapDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Disp
         ## Finally, add the display function to the active context
         active_display_fn_identifying_ctx = active_context.adding_context('display_fn', display_fn_name='_display_1d_placefields')
         # _build_safe_kwargs
-        ax_pf_1D = computation_result.computed_data['pf1D'].plot_ratemaps_1D()
+        ax_pf_1D = computation_result.computed_data['pf1D'].plot_ratemaps_1D(**kwargs)
         active_figure = plt.gcf()
 
         # return dict(fig=active_figure, ax=ax_pf_1D)
