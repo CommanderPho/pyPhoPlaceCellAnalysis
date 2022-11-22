@@ -293,6 +293,15 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
             else:
                 comp_config_results_list = None
 
+            ## Add the global_computation_results to the comp_config_results_list:
+            if hasattr(a_pipeline, 'global_computation_results'):
+                if comp_config_results_list is None:
+                    comp_config_results_list = {}
+                for a_name, a_result in a_pipeline.global_computation_results.items():
+                    # ['sess', 'computation_config', 'computed_data', 'accumulated_errors']
+                    comp_config_results_list[a_name] = dict(computation_config=a_result['computation_config'], computed_data=tuple(a_result['computed_data'].keys()))
+
+
             out_results_dict.update(active_completed_computation_result_names = tuple(a_pipeline.active_completed_computation_result_names), # ['maze1_PYR', 'maze2_PYR', 'maze_PYR']
                 active_incomplete_computation_result_status_dicts= freeze(a_pipeline.active_incomplete_computation_result_status_dicts),
                 computation_result_computed_data_names = freeze(comp_config_results_list)

@@ -78,45 +78,21 @@ class MultiContextComparingDisplayFunctions(AllFunctionEnumeratingMixin, metacla
             pf1d_short = computation_results[short_epoch_name]['computed_data']['pf1D']
             pf1d = computation_results[global_epoch_name]['computed_data']['pf1D']
 
-            try:
-                # pf2D_Decoder = computation_results[global_epoch_name]['computed_data']['pf2D_Decoder']
-                active_firing_rate_trends = computation_results[global_epoch_name]['computed_data']['firing_rate_trends']
-
-                ## time_binned_unit_specific_binned_spike_rate mode:
-                # time_bins = active_firing_rate_trends.all_session_spikes.time_binning_container.centers
-                # time_binned_unit_specific_binned_spike_rate = active_firing_rate_trends.all_session_spikes.time_binned_unit_specific_binned_spike_rate
-
-                ## instantaneous_unit_specific_spike_rate mode:
-                neuron_IDs = np.unique(computation_results[global_epoch_name].sess.spikes_df.aclu)
-                # neuron_IDXs = np.arange(len(neuron_IDs))
-                instantaneous_unit_specific_spike_rate = active_firing_rate_trends.all_session_spikes.instantaneous_unit_specific_spike_rate
-                # instantaneous_unit_specific_spike_rate = computation_results[global_epoch_name]['computed_data']['firing_rate_trends'].all_session_spikes.instantaneous_unit_specific_spike_rate
-                instantaneous_unit_specific_spike_rate_values = pd.DataFrame(instantaneous_unit_specific_spike_rate.magnitude, columns=neuron_IDs) # builds a df with times along the rows and aclu values along the columns in the style of unit_specific_binned_spike_counts
-                time_bins = instantaneous_unit_specific_spike_rate.times.magnitude # .shape (3429,)
-                time_binned_unit_specific_binned_spike_rate = instantaneous_unit_specific_spike_rate_values # .shape (3429, 71)
-
-            except KeyError:
-                # except ValueError:
-                # print(f'non-placefield neuron. Skipping.')
-                time_bins, time_binned_unit_specific_binned_spike_rate = {}, {}
-
-
-            # ## Compute for all the session spikes first:
+            ## Proper global-computations based way:
             sess = owning_pipeline_reference.sess
-            # BAD DOn'T DO THIS:
-            rdf, aclu_to_idx, irdf, aclu_to_idx_irdf = _final_compute_jonathan_replay_fr_analyses(sess, sess.replay)
-            pos_df = sess.position.to_dataframe()
+            aclu_to_idx = global_computation_results.computed_data['jonathan_firing_rate_analysis']['rdf']['aclu_to_idx']
+            rdf = global_computation_results.computed_data['jonathan_firing_rate_analysis']['rdf']['rdf']
+            irdf = global_computation_results.computed_data['jonathan_firing_rate_analysis']['irdf']['irdf']
+            pos_df = global_computation_results.sess.position.to_dataframe()
+            
+            ## time_binned_unit_specific_binned_spike_rate mode:
+            time_bins = global_computation_results.computed_data['jonathan_firing_rate_analysis']['time_binned_unit_specific_spike_rate']['time_bins']
+            time_binned_unit_specific_binned_spike_rate = global_computation_results.computed_data['jonathan_firing_rate_analysis']['time_binned_unit_specific_spike_rate']['time_binned_unit_specific_binned_spike_rate']
+            # ## instantaneous_unit_specific_spike_rate mode:
+            # time_bins = global_computation_results.computed_data['jonathan_firing_rate_analysis']['time_binned_instantaneous_unit_specific_spike_rate']['time_bins']
+            # time_binned_unit_specific_binned_spike_rate = global_computation_results.computed_data['jonathan_firing_rate_analysis']['time_binned_instantaneous_unit_specific_spike_rate']['instantaneous_unit_specific_spike_rate_values']
 
-            # ==================================================================================================================== #
-            ## Calculating:
-            final_jonathan_df = _subfn_computations_make_jonathan_firing_comparison_df(time_binned_unit_specific_binned_spike_rate, pf1d_short, pf1d_long, aclu_to_idx, rdf, irdf)
-
-            ## TODO: This is the proper way once global computations work:
-            # aclu_to_idx = computation_result.computed_data['jonathan_firing_rate_analysis']['rdf']['aclu_to_idx']
-            # rdf = computation_result.computed_data['jonathan_firing_rate_analysis']['rdf']['rdf'],
-            # irdf = computation_result.computed_data['jonathan_firing_rate_analysis']['irdf']['irdf']
-            # pos_df = computation_result.sess.position.to_dataframe()
-            # compare_firing_rates(rdf, irdf)
+            final_jonathan_df = global_computation_results.computed_data['jonathan_firing_rate_analysis']['final_jonathan_df']
 
             graphics_output_dict, neuron_df = _make_jonathan_interactive_plot(sess, time_bins, final_jonathan_df, time_binned_unit_specific_binned_spike_rate, pos_df, aclu_to_idx, rdf, irdf, show_inter_replay_frs=False)
             # output_dict = {'fig': fig, 'axs': ax, 'colors': colors}
@@ -151,39 +127,6 @@ class MultiContextComparingDisplayFunctions(AllFunctionEnumeratingMixin, metacla
             pf1d_short = computation_results[short_epoch_name]['computed_data']['pf1D']
             pf1D_all = computation_results[global_epoch_name]['computed_data']['pf1D']
 
-            # try:
-            #     # pf2D_Decoder = computation_results[global_epoch_name]['computed_data']['pf2D_Decoder']
-            #     active_firing_rate_trends = computation_results[global_epoch_name]['computed_data']['firing_rate_trends']
-
-            #     ## time_binned_unit_specific_binned_spike_rate mode:
-            #     # time_bins = active_firing_rate_trends.all_session_spikes.time_binning_container.centers
-            #     # time_binned_unit_specific_binned_spike_rate = active_firing_rate_trends.all_session_spikes.time_binned_unit_specific_binned_spike_rate
-
-            #     ## instantaneous_unit_specific_spike_rate mode:
-            #     neuron_IDs = np.unique(computation_results[global_epoch_name].sess.spikes_df.aclu)
-            #     # neuron_IDXs = np.arange(len(neuron_IDs))
-            #     instantaneous_unit_specific_spike_rate = active_firing_rate_trends.all_session_spikes.instantaneous_unit_specific_spike_rate
-            #     # instantaneous_unit_specific_spike_rate = computation_results[global_epoch_name]['computed_data']['firing_rate_trends'].all_session_spikes.instantaneous_unit_specific_spike_rate
-            #     instantaneous_unit_specific_spike_rate_values = pd.DataFrame(instantaneous_unit_specific_spike_rate.magnitude, columns=neuron_IDs) # builds a df with times along the rows and aclu values along the columns in the style of unit_specific_binned_spike_counts
-            #     time_bins = instantaneous_unit_specific_spike_rate.times.magnitude # .shape (3429,)
-            #     time_binned_unit_specific_binned_spike_rate = instantaneous_unit_specific_spike_rate_values # .shape (3429, 71)
-
-            # except KeyError:
-            #     # except ValueError:
-            #     print(f'WARNING: Could not get firing_rate_trends from computation_results. Skipping.')
-            #     time_bins, time_binned_unit_specific_binned_spike_rate = {}, {}
-
-            # print(f'np.shape(time_binned_unit_specific_binned_spike_rate): {time_binned_unit_specific_binned_spike_rate}')
-
-            # ## Compute for all the session spikes first:
-            # sess = owning_pipeline_reference.sess
-            # BAD DOn'T DO THIS:
-            # rdf, aclu_to_idx, irdf, aclu_to_idx_irdf = _final_compute_jonathan_replay_fr_analyses(sess, sess.replay)
-            # pos_df = sess.position.to_dataframe()
-            # ==================================================================================================================== #
-            ## Calculating:
-            # final_jonathan_df = _subfn_computations_make_jonathan_firing_comparison_df(time_binned_unit_specific_binned_spike_rate, pf1d_short, pf1d_long, aclu_to_idx, rdf, irdf)
-
 
             ## Proper global-computations based way:
             sess = owning_pipeline_reference.sess
@@ -191,17 +134,13 @@ class MultiContextComparingDisplayFunctions(AllFunctionEnumeratingMixin, metacla
             rdf = global_computation_results.computed_data['jonathan_firing_rate_analysis']['rdf']['rdf']
             irdf = global_computation_results.computed_data['jonathan_firing_rate_analysis']['irdf']['irdf']
             pos_df = global_computation_results.sess.position.to_dataframe()
-
+            ## time_binned_unit_specific_binned_spike_rate mode:
             time_bins = global_computation_results.computed_data['jonathan_firing_rate_analysis']['time_binned_unit_specific_spike_rate']['time_bins']
             time_binned_unit_specific_binned_spike_rate = global_computation_results.computed_data['jonathan_firing_rate_analysis']['time_binned_unit_specific_spike_rate']['time_binned_unit_specific_binned_spike_rate']
-
+            # ## instantaneous_unit_specific_spike_rate mode:
+            # time_bins = global_computation_results.computed_data['jonathan_firing_rate_analysis']['time_binned_instantaneous_unit_specific_spike_rate']['time_bins']
+            # time_binned_unit_specific_binned_spike_rate = global_computation_results.computed_data['jonathan_firing_rate_analysis']['time_binned_instantaneous_unit_specific_spike_rate']['instantaneous_unit_specific_spike_rate_values']
             final_jonathan_df = global_computation_results.computed_data['jonathan_firing_rate_analysis']['final_jonathan_df']
-
-
-            # aclu_to_idx = computation_result.computed_data['jonathan_firing_rate_analysis']['rdf']['aclu_to_idx']
-            # rdf = computation_result.computed_data['jonathan_firing_rate_analysis']['rdf']['rdf'],
-            # irdf = computation_result.computed_data['jonathan_firing_rate_analysis']['irdf']['irdf']
-            # pos_df = computation_result.sess.position.to_dataframe()
             # compare_firing_rates(rdf, irdf)
 
             graphics_output_dict = _make_pho_jonathan_batch_plots(sess, time_bins, final_jonathan_df, time_binned_unit_specific_binned_spike_rate, pf1D_all, aclu_to_idx, rdf, irdf, show_inter_replay_frs=True, n_max_plot_rows=6)

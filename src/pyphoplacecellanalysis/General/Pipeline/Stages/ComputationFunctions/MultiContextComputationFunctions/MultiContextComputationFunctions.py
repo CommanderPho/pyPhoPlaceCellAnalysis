@@ -45,13 +45,17 @@ class MultiContextComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Co
                     ['jonathan_firing_rate_analysis']['time_binned_unit_specific_spike_rate']['time_bins']
                     ['jonathan_firing_rate_analysis']['time_binned_unit_specific_spike_rate']['time_binned_unit_specific_binned_spike_rate']
 
+                ['jonathan_firing_rate_analysis']['time_binned_instantaneous_unit_specific_spike_rate']:
+                    ['jonathan_firing_rate_analysis']['time_binned_instantaneous_unit_specific_spike_rate']['time_bins']
+                    ['jonathan_firing_rate_analysis']['time_binned_instantaneous_unit_specific_spike_rate']['instantaneous_unit_specific_spike_rate_values']
+
                 ['jonathan_firing_rate_analysis']['final_jonathan_df']
         
         """
         if include_whitelist is None:
             include_whitelist = owning_pipeline_reference.active_completed_computation_result_names # ['maze', 'sprinkle']
 
-        # ## Compute for all the session spikes first:
+        ## Compute for all the session spikes first:
         sess = owning_pipeline_reference.sess
         replays_df = sess.replay
         rdf, aclu_to_idx, irdf, aclu_to_idx_irdf = _final_compute_jonathan_replay_fr_analyses(sess, replays_df)
@@ -71,27 +75,32 @@ class MultiContextComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Co
         pf1d_short = computation_results[short_epoch_name]['computed_data']['pf1D']
         pf1d = computation_results[global_epoch_name]['computed_data']['pf1D']
 
+        ## time_binned_unit_specific_binned_spike_rate mode:
         try:
-            # pf2D_Decoder = computation_results[global_epoch_name]['computed_data']['pf2D_Decoder']
-            active_firing_rate_trends = computation_results[global_epoch_name]['computed_data']['firing_rate_trends']
+            active_firing_rate_trends = computation_results[global_epoch_name]['computed_data']['firing_rate_trends']    
+            time_bins = active_firing_rate_trends.all_session_spikes.time_binning_container.centers
+            time_binned_unit_specific_binned_spike_rate = active_firing_rate_trends.all_session_spikes.time_binned_unit_specific_binned_spike_rate
+        except KeyError:
+            time_bins, time_binned_unit_specific_binned_spike_rate = {}, {}
+        time_binned_unit_specific_spike_rate_result = DynamicParameters.init_from_dict({
+            'time_bins': time_bins.copy(),
+            'time_binned_unit_specific_binned_spike_rate': time_binned_unit_specific_binned_spike_rate,           
+        })
 
-            ## time_binned_unit_specific_binned_spike_rate mode:
-            # time_bins = active_firing_rate_trends.all_session_spikes.time_binning_container.centers
-            # time_binned_unit_specific_binned_spike_rate = active_firing_rate_trends.all_session_spikes.time_binned_unit_specific_binned_spike_rate
-
-            ## instantaneous_unit_specific_spike_rate mode:
+        ## instantaneous_unit_specific_spike_rate mode:
+        try:
+            active_firing_rate_trends = computation_results[global_epoch_name]['computed_data']['firing_rate_trends']            
             neuron_IDs = np.unique(computation_results[global_epoch_name].sess.spikes_df.aclu)
-            # neuron_IDXs = np.arange(len(neuron_IDs))
             instantaneous_unit_specific_spike_rate = active_firing_rate_trends.all_session_spikes.instantaneous_unit_specific_spike_rate
             # instantaneous_unit_specific_spike_rate = computation_results[global_epoch_name]['computed_data']['firing_rate_trends'].all_session_spikes.instantaneous_unit_specific_spike_rate
             instantaneous_unit_specific_spike_rate_values = pd.DataFrame(instantaneous_unit_specific_spike_rate.magnitude, columns=neuron_IDs) # builds a df with times along the rows and aclu values along the columns in the style of unit_specific_binned_spike_counts
             time_bins = instantaneous_unit_specific_spike_rate.times.magnitude # .shape (3429,)
-            time_binned_unit_specific_binned_spike_rate = instantaneous_unit_specific_spike_rate_values # .shape (3429, 71)
-
         except KeyError:
-            # except ValueError:
-            # print(f'non-placefield neuron. Skipping.')
-            time_bins, time_binned_unit_specific_binned_spike_rate = {}, {}
+            time_bins, instantaneous_unit_specific_spike_rate_values = {}, {}
+        instantaneous_unit_specific_spike_rate_result = DynamicParameters.init_from_dict({
+            'time_bins': time_bins.copy(),
+            'instantaneous_unit_specific_spike_rate_values': instantaneous_unit_specific_spike_rate_values,           
+        })
 
         final_jonathan_df = _subfn_computations_make_jonathan_firing_comparison_df(time_binned_unit_specific_binned_spike_rate, pf1d_short, pf1d_long, aclu_to_idx, rdf, irdf)
 
@@ -104,10 +113,8 @@ class MultiContextComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Co
                 'irdf': irdf,
                 'aclu_to_idx': aclu_to_idx_irdf,           
             }),
-            'time_binned_unit_specific_spike_rate': DynamicParameters.init_from_dict({
-                'time_bins': time_bins,
-                'time_binned_unit_specific_binned_spike_rate': time_binned_unit_specific_binned_spike_rate,           
-            }),
+            'time_binned_unit_specific_spike_rate': time_binned_unit_specific_spike_rate_result,
+            'time_binned_instantaneous_unit_specific_spike_rate': instantaneous_unit_specific_spike_rate_result,
             'final_jonathan_df': final_jonathan_df
         })
         return global_computation_results
