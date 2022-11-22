@@ -158,10 +158,10 @@ class MultiContextComparingDisplayFunctions(AllFunctionEnumeratingMixin, metacla
 
             except KeyError:
                 # except ValueError:
-                print(f'Could not get firing_rate_trends from computation_results. Skipping.')
+                print(f'WARNING: Could not get firing_rate_trends from computation_results. Skipping.')
                 time_bins, time_binned_unit_specific_binned_spike_rate = {}, {}
 
-            print(f'np.shape(time_binned_unit_specific_binned_spike_rate): {time_binned_unit_specific_binned_spike_rate}')
+            # print(f'np.shape(time_binned_unit_specific_binned_spike_rate): {time_binned_unit_specific_binned_spike_rate}')
 
             # ## Compute for all the session spikes first:
             sess = owning_pipeline_reference.sess
@@ -568,6 +568,9 @@ def _make_pho_jonathan_batch_plots(sess, time_bins, final_jonathan_df, unit_spec
     fig = plt.figure(constrained_layout=True, figsize=(10, 4))
     subfigs = fig.subfigures(n_max_plot_rows, 1, wspace=0.07)
     colors = plt.rcParams['axes.prop_cycle'].by_key()['color'];
+
+    axs_list = []
+
     for i in np.arange(n_max_plot_rows):
         is_first_row = (i==0)
         is_last_row = (i == (n_max_plot_rows-1))
@@ -613,11 +616,13 @@ def _make_pho_jonathan_batch_plots(sess, time_bins, final_jonathan_df, unit_spec
         curr_ax_placefield.sharey(curr_ax_lap_spikes)
         _ = plot_1D_placecell_validation(pf1D_all, i, extant_fig=curr_fig, extant_axes=(curr_ax_lap_spikes, curr_ax_placefield), **({'should_include_labels': False, 'should_plot_spike_indicator_points_on_placefield': False, 'spike_indicator_lines_alpha': 0.2} | kwargs))
 
-
         t_start, t_end = curr_ax_lap_spikes.get_xlim()
         curr_ax_firing_rate.set_xlim((t_start, t_end)) # We don't want to clip to only the spiketimes for this cell, we want it for all cells, or even when the recording started/ended
         curr_ax_lap_spikes.sharex(curr_ax_firing_rate) # Sync the time axes of the laps and the firing rates
         
-    graphics_output_dict = {'fig': fig, 'subfigs': subfigs, 'axs': [], 'colors': colors}
+        # output the axes created:
+        axs_list.append({'firing_rate':curr_ax_firing_rate, 'lap_spikes': curr_ax_lap_spikes, 'placefield': curr_ax_placefield})
+
+    graphics_output_dict = {'fig': fig, 'subfigs': subfigs, 'axs': axs_list, 'colors': colors}
     fig.show()
     return graphics_output_dict
