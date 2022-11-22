@@ -319,7 +319,11 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
             # Connect the jump forward/back controls:
             self.ui.bottom_bar_connections.append(self.ui.bottomPlaybackControlBarWidget.jump_target_left.connect(self.perform_jump_prev_series_item))
             self.ui.bottom_bar_connections.append(self.ui.bottomPlaybackControlBarWidget.jump_target_right.connect(self.perform_jump_next_series_item))
-
+            # Connect the interval series action controls:
+            self.ui.bottom_bar_connections.append(self.ui.bottomPlaybackControlBarWidget.series_remove_pressed.connect(self.perform_interval_series_remove_item))
+            self.ui.bottom_bar_connections.append(self.ui.bottomPlaybackControlBarWidget.series_customize_pressed.connect(self.perform_interval_series_customize_item))
+            self.ui.bottom_bar_connections.append(self.ui.bottomPlaybackControlBarWidget.series_clear_all_pressed.connect(self.perform_interval_series_clear_all))
+            self.ui.bottom_bar_connections.append(self.ui.bottomPlaybackControlBarWidget.series_add_pressed.connect(self.perform_interval_series_request_add))
 
         # Set Window Title Options:
         if self.applicationName is not None:
@@ -536,7 +540,7 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
 
 
     ########################################################
-    ## For SpikeRasterLeftSidebarControlsMixin conformance:
+    ## For SpikeRasterBottomFrameControlsMixin conformance:
     ########################################################
 
     @QtCore.Slot(str)
@@ -589,8 +593,39 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
         ## Update the window:
         self.update_animation(next_start_timestamp=next_target_jump_time)
 
+    @QtCore.Slot(str)
+    def perform_interval_series_remove_item(self, curr_series_name):
+        """ Removes the interval series with the name specified by curr_series_name
+        """
+        ## Get Interval Datasources:
+        interval_datasources = self.spike_raster_plt_2d.interval_datasources
+        assert curr_series_name in interval_datasources, f"curr_series_name: '{curr_series_name}' not in interval_datasources: {interval_datasources}"
+        self.spike_raster_plt_2d.remove_rendered_intervals(name=curr_series_name)
+
+    @QtCore.Slot(str)
+    def perform_interval_series_customize_item(self, curr_series_name):
+        """ Launches a customization dialog for the interval series with the name specified by curr_series_name
+        """
+        ## Get Interval Datasources:
+        interval_datasources = self.spike_raster_plt_2d.interval_datasources
+        assert curr_series_name in interval_datasources, f"curr_series_name: '{curr_series_name}' not in interval_datasources: {interval_datasources}"
+        ## TODO: not yet implemented
+        print(f'perform_series_customize_item(curr_series_name: "{curr_series_name}"): NOT YET IMPLEMENTED')
 
 
+    @QtCore.Slot()
+    def perform_interval_series_clear_all(self):
+        """ Removes all rendered interval series
+        """
+        self.spike_raster_plt_2d.clear_all_rendered_intervals()
+
+    @QtCore.Slot()
+    def perform_interval_series_request_add(self):
+        """ Launches a dialog to add new rendered interval series
+        """
+        ## TODO: not yet implemented
+        print(f'perform_interval_series_request_add(): NOT YET IMPLEMENTED')
+        # self.spike_raster_plt_2d.clear_all_rendered_intervals()
 
     ########################################################
     ## For GlobalConnectionManagerAccessingMixin conformance:

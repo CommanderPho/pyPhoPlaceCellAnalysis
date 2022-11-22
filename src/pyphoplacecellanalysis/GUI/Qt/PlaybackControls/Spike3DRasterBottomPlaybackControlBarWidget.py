@@ -34,11 +34,17 @@ RenderWindowControlsMixin
 RenderPlaybackControlsMixin
 
 
-btnJumpToPrevious
+
 
 btnJumpToPrevious
 comboActiveJumpTargetSeries
 btnJumpToNext
+
+# TODO:
+
+btnCurrentIntervals_Remove
+btnCurrentIntervals_Customize
+
 """
 
 
@@ -55,6 +61,13 @@ class Spike3DRasterBottomPlaybackControlBar(ComboBoxCtrlOwningMixin, QWidget):
     jump_target_right = QtCore.pyqtSignal(str)
     jump_series_selection_changed = QtCore.pyqtSignal(str)
     
+    # Series Target Actions
+    series_remove_pressed = QtCore.pyqtSignal(str)    
+    series_customize_pressed = QtCore.pyqtSignal(str)
+
+    series_clear_all_pressed = QtCore.pyqtSignal()
+    series_add_pressed = QtCore.pyqtSignal()
+
     def __init__(self, parent=None):
         super().__init__(parent=parent) # Call the inherited classes __init__ method
         self.ui = Ui_RootWidget()
@@ -92,44 +105,7 @@ class Spike3DRasterBottomPlaybackControlBar(ComboBoxCtrlOwningMixin, QWidget):
         
         self.ui.btnLeft.clicked.connect(self.on_jump_left)
         self.ui.btnRight.clicked.connect(self.on_jump_right)
-        
-        # self.ui.doubleSpinBoxPlaybackSpeed.setStyleSheet("alternate-background-color: rgb(255, 0, 0); selection-background-color: rgb(75, 83, 65);")
-                    
-        # self.ui.doubleSpinBoxPlaybackSpeed.setStyleSheet("QDoubleSpinBox"
-        #                     "{"
-        #                     "border : 2px solid black;"
-        #                     "background : rgb(62, 57, 52);"
-        #                     "}"
-        #                     "QDoubleSpinBox::hover"
-        #                     "{"
-        #                     "border : 2px solid green;"
-        #                     "background : lightgreen;"
-        #                     "}"                            
-        #                     )
-        # "QDoubleSpinBox::up-arrow"
-        #                     "{"
-        #                     "border : 1px solid black;"
-        #                     "background : blue;"
-        #                     "}"
-        #                     "QDoubleSpinBox::down-arrow"
-        #                     "{"
-        #                     "border : 1px solid black;"
-        #                     "background : red;"
-        #                     "}"
-        # rgb(75, 83, 65)
-        
-        # self.ui.spinBoxFrameJumpMultiplier.setStyleSheet("alternate-background-color: rgb(255, 0, 0); selection-background-color: rgb(75, 83, 65);")
-        # self.ui.spinBoxFrameJumpMultiplier.setStyleSheet("QSpinBox"
-        # "{"
-        # "background: rgb(62, 57, 52);"
-        # "}"
-        # "QSpinBox::hover"
-        # "{"
-        # "background: rgb(75, 83, 65);"
-        # "}"
-        # )
-        
-        
+
         ## Remove Extra Buttons:
         self.ui.btnSkipLeft.hide()
         self.ui.btnSkipRight.hide()
@@ -145,10 +121,20 @@ class Spike3DRasterBottomPlaybackControlBar(ComboBoxCtrlOwningMixin, QWidget):
         self.ui.btnJumpToNext.pressed.connect(self.on_jump_next_series_item)
         self.ui.comboActiveJumpTargetSeries.currentTextChanged.connect(self.on_jump_combo_series_changed)
 
+        self.ui.btnCurrentIntervals_Customize.pressed.connect(self.on_series_customize_button_pressed)
+        self.ui.btnCurrentIntervals_Remove.pressed.connect(self.on_series_remove_button_pressed)
+
+        ## Setup Extra Button:
+        # self.ui.btnCurrentIntervals_Extra.pressed.connect(self.on_series_customize_button_pressed)
+        self.ui._series_extra_menu = QtWidgets.QMenu()
+        self.ui._series_extra_menu.addAction('Clear all', self.on_action_clear_all_pressed)
+        self.ui._series_extra_menu.addAction('Add Intervals...', self.on_action_request_add_intervals_pressed)
+        self.ui.btnCurrentIntervals_Extra.setMenu(self.ui._series_extra_menu)
+        self._update_series_action_buttons(self.has_valid_current_target_series_name) # should disable the action buttons to start
+
         
     def __str__(self):
          return 
-
     
     # Called when the play/pause button is clicked:
     def play_pause(self):
@@ -156,39 +142,6 @@ class Spike3DRasterBottomPlaybackControlBar(ComboBoxCtrlOwningMixin, QWidget):
         is_playing = self.ui.play_pause_model.getState()
         # print(f'is_playing: {is_playing}')
         self.play_pause_toggled.emit(is_playing)
-        
-        # if (not is_playing):
-        #     # if self.slidebar_val == 1:
-        #     #     # self.ui.slider.setValue(0)
-        #     #     pass
-        #     # # self.play_pause_model.setState(not is_playing)
-        #     # self.animationThread.start()
-        #     pass
-
-        # else:
-        #     # self.play_pause_model.setState(not is_playing)
-        #     # self.animationThread.terminate()
-        #     pass
-                    
-        # self.ui.play_pause_model.blockSignals(True)
-        # self.ui.play_pause_model.setState(not is_playing)
-        # self.ui.play_pause_model.blockSignals(False)
-        
-        # if self.ui.btn_slide_run.tag == "paused" or self.slidebar_val == 1:
-        #     if self.slidebar_val == 1:
-        #         self.ui.slider.setValue(0)
-            
-        #     self.ui.btn_slide_run.setText("||")
-        #     self.ui.btn_slide_run.tag = "running"
-        #     self.animationThread.start()
-
-        # elif self.ui.btn_slide_run.tag == "running":
-        #     self.ui.btn_slide_run.setText(">")
-        #     self.ui.btn_slide_run.tag = "paused"
-        #     self.animationThread.terminate()
-
-
-    
 
     def on_jump_left(self):
         # Skip back some frames
@@ -234,11 +187,15 @@ class Spike3DRasterBottomPlaybackControlBar(ComboBoxCtrlOwningMixin, QWidget):
         """The current_selected_jump_target_series_name property."""
         selected_index, selected_item_text = self.get_current_jump_target_series_selection()
         return selected_item_text
-
     @current_selected_jump_target_series_name.setter
     def current_selected_jump_target_series_name(self, value):
         self.try_select_combo_item_with_text(self.ui.comboActiveJumpTargetSeries, search_text=value, debug_print=False)
 
+    @property
+    def has_valid_current_target_series_name(self):
+        """True if there is currently a valid current_target_series selected in the combo box."""
+        selected_index, selected_item_text = self.get_current_jump_target_series_selection()
+        return (selected_index > -1)
 
     def get_current_jump_target_series_selection(self):
         """ gets the currently selected jump-target series """
@@ -290,6 +247,15 @@ class Spike3DRasterBottomPlaybackControlBar(ComboBoxCtrlOwningMixin, QWidget):
         return found_desired_index
 
 
+    def _update_series_action_buttons(self, has_valid_series_selection: bool):
+        """ conditionally update whether the buttons are enabled based on whether we have a valid series selection. """
+        self.ui.btnJumpToPrevious.setEnabled(has_valid_series_selection)
+        self.ui.btnJumpToNext.setEnabled(has_valid_series_selection)
+        self.ui.btnCurrentIntervals_Remove.setEnabled(has_valid_series_selection)
+        self.ui.btnCurrentIntervals_Customize.setEnabled(has_valid_series_selection)
+        # self.ui.btnCurrentIntervals_Extra.setEnabled(has_valid_series_selection)
+
+
     @QtCore.pyqtSlot(object)
     def on_rendered_intervals_list_changed(self, interval_list_owning_object):
         """ called when the list of rendered intervals changes """
@@ -299,6 +265,7 @@ class Spike3DRasterBottomPlaybackControlBar(ComboBoxCtrlOwningMixin, QWidget):
     def on_jump_combo_series_changed(self, series_name):
         print(f'on_jump_combo_series_changed(series_name: {series_name})')
         curr_jump_series_name = self.current_selected_jump_target_series_name # 'PBEs'
+        self._update_series_action_buttons(self.has_valid_current_target_series_name) # enable/disable the action buttons
         self.jump_series_selection_changed.emit(curr_jump_series_name)
 
     @QtCore.pyqtSlot()
@@ -322,6 +289,44 @@ class Spike3DRasterBottomPlaybackControlBar(ComboBoxCtrlOwningMixin, QWidget):
         self.jump_target_left.emit(curr_jump_series_name)
 
 
+    @QtCore.pyqtSlot()
+    def on_series_remove_button_pressed(self):
+        """ 
+        """
+        curr_series_name = self.current_selected_jump_target_series_name # 'PBEs'
+        print(f'on_series_remove_button_pressed(): curr_series_name: {curr_series_name}')
+        self.series_remove_pressed.emit(curr_series_name)
+
+    @QtCore.pyqtSlot()
+    def on_series_customize_button_pressed(self):
+        """ 
+        """
+        curr_series_name = self.current_selected_jump_target_series_name # 'PBEs'
+        print(f'on_series_customize_button_pressed(): curr_series_name: {curr_series_name}')
+        self.series_customize_pressed.emit(curr_series_name)
+
+
+    @QtCore.pyqtSlot()
+    def on_action_clear_all_pressed(self):
+        """ 
+        """
+        print(f'on_action_clear_all_pressed()')
+        self.series_clear_all_pressed.emit()
+
+    @QtCore.pyqtSlot()
+    def on_action_request_add_intervals_pressed(self):
+        """ 
+        """
+        print(f'on_action_request_add_intervals_pressed()')
+        self.series_add_pressed.emit()
+
+
+    # @QtCore.pyqtSlot()
+    # def on_series_extra_button_pressed(self):
+    #     """ 
+    #     """
+    #     print(f'on_series_extra_button_pressed()')
+    #     # self.series_remove_pressed.emit(curr_series_name)
 
     
 class SpikeRasterBottomFrameControlsMixin:
