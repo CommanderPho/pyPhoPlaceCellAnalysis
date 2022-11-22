@@ -3,13 +3,20 @@ import pandas as pd
 
 from neuropy.utils.misc import safe_pandas_get_group # for _compute_pybursts_burst_interval_detection
 
-
 from pyphocorehelpers.mixins.member_enumerating import AllFunctionEnumeratingMixin
 from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.ComputationFunctionRegistryHolder import ComputationFunctionRegistryHolder
 from pyphoplacecellanalysis.General.Model.ComputationResults import ComputationResult
 from pyphocorehelpers.DataStructure.dynamic_parameters import DynamicParameters
 
 from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import ZhangReconstructionImplementation # for _perform_firing_rate_trends_computation
+
+def _wrap_multi_context_computation_function(global_comp_fcn):
+    """ captures global_comp_fcn and unwraps its arguments: owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_whitelist=None, debug_print=False """
+    def _(x):
+        assert len(x) > 4, f"{x}"
+        x[1] = global_comp_fcn(*x) # update global_computation_results
+        return x
+    return _
 
 
 class MultiContextComputationFunctions(AllFunctionEnumeratingMixin, metaclass=ComputationFunctionRegistryHolder):
