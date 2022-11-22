@@ -857,6 +857,20 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
         
         spike_indicies: e.g. np.logical_not(is_spike_included)
         defer_render: if false, the all_spots will be rebuilt after updating the dataframe and the changes rendered out
+
+
+        Examples:
+
+        from pyphoplacecellanalysis.General.Mixins.SpikesRenderingBaseMixin import SpikeEmphasisState
+
+        ## Example 1: De-emphasize spikes excluded from the placefield calculations:
+        is_spike_included_in_pf = np.isin(spike_raster_window.spike_raster_plt_2d.spikes_df.index, active_pf_2D.filtered_spikes_df.index)
+        spike_raster_window.spike_raster_plt_2d.update_spike_emphasis(np.logical_not(is_spike_included_in_pf), SpikeEmphasisState.Deemphasized)
+
+        ## Example 2: De-emphasize spikes that don't have their 'aclu' from a given set of indicies:
+        is_spike_included = spike_raster_window.spike_raster_plt_2d.spikes_df.aclu.to_numpy() == 2
+        spike_raster_window.spike_raster_plt_2d.update_spike_emphasis(np.logical_not(is_spike_included), SpikeEmphasisState.Deemphasized)
+
         """
         if 'visualization_raster_emphasis_state' not in self.spikes_df.columns:
             print('Spike2DRaster.update_spike_emphasis(): adding "visualization_raster_emphasis_state" column to spikes_df...')
