@@ -157,6 +157,7 @@ def plot_1D_placecell_validation(active_epoch_placefields1D, placefield_cell_ind
 
     """
     
+
     curr_cell_id = active_epoch_placefields1D.cell_ids[placefield_cell_index]
     # jitter the curve_value for each spike based on the time it occured along the curve:
     jitter_multiplier = kwargs.get('jitter_multiplier', 0.05)
@@ -202,8 +203,8 @@ def plot_1D_placecell_validation(active_epoch_placefields1D, placefield_cell_ind
     spike_marker = "_" # 'hline' "CARETRIGHTBASE" 'caretrightbase' 9
     # spike_plot_kwargs = {'linestyle':'none', 'markersize':6.0, 'marker': "_", 'markerfacecolor':'#55aaffcc', 'markeredgecolor':'#55aaffcc'}
     # spike_plot_kwargs = {'linestyle':'none', 'markersize':2.0, 'marker': 9, 'markerfacecolor':'#1420ffcc', 'markeredgecolor':'#1420ffcc'}
-    spike_plot_kwargs = {'linestyle':'none', 'markersize':5.0, 'marker': '.', 'markerfacecolor':'#1420ffcc', 'markeredgecolor':'#1420ffcc'}
-    active_epoch_placefields1D.plotRaw_v_time(placefield_cell_index, ax=axs0, spikes_color=spikes_color, spikes_alpha=spikes_alpha, position_plot_kwargs={'color': '#393939c8', 'linewidth': 1.0}, spike_plot_kwargs=spike_plot_kwargs, should_include_labels=should_include_labels)
+    spike_plot_kwargs = {'linestyle':'none', 'markersize':5.0, 'marker': '.', 'markerfacecolor':'#1420ffcc', 'markeredgecolor':'#1420ffcc', 'zorder':10}
+    active_epoch_placefields1D.plotRaw_v_time(placefield_cell_index, ax=axs0, spikes_color=spikes_color, spikes_alpha=spikes_alpha, position_plot_kwargs={'color': '#393939c8', 'linewidth': 1.0, 'zorder':5}, spike_plot_kwargs=spike_plot_kwargs, should_include_labels=should_include_labels)
     
     # Title and Subtitle:
     title_string = ' '.join(['pf1D', f'Cell {curr_cell_id:02d}'])
@@ -233,7 +234,7 @@ def plot_1D_placecell_validation(active_epoch_placefields1D, placefield_cell_ind
     if should_plot_spike_indicator_lines_on_trajectory:
         # plot the orange lines that span across the position plot to the right
         axs0.hlines(y=curr_cell_interpolated_spike_positions, xmin=curr_cell_spike_times, xmax=t_end,
-                    linestyles='solid', color='orange', alpha=spike_indicator_lines_alpha, linewidth=spike_indcator_lines_linewidth) # plot the lines that underlie the spike points
+                    linestyles='solid', color='orange', alpha=spike_indicator_lines_alpha, linewidth=spike_indcator_lines_linewidth, zorder=0) # plot the lines that underlie the spike points
     axs0.set_xlim((t_start, t_end)) # We don't want to clip to only the spiketimes for this cell, we want it for all cells, or even when the recording started/ended    
 
     ## The computed placefield on the right-hand side:

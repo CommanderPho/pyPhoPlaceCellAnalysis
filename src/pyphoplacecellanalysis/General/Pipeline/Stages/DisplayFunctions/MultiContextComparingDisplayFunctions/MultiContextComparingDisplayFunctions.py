@@ -124,7 +124,16 @@ class MultiContextComparingDisplayFunctions(AllFunctionEnumeratingMixin, metacla
     def _display_batch_pho_jonathan_replay_firing_rate_comparison(owning_pipeline_reference, computation_results, active_configs, include_whitelist=None, **kwargs):
             """ Stacked Jonathan-style firing-rate-across-epochs-plot. Pho's batch adaptation of the primary elements from Jonathan's interactive display. Currently hacked up to directly compute the results to display within this function
                 Usage:
-                
+
+                    %matplotlib qt
+                    active_identifying_session_ctx = curr_active_pipeline.sess.get_context() # 'bapun_RatN_Day4_2019-10-15_11-30-06'
+
+                    graphics_output_dict = curr_active_pipeline.display('_display_batch_pho_jonathan_replay_firing_rate_comparison', active_identifying_session_ctx)
+                    fig, axs, plot_data = graphics_output_dict['fig'], graphics_output_dict['axs'], graphics_output_dict['plot_data']
+                    neuron_df, rdf, aclu_to_idx, irdf = plot_data['df'], plot_data['rdf'], plot_data['aclu_to_idx'], plot_data['irdf']
+                    # Grab the output axes:
+                    curr_axs_dict = axs[0]
+                    curr_firing_rate_ax, curr_lap_spikes_ax, curr_placefield_ax = curr_axs_dict['firing_rate'], curr_axs_dict['lap_spikes'], curr_axs_dict['placefield'] # Extract variables from the `curr_axs_dict` dictionary to the local workspace
 
             """
             if include_whitelist is None:
@@ -557,7 +566,8 @@ def _make_jonathan_interactive_plot(sess, time_bins, final_jonathan_df, unit_spe
 
 
 
-def _make_pho_jonathan_batch_plots(sess, time_bins, final_jonathan_df, unit_specific_time_binned_firing_rates, pf1D_all, aclu_to_idx, rdf, irdf, show_inter_replay_frs=False, n_max_plot_rows:int=4, **kwargs):
+
+def _make_pho_jonathan_batch_plots(sess, time_bins, final_jonathan_df, unit_specific_time_binned_firing_rates, pf1D_all, aclu_to_idx, rdf, irdf, show_inter_replay_frs=False, n_max_plot_rows:int=4, debug_print=False, **kwargs):
     """ Stacked Jonathan-style firing-rate-across-epochs-plot
     Internally calls `plot_1D_placecell_validation` and `_temp_draw_jonathan_ax`
 
@@ -569,30 +579,45 @@ def _make_pho_jonathan_batch_plots(sess, time_bins, final_jonathan_df, unit_spec
     subfigs = fig.subfigures(n_max_plot_rows, 1, wspace=0.07)
     colors = plt.rcParams['axes.prop_cycle'].by_key()['color'];
 
+    num_gridspec_columns = 8
     axs_list = []
 
     for i in np.arange(n_max_plot_rows):
         is_first_row = (i==0)
         is_last_row = (i == (n_max_plot_rows-1))
         aclu = int(final_jonathan_df.index[i])
-        print(f"selected neuron has index: {i} aclu: {aclu}")
+        if debug_print:
+            print(f"selected neuron has index: {i} aclu: {aclu}")
         title_string = ' '.join(['pf1D', f'Cell {aclu:02d}'])
         subtitle_string = ' '.join([f'{pf1D_all.config.str_for_display(False)}'])
-        print(f'\t{title_string}\n\t{subtitle_string}')
-            
+        short_title_string = f'{aclu:02d}'
+        if debug_print:
+            print(f'\t{title_string}\n\t{subtitle_string}')
+        
+
         # gridspec mode:
         curr_fig = subfigs[i]
         curr_fig.set_facecolor('0.75')
-        gs = curr_fig.add_gridspec(2, 8) # layout figure is usually a gridspec of (1,8)
-        gs.update(wspace=0, hspace=0.0) # set the spacing between axes.
+
+
+
+        gs_kw = dict(width_ratios=np.repeat(1, num_gridspec_columns).tolist(), height_ratios=[1, 1], wspace=0.0, hspace=0.0)
+        gs_kw['width_ratios'][-1] = 0.3 # make the last column (containing the 1D placefield plot) a fraction of the width of the others
+
+        gs = curr_fig.add_gridspec(2, num_gridspec_columns, **gs_kw) # layout figure is usually a gridspec of (1,8)
+        # gs.update(wspace=0, hspace=0.0) # set the spacing between axes.
         # curr_ax_firing_rate = curr_fig.add_subplot(gs[0, :]) # the whole top row
         # curr_ax_lap_spikes = curr_fig.add_subplot(gs[1, :-1]) # all up to excluding the last element of the row
         # curr_ax_placefield = curr_fig.add_subplot(gs[1, -1], sharey=curr_ax_lap_spikes) # only the last element of the row
-        curr_ax_firing_rate = curr_fig.add_subplot(gs[0, :-1]) # the whole top row except the last element (to match the firing rates below
+        curr_ax_firing_rate = curr_fig.add_subplot(gs[0, :-1]) # the whole top row except the last element (to match the firing rates below)
+        curr_ax_cell_label = curr_fig.add_subplot(gs[0, -1]) # the last element of the first row contains the labels that identify the cell
         curr_ax_lap_spikes = curr_fig.add_subplot(gs[1, :-1]) # all up to excluding the last element of the row
         curr_ax_placefield = curr_fig.add_subplot(gs[1, -1], sharey=curr_ax_lap_spikes) # only the last element of the row
-
-
+        
+        # Setup title axis:
+        title_axes_kwargs = dict(ha="center", va="center", fontsize=18, color="black")
+        curr_ax_cell_label.text(0.5, 0.5, short_title_string, transform=curr_ax_cell_label.transAxes, **title_axes_kwargs)
+        curr_ax_cell_label.axis('off')
 
         ## New ax[0,1] draw method:
         _temp_draw_jonathan_ax(sess, time_bins, unit_specific_time_binned_firing_rates, aclu_to_idx, rdf, irdf, show_inter_replay_frs=show_inter_replay_frs, colors=colors, fig=curr_fig, ax=curr_ax_firing_rate, active_aclu=aclu,
@@ -621,7 +646,7 @@ def _make_pho_jonathan_batch_plots(sess, time_bins, final_jonathan_df, unit_spec
         curr_ax_lap_spikes.sharex(curr_ax_firing_rate) # Sync the time axes of the laps and the firing rates
         
         # output the axes created:
-        axs_list.append({'firing_rate':curr_ax_firing_rate, 'lap_spikes': curr_ax_lap_spikes, 'placefield': curr_ax_placefield})
+        axs_list.append({'firing_rate':curr_ax_firing_rate, 'lap_spikes': curr_ax_lap_spikes, 'placefield': curr_ax_placefield, 'labels': curr_ax_cell_label})
 
     graphics_output_dict = {'fig': fig, 'subfigs': subfigs, 'axs': axs_list, 'colors': colors}
     fig.show()
