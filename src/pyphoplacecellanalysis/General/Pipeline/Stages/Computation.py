@@ -21,6 +21,7 @@ from pyphoplacecellanalysis.General.Model.ComputationResults import ComputationR
 import pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions
 # from General.Pipeline.Stages.ComputationFunctions import ComputationFunctionRegistryHolder # should include ComputationFunctionRegistryHolder and all specifics
 from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.ComputationFunctionRegistryHolder import ComputationFunctionRegistryHolder
+from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.MultiContextComputationFunctions import _wrap_multi_context_computation_function
 
 from enum import Enum # for EvaluationActions
 
@@ -427,7 +428,8 @@ class ComputedPipelineStage(LoadableInput, LoadableSessionInput, FilterablePipel
     # ==================================================================================================================== #
     # CLASS/STATIC METHODS                                                                                                 #
     # ==================================================================================================================== #
-    
+
+
     @classmethod
     def _build_initial_computationResult(cls, active_session, computation_config):
         """Conceptually, a single computation consists of a specific active_session and a specific computation_config object
@@ -456,6 +458,9 @@ class ComputedPipelineStage(LoadableInput, LoadableSessionInput, FilterablePipel
             if are_global:
                 assert isinstance(previous_computation_result, (dict, DynamicParameters)), 'ERROR: previous_computation_result must be a dict or DynamicParameters object when are_global=True'
                 # global_kwargs = dict(owning_pipeline_reference=self, global_computation_results, computation_results, active_configs, include_whitelist=None, debug_print=False)
+                previous_computation_result = list(previous_computation_result.values()) # get the list of values since the global computation functions expects positional arguments
+                # Wrap the active functions in the wrapper that extracts their arguments:
+                active_computation_functions = [_wrap_multi_context_computation_function(a_global_fcn) for a_global_fcn in active_computation_functions]
             
             if fail_on_exception:
                 ## normal version that fails on any exception:
@@ -469,6 +474,15 @@ class ComputedPipelineStage(LoadableInput, LoadableSessionInput, FilterablePipel
             
             if debug_print:
                 print(f'_execute_computation_functions(...): \n\taccumulated_errors: {accumulated_errors}')
+            
+
+            if are_global:
+                # Extract the global_computation_results from the returned list for global computations:
+                # owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_whitelist=None, debug_print=False
+                assert isinstance(previous_computation_result, list)
+                previous_computation_result = previous_computation_result[1] # get the global_computation_results object
+                assert isinstance(previous_computation_result, ComputationResult)
+
             # Add the function to the computation result:
             previous_computation_result.accumulated_errors = accumulated_errors
             if len(accumulated_errors or {}) > 0:
