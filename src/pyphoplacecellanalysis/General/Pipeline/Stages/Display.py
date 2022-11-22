@@ -321,8 +321,8 @@ class PipelineWithDisplayPipelineStageMixin:
             ## Global session-level context (not filtered, so not corresponding to a specific config name):
             print(f'WARNING: .display(...) function called with GLOBAL (non-filtered) context. This should be the case only for one function (`_display_context_nested_docks`) currently. ')
             ## For a global-style display function, pass ALL of the computation_results and active_configs just to preserve the argument style.
-            # NOTE: global-style display functions have re-arranged arguments of the form (owning_pipeline_reference, computation_results, active_configs, **kwargs). This differs from standard ones.
-            return display_function(self, self.computation_results, self.active_configs, active_config_name=None, **kwargs)
+            # NOTE: global-style display functions have re-arranged arguments of the form (owning_pipeline_reference, global_computation_results, computation_results, active_configs, **kwargs). This differs from standard ones.
+            return display_function(self, self.global_computation_results, self.computation_results, self.active_configs, active_config_name=None, **kwargs)
         
         else:
             ## The expected filtered context:

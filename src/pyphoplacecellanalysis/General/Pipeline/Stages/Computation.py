@@ -84,26 +84,33 @@ class ComputedPipelineStage(LoadableInput, LoadableSessionInput, FilterablePipel
 
     @property
     def registered_computation_functions(self):
-        """The registered_computation_functions property."""
         return list(self.registered_computation_function_dict.values())
-
     @property
     def registered_computation_function_names(self):
-        """The registered_computation_function_names property."""
         return list(self.registered_computation_function_dict.keys()) 
 
 
     @property
     def registered_global_computation_functions(self):
-        """The registered_global_computation_functions property."""
         return list(self.registered_global_computation_function_dict.values())
-
     @property
     def registered_global_computation_function_names(self):
-        """The registered_global_computation_function_names property."""
         return list(self.registered_global_computation_function_dict.keys()) 
 
-    
+
+    # 'merged' refers to the fact that both global and non-global computation functions are included _____________________ #
+    @property
+    def registered_merged_computation_function_dict(self):
+        """build a merged function dictionary containing both global and non-global functions:"""
+        return (self.registered_global_computation_function_dict | self.registered_computation_function_dict)
+    @property
+    def registered_merged_computation_functions(self):
+        return list(self.registered_merged_computation_function_dict.values())
+    @property
+    def registered_merged_computation_function_names(self):
+        return list(self.registered_merged_computation_function_dict.keys()) 
+
+
     def reload_default_computation_functions(self):
         """ reloads/re-registers the default display functions after adding a new one
          Note: execution ORDER MATTERS for the computation functions, unlike the display functions, so they need to be enumerated in the correct order and not sorted alphabetically        

@@ -25,10 +25,10 @@ from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiCo
 class MultiContextComparingDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=DisplayFunctionRegistryHolder):
     """ MultiContextComparingDisplayFunctions
     These display functions compare results across several contexts.
-
+    Must have a signature of: (owning_pipeline_reference, global_computation_results, computation_results, active_configs, ..., **kwargs) at a minimum
     """
 
-    def _display_context_nested_docks(owning_pipeline_reference, computation_results, active_configs, include_whitelist=None, **kwargs):
+    def _display_context_nested_docks(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_whitelist=None, **kwargs):
         """ Create `master_dock_win` - centralized plot output window to collect individual figures/controls in (2022-08-18) 
         NOTE: Ignores `active_config` because context_nested_docks is for all contexts
         
@@ -54,7 +54,7 @@ class MultiContextComparingDisplayFunctions(AllFunctionEnumeratingMixin, metacla
         # return master_dock_win, app, out_items
         return {'master_dock_win': master_dock_win, 'app': app, 'out_items': out_items}
 
-    def _display_jonathan_replay_firing_rate_comparison(owning_pipeline_reference, computation_results, active_configs, include_whitelist=None, **kwargs):
+    def _display_jonathan_replay_firing_rate_comparison(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_whitelist=None, **kwargs):
             """ Jonathan's interactive display. Currently hacked up to directly compute the results to display within this function
 
                 Usage:
@@ -109,7 +109,7 @@ class MultiContextComparingDisplayFunctions(AllFunctionEnumeratingMixin, metacla
 
             # ==================================================================================================================== #
             ## Calculating:
-            final_jonathan_df = _subfn_computations_make_jonathan_interactive_plot(time_binned_unit_specific_binned_spike_rate, pf1d_short, pf1d_long, aclu_to_idx, rdf, irdf)
+            final_jonathan_df = _subfn_computations_make_jonathan_firing_comparison_df(time_binned_unit_specific_binned_spike_rate, pf1d_short, pf1d_long, aclu_to_idx, rdf, irdf)
 
             ## TODO: This is the proper way once global computations work:
             # aclu_to_idx = computation_result.computed_data['jonathan_firing_rate_analysis']['rdf']['aclu_to_idx']
@@ -124,7 +124,7 @@ class MultiContextComparingDisplayFunctions(AllFunctionEnumeratingMixin, metacla
             
             return graphics_output_dict
 
-    def _display_batch_pho_jonathan_replay_firing_rate_comparison(owning_pipeline_reference, computation_results, active_configs, include_whitelist=None, **kwargs):
+    def _display_batch_pho_jonathan_replay_firing_rate_comparison(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_whitelist=None, **kwargs):
             """ Stacked Jonathan-style firing-rate-across-epochs-plot. Pho's batch adaptation of the primary elements from Jonathan's interactive display. Currently hacked up to directly compute the results to display within this function
                 Usage:
 
@@ -176,16 +176,24 @@ class MultiContextComparingDisplayFunctions(AllFunctionEnumeratingMixin, metacla
             # print(f'np.shape(time_binned_unit_specific_binned_spike_rate): {time_binned_unit_specific_binned_spike_rate}')
 
             # ## Compute for all the session spikes first:
-            sess = owning_pipeline_reference.sess
+            # sess = owning_pipeline_reference.sess
             # BAD DOn'T DO THIS:
-            rdf, aclu_to_idx, irdf, aclu_to_idx_irdf = _final_compute_jonathan_replay_fr_analyses(sess, sess.replay)
-            pos_df = sess.position.to_dataframe()
+            # rdf, aclu_to_idx, irdf, aclu_to_idx_irdf = _final_compute_jonathan_replay_fr_analyses(sess, sess.replay)
+            # pos_df = sess.position.to_dataframe()
+
+            ## Proper global-computations based way:
+            sess = owning_pipeline_reference.sess
+            aclu_to_idx = global_computation_results.computed_data['jonathan_firing_rate_analysis']['rdf']['aclu_to_idx']
+            rdf = global_computation_results.computed_data['jonathan_firing_rate_analysis']['rdf']['rdf'],
+            irdf = global_computation_results.computed_data['jonathan_firing_rate_analysis']['irdf']['irdf']
+            pos_df = global_computation_results.sess.position.to_dataframe()
+
 
             # ==================================================================================================================== #
             ## Calculating:
-            final_jonathan_df = _subfn_computations_make_jonathan_interactive_plot(time_binned_unit_specific_binned_spike_rate, pf1d_short, pf1d_long, aclu_to_idx, rdf, irdf)
+            final_jonathan_df = _subfn_computations_make_jonathan_firing_comparison_df(time_binned_unit_specific_binned_spike_rate, pf1d_short, pf1d_long, aclu_to_idx, rdf, irdf)
 
-            ## TODO: This is the proper way once global computations work:
+
             # aclu_to_idx = computation_result.computed_data['jonathan_firing_rate_analysis']['rdf']['aclu_to_idx']
             # rdf = computation_result.computed_data['jonathan_firing_rate_analysis']['rdf']['rdf'],
             # irdf = computation_result.computed_data['jonathan_firing_rate_analysis']['irdf']['irdf']
@@ -432,8 +440,9 @@ def _temp_draw_jonathan_spikes_on_track(ax, pos_df, single_neuron_spikes):
     ax.set_ylabel("Position")
     ax.set_title("Animal position on track")
 
-def _subfn_computations_make_jonathan_interactive_plot(unit_specific_time_binned_firing_rates, pf1d_short, pf1d_long, aclu_to_idx, rdf, irdf):
+def _subfn_computations_make_jonathan_firing_comparison_df(unit_specific_time_binned_firing_rates, pf1d_short, pf1d_long, aclu_to_idx, rdf, irdf):
     """ the computations that were factored out of _make_jonathan_interactive_plot(...) 
+    Historical: used to be called `_subfn_computations_make_jonathan_interactive_plot(...)`
     """
     # ==================================================================================================================== #
     ## Calculating:
