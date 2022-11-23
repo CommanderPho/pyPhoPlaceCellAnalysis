@@ -1,13 +1,20 @@
 import numpy as np
 import pandas as pd
+import matplotlib as mpl
 import matplotlib.pyplot as plt
 
 from neuropy.utils.dynamic_container import overriding_dict_with # required for _display_2d_placefield_result_plot_raw
-from pyphocorehelpers.mixins.member_enumerating import AllFunctionEnumeratingMixin
-from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DisplayFunctionRegistryHolder import DisplayFunctionRegistryHolder
+from neuropy.core.neuron_identities import PlotStringBrevityModeEnum # for plot_short_v_long_pf1D_comparison (_display_short_long_pf1D_comparison)
+from neuropy.plotting.figure import Fig # for plot_short_v_long_pf1D_comparison (_display_short_long_pf1D_comparison)
+from neuropy.plotting.ratemaps import plot_ratemap_1D # for plot_short_v_long_pf1D_comparison (_display_short_long_pf1D_comparison)
 
+from pyphocorehelpers.mixins.member_enumerating import AllFunctionEnumeratingMixin
+from pyphocorehelpers.plotting.figure_management import PhoActiveFigureManager2D # for plot_short_v_long_pf1D_comparison (_display_short_long_pf1D_comparison)
 from pyphocorehelpers.DataStructure.RenderPlots.MatplotLibRenderPlots import MatplotlibRenderPlots
 from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer  # for context_nested_docks/single_context_nested_docks
+
+from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DisplayFunctionRegistryHolder import DisplayFunctionRegistryHolder
+
 from pyphoplacecellanalysis.GUI.PyQtPlot.DockingWidgets.DynamicDockDisplayAreaContent import CustomDockDisplayConfig # for context_nested_docks/single_context_nested_docks
 from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.DockAreaWrapper import DockAreaWrapper # for context_nested_docks/single_context_nested_docks
 from pyphoplacecellanalysis.GUI.Qt.Widgets.DecoderPlotSelectorControls.DecoderPlotSelectorWidget import DecoderPlotSelectorWidget # for context_nested_docks/single_context_nested_docks
@@ -15,11 +22,17 @@ from pyphoplacecellanalysis.GUI.Qt.Widgets.FigureFormatConfigControls.FigureForm
 from pyphoplacecellanalysis.Pho2D.PyQtPlots.plot_placefields import pyqtplot_plot_image_array # for context_nested_docks/single_context_nested_docks
 
 from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.MultiContextComputationFunctions import take_difference, take_difference_nonzero, make_fr
+from pyphoplacecellanalysis.General.Mixins.CrossComputationComparisonHelpers import _find_any_context_neurons # for plot_short_v_long_pf1D_comparison
 
 from pyphoplacecellanalysis.PhoPositionalData.plotting.placefield import plot_1D_placecell_validation # for _make_pho_jonathan_batch_plots
 
-# BAD DOn'T DO THIS:
-from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.MultiContextComputationFunctions import _final_compute_jonathan_replay_fr_analyses
+
+
+
+
+
+
+
 
 
 class MultiContextComparingDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=DisplayFunctionRegistryHolder):
@@ -148,6 +161,53 @@ class MultiContextComparingDisplayFunctions(AllFunctionEnumeratingMixin, metacla
             graphics_output_dict['plot_data'] = {'df': final_jonathan_df, 'rdf':rdf, 'aclu_to_idx':aclu_to_idx, 'irdf':irdf, 'time_binned_unit_specific_spike_rate': global_computation_results.computed_data['jonathan_firing_rate_analysis']['time_binned_unit_specific_spike_rate']}
 
             return graphics_output_dict
+
+
+    def _display_short_long_pf1D_comparison(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_whitelist=None, **kwargs):
+            """ Displays a figure for comparing the 1D placefields across-epochs (between the short and long tracks)
+                Usage:
+
+                    %matplotlib qt
+                    active_identifying_session_ctx = curr_active_pipeline.sess.get_context() # 'bapun_RatN_Day4_2019-10-15_11-30-06'
+
+                    graphics_output_dict = curr_active_pipeline.display('_display_batch_pho_jonathan_replay_firing_rate_comparison', active_identifying_session_ctx)
+                    fig, axs, plot_data = graphics_output_dict['fig'], graphics_output_dict['axs'], graphics_output_dict['plot_data']
+                    neuron_df, rdf, aclu_to_idx, irdf = plot_data['df'], plot_data['rdf'], plot_data['aclu_to_idx'], plot_data['irdf']
+                    # Grab the output axes:
+                    curr_axs_dict = axs[0]
+                    curr_firing_rate_ax, curr_lap_spikes_ax, curr_placefield_ax = curr_axs_dict['firing_rate'], curr_axs_dict['lap_spikes'], curr_axs_dict['placefield'] # Extract variables from the `curr_axs_dict` dictionary to the local workspace
+
+            """
+
+            reuse_axs_tuple = kwargs.pop('reuse_axs_tuple', None)            
+            # reuse_axs_tuple = None # plot fresh
+            # reuse_axs_tuple=(ax_long_pf_1D, ax_short_pf_1D)
+            # reuse_axs_tuple=(ax_long_pf_1D, ax_long_pf_1D) # plot only on long axis
+            single_figure = kwargs.pop('single_figure', True)
+            debug_print = kwargs.pop('debug_print', False)
+
+            if include_whitelist is None:
+                include_whitelist = owning_pipeline_reference.active_completed_computation_result_names # ['maze', 'sprinkle']
+
+            long_epoch_name = include_whitelist[0] # 'maze1_PYR'
+            short_epoch_name = include_whitelist[1] # 'maze2_PYR'
+            assert len(include_whitelist) > 2
+            global_epoch_name = include_whitelist[-1] # 'maze_PYR'
+            if debug_print:
+                print(f'include_whitelist: {include_whitelist}\nlong_epoch_name: {long_epoch_name}, short_epoch_name: {short_epoch_name}, global_epoch_name: {global_epoch_name}')           
+    
+            long_results = computation_results[long_epoch_name]['computed_data']
+            short_results = computation_results[short_epoch_name]['computed_data']
+            # curr_any_context_neurons = _find_any_context_neurons(*[owning_pipeline_reference.computation_results[k].computed_data.pf1D.ratemap.neuron_ids for k in [long_epoch_name, short_epoch_name]])
+            curr_any_context_neurons = _find_any_context_neurons(*[a_result.pf1D.ratemap.neuron_ids for a_result in [long_results, short_results]])
+
+            (fig_long_pf_1D, ax_long_pf_1D, long_sort_ind, long_neurons_colors_array), (fig_short_pf_1D, ax_short_pf_1D, short_sort_ind, short_neurons_colors_array) = plot_short_v_long_pf1D_comparison(long_results, short_results, curr_any_context_neurons, reuse_axs_tuple=reuse_axs_tuple, single_figure=single_figure, debug_print=debug_print)
+
+            graphics_output_dict = MatplotlibRenderPlots(name='', figures=(fig_long_pf_1D, fig_short_pf_1D), axes=(ax_long_pf_1D, ax_short_pf_1D), plot_data={})
+            graphics_output_dict['plot_data'] = {'sort_indicies': (long_sort_ind, short_sort_ind), 'colors':(long_neurons_colors_array, short_neurons_colors_array)}
+
+            return graphics_output_dict
+
 
 
 
@@ -305,7 +365,7 @@ def _context_nested_docks(curr_active_pipeline, active_config_names, enable_gui=
 # # this cell really works best in qt
 # %matplotlib qt
 
-
+# ==================================================================================================================== #
 def _temp_draw_jonathan_ax(sess, time_bins, unit_specific_time_binned_firing_rates, aclu_to_idx, rdf, irdf, show_inter_replay_frs=False, colors=None, fig=None, ax=None, active_aclu:int=0, include_horizontal_labels=True, include_vertical_labels=True, should_render=False):
     """ Draws the time binned firing rates and the replay firing rates for a single cell
 
@@ -382,7 +442,7 @@ def _temp_draw_jonathan_spikes_on_track(ax, pos_df, single_neuron_spikes):
     ax.set_ylabel("Position")
     ax.set_title("Animal position on track")
 
-
+# ==================================================================================================================== #
 def _make_jonathan_interactive_plot(sess, time_bins, final_jonathan_df, unit_specific_time_binned_firing_rates, pos_df, aclu_to_idx, rdf, irdf, show_inter_replay_frs=False):
 
     # ==================================================================================================================== #
@@ -481,11 +541,7 @@ def _make_jonathan_interactive_plot(sess, time_bins, final_jonathan_df, unit_spe
     fig.canvas.mpl_connect('pick_event', on_pick)
     fig.canvas.mpl_connect('key_press_event', on_keypress)
     return graphics_output_dict, final_jonathan_df
-
-
-
-
-
+# ==================================================================================================================== #
 def _make_pho_jonathan_batch_plots(sess, time_bins, final_jonathan_df, unit_specific_time_binned_firing_rates, pf1D_all, aclu_to_idx, rdf, irdf, show_inter_replay_frs=False, n_max_plot_rows:int=4, debug_print=False, **kwargs):
     """ Stacked Jonathan-style firing-rate-across-epochs-plot
     Internally calls `plot_1D_placecell_validation` and `_temp_draw_jonathan_ax`
@@ -571,3 +627,79 @@ def _make_pho_jonathan_batch_plots(sess, time_bins, final_jonathan_df, unit_spec
     graphics_output_dict = {'fig': fig, 'subfigs': subfigs, 'axs': axs_list, 'colors': colors}
     fig.show()
     return graphics_output_dict
+
+# ==================================================================================================================== #
+
+@mpl.rc_context(Fig.get_mpl_style(style='figPublish'))
+def plot_short_v_long_pf1D_comparison(long_results, short_results, curr_any_context_neurons, reuse_axs_tuple=None, single_figure=False, debug_print=False):
+    """ Produces a figure to compare the 1D placefields on the long vs. the short track. 
+    
+    single_figure:bool - if True, both long and short are plotted on the same axes of a single shared figure. Otherwise seperate figures are used for each
+    
+    Usage:
+    
+        long_results = curr_active_pipeline.computation_results['maze1_PYR'].computed_data
+        short_results = curr_active_pipeline.computation_results['maze2_PYR'].computed_data
+        curr_any_context_neurons = _find_any_context_neurons(*[curr_active_pipeline.computation_results[k].computed_data.pf1D.ratemap.neuron_ids for k in ['maze1_PYR', 'maze2_PYR']])
+        reuse_axs_tuple=None # plot fresh
+        # reuse_axs_tuple=(ax_long_pf_1D, ax_short_pf_1D)
+        # reuse_axs_tuple=(ax_long_pf_1D, ax_long_pf_1D) # plot only on long axis
+        (fig_long_pf_1D, ax_long_pf_1D, long_sort_ind, long_neurons_colors_array), (fig_short_pf_1D, ax_short_pf_1D, short_sort_ind, short_neurons_colors_array) = plot_short_v_long_pf1D_comparison(long_results, short_results, curr_any_context_neurons, reuse_axs_tuple=reuse_axs_tuple, single_figure=True)
+
+    """
+    plot_ratemap_1D_kwargs = dict(pad=2, brev_mode=PlotStringBrevityModeEnum.NONE, normalize=True, debug_print=debug_print, normalize_tuning_curve=True)
+    
+    n_neurons = len(curr_any_context_neurons)
+    shared_fragile_neuron_IDXs = np.arange(n_neurons)
+    # neurons_colors_array = build_neurons_color_map(n_neurons, sortby=shared_fragile_neuron_IDXs, cmap=None, included_unit_indicies=None, included_unit_neuron_IDs=curr_any_context_neurons)
+    if debug_print:
+        print(f'n_neurons: {n_neurons}')
+        print(f'shared_fragile_neuron_IDXs: {shared_fragile_neuron_IDXs}.\t np.shape: {np.shape(shared_fragile_neuron_IDXs)}')
+        print(f'curr_any_context_neurons: {curr_any_context_neurons}.\t np.shape: {np.shape(curr_any_context_neurons)}')
+
+    if reuse_axs_tuple is not None:
+        if not single_figure:
+            assert len(reuse_axs_tuple) == 2
+            ax_long_pf_1D, ax_short_pf_1D = reuse_axs_tuple
+            fig_long_pf_1D = ax_long_pf_1D.get_figure()
+            fig_short_pf_1D = ax_short_pf_1D.get_figure()
+            PhoActiveFigureManager2D.reshow_figure_if_needed(fig_long_pf_1D)
+            PhoActiveFigureManager2D.reshow_figure_if_needed(fig_short_pf_1D)
+        else:
+            # single figure
+            if isinstance(reuse_axs_tuple, tuple):
+                ax_long_pf_1D = reuse_axs_tuple[0]
+            else:
+                # hopefully an Axis directly
+                ax_long_pf_1D = reuse_axs_tuple
+            # for code reuse the ax_short_pf_1D = ax_long_pf_1D, fig_short_pf_1D = fig_long_pf_1D are set after plotting the long anyway
+            
+    else:
+        if debug_print:
+            print(f'reuse_axs_tuple is None. Making new figures/axes')
+        ax_long_pf_1D, ax_short_pf_1D = None, None
+        fig_long_pf_1D, fig_short_pf_1D = None, None
+        
+    ax_long_pf_1D, long_sort_ind, long_neurons_colors_array = plot_ratemap_1D(long_results.pf1D.ratemap, sortby=shared_fragile_neuron_IDXs, included_unit_neuron_IDs=curr_any_context_neurons, fignum=None, ax=ax_long_pf_1D, curve_hatch_style=None, **plot_ratemap_1D_kwargs)
+    fig_long_pf_1D = ax_long_pf_1D.get_figure()
+    
+    if single_figure:
+        ax_short_pf_1D = ax_long_pf_1D # Set the axes for the short to that that was just plotted on by the long
+        fig_short_pf_1D = fig_long_pf_1D
+    
+    ax_short_pf_1D, short_sort_ind, short_neurons_colors_array = plot_ratemap_1D(short_results.pf1D.ratemap, sortby=shared_fragile_neuron_IDXs, included_unit_neuron_IDs=curr_any_context_neurons, fignum=None, ax=ax_short_pf_1D, curve_hatch_style='///', **plot_ratemap_1D_kwargs)
+    fig_short_pf_1D = ax_short_pf_1D.get_figure()
+    
+    if single_figure:
+        fig_long_pf_1D.suptitle('Long vs. Short (hatched)')
+    else:
+        fig_long_pf_1D.suptitle('Long')
+        fig_short_pf_1D.suptitle('Short')
+        ax_short_pf_1D.set_xlim(ax_long_pf_1D.get_xlim())
+        # ax_long_pf_1D.sharex(ax_short_pf_1D)
+        
+    return (fig_long_pf_1D, ax_long_pf_1D, long_sort_ind, long_neurons_colors_array), (fig_short_pf_1D, ax_short_pf_1D, short_sort_ind, short_neurons_colors_array)
+
+
+
+
