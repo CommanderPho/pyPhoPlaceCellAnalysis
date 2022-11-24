@@ -8,7 +8,8 @@ from neuropy.utils.misc import safe_item
 from pyphocorehelpers.DataStructure.dynamic_parameters import DynamicParameters
 from pyphoplacecellanalysis.General.Model.ComputationResults import ComputationResult
 
-# def _compare_filtered_sessions(lhs_sess, rhs_sess):
+from neuropy.utils.colors_util import get_neuron_colors # required for build_neurons_color_map 
+
 
 def _compare_computation_results(lhs_computation_results, rhs_computation_results):
 	"""Computes the differences between two separate computation results, such as those computed for different epochs
@@ -84,3 +85,20 @@ def _find_any_context_neurons(*args):
 	"""
 	# reduce(np.union1d, ([1, 3, 4, 3], [3, 1, 2, 1], [6, 3, 4, 2]))
 	return reduce(np.union1d, tuple(args))
+
+
+def build_neurons_color_map(n_neurons:int, sortby=None, cmap=None):
+    """ neurons_colors_array = build_neurons_color_map(n_neurons, sortby=shared_fragile_neuron_IDXs, cmap=None) """
+    if sortby is None:
+        sort_ind = np.arange(n_neurons)
+    elif isinstance(sortby, (list, np.ndarray)):
+        # use the provided sort indicies
+        sort_ind = sortby
+    else:
+        sort_ind = np.arange(n_neurons)
+
+    # Use the get_neuron_colors function to generate colors for these neurons
+    neurons_colors_array = get_neuron_colors(sort_ind, cmap=cmap)
+    return neurons_colors_array
+
+

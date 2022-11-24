@@ -22,11 +22,11 @@ from pyphoplacecellanalysis.GUI.Qt.Widgets.FigureFormatConfigControls.FigureForm
 from pyphoplacecellanalysis.Pho2D.PyQtPlots.plot_placefields import pyqtplot_plot_image_array # for context_nested_docks/single_context_nested_docks
 
 from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.MultiContextComputationFunctions import take_difference, take_difference_nonzero, make_fr
-from pyphoplacecellanalysis.General.Mixins.CrossComputationComparisonHelpers import _compare_computation_results, _find_any_context_neurons # for plot_short_v_long_pf1D_comparison
+from pyphoplacecellanalysis.General.Mixins.CrossComputationComparisonHelpers import _compare_computation_results, _find_any_context_neurons, build_neurons_color_map # for plot_short_v_long_pf1D_comparison
 
 from pyphoplacecellanalysis.PhoPositionalData.plotting.placefield import plot_1D_placecell_validation # for _make_pho_jonathan_batch_plots
 
-from neuropy.utils.colors_util import get_neuron_colors # required for build_neurons_color_map
+
 
 
 
@@ -753,21 +753,6 @@ def plot_short_v_long_pf1D_comparison(long_results, short_results, curr_any_cont
         # ax_long_pf_1D.sharex(ax_short_pf_1D)
         
     return (fig_long_pf_1D, ax_long_pf_1D, long_sort_ind, long_neurons_colors_array), (fig_short_pf_1D, ax_short_pf_1D, short_sort_ind, short_neurons_colors_array)
-
-
-def build_neurons_color_map(n_neurons:int, sortby=None, cmap=None):
-    """ neurons_colors_array = build_neurons_color_map(n_neurons, sortby=shared_fragile_neuron_IDXs, cmap=None) """
-    if sortby is None:
-        sort_ind = np.arange(n_neurons)
-    elif isinstance(sortby, (list, np.ndarray)):
-        # use the provided sort indicies
-        sort_ind = sortby
-    else:
-        sort_ind = np.arange(n_neurons)
-
-    # Use the get_neuron_colors function to generate colors for these neurons
-    neurons_colors_array = get_neuron_colors(sort_ind, cmap=cmap)
-    return neurons_colors_array
 
 
 
