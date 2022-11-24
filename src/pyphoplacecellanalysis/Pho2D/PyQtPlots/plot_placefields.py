@@ -218,6 +218,12 @@ def display_all_pf_2D_pyqtgraph_binned_image_rendering(active_pf_2D, figure_form
     included_unit_indicies = figure_format_config.get('included_unit_indicies', None)
     included_unit_neuron_IDs = figure_format_config.get('included_unit_neuron_IDs', None)
 
+    missing_aclu_string_formatter = figure_format_config.get('missing_aclu_string_formatter', None)
+    # missing_aclu_string_formatter: a lambda function that takes the current aclu string and returns a modified string that reflects that this aclu value is missing from the current result (e.g. missing_aclu_string_formatter('3') -> '3 <shared>')
+    if missing_aclu_string_formatter is None:
+        # missing_aclu_string_formatter = lambda curr_extended_id_string: f'{curr_extended_id_string} <shared>'
+        missing_aclu_string_formatter = lambda curr_extended_id_string: f'{curr_extended_id_string}-'
+
     if included_unit_neuron_IDs is not None:
         if debug_print:
             print(f'included_unit_neuron_IDs: {included_unit_neuron_IDs}')
@@ -300,22 +306,22 @@ def display_all_pf_2D_pyqtgraph_binned_image_rendering(active_pf_2D, figure_form
                     ## NOTE: must set max_value_formatter on the pfmap BEFORE the `_scale_current_placefield_to_acceptable_range` is called to have it show accurate labels!
                     formatted_max_value_string = max_value_formatter(np.nanmax(pfmap))
                     
-                final_title = _build_neuron_identity_label(neuron_extended_id=active_pf_2D.ratemap.neuron_extended_ids[neuron_IDX], brev_mode=brev_mode, formatted_max_value_string=formatted_max_value_string, use_special_overlayed_title=use_special_overlayed_title)
+                final_title_str = _build_neuron_identity_label(neuron_extended_id=active_pf_2D.ratemap.neuron_extended_ids[neuron_IDX], brev_mode=brev_mode, formatted_max_value_string=formatted_max_value_string, use_special_overlayed_title=use_special_overlayed_title)
 
             else:
                 # invalid neuron ID, generate blank entry
                 pfmap = np.zeros((np.shape(active_maps)[1], np.shape(active_maps)[2])) # fully allocated new array of zeros
                 curr_extended_id_string = f'{included_unit_neuron_IDs[a_linear_index]}' # get the aclu value (which is all that's known about the missing cell and use that as the curr_extended_id_string
-                final_title = f'{curr_extended_id_string} <shared>'
+                final_title_str = missing_aclu_string_formatter(curr_extended_id_string)
 
             ## Once the max_value_formatter is called with the unscaled pfmap, we can call _scale_current_placefield_to_acceptable_range to scale it appropriately:
             pfmap = _scale_current_placefield_to_acceptable_range(pfmap, occupancy=active_pf_2D.occupancy, drop_below_threshold=drop_below_threshold)                       
 
             if out is None:
                 # first iteration only
-                out = BasicBinnedImageRenderingWindow(pfmap, active_xbins, active_ybins, name=f'pf[{final_title}]', title=final_title, variable_label=curr_extended_id_string, wants_crosshairs=wants_crosshairs, color_map=color_map, color_bar_mode=color_bar_mode)
+                out = BasicBinnedImageRenderingWindow(pfmap, active_xbins, active_ybins, name=f'pf[{final_title_str}]', title=final_title_str, variable_label=curr_extended_id_string, wants_crosshairs=wants_crosshairs, color_map=color_map, color_bar_mode=color_bar_mode)
             else:
-                out.add_data(row=curr_page_relative_row, col=curr_page_relative_col, matrix=pfmap, xbins=active_xbins, ybins=active_ybins, name=f'pf[{final_title}]', title=final_title, variable_label=curr_extended_id_string)
+                out.add_data(row=curr_page_relative_row, col=curr_page_relative_col, matrix=pfmap, xbins=active_xbins, ybins=active_ybins, name=f'pf[{final_title_str}]', title=final_title_str, variable_label=curr_extended_id_string)
         
     # ## Debugging only:
     # out.plots_data.included_unit_neuron_IDs = included_unit_neuron_IDs
