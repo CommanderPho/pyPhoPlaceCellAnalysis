@@ -1,3 +1,4 @@
+from enum import Enum
 import numpy as np
 import pandas as pd
 import matplotlib as mpl
@@ -25,14 +26,6 @@ from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiCo
 from pyphoplacecellanalysis.General.Mixins.CrossComputationComparisonHelpers import _compare_computation_results, _find_any_context_neurons, build_neurons_color_map # for plot_short_v_long_pf1D_comparison
 
 from pyphoplacecellanalysis.PhoPositionalData.plotting.placefield import plot_1D_placecell_validation # for _make_pho_jonathan_batch_plots
-
-
-
-
-
-
-from enum import Enum
-
 
 class PlacefieldOverlapMetricMode(Enum):
     """Docstring for PlacefieldOverlapMetricMode."""
@@ -228,7 +221,7 @@ class MultiContextComparingDisplayFunctions(AllFunctionEnumeratingMixin, metacla
 
             return graphics_output_dict
 
-    def _display_short_long_pf1D_poly_overlap_comparison(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_whitelist=None, **kwargs):
+    def _display_short_long_pf1D_scalar_overlap_comparison(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_whitelist=None, **kwargs):
             """ Displays a figure for comparing the 1D placefields across-epochs (between the short and long tracks)
                 Usage:
 
@@ -264,9 +257,6 @@ class MultiContextComparingDisplayFunctions(AllFunctionEnumeratingMixin, metacla
             if debug_print:
                 print(f'include_whitelist: {include_whitelist}\nlong_epoch_name: {long_epoch_name}, short_epoch_name: {short_epoch_name}, global_epoch_name: {global_epoch_name}')           
     
-            # long_results = computation_results[long_epoch_name]['computed_data']
-            # short_results = computation_results[short_epoch_name]['computed_data']
-            # print(f'')
 
             short_long_pf_overlap_analyses_results = global_computation_results['computed_data']['short_long_pf_overlap_analyses']
             pf_neurons_diff = short_long_pf_overlap_analyses_results['short_long_neurons_diff'] # get shared neuron info:
@@ -758,7 +748,7 @@ def plot_short_v_long_pf1D_comparison(long_results, short_results, curr_any_cont
 
 
 @mpl.rc_context(Fig.get_mpl_style(style='figPublish'))
-def plot_short_v_long_pf1D_scalar_overlap_comparison(overlap_scalars_df, pf_neurons_diff, neurons_colors_array, reuse_axs_tuple=None, single_figure=False, overlap_metric_mode=PlacefieldOverlapMetricMode.POLY, debug_print=False):
+def plot_short_v_long_pf1D_scalar_overlap_comparison(overlap_scalars_df, pf_neurons_diff, neurons_colors_array, reuse_axs_tuple=None, single_figure=False, overlap_metric_mode=PlacefieldOverlapMetricMode.POLY, variant_name='', debug_print=False):
     """ Produces a figure to compare the 1D placefields on the long vs. the short track. 
     poly_overlap_df: pd.DataFrame - computed by compute_polygon_overlap(...)
     pf_neurons_diff: pd.DataFrame - 
@@ -798,8 +788,8 @@ def plot_short_v_long_pf1D_scalar_overlap_comparison(overlap_scalars_df, pf_neur
         lowercase_desc = 'conv'
         titlecase_desc = 'Conv'
     elif overlap_metric_mode.name == PlacefieldOverlapMetricMode.PRODUCT.name:
-        # freq_series = overlap_scalars_df.prod_overlap
-        freq_series = overlap_scalars_df.prod_overlap_peak_max
+        freq_series = overlap_scalars_df.prod_overlap
+        # freq_series = overlap_scalars_df.prod_overlap_peak_max
         lowercase_desc = 'prod'
         titlecase_desc = 'Prod'
 
@@ -811,7 +801,7 @@ def plot_short_v_long_pf1D_scalar_overlap_comparison(overlap_scalars_df, pf_neur
     neurons_color_tuples_list = [tuple(neurons_colors_array[:-1, color_idx]) for color_idx in np.arange(np.shape(neurons_colors_array)[1])]
 
     # Plot the figure.
-    fig = plt.figure(figsize=(12, 8), num=f'pf1D_{lowercase_desc}_overlap', clear=True)
+    fig = plt.figure(figsize=(12, 8), num=f'pf1D_{lowercase_desc}_overlap{variant_name}', clear=True)
     # plt.gcf()
     ax = freq_series.plot(kind='bar', color=neurons_color_tuples_list)
     ax.set_title(f'1D Placefield Short vs. Long {titlecase_desc} Overlap')
