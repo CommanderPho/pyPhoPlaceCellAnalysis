@@ -31,7 +31,26 @@ from neuropy.utils.colors_util import get_neuron_colors # required for build_neu
 
 
 
+from enum import Enum
 
+
+class PlacefieldOverlapMetricMode(Enum):
+    """Docstring for PlacefieldOverlapMetricMode."""
+    POLY = "POLY"
+    CONVOLUTION = "CONVOLUTION"
+    PRODUCT = "PRODUCT"
+
+    @classmethod
+    def init(cls, name):
+        if name == cls.POLY.name:
+            return cls.POLY
+        elif name == cls.CONVOLUTION.name:
+            return cls.CONVOLUTION
+        elif name == cls.PRODUCT.name:
+            return cls.PRODUCT
+        else:
+            raise NotImplementedError
+    
 
 
 
@@ -224,6 +243,9 @@ class MultiContextComparingDisplayFunctions(AllFunctionEnumeratingMixin, metacla
                     curr_firing_rate_ax, curr_lap_spikes_ax, curr_placefield_ax = curr_axs_dict['firing_rate'], curr_axs_dict['lap_spikes'], curr_axs_dict['placefield'] # Extract variables from the `curr_axs_dict` dictionary to the local workspace
 
             """
+            overlap_metric_mode = kwargs.pop('overlap_metric_mode', PlacefieldOverlapMetricMode.POLY)
+            if not isinstance(overlap_metric_mode, PlacefieldOverlapMetricMode):
+                overlap_metric_mode = PlacefieldOverlapMetricMode.init(overlap_metric_mode)
 
             reuse_axs_tuple = kwargs.pop('reuse_axs_tuple', None)            
             # reuse_axs_tuple = None # plot fresh
@@ -250,15 +272,24 @@ class MultiContextComparingDisplayFunctions(AllFunctionEnumeratingMixin, metacla
             pf_neurons_diff = short_long_pf_overlap_analyses_results['short_long_neurons_diff'] # get shared neuron info:
             n_neurons = pf_neurons_diff.shared.n_neurons
             shared_fragile_neuron_IDXs = pf_neurons_diff.shared.shared_fragile_neuron_IDXs
-
-            poly_overlap_df = short_long_pf_overlap_analyses_results['poly_overlap_df']
-            # pf_neurons_diff = _compare_computation_results(long_results.pf1D.ratemap.neuron_ids, short_results.pf1D.ratemap.neuron_ids)
-
             neurons_colors_array = build_neurons_color_map(n_neurons, sortby=shared_fragile_neuron_IDXs, cmap=None)
 
-            fig, ax = plot_short_v_long_pf1D_poly_overlap_comparison(poly_overlap_df, pf_neurons_diff, neurons_colors_array, reuse_axs_tuple=reuse_axs_tuple, single_figure=single_figure, debug_print=debug_print)
+            if overlap_metric_mode.name == PlacefieldOverlapMetricMode.POLY.name:
+                poly_overlap_df = short_long_pf_overlap_analyses_results['poly_overlap_df']
+                fig, ax = plot_short_v_long_pf1D_scalar_overlap_comparison(poly_overlap_df, pf_neurons_diff, neurons_colors_array, reuse_axs_tuple=reuse_axs_tuple, single_figure=single_figure, overlap_metric_mode=overlap_metric_mode, debug_print=debug_print)
+            elif overlap_metric_mode.name == PlacefieldOverlapMetricMode.CONVOLUTION.name:
+                conv_overlap_dict = short_long_pf_overlap_analyses_results['conv_overlap_dict']
+                conv_overlap_scalars_df = short_long_pf_overlap_analyses_results['conv_overlap_scalars_df']
+                fig, ax = plot_short_v_long_pf1D_scalar_overlap_comparison(conv_overlap_scalars_df, pf_neurons_diff, neurons_colors_array, reuse_axs_tuple=reuse_axs_tuple, single_figure=single_figure, overlap_metric_mode=overlap_metric_mode, debug_print=debug_print)
+            elif overlap_metric_mode.name == PlacefieldOverlapMetricMode.PRODUCT.name:
+                prod_overlap_dict = short_long_pf_overlap_analyses_results['product_overlap_dict']
+                product_overlap_scalars_df = short_long_pf_overlap_analyses_results['product_overlap_scalars_df']
+                fig, ax = plot_short_v_long_pf1D_scalar_overlap_comparison(product_overlap_scalars_df, pf_neurons_diff, neurons_colors_array, reuse_axs_tuple=reuse_axs_tuple, single_figure=single_figure, overlap_metric_mode=overlap_metric_mode, debug_print=debug_print)
 
-            graphics_output_dict = MatplotlibRenderPlots(name='', figures=(fig), axes=(ax), plot_data={'colors': neurons_colors_array})
+            else:
+                raise NotImplementedError
+            
+            graphics_output_dict = MatplotlibRenderPlots(name='_display_short_long_pf1D_poly_overlap_comparison', figures=(fig), axes=(ax), plot_data={'colors': neurons_colors_array})
             # graphics_output_dict['plot_data'] = {'sort_indicies': (long_sort_ind, short_sort_ind), 'colors':(long_neurons_colors_array, short_neurons_colors_array)}
 
             return graphics_output_dict
@@ -742,14 +773,14 @@ def build_neurons_color_map(n_neurons:int, sortby=None, cmap=None):
 
 
 @mpl.rc_context(Fig.get_mpl_style(style='figPublish'))
-def plot_short_v_long_pf1D_poly_overlap_comparison(poly_overlap_df, pf_neurons_diff, neurons_colors_array, reuse_axs_tuple=None, single_figure=False, debug_print=False):
+def plot_short_v_long_pf1D_scalar_overlap_comparison(overlap_scalars_df, pf_neurons_diff, neurons_colors_array, reuse_axs_tuple=None, single_figure=False, overlap_metric_mode=PlacefieldOverlapMetricMode.POLY, debug_print=False):
     """ Produces a figure to compare the 1D placefields on the long vs. the short track. 
     poly_overlap_df: pd.DataFrame - computed by compute_polygon_overlap(...)
     pf_neurons_diff: pd.DataFrame - 
     single_figure:bool - if True, both long and short are plotted on the same axes of a single shared figure. Otherwise seperate figures are used for each
     
     Usage:
-        from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.MultiContextComparingDisplayFunctions.MultiContextComparingDisplayFunctions import plot_short_v_long_pf1D_comparison
+        from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.MultiContextComparingDisplayFunctions.MultiContextComparingDisplayFunctions import plot_short_v_long_pf1D_scalar_overlap_comparison
 
         long_results = curr_active_pipeline.computation_results['maze1_PYR'].computed_data
         short_results = curr_active_pipeline.computation_results['maze2_PYR'].computed_data
@@ -757,13 +788,15 @@ def plot_short_v_long_pf1D_poly_overlap_comparison(poly_overlap_df, pf_neurons_d
         reuse_axs_tuple=None # plot fresh
         # reuse_axs_tuple=(ax_long_pf_1D, ax_short_pf_1D)
         # reuse_axs_tuple=(ax_long_pf_1D, ax_long_pf_1D) # plot only on long axis
-        (fig_long_pf_1D, ax_long_pf_1D, long_sort_ind, long_neurons_colors_array), (fig_short_pf_1D, ax_short_pf_1D, short_sort_ind, short_neurons_colors_array) = plot_short_v_long_pf1D_comparison(long_results, short_results, curr_any_context_neurons, reuse_axs_tuple=reuse_axs_tuple, single_figure=True)
+        (fig_long_pf_1D, ax_long_pf_1D, long_sort_ind, long_neurons_colors_array), (fig_short_pf_1D, ax_short_pf_1D, short_sort_ind, short_neurons_colors_array) = plot_short_v_long_pf1D_scalar_overlap_comparison(long_results, short_results, curr_any_context_neurons, reuse_axs_tuple=reuse_axs_tuple, single_figure=True)
 
     """
+    if not isinstance(overlap_metric_mode, PlacefieldOverlapMetricMode):
+        overlap_metric_mode = PlacefieldOverlapMetricMode.init(overlap_metric_mode)
+
     curr_any_context_neurons = pf_neurons_diff.either
     n_neurons = pf_neurons_diff.shared.n_neurons
     shared_fragile_neuron_IDXs = pf_neurons_diff.shared.shared_fragile_neuron_IDXs
-
 
     # neurons_colors_array = build_neurons_color_map(n_neurons, sortby=shared_fragile_neuron_IDXs, cmap=None, included_unit_indicies=None, included_unit_neuron_IDs=curr_any_context_neurons)
     if debug_print:
@@ -771,19 +804,34 @@ def plot_short_v_long_pf1D_poly_overlap_comparison(poly_overlap_df, pf_neurons_d
         print(f'shared_fragile_neuron_IDXs: {shared_fragile_neuron_IDXs}.\t np.shape: {np.shape(shared_fragile_neuron_IDXs)}')
         print(f'curr_any_context_neurons: {curr_any_context_neurons}.\t np.shape: {np.shape(curr_any_context_neurons)}')
 
-    freq_series = poly_overlap_df.poly_overlap
+    if overlap_metric_mode.name == PlacefieldOverlapMetricMode.POLY.name:
+        freq_series = overlap_scalars_df.poly_overlap
+        lowercase_desc = 'poly'
+        titlecase_desc = 'Poly'
+    elif overlap_metric_mode.name == PlacefieldOverlapMetricMode.CONVOLUTION.name:
+        freq_series = overlap_scalars_df.conv_overlap
+        lowercase_desc = 'conv'
+        titlecase_desc = 'Conv'
+    elif overlap_metric_mode.name == PlacefieldOverlapMetricMode.PRODUCT.name:
+        # freq_series = overlap_scalars_df.prod_overlap
+        freq_series = overlap_scalars_df.prod_overlap_peak_max
+        lowercase_desc = 'prod'
+        titlecase_desc = 'Prod'
 
-    x_labels = poly_overlap_df.index.to_numpy()
+    else:
+        raise NotImplementedError
+
+    x_labels = overlap_scalars_df.index.to_numpy()
 
     neurons_color_tuples_list = [tuple(neurons_colors_array[:-1, color_idx]) for color_idx in np.arange(np.shape(neurons_colors_array)[1])]
 
     # Plot the figure.
-    fig = plt.figure(figsize=(12, 8), num='pf1D_poly_overlap', clear=True)
+    fig = plt.figure(figsize=(12, 8), num=f'pf1D_{lowercase_desc}_overlap', clear=True)
     # plt.gcf()
     ax = freq_series.plot(kind='bar', color=neurons_color_tuples_list)
-    ax.set_title('1D Placefield Short vs. Long Poly Overlap')
+    ax.set_title(f'1D Placefield Short vs. Long {titlecase_desc} Overlap')
     ax.set_xlabel('Cell ID (aclu)')
-    ax.set_ylabel('Poly Overlap')
+    ax.set_ylabel(f'{titlecase_desc} Overlap')
     ax.set_xticklabels(x_labels)
 
     def add_value_labels(ax, spacing=5, labels=None):
@@ -837,3 +885,67 @@ def plot_short_v_long_pf1D_poly_overlap_comparison(poly_overlap_df, pf_neurons_d
     add_value_labels(ax, labels=x_labels) # 
 
     return fig, ax
+
+
+def _test_plot_conv(long_xbins, long_curve, short_xbins, short_curve, x, overlap_curves): # , t_full, m_full
+    """
+        from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.MultiContextComparingDisplayFunctions.MultiContextComparingDisplayFunctions import _test_plot_conv
+        long_curve = long_curves[i]
+        short_curve = short_curves[i] 
+    """
+    # convolved_result = m_full_subset
+
+    if isinstance(overlap_curves, dict):
+        overlap_plot_dict = overlap_curves
+    elif isinstance(overlap_curves, (tuple, list)):
+        overlap_plot_dict = {}
+        # overlap_plot_list = []
+        # labels = []
+        for i, a_curve in enumerate(overlap_curves):
+            # overlap_plot_list.append(x)
+            # overlap_plot_list.append(a_curve)
+            overlap_plot_dict[f'overlap[{i}]'] = a_curve
+
+    else:
+        # overlap_plot_list = (overlap_curves) # make a single item array
+        overlap_plot_dict['Conv'] = overlap_curves
+        # labels = ['Conv']
+
+    ### Plot the input, repsonse function, and analytic result
+    f1, (ax1,ax2,ax3) = plt.subplots(nrows=3,ncols=1,num='Analytic', sharex=True, sharey=True)
+    ax1.plot(long_xbins, long_curve, label='Long pf1D'),ax1.set_xlabel('Position'),ax1.set_ylabel('Long'),ax1.legend()
+    ax2.plot(short_xbins, short_curve, label='Short pf1D'),ax2.set_xlabel('Position'),ax2.set_ylabel('Short'),ax2.legend()
+    # ax3.plot(*overlap_plot_list, label=labels) # , label='Conv'
+    for a_label, an_overlap_curve in overlap_plot_dict.items():
+        ax3.plot(x, an_overlap_curve, label=a_label) # , label='Conv'
+
+    ax3.set_xlabel('Position'),ax3.set_ylabel('Convolved'),ax3.legend()
+
+    # ### Plot the discrete convolution agains analytic
+    # f2, ax4 = plt.subplots(nrows=1)
+    # # ax4.scatter(t_same[::2],m_same[::2],label='Discrete Convolution (Same)')
+    # ax4.scatter(t_full[::2],m_full[::2],label='Discrete Convolution (Full)',facecolors='none',edgecolors='k')
+    # # ax4.scatter(t_full_subset[::2], convolved_result[::2], label='Discrete Convolution (Valid)', facecolors='none', edgecolors='r')
+    # ax4.plot(t,m,label='Analytic Solution'),ax4.set_xlabel('Time'),ax4.set_ylabel('Signal'),ax4.legend()
+    # plt.show()
+    return MatplotlibRenderPlots(name='', figures=(f1), axes=((ax1,ax2,ax3)))
+
+
+# def _test_plot_conv(t, t_response, t_full_subset, m_full_subset, t_full, m_full):
+#     s = long_curves[i]
+#     r = short_curves[i] 
+#     m = m_full_subset
+
+#     ### Plot the input, repsonse function, and analytic result
+#     f1, (ax1,ax2,ax3) = plt.subplots(nrows=3,ncols=1,num='Analytic', sharex=True)
+#     ax1.plot(t,s,label='Input'),ax1.set_xlabel('Time'),ax1.set_ylabel('Signal'),ax1.legend()
+#     ax2.plot(t_response,r,label='Response'),ax2.set_xlabel('Time'),ax2.set_ylabel('Signal'),ax2.legend()
+#     ax3.plot(t_full_subset, m_full_subset, label='Output'),ax3.set_xlabel('Time'),ax3.set_ylabel('Signal'),ax3.legend()
+
+#     ### Plot the discrete convolution agains analytic
+#     f2, ax4 = plt.subplots(nrows=1)
+#     # ax4.scatter(t_same[::2],m_same[::2],label='Discrete Convolution (Same)')
+#     ax4.scatter(t_full[::2],m_full[::2],label='Discrete Convolution (Full)',facecolors='none',edgecolors='k')
+#     ax4.scatter(t_full_subset[::2], m_full_subset[::2], label='Discrete Convolution (Valid)', facecolors='none', edgecolors='r')
+#     ax4.plot(t,m,label='Analytic Solution'),ax4.set_xlabel('Time'),ax4.set_ylabel('Signal'),ax4.legend()
+#     plt.show()
