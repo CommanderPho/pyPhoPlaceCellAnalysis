@@ -13,6 +13,7 @@ from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import ZhangReconstr
 from shapely.geometry import LineString # for compute_polygon_overlap
 from shapely.ops import unary_union, polygonize # for compute_polygon_overlap
 from pyphoplacecellanalysis.General.Mixins.CrossComputationComparisonHelpers import _find_any_context_neurons, _compare_computation_results # for compute_polygon_overlap
+from scipy.signal import convolve as convolve # compute_convolution_overlap
 
 def _wrap_multi_context_computation_function(global_comp_fcn):
     """ captures global_comp_fcn and unwraps its arguments: owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_whitelist=None, debug_print=False """
@@ -153,13 +154,17 @@ class MultiContextComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Co
         long_results = computation_results[long_epoch_name]['computed_data']
         short_results = computation_results[short_epoch_name]['computed_data']
 
-        # get shared neuron info:
-        pf_neurons_diff = _compare_computation_results(long_results.pf1D.ratemap.neuron_ids, short_results.pf1D.ratemap.neuron_ids)
+        # Compute various forms of overlaps:        
+        pf_neurons_diff = _compare_computation_results(long_results.pf1D.ratemap.neuron_ids, short_results.pf1D.ratemap.neuron_ids) # get shared neuron info
         poly_overlap_df = compute_polygon_overlap(long_results, short_results, debug_print=debug_print)
+        conv_overlap_dict, conv_overlap_scalars_df = compute_convolution_overlap(long_results, short_results, debug_print=debug_print)
+        product_overlap_dict, product_overlap_scalars_df = compute_dot_product_overlap(long_results, short_results, debug_print=debug_print)
 
         global_computation_results.computed_data['short_long_pf_overlap_analyses'] = DynamicParameters.init_from_dict({
             'short_long_neurons_diff': pf_neurons_diff,
-            'poly_overlap_df': poly_overlap_df
+            'poly_overlap_df': poly_overlap_df,
+            'conv_overlap_dict': conv_overlap_dict, 'conv_overlap_scalars_df': conv_overlap_scalars_df,
+            'product_overlap_dict': product_overlap_dict, 'product_overlap_scalars_df': product_overlap_scalars_df
         })
         return global_computation_results
 
@@ -386,9 +391,10 @@ def take_difference_nonzero(df):
 #     return short_averages  - long_averages
 
 # ==================================================================================================================== #
-# Polygon Overlap                                                                                                      #
+# Overlap                                                                                                      #
 # ==================================================================================================================== #
 
+# Polygon Overlap ____________________________________________________________________________________________________ #
 def compute_polygon_overlap(long_results, short_results, debug_print=False):
     """ computes the overlap between 1D placefields for all units
     If the placefield is unique to one of the two epochs, a value of zero is returned for the overlap.
@@ -436,10 +442,12 @@ def compute_polygon_overlap(long_results, short_results, debug_print=False):
     shared_fragile_neuron_IDXs = pf_neurons_diff.shared.shared_fragile_neuron_IDXs
     
     short_xbins = short_results.pf1D.xbin_centers # .shape # (40,)
-    short_curves = short_results.pf1D.ratemap.tuning_curves # .shape # (64, 40)
+    # short_curves = short_results.pf1D.ratemap.tuning_curves # .shape # (64, 40)
+    short_curves = short_results.pf1D.ratemap.normalized_tuning_curves # .shape # (64, 40)
 
     long_xbins = long_results.pf1D.xbin_centers # .shape # (63,)
-    long_curves = long_results.pf1D.ratemap.tuning_curves # .shape # (64, 63)
+    # long_curves = long_results.pf1D.ratemap.tuning_curves # .shape # (64, 63)
+    long_curves = long_results.pf1D.ratemap.normalized_tuning_curves # .shape # (64, 63)
 
     pf_overlap_polys = []
     for i, a_pair in enumerate(pf_neurons_diff.shared.pairs):
@@ -458,5 +466,122 @@ def compute_polygon_overlap(long_results, short_results, debug_print=False):
     overlap_df = pd.DataFrame(dict(aclu=curr_any_context_neurons, fragile_linear_IDX=shared_fragile_neuron_IDXs, poly_overlap=pf_overlap_polys)).set_index('aclu')
     return overlap_df
 
+# Convolution Overlap ________________________________________________________________________________________________ #
+def compute_convolution_overlap(long_results, short_results, debug_print=False):
+    """ computes the overlap between 1D placefields for all units
+    If the placefield is unique to one of the two epochs, a value of zero is returned for the overlap.
+    """
+    def _subfcn_compute_single_unit_convolution_overlap(long_xbins, long_curve, short_xbins, short_curve, debug_print=False):
+        ### Convolve
+        convolved_result_full = convolve(long_curve, short_curve, mode='full') # .shape # (102,)
+        ### Define time of convolved data
+        # here we'll uses t=long_results
+        x_long = long_xbins.copy()
+        x_short = short_xbins.copy()
+        x_full = np.linspace(x_long[0]+x_short[0],x_long[-1]+x_short[-1],len(convolved_result_full)) # .shape # (102,)
+        # t_same = t
+
+        ### Compute the restricted bounds of the output so that it matches the long input function:
+        istart = (np.abs(x_full-x_long[0])).argmin()
+        iend = (np.abs(x_full-x_long[-1])).argmin()+1
+        x_subset = x_full[istart:iend] # .shape # (63,)
+        convolved_result_subset = convolved_result_full[istart:iend] # .shape # (63,)
+
+        ### Normalize the discrete convolutions
+        convolved_result_area = np.trapz(convolved_result_full, x=x_full)
+        normalized_convolved_result_full = convolved_result_full / convolved_result_area
+        
+        convolved_result_subset_area = np.trapz(convolved_result_subset, x=x_subset)
+        normalized_convolved_result_subset = convolved_result_subset / convolved_result_subset_area
+
+        return dict(full=dict(x=x_full, convolved_result=convolved_result_full, normalized_convolved_result=normalized_convolved_result_full, area=convolved_result_area),
+            valid_subset=dict(x=x_subset, convolved_result=convolved_result_subset, normalized_convolved_result=normalized_convolved_result_subset, area=convolved_result_subset_area))
+
+    # get shared neuron info:
+    pf_neurons_diff = _compare_computation_results(long_results.pf1D.ratemap.neuron_ids, short_results.pf1D.ratemap.neuron_ids)
+    curr_any_context_neurons = pf_neurons_diff.either
+    n_neurons = pf_neurons_diff.shared.n_neurons
+    shared_fragile_neuron_IDXs = pf_neurons_diff.shared.shared_fragile_neuron_IDXs
+    
+    short_xbins = short_results.pf1D.xbin_centers # .shape # (40,)
+    # short_curves = short_results.pf1D.ratemap.tuning_curves # .shape # (64, 40)
+    short_curves = short_results.pf1D.ratemap.normalized_tuning_curves # .shape # (64, 40)
+
+    long_xbins = long_results.pf1D.xbin_centers # .shape # (63,)
+    # long_curves = long_results.pf1D.ratemap.tuning_curves # .shape # (64, 63)
+    long_curves = long_results.pf1D.ratemap.normalized_tuning_curves # .shape # (64, 63)
+
+    pf_overlap_conv_results = []
+    for i, a_pair in enumerate(pf_neurons_diff.shared.pairs):
+        long_idx, short_idx = a_pair
+        if long_idx is None or short_idx is None:
+            # missing entry, answer is zero
+            overlap_results_dict = None
+        else:        
+            # long_coords = list(zip(long_xbins, long_curves[long_idx]))
+            # short_coords = list(zip(short_xbins, short_curves[short_idx]))
+            long_curve = long_curves[long_idx]
+            short_curve = short_curves[short_idx]
+            overlap_results_dict = _subfcn_compute_single_unit_convolution_overlap(long_xbins, long_curve, short_xbins, short_curve)
+        pf_overlap_conv_results.append(overlap_results_dict)
+
+    overlap_dict = {aclu:pf_overlap_conv_results[i] for i, aclu in enumerate(curr_any_context_neurons)}
+    # print(f"{[pf_overlap_conv_results[i] for i, aclu in enumerate(curr_any_context_neurons)]}")
+    # print(f"{[(pf_overlap_conv_results[i] or {}).get('full', {}).get('area', 0.0) for i, aclu in enumerate(curr_any_context_neurons)]}")    
+    overlap_areas = [(pf_overlap_conv_results[i] or {}).get('full', {}).get('area', 0.0) for i, aclu in enumerate(curr_any_context_neurons)]
+    overlap_scalars_df = pd.DataFrame(dict(aclu=curr_any_context_neurons, fragile_linear_IDX=shared_fragile_neuron_IDXs, conv_overlap=overlap_areas)).set_index('aclu')
+
+    return overlap_dict, overlap_scalars_df
+
+# Product Overlap ____________________________________________________________________________________________________ #
+def compute_dot_product_overlap(long_results, short_results, debug_print=False):
+    """ computes the overlap between 1D placefields for all units
+    If the placefield is unique to one of the two epochs, a value of zero is returned for the overlap.
+    """
+    def _subfcn_compute_single_unit_dot_product_overlap(long_xbins, long_curve, short_xbins, short_curve, debug_print=False):
+        # extrapolate the short curve so that it is aligned with long_curve
+        extrapolated_short_curve = np.interp(long_xbins, short_xbins, short_curve, left=0.0, right=0.0)
+        pf_overlap_dot_product_curve = extrapolated_short_curve * long_curve
+
+        overlap_dot_product_maximum = np.nanmax(pf_overlap_dot_product_curve)
+
+        ### Normalize the discrete convolutions
+        overlap_area = np.trapz(pf_overlap_dot_product_curve, x=long_xbins)
+        normalized_overlap_dot_product = pf_overlap_dot_product_curve / overlap_area
+
+        return dict(x=long_xbins, overlap_dot_product=pf_overlap_dot_product_curve, normalized_overlap_dot_product=normalized_overlap_dot_product, area=overlap_area, peak_max=overlap_dot_product_maximum, extrapolated_short_curve=extrapolated_short_curve)
+
+    # get shared neuron info:
+    pf_neurons_diff = _compare_computation_results(long_results.pf1D.ratemap.neuron_ids, short_results.pf1D.ratemap.neuron_ids)
+    curr_any_context_neurons = pf_neurons_diff.either
+    n_neurons = pf_neurons_diff.shared.n_neurons
+    shared_fragile_neuron_IDXs = pf_neurons_diff.shared.shared_fragile_neuron_IDXs
+    
+    short_xbins = short_results.pf1D.xbin_centers # .shape # (40,)
+    # short_curves = short_results.pf1D.ratemap.tuning_curves # .shape # (64, 40)
+    short_curves = short_results.pf1D.ratemap.normalized_tuning_curves # .shape # (64, 40)
+
+    long_xbins = long_results.pf1D.xbin_centers # .shape # (63,)
+    # long_curves = long_results.pf1D.ratemap.tuning_curves # .shape # (64, 63)
+    long_curves = long_results.pf1D.ratemap.normalized_tuning_curves # .shape # (64, 63)
+
+    pf_overlap_results = []
+    for i, a_pair in enumerate(pf_neurons_diff.shared.pairs):
+        long_idx, short_idx = a_pair
+        if long_idx is None or short_idx is None:
+            # missing entry, answer is zero
+            overlap_results_dict = None
+        else:        
+            long_curve = long_curves[long_idx]
+            short_curve = short_curves[short_idx]
+            overlap_results_dict = _subfcn_compute_single_unit_dot_product_overlap(long_xbins, long_curve, short_xbins, short_curve)
+        pf_overlap_results.append(overlap_results_dict)
+
+    overlap_dict = {aclu:pf_overlap_results[i] for i, aclu in enumerate(curr_any_context_neurons)}
+    prod_overlap_areas = [(pf_overlap_results[i] or {}).get('area', 0.0) for i, aclu in enumerate(curr_any_context_neurons)]
+    prod_overlap_peak_max = [(pf_overlap_results[i] or {}).get('peak_max', 0.0) for i, aclu in enumerate(curr_any_context_neurons)]
+    overlap_scalars_df = pd.DataFrame(dict(aclu=curr_any_context_neurons, fragile_linear_IDX=shared_fragile_neuron_IDXs, prod_overlap=prod_overlap_areas, prod_overlap_peak_max=prod_overlap_peak_max)).set_index('aclu')
+
+    return overlap_dict, overlap_scalars_df
 
 
