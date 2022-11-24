@@ -10,6 +10,10 @@ from pyphocorehelpers.DataStructure.dynamic_parameters import DynamicParameters
 
 from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import ZhangReconstructionImplementation # for _perform_firing_rate_trends_computation
 
+from shapely.geometry import LineString # for compute_polygon_overlap
+from shapely.ops import unary_union, polygonize # for compute_polygon_overlap
+from pyphoplacecellanalysis.General.Mixins.CrossComputationComparisonHelpers import _find_any_context_neurons, _compare_computation_results # for compute_polygon_overlap
+
 def _wrap_multi_context_computation_function(global_comp_fcn):
     """ captures global_comp_fcn and unwraps its arguments: owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_whitelist=None, debug_print=False """
     def _(x):
@@ -118,6 +122,50 @@ class MultiContextComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Co
             'final_jonathan_df': final_jonathan_df
         })
         return global_computation_results
+
+    def _perform_short_long_pf_overlap_analyses(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_whitelist=None, debug_print=False):
+        """ 
+        
+        Requires:
+            ['sess']
+            
+        Provides:
+            computation_result.computed_data['short_long_pf_overlap_analyses']
+                ['short_long_pf_overlap_analyses']['short_long_neurons_diff']
+                ['short_long_pf_overlap_analyses']['poly_overlap_df']
+        
+        """
+        if include_whitelist is None:
+            include_whitelist = owning_pipeline_reference.active_completed_computation_result_names # ['maze', 'sprinkle']
+
+        # Epoch dataframe stuff:
+        long_epoch_name = include_whitelist[0] # 'maze1_PYR'
+        short_epoch_name = include_whitelist[1] # 'maze2_PYR'
+        if len(include_whitelist) > 2:
+            global_epoch_name = include_whitelist[-1] # 'maze_PYR'
+        else:
+            print(f'WARNING: no global_epoch detected.')
+            global_epoch_name = '' # None
+
+        if debug_print:
+            print(f'include_whitelist: {include_whitelist}\nlong_epoch_name: {long_epoch_name}, short_epoch_name: {short_epoch_name}, global_epoch_name: {global_epoch_name}')
+
+        long_results = computation_results[long_epoch_name]['computed_data']
+        short_results = computation_results[short_epoch_name]['computed_data']
+
+        # get shared neuron info:
+        pf_neurons_diff = _compare_computation_results(long_results.pf1D.ratemap.neuron_ids, short_results.pf1D.ratemap.neuron_ids)
+        poly_overlap_df = compute_polygon_overlap(long_results, short_results, debug_print=debug_print)
+
+        global_computation_results.computed_data['short_long_pf_overlap_analyses'] = DynamicParameters.init_from_dict({
+            'short_long_neurons_diff': pf_neurons_diff,
+            'poly_overlap_df': poly_overlap_df
+        })
+        return global_computation_results
+
+
+
+
 
 
 # ==================================================================================================================== #
@@ -288,7 +336,6 @@ def take_difference(df):
         
     return short_averages - long_averages
 
-
 def take_difference_nonzero(df):
     """this compares the average firing rate for each neuron before and after the context switch
     
@@ -337,5 +384,79 @@ def take_difference_nonzero(df):
 #     long_averages = long_spikes/ long_time
         
 #     return short_averages  - long_averages
+
+# ==================================================================================================================== #
+# Polygon Overlap                                                                                                      #
+# ==================================================================================================================== #
+
+def compute_polygon_overlap(long_results, short_results, debug_print=False):
+    """ computes the overlap between 1D placefields for all units
+    If the placefield is unique to one of the two epochs, a value of zero is returned for the overlap.
+    """
+    def _subfcn_compute_single_unit_polygon_overlap(avg_coords, model_coords, debug_print=False):
+        polygon_points = [] #creates a empty list where we will append the points to create the polygon
+
+        for xyvalue in avg_coords:
+            polygon_points.append([xyvalue[0],xyvalue[1]]) #append all xy points for curve 1
+
+        for xyvalue in model_coords[::-1]:
+            polygon_points.append([xyvalue[0],xyvalue[1]]) #append all xy points for curve 2 in the reverse order (from last point to first point)
+
+        for xyvalue in avg_coords[0:1]:
+            polygon_points.append([xyvalue[0],xyvalue[1]]) #append the first point in curve 1 again, to it "closes" the polygon
+
+        avg_poly = [] 
+        model_poly = []
+
+        for xyvalue in avg_coords:
+            avg_poly.append([xyvalue[0],xyvalue[1]]) 
+
+        for xyvalue in model_coords:
+            model_poly.append([xyvalue[0],xyvalue[1]]) 
+
+
+        line_non_simple = LineString(polygon_points)
+        mls = unary_union(line_non_simple)
+
+        Area_cal =[]
+
+        for polygon in polygonize(mls):
+            Area_cal.append(polygon.area)
+            if debug_print:
+                print(polygon.area)# print area of each section 
+            Area_poly = (np.asarray(Area_cal).sum())
+        if debug_print:
+            print(Area_poly)#print combined area
+        return Area_poly
+
+    # get shared neuron info:
+    pf_neurons_diff = _compare_computation_results(long_results.pf1D.ratemap.neuron_ids, short_results.pf1D.ratemap.neuron_ids)
+    curr_any_context_neurons = pf_neurons_diff.either
+    n_neurons = pf_neurons_diff.shared.n_neurons
+    shared_fragile_neuron_IDXs = pf_neurons_diff.shared.shared_fragile_neuron_IDXs
+    
+    short_xbins = short_results.pf1D.xbin_centers # .shape # (40,)
+    short_curves = short_results.pf1D.ratemap.tuning_curves # .shape # (64, 40)
+
+    long_xbins = long_results.pf1D.xbin_centers # .shape # (63,)
+    long_curves = long_results.pf1D.ratemap.tuning_curves # .shape # (64, 63)
+
+    pf_overlap_polys = []
+    for i, a_pair in enumerate(pf_neurons_diff.shared.pairs):
+        long_idx, short_idx = a_pair
+        if long_idx is None or short_idx is None:
+            # missing entry, answer is zero
+            overlap_poly = 0
+        else:        
+            long_coords = list(zip(long_xbins, long_curves[long_idx]))
+            short_coords = list(zip(short_xbins, short_curves[short_idx]))
+            overlap_poly = _subfcn_compute_single_unit_polygon_overlap(short_coords, long_coords)
+        pf_overlap_polys.append(overlap_poly)
+
+    # np.array(pf_overlap_polys).shape # (69,)
+    # return pf_overlap_polys
+    overlap_df = pd.DataFrame(dict(aclu=curr_any_context_neurons, fragile_linear_IDX=shared_fragile_neuron_IDXs, poly_overlap=pf_overlap_polys)).set_index('aclu')
+    return overlap_df
+
 
 

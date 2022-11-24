@@ -22,10 +22,11 @@ from pyphoplacecellanalysis.GUI.Qt.Widgets.FigureFormatConfigControls.FigureForm
 from pyphoplacecellanalysis.Pho2D.PyQtPlots.plot_placefields import pyqtplot_plot_image_array # for context_nested_docks/single_context_nested_docks
 
 from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.MultiContextComputationFunctions import take_difference, take_difference_nonzero, make_fr
-from pyphoplacecellanalysis.General.Mixins.CrossComputationComparisonHelpers import _find_any_context_neurons # for plot_short_v_long_pf1D_comparison
+from pyphoplacecellanalysis.General.Mixins.CrossComputationComparisonHelpers import _compare_computation_results, _find_any_context_neurons # for plot_short_v_long_pf1D_comparison
 
 from pyphoplacecellanalysis.PhoPositionalData.plotting.placefield import plot_1D_placecell_validation # for _make_pho_jonathan_batch_plots
 
+from neuropy.utils.colors_util import get_neuron_colors # required for build_neurons_color_map
 
 
 
@@ -208,6 +209,61 @@ class MultiContextComparingDisplayFunctions(AllFunctionEnumeratingMixin, metacla
 
             return graphics_output_dict
 
+    def _display_short_long_pf1D_poly_overlap_comparison(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_whitelist=None, **kwargs):
+            """ Displays a figure for comparing the 1D placefields across-epochs (between the short and long tracks)
+                Usage:
+
+                    %matplotlib qt
+                    active_identifying_session_ctx = curr_active_pipeline.sess.get_context() # 'bapun_RatN_Day4_2019-10-15_11-30-06'
+
+                    graphics_output_dict = curr_active_pipeline.display('_display_batch_pho_jonathan_replay_firing_rate_comparison', active_identifying_session_ctx)
+                    fig, axs, plot_data = graphics_output_dict['fig'], graphics_output_dict['axs'], graphics_output_dict['plot_data']
+                    neuron_df, rdf, aclu_to_idx, irdf = plot_data['df'], plot_data['rdf'], plot_data['aclu_to_idx'], plot_data['irdf']
+                    # Grab the output axes:
+                    curr_axs_dict = axs[0]
+                    curr_firing_rate_ax, curr_lap_spikes_ax, curr_placefield_ax = curr_axs_dict['firing_rate'], curr_axs_dict['lap_spikes'], curr_axs_dict['placefield'] # Extract variables from the `curr_axs_dict` dictionary to the local workspace
+
+            """
+
+            reuse_axs_tuple = kwargs.pop('reuse_axs_tuple', None)            
+            # reuse_axs_tuple = None # plot fresh
+            # reuse_axs_tuple=(ax_long_pf_1D, ax_short_pf_1D)
+            # reuse_axs_tuple=(ax_long_pf_1D, ax_long_pf_1D) # plot only on long axis
+            single_figure = kwargs.pop('single_figure', True)
+            debug_print = kwargs.pop('debug_print', False)
+
+            if include_whitelist is None:
+                include_whitelist = owning_pipeline_reference.active_completed_computation_result_names # ['maze', 'sprinkle']
+
+            long_epoch_name = include_whitelist[0] # 'maze1_PYR'
+            short_epoch_name = include_whitelist[1] # 'maze2_PYR'
+            assert len(include_whitelist) > 2
+            global_epoch_name = include_whitelist[-1] # 'maze_PYR'
+            if debug_print:
+                print(f'include_whitelist: {include_whitelist}\nlong_epoch_name: {long_epoch_name}, short_epoch_name: {short_epoch_name}, global_epoch_name: {global_epoch_name}')           
+    
+            # long_results = computation_results[long_epoch_name]['computed_data']
+            # short_results = computation_results[short_epoch_name]['computed_data']
+            # print(f'')
+
+            short_long_pf_overlap_analyses_results = global_computation_results['computed_data']['short_long_pf_overlap_analyses']
+            pf_neurons_diff = short_long_pf_overlap_analyses_results['short_long_neurons_diff'] # get shared neuron info:
+            n_neurons = pf_neurons_diff.shared.n_neurons
+            shared_fragile_neuron_IDXs = pf_neurons_diff.shared.shared_fragile_neuron_IDXs
+
+            poly_overlap_df = short_long_pf_overlap_analyses_results['poly_overlap_df']
+            # pf_neurons_diff = _compare_computation_results(long_results.pf1D.ratemap.neuron_ids, short_results.pf1D.ratemap.neuron_ids)
+
+            neurons_colors_array = build_neurons_color_map(n_neurons, sortby=shared_fragile_neuron_IDXs, cmap=None)
+
+            fig, ax = plot_short_v_long_pf1D_poly_overlap_comparison(poly_overlap_df, pf_neurons_diff, neurons_colors_array, reuse_axs_tuple=reuse_axs_tuple, single_figure=single_figure, debug_print=debug_print)
+
+            graphics_output_dict = MatplotlibRenderPlots(name='', figures=(fig), axes=(ax), plot_data={'colors': neurons_colors_array})
+            # graphics_output_dict['plot_data'] = {'sort_indicies': (long_sort_ind, short_sort_ind), 'colors':(long_neurons_colors_array, short_neurons_colors_array)}
+
+            return graphics_output_dict
+
+
 
 
 
@@ -309,7 +365,6 @@ def _single_context_nested_docks(curr_active_pipeline, active_config_name, app, 
         return active_identifying_filtered_session_ctx, out_display_items
         # END single_context_nested_docks(...)
 
-
 def _context_nested_docks(curr_active_pipeline, active_config_names, enable_gui=False, debug_print=True):
     """ 2022-08-18 - builds a series of nested contexts for each active_config
 
@@ -331,39 +386,6 @@ def _context_nested_docks(curr_active_pipeline, active_config_names, enable_gui=
         out_items[a_config_name] = (active_identifying_session_ctx, out_display_items)
 
     return master_dock_win, app, out_items
-
-
-# Jonathan's visualizations:
-# def compare_firing_rates(rdf, irdf, show_nonzero=True):
-#     x1 = take_difference(irdf)
-#     y1 = take_difference(rdf)
-#     fig, ax = plt.subplots()
-
-#     ax.plot(x1,y1,'.',label="naieve difference")
-
-#     if show_nonzero:
-#         x2 = take_difference_nonzero(irdf)
-#         y2 = take_difference_nonzero(rdf)
-
-#         # x2 = take_difference_adjust_for_time(irdf)
-#         # y2 = take_difference_nonzero(rdf)
-
-#         ax.plot(x2,y2,'.', label="nonzero difference")
-#         ax.plot(np.vstack([x1,x2]), np.vstack([y1,y2]), color = (0,0,0,.1))
-
-
-#     ax.set_xlabel("Mean FR change in all non-replay time (Hz)");
-#     ax.set_ylabel("Mean FR change in replay time (Hz)");
-#     ax.set_title("Firing rates are correlated in replay and non-replay time");
-#     if show_nonzero:
-#         ax.legend()
-
-    # plt.axis("equal");
-
-
-
-# # this cell really works best in qt
-# %matplotlib qt
 
 # ==================================================================================================================== #
 def _temp_draw_jonathan_ax(sess, time_bins, unit_specific_time_binned_firing_rates, aclu_to_idx, rdf, irdf, show_inter_replay_frs=False, colors=None, fig=None, ax=None, active_aclu:int=0, include_horizontal_labels=True, include_vertical_labels=True, should_render=False):
@@ -637,7 +659,8 @@ def plot_short_v_long_pf1D_comparison(long_results, short_results, curr_any_cont
     single_figure:bool - if True, both long and short are plotted on the same axes of a single shared figure. Otherwise seperate figures are used for each
     
     Usage:
-    
+        from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.MultiContextComparingDisplayFunctions.MultiContextComparingDisplayFunctions import plot_short_v_long_pf1D_comparison
+
         long_results = curr_active_pipeline.computation_results['maze1_PYR'].computed_data
         short_results = curr_active_pipeline.computation_results['maze2_PYR'].computed_data
         curr_any_context_neurons = _find_any_context_neurons(*[curr_active_pipeline.computation_results[k].computed_data.pf1D.ratemap.neuron_ids for k in ['maze1_PYR', 'maze2_PYR']])
@@ -701,5 +724,116 @@ def plot_short_v_long_pf1D_comparison(long_results, short_results, curr_any_cont
     return (fig_long_pf_1D, ax_long_pf_1D, long_sort_ind, long_neurons_colors_array), (fig_short_pf_1D, ax_short_pf_1D, short_sort_ind, short_neurons_colors_array)
 
 
+def build_neurons_color_map(n_neurons:int, sortby=None, cmap=None):
+    """ neurons_colors_array = build_neurons_color_map(n_neurons, sortby=shared_fragile_neuron_IDXs, cmap=None) """
+    if sortby is None:
+        sort_ind = np.arange(n_neurons)
+    elif isinstance(sortby, (list, np.ndarray)):
+        # use the provided sort indicies
+        sort_ind = sortby
+    else:
+        sort_ind = np.arange(n_neurons)
+
+    # Use the get_neuron_colors function to generate colors for these neurons
+    neurons_colors_array = get_neuron_colors(sort_ind, cmap=cmap)
+    return neurons_colors_array
 
 
+
+
+@mpl.rc_context(Fig.get_mpl_style(style='figPublish'))
+def plot_short_v_long_pf1D_poly_overlap_comparison(poly_overlap_df, pf_neurons_diff, neurons_colors_array, reuse_axs_tuple=None, single_figure=False, debug_print=False):
+    """ Produces a figure to compare the 1D placefields on the long vs. the short track. 
+    poly_overlap_df: pd.DataFrame - computed by compute_polygon_overlap(...)
+    pf_neurons_diff: pd.DataFrame - 
+    single_figure:bool - if True, both long and short are plotted on the same axes of a single shared figure. Otherwise seperate figures are used for each
+    
+    Usage:
+        from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.MultiContextComparingDisplayFunctions.MultiContextComparingDisplayFunctions import plot_short_v_long_pf1D_comparison
+
+        long_results = curr_active_pipeline.computation_results['maze1_PYR'].computed_data
+        short_results = curr_active_pipeline.computation_results['maze2_PYR'].computed_data
+        curr_any_context_neurons = _find_any_context_neurons(*[curr_active_pipeline.computation_results[k].computed_data.pf1D.ratemap.neuron_ids for k in ['maze1_PYR', 'maze2_PYR']])
+        reuse_axs_tuple=None # plot fresh
+        # reuse_axs_tuple=(ax_long_pf_1D, ax_short_pf_1D)
+        # reuse_axs_tuple=(ax_long_pf_1D, ax_long_pf_1D) # plot only on long axis
+        (fig_long_pf_1D, ax_long_pf_1D, long_sort_ind, long_neurons_colors_array), (fig_short_pf_1D, ax_short_pf_1D, short_sort_ind, short_neurons_colors_array) = plot_short_v_long_pf1D_comparison(long_results, short_results, curr_any_context_neurons, reuse_axs_tuple=reuse_axs_tuple, single_figure=True)
+
+    """
+    curr_any_context_neurons = pf_neurons_diff.either
+    n_neurons = pf_neurons_diff.shared.n_neurons
+    shared_fragile_neuron_IDXs = pf_neurons_diff.shared.shared_fragile_neuron_IDXs
+
+
+    # neurons_colors_array = build_neurons_color_map(n_neurons, sortby=shared_fragile_neuron_IDXs, cmap=None, included_unit_indicies=None, included_unit_neuron_IDs=curr_any_context_neurons)
+    if debug_print:
+        print(f'n_neurons: {n_neurons}')
+        print(f'shared_fragile_neuron_IDXs: {shared_fragile_neuron_IDXs}.\t np.shape: {np.shape(shared_fragile_neuron_IDXs)}')
+        print(f'curr_any_context_neurons: {curr_any_context_neurons}.\t np.shape: {np.shape(curr_any_context_neurons)}')
+
+    freq_series = poly_overlap_df.poly_overlap
+
+    x_labels = poly_overlap_df.index.to_numpy()
+
+    neurons_color_tuples_list = [tuple(neurons_colors_array[:-1, color_idx]) for color_idx in np.arange(np.shape(neurons_colors_array)[1])]
+
+    # Plot the figure.
+    fig = plt.figure(figsize=(12, 8), num='pf1D_poly_overlap', clear=True)
+    # plt.gcf()
+    ax = freq_series.plot(kind='bar', color=neurons_color_tuples_list)
+    ax.set_title('1D Placefield Short vs. Long Poly Overlap')
+    ax.set_xlabel('Cell ID (aclu)')
+    ax.set_ylabel('Poly Overlap')
+    ax.set_xticklabels(x_labels)
+
+    def add_value_labels(ax, spacing=5, labels=None):
+        """Add labels to the end of each bar in a bar chart.
+
+        Arguments:
+            ax (matplotlib.axes.Axes): The matplotlib object containing the axes
+                of the plot to annotate.
+            spacing (int): The distance between the labels and the bars.
+        """
+
+        # For each bar: Place a label
+        for i, rect in enumerate(ax.patches):
+            # Get X and Y placement of label from rect.
+            y_value = rect.get_height()
+            x_value = rect.get_x() + rect.get_width() / 2
+
+            # Number of points between bar and label. Change to your liking.
+            space = spacing
+            # Vertical alignment for positive values
+            va = 'bottom'
+
+            # If value of bar is negative: Place label below bar
+            if y_value < 0:
+                # Invert space to place label below
+                space *= -1
+                # Vertically align label at top
+                va = 'top'
+
+            # Use Y value as label and format number with one decimal place
+            if labels is None:
+                label = "{:.1f}".format(y_value)
+                # # Use cell ID (given by x position) as the label
+                label = "{}".format(x_value)
+            else:
+                label = str(labels[i])
+                
+            # Create annotation
+            ax.annotate(
+                label,                      # Use `label` as label
+                (x_value, y_value),         # Place label at end of the bar
+                xytext=(0, space),          # Vertically shift label by `space`
+                textcoords="offset points", # Interpret `xytext` as offset in points
+                ha='center',                # Horizontally center label
+                va=va,                      # Vertically align label differently for positive and negative values.
+                color=rect.get_facecolor(),
+                rotation=90)                      
+                                            # 
+
+    # Call the function above. All the magic happens there.
+    add_value_labels(ax, labels=x_labels) # 
+
+    return fig, ax
