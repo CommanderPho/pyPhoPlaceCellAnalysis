@@ -601,12 +601,16 @@ def _make_jonathan_interactive_plot(sess, time_bins, final_jonathan_df, unit_spe
     return graphics_output_dict, final_jonathan_df
 # ==================================================================================================================== #
 
-def _plot_pho_jonathan_batch_plot_single_cell(sess, time_bins, unit_specific_time_binned_firing_rates, pf1D_all, rdf_aclu_to_idx, rdf, irdf, show_inter_replay_frs, pf1D_aclu_to_idx, aclu, curr_fig, colors, debug_print=False, **kwargs):
+def _plot_pho_jonathan_batch_plot_single_cell(t_split, time_bins, unit_specific_time_binned_firing_rates, pf1D_all, rdf_aclu_to_idx, rdf, irdf, show_inter_replay_frs, pf1D_aclu_to_idx, aclu, curr_fig, colors, debug_print=False, **kwargs):
     """ Plots a single cell's plots for a stacked Jonathan-style firing-rate-across-epochs-plot
     Internally calls `plot_1D_placecell_validation` and `_temp_draw_jonathan_ax`
 
     Used by:
         `_make_pho_jonathan_batch_plots`
+
+    Historical:
+        used to take sess: DataSession as first argument and then access `sess.paradigm[0][0,1]` internally. On 2022-11-27 refactored to take this time `t_split` directly and no longer require session
+
 
     """
     # cell_linear_fragile_IDX = rdf_aclu_to_idx[aclu] # get the cell_linear_fragile_IDX from aclu
@@ -635,7 +639,6 @@ def _plot_pho_jonathan_batch_plot_single_cell(sess, time_bins, unit_specific_tim
     curr_ax_cell_label.axis('off')
 
     ## New ax[0,1] draw method:
-    t_split = sess.paradigm[0][0,1]
     _temp_draw_jonathan_ax(t_split, time_bins, unit_specific_time_binned_firing_rates, rdf_aclu_to_idx, rdf, irdf, show_inter_replay_frs=show_inter_replay_frs, colors=colors, fig=curr_fig, ax=curr_ax_firing_rate, active_aclu=aclu,
                         include_horizontal_labels=False, include_vertical_labels=False, should_render=False)
     # curr_ax_firing_rate includes only bottom and left spines, and only y-axis ticks and labels
@@ -867,7 +870,8 @@ def _make_pho_jonathan_batch_plots(sess, time_bins, final_jonathan_df, unit_spec
             # Unhandled exception
             raise e
 
-        curr_single_cell_out_dict = _plot_pho_jonathan_batch_plot_single_cell(sess, time_bins, unit_specific_time_binned_firing_rates, pf1D_all, aclu_to_idx, rdf, irdf, show_inter_replay_frs, _temp_aclu_to_fragile_linear_neuron_IDX, aclu, curr_fig, colors, debug_print=debug_print, **kwargs)
+        t_split = sess.paradigm[0][0,1]
+        curr_single_cell_out_dict = _plot_pho_jonathan_batch_plot_single_cell(t_split, time_bins, unit_specific_time_binned_firing_rates, pf1D_all, aclu_to_idx, rdf, irdf, show_inter_replay_frs, _temp_aclu_to_fragile_linear_neuron_IDX, aclu, curr_fig, colors, debug_print=debug_print, **kwargs)
 
         # output the axes created:
         axs_list.append(curr_single_cell_out_dict)
