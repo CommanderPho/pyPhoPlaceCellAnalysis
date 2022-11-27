@@ -462,6 +462,13 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
         
         _stage_changed_connection = self.sigStageChanged.connect(self.on_stage_changed)
          
+        # Reload both the computation and display functions to get the updated values:
+        self.reload_default_computation_functions()
+        self.reload_default_display_functions()
+
+
+
+
 
     def save_pipeline(self, active_pickle_filename='loadedSessPickle.pkl'):
         """ pickles (saves) the entire pipeline to a file that can be loaded later without recomputing.
