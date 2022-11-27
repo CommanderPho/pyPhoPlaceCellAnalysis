@@ -604,7 +604,7 @@ def _plot_pho_jonathan_batch_plot_single_cell(sess, time_bins, unit_specific_tim
         `_make_pho_jonathan_batch_plots`
 
     """
-    num_gridspec_columns = 8 # hardcoded
+    
 
     title_string = ' '.join(['pf1D', f'Cell {aclu:02d}'])
     subtitle_string = ' '.join([f'{pf1D_all.config.str_for_display(False)}'])
@@ -615,6 +615,7 @@ def _plot_pho_jonathan_batch_plot_single_cell(sess, time_bins, unit_specific_tim
     # gridspec mode:
     curr_fig.set_facecolor('0.75')
 
+    num_gridspec_columns = 8 # hardcoded
     gs_kw = dict(width_ratios=np.repeat(1, num_gridspec_columns).tolist(), height_ratios=[1, 1], wspace=0.0, hspace=0.0)
     gs_kw['width_ratios'][-1] = 0.3 # make the last column (containing the 1D placefield plot) a fraction of the width of the others
 
@@ -655,6 +656,160 @@ def _plot_pho_jonathan_batch_plot_single_cell(sess, time_bins, unit_specific_tim
     curr_ax_firing_rate.set_xlim((t_start, t_end)) # We don't want to clip to only the spiketimes for this cell, we want it for all cells, or even when the recording started/ended
     curr_ax_lap_spikes.sharex(curr_ax_firing_rate) # Sync the time axes of the laps and the firing rates
     return {'firing_rate':curr_ax_firing_rate, 'lap_spikes': curr_ax_lap_spikes, 'placefield': curr_ax_placefield, 'labels': curr_ax_cell_label}
+
+from neuropy.utils.misc import RowColTuple # for _make_pho_jonathan_batch_plots_advanced
+from neuropy.utils.matplotlib_helpers import build_or_reuse_figure, _build_variable_max_value_label, _determine_best_placefield_2D_layout, _build_neuron_identity_label # for _make_pho_jonathan_batch_plots_advanced
+
+
+# def _make_pho_jonathan_batch_plots_advanced(sess, time_bins, final_jonathan_df, unit_specific_time_binned_firing_rates, pf1D_all, aclu_to_idx, rdf, irdf, show_inter_replay_frs=False, included_unit_indicies=None, included_unit_neuron_IDs=None,
+#     subplots:RowColTuple=(40, 3), fig_column_width:float=8.0, fig_row_height:float=1.0, resolution_multiplier:float=1.0, max_screen_figure_size=(None, None), fignum=1, fig=None, missing_aclu_string_formatter=None, debug_print=False):
+#     """ An attempt to allow standardized pagination and such in `_make_pho_jonathan_batch_plots(...)` by converting from `plot_ratemap_2D(...)`'s page form and such. 
+
+#     NOT YET FINISHED
+    
+#     Parameters
+#     ----------
+#     subplots : tuple, optional
+#         number of cells within each figure window. If cells exceed the number of subplots, then cells are plotted in successive figure windows of same size, by default (10, 8)
+#     fignum : int, optional
+#         figure number to start from, by default None
+#     fig_subplotsize: tuple, optional
+#         fig_subplotsize: the size of a single subplot. used to compute the figure size
+
+#     """
+#     # last_figure_subplots_same_layout = False
+#     last_figure_subplots_same_layout = True
+#     # missing_aclu_string_formatter: a lambda function that takes the current aclu string and returns a modified string that reflects that this aclu value is missing from the current result (e.g. missing_aclu_string_formatter('3') -> '3 <shared>')
+#     if missing_aclu_string_formatter is None:
+#         # missing_aclu_string_formatter = lambda curr_extended_id_string: f'{curr_extended_id_string} <shared>'
+#         missing_aclu_string_formatter = lambda curr_extended_id_string: f'{curr_extended_id_string}-'
+
+#     active_maps, title_substring, included_unit_indicies = _help_plot_ratemap_neuronIDs(ratemap, included_unit_indicies=included_unit_indicies, included_unit_neuron_IDs=included_unit_neuron_IDs, plot_variable=plot_variable, debug_print=debug_print)
+
+#     # ==================================================================================================================== #
+    
+#     ## BEGIN FACTORING OUT:
+#     ## NEW COMBINED METHOD, COMPUTES ALL PAGES AT ONCE:
+#     if resolution_multiplier is None:
+#         resolution_multiplier = 1.0
+#     nfigures, num_pages, included_combined_indicies_pages, page_grid_sizes, data_aspect_ratio, page_figure_sizes = _determine_best_placefield_2D_layout(xbin=ratemap.xbin, ybin=ratemap.ybin, included_unit_indicies=included_unit_indicies, subplots=subplots, fig_column_width=fig_column_width, fig_row_height=fig_row_height, resolution_multiplier=resolution_multiplier, max_screen_figure_size=max_screen_figure_size, last_figure_subplots_same_layout=last_figure_subplots_same_layout, debug_print=debug_print)
+    
+#     if fignum is None:
+#         if f := plt.get_fignums():
+#             fignum = f[-1] + 1
+#         else:
+#             fignum = 1
+
+#     figures, page_gs, graphics_obj_dicts = [], [], []
+#     for fig_ind in range(nfigures):
+#         # Dynamic Figure Sizing: 
+#         curr_fig_page_grid_size = page_grid_sizes[fig_ind]
+#         active_figure_size = page_figure_sizes[fig_ind]
+        
+#         ## Figure Setup:
+#         fig = build_or_reuse_figure(fignum=fignum, fig=fig, fig_idx=fig_ind, figsize=active_figure_size, dpi=None, clear=True, tight_layout=False)
+        
+#         # grid_rect = (0.01, 0.05, 0.98, 0.9) # (left, bottom, width, height) 
+#         # grid_rect = 111
+#         # grid = ImageGrid(fig, grid_rect,  # similar to subplot(211)
+#         #         nrows_ncols=(curr_fig_page_grid_size.num_rows, curr_fig_page_grid_size.num_columns),
+#         #         axes_pad=0.05,
+#         #         label_mode="1",
+#         #         share_all=True,
+#         #         aspect=True,
+#         #         cbar_location="top",
+#         #         cbar_mode=curr_cbar_mode,
+#         #         cbar_size="7%",
+#         #         cbar_pad="1%",
+#         #         )
+#         # page_gs.append(grid)
+
+#         num_gridspec_columns = 8 # hardcoded
+#         gs_kw = dict(width_ratios=np.repeat(1, num_gridspec_columns).tolist(), height_ratios=[1, 1], wspace=0.0, hspace=0.0)
+#         gs_kw['width_ratios'][-1] = 0.3 # make the last column (containing the 1D placefield plot) a fraction of the width of the others
+
+#         ## NOTE: previously expected a subfigure to use instead of the main figure:
+#         gs = fig.add_gridspec(2, num_gridspec_columns, **gs_kw) # layout figure is usually a gridspec of (1,8)
+#         curr_ax_firing_rate = fig.add_subplot(gs[0, :-1]) # the whole top row except the last element (to match the firing rates below)
+#         curr_ax_cell_label = fig.add_subplot(gs[0, -1]) # the last element of the first row contains the labels that identify the cell
+#         curr_ax_lap_spikes = fig.add_subplot(gs[1, :-1]) # all up to excluding the last element of the row
+#         curr_ax_placefield = fig.add_subplot(gs[1, -1], sharey=curr_ax_lap_spikes) # only the last element of the row
+
+#         title_string = f'2D Placemaps {title_substring} ({len(ratemap.neuron_ids)} good cells)'
+
+#         fig.suptitle(title_string)
+#         figures.append(fig)
+#         graphics_obj_dicts.append({}) # New empty dict
+
+#     # New page-based version:
+#     for page_idx in np.arange(num_pages):
+#         if debug_print:
+#             print(f'page_idx: {page_idx}')
+        
+#         active_page_grid = page_gs[page_idx]
+#         active_graphics_obj_dict = graphics_obj_dicts[page_idx]
+#         # print(f'active_page_grid: {active_page_grid}')
+            
+#         for (a_linear_index, curr_row, curr_col, curr_included_unit_index) in included_combined_indicies_pages[page_idx]:
+#             # Need to convert to page specific:
+#             curr_page_relative_linear_index = np.mod(a_linear_index, int(page_grid_sizes[page_idx].num_rows * page_grid_sizes[page_idx].num_columns))
+#             curr_page_relative_row = np.mod(curr_row, page_grid_sizes[page_idx].num_rows)
+#             curr_page_relative_col = np.mod(curr_col, page_grid_sizes[page_idx].num_columns)
+#             # print(f'a_linear_index: {a_linear_index}, curr_page_relative_linear_index: {curr_page_relative_linear_index}, curr_row: {curr_row}, curr_col: {curr_col}, curr_page_relative_row: {curr_page_relative_row}, curr_page_relative_col: {curr_page_relative_col}, curr_included_unit_index: {curr_included_unit_index}')
+           
+#             if curr_included_unit_index is not None:
+#                 # valid neuron ID, access like normal
+#                 pfmap = active_maps[curr_included_unit_index]
+#                 # normal (non-shared mode)
+#                 curr_ratemap_relative_neuron_IDX = curr_included_unit_index
+#                 curr_neuron_ID = ratemap.neuron_ids[curr_ratemap_relative_neuron_IDX]
+                
+#                 ## Labeling:
+#                 formatted_max_value_string = None 
+#                 final_title_str = _build_neuron_identity_label(neuron_extended_id=ratemap.neuron_extended_ids[curr_ratemap_relative_neuron_IDX], brev_mode=brev_mode, formatted_max_value_string=formatted_max_value_string, use_special_overlayed_title=use_special_overlayed_title)
+
+#             else:
+#                 # invalid neuron ID, generate blank entry
+#                 curr_ratemap_relative_neuron_IDX = None # This neuron_ID doesn't correspond to a neuron_IDX in the current ratemap, so we'll mark this value as None
+#                 curr_neuron_ID = included_unit_neuron_IDs[a_linear_index]
+
+#                 pfmap = np.zeros((np.shape(active_maps)[1], np.shape(active_maps)[2])) # fully allocated new array of zeros
+#                 curr_extended_id_string = f'{curr_neuron_ID}' # get the aclu value (which is all that's known about the missing cell and use that as the curr_extended_id_string
+#                 final_title_str = missing_aclu_string_formatter(curr_extended_id_string)
+
+#             # Get the axis to plot on:
+#             curr_ax = active_page_grid[curr_page_relative_linear_index]
+            
+#             ## Plot the main heatmap for this pfmap:
+#             # curr_im, curr_title_anchored_text = _plot_single_tuning_map_2D(ratemap.xbin, ratemap.ybin, pfmap, ratemap.occupancy, final_title_str=final_title_str, drop_below_threshold=drop_below_threshold, brev_mode=brev_mode, plot_mode=plot_mode,
+#             #                                 ax=curr_ax, max_value_formatter=max_value_formatter, use_special_overlayed_title=use_special_overlayed_title, bg_rendering_mode=bg_rendering_mode)
+
+
+#             curr_single_cell_out_dict = _plot_pho_jonathan_batch_plot_single_cell(sess, time_bins, unit_specific_time_binned_firing_rates, pf1D_all, aclu_to_idx, rdf, irdf, show_inter_replay_frs, i, aclu, curr_fig, colors, debug_print=debug_print, **kwargs)
+
+            
+#             # active_graphics_obj_dict[curr_neuron_ID] = {'axs': [curr_ax], 'image': curr_im, 'title_obj': curr_title_anchored_text}
+#             active_graphics_obj_dict[curr_neuron_ID] = curr_single_cell_out_dict
+
+
+#             # if curr_ratemap_relative_neuron_IDX is not None:
+#                 # This means this neuron is included in the current ratemap:
+#                 ## Decision: Only do these extended plotting things when the neuron_IDX is included/valid.
+                
+
+#         ## Remove the unused axes if there are any:
+#         # Note that this makes use of the fact that curr_page_relative_linear_index is left maxed-out after the above loop finishes executing.
+#         num_axes_to_remove = (len(active_page_grid) - 1) - curr_page_relative_linear_index
+#         if (num_axes_to_remove > 0):
+#             for a_removed_linear_index in np.arange(curr_page_relative_linear_index+1, len(active_page_grid)):
+#                 removal_ax = active_page_grid[a_removed_linear_index]
+#                 fig.delaxes(removal_ax)
+
+#         # Apply subplots adjust to fix margins:
+#         plt.subplots_adjust(left=0.0, right=1.0, bottom=0.0, top=1.0)
+        
+#     return figures, page_gs, graphics_obj_dicts
+
 
 
 def _make_pho_jonathan_batch_plots(sess, time_bins, final_jonathan_df, unit_specific_time_binned_firing_rates, pf1D_all, aclu_to_idx, rdf, irdf, show_inter_replay_frs=False, n_max_plot_rows:int=4, debug_print=False, **kwargs):
