@@ -222,7 +222,9 @@ class MultiContextComparingDisplayFunctions(AllFunctionEnumeratingMixin, metacla
             return graphics_output_dict
 
     def _display_short_long_pf1D_scalar_overlap_comparison(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_whitelist=None, **kwargs):
-            """ Displays a figure for comparing the 1D placefields across-epochs (between the short and long tracks)
+            """ Displays a figure for comparing the scalar comparison quantities computed for 1D placefields across-epochs (between the short and long tracks)
+                This currently renders as a bar-graph
+
                 Usage:
 
                     %matplotlib qt
@@ -749,7 +751,7 @@ def plot_short_v_long_pf1D_comparison(long_results, short_results, curr_any_cont
 
 @mpl.rc_context(Fig.get_mpl_style(style='figPublish'))
 def plot_short_v_long_pf1D_scalar_overlap_comparison(overlap_scalars_df, pf_neurons_diff, neurons_colors_array, reuse_axs_tuple=None, single_figure=False, overlap_metric_mode=PlacefieldOverlapMetricMode.POLY, variant_name='', debug_print=False):
-    """ Produces a figure to compare the 1D placefields on the long vs. the short track. 
+    """ Produces a figure to compare *a scalar value* the 1D placefields on the long vs. the short track. 
     poly_overlap_df: pd.DataFrame - computed by compute_polygon_overlap(...)
     pf_neurons_diff: pd.DataFrame - 
     single_figure:bool - if True, both long and short are plotted on the same axes of a single shared figure. Otherwise seperate figures are used for each
@@ -773,7 +775,6 @@ def plot_short_v_long_pf1D_scalar_overlap_comparison(overlap_scalars_df, pf_neur
     n_neurons = pf_neurons_diff.shared.n_neurons
     shared_fragile_neuron_IDXs = pf_neurons_diff.shared.shared_fragile_neuron_IDXs
 
-    # neurons_colors_array = build_neurons_color_map(n_neurons, sortby=shared_fragile_neuron_IDXs, cmap=None, included_unit_indicies=None, included_unit_neuron_IDs=curr_any_context_neurons)
     if debug_print:
         print(f'n_neurons: {n_neurons}')
         print(f'shared_fragile_neuron_IDXs: {shared_fragile_neuron_IDXs}.\t np.shape: {np.shape(shared_fragile_neuron_IDXs)}')
@@ -802,7 +803,7 @@ def plot_short_v_long_pf1D_scalar_overlap_comparison(overlap_scalars_df, pf_neur
 
     # Plot the figure.
     fig = plt.figure(figsize=(12, 8), num=f'pf1D_{lowercase_desc}_overlap{variant_name}', clear=True)
-    # plt.gcf()
+    
     ax = freq_series.plot(kind='bar', color=neurons_color_tuples_list)
     ax.set_title(f'1D Placefield Short vs. Long {titlecase_desc} Overlap')
     ax.set_xlabel('Cell ID (aclu)')
@@ -810,7 +811,7 @@ def plot_short_v_long_pf1D_scalar_overlap_comparison(overlap_scalars_df, pf_neur
     ax.set_xticklabels(x_labels)
 
     def add_value_labels(ax, spacing=5, labels=None):
-        """Add labels to the end of each bar in a bar chart.
+        """Add labels to the end (top) of each bar in a bar chart.
 
         Arguments:
             ax (matplotlib.axes.Axes): The matplotlib object containing the axes
