@@ -425,19 +425,31 @@ def _compute_modern_aggregate_short_long_replay_stats(rdf, debug_print=True):
     # Differences
     diff_total_num_replays, diff_total_replay_duration, diff_mean_replay_duration, diff_var_replay_duration = (short_total_num_replays-long_total_num_replays), (short_total_replay_duration-long_total_replay_duration), (short_mean_replay_duration-long_mean_replay_duration), (short_var_replay_duration-long_var_replay_duration)
 
+    if debug_print:
+        print(f'diff_total_num_replays: {diff_total_num_replays}, diff_replay_duration: (total: {diff_total_replay_duration}, mean: {diff_mean_replay_duration}, var: {diff_var_replay_duration})')
+
     return (diff_total_num_replays, diff_total_replay_duration, diff_mean_replay_duration, diff_var_replay_duration), (long_total_num_replays, long_total_replay_duration, long_mean_replay_duration, long_var_replay_duration), (short_total_num_replays, short_total_replay_duration, short_mean_replay_duration, short_var_replay_duration)
 
 
 
 
 def _compute_neuron_replay_stats(rdf, aclu_to_idx):
+    """ add replay statistics to 
+
+    Usage:
+        out_replay_df, out_neuron_df = _compute_neuron_replay_stats(rdf, aclu_to_idx)
+        out_neuron_df
+
+    """
     # Find the total number of replays each neuron is active during:
+
+    # could assert np.shape(list(aclu_to_idx.keys())) # (52,) is equal to n_neurons
     # def _subfn_compute_epoch_neuron_replay_stats(epoch_rdf, aclu_to_idx):
     def _subfn_compute_epoch_neuron_replay_stats(epoch_rdf):
         # Extract the firing rates into a flat matrix instead
         flat_matrix = np.vstack(epoch_rdf.firing_rates)
         # flat_matrix.shape # (116, 52) # (n_replays, n_neurons)
-        n_replays = np.shape(flat_matrix)[0]
+        # n_replays = np.shape(flat_matrix)[0]
         n_neurons = np.shape(flat_matrix)[1]
         is_inactive_mask = np.isclose(flat_matrix, 0.0)
         is_active_mask = np.logical_not(is_inactive_mask)
@@ -465,7 +477,7 @@ def _compute_neuron_replay_stats(rdf, aclu_to_idx):
     # Extract the firing rates into a flat matrix instead
     flat_matrix = np.vstack(rdf.firing_rates) # flat_matrix.shape # (116, 52) # (n_replays, n_neurons)
     n_replays = np.shape(flat_matrix)[0]
-    n_neurons = np.shape(flat_matrix)[1]
+    # n_neurons = np.shape(flat_matrix)[1]
     is_inactive_mask = np.isclose(flat_matrix, 0.0)
     is_active_mask = np.logical_not(is_inactive_mask)
     ## Number of unique neurons participating in each replay:    
@@ -475,18 +487,67 @@ def _compute_neuron_replay_stats(rdf, aclu_to_idx):
     out_replay_df = rdf.copy()
     out_replay_df['num_neuron_participating'] = replay_num_neuron_participating
                  
-    # return neuron_num_active_replays, replay_num_neuron_participating
     return out_replay_df, out_neuron_df
 
 
-# grouped_rdf = rdf.groupby(by=["short_track"])
-# long_rdf = grouped_rdf.get_group(False)
-# long_result = _compute_neuron_replay_stats(long_rdf, aclu_to_idx)
-# short_rdf = grouped_rdf.get_group(True)
-# short_result = _compute_neuron_replay_stats(short_rdf, aclu_to_idx)
 
-out_replay_df, out_neuron_df = _compute_neuron_replay_stats(rdf, aclu_to_idx)
-out_neuron_df
+
+def compute_evening_morning_parition(final_jonathan_df, debug_print=True):
+    """ 2022-11-27 - Computes the cells that are either appearing or disappearing across the transition from the long to short track.
+    
+    Goal: Detect the cells that either appear or disappear across the transition from the long-to-short track
+    
+    
+    Usage:
+        difference_sorted_aclus, evening_sorted_aclus, morning_sorted_aclus = compute_evening_morning_parition(final_jonathan_df, debug_print=True)
+        sorted_final_jonathan_df = final_jonathan_df.reindex(difference_sorted_aclus).copy() # This seems to work to re-sort the dataframe by the sort indicies
+        sorted_final_jonathan_df
+        
+    difference_sorted_aclus: [        nan         nan  4.26399584  3.84391289  3.2983088   3.26820908
+      2.75093881  2.32313925  2.28524202  2.24443817  1.92526386  1.87876877
+      1.71554535  1.48531487  1.18602994  1.04168718  0.81165515  0.7807097
+      0.59763511  0.5509481   0.54756479  0.50568564  0.41716005  0.37976643
+      0.37645228  0.26027113  0.21105209  0.12519103  0.10830269 -0.03520479
+     -0.04286447 -0.15702646 -0.17816494 -0.29196706 -0.31561772 -0.31763809
+     -0.32949624 -0.38297539 -0.38715584 -0.40302644 -0.44631645 -0.45664655
+     -0.47779662 -0.48631874 -0.60326742 -0.61542106 -0.68274119 -0.69134462
+     -0.70242751 -0.7262794  -0.74993767 -0.79563808 -0.83345136 -1.02494536
+     -1.0809595  -1.09055803 -1.12411968 -1.27320071 -1.28961086 -1.3305737
+     -1.48966833 -1.87966732 -2.04939727 -2.24369668 -2.42700786 -2.59375268
+     -2.62661755 -3.06693382 -4.56042725]
+     For difference sorted values (difference_sorted_aclus), the first values in the array are likely to be short-specific while the last values are likely to be long-specific
+    """
+    # active_column_names = {'long':'long_mean', 'short':'short_mean', 'diff':'mean_diff'} # uses both replay and non-replay firing rate means
+    active_column_names = {'long':'long_replay_mean', 'short':'short_replay_mean', 'diff':'replay_diff'} # uses only replay firing rate means
+    # active_column_names = {'long':'long_non_replay_mean', 'short':'short_non_replay_mean', 'diff':'non_replay_diff'} # uses only non-replay firing rate means
+
+    # Find "Evening" Cells:
+    curr_long_mean_abs = final_jonathan_df[active_column_names['long']].abs().to_numpy()
+    long_nearest_zero_sort_idxs = np.argsort(curr_long_mean_abs)
+    evening_sorted_aclus = final_jonathan_df.index.to_numpy()[long_nearest_zero_sort_idxs] # find cells nearest to zero firing for long_mean
+
+    if debug_print:
+        print(f'Evening sorted values: {curr_long_mean_abs[long_nearest_zero_sort_idxs]}')
+    
+    ## Find "Morning" Cells:
+    curr_short_mean_abs = final_jonathan_df[active_column_names['short']].abs().to_numpy()
+    short_nearest_zero_sort_idxs = np.argsort(curr_short_mean_abs)
+    morning_sorted_aclus = final_jonathan_df.index.to_numpy()[short_nearest_zero_sort_idxs] # find cells nearest to zero firing for short_mean
+
+    if debug_print:
+        print(f'Morning sorted values: {curr_short_mean_abs[short_nearest_zero_sort_idxs]}')
+    
+    # Look at differences method:
+    curr_mean_diff = final_jonathan_df[active_column_names['diff']].to_numpy()
+    biggest_differences_sort_idxs = np.argsort(curr_mean_diff)[::-1] # sort this one in order of increasing values (most promising differences first)
+    difference_sorted_aclus = final_jonathan_df.index.to_numpy()[biggest_differences_sort_idxs]
+    # for the difference sorted method, the aclus at both ends of the `difference_sorted_aclus` are more likely to belong to morning/evening respectively
+    if debug_print:
+        print(f'Difference sorted values: {curr_mean_diff[biggest_differences_sort_idxs]}')
+    return (difference_sorted_aclus, evening_sorted_aclus, morning_sorted_aclus)
+
+
+
 
 
 # ==================================================================================================================== #
