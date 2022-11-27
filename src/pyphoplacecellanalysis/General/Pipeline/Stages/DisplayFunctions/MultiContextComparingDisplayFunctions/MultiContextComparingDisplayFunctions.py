@@ -659,10 +659,8 @@ def _plot_pho_jonathan_batch_plot_single_cell(sess, time_bins, unit_specific_tim
 
 def _make_pho_jonathan_batch_plots(sess, time_bins, final_jonathan_df, unit_specific_time_binned_firing_rates, pf1D_all, aclu_to_idx, rdf, irdf, show_inter_replay_frs=False, n_max_plot_rows:int=4, debug_print=False, **kwargs):
     """ Stacked Jonathan-style firing-rate-across-epochs-plot
-    Internally calls `_plot_pho_jonathan_batch_plot_single_cell` `plot_1D_placecell_validation` and `_temp_draw_jonathan_ax`
-
+    Internally calls `_plot_pho_jonathan_batch_plot_single_cell`
         n_max_plot_rows: the maximum number of rows to plot
-
 
     """
     fig = plt.figure(constrained_layout=True, figsize=(10, 4))
