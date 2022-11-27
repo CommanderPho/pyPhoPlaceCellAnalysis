@@ -143,7 +143,7 @@ def plot_1d_placecell_validations(active_placefields1D, plotting_config, should_
 
     # ui.show() # Tabbed mode only
     return MatplotlibRenderPlots(name=f'{common_basename}', figures=out_figures_list, axes=out_axes_list, ui=ui)
-    # return out_figures_list
+    
 
 
 # 2d Placefield comparison figure:

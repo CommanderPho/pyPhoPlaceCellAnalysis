@@ -22,7 +22,7 @@ from pyphoplacecellanalysis.GUI.Qt.Widgets.DecoderPlotSelectorControls.DecoderPl
 from pyphoplacecellanalysis.GUI.Qt.Widgets.FigureFormatConfigControls.FigureFormatConfigControls import FigureFormatConfigControls # for context_nested_docks/single_context_nested_docks
 from pyphoplacecellanalysis.Pho2D.PyQtPlots.plot_placefields import pyqtplot_plot_image_array # for context_nested_docks/single_context_nested_docks
 
-from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.MultiContextComputationFunctions import take_difference, take_difference_nonzero, make_fr
+from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.MultiContextComputationFunctions import make_fr
 from pyphoplacecellanalysis.General.Mixins.CrossComputationComparisonHelpers import _compare_computation_results, _find_any_context_neurons, build_neurons_color_map # for plot_short_v_long_pf1D_comparison
 
 from pyphoplacecellanalysis.PhoPositionalData.plotting.placefield import plot_1D_placecell_validation # for _make_pho_jonathan_batch_plots
@@ -126,7 +126,7 @@ class MultiContextComparingDisplayFunctions(AllFunctionEnumeratingMixin, metacla
             return graphics_output_dict
 
     def _display_batch_pho_jonathan_replay_firing_rate_comparison(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_whitelist=None, **kwargs):
-            """ Stacked Jonathan-style firing-rate-across-epochs-plot. Pho's batch adaptation of the primary elements from Jonathan's interactive display. Currently hacked up to directly compute the results to display within this function
+            """ Stacked Jonathan-style firing-rate-across-epochs-plot. Pho's batch adaptation of the primary elements from Jonathan's interactive display.
                 Usage:
 
                     %matplotlib qt
@@ -515,10 +515,10 @@ def _make_jonathan_interactive_plot(sess, time_bins, final_jonathan_df, unit_spe
 
     # this fills in the nan's in the single-track cells so that they get plotted at the edges
     # plotting everything in one go makes resizing points later simpler
-    final_jonathan_df.long.fillna(xlim[0] + 1, inplace=True) # xlim[0] + 1 is the extreme edge of the plot
-    final_jonathan_df.short.fillna(ylim[0] + 1, inplace=True)
+    final_jonathan_df.long_pf_peak_x.fillna(xlim[0] + 1, inplace=True) # xlim[0] + 1 is the extreme edge of the plot
+    final_jonathan_df.short_pf_peak_x.fillna(ylim[0] + 1, inplace=True)
 
-    remap_scatter = ax[0,0].scatter(final_jonathan_df.long, final_jonathan_df.short, s=7, picker=True, c=[colors[c] for c in final_jonathan_df["has_na"]]);
+    remap_scatter = ax[0,0].scatter(final_jonathan_df.long_pf_peak_x, final_jonathan_df.short_pf_peak_x, s=7, picker=True, c=[colors[c] for c in final_jonathan_df["has_na"]]);
     ax[0,0].set_ylim(ylim);
     ax[0,0].set_xlim(xlim);
     ax[0,0].xaxis.set_tick_params(labelbottom=False)
@@ -595,9 +595,71 @@ def _make_jonathan_interactive_plot(sess, time_bins, final_jonathan_df, unit_spe
     fig.canvas.mpl_connect('key_press_event', on_keypress)
     return graphics_output_dict, final_jonathan_df
 # ==================================================================================================================== #
+
+def _plot_pho_jonathan_batch_plot_single_cell(sess, time_bins, unit_specific_time_binned_firing_rates, pf1D_all, aclu_to_idx, rdf, irdf, show_inter_replay_frs, i, aclu, curr_fig, colors, debug_print=False, **kwargs):
+    """ Plots a single cell's plots for a stacked Jonathan-style firing-rate-across-epochs-plot
+    Internally calls `plot_1D_placecell_validation` and `_temp_draw_jonathan_ax`
+
+    Used by:
+        `_make_pho_jonathan_batch_plots`
+
+    """
+    num_gridspec_columns = 8 # hardcoded
+
+    title_string = ' '.join(['pf1D', f'Cell {aclu:02d}'])
+    subtitle_string = ' '.join([f'{pf1D_all.config.str_for_display(False)}'])
+    short_title_string = f'{aclu:02d}'
+    if debug_print:
+        print(f'\t{title_string}\n\t{subtitle_string}')
+
+    # gridspec mode:
+    curr_fig.set_facecolor('0.75')
+
+    gs_kw = dict(width_ratios=np.repeat(1, num_gridspec_columns).tolist(), height_ratios=[1, 1], wspace=0.0, hspace=0.0)
+    gs_kw['width_ratios'][-1] = 0.3 # make the last column (containing the 1D placefield plot) a fraction of the width of the others
+
+    gs = curr_fig.add_gridspec(2, num_gridspec_columns, **gs_kw) # layout figure is usually a gridspec of (1,8)
+    curr_ax_firing_rate = curr_fig.add_subplot(gs[0, :-1]) # the whole top row except the last element (to match the firing rates below)
+    curr_ax_cell_label = curr_fig.add_subplot(gs[0, -1]) # the last element of the first row contains the labels that identify the cell
+    curr_ax_lap_spikes = curr_fig.add_subplot(gs[1, :-1]) # all up to excluding the last element of the row
+    curr_ax_placefield = curr_fig.add_subplot(gs[1, -1], sharey=curr_ax_lap_spikes) # only the last element of the row
+
+    # Setup title axis:
+    title_axes_kwargs = dict(ha="center", va="center", fontsize=18, color="black")
+    curr_ax_cell_label.text(0.5, 0.5, short_title_string, transform=curr_ax_cell_label.transAxes, **title_axes_kwargs)
+    curr_ax_cell_label.axis('off')
+
+    ## New ax[0,1] draw method:
+    _temp_draw_jonathan_ax(sess, time_bins, unit_specific_time_binned_firing_rates, aclu_to_idx, rdf, irdf, show_inter_replay_frs=show_inter_replay_frs, colors=colors, fig=curr_fig, ax=curr_ax_firing_rate, active_aclu=aclu,
+                        include_horizontal_labels=False, include_vertical_labels=False, should_render=False)
+    # curr_ax_firing_rate includes only bottom and left spines, and only y-axis ticks and labels
+    curr_ax_firing_rate.set_xticklabels([])
+    curr_ax_firing_rate.spines['top'].set_visible(False)
+    curr_ax_firing_rate.spines['right'].set_visible(False)
+    # curr_ax_firing_rate.spines['bottom'].set_visible(False)
+    # curr_ax_firing_rate.spines['left'].set_visible(False)
+    curr_ax_firing_rate.get_xaxis().set_ticks([])
+    # curr_ax_firing_rate.get_yaxis().set_ticks([])
+
+    # this plots where the neuron spiked on the track
+    curr_ax_lap_spikes.set_xticklabels([])
+    curr_ax_lap_spikes.set_yticklabels([])
+    curr_ax_lap_spikes.axis('off')
+
+    curr_ax_placefield.set_xticklabels([])
+    curr_ax_placefield.set_yticklabels([])
+    curr_ax_placefield.sharey(curr_ax_lap_spikes)
+    _ = plot_1D_placecell_validation(pf1D_all, i, extant_fig=curr_fig, extant_axes=(curr_ax_lap_spikes, curr_ax_placefield), **({'should_include_labels': False, 'should_plot_spike_indicator_points_on_placefield': False, 'spike_indicator_lines_alpha': 0.2} | kwargs))
+
+    t_start, t_end = curr_ax_lap_spikes.get_xlim()
+    curr_ax_firing_rate.set_xlim((t_start, t_end)) # We don't want to clip to only the spiketimes for this cell, we want it for all cells, or even when the recording started/ended
+    curr_ax_lap_spikes.sharex(curr_ax_firing_rate) # Sync the time axes of the laps and the firing rates
+    return {'firing_rate':curr_ax_firing_rate, 'lap_spikes': curr_ax_lap_spikes, 'placefield': curr_ax_placefield, 'labels': curr_ax_cell_label}
+
+
 def _make_pho_jonathan_batch_plots(sess, time_bins, final_jonathan_df, unit_specific_time_binned_firing_rates, pf1D_all, aclu_to_idx, rdf, irdf, show_inter_replay_frs=False, n_max_plot_rows:int=4, debug_print=False, **kwargs):
     """ Stacked Jonathan-style firing-rate-across-epochs-plot
-    Internally calls `plot_1D_placecell_validation` and `_temp_draw_jonathan_ax`
+    Internally calls `_plot_pho_jonathan_batch_plot_single_cell` `plot_1D_placecell_validation` and `_temp_draw_jonathan_ax`
 
         n_max_plot_rows: the maximum number of rows to plot
 
@@ -605,24 +667,19 @@ def _make_pho_jonathan_batch_plots(sess, time_bins, final_jonathan_df, unit_spec
     """
     fig = plt.figure(constrained_layout=True, figsize=(10, 4))
     subfigs = fig.subfigures(n_max_plot_rows, 1, wspace=0.07)
-    colors = plt.rcParams['axes.prop_cycle'].by_key()['color'];
 
-    num_gridspec_columns = 8
+    colors = plt.rcParams['axes.prop_cycle'].by_key()['color']
+    
     axs_list = []
 
     for i in np.arange(n_max_plot_rows):
         is_first_row = (i==0)
         is_last_row = (i == (n_max_plot_rows-1))
+
         aclu = int(final_jonathan_df.index[i])
         if debug_print:
             print(f"selected neuron has index: {i} aclu: {aclu}")
-        title_string = ' '.join(['pf1D', f'Cell {aclu:02d}'])
-        subtitle_string = ' '.join([f'{pf1D_all.config.str_for_display(False)}'])
-        short_title_string = f'{aclu:02d}'
-        if debug_print:
-            print(f'\t{title_string}\n\t{subtitle_string}')
-
-        # gridspec mode:
+        
         try:
             curr_fig = subfigs[i] 
         except TypeError as e:
@@ -631,51 +688,11 @@ def _make_pho_jonathan_batch_plots(sess, time_bins, final_jonathan_df, unit_spec
         except Exception as e:
             # Unhandled exception
             raise e
-        
-        curr_fig.set_facecolor('0.75')
 
-        gs_kw = dict(width_ratios=np.repeat(1, num_gridspec_columns).tolist(), height_ratios=[1, 1], wspace=0.0, hspace=0.0)
-        gs_kw['width_ratios'][-1] = 0.3 # make the last column (containing the 1D placefield plot) a fraction of the width of the others
-
-        gs = curr_fig.add_gridspec(2, num_gridspec_columns, **gs_kw) # layout figure is usually a gridspec of (1,8)
-        curr_ax_firing_rate = curr_fig.add_subplot(gs[0, :-1]) # the whole top row except the last element (to match the firing rates below)
-        curr_ax_cell_label = curr_fig.add_subplot(gs[0, -1]) # the last element of the first row contains the labels that identify the cell
-        curr_ax_lap_spikes = curr_fig.add_subplot(gs[1, :-1]) # all up to excluding the last element of the row
-        curr_ax_placefield = curr_fig.add_subplot(gs[1, -1], sharey=curr_ax_lap_spikes) # only the last element of the row
-
-        # Setup title axis:
-        title_axes_kwargs = dict(ha="center", va="center", fontsize=18, color="black")
-        curr_ax_cell_label.text(0.5, 0.5, short_title_string, transform=curr_ax_cell_label.transAxes, **title_axes_kwargs)
-        curr_ax_cell_label.axis('off')
-
-        ## New ax[0,1] draw method:
-        _temp_draw_jonathan_ax(sess, time_bins, unit_specific_time_binned_firing_rates, aclu_to_idx, rdf, irdf, show_inter_replay_frs=show_inter_replay_frs, colors=colors, fig=curr_fig, ax=curr_ax_firing_rate, active_aclu=aclu,
-                            include_horizontal_labels=False, include_vertical_labels=False, should_render=False)
-        # curr_ax_firing_rate includes only bottom and left spines, and only y-axis ticks and labels
-        curr_ax_firing_rate.set_xticklabels([])
-        curr_ax_firing_rate.spines['top'].set_visible(False)
-        curr_ax_firing_rate.spines['right'].set_visible(False)
-        # curr_ax_firing_rate.spines['bottom'].set_visible(False)
-        # curr_ax_firing_rate.spines['left'].set_visible(False)
-        curr_ax_firing_rate.get_xaxis().set_ticks([])
-        # curr_ax_firing_rate.get_yaxis().set_ticks([])
-
-        # this plots where the neuron spiked on the track
-        curr_ax_lap_spikes.set_xticklabels([])
-        curr_ax_lap_spikes.set_yticklabels([])
-        curr_ax_lap_spikes.axis('off')
-
-        curr_ax_placefield.set_xticklabels([])
-        curr_ax_placefield.set_yticklabels([])
-        curr_ax_placefield.sharey(curr_ax_lap_spikes)
-        _ = plot_1D_placecell_validation(pf1D_all, i, extant_fig=curr_fig, extant_axes=(curr_ax_lap_spikes, curr_ax_placefield), **({'should_include_labels': False, 'should_plot_spike_indicator_points_on_placefield': False, 'spike_indicator_lines_alpha': 0.2} | kwargs))
-
-        t_start, t_end = curr_ax_lap_spikes.get_xlim()
-        curr_ax_firing_rate.set_xlim((t_start, t_end)) # We don't want to clip to only the spiketimes for this cell, we want it for all cells, or even when the recording started/ended
-        curr_ax_lap_spikes.sharex(curr_ax_firing_rate) # Sync the time axes of the laps and the firing rates
+        curr_single_cell_out_dict = _plot_pho_jonathan_batch_plot_single_cell(sess, time_bins, unit_specific_time_binned_firing_rates, pf1D_all, aclu_to_idx, rdf, irdf, show_inter_replay_frs, i, aclu, curr_fig, colors, debug_print=debug_print, **kwargs)
 
         # output the axes created:
-        axs_list.append({'firing_rate':curr_ax_firing_rate, 'lap_spikes': curr_ax_lap_spikes, 'placefield': curr_ax_placefield, 'labels': curr_ax_cell_label})
+        axs_list.append(curr_single_cell_out_dict)
 
     graphics_output_dict = {'fig': fig, 'subfigs': subfigs, 'axs': axs_list, 'colors': colors}
     fig.show()
