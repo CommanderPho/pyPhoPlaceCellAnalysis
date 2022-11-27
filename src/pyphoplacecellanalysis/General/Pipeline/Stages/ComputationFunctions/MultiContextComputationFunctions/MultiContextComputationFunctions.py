@@ -154,7 +154,7 @@ class MultiContextComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Co
         long_results = computation_results[long_epoch_name]['computed_data']
         short_results = computation_results[short_epoch_name]['computed_data']
 
-        # Compute various forms of overlaps:        
+        # Compute various forms of 1D placefield overlaps:        
         pf_neurons_diff = _compare_computation_results(long_results.pf1D.ratemap.neuron_ids, short_results.pf1D.ratemap.neuron_ids) # get shared neuron info
         poly_overlap_df = compute_polygon_overlap(long_results, short_results, debug_print=debug_print)
         conv_overlap_dict, conv_overlap_scalars_df = compute_convolution_overlap(long_results, short_results, debug_print=debug_print)
@@ -239,23 +239,30 @@ def _subfn_computations_make_jonathan_firing_comparison_df(unit_specific_time_bi
     # calculations for ax[0,0] ___________________________________________________________________________________________ #
     # below we find where the tuning curve peak was for each cell in each context and store it in a dataframe
     # pf1d_long = computation_results['maze1_PYR']['computed_data']['pf1D']
-    long_peaks = [pf1d_long.xbin_centers[np.argmax(x)] for x in pf1d_long.ratemap.tuning_curves]
-    long_df = pd.DataFrame(long_peaks, columns=['long'], index=pf1d_long.cell_ids)
+    long_peaks = [pf1d_long.xbin_centers[np.argmax(x)] for x in pf1d_long.ratemap.tuning_curves] # CONCERN: these correspond to different neurons between the short and long peaks, right?
+    long_df = pd.DataFrame(long_peaks, columns=['long_pf_peak_x'], index=pf1d_long.cell_ids) # nevermind, this is okay because we're using the correct cell_ids to build the dataframe
 
     # pf1d_short = computation_results['maze2_PYR']['computed_data']['pf1D']
-    short_peaks = [pf1d_short.xbin_centers[np.argmax(x)] for x in pf1d_short.ratemap.tuning_curves]
-    short_df = pd.DataFrame(short_peaks, columns=['short'],index=pf1d_short.cell_ids)
+    short_peaks = [pf1d_short.xbin_centers[np.argmax(x)] for x in pf1d_short.ratemap.tuning_curves] 
+    short_df = pd.DataFrame(short_peaks, columns=['short_pf_peak_x'],index=pf1d_short.cell_ids)
 
     # df keeps most of the interesting data for these plots
-    # at this point, it has columns 'long' and 'short' holding the peak tuning curve positions for each context
+    # at this point, it has columns 'long_pf_peak_x' and 'short_pf_peak_x' holding the peak tuning curve positions for each context
     # the index of this dataframe are the ACLU's for each neuron; this is why `how='outer'` works.
     df = long_df.join(short_df, how='outer')
-    df["has_na"] = df.isna().any(axis=1)
+    df["has_na"] = df.isna().any(axis=1) # determines if any aclu are missing from either (long and short) ratemap
 
     # calculations for ax[1,0] ___________________________________________________________________________________________ #
-    non_replay_diff = take_difference_nonzero(irdf)
-    replay_diff = take_difference_nonzero(rdf)
+    
+    non_replay_long_averages, non_replay_short_averages, non_replay_diff = take_difference_nonzero(irdf)
+    replay_long_averages, replay_short_averages, replay_diff  = take_difference_nonzero(rdf)
+        
+    df["long_non_replay_mean"] = [non_replay_long_averages[aclu_to_idx[aclu]] for aclu in df.index]
+    df["short_non_replay_mean"] = [non_replay_short_averages[aclu_to_idx[aclu]] for aclu in df.index]
     df["non_replay_diff"] = [non_replay_diff[aclu_to_idx[aclu]] for aclu in df.index]
+
+    df["long_replay_mean"] = [replay_long_averages[aclu_to_idx[aclu]] for aclu in df.index]
+    df["short_replay_mean"] = [replay_short_averages[aclu_to_idx[aclu]] for aclu in df.index]
     df["replay_diff"] = [replay_diff[aclu_to_idx[aclu]] for aclu in df.index]
 
     ## Compare the number of replay events between the long and the short
@@ -339,7 +346,7 @@ def take_difference(df):
         row = [x for x in long_fr[:,i] if x >= 0]
         long_averages[i] = np.mean(row)
         
-    return short_averages - long_averages
+    return long_averages, short_averages, (short_averages - long_averages)
 
 def take_difference_nonzero(df):
     """this compares the average firing rate for each neuron before and after the context switch
@@ -348,7 +355,7 @@ def take_difference_nonzero(df):
     correct for differences in participation."""
     
     short_fr = make_fr(df[df["short_track"]])
-    long_fr = make_fr(df[~df["short_track"]])   
+    long_fr = make_fr(df[~df["short_track"]])
     
     short_averages = np.zeros(short_fr.shape[1])
     for i in np.arange(short_fr.shape[1]):
@@ -360,7 +367,7 @@ def take_difference_nonzero(df):
         row = [x for x in long_fr[:,i] if x > 0] # NOTE: the difference from take_difference(df) seems to be only the `x > 0` instead of `x >= 0`
         long_averages[i] = np.mean(row)
         
-    return short_averages - long_averages
+    return long_averages, short_averages, (short_averages - long_averages)
 
 
 # # note: this is defined here, but not used anywhere
