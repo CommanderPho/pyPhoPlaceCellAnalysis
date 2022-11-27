@@ -405,6 +405,90 @@ def take_difference_nonzero(df):
         
 #     return short_averages  - long_averages
 
+
+
+# Aggregate Stats ____________________________________________________________________________________________________ #
+def _compute_modern_aggregate_short_long_replay_stats(rdf, debug_print=True):
+    """ Computes measures across all cells such as the number of replays in each epoch (long v short) and etc
+    Usage:
+        (diff_total_num_replays, diff_total_replay_duration, diff_mean_replay_duration, diff_var_replay_duration), (long_total_num_replays, long_total_replay_duration, long_mean_replay_duration, long_var_replay_duration), (short_total_num_replays, short_total_replay_duration, short_mean_replay_duration, short_var_replay_duration) = _compute_modern_aggregate_short_long_replay_stats(rdf)
+        print(f'diff_total_num_replays: {diff_total_num_replays}, diff_replay_duration: (total: {diff_total_replay_duration}, mean: {diff_mean_replay_duration}, var: {diff_var_replay_duration})')
+    """
+    (long_total_replay_duration, long_mean_replay_duration, long_var_replay_duration), (short_total_replay_duration, short_mean_replay_duration, short_var_replay_duration) = rdf.groupby("short_track")['duration'].agg(['sum','mean','var']).to_numpy() #.count()
+    # long_total_replay_duration, short_total_replay_duration = rdf.groupby("short_track")['duration'].agg(['sum']).to_numpy() #.count()
+    # print(f'long_total_replay_duration: {long_total_replay_duration}, short_total_replay_duration: {short_total_replay_duration}')
+    if debug_print:
+        print(f'long_replay_duration: (total: {long_total_replay_duration}, mean: {long_mean_replay_duration}, var: {long_var_replay_duration}), short_replay_duration: (total: {short_total_replay_duration}, mean: {short_mean_replay_duration}, var: {short_var_replay_duration})')
+    long_total_num_replays, short_total_num_replays = rdf.groupby(by=["short_track"])['start'].agg('count').to_numpy() # array([392, 353], dtype=int64)
+    if debug_print:
+        print(f'long_total_num_replays: {long_total_num_replays}, short_total_num_replays: {short_total_num_replays}')
+    # Differences
+    diff_total_num_replays, diff_total_replay_duration, diff_mean_replay_duration, diff_var_replay_duration = (short_total_num_replays-long_total_num_replays), (short_total_replay_duration-long_total_replay_duration), (short_mean_replay_duration-long_mean_replay_duration), (short_var_replay_duration-long_var_replay_duration)
+
+    return (diff_total_num_replays, diff_total_replay_duration, diff_mean_replay_duration, diff_var_replay_duration), (long_total_num_replays, long_total_replay_duration, long_mean_replay_duration, long_var_replay_duration), (short_total_num_replays, short_total_replay_duration, short_mean_replay_duration, short_var_replay_duration)
+
+
+
+
+def _compute_neuron_replay_stats(rdf, aclu_to_idx):
+    # Find the total number of replays each neuron is active during:
+    # def _subfn_compute_epoch_neuron_replay_stats(epoch_rdf, aclu_to_idx):
+    def _subfn_compute_epoch_neuron_replay_stats(epoch_rdf):
+        # Extract the firing rates into a flat matrix instead
+        flat_matrix = np.vstack(epoch_rdf.firing_rates)
+        # flat_matrix.shape # (116, 52) # (n_replays, n_neurons)
+        n_replays = np.shape(flat_matrix)[0]
+        n_neurons = np.shape(flat_matrix)[1]
+        is_inactive_mask = np.isclose(flat_matrix, 0.0)
+        is_active_mask = np.logical_not(is_inactive_mask)
+
+        ## Number of unique replays each neuron participates in:
+        neuron_num_active_replays = np.sum(is_active_mask, axis=0)
+        assert (neuron_num_active_replays.shape[0] == n_neurons) # neuron_num_active_replays.shape # (52,) # (n_neurons,)
+        return neuron_num_active_replays
+        # # build output dataframes:
+        # return pd.DataFrame({'aclu': aclu_to_idx.keys(), 'neuron_IDX': aclu_to_idx.values(), 'num_replays': neuron_num_active_replays}).set_index('aclu')
+    
+    ## Begin function body:
+    grouped_rdf = rdf.groupby(by=["short_track"])
+    long_rdf = grouped_rdf.get_group(False)
+    # long_neuron_df = _subfn_compute_epoch_neuron_replay_stats(long_rdf, aclu_to_idx)
+    long_neuron_num_active_replays = _subfn_compute_epoch_neuron_replay_stats(long_rdf)
+    short_rdf = grouped_rdf.get_group(True)
+    # short_neuron_df = _subfn_compute_epoch_neuron_replay_stats(short_rdf, aclu_to_idx)
+    short_neuron_num_active_replays = _subfn_compute_epoch_neuron_replay_stats(short_rdf)
+
+    # build output dataframes:
+    out_neuron_df = pd.DataFrame({'aclu': aclu_to_idx.keys(), 'neuron_IDX': aclu_to_idx.values(), 'num_replays': (long_neuron_num_active_replays+short_neuron_num_active_replays), 'long_num_replays': long_neuron_num_active_replays, 'short_num_replays': short_neuron_num_active_replays}).set_index('aclu')
+
+    ## Both:
+    # Extract the firing rates into a flat matrix instead
+    flat_matrix = np.vstack(rdf.firing_rates) # flat_matrix.shape # (116, 52) # (n_replays, n_neurons)
+    n_replays = np.shape(flat_matrix)[0]
+    n_neurons = np.shape(flat_matrix)[1]
+    is_inactive_mask = np.isclose(flat_matrix, 0.0)
+    is_active_mask = np.logical_not(is_inactive_mask)
+    ## Number of unique neurons participating in each replay:    
+    replay_num_neuron_participating = np.sum(is_active_mask, axis=1)
+    assert (replay_num_neuron_participating.shape[0] == n_replays) # num_active_replays.shape # (52,) # (n_neurons,)
+    
+    out_replay_df = rdf.copy()
+    out_replay_df['num_neuron_participating'] = replay_num_neuron_participating
+                 
+    # return neuron_num_active_replays, replay_num_neuron_participating
+    return out_replay_df, out_neuron_df
+
+
+# grouped_rdf = rdf.groupby(by=["short_track"])
+# long_rdf = grouped_rdf.get_group(False)
+# long_result = _compute_neuron_replay_stats(long_rdf, aclu_to_idx)
+# short_rdf = grouped_rdf.get_group(True)
+# short_result = _compute_neuron_replay_stats(short_rdf, aclu_to_idx)
+
+out_replay_df, out_neuron_df = _compute_neuron_replay_stats(rdf, aclu_to_idx)
+out_neuron_df
+
+
 # ==================================================================================================================== #
 # Overlap                                                                                                      #
 # ==================================================================================================================== #
