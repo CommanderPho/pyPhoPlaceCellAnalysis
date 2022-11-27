@@ -122,7 +122,7 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
         return cls(name=f'{type_name}_pipeline', session_data_type=type_name, basedir=basepath,
             load_function=known_type_properties.load_function, post_load_functions=post_load_functions)
 
-
+    # Load/Save Persistance and Comparison _______________________________________________________________________________ #
     @classmethod
     def try_init_from_saved_pickle_or_reload_if_needed(cls, type_name: str, known_type_properties: KnownDataSessionTypeProperties, override_basepath=None, override_post_load_functions=None, force_reload=False, active_pickle_filename='loadedSessPickle.pkl', skip_save=False):
         """ After a session has completed the loading stage prior to filtering (after all objects are built and such), it can be pickled to a file to drastically speed up future loading requests (as would have to be done when the notebook is restarted, etc) 
@@ -293,14 +293,15 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
             else:
                 comp_config_results_list = None
 
-            # ## Add the global_computation_results to the comp_config_results_list:
+            # ## Add the global_computation_results to the comp_config_results_list with a common key '__GLOBAL__':
             # if hasattr(a_pipeline, 'global_computation_results'):
             #     if comp_config_results_list is None:
             #         comp_config_results_list = {}
-            #     for a_name, a_result in a_pipeline.global_computation_results.items():
-            #         # ['sess', 'computation_config', 'computed_data', 'accumulated_errors']
-            #         comp_config_results_list[a_name] = dict(computation_config=a_result['computation_config'], computed_data=tuple(a_result['computed_data'].keys()))
-
+            #     the_global_result = a_pipeline.global_computation_results
+            #     comp_config_results_list['__GLOBAL__'] = dict(computation_config=(the_global_result.get('computation_config', {}) or {}), computed_data=tuple(the_global_result['computed_data'].keys()))
+            # else:
+            #     # has none
+            #     pass # 
 
             out_results_dict.update(active_completed_computation_result_names = tuple(a_pipeline.active_completed_computation_result_names), # ['maze1_PYR', 'maze2_PYR', 'maze_PYR']
                 active_incomplete_computation_result_status_dicts= freeze(a_pipeline.active_incomplete_computation_result_status_dicts),
@@ -502,9 +503,6 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
             ## Save under a temporary name in the same output directory, and then compare post-hoc
             _desired_finalized_loaded_sess_pickle_path = finalized_loaded_sess_pickle_path
             finalized_loaded_sess_pickle_path, _ = _build_unique_filename(finalized_loaded_sess_pickle_path)
-
-
-                
 
         # Save reloaded pipeline out to pickle for future loading
         saveData(finalized_loaded_sess_pickle_path, db=self) # Save the pipeline out to pickle.
