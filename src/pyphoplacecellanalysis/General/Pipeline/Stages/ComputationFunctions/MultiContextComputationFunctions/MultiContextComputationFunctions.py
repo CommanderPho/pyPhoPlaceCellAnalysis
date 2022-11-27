@@ -1,3 +1,6 @@
+from enum import Enum # required by `FiringRateActivitySource` enum
+from dataclasses import dataclass # required by `SortOrderMetric` class
+
 import numpy as np
 import pandas as pd
 
@@ -14,6 +17,11 @@ from shapely.geometry import LineString # for compute_polygon_overlap
 from shapely.ops import unary_union, polygonize # for compute_polygon_overlap
 from pyphoplacecellanalysis.General.Mixins.CrossComputationComparisonHelpers import _find_any_context_neurons, _compare_computation_results # for compute_polygon_overlap
 from scipy.signal import convolve as convolve # compute_convolution_overlap
+
+
+
+
+
 
 def _wrap_multi_context_computation_function(global_comp_fcn):
     """ captures global_comp_fcn and unwraps its arguments: owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_whitelist=None, debug_print=False """
@@ -127,7 +135,7 @@ class MultiContextComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Co
             }),
             'irdf': DynamicParameters.init_from_dict({
                 'irdf': irdf,
-                'aclu_to_idx': aclu_to_idx_irdf,           
+                'aclu_to_idx': aclu_to_idx_irdf,
             }),
             'time_binned_unit_specific_spike_rate': time_binned_unit_specific_spike_rate_result,
             'time_binned_instantaneous_unit_specific_spike_rate': instantaneous_unit_specific_spike_rate_result,
@@ -252,16 +260,30 @@ def _subfn_computations_make_jonathan_firing_comparison_df(unit_specific_time_bi
     # pf1d_long = computation_results['maze1_PYR']['computed_data']['pf1D']
     long_peaks = [pf1d_long.xbin_centers[np.argmax(x)] for x in pf1d_long.ratemap.tuning_curves] # CONCERN: these correspond to different neurons between the short and long peaks, right?
     long_df = pd.DataFrame(long_peaks, columns=['long_pf_peak_x'], index=pf1d_long.cell_ids) # nevermind, this is okay because we're using the correct cell_ids to build the dataframe
+    long_df['has_long_pf'] = True
 
     # pf1d_short = computation_results['maze2_PYR']['computed_data']['pf1D']
     short_peaks = [pf1d_short.xbin_centers[np.argmax(x)] for x in pf1d_short.ratemap.tuning_curves] 
-    short_df = pd.DataFrame(short_peaks, columns=['short_pf_peak_x'],index=pf1d_short.cell_ids)
+    short_df = pd.DataFrame(short_peaks, columns=['short_pf_peak_x'], index=pf1d_short.cell_ids)
+    short_df['has_short_pf'] = True
 
     # df keeps most of the interesting data for these plots
     # at this point, it has columns 'long_pf_peak_x' and 'short_pf_peak_x' holding the peak tuning curve positions for each context
     # the index of this dataframe are the ACLU's for each neuron; this is why `how='outer'` works.
     df = long_df.join(short_df, how='outer')
+    all_cell_ids = np.array(list(aclu_to_idx.keys()))
+    missing_cell_id_mask = np.isin(all_cell_ids, df.index.to_numpy(), invert=True) # invert=True returns True for the things NOT in the existing aclus 
+    missing_cell_ids = all_cell_ids[missing_cell_id_mask]
+    neither_df = pd.DataFrame(index=missing_cell_ids)
+    # Join on the neither df:
+    df = df.join(neither_df, how='outer')
+
     df["has_na"] = df.isna().any(axis=1) # determines if any aclu are missing from either (long and short) ratemap
+    # After the join the missing values are NaN instead of False. Fill them.
+    df['has_short_pf'] = df['has_short_pf'].fillna(value=False)
+    df['has_long_pf'] = df['has_long_pf'].fillna(value=False)
+
+
 
     # calculations for ax[1,0] ___________________________________________________________________________________________ #
     
@@ -297,7 +319,7 @@ def make_fr(rdf):
 def add_spike_counts(sess, rdf):
     """ adds the spike counts vector to the dataframe """
     aclus = np.sort(sess.spikes_df.aclu.unique())
-    aclu_to_idx = {aclus[i] : i for i in range(len(aclus))}
+    aclu_to_idx = {aclus[i]:i for i in range(len(aclus))}
 
     spike_counts_list = []
 
@@ -306,7 +328,7 @@ def add_spike_counts(sess, rdf):
         mask = (row["start"] < sess.spikes_df.t_rel_seconds) & (sess.spikes_df.t_rel_seconds < row["end"])
         for aclu in sess.spikes_df.loc[mask,"aclu"]:
             replay_spike_counts[aclu_to_idx[aclu]] += 1
-        replay_spike_counts /= row["end"] - row["start"]
+        replay_spike_counts /= row["end"] - row["start"] # converts to a firing rate instead of a spike count
         
         if(np.isclose(replay_spike_counts.sum(), 0)):
             print(f"Time window {index} has no spikes." )
@@ -319,7 +341,6 @@ def add_spike_counts(sess, rdf):
 # Make `rdf` (replay dataframe) ______________________________________________________________________________________ #
 def make_rdf(sess, replays_df):
     """ uses the `sess.replay` property"""
-
     rdf = replays_df.copy()[["start", "end"]]
     rdf["short_track"] = rdf["start"] > sess.paradigm[1][0,0]
     return rdf
@@ -419,8 +440,35 @@ def take_difference_nonzero(df):
 
 
 # Aggregate Stats ____________________________________________________________________________________________________ #
+class FiringRateActivitySource(Enum):
+    """Specifies which type of firing rate statistics should be used to determine sort and partition separations.
+        Used as argument to `compute_evening_morning_parition(..., firing_rates_activity_source:FiringRateActivitySource=FiringRateActivitySource.ONLY_REPLAY, ...)`
+    """
+    BOTH = "BOTH" # uses both replay and non-replay firing rate means
+    ONLY_REPLAY = "ONLY_REPLAY" # uses only replay firing rate means
+    ONLY_NONREPLAY = "ONLY_NONREPLAY" # uses only non-replay firing rate means
+    
+    @classmethod
+    def get_column_names_dict_list(cls):
+        _tmp_active_column_names_list = [{'long':'long_mean', 'short':'short_mean', 'diff':'mean_diff'}, {'long':'long_replay_mean', 'short':'short_replay_mean', 'diff':'replay_diff'}, {'long':'long_non_replay_mean', 'short':'short_non_replay_mean', 'diff':'non_replay_diff'}]
+        return {a_type.name:a_dict for a_type, a_dict in zip(list(cls), _tmp_active_column_names_list)}
+
+    @property
+    def active_column_names(self):
+        """The active_column_names property."""
+        return self.__class__.get_column_names_dict_list()[self.name]
+
+@dataclass
+class SortOrderMetric(object):
+    """Holds return values of the same from from `compute_evening_morning_parition(...)`
+    """
+    sort_idxs: np.ndarray
+    sorted_aclus: np.ndarray
+    sorted_column_values: np.ndarray
+
+
 def _compute_modern_aggregate_short_long_replay_stats(rdf, debug_print=True):
-    """ Computes measures across all cells such as the number of replays in each epoch (long v short) and etc
+    """ Computes measures across all epochs in rdf: such as the average number of replays in each epoch (long v short) and etc
     Usage:
         (diff_total_num_replays, diff_total_replay_duration, diff_mean_replay_duration, diff_var_replay_duration), (long_total_num_replays, long_total_replay_duration, long_mean_replay_duration, long_var_replay_duration), (short_total_num_replays, short_total_replay_duration, short_mean_replay_duration, short_var_replay_duration) = _compute_modern_aggregate_short_long_replay_stats(rdf)
         print(f'diff_total_num_replays: {diff_total_num_replays}, diff_replay_duration: (total: {diff_total_replay_duration}, mean: {diff_mean_replay_duration}, var: {diff_var_replay_duration})')
@@ -441,11 +489,8 @@ def _compute_modern_aggregate_short_long_replay_stats(rdf, debug_print=True):
 
     return (diff_total_num_replays, diff_total_replay_duration, diff_mean_replay_duration, diff_var_replay_duration), (long_total_num_replays, long_total_replay_duration, long_mean_replay_duration, long_var_replay_duration), (short_total_num_replays, short_total_replay_duration, short_mean_replay_duration, short_var_replay_duration)
 
-
-
-
 def _compute_neuron_replay_stats(rdf, aclu_to_idx):
-    """ add replay statistics to 
+    """ Computes measures regarding replays across all neurons: such as the number of replays a neuron is involved in, etc 
 
     Usage:
         out_replay_df, out_neuron_df = _compute_neuron_replay_stats(rdf, aclu_to_idx)
@@ -501,9 +546,7 @@ def _compute_neuron_replay_stats(rdf, aclu_to_idx):
     return out_replay_df, out_neuron_df
 
 
-
-
-def compute_evening_morning_parition(final_jonathan_df, debug_print=True):
+def compute_evening_morning_parition(final_jonathan_df, firing_rates_activity_source:FiringRateActivitySource=FiringRateActivitySource.ONLY_REPLAY, debug_print=True):
     """ 2022-11-27 - Computes the cells that are either appearing or disappearing across the transition from the long to short track.
     
     Goal: Detect the cells that either appear or disappear across the transition from the long-to-short track
@@ -529,22 +572,24 @@ def compute_evening_morning_parition(final_jonathan_df, debug_print=True):
      For difference sorted values (difference_sorted_aclus), the first values in the array are likely to be short-specific while the last values are likely to be long-specific
     """
     # active_column_names = {'long':'long_mean', 'short':'short_mean', 'diff':'mean_diff'} # uses both replay and non-replay firing rate means
-    active_column_names = {'long':'long_replay_mean', 'short':'short_replay_mean', 'diff':'replay_diff'} # uses only replay firing rate means
+    # active_column_names = {'long':'long_replay_mean', 'short':'short_replay_mean', 'diff':'replay_diff'} # uses only replay firing rate means
     # active_column_names = {'long':'long_non_replay_mean', 'short':'short_non_replay_mean', 'diff':'non_replay_diff'} # uses only non-replay firing rate means
+    active_column_names = firing_rates_activity_source.active_column_names
+    out_dict = {}
 
-    # Find "Evening" Cells:
+    # Find "Evening" Cells: which have almost no activity in the 'long' epoch
     curr_long_mean_abs = final_jonathan_df[active_column_names['long']].abs().to_numpy()
     long_nearest_zero_sort_idxs = np.argsort(curr_long_mean_abs)
     evening_sorted_aclus = final_jonathan_df.index.to_numpy()[long_nearest_zero_sort_idxs] # find cells nearest to zero firing for long_mean
-
+    out_dict['evening'] = SortOrderMetric(long_nearest_zero_sort_idxs, evening_sorted_aclus, curr_long_mean_abs[long_nearest_zero_sort_idxs])
     if debug_print:
         print(f'Evening sorted values: {curr_long_mean_abs[long_nearest_zero_sort_idxs]}')
     
-    ## Find "Morning" Cells:
+    ## Find "Morning" Cells: which have almost no activity in the 'short' epoch
     curr_short_mean_abs = final_jonathan_df[active_column_names['short']].abs().to_numpy()
     short_nearest_zero_sort_idxs = np.argsort(curr_short_mean_abs)
     morning_sorted_aclus = final_jonathan_df.index.to_numpy()[short_nearest_zero_sort_idxs] # find cells nearest to zero firing for short_mean
-
+    out_dict['morning'] = SortOrderMetric(short_nearest_zero_sort_idxs, morning_sorted_aclus, curr_short_mean_abs[short_nearest_zero_sort_idxs])
     if debug_print:
         print(f'Morning sorted values: {curr_short_mean_abs[short_nearest_zero_sort_idxs]}')
     
@@ -552,10 +597,12 @@ def compute_evening_morning_parition(final_jonathan_df, debug_print=True):
     curr_mean_diff = final_jonathan_df[active_column_names['diff']].to_numpy()
     biggest_differences_sort_idxs = np.argsort(curr_mean_diff)[::-1] # sort this one in order of increasing values (most promising differences first)
     difference_sorted_aclus = final_jonathan_df.index.to_numpy()[biggest_differences_sort_idxs]
+    out_dict['diff'] = SortOrderMetric(biggest_differences_sort_idxs, difference_sorted_aclus, curr_mean_diff[biggest_differences_sort_idxs])
     # for the difference sorted method, the aclus at both ends of the `difference_sorted_aclus` are more likely to belong to morning/evening respectively
     if debug_print:
         print(f'Difference sorted values: {curr_mean_diff[biggest_differences_sort_idxs]}')
-    return (difference_sorted_aclus, evening_sorted_aclus, morning_sorted_aclus)
+    # return (difference_sorted_aclus, evening_sorted_aclus, morning_sorted_aclus)
+    return out_dict
 
 
 
