@@ -265,6 +265,11 @@ def _subfn_computations_make_jonathan_firing_comparison_df(unit_specific_time_bi
     df["short_replay_mean"] = [replay_short_averages[aclu_to_idx[aclu]] for aclu in df.index]
     df["replay_diff"] = [replay_diff[aclu_to_idx[aclu]] for aclu in df.index]
 
+    # Combined/Both Firing Rates:
+    df['long_mean'] = (df['long_replay_mean'] + df['long_non_replay_mean'])/2.0
+    df['short_mean'] = (df['short_replay_mean'] + df['short_non_replay_mean'])/2.0
+    df['mean_diff'] = df['short_mean'] - df['long_mean']
+
     ## Compare the number of replay events between the long and the short
     
 
@@ -273,6 +278,9 @@ def _subfn_computations_make_jonathan_firing_comparison_df(unit_specific_time_bi
 
 # Common _____________________________________________________________________________________________________________ #
 def make_fr(rdf):
+    """ extracts the firing_rates column from the dataframe and returns a numpy matrix 
+        output_dict.shape # (116, 52) # (n_replays, n_neurons)
+    """
     return np.vstack(rdf.firing_rates)
 
 def add_spike_counts(sess, rdf):
