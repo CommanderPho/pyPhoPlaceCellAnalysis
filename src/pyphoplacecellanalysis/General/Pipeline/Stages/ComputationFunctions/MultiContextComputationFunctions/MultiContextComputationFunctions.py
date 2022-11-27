@@ -81,16 +81,25 @@ class MultiContextComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Co
             print(f'include_whitelist: {include_whitelist}\nlong_epoch_name: {long_epoch_name}, short_epoch_name: {short_epoch_name}, global_epoch_name: {global_epoch_name}')
         pf1d_long = computation_results[long_epoch_name]['computed_data']['pf1D']
         pf1d_short = computation_results[short_epoch_name]['computed_data']['pf1D']
-        pf1d = computation_results[global_epoch_name]['computed_data']['pf1D']
+        # pf1d = computation_results[global_epoch_name]['computed_data']['pf1D']
 
         ## Compute for all the session spikes first:
 
-        ## Use the filtered spikes from the global_epoch_name: these are those that pass the filtering stage (such as Pyramidal-only). These include spikes and aclus that are not incldued in the placefields.
-        assert global_epoch_name in owning_pipeline_reference.filtered_sessions, f"global_epoch_name: {global_epoch_name} not in owning_pipeline_reference.filtered_sessions.keys(): {list(owning_pipeline_reference.filtered_sessions.keys())}"
-        sess = owning_pipeline_reference.filtered_sessions[global_epoch_name] # get the filtered session with the global_epoch_name (which we assert exists!)
+        # ## Use the filtered spikes from the global_epoch_name: these are those that pass the filtering stage (such as Pyramidal-only). These include spikes and aclus that are not incldued in the placefields.
+        # assert global_epoch_name in owning_pipeline_reference.filtered_sessions, f"global_epoch_name: {global_epoch_name} not in owning_pipeline_reference.filtered_sessions.keys(): {list(owning_pipeline_reference.filtered_sessions.keys())}"
+        # sess = owning_pipeline_reference.filtered_sessions[global_epoch_name] # get the filtered session with the global_epoch_name (which we assert exists!)
+
+        # I think this is the correct way:
+        assert global_epoch_name in computation_results, f"global_epoch_name: {global_epoch_name} not in computation_results.keys(): {list(computation_results.keys())}"
+        sess = computation_results[global_epoch_name].sess # should be the same as `owning_pipeline_reference.filtered_sessions[global_epoch_name]`
+        assert sess is not None
 
         ## Unfiltered mode (probably a mistake)
         # sess = owning_pipeline_reference.sess
+
+        ## neuron_IDs used for instantaneous_unit_specific_spike_rate to build the dataframe:
+        neuron_IDs = np.unique(sess.spikes_df.aclu) # TODO: make sure standardized
+
 
         replays_df = sess.replay
         rdf, aclu_to_idx, irdf, aclu_to_idx_irdf = _final_compute_jonathan_replay_fr_analyses(sess, replays_df)
@@ -111,7 +120,7 @@ class MultiContextComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Co
         ## instantaneous_unit_specific_spike_rate mode:
         try:
             active_firing_rate_trends = computation_results[global_epoch_name]['computed_data']['firing_rate_trends']            
-            neuron_IDs = np.unique(computation_results[global_epoch_name].sess.spikes_df.aclu) # TODO: make sure standardized
+            # neuron_IDs = np.unique(computation_results[global_epoch_name].sess.spikes_df.aclu) # TODO: make sure standardized
             instantaneous_unit_specific_spike_rate = active_firing_rate_trends.all_session_spikes.instantaneous_unit_specific_spike_rate
             # instantaneous_unit_specific_spike_rate = computation_results[global_epoch_name]['computed_data']['firing_rate_trends'].all_session_spikes.instantaneous_unit_specific_spike_rate
             instantaneous_unit_specific_spike_rate_values = pd.DataFrame(instantaneous_unit_specific_spike_rate.magnitude, columns=neuron_IDs) # builds a df with times along the rows and aclu values along the columns in the style of unit_specific_binned_spike_counts
@@ -125,8 +134,6 @@ class MultiContextComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Co
 
         final_jonathan_df = _subfn_computations_make_jonathan_firing_comparison_df(time_binned_unit_specific_binned_spike_rate, pf1d_short, pf1d_long, aclu_to_idx, rdf, irdf)
         final_jonathan_df = final_jonathan_df.join(neuron_replay_stats_df, how='outer')
-
-
 
         global_computation_results.computed_data['jonathan_firing_rate_analysis'] = DynamicParameters.init_from_dict({
             'rdf': DynamicParameters.init_from_dict({
