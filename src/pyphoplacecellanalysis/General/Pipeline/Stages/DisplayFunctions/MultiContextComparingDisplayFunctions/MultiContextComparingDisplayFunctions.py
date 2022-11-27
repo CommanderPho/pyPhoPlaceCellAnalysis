@@ -597,7 +597,7 @@ def _make_jonathan_interactive_plot(sess, time_bins, final_jonathan_df, unit_spe
     return graphics_output_dict, final_jonathan_df
 # ==================================================================================================================== #
 
-def _plot_pho_jonathan_batch_plot_single_cell(sess, time_bins, unit_specific_time_binned_firing_rates, pf1D_all, aclu_to_idx, rdf, irdf, show_inter_replay_frs, i, aclu, curr_fig, colors, debug_print=False, **kwargs):
+def _plot_pho_jonathan_batch_plot_single_cell(sess, time_bins, unit_specific_time_binned_firing_rates, pf1D_all, rdf_aclu_to_idx, rdf, irdf, show_inter_replay_frs, pf1D_aclu_to_idx, aclu, curr_fig, colors, debug_print=False, **kwargs):
     """ Plots a single cell's plots for a stacked Jonathan-style firing-rate-across-epochs-plot
     Internally calls `plot_1D_placecell_validation` and `_temp_draw_jonathan_ax`
 
@@ -605,11 +605,7 @@ def _plot_pho_jonathan_batch_plot_single_cell(sess, time_bins, unit_specific_tim
         `_make_pho_jonathan_batch_plots`
 
     """
-    
-
-    cell_linear_fragile_IDX = aclu_to_idx[aclu] # get the cell_linear_fragile_IDX from aclu
-
-
+    # cell_linear_fragile_IDX = rdf_aclu_to_idx[aclu] # get the cell_linear_fragile_IDX from aclu
     title_string = ' '.join(['pf1D', f'Cell {aclu:02d}'])
     subtitle_string = ' '.join([f'{pf1D_all.config.str_for_display(False)}'])
     short_title_string = f'{aclu:02d}'
@@ -635,7 +631,7 @@ def _plot_pho_jonathan_batch_plot_single_cell(sess, time_bins, unit_specific_tim
     curr_ax_cell_label.axis('off')
 
     ## New ax[0,1] draw method:
-    _temp_draw_jonathan_ax(sess, time_bins, unit_specific_time_binned_firing_rates, aclu_to_idx, rdf, irdf, show_inter_replay_frs=show_inter_replay_frs, colors=colors, fig=curr_fig, ax=curr_ax_firing_rate, active_aclu=aclu,
+    _temp_draw_jonathan_ax(sess, time_bins, unit_specific_time_binned_firing_rates, rdf_aclu_to_idx, rdf, irdf, show_inter_replay_frs=show_inter_replay_frs, colors=colors, fig=curr_fig, ax=curr_ax_firing_rate, active_aclu=aclu,
                         include_horizontal_labels=False, include_vertical_labels=False, should_render=False)
     # curr_ax_firing_rate includes only bottom and left spines, and only y-axis ticks and labels
     curr_ax_firing_rate.set_xticklabels([])
@@ -654,11 +650,21 @@ def _plot_pho_jonathan_batch_plot_single_cell(sess, time_bins, unit_specific_tim
     curr_ax_placefield.set_xticklabels([])
     curr_ax_placefield.set_yticklabels([])
     curr_ax_placefield.sharey(curr_ax_lap_spikes)
-    _ = plot_1D_placecell_validation(pf1D_all, cell_linear_fragile_IDX, extant_fig=curr_fig, extant_axes=(curr_ax_lap_spikes, curr_ax_placefield), **({'should_include_labels': False, 'should_plot_spike_indicator_points_on_placefield': False, 'spike_indicator_lines_alpha': 0.2} | kwargs))
 
-    t_start, t_end = curr_ax_lap_spikes.get_xlim()
-    curr_ax_firing_rate.set_xlim((t_start, t_end)) # We don't want to clip to only the spiketimes for this cell, we want it for all cells, or even when the recording started/ended
-    curr_ax_lap_spikes.sharex(curr_ax_firing_rate) # Sync the time axes of the laps and the firing rates
+    # the index passed into plot_1D_placecell_validation(...) must be in terms of the pf1D_all ratemap that's provided. the rdf_aclu_to_idx does not work and will result in indexing errors
+    # pf1D_aclu_to_idx = {aclu:i for i, aclu in enumerate(pf1D_all.ratemap.neuron_ids)}
+
+    # Not sure if this is okay, but it's possible that the aclu isn't in the ratemap, in which case currently we'll just skip plotting?
+    if aclu in pf1D_aclu_to_idx:
+        cell_linear_fragile_IDX = pf1D_aclu_to_idx[aclu]
+        _ = plot_1D_placecell_validation(pf1D_all, cell_linear_fragile_IDX, extant_fig=curr_fig, extant_axes=(curr_ax_lap_spikes, curr_ax_placefield), **({'should_include_labels': False, 'should_plot_spike_indicator_points_on_placefield': False, 'spike_indicator_lines_alpha': 0.2} | kwargs))
+        t_start, t_end = curr_ax_lap_spikes.get_xlim()
+        curr_ax_firing_rate.set_xlim((t_start, t_end)) # We don't want to clip to only the spiketimes for this cell, we want it for all cells, or even when the recording started/ended
+        curr_ax_lap_spikes.sharex(curr_ax_firing_rate) # Sync the time axes of the laps and the firing rates
+
+    else:
+        print(f'WARNING: aclu {aclu} is not present in the pf1D_all ratemaps. Which contain aclus: {pf1D_all.ratemap.neuron_ids}')
+        
     return {'firing_rate':curr_ax_firing_rate, 'lap_spikes': curr_ax_lap_spikes, 'placefield': curr_ax_placefield, 'labels': curr_ax_cell_label}
 
 # from neuropy.utils.misc import RowColTuple # for _make_pho_jonathan_batch_plots_advanced
@@ -824,6 +830,10 @@ def _make_pho_jonathan_batch_plots(sess, time_bins, final_jonathan_df, unit_spec
         
     if included_unit_neuron_IDs is None:
         included_unit_neuron_IDs = [int(final_jonathan_df.index[i]) for i in np.arange(n_max_plot_rows)]
+
+    # the index passed into plot_1D_placecell_validation(...) must be in terms of the pf1D_all ratemap that's provided. the rdf_aclu_to_idx does not work and will result in indexing errors
+    _temp_aclu_to_fragile_linear_neuron_IDX = {aclu:i for i, aclu in enumerate(pf1D_all.ratemap.neuron_ids)}
+
     actual_num_subfigures = min(len(included_unit_neuron_IDs), n_max_plot_rows) # only include the possible rows 
     subfigs = fig.subfigures(actual_num_subfigures, 1, wspace=0.07)
 
@@ -850,7 +860,7 @@ def _make_pho_jonathan_batch_plots(sess, time_bins, final_jonathan_df, unit_spec
             # Unhandled exception
             raise e
 
-        curr_single_cell_out_dict = _plot_pho_jonathan_batch_plot_single_cell(sess, time_bins, unit_specific_time_binned_firing_rates, pf1D_all, aclu_to_idx, rdf, irdf, show_inter_replay_frs, i, aclu, curr_fig, colors, debug_print=debug_print, **kwargs)
+        curr_single_cell_out_dict = _plot_pho_jonathan_batch_plot_single_cell(sess, time_bins, unit_specific_time_binned_firing_rates, pf1D_all, aclu_to_idx, rdf, irdf, show_inter_replay_frs, _temp_aclu_to_fragile_linear_neuron_IDX, aclu, curr_fig, colors, debug_print=debug_print, **kwargs)
 
         # output the axes created:
         axs_list.append(curr_single_cell_out_dict)
