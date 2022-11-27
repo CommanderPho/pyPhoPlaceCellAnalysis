@@ -86,6 +86,8 @@ class MultiContextComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Co
 
         replays_df = sess.replay
         rdf, aclu_to_idx, irdf, aclu_to_idx_irdf = _final_compute_jonathan_replay_fr_analyses(sess, replays_df)
+        rdf, neuron_replay_stats_df = _compute_neuron_replay_stats(rdf, aclu_to_idx) # neuron_replay_stats_df is joined with `final_jonathan_df` after that is built
+
         ## time_binned_unit_specific_binned_spike_rate mode:
         try:
             active_firing_rate_trends = computation_results[global_epoch_name]['computed_data']['firing_rate_trends']    
@@ -114,6 +116,9 @@ class MultiContextComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Co
         })
 
         final_jonathan_df = _subfn_computations_make_jonathan_firing_comparison_df(time_binned_unit_specific_binned_spike_rate, pf1d_short, pf1d_long, aclu_to_idx, rdf, irdf)
+        final_jonathan_df = final_jonathan_df.join(neuron_replay_stats_df, how='outer')
+
+
 
         global_computation_results.computed_data['jonathan_firing_rate_analysis'] = DynamicParameters.init_from_dict({
             'rdf': DynamicParameters.init_from_dict({
