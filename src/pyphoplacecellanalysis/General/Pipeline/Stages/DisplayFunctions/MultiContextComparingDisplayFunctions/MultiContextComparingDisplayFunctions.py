@@ -420,7 +420,7 @@ def _context_nested_docks(curr_active_pipeline, active_config_names, enable_gui=
     return master_dock_win, app, out_items
 
 # ==================================================================================================================== #
-def _temp_draw_jonathan_ax(sess, time_bins, unit_specific_time_binned_firing_rates, aclu_to_idx, rdf, irdf, show_inter_replay_frs=False, colors=None, fig=None, ax=None, active_aclu:int=0, include_horizontal_labels=True, include_vertical_labels=True, should_render=False):
+def _temp_draw_jonathan_ax(t_split, time_bins, unit_specific_time_binned_firing_rates, aclu_to_idx, rdf, irdf, show_inter_replay_frs=False, colors=None, fig=None, ax=None, active_aclu:int=0, include_horizontal_labels=True, include_vertical_labels=True, should_render=False):
     """ Draws the time binned firing rates and the replay firing rates for a single cell
 
     Usage:
@@ -429,8 +429,11 @@ def _temp_draw_jonathan_ax(sess, time_bins, unit_specific_time_binned_firing_rat
     active_aclu = int(joined_df.index[index])
     _temp_draw_jonathan_ax(ax[0,1])
 
-    _temp_draw_jonathan_ax(sess, time_bins, unit_specific_time_binned_firing_rates, aclu_to_idx, rdf, irdf, show_inter_replay_frs=show_inter_replay_frs, colors=colors, fig=None, ax=ax[0,1], active_aclu=active_aclu)
+    t_split = sess.paradigm[0][0,1]
+    _temp_draw_jonathan_ax(t_split, time_bins, unit_specific_time_binned_firing_rates, aclu_to_idx, rdf, irdf, show_inter_replay_frs=show_inter_replay_frs, colors=colors, fig=None, ax=ax[0,1], active_aclu=active_aclu)
 
+    Historical:
+        used to take sess: DataSession as first argument and then access `sess.paradigm[0][0,1]` internally. On 2022-11-27 refactored to take this time `t_split` directly and no longer require session
 
     """
     assert ax is not None
@@ -473,7 +476,7 @@ def _temp_draw_jonathan_ax(sess, time_bins, unit_specific_time_binned_firing_rat
 
     required_epoch_bar_height = ax.get_ylim()[-1]
     # Draw the vertical epoch splitter line:
-    ax.vlines(sess.paradigm[0][0,1], ymin = 0, ymax=required_epoch_bar_height, color=(0,0,0,.25))
+    ax.vlines(t_split, ymin = 0, ymax=required_epoch_bar_height, color=(0,0,0,.25))
 
     if should_render:
         if fig is None:
@@ -564,7 +567,8 @@ def _make_jonathan_interactive_plot(sess, time_bins, final_jonathan_df, unit_spe
         diff_scatter.set_sizes([7 if i!= index else 30 for i in range(len(final_jonathan_df))])
 
         ## New ax[0,1] draw method:
-        _temp_draw_jonathan_ax(sess, time_bins, unit_specific_time_binned_firing_rates, aclu_to_idx, rdf, irdf, show_inter_replay_frs=show_inter_replay_frs, colors=colors, fig=fig, ax=ax[0,1], active_aclu=aclu, should_render=True)
+        t_split = sess.paradigm[0][0,1]
+        _temp_draw_jonathan_ax(t_split, time_bins, unit_specific_time_binned_firing_rates, aclu_to_idx, rdf, irdf, show_inter_replay_frs=show_inter_replay_frs, colors=colors, fig=fig, ax=ax[0,1], active_aclu=aclu, should_render=True)
 
         # this plots where the neuron spiked on the track
         single_neuron_spikes = sess.spikes_df[sess.spikes_df.aclu == aclu]
@@ -631,7 +635,8 @@ def _plot_pho_jonathan_batch_plot_single_cell(sess, time_bins, unit_specific_tim
     curr_ax_cell_label.axis('off')
 
     ## New ax[0,1] draw method:
-    _temp_draw_jonathan_ax(sess, time_bins, unit_specific_time_binned_firing_rates, rdf_aclu_to_idx, rdf, irdf, show_inter_replay_frs=show_inter_replay_frs, colors=colors, fig=curr_fig, ax=curr_ax_firing_rate, active_aclu=aclu,
+    t_split = sess.paradigm[0][0,1]
+    _temp_draw_jonathan_ax(t_split, time_bins, unit_specific_time_binned_firing_rates, rdf_aclu_to_idx, rdf, irdf, show_inter_replay_frs=show_inter_replay_frs, colors=colors, fig=curr_fig, ax=curr_ax_firing_rate, active_aclu=aclu,
                         include_horizontal_labels=False, include_vertical_labels=False, should_render=False)
     # curr_ax_firing_rate includes only bottom and left spines, and only y-axis ticks and labels
     curr_ax_firing_rate.set_xticklabels([])
