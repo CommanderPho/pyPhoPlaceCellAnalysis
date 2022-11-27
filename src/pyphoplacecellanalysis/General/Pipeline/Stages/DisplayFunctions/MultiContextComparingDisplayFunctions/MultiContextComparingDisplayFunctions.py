@@ -169,8 +169,9 @@ class MultiContextComparingDisplayFunctions(AllFunctionEnumeratingMixin, metacla
 
             n_max_plot_rows = kwargs.get('n_max_plot_rows', 6)
             show_inter_replay_frs = kwargs.get('show_inter_replay_frs', True)
+            included_unit_neuron_IDs = kwargs.get('included_unit_neuron_IDs', None)
 
-            graphics_output_dict = _make_pho_jonathan_batch_plots(sess, time_bins, final_jonathan_df, time_binned_unit_specific_binned_spike_rate, pf1D_all, aclu_to_idx, rdf, irdf, show_inter_replay_frs=show_inter_replay_frs, n_max_plot_rows=n_max_plot_rows)
+            graphics_output_dict = _make_pho_jonathan_batch_plots(sess, time_bins, final_jonathan_df, time_binned_unit_specific_binned_spike_rate, pf1D_all, aclu_to_idx, rdf, irdf, show_inter_replay_frs=show_inter_replay_frs, n_max_plot_rows=n_max_plot_rows, included_unit_neuron_IDs=included_unit_neuron_IDs)
             graphics_output_dict['plot_data'] = {'df': final_jonathan_df, 'rdf':rdf, 'aclu_to_idx':aclu_to_idx, 'irdf':irdf, 'time_binned_unit_specific_spike_rate': global_computation_results.computed_data['jonathan_firing_rate_analysis']['time_binned_unit_specific_spike_rate']}
 
             return graphics_output_dict
@@ -606,6 +607,9 @@ def _plot_pho_jonathan_batch_plot_single_cell(sess, time_bins, unit_specific_tim
     """
     
 
+    cell_linear_fragile_IDX = aclu_to_idx[aclu] # get the cell_linear_fragile_IDX from aclu
+
+
     title_string = ' '.join(['pf1D', f'Cell {aclu:02d}'])
     subtitle_string = ' '.join([f'{pf1D_all.config.str_for_display(False)}'])
     short_title_string = f'{aclu:02d}'
@@ -650,16 +654,15 @@ def _plot_pho_jonathan_batch_plot_single_cell(sess, time_bins, unit_specific_tim
     curr_ax_placefield.set_xticklabels([])
     curr_ax_placefield.set_yticklabels([])
     curr_ax_placefield.sharey(curr_ax_lap_spikes)
-    _ = plot_1D_placecell_validation(pf1D_all, i, extant_fig=curr_fig, extant_axes=(curr_ax_lap_spikes, curr_ax_placefield), **({'should_include_labels': False, 'should_plot_spike_indicator_points_on_placefield': False, 'spike_indicator_lines_alpha': 0.2} | kwargs))
+    _ = plot_1D_placecell_validation(pf1D_all, cell_linear_fragile_IDX, extant_fig=curr_fig, extant_axes=(curr_ax_lap_spikes, curr_ax_placefield), **({'should_include_labels': False, 'should_plot_spike_indicator_points_on_placefield': False, 'spike_indicator_lines_alpha': 0.2} | kwargs))
 
     t_start, t_end = curr_ax_lap_spikes.get_xlim()
     curr_ax_firing_rate.set_xlim((t_start, t_end)) # We don't want to clip to only the spiketimes for this cell, we want it for all cells, or even when the recording started/ended
     curr_ax_lap_spikes.sharex(curr_ax_firing_rate) # Sync the time axes of the laps and the firing rates
     return {'firing_rate':curr_ax_firing_rate, 'lap_spikes': curr_ax_lap_spikes, 'placefield': curr_ax_placefield, 'labels': curr_ax_cell_label}
 
-from neuropy.utils.misc import RowColTuple # for _make_pho_jonathan_batch_plots_advanced
-from neuropy.utils.matplotlib_helpers import build_or_reuse_figure, _build_variable_max_value_label, _determine_best_placefield_2D_layout, _build_neuron_identity_label # for _make_pho_jonathan_batch_plots_advanced
-
+# from neuropy.utils.misc import RowColTuple # for _make_pho_jonathan_batch_plots_advanced
+# from neuropy.utils.matplotlib_helpers import build_or_reuse_figure, _build_variable_max_value_label, _determine_best_placefield_2D_layout, _build_neuron_identity_label # for _make_pho_jonathan_batch_plots_advanced
 
 # def _make_pho_jonathan_batch_plots_advanced(sess, time_bins, final_jonathan_df, unit_specific_time_binned_firing_rates, pf1D_all, aclu_to_idx, rdf, irdf, show_inter_replay_frs=False, included_unit_indicies=None, included_unit_neuron_IDs=None,
 #     subplots:RowColTuple=(40, 3), fig_column_width:float=8.0, fig_row_height:float=1.0, resolution_multiplier:float=1.0, max_screen_figure_size=(None, None), fignum=1, fig=None, missing_aclu_string_formatter=None, debug_print=False):
@@ -681,7 +684,6 @@ from neuropy.utils.matplotlib_helpers import build_or_reuse_figure, _build_varia
 #     last_figure_subplots_same_layout = True
 #     # missing_aclu_string_formatter: a lambda function that takes the current aclu string and returns a modified string that reflects that this aclu value is missing from the current result (e.g. missing_aclu_string_formatter('3') -> '3 <shared>')
 #     if missing_aclu_string_formatter is None:
-#         # missing_aclu_string_formatter = lambda curr_extended_id_string: f'{curr_extended_id_string} <shared>'
 #         missing_aclu_string_formatter = lambda curr_extended_id_string: f'{curr_extended_id_string}-'
 
 #     active_maps, title_substring, included_unit_indicies = _help_plot_ratemap_neuronIDs(ratemap, included_unit_indicies=included_unit_indicies, included_unit_neuron_IDs=included_unit_neuron_IDs, plot_variable=plot_variable, debug_print=debug_print)
@@ -812,24 +814,30 @@ from neuropy.utils.matplotlib_helpers import build_or_reuse_figure, _build_varia
 
 
 
-def _make_pho_jonathan_batch_plots(sess, time_bins, final_jonathan_df, unit_specific_time_binned_firing_rates, pf1D_all, aclu_to_idx, rdf, irdf, show_inter_replay_frs=False, n_max_plot_rows:int=4, debug_print=False, **kwargs):
+def _make_pho_jonathan_batch_plots(sess, time_bins, final_jonathan_df, unit_specific_time_binned_firing_rates, pf1D_all, aclu_to_idx, rdf, irdf, show_inter_replay_frs=False, included_unit_neuron_IDs=None, n_max_plot_rows:int=4, debug_print=False, **kwargs):
     """ Stacked Jonathan-style firing-rate-across-epochs-plot
     Internally calls `_plot_pho_jonathan_batch_plot_single_cell`
         n_max_plot_rows: the maximum number of rows to plot
 
     """
     fig = plt.figure(constrained_layout=True, figsize=(10, 4))
-    subfigs = fig.subfigures(n_max_plot_rows, 1, wspace=0.07)
+        
+    if included_unit_neuron_IDs is None:
+        included_unit_neuron_IDs = [int(final_jonathan_df.index[i]) for i in np.arange(n_max_plot_rows)]
+    actual_num_subfigures = min(len(included_unit_neuron_IDs), n_max_plot_rows) # only include the possible rows 
+    subfigs = fig.subfigures(actual_num_subfigures, 1, wspace=0.07)
 
     colors = plt.rcParams['axes.prop_cycle'].by_key()['color']
     
     axs_list = []
 
-    for i in np.arange(n_max_plot_rows):
+    # for i in np.arange(n_max_plot_rows):
+    for i, aclu in enumerate(included_unit_neuron_IDs):
+
         is_first_row = (i==0)
         is_last_row = (i == (n_max_plot_rows-1))
 
-        aclu = int(final_jonathan_df.index[i])
+        # aclu = int(final_jonathan_df.index[i])
         if debug_print:
             print(f"selected neuron has index: {i} aclu: {aclu}")
         
