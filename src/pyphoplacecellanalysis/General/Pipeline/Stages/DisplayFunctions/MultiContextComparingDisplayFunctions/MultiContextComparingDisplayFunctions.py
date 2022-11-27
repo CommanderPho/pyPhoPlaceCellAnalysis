@@ -148,12 +148,14 @@ class MultiContextComparingDisplayFunctions(AllFunctionEnumeratingMixin, metacla
             assert len(include_whitelist) > 2
             global_epoch_name = include_whitelist[-1] # 'maze_PYR'
             print(f'include_whitelist: {include_whitelist}\nlong_epoch_name: {long_epoch_name}, short_epoch_name: {short_epoch_name}, global_epoch_name: {global_epoch_name}')
-            pf1d_long = computation_results[long_epoch_name]['computed_data']['pf1D']
-            pf1d_short = computation_results[short_epoch_name]['computed_data']['pf1D']
-            pf1D_all = computation_results[global_epoch_name]['computed_data']['pf1D']
+            # pf1d_long = computation_results[long_epoch_name]['computed_data']['pf1D']
+            # pf1d_short = computation_results[short_epoch_name]['computed_data']['pf1D']
+            pf1D_all = computation_results[global_epoch_name]['computed_data']['pf1D'] # passed to _make_pho_jonathan_batch_plots(t_split, ...)
 
             ## Proper global-computations based way:
             sess = owning_pipeline_reference.sess
+            t_split = sess.paradigm[0][0,1] # passed to _make_pho_jonathan_batch_plots(t_split, ...)
+
             aclu_to_idx = global_computation_results.computed_data['jonathan_firing_rate_analysis']['rdf']['aclu_to_idx']
             rdf = global_computation_results.computed_data['jonathan_firing_rate_analysis']['rdf']['rdf']
             irdf = global_computation_results.computed_data['jonathan_firing_rate_analysis']['irdf']['irdf']
@@ -171,7 +173,8 @@ class MultiContextComparingDisplayFunctions(AllFunctionEnumeratingMixin, metacla
             show_inter_replay_frs = kwargs.get('show_inter_replay_frs', True)
             included_unit_neuron_IDs = kwargs.get('included_unit_neuron_IDs', None)
 
-            graphics_output_dict = _make_pho_jonathan_batch_plots(sess, time_bins, final_jonathan_df, time_binned_unit_specific_binned_spike_rate, pf1D_all, aclu_to_idx, rdf, irdf, show_inter_replay_frs=show_inter_replay_frs, n_max_plot_rows=n_max_plot_rows, included_unit_neuron_IDs=included_unit_neuron_IDs)
+            
+            graphics_output_dict = _make_pho_jonathan_batch_plots(t_split, time_bins, final_jonathan_df, time_binned_unit_specific_binned_spike_rate, pf1D_all, aclu_to_idx, rdf, irdf, show_inter_replay_frs=show_inter_replay_frs, n_max_plot_rows=n_max_plot_rows, included_unit_neuron_IDs=included_unit_neuron_IDs)
             graphics_output_dict['plot_data'] = {'df': final_jonathan_df, 'rdf':rdf, 'aclu_to_idx':aclu_to_idx, 'irdf':irdf, 'time_binned_unit_specific_spike_rate': global_computation_results.computed_data['jonathan_firing_rate_analysis']['time_binned_unit_specific_spike_rate']}
 
             return graphics_output_dict
@@ -828,7 +831,7 @@ def _plot_pho_jonathan_batch_plot_single_cell(t_split, time_bins, unit_specific_
 
 
 
-def _make_pho_jonathan_batch_plots(sess, time_bins, final_jonathan_df, unit_specific_time_binned_firing_rates, pf1D_all, aclu_to_idx, rdf, irdf, show_inter_replay_frs=False, included_unit_neuron_IDs=None, n_max_plot_rows:int=4, debug_print=False, **kwargs):
+def _make_pho_jonathan_batch_plots(t_split, time_bins, final_jonathan_df, unit_specific_time_binned_firing_rates, pf1D_all, aclu_to_idx, rdf, irdf, show_inter_replay_frs=False, included_unit_neuron_IDs=None, n_max_plot_rows:int=4, debug_print=False, **kwargs):
     """ Stacked Jonathan-style firing-rate-across-epochs-plot
     Internally calls `_plot_pho_jonathan_batch_plot_single_cell`
         n_max_plot_rows: the maximum number of rows to plot
@@ -870,7 +873,7 @@ def _make_pho_jonathan_batch_plots(sess, time_bins, final_jonathan_df, unit_spec
             # Unhandled exception
             raise e
 
-        t_split = sess.paradigm[0][0,1]
+        
         curr_single_cell_out_dict = _plot_pho_jonathan_batch_plot_single_cell(t_split, time_bins, unit_specific_time_binned_firing_rates, pf1D_all, aclu_to_idx, rdf, irdf, show_inter_replay_frs, _temp_aclu_to_fragile_linear_neuron_IDX, aclu, curr_fig, colors, debug_print=debug_print, **kwargs)
 
         # output the axes created:
