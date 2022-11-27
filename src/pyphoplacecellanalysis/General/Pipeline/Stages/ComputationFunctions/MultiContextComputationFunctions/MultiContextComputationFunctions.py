@@ -60,11 +60,6 @@ class MultiContextComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Co
         if include_whitelist is None:
             include_whitelist = owning_pipeline_reference.active_completed_computation_result_names # ['maze', 'sprinkle']
 
-        ## Compute for all the session spikes first:
-        sess = owning_pipeline_reference.sess
-        replays_df = sess.replay
-        rdf, aclu_to_idx, irdf, aclu_to_idx_irdf = _final_compute_jonathan_replay_fr_analyses(sess, replays_df)
-
         # Epoch dataframe stuff:
         long_epoch_name = include_whitelist[0] # 'maze1_PYR'
         short_epoch_name = include_whitelist[1] # 'maze2_PYR'
@@ -80,6 +75,17 @@ class MultiContextComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Co
         pf1d_short = computation_results[short_epoch_name]['computed_data']['pf1D']
         pf1d = computation_results[global_epoch_name]['computed_data']['pf1D']
 
+        ## Compute for all the session spikes first:
+
+        ## Use the filtered spikes from the global_epoch_name: these are those that pass the filtering stage (such as Pyramidal-only). These include spikes and aclus that are not incldued in the placefields.
+        assert global_epoch_name in owning_pipeline_reference.filtered_sessions, f"global_epoch_name: {global_epoch_name} not in owning_pipeline_reference.filtered_sessions.keys(): {list(owning_pipeline_reference.filtered_sessions.keys())}"
+        sess = owning_pipeline_reference.filtered_sessions[global_epoch_name] # get the filtered session with the global_epoch_name (which we assert exists!)
+
+        ## Unfiltered mode (probably a mistake)
+        # sess = owning_pipeline_reference.sess
+
+        replays_df = sess.replay
+        rdf, aclu_to_idx, irdf, aclu_to_idx_irdf = _final_compute_jonathan_replay_fr_analyses(sess, replays_df)
         ## time_binned_unit_specific_binned_spike_rate mode:
         try:
             active_firing_rate_trends = computation_results[global_epoch_name]['computed_data']['firing_rate_trends']    
@@ -95,7 +101,7 @@ class MultiContextComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Co
         ## instantaneous_unit_specific_spike_rate mode:
         try:
             active_firing_rate_trends = computation_results[global_epoch_name]['computed_data']['firing_rate_trends']            
-            neuron_IDs = np.unique(computation_results[global_epoch_name].sess.spikes_df.aclu)
+            neuron_IDs = np.unique(computation_results[global_epoch_name].sess.spikes_df.aclu) # TODO: make sure standardized
             instantaneous_unit_specific_spike_rate = active_firing_rate_trends.all_session_spikes.instantaneous_unit_specific_spike_rate
             # instantaneous_unit_specific_spike_rate = computation_results[global_epoch_name]['computed_data']['firing_rate_trends'].all_session_spikes.instantaneous_unit_specific_spike_rate
             instantaneous_unit_specific_spike_rate_values = pd.DataFrame(instantaneous_unit_specific_spike_rate.magnitude, columns=neuron_IDs) # builds a df with times along the rows and aclu values along the columns in the style of unit_specific_binned_spike_counts
