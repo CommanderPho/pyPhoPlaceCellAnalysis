@@ -829,6 +829,8 @@ def _make_pho_jonathan_batch_plots(sess, time_bins, final_jonathan_df, unit_spec
     fig = plt.figure(constrained_layout=True, figsize=(10, 4))
         
     if included_unit_neuron_IDs is None:
+        n_all_neuron_IDs = np.shape(final_jonathan_df)[0] 
+        n_max_plot_rows = min(n_all_neuron_IDs, n_max_plot_rows) # don't allow more than the possible number of neuronIDs
         included_unit_neuron_IDs = [int(final_jonathan_df.index[i]) for i in np.arange(n_max_plot_rows)]
 
     # the index passed into plot_1D_placecell_validation(...) must be in terms of the pf1D_all ratemap that's provided. the rdf_aclu_to_idx does not work and will result in indexing errors
