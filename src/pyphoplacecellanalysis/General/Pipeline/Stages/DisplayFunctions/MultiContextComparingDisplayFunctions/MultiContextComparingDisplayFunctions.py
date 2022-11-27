@@ -199,6 +199,12 @@ class MultiContextComparingDisplayFunctions(AllFunctionEnumeratingMixin, metacla
             single_figure = kwargs.pop('single_figure', True)
             debug_print = kwargs.pop('debug_print', False)
 
+
+            # Plot 1D Keywoard args:
+            shared_kwargs = kwargs.pop('shared_kwargs', None)
+            long_kwargs = kwargs.pop('long_kwargs', None)
+            short_kwargs = kwargs.pop('short_kwargs', None)
+
             if include_whitelist is None:
                 include_whitelist = owning_pipeline_reference.active_completed_computation_result_names # ['maze', 'sprinkle']
 
@@ -214,12 +220,14 @@ class MultiContextComparingDisplayFunctions(AllFunctionEnumeratingMixin, metacla
             # curr_any_context_neurons = _find_any_context_neurons(*[owning_pipeline_reference.computation_results[k].computed_data.pf1D.ratemap.neuron_ids for k in [long_epoch_name, short_epoch_name]])
             curr_any_context_neurons = _find_any_context_neurons(*[a_result.pf1D.ratemap.neuron_ids for a_result in [long_results, short_results]])
 
-            (fig_long_pf_1D, ax_long_pf_1D, long_sort_ind, long_neurons_colors_array), (fig_short_pf_1D, ax_short_pf_1D, short_sort_ind, short_neurons_colors_array) = plot_short_v_long_pf1D_comparison(long_results, short_results, curr_any_context_neurons, reuse_axs_tuple=reuse_axs_tuple, single_figure=single_figure, debug_print=debug_print)
+            (fig_long_pf_1D, ax_long_pf_1D, long_sort_ind, long_neurons_colors_array), (fig_short_pf_1D, ax_short_pf_1D, short_sort_ind, short_neurons_colors_array) = plot_short_v_long_pf1D_comparison(long_results, short_results, curr_any_context_neurons, reuse_axs_tuple=reuse_axs_tuple, single_figure=single_figure,
+                shared_kwargs=shared_kwargs, long_kwargs=long_kwargs, short_kwargs=short_kwargs, debug_print=debug_print)
 
-            graphics_output_dict = MatplotlibRenderPlots(name='', figures=(fig_long_pf_1D, fig_short_pf_1D), axes=(ax_long_pf_1D, ax_short_pf_1D), plot_data={})
+            graphics_output_dict = MatplotlibRenderPlots(name='display_short_long_pf1D_comparison', figures=(fig_long_pf_1D, fig_short_pf_1D), axes=(ax_long_pf_1D, ax_short_pf_1D), plot_data={})
             graphics_output_dict['plot_data'] = {'sort_indicies': (long_sort_ind, short_sort_ind), 'colors':(long_neurons_colors_array, short_neurons_colors_array)}
 
             return graphics_output_dict
+
 
     def _display_short_long_pf1D_scalar_overlap_comparison(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_whitelist=None, **kwargs):
             """ Displays a figure for comparing the scalar comparison quantities computed for 1D placefields across-epochs (between the short and long tracks)
@@ -676,7 +684,7 @@ def _make_pho_jonathan_batch_plots(sess, time_bins, final_jonathan_df, unit_spec
 # ==================================================================================================================== #
 
 @mpl.rc_context(Fig.get_mpl_style(style='figPublish'))
-def plot_short_v_long_pf1D_comparison(long_results, short_results, curr_any_context_neurons, reuse_axs_tuple=None, single_figure=False, debug_print=False):
+def plot_short_v_long_pf1D_comparison(long_results, short_results, curr_any_context_neurons, reuse_axs_tuple=None, single_figure=False, shared_kwargs=None, long_kwargs=None, short_kwargs=None, debug_print=False):
     """ Produces a figure to compare the 1D placefields on the long vs. the short track. 
     
     single_figure:bool - if True, both long and short are plotted on the same axes of a single shared figure. Otherwise seperate figures are used for each
@@ -693,8 +701,21 @@ def plot_short_v_long_pf1D_comparison(long_results, short_results, curr_any_cont
         (fig_long_pf_1D, ax_long_pf_1D, long_sort_ind, long_neurons_colors_array), (fig_short_pf_1D, ax_short_pf_1D, short_sort_ind, short_neurons_colors_array) = plot_short_v_long_pf1D_comparison(long_results, short_results, curr_any_context_neurons, reuse_axs_tuple=reuse_axs_tuple, single_figure=True)
 
     """
-    plot_ratemap_1D_kwargs = dict(pad=2, brev_mode=PlotStringBrevityModeEnum.NONE, normalize=True, debug_print=debug_print, normalize_tuning_curve=True)
+    if shared_kwargs is None:
+        shared_kwargs = {}
+    if long_kwargs is None:
+        long_kwargs = {}
+    if short_kwargs is None:
+        short_kwargs = {}
+
+    # Shared/Common kwargs:
+    plot_ratemap_1D_kwargs = (dict(pad=2, brev_mode=PlotStringBrevityModeEnum.NONE, normalize=True, debug_print=debug_print, normalize_tuning_curve=True) | shared_kwargs)
     
+
+    single_cell_pfmap_processing_fn_identity = lambda i, aclu, pfmap: pfmap # flip over the y-axis
+    single_cell_pfmap_processing_fn_flipped_y = lambda i, aclu, pfmap: -1.0 * pfmap # flip over the y-axis
+
+
     n_neurons = len(curr_any_context_neurons)
     shared_fragile_neuron_IDXs = np.arange(n_neurons)
     # neurons_colors_array = build_neurons_color_map(n_neurons, sortby=shared_fragile_neuron_IDXs, cmap=None, included_unit_indicies=None, included_unit_neuron_IDs=curr_any_context_neurons)
@@ -726,14 +747,20 @@ def plot_short_v_long_pf1D_comparison(long_results, short_results, curr_any_cont
         ax_long_pf_1D, ax_short_pf_1D = None, None
         fig_long_pf_1D, fig_short_pf_1D = None, None
         
-    ax_long_pf_1D, long_sort_ind, long_neurons_colors_array = plot_ratemap_1D(long_results.pf1D.ratemap, sortby=shared_fragile_neuron_IDXs, included_unit_neuron_IDs=curr_any_context_neurons, fignum=None, ax=ax_long_pf_1D, curve_hatch_style=None, **plot_ratemap_1D_kwargs)
+    ## Need to determine the same sort for both of them?
+
+    # Long/Short Specific (Distinguishing) kwargs:
+    long_kwargs = (plot_ratemap_1D_kwargs | {'sortby': shared_fragile_neuron_IDXs, 'included_unit_neuron_IDs': curr_any_context_neurons, 'fignum': None,  'ax': ax_long_pf_1D, 'curve_hatch_style': None, 'single_cell_pfmap_processing_fn': single_cell_pfmap_processing_fn_identity} | long_kwargs)
+    ax_long_pf_1D, long_sort_ind, long_neurons_colors_array = plot_ratemap_1D(long_results.pf1D.ratemap, **long_kwargs)
     fig_long_pf_1D = ax_long_pf_1D.get_figure()
     
     if single_figure:
         ax_short_pf_1D = ax_long_pf_1D # Set the axes for the short to that that was just plotted on by the long
         fig_short_pf_1D = fig_long_pf_1D
     
-    ax_short_pf_1D, short_sort_ind, short_neurons_colors_array = plot_ratemap_1D(short_results.pf1D.ratemap, sortby=shared_fragile_neuron_IDXs, included_unit_neuron_IDs=curr_any_context_neurons, fignum=None, ax=ax_short_pf_1D, curve_hatch_style='///', **plot_ratemap_1D_kwargs)
+    # Long/Short Specific (Distinguishing) kwargs:
+    short_kwargs = (plot_ratemap_1D_kwargs | {'sortby': shared_fragile_neuron_IDXs, 'included_unit_neuron_IDs': curr_any_context_neurons, 'fignum': None, 'ax': ax_short_pf_1D, 'curve_hatch_style': {'hatch':'///', 'edgecolor':'k'}, 'single_cell_pfmap_processing_fn': single_cell_pfmap_processing_fn_flipped_y} | short_kwargs)
+    ax_short_pf_1D, short_sort_ind, short_neurons_colors_array = plot_ratemap_1D(short_results.pf1D.ratemap, **short_kwargs, name=f"short")
     fig_short_pf_1D = ax_short_pf_1D.get_figure()
     
     if single_figure:
