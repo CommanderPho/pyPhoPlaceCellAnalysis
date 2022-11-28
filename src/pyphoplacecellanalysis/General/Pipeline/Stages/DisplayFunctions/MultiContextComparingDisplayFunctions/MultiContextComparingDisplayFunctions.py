@@ -80,8 +80,9 @@ class MultiContextComparingDisplayFunctions(AllFunctionEnumeratingMixin, metacla
         # return master_dock_win, app, out_items
         return {'master_dock_win': master_dock_win, 'app': app, 'out_items': out_items}
 
-    def _display_jonathan_replay_firing_rate_comparison(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_whitelist=None, **kwargs):
+    def _display_jonathan_interactive_replay_firing_rate_comparison(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_whitelist=None, **kwargs):
             """ Jonathan's interactive display. Currently hacked up to directly compute the results to display within this function
+                Internally calls `_make_jonathan_interactive_plot(...)`
 
                 Usage:
                 active_identifying_session_ctx = curr_active_pipeline.sess.get_context() # 'bapun_RatN_Day4_2019-10-15_11-30-06'
