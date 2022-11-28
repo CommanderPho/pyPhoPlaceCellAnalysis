@@ -136,7 +136,7 @@ class MultiContextComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Co
 
         # Uses `aclu_to_idx` to add the ['active_aclus', 'is_neuron_active'] columns
         # Uses to add ['num_long_only_neuron_participating', 'num_shared_neuron_participating', 'num_short_only_neuron_participating'] columns
-        flat_matrix = np.vstack(rdf.firing_rates) # flat_matrix.shape # (116, 52) # (n_replays, n_neurons)
+        flat_matrix = make_fr(rdf.firing_rates) # flat_matrix.shape # (116, 52) # (n_replays, n_neurons)
         n_replays = np.shape(flat_matrix)[0] # 743
         is_inactive_mask = np.isclose(flat_matrix, 0.0)
         is_active_mask = np.logical_not(is_inactive_mask) # .shape # (743, 70)
