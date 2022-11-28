@@ -18,6 +18,7 @@ from shapely.ops import unary_union, polygonize # for compute_polygon_overlap
 from pyphoplacecellanalysis.General.Mixins.CrossComputationComparisonHelpers import _find_any_context_neurons, _compare_computation_results # for compute_polygon_overlap
 from scipy.signal import convolve as convolve # compute_convolution_overlap
 
+from pyphoplacecellanalysis.General.Mixins.CrossComputationComparisonHelpers import SplitPartitionMembership
 
 
 
@@ -290,7 +291,10 @@ def _subfn_computations_make_jonathan_firing_comparison_df(unit_specific_time_bi
     df['has_short_pf'] = df['has_short_pf'].fillna(value=False)
     df['has_long_pf'] = df['has_long_pf'].fillna(value=False)
 
-
+    # Add TrackMembershipMode
+    df['track_membership'] = SplitPartitionMembership.SHARED
+    df.loc[np.logical_and(df['has_short_pf'], np.logical_not(df['has_long_pf'])),'track_membership'] = SplitPartitionMembership.RIGHT_ONLY
+    df.loc[np.logical_and(df['has_long_pf'], np.logical_not(df['has_short_pf'])),'track_membership'] = SplitPartitionMembership.LEFT_ONLY
 
     # calculations for ax[1,0] ___________________________________________________________________________________________ #
     
