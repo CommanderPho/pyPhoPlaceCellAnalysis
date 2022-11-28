@@ -233,26 +233,29 @@ def plot_1D_placecell_validation(active_epoch_placefields1D, placefield_cell_ind
     t_end = kwargs.get('t_end', active_epoch_placefields1D.t[-1])
     
     # Interpolate the tuning curve for all the spike values:
-    curr_cell_interpolated_spike_positions = np.interp(curr_cell_spike_positions, active_epoch_placefields1D.ratemap.xbin_centers, active_epoch_placefields1D.ratemap.xbin_centers) # (271,)
-    curr_cell_interpolated_spike_curve_values = np.interp(curr_cell_spike_positions, active_epoch_placefields1D.ratemap.xbin_centers, curr_cell_normalized_tuning_curve) # (271,)
-    curr_cell_jittered_spike_curve_values = _plot_helper_build_jittered_spike_points(curr_cell_spike_times, curr_cell_interpolated_spike_curve_values,
-                                                                                     jitter_multiplier=jitter_multiplier, feature_range=feature_range, time_independent_jitter=False)
+    if should_plot_spike_indicator_lines_on_trajectory or should_plot_spike_indicator_points_on_placefield:
+        # only used if either should_plot_spike_indicator_lines_on_trajectory or should_plot_spike_indicator_points_on_placefield are True, so only compute under those conditions:
+        curr_cell_interpolated_spike_positions = np.interp(curr_cell_spike_positions, active_epoch_placefields1D.ratemap.xbin_centers, active_epoch_placefields1D.ratemap.xbin_centers) # (271,)
+    
     if should_plot_spike_indicator_lines_on_trajectory:
         # plot the orange lines that span across the position plot to the right
-        axs0.hlines(y=curr_cell_interpolated_spike_positions, xmin=curr_cell_spike_times, xmax=t_end,
+        ax_activity_v_time.hlines(y=curr_cell_interpolated_spike_positions, xmin=curr_cell_spike_times, xmax=t_end,
                     linestyles='solid', color='orange', alpha=spike_indicator_lines_alpha, linewidth=spike_indcator_lines_linewidth, zorder=0) # plot the lines that underlie the spike points
-    axs0.set_xlim((t_start, t_end)) # We don't want to clip to only the spiketimes for this cell, we want it for all cells, or even when the recording started/ended    
+    ax_activity_v_time.set_xlim((t_start, t_end)) # We don't want to clip to only the spiketimes for this cell, we want it for all cells, or even when the recording started/ended
 
     ## The computed placefield on the right-hand side:
-    axs1 = plot_placefield_tuning_curve(active_epoch_placefields1D.ratemap.xbin_centers, curr_cell_normalized_tuning_curve, axs1, is_horizontal=True)
+    ax_pf_tuning_curve = plot_placefield_tuning_curve(active_epoch_placefields1D.ratemap.xbin_centers, curr_cell_normalized_tuning_curve, ax_pf_tuning_curve, is_horizontal=True)
     if should_plot_spike_indicator_points_on_placefield:
-        axs1.hlines(y=curr_cell_interpolated_spike_positions, xmin=np.zeros_like(curr_cell_jittered_spike_curve_values), xmax=curr_cell_jittered_spike_curve_values, linestyles='solid', color='orange', alpha=spike_indicator_lines_alpha, linewidth=spike_indcator_lines_linewidth) # plot the lines that underlie the spike points
+        curr_cell_interpolated_spike_curve_values = np.interp(curr_cell_spike_positions, active_epoch_placefields1D.ratemap.xbin_centers, curr_cell_normalized_tuning_curve) # (271,)
+        curr_cell_jittered_spike_curve_values = _plot_helper_build_jittered_spike_points(curr_cell_spike_times, curr_cell_interpolated_spike_curve_values,
+                                                                                     jitter_multiplier=jitter_multiplier, feature_range=feature_range, time_independent_jitter=False)
+        ax_pf_tuning_curve.hlines(y=curr_cell_interpolated_spike_positions, xmin=np.zeros_like(curr_cell_jittered_spike_curve_values), xmax=curr_cell_jittered_spike_curve_values, linestyles='solid', color='orange', alpha=spike_indicator_lines_alpha, linewidth=spike_indcator_lines_linewidth) # plot the lines that underlie the spike points
         # axs1.hlines(y=curr_cell_interpolated_spike_positions, xmin=curr_cell_interpolated_spike_curve_values, xmax=curr_cell_jittered_spike_curve_values, linestyles='solid', color='orange', alpha=1.0, linewidth=0.25) # plot the lines that underlie the spike points
-        axs1.scatter(curr_cell_jittered_spike_curve_values, curr_cell_interpolated_spike_positions, c='r', marker='_', alpha=0.5) # plot the points themselves
-    axs1.axis('off')
-    axs1.set_xlim((0, 1))
+        ax_pf_tuning_curve.scatter(curr_cell_jittered_spike_curve_values, curr_cell_interpolated_spike_positions, c='r', marker='_', alpha=0.5) # plot the points themselves
+    ax_pf_tuning_curve.axis('off')
+    ax_pf_tuning_curve.set_xlim((0, 1))
     # axs1.set_ylim((-72, 150))
-    return fig, [axs0, axs1]
+    return fig, [ax_activity_v_time, ax_pf_tuning_curve]
 
 
 # ==================================================================================================================== #
