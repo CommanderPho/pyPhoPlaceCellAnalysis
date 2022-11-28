@@ -844,16 +844,28 @@ def _make_pho_jonathan_batch_plots(t_split, time_bins, final_jonathan_df, unit_s
         n_all_neuron_IDs = np.shape(final_jonathan_df)[0] 
         n_max_plot_rows = min(n_all_neuron_IDs, n_max_plot_rows) # don't allow more than the possible number of neuronIDs
         included_unit_neuron_IDs = [int(final_jonathan_df.index[i]) for i in np.arange(n_max_plot_rows)]
+    else:
+        # truncate to n_max_plot_rows if needed:
+        actual_num_unit_neuron_IDs = min(len(included_unit_neuron_IDs), n_max_plot_rows) # only include the possible rows
+        if (actual_num_unit_neuron_IDs < len(included_unit_neuron_IDs)):
+            print(f'WARNING: truncating included_unit_neuron_IDs of length {len(included_unit_neuron_IDs)} to length {actual_num_unit_neuron_IDs} due to n_max_plot_rows: {n_max_plot_rows}...')
+            included_unit_neuron_IDs = included_unit_neuron_IDs[:actual_num_unit_neuron_IDs]
 
     # the index passed into plot_1D_placecell_validation(...) must be in terms of the pf1D_all ratemap that's provided. the rdf_aclu_to_idx does not work and will result in indexing errors
-    _temp_aclu_to_fragile_linear_neuron_IDX = {aclu:i for i, aclu in enumerate(pf1D_all.ratemap.neuron_ids)}
+    _temp_aclu_to_fragile_linear_neuron_IDX = {aclu:i for i, aclu in enumerate(pf1D_all.ratemap.neuron_ids)} 
 
     actual_num_subfigures = min(len(included_unit_neuron_IDs), n_max_plot_rows) # only include the possible rows 
     subfigs = fig.subfigures(actual_num_subfigures, 1, wspace=0.07)
-
     colors = plt.rcParams['axes.prop_cycle'].by_key()['color']
     
     axs_list = []
+
+    ## IDEA: to change the display order, keep `_temp_aclu_to_fragile_linear_neuron_IDX` the same and just modify the order of aclu values iterated over
+    # _temp_aclu_to_subfig_idx
+
+
+
+
 
     # for i in np.arange(n_max_plot_rows):
     for i, aclu in enumerate(included_unit_neuron_IDs):
