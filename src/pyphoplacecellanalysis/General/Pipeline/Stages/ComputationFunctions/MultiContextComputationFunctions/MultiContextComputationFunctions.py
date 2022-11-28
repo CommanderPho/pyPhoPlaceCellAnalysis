@@ -18,10 +18,8 @@ from shapely.ops import unary_union, polygonize # for compute_polygon_overlap
 from pyphoplacecellanalysis.General.Mixins.CrossComputationComparisonHelpers import _find_any_context_neurons, _compare_computation_results # for compute_polygon_overlap
 from scipy.signal import convolve as convolve # compute_convolution_overlap
 
+from collections import Counter # Count the Number of Occurrences in a Python list using Counter
 from pyphoplacecellanalysis.General.Mixins.CrossComputationComparisonHelpers import SplitPartitionMembership
-
-
-
 
 
 def _wrap_multi_context_computation_function(global_comp_fcn):
@@ -135,6 +133,37 @@ class MultiContextComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Co
 
         final_jonathan_df = _subfn_computations_make_jonathan_firing_comparison_df(time_binned_unit_specific_binned_spike_rate, pf1d_short, pf1d_long, aclu_to_idx, rdf, irdf)
         final_jonathan_df = final_jonathan_df.join(neuron_replay_stats_df, how='outer')
+
+        # Uses `aclu_to_idx` to add the ['active_aclus', 'is_neuron_active'] columns
+        # Uses to add ['num_long_only_neuron_participating', 'num_shared_neuron_participating', 'num_short_only_neuron_participating'] columns
+        flat_matrix = np.vstack(rdf.firing_rates) # flat_matrix.shape # (116, 52) # (n_replays, n_neurons)
+        n_replays = np.shape(flat_matrix)[0] # 743
+        is_inactive_mask = np.isclose(flat_matrix, 0.0)
+        is_active_mask = np.logical_not(is_inactive_mask) # .shape # (743, 70)
+
+        rdf_aclus = np.array(list(aclu_to_idx.keys()))
+        aclu_to_track_membership_map = {aclu:row['track_membership'] for aclu, row in final_jonathan_df.iterrows()} # {2: <SplitPartitionMembership.LEFT_ONLY: 0>, 3: <SplitPartitionMembership.SHARED: 1>, ...}
+        is_cell_active_list = []
+        active_aclus_list = []
+        num_long_only_neuron_participating = []
+        num_shared_neuron_participating = []
+        num_short_only_neuron_participating = []
+
+        for i, (replay_index, row) in enumerate(rdf.iterrows()):
+            active_aclus = rdf_aclus[is_active_mask[i]]
+            # get the aclu's long_only/shared/short_only identity
+            active_cells_track_membership = [aclu_to_track_membership_map[aclu] for aclu in active_aclus]
+            counts = Counter(active_cells_track_membership) # Counter({<SplitPartitionMembership.LEFT_ONLY: 0>: 3, <SplitPartitionMembership.SHARED: 1>: 7, <SplitPartitionMembership.RIGHT_ONLY: 2>: 7})
+            num_long_only_neuron_participating.append(counts[SplitPartitionMembership.LEFT_ONLY])
+            num_shared_neuron_participating.append(counts[SplitPartitionMembership.SHARED])
+            num_short_only_neuron_participating.append(counts[SplitPartitionMembership.RIGHT_ONLY])
+            is_cell_active_list.append(is_active_mask[i])
+            active_aclus_list.append(active_aclus)
+
+        rdf = rdf.assign(is_neuron_active=is_cell_active_list, active_aclus=active_aclus_list,
+                        num_long_only_neuron_participating=num_long_only_neuron_participating,
+                        num_shared_neuron_participating=num_shared_neuron_participating,
+                        num_short_only_neuron_participating=num_short_only_neuron_participating)
 
         global_computation_results.computed_data['jonathan_firing_rate_analysis'] = DynamicParameters.init_from_dict({
             'rdf': DynamicParameters.init_from_dict({
