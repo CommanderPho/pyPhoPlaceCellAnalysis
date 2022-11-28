@@ -863,11 +863,6 @@ def _make_pho_jonathan_batch_plots(t_split, time_bins, final_jonathan_df, unit_s
     ## IDEA: to change the display order, keep `_temp_aclu_to_fragile_linear_neuron_IDX` the same and just modify the order of aclu values iterated over
     # _temp_aclu_to_subfig_idx
 
-
-
-
-
-    # for i in np.arange(n_max_plot_rows):
     for i, aclu in enumerate(included_unit_neuron_IDs):
 
         is_first_row = (i==0)

@@ -55,7 +55,7 @@ class LoadedObjectPersistanceState(object):
     def needs_save(self, curr_object) -> bool:
         """ compares the curr_object's state to its state when loaded from disk to see if anything changed and it needs to be re-persisted (by saving) """
         # lhs_compare_dict = NeuropyPipeline.build_pipeline_compare_dict(curr_object)
-        curr_diff = DiffableObject.compute_diff(curr_object.pipeline_compare_dict, self.load_compare_state)        
+        curr_diff = DiffableObject.compute_diff(curr_object.pipeline_compare_dict, self.load_compare_state)
         return len(curr_diff) > 0
 
     
