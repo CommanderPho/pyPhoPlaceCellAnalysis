@@ -49,17 +49,24 @@ from vtkmodules.vtkCommonCore import vtkLookupTable # required for build_custom_
 # 1D Placefields and Tuning Curves                                                                                     #
 # ==================================================================================================================== #
 
-def plot_placefield_tuning_curve(xbin_centers, tuning_curve, ax, is_horizontal=False, color='g'):
+def plot_placefield_tuning_curve(xbin_centers, tuning_curve, ax, is_horizontal=False, color='g', fill_alpha=0.3, border_line_override_color=None, border_line_alpha=0.8):
     """ Plots the 1D Normalized Tuning Curve in a 2D Plot
+
+    fill_alpha: the alpha for the fill color
+    border_line_alpha: the alpha for the line
+
     Usage:
         axs1 = plot_placefield_tuning_curve(active_epoch_placefields1D.ratemap.xbin_centers, active_epoch_placefields1D.ratemap.normalized_tuning_curves[curr_cell_id, :].squeeze(), axs1)
     """
+    if border_line_override_color is None:
+        border_line_override_color = color # should just equal the fill color, which is typical
+
     if is_horizontal:
-        ax.fill_betweenx(xbin_centers, tuning_curve, color=color, alpha=0.3, interpolate=True)
-        ax.plot(tuning_curve, xbin_centers, color, alpha=0.8)
+        ax.fill_betweenx(xbin_centers, tuning_curve, color=color, alpha=fill_alpha, interpolate=True)
+        ax.plot(tuning_curve, xbin_centers, border_line_override_color, alpha=border_line_alpha)
     else:
-        ax.fill_between(xbin_centers, tuning_curve, color=color, alpha=0.3)
-        ax.plot(xbin_centers, tuning_curve, color, alpha=0.8)
+        ax.fill_between(xbin_centers, tuning_curve, color=color, alpha=fill_alpha)
+        ax.plot(xbin_centers, tuning_curve, border_line_override_color, alpha=border_line_alpha)
     return ax
 
 def _plot_helper_build_jittered_spike_points(curr_cell_spike_times, curr_cell_interpolated_spike_curve_values, jitter_multiplier=2.0, feature_range=(-1, 1), time_independent_jitter=False):
@@ -85,9 +92,6 @@ def plot_1d_placecell_validations(active_placefields1D, plotting_config, should_
         plot_1d_placecell_validations(active_epoch_placefields1D, modifier_string='lap_only', should_save=False)
 
     """
-    # def _filename_for_placefield(active_epoch_placefields1D, curr_cell_id):
-    #     return active_epoch_placefields1D.str_for_filename(is_2D=False) + '-cell_{:02d}'.format(curr_cell_id)
-    
     n_cells = active_placefields1D.ratemap.n_neurons
     out_figures_list = []
     out_axes_list = []
@@ -153,7 +157,9 @@ def plot_1D_placecell_validation(active_epoch_placefields1D, placefield_cell_ind
     placefield_cell_index: an flat index into active_epoch_placefields1D.cell_ids. Must be between 0 and len(active_epoch_placefields1D.cell_ids). NOT the cell's original ID!
 
     Implementation:
-        Internally relies on plotRaw_v_time(...) to plot the main position vs. spike curve
+        Internally relies on:
+            active_epoch_placefields1D.plotRaw_v_time(...) to plot the main position vs. spike curve
+            plot_placefield_tuning_curve(...) to plot the 1D placefield tuning curve
 
     """
     
@@ -183,18 +189,18 @@ def plot_1D_placecell_validation(active_epoch_placefields1D, placefield_cell_ind
     if extant_axes is not None:
         # user-supplied extant axes [axs0, axs1]
         assert len(extant_axes) == 2
-        axs0, axs1 = extant_axes
+        ax_activity_v_time, ax_pf_tuning_curve = extant_axes
     else:
         # Need axes:
         # Layout Subplots in Figure:
         gs = fig.add_gridspec(1, 8)
         gs.update(wspace=0, hspace=0.05) # set the spacing between axes.
-        axs0 = fig.add_subplot(gs[0, :-1])
-        axs1 = fig.add_subplot(gs[0, -1], sharey=axs0)
+        ax_activity_v_time = fig.add_subplot(gs[0, :-1])
+        ax_pf_tuning_curve = fig.add_subplot(gs[0, -1], sharey=ax_activity_v_time)
         if should_include_labels:
-            axs1.set_title('Normalized Placefield', fontsize='14')
-        axs1.set_xticklabels([])
-        axs1.set_yticklabels([])
+            ax_pf_tuning_curve.set_title('Normalized Placefield', fontsize='14')
+        ax_pf_tuning_curve.set_xticklabels([])
+        ax_pf_tuning_curve.set_yticklabels([])
 
     ## The main position vs. spike curve:
     # spike_marker = 'tri_left' # '3'
@@ -204,18 +210,18 @@ def plot_1D_placecell_validation(active_epoch_placefields1D, placefield_cell_ind
     # spike_plot_kwargs = {'linestyle':'none', 'markersize':6.0, 'marker': "_", 'markerfacecolor':'#55aaffcc', 'markeredgecolor':'#55aaffcc'}
     # spike_plot_kwargs = {'linestyle':'none', 'markersize':2.0, 'marker': 9, 'markerfacecolor':'#1420ffcc', 'markeredgecolor':'#1420ffcc'}
     spike_plot_kwargs = {'linestyle':'none', 'markersize':5.0, 'marker': '.', 'markerfacecolor':'#1420ffcc', 'markeredgecolor':'#1420ffcc', 'zorder':10}
-    active_epoch_placefields1D.plotRaw_v_time(placefield_cell_index, ax=axs0, spikes_color=spikes_color, spikes_alpha=spikes_alpha, position_plot_kwargs={'color': '#393939c8', 'linewidth': 1.0, 'zorder':5}, spike_plot_kwargs=spike_plot_kwargs, should_include_labels=should_include_labels)
+    active_epoch_placefields1D.plotRaw_v_time(placefield_cell_index, ax=ax_activity_v_time, spikes_color=spikes_color, spikes_alpha=spikes_alpha, position_plot_kwargs={'color': '#393939c8', 'linewidth': 1.0, 'zorder':5}, spike_plot_kwargs=spike_plot_kwargs, should_include_labels=should_include_labels)
     
     # Title and Subtitle:
     title_string = ' '.join(['pf1D', f'Cell {curr_cell_id:02d}'])
     subtitle_string = ' '.join([f'{active_epoch_placefields1D.config.str_for_display(False)}'])
     if should_include_labels:
         fig.suptitle(title_string, fontsize='22')
-        axs0.set_title(subtitle_string, fontsize='16')
+        ax_activity_v_time.set_title(subtitle_string, fontsize='16')
     
     # axs0.yaxis.grid(True, color = 'green', linestyle = '--', linewidth = 0.5)
     if should_plot_bins_grid:
-        _plot_helper_setup_gridlines(axs0, active_epoch_placefields1D.ratemap.xbin, active_epoch_placefields1D.ratemap.xbin_centers)
+        _plot_helper_setup_gridlines(ax_activity_v_time, active_epoch_placefields1D.ratemap.xbin, active_epoch_placefields1D.ratemap.xbin_centers)
 
 
     ## Part 2: The Placefield Plot to the Right and the connecting features:
