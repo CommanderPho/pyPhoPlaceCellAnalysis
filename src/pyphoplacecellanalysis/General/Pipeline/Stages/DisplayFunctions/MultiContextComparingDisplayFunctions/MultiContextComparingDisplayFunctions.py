@@ -119,10 +119,10 @@ class MultiContextComparingDisplayFunctions(AllFunctionEnumeratingMixin, metacla
             # time_bins = global_computation_results.computed_data['jonathan_firing_rate_analysis']['time_binned_instantaneous_unit_specific_spike_rate']['time_bins']
             # time_binned_unit_specific_binned_spike_rate = global_computation_results.computed_data['jonathan_firing_rate_analysis']['time_binned_instantaneous_unit_specific_spike_rate']['instantaneous_unit_specific_spike_rate_values']
 
-            final_jonathan_df = global_computation_results.computed_data['jonathan_firing_rate_analysis']['final_jonathan_df']
+            neuron_replay_stats_df = global_computation_results.computed_data['jonathan_firing_rate_analysis']['neuron_replay_stats_df']
 
-            graphics_output_dict, neuron_df = _make_jonathan_interactive_plot(sess, time_bins, final_jonathan_df, time_binned_unit_specific_binned_spike_rate, pos_df, aclu_to_idx, rdf, irdf, show_inter_replay_frs=False)
-            graphics_output_dict['plot_data'] = {'df': final_jonathan_df, 'rdf':rdf, 'aclu_to_idx':aclu_to_idx, 'irdf':irdf, 'time_binned_unit_specific_spike_rate': global_computation_results.computed_data['jonathan_firing_rate_analysis']['time_binned_unit_specific_spike_rate']}
+            graphics_output_dict, neuron_df = _make_jonathan_interactive_plot(sess, time_bins, neuron_replay_stats_df, time_binned_unit_specific_binned_spike_rate, pos_df, aclu_to_idx, rdf, irdf, show_inter_replay_frs=False)
+            graphics_output_dict['plot_data'] = {'df': neuron_replay_stats_df, 'rdf':rdf, 'aclu_to_idx':aclu_to_idx, 'irdf':irdf, 'time_binned_unit_specific_spike_rate': global_computation_results.computed_data['jonathan_firing_rate_analysis']['time_binned_unit_specific_spike_rate']}
 
             return graphics_output_dict
 
@@ -167,7 +167,7 @@ class MultiContextComparingDisplayFunctions(AllFunctionEnumeratingMixin, metacla
             # ## instantaneous_unit_specific_spike_rate mode:
             # time_bins = global_computation_results.computed_data['jonathan_firing_rate_analysis']['time_binned_instantaneous_unit_specific_spike_rate']['time_bins']
             # time_binned_unit_specific_binned_spike_rate = global_computation_results.computed_data['jonathan_firing_rate_analysis']['time_binned_instantaneous_unit_specific_spike_rate']['instantaneous_unit_specific_spike_rate_values']
-            final_jonathan_df = global_computation_results.computed_data['jonathan_firing_rate_analysis']['final_jonathan_df']
+            neuron_replay_stats_df = global_computation_results.computed_data['jonathan_firing_rate_analysis']['neuron_replay_stats_df']
             # compare_firing_rates(rdf, irdf)
 
             n_max_plot_rows = kwargs.get('n_max_plot_rows', 6)
@@ -175,8 +175,8 @@ class MultiContextComparingDisplayFunctions(AllFunctionEnumeratingMixin, metacla
             included_unit_neuron_IDs = kwargs.get('included_unit_neuron_IDs', None)
 
             
-            graphics_output_dict = _make_pho_jonathan_batch_plots(t_split, time_bins, final_jonathan_df, time_binned_unit_specific_binned_spike_rate, pf1D_all, aclu_to_idx, rdf, irdf, show_inter_replay_frs=show_inter_replay_frs, n_max_plot_rows=n_max_plot_rows, included_unit_neuron_IDs=included_unit_neuron_IDs)
-            graphics_output_dict['plot_data'] = {'df': final_jonathan_df, 'rdf':rdf, 'aclu_to_idx':aclu_to_idx, 'irdf':irdf, 'time_binned_unit_specific_spike_rate': global_computation_results.computed_data['jonathan_firing_rate_analysis']['time_binned_unit_specific_spike_rate']}
+            graphics_output_dict = _make_pho_jonathan_batch_plots(t_split, time_bins, neuron_replay_stats_df, time_binned_unit_specific_binned_spike_rate, pf1D_all, aclu_to_idx, rdf, irdf, show_inter_replay_frs=show_inter_replay_frs, n_max_plot_rows=n_max_plot_rows, included_unit_neuron_IDs=included_unit_neuron_IDs)
+            graphics_output_dict['plot_data'] = {'df': neuron_replay_stats_df, 'rdf':rdf, 'aclu_to_idx':aclu_to_idx, 'irdf':irdf, 'time_binned_unit_specific_spike_rate': global_computation_results.computed_data['jonathan_firing_rate_analysis']['time_binned_unit_specific_spike_rate']}
 
             return graphics_output_dict
 
@@ -504,7 +504,7 @@ def _temp_draw_jonathan_spikes_on_track(ax, pos_df, single_neuron_spikes):
     ax.set_title("Animal position on track")
 
 # ==================================================================================================================== #
-def _make_jonathan_interactive_plot(sess, time_bins, final_jonathan_df, unit_specific_time_binned_firing_rates, pos_df, aclu_to_idx, rdf, irdf, show_inter_replay_frs=False):
+def _make_jonathan_interactive_plot(sess, time_bins, neuron_replay_stats_df, unit_specific_time_binned_firing_rates, pos_df, aclu_to_idx, rdf, irdf, show_inter_replay_frs=False):
 
     # ==================================================================================================================== #
     ## Plotting/Graphics:
@@ -523,10 +523,10 @@ def _make_jonathan_interactive_plot(sess, time_bins, final_jonathan_df, unit_spe
 
     # this fills in the nan's in the single-track cells so that they get plotted at the edges
     # plotting everything in one go makes resizing points later simpler
-    final_jonathan_df.long_pf_peak_x.fillna(xlim[0] + 1, inplace=True) # xlim[0] + 1 is the extreme edge of the plot
-    final_jonathan_df.short_pf_peak_x.fillna(ylim[0] + 1, inplace=True)
+    neuron_replay_stats_df.long_pf_peak_x.fillna(xlim[0] + 1, inplace=True) # xlim[0] + 1 is the extreme edge of the plot
+    neuron_replay_stats_df.short_pf_peak_x.fillna(ylim[0] + 1, inplace=True)
 
-    remap_scatter = ax[0,0].scatter(final_jonathan_df.long_pf_peak_x, final_jonathan_df.short_pf_peak_x, s=7, picker=True, c=[colors[c] for c in final_jonathan_df["has_na"]]);
+    remap_scatter = ax[0,0].scatter(neuron_replay_stats_df.long_pf_peak_x, neuron_replay_stats_df.short_pf_peak_x, s=7, picker=True, c=[colors[c] for c in neuron_replay_stats_df["has_na"]]);
     ax[0,0].set_ylim(ylim);
     ax[0,0].set_xlim(xlim);
     ax[0,0].xaxis.set_tick_params(labelbottom=False)
@@ -541,7 +541,7 @@ def _make_jonathan_interactive_plot(sess, time_bins, final_jonathan_df, unit_spe
     graphics_output_dict['remap_scatter'] = remap_scatter
 
     # plotting for ax[1,0]: ______________________________________________________________________________________________ #
-    diff_scatter = ax[1,0].scatter(final_jonathan_df.non_replay_diff, final_jonathan_df.replay_diff, s=7, picker=True);
+    diff_scatter = ax[1,0].scatter(neuron_replay_stats_df.non_replay_diff, neuron_replay_stats_df.replay_diff, s=7, picker=True);
     # ax[1,0].set_xlabel("Firing rate along long track")
     # ax[1,0].set_ylabel("Firing rate along short track")
     ax[1,0].set_title("Firing rate on short vs. long track")
@@ -561,14 +561,14 @@ def _make_jonathan_interactive_plot(sess, time_bins, final_jonathan_df, unit_spe
         'This gets called when the selected neuron changes; it updates the graphs'
 
         index = new_index
-        aclu = int(final_jonathan_df.index[index])
+        aclu = int(neuron_replay_stats_df.index[index])
         print(f"selected neuron has index: {index} aclu: {aclu}")
 
         # this changes the size of the neuron in ax[0,0]
-        remap_scatter.set_sizes([7 if i!= index else 30 for i in range(len(final_jonathan_df))])
+        remap_scatter.set_sizes([7 if i!= index else 30 for i in range(len(neuron_replay_stats_df))])
 
         # this changes the size of the neuron in ax[1,0]
-        diff_scatter.set_sizes([7 if i!= index else 30 for i in range(len(final_jonathan_df))])
+        diff_scatter.set_sizes([7 if i!= index else 30 for i in range(len(neuron_replay_stats_df))])
 
         ## New ax[0,1] draw method:
         t_split = sess.paradigm[0][0,1]
@@ -585,10 +585,10 @@ def _make_jonathan_interactive_plot(sess, time_bins, final_jonathan_df, unit_spe
         global g_index
         if event.key=='tab':
             g_index += 1
-            g_index %= len(final_jonathan_df)
+            g_index %= len(neuron_replay_stats_df)
         elif event.key=='b':
             g_index -= 1
-            g_index %= len(final_jonathan_df)
+            g_index %= len(neuron_replay_stats_df)
         on_index_change(g_index)
 
 
@@ -602,7 +602,7 @@ def _make_jonathan_interactive_plot(sess, time_bins, final_jonathan_df, unit_spe
 
     fig.canvas.mpl_connect('pick_event', on_pick)
     fig.canvas.mpl_connect('key_press_event', on_keypress)
-    return graphics_output_dict, final_jonathan_df
+    return graphics_output_dict, neuron_replay_stats_df
 # ==================================================================================================================== #
 
 def _plot_pho_jonathan_batch_plot_single_cell(t_split, time_bins, unit_specific_time_binned_firing_rates, pf1D_all, rdf_aclu_to_idx, rdf, irdf, show_inter_replay_frs, pf1D_aclu_to_idx, aclu, curr_fig, colors, debug_print=False, **kwargs):
@@ -682,7 +682,7 @@ def _plot_pho_jonathan_batch_plot_single_cell(t_split, time_bins, unit_specific_
 # from neuropy.utils.misc import RowColTuple # for _make_pho_jonathan_batch_plots_advanced
 # from neuropy.utils.matplotlib_helpers import build_or_reuse_figure, _build_variable_max_value_label, _determine_best_placefield_2D_layout, _build_neuron_identity_label # for _make_pho_jonathan_batch_plots_advanced
 
-# def _make_pho_jonathan_batch_plots_advanced(sess, time_bins, final_jonathan_df, unit_specific_time_binned_firing_rates, pf1D_all, aclu_to_idx, rdf, irdf, show_inter_replay_frs=False, included_unit_indicies=None, included_unit_neuron_IDs=None,
+# def _make_pho_jonathan_batch_plots_advanced(sess, time_bins, neuron_replay_stats_df, unit_specific_time_binned_firing_rates, pf1D_all, aclu_to_idx, rdf, irdf, show_inter_replay_frs=False, included_unit_indicies=None, included_unit_neuron_IDs=None,
 #     subplots:RowColTuple=(40, 3), fig_column_width:float=8.0, fig_row_height:float=1.0, resolution_multiplier:float=1.0, max_screen_figure_size=(None, None), fignum=1, fig=None, missing_aclu_string_formatter=None, debug_print=False):
 #     """ An attempt to allow standardized pagination and such in `_make_pho_jonathan_batch_plots(...)` by converting from `plot_ratemap_2D(...)`'s page form and such. 
 
@@ -832,7 +832,7 @@ def _plot_pho_jonathan_batch_plot_single_cell(t_split, time_bins, unit_specific_
 
 
 
-def _make_pho_jonathan_batch_plots(t_split, time_bins, final_jonathan_df, unit_specific_time_binned_firing_rates, pf1D_all, aclu_to_idx, rdf, irdf, show_inter_replay_frs=False, included_unit_neuron_IDs=None, n_max_plot_rows:int=4, debug_print=False, **kwargs):
+def _make_pho_jonathan_batch_plots(t_split, time_bins, neuron_replay_stats_df, unit_specific_time_binned_firing_rates, pf1D_all, aclu_to_idx, rdf, irdf, show_inter_replay_frs=False, included_unit_neuron_IDs=None, n_max_plot_rows:int=4, debug_print=False, **kwargs):
     """ Stacked Jonathan-style firing-rate-across-epochs-plot
     Internally calls `_plot_pho_jonathan_batch_plot_single_cell`
         n_max_plot_rows: the maximum number of rows to plot
@@ -841,9 +841,9 @@ def _make_pho_jonathan_batch_plots(t_split, time_bins, final_jonathan_df, unit_s
     fig = plt.figure(constrained_layout=True, figsize=(10, 4))
         
     if included_unit_neuron_IDs is None:
-        n_all_neuron_IDs = np.shape(final_jonathan_df)[0] 
+        n_all_neuron_IDs = np.shape(neuron_replay_stats_df)[0] 
         n_max_plot_rows = min(n_all_neuron_IDs, n_max_plot_rows) # don't allow more than the possible number of neuronIDs
-        included_unit_neuron_IDs = [int(final_jonathan_df.index[i]) for i in np.arange(n_max_plot_rows)]
+        included_unit_neuron_IDs = [int(neuron_replay_stats_df.index[i]) for i in np.arange(n_max_plot_rows)]
     else:
         # truncate to n_max_plot_rows if needed:
         actual_num_unit_neuron_IDs = min(len(included_unit_neuron_IDs), n_max_plot_rows) # only include the possible rows
@@ -868,7 +868,7 @@ def _make_pho_jonathan_batch_plots(t_split, time_bins, final_jonathan_df, unit_s
         is_first_row = (i==0)
         is_last_row = (i == (n_max_plot_rows-1))
 
-        # aclu = int(final_jonathan_df.index[i])
+        # aclu = int(neuron_replay_stats_df.index[i])
         if debug_print:
             print(f"selected neuron has index: {i} aclu: {aclu}")
         

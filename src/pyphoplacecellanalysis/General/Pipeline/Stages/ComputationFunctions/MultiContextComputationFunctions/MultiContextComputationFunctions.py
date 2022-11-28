@@ -62,7 +62,7 @@ class MultiContextComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Co
                     ['jonathan_firing_rate_analysis']['time_binned_instantaneous_unit_specific_spike_rate']['time_bins']
                     ['jonathan_firing_rate_analysis']['time_binned_instantaneous_unit_specific_spike_rate']['instantaneous_unit_specific_spike_rate_values']
 
-                ['jonathan_firing_rate_analysis']['final_jonathan_df']
+                ['jonathan_firing_rate_analysis']['neuron_replay_stats_df']
         
         """
         if include_whitelist is None:
@@ -146,7 +146,7 @@ class MultiContextComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Co
             }),
             'time_binned_unit_specific_spike_rate': time_binned_unit_specific_spike_rate_result,
             'time_binned_instantaneous_unit_specific_spike_rate': instantaneous_unit_specific_spike_rate_result,
-            'final_jonathan_df': final_jonathan_df
+            'neuron_replay_stats_df': final_jonathan_df
         })
         return global_computation_results
 
@@ -553,16 +553,16 @@ def _compute_neuron_replay_stats(rdf, aclu_to_idx):
     return out_replay_df, out_neuron_df
 
 
-def compute_evening_morning_parition(final_jonathan_df, firing_rates_activity_source:FiringRateActivitySource=FiringRateActivitySource.ONLY_REPLAY, debug_print=True):
+def compute_evening_morning_parition(neuron_replay_stats_df, firing_rates_activity_source:FiringRateActivitySource=FiringRateActivitySource.ONLY_REPLAY, debug_print=True):
     """ 2022-11-27 - Computes the cells that are either appearing or disappearing across the transition from the long to short track.
     
     Goal: Detect the cells that either appear or disappear across the transition from the long-to-short track
     
     
     Usage:
-        difference_sorted_aclus, evening_sorted_aclus, morning_sorted_aclus = compute_evening_morning_parition(final_jonathan_df, debug_print=True)
-        sorted_final_jonathan_df = final_jonathan_df.reindex(difference_sorted_aclus).copy() # This seems to work to re-sort the dataframe by the sort indicies
-        sorted_final_jonathan_df
+        difference_sorted_aclus, evening_sorted_aclus, morning_sorted_aclus = compute_evening_morning_parition(neuron_replay_stats_df, debug_print=True)
+        sorted_neuron_replay_stats_df = neuron_replay_stats_df.reindex(difference_sorted_aclus).copy() # This seems to work to re-sort the dataframe by the sort indicies
+        sorted_neuron_replay_stats_df
         
     difference_sorted_aclus: [        nan         nan  4.26399584  3.84391289  3.2983088   3.26820908
       2.75093881  2.32313925  2.28524202  2.24443817  1.92526386  1.87876877
@@ -585,25 +585,25 @@ def compute_evening_morning_parition(final_jonathan_df, firing_rates_activity_so
     out_dict = {}
 
     # Find "Evening" Cells: which have almost no activity in the 'long' epoch
-    curr_long_mean_abs = final_jonathan_df[active_column_names['long']].abs().to_numpy()
+    curr_long_mean_abs = neuron_replay_stats_df[active_column_names['long']].abs().to_numpy()
     long_nearest_zero_sort_idxs = np.argsort(curr_long_mean_abs)
-    evening_sorted_aclus = final_jonathan_df.index.to_numpy()[long_nearest_zero_sort_idxs] # find cells nearest to zero firing for long_mean
+    evening_sorted_aclus = neuron_replay_stats_df.index.to_numpy()[long_nearest_zero_sort_idxs] # find cells nearest to zero firing for long_mean
     out_dict['evening'] = SortOrderMetric(long_nearest_zero_sort_idxs, evening_sorted_aclus, curr_long_mean_abs[long_nearest_zero_sort_idxs])
     if debug_print:
         print(f'Evening sorted values: {curr_long_mean_abs[long_nearest_zero_sort_idxs]}')
     
     ## Find "Morning" Cells: which have almost no activity in the 'short' epoch
-    curr_short_mean_abs = final_jonathan_df[active_column_names['short']].abs().to_numpy()
+    curr_short_mean_abs = neuron_replay_stats_df[active_column_names['short']].abs().to_numpy()
     short_nearest_zero_sort_idxs = np.argsort(curr_short_mean_abs)
-    morning_sorted_aclus = final_jonathan_df.index.to_numpy()[short_nearest_zero_sort_idxs] # find cells nearest to zero firing for short_mean
+    morning_sorted_aclus = neuron_replay_stats_df.index.to_numpy()[short_nearest_zero_sort_idxs] # find cells nearest to zero firing for short_mean
     out_dict['morning'] = SortOrderMetric(short_nearest_zero_sort_idxs, morning_sorted_aclus, curr_short_mean_abs[short_nearest_zero_sort_idxs])
     if debug_print:
         print(f'Morning sorted values: {curr_short_mean_abs[short_nearest_zero_sort_idxs]}')
     
     # Look at differences method:
-    curr_mean_diff = final_jonathan_df[active_column_names['diff']].to_numpy()
+    curr_mean_diff = neuron_replay_stats_df[active_column_names['diff']].to_numpy()
     biggest_differences_sort_idxs = np.argsort(curr_mean_diff)[::-1] # sort this one in order of increasing values (most promising differences first)
-    difference_sorted_aclus = final_jonathan_df.index.to_numpy()[biggest_differences_sort_idxs]
+    difference_sorted_aclus = neuron_replay_stats_df.index.to_numpy()[biggest_differences_sort_idxs]
     out_dict['diff'] = SortOrderMetric(biggest_differences_sort_idxs, difference_sorted_aclus, curr_mean_diff[biggest_differences_sort_idxs])
     # for the difference sorted method, the aclus at both ends of the `difference_sorted_aclus` are more likely to belong to morning/evening respectively
     if debug_print:
