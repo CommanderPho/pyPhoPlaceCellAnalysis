@@ -428,16 +428,20 @@ def _temp_draw_jonathan_ax(t_split, time_bins, unit_specific_time_binned_firing_
     """ Draws the time binned firing rates and the replay firing rates for a single cell
 
 
-        custom_replay_markers
+        custom_replay_markers:
+            # The colors for each point indicating the percentage of participating cells that belong to which track.
+                - More long_only -> more red
+                - More short_only -> more blue
+
 
     Usage:
 
-    index = new_index
-    active_aclu = int(joined_df.index[index])
-    _temp_draw_jonathan_ax(ax[0,1])
+        index = new_index
+        active_aclu = int(joined_df.index[index])
+        _temp_draw_jonathan_ax(ax[0,1])
 
-    t_split = sess.paradigm[0][0,1]
-    _temp_draw_jonathan_ax(t_split, time_bins, unit_specific_time_binned_firing_rates, aclu_to_idx, rdf, irdf, show_inter_replay_frs=show_inter_replay_frs, colors=colors, fig=None, ax=ax[0,1], active_aclu=active_aclu)
+        t_split = sess.paradigm[0][0,1]
+        _temp_draw_jonathan_ax(t_split, time_bins, unit_specific_time_binned_firing_rates, aclu_to_idx, rdf, irdf, show_inter_replay_frs=show_inter_replay_frs, colors=colors, fig=None, ax=ax[0,1], active_aclu=active_aclu)
 
     Historical:
         used to take sess: DataSession as first argument and then access `sess.paradigm[0][0,1]` internally. On 2022-11-27 refactored to take this time `t_split` directly and no longer require session
@@ -469,7 +473,13 @@ def _temp_draw_jonathan_ax(t_split, time_bins, unit_specific_time_binned_firing_
                     ax.plot(centers[replay_idx], heights[replay_idx], markersize=5, **out_plot_kwarg)
             else:
                 # don't do the fancy custom makers for the inactive (zero firing for this aclu) replay points:
+                plot_replays_kwargs = {
+                    'marker':'o',
+                    's': 3,
+                    'c': 'black'
+                }
                 ax.scatter(centers, heights, **plot_replays_kwargs)
+                pass # don't plot at all
 
     else:
         
@@ -930,6 +940,12 @@ def _make_pho_jonathan_batch_plots(t_split, time_bins, neuron_replay_stats_df, u
     """ Stacked Jonathan-style firing-rate-across-epochs-plot
     Internally calls `_plot_pho_jonathan_batch_plot_single_cell`
         n_max_plot_rows: the maximum number of rows to plot
+
+
+    # The colors for each point indicating the percentage of participating cells that belong to which track.
+        - More long_only -> more red
+        - More short_only -> more blue
+
 
     """
     fig = plt.figure(constrained_layout=True, figsize=(10, 4))

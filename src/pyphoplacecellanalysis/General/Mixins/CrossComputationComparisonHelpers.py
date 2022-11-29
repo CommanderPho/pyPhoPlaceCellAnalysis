@@ -164,8 +164,8 @@ from matplotlib.transforms import Bbox
 def _build_neuron_type_distribution_color(rdf):
     """
     # The colors for each point indicating the percentage of participating cells that belong to which track.
-        - More long_only == more red
-        - More short_only == more blue
+        - More long_only -> more red
+        - More short_only -> more blue
 
     Usage:
         from pyphoplacecellanalysis.General.Mixins.CrossComputationComparisonHelpers import _build_neuron_type_distribution_color
