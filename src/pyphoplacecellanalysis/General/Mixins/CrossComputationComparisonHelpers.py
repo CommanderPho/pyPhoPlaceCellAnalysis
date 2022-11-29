@@ -233,12 +233,13 @@ def build_replays_custom_scatter_markers(rdf, debug_print=False):
     # scatter_plot_kwargs_list, scatter_markerstyles_list, scatter_marker_paths_list = custom_markers_dict_list['plot_kwargs'], custom_markers_dict_list['markerstyles'], custom_markers_dict_list['paths'] # Extract variables from the `custom_markers_dict_list` dictionary to the local workspace
 
     custom_markers_tuple_list = [_subfn_build_custom_scatter_marker(long, shared, short, long_to_short_balance, is_tri_mode=False, debug_print=False) for long, shared, short, long_to_short_balance in list(zip(_percent_long_only, _percent_shared, _percent_short_only, _long_to_short_balances))]
-    scatter_markerstyles_list = [a_tuple[1] for a_tuple in custom_markers_tuple_list]
+    
 
     out_plot_kwargs_list = [a_tuple[0] for a_tuple in custom_markers_tuple_list]
     # out_plot_kwargs_array = [build_custom_scatter_marker(long, shared, short, long_to_short_balance, is_tri_mode=False, debug_print=False)[0] for long, shared, short, long_to_short_balance in list(zip(_percent_long_only, _percent_shared, _percent_short_only, _long_to_short_balances))]
     # out_plot_kwargs_array
 
+    # scatter_markerstyles_list = [a_tuple[1] for a_tuple in custom_markers_tuple_list]
     # # Break into two parts <list<tuple[2]<MarkerStyle>> -> list<MarkerStyle>, List<MarkerStyle>
     # scatter_markerstyles_0_list = [a_tuple[0] for a_tuple in scatter_markerstyles_list]
     # scatter_markerstyles_1_list = [a_tuple[1] for a_tuple in scatter_markerstyles_list]

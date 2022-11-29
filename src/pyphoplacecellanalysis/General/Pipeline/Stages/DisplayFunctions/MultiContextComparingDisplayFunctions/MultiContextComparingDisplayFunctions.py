@@ -424,8 +424,11 @@ def _context_nested_docks(curr_active_pipeline, active_config_names, enable_gui=
     return master_dock_win, app, out_items
 
 # ==================================================================================================================== #
-def _temp_draw_jonathan_ax(t_split, time_bins, unit_specific_time_binned_firing_rates, aclu_to_idx, rdf, irdf, show_inter_replay_frs=False, colors=None, fig=None, ax=None, active_aclu:int=0, include_horizontal_labels=True, include_vertical_labels=True, should_render=False):
+def _temp_draw_jonathan_ax(t_split, time_bins, unit_specific_time_binned_firing_rates, aclu_to_idx, rdf, irdf, show_inter_replay_frs=False, colors=None, fig=None, ax=None, active_aclu:int=0, custom_replay_markers=None, include_horizontal_labels=True, include_vertical_labels=True, should_render=False):
     """ Draws the time binned firing rates and the replay firing rates for a single cell
+
+
+        custom_replay_markers
 
     Usage:
 
@@ -444,71 +447,96 @@ def _temp_draw_jonathan_ax(t_split, time_bins, unit_specific_time_binned_firing_
     if colors is None:
         colors = plt.rcParams['axes.prop_cycle'].by_key()['color'];
 
-
     show_replay_neuron_participation_distribution_labels = False
     # print(f"selected neuron has index: {index} aclu: {active_aclu}")
 
     # this redraws ax
     ax.clear()
 
-    plot_replays_kwargs = {}
-    secondary_plot_replays_kwargs = None
-
     is_aclu_active_in_replay = np.array([active_aclu in replay_active_aclus for replay_active_aclus in rdf.active_aclus]) # .shape (743,)
 
-    centers = (rdf["start"] + rdf["end"])/2
+    centers = (rdf["start"].values + rdf["end"].values)/2
     heights = make_fr(rdf)[:, aclu_to_idx[active_aclu]]
 
-    if 'neuron_type_distribution_color_RGB' in rdf.columns:
-        # direct color mode:
-        # plot_replays_kwargs['c'] = rdf.neuron_type_distribution_color.values.tolist()
-        # plot_replays_kwargs['edgecolors'] = 'black'
-        # plot_replays_kwargs = {
-        #     'marker':'o',
-        #     's': 5,
-        #     'c': rdf.neuron_type_distribution_color_RGB.values.tolist(),
-        #     # 'edgecolors': 'black',
-        #     # 'linewidths': 2.0,
-        #     # 'fillstyle': 'left'
-        # }
-        # scalar colors with colormap mode:
-        # plot_replays_kwargs['cmap'] = 'PiYG' # 'coolwarm' # 'PiYG'
-        # plot_replays_kwargs['edgecolors'] = 'black'
+    if custom_replay_markers is not None:
+        ### New 2022-11-28 Custom Scatter Marker Mode (using `custom_replay_markers`):
+        assert isinstance(custom_replay_markers, list)
+        for replay_idx, curr_out_plot_kwargs in enumerate(custom_replay_markers):
+            # if replay_idx < 5:
+            if True:
+                for i, out_plot_kwarg in enumerate(curr_out_plot_kwargs):
+                    # this should be only the two separate paths to be plotted
+                    ax.plot(centers[replay_idx], heights[replay_idx], markersize=6, **out_plot_kwarg)
+    else:
+        plot_replays_kwargs = {}
+        extra_plots_replays_kwargs_list = None
+        if 'neuron_type_distribution_color_RGB' in rdf.columns:
+            ### Single-SCATTER MODE:
+            # direct color mode:
+            # plot_replays_kwargs['c'] = rdf.neuron_type_distribution_color.values.tolist()
+            # plot_replays_kwargs['edgecolors'] = 'black'
+            # plot_replays_kwargs = {
+            #     'marker':'o',
+            #     's': 5,
+            #     'c': rdf.neuron_type_distribution_color_RGB.values.tolist(),
+            #     # 'edgecolors': 'black',
+            #     # 'linewidths': 2.0,
+            #     # 'fillstyle': 'left'
+            # }
+            # scalar colors with colormap mode:
+            # plot_replays_kwargs['cmap'] = 'PiYG' # 'coolwarm' # 'PiYG'
+            # plot_replays_kwargs['edgecolors'] = 'black'
 
-        # edge indicator mode:
-        plot_replays_kwargs = {'marker':'o',
-            's': 5,
-            'c': 'black',
-            'edgecolors': rdf.neuron_type_distribution_color_RGB.values.tolist(),
-            'linewidths': 5,
-            'alpha': 0.5
-            # 'fillstyle': 'left'
-        }
-
-        # double stroke mode:
-        # secondary_filled_marker_style = dict(marker='o', linestyle=None, markersize=15,
-        #                    color='darkgrey',
-        #                    markerfacecolor='tab:blue',
-        #                    markerfacecoloralt='lightsteelblue',
-        #                    markeredgecolor='brown')
-
-        # secondary_plot_replays_kwargs = {#'c':'black',
-        #     's': 2,
-        #     'facecolors': 'none',
-        #     'edgecolors': rdf.neuron_type_distribution_color_RGB.values.tolist(),
-        #     'linewidths': 2.0,
-        #     'fillstyle': secondary_filled_marker_style,
-        #     'alpha': 0.5
-        # }
-
-        # NOTE: 'markeredgewidth' was renamed to 'linewidths'
+            # edge indicator mode:
+            plot_replays_kwargs = {'marker':'o',
+                's': 5,
+                'c': 'black',
+                'edgecolors': rdf.neuron_type_distribution_color_RGB.values.tolist(),
+                'linewidths': 5,
+                'alpha': 0.5
+                # 'fillstyle': 'left'
+            }
 
 
-        
-    # ax.plot(centers, heights, '.', **plot_replays_kwargs)
-    ax.scatter(centers, heights, **plot_replays_kwargs)
-    if secondary_plot_replays_kwargs is not None:
-        ax.scatter(centers, heights, **secondary_plot_replays_kwargs) # double stroke style
+            ### MULTI-SCATTER MODE:
+            plot_replays_kwargs = {'marker':'o',
+                's': _marker_shared,
+                'c': 'black',
+                'edgecolors': rdf.neuron_type_distribution_color_RGB.values.tolist(),
+                'linewidths': 5,
+                'alpha': 0.1
+                # 'fillstyle': 'left'
+            }
+
+            secondary_plot_replays_kwargs = {#'c':'black',
+                's': _marker_shared+_marker_long_only,
+                'c': 'green',
+                # 'facecolors': 'none',
+                # 'edgecolors': 'g',
+                # 'linewidths': 2.0,
+                'alpha': 0.9
+            }
+
+            third_plot_replays_kwargs = {#'c':'black',
+                's': _marker_shared+_marker_long_only+_marker_short_only,
+                'c': 'red',
+                # 'facecolors': 'none',
+                # 'edgecolors': 'g',
+                # 'linewidths': 2.0,
+                'alpha': 0.9
+            }
+
+            extra_plots_replays_kwargs_list = [secondary_plot_replays_kwargs, third_plot_replays_kwargs]
+            # NOTE: 'markeredgewidth' was renamed to 'linewidths'
+            # ax.plot(centers, heights, '.', **plot_replays_kwargs)
+            ax.scatter(centers, heights, **plot_replays_kwargs)
+            if extra_plots_replays_kwargs_list is not None:
+                for curr_plot_kwargs in extra_plots_replays_kwargs_list:
+                    ax.scatter(centers, heights, **curr_plot_kwargs) # double stroke style
+                    # for plot command instead of scatter
+                    # curr_plot_kwargs['markersize'] = curr_plot_kwargs.popitem('s', None)
+                    # ax.plot(centers, heights, **curr_plot_kwargs) # double stroke style
+
 
     if show_replay_neuron_participation_distribution_labels:
         n_replays = np.shape(rdf)[0]
@@ -711,9 +739,11 @@ def _plot_pho_jonathan_batch_plot_single_cell(t_split, time_bins, unit_specific_
     curr_ax_cell_label.text(0.5, 0.5, short_title_string, transform=curr_ax_cell_label.transAxes, **title_axes_kwargs)
     curr_ax_cell_label.axis('off')
 
+    custom_replay_scatter_markers_plot_kwargs_list = kwargs.pop('custom_replay_scatter_markers_plot_kwargs_list', None)
+
     ## New ax[0,1] draw method:
     _temp_draw_jonathan_ax(t_split, time_bins, unit_specific_time_binned_firing_rates, rdf_aclu_to_idx, rdf, irdf, show_inter_replay_frs=show_inter_replay_frs, colors=colors, fig=curr_fig, ax=curr_ax_firing_rate, active_aclu=aclu,
-                        include_horizontal_labels=False, include_vertical_labels=False, should_render=False)
+                        include_horizontal_labels=False, include_vertical_labels=False, should_render=False, custom_replay_markers=custom_replay_scatter_markers_plot_kwargs_list)
     # curr_ax_firing_rate includes only bottom and left spines, and only y-axis ticks and labels
     curr_ax_firing_rate.set_xticklabels([])
     curr_ax_firing_rate.spines['top'].set_visible(False)
@@ -952,8 +982,9 @@ def _make_pho_jonathan_batch_plots(t_split, time_bins, neuron_replay_stats_df, u
     # out_scatter_marker_paths_array = [_build_marker(long, shared, short, long_to_short_balance, is_tri_mode=False)[1] for long, shared, short, long_to_short_balance in list(zip(_percent_long_only, _percent_shared, _percent_short_only, _long_to_short_balances))]
     # out_scatter_marker_paths_array
 
-    out_custom_replay_scatter_markers_plot_kwargs_list = build_replays_custom_scatter_markers(rdf, debug_print=debug_print)
-
+    # Build custom replay markers:
+    custom_replay_scatter_markers_plot_kwargs_list = build_replays_custom_scatter_markers(rdf, debug_print=debug_print)
+    kwargs['custom_replay_scatter_markers_plot_kwargs_list'] = custom_replay_scatter_markers_plot_kwargs_list
 
     axs_list = []
 
