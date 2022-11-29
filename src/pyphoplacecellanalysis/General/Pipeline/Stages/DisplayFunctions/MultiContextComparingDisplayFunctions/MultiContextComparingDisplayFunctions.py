@@ -154,9 +154,30 @@ class MultiContextComparingDisplayFunctions(AllFunctionEnumeratingMixin, metacla
             assert len(include_whitelist) > 2
             global_epoch_name = include_whitelist[-1] # 'maze_PYR'
             print(f'include_whitelist: {include_whitelist}\nlong_epoch_name: {long_epoch_name}, short_epoch_name: {short_epoch_name}, global_epoch_name: {global_epoch_name}')
+
+            ## TODO: move this computation elsewhere, this is BAD:
+            long_results = computation_results[long_epoch_name]
+            short_results = computation_results[short_epoch_name]
+            global_results = computation_results[global_epoch_name]
+        
+            ## Add three columns to global_results.sess.spikes_df, indicating whether each spike is included in the filtered_spikes_df for the (long, short, global) pf1Ds
+            if 'is_included_long_pf1D' not in global_results.sess.spikes_df.columns:
+                global_results.sess.spikes_df['is_included_long_pf1D'] = False
+                global_results.sess.spikes_df.loc[np.isin(global_results.sess.spikes_df.index, long_results.computed_data.pf1D.filtered_spikes_df.index),'is_included_long_pf1D'] = True
+            if 'is_included_short_pf1D' not in global_results.sess.spikes_df.columns:
+                global_results.sess.spikes_df['is_included_short_pf1D'] = False
+                global_results.sess.spikes_df.loc[np.isin(global_results.sess.spikes_df.index, short_results.computed_data.pf1D.filtered_spikes_df.index),'is_included_short_pf1D'] = True
+            if 'is_included_global_pf1D' not in global_results.sess.spikes_df.columns:
+                global_results.sess.spikes_df['is_included_global_pf1D'] = False
+                global_results.sess.spikes_df.loc[np.isin(global_results.sess.spikes_df.index, global_results.computed_data.pf1D.filtered_spikes_df.index),'is_included_global_pf1D'] = True
+
+            # cell_spikes_dfs_list, aclu_to_fragile_linear_idx_map = _build_spikes_df_interpolated_props(global_results) # cell_spikes_dfs_list is indexed by aclu_to_fragile_linear_idx_map
+            cell_spikes_dfs_dict, aclu_to_fragile_linear_idx_map = _build_spikes_df_interpolated_props(global_results) # cell_spikes_dfs_list is indexed by aclu_to_fragile_linear_idx_map
+            time_variable_name = global_results.sess.spikes_df.spikes.time_variable_name
+
             # pf1d_long = computation_results[long_epoch_name]['computed_data']['pf1D']
             # pf1d_short = computation_results[short_epoch_name]['computed_data']['pf1D']
-            pf1D_all = computation_results[global_epoch_name]['computed_data']['pf1D'] # passed to _make_pho_jonathan_batch_plots(t_split, ...)
+            pf1D_all = global_results['computed_data']['pf1D'] # passed to _make_pho_jonathan_batch_plots(t_split, ...)
 
             ## Proper global-computations based way:
             sess = owning_pipeline_reference.sess
@@ -179,9 +200,10 @@ class MultiContextComparingDisplayFunctions(AllFunctionEnumeratingMixin, metacla
             show_inter_replay_frs = kwargs.get('show_inter_replay_frs', True)
             included_unit_neuron_IDs = kwargs.get('included_unit_neuron_IDs', None)
 
-            
-            graphics_output_dict = _make_pho_jonathan_batch_plots(t_split, time_bins, neuron_replay_stats_df, time_binned_unit_specific_binned_spike_rate, pf1D_all, aclu_to_idx, rdf, irdf, show_inter_replay_frs=show_inter_replay_frs, n_max_plot_rows=n_max_plot_rows, included_unit_neuron_IDs=included_unit_neuron_IDs)
-            graphics_output_dict['plot_data'] = {'df': neuron_replay_stats_df, 'rdf':rdf, 'aclu_to_idx':aclu_to_idx, 'irdf':irdf, 'time_binned_unit_specific_spike_rate': global_computation_results.computed_data['jonathan_firing_rate_analysis']['time_binned_unit_specific_spike_rate']}
+            graphics_output_dict = _make_pho_jonathan_batch_plots(t_split, time_bins, neuron_replay_stats_df, time_binned_unit_specific_binned_spike_rate, pf1D_all, aclu_to_idx, rdf, irdf,
+                show_inter_replay_frs=show_inter_replay_frs, n_max_plot_rows=n_max_plot_rows, included_unit_neuron_IDs=included_unit_neuron_IDs, cell_spikes_dfs_dict=cell_spikes_dfs_dict, time_variable_name=time_variable_name)
+            graphics_output_dict['plot_data'] = {'df': neuron_replay_stats_df, 'rdf':rdf, 'aclu_to_idx':aclu_to_idx, 'irdf':irdf, 'time_binned_unit_specific_spike_rate': global_computation_results.computed_data['jonathan_firing_rate_analysis']['time_binned_unit_specific_spike_rate'],
+                'time_variable_name':time_variable_name}
 
             return graphics_output_dict
 
@@ -721,7 +743,7 @@ def _build_spikes_df_interpolated_props(global_results):
     # Group by the aclu (cluster indicator) column
     cell_grouped_spikes_df = global_results.sess.spikes_df.groupby(['aclu'])
     cell_spikes_dfs = [cell_grouped_spikes_df.get_group(a_neuron_id) for a_neuron_id in global_results.sess.spikes_df.spikes.neuron_ids] # a list of dataframes for each neuron_id
-
+    aclu_to_fragile_linear_idx_map = {a_neuron_id:i for i, a_neuron_id in enumerate(global_results.sess.spikes_df.spikes.neuron_ids)}
     # get position variables usually used within pfND.setup(...) - self.t, self.x, self.y:
     ndim = global_results.computed_data.pf1D.ndim
     pos_df = global_results.computed_data.pf1D.filtered_pos_df
@@ -732,7 +754,7 @@ def _build_spikes_df_interpolated_props(global_results):
     else:
         y = None
 
-    spk_pos, spk_t = [], []
+    # spk_pos, spk_t = [], []
     # re-interpolate given the updated spks
     for cell_df in cell_spikes_dfs:
         cell_spike_times = cell_df[global_results.sess.spikes_df.spikes.time_variable_name].to_numpy()
@@ -743,16 +765,18 @@ def _build_spikes_df_interpolated_props(global_results):
         if (ndim > 1):
             spk_y = np.interp(cell_spike_times, t, y) # TODO: shouldn't we already have interpolated spike times for all spikes in the dataframe?
             cell_df.loc[:, 'y'] = spk_y
-            spk_pos.append([spk_x, spk_y])        
-        else:
-            # otherwise only 1D:
-            spk_pos.append([spk_x])
+            # spk_pos.append([spk_x, spk_y])        
+        # else:
+        #     # otherwise only 1D:
+        #     spk_pos.append([spk_x])
             
-        spk_t.append(cell_spike_times)
+        # spk_t.append(cell_spike_times)
 
     # spk_pos[0][0].shape # (214,)
     # returns (spk_t, spk_pos) arrays that can be used to plot spikes
-    return cell_grouped_spikes_df, cell_spikes_dfs #, (spk_t, spk_pos)
+    # return cell_spikes_dfs_list, aclu_to_fragile_linear_idx_map #, (spk_t, spk_pos)
+    return {a_neuron_id:cell_spikes_dfs[i] for i, a_neuron_id in enumerate(global_results.sess.spikes_df.spikes.neuron_ids)}, aclu_to_fragile_linear_idx_map # return a dict instead
+
 
 def _simple_plot_spikes(ax, a_spk_t, a_spk_pos, spikes_color_RGB=(1, 0, 0), spikes_alpha=0.2):
     spikes_color_RGBA = [*spikes_color_RGB, spikes_alpha]
@@ -760,8 +784,8 @@ def _simple_plot_spikes(ax, a_spk_t, a_spk_pos, spikes_color_RGB=(1, 0, 0), spik
     ax.plot(a_spk_t, a_spk_pos, color=spikes_color_RGBA, **(spike_plot_kwargs or {})) # , color=[*spikes_color, spikes_alpha]
     return ax
 
-def _plot_general_all_spikes(ax_activity_v_time, active_spikes_df, time_variable_name='t'):
-    """ 
+def _plot_general_all_spikes(ax_activity_v_time, active_spikes_df, time_variable_name='t', defer_render=True):
+    """ Plots all spikes for a given cell
     Usage:
 
         curr_aclu_axs = axs[-2]
@@ -785,6 +809,10 @@ def _plot_general_all_spikes(ax_activity_v_time, active_spikes_df, time_variable
 
     active_short_spikes_df = active_spikes_df[active_spikes_df.is_included_short_pf1D]
     ax_activity_v_time = _simple_plot_spikes(ax_activity_v_time, active_short_spikes_df[time_variable_name].values, active_short_spikes_df['x'].values, spikes_color_RGB=(0, 0, 1), spikes_alpha=1.0)
+
+    if not defer_render:
+        fig = ax_activity_v_time.get_figure().get_figure() # For SubFigure
+        fig.canvas.draw()
 
     return ax_activity_v_time
 
@@ -858,7 +886,17 @@ def _plot_pho_jonathan_batch_plot_single_cell(t_split, time_bins, unit_specific_
     if cell_linear_fragile_IDX is None:
         print(f'WARNING: aclu {aclu} is not present in the pf1D_all ratemaps. Which contain aclus: {pf1D_all.ratemap.neuron_ids}')
     _ = plot_1D_placecell_validation(pf1D_all, cell_linear_fragile_IDX, extant_fig=curr_fig, extant_axes=(curr_ax_lap_spikes, curr_ax_placefield),
-            **({'should_include_labels': False, 'should_plot_spike_indicator_points_on_placefield': False, 'spike_indicator_lines_alpha': 0.2, 'spikes_color':(0.1, 0.1, 0.1), 'spikes_alpha':0.5} | kwargs))
+            **({'should_include_labels': False, 'should_plot_spike_indicator_points_on_placefield': False, 'spike_indicator_lines_alpha': 0.2, 'spikes_color':(0.1, 0.1, 0.1), 'spikes_alpha':0.1} | kwargs))
+
+    # Custom All Spikes
+    cell_spikes_dfs_dict = kwargs.get('cell_spikes_dfs_dict', None)
+    time_variable_name = kwargs.get('time_variable_name', None)
+    if cell_spikes_dfs_dict is not None:
+        assert time_variable_name is not None, f"if cell_spikes_dfs_dict is passed time_variable_name must also be passed"
+        # active_spikes_df = cell_spikes_dfs[cellind]
+        active_spikes_df = cell_spikes_dfs_dict[aclu]
+        curr_ax_lap_spikes = _plot_general_all_spikes(curr_ax_lap_spikes, active_spikes_df, time_variable_name=time_variable_name, defer_render=True)
+
     t_start, t_end = curr_ax_lap_spikes.get_xlim()
     curr_ax_firing_rate.set_xlim((t_start, t_end)) # We don't want to clip to only the spiketimes for this cell, we want it for all cells, or even when the recording started/ended
     curr_ax_lap_spikes.sharex(curr_ax_firing_rate) # Sync the time axes of the laps and the firing rates
@@ -908,6 +946,11 @@ def _make_pho_jonathan_batch_plots(t_split, time_bins, neuron_replay_stats_df, u
     custom_replay_scatter_markers_plot_kwargs_list = build_replays_custom_scatter_markers(rdf, debug_print=debug_print)
     kwargs['custom_replay_scatter_markers_plot_kwargs_list'] = custom_replay_scatter_markers_plot_kwargs_list
 
+
+    # # Build all spikes interpolated positions/dfs:
+    # cell_spikes_dfs_dict = kwargs.get('cell_spikes_dfs_dict', None)
+    # cell_grouped_spikes_df, cell_spikes_dfs = _build_spikes_df_interpolated_props(global_results)
+
     axs_list = []
 
     ## IDEA: to change the display order, keep `_temp_aclu_to_fragile_linear_neuron_IDX` the same and just modify the order of aclu values iterated over
@@ -930,7 +973,6 @@ def _make_pho_jonathan_batch_plots(t_split, time_bins, neuron_replay_stats_df, u
         except Exception as e:
             # Unhandled exception
             raise e
-
         
         curr_single_cell_out_dict = _plot_pho_jonathan_batch_plot_single_cell(t_split, time_bins, unit_specific_time_binned_firing_rates, pf1D_all, aclu_to_idx, rdf, irdf, show_inter_replay_frs, _temp_aclu_to_fragile_linear_neuron_IDX, aclu, curr_fig, colors, debug_print=debug_print, **kwargs)
 

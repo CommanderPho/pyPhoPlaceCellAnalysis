@@ -171,7 +171,7 @@ def plot_1D_placecell_validation(active_epoch_placefields1D, placefield_cell_ind
     # spikes_color=(0, 0, 0.8), spikes_alpha=0.5
     spikes_color_RGB = kwargs.get('spikes_color', (0, 0, 0))
     spikes_alpha = kwargs.get('spikes_alpha', 0.8)
-    print(f'spikes_color: {spikes_color_RGB}')
+    # print(f'spikes_color: {spikes_color_RGB}')
     spike_indicator_lines_alpha = kwargs.get('spike_indicator_lines_alpha', 1.0)
     spike_indcator_lines_linewidth = kwargs.get('spike_indcator_lines_linewidth', 0.3)
     should_plot_bins_grid = kwargs.get('should_plot_bins_grid', False)
