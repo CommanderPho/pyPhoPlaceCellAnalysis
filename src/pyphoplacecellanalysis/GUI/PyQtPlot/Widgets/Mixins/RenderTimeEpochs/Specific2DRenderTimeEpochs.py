@@ -305,4 +305,10 @@ class NewRipples_2DRenderTimeEpochs(General2DRenderTimeEpochs):
         return _add_interval_dataframe_visualization_columns_general_epoch
         
 
+def inline_mkColor(color, alpha=1.0):
+    """ helps build a new QColor for a pen/brush in an inline (single-line) way. """
+    out_color = pg.mkColor(color)
+    out_color.setAlphaF(alpha)
+    return out_color
+
 """ HISTORICAL NOTE: Specific2DRenderTimeEpochsHelper has been removed in favor of a class-based approach """
