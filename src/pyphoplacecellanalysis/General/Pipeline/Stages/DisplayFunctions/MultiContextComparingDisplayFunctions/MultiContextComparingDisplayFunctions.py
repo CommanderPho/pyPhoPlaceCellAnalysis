@@ -453,7 +453,7 @@ def _temp_draw_jonathan_ax(t_split, time_bins, unit_specific_time_binned_firing_
     # this redraws ax
     ax.clear()
 
-    plot_replays_kwargs = {'alpha': 0.5}
+    plot_replays_kwargs = {}
     is_aclu_active_in_replay = np.array([active_aclu in replay_active_aclus for replay_active_aclus in rdf.active_aclus]) # .shape (743,)
     centers = (rdf["start"].values + rdf["end"].values)/2
     heights = make_fr(rdf)[:, aclu_to_idx[active_aclu]]
@@ -466,7 +466,7 @@ def _temp_draw_jonathan_ax(t_split, time_bins, unit_specific_time_binned_firing_
             if is_aclu_active_in_replay[replay_idx]:
                 for i, out_plot_kwarg in enumerate(curr_out_plot_kwargs):
                     # this should be only iterate through the two separate paths to be plotted
-                    ax.plot(centers[replay_idx], heights[replay_idx], markersize=6, **out_plot_kwarg)
+                    ax.plot(centers[replay_idx], heights[replay_idx], markersize=5, **out_plot_kwarg)
             else:
                 # don't do the fancy custom makers for the inactive (zero firing for this aclu) replay points:
                 ax.scatter(centers, heights, **plot_replays_kwargs)
