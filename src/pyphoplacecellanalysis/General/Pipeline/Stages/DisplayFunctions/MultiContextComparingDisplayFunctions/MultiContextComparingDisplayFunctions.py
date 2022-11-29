@@ -475,7 +475,7 @@ def _temp_draw_jonathan_ax(t_split, time_bins, unit_specific_time_binned_firing_
             if is_aclu_active_in_replay[replay_idx]:
                 for i, out_plot_kwarg in enumerate(curr_out_plot_kwargs):
                     # this should be only iterate through the two separate paths to be plotted
-                    ax.plot(centers[replay_idx], heights[replay_idx], markersize=5, **out_plot_kwarg)
+                    ax.plot(centers[replay_idx], heights[replay_idx], markersize=5, **out_plot_kwarg, zorder=7)
             else:
                 # don't do the fancy custom makers for the inactive (zero firing for this aclu) replay points:
                 plot_replays_kwargs = {
@@ -483,8 +483,8 @@ def _temp_draw_jonathan_ax(t_split, time_bins, unit_specific_time_binned_firing_
                     's': 3,
                     'c': 'black'
                 }
-                ax.scatter(centers, heights, **plot_replays_kwargs)
-                pass # don't plot at all
+                ax.scatter(centers, heights, **plot_replays_kwargs, zorder=5)
+                # pass # don't plot at all
 
     else:
         
@@ -541,7 +541,7 @@ def _temp_draw_jonathan_ax(t_split, time_bins, unit_specific_time_binned_firing_
             ax.scatter(centers, heights, **plot_replays_kwargs)
             if extra_plots_replays_kwargs_list is not None:
                 for curr_plot_kwargs in extra_plots_replays_kwargs_list:
-                    ax.scatter(centers, heights, **curr_plot_kwargs) # double stroke style
+                    ax.scatter(centers, heights, **curr_plot_kwargs, zorder=5) # double stroke style
                     # for plot command instead of scatter
                     # curr_plot_kwargs['markersize'] = curr_plot_kwargs.popitem('s', None)
                     # ax.plot(centers, heights, **curr_plot_kwargs) # double stroke style
@@ -563,7 +563,7 @@ def _temp_draw_jonathan_ax(t_split, time_bins, unit_specific_time_binned_firing_
         # this would show the inter-replay firing times in orange it's frankly distracting
         centers = (irdf["start"] + irdf["end"])/2
         heights = make_fr(irdf)[:, aclu_to_idx[active_aclu]]
-        ax.plot(centers, heights, '.', color=colors[1]+"80")
+        ax.plot(centers, heights, '.', color=colors[1]+"80", zorder=4)
 
     if include_horizontal_labels:
         ax.set_title(f"Replay firing rates for neuron {active_aclu}")
@@ -578,15 +578,21 @@ def _temp_draw_jonathan_ax(t_split, time_bins, unit_specific_time_binned_firing_
         v = unit_specific_time_binned_firing_rates[active_aclu].to_numpy() # index directly by ACLU
         if v is not None:
             # Plot the continuous firing rates
-            ax.plot(t, v, color='#aaaaff8c') # this color is a translucent lilac (purple) color)
+            ax.plot(t, v, color='#aaaaff8c', zorder=2) # this color is a translucent lilac (purple) color)
     except KeyError:
         print(f'non-placefield neuron. Skipping.')
         t, v = None, None
         pass
 
-    required_epoch_bar_height = ax.get_ylim()[-1]
+
+    # Highlight the two epochs with their characteristic colors ['r','b'] - ideally this would be at the very back
+    x_start, x_stop = ax.get_xlim()
+    ax.axvspan(x_start, t_split, color='red', alpha=0.2, zorder=0)
+    ax.axvspan(t_split, x_stop, color='blue', alpha=0.2, zorder=0)
+
     # Draw the vertical epoch splitter line:
-    ax.vlines(t_split, ymin = 0, ymax=required_epoch_bar_height, color=(0,0,0,.25))
+    required_epoch_bar_height = ax.get_ylim()[-1]
+    ax.vlines(t_split, ymin = 0, ymax=required_epoch_bar_height, color=(0,0,0,.25), zorder=25) # divider should be in very front
 
     if should_render:
         if fig is None:
