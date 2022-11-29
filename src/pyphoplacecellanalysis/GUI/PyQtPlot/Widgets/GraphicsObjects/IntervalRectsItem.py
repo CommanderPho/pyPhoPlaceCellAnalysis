@@ -332,10 +332,10 @@ def main():
     
     item = IntervalRectsItem(data)
 
-    item.setFlag(QGraphicsItem.ItemIsMovable)
+    item.setFlag(QtGui.QGraphicsItem.ItemIsMovable)
     plt = pg.plot()
     plt.addItem(item)
-    plt.setWindowTitle('pyqtgraph example: customGraphicsItem')
+    plt.setWindowTitle('pyqtgraph example: IntervalRectsItem')
     
 if __name__ == '__main__':
     

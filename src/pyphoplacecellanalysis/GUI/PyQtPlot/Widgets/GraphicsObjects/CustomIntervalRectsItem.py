@@ -409,7 +409,7 @@ def main():
     item.setFlag(QtGui.QGraphicsItem.ItemIsMovable)
     plt = pg.plot()
     plt.addItem(item)
-    plt.setWindowTitle('pyqtgraph example: customGraphicsItem')
+    plt.setWindowTitle('pyqtgraph example: CustomIntervalRectsItem')
     
 if __name__ == '__main__':
     
