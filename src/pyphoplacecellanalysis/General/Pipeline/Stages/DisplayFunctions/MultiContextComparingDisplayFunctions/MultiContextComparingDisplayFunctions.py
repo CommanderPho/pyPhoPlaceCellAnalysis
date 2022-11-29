@@ -24,8 +24,13 @@ from pyphoplacecellanalysis.Pho2D.PyQtPlots.plot_placefields import pyqtplot_plo
 
 from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.MultiContextComputationFunctions import make_fr
 from pyphoplacecellanalysis.General.Mixins.CrossComputationComparisonHelpers import _compare_computation_results, _find_any_context_neurons, build_neurons_color_map # for plot_short_v_long_pf1D_comparison
+from pyphoplacecellanalysis.General.Mixins.CrossComputationComparisonHelpers import build_replays_custom_scatter_markers # used in _make_pho_jonathan_batch_plots
+from pyphoplacecellanalysis.General.Mixins.CrossComputationComparisonHelpers import _build_neuron_type_distribution_color # used in _make_pho_jonathan_batch_plots
+
 
 from pyphoplacecellanalysis.PhoPositionalData.plotting.placefield import plot_1D_placecell_validation # for _make_pho_jonathan_batch_plots
+
+
 
 class PlacefieldOverlapMetricMode(Enum):
     """Docstring for PlacefieldOverlapMetricMode."""
@@ -933,8 +938,6 @@ def _plot_pho_jonathan_batch_plot_single_cell(t_split, time_bins, unit_specific_
         
 #     return figures, page_gs, graphics_obj_dicts
 
-from pyphoplacecellanalysis.General.Mixins.CrossComputationComparisonHelpers import build_replays_custom_scatter_markers # used in _make_pho_jonathan_batch_plots
-
 
 def _make_pho_jonathan_batch_plots(t_split, time_bins, neuron_replay_stats_df, unit_specific_time_binned_firing_rates, pf1D_all, aclu_to_idx, rdf, irdf, show_inter_replay_frs=False, included_unit_neuron_IDs=None, n_max_plot_rows:int=4, debug_print=False, **kwargs):
     """ Stacked Jonathan-style firing-rate-across-epochs-plot
@@ -991,6 +994,9 @@ def _make_pho_jonathan_batch_plots(t_split, time_bins, neuron_replay_stats_df, u
 
     # out_scatter_marker_paths_array = [_build_marker(long, shared, short, long_to_short_balance, is_tri_mode=False)[1] for long, shared, short, long_to_short_balance in list(zip(_percent_long_only, _percent_shared, _percent_short_only, _long_to_short_balances))]
     # out_scatter_marker_paths_array
+
+
+    rdf, (_percent_long_only, _percent_shared, _percent_short_only, _percent_short_long_diff) = _build_neuron_type_distribution_color(rdf)
 
     # Build custom replay markers:
     custom_replay_scatter_markers_plot_kwargs_list = build_replays_custom_scatter_markers(rdf, debug_print=debug_print)
