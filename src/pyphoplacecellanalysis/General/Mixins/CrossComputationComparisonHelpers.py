@@ -207,7 +207,7 @@ def _build_neuron_type_distribution_color(rdf):
 ch_rng = lambda x: 2.0*x-1.0 # map from [0, 1] -> [-1, 1] (the space where the paths are built)
 # validation: [ch_rng(v) for v in [0, 0.25, 0.5, 0.75, 1.0]] # [-1.0, -0.5, 0.0, 0.5, 1.0]
 
-def build_replays_custom_scatter_markers(rdf, debug_print=False):
+def build_replays_custom_scatter_markers(rdf, is_tri_mode=False, debug_print=False):
     """ Builds all custom scatter markers for the rdf (replay dataframe), one for each replay
     Usage:
         from pyphoplacecellanalysis.General.Mixins.CrossComputationComparisonHelpers import build_replays_custom_scatter_markers, build_custom_scatter_marker
@@ -230,7 +230,7 @@ def build_replays_custom_scatter_markers(rdf, debug_print=False):
     # custom_markers_dict_list = [_build_marker(long, shared, short, long_to_short_balance, is_tri_mode=False, debug_print=False) for long, shared, short, long_to_short_balance in list(zip(_percent_long_only, _percent_shared, _percent_short_only, _long_to_short_balances))]
     # scatter_plot_kwargs_list, scatter_markerstyles_list, scatter_marker_paths_list = custom_markers_dict_list['plot_kwargs'], custom_markers_dict_list['markerstyles'], custom_markers_dict_list['paths'] # Extract variables from the `custom_markers_dict_list` dictionary to the local workspace
 
-    custom_markers_tuple_list = [_subfn_build_custom_scatter_marker(long, shared, short, long_to_short_balance, is_tri_mode=False, debug_print=False) for long, shared, short, long_to_short_balance in list(zip(_percent_long_only, _percent_shared, _percent_short_only, _long_to_short_balances))]
+    custom_markers_tuple_list = [_subfn_build_custom_scatter_marker(long, shared, short, long_to_short_balance, is_tri_mode=is_tri_mode, debug_print=False) for long, shared, short, long_to_short_balance in list(zip(_percent_long_only, _percent_shared, _percent_short_only, _long_to_short_balances))]
     
 
     out_plot_kwargs_list = [a_tuple[0] for a_tuple in custom_markers_tuple_list]
@@ -310,18 +310,19 @@ def _subfn_build_custom_scatter_marker(long, shared, short, long_to_short_balanc
     
     # Tri-split mode:
     if is_tri_mode:
-        colors = ['r','g','b']
+        # colors = ['r','g','b'] # should these be reversed too since the two-split version are? I assume so.
+        colors = ['b','g','g'] # should these be reversed too since the two-split version are? I assume so.
         cum_long, cum_shared, cum_short = long, (long+shared), (long+shared+short)
         if debug_print:
             print(f'cum_long: {cum_long}, cum_shared: {cum_shared}, cum_short: {cum_short}')
-        
         clip_bboxs = (Bbox(((-1.0, -1.0),(ch_rng(cum_long), 1.0))),
               Bbox(((ch_rng(cum_long), -1.0),(ch_rng(cum_shared), 1.0))),
               Bbox(((ch_rng(cum_shared), -1.0),(ch_rng(cum_short), 1.0))))
 
     else:
         # Two-split mode:
-        colors = ['r','b']
+        # colors = ['r','b'] # OLD: noted that I had to reverse these to make the plot correct, but I'm honestly not sure why. I'm thinking it has to do with the order they are plotted or something
+        colors = ['b','r']
         if debug_print:
             print(f'long_to_short_balance: {long_to_short_balance}')
         clip_bboxs = (Bbox(((-1.0, -1.0),(long_to_short_balance, 1.0))),
@@ -336,7 +337,6 @@ def _subfn_build_custom_scatter_marker(long, shared, short, long_to_short_balanc
     out_markerstyles = [MarkerStyle(mpath.Path.unit_circle().clip_to_bbox(bbox=clip_bbox, inside=True), 'full', t) for i, clip_bbox in enumerate(clip_bboxs)]
     out_plot_kwargs = [dict(marker=m, color=colors[i], linestyle='none') for i, m in enumerate(out_markerstyles)]
 
-    # return {'plot_kwargs':out_plot_kwargs, 'markerstyles': out_markerstyles, 'paths':out_paths}
     return (out_plot_kwargs, out_markerstyles, out_paths)
 
 ##########################
