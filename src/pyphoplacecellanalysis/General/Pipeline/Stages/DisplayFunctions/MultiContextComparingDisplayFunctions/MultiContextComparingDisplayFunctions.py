@@ -453,8 +453,8 @@ def _temp_draw_jonathan_ax(t_split, time_bins, unit_specific_time_binned_firing_
     # this redraws ax
     ax.clear()
 
+    plot_replays_kwargs = {'alpha': 0.5}
     is_aclu_active_in_replay = np.array([active_aclu in replay_active_aclus for replay_active_aclus in rdf.active_aclus]) # .shape (743,)
-
     centers = (rdf["start"].values + rdf["end"].values)/2
     heights = make_fr(rdf)[:, aclu_to_idx[active_aclu]]
 
@@ -463,12 +463,16 @@ def _temp_draw_jonathan_ax(t_split, time_bins, unit_specific_time_binned_firing_
         assert isinstance(custom_replay_markers, list)
         for replay_idx, curr_out_plot_kwargs in enumerate(custom_replay_markers):
             # if replay_idx < 5:
-            if True:
+            if is_aclu_active_in_replay[replay_idx]:
                 for i, out_plot_kwarg in enumerate(curr_out_plot_kwargs):
-                    # this should be only the two separate paths to be plotted
+                    # this should be only iterate through the two separate paths to be plotted
                     ax.plot(centers[replay_idx], heights[replay_idx], markersize=6, **out_plot_kwarg)
+            else:
+                # don't do the fancy custom makers for the inactive (zero firing for this aclu) replay points:
+                ax.scatter(centers, heights, **plot_replays_kwargs)
+
     else:
-        plot_replays_kwargs = {}
+        
         extra_plots_replays_kwargs_list = None
         if 'neuron_type_distribution_color_RGB' in rdf.columns:
             ### Single-SCATTER MODE:
@@ -487,46 +491,36 @@ def _temp_draw_jonathan_ax(t_split, time_bins, unit_specific_time_binned_firing_
             # plot_replays_kwargs['cmap'] = 'PiYG' # 'coolwarm' # 'PiYG'
             # plot_replays_kwargs['edgecolors'] = 'black'
 
-            # edge indicator mode:
+            ### edge indicator mode:
             plot_replays_kwargs = {'marker':'o',
                 's': 5,
                 'c': 'black',
                 'edgecolors': rdf.neuron_type_distribution_color_RGB.values.tolist(),
                 'linewidths': 5,
                 'alpha': 0.5
-                # 'fillstyle': 'left'
             }
 
+            # ### MULTI-SCATTER MODE: this doesn't really work well and wasn't finished.
+            # plot_replays_kwargs = {'marker':'o',
+            #     's': _marker_shared,
+            #     'c': 'black',
+            #     'edgecolors': rdf.neuron_type_distribution_color_RGB.values.tolist(),
+            #     'linewidths': 5,
+            #     'alpha': 0.1
+            # }
+            # secondary_plot_replays_kwargs = {
+            #     's': _marker_shared+_marker_long_only,
+            #     'c': 'green',
+            #     'alpha': 0.9
+            # }
+            # third_plot_replays_kwargs = {
+            #     's': _marker_shared+_marker_long_only+_marker_short_only,
+            #     'c': 'red',
+            #     'alpha': 0.9
+            # }
+            # extra_plots_replays_kwargs_list = [secondary_plot_replays_kwargs, third_plot_replays_kwargs]
 
-            ### MULTI-SCATTER MODE:
-            plot_replays_kwargs = {'marker':'o',
-                's': _marker_shared,
-                'c': 'black',
-                'edgecolors': rdf.neuron_type_distribution_color_RGB.values.tolist(),
-                'linewidths': 5,
-                'alpha': 0.1
-                # 'fillstyle': 'left'
-            }
 
-            secondary_plot_replays_kwargs = {#'c':'black',
-                's': _marker_shared+_marker_long_only,
-                'c': 'green',
-                # 'facecolors': 'none',
-                # 'edgecolors': 'g',
-                # 'linewidths': 2.0,
-                'alpha': 0.9
-            }
-
-            third_plot_replays_kwargs = {#'c':'black',
-                's': _marker_shared+_marker_long_only+_marker_short_only,
-                'c': 'red',
-                # 'facecolors': 'none',
-                # 'edgecolors': 'g',
-                # 'linewidths': 2.0,
-                'alpha': 0.9
-            }
-
-            extra_plots_replays_kwargs_list = [secondary_plot_replays_kwargs, third_plot_replays_kwargs]
             # NOTE: 'markeredgewidth' was renamed to 'linewidths'
             # ax.plot(centers, heights, '.', **plot_replays_kwargs)
             ax.scatter(centers, heights, **plot_replays_kwargs)
