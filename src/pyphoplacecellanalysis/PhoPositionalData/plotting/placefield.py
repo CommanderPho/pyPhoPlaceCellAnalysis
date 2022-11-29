@@ -171,9 +171,10 @@ def plot_1D_placecell_validation(active_epoch_placefields1D, placefield_cell_ind
     feature_range = (0, 1)
     should_plot_spike_indicator_points_on_placefield = kwargs.get('should_plot_spike_indicator_points_on_placefield', True)
     should_plot_spike_indicator_lines_on_trajectory = kwargs.get('should_plot_spike_indicator_lines_on_trajectory', True)
-    # spikes_color = (0, 0, 0.8)
-    spikes_color = kwargs.get('spikes_color', (0, 0, 0))
+    # spikes_color=(0, 0, 0.8), spikes_alpha=0.5
+    spikes_color_RGB = kwargs.get('spikes_color', (0, 0, 0))
     spikes_alpha = kwargs.get('spikes_alpha', 0.8)
+    print(f'spikes_color: {spikes_color_RGB}')
     spike_indicator_lines_alpha = kwargs.get('spike_indicator_lines_alpha', 1.0)
     spike_indcator_lines_linewidth = kwargs.get('spike_indcator_lines_linewidth', 0.3)
     should_plot_bins_grid = kwargs.get('should_plot_bins_grid', False)
@@ -206,11 +207,12 @@ def plot_1D_placecell_validation(active_epoch_placefields1D, placefield_cell_ind
     # spike_marker = 'tri_left' # '3'
     # spike_marker = "TICKLEFT" # 'tickleft'
     # spike_marker = "." # original
-    spike_marker = "_" # 'hline' "CARETRIGHTBASE" 'caretrightbase' 9
+    # spike_marker = "_" # 'hline' "CARETRIGHTBASE" 'caretrightbase' 9
     # spike_plot_kwargs = {'linestyle':'none', 'markersize':6.0, 'marker': "_", 'markerfacecolor':'#55aaffcc', 'markeredgecolor':'#55aaffcc'}
     # spike_plot_kwargs = {'linestyle':'none', 'markersize':2.0, 'marker': 9, 'markerfacecolor':'#1420ffcc', 'markeredgecolor':'#1420ffcc'}
-    spike_plot_kwargs = {'linestyle':'none', 'markersize':5.0, 'marker': '.', 'markerfacecolor':'#1420ffcc', 'markeredgecolor':'#1420ffcc', 'zorder':10}
-    active_epoch_placefields1D.plotRaw_v_time(placefield_cell_index, ax=ax_activity_v_time, spikes_color=spikes_color, spikes_alpha=spikes_alpha, position_plot_kwargs={'color': '#393939c8', 'linewidth': 1.0, 'zorder':5}, spike_plot_kwargs=spike_plot_kwargs, should_include_labels=should_include_labels)
+    # spike_plot_kwargs = {'linestyle':'none', 'markersize':5.0, 'marker': '.', 'markerfacecolor':'#1420ffcc', 'markeredgecolor':'#1420ffcc', 'zorder':10}
+    spike_plot_kwargs = {'linestyle':'none', 'markersize':5.0, 'marker': '.', 'markerfacecolor':spikes_color_RGB, 'markeredgecolor':spikes_color_RGB, 'zorder':10}
+    active_epoch_placefields1D.plotRaw_v_time(placefield_cell_index, ax=ax_activity_v_time, spikes_alpha=spikes_alpha, position_plot_kwargs={'color': '#393939c8', 'linewidth': 1.0, 'zorder':5}, spike_plot_kwargs=spike_plot_kwargs, should_include_labels=should_include_labels) # , spikes_color=spikes_color, spikes_alpha=spikes_alpha
     
     # Title and Subtitle:
     title_string = ' '.join(['pf1D', f'Cell {curr_cell_id:02d}'])
