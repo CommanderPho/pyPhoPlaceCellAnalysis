@@ -161,11 +161,11 @@ class EpochRenderingMixin:
     @QtCore.Slot(object)
     def EpochRenderingMixin_on_interval_datasource_changed(self, datasource):
         """ emit our own custom signal when the general datasource update method returns """
-        print(f'datasource: {datasource.custom_datasource_name}')
+        # print(f'datasource: {datasource.custom_datasource_name}')
         self.add_rendered_intervals(datasource, name=datasource.custom_datasource_name, debug_print=False) # updates the rendered intervals on the change
         
         
-    def add_rendered_intervals(self, interval_datasource, name=None, child_plots=None, debug_print=True):
+    def add_rendered_intervals(self, interval_datasource, name=None, child_plots=None, debug_print=False):
         """ adds or updates the intervals specified by the interval_datasource to the plots 
         
         Inputs: 
@@ -206,14 +206,16 @@ class EpochRenderingMixin:
 
         else:
             # extant_datasource exists!
-            print(f'WARNING: extant_datasource with the name ({name}) already exists. Attempting to update.')
+            if debug_print:
+                print(f'WARNING: extant_datasource with the name ({name}) already exists. Attempting to update.')
             if extant_datasource == interval_datasource:
                 # already the same datasource
-                print(f'\t already the same datasource. Continuing to try and update.')
-                # return
+                if debug_print:
+                    print(f'\t already the same datasource. Continuing to try and update.')
             else:
                 # Otherwise the datasource should be replaced:
-                print(f'\t replacing extant datasource.')
+                if debug_print:
+                    print(f'\t replacing extant datasource.')
                 # TODO: remove plots associated with replaced datasource? DONE: as long as name doesn't change, this is done below
                 # TODO: disconnect the previous datasource from the update signal?
                 self.interval_datasources[name] = interval_datasource
@@ -225,7 +227,7 @@ class EpochRenderingMixin:
         
         # Build the rendered interval item:
         new_interval_rects_item = Render2DEventRectanglesHelper.build_IntervalRectsItem_from_interval_datasource(interval_datasource)
-        new_interval_rects_item.setToolTip(name)
+        new_interval_rects_item.setToolTip(name) # The tooltip is set generically here to 'PBEs', 'Replays' or whatever the dataseries name is
         
         ######### PLOTS:
         if child_plots is None:
@@ -237,7 +239,8 @@ class EpochRenderingMixin:
         extant_rects_plot_items_container = self.rendered_epochs.get(name, None)
         if extant_rects_plot_items_container is not None:
             # extant plot exists!
-            print(f'WARNING: extant_rects_plot_item with the name ({name}) already exists. removing.')
+            if debug_print:
+                print(f'WARNING: extant_rects_plot_item with the name ({name}) already exists. removing.')
             assert isinstance(extant_rects_plot_items_container, RenderedEpochsItemsContainer), f"extant_rects_plot_item must be RenderedEpochsItemsContainer but type(extant_rects_plot_item): {type(extant_rects_plot_items_container)}"
             
             for a_plot in child_plots:
@@ -410,7 +413,7 @@ class EpochRenderingMixin:
     #                                 Class Methods                                #
     # ---------------------------------------------------------------------------- #
     @classmethod
-    def compute_bounds_adjustment_for_rect_item(cls, a_plot, a_rect_item, should_apply_adjustment:bool=True, debug_print=True):
+    def compute_bounds_adjustment_for_rect_item(cls, a_plot, a_rect_item, should_apply_adjustment:bool=True, debug_print=False):
         """ 
         NOTE: 2D Only
         

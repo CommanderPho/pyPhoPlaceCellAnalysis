@@ -175,7 +175,7 @@ class RenderTimeEpoch3DMeshesMixin(EpochRenderingMixin):
 
     
 
-    def add_rendered_intervals(self, interval_datasource, name=None, child_plots=None, debug_print=True, **kwargs):
+    def add_rendered_intervals(self, interval_datasource, name=None, child_plots=None, debug_print=False, **kwargs):
         """ adds the intervals specified by the interval_datasource to the plots 
         
         Inputs: 
@@ -220,14 +220,17 @@ class RenderTimeEpoch3DMeshesMixin(EpochRenderingMixin):
 
         else:
             # extant_datasource exists!
-            print(f'WARNING: extant_datasource with the name ({name}) already exists. Attempting to update.')
+            if debug_print:
+                print(f'WARNING: extant_datasource with the name ({name}) already exists. Attempting to update.')
             if extant_datasource == interval_datasource:
                 # already the same datasource
-                print(f'\t already the same datasource!')
+                if debug_print:
+                    print(f'\t already the same datasource!')
                 return
             else:
                 # Otherwise the datasource should be replaced:
-                print(f'\t replacing extant datasource.')
+                if debug_print:
+                    print(f'\t replacing extant datasource.')
                 # TODO: remove plots associated with replaced datasource
                 self.interval_datasources[name] = interval_datasource
         
@@ -270,7 +273,8 @@ class RenderTimeEpoch3DMeshesMixin(EpochRenderingMixin):
         extant_rects_plot_items_container = self.rendered_epochs.get(name, None)
         if extant_rects_plot_items_container is not None:
             # extant plot exists!
-            print(f'WARNING: extant_rects_plot_item with the name ({name}) already exists. removing.')
+            if debug_print:
+                print(f'WARNING: extant_rects_plot_item with the name ({name}) already exists. removing.')
             assert isinstance(extant_rects_plot_items_container, RenderedEpochsItemsContainer), f"extant_rects_plot_item must be RenderedEpochsItemsContainer but type(extant_rects_plot_item): {type(extant_rects_plot_items_container)}"
             
             for a_plot in child_plots:
