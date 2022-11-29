@@ -899,6 +899,7 @@ def _plot_pho_jonathan_batch_plot_single_cell(t_split, time_bins, unit_specific_
         
 #     return figures, page_gs, graphics_obj_dicts
 
+from pyphoplacecellanalysis.General.Mixins.CrossComputationComparisonHelpers import build_replays_custom_scatter_markers # used in _make_pho_jonathan_batch_plots
 
 
 def _make_pho_jonathan_batch_plots(t_split, time_bins, neuron_replay_stats_df, unit_specific_time_binned_firing_rates, pf1D_all, aclu_to_idx, rdf, irdf, show_inter_replay_frs=False, included_unit_neuron_IDs=None, n_max_plot_rows:int=4, debug_print=False, **kwargs):
@@ -927,6 +928,33 @@ def _make_pho_jonathan_batch_plots(t_split, time_bins, neuron_replay_stats_df, u
     subfigs = fig.subfigures(actual_num_subfigures, 1, wspace=0.07)
     colors = plt.rcParams['axes.prop_cycle'].by_key()['color']
     
+
+    ##########################
+
+    # _long_to_short_balances = rdf['neuron_type_distribution_color_scalar'].values
+
+    # ## Test the building marker for specific aclu:
+
+    # # custom_markers_dict_list = [_build_marker(long, shared, short, long_to_short_balance, is_tri_mode=False, debug_print=False) for long, shared, short, long_to_short_balance in list(zip(_percent_long_only, _percent_shared, _percent_short_only, _long_to_short_balances))]
+    # # scatter_plot_kwargs_list, scatter_markerstyles_list, scatter_marker_paths_list = custom_markers_dict_list['plot_kwargs'], custom_markers_dict_list['markerstyles'], custom_markers_dict_list['paths'] # Extract variables from the `custom_markers_dict_list` dictionary to the local workspace
+
+    # custom_markers_tuple_list = [build_custom_scatter_marker(long, shared, short, long_to_short_balance, is_tri_mode=False, debug_print=False) for long, shared, short, long_to_short_balance in list(zip(_percent_long_only, _percent_shared, _percent_short_only, _long_to_short_balances))]
+    # scatter_markerstyles_list = [a_tuple[1] for a_tuple in custom_markers_tuple_list]
+
+    # # Break into two parts <list<tuple[2]<MarkerStyle>> -> list<MarkerStyle>, List<MarkerStyle>
+    # scatter_markerstyles_0_list = [a_tuple[0] for a_tuple in scatter_markerstyles_list]
+    # scatter_markerstyles_1_list = [a_tuple[1] for a_tuple in scatter_markerstyles_list]
+
+    # len(scatter_markerstyles_0_list) # 743 - n_replays
+    # # out_plot_kwargs_array = [_build_marker(long, shared, short, long_to_short_balance, is_tri_mode=False, debug_print=False)[0] for long, shared, short, long_to_short_balance in list(zip(_percent_long_only, _percent_shared, _percent_short_only, _long_to_short_balances))]
+    # # out_plot_kwargs_array
+
+    # out_scatter_marker_paths_array = [_build_marker(long, shared, short, long_to_short_balance, is_tri_mode=False)[1] for long, shared, short, long_to_short_balance in list(zip(_percent_long_only, _percent_shared, _percent_short_only, _long_to_short_balances))]
+    # out_scatter_marker_paths_array
+
+    out_custom_replay_scatter_markers_plot_kwargs_list = build_replays_custom_scatter_markers(rdf, debug_print=debug_print)
+
+
     axs_list = []
 
     ## IDEA: to change the display order, keep `_temp_aclu_to_fragile_linear_neuron_IDX` the same and just modify the order of aclu values iterated over
