@@ -192,14 +192,14 @@ def _build_neuron_type_distribution_color(rdf):
     
     # Scalar Output Mode
     # _percent_short_long_diff = _percent_short_only - _percent_long_only
-    _percent_short_long_diff = _percent_short_only - _percent_long_only / (_percent_short_only + _percent_long_only)
+    # _short_long_balance_diff = _percent_short_only - _percent_long_only / (_percent_short_only + _percent_long_only) ## Working but (0, 1, 1) would clip to 0.5 despite (1, 13, 0) going all the way down to -1.0
+    _long_to_short_balances = (rdf.num_short_only_neuron_participating.values - rdf.num_long_only_neuron_participating.values) / (rdf.num_short_only_neuron_participating.values + rdf.num_long_only_neuron_participating.values) ## Working but (0, 1, 1) would clip to 0.5 despite (1, 13, 0) going all the way down to -1.0
     # those where (_percent_short_only + _percent_long_only) now have NaN, so call np.nan_to_num(_percent_short_long_diff) to replace these NaNs with zeros to indicate that they are perfectly balanced
-    _percent_short_long_diff = np.nan_to_num(_percent_short_long_diff)
+    _long_to_short_balances = np.nan_to_num(_long_to_short_balances)
     # colors_mat = _percent_short_long_diff
-
     rdf['neuron_type_distribution_color_RGB'] = colors_mat.tolist()
-    rdf['neuron_type_distribution_color_scalar'] = _percent_short_long_diff.tolist()    
-    return rdf, (_percent_long_only, _percent_shared, _percent_short_only, _percent_short_long_diff)
+    rdf['neuron_type_distribution_color_scalar'] = _long_to_short_balances.tolist()    
+    return rdf, (_percent_long_only, _percent_shared, _percent_short_only, _long_to_short_balances)
 
 
 
@@ -223,11 +223,9 @@ def build_replays_custom_scatter_markers(rdf, debug_print=False):
     _percent_shared = rdf.num_shared_neuron_participating.values/rdf.num_neuron_participating.values
     _percent_short_only = rdf.num_short_only_neuron_participating.values/rdf.num_neuron_participating.values
 
-    _long_to_short_balances = _percent_short_only - _percent_long_only / (_percent_short_only + _percent_long_only)
+    _long_to_short_balances = (rdf.num_short_only_neuron_participating.values - rdf.num_long_only_neuron_participating.values) / (rdf.num_short_only_neuron_participating.values + rdf.num_long_only_neuron_participating.values) ## Working but (0, 1, 1) would clip to 0.5 despite (1, 13, 0) going all the way down to -1.0
     # those where (_percent_short_only + _percent_long_only) now have NaN, so call np.nan_to_num(_percent_short_long_diff) to replace these NaNs with zeros to indicate that they are perfectly balanced
     _long_to_short_balances = np.nan_to_num(_long_to_short_balances)
-    # _long_to_short_balances = rdf['neuron_type_distribution_color_scalar'].values
-
 
     # custom_markers_dict_list = [_build_marker(long, shared, short, long_to_short_balance, is_tri_mode=False, debug_print=False) for long, shared, short, long_to_short_balance in list(zip(_percent_long_only, _percent_shared, _percent_short_only, _long_to_short_balances))]
     # scatter_plot_kwargs_list, scatter_markerstyles_list, scatter_marker_paths_list = custom_markers_dict_list['plot_kwargs'], custom_markers_dict_list['markerstyles'], custom_markers_dict_list['paths'] # Extract variables from the `custom_markers_dict_list` dictionary to the local workspace
@@ -324,8 +322,6 @@ def _subfn_build_custom_scatter_marker(long, shared, short, long_to_short_balanc
     else:
         # Two-split mode:
         colors = ['r','b']
-        # _long_to_short_balances = rdf['neuron_type_distribution_color_scalar'].values
-        # long_to_short_balance = _long_to_short_balances[i]
         if debug_print:
             print(f'long_to_short_balance: {long_to_short_balance}')
         clip_bboxs = (Bbox(((-1.0, -1.0),(long_to_short_balance, 1.0))),
