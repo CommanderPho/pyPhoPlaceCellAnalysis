@@ -459,20 +459,30 @@ def _temp_draw_jonathan_ax(t_split, time_bins, unit_specific_time_binned_firing_
     centers = (rdf["start"] + rdf["end"])/2
     heights = make_fr(rdf)[:, aclu_to_idx[active_aclu]]
 
-    if 'neuron_type_distribution_color' in rdf.columns:
+    if 'neuron_type_distribution_color_RGB' in rdf.columns:
         # direct color mode:
         # plot_replays_kwargs['c'] = rdf.neuron_type_distribution_color.values.tolist()
         # plot_replays_kwargs['edgecolors'] = 'black'
-
+        # plot_replays_kwargs = {
+        #     'marker':'o',
+        #     's': 5,
+        #     'c': rdf.neuron_type_distribution_color_RGB.values.tolist(),
+        #     # 'edgecolors': 'black',
+        #     # 'linewidths': 2.0,
+        #     # 'fillstyle': 'left'
+        # }
         # scalar colors with colormap mode:
         # plot_replays_kwargs['cmap'] = 'PiYG' # 'coolwarm' # 'PiYG'
         # plot_replays_kwargs['edgecolors'] = 'black'
 
         # edge indicator mode:
-        plot_replays_kwargs = {'c': 'black',
-        'edgecolors': rdf.neuron_type_distribution_color.values.tolist(),
-        'linewidths': 2.0,
-        'fillstyle': 'left'
+        plot_replays_kwargs = {'marker':'o',
+            's': 5,
+            'c': 'black',
+            'edgecolors': rdf.neuron_type_distribution_color_RGB.values.tolist(),
+            'linewidths': 5,
+            'alpha': 0.5
+            # 'fillstyle': 'left'
         }
 
         # double stroke mode:
@@ -482,17 +492,23 @@ def _temp_draw_jonathan_ax(t_split, time_bins, unit_specific_time_binned_firing_
         #                    markerfacecoloralt='lightsteelblue',
         #                    markeredgecolor='brown')
 
-        # secondary_plot_replays_kwargs = {'c':'black',
-        # 'edgecolors': rdf.neuron_type_distribution_color.values.tolist(),
-        # 'linewidths': 2.0
+        # secondary_plot_replays_kwargs = {#'c':'black',
+        #     's': 2,
+        #     'facecolors': 'none',
+        #     'edgecolors': rdf.neuron_type_distribution_color_RGB.values.tolist(),
+        #     'linewidths': 2.0,
+        #     'fillstyle': secondary_filled_marker_style,
+        #     'alpha': 0.5
         # }
+
+        # NOTE: 'markeredgewidth' was renamed to 'linewidths'
 
 
         
     # ax.plot(centers, heights, '.', **plot_replays_kwargs)
-    ax.scatter(centers, heights, marker='.', s=1, **plot_replays_kwargs)
+    ax.scatter(centers, heights, **plot_replays_kwargs)
     if secondary_plot_replays_kwargs is not None:
-        ax.scatter(centers, heights, marker='.', s=2, **plot_replays_kwargs) # double stroke style
+        ax.scatter(centers, heights, **secondary_plot_replays_kwargs) # double stroke style
 
     if show_replay_neuron_participation_distribution_labels:
         n_replays = np.shape(rdf)[0]
