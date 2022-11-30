@@ -8,6 +8,7 @@ from neuropy.utils.dynamic_container import overriding_dict_with # required for 
 from neuropy.core.neuron_identities import PlotStringBrevityModeEnum # for plot_short_v_long_pf1D_comparison (_display_short_long_pf1D_comparison)
 from neuropy.plotting.figure import Fig # for plot_short_v_long_pf1D_comparison (_display_short_long_pf1D_comparison)
 from neuropy.plotting.ratemaps import plot_ratemap_1D # for plot_short_v_long_pf1D_comparison (_display_short_long_pf1D_comparison)
+from neuropy.utils.matplotlib_helpers import build_or_reuse_figure # used for `_make_pho_jonathan_batch_plots(...)`
 
 from pyphocorehelpers.mixins.member_enumerating import AllFunctionEnumeratingMixin
 from pyphocorehelpers.plotting.figure_management import PhoActiveFigureManager2D # for plot_short_v_long_pf1D_comparison (_display_short_long_pf1D_comparison)
@@ -186,7 +187,7 @@ class MultiContextComparingDisplayFunctions(AllFunctionEnumeratingMixin, metacla
             aclu_to_idx = global_computation_results.computed_data['jonathan_firing_rate_analysis']['rdf']['aclu_to_idx']
             rdf = global_computation_results.computed_data['jonathan_firing_rate_analysis']['rdf']['rdf']
             irdf = global_computation_results.computed_data['jonathan_firing_rate_analysis']['irdf']['irdf']
-            pos_df = global_computation_results.sess.position.to_dataframe()
+            # pos_df = global_computation_results.sess.position.to_dataframe()
             ## time_binned_unit_specific_binned_spike_rate mode:
             time_bins = global_computation_results.computed_data['jonathan_firing_rate_analysis']['time_binned_unit_specific_spike_rate']['time_bins']
             time_binned_unit_specific_binned_spike_rate = global_computation_results.computed_data['jonathan_firing_rate_analysis']['time_binned_unit_specific_spike_rate']['time_binned_unit_specific_binned_spike_rate']
@@ -196,12 +197,14 @@ class MultiContextComparingDisplayFunctions(AllFunctionEnumeratingMixin, metacla
             neuron_replay_stats_df = global_computation_results.computed_data['jonathan_firing_rate_analysis']['neuron_replay_stats_df']
             # compare_firing_rates(rdf, irdf)
 
-            n_max_plot_rows = kwargs.get('n_max_plot_rows', 6)
-            show_inter_replay_frs = kwargs.get('show_inter_replay_frs', True)
-            included_unit_neuron_IDs = kwargs.get('included_unit_neuron_IDs', None)
+            n_max_plot_rows = kwargs.pop('n_max_plot_rows', 6)
+            show_inter_replay_frs = kwargs.pop('show_inter_replay_frs', True)
+            included_unit_neuron_IDs = kwargs.pop('included_unit_neuron_IDs', None)
 
             graphics_output_dict = _make_pho_jonathan_batch_plots(t_split, time_bins, neuron_replay_stats_df, time_binned_unit_specific_binned_spike_rate, pf1D_all, aclu_to_idx, rdf, irdf,
-                show_inter_replay_frs=show_inter_replay_frs, n_max_plot_rows=n_max_plot_rows, included_unit_neuron_IDs=included_unit_neuron_IDs, cell_spikes_dfs_dict=cell_spikes_dfs_dict, time_variable_name=time_variable_name)
+                show_inter_replay_frs=show_inter_replay_frs, n_max_plot_rows=n_max_plot_rows, included_unit_neuron_IDs=included_unit_neuron_IDs, cell_spikes_dfs_dict=cell_spikes_dfs_dict, time_variable_name=time_variable_name, **kwargs)
+
+
             graphics_output_dict['plot_data'] = {'df': neuron_replay_stats_df, 'rdf':rdf, 'aclu_to_idx':aclu_to_idx, 'irdf':irdf, 'time_binned_unit_specific_spike_rate': global_computation_results.computed_data['jonathan_firing_rate_analysis']['time_binned_unit_specific_spike_rate'],
                 'time_variable_name':time_variable_name}
 
@@ -472,6 +475,9 @@ def _temp_draw_jonathan_ax(t_split, time_bins, unit_specific_time_binned_firing_
 
     Historical:
         used to take sess: DataSession as first argument and then access `sess.paradigm[0][0,1]` internally. On 2022-11-27 refactored to take this time `t_split` directly and no longer require session
+
+    TODO:
+        The `colors` argument is only used to plot the irdf (which only happens if `show_inter_replay_frs == True`), and seems uneeded. Could be removed through entire call-tree.
 
     """
     assert ax is not None
@@ -785,7 +791,7 @@ def _simple_plot_spikes(ax, a_spk_t, a_spk_pos, spikes_color_RGB=(1, 0, 0), spik
     return ax
 
 def _plot_general_all_spikes(ax_activity_v_time, active_spikes_df, time_variable_name='t', defer_render=True):
-    """ Plots all spikes for a given cell
+    """ Plots all spikes for a given cell from that cell's complete `active_spikes_df`
     Usage:
 
         curr_aclu_axs = axs[-2]
@@ -819,7 +825,7 @@ def _plot_general_all_spikes(ax_activity_v_time, active_spikes_df, time_variable
 
 def _plot_pho_jonathan_batch_plot_single_cell(t_split, time_bins, unit_specific_time_binned_firing_rates, pf1D_all, rdf_aclu_to_idx, rdf, irdf, show_inter_replay_frs, pf1D_aclu_to_idx, aclu, curr_fig, colors, debug_print=False, **kwargs):
     """ Plots a single cell's plots for a stacked Jonathan-style firing-rate-across-epochs-plot
-    Internally calls `plot_1D_placecell_validation` and `_temp_draw_jonathan_ax`
+    Internally calls `plot_1D_placecell_validation`, `_temp_draw_jonathan_ax`, and `_plot_general_all_spikes`
 
     Used by:
         `_make_pho_jonathan_batch_plots`
@@ -906,6 +912,8 @@ def _plot_pho_jonathan_batch_plot_single_cell(t_split, time_bins, unit_specific_
 
 
 
+
+
 def _make_pho_jonathan_batch_plots(t_split, time_bins, neuron_replay_stats_df, unit_specific_time_binned_firing_rates, pf1D_all, aclu_to_idx, rdf, irdf, show_inter_replay_frs=False, included_unit_neuron_IDs=None, n_max_plot_rows:int=4, debug_print=False, **kwargs):
     """ Stacked Jonathan-style firing-rate-across-epochs-plot
     Internally calls `_plot_pho_jonathan_batch_plot_single_cell`
@@ -918,7 +926,8 @@ def _make_pho_jonathan_batch_plots(t_split, time_bins, neuron_replay_stats_df, u
 
 
     """
-    fig = plt.figure(constrained_layout=True, figsize=(10, 4))
+    
+    
         
     if included_unit_neuron_IDs is None:
         n_all_neuron_IDs = np.shape(neuron_replay_stats_df)[0] 
@@ -935,8 +944,14 @@ def _make_pho_jonathan_batch_plots(t_split, time_bins, neuron_replay_stats_df, u
     _temp_aclu_to_fragile_linear_neuron_IDX = {aclu:i for i, aclu in enumerate(pf1D_all.ratemap.neuron_ids)} 
 
     actual_num_subfigures = min(len(included_unit_neuron_IDs), n_max_plot_rows) # only include the possible rows 
+
+
+
+    ## Figure Setup:
+    fig = build_or_reuse_figure(fignum=kwargs.pop('fignum', None), fig=kwargs.pop('fig', None), fig_idx=kwargs.pop('fig_idx', 0), figsize=kwargs.pop('figsize', (10, 4)), dpi=kwargs.pop('dpi', None), constrained_layout=True) # , clear=True
+    # fig = plt.figure(constrained_layout=True, figsize=(10, 4))
     subfigs = fig.subfigures(actual_num_subfigures, 1, wspace=0.07)
-    colors = plt.rcParams['axes.prop_cycle'].by_key()['color']
+
     
 
     ##########################
@@ -951,7 +966,7 @@ def _make_pho_jonathan_batch_plots(t_split, time_bins, neuron_replay_stats_df, u
     # # Build all spikes interpolated positions/dfs:
     # cell_spikes_dfs_dict = kwargs.get('cell_spikes_dfs_dict', None)
     # cell_grouped_spikes_df, cell_spikes_dfs = _build_spikes_df_interpolated_props(global_results)
-
+    colors = plt.rcParams['axes.prop_cycle'].by_key()['color']
     axs_list = []
 
     ## IDEA: to change the display order, keep `_temp_aclu_to_fragile_linear_neuron_IDX` the same and just modify the order of aclu values iterated over
