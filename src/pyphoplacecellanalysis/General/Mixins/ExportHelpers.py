@@ -123,27 +123,41 @@ def create_daily_programmatic_display_function_testing_folder_if_needed(out_path
     out_path.mkdir(exist_ok=True)
     return out_path
 
-def build_pdf_metadata_from_display_context(active_identifying_ctx, debug_print=False):
+
+def build_figure_basename_from_display_context(active_identifying_ctx, context_tuple_join_character='_', debug_print=False):
     """ 
     Usage:
+        curr_fig_save_basename = build_figure_basename_from_display_context(active_identifying_ctx, context_tuple_join_character='_')
+        >>> 'kdiba_2006-6-09_1-22-43_batch_plot_test_long_only'
+    """
+    ## Note that active_identifying_ctx.as_tuple() can have non-string elements (e.g. debug_test_max_num_slices=128, which is an int). This is what we want, but for setting the metadata we need to convert them to strings
+    context_tuple = [str(v) for v in list(active_identifying_ctx.as_tuple())]
+    fig_save_basename = context_tuple_join_character.join(context_tuple) # joins the elements of the context_tuple with '_'
+    if debug_print:
+        print(f'fig_save_basename: "{fig_save_basename}"')
+    return fig_save_basename
+
+
+
+def build_pdf_metadata_from_display_context(active_identifying_ctx, debug_print=False):
+    """ Internally uses `build_figure_basename_from_display_context(...)` 
+    Usage:
         curr_built_pdf_metadata, curr_pdf_save_filename = build_pdf_metadata_from_display_context(active_identifying_ctx)
-    
+        >>> 'C:\Users\pho\repos\PhoPy3DPositionAnalysis2021\EXTERNAL\Screenshots\ProgrammaticDisplayFunctionTesting\2022-11-30'
+
     """
     session_descriptor_string = '_'.join([active_identifying_ctx.format_name, active_identifying_ctx.session_name]) # 'kdiba_2006-6-08_14-26-15'
     if debug_print:
         print(f'session_descriptor_string: "{session_descriptor_string}"')
     built_pdf_metadata = {'Creator': 'Spike3D - TestNeuroPyPipeline227', 'Author': 'Pho Hale', 'Title': session_descriptor_string, 'Subject': '', 'Keywords': [session_descriptor_string]}
-    # context_tuple = [session_descriptor_string, active_identifying_ctx.filter_name, active_identifying_ctx.display_fn_name]
-
-    ## Note that active_identifying_ctx.as_tuple() can have non-string elements (e.g. debug_test_max_num_slices=128, which is an int). This is what we want, but for setting the metadata we need to convert them to strings
-    context_tuple = [str(v) for v in list(active_identifying_ctx.as_tuple())]
-    built_pdf_metadata['Title'] = '_'.join(context_tuple)
+    # context_tuple = [str(v) for v in list(active_identifying_ctx.as_tuple())]
+    curr_fig_save_basename = build_figure_basename_from_display_context(active_identifying_ctx, context_tuple_join_character='_')
+    built_pdf_metadata['Title'] = curr_fig_save_basename
     built_pdf_metadata['Subject'] = active_identifying_ctx.display_fn_name
-    built_pdf_metadata['Keywords'] = ' | '.join(context_tuple)
-    curr_pdf_save_filename = '_'.join(context_tuple) + '.pdf'
+    built_pdf_metadata['Keywords'] = build_figure_basename_from_display_context(active_identifying_ctx, context_tuple_join_character=' | ') # ' | '.join(context_tuple)
+    curr_pdf_save_filename = curr_fig_save_basename + '.pdf'
     if debug_print:
         print(f'curr_pdf_save_filename: "{curr_pdf_save_filename}"')
-    # curr_pdf_save_path = out_path.joinpath(curr_pdf_save_filename)
     return built_pdf_metadata, curr_pdf_save_filename
 
 
