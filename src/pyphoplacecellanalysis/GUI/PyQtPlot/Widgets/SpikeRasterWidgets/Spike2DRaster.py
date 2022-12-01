@@ -123,7 +123,7 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
         # NOTE: It looks like this didn't work when called before self.show(), but worked when called from the Notebook. Might just be a timeing thing.
         ## Make sure to set the initial linear scroll region size/location to something reasonable and not cut-off so the user can adjust it:
         self._fix_initial_linearRegionLocation() # Implemented in Render2DScrollWindowPlotMixin, since it's the one that creates the Scrollwindow anyways
-        
+
         ## Starts the delayed_gui_itemer which will run after 1-second to update the GUI:
         self._delayed_gui_timer = QtCore.QTimer(self)
         self._delayed_gui_timer.timeout.connect(self._run_delayed_gui_load_code)
@@ -183,12 +183,13 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
             self.logger.info(f'\tdone.')
         else:
             self.logger.info('\t"visualization_raster_emphasis_state" column already exists.')
-            
+
         self.EpochRenderingMixin_on_setup()
 
-        # Required for Time Curves:        
+        # Required for Time Curves:
         self.params.time_curves_datasource = None # required before calling self._update_plot_ranges()
     
+
     def _build_cell_configs(self):
         """ Adds the neuron/cell configurations that are used to color and format the scatterplot spikes and such. 
         Requires:
@@ -202,11 +203,12 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
                 upper_y: [0.0147059, 0.0294118, 0.0441176, ..., 0.970588, 0.985294, 1.0]
 
         Adds:
-            self.params.config_items: list
+            self.params.config_items: IndexedOrderedDict
             self.config_fragile_linear_neuron_IDX_map: dict<self.fragile_linear_neuron_IDXs, self.params.config_items>
         
         Known Calls:
             From self._buildGraphics()
+            From self.on_neuron_colors_changed(...) and self.on_unit_sort_order_changed(...)
         """
         
         # SpikeEmphasisState
@@ -239,7 +241,7 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
                 curr_pen = pg.mkPen(curr_color)
                 curr_state_pen_dict[an_emphasis_state] = curr_pen
             
-            curr_config_item = (i, fragile_linear_neuron_IDX, curr_state_pen_dict, self.lower_y[i], self.upper_y[i])
+            curr_config_item = (i, fragile_linear_neuron_IDX, curr_state_pen_dict, self.lower_y[i], self.upper_y[i]) # config item is just a tuple here
             self.params.config_items[curr_neuron_id] = curr_config_item # add the current config item to the config items 
             
     
