@@ -134,8 +134,8 @@ class SessionEpochs2DRenderTimeEpochs(General2DRenderTimeEpochs):
             """
             num_intervals = np.shape(active_df)[0]
             ## parameters:
-            y_location = 0.0
-            height = 1.0
+            y_location = -1.0
+            height = 0.9
             # pen_color = pg.mkColor('red')
             # brush_color = pg.mkColor('red')
 
@@ -145,7 +145,6 @@ class SessionEpochs2DRenderTimeEpochs(General2DRenderTimeEpochs):
             
             ## Add the missing parameters to the dataframe:
             active_df = cls._update_df_visualization_columns(active_df, y_location, height, pen_color, brush_color, **kwargs)
-            
             return active_df
 
         return _add_interval_dataframe_visualization_columns_general_epoch
@@ -163,8 +162,8 @@ class Laps2DRenderTimeEpochs(General2DRenderTimeEpochs):
             """
             num_intervals = np.shape(active_df)[0]
             ## parameters:
-            y_location = 0.0
-            height = 1.0
+            y_location = -2.0
+            height = 0.9
             pen_color = pg.mkColor('red')
             brush_color = pg.mkColor('red')
             brush_color.setAlphaF(0.5)
@@ -205,17 +204,14 @@ class PBE_2DRenderTimeEpochs(General2DRenderTimeEpochs):
             """
             num_intervals = np.shape(active_df)[0]
             ## parameters:
-            y_location = 0.0
-            height = 2.5
+            y_location = -3.0
+            height = 0.9
             pen_color = pg.mkColor('w')
             pen_color.setAlphaF(0.8)
-            
             brush_color = pg.mkColor('grey')
             brush_color.setAlphaF(0.5)
-            
             ## Add the missing parameters to the dataframe:
             active_df = cls._update_df_visualization_columns(active_df, y_location, height, pen_color, brush_color, **kwargs)
-            
             return active_df
 
         return _add_interval_dataframe_visualization_columns_general_epoch
@@ -231,8 +227,8 @@ class Replays_2DRenderTimeEpochs(General2DRenderTimeEpochs):
     def build_epochs_dataframe_formatter(cls, **kwargs):
         def _add_interval_dataframe_visualization_columns_general_epoch(active_df):
             ## parameters:
-            y_location = 0.0
-            height = 5.5
+            y_location = -4.0
+            height = 0.9
             pen_color = pg.mkColor('orange')
             brush_color = pg.mkColor('orange')
             
@@ -252,8 +248,7 @@ class Replays_2DRenderTimeEpochs(General2DRenderTimeEpochs):
         elif isinstance(curr_sess, Epoch):
             active_Epochs = curr_sess  # <Epoch> object passed directly
         elif isinstance(curr_sess, pd.DataFrame):
-            active_Epochs = (curr_sess['start'].to_numpy(), curr_sess['duration'].to_numpy(), curr_sess['flat_replay_idx'].to_numpy())
-            
+            active_Epochs = (curr_sess['start'].to_numpy(), curr_sess['duration'].to_numpy(), curr_sess['flat_replay_idx'].to_numpy()) 
         else:
             raise NotImplementedError
         interval_datasource = cls.build_render_time_epochs_datasource(active_epochs_obj=active_Epochs, **kwargs)
@@ -270,16 +265,14 @@ class Ripples_2DRenderTimeEpochs(General2DRenderTimeEpochs):
     def build_epochs_dataframe_formatter(cls, **kwargs):
         def _add_interval_dataframe_visualization_columns_general_epoch(active_df):
             ## parameters:
-            y_location = 10.0
-            height = 8.5
+            y_location = -5.0
+            height = 0.9
             pen_color = pg.mkColor('blue')
             brush_color = pg.mkColor('blue')
-            brush_color.setAlphaF(0.5)
-            
+            brush_color.setAlphaF(0.5)            
             ## Add the missing parameters to the dataframe:
             active_df = cls._update_df_visualization_columns(active_df, y_location, height, pen_color, brush_color, **kwargs)
             return active_df
-
         return _add_interval_dataframe_visualization_columns_general_epoch
         
 
@@ -292,8 +285,8 @@ class NewRipples_2DRenderTimeEpochs(General2DRenderTimeEpochs):
     def build_epochs_dataframe_formatter(cls, **kwargs):
         def _add_interval_dataframe_visualization_columns_general_epoch(active_df):
             ## parameters:
-            y_location = 14.0
-            height = 10.5
+            y_location = -6.0
+            height = 0.9
             pen_color = pg.mkColor('cyan')
             brush_color = pg.mkColor('cyan')
             brush_color.setAlphaF(0.5)
