@@ -99,8 +99,10 @@ class MultiContextComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Co
         ## neuron_IDs used for instantaneous_unit_specific_spike_rate to build the dataframe:
         neuron_IDs = np.unique(sess.spikes_df.aclu) # TODO: make sure standardized
 
-
+        ## HERE I CAN SPECIFY WHICH REPLAYS TO USE FOR THE ANALYSIS:
         replays_df = sess.replay
+
+
         rdf, aclu_to_idx, irdf, aclu_to_idx_irdf = _final_compute_jonathan_replay_fr_analyses(sess, replays_df)
         rdf, neuron_replay_stats_df = _compute_neuron_replay_stats(rdf, aclu_to_idx) # neuron_replay_stats_df is joined with `final_jonathan_df` after that is built
 
