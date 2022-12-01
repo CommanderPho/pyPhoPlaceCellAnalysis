@@ -3,6 +3,7 @@ import numpy as np
 import pandas as pd
 import matplotlib as mpl
 import matplotlib.pyplot as plt
+from matplotlib.figure import Figure, FigureBase # FigureBase: both Figure and SubFigure
 
 from neuropy.utils.dynamic_container import overriding_dict_with # required for _display_2d_placefield_result_plot_raw
 from neuropy.core.neuron_identities import PlotStringBrevityModeEnum # for plot_short_v_long_pf1D_comparison (_display_short_long_pf1D_comparison)
@@ -995,9 +996,18 @@ def _make_pho_jonathan_batch_plots(t_split, time_bins, neuron_replay_stats_df, u
         # output the axes created:
         axs_list.append(curr_single_cell_out_dict)
 
+    if isinstance(subfigs, FigureBase):
+        subfigs = [subfigs] # wrap it to be a single item list
+
     graphics_output_dict = {'fig': fig, 'subfigs': subfigs, 'axs': axs_list, 'colors': colors}
     fig.show()
     return graphics_output_dict
+
+
+# ==================================================================================================================== #
+
+
+
 
 # ==================================================================================================================== #
 
