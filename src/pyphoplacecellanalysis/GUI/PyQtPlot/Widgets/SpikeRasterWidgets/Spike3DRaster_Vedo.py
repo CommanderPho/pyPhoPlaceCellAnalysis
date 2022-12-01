@@ -246,7 +246,7 @@ class Spike3DRaster_Vedo(VedoSpecificTimeCurvesMixin, SpikeRasterBase):
         if 'visualization_raster_y_location' not in self.spikes_df.columns:
             print(f'visualization_raster_y_location column missing. rebuilding (this might take a minute or two)...')
             # Compute the y for all windows, not just the current one:
-            y = DataSeriesToSpatial.build_series_identity_axis(self.n_cells, center_mode=self.params.center_mode, bin_position_mode='bin_center', side_bin_margins = self.params.side_bin_margins)
+            # y = DataSeriesToSpatial.build_series_identity_axis(self.n_cells, center_mode=self.params.center_mode, bin_position_mode='bin_center', side_bin_margins = self.params.side_bin_margins)
             # all_y = [y[a_cell_id] for a_cell_id in self.spikes_df['neuron_IDX'].to_numpy()]
             all_y = [self.fragile_linear_neuron_IDX_to_spatial(self.cell_id_to_fragile_linear_neuron_IDX_map[a_cell_id]) for a_cell_id in self.spikes_df['neuron_IDX'].to_numpy()]
             

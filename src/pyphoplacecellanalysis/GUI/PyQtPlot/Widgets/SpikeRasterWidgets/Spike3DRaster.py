@@ -214,11 +214,7 @@ class Spike3DRaster(PyQtGraphSpecificTimeCurvesMixin, RenderTimeEpoch3DMeshesMix
         ##### Main Raster Plot Content Top ##########
         # self.ui.main_gl_widget = gl.GLViewWidget()
         self.ui.main_gl_widget = ContextMenuGLViewWidget()
-        
-        
-        
-        
-        # self.ui.main_gl_widget.show()
+
         self.ui.main_gl_widget.resize(1000,600)
         # self.ui.main_gl_widget.setWindowTitle('pyqtgraph: 3D Raster Spikes Plotting')
         self.ui.main_gl_widget.setCameraPosition(distance=40)

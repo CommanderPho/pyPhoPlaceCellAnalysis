@@ -11,6 +11,9 @@ class NeuronConfigOwningMixin:
         self.params.pf_active_configs
         self.params.pf_colors_hex
         
+        self.ratemap.neuron_ids
+
+
         Functions:
             self.update_spikes(): to apply the changes visually
         

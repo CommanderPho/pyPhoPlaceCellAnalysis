@@ -33,7 +33,7 @@ class Render2DScrollWindowPlotMixin:
         
         Note that the colors are built using the self.config_fragile_linear_neuron_IDX_map property
         
-        config_fragile_linear_neuron_IDX_map: a map from fragile_linear_neuron_IDX to config values
+        config_fragile_linear_neuron_IDX_map: a map from fragile_linear_neuron_IDX to config (tuple) values
         is_included_indicies: Optional np.array of bools indicating whether each spike is included in the generated points
         
         """
@@ -69,7 +69,9 @@ class Render2DScrollWindowPlotMixin:
     
     @classmethod
     def build_spikes_all_spots_from_df(cls, spikes_df, config_fragile_linear_neuron_IDX_map, is_spike_included=None, **kwargs):
-        """ builds the 'all_spots' tuples suitable for setting self.plots_data.all_spots from ALL Spikes """
+        """ builds the 'all_spots' tuples suitable for setting self.plots_data.all_spots from ALL Spikes 
+        Internally calls `cls.build_spikes_data_values_from_df(...)
+        """
         curr_spike_x, curr_spike_y, curr_spike_pens, all_spots, curr_n = cls.build_spikes_data_values_from_df(spikes_df, config_fragile_linear_neuron_IDX_map, is_spike_included=is_spike_included, **kwargs)
         return all_spots
     
@@ -90,7 +92,7 @@ class Render2DScrollWindowPlotMixin:
         
         is_included_indicies: Optional np.array of bools indicating whether each spike is included in the generated points
         
-        
+        Internally calls `cls.build_spikes_data_values_from_df(...)
         """
         # All units at once approach:
         return Render2DScrollWindowPlotMixin.build_spikes_data_values_from_df(self.spikes_window.df, self.config_fragile_linear_neuron_IDX_map, is_spike_included=is_included_indicies, **kwargs)

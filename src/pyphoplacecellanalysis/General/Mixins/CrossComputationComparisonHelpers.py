@@ -131,7 +131,9 @@ def _find_any_context_neurons(*args):
 
 
 def build_neurons_color_map(n_neurons:int, sortby=None, cmap=None):
-    """ neurons_colors_array = build_neurons_color_map(n_neurons, sortby=shared_fragile_neuron_IDXs, cmap=None) """
+    """ returns the list of colors, an RGBA np.array of shape: 4 x n_neurons. 
+    neurons_colors_array = build_neurons_color_map(n_neurons, sortby=shared_fragile_neuron_IDXs, cmap=None) 
+    """
     if sortby is None:
         sort_ind = np.arange(n_neurons)
     elif isinstance(sortby, (list, np.ndarray)):
