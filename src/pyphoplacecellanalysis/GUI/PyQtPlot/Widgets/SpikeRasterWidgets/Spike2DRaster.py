@@ -101,6 +101,50 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
         return 0
         
 
+    # ==================================================================================================================== #
+    # unit_sort_order support from Spike3DRaster                                                                           #
+    # ==================================================================================================================== #
+
+    @property
+    def series_identity_y_values(self):
+        """The series_identity_y_values property."""
+        return self._series_identity_y_values
+
+    def update_series_identity_y_values(self):
+        """ updates the fixed self._series_identity_y_values using the DataSeriesToSpatial.build_series_identity_axis(...) function.
+        
+        Should be called whenever:
+        self.n_cells, 
+        self.params.center_mode,
+        self.params.bin_position_mode
+        self.params.side_bin_margins
+        self.unit_sort_order
+
+        values change.
+        """
+        self._series_identity_y_values = DataSeriesToSpatial.build_series_identity_axis(self.n_cells, center_mode=self.params.center_mode, bin_position_mode=self.params.bin_position_mode, side_bin_margins = self.params.side_bin_margins)
+        self._series_identity_lower_y_values = DataSeriesToSpatial.build_series_identity_axis(self.n_cells, center_mode=self.params.center_mode, bin_position_mode='left_edges', side_bin_margins = self.params.side_bin_margins) / self.n_cells
+        self._series_identity_upper_y_values = DataSeriesToSpatial.build_series_identity_axis(self.n_cells, center_mode=self.params.center_mode, bin_position_mode='right_edges', side_bin_margins = self.params.side_bin_margins) / self.n_cells
+
+        # This might be overkill, idk
+        # self.y_fragile_linear_neuron_IDX_map = dict(zip(self.fragile_linear_neuron_IDX_to_spatial(self.fragile_linear_neuron_IDXs), self._series_identity_y_values)) # Using `self.fragile_linear_neuron_IDX_to_spatial(self.fragile_linear_neuron_IDXs)` instead of just `self.fragile_linear_neuron_IDXs` should yield sorted results
+
+
+
+    ## Required for DataSeriesToSpatialTransformingMixin
+    def fragile_linear_neuron_IDX_to_spatial(self, fragile_linear_neuron_IDXs):
+        """ transforms the fragile_linear_neuron_IDXs in fragile_linear_neuron_IDXs to a spatial offset (such as the y-positions for a 3D raster plot) """
+        if self.series_identity_y_values is None:
+            self.update_series_identity_y_values()
+        fragile_linear_neuron_IDX_series_indicies = self.unit_sort_order[fragile_linear_neuron_IDXs] # get the appropriate series index for each fragile_linear_neuron_IDX given their sort order
+        return self.series_identity_y_values[fragile_linear_neuron_IDX_series_indicies]
+
+
+    # ==================================================================================================================== #
+    # END unit_sort_order                                                                                                  #
+    # ==================================================================================================================== #
+
+
 
     def __init__(self, params=None, spikes_window=None, playback_controller=None, neuron_colors=None, neuron_sort_order=None, application_name=None, **kwargs):
         super(Spike2DRaster, self).__init__(params=params, spikes_window=spikes_window, playback_controller=playback_controller, neuron_colors=neuron_colors, neuron_sort_order=neuron_sort_order, application_name=application_name, **kwargs)
@@ -114,7 +158,8 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
         self.temporal_mapping_changed.connect(self.on_adjust_temporal_spatial_mapping)
         self.spikes_window.timeWindow.window_duration_changed_signal.connect(self.on_adjust_temporal_spatial_mapping)
         # self.on_window_duration_changed.connect(self.on_adjust_temporal_spatial_mapping)
-        
+        self.unit_sort_order_changed_signal.connect(self.on_unit_sort_order_changed)
+
         self.EpochRenderingMixin_on_init()
         
         if self.enable_show_on_init:
@@ -164,15 +209,23 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
         self.enable_debug_print = False
         self.enable_debug_widgets = True
         
+        # Determine the y-values corresponding to the series identity
+        self._series_identity_y_values = None
+        self._series_identity_lower_y_values = None
+        self._series_identity_upper_y_values = None
+        self.update_series_identity_y_values()
+
         # Build Required SpikesDf fields:
         # print(f'fragile_linear_neuron_IDXs: {self.fragile_linear_neuron_IDXs}, n_cells: {self.n_cells}')
-        self.y = DataSeriesToSpatial.build_series_identity_axis(self.n_cells, center_mode=self.params.center_mode, bin_position_mode=self.params.bin_position_mode, side_bin_margins = self.params.side_bin_margins)
-        self.y_fragile_linear_neuron_IDX_map = dict(zip(self.fragile_linear_neuron_IDXs, self.y))
+        # self._series_identity_y_values = DataSeriesToSpatial.build_series_identity_axis(self.n_cells, center_mode=self.params.center_mode, bin_position_mode=self.params.bin_position_mode, side_bin_margins = self.params.side_bin_margins) # replaced by self._series_identity_y_values
+        self.y_fragile_linear_neuron_IDX_map = dict(zip(self.fragile_linear_neuron_IDXs, self._series_identity_y_values)) # Old way 
+        # self.y_fragile_linear_neuron_IDX_map = dict(zip(self.fragile_linear_neuron_IDX_to_spatial(self.fragile_linear_neuron_IDXs), self._series_identity_y_values)) # Using `self.fragile_linear_neuron_IDX_to_spatial(self.fragile_linear_neuron_IDXs)` instead of just `self.fragile_linear_neuron_IDXs` should yield sorted results
 
         # Compute the y for all windows, not just the current one:
         if 'visualization_raster_y_location' not in self.spikes_df.columns:
             self.logger.info('Spike2DRaster.setup(): adding "visualization_raster_y_location" column to spikes_df...')
-            all_y = [self.y_fragile_linear_neuron_IDX_map[a_cell_IDX] for a_cell_IDX in self.spikes_df['fragile_linear_neuron_IDX'].to_numpy()]
+            all_y = [self.y_fragile_linear_neuron_IDX_map[a_cell_IDX] for a_cell_IDX in self.spikes_df['fragile_linear_neuron_IDX'].to_numpy()] # old
+            # all_y = [self.fragile_linear_neuron_IDX_to_spatial(self.cell_id_to_fragile_linear_neuron_IDX_map[a_cell_id]) for a_cell_id in self.spikes_df['fragile_linear_neuron_IDX'].to_numpy()] # copied from Spike3DRaster_Vedo. Note self.spikes_df's 'neuron_IDX' is identical to 'fragile_linear_neuron_IDX'
             self.spikes_df['visualization_raster_y_location'] = all_y # adds as a column to the dataframe. Only needs to be updated when the number of active units changes. BUG? NO, RESOLVED: actually, this should be updated when anything that would change .y_fragile_linear_neuron_IDX_map would change, right? Meaning: .y, ... oh, I see. self.y doesn't change because self.params.center_mode, self.params.bin_position_mode, and self.params.side_bin_margins aren't expected to change. 
             self.logger.info('\tdone.')
             
@@ -193,10 +246,10 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
     def _build_cell_configs(self):
         """ Adds the neuron/cell configurations that are used to color and format the scatterplot spikes and such. 
         Requires:
-            self.lower_y = DataSeriesToSpatial.build_series_identity_axis(self.n_cells, center_mode=self.params.center_mode, bin_position_mode='left_edges', side_bin_margins = self.params.side_bin_margins) / self.n_cells
-            self.upper_y = DataSeriesToSpatial.build_series_identity_axis(self.n_cells, center_mode=self.params.center_mode, bin_position_mode='right_edges', side_bin_margins = self.params.side_bin_margins) / self.n_cells
+            self._series_identity_lower_y_values = DataSeriesToSpatial.build_series_identity_axis(self.n_cells, center_mode=self.params.center_mode, bin_position_mode='left_edges', side_bin_margins = self.params.side_bin_margins) / self.n_cells
+            self._series_identity_upper_y_values = DataSeriesToSpatial.build_series_identity_axis(self.n_cells, center_mode=self.params.center_mode, bin_position_mode='right_edges', side_bin_margins = self.params.side_bin_margins) / self.n_cells
         
-        NOTE: on self.y vs (self.lower_y, self.upper_y): two ndarrays of the same length as self.y but they each express the start/end edges of each series as a ratio of the total.
+        NOTE: on self.y vs (self._series_identity_lower_y_values, self._series_identity_upper_y_values): two ndarrays of the same length as self.y but they each express the start/end edges of each series as a ratio of the total.
             this means for example: 
                 y:       [0.5, 1.5, 2.5, ..., 65.5, 66.5, 67.5]
                 lower_y: [0.0, 0.0147059, 0.0294118, ..., 0.955882, 0.970588, 0.985294]
@@ -241,7 +294,7 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
                 curr_pen = pg.mkPen(curr_color)
                 curr_state_pen_dict[an_emphasis_state] = curr_pen
             
-            curr_config_item = (i, fragile_linear_neuron_IDX, curr_state_pen_dict, self.lower_y[i], self.upper_y[i]) # config item is just a tuple here
+            curr_config_item = (i, fragile_linear_neuron_IDX, curr_state_pen_dict, self._series_identity_lower_y_values[i], self._series_identity_upper_y_values[i]) # config item is just a tuple here
             self.params.config_items[curr_neuron_id] = curr_config_item # add the current config item to the config items 
             
     
@@ -274,10 +327,11 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
         
         #### Build Graphics Objects ##### 
         # Add debugging widget:
-        self.y = DataSeriesToSpatial.build_series_identity_axis(self.n_cells, center_mode=self.params.center_mode, bin_position_mode=self.params.bin_position_mode, side_bin_margins = self.params.side_bin_margins)
-        self.lower_y = DataSeriesToSpatial.build_series_identity_axis(self.n_cells, center_mode=self.params.center_mode, bin_position_mode='left_edges', side_bin_margins = self.params.side_bin_margins) / self.n_cells
-        self.upper_y = DataSeriesToSpatial.build_series_identity_axis(self.n_cells, center_mode=self.params.center_mode, bin_position_mode='right_edges', side_bin_margins = self.params.side_bin_margins) / self.n_cells
-        self._build_cell_configs()   
+        # self._series_identity_y_values = DataSeriesToSpatial.build_series_identity_axis(self.n_cells, center_mode=self.params.center_mode, bin_position_mode=self.params.bin_position_mode, side_bin_margins = self.params.side_bin_margins)
+        # self._series_identity_lower_y_values = DataSeriesToSpatial.build_series_identity_axis(self.n_cells, center_mode=self.params.center_mode, bin_position_mode='left_edges', side_bin_margins = self.params.side_bin_margins) / self.n_cells
+        # self._series_identity_upper_y_values = DataSeriesToSpatial.build_series_identity_axis(self.n_cells, center_mode=self.params.center_mode, bin_position_mode='right_edges', side_bin_margins = self.params.side_bin_margins) / self.n_cells
+        self.update_series_identity_y_values()
+        self._build_cell_configs()
         
         
         ## New: Build a container layout to contain all elements that will represent the active window 
@@ -390,7 +444,7 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
                 background_static_scroll_window_plot.setXRange(earliest_t, latest_t, padding=0)
                 background_static_scroll_window_plot.setYRange(np.nanmin(curr_spike_y), np.nanmax(curr_spike_y), padding=0)
 
-            Here it looks like I'm trying to use some sort of reletive x-coordinates (as I noted that I did in self.lower_y, self.upper_y?)
+            Here it looks like I'm trying to use some sort of reletive x-coordinates (as I noted that I did in self._series_identity_lower_y_values, self._series_identity_upper_y_values?)
             
             OOPS, back-up, this is the main_plot_widget (that should be displaying the contents of the window above), not the same as the static background plot that displays all time.
             """
@@ -404,8 +458,7 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
             # print(f'resolved_end_x: {resolved_end_x}')
             # self.plots.main_plot_widget.setRange(xRange=[resolved_start_x, resolved_end_x], yRange=[self.y[0], self.y[-1]])
             # ## NOW I THINK THIS IS JUST THE ZOOMED PLOT AND NOT THE REASON THE LINEAR SCROLL REGION is cut off
-                        
-            self.plots.main_plot_widget.setRange(xRange=[0.0, +self.temporal_axis_length], yRange=[self.y[0], self.y[-1]]) # After all this, I've concluded that it was indeed correct!
+            self.plots.main_plot_widget.setRange(xRange=[0.0, +self.temporal_axis_length], yRange=[self._series_identity_y_values[0], self._series_identity_y_values[-1]]) # After all this, I've concluded that it was indeed correct!
             _v_axis_item = Render2DNeuronIdentityLinesMixin.setup_custom_neuron_identity_axis(self.plots.main_plot_widget, self.n_cells)
     
     
@@ -435,7 +488,7 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
             print(f'Spike2DRaster._update_plots()')
         # assert (len(self.ui.plots) == self.n_cells), f"after all operations the length of the plots array should be the same as the n_cells, but len(self.ui.plots): {len(self.ui.plots)} and self.n_cells: {self.n_cells}!"
         # build the position range for each unit along the y-axis:
-        self.y = DataSeriesToSpatial.build_series_identity_axis(self.n_cells, center_mode=self.params.center_mode, bin_position_mode=self.params.bin_position_mode, side_bin_margins = self.params.side_bin_margins)
+        self._series_identity_y_values = DataSeriesToSpatial.build_series_identity_axis(self.n_cells, center_mode=self.params.center_mode, bin_position_mode=self.params.bin_position_mode, side_bin_margins = self.params.side_bin_margins)
         
         # update the current scroll region:
         # self.ui.scroll_window_region.setRegion(updated_time_window)
@@ -487,6 +540,36 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
             self.ui.scroll_window_region.blockSignals(False)
         
         
+    # unit_sort_order_changed_signal
+    @QtCore.pyqtSlot(object)
+    def on_unit_sort_order_changed(self, new_sort_order):
+        ## TODO: copied from Spike3DRaster but untested
+        print(f'unit_sort_order_changed_signal(new_sort_order: {new_sort_order})')
+        # rebuild the position range for each unit along the y-axis:
+        self.update_series_identity_y_values()
+        # self._update_neuron_id_graphics() # rebuild the text labels
+        # self._update_plots()
+        
+        # Update the 'visualization_raster_y_location' locations:
+        ## TODO: performance: can this just be sorted in place instead of rebuilt entirely?
+
+        all_y = [self.y_fragile_linear_neuron_IDX_map[a_cell_IDX] for a_cell_IDX in self.spikes_df['fragile_linear_neuron_IDX'].to_numpy()] # old
+        # all_y = [self.fragile_linear_neuron_IDX_to_spatial(self.cell_id_to_fragile_linear_neuron_IDX_map[a_cell_id]) for a_cell_id in self.spikes_df['fragile_linear_neuron_IDX'].to_numpy()] # copied from Spike3DRaster_Vedo. Note self.spikes_df's 'neuron_IDX' is identical to 'fragile_linear_neuron_IDX'
+        self.spikes_df['visualization_raster_y_location'] = all_y
+
+        ## Rebuild Raster Plot Points:
+        self._build_cell_configs()
+
+        # ALL Spikes in the preview window:
+        # curr_spike_x, curr_spike_y, curr_spike_pens, curr_n = self._build_all_spikes_data_values()
+        # pos = np.vstack((curr_spike_x, curr_spike_y)) # np.shape(curr_spike_t): (11,), np.shape(curr_spike_x): (11,), np.shape(curr_spike_y): (11,), curr_n: 11
+        # self.plots_data.all_spots = [{'pos': pos[:,i], 'data': i, 'pen': curr_spike_pens[i]} for i in range(curr_n)] # update self.plots_data.all_spots        
+        self.plots_data.all_spots = self._build_all_spikes_all_spots()
+        # Update preview_overview_scatter_plot
+        self.update_rasters()
+        print('\t done.')
+
+
     @QtCore.pyqtSlot(object)
     def on_neuron_colors_changed(self, neuron_id_color_update_dict):
         """ Called when the neuron colors have finished changing (changed) to update the rendered elements.

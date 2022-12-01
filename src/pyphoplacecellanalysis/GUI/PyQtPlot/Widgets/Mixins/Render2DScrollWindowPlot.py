@@ -57,7 +57,7 @@ class Render2DScrollWindowPlotMixin:
         curr_spike_t = filtered_spikes_df[active_time_variable_name].to_numpy() # this will map
         curr_spike_y = filtered_spikes_df['visualization_raster_y_location'].to_numpy() # this will map
         
-        # config_fragile_linear_neuron_IDX_map values are of the form: (i, fragile_linear_neuron_IDX, curr_pen, self.lower_y[i], self.upper_y[i])
+        # config_fragile_linear_neuron_IDX_map values are of the form: (i, fragile_linear_neuron_IDX, curr_pen, self._series_identity_lower_y_values[i], self._series_identity_upper_y_values[i])
         # Emphasis/Deemphasis-Dependent Pens:
         curr_spike_pens = [config_fragile_linear_neuron_IDX_map[a_fragile_linear_neuron_IDX][2][a_spike_emphasis_state] for a_fragile_linear_neuron_IDX, a_spike_emphasis_state in zip(filtered_spikes_df['fragile_linear_neuron_IDX'].to_numpy(), filtered_spikes_df['visualization_raster_emphasis_state'].to_numpy())] # get the pens for each spike from the configs map
         
