@@ -143,7 +143,6 @@ def build_pdf_metadata_from_display_context(active_identifying_ctx, debug_print=
     """ Internally uses `build_figure_basename_from_display_context(...)` 
     Usage:
         curr_built_pdf_metadata, curr_pdf_save_filename = build_pdf_metadata_from_display_context(active_identifying_ctx)
-        >>> 'C:\Users\pho\repos\PhoPy3DPositionAnalysis2021\EXTERNAL\Screenshots\ProgrammaticDisplayFunctionTesting\2022-11-30'
 
     """
     session_descriptor_string = '_'.join([active_identifying_ctx.format_name, active_identifying_ctx.session_name]) # 'kdiba_2006-6-08_14-26-15'
