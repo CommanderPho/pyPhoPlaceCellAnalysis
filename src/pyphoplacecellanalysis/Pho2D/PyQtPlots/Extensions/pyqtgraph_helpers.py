@@ -1,3 +1,5 @@
+from enum import Enum
+from pathlib import Path
 import numpy as np
 
 from pyphocorehelpers.DataStructure.general_parameter_containers import VisualizationParameters, RenderPlotsData, RenderPlots
@@ -197,6 +199,70 @@ def build_scrollable_graphics_layout_widget_with_nested_viewbox_ui(name, window_
 
 
 
+# ==================================================================================================================== #
+# Exporting Helpers                                                                                                    #
+# ==================================================================================================================== #
+
+
+
+class ExportFiletype(Enum):
+    """Used by `export_pyqtgraph(.)` to specify the filetype of the export to do"""
+    PNG = '.png'
+    SVG =  '.svg'
+
+
+def export_pyqtgraph(graphics_item, savepath='fileName.png', **kwargs):
+    """Takes a PlotItem, A GraphicsLayoutWidget, or other pyqtgraph item to be exported.
+
+    Uses the extension of the `savepath` to determine which type of Exporter to use (png, SVG, etc.)
+
+    Args:
+        graphics_item (_type_): _description_
+        savepath (str, optional): _description_. Defaults to 'fileName.png'.
+
+    Usage:
+
+        from pyphoplacecellanalysis.Pho2D.PyQtPlots.Extensions.pyqtgraph_helpers import export_pyqtgraph
+
+        main_graphics_layout_widget = active_2d_plot.ui.main_graphics_layout_widget # GraphicsLayoutWidget
+        main_plot_widget = active_2d_plot.plots.main_plot_widget # PlotItem
+        background_static_scroll_plot_widget = active_2d_plot.plots.background_static_scroll_window_plot # PlotItem
+        # Export:
+        export_pyqtgraph(main_graphics_layout_widget, savepath='main_graphics_layout_widget.png') # works
+        export_pyqtgraph(main_plot_widget, savepath='main_plot_widget.png') # works
+        export_pyqtgraph(background_static_scroll_plot_widget, savepath='background_static_scroll_plot_widget_HUGE.png') # works
+
+        export_pyqtgraph(background_static_scroll_plot_widget, savepath='background_static_scroll_plot_widget_VECTOR.svg') # works
+
+    """
+    if not isinstance(savepath, Path):
+        savepath = Path(savepath).resolve() # convert to a path
+
+    if isinstance(graphics_item, pg.widgets.GraphicsLayoutWidget.GraphicsLayoutWidget):
+        ## To export the overall layout of a GraphicsLayoutWidget grl, the exporter initialization is:
+        graphics_item = graphics_item.scene()
+
+    # Get the extension from the path to determine the filetype:
+    file_extensions = savepath.suffixes
+    assert len(file_extensions)>0, f"savepath {savepath} must have a recognizable file extension"
+    file_extension = file_extensions[-1].lower() # the last is the suffix
+    
+    ## create an exporter instance, as an argument give it the item you wish to export
+    if file_extension == ExportFiletype.PNG.value:
+        exporter = pg.exporters.ImageExporter(graphics_item)
+        kwargs = ({'width': 4096} | kwargs) # add 'width' to kwargs if not specified
+    elif file_extension == ExportFiletype.SVG.value:
+        exporter = pg.exporters.SVGExporter(graphics_item)
+    else:
+        print(f'Unknown file_extension: {file_extension}')
+        raise NotImplementedError
+
+    ## set export parameters if needed
+    for k, v in kwargs.items():
+        # exporter.parameters()['width'] = 4096*4   # (note this also affects height parameter)   
+        exporter.parameters()[k] = v
+    ## save to file
+    exporter.export(str(savepath))
 
 
     
