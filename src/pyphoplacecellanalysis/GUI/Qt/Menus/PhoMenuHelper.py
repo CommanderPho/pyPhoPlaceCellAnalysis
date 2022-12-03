@@ -1,4 +1,5 @@
 import re # regular expression for PhoMenuHelper
+from benedict import benedict
 from qtpy import QtCore, QtGui, QtWidgets
 from pyphocorehelpers.DataStructure.dynamic_parameters import DynamicParameters # for initialize_global_menu_ui_variables_if_needed
 from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer
@@ -418,5 +419,41 @@ class PhoMenuHelper(object):
     def parse_QAction_for_menu_path(cls, specific_action):
         action_objname_str = specific_action.objectName() # 'actionAddTimeIntervals_Laps'
         return action_objname_str.removeprefix('action').split('_') # ['AddTimeIntervals', 'Laps']
+
     
-    
+    @classmethod
+    def build_programmatic_menu_command_dict(cls, active_2d_plot):
+        def _subfn_extract_command_dict(specific_tuples_list, debug_print=False):
+            """ Builds a dict of QActions from each menu item in `active_2d_plot.ui.menus.custom_context_menus.add_renderables`
+
+            Usage:
+                active_2d_plot_renderable_menus = active_2d_plot.ui.menus.custom_context_menus.add_renderables
+                # widget, renderable_menu, (submenu_addTimeIntervals, submenu_addTimeIntervalCallbacks, submenu_addTimeIntervals_Connections)
+                widget, renderable_menu, *specific_tuples_list, = active_2d_plot_renderable_menus
+
+            """
+            out_command_dict = benedict()
+            out_menu_paths = []
+            for (specific_actions, specific_Callbacks, specific_Connections) in specific_tuples_list:
+                # (specific_actions: list<QAction>, specific_Callbacks: list<Callable>, specific_Connections: list<PyQt5.QtCore.QMetaObject.Connection>)
+                for specific_action in specific_actions:
+                    extracted_menu_path = cls.parse_QAction_for_menu_path(specific_action)
+                    out_menu_paths.append(extracted_menu_path)
+                    out_command_dict['.'.join(extracted_menu_path)] = specific_action # have to use a string keypath because `out_command_dict[*extracted_menu_path]` is not allowed
+
+            if debug_print:
+                print(out_menu_paths) # list<list<str>>: [['AddTimeIntervals', 'Laps'], ['AddTimeIntervals', 'PBEs'], ['AddTimeIntervals', 'Session', 'Epochs'], ['AddTimeIntervals', 'Ripples'], ['AddTimeIntervals', 'Replays'], ['AddTimeIntervals', 'Custom'], ['AddTimeCurves', 'Position'], ['AddTimeCurves', 'Random'], ['AddTimeCurves', 'Custom'], ['AddMatplotlibPlot', 'DecodedPosition'], ['AddMatplotlibPlot', 'Custom']]
+                # out_command_dict.keys() # dict_keys(['AddTimeIntervals', 'AddTimeCurves', 'AddMatplotlibPlot'])
+                print(out_command_dict.keypaths()) # ['AddMatplotlibPlot', 'AddMatplotlibPlot.Custom', 'AddMatplotlibPlot.DecodedPosition', 'AddTimeCurves', 'AddTimeCurves.Custom', 'AddTimeCurves.Position', 'AddTimeCurves.Random', 'AddTimeIntervals', 'AddTimeIntervals.Custom', 'AddTimeIntervals.Laps', 'AddTimeIntervals.PBEs', 'AddTimeIntervals.Replays', 'AddTimeIntervals.Ripples', 'AddTimeIntervals.Session', 'AddTimeIntervals.Session.Epochs']
+            return out_command_dict, out_menu_paths
+
+        active_2d_plot_renderable_menus = active_2d_plot.ui.menus.custom_context_menus.add_renderables
+        widget, renderable_menu, *specific_tuples_list, = active_2d_plot_renderable_menus        
+        out_command_dict, out_menu_paths = _subfn_extract_command_dict(specific_tuples_list, debug_print=False)
+        # Nested PhoUIContainers:
+        out_final = PhoUIContainer.init_from_dict({})
+        for k, v in out_command_dict.items_sorted_by_keys(reverse=False):
+            out_final[k] = PhoUIContainer.init_from_dict(v)
+            # print(k, v)
+
+        return out_final
