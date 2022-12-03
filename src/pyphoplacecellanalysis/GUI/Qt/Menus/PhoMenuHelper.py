@@ -413,5 +413,10 @@ class PhoMenuHelper(object):
     #             new_actions.append(cls.perform_copy_QAction(a_child, dest_parent=new_menu, debug_print=debug_print))
                 
     #     return new_menu, new_children_items, new_actions
+
+    @classmethod    
+    def parse_QAction_for_menu_path(cls, specific_action):
+        action_objname_str = specific_action.objectName() # 'actionAddTimeIntervals_Laps'
+        return action_objname_str.removeprefix('action').split('_') # ['AddTimeIntervals', 'Laps']
     
     
