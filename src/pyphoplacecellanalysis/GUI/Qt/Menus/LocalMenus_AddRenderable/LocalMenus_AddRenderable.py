@@ -2,6 +2,7 @@
 # Generated from c:\Users\pho\repos\pyPhoPlaceCellAnalysis\src\pyphoplacecellanalysis\GUI\Qt\GlobalApplicationMenus\LocalMenus_AddRenderable.ui automatically by PhoPyQtClassGenerator VSCode Extension
 
 from functools import partial
+from benedict import benedict
 
 import pyphoplacecellanalysis.External.pyqtgraph as pg
 from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtCore, QtGui, QtWidgets, mkQApp, uic
@@ -39,6 +40,7 @@ class LocalMenus_AddRenderable(QtWidgets.QMainWindow):
         super().__init__(parent=parent) # Call the inherited classes __init__ method
         # self.ui = uic.loadUi("../pyPhoPlaceCellAnalysis/src/pyphoplacecellanalysis/GUI/Qt/GlobalApplicationMenus/LocalMenus_AddRenderable.ui", self) # Load the .ui file
         # AUTOGEN version:
+        self.programmatic_actions_dict = None # PhoUIContainer.init_from_dict({})
         self.ui = Ui_LocalMenus_AddRenderable()
         self.ui.setupUi(self) # builds the design from the .ui onto this widget.
         self.initUI()
@@ -62,6 +64,7 @@ class LocalMenus_AddRenderable(QtWidgets.QMainWindow):
         
         
         widget = LocalMenus_AddRenderable() # get the UI widget containing the menu items:
+        widget.programmatic_actions_dict = benedict() # PhoUIContainer.init_from_dict({})
         renderable_menu = widget.ui.menuAdd_Renderable
         
         ## Time Intervals/Epochs:
@@ -82,7 +85,9 @@ class LocalMenus_AddRenderable(QtWidgets.QMainWindow):
         for an_action, a_callback in zip(submenu_addTimeIntervals, submenu_addTimeIntervalCallbacks):
             _curr_conn = an_action.triggered.connect(a_callback)
             submenu_addTimeIntervals_Connections.append(_curr_conn)
-            
+            extracted_menu_path = PhoMenuHelper.parse_QAction_for_menu_path(an_action)
+            widget.programmatic_actions_dict['.'.join(extracted_menu_path)] = an_action # have to use a string keypath because `out_command_dict[*extracted_menu_path]` is not allowed
+
         # Set enabled state
         widget.ui.actionAddTimeIntervals_PBEs.setEnabled(sess.pbe is not None)
         widget.ui.actionAddTimeIntervals_Laps.setEnabled(sess.laps is not None)
@@ -99,7 +104,8 @@ class LocalMenus_AddRenderable(QtWidgets.QMainWindow):
         for an_action, a_callback in zip(submenu_addTimeCurves, submenu_addTimeCurvesCallbacks):
             _curr_conn = an_action.triggered.connect(a_callback)
             submenu_addTimeCurves_Connections.append(_curr_conn)
-            
+            extracted_menu_path = PhoMenuHelper.parse_QAction_for_menu_path(an_action)
+            widget.programmatic_actions_dict['.'.join(extracted_menu_path)] = an_action # have to use a string keypath because `out_command_dict[*extracted_menu_path]` is not allowed
         
         ## Matplotlib Plots:
         # self.ui.menuAddRenderable_Matplotlib_Plot        
@@ -110,9 +116,12 @@ class LocalMenus_AddRenderable(QtWidgets.QMainWindow):
         for an_action, a_callback in zip(submenu_addMatplotlibPlot, submenu_addMatplotlibPlotCallbacks):
             _curr_conn = an_action.triggered.connect(a_callback)
             submenu_addMatplotlibPlot_Connections.append(_curr_conn)
-            
+            extracted_menu_path = PhoMenuHelper.parse_QAction_for_menu_path(an_action)
+            widget.programmatic_actions_dict['.'.join(extracted_menu_path)] = an_action # have to use a string keypath because `out_command_dict[*extracted_menu_path]` is not allowed
         
         # Connect Clear actions:
+        clear_actions = [widget.ui.actionClear_all_Time_Curves, widget.ui.actionClear_all_Time_Intervals, widget.ui.actionClear_all_Matplotlib_Plots, widget.ui.actionClear_all_Renderables]
+
         widget.ui.actionClear_all_Time_Curves.triggered.connect(destination_plot.clear_all_3D_time_curves)
         widget.ui.actionClear_all_Time_Intervals.triggered.connect(destination_plot.clear_all_rendered_intervals)
         widget.ui.actionClear_all_Matplotlib_Plots.triggered.connect(destination_plot.clear_all_matplotlib_plots)
@@ -123,6 +132,9 @@ class LocalMenus_AddRenderable(QtWidgets.QMainWindow):
             destination_plot.clear_all_matplotlib_plots()
             
         widget.ui.actionClear_all_Renderables.triggered.connect(_clear_all_both)
+
+        for an_action in clear_actions:
+            widget.programmatic_actions_dict['.'.join(PhoMenuHelper.parse_QAction_for_menu_path(an_action))] = an_action # have to use a string keypath because `out_command_dict[*extracted_menu_path]` is not allowed
         
         return widget, renderable_menu, (submenu_addTimeIntervals, submenu_addTimeIntervalCallbacks, submenu_addTimeIntervals_Connections), (submenu_addTimeCurves, submenu_addTimeCurvesCallbacks, submenu_addTimeCurves_Connections), (submenu_addMatplotlibPlot, submenu_addMatplotlibPlotCallbacks, submenu_addMatplotlibPlot_Connections)
 
@@ -165,7 +177,8 @@ class LocalMenus_AddRenderable(QtWidgets.QMainWindow):
         active_2d_plot_renderable_menus = cls._build_renderable_menu(active_2d_plot, curr_active_pipeline, active_config_name)
         widget_2d_menu = active_2d_plot_renderable_menus[0]
         menuAdd_Renderable = widget_2d_menu.ui.menuAdd_Renderable
-        
+        programmatic_actions_dict = widget_2d_menu.programmatic_actions_dict
+
         ## Specific to SpikeRaster2D:        
         ## Add the custom menu to the context menus of the plots in SpikeRaster2D:        
         main_plot_widget = active_2d_plot.plots.main_plot_widget # PlotItem
@@ -176,7 +189,15 @@ class LocalMenus_AddRenderable(QtWidgets.QMainWindow):
         # Add the reference to the context menus to owner, so it isn't released:
         ## TODO: currently replaces the dict entry, which we might want to use for other menus
         active_2d_plot.ui.menus = PhoUIContainer.init_from_dict({'custom_context_menus': PhoUIContainer.init_from_dict({'add_renderables': active_2d_plot_renderable_menus})})
-        
+
+        # # Build final programmatic dict from nested PhoUIContainers:
+        # out_final = PhoUIContainer.init_from_dict({})
+        # for k, v in programmatic_actions_dict.items_sorted_by_keys(reverse=False):
+        #     out_final[k] = PhoUIContainer.init_from_dict(v)
+        #     # print(k, v)
+        # widget_2d_menu.programmatic_actions_dict = out_final
+
+
         return menuAdd_Renderable # try returning just the menu and not the stupid references to everything # Works when we hold a reference
 
 
