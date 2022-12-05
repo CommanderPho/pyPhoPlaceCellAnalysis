@@ -334,7 +334,7 @@ class EpochRenderingMixin:
                 self.remove_rendered_intervals(a_name, child_plots_removal_list=child_plots_removal_list, debug_print=debug_print)
       
       
-    def list_all_rendered_intervals(self, debug_print = True):
+    def list_all_rendered_intervals(self, debug_print=True):
         """ Returns a dictionary containing the hierarchy of all the members. Can optionally also print. 
         
         Example:
@@ -542,7 +542,7 @@ class EpochRenderingMixin:
 
     @classmethod
     def build_stacked_epoch_layout(cls, rendered_interval_heights, epoch_render_stack_height=40.0, interval_stack_location='below', debug_print=True):
-        """ Builds a layout for the list of specified epochs
+        """ Builds a stack layout for the list of specified epochs
 
 
             rendered_interval_keys = ['_', 'SessionEpochs', 'Laps', '_', 'PBEs', 'Ripples', 'Replays'] # '_' indicates a vertical spacer

@@ -41,6 +41,7 @@
        <normaloff>:/Render/Icons/actions/chart-up-color.png</normaloff>:/Render/Icons/actions/chart-up-color.png</iconset>
      </property>
      <addaction name="actionAddTimeCurves_Position"/>
+     <addaction name="actionAddTimeCurves_Velocity"/>
      <addaction name="actionAddTimeCurves_Random"/>
      <addaction name="actionAddTimeCurves_Custom"/>
      <addaction name="separator"/>
@@ -343,6 +344,11 @@
    </property>
    <property name="text">
     <string>Custom...</string>
+   </property>
+  </action>
+  <action name="actionAddTimeCurves_Velocity">
+   <property name="text">
+    <string>Velocity</string>
    </property>
   </action>
  </widget>
