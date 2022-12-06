@@ -70,7 +70,7 @@ class LocalMenus_AddRenderable(QtWidgets.QMainWindow):
         ## Time Intervals/Epochs:
         submenu_addTimeIntervals = [widget.ui.actionAddTimeIntervals_Laps,
                                     widget.ui.actionAddTimeIntervals_PBEs,
-                                    widget.ui.actionAddTimeIntervals_Session_Epochs,
+                                    widget.ui.actionAddTimeIntervals_SessionEpochs,
                                     widget.ui.actionAddTimeIntervals_Ripples,
                                     widget.ui.actionAddTimeIntervals_Replays,
                                     widget.ui.actionAddTimeIntervals_Custom]

@@ -19,7 +19,7 @@ def connect_renderable_menu(sess, destination_plot):
     renderable_menu = widget.ui.menuAdd_Renderable
     
     ## Time Intervals/Epochs:
-    submenu_addTimeIntervals = [widget.ui.actionAddTimeIntervals_Laps, widget.ui.actionAddTimeIntervals_PBEs, widget.ui.actionAddTimeIntervals_Session_Epochs, widget.ui.actionAddTimeIntervals_Custom]
+    submenu_addTimeIntervals = [widget.ui.actionAddTimeIntervals_Laps, widget.ui.actionAddTimeIntervals_PBEs, widget.ui.actionAddTimeIntervals_SessionEpochs, widget.ui.actionAddTimeIntervals_Custom]
     submenu_addTimeIntervalCallbacks = [lambda evt=None: SessionEpochs2DRenderTimeEpochs.add_render_time_epochs(curr_sess=sess.epochs, destination_plot=destination_plot),
                                         lambda evt=None: PBE_2DRenderTimeEpochs.add_render_time_epochs(curr_sess=sess.pbe, destination_plot=destination_plot),
                                         lambda evt=None: Laps2DRenderTimeEpochs.add_render_time_epochs(curr_sess=sess.laps, destination_plot=destination_plot),

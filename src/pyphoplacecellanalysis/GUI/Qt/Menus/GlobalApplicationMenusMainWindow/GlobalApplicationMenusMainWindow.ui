@@ -89,7 +89,7 @@
        <normaloff>:/Render/Icons/actions/spectrum-emission.png</normaloff>:/Render/Icons/actions/spectrum-emission.png</iconset>
      </property>
      <addaction name="actionAddTimeIntervals_PBEs"/>
-     <addaction name="actionAddTimeIntervals_Session_Epochs"/>
+     <addaction name="actionAddTimeIntervals_SessionEpochs"/>
      <addaction name="actionAddTimeIntervals_Laps"/>
      <addaction name="actionAddTimeIntervals_Custom"/>
     </widget>
@@ -231,7 +231,7 @@
     <string>PBEs</string>
    </property>
   </action>
-  <action name="actionAddTimeIntervals_Session_Epochs">
+  <action name="actionAddTimeIntervals_SessionEpochs">
    <property name="text">
     <string>Session Epochs</string>
    </property>
