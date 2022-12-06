@@ -748,12 +748,16 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
 
             self.add_3D_time_curves_baseline_grid_mesh() # from Render3DTimeCurvesBaseGridMixin
 
-    def _build_or_update_time_curves_legend(self):
-        """ Build a legend for each of the curves """
+    def _build_or_update_time_curves_legend(self, parent_item):
+        """ Build a legend for each of the curves 
+    
+        parent_item=self.ui.main_time_curves_view_widget.graphicsItem()
+
+        """
         # legend_size = (80,60) # fixed size legend
         legend_size = None # auto-sizing legend to contents
         legend = pg.LegendItem(legend_size, offset=(-1,0)) # do this instead of # .addLegend
-        legend.setParentItem(self.ui.main_time_curves_view_widget.graphicsItem())
+        legend.setParentItem(parent_item)
 
         # desired_series_legend_names = list(self.params.time_curves_datasource.data_column_names) # ['lin_pos', 'x', 'y']
         # for legend_name, (curve_name, curveDataItem) in zip(desired_series_legend_names, self.plots['time_curves'].items()):
@@ -783,7 +787,7 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
         if curr_plot_legend_name is not None:
             if self.ui.main_time_curves_view_legend is None:
                 # build the legend if needed
-                self.ui.main_time_curves_view_legend = self._build_or_update_time_curves_legend()
+                self.ui.main_time_curves_view_legend = self._build_or_update_time_curves_legend(self.ui.main_time_curves_view_widget.graphicsItem())
 
         ## Drop the y-value from the 3D version to get the appropriate 2D coordinates (x,y)
         if np.shape(points)[1] == 3:
@@ -861,6 +865,12 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
         
         return new_curves_separate_plot
         
+
+    def remove_separate_render_plot_items(self, separate_plot_item):
+        """ removes the PlotItem separate_plot_item created by calling self.create_separate_render_plot_item(...) from the layout. """
+        target_graphics_layout_widget = self.ui.active_window_container_layout # GraphicsLayoutWidget
+        target_graphics_layout_widget.removeItem(separate_plot_item)
+
         
     # matplotlib render subplot __________________________________________________________________________________________ #
     def add_new_matplotlib_render_plot_widget(self, row=1, col=0, name='matplotlib_view_widget'):
