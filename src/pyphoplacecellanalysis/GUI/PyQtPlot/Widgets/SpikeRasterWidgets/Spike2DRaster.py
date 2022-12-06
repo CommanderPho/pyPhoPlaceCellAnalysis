@@ -618,6 +618,75 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
         self.update_rasters()
         
         
+
+
+    # ==================================================================================================================== #
+    # State Save/Restore                                                                                                   #
+    # ==================================================================================================================== #
+    def save_state_active_renderables(self, debug_print=True):
+        """ Called to capture the currently added renderables, their customized visual appearance and layout, etc so that they can be restored later by calling `self.perform_restore_renderables(...)` with the output state of this function.
+        TODO: not yet complete    
+
+        Usage:
+
+            saved_state_active_renderables = active_2d_plot.save_state_active_renderables(debug_print=True)
+            saved_state_active_renderables
+            # plots_data: ['name', 'all_spots', 'interval_datasources']
+
+        """
+        # # from 'plots' array:
+        # epochs = self.plots.rendered_epochs
+        # curves = self.plots.time_curves
+        
+        ## Epoch/Interval Rectangles:
+        interval_datasource_names = self.interval_datasource_names # ['CustomPBEs', 'PBEs', 'Ripples', 'Laps', 'Replays', 'SessionEpochs']
+        if debug_print:
+            print(f'interval_datasource_names: {interval_datasource_names}')
+        restore_epoch_menu_commands = [f'AddTimeIntervals.{a_name}' for a_name in interval_datasource_names]
+        if debug_print:
+            print(f'restore_epoch_menu_commands: {restore_epoch_menu_commands}')
+        add_renderables_menu = self.ui.menus.custom_context_menus.add_renderables[0].programmatic_actions_dict
+        for a_command in restore_epoch_menu_commands:
+            if a_command not in add_renderables_menu:
+                print(f"WARNING: command '{a_command}' is not present in add_renderables_menu, so restore will not work for this item!")
+            # add_renderables_menu[a_command].trigger()
+
+        # Capture the curve positions and such to restore their position:
+        all_series_positioning_dfs, all_series_compressed_positioning_dfs, all_series_compressed_positioning_update_dicts = self.recover_interval_datasources_positioning_properties(debug_print=False)
+        # Can be restored with:  
+        # all_series_compressed_positioning_update_dicts = { 'SessionEpochs': {'y_location': -2.916666666666667, 'height': 2.0833333333333335},
+        # 'Laps': {'y_location': -7.083333333333334, 'height': 4.166666666666667},
+        # 'PBEs': {'y_location': -11.666666666666668, 'height': 4.166666666666667},
+        # 'Ripples': {'y_location': -15.833333333333336, 'height': 4.166666666666667},
+        # 'Replays': {'y_location': -20.000000000000004, 'height': 4.166666666666667}}
+        # active_2d_plot.update_rendered_intervals_visualization_properties(all_series_compressed_positioning_update_dicts)
+
+        restore_dict = {'epoch_menu_commands': restore_epoch_menu_commands,
+                    'epoch_updating_dicts': all_series_compressed_positioning_update_dicts}
+        # return restore_epoch_menu_commands, all_series_compressed_positioning_update_dicts
+        
+        return restore_dict
+            
+    def perform_restore_renderables(self, saved_state_active_renderables, debug_print=True):
+        """ restore the renderables state saved by `saved_state_active_renderables = save_state_active_renderables(...)` 
+        TODO: not yet complete
+
+        """
+        add_renderables_menu = self.ui.menus.custom_context_menus.add_renderables[0].programmatic_actions_dict
+        restore_epoch_menu_commands = saved_state_active_renderables.get('epoch_menu_commands', [])
+        for a_command in restore_epoch_menu_commands:
+            if a_command not in add_renderables_menu:
+                print(f"WARNING: command '{a_command}' is not present in add_renderables_menu, so restore will not work for this item!")
+            else:
+                add_renderables_menu[a_command].trigger()
+        ## Restore Positions/Visualization Appearance:
+        restore_epoch_positions_dict = saved_state_active_renderables.get('epoch_updating_dicts', [])
+        self.update_rendered_intervals_visualization_properties(restore_epoch_positions_dict)
+
+    
+        
+
+
     ######################################################
     # EpochRenderingMixin Convencince methods:
     #####################################################
