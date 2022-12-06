@@ -14,7 +14,7 @@ from pyphoplacecellanalysis.Resources import GuiResources, ActionIcons
 from pyphoplacecellanalysis.GUI.Qt.Menus.LocalMenus_AddRenderable.Uic_AUTOGEN_LocalMenus_AddRenderable import Ui_LocalMenus_AddRenderable
 
 from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.Mixins.RenderTimeEpochs.Specific2DRenderTimeEpochs import General2DRenderTimeEpochs, Replays_2DRenderTimeEpochs, Ripples_2DRenderTimeEpochs, SessionEpochs2DRenderTimeEpochs, PBE_2DRenderTimeEpochs, Laps2DRenderTimeEpochs # Time Intervals/Epochs
-from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.Mixins.TimeCurves.SpecificTimeCurves import GeneralRenderTimeCurves, PositionRenderTimeCurves, VelocityRenderTimeCurves, MUA_RenderTimeCurves ## Time Curves
+from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.Mixins.TimeCurves.SpecificTimeCurves import GeneralRenderTimeCurves, PositionRenderTimeCurves, VelocityRenderTimeCurves, ConfigurableRenderTimeCurves, MUA_RenderTimeCurves ## Time Curves
 
 from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import AddNewDecodedPosition_MatplotlibPlotCommand ## MatplotlibSubplots
 
@@ -61,8 +61,7 @@ class LocalMenus_AddRenderable(QtWidgets.QMainWindow):
         computation_result = curr_active_pipeline.computation_results[active_config_name]
         sess = computation_result.sess
         
-        
-        
+
         widget = LocalMenus_AddRenderable() # get the UI widget containing the menu items:
         widget.programmatic_actions_dict = benedict() # PhoUIContainer.init_from_dict({})
         renderable_menu = widget.ui.menuAdd_Renderable
@@ -100,7 +99,9 @@ class LocalMenus_AddRenderable(QtWidgets.QMainWindow):
                                             lambda evt=None: VelocityRenderTimeCurves.add_render_time_curves(curr_sess=sess, destination_plot=destination_plot),
                                             lambda evt=None: MUA_RenderTimeCurves.add_render_time_curves(curr_sess=sess, destination_plot=destination_plot),
                                             # lambda evt=None: Laps2DRenderTimeEpochs.add_render_time_epochs(curr_sess=sess.laps, destination_plot=destination_plot),
-                                            lambda evt=None: print(f'actionAddTimeCurves_Custom not yet supported')]
+                                            lambda evt=None: ConfigurableRenderTimeCurves.add_render_time_curves(curr_sess=sess, destination_plot=destination_plot),
+                                            # lambda evt=None: print(f'actionAddTimeCurves_Custom not yet supported')
+            ]
         submenu_addTimeCurves_Connections = []
         for an_action, a_callback in zip(submenu_addTimeCurves, submenu_addTimeCurvesCallbacks):
             _curr_conn = an_action.triggered.connect(a_callback)

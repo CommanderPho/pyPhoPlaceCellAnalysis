@@ -259,7 +259,7 @@ class Spike3DRasterBottomPlaybackControlBar(ComboBoxCtrlOwningMixin, QWidget):
     @QtCore.pyqtSlot(object)
     def on_rendered_intervals_list_changed(self, interval_list_owning_object):
         """ called when the list of rendered intervals changes """
-        self.update_jump_target_series_options(interval_list_owning_object.list_all_rendered_intervals())
+        self.update_jump_target_series_options(interval_list_owning_object.list_all_rendered_intervals(debug_print=False))
 
     @QtCore.pyqtSlot(str)
     def on_jump_combo_series_changed(self, series_name):
