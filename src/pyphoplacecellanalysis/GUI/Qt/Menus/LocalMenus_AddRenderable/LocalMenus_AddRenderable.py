@@ -72,12 +72,14 @@ class LocalMenus_AddRenderable(QtWidgets.QMainWindow):
                                     widget.ui.actionAddTimeIntervals_SessionEpochs,
                                     widget.ui.actionAddTimeIntervals_Ripples,
                                     widget.ui.actionAddTimeIntervals_Replays,
+                                    widget.ui.actionAddTimeIntervals_Bursts,
                                     widget.ui.actionAddTimeIntervals_Custom]
         submenu_addTimeIntervalCallbacks = [lambda evt=None: Laps2DRenderTimeEpochs.add_render_time_epochs(curr_sess=sess.laps, destination_plot=destination_plot),
                                             lambda evt=None: PBE_2DRenderTimeEpochs.add_render_time_epochs(curr_sess=sess.pbe, destination_plot=destination_plot),
                                             lambda evt=None: SessionEpochs2DRenderTimeEpochs.add_render_time_epochs(curr_sess=sess.epochs, destination_plot=destination_plot),
                                             lambda evt=None: Ripples_2DRenderTimeEpochs.add_render_time_epochs(curr_sess=sess.ripple, destination_plot=destination_plot),
                                             lambda evt=None: Replays_2DRenderTimeEpochs.add_render_time_epochs(curr_sess=sess.replay, destination_plot=destination_plot),
+                                            lambda evt=None: print(f'actionAddTimeIntervals_Bursts not yet supported')
                                             lambda evt=None: print(f'actionAddTimeIntervals_Custom not yet supported')]
         
         submenu_addTimeIntervals_Connections = []
@@ -92,7 +94,9 @@ class LocalMenus_AddRenderable(QtWidgets.QMainWindow):
         widget.ui.actionAddTimeIntervals_Laps.setEnabled(sess.laps is not None)
         widget.ui.actionAddTimeIntervals_Ripples.setEnabled(sess.ripple is not None)
         widget.ui.actionAddTimeIntervals_Replays.setEnabled(sess.has_replays)
-        
+        widget.ui.actionAddTimeIntervals_Bursts.setEnabled(False) # disable by default
+
+
         ## Time Curves:
         submenu_addTimeCurves = [widget.ui.actionAddTimeCurves_Position, widget.ui.actionAddTimeCurves_Velocity, widget.ui.actionAddTimeCurves_Random, widget.ui.actionAddTimeCurves_Custom]
         submenu_addTimeCurvesCallbacks = [lambda evt=None: PositionRenderTimeCurves.add_render_time_curves(curr_sess=sess, destination_plot=destination_plot),

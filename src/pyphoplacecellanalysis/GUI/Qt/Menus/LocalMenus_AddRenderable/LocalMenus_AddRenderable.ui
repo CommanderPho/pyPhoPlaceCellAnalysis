@@ -60,6 +60,7 @@
      <addaction name="actionAddTimeIntervals_PBEs"/>
      <addaction name="actionAddTimeIntervals_Ripples"/>
      <addaction name="actionAddTimeIntervals_Replays"/>
+     <addaction name="actionAddTimeIntervals_Bursts"/>
      <addaction name="actionAddTimeIntervals_Custom"/>
      <addaction name="separator"/>
      <addaction name="actionClear_all_Time_Intervals"/>
@@ -346,6 +347,11 @@
   <action name="actionAddTimeCurves_Velocity">
    <property name="text">
     <string>Velocity</string>
+   </property>
+  </action>
+  <action name="actionAddTimeIntervals_Bursts">
+   <property name="text">
+    <string>Bursts</string>
    </property>
   </action>
  </widget>

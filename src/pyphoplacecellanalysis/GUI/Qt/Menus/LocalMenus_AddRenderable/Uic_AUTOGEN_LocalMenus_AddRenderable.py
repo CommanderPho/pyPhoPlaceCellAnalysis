@@ -158,6 +158,8 @@ class Ui_LocalMenus_AddRenderable(object):
         self.actionDecoded_Epoch_Slices_Custom.setObjectName("actionDecoded_Epoch_Slices_Custom")
         self.actionAddTimeCurves_Velocity = QtWidgets.QAction(LocalMenus_AddRenderable)
         self.actionAddTimeCurves_Velocity.setObjectName("actionAddTimeCurves_Velocity")
+        self.actionAddTimeIntervals_Bursts = QtWidgets.QAction(LocalMenus_AddRenderable)
+        self.actionAddTimeIntervals_Bursts.setObjectName("actionAddTimeIntervals_Bursts")
         self.menuAddRenderable_Time_Curves.addAction(self.actionAddTimeCurves_Position)
         self.menuAddRenderable_Time_Curves.addAction(self.actionAddTimeCurves_Velocity)
         self.menuAddRenderable_Time_Curves.addAction(self.actionAddTimeCurves_Random)
@@ -169,6 +171,7 @@ class Ui_LocalMenus_AddRenderable(object):
         self.menuAddRenderable_Time_Intervals.addAction(self.actionAddTimeIntervals_PBEs)
         self.menuAddRenderable_Time_Intervals.addAction(self.actionAddTimeIntervals_Ripples)
         self.menuAddRenderable_Time_Intervals.addAction(self.actionAddTimeIntervals_Replays)
+        self.menuAddRenderable_Time_Intervals.addAction(self.actionAddTimeIntervals_Bursts)
         self.menuAddRenderable_Time_Intervals.addAction(self.actionAddTimeIntervals_Custom)
         self.menuAddRenderable_Time_Intervals.addSeparator()
         self.menuAddRenderable_Time_Intervals.addAction(self.actionClear_all_Time_Intervals)
@@ -236,6 +239,7 @@ class Ui_LocalMenus_AddRenderable(object):
         self.actionDecoded_Epoch_Slices_Replay.setText(_translate("LocalMenus_AddRenderable", "Replay"))
         self.actionDecoded_Epoch_Slices_Custom.setText(_translate("LocalMenus_AddRenderable", "Custom..."))
         self.actionAddTimeCurves_Velocity.setText(_translate("LocalMenus_AddRenderable", "Velocity"))
+        self.actionAddTimeIntervals_Bursts.setText(_translate("LocalMenus_AddRenderable", "Bursts"))
 from pyphoplacecellanalysis.Resources import ActionIcons
 from pyphoplacecellanalysis.Resources import GuiResources
 from pyphoplacecellanalysis.Resources import breeze
