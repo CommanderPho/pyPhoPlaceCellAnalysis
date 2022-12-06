@@ -49,8 +49,7 @@ class LocalMenus_AddRenderable(QtWidgets.QMainWindow):
 
     def initUI(self):
         pass
-
-
+    
     @classmethod
     def _build_renderable_menu(cls, destination_plot, curr_active_pipeline, active_config_name):
         """ Builds the callbacks needed and connects them to the QActions and QMenus for the specific destination_plot to be used as context menus. 
