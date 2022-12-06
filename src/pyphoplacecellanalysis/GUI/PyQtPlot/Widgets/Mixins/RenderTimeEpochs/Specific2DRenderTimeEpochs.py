@@ -285,8 +285,8 @@ class NewRipples_2DRenderTimeEpochs(General2DRenderTimeEpochs):
     def build_epochs_dataframe_formatter(cls, **kwargs):
         def _add_interval_dataframe_visualization_columns_general_epoch(active_df):
             ## parameters:
-            y_location = -6.0
-            height = 0.9
+            y_location = 0.0
+            height = 2.0
             pen_color = pg.mkColor('cyan')
             brush_color = pg.mkColor('cyan')
             brush_color.setAlphaF(0.5)
