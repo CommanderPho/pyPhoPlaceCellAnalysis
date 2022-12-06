@@ -3,6 +3,7 @@ import numpy as np
 import pyphoplacecellanalysis.External.pyqtgraph.graphicsItems as graphicsItems
 from pyphoplacecellanalysis.External.pyqtgraph.graphicsItems.PlotItem import PlotItem #, PlotCurveItem
 from pyphoplacecellanalysis.External.pyqtgraph.graphicsItems.ScatterPlotItem import ScatterPlotItem #, PlotCurveItem
+from pyphoplacecellanalysis.External.pyqtgraph.graphicsItems.GraphicsLayout import GraphicsLayout
 
 # """ 
 
@@ -40,7 +41,14 @@ def recover_graphics_layout_widget_item_indicies(graphics_layout_widget, debug_p
     (found_max_row: 4, found_max_col: 0)
 
     """
-    graphics_layout = graphics_layout_widget.ci # <pyphoplacecellanalysis.External.pyqtgraph.graphicsItems.GraphicsLayout.GraphicsLayout at 0x24affb75820>
+    # Need graphics_layout to be a GraphicsLayout object:
+    if isinstance(graphics_layout_widget, GraphicsLayout):
+        graphics_layout = graphics_layout_widget # input is already a GraphicsLayout object. <pyphoplacecellanalysis.External.pyqtgraph.graphicsItems.GraphicsLayout.GraphicsLayout at 0x24affb75820>
+    else:
+        # for GraphicsLayoutWidget or GraphicsWindow:
+        graphics_layout = graphics_layout_widget.ci
+
+    assert isinstance(graphics_layout, GraphicsLayout), f"type(graphics_layout): {type(graphics_layout)}"
     plot_items_dict = graphics_layout.items ## item: [(row, col), (row, col), ...]  lists all cells occupied by the item
     num_plot_items = len(plot_items_dict)
     found_items_list = list(plot_items_dict.keys())
