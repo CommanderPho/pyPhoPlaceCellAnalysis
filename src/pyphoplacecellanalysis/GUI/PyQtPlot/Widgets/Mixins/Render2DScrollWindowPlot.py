@@ -25,94 +25,8 @@ class Render2DScrollWindowPlotMixin:
     ## Scrollable Window Signals
     window_scrolled = QtCore.pyqtSignal(float, float) # signal is emitted on updating the 2D sliding window, where the first argument is the new start value and the 2nd is the new end value
     
-    @classmethod
-    def build_spikes_data_values_from_df(cls, spikes_df, config_fragile_linear_neuron_IDX_map, is_spike_included=None, **kwargs):
-        """ build global spikes for entire dataframe (not just the current window) 
-        
-        Uses the df['visualization_raster_y_location'] field added to the spikes dataframe to get the y-value for the spike
-        
-        Note that the colors are built using the self.config_fragile_linear_neuron_IDX_map property
-        
-        config_fragile_linear_neuron_IDX_map: a map from fragile_linear_neuron_IDX to config (tuple) values
-        is_included_indicies: Optional np.array of bools indicating whether each spike is included in the generated points
-        
-        """
-        # All units at once approach:
-        active_time_variable_name = spikes_df.spikes.time_variable_name
-        # Copy only the relevent columns so filtering is easier:
-        filtered_spikes_df = spikes_df[[active_time_variable_name, 'visualization_raster_y_location',  'visualization_raster_emphasis_state', 'fragile_linear_neuron_IDX']].copy()
-        
-        spike_emphasis_states = kwargs.get('spike_emphasis_state', None)
-        if spike_emphasis_states is not None:
-            assert len(spike_emphasis_states) == np.shape(spikes_df)[0], f"if specified, spike_emphasis_states must be the same length as the number of spikes but np.shape(spikes_df)[0]: {np.shape(spikes_df)[0]} and len(is_included_indicies): {len(spike_emphasis_states)}"
-            # Can set it on the dataframe:
-            # 'visualization_raster_y_location'
-        
-        if is_spike_included is not None:
-            assert len(is_spike_included) == np.shape(spikes_df)[0], f"if specified, is_included_indicies must be the same length as the number of spikes but np.shape(spikes_df)[0]: {np.shape(spikes_df)[0]} and len(is_included_indicies): {len(is_spike_included)}"
-            ## filter them by the is_included_indicies:
-            filtered_spikes_df = filtered_spikes_df[is_spike_included]
-        
-        # Filter the dataframe using that column and value from the list
-        curr_spike_t = filtered_spikes_df[active_time_variable_name].to_numpy() # this will map
-        curr_spike_y = filtered_spikes_df['visualization_raster_y_location'].to_numpy() # this will map
-        
-        # config_fragile_linear_neuron_IDX_map values are of the form: (i, fragile_linear_neuron_IDX, curr_pen, self._series_identity_lower_y_values[i], self._series_identity_upper_y_values[i])
-        # Emphasis/Deemphasis-Dependent Pens:
-        curr_spike_pens = [config_fragile_linear_neuron_IDX_map[a_fragile_linear_neuron_IDX][2][a_spike_emphasis_state] for a_fragile_linear_neuron_IDX, a_spike_emphasis_state in zip(filtered_spikes_df['fragile_linear_neuron_IDX'].to_numpy(), filtered_spikes_df['visualization_raster_emphasis_state'].to_numpy())] # get the pens for each spike from the configs map
-        
-        curr_n = len(curr_spike_t) # curr number of spikes
-        # builds the 'all_spots' tuples suitable for setting self.plots_data.all_spots from ALL Spikes
-        pos = np.vstack((curr_spike_t, curr_spike_y))
-        all_spots = [{'pos': pos[:,i], 'data': i, 'pen': curr_spike_pens[i]} for i in range(curr_n)]
-        return curr_spike_t, curr_spike_y, curr_spike_pens, all_spots, curr_n
     
-    @classmethod
-    def build_spikes_all_spots_from_df(cls, spikes_df, config_fragile_linear_neuron_IDX_map, is_spike_included=None, **kwargs):
-        """ builds the 'all_spots' tuples suitable for setting self.plots_data.all_spots from ALL Spikes 
-        Internally calls `cls.build_spikes_data_values_from_df(...)
-        """
-        curr_spike_x, curr_spike_y, curr_spike_pens, all_spots, curr_n = cls.build_spikes_data_values_from_df(spikes_df, config_fragile_linear_neuron_IDX_map, is_spike_included=is_spike_included, **kwargs)
-        return all_spots
-    
-    
-    # def update_scatter_plots(self):
-    #     # Update preview_overview_scatter_plot
-    #     self.plots.preview_overview_scatter_plot.setData(self.plots_data.all_spots)
-    #     if self.Includes2DActiveWindowScatter:
-    #         self.plots.scatter_plot.setData(self.plots_data.all_spots)
-    
-    
-    def _build_all_spikes_data_values(self, is_included_indicies=None, **kwargs):
-        """ build global spikes for entire dataframe (not just the current window) 
-        
-        Uses the df['visualization_raster_y_location'] field added to the spikes dataframe to get the y-value for the spike
-        
-        Note that the colors are built using the self.config_fragile_linear_neuron_IDX_map property
-        
-        is_included_indicies: Optional np.array of bools indicating whether each spike is included in the generated points
-        
-        Internally calls `cls.build_spikes_data_values_from_df(...)
-        """
-        # All units at once approach:
-        return Render2DScrollWindowPlotMixin.build_spikes_data_values_from_df(self.spikes_window.df, self.config_fragile_linear_neuron_IDX_map, is_spike_included=is_included_indicies, **kwargs)
-        
-    def _build_all_spikes_all_spots(self, is_included_indicies=None, **kwargs):
-        """ build the all_spots from the global spikes for entire dataframe (not just the current window) 
-        
-        Example:
-            ## Rebuild Raster Plot Points:
-            self._build_cell_configs()
 
-            # ALL Spikes in the preview window:
-            self.plots_data.all_spots = self._build_all_spikes_all_spots()
-            # Update preview_overview_scatter_plot
-            self.plots.preview_overview_scatter_plot.setData(self.plots_data.all_spots)
-            if self.Includes2DActiveWindowScatter:
-                self.plots.scatter_plot.setData(self.plots_data.all_spots)     
-        """
-        return Render2DScrollWindowPlotMixin.build_spikes_all_spots_from_df(self.spikes_window.df, self.config_fragile_linear_neuron_IDX_map, is_spike_included=is_included_indicies, **kwargs)
-    
     # def ScrollRasterPreviewWindow_on_BuildUI(self, graphics_layout_widget: pg.GraphicsLayoutWidget=None, layout_row=0, layout_col=0):
     def ScrollRasterPreviewWindow_on_BuildUI(self, background_static_scroll_window_plot):
         """ Note that this doesn't need to update because the background is static (it shows all time) 
@@ -249,4 +163,106 @@ class Render2DScrollWindowPlotMixin:
         self.ui.scroll_window_region.setRegion([new_start, new_end]) # adjust scroll control
     
     
+    # ==================================================================================================================== #
+    # Private/Internal Methods                                                                                             #
+    # ==================================================================================================================== #
+    
+    def _build_all_spikes_data_values(self, is_included_indicies=None, **kwargs):
+        """ build global spikes for entire dataframe (not just the current window) 
+        
+        Called ONLY by ScrollRasterPreviewWindow_on_BuildUI(self, background_static_scroll_window_plot)
+
+        Implementation:
+            Uses the df['visualization_raster_y_location'] field added to the spikes dataframe to get the y-value for the spike
+            Note that the colors are built using the self.config_fragile_linear_neuron_IDX_map property
+            is_included_indicies: Optional np.array of bools indicating whether each spike is included in the generated points
+            Internally calls `cls.build_spikes_data_values_from_df(...)
+            
+        """
+        # All units at once approach:
+        return Render2DScrollWindowPlotMixin.build_spikes_data_values_from_df(self.spikes_window.df, self.config_fragile_linear_neuron_IDX_map, is_spike_included=is_included_indicies, **kwargs)
+        
+    def _build_all_spikes_all_spots(self, is_included_indicies=None, **kwargs):
+        """ build the all_spots from the global spikes for entire dataframe (not just the current window) 
+        
+
+        Called by:
+            on_unit_sort_order_changed
+            on_neuron_colors_changed
+            reset_spike_emphasis
+            update_spike_emphasis
+
+
+        Example:
+            ## Rebuild Raster Plot Points:
+            self._build_cell_configs()
+
+            # ALL Spikes in the preview window:
+            self.plots_data.all_spots = self._build_all_spikes_all_spots()
+            # Update preview_overview_scatter_plot
+            self.plots.preview_overview_scatter_plot.setData(self.plots_data.all_spots)
+            if self.Includes2DActiveWindowScatter:
+                self.plots.scatter_plot.setData(self.plots_data.all_spots)     
+        """
+        return Render2DScrollWindowPlotMixin.build_spikes_all_spots_from_df(self.spikes_window.df, self.config_fragile_linear_neuron_IDX_map, is_spike_included=is_included_indicies, **kwargs)
+    
+
+
+    
+    # ==================================================================================================================== #
+    # Class/Static Methods                                                                                                 #
+    # ==================================================================================================================== #
+    @classmethod
+    def build_spikes_data_values_from_df(cls, spikes_df, config_fragile_linear_neuron_IDX_map, is_spike_included=None, **kwargs):
+        """ build global spikes for entire dataframe (not just the current window) 
+        
+        Called by:
+            self.build_spikes_all_spots_from_df(...)
+            cls.build_spikes_all_spots_from_df(...)
+
+        Uses the df['visualization_raster_y_location'] field added to the spikes dataframe to get the y-value for the spike
+        
+        Note that the colors are built using the self.config_fragile_linear_neuron_IDX_map property
+        
+        config_fragile_linear_neuron_IDX_map: a map from fragile_linear_neuron_IDX to config (tuple) values
+        is_included_indicies: Optional np.array of bools indicating whether each spike is included in the generated points
+        
+        """
+        # All units at once approach:
+        active_time_variable_name = spikes_df.spikes.time_variable_name
+        # Copy only the relevent columns so filtering is easier:
+        filtered_spikes_df = spikes_df[[active_time_variable_name, 'visualization_raster_y_location',  'visualization_raster_emphasis_state', 'fragile_linear_neuron_IDX']].copy()
+        
+        spike_emphasis_states = kwargs.get('spike_emphasis_state', None)
+        if spike_emphasis_states is not None:
+            assert len(spike_emphasis_states) == np.shape(spikes_df)[0], f"if specified, spike_emphasis_states must be the same length as the number of spikes but np.shape(spikes_df)[0]: {np.shape(spikes_df)[0]} and len(is_included_indicies): {len(spike_emphasis_states)}"
+            # Can set it on the dataframe:
+            # 'visualization_raster_y_location'
+        
+        if is_spike_included is not None:
+            assert len(is_spike_included) == np.shape(spikes_df)[0], f"if specified, is_included_indicies must be the same length as the number of spikes but np.shape(spikes_df)[0]: {np.shape(spikes_df)[0]} and len(is_included_indicies): {len(is_spike_included)}"
+            ## filter them by the is_included_indicies:
+            filtered_spikes_df = filtered_spikes_df[is_spike_included]
+        
+        # Filter the dataframe using that column and value from the list
+        curr_spike_t = filtered_spikes_df[active_time_variable_name].to_numpy() # this will map
+        curr_spike_y = filtered_spikes_df['visualization_raster_y_location'].to_numpy() # this will map
+        
+        # config_fragile_linear_neuron_IDX_map values are of the form: (i, fragile_linear_neuron_IDX, curr_pen, self._series_identity_lower_y_values[i], self._series_identity_upper_y_values[i])
+        # Emphasis/Deemphasis-Dependent Pens:
+        curr_spike_pens = [config_fragile_linear_neuron_IDX_map[a_fragile_linear_neuron_IDX][2][a_spike_emphasis_state] for a_fragile_linear_neuron_IDX, a_spike_emphasis_state in zip(filtered_spikes_df['fragile_linear_neuron_IDX'].to_numpy(), filtered_spikes_df['visualization_raster_emphasis_state'].to_numpy())] # get the pens for each spike from the configs map
+        
+        curr_n = len(curr_spike_t) # curr number of spikes
+        # builds the 'all_spots' tuples suitable for setting self.plots_data.all_spots from ALL Spikes
+        pos = np.vstack((curr_spike_t, curr_spike_y))
+        all_spots = [{'pos': pos[:,i], 'data': i, 'pen': curr_spike_pens[i]} for i in range(curr_n)]
+        return curr_spike_t, curr_spike_y, curr_spike_pens, all_spots, curr_n
+    
+    @classmethod
+    def build_spikes_all_spots_from_df(cls, spikes_df, config_fragile_linear_neuron_IDX_map, is_spike_included=None, **kwargs):
+        """ builds the 'all_spots' tuples suitable for setting self.plots_data.all_spots from ALL Spikes 
+        Internally calls `cls.build_spikes_data_values_from_df(...)
+        """
+        curr_spike_x, curr_spike_y, curr_spike_pens, all_spots, curr_n = cls.build_spikes_data_values_from_df(spikes_df, config_fragile_linear_neuron_IDX_map, is_spike_included=is_spike_included, **kwargs)
+        return all_spots
     
