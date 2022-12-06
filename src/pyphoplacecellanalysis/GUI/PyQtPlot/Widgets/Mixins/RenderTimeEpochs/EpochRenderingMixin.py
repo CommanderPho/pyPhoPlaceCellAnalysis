@@ -91,7 +91,13 @@ class EpochRenderingMixin:
     def interval_datasources(self):
         """The interval_datasources property. A RenderPlotsData object """
         return self.plots_data['interval_datasources']
- 
+
+
+    @property
+    def interval_datasource_names(self):
+        """The interval_datasources property."""
+        return list(self.interval_datasources.dynamically_added_attributes) # ['CustomPBEs', 'PBEs', 'Ripples', 'Laps', 'Replays', 'SessionEpochs']
+
     @property
     def interval_datasource_updating_connections(self):
         """The interval_datasource_updating_connections property. A ConnectionsContainer object """
@@ -284,7 +290,7 @@ class EpochRenderingMixin:
 
         return returned_rect_items 
 
-    def remove_rendered_intervals(self, name, child_plots_removal_list=None, debug_print=True):
+    def remove_rendered_intervals(self, name, child_plots_removal_list=None, debug_print=False):
         """ removes the intervals specified by the interval_datasource to the plots
 
         Inputs:
@@ -324,7 +330,7 @@ class EpochRenderingMixin:
     
         return items_to_remove_from_rendered_epochs
 
-    def clear_all_rendered_intervals(self, child_plots_removal_list=None, debug_print=True):
+    def clear_all_rendered_intervals(self, child_plots_removal_list=None, debug_print=False):
         """ removes all rendered rects - a batch version of removed_rendered_intervals(...) """
         curr_rendered_epoch_names = list(self.rendered_epochs.keys()) # done to prevent problems with dict changing size during iteration
         for a_name in curr_rendered_epoch_names:
@@ -354,7 +360,7 @@ class EpochRenderingMixin:
                 'main_plot_widget': 'plot[42 intervals]'}}
         """
         out_dict = {}
-        rendered_epoch_names = list(self.interval_datasources.dynamically_added_attributes)
+        rendered_epoch_names = self.interval_datasource_names
         if debug_print:
             print(f'rendered_epoch_names: {rendered_epoch_names}')
         for a_name in rendered_epoch_names:
@@ -413,6 +419,9 @@ class EpochRenderingMixin:
                 #     if not isinstance(a_rect_item, str):
                 #         # Adjust the bounds to fit any children:
                 #         EpochRenderingMixin.compute_bounds_adjustment_for_rect_item(a_plot, a_rect_item)
+            else:
+                print(f"WARNING: interval_key '{interval_key}' was not found in self.interval_datasources. Skipping update for unknown item.")
+
 
 
 
@@ -543,7 +552,6 @@ class EpochRenderingMixin:
     @classmethod
     def build_stacked_epoch_layout(cls, rendered_interval_heights, epoch_render_stack_height=40.0, interval_stack_location='below', debug_print=True):
         """ Builds a stack layout for the list of specified epochs
-
 
             rendered_interval_keys = ['_', 'SessionEpochs', 'Laps', '_', 'PBEs', 'Ripples', 'Replays'] # '_' indicates a vertical spacer
             rendered_interval_heights = [0.2, 1.0, 1.0, 0.1, 1.0, 1.0, 1.0] # ratio of heights to each interval
