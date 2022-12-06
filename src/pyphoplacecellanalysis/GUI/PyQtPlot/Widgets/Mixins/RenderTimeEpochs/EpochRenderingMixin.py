@@ -496,6 +496,7 @@ class EpochRenderingMixin:
     def extract_interval_bottom_top_area(self, debug_print=False):
         """ Computes the REQUIRED display rectangles for each of the `self.interval_datasources`. Does NOT take into account the active raster data.
 
+        TODO: Unused, and obsoleted by `self.recover_interval_datasources_positioning_properties(...)
         Usage:
             upper_extreme_vertical_offset, lower_extreme_vertical_offsets = active_2d_plot.extract_interval_bottom_top_area()
             (upper_extreme_vertical_offset, lower_extreme_vertical_offsets) # (-24.16666666666667, -5.0)
@@ -532,7 +533,7 @@ class EpochRenderingMixin:
 
 
     def apply_stacked_epoch_layout(self, rendered_interval_keys, desired_interval_height_ratios, epoch_render_stack_height=20.0, interval_stack_location='below', debug_print=True):
-        """ TODO: Builds a stack layout for the list of specified epochs
+        """ Builds and applies a stacked layout for the list of specified epochs
 
             rendered_interval_keys = ['_', 'SessionEpochs', 'Laps', '_', 'PBEs', 'Ripples', 'Replays'] # '_' indicates a vertical spacer
             rendered_interval_heights = [0.2, 1.0, 1.0, 0.1, 1.0, 1.0, 1.0] # ratio of heights to each interval
@@ -544,8 +545,9 @@ class EpochRenderingMixin:
             from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.Mixins.RenderTimeEpochs.Specific2DRenderTimeEpochs import General2DRenderTimeEpochs
 
             rendered_interval_keys = ['_', 'SessionEpochs', 'Laps', '_', 'PBEs', 'Ripples', 'Replays'] # '_' indicates a vertical spacer
-            desired_interval_height_ratios = [0.2, 1.0, 1.0, 0.1, 1.0, 1.0, 1.0] # ratio of heights to each interval
-            required_vertical_offsets, required_interval_heights = build_stacked_epoch_layout(desired_interval_height_ratios, epoch_render_stack_height=40.0, interval_stack_location='below')
+            desired_interval_height_ratios = [0.2, 0.5, 1.0, 0.1, 1.0, 1.0, 1.0] # ratio of heights to each interval (and the vertical spacers)
+            stacked_epoch_layout_dict = active_2d_plot.apply_stacked_epoch_layout(rendered_interval_keys, desired_interval_height_ratios, epoch_render_stack_height=20.0, interval_stack_location='below')
+            stacked_epoch_layout_dict
 
 
             ## Inline Concise: Position Replays, PBEs, and Ripples all below the scatter:
@@ -553,33 +555,25 @@ class EpochRenderingMixin:
                 if interval_key in active_2d_plot.interval_datasources:
                     active_2d_plot.interval_datasources[interval_key].update_visualization_properties(lambda active_df, **kwargs: General2DRenderTimeEpochs._update_df_visualization_columns(active_df, y_location=y_location, height=height, **kwargs)) ## Fully inline
         """
-
-        
-        # rendered_interval_keys = ['_', 'SessionEpochs', 'Laps', '_', 'PBEs', 'Ripples', 'Replays'] # '_' indicates a vertical spacer
-        # desired_interval_height_ratios = [0.2, 0.5, 1.0, 0.1, 1.0, 1.0, 1.0] # ratio of heights to each interval (and the vertical spacers)
-
         assert len(rendered_interval_keys) == len(desired_interval_height_ratios), f"len(rendered_interval_keys): {len(rendered_interval_keys)} != len(desired_interval_height_ratios): {len(desired_interval_height_ratios)}"
         required_vertical_offsets, required_interval_heights = self.build_stacked_epoch_layout(desired_interval_height_ratios, epoch_render_stack_height=epoch_render_stack_height, interval_stack_location=interval_stack_location)
+        
+        if interval_stack_location == 'below':
+            # required_vertical_offsets = required_vertical_offsets * -1.0 # make offsets negative if it's below the plot
+            pass
+        elif interval_stack_location == 'above':
+            # if it's to be placed above the plot, we need to add the top of the plot to each of the offsets:
+            curr_x_min, curr_x_max, curr_y_min, curr_y_max = self.get_render_intervals_plot_range()
+            required_vertical_offsets = required_vertical_offsets + curr_y_max # TODO: get top of plot
+        else:
+            print(f"interval_stack_location: str must be either ('below' or 'above') but was {interval_stack_location}")
+            raise NotImplementedError
+        
         # Build update dict:
         stacked_epoch_layout_dict = {interval_key:dict(y_location=y_location, height=height) for interval_key, y_location, height in zip(rendered_interval_keys, required_vertical_offsets, required_interval_heights)} # Build a stacked_epoch_layout_dict to update the display
-        active_2d_plot.update_rendered_intervals_visualization_properties(stacked_epoch_layout_dict)
+        self.update_rendered_intervals_visualization_properties(stacked_epoch_layout_dict)
 
-
-        # normalized_interval_heights = rendered_interval_heights/np.sum(rendered_interval_heights) # array([0.2, 0.2, 0.2, 0.2, 0.2])
-        # required_interval_heights = normalized_interval_heights * epoch_render_stack_height # array([3.2, 3.2, 3.2, 3.2, 3.2])
-        # required_vertical_offsets = np.cumsum(required_interval_heights) # array([ 3.2  6.4  9.6 12.8 16.])
-        # if interval_stack_location == 'below':
-        #     required_vertical_offsets = required_vertical_offsets * -1.0 # make offsets negative if it's below the plot
-        # elif interval_stack_location == 'above':
-        #     # if it's to be placed above the plot, we need to add the top of the plot to each of the offsets:
-        #     required_vertical_offsets = required_vertical_offsets + 0.0 # TODO: get top of plot
-        # else:
-        #     print(f"interval_stack_location: str must be either ('below' or 'above') but was {interval_stack_location}")
-        #     raise NotImplementedError
-        # if debug_print:
-        #     print(f'required_interval_heights: {required_interval_heights}, required_vertical_offsets: {required_vertical_offsets}')
-
-        return required_vertical_offsets, required_interval_heights
+        return stacked_epoch_layout_dict
 
 
 
