@@ -6,9 +6,11 @@ from neuropy.core import Epoch
 from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtCore
 from pyphoplacecellanalysis.General.Model.Datasources.Datasources import BaseDatasource, DataframeDatasource
 
+import pyphoplacecellanalysis.External.pyqtgraph as pg
+from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.helpers import RectangleRenderTupleHelpers, QPenTuple, QBrushTuple
 
 class IntervalsDatasource(BaseDatasource):
-    """ TODO: a datasource for interval data
+    """ a datasource for interval data
 
     Contains a dataframe.
         
@@ -147,7 +149,51 @@ class IntervalsDatasource(BaseDatasource):
         self._df = dataframe_vis_columns_function(self._df)
         self.source_data_changed_signal.emit(self) # Emit the data changed signal
 
+    
+    def recover_positioning_properties(self):
+        """ Tries to recover the positioning properties from each of the interval_datasources of active_2d_plot
         
+        Usage:
+
+            all_series_positioning_dfs, all_series_compressed_positioning_dfs = active_2d_plot.extract_interval_bottom_top_area()
+            # all_series_positioning_dfs
+            all_series_compressed_positioning_dfs
+
+        all_series_compressed_positioning_dfs: {'PBEs': {'y_location': -11.666666666666668, 'height': 4.166666666666667},
+        'Ripples': {'y_location': -15.833333333333336, 'height': 4.166666666666667},
+        'Replays': {'y_location': -20.000000000000004, 'height': 4.166666666666667},
+        'Laps': {'y_location': -7.083333333333334, 'height': 4.166666666666667},
+        'SessionEpochs': {'y_location': -2.916666666666667, 'height': 2.0833333333333335}}
+
+        """
+        series_positioning_df = self.df[['series_vertical_offset', 'series_height']].copy() # , 'pen', 'brush'
+        # # series can render either 'above' or 'below':
+        # series_positioning_df['is_series_below'] = (series_positioning_df['series_vertical_offset'] <= 0.0) # all elements less than or equal to zero indicate that it's below the plot, and its height will be added negatively to find the max-y value
+        # _curr_active_effective_series_heights = series_positioning_df.series_height.values.copy()
+        # _curr_active_effective_series_heights[series_positioning_df['is_series_below'].values] = -1.0 * _curr_active_effective_series_heights[series_positioning_df['is_series_below'].values] # effective heights are negative for series below the y-axis
+        # series_positioning_df['effective_series_heights'] = _curr_active_effective_series_heights # curr_df['series_height'].copy()
+        # series_positioning_df['effective_series_extreme_vertical_offsets'] = series_positioning_df['effective_series_heights'] + series_positioning_df['series_vertical_offset']
+        # Generate a compressed-position representation of curr_df:
+        a_compressed_series_positioning_df = series_positioning_df.drop_duplicates(inplace=False)
+        series_compressed_positioning_df = a_compressed_series_positioning_df
+        series_compressed_positioning_update_dict = None
+
+        if a_compressed_series_positioning_df.shape[0] == 1:
+            # only one entry, to be expected
+            series_compressed_positioning_update_dict = {k:list(v.values())[0] for k, v in a_compressed_series_positioning_df.to_dict().items() if k in ['series_vertical_offset', 'series_height']}
+            ## Rename columns for update outputs:
+            series_compressed_positioning_update_dict['y_location'] = series_compressed_positioning_update_dict.pop('series_vertical_offset')
+            series_compressed_positioning_update_dict['height'] = series_compressed_positioning_update_dict.pop('series_height')                
+        else:
+            series_compressed_positioning_update_dict = None
+
+        return series_positioning_df, series_compressed_positioning_df, series_compressed_positioning_update_dict
+
+
+
+    # ==================================================================================================================== #
+    # classmethods                                                                                                         #
+    # ==================================================================================================================== #
         
     @classmethod
     def add_missing_reciprocal_columns_if_needed(cls, df):
@@ -167,15 +213,12 @@ class IntervalsDatasource(BaseDatasource):
             else:
                 raise NotImplementedError
             return df
-            
-            
         
     @classmethod
     def init_from_times_values(cls, t_starts, t_durations, values, dataframe_vis_columns_function, datasource_name='intervals_datasource_from_epoch_obj'):
         plot_df = pd.DataFrame({'t_start': t_starts, 't_duration': t_durations, 't_end': (t_starts + t_durations), 'v': values})
         return cls.init_from_epoch_object(plot_df, dataframe_vis_columns_function=dataframe_vis_columns_function, datasource_name=datasource_name)
         # return cls(plot_df, datasource_name=datasource_name)
-        
         
     @classmethod
     def init_from_epoch_object(cls, epochs, dataframe_vis_columns_function, datasource_name='intervals_datasource_from_epoch_obj', debug_print=False):
@@ -201,7 +244,6 @@ class IntervalsDatasource(BaseDatasource):
         active_df = cls.add_missing_reciprocal_columns_if_needed(active_df)
         active_df = dataframe_vis_columns_function(active_df)
         return cls(active_df, datasource_name=datasource_name)
-        
     
     @QtCore.pyqtSlot(float, float)
     def get_updated_data_window(self, new_start, new_end):

@@ -443,12 +443,12 @@ class EpochRenderingMixin:
         return (extrema_df['x_min'].min(), extrema_df['x_max'].max(), extrema_df['y_min'].min(), extrema_df['y_max'].max())
 
 
-    def recover_interval_datasources_positioning_properties(self):
+    def recover_interval_datasources_positioning_properties(self, debug_print=False):
         """ Tries to recover the positioning properties from each of the interval_datasources of active_2d_plot
         
         Usage:
 
-            all_series_positioning_dfs, all_series_compressed_positioning_dfs = extract_interval_bottom_top_area(active_2d_plot)
+            all_series_positioning_dfs, all_series_compressed_positioning_dfs, all_series_compressed_positioning_update_dicts = active_2d_plot.recover_interval_datasources_positioning_properties()
             # all_series_positioning_dfs
             all_series_compressed_positioning_dfs
 
@@ -458,42 +458,37 @@ class EpochRenderingMixin:
         'Laps': {'y_location': -7.083333333333334, 'height': 4.166666666666667},
         'SessionEpochs': {'y_location': -2.916666666666667, 'height': 2.0833333333333335}}
 
+
+        >> Can restore with:
+
+            all_series_compressed_positioning_update_dicts = { 'SessionEpochs': {'y_location': -2.916666666666667, 'height': 2.0833333333333335},
+            'Laps': {'y_location': -7.083333333333334, 'height': 4.166666666666667},
+            'PBEs': {'y_location': -11.666666666666668, 'height': 4.166666666666667},
+            'Ripples': {'y_location': -15.833333333333336, 'height': 4.166666666666667},
+            'Replays': {'y_location': -20.000000000000004, 'height': 4.166666666666667}}
+            active_2d_plot.update_rendered_intervals_visualization_properties(all_series_compressed_positioning_update_dicts)
+
+
         """
         all_series_positioning_dfs = {}
         all_series_compressed_positioning_dfs = {}
-        # all_series_vertical_offsets = []
-        # all_series_heights = []
-
+        all_series_compressed_positioning_update_dicts = {}
         for a_name, a_ds in self.interval_datasources.items():
             # print(a_name, a_ds)
             if isinstance(a_ds, IntervalsDatasource):
-                curr_df = a_ds.df[['series_vertical_offset', 'series_height']].copy()
-                # series can render either 'above' or 'below':
-                curr_df['is_series_below'] = (curr_df['series_vertical_offset'] <= 0.0) # all elements less than or equal to zero indicate that it's below the plot, and its height will be added negatively to find the max-y value
-                _curr_active_effective_series_heights = curr_df.series_height.values.copy()
-                _curr_active_effective_series_heights[curr_df['is_series_below'].values] = -1.0 * _curr_active_effective_series_heights[curr_df['is_series_below'].values] # effective heights are negative for series below the y-axis
-                curr_df['effective_series_heights'] = _curr_active_effective_series_heights # curr_df['series_height'].copy()
-                # curr_df['active_effective_series_heights']
-                curr_df['effective_series_extreme_vertical_offsets'] = curr_df['effective_series_heights'] + curr_df['series_vertical_offset']
-                # all_series_positioning_dfs.append(curr_df)
-                all_series_positioning_dfs[a_name] = curr_df
-                # Generate a compressed-position representation of curr_df:
-                a_compressed_series_positioning_df = curr_df.drop_duplicates(inplace=False)
-                if a_compressed_series_positioning_df.shape[0] == 1:
+                # all_series_positioning_dfs[a_name], a_compressed_series_positioning_df, series_compressed_positioning_update_dict = a_ds.recover_positioning_properties()
+                all_series_positioning_dfs[a_name], all_series_compressed_positioning_dfs[a_name], series_compressed_positioning_update_dict = a_ds.recover_positioning_properties()
+                if series_compressed_positioning_update_dict is not None:
                     # only one entry, to be expected
-                    a_compressed_series_positioning_df = {k:list(v.values())[0] for k, v in a_compressed_series_positioning_df.to_dict().items() if k in ['series_vertical_offset', 'series_height']}
-                    ## Rename columns for update outputs:
-                    a_compressed_series_positioning_df['y_location'] = a_compressed_series_positioning_df.pop('series_vertical_offset')
-                    a_compressed_series_positioning_df['height'] = a_compressed_series_positioning_df.pop('series_height')
-                    all_series_compressed_positioning_dfs[a_name] = a_compressed_series_positioning_df
+                    all_series_compressed_positioning_update_dicts[a_name] = series_compressed_positioning_update_dict
                 else:
-                    print(f'ERROR: {a_name}')
-                    all_series_compressed_positioning_dfs[a_name] = a_compressed_series_positioning_df
-            
+                    print(f'ERROR: series_compressed_positioning_update_dict is None for {a_name}. it will not be represented in the output dict.')            
             else:
-                print(f'weird a_name, a_ds: {a_name}, {a_ds}, type(a_ds): {type(a_ds)}')
+                if debug_print:
+                    print(f'weird a_name, a_ds: {a_name}, {a_ds}, type(a_ds): {type(a_ds)}')
+                pass
 
-        return all_series_positioning_dfs, all_series_compressed_positioning_dfs
+        return all_series_positioning_dfs, all_series_compressed_positioning_dfs, all_series_compressed_positioning_update_dicts
 
 
 
@@ -537,7 +532,7 @@ class EpochRenderingMixin:
 
 
     def apply_stacked_epoch_layout(self, rendered_interval_keys, desired_interval_height_ratios, epoch_render_stack_height=20.0, interval_stack_location='below', debug_print=True):
-        """ Builds a stack layout for the list of specified epochs
+        """ TODO: Builds a stack layout for the list of specified epochs
 
             rendered_interval_keys = ['_', 'SessionEpochs', 'Laps', '_', 'PBEs', 'Ripples', 'Replays'] # '_' indicates a vertical spacer
             rendered_interval_heights = [0.2, 1.0, 1.0, 0.1, 1.0, 1.0, 1.0] # ratio of heights to each interval
