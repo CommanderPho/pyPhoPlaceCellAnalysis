@@ -287,7 +287,7 @@ class Render2DEventRectanglesHelper:
             don't need ['interval_pair']
         
         Usage:            
-            from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.Mixins.Render2DEventRectanglesHelper import Render2DEventRectanglesHelper
+            from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.Mixins.RenderTimeEpochs.Render2DEventRectanglesHelper import Render2DEventRectanglesHelper
 
             output_display_items = Render2DEventRectanglesHelper.add_event_rectangles(spike_raster_window.spike_raster_plt_2d, active_burst_intervals) # {'interval_rects_item': active_interval_rects_item}
             active_interval_rects_item = output_display_items['interval_rects_item']
@@ -312,7 +312,7 @@ class Render2DEventRectanglesHelper:
             active_2d_plot: e.g. spike_raster_window.spike_raster_plt_2d
             active_burst_intervals
         Usage:            
-            from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.Mixins.Render2DEventRectanglesHelper import Render2DEventRectanglesHelper
+            from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.Mixins.RenderTimeEpochs.Render2DEventRectanglesHelper import Render2DEventRectanglesHelper
 
             output_display_items = Render2DEventRectanglesHelper.add_event_rectangles(spike_raster_window.spike_raster_plt_2d, active_burst_intervals) # {'interval_rects_item': active_interval_rects_item}
             active_interval_rects_item = output_display_items['interval_rects_item']
