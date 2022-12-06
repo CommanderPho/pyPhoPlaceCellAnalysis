@@ -1,6 +1,7 @@
 from copy import copy, deepcopy
 from neuropy.core import Epoch
 import numpy as np
+import pandas as pd
 
 from qtpy import QtCore
 
@@ -423,6 +424,167 @@ class EpochRenderingMixin:
                 print(f"WARNING: interval_key '{interval_key}' was not found in self.interval_datasources. Skipping update for unknown item.")
 
 
+
+    # Interval Positioning Helpers _______________________________________________________________________________________ #
+
+    def get_render_intervals_plot_range(self, debug_print=False):
+        """ Gets the most extreme range of all the interval plots 
+            Internally calls `self.get_plot_view_range(a_plot)` on each `self.interval_rendering_plots` to determine the absolute ('x_min', 'x_max', 'y_min','y_max') among all these plots.
+
+        Usage:
+            curr_x_min, curr_x_max, curr_y_min, curr_y_max = active_2d_plot.get_render_intervals_plot_range()
+            (curr_x_min, curr_x_max, curr_y_min, curr_y_max) # (22.3668519082712, 2093.8524703475414, -21.0, 72.85886744622752)
+        
+        """
+        extrema_tuples = []
+        for a_plot in self.interval_rendering_plots:
+            extrema_tuples.append(self.get_plot_view_range(a_plot, debug_print=debug_print))
+        extrema_df = pd.DataFrame(np.array(extrema_tuples), columns=['x_min', 'x_max', 'y_min','y_max'])
+        return (extrema_df['x_min'].min(), extrema_df['x_max'].max(), extrema_df['y_min'].min(), extrema_df['y_max'].max())
+
+
+    def recover_interval_datasources_positioning_properties(self):
+        """ Tries to recover the positioning properties from each of the interval_datasources of active_2d_plot
+        
+        Usage:
+
+            all_series_positioning_dfs, all_series_compressed_positioning_dfs = extract_interval_bottom_top_area(active_2d_plot)
+            # all_series_positioning_dfs
+            all_series_compressed_positioning_dfs
+
+        all_series_compressed_positioning_dfs: {'PBEs': {'y_location': -11.666666666666668, 'height': 4.166666666666667},
+        'Ripples': {'y_location': -15.833333333333336, 'height': 4.166666666666667},
+        'Replays': {'y_location': -20.000000000000004, 'height': 4.166666666666667},
+        'Laps': {'y_location': -7.083333333333334, 'height': 4.166666666666667},
+        'SessionEpochs': {'y_location': -2.916666666666667, 'height': 2.0833333333333335}}
+
+        """
+        all_series_positioning_dfs = {}
+        all_series_compressed_positioning_dfs = {}
+        # all_series_vertical_offsets = []
+        # all_series_heights = []
+
+        for a_name, a_ds in self.interval_datasources.items():
+            # print(a_name, a_ds)
+            if isinstance(a_ds, IntervalsDatasource):
+                curr_df = a_ds.df[['series_vertical_offset', 'series_height']].copy()
+                # series can render either 'above' or 'below':
+                curr_df['is_series_below'] = (curr_df['series_vertical_offset'] <= 0.0) # all elements less than or equal to zero indicate that it's below the plot, and its height will be added negatively to find the max-y value
+                _curr_active_effective_series_heights = curr_df.series_height.values.copy()
+                _curr_active_effective_series_heights[curr_df['is_series_below'].values] = -1.0 * _curr_active_effective_series_heights[curr_df['is_series_below'].values] # effective heights are negative for series below the y-axis
+                curr_df['effective_series_heights'] = _curr_active_effective_series_heights # curr_df['series_height'].copy()
+                # curr_df['active_effective_series_heights']
+                curr_df['effective_series_extreme_vertical_offsets'] = curr_df['effective_series_heights'] + curr_df['series_vertical_offset']
+                # all_series_positioning_dfs.append(curr_df)
+                all_series_positioning_dfs[a_name] = curr_df
+                # Generate a compressed-position representation of curr_df:
+                a_compressed_series_positioning_df = curr_df.drop_duplicates(inplace=False)
+                if a_compressed_series_positioning_df.shape[0] == 1:
+                    # only one entry, to be expected
+                    a_compressed_series_positioning_df = {k:list(v.values())[0] for k, v in a_compressed_series_positioning_df.to_dict().items() if k in ['series_vertical_offset', 'series_height']}
+                    ## Rename columns for update outputs:
+                    a_compressed_series_positioning_df['y_location'] = a_compressed_series_positioning_df.pop('series_vertical_offset')
+                    a_compressed_series_positioning_df['height'] = a_compressed_series_positioning_df.pop('series_height')
+                    all_series_compressed_positioning_dfs[a_name] = a_compressed_series_positioning_df
+                else:
+                    print(f'ERROR: {a_name}')
+                    all_series_compressed_positioning_dfs[a_name] = a_compressed_series_positioning_df
+            
+            else:
+                print(f'weird a_name, a_ds: {a_name}, {a_ds}, type(a_ds): {type(a_ds)}')
+
+        return all_series_positioning_dfs, all_series_compressed_positioning_dfs
+
+
+
+
+    def extract_interval_bottom_top_area(self, debug_print=False):
+        """ Computes the REQUIRED display rectangles for each of the `self.interval_datasources`. Does NOT take into account the active raster data.
+
+        Usage:
+            upper_extreme_vertical_offset, lower_extreme_vertical_offsets = active_2d_plot.extract_interval_bottom_top_area()
+            (upper_extreme_vertical_offset, lower_extreme_vertical_offsets) # (-24.16666666666667, -5.0)
+        """
+        all_series_positioning_dfs = {}
+        all_series_vertical_offsets = []
+        all_series_heights = []
+
+        for a_name, a_ds in self.interval_datasources.items():
+            if isinstance(a_ds, IntervalsDatasource):
+                curr_df = a_ds.df[['series_vertical_offset', 'series_height']].copy()
+                # all_series_positioning_dfs.append(curr_df)
+                all_series_positioning_dfs[a_name] = curr_df
+                all_series_vertical_offsets.extend(curr_df.series_vertical_offset.values)
+                all_series_heights.extend(curr_df.series_height.values)
+            else:
+                if debug_print:
+                    print(f'weird a_name, a_ds: {a_name}, {a_ds}, type(a_ds): {type(a_ds)}')
+                pass
+
+        # Convert to a numpy array:
+        all_series_vertical_offsets = np.array(all_series_vertical_offsets)
+        all_series_heights = np.array(all_series_heights)
+
+        # series can render either 'above' or 'below':
+        is_series_below = (all_series_vertical_offsets <= 0.0) # all elements less than or equal to zero indicate that it's below the plot, and its height will be added negatively to find the max-y value
+
+        _temp_active_effective_series_heights = all_series_heights.copy()
+        _temp_active_effective_series_heights[is_series_below] = -1.0 * _temp_active_effective_series_heights[is_series_below] # effective heights are negative for series below the y-axis
+        _temp_active_effective_series_extreme_vertical_offsets = all_series_vertical_offsets + _temp_active_effective_series_heights
+
+        return ( _temp_active_effective_series_extreme_vertical_offsets.min(), _temp_active_effective_series_extreme_vertical_offsets.max()), all_series_positioning_dfs # (-24.16666666666667, -5.0)
+
+
+
+    def apply_stacked_epoch_layout(self, rendered_interval_keys, desired_interval_height_ratios, epoch_render_stack_height=20.0, interval_stack_location='below', debug_print=True):
+        """ Builds a stack layout for the list of specified epochs
+
+            rendered_interval_keys = ['_', 'SessionEpochs', 'Laps', '_', 'PBEs', 'Ripples', 'Replays'] # '_' indicates a vertical spacer
+            rendered_interval_heights = [0.2, 1.0, 1.0, 0.1, 1.0, 1.0, 1.0] # ratio of heights to each interval
+            vertical_spacer_height = 0.2
+            epoch_render_stack_height = 40.0 # the height of the entire stack containing all rendered epochs:
+            interval_stack_location = 'below' # 'below' or 'above'
+
+        Usage:
+            from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.Mixins.RenderTimeEpochs.Specific2DRenderTimeEpochs import General2DRenderTimeEpochs
+
+            rendered_interval_keys = ['_', 'SessionEpochs', 'Laps', '_', 'PBEs', 'Ripples', 'Replays'] # '_' indicates a vertical spacer
+            desired_interval_height_ratios = [0.2, 1.0, 1.0, 0.1, 1.0, 1.0, 1.0] # ratio of heights to each interval
+            required_vertical_offsets, required_interval_heights = build_stacked_epoch_layout(desired_interval_height_ratios, epoch_render_stack_height=40.0, interval_stack_location='below')
+
+
+            ## Inline Concise: Position Replays, PBEs, and Ripples all below the scatter:
+            for interval_key, y_location, height in zip(rendered_interval_keys, required_vertical_offsets, required_interval_heights):
+                if interval_key in active_2d_plot.interval_datasources:
+                    active_2d_plot.interval_datasources[interval_key].update_visualization_properties(lambda active_df, **kwargs: General2DRenderTimeEpochs._update_df_visualization_columns(active_df, y_location=y_location, height=height, **kwargs)) ## Fully inline
+        """
+
+        
+        # rendered_interval_keys = ['_', 'SessionEpochs', 'Laps', '_', 'PBEs', 'Ripples', 'Replays'] # '_' indicates a vertical spacer
+        # desired_interval_height_ratios = [0.2, 0.5, 1.0, 0.1, 1.0, 1.0, 1.0] # ratio of heights to each interval (and the vertical spacers)
+
+        assert len(rendered_interval_keys) == len(desired_interval_height_ratios), f"len(rendered_interval_keys): {len(rendered_interval_keys)} != len(desired_interval_height_ratios): {len(desired_interval_height_ratios)}"
+        required_vertical_offsets, required_interval_heights = self.build_stacked_epoch_layout(desired_interval_height_ratios, epoch_render_stack_height=epoch_render_stack_height, interval_stack_location=interval_stack_location)
+        # Build update dict:
+        stacked_epoch_layout_dict = {interval_key:dict(y_location=y_location, height=height) for interval_key, y_location, height in zip(rendered_interval_keys, required_vertical_offsets, required_interval_heights)} # Build a stacked_epoch_layout_dict to update the display
+        active_2d_plot.update_rendered_intervals_visualization_properties(stacked_epoch_layout_dict)
+
+
+        # normalized_interval_heights = rendered_interval_heights/np.sum(rendered_interval_heights) # array([0.2, 0.2, 0.2, 0.2, 0.2])
+        # required_interval_heights = normalized_interval_heights * epoch_render_stack_height # array([3.2, 3.2, 3.2, 3.2, 3.2])
+        # required_vertical_offsets = np.cumsum(required_interval_heights) # array([ 3.2  6.4  9.6 12.8 16.])
+        # if interval_stack_location == 'below':
+        #     required_vertical_offsets = required_vertical_offsets * -1.0 # make offsets negative if it's below the plot
+        # elif interval_stack_location == 'above':
+        #     # if it's to be placed above the plot, we need to add the top of the plot to each of the offsets:
+        #     required_vertical_offsets = required_vertical_offsets + 0.0 # TODO: get top of plot
+        # else:
+        #     print(f"interval_stack_location: str must be either ('below' or 'above') but was {interval_stack_location}")
+        #     raise NotImplementedError
+        # if debug_print:
+        #     print(f'required_interval_heights: {required_interval_heights}, required_vertical_offsets: {required_vertical_offsets}')
+
+        return required_vertical_offsets, required_interval_heights
 
 
 
