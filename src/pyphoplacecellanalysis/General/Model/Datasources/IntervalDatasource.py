@@ -1,3 +1,4 @@
+from copy import copy, deepcopy
 import numpy as np
 import pandas as pd
 
@@ -7,7 +8,8 @@ from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtCore
 from pyphoplacecellanalysis.General.Model.Datasources.Datasources import BaseDatasource, DataframeDatasource
 
 import pyphoplacecellanalysis.External.pyqtgraph as pg
-from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.helpers import RectangleRenderTupleHelpers, QPenTuple, QBrushTuple
+from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.helpers import RectangleRenderTupleHelpers # used for  `get_serialized_data` and `get_deserialized_data`
+
 
 class IntervalsDatasource(BaseDatasource):
     """ a datasource for interval data
@@ -188,6 +190,44 @@ class IntervalsDatasource(BaseDatasource):
             series_compressed_positioning_update_dict = None
 
         return series_positioning_df, series_compressed_positioning_df, series_compressed_positioning_update_dict
+
+
+
+    def get_serialized_data(self, drop_duplicates=False):
+        """ converts the 'pen' and 'brush' columns of self.df to hashable tuples for serialization.
+        Fixes # TypeError: unhashable type: 'QPen'
+        """
+        interval_datasource_df = self.df
+        serialized_df = deepcopy(interval_datasource_df)
+        if 'pen_tuple' not in serialized_df.columns:
+            serialized_df['pen_tuple'] = [RectangleRenderTupleHelpers.QPen_to_tuple(a_pen) for a_pen in serialized_df['pen']] # gets the RgbF values of the QColor returned from the QPen a_pen
+        if 'brush_tuple' not in serialized_df.columns:
+            serialized_df['brush_tuple'] = [RectangleRenderTupleHelpers.QBrush_to_tuple(a_brush) for a_brush in serialized_df['brush']] # gets the RgbF values of the QColor returned from the QBrush a_brush
+        # overwrite:
+        serialized_df['pen'] = serialized_df['pen_tuple']
+        serialized_df['brush'] = serialized_df['brush_tuple']
+        if drop_duplicates:
+            return serialized_df[['series_vertical_offset','series_height','pen','brush']].drop_duplicates(inplace=False)
+        else:
+            return serialized_df[['series_vertical_offset','series_height','pen','brush']] # return all entries
+
+
+    @classmethod
+    def get_deserialized_data(cls, serialized_df):
+        """ converts the list of (float, float, float, float, pen_color_hex:str, brush_color_hex:str) tuples back to the original (float, float, float, float, QPen, QBrush) list
+
+        Inverse operation of .get_serialized_data(...).
+
+        Usage:
+            seralized_tuples_data = RectangleRenderTupleHelpers.get_serialized_data(tuples_data)
+            tuples_data = RectangleRenderTupleHelpers.get_deserialized_data(seralized_tuples_data)
+
+            deserialized_df = get_deserialized_data(serialized_df)
+            deserialized_df
+        """ 
+        serialized_df['pen'] = [pg.mkPen(a_pen.color, width=a_pen.width) for a_pen in serialized_df['pen']] # gets the RgbF values of the QColor returned from the QPen a_pen
+        serialized_df['brush'] = [pg.mkBrush(a_brush.color) for a_brush in serialized_df['brush']] # gets the RgbF values of the QColor returned from the QBrush a_brush
+        return serialized_df
 
 
 
