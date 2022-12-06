@@ -110,7 +110,7 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
         """The series_identity_y_values property."""
         return self._series_identity_y_values
 
-    def update_series_identity_y_values(self):
+    def update_series_identity_y_values(self, debug_print=False):
         """ updates the fixed self._series_identity_y_values using the DataSeriesToSpatial.build_series_identity_axis(...) function.
         
         Should be called whenever:
@@ -126,22 +126,21 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
         self._series_identity_lower_y_values = DataSeriesToSpatial.build_series_identity_axis(self.n_cells, center_mode=self.params.center_mode, bin_position_mode='left_edges', side_bin_margins = self.params.side_bin_margins) / self.n_cells
         self._series_identity_upper_y_values = DataSeriesToSpatial.build_series_identity_axis(self.n_cells, center_mode=self.params.center_mode, bin_position_mode='right_edges', side_bin_margins = self.params.side_bin_margins) / self.n_cells
 
-
         ## SORT: TODO: This sort condition seems to work and change the sort-order of the cells when self.unit_sort_order is updated... but the colors get all wonky and I'm uncertain if the configs are working correctly. Furthmore, it isn't clear that the spiking is any better aligned.
         # This might be overkill, idk
         # self.y_fragile_linear_neuron_IDX_map = dict(zip(self.fragile_linear_neuron_IDX_to_spatial(self.fragile_linear_neuron_IDXs), self._series_identity_y_values)) # Using `self.fragile_linear_neuron_IDX_to_spatial(self.fragile_linear_neuron_IDXs)` instead of just `self.fragile_linear_neuron_IDXs` should yield sorted results
         if not np.alltrue(self.unit_sort_order == self.fragile_linear_neuron_IDXs):
-            print(f'update_series_identity_y_values(): building sorted version...')
+            if debug_print:
+                print(f'update_series_identity_y_values(): building sorted version...')
             # Copy the `self.series_identity_y_values` and sort them according to `self.unit_sort_order`
             _sorted_map_values = self.series_identity_y_values[self.unit_sort_order].copy() # sort the y-values
             # Builds the sorted version by sorting the map values before building:
             self.y_fragile_linear_neuron_IDX_map = dict(zip(self.fragile_linear_neuron_IDXs, _sorted_map_values)) # Old way
 
         else:
+            if debug_print:
+                print(f'update_series_identity_y_values(): (self.unit_sort_order == self.fragile_linear_neuron_IDXs) (default sort).')
             self.y_fragile_linear_neuron_IDX_map = dict(zip(self.fragile_linear_neuron_IDXs, self._series_identity_y_values)) # Old way 
-
-
-
 
 
     ## Required for DataSeriesToSpatialTransformingMixin
