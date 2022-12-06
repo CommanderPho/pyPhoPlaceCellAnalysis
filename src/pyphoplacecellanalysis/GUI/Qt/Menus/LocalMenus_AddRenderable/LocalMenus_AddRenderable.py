@@ -79,7 +79,7 @@ class LocalMenus_AddRenderable(QtWidgets.QMainWindow):
                                             lambda evt=None: SessionEpochs2DRenderTimeEpochs.add_render_time_epochs(curr_sess=sess.epochs, destination_plot=destination_plot),
                                             lambda evt=None: Ripples_2DRenderTimeEpochs.add_render_time_epochs(curr_sess=sess.ripple, destination_plot=destination_plot),
                                             lambda evt=None: Replays_2DRenderTimeEpochs.add_render_time_epochs(curr_sess=sess.replay, destination_plot=destination_plot),
-                                            lambda evt=None: print(f'actionAddTimeIntervals_Bursts not yet supported')
+                                            lambda evt=None: print(f'actionAddTimeIntervals_Bursts not yet supported'),
                                             lambda evt=None: print(f'actionAddTimeIntervals_Custom not yet supported')]
         
         submenu_addTimeIntervals_Connections = []
