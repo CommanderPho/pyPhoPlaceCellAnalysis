@@ -297,10 +297,13 @@ def programmatic_display_to_PDF(curr_active_pipeline, curr_display_function_name
 # ==================================================================================================================== #
 # Output PDF Merging/Manipulation                                                                                      #
 # ==================================================================================================================== #
-from PyPDF2 import PdfMerger
+
 
 def merge_output_pdfs(out_file_path='merged-pdf.pdf', *input_files):
-    """ merges the input PDF files into a single output """
+    """ merges the input PDF files into a single output 
+    Requires: PyPDF2
+    """
+    from PyPDF2 import PdfMerger
     merger = PdfMerger()
     for pdf in input_files: # ["file1.pdf", "file2.pdf", "file3.pdf"]
         merger.append(pdf)
