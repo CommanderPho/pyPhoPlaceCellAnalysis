@@ -100,8 +100,9 @@ class MultiContextComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Co
         neuron_IDs = np.unique(sess.spikes_df.aclu) # TODO: make sure standardized
 
         ## HERE I CAN SPECIFY WHICH REPLAYS TO USE FOR THE ANALYSIS:
-        replays_df = sess.replay
-
+        # replays_df = sess.replay
+        # replays_df = sess.pbe.to_dataframe()
+        replays_df = sess.ripple.to_dataframe()
 
         rdf, aclu_to_idx, irdf, aclu_to_idx_irdf = _final_compute_jonathan_replay_fr_analyses(sess, replays_df)
         rdf, neuron_replay_stats_df = _compute_neuron_replay_stats(rdf, aclu_to_idx) # neuron_replay_stats_df is joined with `final_jonathan_df` after that is built
@@ -382,13 +383,13 @@ def add_spike_counts(sess, rdf):
 
 # Make `rdf` (replay dataframe) ______________________________________________________________________________________ #
 def make_rdf(sess, replays_df):
-    """ uses the `sess.replay` property"""
+    """ recieves `replays_df`, but uses `sess.paradigm[1][0,0]` """
     rdf = replays_df.copy()[["start", "end"]]
     rdf["short_track"] = rdf["start"] > sess.paradigm[1][0,0]
     return rdf
 
 def remove_nospike_replays(rdf):
-    to_drop = np.where(make_fr(rdf).sum(axis=1)==0)[0]
+    to_drop = rdf.index[make_fr(rdf).sum(axis=1)==0]
     rdf = rdf.drop(to_drop, axis=0)
     return rdf
 
