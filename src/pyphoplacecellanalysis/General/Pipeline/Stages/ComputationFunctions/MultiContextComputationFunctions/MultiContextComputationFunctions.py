@@ -37,7 +37,7 @@ class MultiContextComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Co
     _computationPrecidence = 1000
     _is_global = True
 
-    def _perform_jonathan_replay_firing_rate_analyses(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_whitelist=None, replays_df=None, debug_print=False):
+    def _perform_jonathan_replay_firing_rate_analyses(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_whitelist=None, debug_print=False):
         """ Ported from Jonathan's `Gould_22-09-29.ipynb` Notebook
         
         Requires:
@@ -64,6 +64,7 @@ class MultiContextComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Co
                 ['jonathan_firing_rate_analysis']['neuron_replay_stats_df']
         
         """
+        replays_df = None
         if include_whitelist is None:
             include_whitelist = owning_pipeline_reference.active_completed_computation_result_names # ['maze', 'sprinkle']
 
@@ -100,13 +101,14 @@ class MultiContextComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Co
         neuron_IDs = np.unique(sess.spikes_df.aclu) # TODO: make sure standardized
 
         ## HERE I CAN SPECIFY WHICH REPLAYS TO USE FOR THE ANALYSIS:
-        if replays_df is None:
-            # If not replays_df argument is provided, get it from `sess`:
-            # replays_df = sess.replay
-            # replays_df = sess.pbe.to_dataframe()
-            replays_df = sess.ripple.to_dataframe()
-        else:
-            replays_df = replays_df.copy() # make a copy of the provided df
+        print(f'replays_df: {replays_df}, type(replays_df): {type(replays_df)}')
+        # if replays_df is None:
+        # If not replays_df argument is provided, get it from `sess`:
+        replays_df = sess.replay
+        # replays_df = sess.pbe.to_dataframe()
+        # replays_df = sess.ripple.to_dataframe()
+        # else:
+        #     replays_df = replays_df.copy() # make a copy of the provided df
 
 
         rdf, aclu_to_idx, irdf, aclu_to_idx_irdf = _final_compute_jonathan_replay_fr_analyses(sess, replays_df)
@@ -187,6 +189,7 @@ class MultiContextComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Co
             'neuron_replay_stats_df': final_jonathan_df
         })
         return global_computation_results
+
 
     def _perform_short_long_pf_overlap_analyses(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_whitelist=None, debug_print=False):
         """ 

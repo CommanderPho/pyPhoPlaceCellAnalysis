@@ -416,7 +416,20 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
                 self.logger.info(f'novel_filter_names: {novel_filter_names}')
                 print(f'novel_filter_names: {novel_filter_names}')
             ## Deal with filters with the same name, but different filter functions:
-            changed_filters_names_list = [a_config_name for a_config_name in common_filter_names if (inspect.getsource(prev_session_filter_configurations[a_config_name]) != inspect.getsource(active_session_filter_configurations[a_config_name]))] # changed_filters_names_list: a list of filter names for filters that have changed but have the same name
+            # changed_filters_names_list = [a_config_name for a_config_name in common_filter_names if (inspect.getsource(prev_session_filter_configurations[a_config_name]) != inspect.getsource(active_session_filter_configurations[a_config_name]))] 
+            changed_filters_names_list = [] # changed_filters_names_list: a list of filter names for filters that have changed but have the same name
+            for a_config_name in common_filter_names:
+                try:
+                    if (inspect.getsource(prev_session_filter_configurations[a_config_name]) != inspect.getsource(active_session_filter_configurations[a_config_name])):
+                        changed_filters_names_list.append(a_config_name) # if inspect works and there is a difference, add it to the changed list
+                except OSError as e:
+                    # OSError: source code not available
+                    # if inspect fails for some reason, we should assume a difference to be safe and add it to the changed list
+                    print(f'WARNING: inspect failed for {a_config_name} with error {e}. Assuming changed.')
+                    changed_filters_names_list.append(a_config_name)
+                except Exception as e:
+                    raise e
+            
             if debug_print:
                 print(f'changed_filters_names_list: {changed_filters_names_list}')
             unprocessed_filters = {a_config_name:active_session_filter_configurations[a_config_name] for a_config_name in changed_filters_names_list}
