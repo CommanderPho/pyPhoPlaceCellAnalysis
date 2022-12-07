@@ -237,8 +237,11 @@ class ZhangReconstructionImplementation:
     #     return result
     
     @staticmethod
-    def neuropy_bayesian_prob(tau, P_x, F, n, debug_print=False):
-        # n_i: the number of spikes fired by each cell during the time window of consideration
+    def neuropy_bayesian_prob(tau, P_x, F, n, use_flat_computation_mode=True, debug_print=False):
+        """ 
+            n_i: the number of spikes fired by each cell during the time window of consideration
+            use_flat_computation_mode: bool - if True, a more memory efficient accumulating computation is performed that avoids `MemoryError: Unable to allocate 65.4 GiB for an array with shape (3969, 21896, 101) and data type float64` caused by allocating the full `cell_prob` matrix
+        """
         assert(len(n) == np.shape(F)[1]), f'n must be a column vector with an entry for each place cell (neuron). Instead it is of np.shape(n): {np.shape(n)}. np.shape(F): {np.shape(F)}'        
         if debug_print:
             print(f'np.shape(P_x): {np.shape(P_x)}, np.shape(F): {np.shape(F)}, np.shape(n): {np.shape(n)}')
@@ -250,7 +253,14 @@ class ZhangReconstructionImplementation:
         nFlatPositionBins = np.shape(P_x)[0]
 
         F = F.T # Transpose F so it's of the right form
-        cell_prob = np.zeros((nFlatPositionBins, nTimeBins, nCells))
+        
+        if use_flat_computation_mode:
+            ## Single-cell flat version which updates each iteration:
+            cell_prob = np.zeros((nFlatPositionBins, nTimeBins)) ## MemoryError: Unable to allocate 65.4 GiB for an array with shape (3969, 21896, 101) and data type float64
+        else:
+            # Full Version which leads to MemoryError when nCells is too large:
+            cell_prob = np.zeros((nFlatPositionBins, nTimeBins, nCells)) ## MemoryError: Unable to allocate 65.4 GiB for an array with shape (3969, 21896, 101) and data type float64
+
         for cell in range(nCells):
             """ Comparing to the Zhang paper: the output posterior is P_n_given_x (Eqn 35)
                 cell_ratemap: [f_{i}(x) for i in range(nCells)]
@@ -259,13 +269,27 @@ class ZhangReconstructionImplementation:
             cell_spkcnt = n[cell, :][np.newaxis, :]
             cell_ratemap = F[cell, :][:, np.newaxis]
             coeff = 1 / (factorial(cell_spkcnt)) # 1/factorial(n_{i}) term
-            # broadcasting
-            cell_prob[:, :, cell] = (((tau * cell_ratemap) ** cell_spkcnt) * coeff) * (
-                np.exp(-tau * cell_ratemap)
-            )
 
-        posterior = np.prod(cell_prob, axis=2)
-        posterior /= np.sum(posterior, axis=0) # C(tau, n) = np.sum(posterior, axis=0): normalization condition mentioned in eqn 36 to convert to P_x_given_n
+            if use_flat_computation_mode:
+                # Single-cell flat Version:
+                cell_prob *= (((tau * cell_ratemap) ** cell_spkcnt) * coeff) * (
+                    np.exp(-tau * cell_ratemap)
+                ) # product equal using *=
+            else:
+                # Full Version:
+                # broadcasting
+                cell_prob[:, :, cell] = (((tau * cell_ratemap) ** cell_spkcnt) * coeff) * (
+                    np.exp(-tau * cell_ratemap)
+                )
+
+        if use_flat_computation_mode:
+            # Single-cell flat Version:
+            posterior = cell_prob # The product has already been accumulating all along
+            posterior /= np.sum(posterior, axis=0) # C(tau, n) = np.sum(posterior, axis=0): normalization condition mentioned in eqn 36 to convert to P_x_given_n
+        else:
+            # Full Version:
+            posterior = np.prod(cell_prob, axis=2) # note this product removes axis=2 (nCells)
+            posterior /= np.sum(posterior, axis=0) # C(tau, n) = np.sum(posterior, axis=0): normalization condition mentioned in eqn 36 to convert to P_x_given_n
 
         return posterior
         
