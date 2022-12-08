@@ -176,14 +176,14 @@ def create_daily_programmatic_display_function_testing_folder_if_needed(out_path
     return out_path
 
 
-def build_figure_basename_from_display_context(active_identifying_ctx, context_tuple_join_character='_', debug_print=False):
+def build_figure_basename_from_display_context(active_identifying_ctx, subset_whitelist=None, subset_blacklist=None, context_tuple_join_character='_', debug_print=False):
     """ 
     Usage:
         curr_fig_save_basename = build_figure_basename_from_display_context(active_identifying_ctx, context_tuple_join_character='_')
         >>> 'kdiba_2006-6-09_1-22-43_batch_plot_test_long_only'
     """
     ## Note that active_identifying_ctx.as_tuple() can have non-string elements (e.g. debug_test_max_num_slices=128, which is an int). This is what we want, but for setting the metadata we need to convert them to strings
-    context_tuple = [str(v) for v in list(active_identifying_ctx.as_tuple())]
+    context_tuple = [str(v) for v in list(active_identifying_ctx.as_tuple(subset_whitelist=subset_whitelist, subset_blacklist=subset_blacklist, drop_missing=True))]
     fig_save_basename = context_tuple_join_character.join(context_tuple) # joins the elements of the context_tuple with '_'
     if debug_print:
         print(f'fig_save_basename: "{fig_save_basename}"')
@@ -191,7 +191,7 @@ def build_figure_basename_from_display_context(active_identifying_ctx, context_t
 
 
 
-def build_pdf_metadata_from_display_context(active_identifying_ctx, debug_print=False):
+def build_pdf_metadata_from_display_context(active_identifying_ctx, subset_whitelist=None, subset_blacklist=None, debug_print=False):
     """ Internally uses `build_figure_basename_from_display_context(...)` 
     Usage:
         curr_built_pdf_metadata, curr_pdf_save_filename = build_pdf_metadata_from_display_context(active_identifying_ctx)
@@ -202,7 +202,7 @@ def build_pdf_metadata_from_display_context(active_identifying_ctx, debug_print=
         print(f'session_descriptor_string: "{session_descriptor_string}"')
     built_pdf_metadata = {'Creator': 'Spike3D - TestNeuroPyPipeline227', 'Author': 'Pho Hale', 'Title': session_descriptor_string, 'Subject': '', 'Keywords': [session_descriptor_string]}
     # context_tuple = [str(v) for v in list(active_identifying_ctx.as_tuple())]
-    curr_fig_save_basename = build_figure_basename_from_display_context(active_identifying_ctx, context_tuple_join_character='_')
+    curr_fig_save_basename = build_figure_basename_from_display_context(active_identifying_ctx, subset_whitelist=subset_whitelist, subset_blacklist=subset_blacklist, context_tuple_join_character='_')
     built_pdf_metadata['Title'] = curr_fig_save_basename
     built_pdf_metadata['Subject'] = active_identifying_ctx.display_fn_name
     built_pdf_metadata['Keywords'] = build_figure_basename_from_display_context(active_identifying_ctx, context_tuple_join_character=' | ') # ' | '.join(context_tuple)
@@ -218,7 +218,7 @@ from matplotlib.backends import backend_pdf, backend_pgf, backend_ps # Needed fo
 # from pyphoplacecellanalysis.General.Mixins.ExportHelpers import create_daily_programmatic_display_function_testing_folder_if_needed, build_pdf_metadata_from_display_context
 
 ## 2022-10-04 Modern Programmatic PDF outputs:
-def programmatic_display_to_PDF(curr_active_pipeline, curr_display_function_name='_display_plot_decoded_epoch_slices',  debug_print=False, **kwargs):
+def programmatic_display_to_PDF(curr_active_pipeline, curr_display_function_name='_display_plot_decoded_epoch_slices', subset_whitelist=None, subset_blacklist=None,  debug_print=False, **kwargs):
     """
     2022-10-04 Modern Programmatic PDF outputs
     curr_display_function_name = '_display_plot_decoded_epoch_slices' 
@@ -248,7 +248,7 @@ def programmatic_display_to_PDF(curr_active_pipeline, curr_display_function_name
                 print(f'active_identifying_ctx_string: "{active_identifying_ctx_string}"')
 
             ## Build PDF Output Info
-            active_pdf_metadata, active_pdf_save_filename = build_pdf_metadata_from_display_context(final_context)
+            active_pdf_metadata, active_pdf_save_filename = build_pdf_metadata_from_display_context(final_context, subset_whitelist=subset_whitelist, subset_blacklist=subset_blacklist)
             active_pdf_save_path = pdf_parent_out_path.joinpath(active_pdf_save_filename) # build the final output pdf path from the pdf_parent_out_path (which is the daily folder)
 
             ## BEGIN DISPLAY/SAVE
