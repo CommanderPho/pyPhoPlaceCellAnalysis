@@ -104,7 +104,7 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
 
 
     def on_stage_changed(self, new_stage):
-        print(f'NeuropyPipeline.on_stage_changed(new_stage="{new_stage.identity}")')
+        # print(f'NeuropyPipeline.on_stage_changed(new_stage="{new_stage.identity}")')
         self.logger.info(f'NeuropyPipeline.on_stage_changed(new_stage="{new_stage.identity}")')
 
     @classmethod
@@ -124,7 +124,7 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
 
     # Load/Save Persistance and Comparison _______________________________________________________________________________ #
     @classmethod
-    def try_init_from_saved_pickle_or_reload_if_needed(cls, type_name: str, known_type_properties: KnownDataSessionTypeProperties, override_basepath=None, override_post_load_functions=None, force_reload=False, active_pickle_filename='loadedSessPickle.pkl', skip_save=False):
+    def try_init_from_saved_pickle_or_reload_if_needed(cls, type_name: str, known_type_properties: KnownDataSessionTypeProperties, override_basepath=None, override_post_load_functions=None, force_reload=False, active_pickle_filename='loadedSessPickle.pkl', skip_save=False, progress_print=True, debug_print=False):
         """ After a session has completed the loading stage prior to filtering (after all objects are built and such), it can be pickled to a file to drastically speed up future loading requests (as would have to be done when the notebook is restarted, etc) 
         Tries to find an extant pickled pipeline, and if it exists it loads and returns that. Otherwise, it loads/rebuilds the pipeline from scratch (from the initial raw data files) and then saves a pickled copy out to disk to speed up future loading attempts.
         
@@ -184,10 +184,10 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
         
         ## Build Pickle Path:
         finalized_loaded_sess_pickle_path = Path(basepath).joinpath(active_pickle_filename).resolve()
-        
 
         if not force_reload:
-            print(f'finalized_loaded_sess_pickle_path: {finalized_loaded_sess_pickle_path}')
+            if debug_print:
+                print(f'finalized_loaded_sess_pickle_path: {finalized_loaded_sess_pickle_path}')
             try:
                 loaded_pipeline = loadData(finalized_loaded_sess_pickle_path, debug_print=False)
                 
@@ -198,11 +198,13 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
 
         else:
             # Otherwise force recompute:
-            print(f'Skipping loading from pickled file because force_reload == True.')
+            if progress_print:
+                print(f'Skipping loading from pickled file because force_reload == True.')
             loaded_pipeline = None
 
         if loaded_pipeline is not None:
-            print(f'Loading pickled pipeline success: {finalized_loaded_sess_pickle_path}.')
+            if progress_print:
+                print(f'Loading pickled pipeline success: {finalized_loaded_sess_pickle_path}.')
             if isinstance(loaded_pipeline, NeuropyPipeline):        
                 curr_active_pipeline = loaded_pipeline
             else:
@@ -213,24 +215,31 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
             active_data_session_types_registered_classes_dict = DataSessionFormatRegistryHolder.get_registry_data_session_type_class_name_dict()
             active_data_mode_registered_class = active_data_session_types_registered_classes_dict[type_name]
             desired_time_variable_name = active_data_mode_registered_class._time_variable_name # Requires desired_time_variable_name
-            pipeline_needs_resave = _ensure_unpickled_pipeline_up_to_date(curr_active_pipeline, active_data_mode_name=type_name, basedir=Path(basepath), desired_time_variable_name=desired_time_variable_name, debug_print=False)
+            pipeline_needs_resave = _ensure_unpickled_pipeline_up_to_date(curr_active_pipeline, active_data_mode_name=type_name, basedir=Path(basepath), desired_time_variable_name=desired_time_variable_name, debug_print=debug_print)
             
             curr_active_pipeline._persistance_state = LoadedObjectPersistanceState(finalized_loaded_sess_pickle_path, compare_state_on_load=curr_active_pipeline.pipeline_compare_dict)
             ## Save out the changes to the pipeline after computation to the pickle file for easy loading in the future
             if pipeline_needs_resave:
-                curr_active_pipeline.save_pipeline(active_pickle_filename=active_pickle_filename)
+                if not skip_save:
+                    curr_active_pipeline.save_pipeline(active_pickle_filename=active_pickle_filename)
+                else:
+                    if progress_print:
+                        print(f'pipeline_needs_resave but skip_save == True, so saving will be skipped entirely. Be sure to save manually if there are changes.')
             else:
-                print(f'property already present in pickled version. No need to save.')
+                if progress_print:
+                    print(f'property already present in pickled version. No need to save.')
     
         else:
             # Otherwise load failed, perform the fallback computation
-            print(f'Must reload/rebuild.')
+            if debug_print:
+                print(f'Must reload/rebuild.')
             curr_active_pipeline = cls.init_from_known_data_session_type(type_name, known_type_properties, override_basepath=Path(basepath), override_post_load_functions=post_load_functions)
             # Save reloaded pipeline out to pickle for future loading
             if not skip_save:
                 saveData(finalized_loaded_sess_pickle_path, db=curr_active_pipeline) # 589 MB
             else:
-                print('skip_save is True so resultant pipeline will not be saved to the pickle file.')
+                if progress_print:
+                    print('skip_save is True so resultant pipeline will not be saved to the pickle file.')
         # finalized_loaded_sess_pickle_path
         return curr_active_pipeline
     
@@ -526,8 +535,8 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
             prev_extant_file_size_MB = print_filesystem_file_size(_desired_finalized_loaded_sess_pickle_path, enable_print=False)
             new_temporary_file_size_MB = print_filesystem_file_size(finalized_loaded_sess_pickle_path, enable_print=False)
 
-            if (prev_extant_file_size_MB >= new_temporary_file_size_MB):
-                print(f'WARNING: prev_extant_file_size_MB ({prev_extant_file_size_MB} MB) >= new_temporary_file_size_MB ({new_temporary_file_size_MB} MB)! A backup will be made!')
+            if (prev_extant_file_size_MB > new_temporary_file_size_MB):
+                print(f'WARNING: prev_extant_file_size_MB ({prev_extant_file_size_MB} MB) > new_temporary_file_size_MB ({new_temporary_file_size_MB} MB)! A backup will be made!')
                 # Backup old file:
                 _backup_extant_file(_desired_finalized_loaded_sess_pickle_path) # only backup if the new file is smaller than the older one (meaning the older one has more info)
             
