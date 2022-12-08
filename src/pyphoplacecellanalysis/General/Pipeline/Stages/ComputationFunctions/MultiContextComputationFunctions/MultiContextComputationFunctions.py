@@ -123,7 +123,7 @@ class MultiContextComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Co
         except AttributeError as e:
             print(f'session is missing the `sess.replay` property. Falling back to sess.pbe.to_dataframe()...')
             new_pbe_epochs = _compute_custom_PBEs(sess)
-            sess.pbe = new_pbe_epochs.copy() # copy the detected PBEs to the session
+            sess.pbe = new_pbe_epochs # copy the detected PBEs to the session
             replays_df = sess.pbe.to_dataframe()
             # replays_df = sess.ripple.to_dataframe()
         except Exception as e:
