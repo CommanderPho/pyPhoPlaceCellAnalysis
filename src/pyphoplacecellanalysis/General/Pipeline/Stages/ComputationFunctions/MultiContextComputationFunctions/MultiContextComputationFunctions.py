@@ -21,6 +21,20 @@ from scipy.signal import convolve as convolve # compute_convolution_overlap
 from collections import Counter # Count the Number of Occurrences in a Python list using Counter
 from pyphoplacecellanalysis.General.Mixins.CrossComputationComparisonHelpers import SplitPartitionMembership
 
+from neuropy.analyses import detect_pbe_epochs # used in `_perform_jonathan_replay_firing_rate_analyses(.)` if replays are missing
+
+def _compute_custom_PBEs(sess):
+    """ 
+        new_pbe_epochs = _compute_custom_PBEs(sess)
+    """
+    print('computing PBE epochs for session...\n')
+    # smth_mua = curr_active_pipeline.sess.mua.get_smoothed(sigma=0.02) # Get the smoothed mua from the session's mua
+    # pbe = detect_pbe_epochs(smth_mua, thresh=(0, 3), min_dur=0.1, merge_dur=0.01, max_dur=1.0) # Default
+    # pbe.to_dataframe()
+    # new_pbe_epochs = detect_pbe_epochs(smth_mua, thresh=(0, 1.5), min_dur=0.06, merge_dur=0.06, max_dur=2.3) # Kamran's Parameters
+    smth_mua = sess.mua.get_smoothed(sigma=0.030)
+    new_pbe_epochs = detect_pbe_epochs(smth_mua, thresh=(0, 1.5), min_dur=0.030, merge_dur=0.100, max_dur=0.300) # NewPaper's Parameters
+    return new_pbe_epochs
 
 def _wrap_multi_context_computation_function(global_comp_fcn):
     """ captures global_comp_fcn and unwraps its arguments: owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_whitelist=None, debug_print=False """
@@ -101,12 +115,21 @@ class MultiContextComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Co
         neuron_IDs = np.unique(sess.spikes_df.aclu) # TODO: make sure standardized
 
         ## HERE I CAN SPECIFY WHICH REPLAYS TO USE FOR THE ANALYSIS:
-        print(f'replays_df: {replays_df}, type(replays_df): {type(replays_df)}')
+        # print(f'replays_df: {replays_df}, type(replays_df): {type(replays_df)}')
         # if replays_df is None:
         # If not replays_df argument is provided, get it from `sess`:
-        replays_df = sess.replay
-        # replays_df = sess.pbe.to_dataframe()
-        # replays_df = sess.ripple.to_dataframe()
+        try:
+            replays_df = sess.replay
+        except AttributeError as e:
+            print(f'session is missing the `sess.replay` property. Falling back to sess.pbe.to_dataframe()...')
+            new_pbe_epochs = _compute_custom_PBEs(sess)
+            sess.pbe = new_pbe_epochs.copy() # copy the detected PBEs to the session
+            replays_df = sess.pbe.to_dataframe()
+            # replays_df = sess.ripple.to_dataframe()
+        except Exception as e:
+            raise e
+        
+
         # else:
         #     replays_df = replays_df.copy() # make a copy of the provided df
 
