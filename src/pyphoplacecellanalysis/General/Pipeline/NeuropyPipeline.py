@@ -404,7 +404,13 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
         """The is_filtered property."""
         return (self.stage is not None) and (isinstance(self.stage, ComputedPipelineStage))
  
-    def filter_sessions(self, active_session_filter_configurations, debug_print = False):
+    def filter_sessions(self, active_session_filter_configurations, changed_filters_ignore_list=None, debug_print=False):
+        """ 
+            changed_filters_ignore_list: <list> a list of names of changed filters which will be ignored if they exists
+        """
+        if changed_filters_ignore_list is None:
+            changed_filters_ignore_list = []
+
         if self.is_filtered:
             # RESUSE LOADED FILTERING: If the loaded pipeline is already filtered, check to see if the filters match those that were previously applied. If they do, don't re-filter unless the user specifies to.
             prev_session_filter_configurations = {a_config_name:a_config.filter_config['filter_function'] for a_config_name, a_config in self.active_configs.items()}
@@ -429,7 +435,14 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
             changed_filters_names_list = [] # changed_filters_names_list: a list of filter names for filters that have changed but have the same name
             for a_config_name in common_filter_names:
                 try:
-                    if (inspect.getsource(prev_session_filter_configurations[a_config_name]) != inspect.getsource(active_session_filter_configurations[a_config_name])):
+                    prev_filter_src = inspect.getsource(prev_session_filter_configurations[a_config_name])
+                    active_filter_src = inspect.getsource(active_session_filter_configurations[a_config_name])
+                    if (prev_filter_src != active_filter_src):
+                        if debug_print:
+                            print(f'prev_filter_src != active_filter_src\nprev_filter_src:')
+                            print(prev_filter_src)
+                            print(f'active_filter_src:')
+                            print(active_filter_src)
                         changed_filters_names_list.append(a_config_name) # if inspect works and there is a difference, add it to the changed list
                 except OSError as e:
                     # OSError: source code not available
@@ -441,8 +454,11 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
             
             if debug_print:
                 print(f'changed_filters_names_list: {changed_filters_names_list}')
-            unprocessed_filters = {a_config_name:active_session_filter_configurations[a_config_name] for a_config_name in changed_filters_names_list}
-            assert len(changed_filters_names_list) == 0, f"WARNING: changed_filters_names_list > 0!: {changed_filters_names_list}"
+            unprocessed_filters = {a_config_name:active_session_filter_configurations[a_config_name] for a_config_name in changed_filters_names_list if a_config_name not in changed_filters_ignore_list}
+            ignored_changed_filters_list = [a_config_name for a_config_name in changed_filters_names_list if a_config_name in changed_filters_ignore_list]
+            if len(ignored_changed_filters_list) > 0:
+                print(f'WARNING: changed_filters_names_list > 0!: {changed_filters_names_list} but these filters are in the changed_filters_ignore_list: {changed_filters_ignore_list}\nignored_changed_filters_list: {ignored_changed_filters_list}')
+            # assert len(changed_filters_names_list) == 0, f"WARNING: changed_filters_names_list > 0!: {changed_filters_names_list}"
             # if len(changed_filters_names_list) > 0:
             #     print(f'WARNING: changed_filters_names_list > 0!: {changed_filters_names_list}')
             for a_novel_filter_name in novel_filter_names:
