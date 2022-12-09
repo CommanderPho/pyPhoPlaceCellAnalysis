@@ -175,6 +175,33 @@ def create_daily_programmatic_display_function_testing_folder_if_needed(out_path
     out_path.mkdir(exist_ok=True)
     return out_path
 
+def session_context_to_relative_path(parent_path, session_ctx):
+    """_summary_
+
+    Args:
+        parent_path (Path): _description_
+        session_ctx (IdentifyingContext): _description_
+
+    Returns:
+        _type_: _description_
+
+    Usage:
+
+        curr_sess_ctx = local_session_contexts_list[0]
+        # curr_sess_ctx # IdentifyingContext<('kdiba', 'gor01', 'one', '2006-6-07_11-26-53')>
+        figures_parent_out_path = create_daily_programmatic_display_function_testing_folder_if_needed()
+        session_context_to_relative_path(figures_parent_out_path, curr_sess_ctx)
+
+    """
+    parent_path = Path(parent_path)
+    subset_whitelist=['format_name','animal','exper_name', 'session_name']
+    all_keys_found, found_keys, missing_keys = session_ctx.check_keys(subset_whitelist, debug_print=False)
+    if not all_keys_found:
+        print(f'WARNING: missing {len(missing_keys)} keys from context: {missing_keys}. Building path anyway.')
+    curr_sess_ctx_tuple = session_ctx.as_tuple(subset_whitelist=subset_whitelist, drop_missing=True) # ('kdiba', 'gor01', 'one', '2006-6-07_11-26-53')
+    return parent_path.joinpath(*curr_sess_ctx_tuple).resolve()
+
+
 
 def build_figure_basename_from_display_context(active_identifying_ctx, subset_whitelist=None, subset_blacklist=None, context_tuple_join_character='_', debug_print=False):
     """ 
@@ -188,7 +215,6 @@ def build_figure_basename_from_display_context(active_identifying_ctx, subset_wh
     if debug_print:
         print(f'fig_save_basename: "{fig_save_basename}"')
     return fig_save_basename
-
 
 
 def build_pdf_metadata_from_display_context(active_identifying_ctx, subset_whitelist=None, subset_blacklist=None, debug_print=False):
@@ -214,7 +240,7 @@ def build_pdf_metadata_from_display_context(active_identifying_ctx, subset_white
 
 import matplotlib.pyplot as plt
 ## PDF Output, NOTE this is single plot stuff: uses active_config_name
-from matplotlib.backends import backend_pdf, backend_pgf, backend_ps # Needed for
+from matplotlib.backends import backend_pdf # Needed for
 # from pyphoplacecellanalysis.General.Mixins.ExportHelpers import create_daily_programmatic_display_function_testing_folder_if_needed, build_pdf_metadata_from_display_context
 
 ## 2022-10-04 Modern Programmatic PDF outputs:
@@ -225,7 +251,14 @@ def programmatic_display_to_PDF(curr_active_pipeline, curr_display_function_name
 
     Looks it this is done for EACH filtered context (in the loop below) whereas the original just did a single specific context
     """
-    pdf_parent_out_path = create_daily_programmatic_display_function_testing_folder_if_needed()
+
+    ## Get the output path (active_session_figures_out_path) for this session (and all of its filtered_contexts as well):
+    active_identifying_session_ctx = curr_active_pipeline.sess.get_context() # 'bapun_RatN_Day4_2019-10-15_11-30-06'
+    figures_parent_out_path = create_daily_programmatic_display_function_testing_folder_if_needed()
+    active_session_figures_out_path = session_context_to_relative_path(figures_parent_out_path, active_identifying_session_ctx)
+    if debug_print:
+        print(f'curr_session_parent_out_path: {active_session_figures_out_path}')
+    active_session_figures_out_path.mkdir(parents=True, exist_ok=True) # make folder if needed
 
     with plt.ioff():
         ## Disables showing the figure by default from within the context manager.
@@ -249,10 +282,10 @@ def programmatic_display_to_PDF(curr_active_pipeline, curr_display_function_name
 
             ## Build PDF Output Info
             active_pdf_metadata, active_pdf_save_filename = build_pdf_metadata_from_display_context(final_context, subset_whitelist=subset_whitelist, subset_blacklist=subset_blacklist)
-            active_pdf_save_path = pdf_parent_out_path.joinpath(active_pdf_save_filename) # build the final output pdf path from the pdf_parent_out_path (which is the daily folder)
+            active_pdf_save_path = active_session_figures_out_path.joinpath(active_pdf_save_filename) # build the final output pdf path from the pdf_parent_out_path (which is the daily folder)
 
             ## BEGIN DISPLAY/SAVE
-            with backend_pdf.PdfPages(active_pdf_save_path, keep_empty=False, metadata=active_pdf_metadata) as pdf:    
+            with backend_pdf.PdfPages(active_pdf_save_path, keep_empty=False, metadata=active_pdf_metadata) as pdf:
                 out_fig_list = [] # Separate PDFs mode:
 
                 if debug_print:
