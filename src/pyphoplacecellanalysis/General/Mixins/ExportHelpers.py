@@ -242,6 +242,8 @@ import matplotlib.pyplot as plt
 ## PDF Output, NOTE this is single plot stuff: uses active_config_name
 from matplotlib.backends import backend_pdf # Needed for
 # from pyphoplacecellanalysis.General.Mixins.ExportHelpers import create_daily_programmatic_display_function_testing_folder_if_needed, build_pdf_metadata_from_display_context
+from pyphocorehelpers.DataStructure.RenderPlots.MatplotLibRenderPlots import MatplotlibRenderPlots # required for programmatic_display_to_PDF
+
 
 ## 2022-10-04 Modern Programmatic PDF outputs:
 def programmatic_display_to_PDF(curr_active_pipeline, curr_display_function_name='_display_plot_decoded_epoch_slices', subset_whitelist=None, subset_blacklist=None,  debug_print=False, **kwargs):
@@ -262,7 +264,8 @@ def programmatic_display_to_PDF(curr_active_pipeline, curr_display_function_name
 
     with plt.ioff():
         ## Disables showing the figure by default from within the context manager.
-        active_display_fn_kwargs = overriding_dict_with(lhs_dict=dict(filter_epochs='ripple', debug_test_max_num_slices=128), **kwargs)
+        # active_display_fn_kwargs = overriding_dict_with(lhs_dict=dict(filter_epochs='ripple', debug_test_max_num_slices=128), **kwargs)
+        active_display_fn_kwargs = overriding_dict_with(lhs_dict=dict(), **kwargs) # active_display_fn_kwargs = overriding_dict_with(lhs_dict=dict(filter_epochs='ripple', debug_test_max_num_slices=128), **kwargs)
 
         # Perform for each filtered context:
         for filter_name, a_filtered_context in curr_active_pipeline.filtered_contexts.items():
@@ -293,7 +296,10 @@ def programmatic_display_to_PDF(curr_active_pipeline, curr_display_function_name
                     print(f'active_display_fn_kwargs: {active_display_fn_kwargs}')
                 out_display_var = curr_active_pipeline.display(curr_display_function_name, a_filtered_context, **active_display_fn_kwargs) # , filter_epochs='ripple', debug_test_max_num_slices=128
                 # , fignum=active_identifying_ctx_string, **figure_format_config
-                
+    
+                if debug_print:
+                    print(f'completed display(...) call. type(out_display_var): {type(out_display_var)}\n out_display_var: {out_display_var}, active_display_fn_kwargs: {active_display_fn_kwargs}')
+
                 if isinstance(out_display_var, dict):
                     main_out_display_context = list(out_display_var.keys())[0]
                     if debug_print:
@@ -304,6 +310,9 @@ def programmatic_display_to_PDF(curr_active_pipeline, curr_display_function_name
                     # params, plots_data, plots, ui = out_plot_tuple 
                     out_fig = ui.mw.getFigure() # TODO: Only works for MatplotlibWidget wrapped figures
                     out_fig_list.append(out_fig)
+                elif isinstance(out_display_var, MatplotlibRenderPlots):
+                    # Newest style plots: 2022-12-09
+                    out_fig_list.extend(out_display_var.figures)
 
                 else:
                     # Non-dictionary type item, older style:
@@ -319,6 +328,11 @@ def programmatic_display_to_PDF(curr_active_pipeline, curr_display_function_name
                             # otherwise just try and set the plots to the list
                             plots = out_display_var
 
+                    out_fig_list.extend(plots)
+
+
+                if debug_print:
+                    print(f'out_fig_list: {out_fig_list}')
 
                 # Finally iterate through and do the saving to PDF
                 for i, a_fig in enumerate(out_fig_list):
