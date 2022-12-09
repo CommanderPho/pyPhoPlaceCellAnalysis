@@ -877,3 +877,55 @@ def compute_dot_product_overlap(long_results, short_results, debug_print=False):
     return overlap_dict, overlap_scalars_df
 
 
+from scipy import stats # for compute_relative_entropy_divergence_overlap
+from scipy.special import rel_entr # alternative for compute_relative_entropy_divergence_overlap
+
+
+# Product Overlap ____________________________________________________________________________________________________ #
+def compute_relative_entropy_divergence_overlap(long_results, short_results, debug_print=False):
+    """ computes the Compute the relative entropy (KL-Divergence) between each pair of tuning curves between {long, global} (in both directions) 1D placefields for all units
+    If the placefield is unique to one of the two epochs, a value of zero is returned for the overlap.
+    """
+    def _subfcn_compute_single_unit_relative_entropy_divergence_overlap(long_curve, short_curve, debug_print=False):
+        long_short_rel_entr_curve = rel_entr(long_curve, short_curve)
+        long_short_relative_entropy = sum(long_short_rel_entr_curve) 
+
+        short_long_rel_entr_curve = rel_entr(short_curve, long_curve)
+        short_long_relative_entropy = sum(short_long_rel_entr_curve) 
+
+        return dict(long_short_rel_entr_curve=long_short_rel_entr_curve, long_short_relative_entropy=long_short_relative_entropy, short_long_rel_entr_curve=short_long_rel_entr_curve, short_long_relative_entropy=short_long_relative_entropy)
+
+    # get shared neuron info:
+    pf_neurons_diff = _compare_computation_results(long_results.pf1D.ratemap.neuron_ids, short_results.pf1D.ratemap.neuron_ids)
+    curr_any_context_neurons = pf_neurons_diff.either
+    n_neurons = pf_neurons_diff.shared.n_neurons
+    shared_fragile_neuron_IDXs = pf_neurons_diff.shared.shared_fragile_neuron_IDXs
+    
+    # short_xbins = short_results.pf1D.xbin_centers # .shape # (40,)
+    # short_curves = short_results.pf1D.ratemap.tuning_curves # .shape # (64, 40)
+    short_curves = short_results.pf1D.ratemap.normalized_tuning_curves # .shape # (64, 40)
+
+    # long_xbins = long_results.pf1D.xbin_centers # .shape # (63,)
+    # long_curves = long_results.pf1D.ratemap.tuning_curves # .shape # (64, 63)
+    long_curves = long_results.pf1D.ratemap.normalized_tuning_curves # .shape # (64, 63)
+
+    pf_overlap_results = []
+    for i, a_pair in enumerate(pf_neurons_diff.shared.pairs):
+        long_idx, short_idx = a_pair
+        if long_idx is None or short_idx is None:
+            # missing entry, answer is zero
+            overlap_results_dict = None
+        else:        
+            long_curve = long_curves[long_idx]
+            short_curve = short_curves[short_idx]
+            overlap_results_dict = _subfcn_compute_single_unit_relative_entropy_divergence_overlap(long_curve, short_curve)
+        pf_overlap_results.append(overlap_results_dict)
+
+    overlap_dict = {aclu:pf_overlap_results[i] for i, aclu in enumerate(curr_any_context_neurons)}
+    long_short_relative_entropy = [(pf_overlap_results[i] or {}).get('long_short_relative_entropy', 0.0) for i, aclu in enumerate(curr_any_context_neurons)]
+    short_long_relative_entropy = [(pf_overlap_results[i] or {}).get('short_long_relative_entropy', 0.0) for i, aclu in enumerate(curr_any_context_neurons)]
+    overlap_scalars_df = pd.DataFrame(dict(aclu=curr_any_context_neurons, fragile_linear_IDX=shared_fragile_neuron_IDXs, long_short_relative_entropy=long_short_relative_entropy, short_long_relative_entropy=short_long_relative_entropy)).set_index('aclu')
+
+    return overlap_dict, overlap_scalars_df
+
+
