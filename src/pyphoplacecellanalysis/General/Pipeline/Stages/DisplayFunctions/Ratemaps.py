@@ -47,6 +47,22 @@ class DefaultRatemapDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Disp
         # _build_safe_kwargs
         ax_pf_1D = computation_result.computed_data['pf1D'].plot_ratemaps_1D(**kwargs)
         active_figure = plt.gcf()
+        
+        ## Setup the plot title and add the session information:
+        session_identifier = computation_result.sess.get_description() # 'sess_bapun_RatN_Day4_2019-10-15_11-30-06'
+        fig_label = f'display_1d_placefields | {session_identifier} | {active_figure.number}'
+        # print(f'fig_label: {fig_label}')
+        active_figure.set_label(fig_label)
+        active_figure.canvas.manager.set_window_title(fig_label) # sets the window's title
+        
+        active_figure.show()
+        # active_pf_2D_figures = [active_figure]            
+        
+        # # Save the figure out to disk if we need to:
+        # should_save_to_disk = enable_saving_to_disk
+        # if should_save_to_disk:
+        #     _save_displayed_figure_if_needed(active_config.plotting_config, plot_type_name='_display_2d_placefield_result_plot_ratemaps_2D', active_variant_name=plot_variable_name, active_figures=active_pf_2D_figures)
+
 
         # return dict(fig=active_figure, ax=ax_pf_1D)
         return MatplotlibRenderPlots(figures=[active_figure], axes=[ax_pf_1D])   
