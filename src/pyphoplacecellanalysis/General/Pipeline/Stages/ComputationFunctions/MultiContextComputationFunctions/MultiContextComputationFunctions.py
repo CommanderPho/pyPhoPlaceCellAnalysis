@@ -17,6 +17,8 @@ from shapely.geometry import LineString # for compute_polygon_overlap
 from shapely.ops import unary_union, polygonize # for compute_polygon_overlap
 from pyphoplacecellanalysis.General.Mixins.CrossComputationComparisonHelpers import _find_any_context_neurons, _compare_computation_results # for compute_polygon_overlap
 from scipy.signal import convolve as convolve # compute_convolution_overlap
+from scipy import stats # for compute_relative_entropy_divergence_overlap
+from scipy.special import rel_entr # alternative for compute_relative_entropy_divergence_overlap
 
 from collections import Counter # Count the Number of Occurrences in a Python list using Counter
 from pyphoplacecellanalysis.General.Mixins.CrossComputationComparisonHelpers import SplitPartitionMembership
@@ -249,12 +251,16 @@ class MultiContextComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Co
         poly_overlap_df = compute_polygon_overlap(long_results, short_results, debug_print=debug_print)
         conv_overlap_dict, conv_overlap_scalars_df = compute_convolution_overlap(long_results, short_results, debug_print=debug_print)
         product_overlap_dict, product_overlap_scalars_df = compute_dot_product_overlap(long_results, short_results, debug_print=debug_print)
+        relative_entropy_overlap_dict, relative_entropy_overlap_scalars_df = compute_relative_entropy_divergence_overlap(long_results, short_results, debug_print=debug_print)
+
+
 
         global_computation_results.computed_data['short_long_pf_overlap_analyses'] = DynamicParameters.init_from_dict({
             'short_long_neurons_diff': pf_neurons_diff,
             'poly_overlap_df': poly_overlap_df,
             'conv_overlap_dict': conv_overlap_dict, 'conv_overlap_scalars_df': conv_overlap_scalars_df,
-            'product_overlap_dict': product_overlap_dict, 'product_overlap_scalars_df': product_overlap_scalars_df
+            'product_overlap_dict': product_overlap_dict, 'product_overlap_scalars_df': product_overlap_scalars_df,
+            'relative_entropy_overlap_dict': relative_entropy_overlap_dict, 'relative_entropy_overlap_scalars_df': relative_entropy_overlap_scalars_df
         })
         return global_computation_results
 
@@ -685,6 +691,19 @@ def compute_evening_morning_parition(neuron_replay_stats_df, firing_rates_activi
 # ==================================================================================================================== #
 # Overlap                                                                                                      #
 # ==================================================================================================================== #
+def extrapolate_short_curve_to_long(long_xbins, short_xbins, short_curve, debug_print=False):
+    """ extrapolate the short curve so that it is aligned with long_curve
+        
+    Usage:
+        extrapolated_short_xbins, extrapolated_short_curve = extrapolate_short_curve_to_long(long_xbins, short_xbins, short_curve, debug_print=False)
+
+    Known Uses:
+        compute_dot_product_overlap, 
+    """
+    extrapolated_short_curve = np.interp(long_xbins, short_xbins, short_curve, left=0.0, right=0.0)
+    return long_xbins, extrapolated_short_curve
+
+
 
 # Polygon Overlap ____________________________________________________________________________________________________ #
 def compute_polygon_overlap(long_results, short_results, debug_print=False):
@@ -832,7 +851,14 @@ def compute_dot_product_overlap(long_results, short_results, debug_print=False):
     """
     def _subfcn_compute_single_unit_dot_product_overlap(long_xbins, long_curve, short_xbins, short_curve, debug_print=False):
         # extrapolate the short curve so that it is aligned with long_curve
-        extrapolated_short_curve = np.interp(long_xbins, short_xbins, short_curve, left=0.0, right=0.0)
+        if len(long_xbins) > len(short_xbins):
+            # Need to interpolate:
+            extrapolated_short_xbins, extrapolated_short_curve = extrapolate_short_curve_to_long(long_xbins, short_xbins, short_curve, debug_print=False)
+        else:
+            # They are already using the same xbins:
+            extrapolated_short_curve = short_curve
+
+        # extrapolated_short_curve = np.interp(long_xbins, short_xbins, short_curve, left=0.0, right=0.0)
         pf_overlap_dot_product_curve = extrapolated_short_curve * long_curve
 
         overlap_dot_product_maximum = np.nanmax(pf_overlap_dot_product_curve)
@@ -877,35 +903,39 @@ def compute_dot_product_overlap(long_results, short_results, debug_print=False):
     return overlap_dict, overlap_scalars_df
 
 
-from scipy import stats # for compute_relative_entropy_divergence_overlap
-from scipy.special import rel_entr # alternative for compute_relative_entropy_divergence_overlap
-
-
-# Product Overlap ____________________________________________________________________________________________________ #
+# Relative Entropy Divergence Overlap ____________________________________________________________________________________________________ #
 def compute_relative_entropy_divergence_overlap(long_results, short_results, debug_print=False):
     """ computes the Compute the relative entropy (KL-Divergence) between each pair of tuning curves between {long, global} (in both directions) 1D placefields for all units
     If the placefield is unique to one of the two epochs, a value of zero is returned for the overlap.
     """
-    def _subfcn_compute_single_unit_relative_entropy_divergence_overlap(long_curve, short_curve, debug_print=False):
-        long_short_rel_entr_curve = rel_entr(long_curve, short_curve)
+    def _subfcn_compute_single_unit_relative_entropy_divergence_overlap(long_xbins, long_curve, short_xbins, short_curve, debug_print=False):
+        # extrapolate the short curve so that it is aligned with long_curve
+        if len(long_xbins) > len(short_xbins):
+            # Need to interpolate:
+            extrapolated_short_xbins, extrapolated_short_curve = extrapolate_short_curve_to_long(long_xbins, short_xbins, short_curve, debug_print=debug_print)
+        else:
+            # They are already using the same xbins:
+            extrapolated_short_curve = short_curve
+    
+        long_short_rel_entr_curve = rel_entr(long_curve, extrapolated_short_curve)
         long_short_relative_entropy = sum(long_short_rel_entr_curve) 
 
-        short_long_rel_entr_curve = rel_entr(short_curve, long_curve)
+        short_long_rel_entr_curve = rel_entr(extrapolated_short_curve, long_curve)
         short_long_relative_entropy = sum(short_long_rel_entr_curve) 
 
-        return dict(long_short_rel_entr_curve=long_short_rel_entr_curve, long_short_relative_entropy=long_short_relative_entropy, short_long_rel_entr_curve=short_long_rel_entr_curve, short_long_relative_entropy=short_long_relative_entropy)
+        return dict(long_short_rel_entr_curve=long_short_rel_entr_curve, long_short_relative_entropy=long_short_relative_entropy, short_long_rel_entr_curve=short_long_rel_entr_curve, short_long_relative_entropy=short_long_relative_entropy, extrapolated_short_curve=extrapolated_short_curve)
 
     # get shared neuron info:
     pf_neurons_diff = _compare_computation_results(long_results.pf1D.ratemap.neuron_ids, short_results.pf1D.ratemap.neuron_ids)
     curr_any_context_neurons = pf_neurons_diff.either
     n_neurons = pf_neurons_diff.shared.n_neurons
     shared_fragile_neuron_IDXs = pf_neurons_diff.shared.shared_fragile_neuron_IDXs
-    
-    # short_xbins = short_results.pf1D.xbin_centers # .shape # (40,)
+
+    short_xbins = short_results.pf1D.xbin_centers # .shape # (40,)
     # short_curves = short_results.pf1D.ratemap.tuning_curves # .shape # (64, 40)
     short_curves = short_results.pf1D.ratemap.normalized_tuning_curves # .shape # (64, 40)
 
-    # long_xbins = long_results.pf1D.xbin_centers # .shape # (63,)
+    long_xbins = long_results.pf1D.xbin_centers # .shape # (63,)
     # long_curves = long_results.pf1D.ratemap.tuning_curves # .shape # (64, 63)
     long_curves = long_results.pf1D.ratemap.normalized_tuning_curves # .shape # (64, 63)
 
@@ -918,7 +948,7 @@ def compute_relative_entropy_divergence_overlap(long_results, short_results, deb
         else:        
             long_curve = long_curves[long_idx]
             short_curve = short_curves[short_idx]
-            overlap_results_dict = _subfcn_compute_single_unit_relative_entropy_divergence_overlap(long_curve, short_curve)
+            overlap_results_dict = _subfcn_compute_single_unit_relative_entropy_divergence_overlap(long_xbins, long_curve, short_xbins, short_curve)
         pf_overlap_results.append(overlap_results_dict)
 
     overlap_dict = {aclu:pf_overlap_results[i] for i, aclu in enumerate(curr_any_context_neurons)}

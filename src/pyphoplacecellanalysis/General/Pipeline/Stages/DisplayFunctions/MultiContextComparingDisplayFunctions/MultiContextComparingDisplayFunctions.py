@@ -33,26 +33,16 @@ from pyphoplacecellanalysis.General.Mixins.CrossComputationComparisonHelpers imp
 from pyphoplacecellanalysis.PhoPositionalData.plotting.placefield import plot_1D_placecell_validation # for _make_pho_jonathan_batch_plots
 
 
+from enum import unique # for PlacefieldOverlapMetricMode
+from pyphocorehelpers.DataStructure.enum_helpers import ExtendedEnum # for PlacefieldOverlapMetricMode
 
-class PlacefieldOverlapMetricMode(Enum):
+@unique
+class PlacefieldOverlapMetricMode(ExtendedEnum):
     """Docstring for PlacefieldOverlapMetricMode."""
     POLY = "POLY"
     CONVOLUTION = "CONVOLUTION"
     PRODUCT = "PRODUCT"
-
-    @classmethod
-    def init(cls, name):
-        if name == cls.POLY.name:
-            return cls.POLY
-        elif name == cls.CONVOLUTION.name:
-            return cls.CONVOLUTION
-        elif name == cls.PRODUCT.name:
-            return cls.PRODUCT
-        else:
-            raise NotImplementedError
-    
-
-
+    REL_ENTROPY = "REL_ENTROPY"
 
 
 class MultiContextComparingDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=DisplayFunctionRegistryHolder):
@@ -321,6 +311,12 @@ class MultiContextComparingDisplayFunctions(AllFunctionEnumeratingMixin, metacla
                 prod_overlap_dict = short_long_pf_overlap_analyses_results['product_overlap_dict']
                 product_overlap_scalars_df = short_long_pf_overlap_analyses_results['product_overlap_scalars_df']
                 fig, ax = plot_short_v_long_pf1D_scalar_overlap_comparison(product_overlap_scalars_df, pf_neurons_diff, neurons_colors_array, reuse_axs_tuple=reuse_axs_tuple, single_figure=single_figure, overlap_metric_mode=overlap_metric_mode, debug_print=debug_print)
+            elif overlap_metric_mode.name == PlacefieldOverlapMetricMode.REL_ENTROPY.name:
+                relative_entropy_overlap_dict = short_long_pf_overlap_analyses_results['relative_entropy_overlap_dict']
+                relative_entropy_overlap_scalars_df = short_long_pf_overlap_analyses_results['relative_entropy_overlap_scalars_df']
+                fig, ax = plot_short_v_long_pf1D_scalar_overlap_comparison(relative_entropy_overlap_scalars_df, pf_neurons_diff, neurons_colors_array, reuse_axs_tuple=reuse_axs_tuple, single_figure=single_figure, overlap_metric_mode=overlap_metric_mode, debug_print=debug_print)
+
+
 
             else:
                 raise NotImplementedError
@@ -1148,7 +1144,10 @@ def plot_short_v_long_pf1D_scalar_overlap_comparison(overlap_scalars_df, pf_neur
         # freq_series = overlap_scalars_df.prod_overlap_peak_max
         lowercase_desc = 'prod'
         titlecase_desc = 'Prod'
-
+    elif overlap_metric_mode.name == PlacefieldOverlapMetricMode.REL_ENTROPY.name:
+        freq_series = overlap_scalars_df.short_long_relative_entropy
+        lowercase_desc = 'rel_entropy'
+        titlecase_desc = 'RelEntropy'
     else:
         raise NotImplementedError
 
