@@ -61,25 +61,19 @@ class MultiContextComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Co
             ['sess']
             
         Provides:
-            computation_result.computed_data['short_long_pf_overlap_analyses']
-                ['short_long_pf_overlap_analyses']['short_long_neurons_diff']
-                ['short_long_pf_overlap_analyses']['poly_overlap_df']
+            computation_result.computed_data['PBE_stats_analyses']
+                ['PBE_stats_analyses']['pbe_analyses_result_df']
+                ['PBE_stats_analyses']['all_epochs_info']
         
         """
         if include_whitelist is None:
             include_whitelist = owning_pipeline_reference.active_completed_computation_result_names # ['maze', 'sprinkle']
         
         pbe_analyses_result_df, all_epochs_info = _perform_PBE_stats(owning_pipeline_reference, include_whitelist=include_whitelist, debug_print=debug_print)
-        
 
-
-
-        global_computation_results.computed_data['short_long_pf_overlap_analyses'] = DynamicParameters.init_from_dict({
-            'short_long_neurons_diff': pf_neurons_diff,
-            'poly_overlap_df': poly_overlap_df,
-            'conv_overlap_dict': conv_overlap_dict, 'conv_overlap_scalars_df': conv_overlap_scalars_df,
-            'product_overlap_dict': product_overlap_dict, 'product_overlap_scalars_df': product_overlap_scalars_df,
-            'relative_entropy_overlap_dict': relative_entropy_overlap_dict, 'relative_entropy_overlap_scalars_df': relative_entropy_overlap_scalars_df
+        global_computation_results.computed_data['PBE_stats_analyses'] = DynamicParameters.init_from_dict({
+            'pbe_analyses_result_df': pbe_analyses_result_df,
+            'all_epochs_info': all_epochs_info,
         })
         return global_computation_results
 
@@ -306,7 +300,7 @@ def _perform_PBE_stats(owning_pipeline_reference, include_whitelist=None, debug_
         
         
     Usage:
-        from PendingNotebookCode import _perform_PBE_stats
+        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.MultiContextComputationFunctions import _perform_PBE_stats
         pbe_analyses_result_df, [all_epochs_full_pbe_spiketrain_lists, all_epochs_pbe_num_spikes_lists, all_epochs_intra_pbe_interval_lists] = _perform_PBE_stats(curr_active_pipeline, debug_print=False) # all_epochs_n_pbes: [206, 31, 237], all_epochs_mean_pbe_durations: [0.2209951456310722, 0.23900000000001073, 0.22335021097046923], all_epochs_cummulative_pbe_durations: [45.52500000000087, 7.409000000000333, 52.934000000001205], all_epochs_total_durations: [1716.8933641185379, 193.26664069312392, 1910.1600048116618]
         pbe_analyses_result_df
 
