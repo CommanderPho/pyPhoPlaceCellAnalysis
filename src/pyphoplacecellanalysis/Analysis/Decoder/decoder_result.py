@@ -28,22 +28,6 @@ def build_position_df_time_window_idx(active_pos_df, curr_active_time_windows, d
     active_pos_df['time_window_idx'] = active_pos_df['time_window_idx'].astype(int) # ensure output is the correct datatype
     return active_pos_df
 
-# def build_position_df_discretized_binned_positions(active_pos_df, active_computation_config, xbin_values=None, ybin_values=None, debug_print=False):
-#     """ Adds the 'binned_x' and 'binned_y' columns to the position dataframe 
-    
-#     - [ ] TODO: CORRECTNESS: POTENTIAL_BUG: I notice that the *bin_centers are being passed here from its call as opposed to the .xbin, .ybin themselves. Is this an issue?
-    
-    
-#     NOTE: This is independently re-implemented from a static version in neuropy.analyses.placefields.PfND with the same name
-#         https://github.com/CommanderPho/NeuroPy/blob/feature%2Fpho_variant/neuropy/analyses/placefields.py#L813
-        
-        
-    
-#     """
-    
-#     active_pos_df, (xbin, ybin), bin_infos = build_df_discretized_binned_position_columns(active_pos_df, bin_values=(xbin_values, ybin_values), active_computation_config=active_computation_config, force_recompute=False, debug_print=debug_print)
-#     return active_pos_df, xbin, ybin, bin_infos
-
 
 def build_position_df_resampled_to_time_windows(active_pos_df, time_bin_size=0.02):
     """ Note that this returns a TimedeltaIndexResampler, not a dataframe proper. To get the real dataframe call .nearest() on output. """
@@ -141,8 +125,6 @@ class DecoderResultDisplayingPlot2D(DecoderResultDisplayingBaseClass):
         # self.fig.suptitle(self.title_string)
         self.index = 0
         active_window, active_p_x_given_n, active_most_likely_x_position, active_nearest_measured_position = self.get_data(self.index) # get the first item
-        # self.active_im = self.axs.imshow(active_p_x_given_n, interpolation='none', aspect='auto', vmin=0, vmax=1)
-        # self.active_im = plot_single_tuning_map_2D(self.xbin, self.ybin, active_p_x_given_n, self.occupancy, drop_below_threshold=None, ax=self.axs)
         self.active_im = DecoderResultDisplayingPlot2D.plot_single_decoder_result(self.xbin, self.ybin, active_p_x_given_n, drop_below_threshold=None, final_string_components=[f'Decoder Result[i: {self.index}]: time window: {active_window}'], ax=self.axs)
         
         # self.active_most_likely_pos = self.axs.plot([], [], lw=2) # how to use a plot(...)

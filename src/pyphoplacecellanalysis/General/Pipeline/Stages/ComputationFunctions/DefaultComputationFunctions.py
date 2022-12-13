@@ -283,15 +283,13 @@ class DefaultComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Computa
                 ## 1D Decoder
                 new_decoder_pf1D = active_pf_1D
                 new_1D_decoder_spikes_df = new_decoder_pf1D.filtered_spikes_df.copy()
-                # new_1D_decoder_spikes_df = new_1D_decoder_spikes_df.spikes.add_binned_time_column(manual_time_window_edges, manual_time_window_edges_binning_info, debug_print=False)
-                new_1D_decoder = BayesianPlacemapPositionDecoder(pf_computation_config.time_bin_size, new_decoder_pf1D, new_1D_decoder_spikes_df, debug_print=False) # , manual_time_window_edges=manual_time_window_edges, manual_time_window_edges_binning_info=manual_time_window_edges_binning_info
+                new_1D_decoder = BayesianPlacemapPositionDecoder(pf_computation_config.time_bin_size, new_decoder_pf1D, new_1D_decoder_spikes_df, debug_print=False) 
                 # new_1D_decoder.compute_all() #  --> n = self.
 
                 ## Custom Manual 2D Decoder:
                 new_decoder_pf2D = active_pf_2D # 
                 new_decoder_spikes_df = new_decoder_pf2D.filtered_spikes_df.copy()
-                # new_decoder_spikes_df = new_decoder_spikes_df.spikes.add_binned_time_column(manual_time_window_edges, manual_time_window_edges_binning_info, debug_print=False)
-                new_2D_decoder = BayesianPlacemapPositionDecoder(pf_computation_config.time_bin_size, new_decoder_pf2D, new_decoder_spikes_df, debug_print=False) # , manual_time_window_edges=manual_time_window_edges, manual_time_window_edges_binning_info=manual_time_window_edges_binning_info
+                new_2D_decoder = BayesianPlacemapPositionDecoder(pf_computation_config.time_bin_size, new_decoder_pf2D, new_decoder_spikes_df, debug_print=False)
                 new_2D_decoder.compute_all() #  --> n = self.
                 
                 return new_1D_decoder, new_2D_decoder
@@ -301,7 +299,7 @@ class DefaultComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Computa
             active_second_order_pf_1D, active_second_order_pf_2D = perform_compute_placefields(active_second_order_spikes_df, Position(active_second_order_pos_df),
                                                                                             next_order_computation_config.pf_params, None, None, included_epochs=None, should_force_recompute_placefields=True)
             # build the second_order decoders:
-            active_second_order_1D_decoder, active_second_order_2D_decoder = _next_order_decode(active_second_order_pf_1D, active_second_order_pf_2D, next_order_computation_config.pf_params) # , manual_time_window_edges=active_one_step_decoder.time_window_edges, manual_time_window_edges_binning_info=active_one_step_decoder.time_window_edges_binning_info
+            active_second_order_1D_decoder, active_second_order_2D_decoder = _next_order_decode(active_second_order_pf_1D, active_second_order_pf_2D, next_order_computation_config.pf_params) 
             
             return active_second_order_pf_1D, active_second_order_pf_2D, active_second_order_1D_decoder, active_second_order_2D_decoder
 
