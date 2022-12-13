@@ -14,8 +14,7 @@ from pyphoplacecellanalysis.General.Model.ComputationResults import ComputationR
 from pyphoplacecellanalysis.Analysis.Decoder.decoder_result import build_position_df_resampled_to_time_windows
 
 
-# from PendingNotebookCode import _build_new_lap_and_intra_lap_intervals
-from PhoPy3DPositionAnalysis2021.PendingNotebookCode import _build_new_lap_and_intra_lap_intervals
+from neuropy.analyses.laps import _build_new_lap_and_intra_lap_intervals # for _perform_time_dependent_pf_sequential_surprise_computation
 
 
 class ExtendedStatsComputations(AllFunctionEnumeratingMixin, metaclass=ComputationFunctionRegistryHolder):
@@ -59,11 +58,7 @@ class ExtendedStatsComputations(AllFunctionEnumeratingMixin, metaclass=Computati
         return computation_result
     
     
-    
-    
-    
 
-        
     def _perform_time_dependent_pf_sequential_surprise_computation(computation_result: ComputationResult, debug_print=False):
         """ Computes extended statistics regarding firing rates and such from the various dataframes.
         
