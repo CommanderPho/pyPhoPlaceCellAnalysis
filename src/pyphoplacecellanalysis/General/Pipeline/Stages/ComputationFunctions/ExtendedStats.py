@@ -1,12 +1,21 @@
 import numpy as np
 import pandas as pd
-import itertools
+
+from pyphocorehelpers.indexing_helpers import build_pairwise_indicies
+from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.MultiContextComputationFunctions import compute_relative_entropy_divergence_overlap
+from scipy import stats # for compute_relative_entropy_divergence_overlap
+from scipy.special import rel_entr # alternative for compute_relative_entropy_divergence_overlap
+
 
 from pyphocorehelpers.DataStructure.dynamic_parameters import DynamicParameters
 from pyphocorehelpers.mixins.member_enumerating import AllFunctionEnumeratingMixin
 from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.ComputationFunctionRegistryHolder import ComputationFunctionRegistryHolder
 from pyphoplacecellanalysis.General.Model.ComputationResults import ComputationResult
 from pyphoplacecellanalysis.Analysis.Decoder.decoder_result import build_position_df_resampled_to_time_windows
+
+
+# from PendingNotebookCode import _build_new_lap_and_intra_lap_intervals
+from PhoPy3DPositionAnalysis2021.PendingNotebookCode import _build_new_lap_and_intra_lap_intervals
 
 
 class ExtendedStatsComputations(AllFunctionEnumeratingMixin, metaclass=ComputationFunctionRegistryHolder):
@@ -50,65 +59,120 @@ class ExtendedStatsComputations(AllFunctionEnumeratingMixin, metaclass=Computati
         return computation_result
     
     
-    def _perform_placefield_overlap_computation(computation_result: ComputationResult, debug_print=False):
-        """ Computes the pairwise overlap between every pair of placefields. 
+    
+    
+    
+
         
-        TODO: Move to PlacefieldDensityAnalysisComputationFunctions
-        
+    def _perform_time_dependent_pf_sequential_surprise_computation(computation_result: ComputationResult, debug_print=False):
+        """ Computes extended statistics regarding firing rates and such from the various dataframes.
         
         Requires:
-            pf2D_Decoder
+            computed_data['pf1D_dt']
+            computation_result.sess.position
+            computation_result.computation_config.pf_params.time_bin_size
             
         Provides:
-            ['placefield_overlap']
+            computation_result.computed_data['extended_stats']
+                ['extended_stats']['time_binned_positioned_resampler']
+                ['extended_stats']['time_binned_position_df']
+                ['extended_stats']['time_binned_position_mean']
+                ['extended_stats']['time_binned_position_covariance']                
+                
         
         """
-        """ all_pairwise_neuron_IDXs_combinations: (np.shape: (903, 2))
-        array([[ 0,  1],
-            [ 0,  2],
-            [ 0,  3],
-            ...,
-            [40, 41],
-            [40, 42],
-            [41, 42]])
-        """
-        all_pairwise_neuron_IDs_combinations = np.array(list(itertools.combinations(computation_result.computed_data['pf2D_Decoder'].neuron_IDs, 2)))
-        list_of_unit_pfs = [computation_result.computed_data['pf2D_Decoder'].pf.ratemap.normalized_tuning_curves[i,:,:] for i in computation_result.computed_data['pf2D_Decoder'].neuron_IDXs]
-        all_pairwise_pfs_combinations = np.array(list(itertools.combinations(list_of_unit_pfs, 2)))
-        # np.shape(all_pairwise_pfs_combinations) # (903, 2, 63, 63)
-        all_pairwise_overlaps = np.squeeze(np.prod(all_pairwise_pfs_combinations, axis=1)) # multiply over the dimension containing '2' (multiply each pair of pfs).
-        # np.shape(all_pairwise_overlaps) # (903, 63, 63)
-        total_pairwise_overlaps = np.sum(all_pairwise_overlaps, axis=(1, 2)) # sum over all positions, finding the total amount of overlap for each pair
-        # np.shape(total_pairwise_overlaps) # (903,)
+        # _perform_time_dependent_pf_sequential_surprise_computation
+        active_pf_1D_dt = computation_result.computed_data['pf1D_dt']
+        # active_pf_2D_dt = computation_result.computed_data['pf2D_dt']
 
-        # np.max(total_pairwise_overlaps) # 31.066909225698513
-        # np.min(total_pairwise_overlaps) # 1.1385978466010813e-07
+        sess = computation_result.sess
+        sess, combined_records_list = _build_new_lap_and_intra_lap_intervals(sess) # from PendingNotebookCode
 
-        # Sort the pairs by their total overlap to potentially elminate redundant pairs:
-        pairwise_overlap_sort_order = np.flip(np.argsort(total_pairwise_overlaps))
+        _out_snapshots = active_pf_1D_dt.batch_snapshotting(combined_records_list, reset_at_start=True, debug_print=False)
+        pf_overlap_results, flat_relative_entropy_results = compute_snapshot_differences(active_pf_1D_dt)
+        flat_relative_entropy_results = np.vstack(flat_relative_entropy_results)
 
-        # Sort the returned quantities:
-        all_pairwise_neuron_IDs_combinations = all_pairwise_neuron_IDs_combinations[pairwise_overlap_sort_order,:] # get the identities of the maximally overlapping placefields
-        total_pairwise_overlaps = total_pairwise_overlaps[pairwise_overlap_sort_order]
-        all_pairwise_overlaps = all_pairwise_overlaps[pairwise_overlap_sort_order,:,:]
-
-        computation_result.computed_data['placefield_overlap'] = DynamicParameters.init_from_dict({
-         'all_pairwise_neuron_IDs_combinations': all_pairwise_neuron_IDs_combinations,
-         'total_pairwise_overlaps': total_pairwise_overlaps,
-         'all_pairwise_overlaps': all_pairwise_overlaps,
+        if 'extended_stats' not in computation_result.computed_data:
+            computation_result.computed_data['extended_stats'] = DynamicParameters() # new 'extended_stats' dict
+ 
+        computation_result.computed_data['extended_stats']['sequential_surprise'] = DynamicParameters.init_from_dict({
+         'pf_overlap_results': pf_overlap_results,
+         'flat_relative_entropy_results': flat_relative_entropy_results,
+         '_out_snapshots': _out_snapshots
         })
         """ 
-        Access via ['placefield_overlap']['all_pairwise_overlaps']
+        Access via ['extended_stats']['sequential_surprise']
         Example:
-            active_pf_overlap_results = curr_active_pipeline.computation_results[active_config_name].computed_data['placefield_overlap']
-            all_pairwise_neuron_IDs_combinations = active_pf_overlap_results['all_pairwise_neuron_IDs_combinations']
-            total_pairwise_overlaps = active_pf_overlap_results['total_pairwise_overlaps']
-            all_pairwise_overlaps = active_pf_overlap_results['all_pairwise_overlaps']
-            all_pairwise_overlaps
+            active_extended_stats = curr_active_pipeline.computation_results['maze1'].computed_data['extended_stats']
+            sequential_surprise = active_extended_stats['sequential_surprise']
+            sequential_surprise
         """
         return computation_result
     
-    
 
-        
-    
+
+
+def compute_surprise_relative_entropy_divergence(long_curve, short_curve):
+    """
+    Given two tuning maps, computes the surprise (in terms of the KL-divergence a.k.a. relative entropy) between the two
+    Returns a dictionary containing the results in both directions
+    """
+    long_short_rel_entr_curve = rel_entr(long_curve, short_curve)
+    long_short_relative_entropy = sum(long_short_rel_entr_curve) 
+    short_long_rel_entr_curve = rel_entr(short_curve, long_curve)
+    short_long_relative_entropy = sum(short_long_rel_entr_curve) 
+    return dict(long_short_rel_entr_curve=long_short_rel_entr_curve, long_short_relative_entropy=long_short_relative_entropy, short_long_rel_entr_curve=short_long_rel_entr_curve, short_long_relative_entropy=short_long_relative_entropy)
+
+
+def compute_snapshot_differences(active_pf_1D_dt):
+    """
+    Computes the surprise between consecutive pairs of placefield snapshots extracted from a computed `active_pf_1D_dt`
+
+    Usage:
+
+        pf_overlap_results, flat_relative_entropy_results = compute_snapshot_differences(active_pf_1D_dt)
+
+
+    """
+    pf_overlap_results = []
+    flat_relative_entropy_results = []
+    n_snapshots = len(active_pf_1D_dt.historical_snapshots)
+    snapshot_times = list(active_pf_1D_dt.historical_snapshots.keys())
+    snapshots = list(active_pf_1D_dt.historical_snapshots.values())
+    snapshot_indicies = np.arange(n_snapshots) # [0, 1, 2, 3, 4]
+
+    snapshot_pair_indicies = build_pairwise_indicies(snapshot_indicies) # [(0, 1), (1, 2), (2, 3), ... , (146, 147), (147, 148), (148, 149)]
+    for earlier_snapshot_idx, later_snapshot_idx in snapshot_pair_indicies:
+        ## Extract the two sequential snapshots for this period:
+        # earlier_snapshot, later_snapshot = active_pf_1D_dt.historical_snapshots[earlier_snapshot_idx], active_pf_1D_dt.historical_snapshots[later_snapshot_idx]
+        earlier_snapshot, later_snapshot = snapshots[earlier_snapshot_idx], snapshots[later_snapshot_idx]
+        earlier_snapshot_t, later_snapshot_t = snapshot_times[earlier_snapshot_idx], snapshot_times[later_snapshot_idx]
+
+        ## Proof of concept, comute surprise between the two snapshots:
+        # relative_entropy_overlap_dict, relative_entropy_overlap_scalars_df = compute_relative_entropy_divergence_overlap(earlier_snapshot, later_snapshot, debug_print=False)
+        # print(earlier_snapshot['occupancy_weighted_tuning_maps_matrix'].shape) # (108, 63)
+        # print(later_snapshot['occupancy_weighted_tuning_maps_matrix'].shape) # (108, 63)
+        # relative_entropy_result_dict = compute_surprise_relative_entropy_divergence(earlier_snapshot['occupancy_weighted_tuning_maps_matrix'], later_snapshot['occupancy_weighted_tuning_maps_matrix'])
+        relative_entropy_result_dict = compute_surprise_relative_entropy_divergence(earlier_snapshot.occupancy_weighted_tuning_maps_matrix, later_snapshot.occupancy_weighted_tuning_maps_matrix)
+
+        # 'long_short_relative_entropy'
+
+        # aclu_keys = [k for k,v in relative_entropy_result_dict.items() if v is not None] # len(aclu_keys) # 101
+        # short_long_rel_entr_curves = np.vstack([v['short_long_rel_entr_curve'] for k,v in relative_entropy_result_dict.items() if v is not None])
+
+        # np.vstack(relative_entropy_result_dict['short_long_relative_entropy'])
+
+
+        # short_long_rel_entr_curves # .shape # (101, 63)
+        # print(f"{relative_entropy_result_dict['short_long_rel_entr_curve'].shape}") # (108, 63)
+        # print(f"{relative_entropy_result_dict['short_long_relative_entropy'].shape}") # (63,)
+
+        flat_relative_entropy_results.append(relative_entropy_result_dict['short_long_relative_entropy'])
+        pf_overlap_results.append({'t': (earlier_snapshot_t, later_snapshot_t),
+                                   'snapshots': (earlier_snapshot, later_snapshot),
+                                   'relative_entropy_result_dict': relative_entropy_result_dict,
+            # 'short_long_rel_entr_curves': short_long_rel_entr_curves,
+            # 'relative_entropy_overlap_scalars_df': relative_entropy_overlap_scalars_df,        
+        })
+
+        return pf_overlap_results, flat_relative_entropy_results
