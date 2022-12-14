@@ -44,6 +44,9 @@ class ZhangReconstructionImplementation:
     def compute_time_bins(spikes_df, max_time_bin_size:float=0.02, debug_print=False):
         """Given a spikes dataframe, this function temporally bins the spikes, counting the number that fall into each bin.
 
+        # importantly adds 'binned_time' column to spikes_df
+
+
         Args:
             spikes_df ([type]): [description]
             time_bin_size ([type]): [description]
@@ -117,9 +120,28 @@ class ZhangReconstructionImplementation:
             unit_specific_binned_spike_counts, out_digitized_variable_bins, out_binning_info = compute_time_binned_spiking_activity(spikes_df, time_bin_size)
 
         """
-        time_window_edges, time_window_edges_binning_info, spikes_df = ZhangReconstructionImplementation.compute_time_bins(spikes_df, max_time_bin_size=max_time_bin_size, debug_print=debug_print)
+        time_window_edges, time_window_edges_binning_info, spikes_df = ZhangReconstructionImplementation.compute_time_bins(spikes_df, max_time_bin_size=max_time_bin_size, debug_print=debug_print) # importantly adds 'binned_time' column to spikes_df
         unit_specific_binned_spike_counts = ZhangReconstructionImplementation.compute_unit_specific_bin_specific_spike_counts(spikes_df, time_window_edges_binning_info.bin_indicies[1:], debug_print=debug_print)
         return unit_specific_binned_spike_counts, time_window_edges, time_window_edges_binning_info
+
+    @classmethod
+    def _validate_time_binned_spike_rate_df(cls, time_bins, unit_specific_binned_spike_counts_df):
+        """ Validates the outputs of `ZhangReconstructionImplementation.compute_time_binned_spiking_activity(...)`
+        
+        Usage:
+            active_session_spikes_df = sess.spikes_df.copy()
+            unit_specific_binned_spike_count_df, sess_time_window_edges, sess_time_window_edges_binning_info = ZhangReconstructionImplementation.compute_time_binned_spiking_activity(active_session_spikes_df.copy(), max_time_bin_size=time_bin_size_seconds, debug_print=False) # np.shape(unit_specific_spike_counts): (4188, 108)
+            sess_time_binning_container = BinningContainer(edges=sess_time_window_edges, edge_info=sess_time_window_edges_binning_info)
+            _validate_time_binned_spike_rate_df(sess_time_binning_container.centers, unit_specific_binned_spike_count_df)
+
+        """
+        assert isinstance(unit_specific_binned_spike_counts_df, pd.DataFrame)
+        assert unit_specific_binned_spike_counts_df.shape[0] == time_bins.shape[0], f"unit_specific_binned_spike_counts_df.shape[0]: {unit_specific_binned_spike_counts_df.shape[0]} and time_bins.shape[0] {time_bins.shape[0]}"
+        print(f'unit_specific_binned_spike_counts_df.shape: {unit_specific_binned_spike_counts_df.shape}')
+        nCells = unit_specific_binned_spike_counts_df.shape[1]
+        nTimeBins = unit_specific_binned_spike_counts_df.shape[0] # many time_bins
+        print(f'nCells: {nCells}, nTimeBins: {nTimeBins}')
+
 
     @staticmethod
     def build_concatenated_F(pf, debug_print=False):
@@ -164,17 +186,40 @@ class ZhangReconstructionImplementation:
             unit_specific_binned_spike_counts, out_digitized_variable_bins, out_binning_info = ZhangReconstructionImplementation.time_bin_spike_counts_N_i(sess.spikes_df.copy(), time_bin_size, debug_print=debug_print) # unit_specific_binned_spike_counts.to_numpy(): (40, 85841)
             
         """
-        if time_window_edges is None or time_window_edges_binning_info is None:    
+        if time_window_edges is None or time_window_edges_binning_info is None:
+            # build time_window_edges/time_window_edges_binning_info AND adds 'binned_time' column to spikes_df
             time_window_edges, time_window_edges_binning_info, spikes_df = ZhangReconstructionImplementation.compute_time_bins(spikes_df, max_time_bin_size=time_bin_size, debug_print=debug_print)
-            unit_specific_binned_spike_counts = ZhangReconstructionImplementation.compute_unit_specific_bin_specific_spike_counts(spikes_df, time_window_edges_binning_info.bin_indicies[1:], debug_print=debug_print)
         else:
-            # already have time bins:
-            unit_specific_binned_spike_counts = ZhangReconstructionImplementation.compute_unit_specific_bin_specific_spike_counts(spikes_df, time_window_edges_binning_info.bin_indicies[1:], debug_print=debug_print)
+            # already have time bins (time_window_edges/time_window_edges_binning_info) so just add 'binned_time' column to spikes_df if needed:
+            if 'binned_time' not in spikes_df.columns:
+                # we must have the 'binned_time' column in spikes_df, so add it if needed
+                spikes_df = spikes_df.spikes.add_binned_time_column(time_window_edges, time_window_edges_binning_info, debug_print=debug_print)
         
+        # either way to compute the unit_specific_binned_spike_counts:
+        unit_specific_binned_spike_counts = ZhangReconstructionImplementation.compute_unit_specific_bin_specific_spike_counts(spikes_df, time_window_edges_binning_info.bin_indicies[1:], debug_print=debug_print) # requires 'binned_time' in spikes_df
         unit_specific_binned_spike_counts = unit_specific_binned_spike_counts.T # Want the outputs to have each time window as a column, with a single time window giving a column vector for each neuron
         if debug_print:
             print(f'unit_specific_binned_spike_counts.to_numpy(): {np.shape(unit_specific_binned_spike_counts.to_numpy())}') # (85841, 40)
         return unit_specific_binned_spike_counts.to_numpy(), time_window_edges, time_window_edges_binning_info
+
+    @classmethod
+    def _validate_time_binned_spike_counts(cls, time_binning_container, unit_specific_binned_spike_counts):
+        """ Validates the outputs of `ZhangReconstructionImplementation.time_bin_spike_counts_N_i(...)`
+        
+        Usage:
+            active_session_spikes_df = sess.spikes_df.copy()
+            unit_specific_binned_spike_counts, time_window_edges, time_window_edges_binning_info = ZhangReconstructionImplementation.time_bin_spike_counts_N_i(active_session_spikes_df.copy(), time_bin_size=time_bin_size_seconds, debug_print=False)  # np.shape(unit_specific_spike_counts): (4188, 108)
+            time_binning_container = BinningContainer(edges=time_window_edges, edge_info=time_window_edges_binning_info)
+            _validate_time_binned_spike_counts(time_binning_container, unit_specific_binned_spike_counts)
+
+        """
+        assert isinstance(unit_specific_binned_spike_counts, np.ndarray)
+        assert unit_specific_binned_spike_counts.shape[1] == time_binning_container.center_info.num_bins, f"unit_specific_binned_spike_counts.shape[1]: {unit_specific_binned_spike_counts.shape[1]} and time_binning_container.center_info.num_bins {time_binning_container.center_info.num_bins}"
+        print(f'unit_specific_binned_spike_counts.shape: {unit_specific_binned_spike_counts.shape}')
+        nCells = unit_specific_binned_spike_counts.shape[0]
+        nTimeBins = unit_specific_binned_spike_counts.shape[1] # many time_bins
+        print(f'nCells: {nCells}, nTimeBins: {nTimeBins}')
+
 
     # Optimal Functions:
     @staticmethod
@@ -190,49 +235,6 @@ class ZhangReconstructionImplementation:
         identity_deviation = identity_approx - np.identity(np.shape(identity_approx)[0])
         return identity_deviation
 
-
-    # Bayesian Probabilistic Approach:
-    # @staticmethod
-    # def bayesian_prob(tau, P_x, F, n, debug_print=False):
-    #     """ this seems to be broken as of 2022-09-20. Replaced by .neuropy_bayesian_prob(...) which does seem to work for 2D and was extracted from Neuropy """
-    #     # n_i: the number of spikes fired by each cell during the time window of consideration
-    #     assert(len(n) == np.shape(F)[1]), f'n must be a column vector with an entry for each place cell (neuron). Instead it is of np.shape(n): {np.shape(n)}. np.shape(F): {np.shape(F)}'
-        
-    #     # total_number_spikes_n = np.sum(n) # the total number of spikes across all placecells during this timewindow
-        
-    #     # take n as a row vector, and repeat it vertically for each column.
-    #     element_wise_n = np.tile(n, (np.shape(F)[0], 1)) # repeat n for each row (coresponding to a position x) in F.
-    #     # repeats_array = np.tile(an_array, (repetitions, 1))
-    #     if debug_print:
-    #         print(f'np.shape(element_wise_n): {np.shape(element_wise_n)}') # np.shape(element_wise_n): (288, 40)
-
-    #     # the inner expression np.power(F, element_wise_n) performs the element-wise exponentiation of F with the values in element_wise_n.
-    #     # result = P_x * np.prod(np.power(F, element_wise_n), axis=1) # the product is over the neurons, so the second dimension
-    #     term1 = np.squeeze(P_x) # np.shape(P_x): (48, 6)
-    #     if debug_print:
-    #         print(f'np.shape(term1): {np.shape(term1)}') # np.shape(P_x): (48, 6)
-    #     term2 = np.prod(np.power(F, element_wise_n), axis=1) # np.shape(term2): (288,)
-    #     if debug_print:
-    #         print(f'np.shape(term2): {np.shape(term2)}') # np.shape(P_x): (48, 6)
-
-    #     # result = C_tau_n * P_x
-    #     term3 = np.exp(-tau * np.sum(F, axis=1)) # sum over all columns (corresponding to over all cells)
-    #     if debug_print:
-    #         print(f'np.shape(term3): {np.shape(term3)}') # np.shape(P_x): (48, 6)
-
-    #     # each column_i of F, F[:,i] should be raised to the power of n_i[i]
-    #     un_normalized_result = term1 * term2 * term3
-    #     C_tau_n = 1.0 / np.sum(un_normalized_result) # normalize the result
-    #     result = C_tau_n * un_normalized_result
-    #     if debug_print:
-    #         print(f'np.shape(result): {np.shape(result)}') # np.shape(P_x): (48, 6)
-    #     """
-    #         np.shape(term1): (288, 1)
-    #         np.shape(term2): (288,)
-    #         np.shape(term3): (288,)
-    #         np.shape(result): (288, 288)
-    #     """
-    #     return result
     
     @staticmethod
     def neuropy_bayesian_prob(tau, P_x, F, n, use_flat_computation_mode=True, debug_print=False):
@@ -527,35 +529,7 @@ class BayesianPlacemapPositionDecoder(PlacemapPositionDecoder):
     def from_dict(cls, val_dict):
         new_obj = BayesianPlacemapPositionDecoder(val_dict.get('time_bin_size', 0.25), val_dict.get('pf', None), val_dict.get('spikes_df', None), setup_on_init=val_dict.get('setup_on_init', True), post_load_on_init=val_dict.get('post_load_on_init', False), debug_print=val_dict.get('debug_print', False))
         return new_obj
-    
-    
-    ## Compatibility properties:
-    # @property
-    # def flat_p_x_given_n(self):
-    #     """The flattened outputs """
-    #     return self._flatten_output(self.p_x_given_n)
-    
-    # @property
-    # def most_likely_position_flat_indicies(self):
-    #     """The flattened outputs for position:
-        
-    #     np.shape(self.most_likely_position_flat_indicies) # (85841,)
-    #     np.shape(self.most_likely_position_indicies) # (2, 85841)
-        
-    #     """
-    #     return self._flatten_output(self.p_x_given_n)
-    
-    # @property
-    # def flat_most_likely_position(self):
-    #     """The flattened outputs for position:
-        
-    #     np.shape(self.most_likely_position_flat_indicies) # (85841,)
-    #     np.shape(self.most_likely_position_indicies) # (2, 85841)
-        
-    #     """
-    #     return self._flatten_output(self.most_likely_positions)
-    
-    
+
     
     # ==================================================================================================================== #
     # Methods                                                                                                              #
@@ -582,7 +556,6 @@ class BayesianPlacemapPositionDecoder(PlacemapPositionDecoder):
         
         self._setup_concatenated_F()
         # Could pre-filter the self.spikes_df by the 
-        
         
         self.time_binning_container = None
         self.unit_specific_time_binned_spike_counts = None
@@ -640,14 +613,13 @@ class BayesianPlacemapPositionDecoder(PlacemapPositionDecoder):
         """
         ## need to create new time_window_edges from the self.time_bin_size:
         print(f'WARNING: _setup_time_bin_spike_counts_N_i(): updating self.time_window_edges and self.time_window_edges_binning_info ...')
-        self.unit_specific_time_binned_spike_counts, time_window_edges, time_window_edges_binning_info = ZhangReconstructionImplementation.time_bin_spike_counts_N_i(self.spikes_df, self.time_bin_size, debug_print=self.debug_print) # unit_specific_binned_spike_counts.to_numpy(): (40, 85841)
+        self.unit_specific_time_binned_spike_counts, time_window_edges, time_window_edges_binning_info = ZhangReconstructionImplementation.time_bin_spike_counts_N_i(self.spikes_df, time_bin_size=self.time_bin_size, debug_print=self.debug_print) # unit_specific_binned_spike_counts.to_numpy(): (40, 85841)
 
         print(f'from ._setup_time_bin_spike_counts_N_i():')
         print(f'\ttime_window_edges.shape: {time_window_edges.shape}') #  (11882,)
         print(f'unit_specific_time_binned_spike_counts.shape: {self.unit_specific_time_binned_spike_counts.shape}') # (70, 11881)
         
         self.time_binning_container = BinningContainer(edges=time_window_edges, edge_info=time_window_edges_binning_info)
-        
         
         # Here we should filter the outputs by the actual self.neuron_IDXs
         # assert np.shape(self.unit_specific_time_binned_spike_counts)[0] == len(self.neuron_IDXs), f"in _setup_time_bin_spike_counts_N_i(): output should equal self.neuronIDXs but np.shape(self.unit_specific_time_binned_spike_counts)[0]: {np.shape(self.unit_specific_time_binned_spike_counts)[0]} and len(self.neuron_IDXs): {len(self.neuron_IDXs)}"
@@ -670,18 +642,6 @@ class BayesianPlacemapPositionDecoder(PlacemapPositionDecoder):
     # ==================================================================================================================== #
     # Main computation functions:                                                                                          #
     # ==================================================================================================================== #
-    # def perform_compute_single_time_bin(self, time_window_idx):
-    #     """ the main computation function for a single time_window_idx """
-    #     n = self.unit_specific_time_binned_spike_counts[:, time_window_idx] # this gets the specific n_t for this time window
-        
-    #     if self.debug_print:
-    #         print(f'np.shape(n): {np.shape(n)}') # np.shape(n): (40,)
-    #     # final_p_x_given_n = ZhangReconstructionImplementation.bayesian_prob(self.time_bin_size, self.P_x, self.F, n, debug_print=self.debug_print) # np.shape(final_p_x_given_n): (288,)
-    #     # NeuroPy's decoder method:
-    #     final_p_x_given_n = ZhangReconstructionImplementation.neuropy_bayesian_prob(self.time_bin_size, self.P_x, self.F, n, debug_print=self.debug_print)
-    #     if self.debug_print:
-    #         print(f'np.shape(final_p_x_given_n): {np.shape(self.flat_p_x_given_n)}') # np.shape(final_p_x_given_n): (288,)
-    #     return final_p_x_given_n
 
     def hyper_perform_decode(self, spikes_df, decoding_time_bin_size=0.1, t_start=None, t_end=None, output_flat_versions=False, debug_print=False):
         """ makes use of:
@@ -709,9 +669,7 @@ class BayesianPlacemapPositionDecoder(PlacemapPositionDecoder):
         most_likely_positions, p_x_given_n, most_likely_position_indicies, flat_outputs_container = self.decode(spkcount, time_bin_size=decoding_time_bin_size, output_flat_versions=output_flat_versions, debug_print=debug_print)
         curr_unit_marginal_x, curr_unit_marginal_y = self.perform_build_marginals(p_x_given_n, most_likely_positions, debug_print=debug_print)
         return time_bin_container, p_x_given_n, most_likely_positions, curr_unit_marginal_x, curr_unit_marginal_y, flat_outputs_container
-    
-    
-            
+
     def compute_all(self, debug_print=False):
         # with WrappingMessagePrinter(f'compute_all final_p_x_given_n called. Computing {np.shape(self.flat_p_x_given_n)[0]} windows for self.final_p_x_given_n...', begin_line_ending='... ', finished_message='compute_all completed.', enable_print=self.debug_print):
         with WrappingMessagePrinter(f'compute_all final_p_x_given_n called. Computing windows...', begin_line_ending='... ', finished_message='compute_all completed.', enable_print=(debug_print or self.debug_print)):
@@ -726,19 +684,7 @@ class BayesianPlacemapPositionDecoder(PlacemapPositionDecoder):
             ## set flat properties for compatibility (I guess)
             self.flat_p_x_given_n = flat_outputs_container.flat_p_x_given_n
             self.most_likely_position_flat_indicies = flat_outputs_container.most_likely_position_flat_indicies
-            # self.flat_p_x_given_n = flat_outputs_container.flat_p_x_given_n
             
-        
-            # print(f'unit_specific_binned_spike_counts.to_numpy(): {np.shape(unit_specific_binned_spike_counts.to_numpy())}') # (85841, 40)
-            
-            ## Older Zhang-style decoding:
-            # self.flat_p_x_given_n[:, :] = ZhangReconstructionImplementation.neuropy_bayesian_prob(self.time_bin_size, self.P_x, self.F, self.unit_specific_time_binned_spike_counts, debug_print=self.debug_print)
-            # print(f'self.flat_p_x_given_n.shape: {self.flat_p_x_given_n.shape}')                        
-            # Reshape the output variable:
-            # np.shape(self.final_p_x_given_n) # (288, 85842)
-            # self.p_x_given_n = self._reshape_output(self.flat_p_x_given_n)
-            # self.compute_most_likely_positions()
-
 
     def compute_most_likely_positions(self):
         """ Computes the most likely positions at each timestep from self.flat_p_x_given_n """        
@@ -746,8 +692,6 @@ class BayesianPlacemapPositionDecoder(PlacemapPositionDecoder):
         self.most_likely_position_flat_indicies, self.most_likely_position_indicies = self.perform_compute_most_likely_positions(self.flat_p_x_given_n, self.original_position_data_shape)
         # np.shape(self.most_likely_position_flat_indicies) # (85841,)
         # np.shape(self.most_likely_position_indicies) # (2, 85841)
-        
-        
             
     def decode(self, unit_specific_time_binned_spike_counts, time_bin_size, output_flat_versions=False, debug_print=True):
         """ decodes the neural activity from its internal placefields, returning its posterior and the predicted position 

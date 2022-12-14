@@ -84,15 +84,14 @@ class ExtendedStatsComputations(AllFunctionEnumeratingMixin, metaclass=Computati
         sess, combined_records_list = _build_new_lap_and_intra_lap_intervals(sess) # from PendingNotebookCode
 
         difference_snapshots = active_pf_1D_dt.batch_snapshotting(combined_records_list, reset_at_start=True, debug_print=debug_print)
-        post_update_times, pf_overlap_results, flat_relative_entropy_results, flat_jensen_shannon_distance_results = compute_snapshot_differences(active_pf_1D_dt)
-        flat_jensen_shannon_distance_results = np.vstack(flat_jensen_shannon_distance_results) # flatten the list
-        flat_relative_entropy_results = np.vstack(flat_relative_entropy_results) # flatten the list
+        # post_update_times, pf_overlap_results, flat_relative_entropy_results, flat_jensen_shannon_distance_results = compute_snapshot_differences(difference_snapshots)
+        post_update_times, pf_overlap_results, flat_relative_entropy_results, flat_jensen_shannon_distance_results = compute_snapshot_differences(active_pf_1D_dt.historical_snapshots)
 
         if 'extended_stats' not in computation_result.computed_data:
             computation_result.computed_data['extended_stats'] = DynamicParameters() # new 'extended_stats' dict
  
         computation_result.computed_data['extended_stats']['sequential_surprise'] = DynamicParameters.init_from_dict({
-         'post_update_times': np.array(post_update_times),
+         'post_update_times': post_update_times,
          'pf_overlap_results': pf_overlap_results,
          'flat_relative_entropy_results': flat_relative_entropy_results,
          'flat_jensen_shannon_distance_results': flat_jensen_shannon_distance_results,
@@ -126,12 +125,11 @@ def compute_surprise_relative_entropy_divergence(long_curve, short_curve):
     mixture_distribution = 0.5 * (long_curve + short_curve)
     jensen_shannon_distance = 0.5 * (sum(rel_entr(mixture_distribution, long_curve)) + sum(rel_entr(mixture_distribution, short_curve)))
 
-
     return dict(long_short_rel_entr_curve=long_short_rel_entr_curve, long_short_relative_entropy=long_short_relative_entropy, short_long_rel_entr_curve=short_long_rel_entr_curve, short_long_relative_entropy=short_long_relative_entropy,
             jensen_shannon_distance=jensen_shannon_distance)
 
 
-def compute_snapshot_differences(active_pf_1D_dt):
+def compute_snapshot_differences(historical_snapshots_dict):
     """
     Computes the surprise between consecutive pairs of placefield snapshots extracted from a computed `active_pf_1D_dt`
 
@@ -145,9 +143,9 @@ def compute_snapshot_differences(active_pf_1D_dt):
     flat_relative_entropy_results = []
     flat_jensen_shannon_distance_results = []
 
-    n_snapshots = len(active_pf_1D_dt.historical_snapshots)
-    snapshot_times = list(active_pf_1D_dt.historical_snapshots.keys())
-    snapshots = list(active_pf_1D_dt.historical_snapshots.values())
+    n_snapshots = len(historical_snapshots_dict)
+    snapshot_times = list(historical_snapshots_dict.keys())
+    snapshots = list(historical_snapshots_dict.values())
     snapshot_indicies = np.arange(n_snapshots) # [0, 1, 2, 3, 4]
 
     post_update_times = snapshot_times[1:] # all but the first snapshot
@@ -155,7 +153,6 @@ def compute_snapshot_differences(active_pf_1D_dt):
     snapshot_pair_indicies = build_pairwise_indicies(snapshot_indicies) # [(0, 1), (1, 2), (2, 3), ... , (146, 147), (147, 148), (148, 149)]
     for earlier_snapshot_idx, later_snapshot_idx in snapshot_pair_indicies:
         ## Extract the two sequential snapshots for this period:
-        # earlier_snapshot, later_snapshot = active_pf_1D_dt.historical_snapshots[earlier_snapshot_idx], active_pf_1D_dt.historical_snapshots[later_snapshot_idx]
         earlier_snapshot, later_snapshot = snapshots[earlier_snapshot_idx], snapshots[later_snapshot_idx]
         earlier_snapshot_t, later_snapshot_t = snapshot_times[earlier_snapshot_idx], snapshot_times[later_snapshot_idx]
 
@@ -187,6 +184,16 @@ def compute_snapshot_differences(active_pf_1D_dt):
             # 'short_long_rel_entr_curves': short_long_rel_entr_curves,
             # 'relative_entropy_overlap_scalars_df': relative_entropy_overlap_scalars_df,        
         })
-        
+
+    # flatten the relevent results:
+    post_update_times = np.array(post_update_times)
+    flat_jensen_shannon_distance_results = np.vstack(flat_jensen_shannon_distance_results) # flatten the list
+    flat_relative_entropy_results = np.vstack(flat_relative_entropy_results) # flatten the list
     
+    # relative_entropy_result_dicts_list = [a_val_dict['relative_entropy_result_dict'] for a_val_dict in pf_overlap_results]
+    # # long_short_rel_entr_curves_list = [a_val_dict['long_short_rel_entr_curve'] for a_val_dict in relative_entropy_result_dicts_list] # [0].shape # (108, 63) = (n_neurons, n_xbins)
+    # # short_long_rel_entr_curves_list = [a_val_dict['short_long_rel_entr_curve'] for a_val_dict in relative_entropy_result_dicts_list]
+    # long_short_rel_entr_curves_frames = np.stack([a_val_dict['long_short_rel_entr_curve'] for a_val_dict in relative_entropy_result_dicts_list]) # build a 3D array (4152, 108, 63) = (n_post_update_times, n_neurons, n_xbins)
+    # short_long_rel_entr_curves_frames = np.stack([a_val_dict['short_long_rel_entr_curve'] for a_val_dict in relative_entropy_result_dicts_list]) # build a 3D array (4152, 108, 63) = (n_post_update_times, n_neurons, n_xbins)
+
     return post_update_times, pf_overlap_results, flat_relative_entropy_results, flat_jensen_shannon_distance_results

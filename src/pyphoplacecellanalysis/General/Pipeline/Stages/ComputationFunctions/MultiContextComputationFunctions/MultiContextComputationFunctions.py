@@ -178,7 +178,7 @@ class MultiContextComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Co
 
         ## instantaneous_unit_specific_spike_rate mode:
         try:
-            active_firing_rate_trends = computation_results[global_epoch_name]['computed_data']['firing_rate_trends']            
+            active_firing_rate_trends = computation_results[global_epoch_name]['computed_data']['firing_rate_trends']
             # neuron_IDs = np.unique(computation_results[global_epoch_name].sess.spikes_df.aclu) # TODO: make sure standardized
             instantaneous_unit_specific_spike_rate = active_firing_rate_trends.all_session_spikes.instantaneous_unit_specific_spike_rate
             # instantaneous_unit_specific_spike_rate = computation_results[global_epoch_name]['computed_data']['firing_rate_trends'].all_session_spikes.instantaneous_unit_specific_spike_rate
