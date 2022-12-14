@@ -27,10 +27,13 @@ from pyphoplacecellanalysis.General.Mixins.CrossComputationComparisonHelpers imp
 from neuropy.analyses import detect_pbe_epochs # used in `_perform_jonathan_replay_firing_rate_analyses(.)` if replays are missing
 
 # For _perform_relative_entropy_analyses
-from pyphocorehelpers.indexing_helpers import build_pairwise_indicies
-from neuropy.analyses.time_dependent_placefields import PfND_TimeDependent
-from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.ExtendedStats import compute_snapshot_relative_entropy_surprise_differences
-from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.ExtendedStats import TimeDependentPlacefieldSurpriseMode # for _perform_relative_entropy_analyses
+# from pyphocorehelpers.indexing_helpers import build_pairwise_indicies
+# from neuropy.analyses.time_dependent_placefields import PfND_TimeDependent
+# from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.ExtendedStats import TimeDependentPlacefieldSurpriseMode, compute_snapshot_relative_entropy_surprise_differences # for _perform_relative_entropy_analyses
+
+# from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.ExtendedStats import ExtendedStatsComputations # ImportError: cannot import name 'ExtendedStatsComputations' causes circular import
+
+# _perform_time_dependent_pf_sequential_surprise_computation
 
 
 def _compute_custom_PBEs(sess):
@@ -299,96 +302,96 @@ class MultiContextComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Co
 
 
 
-    def _perform_relative_entropy_analyses(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_whitelist=None, debug_print=False):
-        """ NOTE: 2022-12-14 - this mirrors the non-global version at `pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.ExtendedStats.ExtendedStatsComputations._perform_time_dependent_pf_sequential_surprise_computation` that I just modified except it only uses the global epoch.
+    # def _perform_relative_entropy_analyses(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_whitelist=None, debug_print=False):
+    #     """ NOTE: 2022-12-14 - this mirrors the non-global version at `pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.ExtendedStats.ExtendedStatsComputations._perform_time_dependent_pf_sequential_surprise_computation` that I just modified except it only uses the global epoch.
         
-        Requires:
-            ['firing_rate_trends']
-            pf1D_dt (or it can build a new one)
+    #     Requires:
+    #         ['firing_rate_trends']
+    #         pf1D_dt (or it can build a new one)
             
-        Provides:
-            computation_result.computed_data['relative_entropy_analyses']
-                ['relative_entropy_analyses']['short_long_neurons_diff']
-                ['relative_entropy_analyses']['poly_overlap_df']
+    #     Provides:
+    #         computation_result.computed_data['relative_entropy_analyses']
+    #             ['relative_entropy_analyses']['short_long_neurons_diff']
+    #             ['relative_entropy_analyses']['poly_overlap_df']
         
-        """
-        # use_extant_pf1D_dt_mode = TimeDependentPlacefieldSurpriseMode.STATIC_METHOD_ONLY
-        use_extant_pf1D_dt_mode = TimeDependentPlacefieldSurpriseMode.USING_EXTANT # reuse the existing pf1D_dt
+    #     """
+    #     # use_extant_pf1D_dt_mode = TimeDependentPlacefieldSurpriseMode.STATIC_METHOD_ONLY
+    #     use_extant_pf1D_dt_mode = TimeDependentPlacefieldSurpriseMode.USING_EXTANT # reuse the existing pf1D_dt
 
-        if include_whitelist is None:
-            include_whitelist = owning_pipeline_reference.active_completed_computation_result_names # ['maze', 'sprinkle']
+    #     if include_whitelist is None:
+    #         include_whitelist = owning_pipeline_reference.active_completed_computation_result_names # ['maze', 'sprinkle']
 
-        # Epoch dataframe stuff:
-        global_epoch_name = include_whitelist[-1] # 'maze_PYR'
+    #     # Epoch dataframe stuff:
+    #     global_epoch_name = include_whitelist[-1] # 'maze_PYR'
         
-        computation_result = computation_results[global_epoch_name]
-        global_results_data = computation_result['computed_data']
+    #     computation_result = computation_results[global_epoch_name]
+    #     global_results_data = computation_result['computed_data']
 
-        ## Get the time-binning from `firing_rate_trends`:
-        active_firing_rate_trends = global_results_data['firing_rate_trends']
-        time_bin_size_seconds, all_session_spikes, pf_included_spikes_only = active_firing_rate_trends['time_bin_size_seconds'], active_firing_rate_trends['all_session_spikes'], active_firing_rate_trends['pf_included_spikes_only']
+    #     ## Get the time-binning from `firing_rate_trends`:
+    #     active_firing_rate_trends = global_results_data['firing_rate_trends']
+    #     time_bin_size_seconds, all_session_spikes, pf_included_spikes_only = active_firing_rate_trends['time_bin_size_seconds'], active_firing_rate_trends['all_session_spikes'], active_firing_rate_trends['pf_included_spikes_only']
 
-        active_time_binning_container, active_time_binned_unit_specific_binned_spike_counts = pf_included_spikes_only['time_binning_container'], pf_included_spikes_only['time_binned_unit_specific_binned_spike_counts']
-        ZhangReconstructionImplementation._validate_time_binned_spike_rate_df(active_time_binning_container.centers, active_time_binned_unit_specific_binned_spike_counts)
+    #     active_time_binning_container, active_time_binned_unit_specific_binned_spike_counts = pf_included_spikes_only['time_binning_container'], pf_included_spikes_only['time_binned_unit_specific_binned_spike_counts']
+    #     ZhangReconstructionImplementation._validate_time_binned_spike_rate_df(active_time_binning_container.centers, active_time_binned_unit_specific_binned_spike_counts)
 
-        ## Use appropriate pf_1D_dt:
-        active_session, pf_computation_config = computation_result.sess, computation_result.computation_config.pf_params
-        active_session_spikes_df, active_pos, computation_config, included_epochs = active_session.spikes_df, active_session.position, pf_computation_config, pf_computation_config.computation_epochs
+    #     ## Use appropriate pf_1D_dt:
+    #     active_session, pf_computation_config = computation_result.sess, computation_result.computation_config.pf_params
+    #     active_session_spikes_df, active_pos, computation_config, included_epochs = active_session.spikes_df, active_session.position, pf_computation_config, pf_computation_config.computation_epochs
         
-        ## Get existing `pf1D_dt`:
-        if not use_extant_pf1D_dt_mode.needs_build_new:
-            ## Get existing `pf1D_dt`:
-            active_pf_1D_dt = global_results_data.pf1D_dt
-        else:
-            # note even in TimeDependentPlacefieldSurpriseMode.STATIC_METHOD_ONLY a PfND_TimeDependent object is used to access its properties for the Static Method (although it isn't modified)
-            active_pf_1D_dt = PfND_TimeDependent(deepcopy(active_session_spikes_df), deepcopy(active_pos.linear_pos_obj), epochs=included_epochs,
-                                                speed_thresh=computation_config.speed_thresh, frate_thresh=computation_config.frate_thresh,
-                                                grid_bin=computation_config.grid_bin, grid_bin_bounds=computation_config.grid_bin_bounds, smooth=computation_config.smooth)
+    #     ## Get existing `pf1D_dt`:
+    #     if not use_extant_pf1D_dt_mode.needs_build_new:
+    #         ## Get existing `pf1D_dt`:
+    #         active_pf_1D_dt = global_results_data.pf1D_dt
+    #     else:
+    #         # note even in TimeDependentPlacefieldSurpriseMode.STATIC_METHOD_ONLY a PfND_TimeDependent object is used to access its properties for the Static Method (although it isn't modified)
+    #         active_pf_1D_dt = PfND_TimeDependent(deepcopy(active_session_spikes_df), deepcopy(active_pos.linear_pos_obj), epochs=included_epochs,
+    #                                             speed_thresh=computation_config.speed_thresh, frate_thresh=computation_config.frate_thresh,
+    #                                             grid_bin=computation_config.grid_bin, grid_bin_bounds=computation_config.grid_bin_bounds, smooth=computation_config.smooth)
 
-        out_pair_indicies = build_pairwise_indicies(np.arange(active_time_binning_container.edge_info.num_bins))
-        time_intervals = active_time_binning_container.edges[out_pair_indicies] # .shape # (4153, 2)
-        # time_intervals
+    #     out_pair_indicies = build_pairwise_indicies(np.arange(active_time_binning_container.edge_info.num_bins))
+    #     time_intervals = active_time_binning_container.edges[out_pair_indicies] # .shape # (4153, 2)
+    #     # time_intervals
 
-        ## Entirely independent computations for binned_times:
-        if use_extant_pf1D_dt_mode.use_pf_dt_obj:
-            active_pf_1D_dt.reset()
+    #     ## Entirely independent computations for binned_times:
+    #     if use_extant_pf1D_dt_mode.use_pf_dt_obj:
+    #         active_pf_1D_dt.reset()
 
-        out_list_t = []
-        out_list = []
-        for start_t, end_t in time_intervals:
-            out_list_t.append(end_t)
+    #     out_list_t = []
+    #     out_list = []
+    #     for start_t, end_t in time_intervals:
+    #         out_list_t.append(end_t)
             
-            ## Inline version that reuses active_pf_1D_dt directly:
-            if use_extant_pf1D_dt_mode.use_pf_dt_obj:
-                out_list.append(active_pf_1D_dt.complete_time_range_computation(start_t, end_t, assign_results_to_member_variables=False))
-            else:
-                # Static version that calls PfND_TimeDependent.perform_time_range_computation(...) itself using just the computed variables of `active_pf_1D_dt`:
-                out_list.append(PfND_TimeDependent.perform_time_range_computation(active_pf_1D_dt.all_time_filtered_spikes_df, active_pf_1D_dt.all_time_filtered_pos_df, position_srate=active_pf_1D_dt.position_srate,
-                                                                            xbin=active_pf_1D_dt.xbin, ybin=active_pf_1D_dt.ybin,
-                                                                            start_time=start_t, end_time=end_t,
-                                                                            included_neuron_IDs=active_pf_1D_dt.included_neuron_IDs, active_computation_config=active_pf_1D_dt.config, override_smooth=active_pf_1D_dt.smooth))
+    #         ## Inline version that reuses active_pf_1D_dt directly:
+    #         if use_extant_pf1D_dt_mode.use_pf_dt_obj:
+    #             out_list.append(active_pf_1D_dt.complete_time_range_computation(start_t, end_t, assign_results_to_member_variables=False))
+    #         else:
+    #             # Static version that calls PfND_TimeDependent.perform_time_range_computation(...) itself using just the computed variables of `active_pf_1D_dt`:
+    #             out_list.append(PfND_TimeDependent.perform_time_range_computation(active_pf_1D_dt.all_time_filtered_spikes_df, active_pf_1D_dt.all_time_filtered_pos_df, position_srate=active_pf_1D_dt.position_srate,
+    #                                                                         xbin=active_pf_1D_dt.xbin, ybin=active_pf_1D_dt.ybin,
+    #                                                                         start_time=start_t, end_time=end_t,
+    #                                                                         included_neuron_IDs=active_pf_1D_dt.included_neuron_IDs, active_computation_config=active_pf_1D_dt.config, override_smooth=active_pf_1D_dt.smooth))
 
-        # out_list # len(out_list) # 4153
-        out_list_t = np.array(out_list_t)
-        historical_snapshots = {float(t):v for t, v in zip(out_list_t, out_list)} # build a dict<float:PlacefieldSnapshot>
-        # {1.9991045125061646: <neuropy.analyses.time_dependent_placefields.PlacefieldSnapshot at 0x16c2b74fb20>, 2.4991045125061646: <neuropy.analyses.time_dependent_placefields.PlacefieldSnapshot at 0x168acfb3bb0>, ...}
+    #     # out_list # len(out_list) # 4153
+    #     out_list_t = np.array(out_list_t)
+    #     historical_snapshots = {float(t):v for t, v in zip(out_list_t, out_list)} # build a dict<float:PlacefieldSnapshot>
+    #     # {1.9991045125061646: <neuropy.analyses.time_dependent_placefields.PlacefieldSnapshot at 0x16c2b74fb20>, 2.4991045125061646: <neuropy.analyses.time_dependent_placefields.PlacefieldSnapshot at 0x168acfb3bb0>, ...}
 
-        post_update_times, snapshot_differences_result_dict, flat_relative_entropy_results, flat_jensen_shannon_distance_results = compute_snapshot_relative_entropy_surprise_differences(historical_snapshots)
-        relative_entropy_result_dicts_list = [a_val_dict['relative_entropy_result_dict'] for a_val_dict in snapshot_differences_result_dict]
-        long_short_rel_entr_curves_list = [a_val_dict['long_short_rel_entr_curve'] for a_val_dict in relative_entropy_result_dicts_list] # [0].shape # (108, 63) = (n_neurons, n_xbins)
-        short_long_rel_entr_curves_list = [a_val_dict['short_long_rel_entr_curve'] for a_val_dict in relative_entropy_result_dicts_list]
-        long_short_rel_entr_curves_frames = np.stack([a_val_dict['long_short_rel_entr_curve'] for a_val_dict in relative_entropy_result_dicts_list]) # build a 3D array (4152, 108, 63) = (n_post_update_times, n_neurons, n_xbins)
-        short_long_rel_entr_curves_frames = np.stack([a_val_dict['short_long_rel_entr_curve'] for a_val_dict in relative_entropy_result_dicts_list]) # build a 3D array (4152, 108, 63) = (n_post_update_times, n_neurons, n_xbins)
+    #     post_update_times, snapshot_differences_result_dict, flat_relative_entropy_results, flat_jensen_shannon_distance_results = compute_snapshot_relative_entropy_surprise_differences(historical_snapshots)
+    #     relative_entropy_result_dicts_list = [a_val_dict['relative_entropy_result_dict'] for a_val_dict in snapshot_differences_result_dict]
+    #     long_short_rel_entr_curves_list = [a_val_dict['long_short_rel_entr_curve'] for a_val_dict in relative_entropy_result_dicts_list] # [0].shape # (108, 63) = (n_neurons, n_xbins)
+    #     short_long_rel_entr_curves_list = [a_val_dict['short_long_rel_entr_curve'] for a_val_dict in relative_entropy_result_dicts_list]
+    #     long_short_rel_entr_curves_frames = np.stack([a_val_dict['long_short_rel_entr_curve'] for a_val_dict in relative_entropy_result_dicts_list]) # build a 3D array (4152, 108, 63) = (n_post_update_times, n_neurons, n_xbins)
+    #     short_long_rel_entr_curves_frames = np.stack([a_val_dict['short_long_rel_entr_curve'] for a_val_dict in relative_entropy_result_dicts_list]) # build a 3D array (4152, 108, 63) = (n_post_update_times, n_neurons, n_xbins)
 
-        global_computation_results.computed_data['relative_entropy_analyses'] = DynamicParameters.init_from_dict({
-            'time_bin_size_seconds': time_bin_size_seconds,
-            'historical_snapshots': historical_snapshots,
-            'post_update_times': post_update_times,
-            'snapshot_differences_result_dict': snapshot_differences_result_dict, 'time_intervals': time_intervals,
-            'long_short_rel_entr_curves_frames': long_short_rel_entr_curves_frames, 'short_long_rel_entr_curves_frames': short_long_rel_entr_curves_frames,
-            'flat_relative_entropy_results': flat_relative_entropy_results, 'flat_jensen_shannon_distance_results': flat_jensen_shannon_distance_results
-        })
-        return global_computation_results
+    #     global_computation_results.computed_data['relative_entropy_analyses'] = DynamicParameters.init_from_dict({
+    #         'time_bin_size_seconds': time_bin_size_seconds,
+    #         'historical_snapshots': historical_snapshots,
+    #         'post_update_times': post_update_times,
+    #         'snapshot_differences_result_dict': snapshot_differences_result_dict, 'time_intervals': time_intervals,
+    #         'long_short_rel_entr_curves_frames': long_short_rel_entr_curves_frames, 'short_long_rel_entr_curves_frames': short_long_rel_entr_curves_frames,
+    #         'flat_relative_entropy_results': flat_relative_entropy_results, 'flat_jensen_shannon_distance_results': flat_jensen_shannon_distance_results
+    #     })
+    #     return global_computation_results
 
 
 # ==================================================================================================================== #

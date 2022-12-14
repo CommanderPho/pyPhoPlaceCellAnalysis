@@ -14,8 +14,7 @@ from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.Computa
 from pyphoplacecellanalysis.General.Model.ComputationResults import ComputationResult
 from pyphoplacecellanalysis.Analysis.Decoder.decoder_result import build_position_df_resampled_to_time_windows, build_position_df_time_window_idx
 
-
-from neuropy.analyses.laps import _build_new_lap_and_intra_lap_intervals # for _perform_time_dependent_pf_sequential_surprise_computation
+# from neuropy.analyses.laps import _build_new_lap_and_intra_lap_intervals # for _perform_time_dependent_pf_sequential_surprise_computation
 
 # For _perform_relative_entropy_analyses
 from pyphocorehelpers.indexing_helpers import build_pairwise_indicies
@@ -199,15 +198,27 @@ class ExtendedStatsComputations(AllFunctionEnumeratingMixin, metaclass=Computati
             'long_short_rel_entr_curves_frames': long_short_rel_entr_curves_frames, 'short_long_rel_entr_curves_frames': short_long_rel_entr_curves_frames,
             'flat_relative_entropy_results': flat_relative_entropy_results, 'flat_jensen_shannon_distance_results': flat_jensen_shannon_distance_results
         })
+        """ 
+        Access via ['extended_stats']['relative_entropy_analyses']
+        Example:
+            active_extended_stats = curr_active_pipeline.computation_results['maze'].computed_data['extended_stats']
+            active_relative_entropy_results = active_extended_stats['relative_entropy_analyses']
+            post_update_times = active_relative_entropy_results['post_update_times']
+            snapshot_differences_result_dict = active_relative_entropy_results['snapshot_differences_result_dict']
+            time_intervals = active_relative_entropy_results['time_intervals']
+            long_short_rel_entr_curves_frames = active_relative_entropy_results['long_short_rel_entr_curves_frames']
+            short_long_rel_entr_curves_frames = active_relative_entropy_results['short_long_rel_entr_curves_frames']
+            flat_relative_entropy_results = active_relative_entropy_results['flat_relative_entropy_results']
+            flat_jensen_shannon_distance_results = active_relative_entropy_results['flat_jensen_shannon_distance_results']
+        """
 
-
-        computation_result.computed_data['extended_stats']['sequential_surprise'] = DynamicParameters.init_from_dict({
-         'post_update_times': post_update_times,
-         'pf_overlap_results': pf_overlap_results,
-         'flat_relative_entropy_results': flat_relative_entropy_results,
-         'flat_jensen_shannon_distance_results': flat_jensen_shannon_distance_results,
-         'difference_snapshots': difference_snapshots
-        })
+        # computation_result.computed_data['extended_stats']['sequential_surprise'] = DynamicParameters.init_from_dict({
+        #  'post_update_times': post_update_times,
+        #  'pf_overlap_results': pf_overlap_results,
+        #  'flat_relative_entropy_results': flat_relative_entropy_results,
+        #  'flat_jensen_shannon_distance_results': flat_jensen_shannon_distance_results,
+        #  'difference_snapshots': difference_snapshots
+        # })
         """ 
         Access via ['extended_stats']['sequential_surprise']
         Example:
