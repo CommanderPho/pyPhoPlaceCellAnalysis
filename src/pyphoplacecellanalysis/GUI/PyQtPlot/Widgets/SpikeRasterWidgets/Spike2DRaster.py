@@ -944,7 +944,7 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
         
     # matplotlib render subplot __________________________________________________________________________________________ #
     def add_new_matplotlib_render_plot_widget(self, row=1, col=0, name='matplotlib_view_widget'):
-        """ creates a new MatplotlibTimeSynchronizedWidget, a container widget that holds a matplotlib figure, and adds it as a row to the main layout
+        """ creates a new dynamic MatplotlibTimeSynchronizedWidget, a container widget that holds a matplotlib figure, and adds it as a row to the main layout
         
         """
         dDisplayItem = self.ui.dynamic_docked_widget_container.find_display_dock(identifier=name) # Dock
@@ -990,6 +990,8 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
         
     def remove_matplotlib_render_plot_widget(self):
         """ removes the subplot - does not work yet """
+        ## TODO: need to remove the display item from self.ui.dynamic_docked_widget_container?
+        # self.ui.dynamic_docked_widget_container
         self.ui.layout.removeWidget(self.ui.matplotlib_view_widget) # Remove the matplotlib widget
         self.ui.matplotlib_view_widget = None # Set the matplotlib_view_widget to None ## TODO: this doesn't actually remove it from the UI container does it?
 
