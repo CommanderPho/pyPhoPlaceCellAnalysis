@@ -43,6 +43,7 @@
      <addaction name="actionAddTimeCurves_Position"/>
      <addaction name="actionAddTimeCurves_Velocity"/>
      <addaction name="actionAddTimeCurves_Random"/>
+     <addaction name="actionAddTimeCurves_RelativeEntropySurprise"/>
      <addaction name="actionAddTimeCurves_Custom"/>
      <addaction name="separator"/>
      <addaction name="actionClear_all_Time_Curves"/>
@@ -352,6 +353,11 @@
   <action name="actionAddTimeIntervals_Bursts">
    <property name="text">
     <string>Bursts</string>
+   </property>
+  </action>
+  <action name="actionAddTimeCurves_RelativeEntropySurprise">
+   <property name="text">
+    <string>Relative Entropy Surprise</string>
    </property>
   </action>
  </widget>

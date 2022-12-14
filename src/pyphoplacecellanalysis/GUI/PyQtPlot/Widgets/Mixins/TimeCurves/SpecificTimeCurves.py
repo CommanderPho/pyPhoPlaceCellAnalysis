@@ -332,6 +332,61 @@ class MUA_RenderTimeCurves(GeneralRenderTimeCurves):
     
 
 
+
+
+
+
+
+
+# ==================================================================================================================== #
+# Animal RelativeEntropySurprise Curves                                                                                               #
+# ==================================================================================================================== #
+class RelativeEntropySurpriseRenderTimeCurves(BasePositionDataframeRenderTimeCurves):
+    """ 
+    add_render_time_curves
+        build_pre_spatial_to_spatial_mappings
+        build_render_time_curves_datasource
+            prepare_dataframe
+            data_series_pre_spatial_list
+    
+    """
+    default_datasource_name = 'RelativeEntropySurpriseTimeCurves'
+    
+    @classmethod
+    def data_series_pre_spatial_list(cls, *args, **kwargs):
+        """ returns the pre_spatial list for the dataseries. Usually just returns a constant, only a function in case a class wants to do separate setup based on a class property. """
+        return [{'name':'speed','t':'t','v_alt':None,'v_main':'speed','color_name':'orange', 'line_width':1.25, 'z_scaling_factor':1.0}]
+         
+    @classmethod
+    def prepare_dataframe(cls, plot_df, *args, **kwargs):
+        """ preforms and pre-processing of the dataframe needed (such as scaling/renaming columns/etc and returns a COPY """
+        z_scaler = MinMaxScaler()
+        transformed_df = plot_df[['t','speed']].copy()
+        transformed_df[['speed']] = z_scaler.fit_transform(transformed_df[['speed']]) # scale speed position separately
+        return transformed_df
+
+
+    @classmethod
+    def build_pre_spatial_to_spatial_mappings(cls, destination_plot, *args, **kwargs):
+        """ builds and returns the mappings from the pre-spatial values to the spatial values, frequently using information from the destination_plot and passed-in variables. """
+        if destination_plot.time_curve_render_dimensionality == 2:
+            # SpikeRaster2D needs different x_map_fn than the 3D plots:
+            x_map_fn = lambda t: t
+        else:            
+            x_map_fn = lambda t: destination_plot.temporal_to_spatial(t)
+        y_map_fn = lambda v: np.full_like(v, -destination_plot.n_half_cells)
+        z_map_fn = lambda v_main: v_main
+        return [{'name':'name','x':'t','y':'v_alt','z':'v_main','x_map_fn':x_map_fn,'y_map_fn':y_map_fn,'z_map_fn':z_map_fn}]
+
+
+
+
+
+
+
+
+
+
         
 
 ## OLD METHOD with two functions per curve type (e.g MUA, Position, etc)

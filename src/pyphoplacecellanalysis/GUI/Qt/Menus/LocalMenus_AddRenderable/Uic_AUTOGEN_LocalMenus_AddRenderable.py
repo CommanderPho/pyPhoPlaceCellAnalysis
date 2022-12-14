@@ -160,9 +160,12 @@ class Ui_LocalMenus_AddRenderable(object):
         self.actionAddTimeCurves_Velocity.setObjectName("actionAddTimeCurves_Velocity")
         self.actionAddTimeIntervals_Bursts = QtWidgets.QAction(LocalMenus_AddRenderable)
         self.actionAddTimeIntervals_Bursts.setObjectName("actionAddTimeIntervals_Bursts")
+        self.actionAddTimeCurves_RelativeEntropySurprise = QtWidgets.QAction(LocalMenus_AddRenderable)
+        self.actionAddTimeCurves_RelativeEntropySurprise.setObjectName("actionAddTimeCurves_RelativeEntropySurprise")
         self.menuAddRenderable_Time_Curves.addAction(self.actionAddTimeCurves_Position)
         self.menuAddRenderable_Time_Curves.addAction(self.actionAddTimeCurves_Velocity)
         self.menuAddRenderable_Time_Curves.addAction(self.actionAddTimeCurves_Random)
+        self.menuAddRenderable_Time_Curves.addAction(self.actionAddTimeCurves_RelativeEntropySurprise)
         self.menuAddRenderable_Time_Curves.addAction(self.actionAddTimeCurves_Custom)
         self.menuAddRenderable_Time_Curves.addSeparator()
         self.menuAddRenderable_Time_Curves.addAction(self.actionClear_all_Time_Curves)
@@ -240,6 +243,7 @@ class Ui_LocalMenus_AddRenderable(object):
         self.actionDecoded_Epoch_Slices_Custom.setText(_translate("LocalMenus_AddRenderable", "Custom..."))
         self.actionAddTimeCurves_Velocity.setText(_translate("LocalMenus_AddRenderable", "Velocity"))
         self.actionAddTimeIntervals_Bursts.setText(_translate("LocalMenus_AddRenderable", "Bursts"))
+        self.actionAddTimeCurves_RelativeEntropySurprise.setText(_translate("LocalMenus_AddRenderable", "Relative Entropy Surprise"))
 from pyphoplacecellanalysis.Resources import ActionIcons
 from pyphoplacecellanalysis.Resources import GuiResources
 from pyphoplacecellanalysis.Resources import breeze

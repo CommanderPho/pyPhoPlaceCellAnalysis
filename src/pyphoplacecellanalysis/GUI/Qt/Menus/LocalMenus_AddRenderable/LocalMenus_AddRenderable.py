@@ -14,7 +14,7 @@ from pyphoplacecellanalysis.Resources import GuiResources, ActionIcons
 from pyphoplacecellanalysis.GUI.Qt.Menus.LocalMenus_AddRenderable.Uic_AUTOGEN_LocalMenus_AddRenderable import Ui_LocalMenus_AddRenderable
 
 from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.Mixins.RenderTimeEpochs.Specific2DRenderTimeEpochs import General2DRenderTimeEpochs, Replays_2DRenderTimeEpochs, Ripples_2DRenderTimeEpochs, SessionEpochs2DRenderTimeEpochs, PBE_2DRenderTimeEpochs, Laps2DRenderTimeEpochs # Time Intervals/Epochs
-from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.Mixins.TimeCurves.SpecificTimeCurves import GeneralRenderTimeCurves, PositionRenderTimeCurves, VelocityRenderTimeCurves, ConfigurableRenderTimeCurves, MUA_RenderTimeCurves ## Time Curves
+from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.Mixins.TimeCurves.SpecificTimeCurves import GeneralRenderTimeCurves, PositionRenderTimeCurves, VelocityRenderTimeCurves, ConfigurableRenderTimeCurves, MUA_RenderTimeCurves, RelativeEntropySurpriseRenderTimeCurves ## Time Curves
 
 from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import AddNewDecodedPosition_MatplotlibPlotCommand ## MatplotlibSubplots
 
@@ -97,10 +97,11 @@ class LocalMenus_AddRenderable(QtWidgets.QMainWindow):
 
 
         ## Time Curves:
-        submenu_addTimeCurves = [widget.ui.actionAddTimeCurves_Position, widget.ui.actionAddTimeCurves_Velocity, widget.ui.actionAddTimeCurves_Random, widget.ui.actionAddTimeCurves_Custom]
+        submenu_addTimeCurves = [widget.ui.actionAddTimeCurves_Position, widget.ui.actionAddTimeCurves_Velocity, widget.ui.actionAddTimeCurves_Random, widget.ui.actionAddTimeCurves_RelativeEntropySurprise, widget.ui.actionAddTimeCurves_Custom]
         submenu_addTimeCurvesCallbacks = [lambda evt=None: PositionRenderTimeCurves.add_render_time_curves(curr_sess=sess, destination_plot=destination_plot),
                                             lambda evt=None: VelocityRenderTimeCurves.add_render_time_curves(curr_sess=sess, destination_plot=destination_plot),
                                             lambda evt=None: MUA_RenderTimeCurves.add_render_time_curves(curr_sess=sess, destination_plot=destination_plot),
+                                            lambda evt=None: RelativeEntropySurpriseRenderTimeCurves.add_render_time_curves(curr_sess=sess, destination_plot=destination_plot),
                                             # lambda evt=None: Laps2DRenderTimeEpochs.add_render_time_epochs(curr_sess=sess.laps, destination_plot=destination_plot),
                                             lambda evt=None: ConfigurableRenderTimeCurves.add_render_time_curves(curr_sess=sess, destination_plot=destination_plot),
                                             # lambda evt=None: print(f'actionAddTimeCurves_Custom not yet supported')
