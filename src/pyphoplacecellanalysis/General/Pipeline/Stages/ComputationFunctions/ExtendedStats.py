@@ -1,3 +1,4 @@
+from copy import deepcopy
 import numpy as np
 import pandas as pd
 
@@ -15,6 +16,37 @@ from pyphoplacecellanalysis.Analysis.Decoder.decoder_result import build_positio
 
 
 from neuropy.analyses.laps import _build_new_lap_and_intra_lap_intervals # for _perform_time_dependent_pf_sequential_surprise_computation
+
+# For _perform_relative_entropy_analyses
+from pyphocorehelpers.indexing_helpers import build_pairwise_indicies
+from neuropy.analyses.time_dependent_placefields import PfND_TimeDependent
+from pyphocorehelpers.DataStructure.enum_helpers import ExtendedEnum
+
+class TimeDependentPlacefieldSurpriseMode(ExtendedEnum):
+    """for _perform_relative_entropy_analyses """
+    STATIC_METHOD_ONLY = "static_method_only"
+    USING_EXTANT = "using_extant"
+    BUILD_NEW = "build_new"
+
+    @property
+    def needs_build_new(self):
+        return TimeDependentPlacefieldSurpriseMode.needs_build_newList()[self]
+
+    @property
+    def use_pf_dt_obj(self):
+        return TimeDependentPlacefieldSurpriseMode.use_pf_dt_objList()[self]
+
+    # Static properties
+    @classmethod
+    def use_pf_dt_objList(cls):
+        return cls.build_member_value_dict([False, True, True])
+
+    @classmethod
+    def needs_build_newList(cls):
+        return cls.build_member_value_dict([False, False, True])
+
+
+
 
 
 class ExtendedStatsComputations(AllFunctionEnumeratingMixin, metaclass=ComputationFunctionRegistryHolder):
@@ -57,12 +89,13 @@ class ExtendedStatsComputations(AllFunctionEnumeratingMixin, metaclass=Computati
         """
         return computation_result
     
-    
 
     def _perform_time_dependent_pf_sequential_surprise_computation(computation_result: ComputationResult, debug_print=False):
         """ Computes extended statistics regarding firing rates and such from the various dataframes.
-        
+        NOTE: 2022-12-14 - previously this version only did laps, but now it does the binned times for the entire epoch from ['firing_rate_trends']
+
         Requires:
+            computed_data['firing_rate_trends']
             computed_data['pf1D_dt']
             computation_result.sess.position
             computation_result.computation_config.pf_params.time_bin_size
@@ -76,20 +109,98 @@ class ExtendedStatsComputations(AllFunctionEnumeratingMixin, metaclass=Computati
                 
         
         """
-        # _perform_time_dependent_pf_sequential_surprise_computation
+        # use_extant_pf1D_dt_mode = TimeDependentPlacefieldSurpriseMode.STATIC_METHOD_ONLY
+        use_extant_pf1D_dt_mode = TimeDependentPlacefieldSurpriseMode.USING_EXTANT # reuse the existing pf1D_dt
+
+        # ==================================================================================================================== #
+        # prev version using batch-snapshotting and the laps:
+        # sess = computation_result.sess
+        # sess, combined_records_list = _build_new_lap_and_intra_lap_intervals(sess) # from PendingNotebookCode
+
+        # difference_snapshots = active_pf_1D_dt.batch_snapshotting(combined_records_list, reset_at_start=True, debug_print=debug_print)
+        # # post_update_times, pf_overlap_results, flat_relative_entropy_results, flat_jensen_shannon_distance_results = compute_snapshot_differences(difference_snapshots)
+        # post_update_times, pf_overlap_results, flat_relative_entropy_results, flat_jensen_shannon_distance_results = compute_snapshot_relative_entropy_surprise_differences(active_pf_1D_dt.historical_snapshots)
+
+
+        # ==================================================================================================================== #
+        # _perform_time_dependent_pf_sequential_surprise_computation - using time binning from computation_result.computed_data['firing_rate_trends']
         active_pf_1D_dt = computation_result.computed_data['pf1D_dt']
-        # active_pf_2D_dt = computation_result.computed_data['pf2D_dt']
+        
+        ## Get the time-binning from `firing_rate_trends`:
+        active_firing_rate_trends = computation_result.computed_data['firing_rate_trends']
+        time_bin_size_seconds, pf_included_spikes_only = active_firing_rate_trends['time_bin_size_seconds'], active_firing_rate_trends['pf_included_spikes_only']
 
-        sess = computation_result.sess
-        sess, combined_records_list = _build_new_lap_and_intra_lap_intervals(sess) # from PendingNotebookCode
+        active_time_binning_container, active_time_binned_unit_specific_binned_spike_counts = pf_included_spikes_only['time_binning_container'], pf_included_spikes_only['time_binned_unit_specific_binned_spike_counts']
+        # ZhangReconstructionImplementation._validate_time_binned_spike_rate_df(active_time_binning_container.centers, active_time_binned_unit_specific_binned_spike_counts)
 
-        difference_snapshots = active_pf_1D_dt.batch_snapshotting(combined_records_list, reset_at_start=True, debug_print=debug_print)
-        # post_update_times, pf_overlap_results, flat_relative_entropy_results, flat_jensen_shannon_distance_results = compute_snapshot_differences(difference_snapshots)
-        post_update_times, pf_overlap_results, flat_relative_entropy_results, flat_jensen_shannon_distance_results = compute_snapshot_differences(active_pf_1D_dt.historical_snapshots)
+        ## Use appropriate pf_1D_dt:
+        active_session, pf_computation_config = computation_result.sess, computation_result.computation_config.pf_params
+        active_session_spikes_df, active_pos, computation_config, included_epochs = active_session.spikes_df, active_session.position, pf_computation_config, pf_computation_config.computation_epochs
+        
+        ## Get existing `pf1D_dt`:
+        if not use_extant_pf1D_dt_mode.needs_build_new:
+            ## Get existing `pf1D_dt`:
+            active_pf_1D_dt = computation_result.computed_data.pf1D_dt
+        else:
+            # note even in TimeDependentPlacefieldSurpriseMode.STATIC_METHOD_ONLY a PfND_TimeDependent object is used to access its properties for the Static Method (although it isn't modified)
+            active_pf_1D_dt = PfND_TimeDependent(deepcopy(active_session_spikes_df), deepcopy(active_pos.linear_pos_obj), epochs=included_epochs,
+                                                speed_thresh=computation_config.speed_thresh, frate_thresh=computation_config.frate_thresh,
+                                                grid_bin=computation_config.grid_bin, grid_bin_bounds=computation_config.grid_bin_bounds, smooth=computation_config.smooth)
 
+        out_pair_indicies = build_pairwise_indicies(np.arange(active_time_binning_container.edge_info.num_bins))
+        time_intervals = active_time_binning_container.edges[out_pair_indicies] # .shape # (4153, 2)
+
+        ## Entirely independent computations for binned_times:
+        if use_extant_pf1D_dt_mode.use_pf_dt_obj:
+            active_pf_1D_dt.reset()
+
+        if not use_extant_pf1D_dt_mode.use_pf_dt_obj:
+            historical_snapshots = {} # build a dict<float:PlacefieldSnapshot>
+
+        for start_t, end_t in time_intervals:
+            
+            ## Inline version that reuses active_pf_1D_dt directly:
+            if use_extant_pf1D_dt_mode.use_pf_dt_obj:
+                # if use_extant_pf1D_dt_mode.needs_build_new
+                active_pf_1D_dt.complete_time_range_computation(start_t, end_t, assign_results_to_member_variables=True)
+                # historical_snapshots[float(end_t)] = active_pf_1D_dt.complete_time_range_computation(start_t, end_t, assign_results_to_member_variables=False)
+            else:
+                # Static version that calls PfND_TimeDependent.perform_time_range_computation(...) itself using just the computed variables of `active_pf_1D_dt`:
+                historical_snapshots[float(end_t)] = PfND_TimeDependent.perform_time_range_computation(active_pf_1D_dt.all_time_filtered_spikes_df, active_pf_1D_dt.all_time_filtered_pos_df, position_srate=active_pf_1D_dt.position_srate,
+                                                                            xbin=active_pf_1D_dt.xbin, ybin=active_pf_1D_dt.ybin,
+                                                                            start_time=start_t, end_time=end_t,
+                                                                            included_neuron_IDs=active_pf_1D_dt.included_neuron_IDs, active_computation_config=active_pf_1D_dt.config, override_smooth=active_pf_1D_dt.smooth)
+
+        # {1.9991045125061646: <neuropy.analyses.time_dependent_placefields.PlacefieldSnapshot at 0x16c2b74fb20>, 2.4991045125061646: <neuropy.analyses.time_dependent_placefields.PlacefieldSnapshot at 0x168acfb3bb0>, ...}
+        if use_extant_pf1D_dt_mode.use_pf_dt_obj:
+            historical_snapshots = active_pf_1D_dt.historical_snapshots
+
+        post_update_times, snapshot_differences_result_dict, flat_relative_entropy_results, flat_jensen_shannon_distance_results = compute_snapshot_relative_entropy_surprise_differences(historical_snapshots)
+        relative_entropy_result_dicts_list = [a_val_dict['relative_entropy_result_dict'] for a_val_dict in snapshot_differences_result_dict]
+        long_short_rel_entr_curves_list = [a_val_dict['long_short_rel_entr_curve'] for a_val_dict in relative_entropy_result_dicts_list] # [0].shape # (108, 63) = (n_neurons, n_xbins)
+        short_long_rel_entr_curves_list = [a_val_dict['short_long_rel_entr_curve'] for a_val_dict in relative_entropy_result_dicts_list]
+        long_short_rel_entr_curves_frames = np.stack([a_val_dict['long_short_rel_entr_curve'] for a_val_dict in relative_entropy_result_dicts_list]) # build a 3D array (4152, 108, 63) = (n_post_update_times, n_neurons, n_xbins)
+        short_long_rel_entr_curves_frames = np.stack([a_val_dict['short_long_rel_entr_curve'] for a_val_dict in relative_entropy_result_dicts_list]) # build a 3D array (4152, 108, 63) = (n_post_update_times, n_neurons, n_xbins)
+
+        
+
+
+        # ==================================================================================================================== #
+        ## Save Outputs:
         if 'extended_stats' not in computation_result.computed_data:
             computation_result.computed_data['extended_stats'] = DynamicParameters() # new 'extended_stats' dict
  
+
+        computation_result.computed_data['extended_stats']['relative_entropy_analyses'] = DynamicParameters.init_from_dict({
+            'time_bin_size_seconds': time_bin_size_seconds,
+            'historical_snapshots': historical_snapshots,
+            'post_update_times': post_update_times,
+            'snapshot_differences_result_dict': snapshot_differences_result_dict, 'time_intervals': time_intervals,
+            'long_short_rel_entr_curves_frames': long_short_rel_entr_curves_frames, 'short_long_rel_entr_curves_frames': short_long_rel_entr_curves_frames,
+            'flat_relative_entropy_results': flat_relative_entropy_results, 'flat_jensen_shannon_distance_results': flat_jensen_shannon_distance_results
+        })
+
+
         computation_result.computed_data['extended_stats']['sequential_surprise'] = DynamicParameters.init_from_dict({
          'post_update_times': post_update_times,
          'pf_overlap_results': pf_overlap_results,
@@ -112,6 +223,7 @@ class ExtendedStatsComputations(AllFunctionEnumeratingMixin, metaclass=Computati
 
 
 
+
 def compute_surprise_relative_entropy_divergence(long_curve, short_curve):
     """
     Given two tuning maps, computes the surprise (in terms of the KL-divergence a.k.a. relative entropy) between the two
@@ -129,7 +241,7 @@ def compute_surprise_relative_entropy_divergence(long_curve, short_curve):
             jensen_shannon_distance=jensen_shannon_distance)
 
 
-def compute_snapshot_differences(historical_snapshots_dict):
+def compute_snapshot_relative_entropy_surprise_differences(historical_snapshots_dict):
     """
     Computes the surprise between consecutive pairs of placefield snapshots extracted from a computed `active_pf_1D_dt`
 

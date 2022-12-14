@@ -27,37 +27,10 @@ from pyphoplacecellanalysis.General.Mixins.CrossComputationComparisonHelpers imp
 from neuropy.analyses import detect_pbe_epochs # used in `_perform_jonathan_replay_firing_rate_analyses(.)` if replays are missing
 
 # For _perform_relative_entropy_analyses
-from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import ZhangReconstructionImplementation
-from neuropy.utils.mixins.binning_helpers import BinningContainer
 from pyphocorehelpers.indexing_helpers import build_pairwise_indicies
 from neuropy.analyses.time_dependent_placefields import PfND_TimeDependent
-from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.ExtendedStats import compute_snapshot_differences
-
-from pyphocorehelpers.DataStructure.enum_helpers import ExtendedEnum
-
-class TimeDependentPlacefieldSurpriseMode(ExtendedEnum):
-    """for _perform_relative_entropy_analyses """
-    STATIC_METHOD_ONLY = "static_method_only"
-    USING_EXTANT = "using_extant"
-    BUILD_NEW = "build_new"
-
-    @property
-    def needs_build_new(self):
-        return TimeDependentPlacefieldSurpriseMode.needs_build_newList()[self]
-
-    @property
-    def use_pf_dt_obj(self):
-        return TimeDependentPlacefieldSurpriseMode.use_pf_dt_objList()[self]
-
-    # Static properties
-    @classmethod
-    def use_pf_dt_objList(cls):
-        return cls.build_member_value_dict([False, True, True])
-
-    @classmethod
-    def needs_build_newList(cls):
-        return cls.build_member_value_dict([False, False, True])
-
+from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.ExtendedStats import compute_snapshot_relative_entropy_surprise_differences
+from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.ExtendedStats import TimeDependentPlacefieldSurpriseMode # for _perform_relative_entropy_analyses
 
 
 def _compute_custom_PBEs(sess):
@@ -327,7 +300,7 @@ class MultiContextComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Co
 
 
     def _perform_relative_entropy_analyses(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_whitelist=None, debug_print=False):
-        """ 
+        """ NOTE: 2022-12-14 - this mirrors the non-global version at `pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.ExtendedStats.ExtendedStatsComputations._perform_time_dependent_pf_sequential_surprise_computation` that I just modified except it only uses the global epoch.
         
         Requires:
             ['firing_rate_trends']
@@ -400,7 +373,7 @@ class MultiContextComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Co
         historical_snapshots = {float(t):v for t, v in zip(out_list_t, out_list)} # build a dict<float:PlacefieldSnapshot>
         # {1.9991045125061646: <neuropy.analyses.time_dependent_placefields.PlacefieldSnapshot at 0x16c2b74fb20>, 2.4991045125061646: <neuropy.analyses.time_dependent_placefields.PlacefieldSnapshot at 0x168acfb3bb0>, ...}
 
-        post_update_times, snapshot_differences_result_dict, flat_relative_entropy_results, flat_jensen_shannon_distance_results = compute_snapshot_differences(historical_snapshots)
+        post_update_times, snapshot_differences_result_dict, flat_relative_entropy_results, flat_jensen_shannon_distance_results = compute_snapshot_relative_entropy_surprise_differences(historical_snapshots)
         relative_entropy_result_dicts_list = [a_val_dict['relative_entropy_result_dict'] for a_val_dict in snapshot_differences_result_dict]
         long_short_rel_entr_curves_list = [a_val_dict['long_short_rel_entr_curve'] for a_val_dict in relative_entropy_result_dicts_list] # [0].shape # (108, 63) = (n_neurons, n_xbins)
         short_long_rel_entr_curves_list = [a_val_dict['short_long_rel_entr_curve'] for a_val_dict in relative_entropy_result_dicts_list]
