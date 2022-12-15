@@ -3,6 +3,7 @@ import sys
 from pathlib import Path
 import numpy as np
 from enum import unique # SessionBatchProgress
+import traceback # for stack trace formatting
 
 ## MATPLOTLIB Imports:
 import matplotlib
@@ -315,58 +316,6 @@ def batch_load_session(global_data_root_parent_path, active_data_mode_name, base
 def batch_extended_computations(curr_active_pipeline, fail_on_exception=False, debug_print=False):
     """ performs the remaining required global computations """
 
-    ## jonathan_firing_rate_analysis:
-    try:
-        ## Get global 'jonathan_firing_rate_analysis' results:
-        curr_jonathan_firing_rate_analysis = curr_active_pipeline.global_computation_results.computed_data['jonathan_firing_rate_analysis']
-        neuron_replay_stats_df, rdf, aclu_to_idx, irdf = curr_jonathan_firing_rate_analysis['neuron_replay_stats_df'], curr_jonathan_firing_rate_analysis['rdf']['rdf'], curr_jonathan_firing_rate_analysis['rdf']['aclu_to_idx'], curr_jonathan_firing_rate_analysis['irdf']['irdf']
-    except (AttributeError, KeyError) as e:
-        print(f'encountered error: {e}. Recomputing...')
-        curr_active_pipeline.perform_specific_computation(computation_functions_name_whitelist=['_perform_jonathan_replay_firing_rate_analyses'], fail_on_exception=fail_on_exception, debug_print=False) 
-        print(f'\t done.')
-        curr_jonathan_firing_rate_analysis = curr_active_pipeline.global_computation_results.computed_data['jonathan_firing_rate_analysis']
-        neuron_replay_stats_df, rdf, aclu_to_idx, irdf = curr_jonathan_firing_rate_analysis['neuron_replay_stats_df'], curr_jonathan_firing_rate_analysis['rdf']['rdf'], curr_jonathan_firing_rate_analysis['rdf']['aclu_to_idx'], curr_jonathan_firing_rate_analysis['irdf']['irdf']
-    except Exception as e:
-        raise e
-
-    ## short_long_pf_overlap_analyses:
-    try:
-        ## Get global `short_long_pf_overlap_analyses` results:
-        short_long_pf_overlap_analyses = curr_active_pipeline.global_computation_results.computed_data.short_long_pf_overlap_analyses
-        conv_overlap_dict = short_long_pf_overlap_analyses['conv_overlap_dict']
-        conv_overlap_scalars_df = short_long_pf_overlap_analyses['conv_overlap_scalars_df']
-        prod_overlap_dict = short_long_pf_overlap_analyses['product_overlap_dict']
-        relative_entropy_overlap_dict = short_long_pf_overlap_analyses['relative_entropy_overlap_dict']
-        relative_entropy_overlap_scalars_df = short_long_pf_overlap_analyses['relative_entropy_overlap_scalars_df']
-
-    except (AttributeError, KeyError) as e:
-        print(f'encountered error: {e}. Recomputing...')
-        curr_active_pipeline.perform_specific_computation(computation_functions_name_whitelist=['_perform_short_long_pf_overlap_analyses'], fail_on_exception=fail_on_exception, debug_print=False)
-        print(f'\t done.')
-        short_long_pf_overlap_analyses = curr_active_pipeline.global_computation_results.computed_data.short_long_pf_overlap_analyses
-        conv_overlap_dict = short_long_pf_overlap_analyses['conv_overlap_dict']
-        conv_overlap_scalars_df = short_long_pf_overlap_analyses['conv_overlap_scalars_df']
-        prod_overlap_dict = short_long_pf_overlap_analyses['product_overlap_dict']
-        relative_entropy_overlap_dict = short_long_pf_overlap_analyses['relative_entropy_overlap_dict']
-        relative_entropy_overlap_scalars_df = short_long_pf_overlap_analyses['relative_entropy_overlap_scalars_df']
-    except Exception as e:
-        raise e
-
-
-    short_only_df = neuron_replay_stats_df[neuron_replay_stats_df.track_membership == SplitPartitionMembership.RIGHT_ONLY]
-    short_only_aclus = short_only_df.index.values.tolist()
-    long_only_df = neuron_replay_stats_df[neuron_replay_stats_df.track_membership == SplitPartitionMembership.LEFT_ONLY]
-    long_only_aclus = long_only_df.index.values.tolist()
-    shared_df = neuron_replay_stats_df[neuron_replay_stats_df.track_membership == SplitPartitionMembership.SHARED]
-    shared_aclus = shared_df.index.values.tolist()
-    if debug_print:
-        print(f'shared_aclus: {shared_aclus}')
-        print(f'long_only_aclus: {long_only_aclus}')
-        print(f'short_only_aclus: {short_only_aclus}')
-
-    active_identifying_session_ctx = curr_active_pipeline.sess.get_context() # 'bapun_RatN_Day4_2019-10-15_11-30-06'
-
-
     ## Get computed relative entropy measures:
     global_epoch_name = curr_active_pipeline.active_completed_computation_result_names[-1] # 'maze'
     global_results = curr_active_pipeline.computation_results[global_epoch_name]['computed_data']
@@ -380,7 +329,7 @@ def batch_extended_computations(curr_active_pipeline, fail_on_exception=False, d
         active_extended_stats = curr_active_pipeline.computation_results[global_epoch_name].computed_data['extended_stats']
         time_binned_pos_df = active_extended_stats['time_binned_position_df']
     except (AttributeError, KeyError) as e:
-        print(f'encountered error: {e}. Recomputing...')
+        print(f'encountered error: {e}\n{traceback.format_exc()}\n. Recomputing...')
         curr_active_pipeline.perform_specific_computation(computation_functions_name_whitelist=['_perform_firing_rate_trends_computation'], enabled_filter_names=[global_epoch_name], fail_on_exception=fail_on_exception, debug_print=False) 
         print(f'\t done.')
         active_extended_stats = curr_active_pipeline.computation_results[global_epoch_name].computed_data['extended_stats']
@@ -401,7 +350,7 @@ def batch_extended_computations(curr_active_pipeline, fail_on_exception=False, d
         flat_jensen_shannon_distance_across_all_positions = np.sum(flat_jensen_shannon_distance_results, axis=1) # sum across all position bins # (4152,) - (nSnapshots)
         flat_surprise_across_all_positions = np.sum(flat_relative_entropy_results, axis=1) # sum across all position bins # (4152,) - (nSnapshots)
     except (AttributeError, KeyError) as e:
-        print(f'encountered error: {e}. Recomputing...')
+        print(f'encountered error: {e}\n{traceback.format_exc()}\n. Recomputing...')
         curr_active_pipeline.perform_specific_computation(computation_functions_name_whitelist=['_perform_time_dependent_pf_sequential_surprise_computation'], enabled_filter_names=[global_epoch_name], fail_on_exception=fail_on_exception, debug_print=False)
         print(f'\t done.')
         active_relative_entropy_results = active_extended_stats['relative_entropy_analyses']
@@ -416,6 +365,59 @@ def batch_extended_computations(curr_active_pipeline, fail_on_exception=False, d
         flat_surprise_across_all_positions = np.sum(np.abs(flat_relative_entropy_results), axis=1) # sum across all position bins # (4152,) - (nSnapshots)
     except Exception as e:
         raise e
+
+    ## jonathan_firing_rate_analysis:
+    try:
+        ## Get global 'jonathan_firing_rate_analysis' results:
+        curr_jonathan_firing_rate_analysis = curr_active_pipeline.global_computation_results.computed_data['jonathan_firing_rate_analysis']
+        neuron_replay_stats_df, rdf, aclu_to_idx, irdf = curr_jonathan_firing_rate_analysis['neuron_replay_stats_df'], curr_jonathan_firing_rate_analysis['rdf']['rdf'], curr_jonathan_firing_rate_analysis['rdf']['aclu_to_idx'], curr_jonathan_firing_rate_analysis['irdf']['irdf']
+    except (AttributeError, KeyError) as e:
+        print(f'encountered error: {e}\n{traceback.format_exc()}\n. Recomputing...')
+        curr_active_pipeline.perform_specific_computation(computation_functions_name_whitelist=['_perform_jonathan_replay_firing_rate_analyses'], fail_on_exception=False, debug_print=False) 
+        print(f'\t done.')
+        curr_jonathan_firing_rate_analysis = curr_active_pipeline.global_computation_results.computed_data['jonathan_firing_rate_analysis']
+        neuron_replay_stats_df, rdf, aclu_to_idx, irdf = curr_jonathan_firing_rate_analysis['neuron_replay_stats_df'], curr_jonathan_firing_rate_analysis['rdf']['rdf'], curr_jonathan_firing_rate_analysis['rdf']['aclu_to_idx'], curr_jonathan_firing_rate_analysis['irdf']['irdf']
+    except Exception as e:
+        raise e
+
+    ## short_long_pf_overlap_analyses:
+    try:
+        ## Get global `short_long_pf_overlap_analyses` results:
+        short_long_pf_overlap_analyses = curr_active_pipeline.global_computation_results.computed_data.short_long_pf_overlap_analyses
+        conv_overlap_dict = short_long_pf_overlap_analyses['conv_overlap_dict']
+        conv_overlap_scalars_df = short_long_pf_overlap_analyses['conv_overlap_scalars_df']
+        prod_overlap_dict = short_long_pf_overlap_analyses['product_overlap_dict']
+        relative_entropy_overlap_dict = short_long_pf_overlap_analyses['relative_entropy_overlap_dict']
+        relative_entropy_overlap_scalars_df = short_long_pf_overlap_analyses['relative_entropy_overlap_scalars_df']
+
+    except (AttributeError, KeyError) as e:
+        print(f'encountered error: {e}\n{traceback.format_exc()}\n. Recomputing...')
+        curr_active_pipeline.perform_specific_computation(computation_functions_name_whitelist=['_perform_short_long_pf_overlap_analyses'], fail_on_exception=False, debug_print=False)
+        print(f'\t done.')
+        short_long_pf_overlap_analyses = curr_active_pipeline.global_computation_results.computed_data.short_long_pf_overlap_analyses
+        conv_overlap_dict = short_long_pf_overlap_analyses['conv_overlap_dict']
+        conv_overlap_scalars_df = short_long_pf_overlap_analyses['conv_overlap_scalars_df']
+        prod_overlap_dict = short_long_pf_overlap_analyses['product_overlap_dict']
+        relative_entropy_overlap_dict = short_long_pf_overlap_analyses['relative_entropy_overlap_dict']
+        relative_entropy_overlap_scalars_df = short_long_pf_overlap_analyses['relative_entropy_overlap_scalars_df']
+    except Exception as e:
+        raise e
+
+    # short_only_df = neuron_replay_stats_df[neuron_replay_stats_df.track_membership == SplitPartitionMembership.RIGHT_ONLY]
+    # short_only_aclus = short_only_df.index.values.tolist()
+    # long_only_df = neuron_replay_stats_df[neuron_replay_stats_df.track_membership == SplitPartitionMembership.LEFT_ONLY]
+    # long_only_aclus = long_only_df.index.values.tolist()
+    # shared_df = neuron_replay_stats_df[neuron_replay_stats_df.track_membership == SplitPartitionMembership.SHARED]
+    # shared_aclus = shared_df.index.values.tolist()
+    # if debug_print:
+    #     print(f'shared_aclus: {shared_aclus}')
+    #     print(f'long_only_aclus: {long_only_aclus}')
+    #     print(f'short_only_aclus: {short_only_aclus}')
+
+    # active_identifying_session_ctx = curr_active_pipeline.sess.get_context() # 'bapun_RatN_Day4_2019-10-15_11-30-06'
+
+
+
 
 
 # ==================================================================================================================== #
