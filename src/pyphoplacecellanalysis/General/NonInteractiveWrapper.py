@@ -301,7 +301,7 @@ def batch_load_session(global_data_root_parent_path, active_data_mode_name, base
     curr_active_pipeline.perform_computations(active_session_computation_configs[0], computation_functions_name_whitelist=computation_functions_name_whitelist, computation_functions_name_blacklist=computation_functions_name_blacklist, fail_on_exception=fail_on_exception, debug_print=debug_print) #, overwrite_extant_results=False  ], fail_on_exception=True, debug_print=False)
 
     if not skip_extended_batch_computations:
-        batch_extended_computations(curr_active_pipeline, fail_on_exception=fail_on_exception, debug_print=debug_print)
+        batch_extended_computations(curr_active_pipeline, fail_on_exception=fail_on_exception, progress_print=True, debug_print=False)
     # curr_active_pipeline.perform_computations(active_session_computation_configs[0], computation_functions_name_blacklist=['_perform_spike_burst_detection_computation'], debug_print=False, fail_on_exception=False) # whitelist: ['_perform_baseline_placefield_computation']
 
     curr_active_pipeline.prepare_for_display(root_output_dir=global_data_root_parent_path.joinpath('Output'), should_smooth_maze=True) # TODO: pass a display config
@@ -313,7 +313,7 @@ def batch_load_session(global_data_root_parent_path, active_data_mode_name, base
     return curr_active_pipeline
 
 
-def batch_extended_computations(curr_active_pipeline, fail_on_exception=False, debug_print=False):
+def batch_extended_computations(curr_active_pipeline, fail_on_exception=False, progress_print=True, debug_print=False):
     """ performs the remaining required global computations """
 
     ## Get computed relative entropy measures:
@@ -323,17 +323,23 @@ def batch_extended_computations(curr_active_pipeline, fail_on_exception=False, d
     ## Get existing `pf1D_dt`:
     active_pf_1D = global_results.pf1D
     active_pf_1D_dt = global_results.pf1D_dt
-    if debug_print:
+    if progress_print:
         print(f'Running batch_extended_computations(...) with global_epoch_name: "{global_epoch_name}"')
 
     ## firing_rate_trends:
+    _comp_name = 'firing_rate_trends'
     try:
         active_extended_stats = curr_active_pipeline.computation_results[global_epoch_name].computed_data['extended_stats']
         time_binned_pos_df = active_extended_stats['time_binned_position_df']
-        if debug_print:
-            print(f'firing_rate_trends already computed.')
+        if progress_print:
+            print(f'{_comp_name} already computed.')
     except (AttributeError, KeyError) as e:
-        print(f'encountered error: {e}\n{traceback.format_exc()}\n. Recomputing...')
+        if progress_print or debug_print:
+            print(f'{_comp_name} missing.')
+        if debug_print:
+            print(f'\t encountered error: {e}\n{traceback.format_exc()}\n.')
+        if progress_print or debug_print:
+            print(f'\t Recomputing {_comp_name}...')
         curr_active_pipeline.perform_specific_computation(computation_functions_name_whitelist=['_perform_firing_rate_trends_computation'], enabled_filter_names=[global_epoch_name], fail_on_exception=fail_on_exception, debug_print=False) 
         print(f'\t done.')
         active_extended_stats = curr_active_pipeline.computation_results[global_epoch_name].computed_data['extended_stats']
@@ -342,6 +348,7 @@ def batch_extended_computations(curr_active_pipeline, fail_on_exception=False, d
         raise e
 
     ## relative_entropy_analyses:
+    _comp_name = 'relative_entropy_analyses'
     try:
         active_relative_entropy_results = active_extended_stats['relative_entropy_analyses']
         post_update_times = active_relative_entropy_results['post_update_times'] # (4152,) = (n_post_update_times,)
@@ -353,10 +360,15 @@ def batch_extended_computations(curr_active_pipeline, fail_on_exception=False, d
         flat_jensen_shannon_distance_results = active_relative_entropy_results['flat_jensen_shannon_distance_results'] # (149, 63) - (nSnapshots, nXbins)
         flat_jensen_shannon_distance_across_all_positions = np.sum(flat_jensen_shannon_distance_results, axis=1) # sum across all position bins # (4152,) - (nSnapshots)
         flat_surprise_across_all_positions = np.sum(flat_relative_entropy_results, axis=1) # sum across all position bins # (4152,) - (nSnapshots)
-        if debug_print:
-            print(f'relative_entropy_analyses already computed.')
+        if progress_print:
+            print(f'{_comp_name} already computed.')
     except (AttributeError, KeyError) as e:
-        print(f'encountered error: {e}\n{traceback.format_exc()}\n. Recomputing...')
+        if progress_print or debug_print:
+            print(f'{_comp_name} missing.')
+        if debug_print:
+            print(f'\t encountered error: {e}\n{traceback.format_exc()}\n.')
+        if progress_print or debug_print:
+            print(f'\t Recomputing {_comp_name}...')
         curr_active_pipeline.perform_specific_computation(computation_functions_name_whitelist=['_perform_time_dependent_pf_sequential_surprise_computation'], enabled_filter_names=[global_epoch_name], fail_on_exception=fail_on_exception, debug_print=False)
         print(f'\t done.')
         active_relative_entropy_results = active_extended_stats['relative_entropy_analyses']
@@ -373,14 +385,20 @@ def batch_extended_computations(curr_active_pipeline, fail_on_exception=False, d
         raise e
 
     ## jonathan_firing_rate_analysis:
+    _comp_name = 'jonathan_firing_rate_analysis'
     try:
         ## Get global 'jonathan_firing_rate_analysis' results:
         curr_jonathan_firing_rate_analysis = curr_active_pipeline.global_computation_results.computed_data['jonathan_firing_rate_analysis']
         neuron_replay_stats_df, rdf, aclu_to_idx, irdf = curr_jonathan_firing_rate_analysis['neuron_replay_stats_df'], curr_jonathan_firing_rate_analysis['rdf']['rdf'], curr_jonathan_firing_rate_analysis['rdf']['aclu_to_idx'], curr_jonathan_firing_rate_analysis['irdf']['irdf']
-        if debug_print:
-            print(f'jonathan_firing_rate_analysis already computed.')
+        if progress_print:
+            print(f'{_comp_name} already computed.')
     except (AttributeError, KeyError) as e:
-        print(f'encountered error: {e}\n{traceback.format_exc()}\n. Recomputing...')
+        if progress_print or debug_print:
+            print(f'{_comp_name} missing.')
+        if debug_print:
+            print(f'\t encountered error: {e}\n{traceback.format_exc()}\n.')
+        if progress_print or debug_print:
+            print(f'\t Recomputing {_comp_name}...')
         curr_active_pipeline.perform_specific_computation(computation_functions_name_whitelist=['_perform_jonathan_replay_firing_rate_analyses'], fail_on_exception=False, debug_print=False) 
         print(f'\t done.')
         curr_jonathan_firing_rate_analysis = curr_active_pipeline.global_computation_results.computed_data['jonathan_firing_rate_analysis']
@@ -389,6 +407,7 @@ def batch_extended_computations(curr_active_pipeline, fail_on_exception=False, d
         raise e
 
     ## short_long_pf_overlap_analyses:
+    _comp_name = 'short_long_pf_overlap_analyses'
     try:
         ## Get global `short_long_pf_overlap_analyses` results:
         short_long_pf_overlap_analyses = curr_active_pipeline.global_computation_results.computed_data.short_long_pf_overlap_analyses
@@ -397,10 +416,15 @@ def batch_extended_computations(curr_active_pipeline, fail_on_exception=False, d
         prod_overlap_dict = short_long_pf_overlap_analyses['product_overlap_dict']
         relative_entropy_overlap_dict = short_long_pf_overlap_analyses['relative_entropy_overlap_dict']
         relative_entropy_overlap_scalars_df = short_long_pf_overlap_analyses['relative_entropy_overlap_scalars_df']
-        if debug_print:
-            print(f'short_long_pf_overlap_analyses already computed.')
+        if progress_print:
+            print(f'{_comp_name} already computed.')
     except (AttributeError, KeyError) as e:
-        print(f'encountered error: {e}\n{traceback.format_exc()}\n. Recomputing...')
+        if progress_print or debug_print:
+            print(f'{_comp_name} missing.')
+        if debug_print:
+            print(f'\t encountered error: {e}\n{traceback.format_exc()}\n.')
+        if progress_print or debug_print:
+            print(f'\t Recomputing {_comp_name}...')
         curr_active_pipeline.perform_specific_computation(computation_functions_name_whitelist=['_perform_short_long_pf_overlap_analyses'], fail_on_exception=False, debug_print=False)
         print(f'\t done.')
         short_long_pf_overlap_analyses = curr_active_pipeline.global_computation_results.computed_data.short_long_pf_overlap_analyses
