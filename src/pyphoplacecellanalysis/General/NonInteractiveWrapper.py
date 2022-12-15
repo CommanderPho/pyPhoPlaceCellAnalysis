@@ -247,8 +247,11 @@ def batch_load_session(global_data_root_parent_path, active_data_mode_name, base
     debug_print = kwargs.get('debug_print', False)
     assert 'skip_save' not in kwargs, f"use saving_mode=PipelineSavingScheme.SKIP_SAVING instead"
     # skip_save = kwargs.get('skip_save', False)
-
     active_pickle_filename = kwargs.get('active_pickle_filename', 'loadedSessPickle.pkl')
+    time_bin_size = kwargs.get('time_bin_size', 0.03333) # 0.03333 = 1.0/30.0 # decode at 30fps to match the position sampling frequency
+    # time_bin_size = kwargs.get('time_bin_size', 0.1) # 10 fps
+
+
 
     known_data_session_type_properties_dict = DataSessionFormatRegistryHolder.get_registry_known_data_session_type_dict()
     active_data_session_types_registered_classes_dict = DataSessionFormatRegistryHolder.get_registry_data_session_type_class_name_dict()
@@ -280,7 +283,7 @@ def batch_load_session(global_data_root_parent_path, active_data_mode_name, base
     grid_bin_bounds = None
 
     # time_bin_size = 0.03333 #1.0/30.0 # decode at 30fps to match the position sampling frequency
-    time_bin_size = 0.1 # 10 fps
+    # time_bin_size = 0.1 # 10 fps
 
     active_session_computation_configs = active_data_mode_registered_class.build_default_computation_configs(sess=curr_active_pipeline.sess, time_bin_size=time_bin_size, grid_bin_bounds=grid_bin_bounds) #1.0/30.0 # decode at 30fps to match the position sampling frequency
 
