@@ -38,9 +38,7 @@ from pyphocorehelpers.indexing_helpers import compute_position_grid_size
 from pyphoplacecellanalysis.General.Mixins.CrossComputationComparisonHelpers import SplitPartitionMembership # needed for batch_extended_computations, batch_programmatic_figures
 from pyphoplacecellanalysis.General.Mixins.ExportHelpers import create_daily_programmatic_display_function_testing_folder_if_needed, session_context_to_relative_path, programmatic_display_to_PDF
 from pyphoplacecellanalysis.General.Mixins.ExportHelpers import build_pdf_metadata_from_display_context, create_daily_programmatic_display_function_testing_folder_if_needed # newer version of build_pdf_export_metadata
-from pyphoplacecellanalysis.General.Pipeline.NeuropyPipeline import NeuropyPipeline # for batch_load_session
-
-
+from pyphoplacecellanalysis.General.Pipeline.NeuropyPipeline import NeuropyPipeline, PipelineSavingScheme # for batch_load_session
 
 @unique
 class SessionBatchProgress(ExtendedEnum):
@@ -232,7 +230,7 @@ class NonInteractiveWrapper(object):
 # 2022-12-07 - batch_load_session - Computes Entire Pipeline                                                           #
 # ==================================================================================================================== #
 
-def batch_load_session(global_data_root_parent_path, active_data_mode_name, basedir, force_reload=False, **kwargs):
+def batch_load_session(global_data_root_parent_path, active_data_mode_name, basedir, force_reload=False, saving_mode=PipelineSavingScheme.SKIP_SAVING, **kwargs):
     """Loads and runs the entire pipeline for a session folder located at the path 'basedir'.
 
     Args:
@@ -243,10 +241,12 @@ def batch_load_session(global_data_root_parent_path, active_data_mode_name, base
     Returns:
         _type_: _description_
     """
-
+    saving_mode = PipelineSavingScheme.init(saving_mode)
     epoch_name_whitelist = kwargs.get('epoch_name_whitelist', ['maze1','maze2','maze'])
     debug_print = kwargs.get('debug_print', False)
-    skip_save = kwargs.get('skip_save', False)
+    assert 'skip_save' not in kwargs, f"use saving_mode=PipelineSavingScheme.SKIP_SAVING instead"
+    # skip_save = kwargs.get('skip_save', False)
+
     active_pickle_filename = kwargs.get('active_pickle_filename', 'loadedSessPickle.pkl')
 
     known_data_session_type_properties_dict = DataSessionFormatRegistryHolder.get_registry_known_data_session_type_dict()
@@ -256,7 +256,7 @@ def batch_load_session(global_data_root_parent_path, active_data_mode_name, base
     active_data_mode_type_properties = known_data_session_type_properties_dict[active_data_mode_name]
 
     curr_active_pipeline = NeuropyPipeline.try_init_from_saved_pickle_or_reload_if_needed(active_data_mode_name, active_data_mode_type_properties,
-        override_basepath=Path(basedir), override_post_load_functions=[], force_reload=force_reload, active_pickle_filename=active_pickle_filename, skip_save=True)
+        override_basepath=Path(basedir), override_post_load_functions=[], force_reload=force_reload, active_pickle_filename=active_pickle_filename, skip_save_on_initial_load=True)
 
     active_session_filter_configurations = active_data_mode_registered_class.build_default_filter_functions(sess=curr_active_pipeline.sess, epoch_name_whitelist=epoch_name_whitelist) # build_filters_pyramidal_epochs(sess=curr_kdiba_pipeline.sess)
     if debug_print:
@@ -301,10 +301,11 @@ def batch_load_session(global_data_root_parent_path, active_data_mode_name, base
 
     curr_active_pipeline.prepare_for_display(root_output_dir=global_data_root_parent_path.joinpath('Output'), should_smooth_maze=True) # TODO: pass a display config
 
-    if not skip_save:
-        curr_active_pipeline.save_pipeline()
-    else:
-        print(f'skip_save == True, so not saving at the end of batch_load_session')
+    curr_active_pipeline.save_pipeline(saving_mode=saving_mode)
+    
+    if not saving_mode.shouldSave:
+        print(f'saving_mode.shouldSave == False, so not saving at the end of batch_load_session')
+
     return curr_active_pipeline
 
 

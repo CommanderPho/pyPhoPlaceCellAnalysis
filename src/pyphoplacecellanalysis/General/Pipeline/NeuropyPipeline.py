@@ -44,6 +44,31 @@ import logging
 from pyphocorehelpers.print_helpers import build_module_logger
 pipeline_module_logger = build_module_logger('Spike3D.pipeline')
 
+from pyphocorehelpers.DataStructure.enum_helpers import ExtendedEnum # for PipelineSavingScheme
+
+class PipelineSavingScheme(ExtendedEnum):
+    """Describes how the pickled pipeline is saved and how it impacts existing files.
+    Used by `save_pipeline(...)`
+
+    from pyphoplacecellanalysis.General.Pipeline.NeuropyPipeline import PipelineSavingScheme
+    PipelineSavingScheme.SKIP_SAVING
+    """
+    SKIP_SAVING = "skip_saving"
+    TEMP_THEN_OVERWRITE = "temp_then_overwrite" # saves to a temporary filename if extant exists, then compares and overwrites if needed. Prevents ruining the real pickle if pickling is interrupted/fails.
+    OVERWRITE_IN_PLACE = "overwrite_in_place" 
+    # SAVING = "Saving"
+    # GENERIC = "Generic"
+
+    @property
+    def shouldSave(self):
+        return PipelineSavingScheme.shouldSaveList()[self]
+
+    # Static properties
+    @classmethod
+    def shouldSaveList(cls):
+        return cls.build_member_value_dict([False, True, True])
+
+
 
 class LoadedObjectPersistanceState(object):
     """Keeps track of the persistance state for an object that has been loaded from disk to keep track of how the object's state relates to the version on disk (the persisted version) """
@@ -124,11 +149,11 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
 
     # Load/Save Persistance and Comparison _______________________________________________________________________________ #
     @classmethod
-    def try_init_from_saved_pickle_or_reload_if_needed(cls, type_name: str, known_type_properties: KnownDataSessionTypeProperties, override_basepath=None, override_post_load_functions=None, force_reload=False, active_pickle_filename='loadedSessPickle.pkl', skip_save=False, progress_print=True, debug_print=False):
+    def try_init_from_saved_pickle_or_reload_if_needed(cls, type_name: str, known_type_properties: KnownDataSessionTypeProperties, override_basepath=None, override_post_load_functions=None, force_reload=False, active_pickle_filename='loadedSessPickle.pkl', skip_save_on_initial_load=False, progress_print=True, debug_print=False):
         """ After a session has completed the loading stage prior to filtering (after all objects are built and such), it can be pickled to a file to drastically speed up future loading requests (as would have to be done when the notebook is restarted, etc) 
         Tries to find an extant pickled pipeline, and if it exists it loads and returns that. Otherwise, it loads/rebuilds the pipeline from scratch (from the initial raw data files) and then saves a pickled copy out to disk to speed up future loading attempts.
         
-        # skip_save: Bool - if True, the resultant pipeline is not saved to the pickle when done
+        # skip_save_on_initial_load: Bool - if True, the resultant pipeline is not saved to the pickle when done
         
         """
         def _ensure_unpickled_pipeline_up_to_date(curr_active_pipeline, active_data_mode_name, basedir, desired_time_variable_name, debug_print=False):
@@ -220,11 +245,11 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
             curr_active_pipeline._persistance_state = LoadedObjectPersistanceState(finalized_loaded_sess_pickle_path, compare_state_on_load=curr_active_pipeline.pipeline_compare_dict)
             ## Save out the changes to the pipeline after computation to the pickle file for easy loading in the future
             if pipeline_needs_resave:
-                if not skip_save:
+                if not skip_save_on_initial_load:
                     curr_active_pipeline.save_pipeline(active_pickle_filename=active_pickle_filename)
                 else:
                     if progress_print:
-                        print(f'pipeline_needs_resave but skip_save == True, so saving will be skipped entirely. Be sure to save manually if there are changes.')
+                        print(f'pipeline_needs_resave but skip_save_on_initial_load == True, so saving will be skipped entirely. Be sure to save manually if there are changes.')
             else:
                 if progress_print:
                     print(f'property already present in pickled version. No need to save.')
@@ -235,11 +260,11 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
                 print(f'Must reload/rebuild.')
             curr_active_pipeline = cls.init_from_known_data_session_type(type_name, known_type_properties, override_basepath=Path(basepath), override_post_load_functions=post_load_functions)
             # Save reloaded pipeline out to pickle for future loading
-            if not skip_save:
+            if not skip_save_on_initial_load:
                 saveData(finalized_loaded_sess_pickle_path, db=curr_active_pipeline) # 589 MB
             else:
                 if progress_print:
-                    print('skip_save is True so resultant pipeline will not be saved to the pickle file.')
+                    print('skip_save_on_initial_load is True so resultant pipeline will not be saved to the pickle file.')
         # finalized_loaded_sess_pickle_path
         return curr_active_pipeline
     
@@ -507,67 +532,79 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
 
 
 
-
-
-    def save_pipeline(self, active_pickle_filename='loadedSessPickle.pkl'):
+    def save_pipeline(self, saving_mode=PipelineSavingScheme.TEMP_THEN_OVERWRITE, active_pickle_filename='loadedSessPickle.pkl'):
         """ pickles (saves) the entire pipeline to a file that can be loaded later without recomputing.
 
         Args:
             active_pickle_filename (str, optional): _description_. Defaults to 'loadedSessPickle.pkl'.
 
         Returns:
-            _type_: _description_
+            _type_: returns the finalized save path if the file was saved, or none if saving_mode=PipelineSavingScheme.SKIP_SAVING
         """
-        ## Build Pickle Path:
-        used_existing_pickle_path = False
-        if active_pickle_filename is None:
-            assert self.has_associated_pickle
-            finalized_loaded_sess_pickle_path = self.pickle_path # get the internal pickle path that it was loaded from if none specified
-            used_existing_pickle_path = True
-        else:        
-            finalized_loaded_sess_pickle_path = Path(self.sess.basepath).joinpath(active_pickle_filename).resolve()
-            used_existing_pickle_path = (finalized_loaded_sess_pickle_path == self.pickle_path) # used the existing path if they're the same
-        
-        self.logger.info(f'save_pipeline(): Attempting to save pipeline to disk...')
+        saving_mode = PipelineSavingScheme.init(saving_mode)
 
-        print(f'finalized_loaded_sess_pickle_path: {finalized_loaded_sess_pickle_path}')
-        self.logger.info(f'\tfinalized_loaded_sess_pickle_path: {finalized_loaded_sess_pickle_path}')
-
-        new_obj_memory_usage_MB = print_object_memory_usage(self, enable_print=False)
-
-        _desired_finalized_loaded_sess_pickle_path = None
-        if finalized_loaded_sess_pickle_path.exists():
-            # file already exists:
-            ## Save under a temporary name in the same output directory, and then compare post-hoc
-            _desired_finalized_loaded_sess_pickle_path = finalized_loaded_sess_pickle_path
-            finalized_loaded_sess_pickle_path, _ = _build_unique_filename(finalized_loaded_sess_pickle_path)
-
-        # Save reloaded pipeline out to pickle for future loading
-        saveData(finalized_loaded_sess_pickle_path, db=self) # Save the pipeline out to pickle.
-
-        # If we saved to a temporary name, now see if we should overwrite or backup and then replace:
-        if _desired_finalized_loaded_sess_pickle_path is not None:
-
-            prev_extant_file_size_MB = print_filesystem_file_size(_desired_finalized_loaded_sess_pickle_path, enable_print=False)
-            new_temporary_file_size_MB = print_filesystem_file_size(finalized_loaded_sess_pickle_path, enable_print=False)
-
-            if (prev_extant_file_size_MB > new_temporary_file_size_MB):
-                print(f'WARNING: prev_extant_file_size_MB ({prev_extant_file_size_MB} MB) > new_temporary_file_size_MB ({new_temporary_file_size_MB} MB)! A backup will be made!')
-                # Backup old file:
-                _backup_extant_file(_desired_finalized_loaded_sess_pickle_path) # only backup if the new file is smaller than the older one (meaning the older one has more info)
+        if not saving_mode.shouldSave:
+            print(f'WARNING: saving_mode is SKIP_SAVING so pipeline will not be saved despite calling .save_pipeline(...).')
+            self.logger.warning(f'WARNING: saving_mode is SKIP_SAVING so pipeline will not be saved despite calling .save_pipeline(...).')
+            return None
+        else:
+            ## Build Pickle Path:
+            used_existing_pickle_path = False
+            if active_pickle_filename is None:
+                assert self.has_associated_pickle
+                finalized_loaded_sess_pickle_path = self.pickle_path # get the internal pickle path that it was loaded from if none specified
+                used_existing_pickle_path = True
+            else:        
+                finalized_loaded_sess_pickle_path = Path(self.sess.basepath).joinpath(active_pickle_filename).resolve()
+                used_existing_pickle_path = (finalized_loaded_sess_pickle_path == self.pickle_path) # used the existing path if they're the same
             
-            # replace the old file with the new one:
-            print(f"moving new output at '{finalized_loaded_sess_pickle_path}' -> to desired location: '{_desired_finalized_loaded_sess_pickle_path}'")
-            shutil.move(finalized_loaded_sess_pickle_path, _desired_finalized_loaded_sess_pickle_path) # move the temporary file to the desired destination, overwriting it
-            # Finally restore the appropriate load path:
-            finalized_loaded_sess_pickle_path = _desired_finalized_loaded_sess_pickle_path
+            self.logger.info(f'save_pipeline(): Attempting to save pipeline to disk...')
 
-        if not used_existing_pickle_path:
-            # the pickle path changed, so set it on the pipeline:
-            self._persistance_state = LoadedObjectPersistanceState(finalized_loaded_sess_pickle_path, compare_state_on_load=self.pipeline_compare_dict)
-        
-        self.logger.info(f'\t save complete.')
-        return finalized_loaded_sess_pickle_path
+            print(f'finalized_loaded_sess_pickle_path: {finalized_loaded_sess_pickle_path}')
+            self.logger.info(f'\tfinalized_loaded_sess_pickle_path: {finalized_loaded_sess_pickle_path}')
+
+            new_obj_memory_usage_MB = print_object_memory_usage(self, enable_print=False)
+
+            _desired_finalized_loaded_sess_pickle_path = None
+            if finalized_loaded_sess_pickle_path.exists():
+                # file already exists:
+                if saving_mode.name == PipelineSavingScheme.TEMP_THEN_OVERWRITE.name:
+                    ## Save under a temporary name in the same output directory, and then compare post-hoc
+                    _desired_finalized_loaded_sess_pickle_path = finalized_loaded_sess_pickle_path
+                    finalized_loaded_sess_pickle_path, _ = _build_unique_filename(finalized_loaded_sess_pickle_path)
+                elif saving_mode.name == PipelineSavingScheme.OVERWRITE_IN_PLACE.name:
+                    print(f'WARNING: saving_mode is OVERWRITE_IN_PLACE so {finalized_loaded_sess_pickle_path} will be overwritten even though exists.')
+                    self.logger.warning(f'WARNING: saving_mode is OVERWRITE_IN_PLACE so {finalized_loaded_sess_pickle_path} will be overwritten even though exists.')
+
+
+            # Save reloaded pipeline out to pickle for future loading
+            saveData(finalized_loaded_sess_pickle_path, db=self) # Save the pipeline out to pickle.
+
+            # If we saved to a temporary name, now see if we should overwrite or backup and then replace:
+            if saving_mode.name == PipelineSavingScheme.TEMP_THEN_OVERWRITE.name:
+                assert _desired_finalized_loaded_sess_pickle_path is not None
+                prev_extant_file_size_MB = print_filesystem_file_size(_desired_finalized_loaded_sess_pickle_path, enable_print=False)
+                new_temporary_file_size_MB = print_filesystem_file_size(finalized_loaded_sess_pickle_path, enable_print=False)
+
+                if (prev_extant_file_size_MB > new_temporary_file_size_MB):
+                    print(f'WARNING: prev_extant_file_size_MB ({prev_extant_file_size_MB} MB) > new_temporary_file_size_MB ({new_temporary_file_size_MB} MB)! A backup will be made!')
+                    self.logger.warning(f'WARNING: prev_extant_file_size_MB ({prev_extant_file_size_MB} MB) > new_temporary_file_size_MB ({new_temporary_file_size_MB} MB)! A backup will be made!')
+                    # Backup old file:
+                    _backup_extant_file(_desired_finalized_loaded_sess_pickle_path) # only backup if the new file is smaller than the older one (meaning the older one has more info)
+                
+                # replace the old file with the new one:
+                print(f"moving new output at '{finalized_loaded_sess_pickle_path}' -> to desired location: '{_desired_finalized_loaded_sess_pickle_path}'")
+                self.logger.info(f"moving new output at '{finalized_loaded_sess_pickle_path}' -> to desired location: '{_desired_finalized_loaded_sess_pickle_path}'")
+                shutil.move(finalized_loaded_sess_pickle_path, _desired_finalized_loaded_sess_pickle_path) # move the temporary file to the desired destination, overwriting it
+                # Finally restore the appropriate load path:
+                finalized_loaded_sess_pickle_path = _desired_finalized_loaded_sess_pickle_path
+
+            if not used_existing_pickle_path:
+                # the pickle path changed, so set it on the pipeline:
+                self._persistance_state = LoadedObjectPersistanceState(finalized_loaded_sess_pickle_path, compare_state_on_load=self.pipeline_compare_dict)
+            
+            self.logger.info(f'\t save complete.')
+            return finalized_loaded_sess_pickle_path
 
 
 
