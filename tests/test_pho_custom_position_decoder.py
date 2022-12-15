@@ -18,7 +18,7 @@ except ModuleNotFoundError as e:
     print('pyphoplacecellanalysis_folder: {}'.format(pyphoplacecellanalysis_folder))
     sys.path.insert(0, str(src_folder))
 finally:
-    from pyphoplacecellanalysis.Analysis.reconstruction import BayesianPlacemapPositionDecoder
+    from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BayesianPlacemapPositionDecoder
 
 
 class TestPhoCustomPositionDecoderMethods(unittest.TestCase):
