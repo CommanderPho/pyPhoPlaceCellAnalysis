@@ -600,7 +600,7 @@ class BayesianPlacemapPositionDecoder(PlacemapPositionDecoder):
         """
         self.neuron_IDXs, self.neuron_IDs, f_i, F_i, self.F, self.P_x = ZhangReconstructionImplementation.build_concatenated_F(self.pf, debug_print=self.debug_print)
         
-    def _setup_time_bin_spike_counts_N_i(self):
+    def _setup_time_bin_spike_counts_N_i(self, debug_print=False):
         """ updates: 
         
         .time_binning_container
@@ -612,12 +612,14 @@ class BayesianPlacemapPositionDecoder(PlacemapPositionDecoder):
         
         """
         ## need to create new time_window_edges from the self.time_bin_size:
-        print(f'WARNING: _setup_time_bin_spike_counts_N_i(): updating self.time_window_edges and self.time_window_edges_binning_info ...')
-        self.unit_specific_time_binned_spike_counts, time_window_edges, time_window_edges_binning_info = ZhangReconstructionImplementation.time_bin_spike_counts_N_i(self.spikes_df, time_bin_size=self.time_bin_size, debug_print=self.debug_print) # unit_specific_binned_spike_counts.to_numpy(): (40, 85841)
+        if debug_print:
+            print(f'WARNING: _setup_time_bin_spike_counts_N_i(): updating self.time_window_edges and self.time_window_edges_binning_info ...')
 
-        print(f'from ._setup_time_bin_spike_counts_N_i():')
-        print(f'\ttime_window_edges.shape: {time_window_edges.shape}') #  (11882,)
-        print(f'unit_specific_time_binned_spike_counts.shape: {self.unit_specific_time_binned_spike_counts.shape}') # (70, 11881)
+        self.unit_specific_time_binned_spike_counts, time_window_edges, time_window_edges_binning_info = ZhangReconstructionImplementation.time_bin_spike_counts_N_i(self.spikes_df, time_bin_size=self.time_bin_size, debug_print=self.debug_print) # unit_specific_binned_spike_counts.to_numpy(): (40, 85841)
+        if debug_print:
+            print(f'from ._setup_time_bin_spike_counts_N_i():')
+            print(f'\ttime_window_edges.shape: {time_window_edges.shape}') #  (11882,)
+            print(f'unit_specific_time_binned_spike_counts.shape: {self.unit_specific_time_binned_spike_counts.shape}') # (70, 11881)
         
         self.time_binning_container = BinningContainer(edges=time_window_edges, edge_info=time_window_edges_binning_info)
         
