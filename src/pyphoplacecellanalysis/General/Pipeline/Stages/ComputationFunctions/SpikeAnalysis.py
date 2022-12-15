@@ -40,7 +40,7 @@ class SpikeAnalysisComputations(AllFunctionEnumeratingMixin, metaclass=Computati
         """ Computes periods when the cells are firing in bursts in a hierarchical manner
         
         Requires:
-            pf2D_Decoder
+            computation_result.sess
             
         Optional Requires:
             computation_result.computation_config['spike_analysis']
