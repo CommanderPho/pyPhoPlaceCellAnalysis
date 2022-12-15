@@ -160,8 +160,8 @@ class ExtendedStatsComputations(AllFunctionEnumeratingMixin, metaclass=Computati
             
             ## Inline version that reuses active_pf_1D_dt directly:
             if use_extant_pf1D_dt_mode.use_pf_dt_obj:
-                # if use_extant_pf1D_dt_mode.needs_build_new
-                active_pf_1D_dt.complete_time_range_computation(start_t, end_t, assign_results_to_member_variables=True, should_snapshot=True)
+                active_pf_1D_dt.update(end_t, should_snapshot=True) # use this because it correctly integrates over [0, end_t] instead of [start_t, end_t]
+                # active_pf_1D_dt.complete_time_range_computation(start_t, end_t, assign_results_to_member_variables=True, should_snapshot=True)
                 # historical_snapshots[float(end_t)] = active_pf_1D_dt.complete_time_range_computation(start_t, end_t, assign_results_to_member_variables=False)
             else:
                 # Static version that calls PfND_TimeDependent.perform_time_range_computation(...) itself using just the computed variables of `active_pf_1D_dt`:
@@ -182,8 +182,6 @@ class ExtendedStatsComputations(AllFunctionEnumeratingMixin, metaclass=Computati
         short_long_rel_entr_curves_frames = np.stack([a_val_dict['short_long_rel_entr_curve'] for a_val_dict in relative_entropy_result_dicts_list]) # build a 3D array (4152, 108, 63) = (n_post_update_times, n_neurons, n_xbins)
 
         
-
-
         # ==================================================================================================================== #
         ## Save Outputs:
         if 'extended_stats' not in computation_result.computed_data:
