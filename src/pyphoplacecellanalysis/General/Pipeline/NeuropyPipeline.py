@@ -149,11 +149,12 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
 
     # Load/Save Persistance and Comparison _______________________________________________________________________________ #
     @classmethod
-    def try_init_from_saved_pickle_or_reload_if_needed(cls, type_name: str, known_type_properties: KnownDataSessionTypeProperties, override_basepath=None, override_post_load_functions=None, force_reload=False, active_pickle_filename='loadedSessPickle.pkl', skip_save_on_initial_load=False, progress_print=True, debug_print=False):
+    def try_init_from_saved_pickle_or_reload_if_needed(cls, type_name: str, known_type_properties: KnownDataSessionTypeProperties, override_basepath=None, override_post_load_functions=None, force_reload=False, active_pickle_filename='loadedSessPickle.pkl', skip_save_on_initial_load=True, progress_print=True, debug_print=False):
         """ After a session has completed the loading stage prior to filtering (after all objects are built and such), it can be pickled to a file to drastically speed up future loading requests (as would have to be done when the notebook is restarted, etc) 
         Tries to find an extant pickled pipeline, and if it exists it loads and returns that. Otherwise, it loads/rebuilds the pipeline from scratch (from the initial raw data files) and then saves a pickled copy out to disk to speed up future loading attempts.
         
-        # skip_save_on_initial_load: Bool - if True, the resultant pipeline is not saved to the pickle when done
+        force_reload: bool - If True, the pipeline isn't attempted to be loaded and instead is created fresh each time
+        # skip_save_on_initial_load: Bool - if True, the resultant pipeline is not saved to the pickle when done (allowing more computations before saving)
         
         """
         def _ensure_unpickled_pipeline_up_to_date(curr_active_pipeline, active_data_mode_name, basedir, desired_time_variable_name, debug_print=False):
