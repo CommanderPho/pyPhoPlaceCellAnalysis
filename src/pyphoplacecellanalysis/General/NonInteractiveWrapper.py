@@ -278,7 +278,10 @@ def batch_load_session(global_data_root_parent_path, active_data_mode_name, base
     ## OR use no grid_bin_bounds meaning they will be determined dynamically for each epoch:
     grid_bin_bounds = None
 
-    active_session_computation_configs = active_data_mode_registered_class.build_default_computation_configs(sess=curr_active_pipeline.sess, time_bin_size=0.03333, grid_bin_bounds=grid_bin_bounds) #1.0/30.0 # decode at 30fps to match the position sampling frequency
+    # time_bin_size = 0.03333 #1.0/30.0 # decode at 30fps to match the position sampling frequency
+    time_bin_size = 0.1 # 10 fps
+
+    active_session_computation_configs = active_data_mode_registered_class.build_default_computation_configs(sess=curr_active_pipeline.sess, time_bin_size=time_bin_size, grid_bin_bounds=grid_bin_bounds) #1.0/30.0 # decode at 30fps to match the position sampling frequency
 
     # Whitelist Mode:
     computation_functions_name_whitelist=['_perform_baseline_placefield_computation', '_perform_time_dependent_placefield_computation', '_perform_extended_statistics_computation',
