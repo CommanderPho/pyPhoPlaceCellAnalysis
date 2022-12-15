@@ -9,6 +9,7 @@ from pyphocorehelpers.DataStructure.general_parameter_containers import Visualiz
 from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer
 
 # For scrollable BasicBinnedImageRenderingWindow
+from pyphoplacecellanalysis.Pho2D.PyQtPlots.Extensions.pyqtgraph_helpers import LayoutScrollability
 from pyphoplacecellanalysis.Pho2D.PyQtPlots.Extensions.pyqtgraph_helpers import _perform_build_root_graphics_layout_widget_ui
 from pyphoplacecellanalysis.Pho2D.PyQtPlots.Extensions.pyqtgraph_helpers import build_scrollable_graphics_layout_widget_ui, build_scrollable_graphics_layout_widget_with_nested_viewbox_ui
 
@@ -87,9 +88,8 @@ class BasicBinnedImageRenderingWindow(QtWidgets.QMainWindow):
             Based off of pyphoplacecellanalysis.GUI.PyQtPlot.pyqtplot_Matrix.MatrixRenderingWindow
             
         Usage:
-            from pyphoplacecellanalysis.GUI.PyQtPlot.BinnedImageRenderingWindow import BasicBinnedImageRenderingWindow
-            
-            out = BasicBinnedImageRenderingWindow(active_eloy_analysis.avg_2D_speed_per_pos, active_pf_2D_dt.xbin_labels, active_pf_2D_dt.ybin_labels, name='avg_velocity', title="Avg Velocity per Pos (X, Y)", variable_label='Avg Velocity')
+            from pyphoplacecellanalysis.GUI.PyQtPlot.BinnedImageRenderingWindow import BasicBinnedImageRenderingWindow, LayoutScrollability
+            out = BasicBinnedImageRenderingWindow(active_eloy_analysis.avg_2D_speed_per_pos, active_pf_2D_dt.xbin_labels, active_pf_2D_dt.ybin_labels, name='avg_velocity', title="Avg Velocity per Pos (X, Y)", variable_label='Avg Velocity', scrollability_mode=LayoutScrollability.SCROLLABLE)
             out.add_data(row=1, col=0, matrix=active_eloy_analysis.pf_overlapDensity_2D, xbins=active_pf_2D_dt.xbin_labels, ybins=active_pf_2D_dt.ybin_labels, name='pf_overlapDensity', title='pf overlapDensity metric', variable_label='pf overlapDensity')
             out.add_data(row=2, col=0, matrix=active_pf_2D.ratemap.occupancy, xbins=active_pf_2D.xbin, ybins=active_pf_2D.ybin, name='occupancy_seconds', title='Seconds Occupancy', variable_label='seconds')
             out.add_data(row=3, col=0, matrix=active_simpler_pf_densities_analysis.n_neurons_meeting_firing_critiera_by_position_bins_2D, xbins=active_pf_2D.xbin, ybins=active_pf_2D.ybin, name='n_neurons_meeting_firing_critiera_by_position_bins_2D', title='# neurons > 1Hz per Pos (X, Y)', variable_label='# neurons')
@@ -98,13 +98,16 @@ class BasicBinnedImageRenderingWindow(QtWidgets.QMainWindow):
     """
     
     def __init__(self, matrix=None, xbins=None, ybins=None, name='avg_velocity', title="Avg Velocity per Pos (X, Y)", variable_label='Avg Velocity',
-                 drop_below_threshold: float=0.0000001, color_map='viridis', color_bar_mode=None, wants_crosshairs=True, defer_show=False, **kwargs):
+                 drop_below_threshold: float=0.0000001, color_map='viridis', color_bar_mode=None, wants_crosshairs=True, scrollability_mode=LayoutScrollability.SCROLLABLE, defer_show=False, **kwargs):
         super(BasicBinnedImageRenderingWindow, self).__init__(**kwargs)
         self.params = VisualizationParameters(name='BasicBinnedImageRenderingWindow')
         self.plots_data = RenderPlotsData(name='BasicBinnedImageRenderingWindow')
         self.plots = RenderPlots(name='BasicBinnedImageRenderingWindow')
         self.ui = PhoUIContainer(name='BasicBinnedImageRenderingWindow')
         self.ui.connections = PhoUIContainer(name='BasicBinnedImageRenderingWindow')
+
+        self.params.scrollability_mode = LayoutScrollability.init(scrollability_mode)
+
         
         if isinstance(color_map, str):        
             self.params.colorMap = pg.colormap.get("viridis")
@@ -129,8 +132,11 @@ class BasicBinnedImageRenderingWindow(QtWidgets.QMainWindow):
         # self.setCentralWidget(self.ui.graphics_layout)
 
         ## Build scrollable UI version:
-        self.ui = _perform_build_root_graphics_layout_widget_ui(self.ui, is_scrollable=True)
-        self.setCentralWidget(self.ui.scrollAreaWidget)
+        self.ui = _perform_build_root_graphics_layout_widget_ui(self.ui, is_scrollable=self.params.scrollability_mode.is_scrollable)
+        if self.params.scrollability_mode.is_scrollable:
+            self.setCentralWidget(self.ui.scrollAreaWidget)
+        else:
+            self.setCentralWidget(self.ui.graphics_layout)
 
         # Shared:
         self.setWindowTitle(title)
@@ -172,11 +178,13 @@ class BasicBinnedImageRenderingWindow(QtWidgets.QMainWindow):
 
         ## Scrollable-support:
         active_num_rows = row+1 # get the number of rows after adding the data (adding one to go from an index to a count)
-        self.params.single_plot_fixed_height = 100.0
-        self.params.all_plots_height = float(active_num_rows) * float(self.params.single_plot_fixed_height)
-        self.ui.graphics_layout.setFixedHeight(self.params.all_plots_height)
-        # self.ui.graphics_layout.setMinimumHeight(self.params.all_plots_height)
-        
+
+        if self.params.scrollability_mode.is_scrollable:
+            self.params.single_plot_fixed_height = 100.0
+            self.params.all_plots_height = float(active_num_rows) * float(self.params.single_plot_fixed_height)
+            self.ui.graphics_layout.setFixedHeight(self.params.all_plots_height)
+            # self.ui.graphics_layout.setMinimumHeight(self.params.all_plots_height)
+            
 
 
     def _update_global_shared_colorbaritem(self):

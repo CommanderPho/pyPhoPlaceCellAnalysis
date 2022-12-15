@@ -100,6 +100,24 @@ def pyqtplot_plot_image(xbin_edges, ybin_edges, image, enable_LUT_Histogram=Fals
 # ==================================================================================================================== #
 # UI Building Helpers                                                                                                  #
 # ==================================================================================================================== #
+
+from pyphocorehelpers.DataStructure.enum_helpers import ExtendedEnum
+
+class LayoutScrollability(ExtendedEnum):
+    """Whether the layout is scrollable or not. Used by """
+    NON_SCROLLABLE = "non_scrollable"
+    SCROLLABLE = "scrollable"
+    
+    @property
+    def is_scrollable(self):
+        return LayoutScrollability.is_scrollableList()[self]
+
+    # Static properties
+    @classmethod
+    def is_scrollableList(cls):
+        return cls.build_member_value_dict([False, True])
+
+
 def _perform_build_root_graphics_layout_widget_ui(ui:PhoUIContainer, is_scrollable: bool = True):
     """ just adds the widgets required to make the main graphics layoutr scrollable
 
@@ -121,7 +139,8 @@ def _perform_build_root_graphics_layout_widget_ui(ui:PhoUIContainer, is_scrollab
 
 
 def build_root_graphics_layout_widget_ui(name, window_title=None, ui=None):
-    """ Updates or builds the ui properties to display a GraphicsLayoutWidget with scrollable rows:
+    """ Updates or builds the ui properties to display a GraphicsLayoutWidget:
+    ## **Non-Scrollable** Version of `build_scrollable_graphics_layout_widget_ui`
     Usage:
     ## Build non-scrollable UI version:
     ui = build_root_graphics_layout_widget_ui(name, window_title=params.window_title, ui=ui)
@@ -145,6 +164,7 @@ def build_root_graphics_layout_widget_ui(name, window_title=None, ui=None):
 
 def build_scrollable_graphics_layout_widget_ui(name, window_title=None, ui=None):
     """ Updates or builds the ui properties to display a GraphicsLayoutWidget with scrollable rows:
+    ## **Scrollable** Version of `build_root_graphics_layout_widget_ui`
     Usage:
     ## Build scrollable UI version:
     ui = build_scrollable_graphics_layout_widget_ui(name, window_title=params.window_title, ui=ui)
