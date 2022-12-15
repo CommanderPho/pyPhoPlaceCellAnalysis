@@ -409,6 +409,11 @@ class ComputedPipelineStage(LoadableInput, LoadableSessionInput, FilterablePipel
 
         if contains_any_global_functions:
             # global computation functions:
+            if self.global_computation_results is None:
+                print(f'global_computation_results is None. Building initial global_computation_results...')
+                self.global_computation_results = DynamicParameters()
+                self.global_computation_results = ComputedPipelineStage._build_initial_computationResult(self.sess, active_computation_params) # returns a computation result. This stores the computation config used to compute it.
+            ## TODO: what is this about?
             previous_computation_result = self.global_computation_results
             global_kwargs = dict(owning_pipeline_reference=self, global_computation_results=previous_computation_result, computation_results=self.computation_results, active_configs=self.active_configs, include_whitelist=enabled_filter_names, debug_print=debug_print)
 
