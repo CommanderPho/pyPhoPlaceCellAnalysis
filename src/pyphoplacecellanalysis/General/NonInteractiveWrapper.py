@@ -35,12 +35,12 @@ from pyphocorehelpers.DataStructure.dynamic_parameters import DynamicParameters
 from pyphocorehelpers.indexing_helpers import compute_position_grid_size
 
 # pyPhoPlaceCellAnalysis:
-from pyphoplacecellanalysis.General.Mixins.CrossComputationComparisonHelpers import SplitPartitionMembership # needed for batch_programmatic_figures
+from pyphoplacecellanalysis.General.Mixins.CrossComputationComparisonHelpers import SplitPartitionMembership # needed for batch_extended_computations, batch_programmatic_figures
 from pyphoplacecellanalysis.General.Mixins.ExportHelpers import create_daily_programmatic_display_function_testing_folder_if_needed, session_context_to_relative_path, programmatic_display_to_PDF
 from pyphoplacecellanalysis.General.Mixins.ExportHelpers import build_pdf_metadata_from_display_context, create_daily_programmatic_display_function_testing_folder_if_needed # newer version of build_pdf_export_metadata
 from pyphoplacecellanalysis.General.Pipeline.NeuropyPipeline import NeuropyPipeline # for batch_load_session
 
-from pyphoplacecellanalysis.General.Mixins.CrossComputationComparisonHelpers import SplitPartitionMembership # for batch_extended_computations
+
 
 @unique
 class SessionBatchProgress(ExtendedEnum):
@@ -262,7 +262,7 @@ def batch_load_session(global_data_root_parent_path, active_data_mode_name, base
     if debug_print:
         print(f'active_session_filter_configurations: {active_session_filter_configurations}')
     
-    curr_active_pipeline.filter_sessions(active_session_filter_configurations, changed_filters_ignore_list=['maze1','maze2','maze'], debug_print=True)
+    curr_active_pipeline.filter_sessions(active_session_filter_configurations, changed_filters_ignore_list=['maze1','maze2','maze'], debug_print=False)
 
     # ## Compute shared grid_bin_bounds for all epochs from the global positions:
     # global_unfiltered_session = curr_active_pipeline.sess
