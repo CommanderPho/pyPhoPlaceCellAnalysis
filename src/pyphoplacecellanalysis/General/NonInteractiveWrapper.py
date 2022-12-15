@@ -289,6 +289,7 @@ def batch_load_session(global_data_root_parent_path, active_data_mode_name, base
                                         '_perform_position_decoding_computation', 
                                         '_perform_firing_rate_trends_computation',
                                         '_perform_pf_find_ratemap_peaks_computation',
+                                        # '_perform_time_dependent_pf_sequential_surprise_computation'
                                         # '_perform_two_step_position_decoding_computation',
                                         # '_perform_recursive_latent_placefield_decoding'
                                      ]  # '_perform_pf_find_ratemap_peaks_peak_prominence2d_computation'
@@ -301,7 +302,7 @@ def batch_load_session(global_data_root_parent_path, active_data_mode_name, base
     curr_active_pipeline.perform_computations(active_session_computation_configs[0], computation_functions_name_whitelist=computation_functions_name_whitelist, computation_functions_name_blacklist=computation_functions_name_blacklist, fail_on_exception=fail_on_exception, debug_print=debug_print) #, overwrite_extant_results=False  ], fail_on_exception=True, debug_print=False)
 
     if not skip_extended_batch_computations:
-        batch_extended_computations(curr_active_pipeline, fail_on_exception=fail_on_exception, progress_print=True, debug_print=False)
+        batch_extended_computations(curr_active_pipeline, include_global_functions=False, fail_on_exception=fail_on_exception, progress_print=True, debug_print=False)
     # curr_active_pipeline.perform_computations(active_session_computation_configs[0], computation_functions_name_blacklist=['_perform_spike_burst_detection_computation'], debug_print=False, fail_on_exception=False) # whitelist: ['_perform_baseline_placefield_computation']
 
     curr_active_pipeline.prepare_for_display(root_output_dir=global_data_root_parent_path.joinpath('Output'), should_smooth_maze=True) # TODO: pass a display config
@@ -313,8 +314,9 @@ def batch_load_session(global_data_root_parent_path, active_data_mode_name, base
     return curr_active_pipeline
 
 
-def batch_extended_computations(curr_active_pipeline, fail_on_exception=False, progress_print=True, debug_print=False):
+def batch_extended_computations(curr_active_pipeline, include_global_functions=False, fail_on_exception=False, progress_print=True, debug_print=False):
     """ performs the remaining required global computations """
+    newly_computed_values = []
 
     ## Get computed relative entropy measures:
     global_epoch_name = curr_active_pipeline.active_completed_computation_result_names[-1] # 'maze'
@@ -344,6 +346,7 @@ def batch_extended_computations(curr_active_pipeline, fail_on_exception=False, p
         print(f'\t done.')
         active_extended_stats = curr_active_pipeline.computation_results[global_epoch_name].computed_data['extended_stats']
         time_binned_pos_df = active_extended_stats['time_binned_position_df']
+        newly_computed_values.append(_comp_name)
     except Exception as e:
         raise e
 
@@ -381,77 +384,81 @@ def batch_extended_computations(curr_active_pipeline, fail_on_exception=False, p
         flat_jensen_shannon_distance_results = active_relative_entropy_results['flat_jensen_shannon_distance_results'] # (149, 63) - (nSnapshots, nXbins)
         flat_jensen_shannon_distance_across_all_positions = np.sum(np.abs(flat_jensen_shannon_distance_results), axis=1) # sum across all position bins # (4152,) - (nSnapshots)
         flat_surprise_across_all_positions = np.sum(np.abs(flat_relative_entropy_results), axis=1) # sum across all position bins # (4152,) - (nSnapshots)
+        newly_computed_values.append(_comp_name)
     except Exception as e:
         raise e
 
-    ## jonathan_firing_rate_analysis:
-    _comp_name = 'jonathan_firing_rate_analysis'
-    try:
-        ## Get global 'jonathan_firing_rate_analysis' results:
-        curr_jonathan_firing_rate_analysis = curr_active_pipeline.global_computation_results.computed_data['jonathan_firing_rate_analysis']
-        neuron_replay_stats_df, rdf, aclu_to_idx, irdf = curr_jonathan_firing_rate_analysis['neuron_replay_stats_df'], curr_jonathan_firing_rate_analysis['rdf']['rdf'], curr_jonathan_firing_rate_analysis['rdf']['aclu_to_idx'], curr_jonathan_firing_rate_analysis['irdf']['irdf']
-        if progress_print:
-            print(f'{_comp_name} already computed.')
-    except (AttributeError, KeyError) as e:
-        if progress_print or debug_print:
-            print(f'{_comp_name} missing.')
-        if debug_print:
-            print(f'\t encountered error: {e}\n{traceback.format_exc()}\n.')
-        if progress_print or debug_print:
-            print(f'\t Recomputing {_comp_name}...')
-        curr_active_pipeline.perform_specific_computation(computation_functions_name_whitelist=['_perform_jonathan_replay_firing_rate_analyses'], fail_on_exception=True, debug_print=False) # fail_on_exception MUST be True or error handling is all messed up 
-        print(f'\t done.')
-        curr_jonathan_firing_rate_analysis = curr_active_pipeline.global_computation_results.computed_data['jonathan_firing_rate_analysis']
-        neuron_replay_stats_df, rdf, aclu_to_idx, irdf = curr_jonathan_firing_rate_analysis['neuron_replay_stats_df'], curr_jonathan_firing_rate_analysis['rdf']['rdf'], curr_jonathan_firing_rate_analysis['rdf']['aclu_to_idx'], curr_jonathan_firing_rate_analysis['irdf']['irdf']
-    except Exception as e:
-        raise e
+    if include_global_functions:
+        ## jonathan_firing_rate_analysis:
+        _comp_name = 'jonathan_firing_rate_analysis'
+        try:
+            ## Get global 'jonathan_firing_rate_analysis' results:
+            curr_jonathan_firing_rate_analysis = curr_active_pipeline.global_computation_results.computed_data['jonathan_firing_rate_analysis']
+            neuron_replay_stats_df, rdf, aclu_to_idx, irdf = curr_jonathan_firing_rate_analysis['neuron_replay_stats_df'], curr_jonathan_firing_rate_analysis['rdf']['rdf'], curr_jonathan_firing_rate_analysis['rdf']['aclu_to_idx'], curr_jonathan_firing_rate_analysis['irdf']['irdf']
+            if progress_print:
+                print(f'{_comp_name} already computed.')
+        except (AttributeError, KeyError) as e:
+            if progress_print or debug_print:
+                print(f'{_comp_name} missing.')
+            if debug_print:
+                print(f'\t encountered error: {e}\n{traceback.format_exc()}\n.')
+            if progress_print or debug_print:
+                print(f'\t Recomputing {_comp_name}...')
+            curr_active_pipeline.perform_specific_computation(computation_functions_name_whitelist=['_perform_jonathan_replay_firing_rate_analyses'], fail_on_exception=True, debug_print=False) # fail_on_exception MUST be True or error handling is all messed up 
+            print(f'\t done.')
+            curr_jonathan_firing_rate_analysis = curr_active_pipeline.global_computation_results.computed_data['jonathan_firing_rate_analysis']
+            neuron_replay_stats_df, rdf, aclu_to_idx, irdf = curr_jonathan_firing_rate_analysis['neuron_replay_stats_df'], curr_jonathan_firing_rate_analysis['rdf']['rdf'], curr_jonathan_firing_rate_analysis['rdf']['aclu_to_idx'], curr_jonathan_firing_rate_analysis['irdf']['irdf']
+            newly_computed_values.append(_comp_name)
+        except Exception as e:
+            raise e
 
-    ## short_long_pf_overlap_analyses:
-    _comp_name = 'short_long_pf_overlap_analyses'
-    try:
-        ## Get global `short_long_pf_overlap_analyses` results:
-        short_long_pf_overlap_analyses = curr_active_pipeline.global_computation_results.computed_data.short_long_pf_overlap_analyses
-        conv_overlap_dict = short_long_pf_overlap_analyses['conv_overlap_dict']
-        conv_overlap_scalars_df = short_long_pf_overlap_analyses['conv_overlap_scalars_df']
-        prod_overlap_dict = short_long_pf_overlap_analyses['product_overlap_dict']
-        relative_entropy_overlap_dict = short_long_pf_overlap_analyses['relative_entropy_overlap_dict']
-        relative_entropy_overlap_scalars_df = short_long_pf_overlap_analyses['relative_entropy_overlap_scalars_df']
-        if progress_print:
-            print(f'{_comp_name} already computed.')
-    except (AttributeError, KeyError) as e:
-        if progress_print or debug_print:
-            print(f'{_comp_name} missing.')
-        if debug_print:
-            print(f'\t encountered error: {e}\n{traceback.format_exc()}\n.')
-        if progress_print or debug_print:
-            print(f'\t Recomputing {_comp_name}...')
-        curr_active_pipeline.perform_specific_computation(computation_functions_name_whitelist=['_perform_short_long_pf_overlap_analyses'], fail_on_exception=True, debug_print=False) # fail_on_exception MUST be True or error handling is all messed up 
-        print(f'\t done.')
-        short_long_pf_overlap_analyses = curr_active_pipeline.global_computation_results.computed_data.short_long_pf_overlap_analyses
-        conv_overlap_dict = short_long_pf_overlap_analyses['conv_overlap_dict']
-        conv_overlap_scalars_df = short_long_pf_overlap_analyses['conv_overlap_scalars_df']
-        prod_overlap_dict = short_long_pf_overlap_analyses['product_overlap_dict']
-        relative_entropy_overlap_dict = short_long_pf_overlap_analyses['relative_entropy_overlap_dict']
-        relative_entropy_overlap_scalars_df = short_long_pf_overlap_analyses['relative_entropy_overlap_scalars_df']
-    except Exception as e:
-        raise e
+        ## short_long_pf_overlap_analyses:
+        _comp_name = 'short_long_pf_overlap_analyses'
+        try:
+            ## Get global `short_long_pf_overlap_analyses` results:
+            short_long_pf_overlap_analyses = curr_active_pipeline.global_computation_results.computed_data.short_long_pf_overlap_analyses
+            conv_overlap_dict = short_long_pf_overlap_analyses['conv_overlap_dict']
+            conv_overlap_scalars_df = short_long_pf_overlap_analyses['conv_overlap_scalars_df']
+            prod_overlap_dict = short_long_pf_overlap_analyses['product_overlap_dict']
+            relative_entropy_overlap_dict = short_long_pf_overlap_analyses['relative_entropy_overlap_dict']
+            relative_entropy_overlap_scalars_df = short_long_pf_overlap_analyses['relative_entropy_overlap_scalars_df']
+            if progress_print:
+                print(f'{_comp_name} already computed.')
+        except (AttributeError, KeyError) as e:
+            if progress_print or debug_print:
+                print(f'{_comp_name} missing.')
+            if debug_print:
+                print(f'\t encountered error: {e}\n{traceback.format_exc()}\n.')
+            if progress_print or debug_print:
+                print(f'\t Recomputing {_comp_name}...')
+            curr_active_pipeline.perform_specific_computation(computation_functions_name_whitelist=['_perform_short_long_pf_overlap_analyses'], fail_on_exception=True, debug_print=False) # fail_on_exception MUST be True or error handling is all messed up 
+            print(f'\t done.')
+            short_long_pf_overlap_analyses = curr_active_pipeline.global_computation_results.computed_data.short_long_pf_overlap_analyses
+            conv_overlap_dict = short_long_pf_overlap_analyses['conv_overlap_dict']
+            conv_overlap_scalars_df = short_long_pf_overlap_analyses['conv_overlap_scalars_df']
+            prod_overlap_dict = short_long_pf_overlap_analyses['product_overlap_dict']
+            relative_entropy_overlap_dict = short_long_pf_overlap_analyses['relative_entropy_overlap_dict']
+            relative_entropy_overlap_scalars_df = short_long_pf_overlap_analyses['relative_entropy_overlap_scalars_df']
+            newly_computed_values.append(_comp_name)
+        except Exception as e:
+            raise e
 
-    # short_only_df = neuron_replay_stats_df[neuron_replay_stats_df.track_membership == SplitPartitionMembership.RIGHT_ONLY]
-    # short_only_aclus = short_only_df.index.values.tolist()
-    # long_only_df = neuron_replay_stats_df[neuron_replay_stats_df.track_membership == SplitPartitionMembership.LEFT_ONLY]
-    # long_only_aclus = long_only_df.index.values.tolist()
-    # shared_df = neuron_replay_stats_df[neuron_replay_stats_df.track_membership == SplitPartitionMembership.SHARED]
-    # shared_aclus = shared_df.index.values.tolist()
-    # if debug_print:
-    #     print(f'shared_aclus: {shared_aclus}')
-    #     print(f'long_only_aclus: {long_only_aclus}')
-    #     print(f'short_only_aclus: {short_only_aclus}')
+        # short_only_df = neuron_replay_stats_df[neuron_replay_stats_df.track_membership == SplitPartitionMembership.RIGHT_ONLY]
+        # short_only_aclus = short_only_df.index.values.tolist()
+        # long_only_df = neuron_replay_stats_df[neuron_replay_stats_df.track_membership == SplitPartitionMembership.LEFT_ONLY]
+        # long_only_aclus = long_only_df.index.values.tolist()
+        # shared_df = neuron_replay_stats_df[neuron_replay_stats_df.track_membership == SplitPartitionMembership.SHARED]
+        # shared_aclus = shared_df.index.values.tolist()
+        # if debug_print:
+        #     print(f'shared_aclus: {shared_aclus}')
+        #     print(f'long_only_aclus: {long_only_aclus}')
+        #     print(f'short_only_aclus: {short_only_aclus}')
 
     # active_identifying_session_ctx = curr_active_pipeline.sess.get_context() # 'bapun_RatN_Day4_2019-10-15_11-30-06'
     if progress_print:
         print('done with all batch_extended_computations(...).')
 
-
+    return newly_computed_values
 
 
 # ==================================================================================================================== #
