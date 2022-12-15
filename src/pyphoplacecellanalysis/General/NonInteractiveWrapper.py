@@ -230,7 +230,7 @@ class NonInteractiveWrapper(object):
 # 2022-12-07 - batch_load_session - Computes Entire Pipeline                                                           #
 # ==================================================================================================================== #
 
-def batch_load_session(global_data_root_parent_path, active_data_mode_name, basedir, force_reload=False, saving_mode=PipelineSavingScheme.SKIP_SAVING, fail_on_exception=True, **kwargs):
+def batch_load_session(global_data_root_parent_path, active_data_mode_name, basedir, force_reload=False, saving_mode=PipelineSavingScheme.SKIP_SAVING, fail_on_exception=True, skip_extended_batch_computations=False, **kwargs):
     """Loads and runs the entire pipeline for a session folder located at the path 'basedir'.
 
     Args:
@@ -296,7 +296,8 @@ def batch_load_session(global_data_root_parent_path, active_data_mode_name, base
 
     curr_active_pipeline.perform_computations(active_session_computation_configs[0], computation_functions_name_whitelist=computation_functions_name_whitelist, computation_functions_name_blacklist=computation_functions_name_blacklist, fail_on_exception=fail_on_exception, debug_print=debug_print) #, overwrite_extant_results=False  ], fail_on_exception=True, debug_print=False)
 
-    batch_extended_computations(curr_active_pipeline, fail_on_exception=fail_on_exception, debug_print=debug_print)
+    if not skip_extended_batch_computations:
+        batch_extended_computations(curr_active_pipeline, fail_on_exception=fail_on_exception, debug_print=debug_print)
     # curr_active_pipeline.perform_computations(active_session_computation_configs[0], computation_functions_name_blacklist=['_perform_spike_burst_detection_computation'], debug_print=False, fail_on_exception=False) # whitelist: ['_perform_baseline_placefield_computation']
 
     curr_active_pipeline.prepare_for_display(root_output_dir=global_data_root_parent_path.joinpath('Output'), should_smooth_maze=True) # TODO: pass a display config
