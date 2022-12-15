@@ -117,7 +117,7 @@ class ExtendedStatsComputations(AllFunctionEnumeratingMixin, metaclass=Computati
         # sess, combined_records_list = _build_new_lap_and_intra_lap_intervals(sess) # from PendingNotebookCode
 
         # difference_snapshots = active_pf_1D_dt.batch_snapshotting(combined_records_list, reset_at_start=True, debug_print=debug_print)
-        # # post_update_times, pf_overlap_results, flat_relative_entropy_results, flat_jensen_shannon_distance_results = compute_snapshot_differences(difference_snapshots)
+        # # post_update_times, pf_overlap_results, flat_relative_entropy_results, flat_jensen_shannon_distance_results = compute_snapshot_relative_entropy_surprise_differences(difference_snapshots) # this fails, use the active_pf_1D_dt.historical_snapshots instead
         # post_update_times, pf_overlap_results, flat_relative_entropy_results, flat_jensen_shannon_distance_results = compute_snapshot_relative_entropy_surprise_differences(active_pf_1D_dt.historical_snapshots)
 
 
@@ -161,7 +161,7 @@ class ExtendedStatsComputations(AllFunctionEnumeratingMixin, metaclass=Computati
             ## Inline version that reuses active_pf_1D_dt directly:
             if use_extant_pf1D_dt_mode.use_pf_dt_obj:
                 # if use_extant_pf1D_dt_mode.needs_build_new
-                active_pf_1D_dt.complete_time_range_computation(start_t, end_t, assign_results_to_member_variables=True)
+                active_pf_1D_dt.complete_time_range_computation(start_t, end_t, assign_results_to_member_variables=True, should_snapshot=True)
                 # historical_snapshots[float(end_t)] = active_pf_1D_dt.complete_time_range_computation(start_t, end_t, assign_results_to_member_variables=False)
             else:
                 # Static version that calls PfND_TimeDependent.perform_time_range_computation(...) itself using just the computed variables of `active_pf_1D_dt`:
@@ -258,7 +258,7 @@ def compute_snapshot_relative_entropy_surprise_differences(historical_snapshots_
 
     Usage:
 
-        pf_overlap_results, flat_relative_entropy_results = compute_snapshot_differences(active_pf_1D_dt)
+        pf_overlap_results, flat_relative_entropy_results = compute_snapshot_relative_entropy_surprise_differences(active_pf_1D_dt)
 
 
     """
