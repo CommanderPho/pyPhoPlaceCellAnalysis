@@ -399,7 +399,7 @@ def batch_extended_computations(curr_active_pipeline, fail_on_exception=False, p
             print(f'\t encountered error: {e}\n{traceback.format_exc()}\n.')
         if progress_print or debug_print:
             print(f'\t Recomputing {_comp_name}...')
-        curr_active_pipeline.perform_specific_computation(computation_functions_name_whitelist=['_perform_jonathan_replay_firing_rate_analyses'], fail_on_exception=False, debug_print=False) 
+        curr_active_pipeline.perform_specific_computation(computation_functions_name_whitelist=['_perform_jonathan_replay_firing_rate_analyses'], fail_on_exception=True, debug_print=False) # fail_on_exception MUST be True or error handling is all messed up 
         print(f'\t done.')
         curr_jonathan_firing_rate_analysis = curr_active_pipeline.global_computation_results.computed_data['jonathan_firing_rate_analysis']
         neuron_replay_stats_df, rdf, aclu_to_idx, irdf = curr_jonathan_firing_rate_analysis['neuron_replay_stats_df'], curr_jonathan_firing_rate_analysis['rdf']['rdf'], curr_jonathan_firing_rate_analysis['rdf']['aclu_to_idx'], curr_jonathan_firing_rate_analysis['irdf']['irdf']
@@ -425,7 +425,7 @@ def batch_extended_computations(curr_active_pipeline, fail_on_exception=False, p
             print(f'\t encountered error: {e}\n{traceback.format_exc()}\n.')
         if progress_print or debug_print:
             print(f'\t Recomputing {_comp_name}...')
-        curr_active_pipeline.perform_specific_computation(computation_functions_name_whitelist=['_perform_short_long_pf_overlap_analyses'], fail_on_exception=False, debug_print=False)
+        curr_active_pipeline.perform_specific_computation(computation_functions_name_whitelist=['_perform_short_long_pf_overlap_analyses'], fail_on_exception=True, debug_print=False) # fail_on_exception MUST be True or error handling is all messed up 
         print(f'\t done.')
         short_long_pf_overlap_analyses = curr_active_pipeline.global_computation_results.computed_data.short_long_pf_overlap_analyses
         conv_overlap_dict = short_long_pf_overlap_analyses['conv_overlap_dict']
@@ -448,7 +448,8 @@ def batch_extended_computations(curr_active_pipeline, fail_on_exception=False, p
     #     print(f'short_only_aclus: {short_only_aclus}')
 
     # active_identifying_session_ctx = curr_active_pipeline.sess.get_context() # 'bapun_RatN_Day4_2019-10-15_11-30-06'
-
+    if progress_print:
+        print('done with all batch_extended_computations(...).')
 
 
 
