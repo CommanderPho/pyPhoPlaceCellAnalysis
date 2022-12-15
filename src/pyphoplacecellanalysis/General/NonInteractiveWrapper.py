@@ -323,11 +323,15 @@ def batch_extended_computations(curr_active_pipeline, fail_on_exception=False, d
     ## Get existing `pf1D_dt`:
     active_pf_1D = global_results.pf1D
     active_pf_1D_dt = global_results.pf1D_dt
+    if debug_print:
+        print(f'Running batch_extended_computations(...) with global_epoch_name: "{global_epoch_name}"')
 
     ## firing_rate_trends:
     try:
         active_extended_stats = curr_active_pipeline.computation_results[global_epoch_name].computed_data['extended_stats']
         time_binned_pos_df = active_extended_stats['time_binned_position_df']
+        if debug_print:
+            print(f'firing_rate_trends already computed.')
     except (AttributeError, KeyError) as e:
         print(f'encountered error: {e}\n{traceback.format_exc()}\n. Recomputing...')
         curr_active_pipeline.perform_specific_computation(computation_functions_name_whitelist=['_perform_firing_rate_trends_computation'], enabled_filter_names=[global_epoch_name], fail_on_exception=fail_on_exception, debug_print=False) 
@@ -349,6 +353,8 @@ def batch_extended_computations(curr_active_pipeline, fail_on_exception=False, d
         flat_jensen_shannon_distance_results = active_relative_entropy_results['flat_jensen_shannon_distance_results'] # (149, 63) - (nSnapshots, nXbins)
         flat_jensen_shannon_distance_across_all_positions = np.sum(flat_jensen_shannon_distance_results, axis=1) # sum across all position bins # (4152,) - (nSnapshots)
         flat_surprise_across_all_positions = np.sum(flat_relative_entropy_results, axis=1) # sum across all position bins # (4152,) - (nSnapshots)
+        if debug_print:
+            print(f'relative_entropy_analyses already computed.')
     except (AttributeError, KeyError) as e:
         print(f'encountered error: {e}\n{traceback.format_exc()}\n. Recomputing...')
         curr_active_pipeline.perform_specific_computation(computation_functions_name_whitelist=['_perform_time_dependent_pf_sequential_surprise_computation'], enabled_filter_names=[global_epoch_name], fail_on_exception=fail_on_exception, debug_print=False)
@@ -371,6 +377,8 @@ def batch_extended_computations(curr_active_pipeline, fail_on_exception=False, d
         ## Get global 'jonathan_firing_rate_analysis' results:
         curr_jonathan_firing_rate_analysis = curr_active_pipeline.global_computation_results.computed_data['jonathan_firing_rate_analysis']
         neuron_replay_stats_df, rdf, aclu_to_idx, irdf = curr_jonathan_firing_rate_analysis['neuron_replay_stats_df'], curr_jonathan_firing_rate_analysis['rdf']['rdf'], curr_jonathan_firing_rate_analysis['rdf']['aclu_to_idx'], curr_jonathan_firing_rate_analysis['irdf']['irdf']
+        if debug_print:
+            print(f'jonathan_firing_rate_analysis already computed.')
     except (AttributeError, KeyError) as e:
         print(f'encountered error: {e}\n{traceback.format_exc()}\n. Recomputing...')
         curr_active_pipeline.perform_specific_computation(computation_functions_name_whitelist=['_perform_jonathan_replay_firing_rate_analyses'], fail_on_exception=False, debug_print=False) 
@@ -389,7 +397,8 @@ def batch_extended_computations(curr_active_pipeline, fail_on_exception=False, d
         prod_overlap_dict = short_long_pf_overlap_analyses['product_overlap_dict']
         relative_entropy_overlap_dict = short_long_pf_overlap_analyses['relative_entropy_overlap_dict']
         relative_entropy_overlap_scalars_df = short_long_pf_overlap_analyses['relative_entropy_overlap_scalars_df']
-
+        if debug_print:
+            print(f'short_long_pf_overlap_analyses already computed.')
     except (AttributeError, KeyError) as e:
         print(f'encountered error: {e}\n{traceback.format_exc()}\n. Recomputing...')
         curr_active_pipeline.perform_specific_computation(computation_functions_name_whitelist=['_perform_short_long_pf_overlap_analyses'], fail_on_exception=False, debug_print=False)
