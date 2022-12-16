@@ -681,7 +681,7 @@ class BayesianPlacemapPositionDecoder(PlacemapPositionDecoder):
             self.time_binning_container, self.p_x_given_n, self.most_likely_positions, curr_unit_marginal_x, curr_unit_marginal_y, flat_outputs_container = self.hyper_perform_decode(self.spikes_df, decoding_time_bin_size=self.time_bin_size, output_flat_versions=True, debug_print=(debug_print or self.debug_print))
             self.marginal = DynamicContainer(x=curr_unit_marginal_x, y=curr_unit_marginal_y)
             assert isinstance(self.time_binning_container, BinningContainer) # Should be neuropy.utils.mixins.binning_helpers.BinningContainer
-            self.compute_corrected_positions()
+            self.compute_corrected_positions() ## this seems to fail for pf1D
             
             ## set flat properties for compatibility (I guess)
             self.flat_p_x_given_n = flat_outputs_container.flat_p_x_given_n

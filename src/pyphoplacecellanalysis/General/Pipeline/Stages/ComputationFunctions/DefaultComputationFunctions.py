@@ -33,7 +33,7 @@ class DefaultComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Computa
     _is_global = False
 
     def _perform_position_decoding_computation(computation_result: ComputationResult, **kwargs):
-        """ Builds the 2D Placefield Decoder 
+        """ Builds the 1D & 2D Placefield Decoder 
         
             ## - [ ] TODO: IMPORTANT!! POTENTIAL_BUG: Should this passed-in spikes_df actually be the filtered spikes_df that was used to compute the placefields in PfND? That would be `prev_output_result.computed_data['pf2D'].filtered_spikes_df`
                 TODO: CORRECTNESS: Consider whether spikes_df or just the spikes_df used to compute the pf2D should be passed. Only the cells used to build the decoder should be used to decode, that much is certain.
@@ -43,11 +43,11 @@ class DefaultComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Computa
         def position_decoding_computation(active_session, pf_computation_config, prev_output_result: ComputationResult):
             """ uses the pf2D property of "prev_output_result.computed_data['pf2D'] """
             ## filtered_spikes_df version:
+            prev_output_result.computed_data['pf1D_Decoder'] = BayesianPlacemapPositionDecoder(pf_computation_config.time_bin_size, prev_output_result.computed_data['pf1D'], prev_output_result.computed_data['pf1D'].filtered_spikes_df.copy(), debug_print=False)
+            prev_output_result.computed_data['pf1D_Decoder'].compute_all() #
+
             prev_output_result.computed_data['pf2D_Decoder'] = BayesianPlacemapPositionDecoder(pf_computation_config.time_bin_size, prev_output_result.computed_data['pf2D'], prev_output_result.computed_data['pf2D'].filtered_spikes_df.copy(), debug_print=False)
-            ## original `active_session.spikes_df` version:
-            # prev_output_result.computed_data['pf2D_Decoder'] = BayesianPlacemapPositionDecoder(pf_computation_config.time_bin_size, prev_output_result.computed_data['pf2D'], active_session.spikes_df.copy(), debug_print=False)
-            # %timeit pho_custom_decoder.compute_all():  18.8 s ± 149 ms per loop (mean ± std. dev. of 7 runs, 1 loop each)
-            prev_output_result.computed_data['pf2D_Decoder'].compute_all() #  --> n = self.
+            prev_output_result.computed_data['pf2D_Decoder'].compute_all() #
             return prev_output_result
 
         placefield_computation_config = computation_result.computation_config.pf_params # should be a PlacefieldComputationParameters
@@ -55,7 +55,9 @@ class DefaultComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Computa
     
     
     def _perform_two_step_position_decoding_computation(computation_result: ComputationResult, debug_print=False, **kwargs):
-        """ Builds the Zhang Velocity/Position For 2-step Bayesian Decoder for 2D Placefields """
+        """ Builds the Zhang Velocity/Position For 2-step Bayesian Decoder for 2D Placefields
+        TODO: Add 1D Support now that 'pf1D_Decoder' has been added.
+        """
         def _compute_avg_speed_at_each_position_bin(active_position_df, active_pf_computation_config, xbin, ybin, show_plots=False, debug_print=False):
             """ compute the average speed at each position x: """
             
@@ -278,13 +280,13 @@ class DefaultComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Computa
                 active_second_order_spikes_df['y'] = active_one_step_decoder.most_likely_positions[spike_binned_time_idx.to_numpy(),1] # y-pos
                 return active_second_order_spikes_df
 
-            def _next_order_decode(active_pf_1D, active_pf_2D, pf_computation_config, manual_time_window_edges=None, manual_time_window_edges_binning_info=None):
+            def _next_order_decode(active_pf_1D, active_pf_2D, pf_computation_config):
                 """ performs the actual decoding given the"""
                 ## 1D Decoder
                 new_decoder_pf1D = active_pf_1D
                 new_1D_decoder_spikes_df = new_decoder_pf1D.filtered_spikes_df.copy()
                 new_1D_decoder = BayesianPlacemapPositionDecoder(pf_computation_config.time_bin_size, new_decoder_pf1D, new_1D_decoder_spikes_df, debug_print=False) 
-                # new_1D_decoder.compute_all() #  --> n = self.
+                new_1D_decoder.compute_all() #  --> TODO: NOTE: 1D .compute_all() has just been recently added due to a previous error in ffill
 
                 ## Custom Manual 2D Decoder:
                 new_decoder_pf2D = active_pf_2D # 
@@ -310,7 +312,7 @@ class DefaultComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Computa
         next_order_computation_config = deepcopy(computation_result.computation_config) # make a deepcopy of the active computation config
         next_order_computation_config.pf_params.speed_thresh = 0.0 # no speed thresholding because the speeds aren't real for the second-order fields
 
-        enable_pf1D = False
+        enable_pf1D = True # Enabled on 2022-12-15 afte fixing bug in implementaion of ffill
         enable_pf2D = True
 
         # Start with empty lists, which will accumulate the different levels of recurrsive depth:
@@ -442,6 +444,7 @@ class DefaultComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Computa
                 default_figure_name = f'{default_figure_name}_CUSTOM'
                 epoch_description_list = [f'{default_figure_name} {epoch_tuple.label}' for epoch_tuple in active_filter_epochs.to_dataframe()[['label']].itertuples()]
                 
+            ## BEGIN_FUNCTION_BODY:
             filter_epochs_decoder_result = active_decoder.decode_specific_epochs(computation_result.sess.spikes_df, filter_epochs=active_filter_epochs, decoding_time_bin_size=decoding_time_bin_size, debug_print=False)
             filter_epochs_decoder_result.epoch_description_list = epoch_description_list
             return filter_epochs_decoder_result, active_filter_epochs, default_figure_name
