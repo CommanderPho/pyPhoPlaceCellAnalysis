@@ -19,6 +19,7 @@ except ModuleNotFoundError as e:
     sys.path.insert(0, str(src_folder))
 finally:
     from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BayesianPlacemapPositionDecoder
+    from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import ZhangReconstructionImplementation
 
 
 class TestPhoCustomPositionDecoderMethods(unittest.TestCase):
@@ -28,9 +29,19 @@ class TestPhoCustomPositionDecoderMethods(unittest.TestCase):
         self.bin_edges = np.array([0, 1, 2, 3, 4, 5])
         # unit_specific_binned_spike_counts, out_digitized_variable_bins, out_binning_info = ZhangReconstructionImplementation.time_bin_spike_counts_N_i(sess.spikes_df.copy(), time_bin_size, debug_print=debug_print) # unit_specific_binned_spike_counts.to_numpy(): (40, 85841)
 
+        ## save test data:
+        # test_file = 'bayes_decoder_test_data.npz'
+        # np.savez(test_file, tau=tau, P_x=P_x, F=F, n=n)
+
+        ## Load test data:
+        test_file = Path('data/bayes_decoder_test_data.npz')
+        self.npzfile = np.load(test_file)
+        self.tau, self.P_x, self.F, self.n = self.npzfile['tau'], self.npzfile['P_x'], self.npzfile['F'].T, self.npzfile['n']
+
+
     def tearDown(self):
         self.bin_edges=None
-        
+        self.npzfile = None
 
     def test_time_bin_spike_counts_N_i(self, out_digitized_variable_bins, out_binning_info):
         np.shape(out_digitized_variable_bins) # (85842,), array([  22.30206346,   22.32206362,   22.34206378, ..., 1739.09557005, 1739.11557021, 1739.13557036])
@@ -55,7 +66,12 @@ class TestPhoCustomPositionDecoderMethods(unittest.TestCase):
         active_pos_df = active_pos_df.set_index('time_delta_sec')
         return active_pos_df
 
-
+    def test_decoding(self, tau, P_x, F, n):
+        # Allow passed as arguments or other:
+        # tau, P_x, F, n = self.tau, self.P_x, self.F, self.n
+        posterior = ZhangReconstructionImplementation.neuropy_bayesian_prob(tau, P_x, F, n, use_flat_computation_mode=True)
+        posterior_full_only = ZhangReconstructionImplementation.neuropy_bayesian_prob(tau, P_x, F, n, use_flat_computation_mode=False)
+        self.assertTrue((posterior_full_only == posterior).all())
 
 
 if __name__ == '__main__':
