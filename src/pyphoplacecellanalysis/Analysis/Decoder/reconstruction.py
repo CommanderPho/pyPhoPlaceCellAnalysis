@@ -241,6 +241,17 @@ class ZhangReconstructionImplementation:
         """ 
             n_i: the number of spikes fired by each cell during the time window of consideration
             use_flat_computation_mode: bool - if True, a more memory efficient accumulating computation is performed that avoids `MemoryError: Unable to allocate 65.4 GiB for an array with shape (3969, 21896, 101) and data type float64` caused by allocating the full `cell_prob` matrix
+                ERROR: it looks like this `use_flat_computation_mode` broke things and the outputs have been all-NaNs ever since?
+
+
+        NOTES: Flat vs. Full computation modes:
+        Originally 
+            cell_prob = np.zeros((nFlatPositionBins, nTimeBins, nCells)) 
+        This was updated throughout the loop, and then after the loop completed np.prod(cell_prob, axis=2) was used to collapse along axis=2 (nCells), leaving the output posterior with dimensions (nFlatPositionBins, nTimeBins)
+
+        To get around this, I introduced a version that accumulates the multilications over the course of the loop.
+            cell_prob = np.ones((nFlatPositionBins, nTimeBins))
+
         """
         assert(len(n) == np.shape(F)[1]), f'n must be a column vector with an entry for each place cell (neuron). Instead it is of np.shape(n): {np.shape(n)}. np.shape(F): {np.shape(F)}'        
         if debug_print:
@@ -272,15 +283,12 @@ class ZhangReconstructionImplementation:
 
             if use_flat_computation_mode:
                 # Single-cell flat Version:
-                cell_prob *= (((tau * cell_ratemap) ** cell_spkcnt) * coeff) * (
-                    np.exp(-tau * cell_ratemap)
-                ) # product equal using *=
+                cell_prob *= (((tau * cell_ratemap) ** cell_spkcnt) * coeff) * (np.exp(-tau * cell_ratemap)) # product equal using *=
+                # cell_prob.shape (nFlatPositionBins, nTimeBins)
             else:
                 # Full Version:
                 # broadcasting
-                cell_prob[:, :, cell] = (((tau * cell_ratemap) ** cell_spkcnt) * coeff) * (
-                    np.exp(-tau * cell_ratemap)
-                )
+                cell_prob[:, :, cell] = (((tau * cell_ratemap) ** cell_spkcnt) * coeff) * (np.exp(-tau * cell_ratemap))
 
         if use_flat_computation_mode:
             # Single-cell flat Version:
