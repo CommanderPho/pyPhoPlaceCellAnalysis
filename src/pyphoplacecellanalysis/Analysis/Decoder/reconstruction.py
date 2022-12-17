@@ -267,7 +267,8 @@ class ZhangReconstructionImplementation:
         
         if use_flat_computation_mode:
             ## Single-cell flat version which updates each iteration:
-            cell_prob = np.zeros((nFlatPositionBins, nTimeBins)) ## MemoryError: Unable to allocate 65.4 GiB for an array with shape (3969, 21896, 101) and data type float64
+            cell_prob = np.ones((nFlatPositionBins, nTimeBins)) # Must start with ONES (not Zeros) since we're accumulating multiplications
+
         else:
             # Full Version which leads to MemoryError when nCells is too large:
             cell_prob = np.zeros((nFlatPositionBins, nTimeBins, nCells)) ## MemoryError: Unable to allocate 65.4 GiB for an array with shape (3969, 21896, 101) and data type float64
