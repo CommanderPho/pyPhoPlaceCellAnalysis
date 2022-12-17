@@ -266,9 +266,9 @@ class ZhangReconstructionImplementation:
                 cell_ratemap: [f_{i}(x) for i in range(nCells)]
                 cell_spkcnt: [n_{i} for i in range(nCells)]            
             """
-            cell_spkcnt = n[cell, :][np.newaxis, :]
-            cell_ratemap = F[cell, :][:, np.newaxis]
-            coeff = 1 / (factorial(cell_spkcnt)) # 1/factorial(n_{i}) term
+            cell_spkcnt = n[cell, :][np.newaxis, :] # .shape: (1, nTimeBins)
+            cell_ratemap = F[cell, :][:, np.newaxis] # .shape: (nFlatPositionBins, 1)
+            coeff = 1.0 / (factorial(cell_spkcnt)) # 1/factorial(n_{i}) term # .shape: (1, nTimeBins)
 
             if use_flat_computation_mode:
                 # Single-cell flat Version:
