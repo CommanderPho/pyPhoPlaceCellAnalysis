@@ -14,12 +14,12 @@ from neuropy.analyses.decoders import epochs_spkcount # for decode_specific_epoc
 from neuropy.utils.mixins.binning_helpers import BinningContainer # for epochs_spkcount getting the correct time bins
 
 from pyphocorehelpers.general_helpers import OrderedMeta
-from pyphocorehelpers.indexing_helpers import BinningInfo, compute_spanning_bins, get_bin_centers, get_bin_edges, build_spanning_grid_matrix
+from pyphocorehelpers.indexing_helpers import BinningInfo, compute_spanning_bins, build_spanning_grid_matrix
 from pyphocorehelpers.indexing_helpers import np_ffill_1D # for compute_corrected_positions(...)
 from pyphocorehelpers.print_helpers import WrappingMessagePrinter, SimplePrintable
 from pyphocorehelpers.mixins.serialized import SerializedAttributesSpecifyingClass
 
-from pyphocorehelpers.print_helpers import print_value_overview_only, print_keys_if_possible, debug_dump_object_member_shapes, safe_get_variable_shape
+from pyphocorehelpers.print_helpers import safe_get_variable_shape
 
 
 
@@ -241,8 +241,6 @@ class ZhangReconstructionImplementation:
         """ 
             n_i: the number of spikes fired by each cell during the time window of consideration
             use_flat_computation_mode: bool - if True, a more memory efficient accumulating computation is performed that avoids `MemoryError: Unable to allocate 65.4 GiB for an array with shape (3969, 21896, 101) and data type float64` caused by allocating the full `cell_prob` matrix
-                ERROR: it looks like this `use_flat_computation_mode` broke things and the outputs have been all-NaNs ever since?
-
 
         NOTES: Flat vs. Full computation modes:
         Originally 
@@ -258,7 +256,6 @@ class ZhangReconstructionImplementation:
             print(f'np.shape(P_x): {np.shape(P_x)}, np.shape(F): {np.shape(F)}, np.shape(n): {np.shape(n)}')
         # np.shape(P_x): (1066, 1), np.shape(F): (1066, 66), np.shape(n): (66, 3530)
         
-        # P_x = np.squeeze(P_x)
         nCells = n.shape[0]
         nTimeBins = n.shape[1] # many time_bins
         nFlatPositionBins = np.shape(P_x)[0]
