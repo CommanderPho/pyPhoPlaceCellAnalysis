@@ -592,6 +592,48 @@ class BayesianPlacemapPositionDecoder(PlacemapPositionDecoder):
                 a_var_shape = safe_get_variable_shape(a_var_value) or 'SCALAR'
                 print(f'\t {a_variable_name}: {a_var_shape}')
 
+
+    def conform_to_position_bins(self, target_one_step_decoder):
+        """ After the underlying placefield (self.pf)'s position bins are changed by calling pf.conform_to_position_bins(...) externally, the computations for the decoder will be messed up (and out of sync).
+            Calling this function detects this issue.
+            # 2022-12-09 - We want to be able to have both long/short track placefields have the same spatial bins.
+            Usage:
+                long_one_step_decoder_1D, short_one_step_decoder_1D  = [results_data.get('pf1D_Decoder', None) for results_data in (long_results, short_results)]
+                short_one_step_decoder_1D.conform_to_position_bins(long_one_step_decoder_1D)
+
+            Usage 1D:
+                long_pf1D = long_results.pf1D
+                short_pf1D = short_results.pf1D
+                
+                long_one_step_decoder_1D, short_one_step_decoder_1D  = [results_data.get('pf1D_Decoder', None) for results_data in (long_results, short_results)]
+                short_one_step_decoder_1D.conform_to_position_bins(long_one_step_decoder_1D)
+
+
+            Usage 2D:
+                long_pf2D = long_results.pf2D
+                short_pf2D = short_results.pf2D
+                long_one_step_decoder_2D, short_one_step_decoder_2D  = [results_data.get('pf2D_Decoder', None) for results_data in (long_results, short_results)]
+                short_one_step_decoder_2D.conform_to_position_bins(long_one_step_decoder_2D)
+
+        """
+        did_recompute = False
+        # Update the internal placefield's position bins if they're not the same as the target_one_step_decoder's:
+        self.pf, did_update_internal_pf_bins = self.pf.conform_to_position_bins(target_one_step_decoder.pf)
+        
+        # Update the one_step_decoders after the short bins have been updated:
+        if (did_update_internal_pf_bins or (self.p_x_given_n.shape[0] < target_one_step_decoder.p_x_given_n.shape[0])):
+            # Compute:
+            print(f'self will be re-binned to match target_one_step_decoder...')
+            self.setup()
+            self.compute_all()
+            did_recompute = True # set the update flag
+        else:
+            # No changes needed:
+            did_recompute = False
+
+        return self, did_recompute
+
+
         
     # ==================================================================================================================== #
     # Private Methods                                                                                                      #
