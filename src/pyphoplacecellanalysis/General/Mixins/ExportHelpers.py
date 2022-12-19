@@ -382,7 +382,6 @@ def get_default_pipeline_data_keys(active_config_name):
     return {'spikes_df': f'/filtered_sessions/{active_config_name}/spikes_df',
             'positions_df': f'/filtered_sessions/{active_config_name}/pos_df'
         }
-
         
 def save_some_pipeline_data_to_h5(active_pipeline, included_session_identifiers=None, custom_key_prefix=None, finalized_output_cache_file='./pipeline_cache_store.h5', debug_print=False):
     """ 

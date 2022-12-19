@@ -59,7 +59,9 @@ class DefaultComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Computa
         TODO: Add 1D Support now that 'pf1D_Decoder' has been added.
         """
 
-        prev_one_step_bayesian_decoder = computation_result.computed_data['pf2D_Decoder']
+        prev_one_step_bayesian_decoder = kwargs.get('prev_one_step_bayesian_decoder', None)
+        if prev_one_step_bayesian_decoder is None:
+            prev_one_step_bayesian_decoder = computation_result.computed_data['pf2D_Decoder'] # add the 2D version if no alterantive is passed in.
 
 
         # active_pos_df: computation_result.sess.position.df
@@ -424,7 +426,9 @@ class DefaultComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Computa
 
 
 
-
+# ==================================================================================================================== #
+# Private Methods                                                                                                      #
+# ==================================================================================================================== #
 
 def _subfn_compute_group_stats_for_var(active_position_df, xbin, ybin, variable_name:str = 'speed', debug_print=False):
     """Can compute aggregate statistics (such as the mean) for any column of the position dataframe.
