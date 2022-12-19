@@ -58,37 +58,10 @@ class DefaultComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Computa
         """ Builds the Zhang Velocity/Position For 2-step Bayesian Decoder for 2D Placefields
         TODO: Add 1D Support now that 'pf1D_Decoder' has been added.
         """
-        def _compute_avg_speed_at_each_position_bin(active_position_df, active_pf_computation_config, xbin, ybin, show_plots=False, debug_print=False):
-            """ compute the average speed at each position x: """
-            
-            def _compute_group_stats_for_var(active_position_df, xbin, ybin, variable_name:str = 'speed', debug_print=False):
-                # For each unique binned_x and binned_y value, what is the average velocity_x at that point?
-                position_bin_dependent_specific_average_velocities = active_position_df.groupby(['binned_x','binned_y'])[variable_name].agg([np.nansum, np.nanmean, np.nanmin, np.nanmax]).reset_index() #.apply(lambda g: g.mean(skipna=True)) #.agg((lambda x: x.mean(skipna=False)))
-                if debug_print:
-                    print(f'np.shape(position_bin_dependent_specific_average_velocities): {np.shape(position_bin_dependent_specific_average_velocities)}')
-                # position_bin_dependent_specific_average_velocities # 1856 rows
-                output = np.zeros((len(xbin), len(ybin))) # (65, 30)
-                if debug_print:
-                    print(f'np.shape(output): {np.shape(output)}')
-                    print(f"np.shape(position_bin_dependent_specific_average_velocities['binned_x'].to_numpy()): {np.shape(position_bin_dependent_specific_average_velocities['binned_x'])}")
-                
-                if debug_print:
-                    max_binned_x_index = np.max(position_bin_dependent_specific_average_velocities['binned_x'].to_numpy()-1) # 63
-                    max_binned_y_index = np.max(position_bin_dependent_specific_average_velocities['binned_y'].to_numpy()-1) # 28
-                
-
-                # (len(xbin), len(ybin)): (59, 21)
-                output[position_bin_dependent_specific_average_velocities['binned_x'].to_numpy()-1, position_bin_dependent_specific_average_velocities['binned_y'].to_numpy()-1] = position_bin_dependent_specific_average_velocities['nanmean'].to_numpy() # ValueError: shape mismatch: value array of shape (1856,) could not be broadcast to indexing result of shape (1856,2,30)
-                return output
-
-            outputs = dict()
-            outputs['speed'] = _compute_group_stats_for_var(active_position_df, xbin, ybin, 'speed')
-            # outputs['velocity_x'] = _compute_group_stats_for_var(active_position_df, xbin, ybin, 'velocity_x')
-            # outputs['acceleration_x'] = _compute_group_stats_for_var(active_position_df, xbin, ybin, 'acceleration_x')
-            return outputs['speed']
-
 
         prev_one_step_bayesian_decoder = computation_result.computed_data['pf2D_Decoder']
+
+
         # active_pos_df: computation_result.sess.position.df
         # xbin_values = prev_one_step_bayesian_decoder.xbin_centers.copy()
         # ybin_values = prev_one_step_bayesian_decoder.ybin_centers.copy()
@@ -140,11 +113,6 @@ class DefaultComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Computa
         # ValueError: operands could not be broadcast together with shapes (64,29,3434) (65,30)
 
         # pre-allocate outputs:
-        # np.vstack((self.xbin_centers[self.most_likely_position_indicies[0,:]], self.ybin_centers[self.most_likely_position_indicies[1,:]])).T
-        # twoDimGrid_x, twoDimGrid_y = np.meshgrid(prev_one_step_bayesian_decoder.xbin_centers, prev_one_step_bayesian_decoder.ybin_centers)
-        
-        # computation_result.computed_data['pf2D_TwoStepDecoder']['all_x'] = cartesian_product((active_xbins, active_ybins)) # (1856, 2)
-        
         computation_result.computed_data['pf2D_TwoStepDecoder']['all_x'], computation_result.computed_data['pf2D_TwoStepDecoder']['flat_all_x'], original_data_shape = Zhang_Two_Step.build_all_positions_matrix(prev_one_step_bayesian_decoder.xbin_centers, prev_one_step_bayesian_decoder.ybin_centers) # all_x: (64, 29, 2), flat_all_x: (1856, 2)
         computation_result.computed_data['pf2D_TwoStepDecoder']['original_all_x_shape'] = original_data_shape # add the original data shape to the computed data
   
@@ -164,16 +132,9 @@ class DefaultComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Computa
             flat_p_x_given_n = prev_one_step_bayesian_decoder.flat_p_x_given_n[:, time_window_bin_idx] # this gets the specific n_t for this time window
             curr_p_x_given_n = prev_one_step_bayesian_decoder.p_x_given_n[:, :, time_window_bin_idx]
             # also have p_x_given_n = prev_one_step_bayesian_decoder.p_x_given_n if we'd prefer
-
-            # TODO: as for prev_x_position: this should actually be the computed two-step position, not the one_step position.
-            
-            # previous positions as determined by the one_step decoder:
-            # prev_x_flat_index = prev_one_step_bayesian_decoder.most_likely_position_flat_indicies[time_window_bin_idx-1] # this is the most likely position (represented as the flattened position bin index) at the last dataframe
-            # prev_x_position = prev_one_step_bayesian_decoder.most_likely_positions[time_window_bin_idx-1, :] # (85844, 2)
             
             # previous positions as determined by the two-step decoder: this uses the two_step previous position instead of the one_step previous position:
-            prev_x_position = computation_result.computed_data['pf2D_TwoStepDecoder']['most_likely_positions'][:, time_window_bin_idx-1]
-            
+            prev_x_position = computation_result.computed_data['pf2D_TwoStepDecoder']['most_likely_positions'][:, time_window_bin_idx-1]            
             active_k = computation_result.computed_data['pf2D_TwoStepDecoder']['all_scaling_factors_k'][time_window_bin_idx] # get the specific k value
             # active_k = computation_result.computed_data['pf2D_TwoStepDecoder']['k']
             if debug_print:
@@ -181,8 +142,7 @@ class DefaultComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Computa
                 print(f'np.shape(prev_x_position): {np.shape(prev_x_position)}')
                         
             # Flat version:
-            computation_result.computed_data['pf2D_TwoStepDecoder']['flat_p_x_given_n_and_x_prev'][:,time_window_bin_idx] = Zhang_Two_Step.compute_bayesian_two_step_prob_single_timestep(flat_p_x_given_n, prev_x_position, computation_result.computed_data['pf2D_TwoStepDecoder']['flat_all_x'], computation_result.computed_data['pf2D_TwoStepDecoder']['flat_sigma_t_all'], computation_result.computed_data['pf2D_TwoStepDecoder']['C'], active_k) # output shape (1856, )
-            
+            computation_result.computed_data['pf2D_TwoStepDecoder']['flat_p_x_given_n_and_x_prev'][:,time_window_bin_idx] = Zhang_Two_Step.compute_bayesian_two_step_prob_single_timestep(flat_p_x_given_n, prev_x_position, computation_result.computed_data['pf2D_TwoStepDecoder']['flat_all_x'], computation_result.computed_data['pf2D_TwoStepDecoder']['flat_sigma_t_all'], computation_result.computed_data['pf2D_TwoStepDecoder']['C'], active_k) # output shape (1856, )            
             computation_result.computed_data['pf2D_TwoStepDecoder']['p_x_given_n_and_x_prev'][:,:,time_window_bin_idx] = np.reshape(computation_result.computed_data['pf2D_TwoStepDecoder']['flat_p_x_given_n_and_x_prev'][:,time_window_bin_idx], (original_data_shape[0], original_data_shape[1]))
             
 
@@ -460,3 +420,69 @@ class DefaultComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Computa
 
         computation_result.computed_data['specific_epochs_decoding'] = curr_result
         return computation_result
+
+
+
+
+
+
+def _subfn_compute_group_stats_for_var(active_position_df, xbin, ybin, variable_name:str = 'speed', debug_print=False):
+    """Can compute aggregate statistics (such as the mean) for any column of the position dataframe.
+
+    Args:
+        active_position_df (_type_): _description_
+        xbin (_type_): _description_
+        ybin (_type_): _description_
+        variable_name (str, optional): _description_. Defaults to 'speed'.
+        debug_print (bool, optional): _description_. Defaults to False.
+
+    Returns:
+        _type_: _description_
+    """
+    if ybin is None:
+        # Assume 1D:
+        ndim = 1
+        binned_col_names = ['binned_x',]
+        
+    else:
+        # otherwise assume 2D:
+        ndim = 2
+        binned_col_names = ['binned_x','binned_y']
+        
+
+    # For each unique binned_x and binned_y value, what is the average velocity_x at that point?
+    position_bin_dependent_specific_average_velocities = active_position_df.groupby(binned_col_names)[variable_name].agg([np.nansum, np.nanmean, np.nanmin, np.nanmax]).reset_index() #.apply(lambda g: g.mean(skipna=True)) #.agg((lambda x: x.mean(skipna=False)))
+    if debug_print:
+        print(f'np.shape(position_bin_dependent_specific_average_velocities): {np.shape(position_bin_dependent_specific_average_velocities)}')
+    # position_bin_dependent_specific_average_velocities # 1856 rows
+    if debug_print:
+        print(f'np.shape(output): {np.shape(output)}')
+        print(f"np.shape(position_bin_dependent_specific_average_velocities['binned_x'].to_numpy()): {np.shape(position_bin_dependent_specific_average_velocities['binned_x'])}")
+        max_binned_x_index = np.max(position_bin_dependent_specific_average_velocities['binned_x'].to_numpy()-1) # 63
+        print(f'max_binned_x_index: {max_binned_x_index}')
+    # (len(xbin), len(ybin)): (59, 21)
+
+    if ndim == 1:
+        # 1D Position:
+        output = np.zeros((len(xbin),)) # (65,)
+        output[position_bin_dependent_specific_average_velocities['binned_x'].to_numpy()-1] = position_bin_dependent_specific_average_velocities['nanmean'].to_numpy() # ValueError: shape mismatch: value array of shape (1856,) could not be broadcast to indexing result of shape (1856,2,30)
+
+    else:
+        # 2D+ Position:
+        if debug_print:
+            max_binned_y_index = np.max(position_bin_dependent_specific_average_velocities['binned_y'].to_numpy()-1) # 28
+            print(f'max_binned_y_index: {max_binned_y_index}')
+        output = np.zeros((len(xbin), len(ybin))) # (65, 30)
+        output[position_bin_dependent_specific_average_velocities['binned_x'].to_numpy()-1, position_bin_dependent_specific_average_velocities['binned_y'].to_numpy()-1] = position_bin_dependent_specific_average_velocities['nanmean'].to_numpy() # ValueError: shape mismatch: value array of shape (1856,) could not be broadcast to indexing result of shape (1856,2,30)
+
+    return output
+
+
+def _compute_avg_speed_at_each_position_bin(active_position_df, active_pf_computation_config, xbin, ybin, show_plots=False, debug_print=False):
+    """ compute the average speed at each position x. Used only by the two-step decoder above. """
+    outputs = dict()
+    outputs['speed'] = _subfn_compute_group_stats_for_var(active_position_df, xbin, ybin, 'speed')
+    # outputs['velocity_x'] = _compute_group_stats_for_var(active_position_df, xbin, ybin, 'velocity_x')
+    # outputs['acceleration_x'] = _compute_group_stats_for_var(active_position_df, xbin, ybin, 'acceleration_x')
+    return outputs['speed']
+

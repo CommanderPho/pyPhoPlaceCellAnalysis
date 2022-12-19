@@ -293,7 +293,7 @@ def batch_load_session(global_data_root_parent_path, active_data_mode_name, base
                                         '_perform_firing_rate_trends_computation',
                                         '_perform_pf_find_ratemap_peaks_computation',
                                         # '_perform_time_dependent_pf_sequential_surprise_computation'
-                                        # '_perform_two_step_position_decoding_computation',
+                                        '_perform_two_step_position_decoding_computation',
                                         # '_perform_recursive_latent_placefield_decoding'
                                      ]  # '_perform_pf_find_ratemap_peaks_peak_prominence2d_computation'
     computation_functions_name_blacklist=None

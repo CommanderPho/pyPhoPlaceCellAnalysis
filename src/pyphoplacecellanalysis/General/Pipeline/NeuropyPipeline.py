@@ -215,7 +215,7 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
             if debug_print:
                 print(f'finalized_loaded_sess_pickle_path: {finalized_loaded_sess_pickle_path}')
             try:
-                loaded_pipeline = loadData(finalized_loaded_sess_pickle_path, debug_print=False)
+                loaded_pipeline = loadData(finalized_loaded_sess_pickle_path, debug_print=debug_print)
                 
             except (FileNotFoundError):
                 # loading failed
@@ -379,7 +379,6 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
     def pipeline_compare_dict(self):
         """The pipeline_compare_dict property."""
         return NeuropyPipeline.build_pipeline_compare_dict(self)
-
 
     @property
     def persistance_state(self):
