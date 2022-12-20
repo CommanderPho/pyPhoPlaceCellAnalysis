@@ -16,7 +16,6 @@ class TimeSynchronizedPlotterBase(QtWidgets.QWidget):
     
         included_epochs = None
         computation_config = active_session_computation_configs[0]
-        print('Recomputing active_epoch_placefields2D...', end=' ')
         # PfND version:
         t_list = []
         ratemaps_list = []
