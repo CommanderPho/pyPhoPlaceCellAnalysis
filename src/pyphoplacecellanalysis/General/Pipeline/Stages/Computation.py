@@ -223,13 +223,13 @@ class ComputedPipelineStage(LoadableInput, LoadableSessionInput, FilterablePipel
         # Perform the computations:
         return ComputedPipelineStage._execute_computation_functions(potentially_updated_failed_functions, previous_computation_result=previous_computation_result, fail_on_exception=fail_on_exception, debug_print=debug_print)
 
-    def run_specific_computations_single_context(self, previous_computation_result, computation_functions_name_whitelist, fail_on_exception:bool=False, progress_logger_callback=None, are_global:bool=False, debug_print=False):
+    def run_specific_computations_single_context(self, previous_computation_result, computation_functions_name_whitelist, computation_kwargs_list=None, fail_on_exception:bool=False, progress_logger_callback=None, are_global:bool=False, debug_print=False):
         """ re-runs just a specific computation provided by computation_functions_name_whitelist """
         active_computation_functions = self.find_registered_computation_functions(computation_functions_name_whitelist, search_mode=FunctionsSearchMode.initFromIsGlobal(are_global))
         if progress_logger_callback is not None:
             progress_logger_callback(f'run_specific_computations_single_context(including only {len(active_computation_functions)} out of {len(self.registered_computation_function_names)} registered computation functions): active_computation_functions: {active_computation_functions}...')
         # Perform the computations:
-        return ComputedPipelineStage._execute_computation_functions(active_computation_functions, previous_computation_result=previous_computation_result, fail_on_exception=fail_on_exception, progress_logger_callback=progress_logger_callback, are_global=are_global, debug_print=debug_print)
+        return ComputedPipelineStage._execute_computation_functions(active_computation_functions, previous_computation_result=previous_computation_result, previous_computation_result=previous_computation_result, fail_on_exception=fail_on_exception, progress_logger_callback=progress_logger_callback, are_global=are_global, debug_print=debug_print)
 
 
 
@@ -382,11 +382,14 @@ class ComputedPipelineStage(LoadableInput, LoadableSessionInput, FilterablePipel
             print(f'done.')
 
 
-    def perform_specific_computation(self, active_computation_params=None, enabled_filter_names=None, computation_functions_name_whitelist=None, fail_on_exception:bool=False, debug_print=False):
+    def perform_specific_computation(self, active_computation_params=None, enabled_filter_names=None, computation_functions_name_whitelist=None, computation_kwargs_list=None, fail_on_exception:bool=False, debug_print=False):
         """ perform a specific computation (specified in computation_functions_name_whitelist) in a minimally destructive manner using the previously recomputed results:
         Ideally would already have access to the:
         - Previous computation result
         - Previous computation config (the input parameters)
+
+
+        computation_kwargs_list: Optional<list>: a list of kwargs corresponding to each function name in computation_functions_name_whitelist
 
         Internally calls: `run_specific_computations_single_context`.
 
@@ -395,6 +398,11 @@ class ComputedPipelineStage(LoadableInput, LoadableSessionInput, FilterablePipel
         """
         if enabled_filter_names is None:
             enabled_filter_names = list(self.filtered_sessions.keys()) # all filters if specific enabled names aren't specified
+
+        if computation_kwargs_list is None:
+            computation_kwargs_list = [{} for _ in computation_functions_name_whitelist]
+            assert len(computation_kwargs_list) == len(computation_functions_name_whitelist)
+
 
         active_computation_functions = self.find_registered_computation_functions(computation_functions_name_whitelist, search_mode=FunctionsSearchMode.ANY) # find_registered_computation_functions is a pipeline.stage property
         contains_any_global_functions = np.any([v.is_global for v in active_computation_functions])
@@ -432,7 +440,7 @@ class ComputedPipelineStage(LoadableInput, LoadableSessionInput, FilterablePipel
 
                     ## Here is an issue, we need to get the appropriate computation result depending on whether it's global or not 
                     previous_computation_result = self.computation_results[a_select_config_name]
-                    self.computation_results[a_select_config_name] = self.run_specific_computations_single_context(previous_computation_result, computation_functions_name_whitelist=computation_functions_name_whitelist, are_global=False, fail_on_exception=fail_on_exception, debug_print=debug_print)
+                    self.computation_results[a_select_config_name] = self.run_specific_computations_single_context(previous_computation_result, computation_functions_name_whitelist=computation_functions_name_whitelist, computation_kwargs_list=computation_kwargs_list, are_global=False, fail_on_exception=fail_on_exception, debug_print=debug_print)
         
         ## IMPLEMENTATION FAULT: the global computations/results should not be ran within the filter/config loop. It applies to all config names and should be ran last. Also don't allow mixing local/global functions.
 
@@ -458,8 +466,12 @@ class ComputedPipelineStage(LoadableInput, LoadableSessionInput, FilterablePipel
         return output_result
     
     @staticmethod
-    def _execute_computation_functions(active_computation_functions, previous_computation_result=None, fail_on_exception:bool = False, progress_logger_callback=None, are_global:bool=False, debug_print=False):
+    def _execute_computation_functions(active_computation_functions, previous_computation_result=None, computation_kwargs_list=None, fail_on_exception:bool = False, progress_logger_callback=None, are_global:bool=False, debug_print=False):
         """ actually performs the provided computations in active_computation_functions """
+        if computation_kwargs_list is None:
+            computation_kwargs_list = [{} for _ in active_computation_functions]
+        assert len(computation_kwargs_list) == len(active_computation_functions)
+
         if (len(active_computation_functions) > 0):
             if debug_print:
                 print(f'Performing _execute_computation_functions(...) with {len(active_computation_functions)} registered_computation_functions...')
