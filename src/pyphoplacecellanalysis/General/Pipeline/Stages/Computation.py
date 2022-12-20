@@ -23,6 +23,8 @@ import pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions
 from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.ComputationFunctionRegistryHolder import ComputationFunctionRegistryHolder
 from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.MultiContextComputationFunctions import _wrap_multi_context_computation_function
 
+from pyphocorehelpers.print_helpers import CapturedException # used in _execute_computation_functions for error handling
+
 from enum import Enum # for EvaluationActions
 
 class EvaluationActions(Enum):
@@ -229,9 +231,7 @@ class ComputedPipelineStage(LoadableInput, LoadableSessionInput, FilterablePipel
         if progress_logger_callback is not None:
             progress_logger_callback(f'run_specific_computations_single_context(including only {len(active_computation_functions)} out of {len(self.registered_computation_function_names)} registered computation functions): active_computation_functions: {active_computation_functions}...')
         # Perform the computations:
-        return ComputedPipelineStage._execute_computation_functions(active_computation_functions, previous_computation_result=previous_computation_result, previous_computation_result=previous_computation_result, fail_on_exception=fail_on_exception, progress_logger_callback=progress_logger_callback, are_global=are_global, debug_print=debug_print)
-
-
+        return ComputedPipelineStage._execute_computation_functions(active_computation_functions, previous_computation_result=previous_computation_result, computation_kwargs_list=computation_kwargs_list, fail_on_exception=fail_on_exception, progress_logger_callback=progress_logger_callback, are_global=are_global, debug_print=debug_print)
 
     # ==================================================================================================================== #
     # Other                                                                                                                #
@@ -464,7 +464,7 @@ class ComputedPipelineStage(LoadableInput, LoadableSessionInput, FilterablePipel
         output_result = ComputationResult(active_session, computation_config, computed_data=DynamicParameters(), accumulated_errors=DynamicParameters()) # Note that this active_session should be correctly filtered
         
         return output_result
-    
+
     @staticmethod
     def _execute_computation_functions(active_computation_functions, previous_computation_result=None, computation_kwargs_list=None, fail_on_exception:bool = False, progress_logger_callback=None, are_global:bool=False, debug_print=False):
         """ actually performs the provided computations in active_computation_functions """
@@ -488,13 +488,38 @@ class ComputedPipelineStage(LoadableInput, LoadableSessionInput, FilterablePipel
             
             if fail_on_exception:
                 ## normal version that fails on any exception:
-                composed_registered_computations_function = compose_functions(*active_computation_functions, progress_logger=progress_logger_callback, error_logger=None) # functions are composed left-to-right
-                previous_computation_result = composed_registered_computations_function(previous_computation_result)
+                total_num_funcs = len(active_computation_functions)
+                for i, f in enumerate(reversed(active_computation_functions)):
+                    if progress_logger_callback is not None:
+                        progress_logger_callback(f'Executing [{i}/{total_num_funcs}]: {f}')
+                    previous_computation_result = f(previous_computation_result, **computation_kwargs_list[i])
+
+                # Since there's no error handling, gettin ghere means that there were no accumulated errors
                 accumulated_errors = None
             else:
                 ## Use exception-tolerant version of function composition (functions are composed left-to-right):
-                composed_registered_computations_function = compose_functions_with_error_handling(*active_computation_functions, progress_logger=progress_logger_callback, error_logger=(lambda x: progress_logger_callback(f'ERROR: {x}'))) # functions are composed left-to-right, exception-tolerant version
-                previous_computation_result, accumulated_errors = composed_registered_computations_function(previous_computation_result)
+                error_logger = (lambda x: progress_logger_callback(f'ERROR: {x}'))
+                accumulated_errors = dict() # empty list for keeping track of exceptions
+                total_num_funcs = len(active_computation_functions)
+                for i, f in enumerate(reversed(active_computation_functions)):
+                    if progress_logger_callback is not None:
+                        progress_logger_callback(f'Executing [{i}/{total_num_funcs}]: {f}')
+                    try:
+                        temp_result = f(previous_computation_result, **computation_kwargs_list[i]) # evaluate the function 'f' using the result provided from the previous output or the initial input
+                    except (TypeError, ValueError, NameError, AttributeError, KeyError, NotImplementedError) as e:
+                        exception_info = sys.exc_info()
+                        accumulated_errors[f] = CapturedException(e, exception_info, previous_computation_result)
+                        # accumulated_errors.append(e) # add the error to the accumulated error array
+                        temp_result = previous_computation_result # restore the result from prior to the calculations?
+                        # result shouldn't be updated unless there wasn't an error, so it should be fine to move on to the next function
+                        if error_logger is not None:
+                            error_logger(f'\t Encountered error: {accumulated_errors[f]} continuing.')
+                    else:
+                        # only if no error occured do we commit the temp_result to result
+                        previous_computation_result = temp_result
+                        if progress_logger_callback is not None:
+                            progress_logger_callback('\t done.')
+
             
             if debug_print:
                 print(f'_execute_computation_functions(...): \n\taccumulated_errors: {accumulated_errors}')
