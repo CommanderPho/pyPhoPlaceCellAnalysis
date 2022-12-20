@@ -193,6 +193,9 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
                     a_sess.spikes_df.spikes.set_time_variable_name(desired_time_variable_name)
                 return did_add_property
 
+            curr_active_pipeline.reload_default_computation_functions() # reloads the registered computation and display functions.
+            curr_active_pipeline.reload_default_display_functions()
+
             did_add_property = False
             did_add_property = did_add_property or _ensure_unpickled_session_up_to_date(curr_active_pipeline.sess, active_data_mode_name=active_data_mode_name, basedir=basedir, desired_time_variable_name=desired_time_variable_name, debug_print=debug_print)
             ## Apply to all of the pipeline's filtered sessions:
