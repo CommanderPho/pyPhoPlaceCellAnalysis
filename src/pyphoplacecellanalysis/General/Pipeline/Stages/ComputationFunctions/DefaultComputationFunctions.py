@@ -58,6 +58,111 @@ class DefaultComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Computa
         """ Builds the Zhang Velocity/Position For 2-step Bayesian Decoder for 2D Placefields
         TODO: Add 1D Support now that 'pf1D_Decoder' has been added.
         """
+
+
+
+        def _subfn_compute_two_step_decoder(active_xbins, active_ybins, prev_one_step_bayesian_decoder, pos_df, computation_config, debug_print=False):
+            """ captures debug_print 
+
+            pos_df = computation_result.sess.position.to_dataframe()
+            computation_config = computation_result.computation_config
+            """
+            
+            avg_speed_per_pos = _compute_avg_speed_at_each_position_bin(pos_df, computation_config, prev_one_step_bayesian_decoder.xbin_centers, prev_one_step_bayesian_decoder.ybin_centers, debug_print=debug_print)
+                    
+            if debug_print:
+                print(f'np.shape(avg_speed_per_pos): {np.shape(avg_speed_per_pos)}')
+            
+            max_speed = np.nanmax(avg_speed_per_pos)
+            # max_speed # 73.80995983236636
+            min_speed = np.nanmin(avg_speed_per_pos)
+            # min_speed # 0.0
+            K_over_V = 60.0 / max_speed # K_over_V = 0.8128984236852197
+        
+            # K = 1.0
+            K = K_over_V
+            V = 1.0
+            sigma_t_all = Zhang_Two_Step.sigma_t(avg_speed_per_pos, K, V, d=1.0) # np.shape(sigma_t_all): (64, 29)
+            if debug_print:
+                print(f'np.shape(sigma_t_all): {np.shape(sigma_t_all)}')
+            
+            # normalize sigma_t_all:
+            two_step_decoder_result = DynamicParameters.init_from_dict({'xbin':active_xbins, 'ybin':active_ybins,
+                                                                    'avg_speed_per_pos': avg_speed_per_pos,
+                                                                    'K':K, 'V':V,
+                                                                    'sigma_t_all':sigma_t_all, 'flat_sigma_t_all': np.squeeze(np.reshape(sigma_t_all, (-1, 1)))
+            })
+            
+            two_step_decoder_result['C'] = 1.0
+            two_step_decoder_result['k'] = 1.0
+
+            if (prev_one_step_bayesian_decoder.ndim < 2):
+                active_ybin_centers = np.array([0.0])
+            else:
+                # 2D Case:
+                active_ybin_centers = prev_one_step_bayesian_decoder.ybin_centers
+
+            # pre-allocate outputs:
+            two_step_decoder_result['all_x'], two_step_decoder_result['flat_all_x'], original_data_shape = Zhang_Two_Step.build_all_positions_matrix(prev_one_step_bayesian_decoder.xbin_centers, active_ybin_centers) # all_x: (64, 29, 2), flat_all_x: (1856, 2)
+            two_step_decoder_result['original_all_x_shape'] = original_data_shape # add the original data shape to the computed data
+    
+            # Pre-allocate output:
+            two_step_decoder_result['flat_p_x_given_n_and_x_prev'] = np.full_like(prev_one_step_bayesian_decoder.flat_p_x_given_n, 0.0) # fill with NaNs. 
+            two_step_decoder_result['p_x_given_n_and_x_prev'] = np.full_like(prev_one_step_bayesian_decoder.p_x_given_n, 0.0) # fill with NaNs. Pre-allocate output
+            two_step_decoder_result['most_likely_position_indicies'] = np.zeros((2, prev_one_step_bayesian_decoder.num_time_windows), dtype=int) # (2, 85841)
+            two_step_decoder_result['most_likely_positions'] = np.zeros((2, prev_one_step_bayesian_decoder.num_time_windows)) # (2, 85841)
+                    
+            if debug_print:
+                print(f'np.shape(prev_one_step_bayesian_decoder.p_x_given_n): {np.shape(prev_one_step_bayesian_decoder.p_x_given_n)}')
+            
+            two_step_decoder_result['all_scaling_factors_k'] = Zhang_Two_Step.compute_scaling_factor_k(prev_one_step_bayesian_decoder.flat_p_x_given_n)
+            
+            # TODO: Efficiency: This will be inefficient, but do a slow iteration. 
+            for time_window_bin_idx in np.arange(prev_one_step_bayesian_decoder.num_time_windows):
+                flat_p_x_given_n = prev_one_step_bayesian_decoder.flat_p_x_given_n[:, time_window_bin_idx] # this gets the specific n_t for this time window                
+                # previous positions as determined by the two-step decoder: this uses the two_step previous position instead of the one_step previous position:
+                prev_x_position = two_step_decoder_result['most_likely_positions'][:, time_window_bin_idx-1]            
+                active_k = two_step_decoder_result['all_scaling_factors_k'][time_window_bin_idx] # get the specific k value
+                # active_k = two_step_decoder_result['k']
+                if debug_print:
+                    print(f'np.shape(prev_x_position): {np.shape(prev_x_position)}')
+                            
+                # Flat version:
+                two_step_decoder_result['flat_p_x_given_n_and_x_prev'][:,time_window_bin_idx] = Zhang_Two_Step.compute_bayesian_two_step_prob_single_timestep(flat_p_x_given_n, prev_x_position, two_step_decoder_result['flat_all_x'], two_step_decoder_result['flat_sigma_t_all'], two_step_decoder_result['C'], active_k) # output shape (1856, )            
+                
+
+                if (prev_one_step_bayesian_decoder.ndim < 2):
+                    # 1D case:
+                    two_step_decoder_result['p_x_given_n_and_x_prev'][:,time_window_bin_idx] = two_step_decoder_result['flat_p_x_given_n_and_x_prev'][:,time_window_bin_idx] # used to be (original_data_shape[0], original_data_shape[1])
+                else:
+                    # 2D:
+                    two_step_decoder_result['p_x_given_n_and_x_prev'][:,:,time_window_bin_idx] = np.reshape(two_step_decoder_result['flat_p_x_given_n_and_x_prev'][:,time_window_bin_idx], (original_data_shape[0], original_data_shape[1]))
+
+                
+            # POST-hoc most-likely computations: Compute the most-likely positions from the p_x_given_n_and_x_prev:
+            # # np.shape(self.most_likely_position_indicies) # (2, 85841)
+            """ Computes the most likely positions at each timestep from flat_p_x_given_n_and_x_prev """
+            two_step_decoder_result['most_likely_position_flat_indicies'] = np.argmax(two_step_decoder_result['flat_p_x_given_n_and_x_prev'], axis=0)
+            # np.shape(self.most_likely_position_flat_indicies) # (85841,)
+            two_step_decoder_result['most_likely_position_indicies'] = np.array(np.unravel_index(two_step_decoder_result['most_likely_position_flat_indicies'], prev_one_step_bayesian_decoder.original_position_data_shape)) # convert back to an array
+            # np.shape(self.most_likely_position_indicies) # (2, 85841)
+            two_step_decoder_result['most_likely_positions'][0, :] = prev_one_step_bayesian_decoder.xbin_centers[two_step_decoder_result['most_likely_position_indicies'][0, :]]
+
+            if prev_one_step_bayesian_decoder.ndim > 1:
+                two_step_decoder_result['most_likely_positions'][1, :] = prev_one_step_bayesian_decoder.ybin_centers[two_step_decoder_result['most_likely_position_indicies'][1, :]]
+            # two_step_decoder_result['sigma_t_all'] = sigma_t_all # set sigma_t_all                
+
+            ## For some reason we set up the two-step decoder's most_likely_positions with the tranposed shape compared to the one-step decoder:
+            two_step_decoder_result['most_likely_positions'] = two_step_decoder_result['most_likely_positions'].T
+            
+            ## Once done, compute marginals for the two-step:
+            curr_unit_marginal_x, curr_unit_marginal_y = prev_one_step_bayesian_decoder.perform_build_marginals(two_step_decoder_result['p_x_given_n_and_x_prev'], two_step_decoder_result['most_likely_positions'], debug_print=debug_print)
+            two_step_decoder_result['marginal'] = DynamicContainer(x=curr_unit_marginal_x, y=curr_unit_marginal_y)
+            
+            return two_step_decoder_result
+
+
+
         ndim = kwargs.get('ndim', 2)
         if ndim is None:
             ndim = 2 # add the 2D version if no alterantive is passed in.
@@ -73,102 +178,13 @@ class DefaultComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Computa
 
         # Get the one-step decoder:
         prev_one_step_bayesian_decoder = computation_result.computed_data[one_step_decoder_key]
-
         ## New 2022-09-15 direct neuropy.utils.mixins.binning_helpers.build_df_discretized_binned_position_columns version:
         computation_result.sess.position.df, (xbin, ybin), bin_infos = build_df_discretized_binned_position_columns(computation_result.sess.position.df, bin_values=(prev_one_step_bayesian_decoder.xbin_centers, prev_one_step_bayesian_decoder.ybin_centers), active_computation_config=computation_result.computation_config.pf_params, force_recompute=False, debug_print=debug_print)
-        # computation_result.sess.position.df, (xbin, ybin), bin_infos = build_df_discretized_binned_position_columns(computation_result.sess.position.df, bin_values=(xbin_values, ybin_values), active_computation_config=computation_result.computation_config.pf_params, force_recompute=False, debug_print=debug_print)
-        
         active_xbins = xbin
         active_ybins = ybin      
-        # active_xbins = prev_one_step_bayesian_decoder.xbin_centers
-        # active_ybins = prev_one_step_bayesian_decoder.ybin_centers
-        
-        avg_speed_per_pos = _compute_avg_speed_at_each_position_bin(computation_result.sess.position.to_dataframe(), computation_result.computation_config, prev_one_step_bayesian_decoder.xbin_centers, prev_one_step_bayesian_decoder.ybin_centers, debug_print=debug_print)
-                
-        if debug_print:
-            print(f'np.shape(avg_speed_per_pos): {np.shape(avg_speed_per_pos)}')
-        
-        max_speed = np.nanmax(avg_speed_per_pos)
-        # max_speed # 73.80995983236636
-        min_speed = np.nanmin(avg_speed_per_pos)
-        # min_speed # 0.0
-        K_over_V = 60.0 / max_speed # K_over_V = 0.8128984236852197
-    
-        # K = 1.0
-        K = K_over_V
-        V = 1.0
-        sigma_t_all = Zhang_Two_Step.sigma_t(avg_speed_per_pos, K, V, d=1.0) # np.shape(sigma_t_all): (64, 29)
-        if debug_print:
-            print(f'np.shape(sigma_t_all): {np.shape(sigma_t_all)}')
-        
-        # normalize sigma_t_all:
-        computation_result.computed_data[two_step_decoder_key] = DynamicParameters.init_from_dict({'xbin':active_xbins, 'ybin':active_ybins,
-                                                                   'avg_speed_per_pos': avg_speed_per_pos,
-                                                                   'K':K, 'V':V,
-                                                                   'sigma_t_all':sigma_t_all, 'flat_sigma_t_all': np.squeeze(np.reshape(sigma_t_all, (-1, 1)))
-        })
-        
-        computation_result.computed_data[two_step_decoder_key]['C'] = 1.0
-        computation_result.computed_data[two_step_decoder_key]['k'] = 1.0
-        # computation_result.computed_data[two_step_decoder_key]['p_x_given_n_and_x_prev_fn'] = lambda x_prev, all_x: Zhang_Two_Step.compute_bayesian_two_step_prob_single_timestep(prev_one_step_bayesian_decoder.p_x_given_n, x_prev, all_x, 
-        #                                                                             computation_result.computed_data[two_step_decoder_key]['sigma_t_all'], 
-        #                                                                             computation_result.computed_data[two_step_decoder_key]['C'], computation_result.computed_data[two_step_decoder_key]['k'])
-        
-        # ValueError: operands could not be broadcast together with shapes (64,29,3434) (65,30)
 
-        # pre-allocate outputs:
-        computation_result.computed_data[two_step_decoder_key]['all_x'], computation_result.computed_data[two_step_decoder_key]['flat_all_x'], original_data_shape = Zhang_Two_Step.build_all_positions_matrix(prev_one_step_bayesian_decoder.xbin_centers, prev_one_step_bayesian_decoder.ybin_centers) # all_x: (64, 29, 2), flat_all_x: (1856, 2)
-        computation_result.computed_data[two_step_decoder_key]['original_all_x_shape'] = original_data_shape # add the original data shape to the computed data
-  
-        # Pre-allocate output:
-        computation_result.computed_data[two_step_decoder_key]['flat_p_x_given_n_and_x_prev'] = np.full_like(prev_one_step_bayesian_decoder.flat_p_x_given_n, 0.0) # fill with NaNs. 
-        computation_result.computed_data[two_step_decoder_key]['p_x_given_n_and_x_prev'] = np.full_like(prev_one_step_bayesian_decoder.p_x_given_n, 0.0) # fill with NaNs. Pre-allocate output
-        computation_result.computed_data[two_step_decoder_key]['most_likely_position_indicies'] = np.zeros((2, prev_one_step_bayesian_decoder.num_time_windows), dtype=int) # (2, 85841)
-        computation_result.computed_data[two_step_decoder_key]['most_likely_positions'] = np.zeros((2, prev_one_step_bayesian_decoder.num_time_windows)) # (2, 85841)
-                
-        if debug_print:
-            print(f'np.shape(prev_one_step_bayesian_decoder.p_x_given_n): {np.shape(prev_one_step_bayesian_decoder.p_x_given_n)}')
-        
-        computation_result.computed_data[two_step_decoder_key]['all_scaling_factors_k'] = Zhang_Two_Step.compute_scaling_factor_k(prev_one_step_bayesian_decoder.flat_p_x_given_n)
-        
-        # TODO: Efficiency: This will be inefficient, but do a slow iteration. 
-        for time_window_bin_idx in np.arange(prev_one_step_bayesian_decoder.num_time_windows):
-            flat_p_x_given_n = prev_one_step_bayesian_decoder.flat_p_x_given_n[:, time_window_bin_idx] # this gets the specific n_t for this time window
-            curr_p_x_given_n = prev_one_step_bayesian_decoder.p_x_given_n[:, :, time_window_bin_idx]
-            # also have p_x_given_n = prev_one_step_bayesian_decoder.p_x_given_n if we'd prefer
-            
-            # previous positions as determined by the two-step decoder: this uses the two_step previous position instead of the one_step previous position:
-            prev_x_position = computation_result.computed_data[two_step_decoder_key]['most_likely_positions'][:, time_window_bin_idx-1]            
-            active_k = computation_result.computed_data[two_step_decoder_key]['all_scaling_factors_k'][time_window_bin_idx] # get the specific k value
-            # active_k = computation_result.computed_data[two_step_decoder_key]['k']
-            if debug_print:
-                print(f'np.shape(curr_p_x_given_n): {np.shape(curr_p_x_given_n)}')
-                print(f'np.shape(prev_x_position): {np.shape(prev_x_position)}')
-                        
-            # Flat version:
-            computation_result.computed_data[two_step_decoder_key]['flat_p_x_given_n_and_x_prev'][:,time_window_bin_idx] = Zhang_Two_Step.compute_bayesian_two_step_prob_single_timestep(flat_p_x_given_n, prev_x_position, computation_result.computed_data[two_step_decoder_key]['flat_all_x'], computation_result.computed_data[two_step_decoder_key]['flat_sigma_t_all'], computation_result.computed_data[two_step_decoder_key]['C'], active_k) # output shape (1856, )            
-            computation_result.computed_data[two_step_decoder_key]['p_x_given_n_and_x_prev'][:,:,time_window_bin_idx] = np.reshape(computation_result.computed_data[two_step_decoder_key]['flat_p_x_given_n_and_x_prev'][:,time_window_bin_idx], (original_data_shape[0], original_data_shape[1]))
-            
 
-        # POST-hoc most-likely computations: Compute the most-likely positions from the p_x_given_n_and_x_prev:
-        # computation_result.computed_data[two_step_decoder_key]['most_likely_position_indicies'] = np.array(np.unravel_index(np.argmax(computation_result.computed_data[two_step_decoder_key]['p_x_given_n_and_x_prev'], axis=None), computation_result.computed_data[two_step_decoder_key]['p_x_given_n_and_x_prev'].shape)) # build the multi-dimensional maximum index for the position (not using the flat notation used in the other class)
-        # # np.shape(self.most_likely_position_indicies) # (2, 85841)
-        """ Computes the most likely positions at each timestep from flat_p_x_given_n_and_x_prev """
-        computation_result.computed_data[two_step_decoder_key]['most_likely_position_flat_indicies'] = np.argmax(computation_result.computed_data[two_step_decoder_key]['flat_p_x_given_n_and_x_prev'], axis=0)
-        # np.shape(self.most_likely_position_flat_indicies) # (85841,)
-        computation_result.computed_data[two_step_decoder_key]['most_likely_position_indicies'] = np.array(np.unravel_index(computation_result.computed_data[two_step_decoder_key]['most_likely_position_flat_indicies'], prev_one_step_bayesian_decoder.original_position_data_shape)) # convert back to an array
-        # np.shape(self.most_likely_position_indicies) # (2, 85841)
-        computation_result.computed_data[two_step_decoder_key]['most_likely_positions'][0, :] = prev_one_step_bayesian_decoder.xbin_centers[computation_result.computed_data[two_step_decoder_key]['most_likely_position_indicies'][0, :]]
-        computation_result.computed_data[two_step_decoder_key]['most_likely_positions'][1, :] = prev_one_step_bayesian_decoder.ybin_centers[computation_result.computed_data[two_step_decoder_key]['most_likely_position_indicies'][1, :]]
-        # computation_result.computed_data[two_step_decoder_key]['sigma_t_all'] = sigma_t_all # set sigma_t_all                
-
-        ## For some reason we set up the two-step decoder's most_likely_positions with the tranposed shape compared to the one-step decoder:
-        computation_result.computed_data[two_step_decoder_key]['most_likely_positions'] = computation_result.computed_data[two_step_decoder_key]['most_likely_positions'].T
-        
-        ## Once done, compute marginals for the two-step:
-        curr_unit_marginal_x, curr_unit_marginal_y = prev_one_step_bayesian_decoder.perform_build_marginals(computation_result.computed_data[two_step_decoder_key]['p_x_given_n_and_x_prev'], computation_result.computed_data[two_step_decoder_key]['most_likely_positions'], debug_print=debug_print)
-        computation_result.computed_data[two_step_decoder_key]['marginal'] = DynamicContainer(x=curr_unit_marginal_x, y=curr_unit_marginal_y)
-        
+        computation_result.computed_data[two_step_decoder_key] = _subfn_compute_two_step_decoder(active_xbins, active_ybins, prev_one_step_bayesian_decoder, computation_result.sess.position.df, computation_config=computation_result.computation_config, debug_print=debug_print)
         ## In this new mode we'll add the two-step properties to the original one-step decoder:
         ## Adds the directly accessible properties to the active_one_step_decoder after they're computed in the active_two_step_decoder so that they can be plotted with the same functions/etc.
 
@@ -179,8 +195,9 @@ class DefaultComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Computa
         prev_one_step_bayesian_decoder.marginal.x.p_x_given_n_and_x_prev = None
         prev_one_step_bayesian_decoder.marginal.x.two_step_most_likely_positions_1D = None
 
-        prev_one_step_bayesian_decoder.marginal.y.p_x_given_n_and_x_prev = None
-        prev_one_step_bayesian_decoder.marginal.y.two_step_most_likely_positions_1D = None
+        if prev_one_step_bayesian_decoder.marginal.y is not None:
+            prev_one_step_bayesian_decoder.marginal.y.p_x_given_n_and_x_prev = None
+            prev_one_step_bayesian_decoder.marginal.y.two_step_most_likely_positions_1D = None
 
         # Set the two-step properties on the one-step decoder:
         prev_one_step_bayesian_decoder.p_x_given_n_and_x_prev = computation_result.computed_data[two_step_decoder_key].p_x_given_n_and_x_prev.copy()

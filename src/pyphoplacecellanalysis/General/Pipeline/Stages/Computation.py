@@ -498,7 +498,10 @@ class ComputedPipelineStage(LoadableInput, LoadableSessionInput, FilterablePipel
                 accumulated_errors = None
             else:
                 ## Use exception-tolerant version of function composition (functions are composed left-to-right):
-                error_logger = (lambda x: progress_logger_callback(f'ERROR: {x}'))
+                if progress_logger_callback is not None:
+                    error_logger = (lambda x: progress_logger_callback(f'ERROR: {x}'))
+                else:
+                    error_logger = (lambda x: print(f'ERROR: {x}'))
                 accumulated_errors = dict() # empty list for keeping track of exceptions
                 total_num_funcs = len(active_computation_functions)
                 for i, f in enumerate(reversed(active_computation_functions)):
@@ -746,7 +749,7 @@ class PipelineWithComputedPipelineStageMixin:
         # return self.stage.perform_action_for_all_contexts(EvaluationActions.EVALUATE_COMPUTATIONS, ... # TODO: refactor to use new layout
         return self.stage.rerun_failed_computations(previous_computation_result, fail_on_exception=fail_on_exception, debug_print=debug_print)
     
-    def perform_specific_computation(self, active_computation_params=None, enabled_filter_names=None, computation_functions_name_whitelist=None, fail_on_exception:bool=False, debug_print=False):
+    def perform_specific_computation(self, active_computation_params=None, enabled_filter_names=None, computation_functions_name_whitelist=None, computation_kwargs_list=None, fail_on_exception:bool=False, debug_print=False):
         """ perform a specific computation (specified in computation_functions_name_whitelist) in a minimally destructive manner using the previously recomputed results:
         Passthrough wrapper to self.stage.perform_specific_computation(...) with the same arguments.
 
@@ -754,7 +757,7 @@ class PipelineWithComputedPipelineStageMixin:
             curr_active_pipeline.computation_results
         """
         # self.stage is of type ComputedPipelineStage
-        return self.stage.perform_specific_computation(active_computation_params=active_computation_params, enabled_filter_names=enabled_filter_names, computation_functions_name_whitelist=computation_functions_name_whitelist, fail_on_exception=fail_on_exception, debug_print=debug_print)
+        return self.stage.perform_specific_computation(active_computation_params=active_computation_params, enabled_filter_names=enabled_filter_names, computation_functions_name_whitelist=computation_functions_name_whitelist, computation_kwargs_list=computation_kwargs_list, fail_on_exception=fail_on_exception, debug_print=debug_print)
     
     # Utility/Debugging Functions:
     def perform_drop_entire_computed_config(self, config_names_to_drop = ['maze1_rippleOnly', 'maze2_rippleOnly']):

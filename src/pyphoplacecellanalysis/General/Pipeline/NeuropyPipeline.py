@@ -115,12 +115,16 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
     
     
     def __init__(self, name="pipeline", session_data_type='kdiba', basedir=None, load_function: Callable = None, post_load_functions: List[Callable] = [], parent=None, **kwargs):
+        """ 
+        Captures:
+            pipeline_module_logger (from module)
+        """
         super(NeuropyPipeline, self).__init__(parent, **kwargs)
         self.pipeline_name = name
         self.session_data_type = None
         self._stage = None
-        self.logger = pipeline_module_logger
-        self.logger.info(f'NeuropyPipeline.__init__(name="{name}", session_data_type="{session_data_type}", basedir="{basedir}")')
+        self._logger = pipeline_module_logger
+        self._logger.info(f'NeuropyPipeline.__init__(name="{name}", session_data_type="{session_data_type}", basedir="{basedir}")')
         
         self._persistance_state = None # indicate that this pipeline doesn't have a corresponding pickle file that it was loaded from
         
@@ -375,6 +379,8 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
         """The session_name property."""
         return self.sess.name
 
+
+    # Persistance and Saving _____________________________________________________________________________________________ #
     @property
     def pipeline_compare_dict(self):
         """The pipeline_compare_dict property."""
@@ -407,8 +413,19 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
             return True # No previous known file (indicating it's never been saved), so return True.
         return self.persistance_state.needs_save(curr_object=self)
 
+    # Logging ____________________________________________________________________________________________________________ #
+    @property
+    def logger(self):
+        """The logger property."""
+        return self._logger
 
+    @property
+    def logger_path(self):
+        """Returns the active logging path of the logger. (e.g. 'C:\\Users\\pho\\repos\\PhoPy3DPositionAnalysis2021\\EXTERNAL\\TESTING\\Logging\\debug_com.PhoHale.Spike3D.pipeline.log') """
+        curr_log_handler = self._logger.logger.handlers[0]
+        return curr_log_handler.baseFilename
 
+    # Stage and Progress _________________________________________________________________________________________________ #
     @property
     def stage(self):
         """The stage property."""
@@ -423,7 +440,7 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
         """The last_completed_stage property."""
         return self.stage.identity
     
-    ## Filtered Properties:
+    # Filtered Properties: _______________________________________________________________________________________________ #
     @property
     def is_filtered(self):
         """The is_filtered property."""
@@ -507,7 +524,7 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
         # Copy the object's state from self.__dict__ which contains all our instance attributes. Always use the dict.copy() method to avoid modifying the original state.
         state = self.__dict__.copy()
         # Remove the unpicklable entries.
-        del state['logger']
+        del state['_logger']
         del state['_persistance_state']
         # del state['_pickle_path']
         return state
@@ -519,8 +536,8 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
         super(NeuropyPipeline, self).__init__() # from 
         
         # Restore unpickable properties:
-        self.logger = pipeline_module_logger
-        self.logger.info(f'NeuropyPipeline.__setstate__(state="{state}")')
+        self._logger = pipeline_module_logger
+        self._logger.info(f'NeuropyPipeline.__setstate__(state="{state}")')
 
         self._persistance_state = None # the pickle_path has to be set manually after loading
         
