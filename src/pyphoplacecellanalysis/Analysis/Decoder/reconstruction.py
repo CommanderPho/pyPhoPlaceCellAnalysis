@@ -969,7 +969,7 @@ class BayesianPlacemapPositionDecoder(PlacemapPositionDecoder):
     
     @classmethod
     def perform_build_marginals(cls, p_x_given_n, most_likely_positions, debug_print=False):
-        """ 
+        """ builds the marginal distributions, which for the 1D decoder are the same as the main posterior.
 
 
         # For 1D Decoder:
@@ -999,8 +999,6 @@ class BayesianPlacemapPositionDecoder(PlacemapPositionDecoder):
         ## Build a container to hold the marginal distribution and its related values:
         curr_unit_marginal_x = DynamicContainer(p_x_given_n=None, most_likely_positions_1D=None)
         
-        
-                
         if is_1D_decoder:
             # 1D Decoder:
             # p_x_given_n should come in with shape (x_bins, time_bins)

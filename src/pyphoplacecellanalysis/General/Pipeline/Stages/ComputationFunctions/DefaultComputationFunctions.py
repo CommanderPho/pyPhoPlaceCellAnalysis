@@ -138,8 +138,8 @@ class DefaultComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Computa
                 else:
                     # 2D:
                     two_step_decoder_result['p_x_given_n_and_x_prev'][:,:,time_window_bin_idx] = np.reshape(two_step_decoder_result['flat_p_x_given_n_and_x_prev'][:,time_window_bin_idx], (original_data_shape[0], original_data_shape[1]))
-
                 
+
             # POST-hoc most-likely computations: Compute the most-likely positions from the p_x_given_n_and_x_prev:
             # # np.shape(self.most_likely_position_indicies) # (2, 85841)
             """ Computes the most likely positions at each timestep from flat_p_x_given_n_and_x_prev """
@@ -186,7 +186,7 @@ class DefaultComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Computa
         computation_result.computed_data[two_step_decoder_key] = _subfn_compute_two_step_decoder(active_xbins, active_ybins, prev_one_step_bayesian_decoder, computation_result.sess.position.df, computation_config=computation_result.computation_config, debug_print=debug_print)
         ## In this new mode we'll add the two-step properties to the original one-step decoder:
         ## Adds the directly accessible properties to the active_one_step_decoder after they're computed in the active_two_step_decoder so that they can be plotted with the same functions/etc.
-        prev_one_step_bayesian_decoder.two_step_decoder_result(computation_result.computed_data[two_step_decoder_key])
+        prev_one_step_bayesian_decoder.add_two_step_decoder_results(computation_result.computed_data[two_step_decoder_key])
 
         return computation_result
 
