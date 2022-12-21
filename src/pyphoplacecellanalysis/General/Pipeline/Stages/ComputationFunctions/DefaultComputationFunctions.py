@@ -4,6 +4,7 @@ import numpy as np
 import pandas as pd
 
 # NeuroPy (Diba Lab Python Repo) Loading
+from neuropy.core.epoch import Epoch
 from neuropy.utils.mixins.binning_helpers import build_df_discretized_binned_position_columns
 from neuropy.utils.dynamic_container import DynamicContainer # for _perform_two_step_position_decoding_computation
 from neuropy.utils.efficient_interval_search import get_non_overlapping_epochs # used in _subfn_compute_decoded_epochs to get only the valid (non-overlapping) epochs
@@ -15,7 +16,6 @@ from pyphocorehelpers.mixins.member_enumerating import AllFunctionEnumeratingMix
 from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BayesianPlacemapPositionDecoder, Zhang_Two_Step
 
 from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.ComputationFunctionRegistryHolder import ComputationFunctionRegistryHolder
-
 
 # from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BayesianPlacemapPositionDecoder # For _perform_new_position_decoding_computation
 from pyphocorehelpers.indexing_helpers import BinningInfo, compute_spanning_bins, get_bin_centers, get_bin_edges, debug_print_1D_bin_infos, interleave_elements # For _perform_new_position_decoding_computation
@@ -40,7 +40,7 @@ class DefaultComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Computa
                     - 2022-09-15: it appears that the 'filtered_spikes_df version' improves issues with decoder jumpiness and general inaccuracy that was present when using the session spikes_df: previously it was just jumping to random points far from the animal's location and then sticking there for a long time.
         
         """
-        def position_decoding_computation(active_session, pf_computation_config, prev_output_result: ComputationResult):
+        def position_decoding_computation(active_session, pf_computation_config, prev_output_result):
             """ uses the pf2D property of "prev_output_result.computed_data['pf2D'] """
             ## filtered_spikes_df version:
             prev_output_result.computed_data['pf1D_Decoder'] = BayesianPlacemapPositionDecoder(pf_computation_config.time_bin_size, prev_output_result.computed_data['pf1D'], prev_output_result.computed_data['pf1D'].filtered_spikes_df.copy(), debug_print=False)
@@ -411,58 +411,50 @@ class KnownFilterEpochs(ExtendedEnum):
                 ## Lap-Epochs Decoding:
                 laps_copy = deepcopy(computation_result.sess.laps)
                 active_filter_epochs = laps_copy.as_epoch_obj() # epoch object
-                pre_exclude_n_epochs = active_filter_epochs.n_epochs
-
-                # default_figure_name = f'Laps'
-
-                ## HANDLE OVERLAPPING EPOCHS: Note that there is a problem that occurs here with overlapping epochs for laps. Below we remove any overlapping epochs and leave only the valid ones.
-                is_non_overlapping = get_non_overlapping_epochs(active_filter_epochs.to_dataframe()[['start','stop']].to_numpy()) # returns a boolean array of the same length as the number of epochs
-                non_overlapping_labels = active_filter_epochs.labels[is_non_overlapping] # array(['41', '42', '43', '44', '45', '46', '47', '48', '49', '50', '51', '52', '53', '54', '55', '56', '57', '58', '59', '60', '61', '62', '63', '64', '65', '66', '67', '68', '69', '70', '71', '72', '73', '74'], dtype=object)
-                # Slice by the valid (non-overlapping) labels to get the new epoch object:
-                active_filter_epochs = active_filter_epochs.label_slice(non_overlapping_labels)
-                post_exclude_n_epochs = active_filter_epochs.n_epochs                    
-                num_excluded_epochs = post_exclude_n_epochs - pre_exclude_n_epochs
-                if num_excluded_epochs > 0:
-                    print(f'num_excluded_epochs: {num_excluded_epochs} due to overlap.')
-
+                if not isinstance(active_filter_epochs, pd.DataFrame):
+                    active_filter_epochs = active_filter_epochs.to_dataframe()
+                # pre_exclude_n_epochs = active_filter_epochs.n_epochs
+                active_filter_epochs = active_filter_epochs.epochs.get_non_overlapping_df()
+                # post_exclude_n_epochs = active_filter_epochs.n_epochs                    
+                # num_excluded_epochs = post_exclude_n_epochs - pre_exclude_n_epochs
+                # if num_excluded_epochs > 0:
+                #     print(f'num_excluded_epochs: {num_excluded_epochs} due to overlap.')
                 # ## Build Epochs:
-                epoch_description_list = [f'lap[{epoch_tuple.lap_id}]' for epoch_tuple in active_filter_epochs.to_dataframe()[['lap_id']].itertuples()] # Short
-                
-                
+                epoch_description_list = [f'lap[{epoch_tuple.lap_id}]' for epoch_tuple in active_filter_epochs[['lap_id']].itertuples()] # Short
+
             elif filter_epochs.name == KnownFilterEpochs.PBE.name:
                 ## PBEs-Epochs Decoding:
                 active_filter_epochs = deepcopy(computation_result.sess.pbe) # epoch object
+                if not isinstance(active_filter_epochs, pd.DataFrame):
+                    active_filter_epochs = active_filter_epochs.to_dataframe()
+                active_filter_epochs = active_filter_epochs.epochs.get_non_overlapping_df()
             
             elif filter_epochs.name == KnownFilterEpochs.RIPPLE.name:
                 ## Ripple-Epochs Decoding:
                 active_filter_epochs = deepcopy(computation_result.sess.ripple) # epoch object
-                active_epoch_df = active_filter_epochs.to_dataframe()
-                active_epoch_df['label'] = active_epoch_df.index.to_numpy() # integer ripple indexing
-                epoch_description_list = [f'ripple[{epoch_tuple.label}]' for epoch_tuple in active_epoch_df[['label']].itertuples()] # SHORT
+                if not isinstance(active_filter_epochs, pd.DataFrame):
+                    active_filter_epochs = active_filter_epochs.to_dataframe()
+                active_filter_epochs = active_filter_epochs.epochs.get_non_overlapping_df()
+                active_filter_epochs['label'] = active_filter_epochs.index.to_numpy() # integer ripple indexing
+                epoch_description_list = [f'ripple[{epoch_tuple.label}]' for epoch_tuple in active_filter_epochs[['label']].itertuples()] # SHORT
                 
             elif filter_epochs.name == KnownFilterEpochs.REPLAY.name:
                 active_filter_epochs = deepcopy(computation_result.sess.replay) # epoch object
+                if not isinstance(active_filter_epochs, pd.DataFrame):
+                    active_filter_epochs = active_filter_epochs.to_dataframe()
                 active_filter_epochs = active_filter_epochs.epochs.get_non_overlapping_df()
-                active_filter_epochs = active_filter_epochs[active_filter_epochs.duration >= min_epoch_included_duration] # only include those epochs which are greater than or equal to two decoding time bins
-
-                # # active_filter_epochs = active_filter_epochs.drop_duplicates("start") # tries to remove duplicate replays to take care of `AssertionError: Intervals in start_stop_times_arr must be non-overlapping`, but it hasn't worked.
-                # if not 'stop' in active_filter_epochs.columns:
-                #     # Make sure it has the 'stop' column which is expected as opposed to the 'end' column
-                #     active_filter_epochs['stop'] = active_filter_epochs['end'].copy()
-
-                # # TODO 2022-10-04 - CORRECTNESS - AssertionError: Intervals in start_stop_times_arr must be non-overlapping. I believe this is due to the stop values overlapping somewhere
-                # print(f'active_filter_epochs: {active_filter_epochs}')
-                # ## HANDLE OVERLAPPING EPOCHS: Note that there is a problem that occurs here with overlapping epochs for laps. Below we remove any overlapping epochs and leave only the valid ones.
-                # is_non_overlapping = get_non_overlapping_epochs(active_filter_epochs[['start','stop']].to_numpy()) # returns a boolean array of the same length as the number of epochs 
-                # # Just drop the rows of the dataframe that are overlapping:
-                # active_filter_epochs = active_filter_epochs.loc[is_non_overlapping]
-                print(f'active_filter_epochs: {active_filter_epochs}')
+                if min_epoch_included_duration is not None:
+                    active_filter_epochs = active_filter_epochs[active_filter_epochs.duration >= min_epoch_included_duration] # only include those epochs which are greater than or equal to two decoding time bins
                 epoch_description_list = [f'{default_figure_name} {epoch_tuple.label}' for epoch_tuple in active_filter_epochs[['label']].itertuples()]
-                # epoch_description_list = [f'{default_figure_name} {epoch_tuple.flat_replay_idx}' for epoch_tuple in active_filter_epochs[['flat_replay_idx']].itertuples()]
                 
             else:
                 print(f'filter_epochs "{filter_epochs.name}" could not be parsed into KnownFilterEpochs but is string.')
                 raise NotImplementedError
+
+            # Finally, convert back to Epoch object:
+            assert isinstance(active_filter_epochs, pd.DataFrame)
+            # active_filter_epochs = Epoch(active_filter_epochs)
+
         else:
             # Use it raw, hope it's right
             active_filter_epochs = filter_epochs

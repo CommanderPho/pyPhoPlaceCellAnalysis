@@ -153,6 +153,7 @@ class DefaultDecoderDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Disp
         active_decoder = computation_result.computed_data['pf2D_Decoder']
         decoding_time_bin_size = kwargs.pop('decoding_time_bin_size', 1.0/30.0) # 0.03333333333333333
         decoder_ndim = kwargs.pop('decoder_ndim', 2)
+        force_recompute = kwargs.pop('force_recompute', False)
 
         ## Check for previous computations:
         needs_compute = True # default to needing to recompute.
@@ -166,6 +167,11 @@ class DefaultDecoderDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Disp
                 # Unwrap and reuse the result:
                 filter_epochs_decoder_result, active_filter_epochs, default_figure_name = found_result # computation_result.computed_data['specific_epochs_decoding'][('Laps', decoding_time_bin_size)]
                 needs_compute = False # we don't need to recompute
+                if force_recompute:
+                    print(f'found extant result but force_recompute is True, so recomputing anyway.')
+                    needs_compute = True
+                    print(f'\t discarding old result.')
+                    _discarded_result = specific_epochs_decoding.pop(computation_tuple_key, None)
 
         if needs_compute:
             ## Do the computation:
@@ -173,7 +179,6 @@ class DefaultDecoderDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Disp
             # I think it's bad to import DefaultComputationFunctions directly in the _display function. Perhaps don't allow recomputations on demand?
             computation_result = DefaultComputationFunctions._perform_specific_epochs_decoding(computation_result, active_config, filter_epochs=filter_epochs, decoding_time_bin_size=decoding_time_bin_size, decoder_ndim=decoder_ndim)
             filter_epochs_decoder_result, active_filter_epochs, default_figure_name = computation_result.computed_data['specific_epochs_decoding'][computation_tuple_key]
-            # filter_epochs_decoder_result, active_filter_epochs, default_figure_name = _compute_specific_decoded_epochs(computation_result, active_config, filter_epochs=filter_epochs, decoding_time_bin_size=decoding_time_bin_size)
 
         ## Actual plotting portion:
         out_plot_tuple = plot_decoded_epoch_slices(active_filter_epochs, filter_epochs_decoder_result, global_pos_df=computation_result.sess.position.to_dataframe(), xbin=active_decoder.xbin,
