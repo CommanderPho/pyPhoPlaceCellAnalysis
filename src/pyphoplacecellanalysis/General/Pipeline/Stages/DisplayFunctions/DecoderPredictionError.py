@@ -22,7 +22,9 @@ from pyphoplacecellanalysis.Pho2D.stacked_epoch_slices import stacked_epoch_slic
 
 from pyphoplacecellanalysis.GUI.Qt.Menus.BaseMenuProviderMixin import BaseMenuCommand # for AddNewDecodedPosition_MatplotlibPlotCommand
 
-from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BayesianPlacemapPositionDecoder 
+from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BayesianPlacemapPositionDecoder
+
+from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions import DefaultComputationFunctions # TODO: I think it's bad to include computation functions here technically
 
 
 class DefaultDecoderDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=DisplayFunctionRegistryHolder):
@@ -127,60 +129,79 @@ class DefaultDecoderDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Disp
             
 
     def _display_plot_decoded_epoch_slices(computation_result, active_config, active_context=None, filter_epochs='ripple', **kwargs):
-            """ renders a plot with the 1D Marginals either (x and y position axes): the computed posterior for the position from the Bayesian decoder and overlays the animal's actual position over the top. 
-            
-            This display function is currently atypically implemented. 
+        """ renders a plot with the 1D Marginals either (x and y position axes): the computed posterior for the position from the Bayesian decoder and overlays the animal's actual position over the top. 
+        
+        This display function is currently atypically implemented. 
 
-            Depends on `_compute_specific_decoded_epochs` to compute the decoder for the epochs.
-            The final step, which is where most display functions start, is calling the actual plot function:
-                plot_decoded_epoch_slices(...)
+        Depends on `_compute_specific_decoded_epochs` to compute the decoder for the epochs.
+        The final step, which is where most display functions start, is calling the actual plot function:
+            plot_decoded_epoch_slices(...)
 
-            Inputs:
-                most_likely_positions_mode: 'standard'|'corrected'
-            
-            
-            ax = destination_plot.ui.matplotlib_view_widget.ax,
-            variable_name = 'x',
-            
-            """
-            assert active_context is not None
-            
-            ## Finally, add the display function to the active context
-            active_display_fn_identifying_ctx = active_context.adding_context('display_fn', display_fn_name='display_plot_decoded_epoch_slices')
+        Inputs:
+            most_likely_positions_mode: 'standard'|'corrected'
+        
+        
+        ax = destination_plot.ui.matplotlib_view_widget.ax,
+        variable_name = 'x',
+        
+        """
+        assert active_context is not None
+        
+        ## Finally, add the display function to the active context
+        active_display_fn_identifying_ctx = active_context.adding_context('display_fn', display_fn_name='display_plot_decoded_epoch_slices')
 
-            active_decoder = computation_result.computed_data['pf2D_Decoder']
-            decoding_time_bin_size = kwargs.pop('decoding_time_bin_size', 1.0/30.0) # 0.03333333333333333
+        active_decoder = computation_result.computed_data['pf2D_Decoder']
+        decoding_time_bin_size = kwargs.pop('decoding_time_bin_size', 1.0/30.0) # 0.03333333333333333
+        decoder_ndim = kwargs.pop('decoder_ndim', 2)
 
+        ## Check for previous computations:
+        needs_compute = True # default to needing to recompute.
+        computation_tuple_key = (filter_epochs, decoding_time_bin_size, decoder_ndim)
+
+        ## Recompute using '_perform_specific_epochs_decoding' if needed:
+        specific_epochs_decoding = computation_result.computed_data.get('specific_epochs_decoding', None)
+        if specific_epochs_decoding is not None:
+            found_result = specific_epochs_decoding.get(computation_tuple_key, None)
+            if found_result is not None:
+                # Unwrap and reuse the result:
+                filter_epochs_decoder_result, active_filter_epochs, default_figure_name = found_result # computation_result.computed_data['specific_epochs_decoding'][('Laps', decoding_time_bin_size)]
+                needs_compute = False # we don't need to recompute
+
+        if needs_compute:
             ## Do the computation:
-            filter_epochs_decoder_result, active_filter_epochs, default_figure_name = _compute_specific_decoded_epochs(computation_result, active_config, filter_epochs=filter_epochs, decoding_time_bin_size=decoding_time_bin_size)
+            print(f'recomputing specific epoch decoding for {computation_tuple_key = }')
+            # I think it's bad to import DefaultComputationFunctions directly in the _display function. Perhaps don't allow recomputations on demand?
+            computation_result = DefaultComputationFunctions._perform_specific_epochs_decoding(computation_result, active_config, filter_epochs=filter_epochs, decoding_time_bin_size=decoding_time_bin_size, decoder_ndim=decoder_ndim)
+            filter_epochs_decoder_result, active_filter_epochs, default_figure_name = computation_result.computed_data['specific_epochs_decoding'][computation_tuple_key]
+            # filter_epochs_decoder_result, active_filter_epochs, default_figure_name = _compute_specific_decoded_epochs(computation_result, active_config, filter_epochs=filter_epochs, decoding_time_bin_size=decoding_time_bin_size)
 
-            ## Actual plotting portion:
-            out_plot_tuple = plot_decoded_epoch_slices(active_filter_epochs, filter_epochs_decoder_result, global_pos_df=computation_result.sess.position.to_dataframe(), xbin=active_decoder.xbin,
-                                                                    **overriding_dict_with(lhs_dict={'name':default_figure_name, 'debug_test_max_num_slices':256, 'enable_flat_line_drawing':False, 'debug_print': False}, **kwargs))
-            params, plots_data, plots, ui = out_plot_tuple
-            
-            
-            ## Build the final context:
-            
-            # Add in the desired display variable:
-            active_identifying_ctx = active_display_fn_identifying_ctx.adding_context('filter_epochs', filter_epochs=filter_epochs) # filter_epochs: 'ripple'
-            active_identifying_ctx_string = active_identifying_ctx.get_description(separator='|') # Get final discription string
-            print(f'active_identifying_ctx_string: "{active_identifying_ctx_string}"')
-            
-            ## TODO: use active_display_fn_identifying_ctx to add it to the display function:
-            
-            # active_display_fn_identifying_ctx
-            
-            # figure, ax
-            # return {active_display_fn_identifying_ctx: dict(params=params, plots_data=plots_data, plots=plots, ui=ui)}
-            
-            final_context = active_identifying_ctx
-            # final_context = active_display_fn_identifying_ctx
+        ## Actual plotting portion:
+        out_plot_tuple = plot_decoded_epoch_slices(active_filter_epochs, filter_epochs_decoder_result, global_pos_df=computation_result.sess.position.to_dataframe(), xbin=active_decoder.xbin,
+                                                                **overriding_dict_with(lhs_dict={'name':default_figure_name, 'debug_test_max_num_slices':256, 'enable_flat_line_drawing':False, 'debug_print': False}, **kwargs))
+        params, plots_data, plots, ui = out_plot_tuple
+        
+        
+        ## Build the final context:
+        
+        # Add in the desired display variable:
+        active_identifying_ctx = active_display_fn_identifying_ctx.adding_context('filter_epochs', filter_epochs=filter_epochs) # filter_epochs: 'ripple'
+        active_identifying_ctx_string = active_identifying_ctx.get_description(separator='|') # Get final discription string
+        print(f'active_identifying_ctx_string: "{active_identifying_ctx_string}"')
+        
+        ## TODO: use active_display_fn_identifying_ctx to add it to the display function:
+        
+        # active_display_fn_identifying_ctx
+        
+        # figure, ax
+        # return {active_display_fn_identifying_ctx: dict(params=params, plots_data=plots_data, plots=plots, ui=ui)}
+        
+        final_context = active_identifying_ctx
+        # final_context = active_display_fn_identifying_ctx
 
-            ## Use the context to appropriately set the window title for the plot:
-            ui.mw.setWindowTitle(f'{active_identifying_ctx_string}')
+        ## Use the context to appropriately set the window title for the plot:
+        ui.mw.setWindowTitle(f'{active_identifying_ctx_string}')
 
-            return {final_context: dict(params=params, plots_data=plots_data, plots=plots, ui=ui)}
+        return {final_context: dict(params=params, plots_data=plots_data, plots=plots, ui=ui)}
         
     
 
@@ -336,97 +357,97 @@ def plot_most_likely_position_comparsions(pho_custom_decoder, position_df, axs=N
         return fig, axs
 
 
-def _compute_specific_decoded_epochs(computation_result, active_config, filter_epochs='ripple', decoding_time_bin_size=0.02):
-    """ computes the decoders for the specific epochs. Required for `_display_plot_decoded_epoch_slices`
+# def _compute_specific_decoded_epochs(computation_result, active_config, filter_epochs='ripple', decoding_time_bin_size=0.02):
+#     """ computes the decoders for the specific epochs. Required for `_display_plot_decoded_epoch_slices`
     
-    It determines which epochs are being referred to (enabling specifying them by a simple string identifier, like 'ripple', 'pbe', or 'laps') and then gets the coresponding data that's needed to recompute the decoded data for them.
-    This decoding is done by calling:
-        active_decoder.decode_specific_epochs(...) which returns a result that can then be plotted.
+#     It determines which epochs are being referred to (enabling specifying them by a simple string identifier, like 'ripple', 'pbe', or 'laps') and then gets the coresponding data that's needed to recompute the decoded data for them.
+#     This decoding is done by calling:
+#         active_decoder.decode_specific_epochs(...) which returns a result that can then be plotted.
     
-    """    
-    default_figure_name = 'stacked_epoch_slices_matplotlib_subplots'
-    active_decoder = computation_result.computed_data['pf2D_Decoder']
+#     """    
+#     default_figure_name = 'stacked_epoch_slices_matplotlib_subplots'
+#     active_decoder = computation_result.computed_data['pf2D_Decoder']
     
-    if isinstance(filter_epochs, str):
-        if filter_epochs == 'laps':
-            ## Lap-Epochs Decoding:
-            laps_copy = deepcopy(computation_result.sess.laps)
-            # active_filter_epochs = laps_copy.filtered_by_lap_flat_index(np.arange(6)).as_epoch_obj() # epoch object
-            active_filter_epochs = laps_copy.as_epoch_obj() # epoch object
-            pre_exclude_n_epochs = active_filter_epochs.n_epochs
+#     if isinstance(filter_epochs, str):
+#         if filter_epochs == 'laps':
+#             ## Lap-Epochs Decoding:
+#             laps_copy = deepcopy(computation_result.sess.laps)
+#             # active_filter_epochs = laps_copy.filtered_by_lap_flat_index(np.arange(6)).as_epoch_obj() # epoch object
+#             active_filter_epochs = laps_copy.as_epoch_obj() # epoch object
+#             pre_exclude_n_epochs = active_filter_epochs.n_epochs
 
-            # default_figure_name = f'{default_figure_name}_Laps'
-            default_figure_name = f'Laps'
+#             # default_figure_name = f'{default_figure_name}_Laps'
+#             default_figure_name = f'Laps'
 
-            ## HANDLE OVERLAPPING EPOCHS: Note that there is a problem that occurs here with overlapping epochs for laps. Below we remove any overlapping epochs and leave only the valid ones.
-            is_non_overlapping = get_non_overlapping_epochs(active_filter_epochs.to_dataframe()[['start','stop']].to_numpy()) # returns a boolean array of the same length as the number of epochs
-            non_overlapping_labels = active_filter_epochs.labels[is_non_overlapping] # array(['41', '42', '43', '44', '45', '46', '47', '48', '49', '50', '51', '52', '53', '54', '55', '56', '57', '58', '59', '60', '61', '62', '63', '64', '65', '66', '67', '68', '69', '70', '71', '72', '73', '74'], dtype=object)
-            # Slice by the valid (non-overlapping) labels to get the new epoch object:
-            active_filter_epochs = active_filter_epochs.label_slice(non_overlapping_labels)
-            post_exclude_n_epochs = active_filter_epochs.n_epochs                    
-            num_excluded_epochs = post_exclude_n_epochs - pre_exclude_n_epochs
-            if num_excluded_epochs > 0:
-                print(f'num_excluded_epochs: {num_excluded_epochs} due to overlap.')
+#             ## HANDLE OVERLAPPING EPOCHS: Note that there is a problem that occurs here with overlapping epochs for laps. Below we remove any overlapping epochs and leave only the valid ones.
+#             is_non_overlapping = get_non_overlapping_epochs(active_filter_epochs.to_dataframe()[['start','stop']].to_numpy()) # returns a boolean array of the same length as the number of epochs
+#             non_overlapping_labels = active_filter_epochs.labels[is_non_overlapping] # array(['41', '42', '43', '44', '45', '46', '47', '48', '49', '50', '51', '52', '53', '54', '55', '56', '57', '58', '59', '60', '61', '62', '63', '64', '65', '66', '67', '68', '69', '70', '71', '72', '73', '74'], dtype=object)
+#             # Slice by the valid (non-overlapping) labels to get the new epoch object:
+#             active_filter_epochs = active_filter_epochs.label_slice(non_overlapping_labels)
+#             post_exclude_n_epochs = active_filter_epochs.n_epochs                    
+#             num_excluded_epochs = post_exclude_n_epochs - pre_exclude_n_epochs
+#             if num_excluded_epochs > 0:
+#                 print(f'num_excluded_epochs: {num_excluded_epochs} due to overlap.')
 
-            # ## Build Epochs:
-            # # epochs = sess.laps.to_dataframe()
-            # epochs = active_filter_epochs.to_dataframe()
-            # epoch_slices = epochs[['start', 'stop']].to_numpy()
-            # epoch_description_list = [f'lap {epoch_tuple.lap_id} (maze: {epoch_tuple.maze_id}, direction: {epoch_tuple.lap_dir})' for epoch_tuple in active_filter_epochs.to_dataframe()[['lap_id','maze_id','lap_dir']].itertuples()] # LONG
-            epoch_description_list = [f'lap[{epoch_tuple.lap_id}]' for epoch_tuple in active_filter_epochs.to_dataframe()[['lap_id']].itertuples()] # Short
+#             # ## Build Epochs:
+#             # # epochs = sess.laps.to_dataframe()
+#             # epochs = active_filter_epochs.to_dataframe()
+#             # epoch_slices = epochs[['start', 'stop']].to_numpy()
+#             # epoch_description_list = [f'lap {epoch_tuple.lap_id} (maze: {epoch_tuple.maze_id}, direction: {epoch_tuple.lap_dir})' for epoch_tuple in active_filter_epochs.to_dataframe()[['lap_id','maze_id','lap_dir']].itertuples()] # LONG
+#             epoch_description_list = [f'lap[{epoch_tuple.lap_id}]' for epoch_tuple in active_filter_epochs.to_dataframe()[['lap_id']].itertuples()] # Short
             
             
-        elif filter_epochs == 'pbe':
-            ## PBEs-Epochs Decoding:
-            active_filter_epochs = deepcopy(computation_result.sess.pbe) # epoch object
-            # default_figure_name = f'{default_figure_name}_PBEs'
-            default_figure_name = f'PBEs'
+#         elif filter_epochs == 'pbe':
+#             ## PBEs-Epochs Decoding:
+#             active_filter_epochs = deepcopy(computation_result.sess.pbe) # epoch object
+#             # default_figure_name = f'{default_figure_name}_PBEs'
+#             default_figure_name = f'PBEs'
         
-        elif filter_epochs == 'ripple':
-            ## Ripple-Epochs Decoding:
-            active_filter_epochs = deepcopy(computation_result.sess.ripple) # epoch object
-            # default_figure_name = f'{default_figure_name}_Ripples'
-            default_figure_name = f'Ripples'
-            active_epoch_df = active_filter_epochs.to_dataframe()
-            # if 'label' not in active_epoch_df.columns:
-            active_epoch_df['label'] = active_epoch_df.index.to_numpy() # integer ripple indexing
-            # epoch_description_list = [f'ripple {epoch_tuple.label} (peakpower: {epoch_tuple.peakpower})' for epoch_tuple in active_filter_epochs.to_dataframe()[['label', 'peakpower']].itertuples()] # LONG
-            epoch_description_list = [f'ripple[{epoch_tuple.label}]' for epoch_tuple in active_epoch_df[['label']].itertuples()] # SHORT
+#         elif filter_epochs == 'ripple':
+#             ## Ripple-Epochs Decoding:
+#             active_filter_epochs = deepcopy(computation_result.sess.ripple) # epoch object
+#             # default_figure_name = f'{default_figure_name}_Ripples'
+#             default_figure_name = f'Ripples'
+#             active_epoch_df = active_filter_epochs.to_dataframe()
+#             # if 'label' not in active_epoch_df.columns:
+#             active_epoch_df['label'] = active_epoch_df.index.to_numpy() # integer ripple indexing
+#             # epoch_description_list = [f'ripple {epoch_tuple.label} (peakpower: {epoch_tuple.peakpower})' for epoch_tuple in active_filter_epochs.to_dataframe()[['label', 'peakpower']].itertuples()] # LONG
+#             epoch_description_list = [f'ripple[{epoch_tuple.label}]' for epoch_tuple in active_epoch_df[['label']].itertuples()] # SHORT
             
-        elif filter_epochs == 'replay':
-            active_filter_epochs = deepcopy(computation_result.sess.replay) # epoch object
-            # active_filter_epochs = active_filter_epochs.drop_duplicates("start") # tries to remove duplicate replays to take care of `AssertionError: Intervals in start_stop_times_arr must be non-overlapping`, but it hasn't worked.
+#         elif filter_epochs == 'replay':
+#             active_filter_epochs = deepcopy(computation_result.sess.replay) # epoch object
+#             # active_filter_epochs = active_filter_epochs.drop_duplicates("start") # tries to remove duplicate replays to take care of `AssertionError: Intervals in start_stop_times_arr must be non-overlapping`, but it hasn't worked.
 
-            # filter_epochs.columns # ['epoch_id', 'rel_id', 'start', 'end', 'replay_r', 'replay_p', 'template_id', 'flat_replay_idx', 'duration']
-            if not 'stop' in active_filter_epochs.columns:
-                # Make sure it has the 'stop' column which is expected as opposed to the 'end' column
-                active_filter_epochs['stop'] = active_filter_epochs['end'].copy()
-            # default_figure_name = f'{default_figure_name}_Replay'
-            default_figure_name = f'Replay'
+#             # filter_epochs.columns # ['epoch_id', 'rel_id', 'start', 'end', 'replay_r', 'replay_p', 'template_id', 'flat_replay_idx', 'duration']
+#             if not 'stop' in active_filter_epochs.columns:
+#                 # Make sure it has the 'stop' column which is expected as opposed to the 'end' column
+#                 active_filter_epochs['stop'] = active_filter_epochs['end'].copy()
+#             # default_figure_name = f'{default_figure_name}_Replay'
+#             default_figure_name = f'Replay'
 
-            # TODO 2022-10-04 - CORRECTNESS - AssertionError: Intervals in start_stop_times_arr must be non-overlapping. I believe this is due to the stop values overlapping somewhere
-            print(f'active_filter_epochs: {active_filter_epochs}')
-            ## HANDLE OVERLAPPING EPOCHS: Note that there is a problem that occurs here with overlapping epochs for laps. Below we remove any overlapping epochs and leave only the valid ones.
-            is_non_overlapping = get_non_overlapping_epochs(active_filter_epochs[['start','stop']].to_numpy()) # returns a boolean array of the same length as the number of epochs 
-            # Just drop the rows of the dataframe that are overlapping:
-            # active_filter_epochs = active_filter_epochs[is_non_overlapping, :]
-            active_filter_epochs = active_filter_epochs.loc[is_non_overlapping]
-            print(f'active_filter_epochs: {active_filter_epochs}')
+#             # TODO 2022-10-04 - CORRECTNESS - AssertionError: Intervals in start_stop_times_arr must be non-overlapping. I believe this is due to the stop values overlapping somewhere
+#             print(f'active_filter_epochs: {active_filter_epochs}')
+#             ## HANDLE OVERLAPPING EPOCHS: Note that there is a problem that occurs here with overlapping epochs for laps. Below we remove any overlapping epochs and leave only the valid ones.
+#             is_non_overlapping = get_non_overlapping_epochs(active_filter_epochs[['start','stop']].to_numpy()) # returns a boolean array of the same length as the number of epochs 
+#             # Just drop the rows of the dataframe that are overlapping:
+#             # active_filter_epochs = active_filter_epochs[is_non_overlapping, :]
+#             active_filter_epochs = active_filter_epochs.loc[is_non_overlapping]
+#             print(f'active_filter_epochs: {active_filter_epochs}')
 
-            # epoch_description_list = [f'{default_figure_name} {epoch_tuple.epoch_id}' for epoch_tuple in active_filter_epochs[['epoch_id']].itertuples()]
-            epoch_description_list = [f'{default_figure_name} {epoch_tuple.flat_replay_idx}' for epoch_tuple in active_filter_epochs[['flat_replay_idx']].itertuples()]
+#             # epoch_description_list = [f'{default_figure_name} {epoch_tuple.epoch_id}' for epoch_tuple in active_filter_epochs[['epoch_id']].itertuples()]
+#             epoch_description_list = [f'{default_figure_name} {epoch_tuple.flat_replay_idx}' for epoch_tuple in active_filter_epochs[['flat_replay_idx']].itertuples()]
             
-        else:
-            raise NotImplementedError
-    else:
-        # Use it raw, hope it's right
-        active_filter_epochs = filter_epochs
-        default_figure_name = f'{default_figure_name}_CUSTOM'
-        epoch_description_list = [f'{default_figure_name} {epoch_tuple.label}' for epoch_tuple in active_filter_epochs.to_dataframe()[['label']].itertuples()]
+#         else:
+#             raise NotImplementedError
+#     else:
+#         # Use it raw, hope it's right
+#         active_filter_epochs = filter_epochs
+#         default_figure_name = f'{default_figure_name}_CUSTOM'
+#         epoch_description_list = [f'{default_figure_name} {epoch_tuple.label}' for epoch_tuple in active_filter_epochs.to_dataframe()[['label']].itertuples()]
         
-    filter_epochs_decoder_result = active_decoder.decode_specific_epochs(computation_result.sess.spikes_df, filter_epochs=active_filter_epochs, decoding_time_bin_size=decoding_time_bin_size, debug_print=False)
-    filter_epochs_decoder_result.epoch_description_list = epoch_description_list
-    return filter_epochs_decoder_result, active_filter_epochs, default_figure_name
+#     filter_epochs_decoder_result = active_decoder.decode_specific_epochs(computation_result.sess.spikes_df, filter_epochs=active_filter_epochs, decoding_time_bin_size=decoding_time_bin_size, debug_print=False)
+#     filter_epochs_decoder_result.epoch_description_list = epoch_description_list
+#     return filter_epochs_decoder_result, active_filter_epochs, default_figure_name
 
 
     
@@ -624,7 +645,7 @@ def plot_decoded_epoch_slices(filter_epochs, filter_epochs_decoder_result, globa
             plots.fig = _temp_fig
         
         curr_ax.set_xlim(*plots_data.epoch_slices[i,:])
-        curr_ax.set_title('')
+        curr_ax.set_title(f'') # needs to be set to empty string '' because this is the title that appears above each subplot/slice
 
     return params, plots_data, plots, ui
 
