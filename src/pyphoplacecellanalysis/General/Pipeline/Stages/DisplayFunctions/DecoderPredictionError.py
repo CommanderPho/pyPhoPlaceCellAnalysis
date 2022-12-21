@@ -214,6 +214,10 @@ class DefaultDecoderDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Disp
 def plot_1D_most_likely_position_comparsions(measured_position_df, time_window_centers, xbin, ax=None, posterior=None, active_most_likely_positions_1D=None, enable_flat_line_drawing=False, variable_name = 'x', debug_print=False):
     """ renders a single 2D subplot in MATPLOTLIB for a 1D position axes: the computed posterior for the position from the Bayesian decoder and overlays the animal's actual position over the top.
     
+    Animal's actual position is rendered as a red line with no markers 
+
+    active_most_likely_positions_1D: Animal's most likely position is rendered as a grey line with '+' markers at each datapoint
+
     Input:
     
         enable_flat_line_drawing
@@ -244,7 +248,7 @@ def plot_1D_most_likely_position_comparsions(measured_position_df, time_window_c
             fig = None # Calling plt.gcf() creates an empty figure and returns the wrong value 
             # fig = plt.gcf()
         
-        # Actual Position Plots:
+        # Actual Position Plots (red line):
         ax.plot(measured_position_df['t'].to_numpy(), measured_position_df[variable_name].to_numpy(), label=f'measured {variable_name}', color='#ff000066', alpha=0.8, marker='+', markersize=4) # Opaque RED # , linestyle='dashed', linewidth=2, color='#ff0000ff'
         ax.set_title(variable_name)
        
