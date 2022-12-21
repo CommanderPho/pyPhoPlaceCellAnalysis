@@ -583,6 +583,7 @@ class BayesianPlacemapPositionDecoder(PlacemapPositionDecoder):
             intermediate_computations = ['F', 'P_x'],
             posteriors = ['p_x_given_n'],
             most_likely = ['most_likely_positions'],
+            marginals = ['marginal'],
             other_variables = ['neuron_IDXs', 'neuron_IDs']
         )
         for a_category_name, variable_names_list in variable_names_dict.items():
@@ -590,7 +591,12 @@ class BayesianPlacemapPositionDecoder(PlacemapPositionDecoder):
             # print(f'\t {variable_names_list}:')
             for a_variable_name in variable_names_list:
                 a_var_value = getattr(self, a_variable_name)
-                a_var_shape = safe_get_variable_shape(a_var_value) or 'SCALAR'
+                a_var_shape = safe_get_variable_shape(a_var_value)
+                if a_var_shape is None:
+                    if isinstance(a_var_value, (int, float)):
+                        a_var_shape = a_var_value # display the value directly if we can
+                    else:
+                        a_var_shape = 'SCALAR' # otherwise just output the literal text "SCALAR"
                 print(f'\t {a_variable_name}: {a_var_shape}')
 
 
@@ -915,25 +921,60 @@ class BayesianPlacemapPositionDecoder(PlacemapPositionDecoder):
     
     @classmethod
     def perform_build_marginals(cls, p_x_given_n, most_likely_positions, debug_print=False):
+        """ 
+
+
+        # For 1D Decoder:
+            p_x_given_n.shape # (63, 106)
+            most_likely_positions.shape # (106,)
+
+            curr_unit_marginal_x['p_x_given_n'].shape # (63, 106)
+            curr_unit_marginal_x['most_likely_positions_1D'].shape # (106,)
+
+            curr_unit_marginal_y: None
+
+        External validations:
+
+            assert np.allclose(curr_epoch_result['marginal_x']['p_x_given_n'], curr_epoch_result['p_x_given_n']), f"1D Decoder should have an x-posterior equal to its own posterior"
+            assert np.allclose(curr_epoch_result['marginal_x']['most_likely_positions_1D'], curr_epoch_result['most_likely_positions']), f"1D Decoder should have an x-posterior with most_likely_positions_1D equal to its own most_likely_positions"
+
+        """
         is_1D_decoder = (most_likely_positions.ndim < 2) # check if we're dealing with a 1D decoder, in which case there is no y-marginal (y doesn't exist)
-        
+        if debug_print:
+            print(f'perform_build_marginals(...): is_1D_decoder: {is_1D_decoder}')
+            print(f"\t{p_x_given_n = }\n\t{most_likely_positions = }")
+            print(f"\t{np.shape(p_x_given_n) = }\n\t{np.shape(most_likely_positions) = }")
+
+        # p_x_given_n_shape = np.shape(p_x_given_n)
+
         # Compute Marginal 1D Posterior:
         ## Build a container to hold the marginal distribution and its related values:
         curr_unit_marginal_x = DynamicContainer(p_x_given_n=None, most_likely_positions_1D=None)
         
-        # Collapse the 2D position posterior into two separate 1D (X & Y) marginal posteriors. Be sure to re-normalize each marginal after summing
-        curr_unit_marginal_x.p_x_given_n = np.squeeze(np.sum(p_x_given_n, 1)) # sum over all y. Result should be [x_bins x time_bins]
-        curr_unit_marginal_x.p_x_given_n = curr_unit_marginal_x.p_x_given_n / np.sum(curr_unit_marginal_x.p_x_given_n, axis=0) # sum over all positions for each time_bin (so there's a normalized distribution at each timestep)
-         ## Ensures that the marginal posterior is at least 2D:
-        if curr_unit_marginal_x.p_x_given_n.ndim == 0:
-            curr_unit_marginal_x.p_x_given_n = curr_unit_marginal_x.p_x_given_n.reshape(1, 1)
-        elif curr_unit_marginal_x.p_x_given_n.ndim == 1:
-            curr_unit_marginal_x.p_x_given_n = curr_unit_marginal_x.p_x_given_n[:, np.newaxis]
-            if debug_print:
-                print(f'\t added dimension to curr_posterior for marginal_x: {curr_unit_marginal_x.p_x_given_n.shape}')
+        
                 
-        if not is_1D_decoder:
+        if is_1D_decoder:
+            # 1D Decoder:
+            # p_x_given_n should come in with shape (x_bins, time_bins)
+            curr_unit_marginal_x.p_x_given_n = p_x_given_n.copy() # Result should be [x_bins, time_bins]
+            curr_unit_marginal_x.p_x_given_n = curr_unit_marginal_x.p_x_given_n / np.sum(curr_unit_marginal_x.p_x_given_n, axis=0) # should already be normalized but do it again anyway just in case (so there's a normalized distribution at each timestep)
+            # for the 1D decoder case, there are no y-positions
+            curr_unit_marginal_y = None
+
+        else:
             # a 2D decoder
+            # Collapse the 2D position posterior into two separate 1D (X & Y) marginal posteriors. Be sure to re-normalize each marginal after summing
+            curr_unit_marginal_x.p_x_given_n = np.squeeze(np.sum(p_x_given_n, 1)) # sum over all y. Result should be [x_bins x time_bins]
+            curr_unit_marginal_x.p_x_given_n = curr_unit_marginal_x.p_x_given_n / np.sum(curr_unit_marginal_x.p_x_given_n, axis=0) # sum over all positions for each time_bin (so there's a normalized distribution at each timestep)
+            ## Ensures that the marginal posterior is at least 2D:
+            if curr_unit_marginal_x.p_x_given_n.ndim == 0:
+                curr_unit_marginal_x.p_x_given_n = curr_unit_marginal_x.p_x_given_n.reshape(1, 1)
+            elif curr_unit_marginal_x.p_x_given_n.ndim == 1:
+                curr_unit_marginal_x.p_x_given_n = curr_unit_marginal_x.p_x_given_n[:, np.newaxis]
+                if debug_print:
+                    print(f'\t added dimension to curr_posterior for marginal_x: {curr_unit_marginal_x.p_x_given_n.shape}')
+
+            # y-axis marginal:
             curr_unit_marginal_y = DynamicContainer(p_x_given_n=None, most_likely_positions_1D=None)
             curr_unit_marginal_y.p_x_given_n = np.squeeze(np.sum(p_x_given_n, 0)) # sum over all x. Result should be [y_bins x time_bins]
             curr_unit_marginal_y.p_x_given_n = curr_unit_marginal_y.p_x_given_n / np.sum(curr_unit_marginal_y.p_x_given_n, axis=0) # sum over all positions for each time_bin (so there's a normalized distribution at each timestep)
@@ -944,16 +985,18 @@ class BayesianPlacemapPositionDecoder(PlacemapPositionDecoder):
                 curr_unit_marginal_y.p_x_given_n = curr_unit_marginal_y.p_x_given_n[:, np.newaxis]
                 if debug_print:
                     print(f'\t added dimension to curr_posterior for marginal_y: {curr_unit_marginal_y.p_x_given_n.shape}')
-                    
-        else:
-            # for the 1D decoder case, there are no y-positions
-            curr_unit_marginal_y = None
-       
                 
         ## Add the most-likely positions to the posterior_x container:
-        if most_likely_positions.ndim < 2:
+        if is_1D_decoder:
             ## 1D Decoder Case, there is no y marginal (y doesn't exist)
+            if debug_print:
+                print(f'np.shape(most_likely_positions): {np.shape(most_likely_positions)}')
             curr_unit_marginal_x.most_likely_positions_1D = np.atleast_1d(most_likely_positions).T # already 1D positions, don't need to extract x-component
+
+            # Validate 1D Conditions:
+            assert np.allclose(curr_unit_marginal_x['p_x_given_n'], p_x_given_n), f"1D Decoder should have an x-posterior equal to its own posterior"
+            assert np.allclose(curr_unit_marginal_x['most_likely_positions_1D'], most_likely_positions), f"1D Decoder should have an x-posterior with most_likely_positions_1D equal to its own most_likely_positions"
+
         else:
             curr_unit_marginal_x.most_likely_positions_1D = most_likely_positions[:,0].T
             curr_unit_marginal_y.most_likely_positions_1D = most_likely_positions[:,1].T

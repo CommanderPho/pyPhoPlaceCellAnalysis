@@ -98,8 +98,10 @@ class DefaultComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Computa
 
             if (prev_one_step_bayesian_decoder.ndim < 2):
                 active_ybin_centers = np.array([0.0])
+
             else:
                 # 2D Case:
+                assert prev_one_step_bayesian_decoder.ndim == 2, f"prev_one_step_bayesian_decoder.ndim must be either 1 or 2, but prev_one_step_bayesian_decoder.ndim: {prev_one_step_bayesian_decoder.ndim}"
                 active_ybin_centers = prev_one_step_bayesian_decoder.ybin_centers
 
             # pre-allocate outputs:
@@ -324,7 +326,7 @@ class DefaultComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Computa
 
 
 
-    def _perform_specific_epochs_decoding(computation_result: ComputationResult, active_config, filter_epochs='ripple', decoding_time_bin_size=0.02, **kwargs):
+    def _perform_specific_epochs_decoding(computation_result: ComputationResult, active_config, decoder_ndim:int=2, filter_epochs='ripple', decoding_time_bin_size=0.02, **kwargs):
         """ TODO: meant to be used by `_display_plot_decoded_epoch_slices` but needs a smarter way to cache the computations and etc. 
         Eventually to replace `pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError._compute_specific_decoded_epochs`
 
@@ -340,8 +342,9 @@ class DefaultComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Computa
         curr_result = computation_result.computed_data.get('specific_epochs_decoding', {})
         
         ## Do the computation:
-        filter_epochs_decoder_result, active_filter_epochs, default_figure_name = _subfn_compute_decoded_epochs(computation_result, active_config, filter_epochs=filter_epochs, decoding_time_bin_size=decoding_time_bin_size)
+        filter_epochs_decoder_result, active_filter_epochs, default_figure_name = _subfn_compute_decoded_epochs(computation_result, active_config, filter_epochs=filter_epochs, decoding_time_bin_size=decoding_time_bin_size, decoder_ndim=decoder_ndim)
 
+        ## Cache the computation result via the tuple key: (default_figure_name, decoding_time_bin_size) e.g. ('Laps', 0.02) or ('Ripples', 0.02)
         crappy_key = (default_figure_name, decoding_time_bin_size)
         curr_result[crappy_key] = (filter_epochs_decoder_result, active_filter_epochs, default_figure_name)
 
@@ -381,7 +384,7 @@ class KnownFilterEpochs(ExtendedEnum):
         return cls.build_member_value_dict([f'Laps',f'PBEs',f'Ripples',f'Replays',f'Laps'])
 
 
-def _subfn_compute_decoded_epochs(computation_result, active_config, filter_epochs='ripple', decoding_time_bin_size=0.02):
+def _subfn_compute_decoded_epochs(computation_result, active_config, filter_epochs='ripple', decoding_time_bin_size=0.02, decoder_ndim:int=2):
     """ compuites a plot with the 1D Marginals either (x and y position axes): the computed posterior for the position from the Bayesian decoder and overlays the animal's actual position over the top. 
     
     It determines which epochs are being referred to (enabling specifying them by a simple string identifier, like 'ripple', 'pbe', or 'laps') and then gets the coresponding data that's needed to recompute the decoded data for them.
@@ -395,7 +398,7 @@ def _subfn_compute_decoded_epochs(computation_result, active_config, filter_epoc
     
     """    
     default_figure_name = 'stacked_epoch_slices_matplotlib_subplots'
-    active_decoder = computation_result.computed_data['pf2D_Decoder']
+    
     
     if isinstance(filter_epochs, str):
         if filter_epochs == 'laps':
@@ -466,11 +469,28 @@ def _subfn_compute_decoded_epochs(computation_result, active_config, filter_epoc
         epoch_description_list = [f'{default_figure_name} {epoch_tuple.label}' for epoch_tuple in active_filter_epochs.to_dataframe()[['label']].itertuples()]
         
     ## BEGIN_FUNCTION_BODY _subfn_compute_decoded_epochs:
+    if decoder_ndim is None:
+        decoder_ndim = 2 # add the 2D version if no alterantive is passed in.
+    if decoder_ndim == 1:
+        one_step_decoder_key = 'pf1D_Decoder'
+        # two_step_decoder_key = 'pf1D_TwoStepDecoder'
+
+    elif decoder_ndim == 2:
+        one_step_decoder_key = 'pf2D_Decoder'
+        # two_step_decoder_key = 'pf2D_TwoStepDecoder'
+    else:
+        raise NotImplementedError # dimensionality must be 1 or 2
+   
+    active_decoder = computation_result.computed_data[one_step_decoder_key]
     filter_epochs_decoder_result = active_decoder.decode_specific_epochs(computation_result.sess.spikes_df, filter_epochs=active_filter_epochs, decoding_time_bin_size=decoding_time_bin_size, debug_print=False)
     filter_epochs_decoder_result.epoch_description_list = epoch_description_list
     return filter_epochs_decoder_result, active_filter_epochs, default_figure_name
 
 
+
+# ==================================================================================================================== #
+# Average Speed/Acceleration per Position Bin                                                                          #
+# ==================================================================================================================== #
 def _subfn_compute_group_stats_for_var(active_position_df, xbin, ybin, variable_name:str = 'speed', debug_print=False):
     """Can compute aggregate statistics (such as the mean) for any column of the position dataframe.
 
