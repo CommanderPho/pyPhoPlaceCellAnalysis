@@ -150,6 +150,12 @@ class ComputedPipelineStage(LoadableInput, LoadableSessionInput, FilterablePipel
                 self.registered_computation_function_dict[registered_name] = computation_function
         
 
+    def unregister_all_computation_functions(self):
+        ## Drops all registered computationf functions (global and non-global) so they can be reloaded fresh:
+        self.registered_global_computation_function_dict = OrderedDict()
+        self.registered_computation_function_dict = OrderedDict()
+
+
     def find_registered_computation_functions(self, registered_names_list, search_mode:FunctionsSearchMode=FunctionsSearchMode.ANY, names_list_is_blacklist:bool=False):
         ''' Finds the list of actual function objects associated with the registered_names_list by using the appropriate dictionary of registered functions depending on whether are_global is True or not.
 
