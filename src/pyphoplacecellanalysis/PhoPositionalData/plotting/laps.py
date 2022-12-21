@@ -14,6 +14,8 @@ from pyphocorehelpers.gui.PyVista.PhoCustomVtkWidgets import PhoWidgetHelper
 import pyvista as pv
 import pyvistaqt as pvqt
 
+from neuropy.utils.matplotlib_helpers import plot_position_curves_figure # for plot_laps_2d
+
 """ 
 
 NOTE: This is a GOOD, general class that offers both 2D (matplot) and 3D (pyvista) functionality
@@ -53,6 +55,9 @@ def _plot_helper_add_arrow(line, position=None, position_mode='rel', direction='
                 add_arrow(line[0], position=curr_lap_num_points, position_mode='index', direction='right', size=20, color='red') # end
                 add_arrow(line[0], position=curr_lap_endpoint, position_mode='abs', direction='right', size=50, color='blue')
                 add_arrow(line[0], position=None, position_mode='rel', direction='right', size=50, color='blue')
+
+
+    ## TODO: general enough to factor out for REUSE?
     """
     if color is None:
         color = line.get_color()
@@ -111,6 +116,9 @@ def _plot_helper_add_span_where_ranges(pos_t: np.ndarray, pos_where_even_lap_ind
         pos_df_is_nonNaN_lap = np.logical_not(np.isnan(pos_df.lap))
         pos_df_is_even_lap = np.logical_and(pos_df_is_nonNaN_lap, (np.remainder(pos_df.lap, 2) == 0))
         pos_df_is_odd_lap = np.logical_and(pos_df_is_nonNaN_lap, (np.remainder(pos_df.lap, 2) != 0))
+
+
+    ## TODO: general enough to factor out for REUSE?
     """
     curr_span_ymin = curr_ax.get_ylim()[0]
     curr_span_ymax = curr_ax.get_ylim()[1]
@@ -131,6 +139,8 @@ def _build_included_mask(mask_shape, crossing_beginings, crossing_endings):
 
     Returns:
         [type]: [description]
+
+    ## TODO: general enough to factor out for REUSE?
     """
     # included_mask = np.full_like(pos_df['x'], False)
     included_mask = np.full(mask_shape, False) 
@@ -174,51 +184,7 @@ def _plot_helper_render_laps(pos_t_rel_seconds, pos_value, crossing_beginings, c
         ax.scatter(pos_t_rel_seconds[curr_highlight_indicies], pos_value[curr_highlight_indicies], s=0.5, c=color)
         # ax.scatter(pos_t_rel_seconds[curr_included_mask], pos_value[curr_included_mask], s=0.5, c=color)
 
-def _plot_position_curves_figure(position_obj, include_velocity=True, include_accel=False, figsize=(24, 10)):
-    """ Renders a figure with a position curve and optionally its higher-order derivatives """
-    num_subplots = 1
-    out_axes_list = []
-    if include_velocity:
-        num_subplots = num_subplots + 1
-    if include_accel:
-        num_subplots = num_subplots + 1
-    subplots=(num_subplots, 1)
-    fig = plt.figure(figsize=figsize, clear=True)
-    gs = plt.GridSpec(subplots[0], subplots[1], figure=fig, hspace=0.02)
-    
-    ax0 = fig.add_subplot(gs[0])
-    ax0.plot(position_obj.time, position_obj.x, 'k')
-    ax0.set_ylabel('pos_x')
-    out_axes_list.append(ax0)
-    
-    if include_velocity:
-        ax1 = fig.add_subplot(gs[1])
-        # ax1.plot(position_obj.time, pos_df['velocity_x'], 'grey')
-        # ax1.plot(position_obj.time, pos_df['velocity_x_smooth'], 'r')
-        ax1.plot(position_obj.time, position_obj._data['velocity_x_smooth'], 'k')
-        ax1.set_ylabel('Velocity_x')
-        ax0.set_xticklabels([]) # this is intensionally ax[i-1], as we want to disable the tick labels on above plots        
-        out_axes_list.append(ax1)
 
-    if include_accel:  
-        ax2 = fig.add_subplot(gs[2])
-        # ax2.plot(position_obj.time, position_obj.velocity)
-        # ax2.plot(position_obj.time, pos_df['velocity_x'])
-        ax2.plot(position_obj.time, position_obj._data['acceleration_x'], 'k')
-        # ax2.plot(position_obj.time, pos_df['velocity_y'])
-        ax2.set_ylabel('Higher Order Terms')
-        ax1.set_xticklabels([]) # this is intensionally ax[i-1], as we want to disable the tick labels on above plots
-        out_axes_list.append(ax2)
-    
-    # Shared:
-    # ax0.get_shared_x_axes().join(ax0, ax1)
-    ax0.get_shared_x_axes().join(*out_axes_list)
-    ax0.set_xticklabels([])
-    ax0.set_xlim([position_obj.time[0], position_obj.time[-1]])
-
-    return fig, out_axes_list
-
-    
 
 # ==================================================================================================================== #
 # MAIN FUNCTIONS                                                                                                       #
@@ -241,7 +207,7 @@ def plot_laps_2d(sess, legacy_plotting_mode=True):
     curr_laps_df = sess.laps.to_dataframe()
     
     
-    fig, out_axes_list = _plot_position_curves_figure(position_obj, include_velocity=True, include_accel=True, figsize=(24, 10))    
+    fig, out_axes_list = plot_position_curves_figure(position_obj, include_velocity=True, include_accel=True, figsize=(24, 10))    
 
     ## Draw on top of the existing position curves with the lap colors:
     if legacy_plotting_mode:

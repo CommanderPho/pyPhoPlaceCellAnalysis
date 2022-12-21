@@ -582,6 +582,7 @@ class BayesianPlacemapPositionDecoder(PlacemapPositionDecoder):
             binned_spikes = ['unit_specific_time_binned_spike_counts', 'total_spike_counts_per_window'],
             intermediate_computations = ['F', 'P_x'],
             posteriors = ['p_x_given_n'],
+            most_likely = ['most_likely_positions'],
             other_variables = ['neuron_IDXs', 'neuron_IDs']
         )
         for a_category_name, variable_names_list in variable_names_dict.items():
