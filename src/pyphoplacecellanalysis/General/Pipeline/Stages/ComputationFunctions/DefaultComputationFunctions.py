@@ -56,10 +56,7 @@ class DefaultComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Computa
     
     def _perform_two_step_position_decoding_computation(computation_result: ComputationResult, debug_print=False, **kwargs):
         """ Builds the Zhang Velocity/Position For 2-step Bayesian Decoder for 2D Placefields
-        TODO: Add 1D Support now that 'pf1D_Decoder' has been added.
         """
-
-
 
         def _subfn_compute_two_step_decoder(active_xbins, active_ybins, prev_one_step_bayesian_decoder, pos_df, computation_config, debug_print=False):
             """ captures debug_print 
@@ -125,7 +122,7 @@ class DefaultComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Computa
             for time_window_bin_idx in np.arange(prev_one_step_bayesian_decoder.num_time_windows):
                 flat_p_x_given_n = prev_one_step_bayesian_decoder.flat_p_x_given_n[:, time_window_bin_idx] # this gets the specific n_t for this time window                
                 # previous positions as determined by the two-step decoder: this uses the two_step previous position instead of the one_step previous position:
-                prev_x_position = two_step_decoder_result['most_likely_positions'][:, time_window_bin_idx-1]            
+                prev_x_position = two_step_decoder_result['most_likely_positions'][:, time_window_bin_idx-1] # TODO: is this okay for 1D as well?
                 active_k = two_step_decoder_result['all_scaling_factors_k'][time_window_bin_idx] # get the specific k value
                 # active_k = two_step_decoder_result['k']
                 if debug_print:
@@ -166,7 +163,6 @@ class DefaultComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Computa
             return two_step_decoder_result
 
 
-
         ndim = kwargs.get('ndim', 2)
         if ndim is None:
             ndim = 2 # add the 2D version if no alterantive is passed in.
@@ -187,32 +183,10 @@ class DefaultComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Computa
         active_xbins = xbin
         active_ybins = ybin      
 
-
         computation_result.computed_data[two_step_decoder_key] = _subfn_compute_two_step_decoder(active_xbins, active_ybins, prev_one_step_bayesian_decoder, computation_result.sess.position.df, computation_config=computation_result.computation_config, debug_print=debug_print)
         ## In this new mode we'll add the two-step properties to the original one-step decoder:
         ## Adds the directly accessible properties to the active_one_step_decoder after they're computed in the active_two_step_decoder so that they can be plotted with the same functions/etc.
-
-        # None initialize two-step properties on the one_step_decoder:
-        prev_one_step_bayesian_decoder.p_x_given_n_and_x_prev = None
-        prev_one_step_bayesian_decoder.two_step_most_likely_positions = None
-
-        prev_one_step_bayesian_decoder.marginal.x.p_x_given_n_and_x_prev = None
-        prev_one_step_bayesian_decoder.marginal.x.two_step_most_likely_positions_1D = None
-
-        if prev_one_step_bayesian_decoder.marginal.y is not None:
-            prev_one_step_bayesian_decoder.marginal.y.p_x_given_n_and_x_prev = None
-            prev_one_step_bayesian_decoder.marginal.y.two_step_most_likely_positions_1D = None
-
-        # Set the two-step properties on the one-step decoder:
-        prev_one_step_bayesian_decoder.p_x_given_n_and_x_prev = computation_result.computed_data[two_step_decoder_key].p_x_given_n_and_x_prev.copy()
-        prev_one_step_bayesian_decoder.two_step_most_likely_positions = computation_result.computed_data[two_step_decoder_key].most_likely_positions.copy()
-
-        prev_one_step_bayesian_decoder.marginal.x.p_x_given_n_and_x_prev = computation_result.computed_data[two_step_decoder_key].marginal.x.p_x_given_n.copy()
-        prev_one_step_bayesian_decoder.marginal.x.two_step_most_likely_positions_1D = computation_result.computed_data[two_step_decoder_key].marginal.x.most_likely_positions_1D.copy()
-
-        if prev_one_step_bayesian_decoder.marginal.y is not None:
-            prev_one_step_bayesian_decoder.marginal.y.p_x_given_n_and_x_prev = computation_result.computed_data[two_step_decoder_key].marginal.y.p_x_given_n.copy()
-            prev_one_step_bayesian_decoder.marginal.y.two_step_most_likely_positions_1D = computation_result.computed_data[two_step_decoder_key].marginal.y.most_likely_positions_1D.copy()
+        prev_one_step_bayesian_decoder.two_step_decoder_result(computation_result.computed_data[two_step_decoder_key])
 
         return computation_result
 

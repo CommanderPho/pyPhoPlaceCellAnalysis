@@ -505,10 +505,20 @@ class BayesianPlacemapPositionDecoder(PlacemapPositionDecoder):
     @property
     def ratemap(self):
         return self.pf.ratemap
+
     @property
     def ndim(self):
-        return self.pf.ndim
-    
+        return int(self.pf.ndim)
+
+    @property
+    def num_neurons(self):
+        """The num_neurons property."""
+        return self.ratemap.n_neurons # np.shape(self.neuron_IDs) # or self.ratemap.n_neurons
+
+    # @property
+    # def n_xbins(self):
+    #     """The num_neurons property."""
+    #     return np.shape(self.P_x)[0]
             
     # ratemap properties (xbin & ybin)  
     @property
@@ -578,7 +588,8 @@ class BayesianPlacemapPositionDecoder(PlacemapPositionDecoder):
         
     def debug_dump_print(self):
         """ dumps the state for debugging purposes """
-        variable_names_dict = dict(time_variable_names = ['time_bin_size', 'time_window_edges', 'time_window_edges_binning_info', 'time_window_centers','time_window_center_binning_info'],
+        variable_names_dict = dict(summary = ['ndim', 'num_neurons', 'num_time_windows'],
+            time_variable_names = ['time_bin_size', 'time_window_edges', 'time_window_edges_binning_info', 'time_window_centers','time_window_center_binning_info'],
             binned_spikes = ['unit_specific_time_binned_spike_counts', 'total_spike_counts_per_window'],
             intermediate_computations = ['F', 'P_x'],
             posteriors = ['p_x_given_n'],
@@ -593,12 +604,16 @@ class BayesianPlacemapPositionDecoder(PlacemapPositionDecoder):
                 a_var_value = getattr(self, a_variable_name)
                 a_var_shape = safe_get_variable_shape(a_var_value)
                 if a_var_shape is None:
-                    if isinstance(a_var_value, (int, float)):
+                    if isinstance(a_var_value, (int, float, np.number)):
                         a_var_shape = a_var_value # display the value directly if we can
                     else:
                         a_var_shape = 'SCALAR' # otherwise just output the literal text "SCALAR"
                 print(f'\t {a_variable_name}: {a_var_shape}')
 
+        # TODO: Handle marginals:
+        # self.marginal.x
+
+    # External Updating __________________________________________________________________________________________________ #
 
     def conform_to_position_bins(self, target_one_step_decoder, force_recompute=True):
         """ After the underlying placefield (self.pf)'s position bins are changed by calling pf.conform_to_position_bins(...) externally, the computations for the decoder will be messed up (and out of sync).
@@ -641,7 +656,40 @@ class BayesianPlacemapPositionDecoder(PlacemapPositionDecoder):
         return self, did_recompute
 
 
+    def add_two_step_decoder_results(self, two_step_decoder_result):
+        """ adds the results from the computed two_step_decoder to self (the one_step_decoder)
+        ## In this new mode we'll add the two-step properties to the original one-step decoder:
+        ## Adds the directly accessible properties to the active_one_step_decoder after they're computed in the active_two_step_decoder so that they can be plotted with the same functions/etc.
+
+        Inputs:
+            two_step_decoder_result: computation_result.computed_data[two_step_decoder_key]
+ 
+        """
         
+        # None initialize two-step properties on the one_step_decoder:
+        self.p_x_given_n_and_x_prev = None
+        self.two_step_most_likely_positions = None
+
+        self.marginal.x.p_x_given_n_and_x_prev = None
+        self.marginal.x.two_step_most_likely_positions_1D = None
+
+        if self.marginal.y is not None:
+            self.marginal.y.p_x_given_n_and_x_prev = None
+            self.marginal.y.two_step_most_likely_positions_1D = None
+
+        # Set the two-step properties on the one-step decoder:
+        self.p_x_given_n_and_x_prev = two_step_decoder_result.p_x_given_n_and_x_prev.copy()
+        self.two_step_most_likely_positions = two_step_decoder_result.most_likely_positions.copy()
+
+        self.marginal.x.p_x_given_n_and_x_prev = two_step_decoder_result.marginal.x.p_x_given_n.copy()
+        self.marginal.x.two_step_most_likely_positions_1D = two_step_decoder_result.marginal.x.most_likely_positions_1D.copy()
+
+        if self.marginal.y is not None:
+            self.marginal.y.p_x_given_n_and_x_prev = two_step_decoder_result.marginal.y.p_x_given_n.copy()
+            self.marginal.y.two_step_most_likely_positions_1D = two_step_decoder_result.marginal.y.most_likely_positions_1D.copy()
+
+
+
     # ==================================================================================================================== #
     # Private Methods                                                                                                      #
     # ==================================================================================================================== #
