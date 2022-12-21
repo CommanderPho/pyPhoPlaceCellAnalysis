@@ -397,7 +397,10 @@ class KnownFilterEpochs(ExtendedEnum):
 
 
     @classmethod
-    def process_functionList(cls, computation_result, filter_epochs, default_figure_name='stacked_epoch_slices_matplotlib_subplots'):
+    def process_functionList(cls, computation_result, filter_epochs, min_epoch_included_duration, default_figure_name='stacked_epoch_slices_matplotlib_subplots'):
+        # min_epoch_included_duration = decoding_time_bin_size * float(2) # 0.06666
+        # min_epoch_included_duration = 0.06666
+
         if isinstance(filter_epochs, str):
             print(f'filter_epochs string: "{filter_epochs}"')
             filter_epochs = cls.init(value=filter_epochs) # init an enum object from the string
@@ -439,19 +442,23 @@ class KnownFilterEpochs(ExtendedEnum):
                 
             elif filter_epochs.name == KnownFilterEpochs.REPLAY.name:
                 active_filter_epochs = deepcopy(computation_result.sess.replay) # epoch object
-                # active_filter_epochs = active_filter_epochs.drop_duplicates("start") # tries to remove duplicate replays to take care of `AssertionError: Intervals in start_stop_times_arr must be non-overlapping`, but it hasn't worked.
-                if not 'stop' in active_filter_epochs.columns:
-                    # Make sure it has the 'stop' column which is expected as opposed to the 'end' column
-                    active_filter_epochs['stop'] = active_filter_epochs['end'].copy()
+                active_filter_epochs = active_filter_epochs.epochs.get_non_overlapping_df()
+                active_filter_epochs = active_filter_epochs[active_filter_epochs.duration >= min_epoch_included_duration] # only include those epochs which are greater than or equal to two decoding time bins
 
-                # TODO 2022-10-04 - CORRECTNESS - AssertionError: Intervals in start_stop_times_arr must be non-overlapping. I believe this is due to the stop values overlapping somewhere
+                # # active_filter_epochs = active_filter_epochs.drop_duplicates("start") # tries to remove duplicate replays to take care of `AssertionError: Intervals in start_stop_times_arr must be non-overlapping`, but it hasn't worked.
+                # if not 'stop' in active_filter_epochs.columns:
+                #     # Make sure it has the 'stop' column which is expected as opposed to the 'end' column
+                #     active_filter_epochs['stop'] = active_filter_epochs['end'].copy()
+
+                # # TODO 2022-10-04 - CORRECTNESS - AssertionError: Intervals in start_stop_times_arr must be non-overlapping. I believe this is due to the stop values overlapping somewhere
+                # print(f'active_filter_epochs: {active_filter_epochs}')
+                # ## HANDLE OVERLAPPING EPOCHS: Note that there is a problem that occurs here with overlapping epochs for laps. Below we remove any overlapping epochs and leave only the valid ones.
+                # is_non_overlapping = get_non_overlapping_epochs(active_filter_epochs[['start','stop']].to_numpy()) # returns a boolean array of the same length as the number of epochs 
+                # # Just drop the rows of the dataframe that are overlapping:
+                # active_filter_epochs = active_filter_epochs.loc[is_non_overlapping]
                 print(f'active_filter_epochs: {active_filter_epochs}')
-                ## HANDLE OVERLAPPING EPOCHS: Note that there is a problem that occurs here with overlapping epochs for laps. Below we remove any overlapping epochs and leave only the valid ones.
-                is_non_overlapping = get_non_overlapping_epochs(active_filter_epochs[['start','stop']].to_numpy()) # returns a boolean array of the same length as the number of epochs 
-                # Just drop the rows of the dataframe that are overlapping:
-                active_filter_epochs = active_filter_epochs.loc[is_non_overlapping]
-                print(f'active_filter_epochs: {active_filter_epochs}')
-                epoch_description_list = [f'{default_figure_name} {epoch_tuple.flat_replay_idx}' for epoch_tuple in active_filter_epochs[['flat_replay_idx']].itertuples()]
+                epoch_description_list = [f'{default_figure_name} {epoch_tuple.label}' for epoch_tuple in active_filter_epochs[['label']].itertuples()]
+                # epoch_description_list = [f'{default_figure_name} {epoch_tuple.flat_replay_idx}' for epoch_tuple in active_filter_epochs[['flat_replay_idx']].itertuples()]
                 
             else:
                 print(f'filter_epochs "{filter_epochs.name}" could not be parsed into KnownFilterEpochs but is string.')
@@ -478,8 +485,8 @@ def _subfn_compute_decoded_epochs(computation_result, active_config, filter_epoc
     
     """    
     default_figure_name = 'stacked_epoch_slices_matplotlib_subplots'
-    
-    active_filter_epochs, default_figure_name, epoch_description_list = KnownFilterEpochs.process_functionList(computation_result=computation_result, filter_epochs=filter_epochs, default_figure_name=default_figure_name)
+    min_epoch_included_duration = decoding_time_bin_size * float(2) # 0.06666 # all epochs shorter than min_epoch_included_duration will be excluded from analysis
+    active_filter_epochs, default_figure_name, epoch_description_list = KnownFilterEpochs.process_functionList(computation_result=computation_result, filter_epochs=filter_epochs, min_epoch_included_duration=min_epoch_included_duration, default_figure_name=default_figure_name)
 
     ## BEGIN_FUNCTION_BODY _subfn_compute_decoded_epochs:
     if decoder_ndim is None:
