@@ -357,7 +357,6 @@ class DefaultComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Computa
             filter_epochs_decoder_result, active_filter_epochs, default_figure_name = _subfn_compute_decoded_epochs(computation_result, active_config, filter_epochs=filter_epochs, decoding_time_bin_size=decoding_time_bin_size, decoder_ndim=decoder_ndim)
 
             ## Cache the computation result via the tuple key: (default_figure_name, decoding_time_bin_size) e.g. ('Laps', 0.02) or ('Ripples', 0.02)
-            # computation_tuple_key = (default_figure_name, decoding_time_bin_size)
             curr_result[computation_tuple_key] = (filter_epochs_decoder_result, active_filter_epochs, default_figure_name)
 
         computation_result.computed_data['specific_epochs_decoding'] = curr_result
@@ -375,10 +374,7 @@ from pyphocorehelpers.DataStructure.enum_helpers import ExtendedEnum
 class KnownFilterEpochs(ExtendedEnum):
     """Describes the type of file progress actions that can be performed to get the right verbage.
     Used by `_subfn_compute_decoded_epochs(...)`
-
-    TODO: NOT YET USED. Replace the switch in _subfn_compute_decoded_epochs with this class
-
-
+   
     """
     LAP = "lap"
     PBE = "pbe"

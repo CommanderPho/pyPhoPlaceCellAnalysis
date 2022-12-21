@@ -957,7 +957,7 @@ class BayesianPlacemapPositionDecoder(PlacemapPositionDecoder):
             # 1D Decoder:
             # p_x_given_n should come in with shape (x_bins, time_bins)
             curr_unit_marginal_x.p_x_given_n = p_x_given_n.copy() # Result should be [x_bins, time_bins]
-            curr_unit_marginal_x.p_x_given_n = curr_unit_marginal_x.p_x_given_n / np.sum(curr_unit_marginal_x.p_x_given_n, axis=0) # should already be normalized but do it again anyway just in case (so there's a normalized distribution at each timestep)
+            curr_unit_marginal_x.p_x_given_n = curr_unit_marginal_x.p_x_given_n # / np.sum(curr_unit_marginal_x.p_x_given_n, axis=0) # should already be normalized but do it again anyway just in case (so there's a normalized distribution at each timestep)
             # for the 1D decoder case, there are no y-positions
             curr_unit_marginal_y = None
 
