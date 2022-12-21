@@ -97,6 +97,8 @@ class DefaultComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Computa
             two_step_decoder_result['k'] = 1.0
 
             if (prev_one_step_bayesian_decoder.ndim < 2):
+                assert prev_one_step_bayesian_decoder.ndim == 1, f"prev_one_step_bayesian_decoder.ndim must be either 1 or 2, but prev_one_step_bayesian_decoder.ndim: {prev_one_step_bayesian_decoder.ndim}"
+                print(f'prev_one_step_bayesian_decoder.ndim == 1, so using [0.0] as active_ybin_centers.')
                 active_ybin_centers = np.array([0.0])
 
             else:

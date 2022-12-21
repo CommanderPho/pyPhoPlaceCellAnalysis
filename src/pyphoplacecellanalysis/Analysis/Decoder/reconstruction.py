@@ -600,7 +600,7 @@ class BayesianPlacemapPositionDecoder(PlacemapPositionDecoder):
                 print(f'\t {a_variable_name}: {a_var_shape}')
 
 
-    def conform_to_position_bins(self, target_one_step_decoder):
+    def conform_to_position_bins(self, target_one_step_decoder, force_recompute=True):
         """ After the underlying placefield (self.pf)'s position bins are changed by calling pf.conform_to_position_bins(...) externally, the computations for the decoder will be messed up (and out of sync).
             Calling this function detects this issue.
             # 2022-12-09 - We want to be able to have both long/short track placefields have the same spatial bins.
@@ -628,7 +628,7 @@ class BayesianPlacemapPositionDecoder(PlacemapPositionDecoder):
         self.pf, did_update_internal_pf_bins = self.pf.conform_to_position_bins(target_one_step_decoder.pf)
         
         # Update the one_step_decoders after the short bins have been updated:
-        if (did_update_internal_pf_bins or (self.p_x_given_n.shape[0] < target_one_step_decoder.p_x_given_n.shape[0])):
+        if (force_recompute or did_update_internal_pf_bins or (self.p_x_given_n.shape[0] < target_one_step_decoder.p_x_given_n.shape[0])):
             # Compute:
             print(f'self will be re-binned to match target_one_step_decoder...')
             self.setup()
