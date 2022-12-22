@@ -144,6 +144,18 @@ class DefaultComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Computa
             # # np.shape(self.most_likely_position_indicies) # (2, 85841)
             """ Computes the most likely positions at each timestep from flat_p_x_given_n_and_x_prev """
             two_step_decoder_result['most_likely_position_flat_indicies'] = np.argmax(two_step_decoder_result['flat_p_x_given_n_and_x_prev'], axis=0)
+            
+            # Adds `most_likely_position_flat_max_likelihood_values`:
+            # Same as np.amax(x, axis=axis_idx)
+            # axis_idx = 0
+            # x = two_step_decoder_result['flat_p_x_given_n_and_x_prev']
+            # index_array = two_step_decoder_result['most_likely_position_flat_indicies']
+            # two_step_decoder_result['most_likely_position_flat_max_likelihood_values'] = np.take_along_axis(x, np.expand_dims(index_array, axis=axis_idx), axis=axis_idx).squeeze(axis=axis_idx)
+            two_step_decoder_result['most_likely_position_flat_max_likelihood_values'] = np.take_along_axis(two_step_decoder_result['flat_p_x_given_n_and_x_prev'], np.expand_dims(two_step_decoder_result['most_likely_position_flat_indicies'], axis=0), axis=0).squeeze(axis=0) # get the flat maximum values
+            print(f"{two_step_decoder_result['most_likely_position_flat_max_likelihood_values'].shape = }")
+            # Reshape the maximum values:
+            # two_step_decoder_result['most_likely_position_max_likelihood_values'] = np.array(np.unravel_index(two_step_decoder_result['most_likely_position_flat_max_likelihood_values'], prev_one_step_bayesian_decoder.original_position_data_shape)) # convert back to an array
+
             # np.shape(self.most_likely_position_flat_indicies) # (85841,)
             two_step_decoder_result['most_likely_position_indicies'] = np.array(np.unravel_index(two_step_decoder_result['most_likely_position_flat_indicies'], prev_one_step_bayesian_decoder.original_position_data_shape)) # convert back to an array
             # np.shape(self.most_likely_position_indicies) # (2, 85841)

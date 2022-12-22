@@ -1043,6 +1043,11 @@ class BayesianPlacemapPositionDecoder(PlacemapPositionDecoder):
             assert np.allclose(curr_unit_marginal_x['p_x_given_n'], p_x_given_n), f"1D Decoder should have an x-posterior equal to its own posterior"
             assert np.allclose(curr_unit_marginal_x['most_likely_positions_1D'], most_likely_positions), f"1D Decoder should have an x-posterior with most_likely_positions_1D equal to its own most_likely_positions"
 
+
+            # # Same as np.amax(x, axis=-1)
+            # np.take_along_axis(x, np.expand_dims(index_array, axis=-1), axis=-1).squeeze(axis=-1)
+
+
         else:
             curr_unit_marginal_x.most_likely_positions_1D = most_likely_positions[:,0].T
             curr_unit_marginal_y.most_likely_positions_1D = most_likely_positions[:,1].T
