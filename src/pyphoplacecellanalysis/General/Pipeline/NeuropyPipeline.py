@@ -128,6 +128,8 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
         
         self._persistance_state = None # indicate that this pipeline doesn't have a corresponding pickle file that it was loaded from
         
+        self._plot_object = None
+
         _stage_changed_connection = self.sigStageChanged.connect(self.on_stage_changed)
         self.set_input(name=name, session_data_type=session_data_type, basedir=basedir, load_function=load_function, post_load_functions=post_load_functions)
 
@@ -529,6 +531,7 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
         # Remove the unpicklable entries.
         del state['_logger']
         del state['_persistance_state']
+        del state['_plot_object']
         # del state['_pickle_path']
         return state
 
@@ -543,7 +546,8 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
         self._logger.info(f'NeuropyPipeline.__setstate__(state="{state}")')
 
         self._persistance_state = None # the pickle_path has to be set manually after loading
-        
+        self._plot_object = None
+
         _stage_changed_connection = self.sigStageChanged.connect(self.on_stage_changed)
          
         # Reload both the computation and display functions to get the updated values:

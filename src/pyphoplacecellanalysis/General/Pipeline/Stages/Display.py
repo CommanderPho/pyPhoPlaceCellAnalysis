@@ -21,6 +21,35 @@ from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.FiringStati
 from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.MultiContextComparingDisplayFunctions.MultiContextComparingDisplayFunctions import MultiContextComparingDisplayFunctions
 
 
+
+class Plot(object):
+    """a member dot accessor for display functions.
+
+    2022-12-13
+
+    Can call like: `plot._display_1d_placefields`
+
+    """
+    def __init__(self, curr_active_pipeline):
+        super(Plot, self).__init__()
+        self._pipeline_reference = curr_active_pipeline
+
+    def __dir__(self):
+        return self._pipeline_reference.registered_display_function_names # ['area', 'perimeter', 'location']
+    
+    def __getattr__(self, k):
+        if '__getstate__' in k: # a trick to make spyder happy when inspecting dotdict
+            def _dummy():
+                pass
+            return _dummy
+        # return self[k]
+        # return self._pipeline_reference.display(display_function=k, active_identifying_session_ctx=self._pipeline_reference.sess.get_context())
+        return self._pipeline_reference.display(display_function=k, active_session_configuration_context=list(self._pipeline_reference.filtered_contexts.values())[-1])
+
+
+
+
+
 def get_neuron_identities(active_placefields, debug_print=False):
     """ 
     
@@ -132,7 +161,9 @@ class DisplayPipelineStage(ComputedPipelineStage):
         self.filtered_epochs = computed_stage.filtered_epochs
         self.active_configs = computed_stage.active_configs # active_config corresponding to each filtered session/epoch
         self.computation_results = computed_stage.computation_results
+        self.global_computation_results = computed_stage.global_computation_results
         self.registered_computation_function_dict = computed_stage.registered_computation_function_dict
+        self.registered_global_computation_function_dict = computed_stage.registered_global_computation_function_dict
 
         # Initialize custom fields:
         self.display_output = display_output or DynamicParameters()
@@ -209,7 +240,11 @@ class PipelineWithDisplayPipelineStageMixin:
         last_added_display_output = self.display_output[self.display_output_last_added_context]
         return last_added_display_output
 
-
+    @property
+    def plot(self):
+        """An interactive accessor object for display functions."""
+        return self._plot_object
+    
     
     @property
     def filtered_contexts(self):
@@ -245,7 +280,13 @@ class PipelineWithDisplayPipelineStageMixin:
         
     def reload_default_display_functions(self):
         """ reloads/re-registers the default display functions after adding a new one """
-        self.stage.reload_default_display_functions() 
+        self.stage.reload_default_display_functions()
+
+        # rebuilds the convenience plot object:
+        self._plot_object = None
+        self._plot_object = Plot(self)
+
+
         
     def prepare_for_display(self, root_output_dir=r'W:\data\Output', should_smooth_maze=True):
         assert (self.is_computed), "Current self.is_computed must be true. Call self.perform_computations to reach this step."
@@ -347,11 +388,7 @@ class PipelineWithDisplayPipelineStageMixin:
         curr_display_output = display_function(self.computation_results[active_session_configuration_name], self.active_configs[active_session_configuration_name], owning_pipeline=self, active_config_name=active_session_configuration_name, **kwargs)
         self.display_output[active_display_fn_identifying_ctx] = curr_display_output # sets the internal display reference to that item
 
-
         return curr_display_output
-
-        # return display_function(self.computation_results[active_session_configuration_name], self.active_configs[active_session_configuration_name], owning_pipeline=self, active_config_name=active_session_configuration_name, **kwargs)
-        
 
 
     # def _pdf_display(self, display_function, active_session_configuration_context, **kwargs):
