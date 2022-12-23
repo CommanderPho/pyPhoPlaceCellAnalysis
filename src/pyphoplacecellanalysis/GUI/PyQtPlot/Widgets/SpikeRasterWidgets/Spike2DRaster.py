@@ -1085,7 +1085,7 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
         
 
 
-
+    # Debug Printing/Logging _____________________________________________________________________________________________ #
     
     def debug_print_spike_raster_2D_specific_plots_info(self, indent_string = '\t'):
         """ Prints a bunch of debugging info related to its specific plots and what they're displaying.

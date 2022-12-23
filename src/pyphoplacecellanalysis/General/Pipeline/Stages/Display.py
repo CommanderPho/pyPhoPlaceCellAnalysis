@@ -27,7 +27,8 @@ class Plot(object):
 
     2022-12-13
 
-    Can call like: `plot._display_1d_placefields`
+    Can call like:
+        `curr_active_pipeline.plot._display_1d_placefields`
 
     """
     def __init__(self, curr_active_pipeline):
