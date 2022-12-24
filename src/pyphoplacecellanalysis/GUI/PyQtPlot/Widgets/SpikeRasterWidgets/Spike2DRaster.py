@@ -34,6 +34,28 @@ from pyphoplacecellanalysis.General.Mixins.SpikesRenderingBaseMixin import Spike
 
 from pyphoplacecellanalysis.GUI.PyQtPlot.DockingWidgets.DynamicDockDisplayAreaContent import CustomDockDisplayConfig 
 
+
+from pyphocorehelpers.DataStructure.enum_helpers import ExtendedEnum
+
+class SynchronizedPlotMode(ExtendedEnum):
+    """Describes the type of file progress actions that can be performed to get the right verbage.
+    Used by `print_file_progress_message(...)`
+    """
+    NO_SYNC = "no_sync" # independent 
+    TO_GLOBAL_DATA = "to_global_data" # synchronized only to the global start and end times
+    TO_WINDOW = "Generic" # synchronized (via a connection) to the active window, meaning it updates when the slider moves.
+
+    # @property
+    # def propertyName(self):
+    #     return SynchronizedPlotMode.propertyNameList()[self]
+
+    # # Static properties
+    # @classmethod
+    # def propertyNameList(cls):
+    #     return cls.build_member_value_dict(['from','to',':'])
+
+
+
 class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Render2DScrollWindowPlotMixin, SpikeRasterBase):
     """ Displays a 2D version of a raster plot with the spikes occuring along a plane. 
     
@@ -254,6 +276,7 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
         # Required for Time Curves:
         self.params.time_curves_datasource = None # required before calling self._update_plot_ranges()
     
+       
 
     def _build_cell_configs(self):
         """ Adds the neuron/cell configurations that are used to color and format the scatterplot spikes and such. 
@@ -431,8 +454,11 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
         self.ui.dynamic_docked_widget_container = NestedDockAreaWidget()
         self.ui.dynamic_docked_widget_container.setObjectName("dynamic_docked_widget_container")
         self.ui.layout.addWidget(self.ui.dynamic_docked_widget_container, 1, 0) # Add the dynamic container as the second row
-        
-        
+
+
+        # Required for dynamic matplotlib figures (2022-12-23 added, not sure how it relates to above):
+        self._setupUI_matplotlib_render_plots()
+
     
         
     def _run_delayed_gui_load_code(self):
@@ -943,6 +969,12 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
 
         
     # matplotlib render subplot __________________________________________________________________________________________ #
+
+    def _setupUI_matplotlib_render_plots(self):
+        # performs required setup to enable dynamically added matplotlib render subplots.
+        self.ui.matplotlib_view_widgets = {} # empty dictionary
+
+
     def add_new_matplotlib_render_plot_widget(self, row=1, col=0, name='matplotlib_view_widget'):
         """ creates a new dynamic MatplotlibTimeSynchronizedWidget, a container widget that holds a matplotlib figure, and adds it as a row to the main layout
         
@@ -951,10 +983,10 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
         if dDisplayItem is None:
             # No extant matplotlib_view_widget and display_dock currently, create a new one:
                 
-            ## TODO: hardcoded single-widget:
-            self.ui.matplotlib_view_widget = MatplotlibTimeSynchronizedWidget() # Matplotlib widget directly
-            self.ui.matplotlib_view_widget.setObjectName(name)
-            self.ui.matplotlib_view_widget.plots.fig.subplots_adjust(top=1.0, bottom=0.0, left=0.0, right=1.0, hspace=0.0, wspace=0.0)
+            ## TODO: hardcoded single-widget: used to be named `self.ui.matplotlib_view_widget`
+            self.ui.matplotlib_view_widgets[name] = MatplotlibTimeSynchronizedWidget() # Matplotlib widget directly
+            self.ui.matplotlib_view_widgets[name].setObjectName(name)
+            self.ui.matplotlib_view_widgets[name].plots.fig.subplots_adjust(top=1.0, bottom=0.0, left=0.0, right=1.0, hspace=0.0, wspace=0.0)
             
             ## Add directly to the main grid layout:
             # self.ui.layout.addWidget(self.ui.matplotlib_view_widget, row, col)
@@ -968,40 +1000,98 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
             # else:
             dockAddLocationOpts = ['bottom'] #no previous dock for this filter, so use absolute positioning
             _, dDisplayItem = self.ui.dynamic_docked_widget_container.add_display_dock(name, dockSize=(min_width, min_height), display_config=FigureWidgetDockDisplayConfig(showCloseButton=True),
-                                                                                    widget=self.ui.matplotlib_view_widget, dockAddLocationOpts=dockAddLocationOpts, autoOrientation=False)
+                                                                                    widget=self.ui.matplotlib_view_widgets[name], dockAddLocationOpts=dockAddLocationOpts, autoOrientation=False)
             dDisplayItem.setOrientation('horizontal', force=True)
             dDisplayItem.updateStyle()
             dDisplayItem.update()
             
             ## Add the plot:
-            fig = self.ui.matplotlib_view_widget.getFigure()
-            ax = self.ui.matplotlib_view_widget.getFigure().add_subplot(111) # Adds a single axes to the figure
+            fig = self.ui.matplotlib_view_widgets[name].getFigure()
+            ax = self.ui.matplotlib_view_widgets[name].getFigure().add_subplot(111) # Adds a single axes to the figure
         
         else:
             # Already had the widget
             print(f'already had the valid matplotlib view widget and its display dock. Returning extant.')
-            fig = self.ui.matplotlib_view_widget.getFigure()
-            ax = self.ui.matplotlib_view_widget.ax
-
+            fig = self.ui.matplotlib_view_widgets[name].getFigure()
+            ax = self.ui.matplotlib_view_widgets[name].ax
 
         # self.sync_matplotlib_render_plot_widget()
+        return self.ui.matplotlib_view_widgets[name], fig, ax
+
+
+    def find_matplotlib_render_plot_widget(self, identifier):
+        """ finds the existing dynamically added matplotlib_render_plot_widget. 
+        returns (widget, fig, ax)
+        """
+        active_matplotlib_view_widget = self.ui.matplotlib_view_widgets.get(identifier, None)
+        if active_matplotlib_view_widget is not None:
+            return active_matplotlib_view_widget, active_matplotlib_view_widget.getFigure(), active_matplotlib_view_widget.ax
+        else:
+            print(f'active_matplotlib_view_widget with identifier {identifier} was not found!')
+            return None, None, None
+
         
-        return self.ui.matplotlib_view_widget, fig, ax
-        
-    def remove_matplotlib_render_plot_widget(self):
+    def remove_matplotlib_render_plot_widget(self, identifier):
         """ removes the subplot - does not work yet """
         ## TODO: need to remove the display item from self.ui.dynamic_docked_widget_container?
-        # self.ui.dynamic_docked_widget_container
-        self.ui.layout.removeWidget(self.ui.matplotlib_view_widget) # Remove the matplotlib widget
-        self.ui.matplotlib_view_widget = None # Set the matplotlib_view_widget to None ## TODO: this doesn't actually remove it from the UI container does it?
+        active_matplotlib_view_widget = self.ui.matplotlib_view_widgets.get(identifier, None)
+        if active_matplotlib_view_widget is not None:
+            # self.ui.dynamic_docked_widget_container
+            self.ui.layout.removeWidget(active_matplotlib_view_widget) # Remove the matplotlib widget
+            active_matplotlib_view_widget = None # Set the matplotlib_view_widget to None ## TODO: this doesn't actually remove it from the UI container does it?
+            ## remove from the dictionary
+            del self.ui.matplotlib_view_widgets[identifier]
+
+        else:
+            print(f'active_matplotlib_view_widget with identifier {identifier} was not found!')
 
 
-    def sync_matplotlib_render_plot_widget(self):
-        """ """
-        # Perform Initial (one-time) update from source -> controlled:
-        self.ui.matplotlib_view_widget.on_window_changed(self.spikes_window.active_window_start_time, self.spikes_window.active_window_end_time)
-        sync_connection = self.window_scrolled.connect(self.ui.matplotlib_view_widget.on_window_changed)
-        return sync_connection
+    def sync_matplotlib_render_plot_widget(self, identifier, sync_mode=SynchronizedPlotMode.TO_WINDOW):
+        """ syncs a matplotlib render plot widget with a specified identifier with either the global window, the active time window, or disables sync with the Spike2DRaster. """
+        # Requires specifying the identifier
+        active_matplotlib_view_widget = self.ui.matplotlib_view_widgets.get(identifier, None)
+        if active_matplotlib_view_widget is not None:
+            if sync_mode.name == SynchronizedPlotMode.NO_SYNC.name:
+                # disable syncing
+                sync_connection = self.ui.connections.get(identifier, None)
+                if sync_connection is not None:
+                    # have an existing sync connection, need to disconnect it.
+                    print('disconnecting window_scrolled for "{identifier}"')
+                    self.window_scrolled.disconnect(sync_connection)
+                    # print(f'WARNING: connection exists!')
+                    self.ui.connections[identifier] = None
+                    del self.ui.connections[identifier] # remove the connection after disconnecting it.
+
+                return None
+            elif sync_mode.name == SynchronizedPlotMode.TO_GLOBAL_DATA.name:
+                ## Synchronize just once to the global data:
+                # disable active window syncing if it's enabled:
+                sync_connection = self.ui.connections.get(identifier, None)
+                if sync_connection is not None:
+                    # have an existing sync connection, need to disconnect it.
+                    print('disconnecting window_scrolled for "{identifier}"')
+                    self.window_scrolled.disconnect(sync_connection)
+                    # print(f'WARNING: connection exists!')
+                    self.ui.connections[identifier] = None
+                    del self.ui.connections[identifier] # remove the connection after disconnecting it.
+
+                # Perform Initial (one-time) update from source -> controlled:
+                active_matplotlib_view_widget.on_window_changed(self.spikes_window.total_df_start_end_times[0], self.spikes_window.total_df_start_end_times[1])
+                return None
+
+            elif sync_mode.name == SynchronizedPlotMode.TO_WINDOW.name:
+                # Perform Initial (one-time) update from source -> controlled:
+                active_matplotlib_view_widget.on_window_changed(self.spikes_window.active_window_start_time, self.spikes_window.active_window_end_time)
+                sync_connection = self.window_scrolled.connect(active_matplotlib_view_widget.on_window_changed)
+                self.ui.connections[identifier] = sync_connection # add the connection to the connections array
+                return sync_connection # return the connection
+            else:
+                raise NotImplementedError
+
+        else:
+            print(f'active_matplotlib_view_widget with identifier {identifier} was not found!')
+            return None
+
     
     def clear_all_matplotlib_plots(self):
         """ required by the menu function """

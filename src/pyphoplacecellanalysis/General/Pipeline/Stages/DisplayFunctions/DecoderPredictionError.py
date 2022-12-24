@@ -767,12 +767,13 @@ class AddNewDecodedPosition_MatplotlibPlotCommand(BaseMenuCommand):
         # print(f'AddNewDecodedPosition_MatplotlibPlotCommand.execute(...)')
         active_2d_plot = self._spike_raster_window.spike_raster_plt_2d
         # If no plot to render on, do this:
-        widget, matplotlib_fig, matplotlib_fig_ax = active_2d_plot.add_new_matplotlib_render_plot_widget()
+        widget, matplotlib_fig, matplotlib_fig_ax = active_2d_plot.add_new_matplotlib_render_plot_widget(name='MenuCommand_display_plot_marginal_1D_most_likely_position_comparisons')
         # most_likely_positions_mode: 'standard'|'corrected'
-        fig, curr_ax = self._curr_active_pipeline.display('_display_plot_marginal_1D_most_likely_position_comparisons', self._active_config_name, variable_name='x', most_likely_positions_mode='corrected', ax=active_2d_plot.ui.matplotlib_view_widget.ax)
+        fig, curr_ax = self._curr_active_pipeline.display('_display_plot_marginal_1D_most_likely_position_comparisons', self._active_config_name, variable_name='x', most_likely_positions_mode='corrected', ax=matplotlib_fig_ax) # ax=active_2d_plot.ui.matplotlib_view_widget.ax
         # print(f'\t AddNewDecodedPosition_MatplotlibPlotCommand.execute(...) finished with the display call...')
-        active_2d_plot.ui.matplotlib_view_widget.draw()
-        active_2d_plot.sync_matplotlib_render_plot_widget() # Sync it with the active window:
+        # active_2d_plot.ui.matplotlib_view_widget.draw()
+        widget.draw() # alternative to accessing through full path?
+        active_2d_plot.sync_matplotlib_render_plot_widget('MenuCommand_display_plot_marginal_1D_most_likely_position_comparisons') # Sync it with the active window:
         # print(f'\t AddNewDecodedPosition_MatplotlibPlotCommand.execute() is done.')
         
         
