@@ -7,8 +7,6 @@ import sys
 import numpy as np
 from pathlib import Path
 
-from pyphocorehelpers.print_helpers import SimplePrintable
-
 # refactored to pyphoplacecellanalysis.General.Configs.DynamicConfigs
 from pyphoplacecellanalysis.General.Configs.DynamicConfigs import VideoOutputModeConfig, PlottingConfig, InteractivePlaceCellConfig
 
