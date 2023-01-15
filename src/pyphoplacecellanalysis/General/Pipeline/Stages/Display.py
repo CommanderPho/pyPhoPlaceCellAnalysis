@@ -294,15 +294,15 @@ class PipelineWithDisplayPipelineStageMixin:
         self.stage = DisplayPipelineStage(self.stage)  # build the Display stage
         
         # Empty the dicts:
-        self.filtered_contexts = DynamicParameters()
+        # self.filtered_contexts = DynamicParameters()
         self.display_output = DynamicParameters()
         
-        active_identifying_session_ctx = self.sess.get_context() # 'bapun_RatN_Day4_2019-10-15_11-30-06'
+        # active_identifying_session_ctx = self.sess.get_context() # 'bapun_RatN_Day4_2019-10-15_11-30-06'
         
         # Loops through all the configs and ensure that they have the neuron identity info if they need it.
         for an_active_config_name in self.active_configs.keys():
-            ## Add the filter to the active context (IdentifyingContext)
-            self.filtered_contexts[an_active_config_name] = active_identifying_session_ctx.adding_context('filter', filter_name=an_active_config_name) # 'bapun_RatN_Day4_2019-10-15_11-30-06_maze'
+            # ## Add the filter to the active context (IdentifyingContext)
+            # self.filtered_contexts[an_active_config_name] = active_identifying_session_ctx.adding_context('filter', filter_name=an_active_config_name) # 'bapun_RatN_Day4_2019-10-15_11-30-06_maze'
             # self.display_output[active_identifying_session_ctx][self.filtered_contexts[an_active_config_name]] = DynamicParameters()
             self.display_output[self.filtered_contexts[an_active_config_name]] = DynamicParameters() # One display_output for each context
             

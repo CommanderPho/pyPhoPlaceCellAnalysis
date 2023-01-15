@@ -1,3 +1,6 @@
+
+from pyphocorehelpers.DataStructure.dynamic_parameters import DynamicParameters # to replace simple PlacefieldComputationParameters
+
 from pyphoplacecellanalysis.PhoPositionalData.analysis.interactive_placeCell_config import build_configs # TODO: should be replaced by a better and internal config
 
 # ==================================================================================================================== #
@@ -13,21 +16,26 @@ class FilterablePipelineStage:
             # if clear_filtered_results is True, initialize the filtered_* properties. Otherwise just continue with the extant values (they must exist)
             self.filtered_sessions = dict()
             self.filtered_epochs = dict()
+            self.filtered_contexts = DynamicParameters()
             self.active_configs = dict() # active_config corresponding to each filtered session/epoch
             self.computation_results = dict()
             
         if progress_logger is not None:
             progress_logger.info(f'select_filters(...) with: {list(active_session_filter_configurations.values())}')
             
-        for a_select_config_name, a_select_config_filter_function in active_session_filter_configurations.items():
-            print(f'Applying session filter named "{a_select_config_name}"...')
+
+        for a_filter_config_name, a_select_config_filter_function in active_session_filter_configurations.items():
+            print(f'Applying session filter named "{a_filter_config_name}"...')
             if progress_logger is not None:
-                progress_logger.info(f'\tApplying session filter named "{a_select_config_name}"...')
-            self.filtered_sessions[a_select_config_name], self.filtered_epochs[a_select_config_name] = a_select_config_filter_function(self.sess)
+                progress_logger.info(f'\tApplying session filter named "{a_filter_config_name}"...')
+            self.filtered_sessions[a_filter_config_name], self.filtered_epochs[a_filter_config_name], self.filtered_contexts[a_filter_config_name] = a_select_config_filter_function(self.sess)
+            ## Add the filter to the active context (IdentifyingContext)
+            # self.filtered_contexts[a_filter_config_name] = active_identifying_session_ctx.adding_context('filter', filter_name=a_filter_config_name) # 'bapun_RatN_Day4_2019-10-15_11-30-06_maze'
+
             # build the active filter config from the session's config and the filtered epoch
-            self.active_configs[a_select_config_name] = build_configs(self.filtered_sessions[a_select_config_name].config, self.filtered_epochs[a_select_config_name]) 
-            self.computation_results[a_select_config_name] = None # Note that computation config is currently None because computation hasn't been performed yet at this stage.
-            self.active_configs[a_select_config_name].filter_config = {'filter_function': a_select_config_filter_function} # add the makeshift filter config (which is currently just a dictionary)
+            self.active_configs[a_filter_config_name] = build_configs(self.filtered_sessions[a_filter_config_name].config, self.filtered_epochs[a_filter_config_name]) 
+            self.computation_results[a_filter_config_name] = None # Note that computation config is currently None because computation hasn't been performed yet at this stage.
+            self.active_configs[a_filter_config_name].filter_config = {'filter_function': a_select_config_filter_function} # add the makeshift filter config (which is currently just a dictionary)
             
 # ==================================================================================================================== #
 # PIPELINE MIXIN                                                                                                       #
