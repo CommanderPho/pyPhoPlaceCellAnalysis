@@ -1,4 +1,5 @@
 from collections import OrderedDict
+from copy import deepcopy
 import sys
 import typing
 from typing import Optional
@@ -482,19 +483,19 @@ class ComputedPipelineStage(LoadableInput, LoadableSessionInput, FilterablePipel
             self.global_computation_results = self.run_specific_computations_single_context(global_kwargs, computation_functions_name_whitelist=computation_functions_name_whitelist, are_global=True, fail_on_exception=fail_on_exception, debug_print=debug_print)
         else:
             # Non-global functions:
-            for a_select_config_name, a_filtered_session in self.filtered_sessions.items():                
-                if a_select_config_name in enabled_filter_names:
-                    print(f'Performing run_specific_computations_single_context on filtered_session with filter named "{a_select_config_name}"...')
+            for a_filter_config_name, a_filtered_session in self.filtered_sessions.items():                
+                if a_filter_config_name in enabled_filter_names:
+                    print(f'Performing run_specific_computations_single_context on filtered_session with filter named "{a_filter_config_name}"...')
                     if active_computation_params is None:
-                        curr_active_computation_params = self.active_configs[a_select_config_name].computation_config # get the previously set computation configs
+                        curr_active_computation_params = self.active_configs[a_filter_config_name].computation_config # get the previously set computation configs
                     else:
                         # set/update the computation configs:
                         curr_active_computation_params = active_computation_params 
-                        self.active_configs[a_select_config_name].computation_config = curr_active_computation_params #TODO: if more than one computation config is passed in, the active_config should be duplicated for each computation config.
+                        self.active_configs[a_filter_config_name].computation_config = curr_active_computation_params #TODO: if more than one computation config is passed in, the active_config should be duplicated for each computation config.
 
                     ## Here is an issue, we need to get the appropriate computation result depending on whether it's global or not 
-                    previous_computation_result = self.computation_results[a_select_config_name]
-                    self.computation_results[a_select_config_name] = self.run_specific_computations_single_context(previous_computation_result, computation_functions_name_whitelist=computation_functions_name_whitelist, computation_kwargs_list=computation_kwargs_list, are_global=False, fail_on_exception=fail_on_exception, debug_print=debug_print)
+                    previous_computation_result = self.computation_results[a_filter_config_name]
+                    self.computation_results[a_filter_config_name] = self.run_specific_computations_single_context(previous_computation_result, computation_functions_name_whitelist=computation_functions_name_whitelist, computation_kwargs_list=computation_kwargs_list, are_global=False, fail_on_exception=fail_on_exception, debug_print=debug_print)
         
         ## IMPLEMENTATION FAULT: the global computations/results should not be ran within the filter/config loop. It applies to all config names and should be ran last. Also don't allow mixing local/global functions.
 
