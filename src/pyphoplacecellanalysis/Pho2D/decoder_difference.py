@@ -123,9 +123,6 @@ def display_predicted_position_difference(active_one_step_decoder, active_two_st
         plt.draw()
         # fig.canvas.draw_idle() # TODO: is this somehow better?
 
-    # active_one_step_decoder = curr_active_pipeline.computation_results['maze1'].computed_data['pf2D_Decoder']
-    # active_two_step_decoder = curr_active_pipeline.computation_results['maze1'].computed_data.get('pf2D_TwoStepDecoder', None)
-    # active_measured_positions = curr_active_pipeline.computation_results['maze1'].sess.position.to_dataframe()
 
 
     def perform_draw_predicted_position_difference(frame, ax=None):
