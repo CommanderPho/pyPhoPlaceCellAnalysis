@@ -515,6 +515,7 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
             self.stage.select_filters(unprocessed_filters, clear_filtered_results=False, progress_logger=self.logger) # select filters when done
     
         else:
+            # Not previously filtered. Perform the filtering:
             self.stage = ComputedPipelineStage(self.stage)
             self.stage.select_filters(active_session_filter_configurations, progress_logger=self.logger) # select filters when done
        
