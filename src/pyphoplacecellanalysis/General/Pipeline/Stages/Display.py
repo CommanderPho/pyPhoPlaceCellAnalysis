@@ -152,7 +152,7 @@ class DisplayPipelineStage(ComputedPipelineStage):
     """ The concrete pipeline stage for displaying the output computed in previous stages."""
     identity: PipelineStage = PipelineStage.Displayed
     
-    def __init__(self, computed_stage: ComputedPipelineStage, display_output=None, render_actions=None, filtered_contexts=None):
+    def __init__(self, computed_stage: ComputedPipelineStage, display_output=None, render_actions=None, override_filtered_contexts=None):
         # super(DisplayPipelineStage, self).__init__()
         # ComputedPipelineStage fields:
         self.stage_name = computed_stage.stage_name
@@ -160,6 +160,7 @@ class DisplayPipelineStage(ComputedPipelineStage):
         self.loaded_data = computed_stage.loaded_data
         self.filtered_sessions = computed_stage.filtered_sessions
         self.filtered_epochs = computed_stage.filtered_epochs
+        self.filtered_contexts = override_filtered_contexts or computed_stage.filtered_contexts
         self.active_configs = computed_stage.active_configs # active_config corresponding to each filtered session/epoch
         self.computation_results = computed_stage.computation_results
         self.global_computation_results = computed_stage.global_computation_results
@@ -169,7 +170,7 @@ class DisplayPipelineStage(ComputedPipelineStage):
         # Initialize custom fields:
         self.display_output = display_output or DynamicParameters()
         self.render_actions = render_actions or DynamicParameters()
-        self.filtered_contexts = filtered_contexts or DynamicParameters() # None by default, otherwise IdentifyingContext
+        # self.filtered_contexts = override_filtered_contexts or DynamicParameters() # None by default, otherwise IdentifyingContext
         self.registered_display_function_dict = OrderedDict()
         self.register_default_known_display_functions() # registers the default display functions
         
@@ -245,15 +246,6 @@ class PipelineWithDisplayPipelineStageMixin:
     def plot(self):
         """An interactive accessor object for display functions."""
         return self._plot_object
-    
-    
-    @property
-    def filtered_contexts(self):
-        """ filtered_contexts holds the corresponding contexts for each filtered config."""
-        return self.stage.filtered_contexts
-    @filtered_contexts.setter
-    def filtered_contexts(self, value):
-        self.stage.filtered_contexts = value
     
     @property
     def registered_display_functions(self):

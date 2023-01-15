@@ -57,7 +57,15 @@ class FilteredPipelineMixin:
     def filtered_session_names(self):
         """The names that identify each filtered session in the self.stage.filtered_sessions dictionary. Should be the same as self.active_config_names I believe."""
         return list(self.stage.filtered_sessions.keys())
-    
+
+    @property
+    def filtered_contexts(self):
+        """ filtered_contexts holds the corresponding contexts for each filtered config."""
+        return self.stage.filtered_contexts
+    @filtered_contexts.setter
+    def filtered_contexts(self, value):
+        self.stage.filtered_contexts = value
+
     @property
     def active_config_names(self):
         """The names of the active configs that can be used to index into the other properties (which are dictionaries)."""

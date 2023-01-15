@@ -62,6 +62,7 @@ class ComputedPipelineStage(LoadableInput, LoadableSessionInput, FilterablePipel
     identity: PipelineStage = PipelineStage.Computed
     filtered_sessions: Optional[DynamicParameters] = None
     filtered_epochs: Optional[DynamicParameters] = None
+    filtered_contexts: Optional[DynamicParameters] = None
     active_configs: Optional[DynamicParameters] = None
     computation_results: Optional[DynamicParameters] = None
     global_computation_results: Optional[DynamicParameters] = None
@@ -75,6 +76,7 @@ class ComputedPipelineStage(LoadableInput, LoadableSessionInput, FilterablePipel
         # Initialize custom fields:
         self.filtered_sessions = DynamicParameters()
         self.filtered_epochs = DynamicParameters()
+        self.filtered_contexts = DynamicParameters()
         self.active_configs = DynamicParameters() # active_config corresponding to each filtered session/epoch
         self.computation_results = DynamicParameters()
         self.global_computation_results = DynamicParameters()
