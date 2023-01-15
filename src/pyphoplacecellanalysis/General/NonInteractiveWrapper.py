@@ -287,6 +287,8 @@ def batch_load_session(global_data_root_parent_path, active_data_mode_name, base
 
     active_session_computation_configs = active_data_mode_registered_class.build_default_computation_configs(sess=curr_active_pipeline.sess, time_bin_size=time_bin_size, grid_bin_bounds=grid_bin_bounds) #1.0/30.0 # decode at 30fps to match the position sampling frequency
 
+
+
     # Whitelist Mode:
     computation_functions_name_whitelist=['_perform_baseline_placefield_computation', '_perform_time_dependent_placefield_computation', '_perform_extended_statistics_computation',
                                         '_perform_position_decoding_computation', 
@@ -302,6 +304,7 @@ def batch_load_session(global_data_root_parent_path, active_data_mode_name, base
     # computation_functions_name_whitelist=None
     # computation_functions_name_blacklist=['_perform_spike_burst_detection_computation','_perform_recursive_latent_placefield_decoding']
 
+    ## TODO 2023-01-15 - perform_computations for all configs!!
     curr_active_pipeline.perform_computations(active_session_computation_configs[0], computation_functions_name_whitelist=computation_functions_name_whitelist, computation_functions_name_blacklist=computation_functions_name_blacklist, fail_on_exception=fail_on_exception, debug_print=debug_print) #, overwrite_extant_results=False  ], fail_on_exception=True, debug_print=False)
 
     if not skip_extended_batch_computations:

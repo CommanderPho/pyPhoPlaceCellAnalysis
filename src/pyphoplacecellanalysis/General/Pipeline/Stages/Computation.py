@@ -302,6 +302,8 @@ class ComputedPipelineStage(LoadableInput, LoadableSessionInput, FilterablePipel
         Takes its filtered_session and applies the provided active_computation_params to it. The results are stored in self.computation_results under the same key as the filtered session. 
         Called only by the pipeline's .perform_computations(...) function
         
+        History:
+            created to generalize the `stage.evaluate_computations_for_single_params(...)` function
         """
         assert (len(self.filtered_sessions.keys()) > 0), "Must have at least one filtered session before calling evaluate_computations_for_single_params(...). Call self.select_filters(...) first."
         # self.active_computation_results = dict()
@@ -321,6 +323,7 @@ class ComputedPipelineStage(LoadableInput, LoadableSessionInput, FilterablePipel
                 if progress_logger_callback is not None:
                     progress_logger_callback(f'Performing perform_action_for_all_contexts with action {action} on filtered_session with filter named "{a_select_config_name}"...')
                 
+                # TODO 2023-01-15 - ASSUMES 1:1 correspondence between self.filtered_sessions's config names and computation_configs:
                 if active_computation_params is None:
                     active_computation_params = self.active_configs[a_select_config_name].computation_config # get the previously set computation configs
                 else:
@@ -341,7 +344,7 @@ class ComputedPipelineStage(LoadableInput, LoadableSessionInput, FilterablePipel
                             progress_logger_callback('\t TODO: this will prevent recomputation even when the blacklist/whitelist or computation function definitions change. Rework so that this is smarter.')
                         
                         print(f'WARNING: skipping computation because overwrite_extant_results={overwrite_extant_results} and active_computation_results[{a_select_config_name}] already exists and is non-None')
-                        print('\t TODO: this will prevent recomputation even when the blacklist/whitelist or computation function definitions change. Rework so that this is smarter.')                    
+                        print('\t TODO: this will prevent recomputation even when the blacklist/whitelist or computation function definitions change. Rework so that this is smarter.')
                         # active_computation_results.setdefault(a_select_config_name, ComputedPipelineStage._build_initial_computationResult(a_filtered_session, active_computation_params)) # returns a computation result. This stores the computation config used to compute it.
                         skip_computations_for_this_result = True
 
@@ -730,6 +733,9 @@ class PipelineWithComputedPipelineStageMixin:
             computation_functions_name_blacklist (_type_, optional): _description_. Defaults to None.
             fail_on_exception (bool, optional): _description_. Defaults to False.
             debug_print (bool, optional): _description_. Defaults to False.
+
+        History:
+            perform_action_for_all_contexts(EvaluationActions.EVALUATE_COMPUTATIONS
         """
         assert (self.can_compute), "Current self.stage must already be a ComputedPipelineStage. Call self.filter_sessions with filter configs to reach this step."
         progress_logger_callback=(lambda x: self.logger.info(x))
