@@ -297,12 +297,25 @@ class PipelineWithDisplayPipelineStageMixin:
             # self.filtered_contexts[an_active_config_name] = active_identifying_session_ctx.adding_context('filter', filter_name=an_active_config_name) # 'bapun_RatN_Day4_2019-10-15_11-30-06_maze'
             # self.display_output[active_identifying_session_ctx][self.filtered_contexts[an_active_config_name]] = DynamicParameters()
             self.display_output[self.filtered_contexts[an_active_config_name]] = DynamicParameters() # One display_output for each context
-            
-            # Note that there may be different numbers of neurons included in the different configs (which include different epochs/filters) so a single one-size-fits-all approach to assigning color identities won't work here.
-            if an_active_config_name in self.computation_results:
-                self.active_configs[an_active_config_name] = add_neuron_identity_info_if_needed(self.computation_results[an_active_config_name], self.active_configs[an_active_config_name])
-                self.active_configs[an_active_config_name] = add_custom_plotting_options_if_needed(self.active_configs[an_active_config_name], should_smooth_maze=should_smooth_maze)
-                self.active_configs[an_active_config_name] = update_figure_files_output_path(self.computation_results[an_active_config_name], self.active_configs[an_active_config_name], root_output_dir=root_output_dir)
+            # TODO: do we want one display_output for each computed_context instead?
+
+
+            # multi-computation-config way:
+            for a_computation_config_name, active_computation_params in self.active_configs[an_active_config_name].computation_params_dict.items():
+                active_computation_results_key = f"{an_active_config_name}_{a_computation_config_name}" # new multi-comp-config version
+                # Note that there may be different numbers of neurons included in the different configs (which include different epochs/filters) so a single one-size-fits-all approach to assigning color identities won't work here.
+                if active_computation_results_key in self.computation_results:
+                    self.active_configs[an_active_config_name] = add_neuron_identity_info_if_needed(self.computation_results[active_computation_results_key], self.active_configs[an_active_config_name])
+                    self.active_configs[an_active_config_name] = add_custom_plotting_options_if_needed(self.active_configs[an_active_config_name], should_smooth_maze=should_smooth_maze)
+                    self.active_configs[an_active_config_name] = update_figure_files_output_path(self.computation_results[active_computation_results_key], self.active_configs[an_active_config_name], root_output_dir=root_output_dir)
+                else:
+                    print(f'WARNING: active_computation_results_key "{active_computation_results_key}" not in self.computation_results (with keys: {list(self.computation_results.keys())})')
+
+            # # Note that there may be different numbers of neurons included in the different configs (which include different epochs/filters) so a single one-size-fits-all approach to assigning color identities won't work here.
+            # if an_active_config_name in self.computation_results:
+            #     self.active_configs[an_active_config_name] = add_neuron_identity_info_if_needed(self.computation_results[an_active_config_name], self.active_configs[an_active_config_name])
+            #     self.active_configs[an_active_config_name] = add_custom_plotting_options_if_needed(self.active_configs[an_active_config_name], should_smooth_maze=should_smooth_maze)
+            #     self.active_configs[an_active_config_name] = update_figure_files_output_path(self.computation_results[an_active_config_name], self.active_configs[an_active_config_name], root_output_dir=root_output_dir)
 
         self.reload_default_display_functions() # reload default display functions first
 
