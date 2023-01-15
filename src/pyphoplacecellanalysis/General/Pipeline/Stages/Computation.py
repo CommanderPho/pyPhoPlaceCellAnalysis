@@ -295,7 +295,7 @@ class ComputedPipelineStage(LoadableInput, LoadableSessionInput, FilterablePipel
                 self.computation_results[a_select_config_name] = self.rerun_failed_computations_single_context(previous_computation_result, fail_on_exception=fail_on_exception, debug_print=debug_print)    
 
 
-    def perform_action_for_all_contexts(self, action: EvaluationActions, enabled_filter_names=None, active_computation_params: Optional[DynamicParameters]=None, overwrite_extant_results=False, computation_functions_name_whitelist=None, computation_functions_name_blacklist=None,
+    def perform_action_for_all_contexts(self, action: EvaluationActions, enabled_filter_names=None, active_computation_params_dict: Optional[dict]=None, overwrite_extant_results=False, computation_functions_name_whitelist=None, computation_functions_name_blacklist=None,
                                                  fail_on_exception:bool=False, progress_logger_callback=None, are_global:bool=False, debug_print=False):
         """ Aims to generalize the `evaluate_computations_for_single_params(...)` function's functionality (such as looping over each context and passing/updating appropriate results, to all three of the computation functions:
 
@@ -325,6 +325,7 @@ class ComputedPipelineStage(LoadableInput, LoadableSessionInput, FilterablePipel
                 if progress_logger_callback is not None:
                     progress_logger_callback(f'Performing perform_action_for_all_contexts with action {action} on filtered_session with filter named "{a_select_config_name}"...')
                 
+                for a_computation_config_name, active_computation_params in active_computation_params_dict.items():
                 # TODO 2023-01-15 - ASSUMES 1:1 correspondence between self.filtered_sessions's config names and computation_configs:
                 if active_computation_params is None:
                     active_computation_params = self.active_configs[a_select_config_name].computation_config # get the previously set computation configs
@@ -720,7 +721,7 @@ class PipelineWithComputedPipelineStageMixin:
         
     ## Computation Helpers: 
     # perform_computations: The main computation function for the pipeline
-    def perform_computations(self, active_computation_params: Optional[DynamicParameters]=None, enabled_filter_names=None, overwrite_extant_results=False, computation_functions_name_whitelist=None, computation_functions_name_blacklist=None, fail_on_exception:bool=False, debug_print=False):
+    def perform_computations(self, active_computation_params_dict: Optional[dict]=None, enabled_filter_names=None, overwrite_extant_results=False, computation_functions_name_whitelist=None, computation_functions_name_blacklist=None, fail_on_exception:bool=False, debug_print=False):
         """The main computation function for the pipeline.
 
         Internally updates the
@@ -742,11 +743,9 @@ class PipelineWithComputedPipelineStageMixin:
         assert (self.can_compute), "Current self.stage must already be a ComputedPipelineStage. Call self.filter_sessions with filter configs to reach this step."
         progress_logger_callback=(lambda x: self.logger.info(x))
 
-        self.stage.perform_action_for_all_contexts(EvaluationActions.EVALUATE_COMPUTATIONS, enabled_filter_names=enabled_filter_names, active_computation_params=active_computation_params, overwrite_extant_results=overwrite_extant_results,
+        self.stage.perform_action_for_all_contexts(EvaluationActions.EVALUATE_COMPUTATIONS, enabled_filter_names=enabled_filter_names, active_computation_params_dict=active_computation_params_dict, overwrite_extant_results=overwrite_extant_results,
             computation_functions_name_whitelist=computation_functions_name_whitelist, computation_functions_name_blacklist=computation_functions_name_blacklist, fail_on_exception=fail_on_exception, progress_logger_callback=progress_logger_callback, debug_print=debug_print)
-        # self.stage.evaluate_computations_for_single_params(active_computation_params, enabled_filter_names=enabled_filter_names, overwrite_extant_results=overwrite_extant_results,
-        #     computation_functions_name_whitelist=computation_functions_name_whitelist, computation_functions_name_blacklist=computation_functions_name_blacklist, fail_on_exception=fail_on_exception, progress_logger_callback=progress_logger_callback, debug_print=debug_print)
-
+        
         # Global MultiContext computations will be done here:
         if progress_logger_callback is not None:
             progress_logger_callback(f'Performing global computations...')

@@ -104,6 +104,7 @@ class NonInteractiveWrapper(object):
         
     @staticmethod
     def perform_computation(pipeline, active_computation_configs, enabled_filter_names=None):
+        ## TODO 2023-01-15 - perform_computations for all configs!!
         pipeline.perform_computations(active_computation_configs[0], enabled_filter_names) # unuses the first config
         pipeline.prepare_for_display() # TODO: pass a display config
         return pipeline
@@ -251,8 +252,6 @@ def batch_load_session(global_data_root_parent_path, active_data_mode_name, base
     time_bin_size = kwargs.get('time_bin_size', 0.03333) # 0.03333 = 1.0/30.0 # decode at 30fps to match the position sampling frequency
     # time_bin_size = kwargs.get('time_bin_size', 0.1) # 10 fps
 
-
-
     known_data_session_type_properties_dict = DataSessionFormatRegistryHolder.get_registry_known_data_session_type_dict()
     active_data_session_types_registered_classes_dict = DataSessionFormatRegistryHolder.get_registry_data_session_type_class_name_dict()
 
@@ -285,8 +284,8 @@ def batch_load_session(global_data_root_parent_path, active_data_mode_name, base
     # time_bin_size = 0.03333 #1.0/30.0 # decode at 30fps to match the position sampling frequency
     # time_bin_size = 0.1 # 10 fps
 
-    active_session_computation_configs = active_data_mode_registered_class.build_default_computation_configs(sess=curr_active_pipeline.sess, time_bin_size=time_bin_size, grid_bin_bounds=grid_bin_bounds) #1.0/30.0 # decode at 30fps to match the position sampling frequency
-
+    active_session_computation_config_list = active_data_mode_registered_class.build_default_computation_configs(sess=curr_active_pipeline.sess, time_bin_size=time_bin_size, grid_bin_bounds=grid_bin_bounds) #1.0/30.0 # decode at 30fps to match the position sampling frequency
+    print(f'active_session_computation_config_list: {active_session_computation_config_list}')
 
 
     # Whitelist Mode:
@@ -305,7 +304,9 @@ def batch_load_session(global_data_root_parent_path, active_data_mode_name, base
     # computation_functions_name_blacklist=['_perform_spike_burst_detection_computation','_perform_recursive_latent_placefield_decoding']
 
     ## TODO 2023-01-15 - perform_computations for all configs!!
-    curr_active_pipeline.perform_computations(active_session_computation_configs[0], computation_functions_name_whitelist=computation_functions_name_whitelist, computation_functions_name_blacklist=computation_functions_name_blacklist, fail_on_exception=fail_on_exception, debug_print=debug_print) #, overwrite_extant_results=False  ], fail_on_exception=True, debug_print=False)
+    # curr_active_pipeline.perform_computations(active_session_computation_configs[0], computation_functions_name_whitelist=computation_functions_name_whitelist, computation_functions_name_blacklist=computation_functions_name_blacklist, fail_on_exception=fail_on_exception, debug_print=debug_print) #, overwrite_extant_results=False  ], fail_on_exception=True, debug_print=False)
+    curr_active_pipeline.perform_computations(active_session_computation_config_list, computation_functions_name_whitelist=computation_functions_name_whitelist, computation_functions_name_blacklist=computation_functions_name_blacklist, fail_on_exception=fail_on_exception, debug_print=debug_print)
+
 
     if not skip_extended_batch_computations:
         batch_extended_computations(curr_active_pipeline, include_global_functions=False, fail_on_exception=fail_on_exception, progress_print=True, debug_print=False)
