@@ -285,15 +285,18 @@ class ComputedPipelineStage(LoadableInput, LoadableSessionInput, FilterablePipel
     
 
 
-    def rerun_failed_computations(self, enabled_filter_names=None, fail_on_exception:bool=False, debug_print=False):
+    def rerun_failed_computations(self, enabled_filter_names=None, enabled_computation_config_names=None, fail_on_exception:bool=False, debug_print=False):
         """ retries the computation functions that previously failed and resulted in accumulated_errors in the previous_computation_result """
         if enabled_filter_names is None:
             enabled_filter_names = list(self.filtered_sessions.keys()) # all filters if specific enabled names aren't specified
-        for a_select_config_name, a_filtered_session in self.filtered_sessions.items():                
-            if a_select_config_name in enabled_filter_names:
-                print(f'Performing rerun_failed_computations_single_context on filtered_session with filter named "{a_select_config_name}"...')
-                previous_computation_result = self.computation_results[a_select_config_name]
-                self.computation_results[a_select_config_name] = self.rerun_failed_computations_single_context(previous_computation_result, fail_on_exception=fail_on_exception, debug_print=debug_print)    
+        for a_filter_config_name in enabled_filter_names:
+            if enabled_computation_config_names is None:
+                enabled_computation_config_names = list(self.active_configs[a_filter_config_name].computation_params_dict.keys()) # all configs for this filter if specific enabled names aren't specified
+            print(f'Performing rerun_failed_computations_single_context on filtered_session with filter named "{a_filter_config_name}" and computation_configs named {enabled_computation_config_names}...')
+            enabled_computation_results_keys = ['_'.join([a_filter_config_name, curr_comp_params_name]) for curr_comp_params_name in enabled_computation_config_names]
+            for active_computation_results_key in enabled_computation_results_keys:
+                previous_computation_result = self.computation_results[active_computation_results_key] 
+                self.computation_results[active_computation_results_key] = self.rerun_failed_computations_single_context(previous_computation_result, fail_on_exception=fail_on_exception, debug_print=debug_print)
 
 
     def perform_action_for_all_contexts(self, action: EvaluationActions, enabled_filter_names=None, active_computation_params_dict: Optional[dict]=None, overwrite_extant_results=False, computation_functions_name_whitelist=None, computation_functions_name_blacklist=None,
@@ -302,7 +305,7 @@ class ComputedPipelineStage(LoadableInput, LoadableSessionInput, FilterablePipel
 
 
         'single' here refers to the fact that it evaluates only one of the active_computation_params
-        Takes its filtered_session and applies the provided active_computation_params to it. The results are stored in self.computation_results under the same key as the filtered session. 
+        Takes its filtered_session and applies the provided active_computation_params to it. The results are stored in self.computation_results under the same key as the filtered session + '_' + computation_config_key. 
         Called only by the pipeline's .perform_computations(...) function
         
         History:

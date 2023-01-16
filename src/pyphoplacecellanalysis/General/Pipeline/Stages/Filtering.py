@@ -34,9 +34,11 @@ class FilterablePipelineStage:
 
             # build the active filter config from the session's config and the filtered epoch
             self.active_configs[a_filter_config_name] = build_configs(self.filtered_sessions[a_filter_config_name].config, self.filtered_epochs[a_filter_config_name]) 
-            self.computation_results[a_filter_config_name] = None # Note that computation config is currently None because computation hasn't been performed yet at this stage.
             self.active_configs[a_filter_config_name].filter_config = {'filter_function': a_select_config_filter_function} # add the makeshift filter config (which is currently just a dictionary)
             
+            # Used set the computation_results to None at this stage for each key, but this no longer works since we don't yet know the multi-computation-configs:
+            # self.computation_results[a_filter_config_name] = None # Note that computation config is currently None because computation hasn't been performed yet at this stage.
+
 # ==================================================================================================================== #
 # PIPELINE MIXIN                                                                                                       #
 # ==================================================================================================================== #

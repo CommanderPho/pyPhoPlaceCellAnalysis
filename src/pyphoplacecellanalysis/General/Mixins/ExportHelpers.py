@@ -541,10 +541,10 @@ def _test_save_pipeline_data_to_h5(curr_active_pipeline, finalized_output_cache_
     if enable_debug_print:
         print(f'active_computed_data.keys(): {active_computed_data.keys()}')
     
-    pf = curr_active_pipeline.computation_results[active_config_name].computed_data['pf1D']
-    active_one_step_decoder = curr_active_pipeline.computation_results[active_config_name].computed_data['pf2D_Decoder']
-    active_two_step_decoder = curr_active_pipeline.computation_results[active_config_name].computed_data.get('pf2D_TwoStepDecoder', None)
-    active_measured_positions = curr_active_pipeline.computation_results[active_config_name].sess.position.to_dataframe()
+    # pf = curr_active_pipeline.computation_results[active_config_name].computed_data['pf1D']
+    # active_one_step_decoder = curr_active_pipeline.computation_results[active_config_name].computed_data['pf2D_Decoder']
+    # active_two_step_decoder = curr_active_pipeline.computation_results[active_config_name].computed_data.get('pf2D_TwoStepDecoder', None)
+    # active_measured_positions = curr_active_pipeline.computation_results[active_config_name].sess.position.to_dataframe()
 
     if not enable_dry_run:
         save_some_pipeline_data_to_h5(curr_active_pipeline, finalized_output_cache_file=finalized_output_cache_file)
