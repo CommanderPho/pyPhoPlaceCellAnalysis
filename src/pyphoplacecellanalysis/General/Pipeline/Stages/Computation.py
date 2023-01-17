@@ -626,7 +626,7 @@ class ComputedPipelineStage(LoadableInput, LoadableSessionInput, FilterablePipel
             return previous_computation_result # just return the unaltered result
                 
     @classmethod    
-    def continue_computations_if_needed(cls, curr_active_pipeline, active_computation_params=None, enabled_filter_names=None, overwrite_extant_results=False, computation_functions_name_whitelist=None, computation_functions_name_blacklist=None, fail_on_exception:bool=False, debug_print=False):
+    def continue_computations_if_needed(cls, curr_active_pipeline, active_computation_params_dict=None, enabled_filter_names=None, overwrite_extant_results=False, computation_functions_name_whitelist=None, computation_functions_name_blacklist=None, fail_on_exception:bool=False, debug_print=False):
         """ continues computations for a pipeline 
 
             NOTE: TODO: this is not yet implemented.
@@ -646,7 +646,7 @@ class ComputedPipelineStage(LoadableInput, LoadableSessionInput, FilterablePipel
 
         for an_incomplete_config_name, a_reason in incomplete_computed_config_dict.items():
             a_filtered_session = curr_active_pipeline.filtered_sessions[an_incomplete_config_name] # get the filtered session
-            if active_computation_params is None:
+            if active_computation_params_dict is None:
                 active_computation_params = curr_active_pipeline.active_configs[an_incomplete_config_name].computation_config # get the previously set computation configs
             else:
                 # set/update the computation configs:
@@ -816,7 +816,7 @@ class PipelineWithComputedPipelineStageMixin:
         # return self.stage.perform_action_for_all_contexts(EvaluationActions.EVALUATE_COMPUTATIONS, ... # TODO: refactor to use new layout
         return self.stage.rerun_failed_computations(previous_computation_result, fail_on_exception=fail_on_exception, debug_print=debug_print)
     
-    def perform_specific_computation(self, active_computation_params=None, enabled_filter_names=None, computation_functions_name_whitelist=None, computation_kwargs_list=None, fail_on_exception:bool=False, debug_print=False):
+    def perform_specific_computation(self, active_computation_params_dict=None, enabled_filter_names=None, computation_functions_name_whitelist=None, computation_kwargs_list=None, fail_on_exception:bool=False, debug_print=False):
         """ perform a specific computation (specified in computation_functions_name_whitelist) in a minimally destructive manner using the previously recomputed results:
         Passthrough wrapper to self.stage.perform_specific_computation(...) with the same arguments.
 
@@ -824,7 +824,7 @@ class PipelineWithComputedPipelineStageMixin:
             curr_active_pipeline.computation_results
         """
         # self.stage is of type ComputedPipelineStage
-        return self.stage.perform_specific_computation(active_computation_params=active_computation_params, enabled_filter_names=enabled_filter_names, computation_functions_name_whitelist=computation_functions_name_whitelist, computation_kwargs_list=computation_kwargs_list, fail_on_exception=fail_on_exception, debug_print=debug_print)
+        return self.stage.perform_specific_computation(active_computation_params_dict=active_computation_params_dict, enabled_filter_names=enabled_filter_names, computation_functions_name_whitelist=computation_functions_name_whitelist, computation_kwargs_list=computation_kwargs_list, fail_on_exception=fail_on_exception, debug_print=debug_print)
     
     # Utility/Debugging Functions:
     def perform_drop_entire_computed_config(self, config_names_to_drop = ['maze1_rippleOnly', 'maze2_rippleOnly']):

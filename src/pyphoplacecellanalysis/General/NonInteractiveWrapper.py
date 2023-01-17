@@ -322,148 +322,154 @@ def batch_load_session(global_data_root_parent_path, active_data_mode_name, base
 
 
 def batch_extended_computations(curr_active_pipeline, include_global_functions=False, fail_on_exception=False, progress_print=True, debug_print=False):
-    """ performs the remaining required global computations """
+    """ performs the remaining required global computations 
+        
+    TODO 2023-01-16 FIXMES:
+        Everywhere that says `curr_active_pipeline.computation_results[global_epoch_name]` is incorrect, as computation_results is indexed by a global_computation_result_key now.
+        The issue is occuring with testing to see if the computation has been done 
+    """
     newly_computed_values = []
 
     ## Get computed relative entropy measures:
-    global_epoch_name = curr_active_pipeline.active_completed_computation_result_names[-1] # 'maze'
-    global_results = curr_active_pipeline.computation_results[global_epoch_name]['computed_data'] # TODO: needs to be updated to conform to multi-computation-param style... unless `curr_active_pipeline.active_completed_computation_result_names[-1]` gets appropriately updated from the real computation_results name.
+    # global_epoch_name = curr_active_pipeline.active_completed_computation_result_names[-1] # 'maze'
+    global_epoch_name = list(curr_active_pipeline.filtered_sessions.keys())[-1] # 'maze'
+    # global_computation_result_keys = curr_active_pipeline.active_completed_computation_result_names[-1] # 'maze_params[0]', this is not right either. we need to get all global_computation_result_keys. Maybe just look for those with the maze prefix?
 
-    ## Get existing `pf1D_dt`:
-    active_pf_1D = global_results.pf1D
-    active_pf_1D_dt = global_results.pf1D_dt
-    if progress_print:
-        print(f'Running batch_extended_computations(...) with global_epoch_name: "{global_epoch_name}"')
+    # global_results = curr_active_pipeline.computation_results[global_epoch_name]['computed_data'] # RESOLVED: needs to be updated to conform to multi-computation-param style... unless `curr_active_pipeline.active_completed_computation_result_names[-1]` gets appropriately updated from the real computation_results name. UPDATE: it did, although now global_epoch_name isn't what we should call it
 
-    ## firing_rate_trends:
-    _comp_name = 'firing_rate_trends'
-    try:
-        active_extended_stats = curr_active_pipeline.computation_results[global_epoch_name].computed_data['extended_stats']
-        time_binned_pos_df = active_extended_stats['time_binned_position_df']
-        if progress_print:
-            print(f'{_comp_name} already computed.')
-    except (AttributeError, KeyError) as e:
-        if progress_print or debug_print:
-            print(f'{_comp_name} missing.')
-        if debug_print:
-            print(f'\t encountered error: {e}\n{traceback.format_exc()}\n.')
-        if progress_print or debug_print:
-            print(f'\t Recomputing {_comp_name}...')
-        curr_active_pipeline.perform_specific_computation(computation_functions_name_whitelist=['_perform_firing_rate_trends_computation'], enabled_filter_names=[global_epoch_name], fail_on_exception=fail_on_exception, debug_print=False) 
-        print(f'\t done.')
-        active_extended_stats = curr_active_pipeline.computation_results[global_epoch_name].computed_data['extended_stats']
-        time_binned_pos_df = active_extended_stats['time_binned_position_df']
-        newly_computed_values.append(_comp_name)
-    except Exception as e:
-        raise e
+    for a_global_computation_result_key, a_global_computation_result in curr_active_pipeline.computation_results.items():
+        if a_global_computation_result_key.startswith(f'{global_epoch_name}_'):
+            # curr_computation_context = filtered_context.adding_context(collision_prefix='computation_params', comp_params_name=a_computation_config_name)
+            # print(f'curr_computation_context: {curr_computation_context}')
+            curr_params_global_results = a_global_computation_result['computed_data']
 
-    ## relative_entropy_analyses:
-    _comp_name = 'relative_entropy_analyses'
-    try:
-        active_relative_entropy_results = active_extended_stats['relative_entropy_analyses']
-        post_update_times = active_relative_entropy_results['post_update_times'] # (4152,) = (n_post_update_times,)
-        snapshot_differences_result_dict = active_relative_entropy_results['snapshot_differences_result_dict']
-        time_intervals = active_relative_entropy_results['time_intervals']
-        long_short_rel_entr_curves_frames = active_relative_entropy_results['long_short_rel_entr_curves_frames'] # (4152, 108, 63) = (n_post_update_times, n_neurons, n_xbins)
-        short_long_rel_entr_curves_frames = active_relative_entropy_results['short_long_rel_entr_curves_frames'] # (4152, 108, 63) = (n_post_update_times, n_neurons, n_xbins)
-        flat_relative_entropy_results = active_relative_entropy_results['flat_relative_entropy_results'] # (149, 63) - (nSnapshots, nXbins)
-        flat_jensen_shannon_distance_results = active_relative_entropy_results['flat_jensen_shannon_distance_results'] # (149, 63) - (nSnapshots, nXbins)
-        flat_jensen_shannon_distance_across_all_positions = np.sum(flat_jensen_shannon_distance_results, axis=1) # sum across all position bins # (4152,) - (nSnapshots)
-        flat_surprise_across_all_positions = np.sum(flat_relative_entropy_results, axis=1) # sum across all position bins # (4152,) - (nSnapshots)
-        if progress_print:
-            print(f'{_comp_name} already computed.')
-    except (AttributeError, KeyError) as e:
-        if progress_print or debug_print:
-            print(f'{_comp_name} missing.')
-        if debug_print:
-            print(f'\t encountered error: {e}\n{traceback.format_exc()}\n.')
-        if progress_print or debug_print:
-            print(f'\t Recomputing {_comp_name}...')
-        curr_active_pipeline.perform_specific_computation(computation_functions_name_whitelist=['_perform_time_dependent_pf_sequential_surprise_computation'], enabled_filter_names=[global_epoch_name], fail_on_exception=fail_on_exception, debug_print=False)
-        print(f'\t done.')
-        active_relative_entropy_results = active_extended_stats['relative_entropy_analyses']
-        post_update_times = active_relative_entropy_results['post_update_times'] # (4152,) = (n_post_update_times,)
-        snapshot_differences_result_dict = active_relative_entropy_results['snapshot_differences_result_dict']
-        time_intervals = active_relative_entropy_results['time_intervals']
-        long_short_rel_entr_curves_frames = active_relative_entropy_results['long_short_rel_entr_curves_frames'] # (4152, 108, 63) = (n_post_update_times, n_neurons, n_xbins)
-        short_long_rel_entr_curves_frames = active_relative_entropy_results['short_long_rel_entr_curves_frames'] # (4152, 108, 63) = (n_post_update_times, n_neurons, n_xbins)
-        flat_relative_entropy_results = active_relative_entropy_results['flat_relative_entropy_results'] # (149, 63) - (nSnapshots, nXbins)
-        flat_jensen_shannon_distance_results = active_relative_entropy_results['flat_jensen_shannon_distance_results'] # (149, 63) - (nSnapshots, nXbins)
-        flat_jensen_shannon_distance_across_all_positions = np.sum(np.abs(flat_jensen_shannon_distance_results), axis=1) # sum across all position bins # (4152,) - (nSnapshots)
-        flat_surprise_across_all_positions = np.sum(np.abs(flat_relative_entropy_results), axis=1) # sum across all position bins # (4152,) - (nSnapshots)
-        newly_computed_values.append(_comp_name)
-    except Exception as e:
-        raise e
-
-    if include_global_functions:
-        ## jonathan_firing_rate_analysis:
-        _comp_name = 'jonathan_firing_rate_analysis'
-        try:
-            ## Get global 'jonathan_firing_rate_analysis' results:
-            curr_jonathan_firing_rate_analysis = curr_active_pipeline.global_computation_results.computed_data['jonathan_firing_rate_analysis']
-            neuron_replay_stats_df, rdf, aclu_to_idx, irdf = curr_jonathan_firing_rate_analysis['neuron_replay_stats_df'], curr_jonathan_firing_rate_analysis['rdf']['rdf'], curr_jonathan_firing_rate_analysis['rdf']['aclu_to_idx'], curr_jonathan_firing_rate_analysis['irdf']['irdf']
+            ## Get existing `pf1D_dt`:
+            active_pf_1D = curr_params_global_results.pf1D
+            active_pf_1D_dt = curr_params_global_results.pf1D_dt
             if progress_print:
-                print(f'{_comp_name} already computed.')
-        except (AttributeError, KeyError) as e:
-            if progress_print or debug_print:
-                print(f'{_comp_name} missing.')
-            if debug_print:
-                print(f'\t encountered error: {e}\n{traceback.format_exc()}\n.')
-            if progress_print or debug_print:
-                print(f'\t Recomputing {_comp_name}...')
-            curr_active_pipeline.perform_specific_computation(computation_functions_name_whitelist=['_perform_jonathan_replay_firing_rate_analyses'], fail_on_exception=True, debug_print=False) # fail_on_exception MUST be True or error handling is all messed up 
-            print(f'\t done.')
-            curr_jonathan_firing_rate_analysis = curr_active_pipeline.global_computation_results.computed_data['jonathan_firing_rate_analysis']
-            neuron_replay_stats_df, rdf, aclu_to_idx, irdf = curr_jonathan_firing_rate_analysis['neuron_replay_stats_df'], curr_jonathan_firing_rate_analysis['rdf']['rdf'], curr_jonathan_firing_rate_analysis['rdf']['aclu_to_idx'], curr_jonathan_firing_rate_analysis['irdf']['irdf']
-            newly_computed_values.append(_comp_name)
-        except Exception as e:
-            raise e
+                print(f'Running batch_extended_computations(...) with global_epoch_name: "{global_epoch_name}, a_global_computation_result_key: {a_global_computation_result_key}"')
 
-        ## short_long_pf_overlap_analyses:
-        _comp_name = 'short_long_pf_overlap_analyses'
-        try:
-            ## Get global `short_long_pf_overlap_analyses` results:
-            short_long_pf_overlap_analyses = curr_active_pipeline.global_computation_results.computed_data.short_long_pf_overlap_analyses
-            conv_overlap_dict = short_long_pf_overlap_analyses['conv_overlap_dict']
-            conv_overlap_scalars_df = short_long_pf_overlap_analyses['conv_overlap_scalars_df']
-            prod_overlap_dict = short_long_pf_overlap_analyses['product_overlap_dict']
-            relative_entropy_overlap_dict = short_long_pf_overlap_analyses['relative_entropy_overlap_dict']
-            relative_entropy_overlap_scalars_df = short_long_pf_overlap_analyses['relative_entropy_overlap_scalars_df']
+            ## firing_rate_trends:
+            _comp_name = 'firing_rate_trends'
+            try:
+                active_extended_stats = curr_active_pipeline.computation_results[a_global_computation_result_key].computed_data['extended_stats']
+                time_binned_pos_df = active_extended_stats['time_binned_position_df']
+                if progress_print:
+                    print(f'{_comp_name} already computed.')
+            except (AttributeError, KeyError) as e:
+                if progress_print or debug_print:
+                    print(f'{_comp_name} missing.')
+                if debug_print:
+                    print(f'\t encountered error: {e}\n{traceback.format_exc()}\n.')
+                if progress_print or debug_print:
+                    print(f'\t Recomputing {_comp_name}...')
+                curr_active_pipeline.perform_specific_computation(computation_functions_name_whitelist=['_perform_firing_rate_trends_computation'], enabled_filter_names=[global_epoch_name], fail_on_exception=fail_on_exception, debug_print=False) 
+                print(f'\t done.')
+                active_extended_stats = curr_active_pipeline.computation_results[a_global_computation_result_key].computed_data['extended_stats']
+                time_binned_pos_df = active_extended_stats['time_binned_position_df']
+                newly_computed_values.append(_comp_name)
+            except Exception as e:
+                raise e
+
+            ## relative_entropy_analyses:
+            _comp_name = 'relative_entropy_analyses'
+            try:
+                active_relative_entropy_results = active_extended_stats['relative_entropy_analyses']
+                post_update_times = active_relative_entropy_results['post_update_times'] # (4152,) = (n_post_update_times,)
+                snapshot_differences_result_dict = active_relative_entropy_results['snapshot_differences_result_dict']
+                time_intervals = active_relative_entropy_results['time_intervals']
+                long_short_rel_entr_curves_frames = active_relative_entropy_results['long_short_rel_entr_curves_frames'] # (4152, 108, 63) = (n_post_update_times, n_neurons, n_xbins)
+                short_long_rel_entr_curves_frames = active_relative_entropy_results['short_long_rel_entr_curves_frames'] # (4152, 108, 63) = (n_post_update_times, n_neurons, n_xbins)
+                flat_relative_entropy_results = active_relative_entropy_results['flat_relative_entropy_results'] # (149, 63) - (nSnapshots, nXbins)
+                flat_jensen_shannon_distance_results = active_relative_entropy_results['flat_jensen_shannon_distance_results'] # (149, 63) - (nSnapshots, nXbins)
+                flat_jensen_shannon_distance_across_all_positions = np.sum(flat_jensen_shannon_distance_results, axis=1) # sum across all position bins # (4152,) - (nSnapshots)
+                flat_surprise_across_all_positions = np.sum(flat_relative_entropy_results, axis=1) # sum across all position bins # (4152,) - (nSnapshots)
+                if progress_print:
+                    print(f'{_comp_name} already computed.')
+            except (AttributeError, KeyError) as e:
+                if progress_print or debug_print:
+                    print(f'{_comp_name} missing.')
+                if debug_print:
+                    print(f'\t encountered error: {e}\n{traceback.format_exc()}\n.')
+                if progress_print or debug_print:
+                    print(f'\t Recomputing {_comp_name}...')
+                curr_active_pipeline.perform_specific_computation(computation_functions_name_whitelist=['_perform_time_dependent_pf_sequential_surprise_computation'], enabled_filter_names=[global_epoch_name], fail_on_exception=fail_on_exception, debug_print=False)
+                print(f'\t done.')
+                active_relative_entropy_results = active_extended_stats['relative_entropy_analyses']
+                post_update_times = active_relative_entropy_results['post_update_times'] # (4152,) = (n_post_update_times,)
+                snapshot_differences_result_dict = active_relative_entropy_results['snapshot_differences_result_dict']
+                time_intervals = active_relative_entropy_results['time_intervals']
+                long_short_rel_entr_curves_frames = active_relative_entropy_results['long_short_rel_entr_curves_frames'] # (4152, 108, 63) = (n_post_update_times, n_neurons, n_xbins)
+                short_long_rel_entr_curves_frames = active_relative_entropy_results['short_long_rel_entr_curves_frames'] # (4152, 108, 63) = (n_post_update_times, n_neurons, n_xbins)
+                flat_relative_entropy_results = active_relative_entropy_results['flat_relative_entropy_results'] # (149, 63) - (nSnapshots, nXbins)
+                flat_jensen_shannon_distance_results = active_relative_entropy_results['flat_jensen_shannon_distance_results'] # (149, 63) - (nSnapshots, nXbins)
+                flat_jensen_shannon_distance_across_all_positions = np.sum(np.abs(flat_jensen_shannon_distance_results), axis=1) # sum across all position bins # (4152,) - (nSnapshots)
+                flat_surprise_across_all_positions = np.sum(np.abs(flat_relative_entropy_results), axis=1) # sum across all position bins # (4152,) - (nSnapshots)
+                newly_computed_values.append(_comp_name)
+            except Exception as e:
+                raise e
+
+            ## TODO 2023-01-16 - Rework MAJOR - need to update global_computation_results to use new multi-params format:
+            # if include_global_functions:
+            #     ## jonathan_firing_rate_analysis:
+            #     _comp_name = 'jonathan_firing_rate_analysis'
+            #     try:
+            #         ## Get global 'jonathan_firing_rate_analysis' results:
+            #         curr_jonathan_firing_rate_analysis = curr_active_pipeline.global_computation_results.computed_data['jonathan_firing_rate_analysis']
+            #         neuron_replay_stats_df, rdf, aclu_to_idx, irdf = curr_jonathan_firing_rate_analysis['neuron_replay_stats_df'], curr_jonathan_firing_rate_analysis['rdf']['rdf'], curr_jonathan_firing_rate_analysis['rdf']['aclu_to_idx'], curr_jonathan_firing_rate_analysis['irdf']['irdf']
+            #         if progress_print:
+            #             print(f'{_comp_name} already computed.')
+            #     except (AttributeError, KeyError) as e:
+            #         if progress_print or debug_print:
+            #             print(f'{_comp_name} missing.')
+            #         if debug_print:
+            #             print(f'\t encountered error: {e}\n{traceback.format_exc()}\n.')
+            #         if progress_print or debug_print:
+            #             print(f'\t Recomputing {_comp_name}...')
+            #         curr_active_pipeline.perform_specific_computation(computation_functions_name_whitelist=['_perform_jonathan_replay_firing_rate_analyses'], fail_on_exception=True, debug_print=False) # fail_on_exception MUST be True or error handling is all messed up 
+            #         print(f'\t done.')
+            #         curr_jonathan_firing_rate_analysis = curr_active_pipeline.global_computation_results.computed_data['jonathan_firing_rate_analysis']
+            #         neuron_replay_stats_df, rdf, aclu_to_idx, irdf = curr_jonathan_firing_rate_analysis['neuron_replay_stats_df'], curr_jonathan_firing_rate_analysis['rdf']['rdf'], curr_jonathan_firing_rate_analysis['rdf']['aclu_to_idx'], curr_jonathan_firing_rate_analysis['irdf']['irdf']
+            #         newly_computed_values.append(_comp_name)
+            #     except Exception as e:
+            #         raise e
+
+            #     ## short_long_pf_overlap_analyses:
+            #     _comp_name = 'short_long_pf_overlap_analyses'
+            #     try:
+            #         ## Get global `short_long_pf_overlap_analyses` results:
+            #         short_long_pf_overlap_analyses = curr_active_pipeline.global_computation_results.computed_data.short_long_pf_overlap_analyses
+            #         conv_overlap_dict = short_long_pf_overlap_analyses['conv_overlap_dict']
+            #         conv_overlap_scalars_df = short_long_pf_overlap_analyses['conv_overlap_scalars_df']
+            #         prod_overlap_dict = short_long_pf_overlap_analyses['product_overlap_dict']
+            #         relative_entropy_overlap_dict = short_long_pf_overlap_analyses['relative_entropy_overlap_dict']
+            #         relative_entropy_overlap_scalars_df = short_long_pf_overlap_analyses['relative_entropy_overlap_scalars_df']
+            #         if progress_print:
+            #             print(f'{_comp_name} already computed.')
+            #     except (AttributeError, KeyError) as e:
+            #         if progress_print or debug_print:
+            #             print(f'{_comp_name} missing.')
+            #         if debug_print:
+            #             print(f'\t encountered error: {e}\n{traceback.format_exc()}\n.')
+            #         if progress_print or debug_print:
+            #             print(f'\t Recomputing {_comp_name}...')
+            #         curr_active_pipeline.perform_specific_computation(computation_functions_name_whitelist=['_perform_short_long_pf_overlap_analyses'], fail_on_exception=True, debug_print=False) # fail_on_exception MUST be True or error handling is all messed up 
+            #         print(f'\t done.')
+            #         short_long_pf_overlap_analyses = curr_active_pipeline.global_computation_results.computed_data.short_long_pf_overlap_analyses
+            #         conv_overlap_dict = short_long_pf_overlap_analyses['conv_overlap_dict']
+            #         conv_overlap_scalars_df = short_long_pf_overlap_analyses['conv_overlap_scalars_df']
+            #         prod_overlap_dict = short_long_pf_overlap_analyses['product_overlap_dict']
+            #         relative_entropy_overlap_dict = short_long_pf_overlap_analyses['relative_entropy_overlap_dict']
+            #         relative_entropy_overlap_scalars_df = short_long_pf_overlap_analyses['relative_entropy_overlap_scalars_df']
+            #         newly_computed_values.append(_comp_name)
+            #     except Exception as e:
+            #         raise e
             if progress_print:
-                print(f'{_comp_name} already computed.')
-        except (AttributeError, KeyError) as e:
-            if progress_print or debug_print:
-                print(f'{_comp_name} missing.')
-            if debug_print:
-                print(f'\t encountered error: {e}\n{traceback.format_exc()}\n.')
-            if progress_print or debug_print:
-                print(f'\t Recomputing {_comp_name}...')
-            curr_active_pipeline.perform_specific_computation(computation_functions_name_whitelist=['_perform_short_long_pf_overlap_analyses'], fail_on_exception=True, debug_print=False) # fail_on_exception MUST be True or error handling is all messed up 
-            print(f'\t done.')
-            short_long_pf_overlap_analyses = curr_active_pipeline.global_computation_results.computed_data.short_long_pf_overlap_analyses
-            conv_overlap_dict = short_long_pf_overlap_analyses['conv_overlap_dict']
-            conv_overlap_scalars_df = short_long_pf_overlap_analyses['conv_overlap_scalars_df']
-            prod_overlap_dict = short_long_pf_overlap_analyses['product_overlap_dict']
-            relative_entropy_overlap_dict = short_long_pf_overlap_analyses['relative_entropy_overlap_dict']
-            relative_entropy_overlap_scalars_df = short_long_pf_overlap_analyses['relative_entropy_overlap_scalars_df']
-            newly_computed_values.append(_comp_name)
-        except Exception as e:
-            raise e
+                print('done with all batch_extended_computations(...) for a_global_computation_result_key: {a_global_computation_result_key}.')
 
-        # short_only_df = neuron_replay_stats_df[neuron_replay_stats_df.track_membership == SplitPartitionMembership.RIGHT_ONLY]
-        # short_only_aclus = short_only_df.index.values.tolist()
-        # long_only_df = neuron_replay_stats_df[neuron_replay_stats_df.track_membership == SplitPartitionMembership.LEFT_ONLY]
-        # long_only_aclus = long_only_df.index.values.tolist()
-        # shared_df = neuron_replay_stats_df[neuron_replay_stats_df.track_membership == SplitPartitionMembership.SHARED]
-        # shared_aclus = shared_df.index.values.tolist()
-        # if debug_print:
-        #     print(f'shared_aclus: {shared_aclus}')
-        #     print(f'long_only_aclus: {long_only_aclus}')
-        #     print(f'short_only_aclus: {short_only_aclus}')
-
-    # active_identifying_session_ctx = curr_active_pipeline.sess.get_context() # 'bapun_RatN_Day4_2019-10-15_11-30-06'
-    if progress_print:
-        print('done with all batch_extended_computations(...).')
+        # active_identifying_session_ctx = curr_active_pipeline.sess.get_context() # 'bapun_RatN_Day4_2019-10-15_11-30-06'
+        if progress_print:
+            print('done with all batch_extended_computations(...) for all computation params.')
 
     return newly_computed_values
 

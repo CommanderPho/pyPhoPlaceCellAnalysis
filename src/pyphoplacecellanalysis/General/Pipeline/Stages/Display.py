@@ -301,7 +301,7 @@ class PipelineWithDisplayPipelineStageMixin:
 
 
             # multi-computation-config way:
-            for a_computation_config_name, active_computation_params in self.active_configs[an_active_config_name].computation_params_dict.items():
+            for a_computation_config_name, active_computation_params_dict in self.active_configs[an_active_config_name].computation_params_dict.items():
                 active_computation_results_key = f"{an_active_config_name}_{a_computation_config_name}" # new multi-comp-config version
                 # Note that there may be different numbers of neurons included in the different configs (which include different epochs/filters) so a single one-size-fits-all approach to assigning color identities won't work here.
                 if active_computation_results_key in self.computation_results:
