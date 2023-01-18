@@ -498,7 +498,7 @@ class ComputedPipelineStage(LoadableInput, LoadableSessionInput, FilterablePipel
                         self.active_configs[a_filter_config_name].computation_params_dict = curr_active_computation_params_dict #TODO: if more than one computation config is passed in, the active_config should be duplicated for each computation config.
 
                     ## Here is an issue, we need to get the appropriate computation result depending on whether it's global or not 
-                    for a_computation_config_name, active_computation_params in active_computation_params_dict.items():
+                    for a_computation_config_name, active_computation_params in curr_active_computation_params_dict.items():
                         # curr_computation_context = filtered_context.adding_context(collision_prefix='computation_params', comp_params_name=a_computation_config_name)
                         # print(f'curr_computation_context: {curr_computation_context}')
 
