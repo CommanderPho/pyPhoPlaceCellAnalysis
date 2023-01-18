@@ -360,15 +360,15 @@ class ComputedPipelineStage(LoadableInput, LoadableSessionInput, FilterablePipel
                     # old method:
                     # active_computation_params = self.active_configs[a_select_config_name].computation_config # get the previously set computation configs
 
+                # keep the same number of active_configs, but add the .computation_params_dict property to replace the .computation_config property
+                self.active_configs[a_filter_config_name].computation_params_dict = active_computation_params_dict
+
                 for a_computation_config_name, active_computation_params in active_computation_params_dict.items():
                     # set/update the computation configs:
                     curr_computation_context = filtered_context.adding_context(collision_prefix='computation_params', comp_params_name=a_computation_config_name)
                     print(f'curr_computation_context: {curr_computation_context}')
                     # add new active_configs entry for the computation context:
                     # self.active_configs[curr_computation_context].computation_config = active_computation_params #TODO: if more than one computation config is passed in, the active_config should be duplicated for each computation config.
-
-                    # keep the same number of active_configs, but add the .computation_params_dict property to replace the .computation_config property
-                    self.active_configs[a_filter_config_name].computation_params_dict = active_computation_params
 
                     # active_computation_results_key = a_select_config_name # pre multi-comp-config version
                     active_computation_results_key = f"{a_filter_config_name}_{a_computation_config_name}" # new multi-comp-config version
