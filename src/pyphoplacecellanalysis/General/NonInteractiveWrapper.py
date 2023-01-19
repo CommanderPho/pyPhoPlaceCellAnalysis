@@ -339,6 +339,7 @@ def batch_extended_computations(curr_active_pipeline, include_global_functions=F
     try:
         active_extended_stats = curr_active_pipeline.computation_results[global_epoch_name].computed_data['extended_stats']
         time_binned_pos_df = active_extended_stats['time_binned_position_df']
+        firing_rate_trends = curr_active_pipeline.computation_results[global_epoch_name].computed_data['firing_rate_trends']
         if progress_print:
             print(f'{_comp_name} already computed.')
     except (AttributeError, KeyError) as e:
@@ -352,11 +353,13 @@ def batch_extended_computations(curr_active_pipeline, include_global_functions=F
         print(f'\t done.')
         active_extended_stats = curr_active_pipeline.computation_results[global_epoch_name].computed_data['extended_stats']
         time_binned_pos_df = active_extended_stats['time_binned_position_df']
+        firing_rate_trends = curr_active_pipeline.computation_results[global_epoch_name].computed_data['firing_rate_trends']
         newly_computed_values.append(_comp_name)
     except Exception as e:
         raise e
 
     ## relative_entropy_analyses:
+    # must have '_perform_firing_rate_trends_computation's fring rate trends
     _comp_name = 'relative_entropy_analyses'
     try:
         active_relative_entropy_results = active_extended_stats['relative_entropy_analyses']
