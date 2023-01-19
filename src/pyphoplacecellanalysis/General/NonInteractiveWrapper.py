@@ -248,10 +248,11 @@ def batch_load_session(global_data_root_parent_path, active_data_mode_name, base
     assert 'skip_save' not in kwargs, f"use saving_mode=PipelineSavingScheme.SKIP_SAVING instead"
     # skip_save = kwargs.get('skip_save', False)
     active_pickle_filename = kwargs.get('active_pickle_filename', 'loadedSessPickle.pkl')
-    time_bin_size = kwargs.get('time_bin_size', 0.03333) # 0.03333 = 1.0/30.0 # decode at 30fps to match the position sampling frequency
-    # time_bin_size = kwargs.get('time_bin_size', 0.1) # 10 fps
 
 
+    active_session_computation_configs = kwargs.get('active_session_computation_configs', None)
+
+    
 
     known_data_session_type_properties_dict = DataSessionFormatRegistryHolder.get_registry_known_data_session_type_dict()
     active_data_session_types_registered_classes_dict = DataSessionFormatRegistryHolder.get_registry_data_session_type_class_name_dict()
@@ -268,25 +269,30 @@ def batch_load_session(global_data_root_parent_path, active_data_mode_name, base
     
     curr_active_pipeline.filter_sessions(active_session_filter_configurations, changed_filters_ignore_list=['maze1','maze2','maze'], debug_print=False)
 
-    # ## Compute shared grid_bin_bounds for all epochs from the global positions:
-    # global_unfiltered_session = curr_active_pipeline.sess
-    # # ((22.736279243974774, 261.696733348342), (49.989466271998936, 151.2870218547401))
-    # first_filtered_session = curr_active_pipeline.filtered_sessions[curr_active_pipeline.filtered_session_names[0]]
-    # # ((22.736279243974774, 261.696733348342), (125.5644705153173, 151.21507349463707))
-    # second_filtered_session = curr_active_pipeline.filtered_sessions[curr_active_pipeline.filtered_session_names[1]]
-    # # ((71.67666779621361, 224.37820920766043), (110.51617463644946, 151.2870218547401))
+    if active_session_computation_configs is None:
+        """
+        If there are is provided computation config, get the default:
+        """
+        # ## Compute shared grid_bin_bounds for all epochs from the global positions:
+        # global_unfiltered_session = curr_active_pipeline.sess
+        # # ((22.736279243974774, 261.696733348342), (49.989466271998936, 151.2870218547401))
+        # first_filtered_session = curr_active_pipeline.filtered_sessions[curr_active_pipeline.filtered_session_names[0]]
+        # # ((22.736279243974774, 261.696733348342), (125.5644705153173, 151.21507349463707))
+        # second_filtered_session = curr_active_pipeline.filtered_sessions[curr_active_pipeline.filtered_session_names[1]]
+        # # ((71.67666779621361, 224.37820920766043), (110.51617463644946, 151.2870218547401))
 
-    # grid_bin_bounding_session = first_filtered_session
-    # grid_bin_bounds = PlacefieldComputationParameters.compute_grid_bin_bounds(grid_bin_bounding_session.position.x, grid_bin_bounding_session.position.y)
+        # grid_bin_bounding_session = first_filtered_session
+        # grid_bin_bounds = PlacefieldComputationParameters.compute_grid_bin_bounds(grid_bin_bounding_session.position.x, grid_bin_bounding_session.position.y)
 
-    ## OR use no grid_bin_bounds meaning they will be determined dynamically for each epoch:
-    grid_bin_bounds = None
-
-    # time_bin_size = 0.03333 #1.0/30.0 # decode at 30fps to match the position sampling frequency
-    # time_bin_size = 0.1 # 10 fps
-
-    active_session_computation_configs = active_data_mode_registered_class.build_default_computation_configs(sess=curr_active_pipeline.sess, time_bin_size=time_bin_size, grid_bin_bounds=grid_bin_bounds) #1.0/30.0 # decode at 30fps to match the position sampling frequency
-
+        ## OR use no grid_bin_bounds meaning they will be determined dynamically for each epoch:
+        grid_bin_bounds = None
+        # time_bin_size = 0.03333 #1.0/30.0 # decode at 30fps to match the position sampling frequency
+        # time_bin_size = 0.1 # 10 fps
+        time_bin_size = kwargs.get('time_bin_size', 0.03333) # 0.03333 = 1.0/30.0 # decode at 30fps to match the position sampling frequency
+        # time_bin_size = kwargs.get('time_bin_size', 0.1) # 10 fps
+        active_session_computation_configs = active_data_mode_registered_class.build_default_computation_configs(sess=curr_active_pipeline.sess, time_bin_size=time_bin_size, grid_bin_bounds=grid_bin_bounds) #1.0/30.0 # decode at 30fps to match the position sampling frequency
+    else:
+        assert 'time_bin_size' not in kwargs, f"time_bin_size kwarg provided but will not be used because a custom active_session_computation_configs was provided as well."
 
 
     # Whitelist Mode:
