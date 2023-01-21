@@ -65,7 +65,7 @@ def epoch_unit_avg_firing_rates(spikes_df, filter_epochs, included_neuron_ids=No
 def fr_index(long_fr, short_fr):
 	return ((long_fr - short_fr) / (long_fr + short_fr))
 
-def compute_long_short_firing_rate_indicies(spikes_df, long_laps, long_replays, short_laps, short_replays):
+def compute_long_short_firing_rate_indicies(spikes_df, long_laps, long_replays, short_laps, short_replays, save_path=None):
 	"""A computation for the long/short firing rate index that Kamran and I discussed as one of three metrics during our meeting on 2023-01-19.
 
 	Args:
@@ -88,8 +88,9 @@ def compute_long_short_firing_rate_indicies(spikes_df, long_laps, long_replays, 
 	x_frs_index = {aclu:fr_index(long_mean_replays_frs[aclu], short_mean_replays_frs[aclu]) for aclu in long_mean_replays_frs.keys()}
 	
 	# Save a backup of the data:
-	backup_results_dict = dict(zip(['long_mean_laps_frs', 'long_mean_replays_frs', 'short_mean_laps_frs', 'short_mean_replays_frs', 'x_frs_index', 'y_frs_index'], [long_mean_laps_frs, long_mean_replays_frs, short_mean_laps_frs, short_mean_replays_frs, x_frs_index, y_frs_index])) # all variables
-	saveData('temp_2023-01-20_results.pkl', backup_results_dict)
+	if save_path is not None:
+		backup_results_dict = dict(zip(['long_mean_laps_frs', 'long_mean_replays_frs', 'short_mean_laps_frs', 'short_mean_replays_frs', 'x_frs_index', 'y_frs_index'], [long_mean_laps_frs, long_mean_replays_frs, short_mean_laps_frs, short_mean_replays_frs, x_frs_index, y_frs_index])) # all variables
+		saveData('temp_2023-01-20_results.pkl', backup_results_dict)
 
 	return x_frs_index, y_frs_index
 
@@ -98,6 +99,6 @@ if __name__ == "__main__":
 	# dict(zip(['spikes_df', 'long_laps', 'short_laps', 'global_laps', 'long_replays', 'short_replays', 'global_replays'], [spikes_df, long_laps, short_laps, global_laps, long_replays, short_replays, global_replays]))
 	backup_dict = loadData(r"C:\Users\pho\repos\PhoPy3DPositionAnalysis2021\temp_2023-01-20.pkl")
 	spikes_df, long_laps, short_laps, global_laps, long_replays, short_replays, global_replays = backup_dict.values()
-	x_frs_index, y_frs_index = compute_long_short_firing_rate_indicies(spikes_df, long_laps, long_replays, short_laps, short_replays)
+	x_frs_index, y_frs_index = compute_long_short_firing_rate_indicies(spikes_df, long_laps, long_replays, short_laps, short_replays, save_path='temp_2023-01-20_results.pkl')
 	print(f'x_frs_index: {x_frs_index}, y_frs_index: {y_frs_index}')
 
