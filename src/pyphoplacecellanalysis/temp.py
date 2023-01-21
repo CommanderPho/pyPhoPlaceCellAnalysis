@@ -10,6 +10,20 @@ from pyphoplacecellanalysis.General.Pipeline.Stages.Loading import saveData, loa
 
 
 def epoch_unit_avg_firing_rates(spikes_df, filter_epochs, included_neuron_ids=None, debug_print=False):
+	"""Computes the average firing rate for each unit in each epoch.
+
+	Args:
+		spikes_df (_type_): _description_
+		filter_epochs (_type_): _description_
+		included_neuron_ids (_type_, optional): _description_. Defaults to None.
+		debug_print (bool, optional): _description_. Defaults to False.
+
+	Returns:
+		_type_: _description_
+
+	TODO: very inefficient.
+
+	"""
 	epoch_avg_firing_rate = {}
 	# .spikes.get_unit_spiketrains()
 	# .spikes.get_split_by_unit(included_neuron_ids=None)
@@ -39,12 +53,8 @@ def epoch_unit_avg_firing_rates(spikes_df, filter_epochs, included_neuron_ids=No
 	for epoch_id in np.arange(np.shape(filter_epochs_df)[0]):
 		epoch_start = filter_epochs_df.start.values[epoch_id]
 		epoch_end = filter_epochs_df.stop.values[epoch_id]
-
-		# epoch_spikes_df = spikes_df[epoch_start <= spikes_df[spikes_df.spikes.time_variable_name] <= epoch_end]
 		epoch_spikes_df = spikes_df.spikes.time_sliced(t_start=epoch_start, t_stop=epoch_end)
-		# filter_epoch_spikes_df.spikes.time_sliced(t_start=epoch_start, t_stop=epoch_end)
 		# epoch_spikes_df = filter_epoch_spikes_df[filter_epoch_spikes_df['temp_epoch_id'] == epoch_id]
-
 		for aclu, unit_epoch_spikes_df in zip(included_neuron_ids, epoch_spikes_df.spikes.get_split_by_unit(included_neuron_ids=included_neuron_ids)):
 			if aclu not in epoch_avg_firing_rate:
 				epoch_avg_firing_rate[aclu] = []
@@ -52,36 +62,40 @@ def epoch_unit_avg_firing_rates(spikes_df, filter_epochs, included_neuron_ids=No
 
 	return epoch_avg_firing_rate,	{aclu:np.mean(unit_epoch_avg_frs) for aclu, unit_epoch_avg_frs in epoch_avg_firing_rate.items()}
 
-
 def fr_index(long_fr, short_fr):
 	return ((long_fr - short_fr) / (long_fr + short_fr))
 
 def compute_long_short_firing_rate_indicies(spikes_df, long_laps, long_replays, short_laps, short_replays):
+	"""A computation for the long/short firing rate index that Kamran and I discussed as one of three metrics during our meeting on 2023-01-19.
 
+	Args:
+		spikes_df (_type_): _description_
+		long_laps (_type_): _description_
+		long_replays (_type_): _description_
+		short_laps (_type_): _description_
+		short_replays (_type_): _description_
+
+	Returns:
+		_type_: _description_
+	"""
 	_, long_mean_laps_frs = epoch_unit_avg_firing_rates(spikes_df, long_laps)
 	_, long_mean_replays_frs = epoch_unit_avg_firing_rates(spikes_df, long_replays)
 
 	_, short_mean_laps_frs = epoch_unit_avg_firing_rates(spikes_df, short_laps)
 	_, short_mean_replays_frs = epoch_unit_avg_firing_rates(spikes_df, short_replays)
 
-	backup_results_dict = dict(zip(['long_mean_laps_frs', 'long_mean_replays_frs', 'short_mean_laps_frs', 'short_mean_replays_frs'], [long_mean_laps_frs, long_mean_replays_frs, short_mean_laps_frs, short_mean_replays_frs]))
-	saveData('temp_2023-01-20_results.pkl', backup_results_dict)
-
-	print(f'reached this point!')
 	y_frs_index = {aclu:fr_index(long_mean_laps_frs[aclu], short_mean_laps_frs[aclu]) for aclu in long_mean_laps_frs.keys()}
 	x_frs_index = {aclu:fr_index(long_mean_replays_frs[aclu], short_mean_replays_frs[aclu]) for aclu in long_mean_replays_frs.keys()}
-
+	
+	# Save a backup of the data:
+	backup_results_dict = dict(zip(['long_mean_laps_frs', 'long_mean_replays_frs', 'short_mean_laps_frs', 'short_mean_replays_frs', 'x_frs_index', 'y_frs_index'], [long_mean_laps_frs, long_mean_replays_frs, short_mean_laps_frs, short_mean_replays_frs, x_frs_index, y_frs_index])) # all variables
+	saveData('temp_2023-01-20_results.pkl', backup_results_dict)
 
 	return x_frs_index, y_frs_index
 
 if __name__ == "__main__":
-	# x_frs_index, y_frs_index = compute_long_short_firing_rate_indicies(spikes_df, long_laps, long_replays, short_laps, short_replays)
-
 	# saveData('temp_2023-01-20.pkl', backup_dict)
 	# dict(zip(['spikes_df', 'long_laps', 'short_laps', 'global_laps', 'long_replays', 'short_replays', 'global_replays'], [spikes_df, long_laps, short_laps, global_laps, long_replays, short_replays, global_replays]))
-
-	
-
 	backup_dict = loadData(r"C:\Users\pho\repos\PhoPy3DPositionAnalysis2021\temp_2023-01-20.pkl")
 	spikes_df, long_laps, short_laps, global_laps, long_replays, short_replays, global_replays = backup_dict.values()
 	x_frs_index, y_frs_index = compute_long_short_firing_rate_indicies(spikes_df, long_laps, long_replays, short_laps, short_replays)
