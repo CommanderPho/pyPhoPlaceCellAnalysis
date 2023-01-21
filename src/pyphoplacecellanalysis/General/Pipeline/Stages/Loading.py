@@ -30,12 +30,12 @@ def saveData(pkl_path, db, should_append=False):
             pickle.dump(db, dbfile)
             dbfile.close()
 
-def loadData(pkl_path, debug_print=False):
+def loadData(pkl_path, debug_print=False, **kwargs):
     # for reading also binary mode is important
     db = None
     with ProgressMessagePrinter(pkl_path, 'Loading', 'loaded session pickle file'):
         with open(pkl_path, 'rb') as dbfile:
-            db = pickle.load(dbfile)
+            db = pickle.load(dbfile, **kwargs)
             if debug_print:
                 for keys in db:
                     print(keys, '=>', db[keys])

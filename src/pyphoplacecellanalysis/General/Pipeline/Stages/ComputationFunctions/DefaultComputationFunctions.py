@@ -377,7 +377,6 @@ class KnownFilterEpochs(ExtendedEnum):
     def default_figure_nameList(cls):
         return cls.build_member_value_dict([f'Laps',f'PBEs',f'Ripples',f'Replays',f'Generic'])
 
-
     @classmethod
     def process_functionList(cls, computation_result, filter_epochs, min_epoch_included_duration, default_figure_name='stacked_epoch_slices_matplotlib_subplots'):
         # min_epoch_included_duration = decoding_time_bin_size * float(2) # 0.06666
