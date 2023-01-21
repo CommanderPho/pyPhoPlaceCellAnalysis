@@ -9,6 +9,9 @@ from neuropy.analyses.decoders import epochs_spkcount # for decode_specific_epoc
 from pyphoplacecellanalysis.General.Pipeline.Stages.Loading import saveData, loadData
 
 
+import matplotlib as mpl
+import matplotlib.pyplot as plt
+
 def epoch_unit_avg_firing_rates(spikes_df, filter_epochs, included_neuron_ids=None, debug_print=False):
 	"""Computes the average firing rate for each unit in each epoch.
 
@@ -77,6 +80,13 @@ def compute_long_short_firing_rate_indicies(spikes_df, long_laps, long_replays, 
 
 	Returns:
 		_type_: _description_
+
+
+	The backups saved with this function can be loaded via:
+
+	# Load previously computed from data:
+	long_mean_laps_frs, long_mean_replays_frs, short_mean_laps_frs, short_mean_replays_frs, x_frs_index, y_frs_index = loadData("data/temp_2023-01-20_results.pkl").values()
+
 	"""
 	_, long_mean_laps_frs = epoch_unit_avg_firing_rates(spikes_df, long_laps)
 	_, long_mean_replays_frs = epoch_unit_avg_firing_rates(spikes_df, long_replays)
@@ -93,6 +103,18 @@ def compute_long_short_firing_rate_indicies(spikes_df, long_laps, long_replays, 
 		saveData('temp_2023-01-20_results.pkl', backup_results_dict)
 
 	return x_frs_index, y_frs_index
+
+
+
+def plot_long_short_firing_rate_indicies(x_frs_index, y_frs_index):
+	""" Plot long|short firing rate index 
+	Each datapoint is a neuron.
+	"""
+	plt.scatter(x_frs_index.values(), y_frs_index.values())
+	plt.xlabel('$\\frac{L_{R}-S_{R}}{L_{R} + S_{R}}$', fontsize=16)
+	plt.ylabel('$\\frac{L_{\\theta}-S_{\\theta}}{L_{\\theta} + S_{\\theta}}$', fontsize=16)
+	plt.title('Computed long ($L$)|short($S$) firing rate indicies')
+
 
 if __name__ == "__main__":
 	# saveData('temp_2023-01-20.pkl', backup_dict)
