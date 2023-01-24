@@ -30,6 +30,10 @@ class Plot(object):
     Can call like:
         `curr_active_pipeline.plot._display_1d_placefields`
 
+
+    ## Set in `reload_default_display_functions()` 
+        self._plot_object = None
+        self._plot_object = Plot(self)
     """
     def __init__(self, curr_active_pipeline):
         super(Plot, self).__init__()
@@ -278,6 +282,7 @@ class PipelineWithDisplayPipelineStageMixin:
         # rebuilds the convenience plot object:
         self._plot_object = None
         self._plot_object = Plot(self)
+
 
 
         
