@@ -99,8 +99,9 @@ def compute_long_short_firing_rate_indicies(spikes_df, long_laps, long_replays, 
 	
 	# Save a backup of the data:
 	if save_path is not None:
+		# save_path: e.g. 'temp_2023-01-20_results.pkl'
 		backup_results_dict = dict(zip(['long_mean_laps_frs', 'long_mean_replays_frs', 'short_mean_laps_frs', 'short_mean_replays_frs', 'x_frs_index', 'y_frs_index'], [long_mean_laps_frs, long_mean_replays_frs, short_mean_laps_frs, short_mean_replays_frs, x_frs_index, y_frs_index])) # all variables
-		saveData('temp_2023-01-20_results.pkl', backup_results_dict)
+		saveData(save_path, backup_results_dict)
 
 	return x_frs_index, y_frs_index
 
