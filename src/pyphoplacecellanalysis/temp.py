@@ -13,7 +13,7 @@ import matplotlib as mpl
 import matplotlib.pyplot as plt
 
 def epoch_unit_avg_firing_rates(spikes_df, filter_epochs, included_neuron_ids=None, debug_print=False):
-	"""Computes the average firing rate for each unit in each epoch.
+	"""Computes the average firing rate for each neuron (unit) in each epoch.
 
 	Args:
 		spikes_df (_type_): _description_
