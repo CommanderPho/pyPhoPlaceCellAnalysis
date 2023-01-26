@@ -459,6 +459,21 @@ class KnownFilterEpochs(ExtendedEnum):
 
 
     @classmethod
+    def perform_get_filter_epochs_df(cls, computation_result, filter_epochs, min_epoch_included_duration=None, **kwargs):
+        """Temporary wrapper for `process_functionList` to replace `_perform_get_filter_epochs_df`
+
+        Args:
+            sess (_type_): computation_result.sess
+            filter_epochs (_type_): _description_
+            min_epoch_included_duration: only applies to Replay for some reason?
+
+        """
+        # `process_functionList` version:
+        return cls.process_functionList(computation_result=computation_result, filter_epochs=filter_epochs, min_epoch_included_duration=min_epoch_included_duration, default_figure_name='', **kwargs)[0] # [0] gets the returned active_filter_epochs
+        # proper `_perform_get_filter_epochs_df` version:
+        # return cls._perform_get_filter_epochs_df(sess=computation_result.sess, filter_epochs=filter_epochs, min_epoch_included_duration=min_epoch_included_duration)
+
+    @classmethod
     def process_functionList(cls, computation_result, filter_epochs, min_epoch_included_duration, default_figure_name='stacked_epoch_slices_matplotlib_subplots'):
         # min_epoch_included_duration = decoding_time_bin_size * float(2) # 0.06666
         # min_epoch_included_duration = 0.06666
