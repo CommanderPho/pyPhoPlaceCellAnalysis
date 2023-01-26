@@ -368,6 +368,8 @@ class KnownFilterEpochs(ExtendedEnum):
     REPLAY = "replay"
     GENERIC = "GENERIC"
 
+
+    # BEGIN PROBLEMATIC ENUM CODE ________________________________________________________________________________________ #
     @property
     def default_figure_name(self):
         return KnownFilterEpochs.default_figure_nameList()[self]
@@ -381,20 +383,19 @@ class KnownFilterEpochs(ExtendedEnum):
 
     @classmethod
     def _perform_get_filter_epochs_df(cls, sess, filter_epochs, min_epoch_included_duration=None, debug_print=False):
-        """_summary_
+        """DOES NOT WORK due to messed-up `.epochs.get_non_overlapping_df`
 
         Args:
             sess (_type_): computation_result.sess
             filter_epochs (_type_): _description_
             min_epoch_included_duration: only applies to Replay for some reason?
 
-
         Raises:
             NotImplementedError: _description_
-
-        
-
         """
+        # post_process_epochs_fn = lambda filter_epochs_df: filter_epochs_df.epochs.get_non_overlapping_df(debug_print=debug_print) # post_process_epochs_fn should accept an epochs dataframe and return a clean copy of the epochs dataframe
+        post_process_epochs_fn = lambda filter_epochs_df: filter_epochs_df.epochs.get_valid_df() # post_process_epochs_fn should accept an epochs dataframe and return a clean copy of the epochs dataframe
+
         if debug_print:
             print(f'')
         if isinstance(filter_epochs, str):
@@ -411,14 +412,14 @@ class KnownFilterEpochs(ExtendedEnum):
                 active_filter_epochs = laps_copy.as_epoch_obj() # epoch object
                 if not isinstance(active_filter_epochs, pd.DataFrame):
                     active_filter_epochs = active_filter_epochs.to_dataframe()
-                active_filter_epochs = active_filter_epochs.epochs.get_non_overlapping_df(debug_print=debug_print)
+                active_filter_epochs = post_process_epochs_fn(active_filter_epochs)
 
             elif filter_epochs.name == cls.PBE.name:
                 ## PBEs-Epochs Decoding:
                 active_filter_epochs = deepcopy(sess.pbe) # epoch object
                 if not isinstance(active_filter_epochs, pd.DataFrame):
                     active_filter_epochs = active_filter_epochs.to_dataframe()
-                active_filter_epochs = active_filter_epochs.epochs.get_non_overlapping_df(debug_print=debug_print)
+                active_filter_epochs = post_process_epochs_fn(active_filter_epochs)
             
             elif filter_epochs.name == cls.RIPPLE.name:
                 ## Ripple-Epochs Decoding:
@@ -427,15 +428,14 @@ class KnownFilterEpochs(ExtendedEnum):
                     active_filter_epochs = active_filter_epochs.to_dataframe()
                 # note we need to make sure we have a valid label to start because `.epochs.get_non_overlapping_df()` requires one.
                 active_filter_epochs['label'] = active_filter_epochs.index.to_numpy() # integer ripple indexing
-
-                active_filter_epochs = active_filter_epochs.epochs.get_non_overlapping_df(debug_print=debug_print)
+                active_filter_epochs = post_process_epochs_fn(active_filter_epochs)
                 active_filter_epochs['label'] = active_filter_epochs.index.to_numpy() # integer ripple indexing
                 
             elif filter_epochs.name == cls.REPLAY.name:
                 active_filter_epochs = deepcopy(sess.replay) # epoch object
                 if not isinstance(active_filter_epochs, pd.DataFrame):
                     active_filter_epochs = active_filter_epochs.to_dataframe()
-                active_filter_epochs = active_filter_epochs.epochs.get_non_overlapping_df(debug_print=debug_print)
+                active_filter_epochs = post_process_epochs_fn(active_filter_epochs)
                 if min_epoch_included_duration is not None:
                     active_filter_epochs = active_filter_epochs[active_filter_epochs.duration >= min_epoch_included_duration] # only include those epochs which are greater than or equal to two decoding time bins
             else:
@@ -444,8 +444,11 @@ class KnownFilterEpochs(ExtendedEnum):
                 raise NotImplementedError
 
         else:
-            # Use it raw, hope it's right
+            # Use it filter_epochs raw, hope it's right. It should be some type of Epoch or pd.DataFrame object.
             active_filter_epochs = filter_epochs
+            ## TODO: why even allow passing in a raw Epoch object? It's not clear what the use case is.
+            raise NotImplementedError
+
 
         # Finally, convert back to Epoch object:
         assert isinstance(active_filter_epochs, pd.DataFrame)
