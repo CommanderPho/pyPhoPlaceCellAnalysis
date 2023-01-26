@@ -12,7 +12,7 @@ from pyphoplacecellanalysis.General.Pipeline.Stages.Loading import saveData, loa
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 
-def epoch_unit_avg_firing_rates(spikes_df, filter_epochs, included_neuron_ids=None, debug_print=False):
+def _epoch_unit_avg_firing_rates(spikes_df, filter_epochs, included_neuron_ids=None, debug_print=False):
 	"""Computes the average firing rate for each neuron (unit) in each epoch.
 
 	Args:
@@ -65,7 +65,7 @@ def epoch_unit_avg_firing_rates(spikes_df, filter_epochs, included_neuron_ids=No
 
 	return epoch_avg_firing_rate,	{aclu:np.mean(unit_epoch_avg_frs) for aclu, unit_epoch_avg_frs in epoch_avg_firing_rate.items()}
 
-def fr_index(long_fr, short_fr):
+def _fr_index(long_fr, short_fr):
 	return ((long_fr - short_fr) / (long_fr + short_fr))
 
 def compute_long_short_firing_rate_indicies(spikes_df, long_laps, long_replays, short_laps, short_replays, save_path=None):
@@ -88,14 +88,14 @@ def compute_long_short_firing_rate_indicies(spikes_df, long_laps, long_replays, 
 	long_mean_laps_frs, long_mean_replays_frs, short_mean_laps_frs, short_mean_replays_frs, x_frs_index, y_frs_index = loadData("data/temp_2023-01-20_results.pkl").values()
 
 	"""
-	_, long_mean_laps_frs = epoch_unit_avg_firing_rates(spikes_df, long_laps)
-	_, long_mean_replays_frs = epoch_unit_avg_firing_rates(spikes_df, long_replays)
+	_, long_mean_laps_frs = _epoch_unit_avg_firing_rates(spikes_df, long_laps)
+	_, long_mean_replays_frs = _epoch_unit_avg_firing_rates(spikes_df, long_replays)
 
-	_, short_mean_laps_frs = epoch_unit_avg_firing_rates(spikes_df, short_laps)
-	_, short_mean_replays_frs = epoch_unit_avg_firing_rates(spikes_df, short_replays)
+	_, short_mean_laps_frs = _epoch_unit_avg_firing_rates(spikes_df, short_laps)
+	_, short_mean_replays_frs = _epoch_unit_avg_firing_rates(spikes_df, short_replays)
 
-	y_frs_index = {aclu:fr_index(long_mean_laps_frs[aclu], short_mean_laps_frs[aclu]) for aclu in long_mean_laps_frs.keys()}
-	x_frs_index = {aclu:fr_index(long_mean_replays_frs[aclu], short_mean_replays_frs[aclu]) for aclu in long_mean_replays_frs.keys()}
+	y_frs_index = {aclu:_fr_index(long_mean_laps_frs[aclu], short_mean_laps_frs[aclu]) for aclu in long_mean_laps_frs.keys()}
+	x_frs_index = {aclu:_fr_index(long_mean_replays_frs[aclu], short_mean_replays_frs[aclu]) for aclu in long_mean_replays_frs.keys()}
 	
 	# Save a backup of the data:
 	if save_path is not None:
