@@ -459,7 +459,7 @@ class KnownFilterEpochs(ExtendedEnum):
 
 
     @classmethod
-    def perform_get_filter_epochs_df(cls, computation_result, filter_epochs, min_epoch_included_duration=None, **kwargs):
+    def perform_get_filter_epochs_df(cls, sess, filter_epochs, min_epoch_included_duration=None, **kwargs):
         """Temporary wrapper for `process_functionList` to replace `_perform_get_filter_epochs_df`
 
         Args:
@@ -469,12 +469,12 @@ class KnownFilterEpochs(ExtendedEnum):
 
         """
         # `process_functionList` version:
-        return cls.process_functionList(computation_result=computation_result, filter_epochs=filter_epochs, min_epoch_included_duration=min_epoch_included_duration, default_figure_name='', **kwargs)[0] # [0] gets the returned active_filter_epochs
+        return cls.process_functionList(sess=sess, filter_epochs=filter_epochs, min_epoch_included_duration=min_epoch_included_duration, default_figure_name='', **kwargs)[0] # [0] gets the returned active_filter_epochs
         # proper `_perform_get_filter_epochs_df` version:
         # return cls._perform_get_filter_epochs_df(sess=computation_result.sess, filter_epochs=filter_epochs, min_epoch_included_duration=min_epoch_included_duration)
 
     @classmethod
-    def process_functionList(cls, computation_result, filter_epochs, min_epoch_included_duration, default_figure_name='stacked_epoch_slices_matplotlib_subplots'):
+    def process_functionList(cls, sess, filter_epochs, min_epoch_included_duration, default_figure_name='stacked_epoch_slices_matplotlib_subplots'):
         # min_epoch_included_duration = decoding_time_bin_size * float(2) # 0.06666
         # min_epoch_included_duration = 0.06666
 
@@ -486,7 +486,7 @@ class KnownFilterEpochs(ExtendedEnum):
 
             if filter_epochs.name == KnownFilterEpochs.LAP.name:
                 ## Lap-Epochs Decoding:
-                laps_copy = deepcopy(computation_result.sess.laps)
+                laps_copy = deepcopy(sess.laps)
                 active_filter_epochs = laps_copy.as_epoch_obj() # epoch object
                 if not isinstance(active_filter_epochs, pd.DataFrame):
                     active_filter_epochs = active_filter_epochs.to_dataframe()
@@ -501,14 +501,14 @@ class KnownFilterEpochs(ExtendedEnum):
 
             elif filter_epochs.name == KnownFilterEpochs.PBE.name:
                 ## PBEs-Epochs Decoding:
-                active_filter_epochs = deepcopy(computation_result.sess.pbe) # epoch object
+                active_filter_epochs = deepcopy(sess.pbe) # epoch object
                 if not isinstance(active_filter_epochs, pd.DataFrame):
                     active_filter_epochs = active_filter_epochs.to_dataframe()
                 active_filter_epochs = active_filter_epochs.epochs.get_non_overlapping_df()
             
             elif filter_epochs.name == KnownFilterEpochs.RIPPLE.name:
                 ## Ripple-Epochs Decoding:
-                active_filter_epochs = deepcopy(computation_result.sess.ripple) # epoch object
+                active_filter_epochs = deepcopy(sess.ripple) # epoch object
                 if not isinstance(active_filter_epochs, pd.DataFrame):
                     active_filter_epochs = active_filter_epochs.to_dataframe()
                 active_filter_epochs = active_filter_epochs.epochs.get_non_overlapping_df()
@@ -516,7 +516,7 @@ class KnownFilterEpochs(ExtendedEnum):
                 epoch_description_list = [f'ripple[{epoch_tuple.label}]' for epoch_tuple in active_filter_epochs[['label']].itertuples()] # SHORT
                 
             elif filter_epochs.name == KnownFilterEpochs.REPLAY.name:
-                active_filter_epochs = deepcopy(computation_result.sess.replay) # epoch object
+                active_filter_epochs = deepcopy(sess.replay) # epoch object
                 if not isinstance(active_filter_epochs, pd.DataFrame):
                     active_filter_epochs = active_filter_epochs.to_dataframe()
                 active_filter_epochs = active_filter_epochs.epochs.get_non_overlapping_df()
@@ -555,7 +555,7 @@ def _subfn_compute_decoded_epochs(computation_result, active_config, filter_epoc
     """    
     default_figure_name = 'stacked_epoch_slices_matplotlib_subplots'
     min_epoch_included_duration = decoding_time_bin_size * float(2) # 0.06666 # all epochs shorter than min_epoch_included_duration will be excluded from analysis
-    active_filter_epochs, default_figure_name, epoch_description_list = KnownFilterEpochs.process_functionList(computation_result=computation_result, filter_epochs=filter_epochs, min_epoch_included_duration=min_epoch_included_duration, default_figure_name=default_figure_name)
+    active_filter_epochs, default_figure_name, epoch_description_list = KnownFilterEpochs.process_functionList(sess=computation_result, filter_epochs=filter_epochs, min_epoch_included_duration=min_epoch_included_duration, default_figure_name=default_figure_name)
 
     ## BEGIN_FUNCTION_BODY _subfn_compute_decoded_epochs:
     if decoder_ndim is None:
