@@ -252,7 +252,7 @@ def batch_load_session(global_data_root_parent_path, active_data_mode_name, base
 
     active_session_computation_configs = kwargs.get('active_session_computation_configs', None)
 
-    
+    computation_functions_name_whitelist = kwargs.get('computation_functions_name_whitelist', None)
 
     known_data_session_type_properties_dict = DataSessionFormatRegistryHolder.get_registry_known_data_session_type_dict()
     active_data_session_types_registered_classes_dict = DataSessionFormatRegistryHolder.get_registry_data_session_type_class_name_dict()
@@ -295,16 +295,20 @@ def batch_load_session(global_data_root_parent_path, active_data_mode_name, base
         assert 'time_bin_size' not in kwargs, f"time_bin_size kwarg provided but will not be used because a custom active_session_computation_configs was provided as well."
 
 
-    # Whitelist Mode:
-    computation_functions_name_whitelist=['_perform_baseline_placefield_computation', '_perform_time_dependent_placefield_computation', '_perform_extended_statistics_computation',
-                                        '_perform_position_decoding_computation', 
-                                        '_perform_firing_rate_trends_computation',
-                                        '_perform_pf_find_ratemap_peaks_computation',
-                                        # '_perform_time_dependent_pf_sequential_surprise_computation'
-                                        '_perform_two_step_position_decoding_computation',
-                                        # '_perform_recursive_latent_placefield_decoding'
-                                     ]  # '_perform_pf_find_ratemap_peaks_peak_prominence2d_computation'
-    computation_functions_name_blacklist=None
+    if computation_functions_name_whitelist is None:
+        # Whitelist Mode:
+        computation_functions_name_whitelist=['_perform_baseline_placefield_computation', '_perform_time_dependent_placefield_computation', '_perform_extended_statistics_computation',
+                                            '_perform_position_decoding_computation', 
+                                            '_perform_firing_rate_trends_computation',
+                                            '_perform_pf_find_ratemap_peaks_computation',
+                                            # '_perform_time_dependent_pf_sequential_surprise_computation'
+                                            '_perform_two_step_position_decoding_computation',
+                                            # '_perform_recursive_latent_placefield_decoding'
+                                        ]  # '_perform_pf_find_ratemap_peaks_peak_prominence2d_computation'
+        computation_functions_name_blacklist=None
+    else:
+        print(f'using provided computation_functions_name_whitelist: {computation_functions_name_whitelist}')
+        computation_functions_name_blacklist=None
 
     # # Blacklist Mode:
     # computation_functions_name_whitelist=None
