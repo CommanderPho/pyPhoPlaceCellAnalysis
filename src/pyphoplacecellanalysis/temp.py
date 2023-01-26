@@ -106,7 +106,6 @@ def compute_long_short_firing_rate_indicies(spikes_df, long_laps, long_replays, 
 	return x_frs_index, y_frs_index
 
 
-
 def plot_long_short_firing_rate_indicies(x_frs_index, y_frs_index):
 	""" Plot long|short firing rate index 
 	Each datapoint is a neuron.
