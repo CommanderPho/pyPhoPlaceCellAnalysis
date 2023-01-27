@@ -66,7 +66,7 @@ def _epoch_unit_avg_firing_rates(spikes_df, filter_epochs, included_neuron_ids=N
 				epoch_avg_firing_rate[aclu] = []
 			epoch_avg_firing_rate[aclu].append((float(np.shape(unit_epoch_spikes_df)[0]) / (epoch_end - epoch_start)))
 
-	return epoch_avg_firing_rate,	{aclu:np.mean(unit_epoch_avg_frs) for aclu, unit_epoch_avg_frs in epoch_avg_firing_rate.items()}
+	return epoch_avg_firing_rate, {aclu:np.mean(unit_epoch_avg_frs) for aclu, unit_epoch_avg_frs in epoch_avg_firing_rate.items()}
 
 def _fr_index(long_fr, short_fr):
 	return ((long_fr - short_fr) / (long_fr + short_fr))
@@ -91,28 +91,35 @@ def compute_long_short_firing_rate_indicies(spikes_df, long_laps, long_replays, 
 	long_mean_laps_frs, long_mean_replays_frs, short_mean_laps_frs, short_mean_replays_frs, x_frs_index, y_frs_index = loadData("data/temp_2023-01-20_results.pkl").values()
 
 	"""
-	_, long_mean_laps_frs = _epoch_unit_avg_firing_rates(spikes_df, long_laps)
-	_, long_mean_replays_frs = _epoch_unit_avg_firing_rates(spikes_df, long_replays)
+	long_mean_laps_all_frs, long_mean_laps_frs = _epoch_unit_avg_firing_rates(spikes_df, long_laps)
+	long_mean_replays_all_frs, long_mean_replays_frs = _epoch_unit_avg_firing_rates(spikes_df, long_replays)
 
-	_, short_mean_laps_frs = _epoch_unit_avg_firing_rates(spikes_df, short_laps)
-	_, short_mean_replays_frs = _epoch_unit_avg_firing_rates(spikes_df, short_replays)
+	short_mean_laps_all_frs, short_mean_laps_frs = _epoch_unit_avg_firing_rates(spikes_df, short_laps)
+	short_mean_replays_all_frs, short_mean_replays_frs = _epoch_unit_avg_firing_rates(spikes_df, short_replays)
+
+	all_results_dict = dict(zip(['long_mean_laps_frs', 'long_mean_replays_frs', 'short_mean_laps_frs', 'short_mean_replays_frs'], [long_mean_laps_frs, long_mean_replays_frs, short_mean_laps_frs, short_mean_replays_frs])) # all variables
+	all_results_dict.update(dict(zip(['long_mean_laps_all_frs', 'long_mean_replays_all_frs', 'short_mean_laps_all_frs', 'short_mean_replays_all_frs'], [long_mean_laps_all_frs, long_mean_replays_all_frs, short_mean_laps_all_frs, short_mean_replays_all_frs]))) # all variables
 
 	y_frs_index = {aclu:_fr_index(long_mean_laps_frs[aclu], short_mean_laps_frs[aclu]) for aclu in long_mean_laps_frs.keys()}
 	x_frs_index = {aclu:_fr_index(long_mean_replays_frs[aclu], short_mean_replays_frs[aclu]) for aclu in long_mean_replays_frs.keys()}
-	
+
+	all_results_dict.update(dict(zip(['x_frs_index', 'y_frs_index'], [x_frs_index, y_frs_index]))) # all variables
+	# long_mean_laps_all_frs, long_mean_replays_all_frs, short_mean_laps_all_frs, short_mean_replays_all_frs = [np.array(list(fr_dict.values())) for fr_dict in [long_mean_laps_all_frs, long_mean_replays_all_frs, short_mean_laps_all_frs, short_mean_replays_all_frs]]	
+
 	# Save a backup of the data:
 	if save_path is not None:
 		# save_path: e.g. 'temp_2023-01-20_results.pkl'
-		backup_results_dict = dict(zip(['long_mean_laps_frs', 'long_mean_replays_frs', 'short_mean_laps_frs', 'short_mean_replays_frs', 'x_frs_index', 'y_frs_index'], [long_mean_laps_frs, long_mean_replays_frs, short_mean_laps_frs, short_mean_replays_frs, x_frs_index, y_frs_index])) # all variables
+		# backup_results_dict = dict(zip(['long_mean_laps_frs', 'long_mean_replays_frs', 'short_mean_laps_frs', 'short_mean_replays_frs', 'x_frs_index', 'y_frs_index'], [long_mean_laps_frs, long_mean_replays_frs, short_mean_laps_frs, short_mean_replays_frs, x_frs_index, y_frs_index])) # all variables
+		backup_results_dict = all_results_dict # really all of the variables
 		saveData(save_path, backup_results_dict)
 
-	return x_frs_index, y_frs_index
+	return x_frs_index, y_frs_index, all_results_dict
 
 
 # from pyphoplacecellanalysis.temp import pipeline_complete_compute_long_short_fr_indicies, compute_long_short_firing_rate_indicies, plot_long_short_firing_rate_indicies
 
 def pipeline_complete_compute_long_short_fr_indicies(curr_active_pipeline, temp_save_filename=None):
-	"""_summary_
+	""" wraps `compute_long_short_firing_rate_indicies(...)` to compute the long_short_fr_index for the complete pipeline
 
 	Args:
 		curr_active_pipeline (_type_): _description_
@@ -131,7 +138,7 @@ def pipeline_complete_compute_long_short_fr_indicies(curr_active_pipeline, temp_
 
 	spikes_df = curr_active_pipeline.sess.spikes_df
 	long_laps, short_laps, global_laps = [curr_active_pipeline.filtered_sessions[an_epoch_name].laps.as_epoch_obj() for an_epoch_name in [long_epoch_name, short_epoch_name, global_epoch_name]]
-
+	
 	# try:
 	#     long_replays, short_replays, global_replays = [Epoch(curr_active_pipeline.filtered_sessions[an_epoch_name].replay.epochs.get_valid_df()) for an_epoch_name in [long_epoch_name, short_epoch_name, global_epoch_name]] # NOTE: this includes a few overlapping   epochs since the function to remove overlapping ones seems to be broken
 	# except (AttributeError, KeyError) as e:
@@ -151,13 +158,21 @@ def pipeline_complete_compute_long_short_fr_indicies(curr_active_pipeline, temp_
 	# New sess.compute_estimated_replay_epochs(...) based method:
 	long_replays, short_replays, global_replays = [DataSession.compute_estimated_replay_epochs(curr_active_pipeline.filtered_sessions[an_epoch_name]) for an_epoch_name in [long_epoch_name, short_epoch_name, global_epoch_name]] # NOTE: this includes a few overlapping epochs since the function to remove overlapping ones seems to be broken
 
+	## Build the output results dict:
+	all_results_dict = dict(zip(['long_laps', 'long_replays', 'short_laps', 'short_replays', 'global_laps', 'global_replays'], [long_laps, long_replays, short_laps, short_replays, global_laps, global_replays])) # all variables
+
+
 	# temp_save_filename = f'{active_context.get_description()}_results.pkl'
 	if temp_save_filename is not None:
 		print(f'temp_save_filename: {temp_save_filename}')
 
-	x_frs_index, y_frs_index = compute_long_short_firing_rate_indicies(spikes_df, long_laps, long_replays, short_laps, short_replays, save_path=temp_save_filename) # 'temp_2023-01-24_results.pkl'
+	x_frs_index, y_frs_index, updated_all_results_dict = compute_long_short_firing_rate_indicies(spikes_df, long_laps, long_replays, short_laps, short_replays, save_path=temp_save_filename) # 'temp_2023-01-24_results.pkl'
 
-	return x_frs_index, y_frs_index, active_context # TODO: add to computed_data instead
+	all_results_dict.update(updated_all_results_dict) # append the results dict
+
+	# all_results_dict.update(dict(zip(['x_frs_index', 'y_frs_index'], [x_frs_index, y_frs_index]))) # append the indicies to the results dict
+
+	return x_frs_index, y_frs_index, active_context, all_results_dict # TODO: add to computed_data instead
 
 
 
@@ -192,6 +207,6 @@ if __name__ == "__main__":
 	# dict(zip(['spikes_df', 'long_laps', 'short_laps', 'global_laps', 'long_replays', 'short_replays', 'global_replays'], [spikes_df, long_laps, short_laps, global_laps, long_replays, short_replays, global_replays]))
 	backup_dict = loadData(r"C:\Users\pho\repos\PhoPy3DPositionAnalysis2021\temp_2023-01-20.pkl")
 	spikes_df, long_laps, short_laps, global_laps, long_replays, short_replays, global_replays = backup_dict.values()
-	x_frs_index, y_frs_index = compute_long_short_firing_rate_indicies(spikes_df, long_laps, long_replays, short_laps, short_replays, save_path='temp_2023-01-20_results.pkl')
+	x_frs_index, y_frs_index, active_context, all_results_dict = compute_long_short_firing_rate_indicies(spikes_df, long_laps, long_replays, short_laps, short_replays, save_path='temp_2023-01-20_results.pkl')
 	print(f'x_frs_index: {x_frs_index}, y_frs_index: {y_frs_index}')
 
