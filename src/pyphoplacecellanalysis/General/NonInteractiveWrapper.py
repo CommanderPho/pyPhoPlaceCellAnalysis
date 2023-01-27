@@ -230,6 +230,8 @@ class NonInteractiveWrapper(object):
 # ==================================================================================================================== #
 # 2022-12-07 - batch_load_session - Computes Entire Pipeline                                                           #
 # ==================================================================================================================== #
+from pyphoplacecellanalysis.temp import pipeline_complete_compute_long_short_fr_indicies, plot_long_short_firing_rate_indicies # called in `batch_extended_computations`
+
 
 def batch_load_session(global_data_root_parent_path, active_data_mode_name, basedir, force_reload=False, saving_mode=PipelineSavingScheme.SKIP_SAVING, fail_on_exception=True, skip_extended_batch_computations=False, **kwargs):
     """Loads and runs the entire pipeline for a session folder located at the path 'basedir'.
@@ -474,6 +476,18 @@ def batch_extended_computations(curr_active_pipeline, include_global_functions=F
         #     print(f'short_only_aclus: {short_only_aclus}')
 
     # active_identifying_session_ctx = curr_active_pipeline.sess.get_context() # 'bapun_RatN_Day4_2019-10-15_11-30-06'
+
+    
+    ## pipeline_complete_compute_long_short_fr_indicies:
+    # TODO 2023-01-26 - NOTE - not really a computation function, a hack.  Should be moved to a separate function.
+    _comp_name = 'pipeline_complete_compute_long_short_fr_indicies'
+    # New unified `pipeline_complete_compute_long_short_fr_indicies(...)` method for entire pipeline:
+    x_frs_index, y_frs_index, active_context, all_results_dict = pipeline_complete_compute_long_short_fr_indicies(curr_active_pipeline)
+    curr_active_pipeline.global_computation_results.computed_data['long_short_fr_indicies_analysis'] = all_results_dict.copy() # use the all_results_dict as the computed data value
+    curr_active_pipeline.global_computation_results.computed_data['long_short_fr_indicies_analysis']['active_context'] = active_context
+    newly_computed_values.append(_comp_name)
+
+
     if progress_print:
         print('done with all batch_extended_computations(...).')
 
@@ -537,10 +551,13 @@ def batch_programmatic_figures(curr_active_pipeline):
     n_max_page_rows = 10
     _batch_plot_kwargs_list = BatchPhoJonathanFiguresHelper._build_batch_plot_kwargs(long_only_aclus, short_only_aclus, shared_aclus, active_identifying_session_ctx, n_max_page_rows=n_max_page_rows)
     active_out_figures_list = BatchPhoJonathanFiguresHelper._perform_batch_plot(curr_active_pipeline, _batch_plot_kwargs_list, figures_parent_out_path=active_session_figures_out_path, write_pdf=False, write_png=True, progress_print=True, debug_print=False)
-
-
-
     return active_identifying_session_ctx, active_session_figures_out_path, active_out_figures_list
+
+
+# import matplotlib as mpl
+# import matplotlib.pyplot as plt
+from pyphoplacecellanalysis.temp import plot_long_short_firing_rate_indicies # used in `batch_extended_programmatic_figures()`
+
 
 def batch_extended_programmatic_figures(curr_active_pipeline):
     _bak_rcParams = mpl.rcParams.copy()
@@ -550,6 +567,16 @@ def batch_extended_programmatic_figures(curr_active_pipeline):
     programmatic_display_to_PDF(curr_active_pipeline, curr_display_function_name='_display_1d_placefields', debug_print=False) # 🟢✅ Now seems to be working and saving to PDF!! Still using matplotlib.use('Qt5Agg') mode and plots still appear.
     programmatic_display_to_PDF(curr_active_pipeline, curr_display_function_name='_display_1d_placefield_validations') # , filter_name=active_config_name 🟢✅ Now seems to be working and saving to PDF!! Still using matplotlib.use('Qt5Agg') mode and plots still appear. Moderate visual improvements can still be made (titles overlap and stuff). Works with %%capture
     programmatic_display_to_PDF(curr_active_pipeline, curr_display_function_name='_display_2d_placefield_result_plot_ratemaps_2D') #  🟢✅ Now seems to be working and saving to PDF!! Still using matplotlib.use('Qt5Agg') mode and plots still appear.
+
+
+    # # Plot long|short firing rate index:
+    # fig_save_parent_path = Path(r'E:\Dropbox (Personal)\Active\Kamran Diba Lab\Results from 2023-01-20 - LongShort Firing Rate Indicies')
+    # long_short_fr_indicies_analysis_results = curr_active_pipeline.global_computation_results.computed_data['long_short_fr_indicies_analysis']
+    # x_frs_index, y_frs_index = long_short_fr_indicies_analysis_results['x_frs_index'], long_short_fr_indicies_analysis_results['y_frs_index'] # use the all_results_dict as the computed data value
+    # active_context = long_short_fr_indicies_analysis_results['active_context']
+    # plot_long_short_firing_rate_indicies(x_frs_index, y_frs_index, active_context, fig_save_parent_path=fig_save_parent_path)
+
+
 
 class BatchPhoJonathanFiguresHelper(object):
     """Private methods that help with batch figure generator for ClassName.
