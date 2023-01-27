@@ -706,7 +706,21 @@ class PipelineWithComputedPipelineStageMixin:
         """Returns the doc strings for each registered computation function. This is taken from their docstring at the start of the function defn, and provides an overview into what the function will do."""
         return {a_fn_name:a_fn.__doc__ for a_fn_name, a_fn in self.registered_global_computation_function_dict.items()}
 
+    
+    def find_LongShortGlobal_epoch_names(self):
+        """ Returns the [long, short, global] epoch names. They must exist.
+        Usage:
+            long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
+            long_results = curr_active_pipeline.computation_results[long_epoch_name]['computed_data']
+            short_results = curr_active_pipeline.computation_results[short_epoch_name]['computed_data']
+            global_results = curr_active_pipeline.computation_results[global_epoch_name]['computed_data']
 
+        """
+        include_whitelist = self.active_completed_computation_result_names # ['maze', 'sprinkle']
+        long_epoch_name = include_whitelist[0] # 'maze1_PYR'
+        short_epoch_name = include_whitelist[1] # 'maze2_PYR'
+        global_epoch_name = include_whitelist[-1] # 'maze_PYR'
+        return long_epoch_name, short_epoch_name, global_epoch_name
 
     
     def reload_default_computation_functions(self):
