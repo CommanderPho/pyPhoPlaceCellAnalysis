@@ -1,3 +1,4 @@
+from pathlib import Path
 import numpy as np
 import pandas as pd
 from neuropy.core import Epoch
@@ -5,9 +6,11 @@ from copy import deepcopy
 
 from neuropy.utils.mixins.time_slicing import add_epochs_id_identity # for decode_specific_epochs
 from neuropy.analyses.decoders import epochs_spkcount # for decode_specific_epochs
+from neuropy.core.session.dataSession import DataSession # for `pipeline_complete_compute_long_short_fr_indicies`
+from neuropy.utils.mixins.print_helpers import ProgressMessagePrinter # for `plot_long_short_firing_rate_indicies`
 
 from pyphoplacecellanalysis.General.Pipeline.Stages.Loading import saveData, loadData
-
+from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.DefaultComputationFunctions import KnownFilterEpochs # for `pipeline_complete_compute_long_short_fr_indicies`
 
 import matplotlib as mpl
 import matplotlib.pyplot as plt
@@ -106,7 +109,59 @@ def compute_long_short_firing_rate_indicies(spikes_df, long_laps, long_replays, 
 	return x_frs_index, y_frs_index
 
 
-def plot_long_short_firing_rate_indicies(x_frs_index, y_frs_index):
+# from pyphoplacecellanalysis.temp import pipeline_complete_compute_long_short_fr_indicies, compute_long_short_firing_rate_indicies, plot_long_short_firing_rate_indicies
+
+def pipeline_complete_compute_long_short_fr_indicies(curr_active_pipeline, temp_save_filename=None):
+	"""_summary_
+
+	Args:
+		curr_active_pipeline (_type_): _description_
+		temp_save_filename (_type_, optional): If None, disable caching the `compute_long_short_firing_rate_indicies` results. Defaults to None.
+
+	Returns:
+		_type_: _description_
+	"""
+	active_identifying_session_ctx = curr_active_pipeline.sess.get_context() # 'bapun_RatN_Day4_2019-10-15_11-30-06' # curr_sess_ctx # IdentifyingContext<('kdiba', 'gor01', 'one', '2006-6-07_11-26-53')>
+	long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
+	# long_session, short_session, global_session = [curr_active_pipeline.filtered_sessions[an_epoch_name] for an_epoch_name in [long_epoch_name, short_epoch_name, global_epoch_name]]
+	# long_computation_results, short_computation_results, global_computation_results = [curr_active_pipeline.computation_results[an_epoch_name] for an_epoch_name in [long_epoch_name, short_epoch_name, global_epoch_name]]
+	# long_results, short_results, global_results = [curr_active_pipeline.computation_results[an_epoch_name]['computed_data'] for an_epoch_name in [long_epoch_name, short_epoch_name, global_epoch_name]] # *_results just shortcut for computation_result['computed_data']
+
+	active_context = active_identifying_session_ctx.adding_context(collision_prefix='fn', fn_name='long_short_firing_rate_indicies')
+
+	spikes_df = curr_active_pipeline.sess.spikes_df
+	long_laps, short_laps, global_laps = [curr_active_pipeline.filtered_sessions[an_epoch_name].laps.as_epoch_obj() for an_epoch_name in [long_epoch_name, short_epoch_name, global_epoch_name]]
+
+	# try:
+	#     long_replays, short_replays, global_replays = [Epoch(curr_active_pipeline.filtered_sessions[an_epoch_name].replay.epochs.get_valid_df()) for an_epoch_name in [long_epoch_name, short_epoch_name, global_epoch_name]] # NOTE: this includes a few overlapping   epochs since the function to remove overlapping ones seems to be broken
+	# except (AttributeError, KeyError) as e:
+		# print(f'e: {e}')
+	# AttributeError: 'DataSession' object has no attribute 'replay'. Fallback to PBEs?
+	# filter_epochs = a_session.pbe # Epoch object
+	filter_epoch_replacement_type = KnownFilterEpochs.PBE
+
+	# filter_epochs = a_session.ripple # Epoch object
+	# filter_epoch_replacement_type = KnownFilterEpochs.RIPPLE
+
+	print(f'missing .replay epochs, using {filter_epoch_replacement_type} as surrogate replays...')
+	active_context = active_context.adding_context(collision_prefix='replay_surrogate', replays=filter_epoch_replacement_type.name)
+
+	## Working:
+	# long_replays, short_replays, global_replays = [KnownFilterEpochs.perform_get_filter_epochs_df(sess=a_computation_result.sess, filter_epochs=filter_epochs, min_epoch_included_duration=min_epoch_included_duration) for a_computation_result in [long_computation_results, short_computation_results, global_computation_results]] # returns Epoch objects
+	# New sess.compute_estimated_replay_epochs(...) based method:
+	long_replays, short_replays, global_replays = [DataSession.compute_estimated_replay_epochs(curr_active_pipeline.filtered_sessions[an_epoch_name]) for an_epoch_name in [long_epoch_name, short_epoch_name, global_epoch_name]] # NOTE: this includes a few overlapping epochs since the function to remove overlapping ones seems to be broken
+
+	# temp_save_filename = f'{active_context.get_description()}_results.pkl'
+	if temp_save_filename is not None:
+		print(f'temp_save_filename: {temp_save_filename}')
+
+	x_frs_index, y_frs_index = compute_long_short_firing_rate_indicies(spikes_df, long_laps, long_replays, short_laps, short_replays, save_path=temp_save_filename) # 'temp_2023-01-24_results.pkl'
+
+	return x_frs_index, y_frs_index, active_context # TODO: add to computed_data instead
+
+
+
+def plot_long_short_firing_rate_indicies(x_frs_index, y_frs_index, active_context, fig_save_parent_path=None):
 	""" Plot long|short firing rate index 
 	Each datapoint is a neuron.
 	"""
@@ -114,6 +169,22 @@ def plot_long_short_firing_rate_indicies(x_frs_index, y_frs_index):
 	plt.xlabel('$\\frac{L_{R}-S_{R}}{L_{R} + S_{R}}$', fontsize=16)
 	plt.ylabel('$\\frac{L_{\\theta}-S_{\\theta}}{L_{\\theta} + S_{\\theta}}$', fontsize=16)
 	plt.title('Computed long ($L$)|short($S$) firing rate indicies')
+	plt.suptitle(f'{active_context.get_description(separator="/")}')
+	fig = plt.gcf()
+	fig.set_size_inches([8.5, 7.25]) # size figure so the x and y labels aren't cut off
+
+	temp_fig_filename = f'{active_context.get_description()}.png'
+	print(f'temp_fig_filename: {temp_fig_filename}')
+	if fig_save_parent_path is None:
+		fig_save_parent_path = Path.cwd()
+
+	_temp_full_fig_save_path = fig_save_parent_path.joinpath(temp_fig_filename)
+
+	with ProgressMessagePrinter(_temp_full_fig_save_path, 'Saving', 'plot_long_short_firing_rate_indicies results'):
+		fig.savefig(fname=_temp_full_fig_save_path, transparent=True)
+	fig.show()
+	return fig, _temp_full_fig_save_path
+
 
 
 if __name__ == "__main__":
