@@ -490,7 +490,7 @@ class ComputedPipelineStage(LoadableInput, LoadableSessionInput, FilterablePipel
 
 
     @classmethod
-    def _build_initial_computationResult(cls, active_session, computation_config):
+    def _build_initial_computationResult(cls, active_session, computation_config) -> ComputationResult:
         """Conceptually, a single computation consists of a specific active_session and a specific computation_config object
         Args:
             active_session (DataSession): this is the filtered data session
