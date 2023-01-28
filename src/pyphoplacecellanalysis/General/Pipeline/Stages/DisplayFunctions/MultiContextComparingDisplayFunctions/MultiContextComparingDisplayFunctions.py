@@ -318,9 +318,6 @@ class MultiContextComparingDisplayFunctions(AllFunctionEnumeratingMixin, metacla
                 relative_entropy_overlap_dict = short_long_pf_overlap_analyses_results['relative_entropy_overlap_dict']
                 relative_entropy_overlap_scalars_df = short_long_pf_overlap_analyses_results['relative_entropy_overlap_scalars_df']
                 fig, ax = plot_short_v_long_pf1D_scalar_overlap_comparison(relative_entropy_overlap_scalars_df, pf_neurons_diff, neurons_colors_array, reuse_axs_tuple=reuse_axs_tuple, single_figure=single_figure, overlap_metric_mode=overlap_metric_mode, debug_print=debug_print)
-
-
-
             else:
                 raise NotImplementedError
             

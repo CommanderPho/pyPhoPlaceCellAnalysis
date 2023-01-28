@@ -78,8 +78,7 @@ class ComputedPipelineStage(LoadableInput, LoadableSessionInput, FilterablePipel
         self.filtered_epochs = DynamicParameters()
         self.filtered_contexts = DynamicParameters()
         self.active_configs = DynamicParameters() # active_config corresponding to each filtered session/epoch
-        self.computation_results = DynamicParameters()
-        # self.global_computation_results = DynamicParameters()
+        self.computation_results = DynamicParameters() # computation_results is a DynamicParameters with keys of type IdentifyingContext and values of type ComputationResult
         self.global_computation_results = ComputedPipelineStage._build_initial_computationResult(self.sess, None) # proper type setup
 
         self.registered_computation_function_dict = OrderedDict()
