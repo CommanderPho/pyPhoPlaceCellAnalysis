@@ -84,7 +84,16 @@ class ComputedPipelineStage(LoadableInput, LoadableSessionInput, FilterablePipel
         self.registered_computation_function_dict = OrderedDict()
         self.registered_global_computation_function_dict = OrderedDict()
         self.reload_default_computation_functions() # registers the default
-        
+
+    @property
+    def active_completed_computation_result_names(self):
+        """The this list of all computed configs."""
+        return self._get_computation_results_progress()[0] # get [0] because it returns complete_computed_config_names_list, incomplete_computed_config_dict
+
+    @property
+    def active_incomplete_computation_result_status_dicts(self):
+        """The this dict containing all the incompletely computed configs and their reason for being incomplete."""
+        return self._get_computation_results_progress()[1] # get [0] because it returns complete_computed_config_names_list, incomplete_computed_config_dict
 
     @property
     def registered_computation_functions(self):
@@ -281,7 +290,22 @@ class ComputedPipelineStage(LoadableInput, LoadableSessionInput, FilterablePipel
                 complete_computed_config_names_list.append(curr_config_name)
                 
         return complete_computed_config_names_list, incomplete_computed_config_dict
-    
+
+    def find_LongShortGlobal_epoch_names(self):
+        """ Helper function to returns the [long, short, global] epoch names. They must exist.
+        Usage:
+            long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
+            long_results = curr_active_pipeline.computation_results[long_epoch_name]['computed_data']
+            short_results = curr_active_pipeline.computation_results[short_epoch_name]['computed_data']
+            global_results = curr_active_pipeline.computation_results[global_epoch_name]['computed_data']
+
+        """
+        include_whitelist = self.active_completed_computation_result_names # ['maze', 'sprinkle']
+        assert (len(include_whitelist) >= 3), "Must have at least 3 completed computation results to find the long, short, and global epoch names."
+        long_epoch_name = include_whitelist[0] # 'maze1_PYR'
+        short_epoch_name = include_whitelist[1] # 'maze2_PYR'
+        global_epoch_name = include_whitelist[-1] # 'maze_PYR'
+        return long_epoch_name, short_epoch_name, global_epoch_name
 
 
     def rerun_failed_computations(self, enabled_filter_names=None, fail_on_exception:bool=False, debug_print=False):
@@ -639,14 +663,12 @@ class PipelineWithComputedPipelineStageMixin:
 
     @property
     def active_completed_computation_result_names(self):
-        """The this list of all computed configs."""        
-        # return self.stage._get_valid_computation_results_config_names()
-        return self.stage._get_computation_results_progress()[0] # get [0] because it returns complete_computed_config_names_list, incomplete_computed_config_dict
-    
+        """The this list of all computed configs."""
+        return self.stage.active_completed_computation_result_names
     @property
     def active_incomplete_computation_result_status_dicts(self):
         """The this dict containing all the incompletely computed configs and their reason for being incomplete."""
-        return self.stage._get_computation_results_progress()[1] # get [0] because it returns complete_computed_config_names_list, incomplete_computed_config_dict
+        return self.stage.active_incomplete_computation_result_status_dicts
     
     @property
     def registered_computation_functions(self):
@@ -705,23 +727,6 @@ class PipelineWithComputedPipelineStageMixin:
     def registered_global_computation_function_docs_dict(self):
         """Returns the doc strings for each registered computation function. This is taken from their docstring at the start of the function defn, and provides an overview into what the function will do."""
         return {a_fn_name:a_fn.__doc__ for a_fn_name, a_fn in self.registered_global_computation_function_dict.items()}
-
-    
-    def find_LongShortGlobal_epoch_names(self):
-        """ Returns the [long, short, global] epoch names. They must exist.
-        Usage:
-            long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
-            long_results = curr_active_pipeline.computation_results[long_epoch_name]['computed_data']
-            short_results = curr_active_pipeline.computation_results[short_epoch_name]['computed_data']
-            global_results = curr_active_pipeline.computation_results[global_epoch_name]['computed_data']
-
-        """
-        include_whitelist = self.active_completed_computation_result_names # ['maze', 'sprinkle']
-        long_epoch_name = include_whitelist[0] # 'maze1_PYR'
-        short_epoch_name = include_whitelist[1] # 'maze2_PYR'
-        global_epoch_name = include_whitelist[-1] # 'maze_PYR'
-        return long_epoch_name, short_epoch_name, global_epoch_name
-
     
     def reload_default_computation_functions(self):
         """ reloads/re-registers the default display functions after adding a new one """
@@ -812,8 +817,6 @@ class PipelineWithComputedPipelineStageMixin:
             
         print(f'\tpost keys: {list(self.active_configs.keys())}')
 
-
-
     def perform_drop_computed_result(self, computed_data_keys_to_drop, config_names_whitelist=None, debug_print=False):
         """ Loops through all computed items and drops a specific result across all configs/contexts  
         Inputs:
@@ -846,6 +849,16 @@ class PipelineWithComputedPipelineStageMixin:
                 if debug_print:
                     print(f'skipping {a_config_name} because it is not in the context whitelist.')
 
-            
+    def find_LongShortGlobal_epoch_names(self):
+        """ Returns the [long, short, global] epoch names. They must exist.
+        Usage:
+            long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
+            long_results = curr_active_pipeline.computation_results[long_epoch_name]['computed_data']
+            short_results = curr_active_pipeline.computation_results[short_epoch_name]['computed_data']
+            global_results = curr_active_pipeline.computation_results[global_epoch_name]['computed_data']
+
+        """
+        return self.stage.find_LongShortGlobal_epoch_names()
+
         # print(f'\tpost keys: {list(self.active_configs.keys())}')
 
