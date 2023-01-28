@@ -180,12 +180,13 @@ def plot_long_short_firing_rate_indicies(x_frs_index, y_frs_index, active_contex
 	""" Plot long|short firing rate index 
 	Each datapoint is a neuron.
 	"""
+	fig = plt.figure(figsize=(8.5, 7.25), num=f'long|short fr indicies_{active_context.get_description(separator="/")}', clear=True)
 	plt.scatter(x_frs_index.values(), y_frs_index.values())
 	plt.xlabel('$\\frac{L_{R}-S_{R}}{L_{R} + S_{R}}$', fontsize=16)
 	plt.ylabel('$\\frac{L_{\\theta}-S_{\\theta}}{L_{\\theta} + S_{\\theta}}$', fontsize=16)
 	plt.title('Computed long ($L$)|short($S$) firing rate indicies')
 	plt.suptitle(f'{active_context.get_description(separator="/")}')
-	fig = plt.gcf()
+	# fig = plt.gcf()
 	fig.set_size_inches([8.5, 7.25]) # size figure so the x and y labels aren't cut off
 
 	temp_fig_filename = f'{active_context.get_description()}.png'
