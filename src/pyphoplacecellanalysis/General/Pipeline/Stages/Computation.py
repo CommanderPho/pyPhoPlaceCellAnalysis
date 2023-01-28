@@ -65,7 +65,7 @@ class ComputedPipelineStage(LoadableInput, LoadableSessionInput, FilterablePipel
     filtered_contexts: Optional[DynamicParameters] = None
     active_configs: Optional[DynamicParameters] = None
     computation_results: Optional[DynamicParameters] = None
-    global_computation_results: Optional[DynamicParameters] = None
+    global_computation_results: Optional[ComputationResult] = None
 
     def __init__(self, loaded_stage: LoadedPipelineStage):
         # super(ClassName, self).__init__()
@@ -79,7 +79,8 @@ class ComputedPipelineStage(LoadableInput, LoadableSessionInput, FilterablePipel
         self.filtered_contexts = DynamicParameters()
         self.active_configs = DynamicParameters() # active_config corresponding to each filtered session/epoch
         self.computation_results = DynamicParameters()
-        self.global_computation_results = DynamicParameters()
+        # self.global_computation_results = DynamicParameters()
+        self.global_computation_results = ComputedPipelineStage._build_initial_computationResult(self.sess, None) # proper type setup
 
         self.registered_computation_function_dict = OrderedDict()
         self.registered_global_computation_function_dict = OrderedDict()
@@ -444,17 +445,17 @@ class ComputedPipelineStage(LoadableInput, LoadableSessionInput, FilterablePipel
         if contains_any_global_functions:
             assert np.all([v.is_global for v in active_computation_functions]), 'ERROR: cannot mix global and non-global functions in a single call to perform_specific_computation'
 
-            if self.global_computation_results is None:
+            if self.global_computation_results is None or not isinstance(self.global_computation_results, ComputationResult):
                 print(f'global_computation_results is None. Building initial global_computation_results...')
-                self.global_computation_results = DynamicParameters()
+                self.global_computation_results = None # clear existing results
                 self.global_computation_results = ComputedPipelineStage._build_initial_computationResult(self.sess, active_computation_params) # returns a computation result. This stores the computation config used to compute it.
                 
 
         if contains_any_global_functions:
             # global computation functions:
-            if self.global_computation_results is None:
+            if self.global_computation_results is None or not isinstance(self.global_computation_results, ComputationResult):
                 print(f'global_computation_results is None. Building initial global_computation_results...')
-                self.global_computation_results = DynamicParameters()
+                self.global_computation_results = None # clear existing results
                 self.global_computation_results = ComputedPipelineStage._build_initial_computationResult(self.sess, active_computation_params) # returns a computation result. This stores the computation config used to compute it.
             ## TODO: what is this about?
             previous_computation_result = self.global_computation_results
