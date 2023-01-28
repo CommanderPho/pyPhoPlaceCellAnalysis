@@ -33,8 +33,9 @@ from neuropy.analyses import detect_pbe_epochs # used in `_perform_jonathan_repl
 
 # from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.ExtendedStats import ExtendedStatsComputations # ImportError: cannot import name 'ExtendedStatsComputations' causes circular import
 
-# _perform_time_dependent_pf_sequential_surprise_computation
+from pyphoplacecellanalysis.temp import pipeline_complete_compute_long_short_fr_indicies # called in `_perform_short_long_firing_rate_analyses`
 
+# _perform_time_dependent_pf_sequential_surprise_computation
 
 def _compute_custom_PBEs(sess):
     """ 
@@ -299,6 +300,27 @@ class MultiContextComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Co
             'relative_entropy_overlap_dict': relative_entropy_overlap_dict, 'relative_entropy_overlap_scalars_df': relative_entropy_overlap_scalars_df
         })
         return global_computation_results
+
+
+    def _perform_short_long_firing_rate_analyses(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_whitelist=None, debug_print=False):
+        """ 
+        
+        Requires:
+            ['sess']
+            
+        Provides:
+            computation_result.computed_data['short_long_pf_overlap_analyses']
+                ['short_long_pf_overlap_analyses']['short_long_neurons_diff']
+                ['short_long_pf_overlap_analyses']['poly_overlap_df']
+        
+        """
+        # New unified `pipeline_complete_compute_long_short_fr_indicies(...)` method for entire pipeline:
+        x_frs_index, y_frs_index, active_context, all_results_dict = pipeline_complete_compute_long_short_fr_indicies(owning_pipeline_reference) # use the all_results_dict as the computed data value
+        global_computation_results.computed_data['long_short_fr_indicies_analysis'] = DynamicParameters.init_from_dict({**all_results_dict, 'active_context': active_context})
+        return global_computation_results
+
+
+
 
 
 

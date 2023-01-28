@@ -230,7 +230,7 @@ class NonInteractiveWrapper(object):
 # ==================================================================================================================== #
 # 2022-12-07 - batch_load_session - Computes Entire Pipeline                                                           #
 # ==================================================================================================================== #
-from pyphoplacecellanalysis.temp import pipeline_complete_compute_long_short_fr_indicies, plot_long_short_firing_rate_indicies # called in `batch_extended_computations`
+
 
 
 def batch_load_session(global_data_root_parent_path, active_data_mode_name, basedir, force_reload=False, saving_mode=PipelineSavingScheme.SKIP_SAVING, fail_on_exception=True, skip_extended_batch_computations=False, **kwargs):
@@ -475,18 +475,35 @@ def batch_extended_computations(curr_active_pipeline, include_global_functions=F
         #     print(f'long_only_aclus: {long_only_aclus}')
         #     print(f'short_only_aclus: {short_only_aclus}')
 
-    # active_identifying_session_ctx = curr_active_pipeline.sess.get_context() # 'bapun_RatN_Day4_2019-10-15_11-30-06'
+        # active_identifying_session_ctx = curr_active_pipeline.sess.get_context() # 'bapun_RatN_Day4_2019-10-15_11-30-06'
 
-    
-    ## pipeline_complete_compute_long_short_fr_indicies:
-    # TODO 2023-01-26 - NOTE - not really a computation function, a hack.  Should be moved to a separate function.
-    _comp_name = 'pipeline_complete_compute_long_short_fr_indicies'
-    # New unified `pipeline_complete_compute_long_short_fr_indicies(...)` method for entire pipeline:
-    x_frs_index, y_frs_index, active_context, all_results_dict = pipeline_complete_compute_long_short_fr_indicies(curr_active_pipeline)
-    curr_active_pipeline.global_computation_results.computed_data['long_short_fr_indicies_analysis'] = all_results_dict.copy() # use the all_results_dict as the computed data value
-    curr_active_pipeline.global_computation_results.computed_data['long_short_fr_indicies_analysis']['active_context'] = active_context
-    newly_computed_values.append(_comp_name)
-
+        
+        ## pipeline_complete_compute_long_short_fr_indicies:
+        # TODO 2023-01-26 - NOTE - not really a computation function, a hack.  Should be moved to a separate function.
+        _comp_name = 'long_short_fr_indicies_analyses'
+        try:
+            ## Get global `long_short_fr_indicies_analysis` results:
+            long_short_fr_indicies_analysis_results = curr_active_pipeline.global_computation_results.computed_data['long_short_fr_indicies_analysis']
+            x_frs_index, y_frs_index = long_short_fr_indicies_analysis_results['x_frs_index'], long_short_fr_indicies_analysis_results['y_frs_index'] # use the all_results_dict as the computed data value
+            active_context = long_short_fr_indicies_analysis_results['active_context']
+            if progress_print:
+                print(f'{_comp_name} already computed.')
+        except (AttributeError, KeyError) as e:
+            if progress_print or debug_print:
+                print(f'{_comp_name} missing.')
+            if debug_print:
+                print(f'\t encountered error: {e}\n{traceback.format_exc()}\n.')
+            if progress_print or debug_print:
+                print(f'\t Recomputing {_comp_name}...')
+            curr_active_pipeline.perform_specific_computation(computation_functions_name_whitelist=['_perform_short_long_firing_rate_analyses'], fail_on_exception=True, debug_print=False) # fail_on_exception MUST be True or error handling is all messed up 
+            print(f'\t done.')
+            long_short_fr_indicies_analysis_results = curr_active_pipeline.global_computation_results.computed_data['long_short_fr_indicies_analysis']
+            x_frs_index, y_frs_index = long_short_fr_indicies_analysis_results['x_frs_index'], long_short_fr_indicies_analysis_results['y_frs_index'] # use the all_results_dict as the computed data value
+            active_context = long_short_fr_indicies_analysis_results['active_context']
+            newly_computed_values.append(_comp_name)
+        except Exception as e:
+            raise e
+        
 
     if progress_print:
         print('done with all batch_extended_computations(...).')
@@ -556,8 +573,6 @@ def batch_programmatic_figures(curr_active_pipeline):
 
 # import matplotlib as mpl
 # import matplotlib.pyplot as plt
-from pyphoplacecellanalysis.temp import plot_long_short_firing_rate_indicies # used in `batch_extended_programmatic_figures()`
-
 
 def batch_extended_programmatic_figures(curr_active_pipeline):
     _bak_rcParams = mpl.rcParams.copy()

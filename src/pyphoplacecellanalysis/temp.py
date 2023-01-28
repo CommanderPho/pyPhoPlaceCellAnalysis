@@ -176,7 +176,7 @@ def pipeline_complete_compute_long_short_fr_indicies(curr_active_pipeline, temp_
 
 
 
-def plot_long_short_firing_rate_indicies(x_frs_index, y_frs_index, active_context, fig_save_parent_path=None):
+def plot_long_short_firing_rate_indicies(x_frs_index, y_frs_index, active_context, fig_save_parent_path=None, debug_print=False):
 	""" Plot long|short firing rate index 
 	Each datapoint is a neuron.
 	"""
@@ -189,7 +189,8 @@ def plot_long_short_firing_rate_indicies(x_frs_index, y_frs_index, active_contex
 	fig.set_size_inches([8.5, 7.25]) # size figure so the x and y labels aren't cut off
 
 	temp_fig_filename = f'{active_context.get_description()}.png'
-	print(f'temp_fig_filename: {temp_fig_filename}')
+	if debug_print:
+		print(f'temp_fig_filename: {temp_fig_filename}')
 	if fig_save_parent_path is None:
 		fig_save_parent_path = Path.cwd()
 

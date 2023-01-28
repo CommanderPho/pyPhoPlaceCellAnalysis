@@ -1,4 +1,5 @@
 from enum import Enum
+from pathlib import Path
 import numpy as np
 import pandas as pd
 import matplotlib as mpl
@@ -31,6 +32,8 @@ from pyphoplacecellanalysis.General.Mixins.CrossComputationComparisonHelpers imp
 
 
 from pyphoplacecellanalysis.PhoPositionalData.plotting.placefield import plot_1D_placecell_validation # for _make_pho_jonathan_batch_plots
+
+from pyphoplacecellanalysis.temp import plot_long_short_firing_rate_indicies # used in `_display_short_long_firing_rate_index_comparison()`
 
 
 from enum import unique # for PlacefieldOverlapMetricMode
@@ -327,6 +330,34 @@ class MultiContextComparingDisplayFunctions(AllFunctionEnumeratingMixin, metacla
             return graphics_output_dict
 
 
+    def _display_short_long_firing_rate_index_comparison(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_whitelist=None, **kwargs):
+            """ Displays a figure for comparing the 1D placefields across-epochs (between the short and long tracks)
+                Usage:
+
+                    %matplotlib qt
+                    active_identifying_session_ctx = curr_active_pipeline.sess.get_context() # 'bapun_RatN_Day4_2019-10-15_11-30-06'
+
+                    graphics_output_dict = curr_active_pipeline.display('_display_batch_pho_jonathan_replay_firing_rate_comparison', active_identifying_session_ctx)
+                    fig, axs, plot_data = graphics_output_dict['fig'], graphics_output_dict['axs'], graphics_output_dict['plot_data']
+                    neuron_df, rdf, aclu_to_idx, irdf = plot_data['df'], plot_data['rdf'], plot_data['aclu_to_idx'], plot_data['irdf']
+                    # Grab the output axes:
+                    curr_axs_dict = axs[0]
+                    curr_firing_rate_ax, curr_lap_spikes_ax, curr_placefield_ax = curr_axs_dict['firing_rate'], curr_axs_dict['lap_spikes'], curr_axs_dict['placefield'] # Extract variables from the `curr_axs_dict` dictionary to the local workspace
+
+            """
+            fig_save_parent_path = kwargs.pop('fig_save_parent_path', Path(r'E:\Dropbox (Personal)\Active\Kamran Diba Lab\Results from 2023-01-20 - LongShort Firing Rate Indicies'))            
+            debug_print = kwargs.pop('debug_print', False)
+
+            # Plot long|short firing rate index:
+            long_short_fr_indicies_analysis_results = global_computation_results.computed_data['long_short_fr_indicies_analysis']
+            x_frs_index, y_frs_index = long_short_fr_indicies_analysis_results['x_frs_index'], long_short_fr_indicies_analysis_results['y_frs_index'] # use the all_results_dict as the computed data value
+            active_context = long_short_fr_indicies_analysis_results['active_context']
+            fig, _temp_full_fig_save_path = plot_long_short_firing_rate_indicies(x_frs_index, y_frs_index, active_context, fig_save_parent_path=fig_save_parent_path, debug_print=debug_print)
+
+            graphics_output_dict = MatplotlibRenderPlots(name='display_short_long_firing_rate_index_comparison', figures=(fig), axes=tuple(fig.axes), plot_data={})
+            # graphics_output_dict['plot_data'] = {'sort_indicies': (long_sort_ind, short_sort_ind), 'colors':(long_neurons_colors_array, short_neurons_colors_array)}
+
+            return graphics_output_dict
 
 
 
