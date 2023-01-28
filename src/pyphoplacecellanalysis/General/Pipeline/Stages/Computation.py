@@ -458,6 +458,9 @@ class ComputedPipelineStage(LoadableInput, LoadableSessionInput, FilterablePipel
                 self.global_computation_results = ComputedPipelineStage._build_initial_computationResult(self.sess, active_computation_params) # returns a computation result. This stores the computation config used to compute it.
             ## TODO: what is this about?
             previous_computation_result = self.global_computation_results
+
+            ## TODO: ERROR: `owning_pipeline_reference=self` is not CORRECT as self is of type `ComputedPipelineStage` (or `DisplayPipelineStage`) and not `NeuropyPipeline`
+                # this has been fine for all the global functions so far because the majority of the properties are defined on the stage anyway, but any pipeline properties will be missing! 
             global_kwargs = dict(owning_pipeline_reference=self, global_computation_results=previous_computation_result, computation_results=self.computation_results, active_configs=self.active_configs, include_whitelist=enabled_filter_names, debug_print=debug_print)
 
             self.global_computation_results = self.run_specific_computations_single_context(global_kwargs, computation_functions_name_whitelist=computation_functions_name_whitelist, are_global=True, fail_on_exception=fail_on_exception, debug_print=debug_print)
