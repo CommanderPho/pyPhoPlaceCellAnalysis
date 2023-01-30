@@ -11,6 +11,7 @@ from neuropy.core.neuron_identities import PlotStringBrevityModeEnum # for plot_
 from neuropy.plotting.figure import Fig # for plot_short_v_long_pf1D_comparison (_display_short_long_pf1D_comparison)
 from neuropy.plotting.ratemaps import plot_ratemap_1D # for plot_short_v_long_pf1D_comparison (_display_short_long_pf1D_comparison)
 from neuropy.utils.matplotlib_helpers import build_or_reuse_figure # used for `_make_pho_jonathan_batch_plots(...)`
+from neuropy.utils.mixins.print_helpers import ProgressMessagePrinter # for `_plot_long_short_firing_rate_indicies`
 
 from pyphocorehelpers.mixins.member_enumerating import AllFunctionEnumeratingMixin
 from pyphocorehelpers.plotting.figure_management import PhoActiveFigureManager2D # for plot_short_v_long_pf1D_comparison (_display_short_long_pf1D_comparison)
@@ -32,9 +33,6 @@ from pyphoplacecellanalysis.General.Mixins.CrossComputationComparisonHelpers imp
 
 
 from pyphoplacecellanalysis.PhoPositionalData.plotting.placefield import plot_1D_placecell_validation # for _make_pho_jonathan_batch_plots
-
-from pyphoplacecellanalysis.temp import plot_long_short_firing_rate_indicies # used in `_display_short_long_firing_rate_index_comparison()`
-
 
 from enum import unique # for PlacefieldOverlapMetricMode
 from pyphocorehelpers.DataStructure.enum_helpers import ExtendedEnum # for PlacefieldOverlapMetricMode
@@ -349,7 +347,7 @@ class MultiContextComparingDisplayFunctions(AllFunctionEnumeratingMixin, metacla
             long_short_fr_indicies_analysis_results = global_computation_results.computed_data['long_short_fr_indicies_analysis']
             x_frs_index, y_frs_index = long_short_fr_indicies_analysis_results['x_frs_index'], long_short_fr_indicies_analysis_results['y_frs_index'] # use the all_results_dict as the computed data value
             active_context = long_short_fr_indicies_analysis_results['active_context']
-            fig, _temp_full_fig_save_path = plot_long_short_firing_rate_indicies(x_frs_index, y_frs_index, active_context, fig_save_parent_path=fig_save_parent_path, debug_print=debug_print)
+            fig, _temp_full_fig_save_path = _plot_long_short_firing_rate_indicies(x_frs_index, y_frs_index, active_context, fig_save_parent_path=fig_save_parent_path, debug_print=debug_print)
 
             graphics_output_dict = MatplotlibRenderPlots(name='display_short_long_firing_rate_index_comparison', figures=(fig), axes=tuple(fig.axes), plot_data={})
             # graphics_output_dict['plot_data'] = {'sort_indicies': (long_sort_ind, short_sort_ind), 'colors':(long_neurons_colors_array, short_neurons_colors_array)}
@@ -1307,3 +1305,37 @@ def _test_plot_conv(long_xbins, long_curve, short_xbins, short_curve, x, overlap
 #     ax4.scatter(t_full_subset[::2], m_full_subset[::2], label='Discrete Convolution (Valid)', facecolors='none', edgecolors='r')
 #     ax4.plot(t,m,label='Analytic Solution'),ax4.set_xlabel('Time'),ax4.set_ylabel('Signal'),ax4.legend()
 #     plt.show()
+
+
+
+
+
+def _plot_long_short_firing_rate_indicies(x_frs_index, y_frs_index, active_context, fig_save_parent_path=None, debug_print=False):
+	""" Plot long|short firing rate index 
+	Each datapoint is a neuron.
+
+    used in `_display_short_long_firing_rate_index_comparison()`
+
+	"""
+	fig = plt.figure(figsize=(8.5, 7.25), num=f'long|short fr indicies_{active_context.get_description(separator="/")}', clear=True)
+	plt.scatter(x_frs_index.values(), y_frs_index.values())
+	plt.xlabel('$\\frac{L_{R}-S_{R}}{L_{R} + S_{R}}$', fontsize=16)
+	plt.ylabel('$\\frac{L_{\\theta}-S_{\\theta}}{L_{\\theta} + S_{\\theta}}$', fontsize=16)
+	plt.title('Computed long ($L$)|short($S$) firing rate indicies')
+	plt.suptitle(f'{active_context.get_description(separator="/")}')
+	# fig = plt.gcf()
+	fig.set_size_inches([8.5, 7.25]) # size figure so the x and y labels aren't cut off
+
+	temp_fig_filename = f'{active_context.get_description()}.png'
+	if debug_print:
+		print(f'temp_fig_filename: {temp_fig_filename}')
+	if fig_save_parent_path is None:
+		fig_save_parent_path = Path.cwd()
+
+	_temp_full_fig_save_path = fig_save_parent_path.joinpath(temp_fig_filename)
+
+	with ProgressMessagePrinter(_temp_full_fig_save_path, 'Saving', 'plot_long_short_firing_rate_indicies results'):
+		fig.savefig(fname=_temp_full_fig_save_path, transparent=True)
+	fig.show()
+	return fig, _temp_full_fig_save_path
+
