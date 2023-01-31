@@ -1201,6 +1201,12 @@ def _perform_PBE_stats(owning_pipeline_reference, include_whitelist=None, debug_
 # ==================================================================================================================== #
 # Long Short Firing Rate Indicies                                                                                      #
 # ==================================================================================================================== #
+def _unwrap_aclu_epoch_values_dict_to_array(mean_epochs_all_frs):
+    """ unwraps a dictionary with keys of ACLUs and values of np.arrays (vectors) """
+    aclus = list(mean_epochs_all_frs.keys())
+    values = np.array(list(mean_epochs_all_frs.values())) # 
+    return aclus, values # values.shape # (108, 36)
+
 
 def _epoch_unit_avg_firing_rates(spikes_df, filter_epochs, included_neuron_ids=None, debug_print=False):
 	"""Computes the average firing rate for each neuron (unit) in each epoch.
@@ -1301,6 +1307,24 @@ def _compute_long_short_firing_rate_indicies(spikes_df, long_laps, long_replays,
 		saveData(save_path, backup_results_dict)
 
 	return x_frs_index, y_frs_index, all_results_dict
+
+def _compute_epochs_num_aclu_inclusions(all_epochs_frs_mat, min_inclusion_fr_thresh=19.01):
+    """Finds the number of unique cells that are included (as measured by their firing rate exceeding the `min_inclusion_fr_thresh`) in each epoch of interest.
+
+    Args:
+        all_epochs_frs_mat (_type_): _description_
+        min_inclusion_fr_thresh (float, optional): Firing rate threshold in Hz. Defaults to 19.01.
+    """
+     # Hz
+    is_cell_included_in_epoch_mat = all_epochs_frs_mat > min_inclusion_fr_thresh
+    # is_cell_included_in_epoch_mat
+    # num_cells_included_in_epoch_mat: the num unique cells included in each epoch that mean the min_inclusion_fr_thresh criteria. Should have one value per epoch of interest.
+    num_cells_included_in_epoch_mat = np.sum(is_cell_included_in_epoch_mat, 0)
+    # num_cells_included_in_epoch_mat
+    return num_cells_included_in_epoch_mat
+
+
+
 
 def pipeline_complete_compute_long_short_fr_indicies(curr_active_pipeline, temp_save_filename=None):
 	""" wraps `compute_long_short_firing_rate_indicies(...)` to compute the long_short_fr_index for the complete pipeline

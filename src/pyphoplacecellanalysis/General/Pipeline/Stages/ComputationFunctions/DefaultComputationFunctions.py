@@ -18,8 +18,6 @@ from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BayesianPlace
 from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.ComputationFunctionRegistryHolder import ComputationFunctionRegistryHolder
 
 # from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BayesianPlacemapPositionDecoder # For _perform_new_position_decoding_computation
-from pyphocorehelpers.indexing_helpers import BinningInfo, compute_spanning_bins, get_bin_centers, get_bin_edges, debug_print_1D_bin_infos, interleave_elements # For _perform_new_position_decoding_computation
-from pyphocorehelpers.indexing_helpers import build_spanning_grid_matrix # For _perform_new_position_decoding_computation
 
 # ### For _perform_recursive_latent_placefield_decoding
 # from neuropy.utils import position_util
@@ -546,7 +544,6 @@ def _subfn_compute_decoded_epochs(computation_result, active_config, filter_epoc
     It determines which epochs are being referred to (enabling specifying them by a simple string identifier, like 'ripple', 'pbe', or 'laps') and then gets the coresponding data that's needed to recompute the decoded data for them.
     This decoding is done by calling:
         active_decoder.decode_specific_epochs(...) which returns a result that can then be plotted.
-
 
     Used by: _perform_specific_epochs_decoding
 
