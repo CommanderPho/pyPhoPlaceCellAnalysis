@@ -29,10 +29,8 @@ ansi2html = "^1.8.0"
 click = "^8.1.3"
 pyqt5 = "5.15.7"
 pyqt-checkbox-table-widget = "^0.0.14"
-# pyqt-frameless-window = "^0.0.82"
 pyqt5-qt5 = "^5.15.2"
 pyqt-custom-titlebar-window = "^0.0.50"
-pyqt5-sip = "^12.11.1"
 
 
 [build-system]
