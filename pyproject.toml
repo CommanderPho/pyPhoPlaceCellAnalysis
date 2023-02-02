@@ -8,6 +8,7 @@ readme = "README.md"
 [tool.poetry.dependencies]
 python = ">=3.9,<3.11"
 param = "^1.12.3"
+pyphocorehelpers = {git = "https://github.com/CommanderPho/pyPhoCoreHelpers.git"}
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^7.2.1"
