@@ -1,8 +1,18 @@
-[build-system]
-# AVOID CHANGING REQUIRES: IT WILL BE UPDATED BY PYSCAFFOLD!
-requires = ["setuptools>=46.1.0", "setuptools_scm[toml]>=5", "wheel"]
-build-backend = "setuptools.build_meta"
+[tool.poetry]
+name = "pyphoplacecellanalysis"
+version = "0.1.0"
+description = ""
+authors = ["Pho Hale <CommanderPho@users.noreply.github.com>"]
+readme = "README.md"
 
-[tool.setuptools_scm]
-# See configuration details in https://github.com/pypa/setuptools_scm
-version_scheme = "no-guess-dev"
+[tool.poetry.dependencies]
+python = ">=3.9,<3.11"
+param = "^1.12.3"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^7.2.1"
+pip = "^23.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
