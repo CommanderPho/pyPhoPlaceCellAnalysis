@@ -9,10 +9,31 @@ readme = "README.md"
 python = ">=3.9,<3.11"
 param = "^1.12.3"
 pyphocorehelpers = {git = "https://github.com/CommanderPho/pyPhoCoreHelpers.git"}
+qtmodern = "^0.2.0"
+pandas-flavor = "^0.3.0"
+dill = "^0.3.6"
+elephant = "^0.11.2"
+klepto = "^0.2.3"
+findpeaks = "^2.4.4"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^7.2.1"
 pip = "^23.0"
+ipython = "^8.9.0"
+viztracer = "^0.15.6"
+setuptools = "^67.1.0"
+ansi2html = "^1.8.0"
+
+
+[tool.poetry.group.gui.dependencies]
+click = "^8.1.3"
+pyqt5 = "5.15.7"
+pyqt-checkbox-table-widget = "^0.0.14"
+# pyqt-frameless-window = "^0.0.82"
+pyqt5-qt5 = "^5.15.2"
+pyqt-custom-titlebar-window = "^0.0.50"
+pyqt5-sip = "^12.11.1"
+
 
 [build-system]
 requires = ["poetry-core"]
