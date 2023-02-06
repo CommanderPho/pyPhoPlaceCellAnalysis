@@ -30,15 +30,6 @@ from pyphoplacecellanalysis.General.Pipeline.Stages.Loading import saveData # fo
 from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.DefaultComputationFunctions import KnownFilterEpochs # for `pipeline_complete_compute_long_short_fr_indicies`
 from neuropy.core.session.dataSession import DataSession # for `pipeline_complete_compute_long_short_fr_indicies`
 
-# For _perform_relative_entropy_analyses
-# from pyphocorehelpers.indexing_helpers import build_pairwise_indicies
-# from neuropy.analyses.time_dependent_placefields import PfND_TimeDependent
-# from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.ExtendedStats import TimeDependentPlacefieldSurpriseMode, compute_snapshot_relative_entropy_surprise_differences # for _perform_relative_entropy_analyses
-
-# from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.ExtendedStats import ExtendedStatsComputations # ImportError: cannot import name 'ExtendedStatsComputations' causes circular import
-
-# _perform_time_dependent_pf_sequential_surprise_computation
-
 def _compute_custom_PBEs(sess):
     """ 
         new_pbe_epochs = _compute_custom_PBEs(sess)
@@ -638,36 +629,6 @@ def take_difference_nonzero(df):
         
     return long_averages, short_averages, (short_averages - long_averages)
 
-
-# # note: this is defined here, but not used anywhere
-# def take_difference_adjust_for_time(sess, df, aclu_to_idx):
-#     """this compares the average firing rate for each neuron before and after the context switch
-    
-#     Note that this function corrects for the length of the intervals before averageing."""
-#     short_time = 0
-#     short_spikes = np.zeros(len(aclu_to_idx))
-#     for index, row in df[df["short_track"]].iterrows():
-#         short_time += row.end-row.start
-#         t_slice = (row.start < sess.spikes_df.t_rel_seconds) & (sess.spikes_df.t_rel_seconds < row.end)
-#         sdf = sess.spikes_df[t_slice]
-#         for index, row in sdf.iterrows():
-#             short_spikes[aclu_to_idx[row.aclu]] += 1
-#     short_averages =short_spikes/ short_time
-            
-#     long_time = 0
-#     long_spikes = np.zeros(len(aclu_to_idx))
-#     for index, row in df[~df["short_track"]].iterrows():
-#         long_time += row.end-row.start
-#         t_slice = (row.start < sess.spikes_df.t_rel_seconds) & (sess.spikes_df.t_rel_seconds < row.end)
-#         sdf = sess.spikes_df[t_slice]
-#         for index, row in sdf.iterrows():
-#             long_spikes[aclu_to_idx[row.aclu]] += 1
-#     long_averages = long_spikes/ long_time
-        
-#     return short_averages  - long_averages
-
-
-
 # Aggregate Stats ____________________________________________________________________________________________________ #
 class FiringRateActivitySource(Enum):
     """Specifies which type of firing rate statistics should be used to determine sort and partition separations.
@@ -832,9 +793,6 @@ def compute_evening_morning_parition(neuron_replay_stats_df, firing_rates_activi
         print(f'Difference sorted values: {curr_mean_diff[biggest_differences_sort_idxs]}')
     # return (difference_sorted_aclus, evening_sorted_aclus, morning_sorted_aclus)
     return out_dict
-
-
-
 
 
 # ==================================================================================================================== #

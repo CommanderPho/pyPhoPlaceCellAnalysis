@@ -18,7 +18,7 @@ dependencies:
   - ipython
   # VISUALIZATION
   - matplotlib
-  - ipympl  # interactive matplotlib plots
+  # - ipympl  # interactive matplotlib plots
   - seaborn
   - pyqtgraph
   - qtmodern
