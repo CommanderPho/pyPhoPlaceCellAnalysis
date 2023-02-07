@@ -23,7 +23,9 @@ from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DisplayFunc
 from pyphoplacecellanalysis.GUI.PyQtPlot.DockingWidgets.DynamicDockDisplayAreaContent import CustomDockDisplayConfig # for context_nested_docks/single_context_nested_docks
 from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.DockAreaWrapper import DockAreaWrapper # for context_nested_docks/single_context_nested_docks
 from pyphoplacecellanalysis.GUI.Qt.Widgets.DecoderPlotSelectorControls.DecoderPlotSelectorWidget import DecoderPlotSelectorWidget # for context_nested_docks/single_context_nested_docks
-from pyphoplacecellanalysis.GUI.Qt.Widgets.FigureFormatConfigControls.FigureFormatConfigControls import FigureFormatConfigControls # for context_nested_docks/single_context_nested_docks
+
+# MOVED IN TO `_single_context_nested_docks`
+# from pyphoplacecellanalysis.GUI.Qt.Widgets.FigureFormatConfigControls.FigureFormatConfigControls import FigureFormatConfigControls # for context_nested_docks/single_context_nested_docks
 from pyphoplacecellanalysis.Pho2D.PyQtPlots.plot_placefields import pyqtplot_plot_image_array # for context_nested_docks/single_context_nested_docks
 
 from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.MultiContextComputationFunctions import make_fr
@@ -364,6 +366,8 @@ def _single_context_nested_docks(curr_active_pipeline, active_config_name, app, 
 
 
         """
+        
+
         out_display_items = dict()
 
         # Get relevant variables for this particular context:
@@ -397,6 +401,7 @@ def _single_context_nested_docks(curr_active_pipeline, active_config_name, app, 
             print(f'active_identifying_ctx_string: {active_identifying_ctx_string}')
 
         if enable_gui:
+            from pyphoplacecellanalysis.GUI.Qt.Widgets.FigureFormatConfigControls.FigureFormatConfigControls import FigureFormatConfigControls # for context_nested_docks/single_context_nested_docks
             figure_format_config_widget = FigureFormatConfigControls(config=curr_active_config)
             figure_format_config_widget.figure_format_config_finalized.connect(on_finalize_figure_format_config)
             figure_format_config_widget.show() # even without .show() being called, the figure still appears
