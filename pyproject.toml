@@ -9,7 +9,7 @@ readme = "README.md"
 python = ">=3.9,<3.11"
 param = "^1.12.3"
 pyphocorehelpers = {git = "https://github.com/CommanderPho/pyPhoCoreHelpers.git"}
-neuropy = {git = "https://github.com/CommanderPho/NeuroPy.git", extras = ["acceleration"]}
+neuropy = {git = "https://github.com/CommanderPho/NeuroPy.git"} # , rev = "main", extras = ["acceleration"]
 qtmodern = "^0.2.0"
 pandas-flavor = "^0.3.0"
 dill = "^0.3.6"
