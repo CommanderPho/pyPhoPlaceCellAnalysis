@@ -1286,7 +1286,11 @@ def _compute_epochs_num_aclu_inclusions(all_epochs_frs_mat, min_inclusion_fr_thr
 
 def pipeline_complete_compute_long_short_fr_indicies(curr_active_pipeline, temp_save_filename=None):
 	""" wraps `compute_long_short_firing_rate_indicies(...)` to compute the long_short_fr_index for the complete pipeline
-     
+
+    Requires:
+        Session Laps
+        If the session is missing .replay objects, uses `DataSession.compute_estimated_replay_epochs(...)` to compute them from session PBEs.
+
     - called in `_perform_short_long_firing_rate_analyses`
 
 	Args:
