@@ -1907,7 +1907,7 @@ files = [
 
 [[package]]
 name = "neuropy"
-version = "0.0.5"
+version = "0.0.6"
 description = "package is primarily developed for hippocampal recordings, but can also be used for general ephys data."
 category = "main"
 optional = false
@@ -1934,14 +1934,14 @@ scipy = "^1.6"
 seaborn = "^0.12.2"
 
 [package.extras]
-acceleration = ["cupy-cuda11x (>=11.5.0,<12.0.0)", "numba (>=0.56.4,<0.57.0)"]
+acceleration = ["cupy (>=11.5.0,<12.0.0)", "numba (>=0.56.4,<0.57.0)"]
 gui = ["tqdm (>=4.64.1,<5.0.0)"]
 
 [package.source]
 type = "git"
 url = "https://github.com/CommanderPho/NeuroPy.git"
 reference = "HEAD"
-resolved_reference = "ba817f52ef0dbb4e11988b42a58417cf4c62873e"
+resolved_reference = "7c7efb1602fa3832cf26159aaee595c884a8d686"
 
 [[package]]
 name = "numba"
