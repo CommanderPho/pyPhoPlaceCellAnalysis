@@ -2611,7 +2611,7 @@ name = "pyopengl-accelerate"
 version = "3.1.6"
 description = "Acceleration code for PyOpenGL"
 category = "main"
-optional = false
+optional = true
 python-versions = "*"
 files = [
     {file = "PyOpenGL-accelerate-3.1.6.tar.gz", hash = "sha256:ad8a300256eca25228261de16f741e51a30f34f1e1b1cf68359f5c62dbcdcdc3"},
@@ -4439,4 +4439,4 @@ testing = ["coverage (>=5.0.3)", "zope.event", "zope.testing"]
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.9,<3.11"
-content-hash = "8e537b9ca2985eae1a3716c668dc5e79d4a8b0824063c52301636c47f0bccdc5"
+content-hash = "0c7115c0ed7b6706d4f517139b5ec76f8e52905e491dd3c4407c384fa1a95ef5"
