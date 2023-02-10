@@ -271,15 +271,18 @@ class IntervalsDatasource(BaseDatasource):
         Returns:
             IntervalsDatasource
         """
-        if isinstance(epochs, Epoch):
-            # if it's an Epoch, convert it to a dataframe
+        try:
+            # Start by assuming it's an Epoch object, and try to convert it to a dataframe
             raw_df = epochs.to_dataframe()
             active_df = pd.DataFrame({'t_start':raw_df.start.copy(), 't_duration':raw_df.duration.copy()}) # still will need columns ['series_vertical_offset', 'series_height', 'pen', 'brush'] added later
-        elif isinstance(epochs, pd.DataFrame):
-            # already a dataframe
+            # RESOLVED: is this 'raw_df.durations.copy()' instead of 'raw_df.duration.copy()' a bug? No, this is right for the result of Epoch.to_dataframe()
+        except AttributeError:
+            # if it's not an Epoch, assume it's a dataframe
             active_df = epochs.copy()
-        else:
-            raise NotImplementedError
+            # TODO: need to rename the columns?
+            # active_df = pd.DataFrame({'t_start':raw_df.start.copy(), 't_duration':raw_df.duration.copy()}) # still will need columns ['series_vertical_offset', 'series_height', 'pen', 'brush'] added later
+        except Exception as e:
+            raise e
         
         active_df = cls.add_missing_reciprocal_columns_if_needed(active_df)
         active_df = dataframe_vis_columns_function(active_df)
