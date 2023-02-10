@@ -28,6 +28,8 @@ from pyphocorehelpers.DataStructure.dynamic_parameters import DynamicParameters
 
 from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import ZhangReconstructionImplementation # for _perform_firing_rate_trends_computation
 
+import multiprocessing
+
 
 class SpikeAnalysisComputations(AllFunctionEnumeratingMixin, metaclass=ComputationFunctionRegistryHolder):
     
@@ -61,47 +63,55 @@ class SpikeAnalysisComputations(AllFunctionEnumeratingMixin, metaclass=Computati
         """
         def _compute_pybursts_burst_interval_detection(sess, max_num_spikes_per_neuron=20000, kleinberg_parameters=DynamicParameters(s=2, gamma=0.1), use_progress_bar=False, debug_print=False):
             """ Computes spike bursts in a hierarchical manner """
-            out_pyburst_intervals = IndexedOrderedDict()
-
             # Build the progress bar:
             if use_progress_bar:
                 p_bar = tqdm(sess.spikes_df.spikes.neuron_ids) # Progress bar version
             else:
                 p_bar = sess.spikes_df.spikes.neuron_ids # Non-progress bar version, just wrap the iterable
 
-            for (i, a_cell_id) in enumerate(p_bar):
-                # loop through the cell_ids  
-                if i == 0 or True:
-                    if debug_print:
-                        print(f'computing burst intervals for {a_cell_id}...')
-                    curr_df = safe_pandas_get_group(sess.spikes_df.groupby('aclu'), a_cell_id)
-                    curr_spike_train = curr_df[curr_df.spikes.time_variable_name].to_numpy()
-                    num_curr_spikes = len(curr_spike_train)
-                    if debug_print:
-                        print(f'\tnum_curr_spikes: {num_curr_spikes}')
+            # Parallel version:
+            num_processes = 8
+            with multiprocessing.Pool(processes=num_processes) as pool:
+                # results = pool.map(_compute_pybursts_burst_interval_detection_single_cell, elements)
+                results = pool.starmap(_compute_pybursts_burst_interval_detection_single_cell, [(sess.spikes_df, a_cell_id, max_num_spikes_per_neuron, kleinberg_parameters.s, kleinberg_parameters.gamma) for a_cell_id in p_bar])
 
-                    # For testing, limit to the first 1000 spikes:
-                    num_curr_spikes = min(num_curr_spikes, max_num_spikes_per_neuron)
-                    if debug_print:
-                        print(f'\ttruncating to 1000...: {num_curr_spikes}')
-                    curr_spike_train = curr_spike_train[:num_curr_spikes]
+            return IndexedOrderedDict({a_cell_id: result for a_cell_id, result in zip(p_bar, results)})
 
-                    # Update the progress bar:
-                    if use_progress_bar:
-                        p_bar.set_description(f'computing burst intervals for "{a_cell_id}" | \tnum_curr_spikes: {num_curr_spikes} | \ttruncating to {max_num_spikes_per_neuron}...: {num_curr_spikes}:')
+            # # Non-parallel version:
+            # out_pyburst_intervals = IndexedOrderedDict()
+            # for (i, a_cell_id) in enumerate(p_bar):
+            #     # loop through the cell_ids  
+            #     if i == 0 or True:
+            #         if debug_print:
+            #             print(f'computing burst intervals for {a_cell_id}...')
+            #         curr_df = safe_pandas_get_group(sess.spikes_df.groupby('aclu'), a_cell_id)
+            #         curr_spike_train = curr_df[curr_df.spikes.time_variable_name].to_numpy()
+            #         num_curr_spikes = len(curr_spike_train)
+            #         if debug_print:
+            #             print(f'\tnum_curr_spikes: {num_curr_spikes}')
 
-                    # Perform the computation:
-                    curr_pyburst_intervals = pybursts.kleinberg(curr_spike_train, s=kleinberg_parameters.s, gamma=kleinberg_parameters.gamma)
-                    # Convert ouptut intervals to dataframe
-                    curr_pyburst_interval_df = pd.DataFrame(curr_pyburst_intervals, columns=['burst_level', 't_start', 't_end'])
-                    curr_pyburst_interval_df['t_duration'] = curr_pyburst_interval_df.t_end - curr_pyburst_interval_df.t_start
+            #         # For testing, limit to the first 1000 spikes:
+            #         num_curr_spikes = min(num_curr_spikes, max_num_spikes_per_neuron)
+            #         if debug_print:
+            #             print(f'\ttruncating to 1000...: {num_curr_spikes}')
+            #         curr_spike_train = curr_spike_train[:num_curr_spikes]
 
-                    # Convert vectors to tuples of (t_start, t_duration) pairs:
-                    curr_pyburst_interval_df['interval_pair'] = list(zip(curr_pyburst_interval_df.t_start, curr_pyburst_interval_df.t_duration)) # pairs like # [(33, 4), (76, 16), (76, 1)]
-                    # print(f'interval_pairs: {interval_pairs}') 
-                    out_pyburst_intervals[a_cell_id] = curr_pyburst_interval_df
+            #         # Update the progress bar:
+            #         if use_progress_bar:
+            #             p_bar.set_description(f'computing burst intervals for "{a_cell_id}" | \tnum_curr_spikes: {num_curr_spikes} | \ttruncating to {max_num_spikes_per_neuron}...: {num_curr_spikes}:')
 
-            return out_pyburst_intervals
+            #         # Perform the computation:
+            #         curr_pyburst_intervals = pybursts.kleinberg(curr_spike_train, s=kleinberg_parameters.s, gamma=kleinberg_parameters.gamma)
+            #         # Convert ouptut intervals to dataframe
+            #         curr_pyburst_interval_df = pd.DataFrame(curr_pyburst_intervals, columns=['burst_level', 't_start', 't_end'])
+            #         curr_pyburst_interval_df['t_duration'] = curr_pyburst_interval_df.t_end - curr_pyburst_interval_df.t_start
+
+            #         # Convert vectors to tuples of (t_start, t_duration) pairs:
+            #         curr_pyburst_interval_df['interval_pair'] = list(zip(curr_pyburst_interval_df.t_start, curr_pyburst_interval_df.t_duration)) # pairs like # [(33, 4), (76, 16), (76, 1)]
+            #         # print(f'interval_pairs: {interval_pairs}') 
+            #         out_pyburst_intervals[a_cell_id] = curr_pyburst_interval_df
+
+            # return out_pyburst_intervals
 
         """
         
@@ -261,3 +271,29 @@ class SpikeAnalysisComputations(AllFunctionEnumeratingMixin, metaclass=Computati
         # active_time_window_edges_binning_info = pf_included_spikes_only['time_window_edges_binning_info']
         # active_time_binned_unit_specific_binned_spike_rate = pf_included_spikes_only['time_binned_unit_specific_binned_spike_rate']
         # active_time_binned_unit_specific_binned_spike_counts = pf_included_spikes_only['time_binned_unit_specific_binned_spike_counts']
+
+
+
+
+# ==================================================================================================================== #
+# Private Functions                                                                                                    #
+# ==================================================================================================================== #
+def _compute_pybursts_burst_interval_detection_single_cell(spikes_df, a_cell_id, max_num_spikes_per_neuron=20000, s=2, gamma=0.1):
+    """ computes the burst intervals for a single cell using pybursts. Written this way so that it can be parallelized."""
+    curr_df = safe_pandas_get_group(spikes_df.groupby('aclu'), a_cell_id)
+    curr_spike_train = curr_df[curr_df.spikes.time_variable_name].to_numpy()
+    num_curr_spikes = len(curr_spike_train)
+
+    # For testing, limit to the first 1000 spikes:
+    num_curr_spikes = min(num_curr_spikes, max_num_spikes_per_neuron)
+    curr_spike_train = curr_spike_train[:num_curr_spikes]
+
+    # Perform the computation:
+    curr_pyburst_intervals = pybursts.kleinberg(curr_spike_train, s=s, gamma=gamma)
+    # Convert ouptut intervals to dataframe
+    curr_pyburst_interval_df = pd.DataFrame(curr_pyburst_intervals, columns=['burst_level', 't_start', 't_end'])
+    curr_pyburst_interval_df['t_duration'] = curr_pyburst_interval_df.t_end - curr_pyburst_interval_df.t_start
+
+    # Convert vectors to tuples of (t_start, t_duration) pairs:
+    curr_pyburst_interval_df['interval_pair'] = list(zip(curr_pyburst_interval_df.t_start, curr_pyburst_interval_df.t_duration)) # pairs like # [(33, 4), (76, 16), (76, 1)]
+    return curr_pyburst_interval_df
