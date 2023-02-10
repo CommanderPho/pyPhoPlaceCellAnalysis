@@ -15,7 +15,7 @@ elephant = "^0.11.2"
 klepto = "^0.2.3" # {version = "^0.2.3", extras="archives"}
 findpeaks = "^2.4.4"
 shapely = "^2.0.1"
-pybursts = "^0.1.1"
+pybursts = {git = "https://github.com/CommanderPho/pybursts.git"}
 pyopengl-accelerate = {version = "^3.1.6", optional = true}
 opencv-python = "^4.7.0.68"
 sqlalchemy = {version = "^2.0.2", optional = false}
