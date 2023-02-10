@@ -13,7 +13,7 @@ class EpochsWindow(QWidget):
     def __init__(self, parent=None):
         super(EpochsWindow, self).__init__(parent)
 
-        self.epoch_list = []
+        self.epoch_list = {}
 
         self.setWindowTitle("Epochs")
 
@@ -27,50 +27,58 @@ class EpochsWindow(QWidget):
         self.listbox = QListWidget()
         self.listbox.setSelectionMode(QAbstractItemView.NoSelection)
 
-        # Create the buttons
-        self.toggle_btn = QPushButton("Toggle")
-        self.options_btn = QPushButton("Options")
-
         # Create the layout and add the widgets
         self.layout = QVBoxLayout()
         self.layout.addWidget(self.label)
         self.layout.addWidget(self.listbox)
-        self.layout.addWidget(self.toggle_btn)
-        self.layout.addWidget(self.options_btn)
 
-        # Connect the buttons to their respective slots
-        self.toggle_btn.clicked.connect(self.toggle_epoch)
-        self.options_btn.clicked.connect(self.show_epoch_options)
 
         # Set the layout
         self.setLayout(self.layout)
 
     def add_epoch(self, title):
-        self.epoch_list.append(title)
+        self.epoch_list[title] = {"visible": True, "options": None}
 
-        # Add the epoch to the listbox
-        item = QListWidgetItem()
-        item.setText(title)
+        # Create the buttons
+        label = QLabel(title)
+        toggle_btn = QPushButton("Toggle")
+        options_btn = QPushButton("Options")
+
+        # Create the layout and add the buttons
+        layout = QHBoxLayout()
+        layout.addWidget(label)
+        layout.addWidget(toggle_btn)
+        layout.addWidget(options_btn)
+
+        # Create the widget and set the layout
+        widget = QWidget()
+        widget.setLayout(layout)
+
+        # Create the list item and set the widget
+        item = QListWidgetItem(self.listbox)
+        item.setSizeHint(widget.sizeHint())
         self.listbox.addItem(item)
+        self.listbox.setItemWidget(item, widget)
 
-    def toggle_epoch(self):
-        # Get the selected item from the listbox
-        item = self.listbox.selectedItems()[0]
+        # Connect the buttons to their respective slots
+        toggle_btn.clicked.connect(lambda: self.toggle_epoch(title))
+        options_btn.clicked.connect(lambda: self.show_epoch_options(title))
 
+    def toggle_epoch(self, title):
         # Toggle the visibility of the epoch
-        self.epoch_list[item.text()]["visible"] = not self.epoch_list[item.text()]["visible"]
+        self.epoch_list[title]["visible"] = not self.epoch_list[title]["visible"]
 
-    def show_epoch_options(self):
-        # Get the selected item from the listbox
-        item = self.listbox.selectedItems()[0]
-
+    def show_epoch_options(self, title):
         # Show the options window for the epoch
-        self.epoch_list[item.text()]["options"].show()
-
+        self.epoch_list[title]["options"].show()
 
 
 if __name__ == '__main__':
     app = QApplication(sys.argv)
     window = EpochsWindow()
     window.show()
+    ## Test adding epochs:
+    for an_epoch_name in ["Epoch 1", "Epoch 2", "Epoch 3"]:
+        window.add_epoch(an_epoch_name)
+
     sys.exit(app.exec_())
