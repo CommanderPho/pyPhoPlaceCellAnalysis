@@ -98,7 +98,8 @@ class SpikeRastersDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Displa
         ## Finally, add the display function to the active context
         active_display_fn_identifying_ctx = active_identifying_context.adding_context('display_fn', display_fn_name='display_spike_rasters_window')
         active_display_fn_identifying_ctx_string = active_display_fn_identifying_ctx.get_description(separator='|') # Get final discription string:
-        
+
+        ## It's passed a specific computation_result which has a .sess attribute that's used to determine which spikes are displayed or not.
         spike_raster_window = Spike3DRasterWindowWidget(computation_result.sess.spikes_df, type_of_3d_plotter=type_of_3d_plotter, application_name=f'Spike Raster Window - {active_display_fn_identifying_ctx_string}')
         
         # Set Window Title Options:
