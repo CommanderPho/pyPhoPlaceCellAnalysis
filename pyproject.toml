@@ -19,6 +19,10 @@ pybursts = {git = "https://github.com/CommanderPho/pybursts.git"}
 pyopengl-accelerate = {version = "^3.1.6", optional = true}
 opencv-python = "^4.7.0.68"
 sqlalchemy = {version = "^2.0.2", optional = false}
+pip = "^23.0"
+setuptools = "^67.3.1"
+wheel = "^0.38.4"
+srsly = "^2.4.5"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^7.2.1"
