@@ -376,18 +376,18 @@ typing-extensions = ">=3.10.0"
 
 [[package]]
 name = "boto3"
-version = "1.26.70"
+version = "1.26.72"
 description = "The AWS SDK for Python"
 category = "dev"
 optional = false
 python-versions = ">= 3.7"
 files = [
-    {file = "boto3-1.26.70-py3-none-any.whl", hash = "sha256:5324c2a9dbc271d2b25eb79f7469b422de411665f9ab1c0b410e8ac820859b1a"},
-    {file = "boto3-1.26.70.tar.gz", hash = "sha256:123cf34f3cc58772b4f806dfbb1ae9ffae47459de5088e971be9d3cd2b198975"},
+    {file = "boto3-1.26.72-py3-none-any.whl", hash = "sha256:990997248716f12b296d7d30b3119a93347d73b7a4831c015e53aaebbd074a77"},
+    {file = "boto3-1.26.72.tar.gz", hash = "sha256:5d6e19d148c4a9d5d85f0d96570d11264f23db610f1e3c9a8b7e8b6898424691"},
 ]
 
 [package.dependencies]
-botocore = ">=1.29.70,<1.30.0"
+botocore = ">=1.29.72,<1.30.0"
 jmespath = ">=0.7.1,<2.0.0"
 s3transfer = ">=0.6.0,<0.7.0"
 
@@ -396,14 +396,14 @@ crt = ["botocore[crt] (>=1.21.0,<2.0a0)"]
 
 [[package]]
 name = "botocore"
-version = "1.29.70"
+version = "1.29.72"
 description = "Low-level, data-driven core of boto 3."
 category = "dev"
 optional = false
 python-versions = ">= 3.7"
 files = [
-    {file = "botocore-1.29.70-py3-none-any.whl", hash = "sha256:7d9abef42846c1c2f31dacaa559f8450f6fbda74c2c9e3dc6630e06e882ad026"},
-    {file = "botocore-1.29.70.tar.gz", hash = "sha256:caaa144f49ef0d01b5e8812c9afa729def2c3358d9c4d9204789be2b56c5e849"},
+    {file = "botocore-1.29.72-py3-none-any.whl", hash = "sha256:77fff109e1bdbf030d8400ccab9d28454c03c7be62c1696a239b21792b0873df"},
+    {file = "botocore-1.29.72.tar.gz", hash = "sha256:8710f53af0e20f08f36a3bf434d18bc7ceba5d9835495b02aedbedd35df5de9a"},
 ]
 
 [package.dependencies]
@@ -2147,6 +2147,23 @@ type = "git"
 url = "https://github.com/CommanderPho/mpl-multitab.git"
 reference = "HEAD"
 resolved_reference = "0b02d2a616e39e5bac10797228fedb71bd8b8fc8"
+
+[[package]]
+name = "mplcursors"
+version = "0.5.2"
+description = "Interactive data selection cursors for Matplotlib."
+category = "dev"
+optional = false
+python-versions = ">=3.6"
+files = [
+    {file = "mplcursors-0.5.2.tar.gz", hash = "sha256:78febb32adf2d9040e2f6fc84b5e4cfb8f96b4ede4916fc418e5fffbcfdc0957"},
+]
+
+[package.dependencies]
+matplotlib = ">=3.1"
+
+[package.extras]
+docs = ["pandas", "pydata_sphinx_theme (!=0.10.1)", "sphinx", "sphinx-gallery"]
 
 [[package]]
 name = "msgpack"
@@ -4293,14 +4310,14 @@ stats = ["scipy (>=1.3)", "statsmodels (>=0.10)"]
 
 [[package]]
 name = "setuptools"
-version = "67.3.1"
+version = "67.3.2"
 description = "Easily download, build, install, upgrade, and uninstall Python packages"
 category = "main"
 optional = false
 python-versions = ">=3.7"
 files = [
-    {file = "setuptools-67.3.1-py3-none-any.whl", hash = "sha256:23c86b4e44432bfd8899384afc08872ec166a24f48a3f99f293b0a557e6a6b5d"},
-    {file = "setuptools-67.3.1.tar.gz", hash = "sha256:daec07fd848d80676694d6bf69c009d28910aeece68a38dbe88b7e1bb6dba12e"},
+    {file = "setuptools-67.3.2-py3-none-any.whl", hash = "sha256:bb6d8e508de562768f2027902929f8523932fcd1fb784e6d573d2cafac995a48"},
+    {file = "setuptools-67.3.2.tar.gz", hash = "sha256:95f00380ef2ffa41d9bba85d95b27689d923c93dfbafed4aecd7cf988a25e012"},
 ]
 
 [package.extras]
@@ -4847,14 +4864,14 @@ twisted = ["twisted (>=20.3.0)", "zope.interface (>=5.2.0)"]
 
 [[package]]
 name = "typing-extensions"
-version = "4.4.0"
+version = "4.5.0"
 description = "Backported and Experimental Type Hints for Python 3.7+"
 category = "main"
 optional = false
 python-versions = ">=3.7"
 files = [
-    {file = "typing_extensions-4.4.0-py3-none-any.whl", hash = "sha256:16fa4864408f655d35ec496218b85f79b3437c829e93320c7c9215ccfd92489e"},
-    {file = "typing_extensions-4.4.0.tar.gz", hash = "sha256:1511434bb92bf8dd198c12b1cc812e800d4181cfcb867674e0f8279cc93087aa"},
+    {file = "typing_extensions-4.5.0-py3-none-any.whl", hash = "sha256:fb33085c39dd998ac16d1431ebc293a8b3eedd00fd4a32de0ff79002c19511b4"},
+    {file = "typing_extensions-4.5.0.tar.gz", hash = "sha256:5cb5f4a79139d699607b3ef622a1dedafa84e115ab0024e0d9c044a9479ca7cb"},
 ]
 
 [[package]]
@@ -5132,14 +5149,14 @@ files = [
 
 [[package]]
 name = "wslink"
-version = "1.10.0"
+version = "1.10.1"
 description = "Python/JavaScript library for communicating over WebSocket"
 category = "dev"
 optional = false
 python-versions = "*"
 files = [
-    {file = "wslink-1.10.0-py3-none-any.whl", hash = "sha256:dba6da0b1f6bc647481097f1a3c84d32519bbd8d883f5a24249fdfedf8846d7d"},
-    {file = "wslink-1.10.0.tar.gz", hash = "sha256:30339d33762d3d1335807c2c0ffcc6626eee528d995275f936031c52c9d1a8ac"},
+    {file = "wslink-1.10.1-py3-none-any.whl", hash = "sha256:cd7b100e746a6ccb6327df8a45c684aa653145da4da17f269ccc3959ec9078e2"},
+    {file = "wslink-1.10.1.tar.gz", hash = "sha256:6f6b56dab254db5aad293e7ae2d6d52f515df3ccdc3093c2e6c268861fa39a3e"},
 ]
 
 [package.dependencies]
@@ -5384,4 +5401,4 @@ testing = ["coverage (>=5.0.3)", "zope.event", "zope.testing"]
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.9,<3.11"
-content-hash = "846dd2b5fe6b93ec899b0259f8c8d265a8317913b22446518c347fd6caba5a25"
+content-hash = "fcfe73a1ea2192cf1d06b0c4ca40e4e81d02040520d0dc4d4be539d643e60be7"

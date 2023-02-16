@@ -34,7 +34,6 @@ viztracer = "^0.15.6"
 setuptools = "^67.1.0"
 ansi2html = {git = "https://github.com/CommanderPho/ansi2html.git"} # poetry add git+https://github.com/CommanderPho/ansi2html.git
 
-
 [tool.poetry.group.gui.dependencies]
 click = "^8.1.3"
 pyqt5 = "5.15.7"
@@ -58,6 +57,8 @@ vedo = {git = "https://github.com/CommanderPho/vedo.git", rev = "release/pho-wor
 neuropy = {path = "../NeuroPy", develop=true} # , rev = "main", extras = ["acceleration"]
 pyphocorehelpers = {path = "../pyPhoCoreHelpers", develop=true}
 
+[tool.poetry.group.testing.dependencies]
+mplcursors = "^0.5.2"
 
 [build-system]
 requires = ["poetry-core"]
