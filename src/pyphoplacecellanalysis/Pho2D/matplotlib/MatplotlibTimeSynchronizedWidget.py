@@ -27,8 +27,9 @@ class MatplotlibTimeSynchronizedWidget(CustomMatplotlibWidget):
     @QtCore.Slot(float, float)
     def on_window_changed(self, start_t, end_t):
         # called when the window is updated
-        curr_ax = self.ax
-        curr_ax.set_xlim(start_t, end_t)
+        ## Update all children axes:
+        for curr_ax in self.axes:
+            curr_ax.set_xlim(start_t, end_t)
         self.draw()
         
     ############### Rate-Limited SLots ###############:

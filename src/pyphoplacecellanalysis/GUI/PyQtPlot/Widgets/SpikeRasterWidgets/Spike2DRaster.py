@@ -1013,7 +1013,8 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
             # Already had the widget
             print(f'already had the valid matplotlib view widget and its display dock. Returning extant.')
             fig = self.ui.matplotlib_view_widgets[name].getFigure()
-            ax = self.ui.matplotlib_view_widgets[name].ax
+            ax = self.ui.matplotlib_view_widgets[name].axes # return all axes instead of just the first one
+            
 
         # self.sync_matplotlib_render_plot_widget()
         return self.ui.matplotlib_view_widgets[name], fig, ax
@@ -1025,7 +1026,7 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
         """
         active_matplotlib_view_widget = self.ui.matplotlib_view_widgets.get(identifier, None)
         if active_matplotlib_view_widget is not None:
-            return active_matplotlib_view_widget, active_matplotlib_view_widget.getFigure(), active_matplotlib_view_widget.ax
+            return active_matplotlib_view_widget, active_matplotlib_view_widget.getFigure(), active_matplotlib_view_widget.axes # return all axes instead of just the first one
         else:
             print(f'active_matplotlib_view_widget with identifier {identifier} was not found!')
             return None, None, None
@@ -1036,6 +1037,9 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
         ## TODO: need to remove the display item from self.ui.dynamic_docked_widget_container?
         active_matplotlib_view_widget = self.ui.matplotlib_view_widgets.get(identifier, None)
         if active_matplotlib_view_widget is not None:
+            ## TODO: remove the connection from self.ui.connections[identifier]?
+            self.sync_matplotlib_render_plot_widget(identifier, sync_mode=SynchronizedPlotMode.NO_SYNC)
+            ## Remove the widget itself:
             # self.ui.dynamic_docked_widget_container
             self.ui.layout.removeWidget(active_matplotlib_view_widget) # Remove the matplotlib widget
             active_matplotlib_view_widget = None # Set the matplotlib_view_widget to None ## TODO: this doesn't actually remove it from the UI container does it?
