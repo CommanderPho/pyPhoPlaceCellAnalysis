@@ -25,6 +25,7 @@ wheel = "^0.38.4"
 srsly = "^2.4.5"
 tables = "^3.8.0"
 hdf5plugin = "^4.1.1"
+magicgui = "^0.6.1"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^7.2.1"
@@ -52,6 +53,7 @@ vedo = {git = "https://github.com/CommanderPho/vedo.git", rev = "release/pho-wor
 # [tool.poetry.group.remote.dependencies]
 # pyphocorehelpers = {git = "https://github.com/CommanderPho/pyPhoCoreHelpers.git"}
 # neuropy = {git = "https://github.com/CommanderPho/NeuroPy.git"} # , rev = "main", extras = ["acceleration"]
+pyqt-responsive-label = "^0.0.3"
 
 [tool.poetry.group.local.dependencies]
 neuropy = {path = "../NeuroPy", develop=true} # , rev = "main", extras = ["acceleration"]
