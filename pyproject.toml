@@ -28,6 +28,7 @@ hdf5plugin = "^4.1.1"
 magicgui = "^0.6.1"
 pyqode-core = {path = "C:/Users/pho/repos/pyqode.core/dist/pyqode_core-3.0.0-py2.py3-none-any.whl"}
 haesleinhuepf-pyqode-python = {path = "C:/Users/pho/repos/ExternalTesting/pyqode.python/dist/haesleinhuepf_pyqode.python-2.15.2-py2.py3-none-any.whl"}
+pysimplegui = "^4.60.4"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^7.2.1"
