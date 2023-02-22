@@ -10,7 +10,7 @@ python = ">=3.9,<3.11"
 param = "^1.12.3"
 qtmodern = "^0.2.0"
 pandas-flavor = "^0.3.0"
-dill = {git = "https://github.com/anivegesana/dill.git", rev = "enums"}
+dill = {git = "https://github.com/CommanderPho/dill.git", rev = "develop", extras=["graph"]} #objgraph diagnostic tool
 elephant = "^0.11.2"
 klepto = "^0.2.3" # {version = "^0.2.3", extras="archives"}
 findpeaks = "^2.4.4"
