@@ -1328,7 +1328,7 @@ def pipeline_complete_compute_long_short_fr_indicies(curr_active_pipeline, temp_
 	## Working:
 	# long_replays, short_replays, global_replays = [KnownFilterEpochs.perform_get_filter_epochs_df(sess=a_computation_result.sess, filter_epochs=filter_epochs, min_epoch_included_duration=min_epoch_included_duration) for a_computation_result in [long_computation_results, short_computation_results, global_computation_results]] # returns Epoch objects
 	# New sess.compute_estimated_replay_epochs(...) based method:
-	long_replays, short_replays, global_replays = [curr_active_pipeline.filtered_sessions[an_epoch_name].compute_estimated_replay_epochs() for an_epoch_name in [long_epoch_name, short_epoch_name, global_epoch_name]] # NOTE: this includes a few overlapping epochs since the function to remove overlapping ones seems to be broken
+	long_replays, short_replays, global_replays = [curr_active_pipeline.filtered_sessions[an_epoch_name].estimate_replay_epochs() for an_epoch_name in [long_epoch_name, short_epoch_name, global_epoch_name]] # NOTE: this includes a few overlapping epochs since the function to remove overlapping ones seems to be broken
 
 	## Build the output results dict:
 	all_results_dict = dict(zip(['long_laps', 'long_replays', 'short_laps', 'short_replays', 'global_laps', 'global_replays'], [long_laps, long_replays, short_laps, short_replays, global_laps, global_replays])) # all variables
