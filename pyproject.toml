@@ -11,7 +11,7 @@ param = "^1.12.3"
 qtmodern = "^0.2.0"
 pandas-flavor = "^0.3.0"
 elephant = "^0.11.2"
-dill = "0.3.5.*"
+dill = {version="0.3.5.*", extras=["graph"]} #objgraph diagnostic tool
 klepto = "0.2.2" # {version = "^0.2.3", extras="archives"}
 findpeaks = "^2.4.4"
 shapely = "^2.0.1"
