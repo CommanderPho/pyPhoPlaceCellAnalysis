@@ -26,10 +26,12 @@ srsly = "^2.4.5"
 tables = "^3.8.0"
 hdf5plugin = "^4.1.1"
 magicgui = "^0.6.1"
-# pyqode-core = {path = "C:/Users/pho/repos/pyqode.core/dist/pyqode_core-3.0.0-py2.py3-none-any.whl"}
-# haesleinhuepf-pyqode-python = {path = "C:/Users/pho/repos/ExternalTesting/pyqode.python/dist/haesleinhuepf_pyqode.python-2.15.2-py2.py3-none-any.whl"}
-pyqode-core = {path = "/home/halechr/repos/pyqode.core/dist/pyqode_core-3.0.0-py2.py3-none-any.whl"}
-pyqode-python = {path = "/home/halechr/repos/pyqode.python/dist/pyqode.python-2.12.1-py2.py3-none-any.whl"}
+# pyqode-core = {path = "C:/Users/pho/repos/pyqode.core/dist/pyqode_core-3.0.0-py2.py3-none-any.whl", platform='windows'}
+# haesleinhuepf-pyqode-python = {path = "C:/Users/pho/repos/ExternalTesting/pyqode.python/dist/haesleinhuepf_pyqode.python-2.15.2-py2.py3-none-any.whl", platform='windows'}
+# pyqode-core = {path = "/home/halechr/repos/pyqode.core/dist/pyqode_core-3.0.0-py2.py3-none-any.whl", platform='linux'}
+# pyqode-python = {path = "/home/halechr/repos/pyqode.python/dist/pyqode.python-2.12.1-py2.py3-none-any.whl", platform='linux'}
+# pyqode-core = {path = "../pyqode.core/dist/pyqode_core-3.0.0-py2.py3-none-any.whl", platform='linux'}
+# pyqode-python = {path = "../pyqode.python/dist/pyqode.python-2.12.1-py2.py3-none-any.whl", platform='linux'}
 pysimplegui = "^4.60.4"
 
 
@@ -69,6 +71,9 @@ pyqt-responsive-label = "^0.0.3"
 neuropy = {path = "../NeuroPy", develop=true} # , rev = "main", extras = ["acceleration"]
 pyphocorehelpers = {path = "../pyPhoCoreHelpers", develop=true}
 # dill = {path = "../ExternalTesting/dill", develop=true, extras=["graph"]} #objgraph diagnostic tool
+pyqode-core = {path = "../pyqode.core/dist/pyqode_core-3.0.0-py2.py3-none-any.whl"}
+haesleinhuepf-pyqode-python = {path = "../pyqode.python/dist/haesleinhuepf_pyqode.python-2.15.2-py2.py3-none-any.whl"}
+
 
 [tool.poetry.group.testing.dependencies]
 mplcursors = "^0.5.2"
