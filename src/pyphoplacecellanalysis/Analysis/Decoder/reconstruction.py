@@ -442,11 +442,11 @@ class PlacemapPositionDecoder(SerializedAttributesSpecifyingClass, SimplePrintab
     
         
 class BayesianPlacemapPositionDecoder(PlacemapPositionDecoder):
-    """docstring for BayesianPlacemapPositionDecoder.
-    
-    
-    Called after deserializing/loading saved result from disk to rebuild the needed computed variables. 
-    
+    """ Holds the placefields. Can be called on any spike data to compute the most likely position given the spike data.
+
+    Used to try to decode everything in one go, meaning it took the parameters (like the time window) and the spikes to decode as well and did the computation internally, but the concept of a decoder is that it is a stateless object that can be called on any spike data to decode it, so this concept is depricated.
+
+
     """    
     @property
     def flat_position_size(self):

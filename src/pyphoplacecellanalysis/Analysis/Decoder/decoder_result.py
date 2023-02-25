@@ -1,45 +1,13 @@
-import matplotlib
 import matplotlib.pyplot as plt
-from matplotlib.animation import FuncAnimation
 import numpy as np
 import pandas as pd
 
 # Neuropy:
-# from neuropy.utils.mixins.binning_helpers import BinnedPositionsMixin, bin_pos_nD, build_df_discretized_binned_position_columns
+from neuropy.core.position import build_position_df_resampled_to_time_windows # used in DecoderResultDisplayingPlot2D.setup()
 
 from .reconstruction import BayesianPlacemapPositionDecoder
 from pyphocorehelpers.indexing_helpers import find_neighbours
 
-
-def build_position_df_time_window_idx(active_pos_df, curr_active_time_windows, debug_print=False):
-    """ adds the time_window_idx column to the active_pos_df
-    Usage:
-        curr_active_time_windows = np.array(pho_custom_decoder.active_time_windows)
-        active_pos_df = build_position_df_time_window_idx(sess.position.to_dataframe(), curr_active_time_windows)
-    """
-    active_pos_df['time_window_idx'] = np.full_like(active_pos_df['t'], -1, dtype='int')
-    starts = curr_active_time_windows[:,0]
-    stops = curr_active_time_windows[:,1]
-    num_slices = len(starts)
-    if debug_print:
-        print(f'starts: {np.shape(starts)}, stops: {np.shape(stops)}, num_slices: {num_slices}')
-    for i in np.arange(num_slices):
-        active_pos_df.loc[active_pos_df[active_pos_df.position.time_variable_name].between(starts[i], stops[i], inclusive='both'), ['time_window_idx']] = int(i) # set the 'time_window_idx' identifier on the object
-    active_pos_df['time_window_idx'] = active_pos_df['time_window_idx'].astype(int) # ensure output is the correct datatype
-    return active_pos_df
-
-
-def build_position_df_resampled_to_time_windows(active_pos_df, time_bin_size=0.02):
-    """ Note that this returns a TimedeltaIndexResampler, not a dataframe proper. To get the real dataframe call .nearest() on output. """
-    position_time_delta = pd.to_timedelta(active_pos_df[active_pos_df.position.time_variable_name], unit="sec")
-    active_pos_df['time_delta_sec'] = position_time_delta
-    active_pos_df = active_pos_df.set_index('time_delta_sec')
-    window_resampled_pos_df = active_pos_df.resample(f'{time_bin_size}S', base=0)#.nearest() # '0.02S' 0.02 second bins
-    return window_resampled_pos_df
-
-
-
-    
 # ==================================================================================================================== #
 # DecoderResultDisplaying* Classes                                                                                     #
 # ==================================================================================================================== #
@@ -107,7 +75,7 @@ class DecoderResultDisplayingBaseClass:
         return self.decoder.most_likely_positions
     
 
-        
+
 
 class DecoderResultDisplayingPlot2D(DecoderResultDisplayingBaseClass):
     """ Displays the decoder for 2D position. """

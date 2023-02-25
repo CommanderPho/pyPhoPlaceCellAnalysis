@@ -3,7 +3,6 @@ import numpy as np
 import pandas as pd
 
 from pyphocorehelpers.indexing_helpers import build_pairwise_indicies
-from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.MultiContextComputationFunctions import compute_relative_entropy_divergence_overlap
 from scipy import stats # for compute_relative_entropy_divergence_overlap
 from scipy.special import rel_entr # alternative for compute_relative_entropy_divergence_overlap
 
@@ -12,7 +11,7 @@ from pyphocorehelpers.DataStructure.dynamic_parameters import DynamicParameters
 from pyphocorehelpers.mixins.member_enumerating import AllFunctionEnumeratingMixin
 from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.ComputationFunctionRegistryHolder import ComputationFunctionRegistryHolder
 from pyphoplacecellanalysis.General.Model.ComputationResults import ComputationResult
-from pyphoplacecellanalysis.Analysis.Decoder.decoder_result import build_position_df_resampled_to_time_windows, build_position_df_time_window_idx
+from neuropy.core.position import build_position_df_resampled_to_time_windows
 
 # from neuropy.analyses.laps import _build_new_lap_and_intra_lap_intervals # for _perform_time_dependent_pf_sequential_surprise_computation
 
