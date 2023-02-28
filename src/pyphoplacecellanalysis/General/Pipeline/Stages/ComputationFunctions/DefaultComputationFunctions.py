@@ -35,7 +35,7 @@ class DefaultComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Computa
         
             ## - [ ] TODO: IMPORTANT!! POTENTIAL_BUG: Should this passed-in spikes_df actually be the filtered spikes_df that was used to compute the placefields in PfND? That would be `prev_output_result.computed_data['pf2D'].filtered_spikes_df`
                 TODO: CORRECTNESS: Consider whether spikes_df or just the spikes_df used to compute the pf2D should be passed. Only the cells used to build the decoder should be used to decode, that much is certain.
-                    - 2022-09-15: it appears that the 'filtered_spikes_df version' improves issues with decoder jumpiness and general inaccuracy that was present when using the session spikes_df: previously it was just jumping to random points far from the animal's location and then sticking there for a long time.
+                    - 2022-09-15: it appears that the 'filtered_spikes_df version' improves issues with decoder jumpiness and general inaccuracy that was present when using the session spikes_df: **previously it was just jumping to random points far from the animal's location and then sticking there for a long time**.
         
         """
         def position_decoding_computation(active_session, pf_computation_config, prev_output_result):
@@ -50,7 +50,6 @@ class DefaultComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Computa
 
         placefield_computation_config = computation_result.computation_config.pf_params # should be a PlacefieldComputationParameters
         return position_decoding_computation(computation_result.sess, placefield_computation_config, computation_result)
-    
     
     def _perform_two_step_position_decoding_computation(computation_result: ComputationResult, debug_print=False, **kwargs):
         """ Builds the Zhang Velocity/Position For 2-step Bayesian Decoder for 2D Placefields
@@ -200,7 +199,6 @@ class DefaultComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Computa
 
         return computation_result
 
-
     def _perform_recursive_latent_placefield_decoding(computation_result: ComputationResult, **kwargs):
         """ note that currently the pf1D_Decoders are not built or used. 
 
@@ -309,8 +307,6 @@ class DefaultComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Computa
             computation_result.computed_data['pf2D_RecursiveLatent'].append(DynamicContainer.init_from_dict({'pf2D':active_third_order_pf_2D, 'pf2D_Decoder':active_third_order_2D_decoder}))
 
         return computation_result
-
-
 
     def _perform_specific_epochs_decoding(computation_result: ComputationResult, active_config, decoder_ndim:int=2, filter_epochs='ripple', decoding_time_bin_size=0.02, **kwargs):
         """ TODO: meant to be used by `_display_plot_decoded_epoch_slices` but needs a smarter way to cache the computations and etc. 

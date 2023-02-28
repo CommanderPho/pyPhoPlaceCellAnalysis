@@ -298,11 +298,6 @@ class ZhangReconstructionImplementation:
             posterior /= np.sum(posterior, axis=0) # C(tau, n) = np.sum(posterior, axis=0): normalization condition mentioned in eqn 36 to convert to P_x_given_n
 
         return posterior
-        
-    
-    
-
-
 
 class Zhang_Two_Step:
     
@@ -867,6 +862,10 @@ class BayesianPlacemapPositionDecoder(PlacemapPositionDecoder):
             .revised_most_likely_positions
             .marginal's .x & .y .revised_most_likely_positions_1D
         
+
+
+        TODO: CRITICAL: CORRECTNESS: 2022-02-25: This was said not to be working for 1D somewhere else in the code, but I don't know if it's working or not. It doesn't seem to be.
+
         """
         ## Find the bins that don't have any spikes in them:
         # zero_bin_indicies = np.where(self.total_spike_counts_per_window == 0)[0]
