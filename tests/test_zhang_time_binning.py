@@ -8,11 +8,11 @@ from pathlib import Path
 
 # Add Neuropy to the path as needed
 tests_folder = Path(os.path.dirname(__file__))
+root_project_folder = tests_folder.parent
 
 try:
     import pyphoplacecellanalysis
-except ModuleNotFoundError as e:    
-    root_project_folder = tests_folder.parent
+except ModuleNotFoundError as e:
     print('root_project_folder: {}'.format(root_project_folder))
     src_folder = root_project_folder.joinpath('src')
     pyphoplacecellanalysis_folder = src_folder.joinpath('pyphoplacecellanalysis')
@@ -20,19 +20,39 @@ except ModuleNotFoundError as e:
     sys.path.insert(0, str(src_folder))
 finally:
     from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import ZhangReconstructionImplementation
-
-from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import ZhangReconstructionImplementation
-from neuropy.utils.mixins.binning_helpers import BinningContainer
-from pyphocorehelpers.indexing_helpers import build_pairwise_indicies
+    from neuropy.utils.mixins.binning_helpers import BinningContainer
+    from pyphocorehelpers.indexing_helpers import build_pairwise_indicies
 
 
 class TestTimeBinningMethods(unittest.TestCase):
 
     def setUp(self):
         ## TODO: Convert
-        
+        """ Corresponding load for Neuropy Testing file 'NeuroPy/tests/neuropy_pf_testing.h5': 
+            ## Save for NeuroPy testing:
+            finalized_testing_file='../NeuroPy/tests/neuropy_pf_testing.h5'
+            sess_identifier_key='sess'
+            spikes_df.to_hdf(finalized_testing_file, key=f'{sess_identifier_key}/spikes_df')
+            active_pos.to_dataframe().to_hdf(finalized_testing_file, key=f'{sess_identifier_key}/pos_df', format='table')
+        """
+        self.enable_debug_plotting = False
+        self.enable_debug_printing = True
+
+        finalized_testing_file = root_project_folder.parent.joinpath('NeuroPy').joinpath('tests').joinpath('neuropy_pf_testing.h5') # The test data is in the Neuropy folder
+        # finalized_testing_file = tests_folder.joinpath('neuropy_pf_testing.h5')
+        sess_identifier_key='sess'
+        # Load the saved .h5 spikes_df and active_pos dataframes for testing:
+        self.spikes_df = pd.read_hdf(finalized_testing_file, key=f'{sess_identifier_key}/spikes_df')
+        active_pos_df = pd.read_hdf(finalized_testing_file, key=f'{sess_identifier_key}/pos_df')
+        self.active_pos = active_pos_df.position.to_Position_obj() # convert back to a full position object
+
         ## NEEDS:
-        """ 2022-12-15 - TODO: refactor to actually test functionality. Need a pseudo spikes-df to test with.
+        """ 
+        2023-03-03 - TODO: Updated based on new testing in Neuropy, but my test functions need arguments and I'm not sure where to get them. 
+            TypeError: test_compute_time_binned_spiking_activity_from_extant_binning_info() missing 2 required positional arguments: 'extant_time_window_edges' and 'extant_time_window_edges_binning_info'
+            TypeError: test_time_bin_spike_counts_N_i() missing 2 required positional arguments: 'out_digitized_variable_bins' and 'out_binning_info'
+
+        2022-12-15 - COMPLETE: refactor to actually test functionality. Need a pseudo spikes-df to test with.
 
         In Notebook we use:
 
@@ -58,7 +78,8 @@ class TestTimeBinningMethods(unittest.TestCase):
         # Hardcoded:
         self.time_bin_size_seconds = 0.5
         self.bin_edges = np.array([0, 1, 2, 3, 4, 5])
-        self.active_session_spikes_df = self.sess.spikes_df.copy()
+        # self.active_session_spikes_df = self.sess.spikes_df.copy()
+        self.active_session_spikes_df = self.spikes_df.copy()
 
         # unit_specific_binned_spike_counts, out_digitized_variable_bins, out_binning_info = ZhangReconstructionImplementation.time_bin_spike_counts_N_i(sess.spikes_df.copy(), time_bin_size, debug_print=debug_print) # unit_specific_binned_spike_counts.to_numpy(): (40, 85841)
 
