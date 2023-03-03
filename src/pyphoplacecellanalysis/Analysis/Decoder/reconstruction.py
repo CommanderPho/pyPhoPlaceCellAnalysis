@@ -442,8 +442,18 @@ class BayesianPlacemapPositionDecoder(NeuronUnitSlicableObjectProtocol, Placemap
 
     Used to try to decode everything in one go, meaning it took the parameters (like the time window) and the spikes to decode as well and did the computation internally, but the concept of a decoder is that it is a stateless object that can be called on any spike data to decode it, so this concept is depricated.
 
+    Call Hierarchy:
+        Path 1:
+            .decode_specific_epochs(...)
+                BayesianPlacemapPositionDecoder.perform_decode_specific_epochs(...)
+                    .decode(...)
+        Path 2:
+            .compute_all(...)
+                .hyper_perform_decode(...)
+                    .decode(...)
+                .compute_corrected_positions(...)
 
-    """    
+    """
     @property
     def flat_position_size(self):
         """The flat_position_size property."""
@@ -558,8 +568,7 @@ class BayesianPlacemapPositionDecoder(NeuronUnitSlicableObjectProtocol, Placemap
             # self._setup_time_window_centers()
             self.p_x_given_n = self._reshape_output(self.flat_p_x_given_n)
             self.compute_most_likely_positions()
-    
-    
+
     def setup(self):
         self.neuron_IDXs = None
         self.neuron_IDs = None
@@ -624,7 +633,6 @@ class BayesianPlacemapPositionDecoder(NeuronUnitSlicableObjectProtocol, Placemap
         neuron_sliced_decoder.compute_all() # does recompute, updating internal variables. TODO EFFICIENCY 2023-03-02 - This is overkill and I could filter the tuning_curves and etc directly, but this is easier for now. 
         return neuron_sliced_decoder
 
-
     def conform_to_position_bins(self, target_one_step_decoder, force_recompute=True):
         """ After the underlying placefield (self.pf)'s position bins are changed by calling pf.conform_to_position_bins(...) externally, the computations for the decoder will be messed up (and out of sync).
             Calling this function detects this issue.
@@ -665,7 +673,6 @@ class BayesianPlacemapPositionDecoder(NeuronUnitSlicableObjectProtocol, Placemap
 
         return self, did_recompute
 
-
     def add_two_step_decoder_results(self, two_step_decoder_result):
         """ adds the results from the computed two_step_decoder to self (the one_step_decoder)
         ## In this new mode we'll add the two-step properties to the original one-step decoder:
@@ -697,7 +704,6 @@ class BayesianPlacemapPositionDecoder(NeuronUnitSlicableObjectProtocol, Placemap
         if self.marginal.y is not None:
             self.marginal.y.p_x_given_n_and_x_prev = two_step_decoder_result.marginal.y.p_x_given_n.copy()
             self.marginal.y.two_step_most_likely_positions_1D = two_step_decoder_result.marginal.y.most_likely_positions_1D.copy()
-
 
 
     # ==================================================================================================================== #
@@ -757,36 +763,21 @@ class BayesianPlacemapPositionDecoder(NeuronUnitSlicableObjectProtocol, Placemap
     # ==================================================================================================================== #
     # Main computation functions:                                                                                          #
     # ==================================================================================================================== #
+    """ 
 
-    def hyper_perform_decode(self, spikes_df, decoding_time_bin_size=0.1, t_start=None, t_end=None, output_flat_versions=False, debug_print=False):
-        """ makes use of:
-        
-            self.neuron_IDs
-            self.perform_build_marginals(...)
-        """
-        # Range of the maze epoch (where position is valid):
-        if t_start is None:
-            t_maze_start = spikes_df[spikes_df.spikes.time_variable_name].loc[spikes_df.x.first_valid_index()] # 1048
-            t_start = t_maze_start
-    
-        if t_end is None:
-            t_maze_end = spikes_df[spikes_df.spikes.time_variable_name].loc[spikes_df.x.last_valid_index()] # 68159707
-            t_end = t_maze_end
-        
-        epochs_df = pd.DataFrame({'start':[t_start],'stop':[t_end],'label':['epoch']})
 
-        ## final step is to time_bin (relative to the start of each epoch) the time values of remaining spikes
-        spkcount, nbins, time_bin_containers_list = epochs_spkcount(spikes_df, epochs_df, decoding_time_bin_size, slideby=decoding_time_bin_size, export_time_bins=True, included_neuron_ids=self.neuron_IDs, debug_print=debug_print) ## time_bins returned are not correct, they're subsampled at a rate of 1000
-        spkcount = spkcount[0]
-        nbins = nbins[0]
-        time_bin_container = time_bin_containers_list[0] # neuropy.utils.mixins.binning_helpers.BinningContainer
-        
-        most_likely_positions, p_x_given_n, most_likely_position_indicies, flat_outputs_container = self.decode(spkcount, time_bin_size=decoding_time_bin_size, output_flat_versions=output_flat_versions, debug_print=debug_print)
-        curr_unit_marginal_x, curr_unit_marginal_y = self.perform_build_marginals(p_x_given_n, most_likely_positions, debug_print=debug_print)
-        return time_bin_container, p_x_given_n, most_likely_positions, curr_unit_marginal_x, curr_unit_marginal_y, flat_outputs_container
+
+    """
+
 
     def compute_all(self, debug_print=False):
-        # with WrappingMessagePrinter(f'compute_all final_p_x_given_n called. Computing {np.shape(self.flat_p_x_given_n)[0]} windows for self.final_p_x_given_n...', begin_line_ending='... ', finished_message='compute_all completed.', enable_print=self.debug_print):
+        """ computes all the outputs of the decoder, and stores them in the class instance 
+
+        Uses:
+            self.hyper_perform_decode(...)
+            self.compute_corrected_positions(...)
+
+        """
         with WrappingMessagePrinter(f'compute_all final_p_x_given_n called. Computing windows...', begin_line_ending='... ', finished_message='compute_all completed.', enable_print=(debug_print or self.debug_print)):
             ## Single sweep decoding:
 
@@ -807,13 +798,62 @@ class BayesianPlacemapPositionDecoder(NeuronUnitSlicableObjectProtocol, Placemap
         self.most_likely_position_flat_indicies, self.most_likely_position_indicies = self.perform_compute_most_likely_positions(self.flat_p_x_given_n, self.original_position_data_shape)
         # np.shape(self.most_likely_position_flat_indicies) # (85841,)
         # np.shape(self.most_likely_position_indicies) # (2, 85841)
+
+    def decode_specific_epochs(self, spikes_df, filter_epochs, decoding_time_bin_size = 0.05, debug_print=False):
+        """ 
+        Uses:
+            BayesianPlacemapPositionDecoder.perform_decode_specific_epochs(...)
+        OBSOLITE? TODO: CRITICAL: THIS IS THE ONLY VERSION OF THE DECODING THAT WORKS. The version perfomred by "compute_all" fails miserably!
+        """
+        return self.perform_decode_specific_epochs(self, spikes_df=spikes_df, filter_epochs=filter_epochs, decoding_time_bin_size=decoding_time_bin_size, debug_print=debug_print)
+
+    def compute_corrected_positions(self):
+        """ computes the revised most likely positions by taking into account the time-bins that had zero spikes and extrapolating position from the prior successfully decoded time bin
+        
+        Requires:
+            .total_spike_counts_per_window
+            .most_likely_positions
             
+        Updates:
+            .revised_most_likely_positions
+            .marginal's .x & .y .revised_most_likely_positions_1D
+        
+
+
+        TODO: CRITICAL: CORRECTNESS: 2022-02-25: This was said not to be working for 1D somewhere else in the code, but I don't know if it's working or not. It doesn't seem to be.
+
+        """
+        ## Find the bins that don't have any spikes in them:
+        # zero_bin_indicies = np.where(self.total_spike_counts_per_window == 0)[0]
+        # is_non_firing_bin = self.is_non_firing_time_bin
+        
+        is_non_firing_bin = np.where(self.is_non_firing_time_bin)[0] # TEMP: do this to get around the indexing issue. TODO: IndexError: boolean index did not match indexed array along dimension 0; dimension is 11880 but corresponding boolean dimension is 11881
+        self.revised_most_likely_positions = self.perform_compute_forward_filled_positions(self.most_likely_positions, is_non_firing_bin=is_non_firing_bin)
+        
+        if self.marginal is not None:
+            _revised_marginals = self.perform_build_marginals(self.p_x_given_n, self.revised_most_likely_positions, debug_print=False) # Stupid way of doing this, but w/e
+            if self.marginal.x is not None:
+                # self.marginal.x.revised_most_likely_positions_1D = self.perform_compute_forward_filled_positions(self.marginal.x.most_likely_positions_1D, is_non_firing_bin=is_non_firing_bin)
+                self.marginal.x.revised_most_likely_positions_1D = _revised_marginals[0].most_likely_positions_1D.copy()
+            if self.marginal.y is not None:
+                # self.marginal.y.revised_most_likely_positions_1D = self.perform_compute_forward_filled_positions(self.marginal.y.most_likely_positions_1D, is_non_firing_bin=is_non_firing_bin)
+                self.marginal.y.revised_most_likely_positions_1D =  _revised_marginals[1].most_likely_positions_1D.copy()
+
+        return self.revised_most_likely_positions
+
+
+    # ==================================================================================================================== #
+    # Non-Modifying Methods:                                                                                               #
+    # ==================================================================================================================== #
     def decode(self, unit_specific_time_binned_spike_counts, time_bin_size, output_flat_versions=False, debug_print=True):
         """ decodes the neural activity from its internal placefields, returning its posterior and the predicted position 
         Does not alter the internal state of the decoder (doesn't change internal most_likely_positions or posterior, etc)
         
         flat_outputs_container is returned IFF output_flat_versions is True
         
+        Inputs:
+            unit_specific_time_binned_spike_counts: np.array of shape (num_cells, num_time_bins) - e.g. (69, 20717)
+
         Requires:
             .P_x
             .F
@@ -821,10 +861,10 @@ class BayesianPlacemapPositionDecoder(NeuronUnitSlicableObjectProtocol, Placemap
             .xbin_centers, .ybin_centers
             .original_position_data_shape
             
-        
-        unit_specific_time_binned_spike_counts: np.array of shape (num_cells, num_time_bins) - e.g. (69, 20717)
-        
-        
+        Uses:
+            BayesianPlacemapPositionDecoder.perform_compute_most_likely_positions(...)
+            ZhangReconstructionImplementation.neuropy_bayesian_prob(...)
+
         Usages: 
             Used by BayesianPlacemapPositionDecoder.perform_decode_specific_epochs(...) to do the actual decoding after building the appropriate spike counts.
         
@@ -862,43 +902,39 @@ class BayesianPlacemapPositionDecoder(NeuronUnitSlicableObjectProtocol, Placemap
         
             return most_likely_positions, p_x_given_n, most_likely_position_indicies, flat_outputs_container
             
-    def decode_specific_epochs(self, spikes_df, filter_epochs, decoding_time_bin_size = 0.05, debug_print=False):
-        """ TODO: CRITICAL: THIS IS THE ONLY VERSION OF THE DECODING THAT WORKS. The version perfomred by "compute_all" fails miserably! """
-        return self.perform_decode_specific_epochs(self, spikes_df=spikes_df, filter_epochs=filter_epochs, decoding_time_bin_size=decoding_time_bin_size, debug_print=debug_print)
+    def hyper_perform_decode(self, spikes_df, decoding_time_bin_size=0.1, t_start=None, t_end=None, output_flat_versions=False, debug_print=False):
+        """ Fully decodes the neural activity from its internal placefields, internally calling `self.decode(...)` and then in addition building the marginals and additional outputs.
 
-    def compute_corrected_positions(self):
-        """ computes the revised most likely positions by taking into account the time-bins that had zero spikes and extrapolating position from the prior successfully decoded time bin
-        
+        Does not alter the internal state of the decoder (doesn't change internal most_likely_positions or posterior, etc)
+
         Requires:
-            .total_spike_counts_per_window
-            .most_likely_positions
-            
-        Updates:
-            .revised_most_likely_positions
-            .marginal's .x & .y .revised_most_likely_positions_1D
-        
+            self.neuron_IDs
 
-
-        TODO: CRITICAL: CORRECTNESS: 2022-02-25: This was said not to be working for 1D somewhere else in the code, but I don't know if it's working or not. It doesn't seem to be.
-
+        Uses:
+            self.decode(...)
+            BayesianPlacemapPositionDecoder.perform_build_marginals(...)
+            epochs_spkcount(...)
         """
-        ## Find the bins that don't have any spikes in them:
-        # zero_bin_indicies = np.where(self.total_spike_counts_per_window == 0)[0]
-        # is_non_firing_bin = self.is_non_firing_time_bin
+        # Range of the maze epoch (where position is valid):
+        if t_start is None:
+            t_maze_start = spikes_df[spikes_df.spikes.time_variable_name].loc[spikes_df.x.first_valid_index()] # 1048
+            t_start = t_maze_start
+    
+        if t_end is None:
+            t_maze_end = spikes_df[spikes_df.spikes.time_variable_name].loc[spikes_df.x.last_valid_index()] # 68159707
+            t_end = t_maze_end
         
-        is_non_firing_bin = np.where(self.is_non_firing_time_bin)[0] # TEMP: do this to get around the indexing issue. TODO: IndexError: boolean index did not match indexed array along dimension 0; dimension is 11880 but corresponding boolean dimension is 11881
-        self.revised_most_likely_positions = self.perform_compute_forward_filled_positions(self.most_likely_positions, is_non_firing_bin=is_non_firing_bin)
-        
-        if self.marginal is not None:
-            _revised_marginals = self.perform_build_marginals(self.p_x_given_n, self.revised_most_likely_positions, debug_print=False) # Stupid way of doing this, but w/e
-            if self.marginal.x is not None:
-                # self.marginal.x.revised_most_likely_positions_1D = self.perform_compute_forward_filled_positions(self.marginal.x.most_likely_positions_1D, is_non_firing_bin=is_non_firing_bin)
-                self.marginal.x.revised_most_likely_positions_1D = _revised_marginals[0].most_likely_positions_1D.copy()
-            if self.marginal.y is not None:
-                # self.marginal.y.revised_most_likely_positions_1D = self.perform_compute_forward_filled_positions(self.marginal.y.most_likely_positions_1D, is_non_firing_bin=is_non_firing_bin)
-                self.marginal.y.revised_most_likely_positions_1D =  _revised_marginals[1].most_likely_positions_1D.copy()
+        epochs_df = pd.DataFrame({'start':[t_start],'stop':[t_end],'label':['epoch']})
 
-        return self.revised_most_likely_positions
+        ## final step is to time_bin (relative to the start of each epoch) the time values of remaining spikes
+        spkcount, nbins, time_bin_containers_list = epochs_spkcount(spikes_df, epochs_df, decoding_time_bin_size, slideby=decoding_time_bin_size, export_time_bins=True, included_neuron_ids=self.neuron_IDs, debug_print=debug_print) ## time_bins returned are not correct, they're subsampled at a rate of 1000
+        spkcount = spkcount[0]
+        nbins = nbins[0]
+        time_bin_container = time_bin_containers_list[0] # neuropy.utils.mixins.binning_helpers.BinningContainer
+        
+        most_likely_positions, p_x_given_n, most_likely_position_indicies, flat_outputs_container = self.decode(spkcount, time_bin_size=decoding_time_bin_size, output_flat_versions=output_flat_versions, debug_print=debug_print)
+        curr_unit_marginal_x, curr_unit_marginal_y = self.perform_build_marginals(p_x_given_n, most_likely_positions, debug_print=debug_print)
+        return time_bin_container, p_x_given_n, most_likely_positions, curr_unit_marginal_x, curr_unit_marginal_y, flat_outputs_container
 
     # ==================================================================================================================== #
     # Class/Static Methods                                                                                                 #
@@ -979,7 +1015,6 @@ class BayesianPlacemapPositionDecoder(NeuronUnitSlicableObjectProtocol, Placemap
             filter_epochs_decoder_result.marginal_y_list.append(curr_unit_marginal_y)
         
         return filter_epochs_decoder_result
-    
     
     @classmethod
     def perform_build_marginals(cls, p_x_given_n, most_likely_positions, debug_print=False):
@@ -1067,8 +1102,7 @@ class BayesianPlacemapPositionDecoder(NeuronUnitSlicableObjectProtocol, Placemap
             curr_unit_marginal_y.most_likely_positions_1D = most_likely_positions[:,1].T
         
         return curr_unit_marginal_x, curr_unit_marginal_y
-        
-        
+
     @classmethod
     def perform_compute_most_likely_positions(cls, flat_p_x_given_n, original_position_data_shape):
         """ Computes the most likely positions at each timestep from flat_p_x_given_n and the shape of the original position data """
@@ -1097,9 +1131,7 @@ class BayesianPlacemapPositionDecoder(NeuronUnitSlicableObjectProtocol, Placemap
         # Forward fill the now NaN positions with the last good value (for the both axes):
         revised_most_likely_positions = np_ffill_1D(revised_most_likely_positions.T).T
         return revised_most_likely_positions
-    
-    
-    
+
     @classmethod
     def perform_compute_spike_count_and_firing_rate_normalizations(cls, pho_custom_decoder):
         """ Computes several different normalizations of binned firing rate and spike counts
