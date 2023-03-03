@@ -300,8 +300,11 @@ class ZhangReconstructionImplementation:
 
         return posterior
 
+
+
 class Zhang_Two_Step:
-    
+    """ Two-Step Decoder from Zhang et al. 2018. """
+
     @classmethod
     def build_all_positions_matrix(cls, x_values, y_values, debug_print=False):
         """ used to build a grid of position points from xbins and ybins.
@@ -435,8 +438,12 @@ class PlacemapPositionDecoder(SerializedAttributesSpecifyingClass, SimplePrintab
         if debug_print:
             print(f'all_data.keys(): {all_data.keys()}, serialization_only_data.keys(): {data.keys()}')
         self.__class__.to_file(data, f, status_print=status_print)
-    
         
+
+
+# ==================================================================================================================== #
+# Bayesian Decoder                                                                                                     #
+# ==================================================================================================================== #
 class BayesianPlacemapPositionDecoder(NeuronUnitSlicableObjectProtocol, PlacemapPositionDecoder):
     """ Holds the placefields. Can be called on any spike data to compute the most likely position given the spike data.
 
@@ -763,11 +770,6 @@ class BayesianPlacemapPositionDecoder(NeuronUnitSlicableObjectProtocol, Placemap
     # ==================================================================================================================== #
     # Main computation functions:                                                                                          #
     # ==================================================================================================================== #
-    """ 
-
-
-
-    """
 
 
     def compute_all(self, debug_print=False):
