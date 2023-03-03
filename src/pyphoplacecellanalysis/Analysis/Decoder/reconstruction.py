@@ -628,16 +628,19 @@ class BayesianPlacemapPositionDecoder(NeuronUnitSlicableObjectProtocol, Placemap
     # External Updating __________________________________________________________________________________________________ #
 
     # for NeuronUnitSlicableObjectProtocol:
-    def get_by_id(self, ids):
+    def get_by_id(self, ids, defer_compute_all:bool = False):
         """Implementors return a copy of themselves with neuron_ids equal to ids
             Needs to update: neuron_sliced_decoder.pf, ... (much more)
+
+        defer_compute_all: bool - should be set to False if you want to manually decode using custom epochs or something later. Otherwise it will compute for all spikes automatically.
         """
         # call .get_by_id(ids) on the placefield (pf):
         neuron_sliced_pf = self.pf.get_by_id(ids)
         ## apply the neuron_sliced_pf to the decoder:
         neuron_sliced_decoder = BayesianPlacemapPositionDecoder(self.time_bin_size, neuron_sliced_pf, neuron_sliced_pf.filtered_spikes_df, debug_print=self.debug_print)
         ## Recompute:
-        neuron_sliced_decoder.compute_all() # does recompute, updating internal variables. TODO EFFICIENCY 2023-03-02 - This is overkill and I could filter the tuning_curves and etc directly, but this is easier for now. 
+        if not defer_compute_all:
+            neuron_sliced_decoder.compute_all() # does recompute, updating internal variables. TODO EFFICIENCY 2023-03-02 - This is overkill and I could filter the tuning_curves and etc directly, but this is easier for now. 
         return neuron_sliced_decoder
 
     def conform_to_position_bins(self, target_one_step_decoder, force_recompute=True):
