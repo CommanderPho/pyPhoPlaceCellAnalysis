@@ -15,10 +15,7 @@ from typing import Callable, List
 import inspect # used for filter_sessions(...)'s inspect.getsource to compare filters:
 
 import numpy as np
-try:
-    import modin.pandas as pd # modin is a drop-in replacement for pandas that uses multiple cores
-except ImportError:
-    import pandas as pd # fallback to pandas when modin isn't available
+import pandas as pd
 
 # NeuroPy (Diba Lab Python Repo) Loading
 from neuropy import core

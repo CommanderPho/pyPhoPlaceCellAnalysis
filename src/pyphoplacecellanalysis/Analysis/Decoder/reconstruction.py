@@ -3,10 +3,7 @@ from pathlib import Path
 import pathlib
 
 import numpy as np
-try:
-    import modin.pandas as pd # modin is a drop-in replacement for pandas that uses multiple cores
-except ImportError:
-    import pandas as pd # fallback to pandas when modin isn't available
+import pandas as pd
 from scipy.stats import multivariate_normal
 from scipy.special import factorial
 

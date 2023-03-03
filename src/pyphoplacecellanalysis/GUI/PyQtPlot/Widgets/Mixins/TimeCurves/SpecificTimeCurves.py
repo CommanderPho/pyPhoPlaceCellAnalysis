@@ -1,10 +1,7 @@
 ### Complex Dataseries-based CurveDatasource approach:
 from typing import OrderedDict
 import numpy as np
-try:
-    import modin.pandas as pd # modin is a drop-in replacement for pandas that uses multiple cores
-except ImportError:
-    import pandas as pd # fallback to pandas when modin isn't available
+import pandas as pd
 from sklearn.preprocessing import MinMaxScaler
 from pyphoplacecellanalysis.General.Model.RenderDataseries import RenderDataseries
 from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.Mixins.TimeCurves.RenderTimeCurvesMixin import CurveDatasource

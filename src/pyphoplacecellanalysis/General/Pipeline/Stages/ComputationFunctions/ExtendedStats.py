@@ -1,9 +1,6 @@
 from copy import deepcopy
 import numpy as np
-try:
-    import modin.pandas as pd # modin is a drop-in replacement for pandas that uses multiple cores
-except ImportError:
-    import pandas as pd # fallback to pandas when modin isn't available
+import pandas as pd
 
 from pyphocorehelpers.indexing_helpers import build_pairwise_indicies
 from scipy import stats # for compute_relative_entropy_divergence_overlap
