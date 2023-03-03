@@ -10,6 +10,7 @@ from scipy.special import factorial
 # import neuropy
 from neuropy.utils.dynamic_container import DynamicContainer # for decode_specific_epochs
 from neuropy.utils.mixins.time_slicing import add_epochs_id_identity # for decode_specific_epochs
+from neuropy.utils.mixins.unit_slicing import NeuronUnitSlicableObjectProtocol # allows placefields to be sliced by neuron ids
 from neuropy.analyses.decoders import epochs_spkcount # for decode_specific_epochs
 from neuropy.utils.mixins.binning_helpers import BinningContainer # for epochs_spkcount getting the correct time bins
 
@@ -436,7 +437,7 @@ class PlacemapPositionDecoder(SerializedAttributesSpecifyingClass, SimplePrintab
         self.__class__.to_file(data, f, status_print=status_print)
     
         
-class BayesianPlacemapPositionDecoder(PlacemapPositionDecoder):
+class BayesianPlacemapPositionDecoder(NeuronUnitSlicableObjectProtocol, PlacemapPositionDecoder):
     """ Holds the placefields. Can be called on any spike data to compute the most likely position given the spike data.
 
     Used to try to decode everything in one go, meaning it took the parameters (like the time window) and the spikes to decode as well and did the computation internally, but the concept of a decoder is that it is a stateless object that can be called on any spike data to decode it, so this concept is depricated.
@@ -609,6 +610,20 @@ class BayesianPlacemapPositionDecoder(PlacemapPositionDecoder):
         # self.marginal.x
 
     # External Updating __________________________________________________________________________________________________ #
+
+    # for NeuronUnitSlicableObjectProtocol:
+    def get_by_id(self, ids):
+        """Implementors return a copy of themselves with neuron_ids equal to ids
+            Needs to update: neuron_sliced_decoder.pf, ... (much more)
+        """
+        # call .get_by_id(ids) on the placefield (pf):
+        neuron_sliced_pf = self.pf.get_by_id(ids)
+        ## apply the neuron_sliced_pf to the decoder:
+        neuron_sliced_decoder = BayesianPlacemapPositionDecoder(self.time_bin_size, neuron_sliced_pf, neuron_sliced_pf.filtered_spikes_df, debug_print=self.debug_print)
+        ## Recompute:
+        neuron_sliced_decoder.compute_all() # does recompute, updating internal variables. TODO EFFICIENCY 2023-03-02 - This is overkill and I could filter the tuning_curves and etc directly, but this is easier for now. 
+        return neuron_sliced_decoder
+
 
     def conform_to_position_bins(self, target_one_step_decoder, force_recompute=True):
         """ After the underlying placefield (self.pf)'s position bins are changed by calling pf.conform_to_position_bins(...) externally, the computations for the decoder will be messed up (and out of sync).
