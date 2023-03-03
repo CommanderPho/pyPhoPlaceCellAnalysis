@@ -1,6 +1,9 @@
 from typing import OrderedDict
 import numpy as np
-import pandas as pd
+try:
+    import modin.pandas as pd # modin is a drop-in replacement for pandas that uses multiple cores
+except ImportError:
+    import pandas as pd # fallback to pandas when modin isn't available
 
 # from pyphoplacecellanalysis.PhoPositionalData.plotting.mixins.spikes_mixins import SpikesDataframeOwningMixin, SpikeRenderingMixin, HideShowSpikeRenderingMixin
 from pyphocorehelpers.indexing_helpers import safe_get

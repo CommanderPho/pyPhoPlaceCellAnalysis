@@ -11,7 +11,10 @@ import sys
 import pyvista as pv
 import pyvistaqt as pvqt
 import numpy as np
-import pandas as pd
+try:
+    import modin.pandas as pd # modin is a drop-in replacement for pandas that uses multiple cores
+except ImportError:
+    import pandas as pd # fallback to pandas when modin isn't available
 from pathlib import Path
 from qtpy import QtGui # for QColor
 

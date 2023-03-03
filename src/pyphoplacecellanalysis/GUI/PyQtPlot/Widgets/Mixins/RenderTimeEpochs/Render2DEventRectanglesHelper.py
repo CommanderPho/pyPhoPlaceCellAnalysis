@@ -3,7 +3,10 @@
 """
 from copy import deepcopy
 import numpy as np
-import pandas as pd
+try:
+    import modin.pandas as pd # modin is a drop-in replacement for pandas that uses multiple cores
+except ImportError:
+    import pandas as pd # fallback to pandas when modin isn't available
 # import matplotlib.pyplot as plt
 # from indexed import IndexedOrderedDict
 # from lazy_property import LazyProperty, LazyWritableProperty

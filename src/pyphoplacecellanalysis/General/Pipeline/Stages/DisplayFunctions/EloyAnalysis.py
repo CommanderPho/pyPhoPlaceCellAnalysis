@@ -1,5 +1,8 @@
 import numpy as np
-import pandas as pd
+try:
+    import modin.pandas as pd # modin is a drop-in replacement for pandas that uses multiple cores
+except ImportError:
+    import pandas as pd # fallback to pandas when modin isn't available
 
 
 ## All matplotlib-related stuff is for _display_pf_peak_prominence2d_plots

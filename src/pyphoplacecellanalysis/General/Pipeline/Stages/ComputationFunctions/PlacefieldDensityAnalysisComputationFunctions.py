@@ -1,7 +1,10 @@
 import sys
 from warnings import warn
 import numpy as np
-import pandas as pd
+try:
+    import modin.pandas as pd # modin is a drop-in replacement for pandas that uses multiple cores
+except ImportError:
+    import pandas as pd # fallback to pandas when modin isn't available
 from findpeaks import findpeaks # for _perform_pf_find_ratemap_peaks_computation. Install with pip install findpeaks 
 import itertools # for _perform_placefield_overlap_computation
 

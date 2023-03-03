@@ -3,7 +3,10 @@ from enum import Enum # required by `FiringRateActivitySource` enum
 from dataclasses import dataclass # required by `SortOrderMetric` class
 
 import numpy as np
-import pandas as pd
+try:
+    import modin.pandas as pd # modin is a drop-in replacement for pandas that uses multiple cores
+except ImportError:
+    import pandas as pd # fallback to pandas when modin isn't available
 
 from neuropy.utils.misc import safe_pandas_get_group # for _compute_pybursts_burst_interval_detection
 

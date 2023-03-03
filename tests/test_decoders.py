@@ -3,7 +3,10 @@ import sys, os
 from pathlib import Path
 from copy import deepcopy
 import numpy as np
-import pandas as pd
+try:
+    import modin.pandas as pd # modin is a drop-in replacement for pandas that uses multiple cores
+except ImportError:
+    import pandas as pd # fallback to pandas when modin isn't available
 
 # Add Neuropy to the path as needed
 tests_folder = Path(os.path.dirname(__file__))

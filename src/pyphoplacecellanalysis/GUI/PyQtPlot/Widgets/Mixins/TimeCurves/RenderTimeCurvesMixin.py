@@ -4,7 +4,10 @@ from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtCore, QtGui, QtWidget
 import pyphoplacecellanalysis.External.pyqtgraph.opengl as gl # for 3D raster plot
 
 import numpy as np
-import pandas as pd
+try:
+    import modin.pandas as pd # modin is a drop-in replacement for pandas that uses multiple cores
+except ImportError:
+    import pandas as pd # fallback to pandas when modin isn't available
 
 from pyphocorehelpers.general_helpers import OrderedMeta
 from pyphocorehelpers.print_helpers import SimplePrintable, PrettyPrintable

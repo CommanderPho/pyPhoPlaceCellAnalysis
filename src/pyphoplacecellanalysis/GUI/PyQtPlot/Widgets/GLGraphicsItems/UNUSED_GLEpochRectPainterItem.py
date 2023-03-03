@@ -6,7 +6,10 @@ from io import StringIO
 from turtle import st # for loading pandas dataframe from literal string
 import OpenGL.GL as GL
 import numpy as np
-import pandas as pd
+try:
+    import modin.pandas as pd # modin is a drop-in replacement for pandas that uses multiple cores
+except ImportError:
+    import pandas as pd # fallback to pandas when modin isn't available
 import pyphoplacecellanalysis.External.pyqtgraph as pg
 from pyphoplacecellanalysis.External.pyqtgraph.opengl import GLAxisItem, GLGraphicsItem, GLGridItem, GLViewWidget
 from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtCore, QtGui
