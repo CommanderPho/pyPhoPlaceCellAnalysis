@@ -1,12 +1,17 @@
+from copy import deepcopy
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+from scipy.spatial.distance import cdist
 
 # Neuropy:
 from neuropy.core.position import build_position_df_resampled_to_time_windows # used in DecoderResultDisplayingPlot2D.setup()
 
+from neuropy.analyses.placefields import PfND
 from .reconstruction import BayesianPlacemapPositionDecoder
 from pyphocorehelpers.indexing_helpers import find_neighbours
+
+from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BayesianPlacemapPositionDecoder # perform_leave_one_aclu_out_decoding_analysis
 
 # ==================================================================================================================== #
 # DecoderResultDisplaying* Classes                                                                                     #
@@ -210,3 +215,96 @@ class DecoderResultDisplayingPlot2D(DecoderResultDisplayingBaseClass):
         # return (self.active_im,)
         return self.fig # returns fig
 
+
+
+def perform_leave_one_aclu_out_decoding_analysis():
+    """2023-03-03 - Performs a "leave-one-out" decoding analysis where we leave out each neuron one at a time and see how the decoding degrades (which serves as an indicator of the importance of that neuron on the decoding performance).
+    """
+
+    def _compute_leave_one_out_decoding(original_decoder):
+        """ "Leave-one-out" decoding
+        WARNING: this might suck up a ton of memory! 
+        """
+        original_neuron_ids = np.array(original_decoder.pf.ratemap.neuron_ids) # original_pf.included_neuron_IDs
+        one_left_out_decoder_dict = {}
+        for i, aclu_to_omit in enumerate(original_neuron_ids):
+            subset_included_neuron_ids = np.array([aclu for aclu in original_neuron_ids if aclu != aclu_to_omit]) # get all but the omitted neuron
+            one_left_out_decoder_dict[aclu_to_omit] = original_decoder.get_by_id(subset_included_neuron_ids, defer_compute_all=True) # skip computations
+            
+        return one_left_out_decoder_dict
+
+
+    ## Build placefield for the decoder to use:
+    original_decoder_pf1D = PfND(deepcopy(pyramidal_only_spikes_df), deepcopy(active_pos.linear_pos_obj), frate_thresh=0.0) # all other settings default
+    ## Build the new decoder with custom params:
+    new_decoder_pf_params = deepcopy(original_decoder_pf1D.config) # should be a PlacefieldComputationParameters
+    new_decoder_pf_params.time_bin_size = 0.15
+    original_1D_decoder = BayesianPlacemapPositionDecoder(new_decoder_pf_params.time_bin_size, original_decoder_pf1D, original_decoder_pf1D.filtered_spikes_df.copy(), debug_print=False)
+
+    # pretty dang inefficient, as there are 70 cells:
+    one_left_out_decoder_dict = _compute_leave_one_out_decoding(original_1D_decoder)
+
+    ## Lap-Epochs Decoding:
+    sess = curr_active_pipeline.sess
+    decoding_time_bin_size = 0.02
+    global_pos_df = sess.position.to_dataframe()
+    # Common for all decoders:
+    laps_copy = deepcopy(sess.laps)
+    laps_filter_epochs = laps_copy.filtered_by_lap_flat_index(np.arange(20)).as_epoch_obj() # epoch object
+    laps_epoch_description_list = [f'lap[{epoch_tuple.lap_id}]' for epoch_tuple in laps_filter_epochs.to_dataframe()[['lap_id']].itertuples()]
+
+    ## `decode_specific_epochs` for each of the decoders:
+    one_left_out_filter_epochs_decoder_result_dict = {}
+
+    ### Loop through and perform the decoding for each epoch. This is the slow part.
+    for left_out_aclu, curr_aclu_omitted_decoder in one_left_out_decoder_dict.items():
+        filter_epochs_decoder_result = curr_aclu_omitted_decoder.decode_specific_epochs(sess.spikes_df, filter_epochs=laps_filter_epochs, decoding_time_bin_size=decoding_time_bin_size, debug_print=False)
+        filter_epochs_decoder_result.epoch_description_list = deepcopy(laps_epoch_description_list)
+        one_left_out_filter_epochs_decoder_result_dict[left_out_aclu] = filter_epochs_decoder_result
+
+    one_left_out_omitted_aclu_distance = {}
+
+    for left_out_aclu, left_out_decoder_result in one_left_out_filter_epochs_decoder_result_dict.items():
+        ## Compute the impact leaving each aclu out had on the average encoding performance:
+        ### 1. The distance between the actual measured position and the decoded position at each timepoint for each decoder. A larger magnitude difference implies a stronger, more positive effect on the decoding quality.
+
+        one_left_out_omitted_aclu_distance[left_out_aclu] = [] # list to hold the distance results from the epochs
+        ## Iterate through each of the epochs for the given left_out_aclu (and its decoder), each of which has its own result
+        for i in np.arange(left_out_decoder_result.num_filter_epochs):
+            curr_time_bin_container = left_out_decoder_result.time_bin_containers[i]
+            curr_time_bins = curr_time_bin_container.centers
+            ## Need to exclude estimates from bins that didn't have any spikes in them (in general these glitch around):
+            curr_total_spike_counts_per_window = np.sum(left_out_decoder_result.spkcount[i], axis=0) # left_out_decoder_result.spkcount[i].shape # (69, 222) - (nCells, nTimeWindowCenters)
+            curr_is_time_bin_non_firing = (curr_total_spike_counts_per_window == 0)
+            curr_non_firing_time_bin_indicies = np.where(curr_is_time_bin_non_firing)[0] # TODO: could also filter on a minimum number of spikes larger than zero (e.g. at least 2 spikes are required).
+            curr_posterior_container = left_out_decoder_result.marginal_x_list[i]
+            curr_posterior = curr_posterior_container.p_x_given_n
+            curr_most_likely_positions = curr_posterior_container.most_likely_positions_1D
+
+            ## Compute the distance metric for this epoch:
+
+            # Interpolate the measured positions to the window center times:
+            window_center_measured_pos_x = np.interp(curr_time_bins, global_pos_df.t, global_pos_df.lin_pos)
+            # ## PLOT_ONLY: NaN out the most_likely_positions that don't have spikes.
+            # curr_most_likely_valid_positions = deepcopy(curr_most_likely_positions)
+            # curr_most_likely_valid_positions[curr_non_firing_time_bin_indicies] = np.nan
+            
+            ## Computed the distance metric finally:
+            # is it fair to only compare the valid (windows containing at least one spike) windows?
+            curr_omit_aclu_distance = cdist(np.atleast_2d(window_center_measured_pos_x[~curr_is_time_bin_non_firing]), np.atleast_2d(curr_most_likely_positions[~curr_is_time_bin_non_firing]), 'sqeuclidean') # squared-euclidian distance between the two vectors
+            # curr_omit_aclu_distance comes back double-wrapped in np.arrays for some reason (array([[659865.11994352]])), so .item() extracts the scalar value
+            curr_omit_aclu_distance = curr_omit_aclu_distance.item()
+            
+            one_left_out_omitted_aclu_distance[left_out_aclu].append(curr_omit_aclu_distance)
+
+    one_left_out_omitted_aclu_distance
+    # build a dataframe version to hold the distances:
+    one_left_out_omitted_aclu_distance_df = pd.DataFrame({'omitted_aclu':np.array(list(one_left_out_omitted_aclu_distance.keys())),
+                                                        'distance': list(one_left_out_omitted_aclu_distance.values()),
+                                                        'avg_dist': [np.mean(v) for v in one_left_out_omitted_aclu_distance.values()]}
+                                                        )
+    one_left_out_omitted_aclu_distance_df
+
+    one_left_out_omitted_aclu_distance_df.sort_values(by='avg_dist', ascending=False, inplace=True) # this sort reveals the aclu values that when omitted had the largest performance decrease on decoding (as indicated by a larger distance)
+    most_contributing_aclus = one_left_out_omitted_aclu_distance_df.omitted_aclu.values
+    most_contributing_aclus
