@@ -239,41 +239,27 @@ def perform_leave_one_aclu_out_decoding_analysis(spikes_df, active_pos_df, activ
 
     spikes_df = deepcopy(spikes_df).spikes.sliced_by_neuron_type('pyramidal') ## get only the pyramidal spikes
     active_pos = active_pos_df.position.to_Position_obj() # convert back to a full position object
-
-    # spikes_df = curr_active_pipeline.sess.spikes_df
-    # active_pos = curr_active_pipeline.sess.position
-    # active_pos_df = sess.position.to_dataframe()
-
-    
-
-
+ 
     ## Build placefield for the decoder to use:
     original_decoder_pf1D = PfND(deepcopy(spikes_df), deepcopy(active_pos.linear_pos_obj)) # all other settings default
     ## Build the new decoder:
     original_1D_decoder = BayesianPlacemapPositionDecoder(decoding_time_bin_size, original_decoder_pf1D, original_decoder_pf1D.filtered_spikes_df.copy(), debug_print=False)
-
     # pretty dang inefficient, as there are 70 cells:
     one_left_out_decoder_dict = _compute_leave_one_out_decoding(original_1D_decoder)
-
     ## `decode_specific_epochs` for each of the decoders:
     one_left_out_filter_epochs_decoder_result_dict = {}
-
     ### Loop through and perform the decoding for each epoch. This is the slow part.
     for left_out_aclu, curr_aclu_omitted_decoder in one_left_out_decoder_dict.items():
         filter_epochs_decoder_result = curr_aclu_omitted_decoder.decode_specific_epochs(spikes_df, filter_epochs=active_filter_epochs, decoding_time_bin_size=decoding_time_bin_size, debug_print=False)
-
-        if filter_epoch_description_list is None:
-            filter_epoch_description_list = [f'Epoch {i}' for i in range(len(filter_epochs_decoder_result.epoch_description_list))]
-
+        # if filter_epoch_description_list is None:
+        #     filter_epoch_description_list = [f'Epoch {i}' for i in range(len(filter_epochs_decoder_result.epoch_description_list))]
         filter_epochs_decoder_result.epoch_description_list = deepcopy(filter_epoch_description_list) # PLOT_ONLY
         one_left_out_filter_epochs_decoder_result_dict[left_out_aclu] = filter_epochs_decoder_result
 
     one_left_out_omitted_aclu_distance = {}
-
     for left_out_aclu, left_out_decoder_result in one_left_out_filter_epochs_decoder_result_dict.items():
         ## Compute the impact leaving each aclu out had on the average encoding performance:
         ### 1. The distance between the actual measured position and the decoded position at each timepoint for each decoder. A larger magnitude difference implies a stronger, more positive effect on the decoding quality.
-
         one_left_out_omitted_aclu_distance[left_out_aclu] = [] # list to hold the distance results from the epochs
         ## Iterate through each of the epochs for the given left_out_aclu (and its decoder), each of which has its own result
         for i in np.arange(left_out_decoder_result.num_filter_epochs):
@@ -311,4 +297,4 @@ def perform_leave_one_aclu_out_decoding_analysis(spikes_df, active_pos_df, activ
     one_left_out_omitted_aclu_distance_df.sort_values(by='avg_dist', ascending=False, inplace=True) # this sort reveals the aclu values that when omitted had the largest performance decrease on decoding (as indicated by a larger distance)
     most_contributing_aclus = one_left_out_omitted_aclu_distance_df.omitted_aclu.values
 
-    return one_left_out_omitted_aclu_distance_df, most_contributing_aclus
+    return one_left_out_filter_epochs_decoder_result_dict, one_left_out_omitted_aclu_distance_df, most_contributing_aclus
