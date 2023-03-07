@@ -9,6 +9,8 @@ from scipy.special import rel_entr # alternative for compute_relative_entropy_di
 
 from pyphocorehelpers.DataStructure.dynamic_parameters import DynamicParameters
 from pyphocorehelpers.mixins.member_enumerating import AllFunctionEnumeratingMixin
+from pyphocorehelpers.function_helpers import function_attributes
+
 from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.ComputationFunctionRegistryHolder import ComputationFunctionRegistryHolder
 from pyphoplacecellanalysis.General.Model.ComputationResults import ComputationResult
 from neuropy.core.position import build_position_df_resampled_to_time_windows
@@ -87,7 +89,9 @@ class ExtendedStatsComputations(AllFunctionEnumeratingMixin, metaclass=Computati
         """
         return computation_result
     
-
+    @function_attributes(short_name='pf_dt_sequential_surprise', tags=['surprise', 'time_dependent_pf'], 
+        input_requires=["computed_data['firing_rate_trends']", "computed_data['pf1D_dt']", "computation_result.sess.position", "computation_result.computation_config.pf_params.time_bin_size"], 
+        output_provides=["computation_result.computed_data['extended_stats']['time_binned_positioned_resampler']", "computation_result.computed_data['extended_stats']['time_binned_position_df']", "computation_result.computed_data['extended_stats']['time_binned_position_mean']", "computation_result.computed_data['extended_stats']['time_binned_position_covariance']"])
     def _perform_time_dependent_pf_sequential_surprise_computation(computation_result: ComputationResult, debug_print=False):
         """ Computes extended statistics regarding firing rates and such from the various dataframes.
         NOTE: 2022-12-14 - previously this version only did laps, but now it does the binned times for the entire epoch from ['firing_rate_trends']
@@ -140,7 +144,7 @@ class ExtendedStatsComputations(AllFunctionEnumeratingMixin, metaclass=Computati
             ## Get existing `pf1D_dt`:
             active_pf_1D_dt = computation_result.computed_data.pf1D_dt
         else:
-            # note even in TimeDependentPlacefieldSurpriseMode.STATIC_METHOD_ONLY a PfND_TimeDependent object is used to access its properties for the Static Method (although it isn't modified)
+            # NOTE: even in TimeDependentPlacefieldSurpriseMode.STATIC_METHOD_ONLY a PfND_TimeDependent object is used to access its properties for the Static Method (although it isn't modified)
             active_pf_1D_dt = PfND_TimeDependent(deepcopy(active_session_spikes_df), deepcopy(active_pos.linear_pos_obj), epochs=included_epochs,
                                                 speed_thresh=computation_config.speed_thresh, frate_thresh=computation_config.frate_thresh,
                                                 grid_bin=computation_config.grid_bin, grid_bin_bounds=computation_config.grid_bin_bounds, smooth=computation_config.smooth)
