@@ -297,4 +297,11 @@ def perform_leave_one_aclu_out_decoding_analysis(spikes_df, active_pos_df, activ
     one_left_out_omitted_aclu_distance_df.sort_values(by='avg_dist', ascending=False, inplace=True) # this sort reveals the aclu values that when omitted had the largest performance decrease on decoding (as indicated by a larger distance)
     most_contributing_aclus = one_left_out_omitted_aclu_distance_df.omitted_aclu.values
 
-    return one_left_out_filter_epochs_decoder_result_dict, one_left_out_omitted_aclu_distance_df, most_contributing_aclus
+    """ Returns:
+        original_1D_decoder: original decoder with all aclu values included
+        one_left_out_decoder_dict: a dictionary of decoders, where each decoder has one less aclu than the original decoder. The key is the aclu that was omitted from the decoder.
+        one_left_out_filter_epochs_decoder_result_dict: a dictionary of decoder results for each of the decoders in one_left_out_decoder_dict. The key is the aclu that was omitted from the decoder.
+        one_left_out_omitted_aclu_distance_df: a dataframe of the distance metric for each of the decoders in one_left_out_decoder_dict. The index is the aclu that was omitted from the decoder.
+        most_contributing_aclus: a list of aclu values, sorted by the largest performance decrease on decoding (as indicated by a larger distance)
+    """
+    return original_1D_decoder, one_left_out_decoder_dict, one_left_out_filter_epochs_decoder_result_dict, one_left_out_omitted_aclu_distance_df, most_contributing_aclus
