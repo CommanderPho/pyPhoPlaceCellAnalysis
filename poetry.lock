@@ -303,7 +303,7 @@ files = [
 name = "attrs"
 version = "22.2.0"
 description = "Classes Without Boilerplate"
-category = "dev"
+category = "main"
 optional = false
 python-versions = ">=3.6"
 files = [
@@ -7353,4 +7353,4 @@ testing = ["coverage (>=5.0.3)", "zope.event", "zope.testing"]
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.9,<3.11"
-content-hash = "e2a84ac0efb67d3caf5c8d5f0243f5840680d9bf594affafae151cef4851a6a4"
+content-hash = "dea2150761189e60fb08afa444e2580d8fc379de34b878b33f001f6273ddaacd"
