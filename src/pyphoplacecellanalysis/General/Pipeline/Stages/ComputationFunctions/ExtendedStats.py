@@ -18,7 +18,6 @@ from neuropy.core.position import build_position_df_resampled_to_time_windows
 # from neuropy.analyses.laps import _build_new_lap_and_intra_lap_intervals # for _perform_time_dependent_pf_sequential_surprise_computation
 
 # For _perform_relative_entropy_analyses
-from pyphocorehelpers.indexing_helpers import build_pairwise_indicies
 from neuropy.analyses.time_dependent_placefields import PfND_TimeDependent
 from pyphocorehelpers.DataStructure.enum_helpers import ExtendedEnum
 
@@ -240,6 +239,12 @@ def compute_surprise_relative_entropy_divergence(long_curve, short_curve):
     """
     Given two tuning maps, computes the surprise (in terms of the KL-divergence a.k.a. relative entropy) between the two
     Returns a dictionary containing the results in both directions
+
+    TODO 2023-03-08 02:41: - [ ] Convert naming convention from long_, short_ to lhs_, rhs_ to be general
+    TODO 2023-03-08 02:47: - [ ] Convert output dict to a dataclass
+
+    from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.ExtendedStats import compute_surprise_relative_entropy_divergence
+
     """
     long_short_rel_entr_curve = rel_entr(long_curve, short_curve)
     long_short_relative_entropy = sum(long_short_rel_entr_curve) 
@@ -258,11 +263,12 @@ def compute_snapshot_relative_entropy_surprise_differences(historical_snapshots_
     Computes the surprise between consecutive pairs of placefield snapshots extracted from a computed `active_pf_1D_dt`
 
     Usage:
-
+        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.ExtendedStats import compute_snapshot_relative_entropy_surprise_differences
         pf_overlap_results, flat_relative_entropy_results = compute_snapshot_relative_entropy_surprise_differences(active_pf_1D_dt)
 
 
     """
+    # Lists with one entry per snapshot in historical_snapshots_dict
     pf_overlap_results = []
     flat_relative_entropy_results = []
     flat_jensen_shannon_distance_results = []
