@@ -58,14 +58,12 @@ mpl-multitab = {git = "https://github.com/CommanderPho/mpl-multitab.git"} # poet
 vedo = {git = "https://github.com/CommanderPho/vedo.git", rev = "release/pho-working"} # poetry add git+https://github.com/CommanderPho/vedo.git#release/pho-working
 pyqt-responsive-label = "^0.0.3"
 
-<INSERT_HERE>
-
 # [tool.poetry.group.remote.dependencies]
 # pyphocorehelpers = {git = "https://github.com/CommanderPho/pyPhoCoreHelpers.git"}
 # neuropy = {git = "https://github.com/CommanderPho/NeuroPy.git"} # , rev = "main", extras = ["acceleration"]
 # dill = {git = "https://github.com/CommanderPho/dill.git", rev = "develop", extras=["graph"]} #objgraph diagnostic tool
 
-# [tool.poetry.group.local.dependencies]
+# [tool.poetry.group.remote.dependencies]
 # neuropy = {path = "../NeuroPy", develop=true} # , rev = "main", extras = ["acceleration"]
 # pyphocorehelpers = {path = "../pyPhoCoreHelpers", develop=true}
 # pyqode-core = {path = "../pyqode.core/dist/pyqode_core-3.0.0-py2.py3-none-any.whl"}
