@@ -61,11 +61,6 @@ vedo = {git = "https://github.com/CommanderPho/vedo.git", rev = "release/pho-wor
 pyqt-responsive-label = "^0.0.3"
 
 
-# [tool.poetry.group.remote.dependencies]
-# pyphocorehelpers = {git = "https://github.com/CommanderPho/pyPhoCoreHelpers.git"}
-# neuropy = {git = "https://github.com/CommanderPho/NeuroPy.git"} # , rev = "main", extras = ["acceleration"]
-# dill = {git = "https://github.com/CommanderPho/dill.git", rev = "develop", extras=["graph"]} #objgraph diagnostic tool
-
 [tool.poetry.group.remote.dependencies]
 neuropy = {path = "../NeuroPy", develop=true} # , rev = "main", extras = ["acceleration"]
 pyphocorehelpers = {path = "../pyPhoCoreHelpers", develop=true}
