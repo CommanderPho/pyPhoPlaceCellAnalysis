@@ -236,7 +236,7 @@ class ExtendedStatsComputations(AllFunctionEnumeratingMixin, metaclass=Computati
 
 
 def compute_surprise_relative_entropy_divergence(long_curve, short_curve):
-    """
+    """ Pre 2023-03-10 Refactoring:
     Given two tuning maps, computes the surprise (in terms of the KL-divergence a.k.a. relative entropy) between the two
     Returns a dictionary containing the results in both directions
 
