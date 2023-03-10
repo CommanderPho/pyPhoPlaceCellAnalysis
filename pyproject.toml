@@ -28,7 +28,6 @@ hdf5plugin = "^4.1.1"
 magicgui = "^0.6.1"
 pysimplegui = "^4.60.4"
 deeptime = "^0.4.4"
-lead-lag = "^2.3"
 attrs = "^22.2.0"
 
 [tool.poetry.group.dev.dependencies]
