@@ -2883,23 +2883,6 @@ dev = ["flit"]
 test = ["black", "flake8", "pre-commit", "pytest"]
 
 [[package]]
-name = "lead-lag"
-version = "2.3"
-description = "Lead lag estimation with a O(n log n) complexity."
-category = "main"
-optional = false
-python-versions = "*"
-files = [
-    {file = "lead-lag-2.3.tar.gz", hash = "sha256:77706b94814c1248e55347050da70e8030e8a111f7b2cdaaa961b9d394c01b89"},
-]
-
-[package.dependencies]
-matplotlib = ">=2.2.2"
-numpy = ">=1.15.0"
-pandas = ">=0.22.0"
-tqdm = ">=4.19.2"
-
-[[package]]
 name = "littleutils"
 version = "0.2.2"
 description = "Small personal collection of python utility functions"
@@ -7313,4 +7296,4 @@ testing = ["coverage (>=5.0.3)", "zope.event", "zope.testing"]
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.9,<3.11"
-content-hash = "043ffb4e632ac1838114f48fabc9ca4fa957da747c97ff0c9896368299ae752a"
+content-hash = "92a242912aa19183bb0c03118ec77056a6e7e08880edfe34a72df3c4c1a771fb"
