@@ -54,7 +54,9 @@ class ExtendedStatsComputations(AllFunctionEnumeratingMixin, metaclass=Computati
     _computationPrecidence = 3
     _is_global = False
 
-
+    @function_attributes(short_name='extended_stats', tags=['statistics'], 
+        input_requires=["computation_result.sess.position", "computation_result.computation_config.pf_params.time_bin_size"], 
+        output_provides=["computation_result.computed_data['extended_stats']['time_binned_positioned_resampler']", "computation_result.computed_data['extended_stats']['time_binned_position_df']", "computation_result.computed_data['extended_stats']['time_binned_position_mean']", "computation_result.computed_data['extended_stats']['time_binned_position_covariance']"])
     def _perform_extended_statistics_computation(computation_result: ComputationResult, debug_print=False):
         """ Computes extended statistics regarding firing rates and such from the various dataframes.
         
@@ -67,7 +69,7 @@ class ExtendedStatsComputations(AllFunctionEnumeratingMixin, metaclass=Computati
                 ['extended_stats']['time_binned_positioned_resampler']
                 ['extended_stats']['time_binned_position_df']
                 ['extended_stats']['time_binned_position_mean']
-                ['extended_stats']['time_binned_position_covariance']                
+                ['extended_stats']['time_binned_position_covariance']
                 
         
         """
@@ -88,6 +90,7 @@ class ExtendedStatsComputations(AllFunctionEnumeratingMixin, metaclass=Computati
         """
         return computation_result
     
+
     @function_attributes(short_name='pf_dt_sequential_surprise', tags=['surprise', 'time_dependent_pf'], 
         input_requires=["computed_data['firing_rate_trends']", "computed_data['pf1D_dt']", "computation_result.sess.position", "computation_result.computation_config.pf_params.time_bin_size"], 
         output_provides=["computation_result.computed_data['extended_stats']['time_binned_positioned_resampler']", "computation_result.computed_data['extended_stats']['time_binned_position_df']", "computation_result.computed_data['extended_stats']['time_binned_position_mean']", "computation_result.computed_data['extended_stats']['time_binned_position_covariance']"])
