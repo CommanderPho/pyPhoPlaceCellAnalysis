@@ -2,7 +2,7 @@ from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtGui, QtCore
 from pyphoplacecellanalysis.External.pyqtgraph.widgets.ProgressDialog import ProgressDialog
 
 # pyPhoPlaceCellAnalysis:
-from pyphoplacecellanalysis.General.NonInteractiveWrapper import NonInteractiveWrapper
+from pyphoplacecellanalysis.General.Batch.NonInteractiveWrapper import NonInteractiveWrapper
 from pyphoplacecellanalysis.GUI.Qt.Mixins.CheckTableCtrlOwningMixin import CheckTableCtrlOwningMixin
 from pyphoplacecellanalysis.GUI.PyQtPlot.Flowchart.CustomNodes.MiscNodes.ExtendedCtrlNode import ExtendedCtrlNode
 

@@ -121,7 +121,6 @@ class PlacefieldRenderingPyVistaMixin:
 class HideShowPlacefieldsRenderingMixin(PlacefieldOwningMixin):
     """ Implementor Visually Displays Placefield data and enables basic interactivity for it.
     
-    
     Requirements:
         self.plots['tuningCurvePlotActors']
     
