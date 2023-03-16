@@ -18,7 +18,7 @@ Example:
     # }
 
     import pyphoplacecellanalysis.External.pyqtgraph as pg
-    from pyphoplacecellanalysis.GUI.PyQtPlot.pyqtplot_DataTreeWidget import plot_dataTreeWidget
+    from pyphoplacecellanalysis.GUI.PyQtPlot.Examples.pyqtplot_DataTreeWidget import plot_dataTreeWidget
     tree, app = plot_dataTreeWidget(data=d, title='PhoOutputDataTreeApp')
     pg.exec() # required in an empty notebook to get the window to show instead of just launching and locking up
 
@@ -164,6 +164,11 @@ class CustomFormattingDataTreeWidget(pg.DataTreeWidget):
 
 
 def plot_dataTreeWidget(data, title='PhoOutputDataTreeApp'):
+    """ 
+
+    from pyphoplacecellanalysis.GUI.PyQtPlot.Examples.pyqtplot_DataTreeWidget import plot_dataTreeWidget
+
+    """
     app = pg.mkQApp(title)
     tree = CustomFormattingDataTreeWidget(data=data)
     tree.show()
@@ -189,7 +194,7 @@ if __name__ == '__main__':
     #     'active_extended_stats': active_extended_stats
     # }
 
-    from pyphoplacecellanalysis.GUI.PyQtPlot.pyqtplot_DataTreeWidget import plot_dataTreeWidget
+    from pyphoplacecellanalysis.GUI.PyQtPlot.Examples.pyqtplot_DataTreeWidget import plot_dataTreeWidget
     tree, app = plot_dataTreeWidget(data=d, title='PhoOutputDataTreeApp')
     
     pg.exec()

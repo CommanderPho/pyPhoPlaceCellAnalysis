@@ -15,9 +15,6 @@ import pandas as pd
 from pathlib import Path
 from qtpy import QtGui # for QColor
 
-## Optional Plotting with Tabbed matplotlib figure:
-from mpl_multitab import MplMultiTab, MplMultiTab2D
-
 from pyphocorehelpers.DataStructure.RenderPlots.MatplotLibRenderPlots import MatplotlibRenderPlots
 from pyphocorehelpers.gui.PyVista.CascadingDynamicPlotsList import CascadingDynamicPlotsList
 
@@ -92,6 +89,9 @@ def plot_1d_placecell_validations(active_placefields1D, plotting_config, should_
         plot_1d_placecell_validations(active_epoch_placefields1D, modifier_string='lap_only', should_save=False)
 
     """
+    ## Optional Plotting with Tabbed matplotlib figure:
+    from mpl_multitab import MplMultiTab, MplMultiTab2D
+
     n_cells = active_placefields1D.ratemap.n_neurons
     out_figures_list = []
     out_axes_list = []

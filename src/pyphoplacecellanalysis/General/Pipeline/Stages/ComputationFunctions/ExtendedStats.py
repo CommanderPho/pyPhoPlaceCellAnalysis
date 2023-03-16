@@ -9,6 +9,8 @@ from scipy.special import rel_entr # alternative for compute_relative_entropy_di
 
 from pyphocorehelpers.DataStructure.dynamic_parameters import DynamicParameters
 from pyphocorehelpers.mixins.member_enumerating import AllFunctionEnumeratingMixin
+from pyphocorehelpers.function_helpers import function_attributes
+
 from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.ComputationFunctionRegistryHolder import ComputationFunctionRegistryHolder
 from pyphoplacecellanalysis.General.Model.ComputationResults import ComputationResult
 from neuropy.core.position import build_position_df_resampled_to_time_windows
@@ -16,7 +18,6 @@ from neuropy.core.position import build_position_df_resampled_to_time_windows
 # from neuropy.analyses.laps import _build_new_lap_and_intra_lap_intervals # for _perform_time_dependent_pf_sequential_surprise_computation
 
 # For _perform_relative_entropy_analyses
-from pyphocorehelpers.indexing_helpers import build_pairwise_indicies
 from neuropy.analyses.time_dependent_placefields import PfND_TimeDependent
 from pyphocorehelpers.DataStructure.enum_helpers import ExtendedEnum
 
@@ -53,7 +54,9 @@ class ExtendedStatsComputations(AllFunctionEnumeratingMixin, metaclass=Computati
     _computationPrecidence = 3
     _is_global = False
 
-
+    @function_attributes(short_name='extended_stats', tags=['statistics'], 
+        input_requires=["computation_result.sess.position", "computation_result.computation_config.pf_params.time_bin_size"], 
+        output_provides=["computation_result.computed_data['extended_stats']['time_binned_positioned_resampler']", "computation_result.computed_data['extended_stats']['time_binned_position_df']", "computation_result.computed_data['extended_stats']['time_binned_position_mean']", "computation_result.computed_data['extended_stats']['time_binned_position_covariance']"])
     def _perform_extended_statistics_computation(computation_result: ComputationResult, debug_print=False):
         """ Computes extended statistics regarding firing rates and such from the various dataframes.
         
@@ -66,7 +69,7 @@ class ExtendedStatsComputations(AllFunctionEnumeratingMixin, metaclass=Computati
                 ['extended_stats']['time_binned_positioned_resampler']
                 ['extended_stats']['time_binned_position_df']
                 ['extended_stats']['time_binned_position_mean']
-                ['extended_stats']['time_binned_position_covariance']                
+                ['extended_stats']['time_binned_position_covariance']
                 
         
         """
@@ -88,6 +91,9 @@ class ExtendedStatsComputations(AllFunctionEnumeratingMixin, metaclass=Computati
         return computation_result
     
 
+    @function_attributes(short_name='pf_dt_sequential_surprise', tags=['surprise', 'time_dependent_pf'], 
+        input_requires=["computed_data['firing_rate_trends']", "computed_data['pf1D_dt']", "computation_result.sess.position", "computation_result.computation_config.pf_params.time_bin_size"], 
+        output_provides=["computation_result.computed_data['extended_stats']['time_binned_positioned_resampler']", "computation_result.computed_data['extended_stats']['time_binned_position_df']", "computation_result.computed_data['extended_stats']['time_binned_position_mean']", "computation_result.computed_data['extended_stats']['time_binned_position_covariance']"])
     def _perform_time_dependent_pf_sequential_surprise_computation(computation_result: ComputationResult, debug_print=False):
         """ Computes extended statistics regarding firing rates and such from the various dataframes.
         NOTE: 2022-12-14 - previously this version only did laps, but now it does the binned times for the entire epoch from ['firing_rate_trends']
@@ -140,7 +146,7 @@ class ExtendedStatsComputations(AllFunctionEnumeratingMixin, metaclass=Computati
             ## Get existing `pf1D_dt`:
             active_pf_1D_dt = computation_result.computed_data.pf1D_dt
         else:
-            # note even in TimeDependentPlacefieldSurpriseMode.STATIC_METHOD_ONLY a PfND_TimeDependent object is used to access its properties for the Static Method (although it isn't modified)
+            # NOTE: even in TimeDependentPlacefieldSurpriseMode.STATIC_METHOD_ONLY a PfND_TimeDependent object is used to access its properties for the Static Method (although it isn't modified)
             active_pf_1D_dt = PfND_TimeDependent(deepcopy(active_session_spikes_df), deepcopy(active_pos.linear_pos_obj), epochs=included_epochs,
                                                 speed_thresh=computation_config.speed_thresh, frate_thresh=computation_config.frate_thresh,
                                                 grid_bin=computation_config.grid_bin, grid_bin_bounds=computation_config.grid_bin_bounds, smooth=computation_config.smooth)
@@ -233,9 +239,15 @@ class ExtendedStatsComputations(AllFunctionEnumeratingMixin, metaclass=Computati
 
 
 def compute_surprise_relative_entropy_divergence(long_curve, short_curve):
-    """
+    """ Pre 2023-03-10 Refactoring:
     Given two tuning maps, computes the surprise (in terms of the KL-divergence a.k.a. relative entropy) between the two
     Returns a dictionary containing the results in both directions
+
+    TODO 2023-03-08 02:41: - [ ] Convert naming convention from long_, short_ to lhs_, rhs_ to be general
+    TODO 2023-03-08 02:47: - [ ] Convert output dict to a dataclass
+
+    from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.ExtendedStats import compute_surprise_relative_entropy_divergence
+
     """
     long_short_rel_entr_curve = rel_entr(long_curve, short_curve)
     long_short_relative_entropy = sum(long_short_rel_entr_curve) 
@@ -254,11 +266,12 @@ def compute_snapshot_relative_entropy_surprise_differences(historical_snapshots_
     Computes the surprise between consecutive pairs of placefield snapshots extracted from a computed `active_pf_1D_dt`
 
     Usage:
-
+        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.ExtendedStats import compute_snapshot_relative_entropy_surprise_differences
         pf_overlap_results, flat_relative_entropy_results = compute_snapshot_relative_entropy_surprise_differences(active_pf_1D_dt)
 
 
     """
+    # Lists with one entry per snapshot in historical_snapshots_dict
     pf_overlap_results = []
     flat_relative_entropy_results = []
     flat_jensen_shannon_distance_results = []

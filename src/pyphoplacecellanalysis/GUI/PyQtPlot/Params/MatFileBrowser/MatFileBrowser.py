@@ -12,7 +12,7 @@ import scipy.io # used for not HDF format files:
 from warnings import warn
 
 import pyphoplacecellanalysis.External.pyqtgraph as pg
-from pyphoplacecellanalysis.GUI.PyQtPlot.pyqtplot_DataTreeWidget import plot_dataTreeWidget # for GUI
+from pyphoplacecellanalysis.GUI.PyQtPlot.Examples.pyqtplot_DataTreeWidget import plot_dataTreeWidget # for GUI
 
 class MatFileBrowser(object):
     """ A helper class that allows the user to interactively browser .mat (MATLAB files in a filesystem directory) 

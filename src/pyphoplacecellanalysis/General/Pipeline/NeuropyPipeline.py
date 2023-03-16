@@ -9,7 +9,6 @@ import importlib
 import sys
 from pathlib import Path
 import shutil # for _backup_extant_file(...)
-from datetime import datetime
 
 from typing import Callable, List
 import inspect # used for filter_sessions(...)'s inspect.getsource to compare filters:
@@ -25,7 +24,7 @@ importlib.reload(core)
 from pyphocorehelpers.hashing_helpers import get_hash_tuple, freeze
 from pyphocorehelpers.mixins.diffable import DiffableObject
 from pyphocorehelpers.print_helpers import print_filesystem_file_size, print_object_memory_usage
-
+from pyphocorehelpers.Filesystem.path_helpers import build_unique_filename, backup_extant_file
 
 from neuropy.core.session.Formats.BaseDataSessionFormats import DataSessionFormatRegistryHolder # hopefully this works without all the other imports
 from neuropy.core.session.KnownDataSessionTypeProperties import KnownDataSessionTypeProperties
@@ -596,7 +595,7 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
                 if saving_mode.name == PipelineSavingScheme.TEMP_THEN_OVERWRITE.name:
                     ## Save under a temporary name in the same output directory, and then compare post-hoc
                     _desired_finalized_loaded_sess_pickle_path = finalized_loaded_sess_pickle_path
-                    finalized_loaded_sess_pickle_path, _ = _build_unique_filename(finalized_loaded_sess_pickle_path)
+                    finalized_loaded_sess_pickle_path, _ = build_unique_filename(finalized_loaded_sess_pickle_path)
                 elif saving_mode.name == PipelineSavingScheme.OVERWRITE_IN_PLACE.name:
                     print(f'WARNING: saving_mode is OVERWRITE_IN_PLACE so {finalized_loaded_sess_pickle_path} will be overwritten even though exists.')
                     self.logger.warning(f'WARNING: saving_mode is OVERWRITE_IN_PLACE so {finalized_loaded_sess_pickle_path} will be overwritten even though exists.')
@@ -615,7 +614,7 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
                     print(f'WARNING: prev_extant_file_size_MB ({prev_extant_file_size_MB} MB) > new_temporary_file_size_MB ({new_temporary_file_size_MB} MB)! A backup will be made!')
                     self.logger.warning(f'WARNING: prev_extant_file_size_MB ({prev_extant_file_size_MB} MB) > new_temporary_file_size_MB ({new_temporary_file_size_MB} MB)! A backup will be made!')
                     # Backup old file:
-                    _backup_extant_file(_desired_finalized_loaded_sess_pickle_path) # only backup if the new file is smaller than the older one (meaning the older one has more info)
+                    backup_extant_file(_desired_finalized_loaded_sess_pickle_path) # only backup if the new file is smaller than the older one (meaning the older one has more info)
                 
                 # replace the old file with the new one:
                 print(f"moving new output at '{finalized_loaded_sess_pickle_path}' -> to desired location: '{_desired_finalized_loaded_sess_pickle_path}'")
@@ -633,66 +632,3 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
 
 
 
-def _build_unique_filename(file_to_save_path, additional_postfix_extension=None):
-    """ builds a unique filename for the file to be saved at file_to_save_path.
-    Usage:
-        from pyphoplacecellanalysis.General.Pipeline.NeuropyPipeline import _build_unique_filename
-        unique_save_path, unique_file_name = _build_unique_filename(curr_active_pipeline.pickle_path) # unique_file_name: '20221109173951-loadedSessPickle.pkl'
-        unique_save_path # 'W:/Data/KDIBA/gor01/one/2006-6-09_1-22-43/20221109173951-loadedSessPickle.pkl'
-    """
-    if not isinstance(file_to_save_path, Path):
-        file_to_save_path = Path(file_to_save_path)
-    parent_path = file_to_save_path.parent # The location to store the backups in
-
-    extensions = file_to_save_path.suffixes # e.g. ['.tar', '.gz']
-    if additional_postfix_extension is not None:
-        extensions.append(additional_postfix_extension)
-
-    unique_file_name = f'{datetime.now().strftime("%Y%m%d%H%M%S")}-{file_to_save_path.stem}{"".join(extensions)}'
-    unique_save_path = parent_path.joinpath(unique_file_name)
-    # print(f"'{file_to_save_path}' backing up -> to_file: '{unique_save_path}'")
-    return unique_save_path, unique_file_name
-
-
-
-def _backup_extant_file(file_to_backup_path, MAX_BACKUP_AMOUNT=2):
-    """creates a backup of an existing file that would otherwise be overwritten
-
-    Args:
-        file_to_backup_path (_type_): _description_
-        MAX_BACKUP_AMOUNT (int, optional):  The maximum amount of backups to have in BACKUP_DIRECTORY. Defaults to 2.
-    """
-    if not isinstance(file_to_backup_path, Path):
-        file_to_backup_path = Path(file_to_backup_path).resolve()
-    assert file_to_backup_path.exists(), f"file at {file_to_backup_path} must already exist to be backed-up!"
-    assert (not file_to_backup_path.is_dir()), f"file at {file_to_backup_path} must be a FILE, not a directory!"
-    backup_extension = '.bak' # simple '.bak' file
-
-    backup_directory_path = file_to_backup_path.parent # The location to store the backups in
-    assert file_to_backup_path.exists()  # Validate the object we are about to backup exists before we continue
-
-    # Validate the backup directory exists and create if required
-    backup_directory_path.mkdir(parents=True, exist_ok=True)
-
-    # Get the amount of past backup zips in the backup directory already
-    existing_backups = [
-        x for x in backup_directory_path.iterdir()
-        if x.is_file() and x.suffix == backup_extension and x.name.startswith('backup-')
-    ]
-
-    # Enforce max backups and delete oldest if there will be too many after the new backup
-    oldest_to_newest_backup_by_name = list(sorted(existing_backups, key=lambda f: f.name))
-    while len(oldest_to_newest_backup_by_name) >= MAX_BACKUP_AMOUNT:  # >= because we will have another soon
-        backup_to_delete = oldest_to_newest_backup_by_name.pop(0)
-        backup_to_delete.unlink()
-
-    # Create zip file (for both file and folder options)
-    backup_file_name = f'backup-{datetime.now().strftime("%Y%m%d%H%M%S")}-{file_to_backup_path.name}{backup_extension}'
-    to_file = backup_directory_path.joinpath(backup_file_name)
-    print(f"'{file_to_backup_path}' backing up -> to_file: '{to_file}'")
-    shutil.copy(file_to_backup_path, to_file)
-    return True
-    # dest = Path('dest')
-    # src = Path('src')
-    # dest.write_bytes(src.read_bytes()) #for binary files
-    # dest.write_text(src.read_text()) #for text files

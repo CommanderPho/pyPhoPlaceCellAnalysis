@@ -1,12 +1,17 @@
+from copy import deepcopy
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+from scipy.spatial.distance import cdist
 
 # Neuropy:
 from neuropy.core.position import build_position_df_resampled_to_time_windows # used in DecoderResultDisplayingPlot2D.setup()
 
+from neuropy.analyses.placefields import PfND
 from .reconstruction import BayesianPlacemapPositionDecoder
 from pyphocorehelpers.indexing_helpers import find_neighbours
+
+from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BayesianPlacemapPositionDecoder # perform_leave_one_aclu_out_decoding_analysis
 
 # ==================================================================================================================== #
 # DecoderResultDisplaying* Classes                                                                                     #
@@ -312,11 +317,13 @@ def perform_leave_one_aclu_out_decoding_analysis(spikes_df, active_pos_df, activ
 
 
 
-def perform_full_session_leave_one_out_decoding_analysis(sess, decoding_time_bin_size = 0.02, cache_suffix = ''):
+# def perform_full_session_leave_one_out_decoding_analysis(sess, decoding_time_bin_size = 0.02, cache_suffix = ''):
+def perform_full_session_leave_one_out_decoding_analysis(sess, original_1D_decoder = None, decoding_time_bin_size = 0.02, cache_suffix = ''):
     """ Performs a full session leave one out decoding analysis.
 
     Args:
         sess: a Session object
+        original_1D_decoder: an optional `BayesianPlacemapPositionDecoder` object to decode with. If None, the decoder will be created from the session. If you pass a decoder, you want to provide the global session and not a particular filtered one.
         decoding_time_bin_size: the time bin size for the decoder
         cache_suffix: a suffix to add to the cache file name, or None to not cache
     Returns:
@@ -360,12 +367,12 @@ def perform_full_session_leave_one_out_decoding_analysis(sess, decoding_time_bin
 
     active_filter_epochs = Epoch(active_filter_epochs)
 
-    ## Build the new decoder:
-    active_pos = active_pos_df.position.to_Position_obj() # convert back to a full position object
-    original_decoder_pf1D = PfND(deepcopy(pyramidal_only_spikes_df), deepcopy(active_pos.linear_pos_obj)) # all other settings default
-    ## Build the new decoder:
-    original_1D_decoder = BayesianPlacemapPositionDecoder(decoding_time_bin_size, original_decoder_pf1D, original_decoder_pf1D.filtered_spikes_df.copy(), debug_print=False)
-
+    # ## Build the new decoder (if not provided):
+    if original_1D_decoder is None:
+        active_pos = active_pos_df.position.to_Position_obj() # convert back to a full position object
+        original_decoder_pf1D = PfND(deepcopy(pyramidal_only_spikes_df), deepcopy(active_pos.linear_pos_obj)) # all other settings default
+        ## Build the new decoder:
+        original_1D_decoder = BayesianPlacemapPositionDecoder(decoding_time_bin_size, original_decoder_pf1D, original_decoder_pf1D.filtered_spikes_df.copy(), debug_print=False)
 
     # -- Part 1 -- perform the decoding:
     original_1D_decoder, all_included_filter_epochs_decoder_result, one_left_out_decoder_dict, one_left_out_filter_epochs_decoder_result_dict, one_left_out_omitted_aclu_distance_df, most_contributing_aclus = perform_leave_one_aclu_out_decoding_analysis(pyramidal_only_spikes_df, active_pos_df, active_filter_epochs, original_1D_decoder=original_1D_decoder, decoding_time_bin_size=decoding_time_bin_size)

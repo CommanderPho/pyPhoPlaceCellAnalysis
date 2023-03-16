@@ -577,9 +577,13 @@ def _temp_debug_two_step_plots_animated_imshow(active_one_step_decoder, active_t
 # Functions for rendering a stack of decoded epochs in a stacked_epoch_slices-style manner                             #
 # ==================================================================================================================== #
 
-def plot_decoded_epoch_slices(filter_epochs, filter_epochs_decoder_result, global_pos_df, xbin=None, enable_flat_line_drawing=False, debug_test_max_num_slices=20, name='stacked_epoch_slices_matplotlib_subplots', debug_print=False):
+def plot_decoded_epoch_slices(filter_epochs, filter_epochs_decoder_result, global_pos_df, variable_name:str='lin_pos', xbin=None, enable_flat_line_drawing=False, debug_test_max_num_slices=20, name='stacked_epoch_slices_matplotlib_subplots', debug_print=False):
     """ plots the decoded epoch results in a stacked slices view 
     
+    Parameters:
+    variable_name: str - the name of the column in the global_pos_df that contains the variable to plot. 
+
+
     Usage:    
         from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import plot_decoded_epoch_slices
 
@@ -646,7 +650,7 @@ def plot_decoded_epoch_slices(filter_epochs, filter_epochs_decoder_result, globa
         if debug_print:
             print(f'i : {i}, curr_posterior.shape: {curr_posterior.shape}')
 
-        _temp_fig, curr_ax = plot_1D_most_likely_position_comparsions(global_pos_df, ax=curr_ax, time_window_centers=curr_time_bins, xbin=xbin,
+        _temp_fig, curr_ax = plot_1D_most_likely_position_comparsions(global_pos_df, ax=curr_ax, time_window_centers=curr_time_bins, variable_name=variable_name, xbin=xbin,
                                                            posterior=curr_posterior,
                                                            active_most_likely_positions_1D=curr_most_likely_positions,
                                                            enable_flat_line_drawing=enable_flat_line_drawing, debug_print=debug_print)
