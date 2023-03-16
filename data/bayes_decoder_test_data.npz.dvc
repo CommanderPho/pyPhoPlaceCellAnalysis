@@ -1,0 +1,4 @@
+outs:
+- md5: d4ab9c84f5f4eb3821f9200f38cf83f1
+  size: 17492798
+  path: bayes_decoder_test_data.npz

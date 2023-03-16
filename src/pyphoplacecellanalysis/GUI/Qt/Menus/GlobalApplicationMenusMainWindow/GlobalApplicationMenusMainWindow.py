@@ -1,12 +1,6 @@
 # GlobalApplicationMenusMainWindow.py
 # Generated from c:\Users\pho\repos\pyPhoPlaceCellAnalysis\src\pyphoplacecellanalysis\GUI\Qt\GlobalApplicationMenus\GlobalApplicationMenusMainWindow.ui automatically by PhoPyQtClassGenerator VSCode Extension
 import os
-# from PyQt5 import QtGui, QtWidgets, uic
-# from PyQt5.QtWidgets import QMessageBox, QToolTip, QStackedWidget, QHBoxLayout, QVBoxLayout, QSplitter, QFormLayout, QLabel, QFrame, QPushButton, QTableWidget, QTableWidgetItem
-# from PyQt5.QtWidgets import QApplication, QFileSystemModel, QTreeView, QWidget, QHeaderView
-# from PyQt5.QtGui import QPainter, QBrush, QPen, QColor, QFont, QIcon
-# from PyQt5.QtCore import Qt, QPoint, QRect, QObject, QEvent, pyqtSignal, pyqtSlot, QSize, QDir
-
 import pyphoplacecellanalysis.External.pyqtgraph as pg
 from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtCore, QtGui, QtWidgets, mkQApp, uic
 
