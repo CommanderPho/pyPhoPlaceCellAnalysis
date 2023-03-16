@@ -569,6 +569,16 @@ def _subfn_compute_decoded_epochs(computation_result, active_config, filter_epoc
     filter_epochs_decoder_result.epoch_description_list = epoch_description_list
     return filter_epochs_decoder_result, active_filter_epochs, default_figure_name
 
+def _subfn_reshape_for_each_epoch_to_for_each_cell(data, epoch_IDXs, neuron_IDs):
+    """ Reshape to -for-each-epoch instead of -for-each-cell
+        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.DefaultComputationFunctions import _subfn_reshape_for_each_epoch_to_for_each_cell
+        flat_all_epochs_cell_data, all_epochs_cell_data = _subfn_reshape_for_each_epoch_to_for_each_cell(data, epoch_IDXs=np.arange(active_filter_epochs.n_epochs), neuron_IDs=original_1D_decoder.neuron_IDs)
+    """
+    all_epochs_cell_data = []
+    for decoded_epoch_idx in epoch_IDXs:
+        all_epochs_cell_data.append(np.array([data[aclu][decoded_epoch_idx] for aclu in neuron_IDs]))
+    flat_all_epochs_cell_data = np.hstack(all_epochs_cell_data) # .shape (65, 4584) -- (n_neurons, n_epochs * n_timebins_for_epoch_i), combines across all time_bins within all epochs
+    return flat_all_epochs_cell_data, all_epochs_cell_data
 
 def _subfn_compute_leave_one_out_analysis(original_1D_decoder, one_left_out_decoder_dict, one_left_out_filter_epochs_decoder_result_dict, active_filter_epochs):
     """ 2023-03-15 - Kamran's Leave-One-Out-Surprise - Main leave-one-out surprise computation:
@@ -640,9 +650,13 @@ def _subfn_compute_leave_one_out_analysis(original_1D_decoder, one_left_out_deco
     flat_all_epochs_decoded_epoch_time_bins = np.hstack(all_epochs_decoded_epoch_time_bins) # .shape (65, 4584) -- (n_neurons, n_epochs * n_timebins_for_epoch_i), combines across all time_bins within all epochs
     flat_all_epochs_computed_surprises = np.hstack(all_epochs_computed_surprises) # .shape (65, 4584) -- (n_neurons, n_epochs * n_timebins_for_epoch_i), combines across all time_bins within all epochs
 
+    ## Could also do but would need to loop over all epochs for each of the three variables:
+    # flat_all_epochs_computed_expected_cell_firing_rates, all_epochs_computed_expected_cell_firing_rates = _subfn_reshape_for_each_epoch_to_for_each_cell(all_cells_decoded_expected_firing_rates, epoch_IDXs=np.arange(active_filter_epochs.n_epochs), neuron_IDs=original_1D_decoder.neuron_IDs)
+
+    ## Aggregates over all time bins in each epoch:
     all_epochs_decoded_epoch_time_bins_mean = np.vstack([np.mean(curr_epoch_time_bins, axis=1) for curr_epoch_time_bins in all_epochs_decoded_epoch_time_bins]) # mean over all time bins in each epoch  # .shape (614, 65) - (n_epochs, n_neurons)
     all_epochs_computed_cell_surprises_mean = np.vstack([np.mean(curr_epoch_surprises, axis=1) for curr_epoch_surprises in all_epochs_computed_surprises]) # mean over all time bins in each epoch  # .shape (614, 65) - (n_epochs, n_neurons)
-
+    ## Aggregates over all cells and all time bins in each epoch:
     all_epochs_all_cells_computed_surprises_mean = np.mean(all_epochs_computed_cell_surprises_mean, axis=1) # average across all cells .shape (614,) - (n_epochs,)
 
     ## Output variables: flat_all_epochs_decoded_epoch_time_bins, flat_all_epochs_computed_surprises, all_epochs_decoded_epoch_time_bins_mean, all_epochs_computed_cell_surprises_mean, all_epochs_all_cells_computed_surprises_mean
