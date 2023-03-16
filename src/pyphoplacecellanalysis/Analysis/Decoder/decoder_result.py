@@ -308,3 +308,96 @@ def perform_leave_one_aclu_out_decoding_analysis(spikes_df, active_pos_df, activ
         most_contributing_aclus: a list of aclu values, sorted by the largest performance decrease on decoding (as indicated by a larger distance)
     """
     return original_1D_decoder, all_included_filter_epochs_decoder_result, one_left_out_decoder_dict, one_left_out_filter_epochs_decoder_result_dict, one_left_out_omitted_aclu_distance_df, most_contributing_aclus
+
+
+
+def perform_full_session_leave_one_out_decoding_analysis(sess, decoding_time_bin_size = 0.02, cache_suffix = ''):
+    """ Performs a full session leave one out decoding analysis.
+
+    Args:
+        sess: a Session object
+        decoding_time_bin_size: the time bin size for the decoder
+        cache_suffix: a suffix to add to the cache file name, or None to not cache
+    Returns:
+        decoder_result: the decoder result for the original decoder with all aclu values included
+
+
+
+    Usage:
+        from pyphoplacecellanalysis.Analysis.Decoder.decoder_result import perform_full_session_leave_one_out_decoding_analysis
+    """
+    from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BayesianPlacemapPositionDecoder
+    from neuropy.core.epoch import Epoch
+    # for caching/saving:
+    from pyphoplacecellanalysis.General.Pipeline.Stages.Loading import loadData, saveData
+    from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.DefaultComputationFunctions import _subfn_compute_leave_one_out_analysis
+
+    if cache_suffix is not None:
+        ### Build a folder to store the temporary outputs:
+        output_data_folder = sess.basepath.joinpath('output').resolve()
+        output_data_folder.mkdir(exist_ok=True)
+
+    ## Get testing variables from `sess`
+    spikes_df = sess.spikes_df
+    pyramidal_only_spikes_df = deepcopy(spikes_df).spikes.sliced_by_neuron_type('pyramidal') ## get only the pyramidal spikes
+    active_pos = sess.position
+    active_pos_df = active_pos.to_dataframe()
+
+    # --------------
+    # ### active_filter_epochs: sess.laps: 
+    # laps_copy = deepcopy(sess.laps)
+    # active_filter_epochs = laps_copy.filtered_by_lap_flat_index(np.arange(20)).as_epoch_obj() # epoch object
+
+    ### active_filter_epochs: sess.replay: 
+    active_filter_epochs = sess.replay.epochs.get_valid_df().epochs.get_epochs_longer_than(minimum_duration=5.0*decoding_time_bin_size).epochs.get_non_overlapping_df()
+    if not 'stop' in active_filter_epochs.columns:
+        # Make sure it has the 'stop' column which is expected as opposed to the 'end' column
+        active_filter_epochs['stop'] = active_filter_epochs['end'].copy()
+        
+    if not 'label' in active_filter_epochs.columns:
+        # Make sure it has the 'stop' column which is expected as opposed to the 'end' column
+        active_filter_epochs['label'] = active_filter_epochs['flat_replay_idx'].copy()
+
+    active_filter_epochs = Epoch(active_filter_epochs)
+
+    # -- Part 1 -- perform the decoding:
+    original_1D_decoder, all_included_filter_epochs_decoder_result, one_left_out_decoder_dict, one_left_out_filter_epochs_decoder_result_dict, one_left_out_omitted_aclu_distance_df, most_contributing_aclus = perform_leave_one_aclu_out_decoding_analysis(pyramidal_only_spikes_df, active_pos_df, active_filter_epochs)
+
+    # Save to file:
+    if cache_suffix is not None:
+        leave_one_out_result_pickle_path = output_data_folder.joinpath(f'leave_one_out_results{cache_suffix}.pkl').resolve()
+        print(f'leave_one_out_result_pickle_path: {leave_one_out_result_pickle_path}')
+        saveData(leave_one_out_result_pickle_path, (active_filter_epochs, original_1D_decoder, all_included_filter_epochs_decoder_result, one_left_out_decoder_dict, one_left_out_filter_epochs_decoder_result_dict, one_left_out_omitted_aclu_distance_df, most_contributing_aclus))
+
+
+    # -- Part 2 -- perform the analysis on the decoder results:
+    flat_all_epochs_decoded_epoch_time_bins, flat_all_epochs_computed_surprises, flat_all_epochs_computed_expected_cell_firing_rates, all_epochs_decoded_epoch_time_bins_mean, all_epochs_computed_cell_surprises_mean, all_epochs_all_cells_computed_surprises_mean = _subfn_compute_leave_one_out_analysis(original_1D_decoder, one_left_out_decoder_dict, one_left_out_filter_epochs_decoder_result_dict, active_filter_epochs)
+
+    ## Flatten the measured spike counts over the time bins within all epochs to get something of the same shape as `flat_all_epochs_decoded_epoch_time_bins`:
+    flat_all_epochs_measured_cell_spike_counts = np.hstack(all_included_filter_epochs_decoder_result.spkcount) # .shape (65, 4584) -- (n_neurons, n_epochs * n_timebins_for_epoch_i), combines across all time_bins within all epochs
+    assert flat_all_epochs_computed_expected_cell_firing_rates.shape == flat_all_epochs_measured_cell_spike_counts.shape, f"{flat_all_epochs_measured_cell_spike_counts.shape = } != {flat_all_epochs_computed_expected_cell_firing_rates.shape =}"
+    ## Get the time bins where each cell is firing (has more than one spike):
+    is_cell_firing_time_bin = (flat_all_epochs_measured_cell_spike_counts > 0)
+
+    ## Convert spike counts to firing rates by dividing by the time bin size:
+    flat_all_epochs_measured_cell_firing_rates = flat_all_epochs_measured_cell_spike_counts / original_1D_decoder.time_bin_size
+    ## Convert the expected firing rates to spike counts by multiplying by the time bin size (NOTE: there can be fractional expected spikes):
+    flat_all_epochs_computed_expected_cell_spike_counts = flat_all_epochs_computed_expected_cell_firing_rates * original_1D_decoder.time_bin_size
+
+    ## Compute the difference from the expected firing rate observed for each cell (in each time bin):
+    flat_all_epochs_difference_from_expected_cell_spike_counts = flat_all_epochs_computed_expected_cell_spike_counts - flat_all_epochs_measured_cell_spike_counts
+    flat_all_epochs_difference_from_expected_cell_firing_rates = flat_all_epochs_computed_expected_cell_firing_rates - flat_all_epochs_measured_cell_firing_rates
+    # flat_all_epochs_difference_from_expected_cell_firing_rates
+
+    if cache_suffix is not None:
+        # Save to file to cache in case we crash:
+        leave_one_out_surprise_result_pickle_path = output_data_folder.joinpath(f'leave_one_out_surprise_results{cache_suffix}.pkl').resolve()
+        print(f'leave_one_out_surprise_result_pickle_path: {leave_one_out_surprise_result_pickle_path}')
+        saveData(leave_one_out_surprise_result_pickle_path, (active_filter_epochs, original_1D_decoder, all_included_filter_epochs_decoder_result, 
+                                                            flat_all_epochs_measured_cell_spike_counts, flat_all_epochs_measured_cell_firing_rates, 
+                                                            flat_all_epochs_decoded_epoch_time_bins, flat_all_epochs_computed_surprises, flat_all_epochs_computed_expected_cell_firing_rates,
+                                                            flat_all_epochs_difference_from_expected_cell_spike_counts, flat_all_epochs_difference_from_expected_cell_firing_rates,
+                                                            all_epochs_decoded_epoch_time_bins_mean, all_epochs_computed_cell_surprises_mean, all_epochs_all_cells_computed_surprises_mean))
+
+    return (active_filter_epochs, original_1D_decoder, all_included_filter_epochs_decoder_result, flat_all_epochs_measured_cell_spike_counts, flat_all_epochs_measured_cell_firing_rates, flat_all_epochs_decoded_epoch_time_bins, flat_all_epochs_computed_surprises, flat_all_epochs_computed_expected_cell_firing_rates, flat_all_epochs_difference_from_expected_cell_spike_counts, flat_all_epochs_difference_from_expected_cell_firing_rates, all_epochs_decoded_epoch_time_bins_mean, all_epochs_computed_cell_surprises_mean, all_epochs_all_cells_computed_surprises_mean)
+
