@@ -230,7 +230,7 @@ def perform_leave_one_aclu_out_decoding_analysis(spikes_df, active_pos_df, activ
         """
         original_neuron_ids = np.array(original_decoder.pf.ratemap.neuron_ids) # original_pf.included_neuron_IDs
         one_left_out_decoder_dict = {}
-        for i, aclu_to_omit in enumerate(original_neuron_ids):
+        for aclu_to_omit in original_neuron_ids:
             subset_included_neuron_ids = np.array([aclu for aclu in original_neuron_ids if aclu != aclu_to_omit]) # get all but the omitted neuron
             one_left_out_decoder_dict[aclu_to_omit] = original_decoder.get_by_id(subset_included_neuron_ids, defer_compute_all=True) # skip computations
             
@@ -326,7 +326,6 @@ def perform_full_session_leave_one_out_decoding_analysis(sess, decoding_time_bin
     Usage:
         from pyphoplacecellanalysis.Analysis.Decoder.decoder_result import perform_full_session_leave_one_out_decoding_analysis
     """
-    from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BayesianPlacemapPositionDecoder
     from neuropy.core.epoch import Epoch
     # for caching/saving:
     from pyphoplacecellanalysis.General.Pipeline.Stages.Loading import loadData, saveData
