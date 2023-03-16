@@ -217,7 +217,9 @@ class DecoderResultDisplayingPlot2D(DecoderResultDisplayingBaseClass):
 
 
 
-def perform_leave_one_aclu_out_decoding_analysis(spikes_df, active_pos_df, active_filter_epochs, filter_epoch_description_list=None, decoding_time_bin_size=0.025):
+
+
+def perform_leave_one_aclu_out_decoding_analysis(spikes_df, active_pos_df, active_filter_epochs, original_1D_decoder=None, filter_epoch_description_list=None, decoding_time_bin_size=0.025):
     """2023-03-03 - Performs a "leave-one-out" decoding analysis where we leave out each neuron one at a time and see how the decoding degrades (which serves as an indicator of the importance of that neuron on the decoding performance).
 
     Usage:
@@ -241,9 +243,13 @@ def perform_leave_one_aclu_out_decoding_analysis(spikes_df, active_pos_df, activ
     active_pos = active_pos_df.position.to_Position_obj() # convert back to a full position object
  
     ## Build placefield for the decoder to use:
-    original_decoder_pf1D = PfND(deepcopy(spikes_df), deepcopy(active_pos.linear_pos_obj)) # all other settings default
-    ## Build the new decoder:
-    original_1D_decoder = BayesianPlacemapPositionDecoder(decoding_time_bin_size, original_decoder_pf1D, original_decoder_pf1D.filtered_spikes_df.copy(), debug_print=False)
+    if original_1D_decoder is None:
+        original_decoder_pf1D = PfND(deepcopy(spikes_df), deepcopy(active_pos.linear_pos_obj)) # all other settings default
+        ## Build the new decoder:
+        original_1D_decoder = BayesianPlacemapPositionDecoder(decoding_time_bin_size, original_decoder_pf1D, original_decoder_pf1D.filtered_spikes_df.copy(), debug_print=False)
+    else:
+        print(f'USING EXISTING original_1D_decoder.')
+
     all_included_filter_epochs_decoder_result = original_1D_decoder.decode_specific_epochs(spikes_df, filter_epochs=active_filter_epochs, decoding_time_bin_size=decoding_time_bin_size, debug_print=False)
 
     # pretty dang inefficient, as there are 70 cells:
@@ -311,11 +317,13 @@ def perform_leave_one_aclu_out_decoding_analysis(spikes_df, active_pos_df, activ
 
 
 
-def perform_full_session_leave_one_out_decoding_analysis(sess, decoding_time_bin_size = 0.02, cache_suffix = ''):
+# def perform_full_session_leave_one_out_decoding_analysis(sess, decoding_time_bin_size = 0.02, cache_suffix = ''):
+def perform_full_session_leave_one_out_decoding_analysis(sess, original_1D_decoder = None, decoding_time_bin_size = 0.02, cache_suffix = ''):
     """ Performs a full session leave one out decoding analysis.
 
     Args:
         sess: a Session object
+        original_1D_decoder: an optional `BayesianPlacemapPositionDecoder` object to decode with. If None, the decoder will be created from the session. If you pass a decoder, you want to provide the global session and not a particular filtered one.
         decoding_time_bin_size: the time bin size for the decoder
         cache_suffix: a suffix to add to the cache file name, or None to not cache
     Returns:
@@ -359,8 +367,15 @@ def perform_full_session_leave_one_out_decoding_analysis(sess, decoding_time_bin
 
     active_filter_epochs = Epoch(active_filter_epochs)
 
+    # ## Build the new decoder (if not provided):
+    if original_1D_decoder is None:
+        active_pos = active_pos_df.position.to_Position_obj() # convert back to a full position object
+        original_decoder_pf1D = PfND(deepcopy(pyramidal_only_spikes_df), deepcopy(active_pos.linear_pos_obj)) # all other settings default
+        ## Build the new decoder:
+        original_1D_decoder = BayesianPlacemapPositionDecoder(decoding_time_bin_size, original_decoder_pf1D, original_decoder_pf1D.filtered_spikes_df.copy(), debug_print=False)
+
     # -- Part 1 -- perform the decoding:
-    original_1D_decoder, all_included_filter_epochs_decoder_result, one_left_out_decoder_dict, one_left_out_filter_epochs_decoder_result_dict, one_left_out_omitted_aclu_distance_df, most_contributing_aclus = perform_leave_one_aclu_out_decoding_analysis(pyramidal_only_spikes_df, active_pos_df, active_filter_epochs)
+    original_1D_decoder, all_included_filter_epochs_decoder_result, one_left_out_decoder_dict, one_left_out_filter_epochs_decoder_result_dict, one_left_out_omitted_aclu_distance_df, most_contributing_aclus = perform_leave_one_aclu_out_decoding_analysis(pyramidal_only_spikes_df, active_pos_df, active_filter_epochs, original_1D_decoder=original_1D_decoder, decoding_time_bin_size=decoding_time_bin_size)
 
     # Save to file:
     if cache_suffix is not None:
