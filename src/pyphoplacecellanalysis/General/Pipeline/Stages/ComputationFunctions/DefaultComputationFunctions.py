@@ -611,7 +611,8 @@ def _subfn_compute_leave_one_out_analysis(original_1D_decoder, one_left_out_deco
         unit_IDX = original_1D_decoder.neuron_IDXs[i] # should just be i, but just to be safe
         ## TODO: only look at bins where the cell fires (is_cell_firing_time_bin[i])
         curr_cell_tuning_curve = original_1D_decoder.pf.ratemap.tuning_curves[unit_IDX]
-        curr_cell_spike_curve = original_1D_decoder.pf.ratemap.spikes_maps[unit_IDX] ## not occupancy weighted... is this the right one to use for computing the expected spike rate?
+        # curr_cell_spike_curve = original_1D_decoder.pf.ratemap.spikes_maps[unit_IDX] ## not occupancy weighted... is this the right one to use for computing the expected spike rate? NO... doesn't seem like it
+
         curr_cell_one_left_out_decoder_result = one_left_out_filter_epochs_decoder_result_dict[aclu]
         ## single cell outputs:
         curr_cell_decoded_epoch_time_bins = [] # will be a list of the time bins in each epoch that correspond to each surprise in the corresponding list in curr_cell_computed_epoch_surprises 
@@ -626,7 +627,8 @@ def _subfn_compute_leave_one_out_analysis(original_1D_decoder, one_left_out_deco
             assert curr_epoch_p_x_given_n.shape[0] == curr_cell_tuning_curve.shape[0]
             
             # Compute the expected firing rate for this cell during each bin by taking the computed position posterior and taking the sum of the element-wise product with the cell's placefield.
-            curr_epoch_expected_fr = np.array([np.sum(curr_cell_spike_curve * curr_p_x_given_n) for curr_p_x_given_n in curr_epoch_p_x_given_n.T]) / original_1D_decoder.time_bin_size
+            # curr_epoch_expected_fr = np.array([np.sum(curr_cell_spike_curve * curr_p_x_given_n) for curr_p_x_given_n in curr_epoch_p_x_given_n.T]) / original_1D_decoder.time_bin_size
+            curr_epoch_expected_fr = original_1D_decoder.pf.ratemap.tuning_curve_unsmoothed_peak_firing_rates[unit_IDX] * np.array([np.sum(curr_cell_tuning_curve * curr_p_x_given_n) for curr_p_x_given_n in curr_epoch_p_x_given_n.T]) # * original_1D_decoder.pf.ratemap.
             all_cells_decoded_expected_firing_rates[aclu].append(curr_epoch_expected_fr)
             
             # Compute the Jensen-Shannon Distance as a measure of surprise between the placefield and the posteriors
