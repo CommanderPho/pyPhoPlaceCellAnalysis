@@ -1094,8 +1094,8 @@ class BayesianPlacemapPositionDecoder(NeuronUnitSlicableObjectProtocol, Placemap
             curr_unit_marginal_x.most_likely_positions_1D = np.atleast_1d(most_likely_positions).T # already 1D positions, don't need to extract x-component
 
             # Validate 1D Conditions:
-            assert np.allclose(curr_unit_marginal_x['p_x_given_n'], p_x_given_n), f"1D Decoder should have an x-posterior equal to its own posterior"
-            assert np.allclose(curr_unit_marginal_x['most_likely_positions_1D'], most_likely_positions), f"1D Decoder should have an x-posterior with most_likely_positions_1D equal to its own most_likely_positions"
+            assert np.allclose(curr_unit_marginal_x['p_x_given_n'], p_x_given_n, equal_nan=True), f"1D Decoder should have an x-posterior equal to its own posterior"
+            assert np.allclose(curr_unit_marginal_x['most_likely_positions_1D'], most_likely_positions, equal_nan=True), f"1D Decoder should have an x-posterior with most_likely_positions_1D equal to its own most_likely_positions"
 
 
             # # Same as np.amax(x, axis=-1)

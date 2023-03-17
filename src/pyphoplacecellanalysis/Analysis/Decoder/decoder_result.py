@@ -6,6 +6,9 @@ from scipy.spatial.distance import cdist
 
 # Neuropy:
 from neuropy.core.position import build_position_df_resampled_to_time_windows # used in DecoderResultDisplayingPlot2D.setup()
+from neuropy.analyses.placefields import PfND
+# from neuropy.utils.debug_helpers import debug_print_placefield, debug_print_subsession_neuron_differences, debug_print_ratemap, debug_print_spike_counts, debug_plot_2d_binning, print_aligned_columns
+# from neuropy.utils.debug_helpers import parameter_sweeps, _plot_parameter_sweep, compare_placefields_info
 
 from neuropy.analyses.placefields import PfND
 from .reconstruction import BayesianPlacemapPositionDecoder
@@ -317,8 +320,7 @@ def perform_leave_one_aclu_out_decoding_analysis(spikes_df, active_pos_df, activ
 
 
 
-# def perform_full_session_leave_one_out_decoding_analysis(sess, decoding_time_bin_size = 0.02, cache_suffix = ''):
-def perform_full_session_leave_one_out_decoding_analysis(sess, original_1D_decoder = None, decoding_time_bin_size = 0.02, cache_suffix = ''):
+def perform_full_session_leave_one_out_decoding_analysis(sess, original_1D_decoder=None, decoding_time_bin_size = 0.02, cache_suffix = ''):
     """ Performs a full session leave one out decoding analysis.
 
     Args:
@@ -367,12 +369,14 @@ def perform_full_session_leave_one_out_decoding_analysis(sess, original_1D_decod
 
     active_filter_epochs = Epoch(active_filter_epochs)
 
-    # ## Build the new decoder (if not provided):
     if original_1D_decoder is None:
+        ## Build the new decoder (if not provided):
         active_pos = active_pos_df.position.to_Position_obj() # convert back to a full position object
         original_decoder_pf1D = PfND(deepcopy(pyramidal_only_spikes_df), deepcopy(active_pos.linear_pos_obj)) # all other settings default
         ## Build the new decoder:
         original_1D_decoder = BayesianPlacemapPositionDecoder(decoding_time_bin_size, original_decoder_pf1D, original_decoder_pf1D.filtered_spikes_df.copy(), debug_print=False)
+    else:
+        print(f'reusing extant decoder.')
 
     # -- Part 1 -- perform the decoding:
     original_1D_decoder, all_included_filter_epochs_decoder_result, one_left_out_decoder_dict, one_left_out_filter_epochs_decoder_result_dict, one_left_out_omitted_aclu_distance_df, most_contributing_aclus = perform_leave_one_aclu_out_decoding_analysis(pyramidal_only_spikes_df, active_pos_df, active_filter_epochs, original_1D_decoder=original_1D_decoder, decoding_time_bin_size=decoding_time_bin_size)
