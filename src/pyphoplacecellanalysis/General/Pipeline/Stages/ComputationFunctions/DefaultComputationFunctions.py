@@ -574,16 +574,16 @@ def _subfn_compute_decoded_epochs(computation_result, active_config, filter_epoc
 # 2023-03-15 Surprise/Leave-One-Out Analyses                                                                           #
 # ==================================================================================================================== #
 
-def _subfn_reshape_for_each_epoch_to_for_each_cell(data, epoch_IDXs, neuron_IDs):
-    """ Reshape to -for-each-epoch instead of -for-each-cell
-        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.DefaultComputationFunctions import _subfn_reshape_for_each_epoch_to_for_each_cell
-        flat_all_epochs_cell_data, all_epochs_cell_data = _subfn_reshape_for_each_epoch_to_for_each_cell(data, epoch_IDXs=np.arange(active_filter_epochs.n_epochs), neuron_IDs=original_1D_decoder.neuron_IDs)
-    """
-    all_epochs_cell_data = []
-    for decoded_epoch_idx in epoch_IDXs:
-        all_epochs_cell_data.append(np.array([data[aclu][decoded_epoch_idx] for aclu in neuron_IDs]))
-    flat_all_epochs_cell_data = np.hstack(all_epochs_cell_data) # .shape (65, 4584) -- (n_neurons, n_epochs * n_timebins_for_epoch_i), combines across all time_bins within all epochs
-    return flat_all_epochs_cell_data, all_epochs_cell_data
+# def _subfn_reshape_for_each_epoch_to_for_each_cell(data, epoch_IDXs, neuron_IDs):
+#     """ UNUSED: Reshape to -for-each-epoch instead of -for-each-cell
+#         from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.DefaultComputationFunctions import _subfn_reshape_for_each_epoch_to_for_each_cell
+#         flat_all_epochs_cell_data, all_epochs_cell_data = _subfn_reshape_for_each_epoch_to_for_each_cell(data, epoch_IDXs=np.arange(active_filter_epochs.n_epochs), neuron_IDs=original_1D_decoder.neuron_IDs)
+#     """
+#     all_epochs_cell_data = []
+#     for decoded_epoch_idx in epoch_IDXs:
+#         all_epochs_cell_data.append(np.array([data[aclu][decoded_epoch_idx] for aclu in neuron_IDs]))
+#     flat_all_epochs_cell_data = np.hstack(all_epochs_cell_data) # .shape (65, 4584) -- (n_neurons, n_epochs * n_timebins_for_epoch_i), combines across all time_bins within all epochs
+#     return flat_all_epochs_cell_data, all_epochs_cell_data
 
 def _subfn_compute_leave_one_out_analysis(active_pos_df, active_filter_epochs, original_1D_decoder, one_left_out_decoder_dict, one_left_out_filter_epochs_decoder_result_dict):
     """ 2023-03-15 - Kamran's Leave-One-Out-Surprise - Main leave-one-out surprise computation:
@@ -687,7 +687,6 @@ def _subfn_compute_leave_one_out_analysis(active_pos_df, active_filter_epochs, o
                                                         )
     one_left_out_omitted_aclu_distance_df.sort_values(by='avg_dist', ascending=False, inplace=True) # this sort reveals the aclu values that when omitted had the largest performance decrease on decoding (as indicated by a larger distance)
     most_contributing_aclus = one_left_out_omitted_aclu_distance_df.omitted_aclu.values
-
 
     ## Reshape to -for-each-epoch instead of -for-each-cell
     all_epochs_decoded_epoch_time_bins = []
