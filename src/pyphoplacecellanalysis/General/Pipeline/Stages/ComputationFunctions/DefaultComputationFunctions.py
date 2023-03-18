@@ -592,53 +592,103 @@ def _subfn_compute_leave_one_out_analysis(original_1D_decoder, one_left_out_deco
 
     Usage:
         from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.DefaultComputationFunctions import _subfn_compute_leave_one_out_analysis
-        original_1D_decoder, all_included_filter_epochs_decoder_result, one_left_out_decoder_dict, one_left_out_filter_epochs_decoder_result_dict, one_left_out_omitted_aclu_distance_df, most_contributing_aclus = perform_leave_one_aclu_out_decoding_analysis(pyramidal_only_spikes_df, active_pos_df, active_filter_epochs)
-        flat_all_epochs_decoded_epoch_time_bins, flat_all_epochs_computed_surprises, all_epochs_decoded_epoch_time_bins_mean, all_epochs_computed_cell_surprises_mean, all_epochs_all_cells_computed_surprises_mean = _subfn_compute_leave_one_out_analysis(original_1D_decoder, one_left_out_decoder_dict, one_left_out_filter_epochs_decoder_result_dict, active_filter_epochs)
+        original_1D_decoder, all_included_filter_epochs_decoder_result, one_left_out_decoder_dict, one_left_out_filter_epochs_decoder_result_dict = perform_leave_one_aclu_out_decoding_analysis(pyramidal_only_spikes_df, active_pos_df, active_filter_epochs)
+        flat_all_epochs_decoded_epoch_time_bins, flat_all_epochs_computed_surprises, all_epochs_decoded_epoch_time_bins_mean, all_epochs_computed_cell_surprises_mean, all_epochs_all_cells_computed_surprises_mean, one_left_out_omitted_aclu_distance_df, most_contributing_aclus = _subfn_compute_leave_one_out_analysis(original_1D_decoder, one_left_out_decoder_dict, one_left_out_filter_epochs_decoder_result_dict, active_filter_epochs)
 
 
     """
+
+    active_pos_df = original_1D_decoder.pos_df.copy()
+
+
     all_cells_decoded_epoch_time_bins = {}
     all_cells_computed_epoch_surprises = {}
 
     # Secondary computations
     all_cells_decoded_expected_firing_rates = {}
+    ## Compute the impact leaving each aclu out had on the average encoding performance:
+    one_left_out_omitted_aclu_distance = {}
 
     num_cells = original_1D_decoder.num_neurons
 
     ## for each cell:
-    for i, aclu in enumerate(original_1D_decoder.neuron_IDs):
+    for i, left_out_aclu in enumerate(original_1D_decoder.neuron_IDs):
         # aclu = original_1D_decoder.neuron_IDs[i]
-        unit_IDX = original_1D_decoder.neuron_IDXs[i] # should just be i, but just to be safe
+        left_out_neuron_IDX = original_1D_decoder.neuron_IDXs[i] # should just be i, but just to be safe
         ## TODO: only look at bins where the cell fires (is_cell_firing_time_bin[i])
-        curr_cell_tuning_curve = original_1D_decoder.pf.ratemap.tuning_curves[unit_IDX]
+        curr_cell_tuning_curve = original_1D_decoder.pf.ratemap.tuning_curves[left_out_neuron_IDX]
         # curr_cell_spike_curve = original_1D_decoder.pf.ratemap.spikes_maps[unit_IDX] ## not occupancy weighted... is this the right one to use for computing the expected spike rate? NO... doesn't seem like it
 
-        curr_cell_one_left_out_decoder_result = one_left_out_filter_epochs_decoder_result_dict[aclu]
+        left_out_decoder_result = one_left_out_filter_epochs_decoder_result_dict[left_out_aclu]
         ## single cell outputs:
         curr_cell_decoded_epoch_time_bins = [] # will be a list of the time bins in each epoch that correspond to each surprise in the corresponding list in curr_cell_computed_epoch_surprises 
         curr_cell_computed_epoch_surprises = [] # will be a list of np.arrays, with each array representing the surprise of each time bin in each epoch
-        all_cells_decoded_expected_firing_rates[aclu] = [] 
+        all_cells_decoded_expected_firing_rates[left_out_aclu] = [] 
         
         # have one list of posteriors p_x_given_n for each decoded epoch (active_filter_epochs.n_epochs):
-        assert len(curr_cell_one_left_out_decoder_result.p_x_given_n_list) == active_filter_epochs.n_epochs
-        for decoded_epoch_idx in np.arange(active_filter_epochs.n_epochs):
-            curr_epoch_time_bins = curr_cell_one_left_out_decoder_result.time_bin_containers[decoded_epoch_idx]
-            curr_epoch_p_x_given_n = curr_cell_one_left_out_decoder_result.p_x_given_n_list[decoded_epoch_idx] # .shape: (239, 5) - (n_x_bins, n_epoch_time_bins)
+        assert len(left_out_decoder_result.p_x_given_n_list) == active_filter_epochs.n_epochs == left_out_decoder_result.num_filter_epochs
+
+        ## Compute the impact leaving each aclu out had on the average encoding performance:
+        ### 1. The distance between the actual measured position and the decoded position at each timepoint for each decoder. A larger magnitude difference implies a stronger, more positive effect on the decoding quality.
+        one_left_out_omitted_aclu_distance[left_out_aclu] = [] # list to hold the distance results from the epochs
+        ## Iterate through each of the epochs for the given left_out_aclu (and its decoder), each of which has its own result
+
+        for decoded_epoch_idx in np.arange(left_out_decoder_result.num_filter_epochs):
+            curr_epoch_time_bin_container = left_out_decoder_result.time_bin_containers[decoded_epoch_idx]
+            curr_time_bins = curr_epoch_time_bin_container.centers
+            curr_epoch_p_x_given_n = left_out_decoder_result.p_x_given_n_list[decoded_epoch_idx] # .shape: (239, 5) - (n_x_bins, n_epoch_time_bins)
             assert curr_epoch_p_x_given_n.shape[0] == curr_cell_tuning_curve.shape[0]
             
+            ## Need to exclude estimates from bins that didn't have any spikes in them (in general these glitch around):
+            curr_total_spike_counts_per_window = np.sum(left_out_decoder_result.spkcount[decoded_epoch_idx], axis=0) # left_out_decoder_result.spkcount[i].shape # (69, 222) - (nCells, nTimeWindowCenters)
+            curr_is_time_bin_non_firing = (curr_total_spike_counts_per_window == 0) # this would mean that no cells fired in this time bin
+            # curr_non_firing_time_bin_indicies = np.where(curr_is_time_bin_non_firing)[0] # TODO: could also filter on a minimum number of spikes larger than zero (e.g. at least 2 spikes are required).
+            curr_posterior_container = left_out_decoder_result.marginal_x_list[decoded_epoch_idx]
+            curr_posterior = curr_posterior_container.p_x_given_n # TODO: check the posteriors too!
+            curr_most_likely_positions = curr_posterior_container.most_likely_positions_1D
+
+            ## Compute the distance metric for this epoch:
+
+            # Interpolate the measured positions to the window center times:
+            window_center_measured_pos_x = np.interp(curr_time_bins, active_pos_df.t, active_pos_df.lin_pos)
+            # ## PLOT_ONLY: NaN out the most_likely_positions that don't have spikes.
+            # curr_most_likely_valid_positions = deepcopy(curr_most_likely_positions)
+            # curr_most_likely_valid_positions[curr_non_firing_time_bin_indicies] = np.nan
+            
+            ## Computed the distance metric finally:
+            # is it fair to only compare the valid (windows containing at least one spike) windows?
+            curr_omit_aclu_distance = distance.cdist(np.atleast_2d(window_center_measured_pos_x[~curr_is_time_bin_non_firing]), np.atleast_2d(curr_most_likely_positions[~curr_is_time_bin_non_firing]), 'sqeuclidean') # squared-euclidian distance between the two vectors
+            # curr_omit_aclu_distance comes back double-wrapped in np.arrays for some reason (array([[659865.11994352]])), so .item() extracts the scalar value
+            curr_omit_aclu_distance = curr_omit_aclu_distance.item()
+            
+            one_left_out_omitted_aclu_distance[left_out_aclu].append(curr_omit_aclu_distance)
+
+
+
             # Compute the expected firing rate for this cell during each bin by taking the computed position posterior and taking the sum of the element-wise product with the cell's placefield.
             # curr_epoch_expected_fr = np.array([np.sum(curr_cell_spike_curve * curr_p_x_given_n) for curr_p_x_given_n in curr_epoch_p_x_given_n.T]) / original_1D_decoder.time_bin_size
-            curr_epoch_expected_fr = original_1D_decoder.pf.ratemap.tuning_curve_unsmoothed_peak_firing_rates[unit_IDX] * np.array([np.sum(curr_cell_tuning_curve * curr_p_x_given_n) for curr_p_x_given_n in curr_epoch_p_x_given_n.T]) # * original_1D_decoder.pf.ratemap.
-            all_cells_decoded_expected_firing_rates[aclu].append(curr_epoch_expected_fr)
+            curr_epoch_expected_fr = original_1D_decoder.pf.ratemap.tuning_curve_unsmoothed_peak_firing_rates[left_out_neuron_IDX] * np.array([np.sum(curr_cell_tuning_curve * curr_p_x_given_n) for curr_p_x_given_n in curr_epoch_p_x_given_n.T]) # * original_1D_decoder.pf.ratemap.
+            all_cells_decoded_expected_firing_rates[left_out_aclu].append(curr_epoch_expected_fr)
             
             # Compute the Jensen-Shannon Distance as a measure of surprise between the placefield and the posteriors
             curr_epoch_surprises = np.array([distance.jensenshannon(curr_cell_tuning_curve, curr_p_x_given_n) for curr_p_x_given_n in curr_epoch_p_x_given_n.T]) # works! Finite! [0.5839003679903784, 0.5839003679903784, 0.6997779781969289, 0.7725622595699131, 0.5992295785891731]
             curr_cell_computed_epoch_surprises.append(curr_epoch_surprises)
-            curr_cell_decoded_epoch_time_bins.append(curr_epoch_time_bins)
+            curr_cell_decoded_epoch_time_bins.append(curr_epoch_time_bin_container)
 
+        ## End loop over decoded epochs
         assert len(curr_cell_decoded_epoch_time_bins) == len(curr_cell_computed_epoch_surprises)
-        all_cells_decoded_epoch_time_bins[aclu] = curr_cell_decoded_epoch_time_bins
-        all_cells_computed_epoch_surprises[aclu] = curr_cell_computed_epoch_surprises
+        all_cells_decoded_epoch_time_bins[left_out_aclu] = curr_cell_decoded_epoch_time_bins
+        all_cells_computed_epoch_surprises[left_out_aclu] = curr_cell_computed_epoch_surprises
+
+    ## End loop over cells
+    # build a dataframe version to hold the distances:
+    one_left_out_omitted_aclu_distance_df = pd.DataFrame({'omitted_aclu':np.array(list(one_left_out_omitted_aclu_distance.keys())),
+                                                        'distance': list(one_left_out_omitted_aclu_distance.values()),
+                                                        'avg_dist': [np.mean(v) for v in one_left_out_omitted_aclu_distance.values()]}
+                                                        )
+    one_left_out_omitted_aclu_distance_df.sort_values(by='avg_dist', ascending=False, inplace=True) # this sort reveals the aclu values that when omitted had the largest performance decrease on decoding (as indicated by a larger distance)
+    most_contributing_aclus = one_left_out_omitted_aclu_distance_df.omitted_aclu.values
+
 
     ## Reshape to -for-each-epoch instead of -for-each-cell
     all_epochs_decoded_epoch_time_bins = []
@@ -665,7 +715,8 @@ def _subfn_compute_leave_one_out_analysis(original_1D_decoder, one_left_out_deco
     all_epochs_all_cells_computed_surprises_mean = np.mean(all_epochs_computed_cell_surprises_mean, axis=1) # average across all cells .shape (614,) - (n_epochs,)
 
     ## Output variables: flat_all_epochs_decoded_epoch_time_bins, flat_all_epochs_computed_surprises, flat_all_epochs_computed_expected_cell_firing_rates, all_epochs_decoded_epoch_time_bins_mean, all_epochs_computed_cell_surprises_mean, all_epochs_all_cells_computed_surprises_mean
-    return flat_all_epochs_decoded_epoch_time_bins, flat_all_epochs_computed_surprises, flat_all_epochs_computed_expected_cell_firing_rates, all_epochs_decoded_epoch_time_bins_mean, all_epochs_computed_cell_surprises_mean, all_epochs_all_cells_computed_surprises_mean
+    return flat_all_epochs_decoded_epoch_time_bins, flat_all_epochs_computed_surprises, flat_all_epochs_computed_expected_cell_firing_rates, all_epochs_decoded_epoch_time_bins_mean, all_epochs_computed_cell_surprises_mean, all_epochs_all_cells_computed_surprises_mean, one_left_out_omitted_aclu_distance_df, most_contributing_aclus
+
 
 
 
