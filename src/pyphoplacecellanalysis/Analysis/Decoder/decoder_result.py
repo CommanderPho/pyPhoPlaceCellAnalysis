@@ -336,7 +336,7 @@ def perform_full_session_leave_one_out_decoding_analysis(sess, original_1D_decod
     from neuropy.core.epoch import Epoch
     # for caching/saving:
     from pyphoplacecellanalysis.General.Pipeline.Stages.Loading import loadData, saveData
-    from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.DefaultComputationFunctions import _subfn_compute_leave_one_out_analysis
+    from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.DefaultComputationFunctions import _analyze_leave_one_out_decoding_results
 
     if cache_suffix is not None:
         ### Build a folder to store the temporary outputs:

@@ -585,7 +585,7 @@ def _subfn_compute_decoded_epochs(computation_result, active_config, filter_epoc
 #     flat_all_epochs_cell_data = np.hstack(all_epochs_cell_data) # .shape (65, 4584) -- (n_neurons, n_epochs * n_timebins_for_epoch_i), combines across all time_bins within all epochs
 #     return flat_all_epochs_cell_data, all_epochs_cell_data
 
-def _subfn_compute_leave_one_out_analysis(active_pos_df, active_filter_epochs, original_1D_decoder, one_left_out_decoder_dict, one_left_out_filter_epochs_decoder_result_dict):
+def _analyze_leave_one_out_decoding_results(active_pos_df, active_filter_epochs, original_1D_decoder, all_included_filter_epochs_decoder_result, one_left_out_decoder_dict, one_left_out_filter_epochs_decoder_result_dict):
     """ 2023-03-15 - Kamran's Leave-One-Out-Surprise - Main leave-one-out surprise computation:
 
         [9:28 AM] Diba, Kamran
