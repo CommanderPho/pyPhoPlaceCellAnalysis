@@ -268,6 +268,21 @@ def perform_leave_one_aclu_out_decoding_analysis(spikes_df, active_pos_df, activ
         filter_epochs_decoder_result.epoch_description_list = deepcopy(filter_epoch_description_list) # PLOT_ONLY
         one_left_out_filter_epochs_decoder_result_dict[left_out_aclu] = filter_epochs_decoder_result
 
+    """ Returns:
+        original_1D_decoder: original decoder with all aclu values included
+        all_included_filter_epochs_decoder_result: the decoder result for the original decoder with all aclu values included
+        one_left_out_decoder_dict: a dictionary of decoders, where each decoder has one less aclu than the original decoder. The key is the aclu that was omitted from the decoder.
+        one_left_out_filter_epochs_decoder_result_dict: a dictionary of decoder results for each of the decoders in one_left_out_decoder_dict. The key is the aclu that was omitted from the decoder.
+    """
+    return original_all_included_decoder, all_included_filter_epochs_decoder_result, one_left_out_decoder_dict, one_left_out_filter_epochs_decoder_result_dict
+
+
+def _temp_analyze(active_pos_df, one_left_out_filter_epochs_decoder_result_dict):
+    """2023-03-17 - Analyze the results of the leave-one-out decoding analysis.
+
+    Factored out of `perform_leave_one_aclu_out_decoding_analysis` for separation of concerns.
+
+    """
     ## Compute the impact leaving each aclu out had on the average encoding performance:
     one_left_out_omitted_aclu_distance = {}
     for left_out_aclu, left_out_decoder_result in one_left_out_filter_epochs_decoder_result_dict.items():
@@ -275,14 +290,14 @@ def perform_leave_one_aclu_out_decoding_analysis(spikes_df, active_pos_df, activ
         ### 1. The distance between the actual measured position and the decoded position at each timepoint for each decoder. A larger magnitude difference implies a stronger, more positive effect on the decoding quality.
         one_left_out_omitted_aclu_distance[left_out_aclu] = [] # list to hold the distance results from the epochs
         ## Iterate through each of the epochs for the given left_out_aclu (and its decoder), each of which has its own result
-        for i in np.arange(left_out_decoder_result.num_filter_epochs):
-            curr_time_bin_container = left_out_decoder_result.time_bin_containers[i]
+        for decoded_epoch_idx in np.arange(left_out_decoder_result.num_filter_epochs):
+            curr_time_bin_container = left_out_decoder_result.time_bin_containers[decoded_epoch_idx]
             curr_time_bins = curr_time_bin_container.centers
             ## Need to exclude estimates from bins that didn't have any spikes in them (in general these glitch around):
-            curr_total_spike_counts_per_window = np.sum(left_out_decoder_result.spkcount[i], axis=0) # left_out_decoder_result.spkcount[i].shape # (69, 222) - (nCells, nTimeWindowCenters)
+            curr_total_spike_counts_per_window = np.sum(left_out_decoder_result.spkcount[decoded_epoch_idx], axis=0) # left_out_decoder_result.spkcount[i].shape # (69, 222) - (nCells, nTimeWindowCenters)
             curr_is_time_bin_non_firing = (curr_total_spike_counts_per_window == 0) # this would mean that no cells fired in this time bin
             # curr_non_firing_time_bin_indicies = np.where(curr_is_time_bin_non_firing)[0] # TODO: could also filter on a minimum number of spikes larger than zero (e.g. at least 2 spikes are required).
-            curr_posterior_container = left_out_decoder_result.marginal_x_list[i]
+            curr_posterior_container = left_out_decoder_result.marginal_x_list[decoded_epoch_idx]
             curr_posterior = curr_posterior_container.p_x_given_n # TODO: check the posteriors too!
             curr_most_likely_positions = curr_posterior_container.most_likely_positions_1D
 
@@ -311,14 +326,11 @@ def perform_leave_one_aclu_out_decoding_analysis(spikes_df, active_pos_df, activ
     most_contributing_aclus = one_left_out_omitted_aclu_distance_df.omitted_aclu.values
 
     """ Returns:
-        original_1D_decoder: original decoder with all aclu values included
-        all_included_filter_epochs_decoder_result: the decoder result for the original decoder with all aclu values included
-        one_left_out_decoder_dict: a dictionary of decoders, where each decoder has one less aclu than the original decoder. The key is the aclu that was omitted from the decoder.
-        one_left_out_filter_epochs_decoder_result_dict: a dictionary of decoder results for each of the decoders in one_left_out_decoder_dict. The key is the aclu that was omitted from the decoder.
         one_left_out_omitted_aclu_distance_df: a dataframe of the distance metric for each of the decoders in one_left_out_decoder_dict. The index is the aclu that was omitted from the decoder.
         most_contributing_aclus: a list of aclu values, sorted by the largest performance decrease on decoding (as indicated by a larger distance)
     """
-    return original_all_included_decoder, all_included_filter_epochs_decoder_result, one_left_out_decoder_dict, one_left_out_filter_epochs_decoder_result_dict, one_left_out_omitted_aclu_distance_df, most_contributing_aclus
+    return one_left_out_omitted_aclu_distance_df, most_contributing_aclus
+
 
 # ==================================================================================================================== #
 # 2023-03-17 Surprise Analysis                                                                                         #
@@ -366,6 +378,9 @@ def perform_full_session_leave_one_out_decoding_analysis(sess, original_1D_decod
     Returns:
         decoder_result: the decoder result for the original decoder with all aclu values included
 
+    Calls:
+        perform_leave_one_aclu_out_decoding_analysis(...)
+        _subfn_compute_leave_one_out_analysis(...)
 
 
     Usage:
@@ -396,11 +411,9 @@ def perform_full_session_leave_one_out_decoding_analysis(sess, original_1D_decod
     if not 'stop' in active_filter_epochs.columns:
         # Make sure it has the 'stop' column which is expected as opposed to the 'end' column
         active_filter_epochs['stop'] = active_filter_epochs['end'].copy()
-        
     if not 'label' in active_filter_epochs.columns:
         # Make sure it has the 'stop' column which is expected as opposed to the 'end' column
         active_filter_epochs['label'] = active_filter_epochs['flat_replay_idx'].copy()
-
     active_filter_epochs = Epoch(active_filter_epochs)
 
     if original_1D_decoder is None:
@@ -413,7 +426,10 @@ def perform_full_session_leave_one_out_decoding_analysis(sess, original_1D_decod
         print(f'reusing extant decoder.')
 
     # -- Part 1 -- perform the decoding:
-    original_1D_decoder, all_included_filter_epochs_decoder_result, one_left_out_decoder_dict, one_left_out_filter_epochs_decoder_result_dict, one_left_out_omitted_aclu_distance_df, most_contributing_aclus = perform_leave_one_aclu_out_decoding_analysis(pyramidal_only_spikes_df, active_pos_df, active_filter_epochs, original_all_included_decoder=original_1D_decoder, decoding_time_bin_size=decoding_time_bin_size)
+    original_1D_decoder, all_included_filter_epochs_decoder_result, one_left_out_decoder_dict, one_left_out_filter_epochs_decoder_result_dict = perform_leave_one_aclu_out_decoding_analysis(pyramidal_only_spikes_df, active_pos_df, active_filter_epochs, original_all_included_decoder=original_1D_decoder, decoding_time_bin_size=decoding_time_bin_size)
+
+    one_left_out_omitted_aclu_distance_df, most_contributing_aclus = _temp_analyze(active_pos_df, one_left_out_filter_epochs_decoder_result_dict)
+
 
     # Save to file:
     if cache_suffix is not None:
