@@ -569,6 +569,11 @@ def _subfn_compute_decoded_epochs(computation_result, active_config, filter_epoc
     filter_epochs_decoder_result.epoch_description_list = epoch_description_list
     return filter_epochs_decoder_result, active_filter_epochs, default_figure_name
 
+
+# ==================================================================================================================== #
+# 2023-03-15 Surprise/Leave-One-Out Analyses                                                                           #
+# ==================================================================================================================== #
+
 def _subfn_reshape_for_each_epoch_to_for_each_cell(data, epoch_IDXs, neuron_IDs):
     """ Reshape to -for-each-epoch instead of -for-each-cell
         from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.DefaultComputationFunctions import _subfn_reshape_for_each_epoch_to_for_each_cell
@@ -580,7 +585,7 @@ def _subfn_reshape_for_each_epoch_to_for_each_cell(data, epoch_IDXs, neuron_IDs)
     flat_all_epochs_cell_data = np.hstack(all_epochs_cell_data) # .shape (65, 4584) -- (n_neurons, n_epochs * n_timebins_for_epoch_i), combines across all time_bins within all epochs
     return flat_all_epochs_cell_data, all_epochs_cell_data
 
-def _subfn_compute_leave_one_out_analysis(original_1D_decoder, one_left_out_decoder_dict, one_left_out_filter_epochs_decoder_result_dict, active_filter_epochs):
+def _subfn_compute_leave_one_out_analysis(active_pos_df, active_filter_epochs, original_1D_decoder, one_left_out_decoder_dict, one_left_out_filter_epochs_decoder_result_dict):
     """ 2023-03-15 - Kamran's Leave-One-Out-Surprise - Main leave-one-out surprise computation:
 
         [9:28 AM] Diba, Kamran
@@ -593,14 +598,10 @@ def _subfn_compute_leave_one_out_analysis(original_1D_decoder, one_left_out_deco
     Usage:
         from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.DefaultComputationFunctions import _subfn_compute_leave_one_out_analysis
         original_1D_decoder, all_included_filter_epochs_decoder_result, one_left_out_decoder_dict, one_left_out_filter_epochs_decoder_result_dict = perform_leave_one_aclu_out_decoding_analysis(pyramidal_only_spikes_df, active_pos_df, active_filter_epochs)
-        flat_all_epochs_decoded_epoch_time_bins, flat_all_epochs_computed_surprises, all_epochs_decoded_epoch_time_bins_mean, all_epochs_computed_cell_surprises_mean, all_epochs_all_cells_computed_surprises_mean, one_left_out_omitted_aclu_distance_df, most_contributing_aclus = _subfn_compute_leave_one_out_analysis(original_1D_decoder, one_left_out_decoder_dict, one_left_out_filter_epochs_decoder_result_dict, active_filter_epochs)
+        flat_all_epochs_decoded_epoch_time_bins, flat_all_epochs_computed_surprises, all_epochs_decoded_epoch_time_bins_mean, all_epochs_computed_cell_surprises_mean, all_epochs_all_cells_computed_surprises_mean, one_left_out_omitted_aclu_distance_df, most_contributing_aclus = _subfn_compute_leave_one_out_analysis(active_pos_df, active_filter_epochs, original_1D_decoder, one_left_out_decoder_dict, one_left_out_filter_epochs_decoder_result_dict)
 
 
     """
-
-    active_pos_df = original_1D_decoder.pos_df.copy()
-
-
     all_cells_decoded_epoch_time_bins = {}
     all_cells_computed_epoch_surprises = {}
 
@@ -662,8 +663,6 @@ def _subfn_compute_leave_one_out_analysis(original_1D_decoder, one_left_out_deco
             curr_omit_aclu_distance = curr_omit_aclu_distance.item()
             
             one_left_out_omitted_aclu_distance[left_out_aclu].append(curr_omit_aclu_distance)
-
-
 
             # Compute the expected firing rate for this cell during each bin by taking the computed position posterior and taking the sum of the element-wise product with the cell's placefield.
             # curr_epoch_expected_fr = np.array([np.sum(curr_cell_spike_curve * curr_p_x_given_n) for curr_p_x_given_n in curr_epoch_p_x_given_n.T]) / original_1D_decoder.time_bin_size
