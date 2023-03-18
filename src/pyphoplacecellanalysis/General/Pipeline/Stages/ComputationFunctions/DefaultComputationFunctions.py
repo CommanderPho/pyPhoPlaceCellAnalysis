@@ -604,6 +604,8 @@ def _analyze_leave_one_out_decoding_results(active_pos_df, active_filter_epochs,
     """
     all_cells_decoded_epoch_time_bins = {}
     all_cells_computed_epoch_surprises = {}
+    all_cells_computed_epoch_one_left_out_to_global_surprises = {}
+
 
     # Secondary computations
     all_cells_decoded_expected_firing_rates = {}
@@ -625,7 +627,9 @@ def _analyze_leave_one_out_decoding_results(active_pos_df, active_filter_epochs,
         curr_cell_decoded_epoch_time_bins = [] # will be a list of the time bins in each epoch that correspond to each surprise in the corresponding list in curr_cell_computed_epoch_surprises 
         curr_cell_computed_epoch_surprises = [] # will be a list of np.arrays, with each array representing the surprise of each time bin in each epoch
         all_cells_decoded_expected_firing_rates[left_out_aclu] = [] 
-        
+        all_cells_computed_epoch_one_left_out_to_global_surprises[left_out_aclu] = []
+
+
         # have one list of posteriors p_x_given_n for each decoded epoch (active_filter_epochs.n_epochs):
         assert len(left_out_decoder_result.p_x_given_n_list) == active_filter_epochs.n_epochs == left_out_decoder_result.num_filter_epochs
 
@@ -640,6 +644,10 @@ def _analyze_leave_one_out_decoding_results(active_pos_df, active_filter_epochs,
             curr_epoch_p_x_given_n = left_out_decoder_result.p_x_given_n_list[decoded_epoch_idx] # .shape: (239, 5) - (n_x_bins, n_epoch_time_bins)
             assert curr_epoch_p_x_given_n.shape[0] == curr_cell_tuning_curve.shape[0]
             
+            ## Get the all-included values too for this decoded_epoch_idx:
+            curr_epoch_all_included_p_x_given_n = all_included_filter_epochs_decoder_result.p_x_given_n_list[decoded_epoch_idx] # .shape: (239, 5) - (n_x_bins, n_epoch_time_bins)
+            assert curr_epoch_p_x_given_n.shape[0] == curr_epoch_all_included_p_x_given_n.shape[0]
+
             ## Need to exclude estimates from bins that didn't have any spikes in them (in general these glitch around):
             curr_total_spike_counts_per_window = np.sum(left_out_decoder_result.spkcount[decoded_epoch_idx], axis=0) # left_out_decoder_result.spkcount[i].shape # (69, 222) - (nCells, nTimeWindowCenters)
             curr_is_time_bin_non_firing = (curr_total_spike_counts_per_window == 0) # this would mean that no cells fired in this time bin
@@ -661,7 +669,6 @@ def _analyze_leave_one_out_decoding_results(active_pos_df, active_filter_epochs,
             curr_omit_aclu_distance = distance.cdist(np.atleast_2d(window_center_measured_pos_x[~curr_is_time_bin_non_firing]), np.atleast_2d(curr_most_likely_positions[~curr_is_time_bin_non_firing]), 'sqeuclidean') # squared-euclidian distance between the two vectors
             # curr_omit_aclu_distance comes back double-wrapped in np.arrays for some reason (array([[659865.11994352]])), so .item() extracts the scalar value
             curr_omit_aclu_distance = curr_omit_aclu_distance.item()
-            
             one_left_out_omitted_aclu_distance[left_out_aclu].append(curr_omit_aclu_distance)
 
             # Compute the expected firing rate for this cell during each bin by taking the computed position posterior and taking the sum of the element-wise product with the cell's placefield.
@@ -674,10 +681,14 @@ def _analyze_leave_one_out_decoding_results(active_pos_df, active_filter_epochs,
             curr_cell_computed_epoch_surprises.append(curr_epoch_surprises)
             curr_cell_decoded_epoch_time_bins.append(curr_epoch_time_bin_container)
 
+            all_cells_computed_epoch_one_left_out_to_global_surprises[left_out_aclu].append(np.array([distance.jensenshannon(curr_epoch_all_included_p_x_given_n, curr_p_x_given_n) for curr_p_x_given_n in curr_epoch_p_x_given_n.T])) 
+
+
         ## End loop over decoded epochs
         assert len(curr_cell_decoded_epoch_time_bins) == len(curr_cell_computed_epoch_surprises)
         all_cells_decoded_epoch_time_bins[left_out_aclu] = curr_cell_decoded_epoch_time_bins
         all_cells_computed_epoch_surprises[left_out_aclu] = curr_cell_computed_epoch_surprises
+
 
     ## End loop over cells
     # build a dataframe version to hold the distances:
@@ -692,16 +703,20 @@ def _analyze_leave_one_out_decoding_results(active_pos_df, active_filter_epochs,
     all_epochs_decoded_epoch_time_bins = []
     all_epochs_computed_surprises = []
     all_epochs_computed_expected_cell_firing_rates = []
+    all_epochs_computed_one_left_out_to_global_surprises = []
     for decoded_epoch_idx in np.arange(active_filter_epochs.n_epochs):
         all_epochs_decoded_epoch_time_bins.append(np.array([all_cells_decoded_epoch_time_bins[aclu][decoded_epoch_idx].centers for aclu in original_1D_decoder.neuron_IDs])) # these are duplicated (and the same) for each cell
         all_epochs_computed_surprises.append(np.array([all_cells_computed_epoch_surprises[aclu][decoded_epoch_idx] for aclu in original_1D_decoder.neuron_IDs]))
         all_epochs_computed_expected_cell_firing_rates.append(np.array([all_cells_decoded_expected_firing_rates[aclu][decoded_epoch_idx] for aclu in original_1D_decoder.neuron_IDs]))
-    
+        all_epochs_computed_one_left_out_to_global_surprises.append(np.array([all_cells_computed_epoch_one_left_out_to_global_surprises[aclu][decoded_epoch_idx] for aclu in original_1D_decoder.neuron_IDs]))
+
     assert len(all_epochs_computed_surprises) == active_filter_epochs.n_epochs
     assert len(all_epochs_computed_surprises[0]) == original_1D_decoder.num_neurons
     flat_all_epochs_decoded_epoch_time_bins = np.hstack(all_epochs_decoded_epoch_time_bins) # .shape (65, 4584) -- (n_neurons, n_epochs * n_timebins_for_epoch_i), combines across all time_bins within all epochs
     flat_all_epochs_computed_surprises = np.hstack(all_epochs_computed_surprises) # .shape (65, 4584) -- (n_neurons, n_epochs * n_timebins_for_epoch_i), combines across all time_bins within all epochs
     flat_all_epochs_computed_expected_cell_firing_rates = np.hstack(all_epochs_computed_expected_cell_firing_rates) # .shape (65, 4584) -- (n_neurons, n_epochs * n_timebins_for_epoch_i), combines across all time_bins within all epochs
+    flat_all_epochs_computed_one_left_out_to_global_surprises = np.hstack(all_epochs_computed_one_left_out_to_global_surprises) # .shape (65, 4584) -- (n_neurons, n_epochs * n_timebins_for_epoch_i), combines across all time_bins within all epochs
+
 
     ## Could also do but would need to loop over all epochs for each of the three variables:
     # flat_all_epochs_computed_expected_cell_firing_rates, all_epochs_computed_expected_cell_firing_rates = _subfn_reshape_for_each_epoch_to_for_each_cell(all_cells_decoded_expected_firing_rates, epoch_IDXs=np.arange(active_filter_epochs.n_epochs), neuron_IDs=original_1D_decoder.neuron_IDs)
@@ -709,16 +724,18 @@ def _analyze_leave_one_out_decoding_results(active_pos_df, active_filter_epochs,
     ## Aggregates over all time bins in each epoch:
     all_epochs_decoded_epoch_time_bins_mean = np.vstack([np.mean(curr_epoch_time_bins, axis=1) for curr_epoch_time_bins in all_epochs_decoded_epoch_time_bins]) # mean over all time bins in each epoch  # .shape (614, 65) - (n_epochs, n_neurons)
     all_epochs_computed_cell_surprises_mean = np.vstack([np.mean(curr_epoch_surprises, axis=1) for curr_epoch_surprises in all_epochs_computed_surprises]) # mean over all time bins in each epoch  # .shape (614, 65) - (n_epochs, n_neurons)
+    all_epochs_computed_cell_one_left_out_to_global_surprises_mean = np.vstack([np.mean(curr_epoch_surprises, axis=1) for curr_epoch_surprises in all_epochs_computed_one_left_out_to_global_surprises]) # mean over all time bins in each epoch  # .shape (614, 65) - (n_epochs, n_neurons)
+
     ## Aggregates over all cells and all time bins in each epoch:
     all_epochs_all_cells_computed_surprises_mean = np.mean(all_epochs_computed_cell_surprises_mean, axis=1) # average across all cells .shape (614,) - (n_epochs,)
+    all_epochs_all_cells_computed_one_left_out_to_global_surprises_mean = np.mean(all_epochs_computed_cell_one_left_out_to_global_surprises_mean, axis=1) # average across all cells .shape (614,) - (n_epochs,)
 
     """ Returns:
         one_left_out_omitted_aclu_distance_df: a dataframe of the distance metric for each of the decoders in one_left_out_decoder_dict. The index is the aclu that was omitted from the decoder.
         most_contributing_aclus: a list of aclu values, sorted by the largest performance decrease on decoding (as indicated by a larger distance)
     """
     ## Output variables: flat_all_epochs_decoded_epoch_time_bins, flat_all_epochs_computed_surprises, flat_all_epochs_computed_expected_cell_firing_rates, all_epochs_decoded_epoch_time_bins_mean, all_epochs_computed_cell_surprises_mean, all_epochs_all_cells_computed_surprises_mean
-    return flat_all_epochs_decoded_epoch_time_bins, flat_all_epochs_computed_surprises, flat_all_epochs_computed_expected_cell_firing_rates, all_epochs_decoded_epoch_time_bins_mean, all_epochs_computed_cell_surprises_mean, all_epochs_all_cells_computed_surprises_mean, one_left_out_omitted_aclu_distance_df, most_contributing_aclus
-
+    return flat_all_epochs_decoded_epoch_time_bins, flat_all_epochs_computed_surprises, flat_all_epochs_computed_expected_cell_firing_rates, flat_all_epochs_computed_one_left_out_to_global_surprises, all_epochs_decoded_epoch_time_bins_mean, all_epochs_computed_cell_surprises_mean, all_epochs_computed_cell_one_left_out_to_global_surprises_mean, all_epochs_all_cells_computed_surprises_mean, all_epochs_all_cells_computed_one_left_out_to_global_surprises_mean, one_left_out_omitted_aclu_distance_df, most_contributing_aclus
 
 
 
