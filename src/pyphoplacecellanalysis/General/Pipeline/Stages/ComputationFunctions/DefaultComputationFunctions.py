@@ -680,9 +680,8 @@ def _analyze_leave_one_out_decoding_results(active_pos_df, active_filter_epochs,
             curr_epoch_surprises = np.array([distance.jensenshannon(curr_cell_tuning_curve, curr_p_x_given_n) for curr_p_x_given_n in curr_epoch_p_x_given_n.T]) # works! Finite! [0.5839003679903784, 0.5839003679903784, 0.6997779781969289, 0.7725622595699131, 0.5992295785891731]
             curr_cell_computed_epoch_surprises.append(curr_epoch_surprises)
             curr_cell_decoded_epoch_time_bins.append(curr_epoch_time_bin_container)
-
-            all_cells_computed_epoch_one_left_out_to_global_surprises[left_out_aclu].append(np.array([distance.jensenshannon(curr_epoch_all_included_p_x_given_n, curr_p_x_given_n) for curr_p_x_given_n in curr_epoch_p_x_given_n.T])) 
-
+            # Compute the Jensen-Shannon Distance as a measure of surprise between the all-included and the one-left-out posteriors:
+            all_cells_computed_epoch_one_left_out_to_global_surprises[left_out_aclu].append(np.array([distance.jensenshannon(curr_all_included_p_x_given_n, curr_p_x_given_n) for curr_all_included_p_x_given_n, curr_p_x_given_n in zip(curr_epoch_all_included_p_x_given_n.T, curr_epoch_p_x_given_n.T)])) 
 
         ## End loop over decoded epochs
         assert len(curr_cell_decoded_epoch_time_bins) == len(curr_cell_computed_epoch_surprises)

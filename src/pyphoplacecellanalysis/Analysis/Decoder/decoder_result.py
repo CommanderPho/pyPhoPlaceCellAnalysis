@@ -305,7 +305,10 @@ class SurpriseAnalysisResult(object):
     all_epochs_decoded_epoch_time_bins_mean: np.ndarray
     all_epochs_computed_cell_surprises_mean: np.ndarray
     all_epochs_all_cells_computed_surprises_mean: np.ndarray
-    one_left_out_omitted_aclu_distance_df: pd.DataFrame
+    flat_all_epochs_computed_one_left_out_to_global_surprises: np.ndarray
+    all_epochs_computed_cell_one_left_out_to_global_surprises_mean: np.ndarray
+    all_epochs_all_cells_computed_one_left_out_to_global_surprises_mean: np.ndarray
+    one_left_out_omitted_aclu_distance_df: pd.core.frame.DataFrame
     most_contributing_aclus: np.ndarray
 
     # @staticmethod
@@ -413,6 +416,9 @@ def perform_full_session_leave_one_out_decoding_analysis(sess, original_1D_decod
                                                             all_epochs_decoded_epoch_time_bins_mean, all_epochs_computed_cell_surprises_mean, all_epochs_all_cells_computed_surprises_mean,
                                                             flat_all_epochs_computed_one_left_out_to_global_surprises, all_epochs_computed_cell_one_left_out_to_global_surprises_mean, all_epochs_all_cells_computed_one_left_out_to_global_surprises_mean,
                                                             one_left_out_omitted_aclu_distance_df, most_contributing_aclus))
+
+
+    # (active_filter_epochs, original_1D_decoder, all_included_filter_epochs_decoder_result, flat_all_epochs_measured_cell_spike_counts, flat_all_epochs_measured_cell_firing_rates, flat_all_epochs_decoded_epoch_time_bins, flat_all_epochs_computed_surprises, flat_all_epochs_computed_expected_cell_firing_rates, flat_all_epochs_difference_from_expected_cell_spike_counts, flat_all_epochs_difference_from_expected_cell_firing_rates, all_epochs_decoded_epoch_time_bins_mean, all_epochs_computed_cell_surprises_mean, all_epochs_all_cells_computed_surprises_mean, flat_all_epochs_computed_one_left_out_to_global_surprises, all_epochs_computed_cell_one_left_out_to_global_surprises_mean, all_epochs_all_cells_computed_one_left_out_to_global_surprises_mean, one_left_out_omitted_aclu_distance_df, most_contributing_aclus)
 
 
     return (active_filter_epochs, original_1D_decoder, all_included_filter_epochs_decoder_result, 
