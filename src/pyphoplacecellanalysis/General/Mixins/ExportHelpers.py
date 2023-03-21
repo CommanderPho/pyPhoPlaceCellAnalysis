@@ -67,10 +67,12 @@ def export_pyqtgraph_plot(graphics_item, savepath='fileName.png', progress_print
     
     ## create an exporter instance, as an argument give it the item you wish to export
     if file_extension == ExportFiletype.PNG.value:
-        exporter = pg.exporters.ImageExporter(graphics_item)
+        from pyphoplacecellanalysis.External.pyqtgraph.exporters.ImageExporter import ImageExporter
+        exporter = ImageExporter(graphics_item)
         kwargs = ({'width': 4096} | kwargs) # add 'width' to kwargs if not specified
     elif file_extension == ExportFiletype.SVG.value:
-        exporter = pg.exporters.SVGExporter(graphics_item)
+        from pyphoplacecellanalysis.External.pyqtgraph.exporters.SVGExporter import SVGExporter
+        exporter = SVGExporter(graphics_item)
     else:
         print(f'Unknown file_extension: {file_extension}')
         raise NotImplementedError
