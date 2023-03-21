@@ -82,9 +82,6 @@ class DecoderResultDisplayingBaseClass:
     @property
     def most_likely_positions(self):
         return self.decoder.most_likely_positions
-    
-
-
 
 class DecoderResultDisplayingPlot2D(DecoderResultDisplayingBaseClass):
     """ Displays the decoder for 2D position. """
@@ -218,9 +215,6 @@ class DecoderResultDisplayingPlot2D(DecoderResultDisplayingBaseClass):
         # anim = animation.FuncAnimation(figure, func=update_figure, fargs=(bar_rects, iteration), frames=generator, interval=100, repeat=False)
         # return (self.active_im,)
         return self.fig # returns fig
-
-
-
 
 
 def perform_leave_one_aclu_out_decoding_analysis(spikes_df, active_pos_df, active_filter_epochs, original_all_included_decoder=None, filter_epoch_description_list=None, decoding_time_bin_size=0.025):

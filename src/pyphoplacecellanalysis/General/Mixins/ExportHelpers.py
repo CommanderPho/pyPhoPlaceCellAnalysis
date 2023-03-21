@@ -8,6 +8,7 @@ import numpy as np
 from neuropy.utils.dynamic_container import overriding_dict_with # required for programmatic_display_to_PDF
 
 from pyphocorehelpers.DataStructure.dynamic_parameters import DynamicParameters
+from pyphocorehelpers.function_helpers import function_attributes
 
 # ==================================================================================================================== #
 # FIGURE/GRAPHICS EXPORT                                                                                               #
@@ -27,6 +28,7 @@ class ExportFiletype(Enum):
     PNG = '.png'
     SVG =  '.svg'
 
+@function_attributes(tags=['pyqtgraph', 'export', 'graphics', 'plot'])
 def export_pyqtgraph_plot(graphics_item, savepath='fileName.png', progress_print=True, **kwargs):
     """Takes a PlotItem, A GraphicsLayoutWidget, or other pyqtgraph item to be exported.
 

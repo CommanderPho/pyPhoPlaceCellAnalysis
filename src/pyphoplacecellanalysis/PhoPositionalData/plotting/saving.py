@@ -4,6 +4,7 @@ from matplotlib.backends.backend_pdf import PdfPages
 import matplotlib.pyplot as plt
 
 """ 
+#saving, #figures, #matplotlib, #pdf
 
 TODO: REORGANIZE_PLOTTER_SCRIPTS: matplotlib
 
