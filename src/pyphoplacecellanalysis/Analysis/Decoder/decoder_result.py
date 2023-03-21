@@ -274,36 +274,59 @@ def perform_leave_one_aclu_out_decoding_analysis(spikes_df, active_pos_df, activ
 # ==================================================================================================================== #
 # 2023-03-17 Surprise Analysis                                                                                         #
 # ==================================================================================================================== #
+from attrs import define, field
+# import cattrs 
 
-@dataclass
-class SurpriseAnalysisResult(object):
+@define
+class SurpriseAnalysisResult:
     """ 
 
     Built with:
         from pyphocorehelpers.general_helpers import GeneratedClassDefinitionType, CodeConversion
         CodeConversion.convert_dictionary_to_class_defn(long_results_dict, class_name='SurpriseAnalysisResult', class_definition_mode=GeneratedClassDefinitionType.DATACLASS)
-
+    n_neurons, n_epochs * n_timebins_for_epoch_i
+    {'n_neurons':67, 'n_epochs':625, 'n_total_time_bins':6855}
     Usage:
         from pyphoplacecellanalysis.Analysis.Decoder.decoder_result import SurpriseAnalysisResult
     """
     active_filter_epochs: Epoch
     original_1D_decoder: BayesianPlacemapPositionDecoder
     all_included_filter_epochs_decoder_result: DynamicContainer
-    flat_all_epochs_measured_cell_spike_counts: np.ndarray
-    flat_all_epochs_measured_cell_firing_rates: np.ndarray
-    flat_all_epochs_decoded_epoch_time_bins: np.ndarray
-    flat_all_epochs_computed_surprises: np.ndarray
-    flat_all_epochs_computed_expected_cell_firing_rates: np.ndarray
-    flat_all_epochs_difference_from_expected_cell_spike_counts: np.ndarray
-    flat_all_epochs_difference_from_expected_cell_firing_rates: np.ndarray
-    all_epochs_decoded_epoch_time_bins_mean: np.ndarray
-    all_epochs_computed_cell_surprises_mean: np.ndarray
-    all_epochs_all_cells_computed_surprises_mean: np.ndarray
-    flat_all_epochs_computed_one_left_out_to_global_surprises: np.ndarray
-    all_epochs_computed_cell_one_left_out_to_global_surprises_mean: np.ndarray
-    all_epochs_all_cells_computed_one_left_out_to_global_surprises_mean: np.ndarray
-    one_left_out_omitted_aclu_distance_df: pd.core.frame.DataFrame
-    most_contributing_aclus: np.ndarray
+    flat_all_epochs_measured_cell_spike_counts: np.ndarray = field(metadata={'shape': ('n_neurons', 'n_total_time_bins')})
+    flat_all_epochs_measured_cell_firing_rates: np.ndarray = field(metadata={'shape': ('n_neurons', 'n_total_time_bins')})
+    flat_all_epochs_decoded_epoch_time_bins: np.ndarray = field(metadata={'shape': ('n_neurons', 'n_total_time_bins')})
+    flat_all_epochs_computed_surprises: np.ndarray = field(metadata={'shape': ('n_neurons', 'n_total_time_bins')})
+    flat_all_epochs_computed_expected_cell_firing_rates: np.ndarray = field(metadata={'shape': ('n_neurons', 'n_total_time_bins')})
+    flat_all_epochs_difference_from_expected_cell_spike_counts: np.ndarray = field(metadata={'shape': ('n_neurons', 'n_total_time_bins')})
+    flat_all_epochs_difference_from_expected_cell_firing_rates: np.ndarray = field(metadata={'shape': ('n_neurons', 'n_total_time_bins')})
+    all_epochs_decoded_epoch_time_bins_mean: np.ndarray = field(metadata={'shape': ('n_epochs', 'n_neurons')})
+    all_epochs_computed_cell_surprises_mean: np.ndarray = field(metadata={'shape': ('n_epochs', 'n_neurons')})
+    all_epochs_all_cells_computed_surprises_mean: np.ndarray = field(metadata={'shape': ('n_epochs',)})
+    flat_all_epochs_computed_one_left_out_to_global_surprises: np.ndarray = field(metadata={'shape': ('n_neurons', 'n_total_time_bins')})
+    all_epochs_computed_cell_one_left_out_to_global_surprises_mean: np.ndarray = field(metadata={'shape': ('n_epochs', 'n_neurons')})
+    all_epochs_all_cells_computed_one_left_out_to_global_surprises_mean: np.ndarray = field(metadata={'shape': ('n_epochs',)})
+    one_left_out_omitted_aclu_distance_df: pd.core.frame.DataFrame = field(metadata={'shape': ('n_neurons', 3)})
+    most_contributing_aclus: np.ndarray = field(metadata={'shape': ('n_neurons',)})
+
+    # def __attrs_post_init__(self):
+    #     self.z = self.x + self.y
+
+    # def sliced_by_aclus(self, aclus):
+    #     """ returns a copy of itself sliced by the aclus provided. """
+    #     from attrs import asdict, fields, evolve
+    #     aclu_is_included = np.isin(self.original_1D_decoder.neuron_IDs, aclus)  #.shape # (104, 63)
+    #     def _filter_obj_attribute(an_attr, attr_value):
+    #         """ return attributes only if they have n_neurons in their shape metadata """
+    #         return ('n_neurons' in an_attr.metadata.get('shape', ()))            
+    #     _temp_obj_dict = asdict(self, filter=_filter_obj_attribute)
+    #     # Find all fields that contain a 'n_neurons':
+    #     neuron_indexed_attributes = [a_field for a_field in fields(type(self)) if ('n_neurons' in a_field.metadata.get('shape', ()))]
+    #     # neuron_shape_index_for_attributes = [a_field.metadata['shape'].index('n_neurons') for a_field in neuron_indexed_attributes]
+    #     neuron_shape_index_for_attribute_name_dict = {a_field.name:a_field.metadata['shape'].index('n_neurons') for a_field in neuron_indexed_attributes} # need the actual attributes so that we can get the .metadata['shape'] from them and find the n_neurons index location
+    #     _temp_obj_dict = {k:v.take(indices=aclu_is_included, axis=neuron_shape_index_for_attribute_name_dict[k]) for k, v in _temp_obj_dict.items()} # filter the n_neurons axis containing items to get a reduced dictionary
+    #     return evolve(self, **_temp_obj_dict)
+
+
 
     # @staticmethod
     # def _build_results_dict(a_results_tuple):
