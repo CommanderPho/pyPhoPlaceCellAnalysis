@@ -1,10 +1,11 @@
 from copy import deepcopy
 from pathlib import Path
-import pathlib
+from attrs import define, field, Factory # for DecodedFilterEpochsResult
+# import pathlib
 
 import numpy as np
 import pandas as pd
-from scipy.stats import multivariate_normal
+# from scipy.stats import multivariate_normal
 from scipy.special import factorial
 
 # import neuropy
@@ -14,14 +15,11 @@ from neuropy.utils.mixins.unit_slicing import NeuronUnitSlicableObjectProtocol #
 from neuropy.analyses.decoders import epochs_spkcount # for decode_specific_epochs
 from neuropy.utils.mixins.binning_helpers import BinningContainer # for epochs_spkcount getting the correct time bins
 
+from pyphocorehelpers.function_helpers import function_attributes
 from pyphocorehelpers.general_helpers import OrderedMeta
-from pyphocorehelpers.indexing_helpers import BinningInfo, compute_spanning_bins, build_spanning_grid_matrix
-from pyphocorehelpers.indexing_helpers import np_ffill_1D # for compute_corrected_positions(...)
-from pyphocorehelpers.print_helpers import WrappingMessagePrinter, SimplePrintable
+from pyphocorehelpers.indexing_helpers import BinningInfo, compute_spanning_bins, build_spanning_grid_matrix, np_ffill_1D # for compute_corrected_positions(...)
+from pyphocorehelpers.print_helpers import WrappingMessagePrinter, SimplePrintable, safe_get_variable_shape
 from pyphocorehelpers.mixins.serialized import SerializedAttributesSpecifyingClass
-
-from pyphocorehelpers.print_helpers import safe_get_variable_shape
-
 
 
 # cut_bins = np.linspace(59200, 60800, 9)
@@ -344,8 +342,29 @@ class Zhang_Two_Step:
     @classmethod
     def compute_bayesian_two_step_prob_single_timestep(cls, one_step_p_x_given_n, x_prev, all_x, sigma_t, C, k):
         return k * one_step_p_x_given_n * cls.compute_conditional_probability_x_prev_given_x_t(x_prev, all_x, sigma_t, C)
-
     
+
+
+@define
+class DecodedFilterEpochsResult(object):
+    """ Container for the results of decoding a set of epochs (filter_epochs) using a decoder (active_decoder) 
+    Usage:
+        from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import DecodedFilterEpochsResult
+
+    """
+    most_likely_positions_list: list
+    p_x_given_n_list: list
+    marginal_x_list: list
+    marginal_y_list: list
+    most_likely_position_indicies_list: list
+    spkcount: list
+    nbins: np.ndarray
+    time_bin_containers: list
+    decoding_time_bin_size: float
+    num_filter_epochs: int
+    time_bin_edges: list
+    epoch_description_list: list[str] = Factory(list)
+
 # ==================================================================================================================== #
 # Placemap Position Decoders                                                                                           #
 # ==================================================================================================================== #
@@ -804,6 +823,8 @@ class BayesianPlacemapPositionDecoder(NeuronUnitSlicableObjectProtocol, Placemap
         # np.shape(self.most_likely_position_flat_indicies) # (85841,)
         # np.shape(self.most_likely_position_indicies) # (2, 85841)
 
+    @function_attributes(short_name='decode_specific_epochs', tags=['decode'], input_requires=[], output_provides=[], creation_date='2023-03-23 19:10',
+        uses=['BayesianPlacemapPositionDecoder.perform_decode_specific_epochs'], used_by=[])
     def decode_specific_epochs(self, spikes_df, filter_epochs, decoding_time_bin_size = 0.05, debug_print=False):
         """ 
         Uses:
@@ -850,6 +871,9 @@ class BayesianPlacemapPositionDecoder(NeuronUnitSlicableObjectProtocol, Placemap
     # ==================================================================================================================== #
     # Non-Modifying Methods:                                                                                               #
     # ==================================================================================================================== #
+    @function_attributes(short_name='decode', tags=['decode', 'pure'], input_requires=[], output_provides=[], creation_date='2023-03-23 19:10',
+        uses=['BayesianPlacemapPositionDecoder.perform_compute_most_likely_positions', 'ZhangReconstructionImplementation.neuropy_bayesian_prob'],
+        used_by=['BayesianPlacemapPositionDecoder.perform_decode_specific_epochs'])
     def decode(self, unit_specific_time_binned_spike_counts, time_bin_size, output_flat_versions=False, debug_print=True):
         """ decodes the neural activity from its internal placefields, returning its posterior and the predicted position 
         Does not alter the internal state of the decoder (doesn't change internal most_likely_positions or posterior, etc)
@@ -907,6 +931,10 @@ class BayesianPlacemapPositionDecoder(NeuronUnitSlicableObjectProtocol, Placemap
         
             return most_likely_positions, p_x_given_n, most_likely_position_indicies, flat_outputs_container
             
+
+    @function_attributes(short_name='hyper_perform_decode', tags=['decode', 'pure'], input_requires=['self.neuron_IDs'], output_provides=[], creation_date='2023-03-23 19:10',
+        uses=['self.decode', 'BayesianPlacemapPositionDecoder.perform_build_marginals', 'epochs_spkcount'],
+        used_by=[])
     def hyper_perform_decode(self, spikes_df, decoding_time_bin_size=0.1, t_start=None, t_end=None, output_flat_versions=False, debug_print=False):
         """ Fully decodes the neural activity from its internal placefields, internally calling `self.decode(...)` and then in addition building the marginals and additional outputs.
 
@@ -944,9 +972,9 @@ class BayesianPlacemapPositionDecoder(NeuronUnitSlicableObjectProtocol, Placemap
     # ==================================================================================================================== #
     # Class/Static Methods                                                                                                 #
     # ==================================================================================================================== #
-        
+
     @classmethod
-    def perform_decode_specific_epochs(cls, active_decoder, spikes_df, filter_epochs, decoding_time_bin_size = 0.05, debug_print=False):
+    def perform_decode_specific_epochs(cls, active_decoder, spikes_df, filter_epochs, decoding_time_bin_size = 0.05, debug_print=False) -> DecodedFilterEpochsResult:
         """Uses the decoder to decode the nerual activity (provided in spikes_df) for each epoch in filter_epochs
 
         NOTE: Uses active_decoder.decode(...) to actually do the decoding
@@ -1005,11 +1033,11 @@ class BayesianPlacemapPositionDecoder(NeuronUnitSlicableObjectProtocol, Placemap
         filter_epochs_decoder_result.marginal_x_list = []
         filter_epochs_decoder_result.marginal_y_list = []
 
-        # half_decoding_time_bin_size = (decoding_time_bin_size/2.0)
-        for i, curr_unit_spkcount, curr_unit_num_bins, curr_unit_time_bin_container in zip(np.arange(num_filter_epochs), spkcount, nbins, time_bin_containers_list):
+        # Looks like we're iterating over each epoch in filter_epochs:
+        for i, curr_filter_epoch_spkcount, curr_epoch_num_time_bins, curr_filter_epoch_time_bin_container in zip(np.arange(num_filter_epochs), spkcount, nbins, time_bin_containers_list):
             ## New 2022-09-26 method with working time_bin_centers_list returned from epochs_spkcount
-            filter_epochs_decoder_result.time_bin_edges.append(curr_unit_time_bin_container.edges)            
-            most_likely_positions, p_x_given_n, most_likely_position_indicies, flat_outputs_container = active_decoder.decode(curr_unit_spkcount, time_bin_size=decoding_time_bin_size, output_flat_versions=False, debug_print=debug_print)
+            filter_epochs_decoder_result.time_bin_edges.append(curr_filter_epoch_time_bin_container.edges)            
+            most_likely_positions, p_x_given_n, most_likely_position_indicies, flat_outputs_container = active_decoder.decode(curr_filter_epoch_spkcount, time_bin_size=decoding_time_bin_size, output_flat_versions=False, debug_print=debug_print)
             filter_epochs_decoder_result.most_likely_positions_list.append(most_likely_positions)
             filter_epochs_decoder_result.p_x_given_n_list.append(p_x_given_n)
             filter_epochs_decoder_result.most_likely_position_indicies_list.append(most_likely_position_indicies)
@@ -1019,7 +1047,7 @@ class BayesianPlacemapPositionDecoder(NeuronUnitSlicableObjectProtocol, Placemap
             filter_epochs_decoder_result.marginal_x_list.append(curr_unit_marginal_x)
             filter_epochs_decoder_result.marginal_y_list.append(curr_unit_marginal_y)
         
-        return filter_epochs_decoder_result
+        return DecodedFilterEpochsResult(**filter_epochs_decoder_result.to_dict()) # dump the dynamic dict as kwargs into the class
     
     @classmethod
     def perform_build_marginals(cls, p_x_given_n, most_likely_positions, debug_print=False):

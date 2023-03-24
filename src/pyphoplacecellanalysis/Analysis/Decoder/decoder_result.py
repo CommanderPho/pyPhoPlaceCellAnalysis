@@ -14,6 +14,7 @@ from neuropy.core.epoch import Epoch
 from neuropy.utils.dynamic_container import DynamicContainer
 
 from pyphocorehelpers.indexing_helpers import find_neighbours
+from pyphocorehelpers.function_helpers import function_attributes
 
 from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BayesianPlacemapPositionDecoder # perform_leave_one_aclu_out_decoding_analysis
 
@@ -216,17 +217,26 @@ class DecoderResultDisplayingPlot2D(DecoderResultDisplayingBaseClass):
         # return (self.active_im,)
         return self.fig # returns fig
 
-
+@function_attributes(short_name='one_aclu_loo_decoding_analysis', tags=['decoding', 'loo'], input_requires=[], output_provides=[], creation_date='2023-03-03 00:00')
 def perform_leave_one_aclu_out_decoding_analysis(spikes_df, active_pos_df, active_filter_epochs, original_all_included_decoder=None, filter_epoch_description_list=None, decoding_time_bin_size=0.025):
     """2023-03-03 - Performs a "leave-one-out" decoding analysis where we leave out each neuron one at a time and see how the decoding degrades (which serves as an indicator of the importance of that neuron on the decoding performance).
 
     Usage:
         from pyphoplacecellanalysis.Analysis.Decoder.decoder_result import perform_leave_one_aclu_out_decoding_analysis
+
+    Called by:
+        `perform_full_session_leave_one_out_decoding_analysis(...)`
+
+    Restrictions:
+        '1D_only'
     """
 
     def _build_one_left_out_decoders(original_all_included_decoder):
         """ "Leave-one-out" decoding
         WARNING: this might suck up a ton of memory! 
+
+        `defer_compute_all=True` is used to skip computations until the decoder is actually used. This is useful for when we want to build a bunch of decoders and then use them all at once. This is the case here, where we want to build a bunch of decoders and then use them all at once to compute the decoding performance of each one.
+
         """
         original_neuron_ids = np.array(original_all_included_decoder.pf.ratemap.neuron_ids) # original_pf.included_neuron_IDs
         one_left_out_decoder_dict = {}
@@ -248,7 +258,9 @@ def perform_leave_one_aclu_out_decoding_analysis(spikes_df, active_pos_df, activ
     else:
         print(f'USING EXISTING original_1D_decoder.')
 
+    ## Decode all the epochs with the original decoder:
     all_included_filter_epochs_decoder_result = original_all_included_decoder.decode_specific_epochs(spikes_df, filter_epochs=active_filter_epochs, decoding_time_bin_size=decoding_time_bin_size, debug_print=False)
+
 
     # pretty dang inefficient, as there are 70 cells:
     one_left_out_decoder_dict = _build_one_left_out_decoders(original_all_included_decoder)
@@ -333,7 +345,7 @@ class SurpriseAnalysisResult:
     #     active_filter_epochs, original_1D_decoder, all_included_filter_epochs_decoder_result, flat_all_epochs_measured_cell_spike_counts, flat_all_epochs_measured_cell_firing_rates, flat_all_epochs_decoded_epoch_time_bins, flat_all_epochs_computed_surprises, flat_all_epochs_computed_expected_cell_firing_rates, flat_all_epochs_difference_from_expected_cell_spike_counts, flat_all_epochs_difference_from_expected_cell_firing_rates, all_epochs_decoded_epoch_time_bins_mean, all_epochs_computed_cell_surprises_mean, all_epochs_all_cells_computed_surprises_mean = a_results_tuple
     #     return {'active_filter_epochs':active_filter_epochs, 'original_1D_decoder':original_1D_decoder, 'all_included_filter_epochs_decoder_result':all_included_filter_epochs_decoder_result, 'flat_all_epochs_measured_cell_spike_counts':flat_all_epochs_measured_cell_spike_counts, 'flat_all_epochs_measured_cell_firing_rates':flat_all_epochs_measured_cell_firing_rates, 'flat_all_epochs_decoded_epoch_time_bins':flat_all_epochs_decoded_epoch_time_bins, 'flat_all_epochs_computed_surprises':flat_all_epochs_computed_surprises, 'flat_all_epochs_computed_expected_cell_firing_rates':flat_all_epochs_computed_expected_cell_firing_rates, 'flat_all_epochs_difference_from_expected_cell_spike_counts':flat_all_epochs_difference_from_expected_cell_spike_counts, 'flat_all_epochs_difference_from_expected_cell_firing_rates':flat_all_epochs_difference_from_expected_cell_firing_rates, 'all_epochs_decoded_epoch_time_bins_mean':all_epochs_decoded_epoch_time_bins_mean, 'all_epochs_computed_cell_surprises_mean':all_epochs_computed_cell_surprises_mean, 'all_epochs_all_cells_computed_surprises_mean':all_epochs_all_cells_computed_surprises_mean}
 
-
+@function_attributes(short_name='session_loo_decoding_analysis', tags=['decoding', 'loo'], input_requires=[], output_provides=[], creation_date='2023-03-17 00:00')
 def perform_full_session_leave_one_out_decoding_analysis(sess, original_1D_decoder=None, decoding_time_bin_size = 0.02, cache_suffix = ''):
     """ 2023-03-17 - Performs a full session leave one out decoding analysis.
 
