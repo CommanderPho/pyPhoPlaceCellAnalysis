@@ -736,6 +736,21 @@ def _analyze_leave_one_out_decoding_results(active_pos_df, active_filter_epochs,
     ## Output variables: flat_all_epochs_decoded_epoch_time_bins, flat_all_epochs_computed_surprises, flat_all_epochs_computed_expected_cell_firing_rates, all_epochs_decoded_epoch_time_bins_mean, all_epochs_computed_cell_surprises_mean, all_epochs_all_cells_computed_surprises_mean
     return flat_all_epochs_decoded_epoch_time_bins, flat_all_epochs_computed_surprises, flat_all_epochs_computed_expected_cell_firing_rates, flat_all_epochs_computed_one_left_out_to_global_surprises, all_epochs_decoded_epoch_time_bins_mean, all_epochs_computed_cell_surprises_mean, all_epochs_computed_cell_one_left_out_to_global_surprises_mean, all_epochs_all_cells_computed_surprises_mean, all_epochs_all_cells_computed_one_left_out_to_global_surprises_mean, one_left_out_omitted_aclu_distance_df, most_contributing_aclus
 
+
+from attrs import define, field, Factory
+
+
+@define
+class LeaveOneOutDecodingResult(object):
+    """Docstring for ClassName."""
+    one_left_out_to_global_surprises: type = Factory(dict)
+    one_left_out_posterior_to_pf_surprises: type = Factory(dict)
+    one_left_out_posterior_to_scrambled_pf_surprises: type = Factory(dict)
+
+    one_left_out_to_global_surprises_mean: type = Factory(dict)
+    shuffle_IDXs: np.array = None
+
+
 def _SHELL_analyze_leave_one_out_decoding_results(active_pos_df, active_filter_epochs, original_1D_decoder, all_included_filter_epochs_decoder_result, one_left_out_decoder_dict, one_left_out_filter_epochs_decoder_result_dict):
     """ 2023-03-23 - Aims to generalize the `_analyze_leave_one_out_decoding_results`
 
@@ -748,7 +763,23 @@ def _SHELL_analyze_leave_one_out_decoding_results(active_pos_df, active_filter_e
     """
     all_cells_decoded_epoch_time_bins = {}
     all_cells_computed_epoch_surprises = {}
+
+
+
     all_cells_computed_epoch_one_left_out_to_global_surprises = {}
+
+
+    def shuffle_ids(neuron_ids, seed:int=1337):
+        import random
+        shuffle_IDXs = list(range(len(neuron_ids)))
+        random.Random(seed).shuffle(shuffle_IDXs) # shuffle the list of indicies
+        shuffle_IDXs = np.array(shuffle_IDXs)
+        return neuron_ids[shuffle_IDXs], shuffle_IDXs
+
+    shuffled_aclus, shuffle_IDXs = shuffle_ids(original_1D_decoder.neuron_IDs)
+
+    result = LeaveOneOutDecodingResult(shuffle_IDXs=shuffle_IDXs)
+    result.one_left_out_posterior_to_scrambled_pf_surprises
 
 
     # Secondary computations
@@ -764,13 +795,14 @@ def _SHELL_analyze_leave_one_out_decoding_results(active_pos_df, active_filter_e
         curr_cell_pf_curve = original_1D_decoder.pf.ratemap.tuning_curves[left_out_neuron_IDX]
         # curr_cell_spike_curve = original_1D_decoder.pf.ratemap.spikes_maps[unit_IDX] ## not occupancy weighted... is this the right one to use for computing the expected spike rate? NO... doesn't seem like it
 
+        shuffled_cell_pf_curve = original_1D_decoder.pf.ratemap.tuning_curves[shuffle_IDXs[i]]
+
         left_out_decoder_result = one_left_out_filter_epochs_decoder_result_dict[left_out_aclu]
         ## single cell outputs:
         curr_cell_decoded_epoch_time_bins = [] # will be a list of the time bins in each epoch that correspond to each surprise in the corresponding list in curr_cell_computed_epoch_surprises 
         curr_cell_computed_epoch_surprises = [] # will be a list of np.arrays, with each array representing the surprise of each time bin in each epoch
         all_cells_decoded_expected_firing_rates[left_out_aclu] = [] 
         all_cells_computed_epoch_one_left_out_to_global_surprises[left_out_aclu] = []
-
 
         # have one list of posteriors p_x_given_n for each decoded epoch (active_filter_epochs.n_epochs):
         assert len(left_out_decoder_result.p_x_given_n_list) == active_filter_epochs.n_epochs == left_out_decoder_result.num_filter_epochs
@@ -779,7 +811,6 @@ def _SHELL_analyze_leave_one_out_decoding_results(active_pos_df, active_filter_e
         ### 1. The distance between the actual measured position and the decoded position at each timepoint for each decoder. A larger magnitude difference implies a stronger, more positive effect on the decoding quality.
         one_left_out_omitted_aclu_distance[left_out_aclu] = [] # list to hold the distance results from the epochs
         ## Iterate through each of the epochs for the given left_out_aclu (and its decoder), each of which has its own result
-
         for decoded_epoch_idx in np.arange(left_out_decoder_result.num_filter_epochs):
             curr_epoch_time_bin_container = left_out_decoder_result.time_bin_containers[decoded_epoch_idx]
             curr_time_bins = curr_epoch_time_bin_container.centers
@@ -822,8 +853,13 @@ def _SHELL_analyze_leave_one_out_decoding_results(active_pos_df, active_filter_e
             curr_epoch_surprises = np.array([distance.jensenshannon(curr_cell_pf_curve, curr_p_x_given_n) for curr_p_x_given_n in curr_epoch_p_x_given_n.T]) # works! Finite! [0.5839003679903784, 0.5839003679903784, 0.6997779781969289, 0.7725622595699131, 0.5992295785891731]
             curr_cell_computed_epoch_surprises.append(curr_epoch_surprises)
             curr_cell_decoded_epoch_time_bins.append(curr_epoch_time_bin_container)
+
             # Compute the Jensen-Shannon Distance as a measure of surprise between the all-included and the one-left-out posteriors:
             all_cells_computed_epoch_one_left_out_to_global_surprises[left_out_aclu].append(np.array([distance.jensenshannon(curr_all_included_p_x_given_n, curr_p_x_given_n) for curr_all_included_p_x_given_n, curr_p_x_given_n in zip(curr_epoch_all_included_p_x_given_n.T, curr_epoch_p_x_given_n.T)])) 
+
+            # The shuffled cell's placefield and the posterior from leaving a cell out:
+            result.one_left_out_posterior_to_scrambled_pf_surprises[left_out_aclu].append(np.array([distance.jensenshannon(shuffled_cell_pf_curve, curr_p_x_given_n) for curr_p_x_given_n in curr_epoch_p_x_given_n.T]))
+            result.one_left_out_posterior_to_pf_surprises[left_out_aclu].append(np.array([distance.jensenshannon(curr_cell_pf_curve, curr_p_x_given_n) for curr_p_x_given_n in curr_epoch_p_x_given_n.T])) # works! Finite! [0.5839003679903784, 0.5839003679903784, 0.6997779781969289, 0.7725622595699131, 0.5992295785891731]
 
         ## End loop over decoded epochs
         assert len(curr_cell_decoded_epoch_time_bins) == len(curr_cell_computed_epoch_surprises)
@@ -876,7 +912,7 @@ def _SHELL_analyze_leave_one_out_decoding_results(active_pos_df, active_filter_e
         most_contributing_aclus: a list of aclu values, sorted by the largest performance decrease on decoding (as indicated by a larger distance)
     """
     ## Output variables: flat_all_epochs_decoded_epoch_time_bins, flat_all_epochs_computed_surprises, flat_all_epochs_computed_expected_cell_firing_rates, all_epochs_decoded_epoch_time_bins_mean, all_epochs_computed_cell_surprises_mean, all_epochs_all_cells_computed_surprises_mean
-    return flat_all_epochs_decoded_epoch_time_bins, flat_all_epochs_computed_surprises, flat_all_epochs_computed_expected_cell_firing_rates, flat_all_epochs_computed_one_left_out_to_global_surprises, all_epochs_decoded_epoch_time_bins_mean, all_epochs_computed_cell_surprises_mean, all_epochs_computed_cell_one_left_out_to_global_surprises_mean, all_epochs_all_cells_computed_surprises_mean, all_epochs_all_cells_computed_one_left_out_to_global_surprises_mean, one_left_out_omitted_aclu_distance_df, most_contributing_aclus
+    return flat_all_epochs_decoded_epoch_time_bins, flat_all_epochs_computed_surprises, flat_all_epochs_computed_expected_cell_firing_rates, flat_all_epochs_computed_one_left_out_to_global_surprises, all_epochs_decoded_epoch_time_bins_mean, all_epochs_computed_cell_surprises_mean, all_epochs_computed_cell_one_left_out_to_global_surprises_mean, all_epochs_all_cells_computed_surprises_mean, all_epochs_all_cells_computed_one_left_out_to_global_surprises_mean, one_left_out_omitted_aclu_distance_df, most_contributing_aclus, result
 
 
 # ==================================================================================================================== #
