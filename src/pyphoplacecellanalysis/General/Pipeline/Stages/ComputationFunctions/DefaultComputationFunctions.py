@@ -764,13 +764,13 @@ def _SHELL_analyze_leave_one_out_decoding_results(active_pos_df, active_filter_e
     all_cells_decoded_epoch_time_bins = {}
     all_cells_computed_epoch_surprises = {}
 
-
-
     all_cells_computed_epoch_one_left_out_to_global_surprises = {}
 
 
     def shuffle_ids(neuron_ids, seed:int=1337):
         import random
+        if not isinstance(neuron_ids, np.ndarray):
+            neuron_ids = np.array(neuron_ids)
         shuffle_IDXs = list(range(len(neuron_ids)))
         random.Random(seed).shuffle(shuffle_IDXs) # shuffle the list of indicies
         shuffle_IDXs = np.array(shuffle_IDXs)
@@ -801,8 +801,13 @@ def _SHELL_analyze_leave_one_out_decoding_results(active_pos_df, active_filter_e
         ## single cell outputs:
         curr_cell_decoded_epoch_time_bins = [] # will be a list of the time bins in each epoch that correspond to each surprise in the corresponding list in curr_cell_computed_epoch_surprises 
         curr_cell_computed_epoch_surprises = [] # will be a list of np.arrays, with each array representing the surprise of each time bin in each epoch
+
+        ## Must pre-allocate each with an empty list:
         all_cells_decoded_expected_firing_rates[left_out_aclu] = [] 
         all_cells_computed_epoch_one_left_out_to_global_surprises[left_out_aclu] = []
+        result.one_left_out_posterior_to_scrambled_pf_surprises[left_out_aclu] = []
+        result.one_left_out_posterior_to_pf_surprises[left_out_aclu] = []
+        result.one_left_out_to_global_surprises[left_out_aclu] = []
 
         # have one list of posteriors p_x_given_n for each decoded epoch (active_filter_epochs.n_epochs):
         assert len(left_out_decoder_result.p_x_given_n_list) == active_filter_epochs.n_epochs == left_out_decoder_result.num_filter_epochs

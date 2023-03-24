@@ -346,7 +346,7 @@ class SurpriseAnalysisResult:
     #     return {'active_filter_epochs':active_filter_epochs, 'original_1D_decoder':original_1D_decoder, 'all_included_filter_epochs_decoder_result':all_included_filter_epochs_decoder_result, 'flat_all_epochs_measured_cell_spike_counts':flat_all_epochs_measured_cell_spike_counts, 'flat_all_epochs_measured_cell_firing_rates':flat_all_epochs_measured_cell_firing_rates, 'flat_all_epochs_decoded_epoch_time_bins':flat_all_epochs_decoded_epoch_time_bins, 'flat_all_epochs_computed_surprises':flat_all_epochs_computed_surprises, 'flat_all_epochs_computed_expected_cell_firing_rates':flat_all_epochs_computed_expected_cell_firing_rates, 'flat_all_epochs_difference_from_expected_cell_spike_counts':flat_all_epochs_difference_from_expected_cell_spike_counts, 'flat_all_epochs_difference_from_expected_cell_firing_rates':flat_all_epochs_difference_from_expected_cell_firing_rates, 'all_epochs_decoded_epoch_time_bins_mean':all_epochs_decoded_epoch_time_bins_mean, 'all_epochs_computed_cell_surprises_mean':all_epochs_computed_cell_surprises_mean, 'all_epochs_all_cells_computed_surprises_mean':all_epochs_all_cells_computed_surprises_mean}
 
 @function_attributes(short_name='session_loo_decoding_analysis', tags=['decoding', 'loo'], input_requires=[], output_provides=[], creation_date='2023-03-17 00:00')
-def perform_full_session_leave_one_out_decoding_analysis(sess, original_1D_decoder=None, decoding_time_bin_size = 0.02, cache_suffix = '', skip_cache_save:bool = True):
+def perform_full_session_leave_one_out_decoding_analysis(sess, original_1D_decoder=None, decoding_time_bin_size = 0.02, cache_suffix = '', skip_cache_save:bool = True, perform_cache_load:bool = False):
     """ 2023-03-17 - Performs a full session leave one out decoding analysis.
 
     Args:
@@ -370,7 +370,7 @@ def perform_full_session_leave_one_out_decoding_analysis(sess, original_1D_decod
     from pyphoplacecellanalysis.General.Pipeline.Stages.Loading import loadData, saveData
     from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.DefaultComputationFunctions import _analyze_leave_one_out_decoding_results, _SHELL_analyze_leave_one_out_decoding_results
 
-    if cache_suffix is not None and skip_cache_save is False:
+    if cache_suffix is not None and ((skip_cache_save is False) or (perform_cache_load is True)):
         ### Build a folder to store the temporary outputs:
         output_data_folder = sess.get_output_path()
 
@@ -404,17 +404,23 @@ def perform_full_session_leave_one_out_decoding_analysis(sess, original_1D_decod
     else:
         print(f'reusing extant decoder.')
 
-    # -- Part 1 -- perform the decoding:
-    original_1D_decoder, all_included_filter_epochs_decoder_result, one_left_out_decoder_dict, one_left_out_filter_epochs_decoder_result_dict = perform_leave_one_aclu_out_decoding_analysis(pyramidal_only_spikes_df, active_pos_df, active_filter_epochs, original_all_included_decoder=original_1D_decoder, decoding_time_bin_size=decoding_time_bin_size)
-    # one_left_out_omitted_aclu_distance_df, most_contributing_aclus = _temp_analyze(active_pos_df, one_left_out_filter_epochs_decoder_result_dict)
+    leave_one_out_result_pickle_path = output_data_folder.joinpath(f'leave_one_out_results{cache_suffix}.pkl').resolve()
+    if cache_suffix is not None and leave_one_out_result_pickle_path.exists() and perform_cache_load:
+        # loading
+        print(f'Loading leave_one_out_result_pickle_path: {leave_one_out_result_pickle_path}')
+        active_filter_epochs, original_1D_decoder, all_included_filter_epochs_decoder_result, one_left_out_decoder_dict, one_left_out_filter_epochs_decoder_result_dict = loadData(leave_one_out_result_pickle_path)
 
+    else:
+        # -- Part 1 -- perform the decoding:
+        original_1D_decoder, all_included_filter_epochs_decoder_result, one_left_out_decoder_dict, one_left_out_filter_epochs_decoder_result_dict = perform_leave_one_aclu_out_decoding_analysis(pyramidal_only_spikes_df, active_pos_df, active_filter_epochs, original_all_included_decoder=original_1D_decoder, decoding_time_bin_size=decoding_time_bin_size)
+        # one_left_out_omitted_aclu_distance_df, most_contributing_aclus = _temp_analyze(active_pos_df, one_left_out_filter_epochs_decoder_result_dict)
+        # Save to file:
+        if cache_suffix is not None and skip_cache_save is False:
+            leave_one_out_result_pickle_path = output_data_folder.joinpath(f'leave_one_out_results{cache_suffix}.pkl').resolve()
+            print(f'leave_one_out_result_pickle_path: {leave_one_out_result_pickle_path}')
+            saveData(leave_one_out_result_pickle_path, (active_filter_epochs, original_1D_decoder, all_included_filter_epochs_decoder_result, one_left_out_decoder_dict, one_left_out_filter_epochs_decoder_result_dict))
 
-    # Save to file:
-    if cache_suffix is not None and skip_cache_save is False:
-        leave_one_out_result_pickle_path = output_data_folder.joinpath(f'leave_one_out_results{cache_suffix}.pkl').resolve()
-        print(f'leave_one_out_result_pickle_path: {leave_one_out_result_pickle_path}')
-        saveData(leave_one_out_result_pickle_path, (active_filter_epochs, original_1D_decoder, all_included_filter_epochs_decoder_result, one_left_out_decoder_dict, one_left_out_filter_epochs_decoder_result_dict))
-
+    
     # -- Part 2 -- perform the analysis on the decoder results:
     flat_all_epochs_decoded_epoch_time_bins, flat_all_epochs_computed_surprises, flat_all_epochs_computed_expected_cell_firing_rates, flat_all_epochs_computed_one_left_out_to_global_surprises, all_epochs_decoded_epoch_time_bins_mean, all_epochs_computed_cell_surprises_mean, all_epochs_computed_cell_one_left_out_to_global_surprises_mean, all_epochs_all_cells_computed_surprises_mean, all_epochs_all_cells_computed_one_left_out_to_global_surprises_mean, one_left_out_omitted_aclu_distance_df, most_contributing_aclus, result = _SHELL_analyze_leave_one_out_decoding_results(active_pos_df, active_filter_epochs, original_1D_decoder, all_included_filter_epochs_decoder_result, one_left_out_decoder_dict, one_left_out_filter_epochs_decoder_result_dict)
 
