@@ -288,6 +288,8 @@ def perform_leave_one_aclu_out_decoding_analysis(spikes_df, active_pos_df, activ
 # ==================================================================================================================== #
 from attrs import define, field
 # import cattrs 
+from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.DefaultComputationFunctions import LeaveOneOutDecodingResult
+
 
 @define
 class SurpriseAnalysisResult:
@@ -319,6 +321,7 @@ class SurpriseAnalysisResult:
     all_epochs_all_cells_computed_one_left_out_to_global_surprises_mean: np.ndarray = field(metadata={'shape': ('n_epochs',)})
     one_left_out_omitted_aclu_distance_df: pd.core.frame.DataFrame = field(metadata={'shape': ('n_neurons', 3)})
     most_contributing_aclus: np.ndarray = field(metadata={'shape': ('n_neurons',)})
+    result: LeaveOneOutDecodingResult = None
 
     # def __attrs_post_init__(self):
     #     self.z = self.x + self.y

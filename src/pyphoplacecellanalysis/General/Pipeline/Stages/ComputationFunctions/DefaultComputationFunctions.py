@@ -742,7 +742,12 @@ from attrs import define, field, Factory
 
 @define
 class LeaveOneOutDecodingResult(object):
-    """Docstring for ClassName."""
+    """Docstring for ClassName.
+    
+    Usage:
+        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.DefaultComputationFunctions import LeaveOneOutDecodingResult
+
+    """
     one_left_out_to_global_surprises: type = Factory(dict)
     one_left_out_posterior_to_pf_surprises: type = Factory(dict)
     one_left_out_posterior_to_scrambled_pf_surprises: type = Factory(dict)
@@ -838,9 +843,6 @@ def _SHELL_analyze_leave_one_out_decoding_results(active_pos_df, active_filter_e
 
             # Interpolate the measured positions to the window center times:
             window_center_measured_pos_x = np.interp(curr_time_bins, active_pos_df.t, active_pos_df.lin_pos)
-            # ## PLOT_ONLY: NaN out the most_likely_positions that don't have spikes.
-            # curr_most_likely_valid_positions = deepcopy(curr_most_likely_positions)
-            # curr_most_likely_valid_positions[curr_non_firing_time_bin_indicies] = np.nan
             
             ## Computed the distance metric finally:
             # is it fair to only compare the valid (windows containing at least one spike) windows?
@@ -850,7 +852,6 @@ def _SHELL_analyze_leave_one_out_decoding_results(active_pos_df, active_filter_e
             one_left_out_omitted_aclu_distance[left_out_aclu].append(curr_omit_aclu_distance)
 
             # Compute the expected firing rate for this cell during each bin by taking the computed position posterior and taking the sum of the element-wise product with the cell's placefield.
-            # curr_epoch_expected_fr = np.array([np.sum(curr_cell_spike_curve * curr_p_x_given_n) for curr_p_x_given_n in curr_epoch_p_x_given_n.T]) / original_1D_decoder.time_bin_size
             curr_epoch_expected_fr = original_1D_decoder.pf.ratemap.tuning_curve_unsmoothed_peak_firing_rates[left_out_neuron_IDX] * np.array([np.sum(curr_cell_pf_curve * curr_p_x_given_n) for curr_p_x_given_n in curr_epoch_p_x_given_n.T]) # * original_1D_decoder.pf.ratemap.
             all_cells_decoded_expected_firing_rates[left_out_aclu].append(curr_epoch_expected_fr)
             
@@ -864,7 +865,7 @@ def _SHELL_analyze_leave_one_out_decoding_results(active_pos_df, active_filter_e
 
             # The shuffled cell's placefield and the posterior from leaving a cell out:
             result.one_left_out_posterior_to_scrambled_pf_surprises[left_out_aclu].append(np.array([distance.jensenshannon(shuffled_cell_pf_curve, curr_p_x_given_n) for curr_p_x_given_n in curr_epoch_p_x_given_n.T]))
-            result.one_left_out_posterior_to_pf_surprises[left_out_aclu].append(np.array([distance.jensenshannon(curr_cell_pf_curve, curr_p_x_given_n) for curr_p_x_given_n in curr_epoch_p_x_given_n.T])) # works! Finite! [0.5839003679903784, 0.5839003679903784, 0.6997779781969289, 0.7725622595699131, 0.5992295785891731]
+            result.one_left_out_posterior_to_pf_surprises[left_out_aclu].append(np.array([distance.jensenshannon(curr_cell_pf_curve, curr_p_x_given_n) for curr_p_x_given_n in curr_epoch_p_x_given_n.T]))
 
         ## End loop over decoded epochs
         assert len(curr_cell_decoded_epoch_time_bins) == len(curr_cell_computed_epoch_surprises)
