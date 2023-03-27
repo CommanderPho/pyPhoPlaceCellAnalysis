@@ -373,9 +373,9 @@ def perform_full_session_leave_one_out_decoding_analysis(sess, original_1D_decod
     from pyphoplacecellanalysis.General.Pipeline.Stages.Loading import loadData, saveData
     from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.DefaultComputationFunctions import _analyze_leave_one_out_decoding_results, _SHELL_analyze_leave_one_out_decoding_results
 
-    if cache_suffix is not None and ((skip_cache_save is False) or (perform_cache_load is True)):
-        ### Build a folder to store the temporary outputs:
-        output_data_folder = sess.get_output_path()
+    # if (cache_suffix is not None) and ((skip_cache_save is False) or (perform_cache_load is True)):
+    ### Build a folder to store the temporary outputs:
+    output_data_folder = sess.get_output_path()
 
     ## Get testing variables from `sess`
     spikes_df = sess.spikes_df
@@ -430,6 +430,7 @@ def perform_full_session_leave_one_out_decoding_analysis(sess, original_1D_decod
     ## Flatten the measured spike counts over the time bins within all epochs to get something of the same shape as `flat_all_epochs_decoded_epoch_time_bins`:
     flat_all_epochs_measured_cell_spike_counts = np.hstack(all_included_filter_epochs_decoder_result.spkcount) # .shape (65, 4584) -- (n_neurons, n_epochs * n_timebins_for_epoch_i), combines across all time_bins within all epochs
     assert flat_all_epochs_computed_expected_cell_firing_rates.shape == flat_all_epochs_measured_cell_spike_counts.shape, f"{flat_all_epochs_measured_cell_spike_counts.shape = } != {flat_all_epochs_computed_expected_cell_firing_rates.shape =}"
+
     ## Get the time bins where each cell is firing (has more than one spike):
     is_cell_firing_time_bin = (flat_all_epochs_measured_cell_spike_counts > 0)
 
