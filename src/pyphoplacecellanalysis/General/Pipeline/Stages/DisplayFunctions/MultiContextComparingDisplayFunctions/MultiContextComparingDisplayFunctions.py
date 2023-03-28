@@ -1151,6 +1151,8 @@ def plot_short_v_long_pf1D_scalar_overlap_comparison(overlap_scalars_df, pf_neur
         (fig_long_pf_1D, ax_long_pf_1D, long_sort_ind, long_neurons_colors_array), (fig_short_pf_1D, ax_short_pf_1D, short_sort_ind, short_neurons_colors_array) = plot_short_v_long_pf1D_scalar_overlap_comparison(long_results, short_results, curr_any_context_neurons, reuse_axs_tuple=reuse_axs_tuple, single_figure=True)
 
     """
+    from neuropy.utils.matplotlib_helpers import add_value_labels # for adding small labels beside each point indicating their ACLU
+
     if not isinstance(overlap_metric_mode, PlacefieldOverlapMetricMode):
         overlap_metric_mode = PlacefieldOverlapMetricMode.init(overlap_metric_mode)
 
@@ -1195,54 +1197,7 @@ def plot_short_v_long_pf1D_scalar_overlap_comparison(overlap_scalars_df, pf_neur
     ax.set_xlabel('Cell ID (aclu)')
     ax.set_ylabel(f'{titlecase_desc} Overlap')
     ax.set_xticklabels(x_labels)
-
-    def add_value_labels(ax, spacing=5, labels=None):
-        """Add labels to the end (top) of each bar in a bar chart.
-
-        Arguments:
-            ax (matplotlib.axes.Axes): The matplotlib object containing the axes
-                of the plot to annotate.
-            spacing (int): The distance between the labels and the bars.
-        """
-
-        # For each bar: Place a label
-        for i, rect in enumerate(ax.patches):
-            # Get X and Y placement of label from rect.
-            y_value = rect.get_height()
-            x_value = rect.get_x() + rect.get_width() / 2
-
-            # Number of points between bar and label. Change to your liking.
-            space = spacing
-            # Vertical alignment for positive values
-            va = 'bottom'
-
-            # If value of bar is negative: Place label below bar
-            if y_value < 0:
-                # Invert space to place label below
-                space *= -1
-                # Vertically align label at top
-                va = 'top'
-
-            # Use Y value as label and format number with one decimal place
-            if labels is None:
-                label = "{:.1f}".format(y_value)
-                # # Use cell ID (given by x position) as the label
-                label = "{}".format(x_value)
-            else:
-                label = str(labels[i])
-                
-            # Create annotation
-            ax.annotate(
-                label,                      # Use `label` as label
-                (x_value, y_value),         # Place label at end of the bar
-                xytext=(0, space),          # Vertically shift label by `space`
-                textcoords="offset points", # Interpret `xytext` as offset in points
-                ha='center',                # Horizontally center label
-                va=va,                      # Vertically align label differently for positive and negative values.
-                color=rect.get_facecolor(),
-                rotation=90)                      
-                                            # 
-
+    
     # Call the function above. All the magic happens there.
     add_value_labels(ax, labels=x_labels) # 
 
