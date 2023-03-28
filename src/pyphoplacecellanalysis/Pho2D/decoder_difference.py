@@ -5,7 +5,10 @@ from matplotlib.patches import FancyArrowPatch, FancyArrow
 from matplotlib import patheffects
 
 from pyphocorehelpers.gui.interaction_helpers import CallbackWrapper
+from pyphocorehelpers.function_helpers import function_attributes
 
+
+@function_attributes(short_name='predicted_position_difference', tags=['display', 'display_helper'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-03-28 04:52')
 def display_predicted_position_difference(active_one_step_decoder, active_two_step_decoder, active_resampled_measured_positions):
     """ Draw difference between predicted and measured position 
     

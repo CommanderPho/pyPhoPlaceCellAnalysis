@@ -13,6 +13,7 @@ from neuropy.plotting.ratemaps import plot_ratemap_1D # for plot_short_v_long_pf
 from neuropy.utils.matplotlib_helpers import build_or_reuse_figure # used for `_make_pho_jonathan_batch_plots(...)`
 from neuropy.utils.mixins.print_helpers import ProgressMessagePrinter # for `_plot_long_short_firing_rate_indicies`
 
+from pyphocorehelpers.function_helpers import function_attributes
 from pyphocorehelpers.mixins.member_enumerating import AllFunctionEnumeratingMixin
 from pyphocorehelpers.plotting.figure_management import PhoActiveFigureManager2D # for plot_short_v_long_pf1D_comparison (_display_short_long_pf1D_comparison)
 from pyphocorehelpers.DataStructure.RenderPlots.MatplotLibRenderPlots import MatplotlibRenderPlots
@@ -206,7 +207,7 @@ class MultiContextComparingDisplayFunctions(AllFunctionEnumeratingMixin, metacla
 
 
     def _display_short_long_pf1D_comparison(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_whitelist=None, **kwargs):
-            """ Displays a figure for comparing the 1D placefields across-epochs (between the short and long tracks)
+            """ Displays a figure for comparing the 1D placefields across-epochs (between the short and long tracks). By default renders the second track's placefield flipped over the x-axis and hatched. 
                 Usage:
 
                     %matplotlib qt
@@ -1133,7 +1134,7 @@ def plot_short_v_long_pf1D_comparison(long_results, short_results, curr_any_cont
 
 @mpl.rc_context(Fig.get_mpl_style(style='figPublish'))
 def plot_short_v_long_pf1D_scalar_overlap_comparison(overlap_scalars_df, pf_neurons_diff, neurons_colors_array, reuse_axs_tuple=None, single_figure=False, overlap_metric_mode=PlacefieldOverlapMetricMode.POLY, variant_name='', debug_print=False):
-    """ Produces a figure to compare *a scalar value* the 1D placefields on the long vs. the short track. 
+    """ Produces a figure containing a bar chart to compare *a scalar value* the 1D placefields on the long vs. the short track. 
     poly_overlap_df: pd.DataFrame - computed by compute_polygon_overlap(...)
     pf_neurons_diff: pd.DataFrame - 
     single_figure:bool - if True, both long and short are plotted on the same axes of a single shared figure. Otherwise seperate figures are used for each

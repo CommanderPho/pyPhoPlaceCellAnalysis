@@ -13,6 +13,7 @@ from pathlib import Path
 
 ## Pho's Custom Libraries:
 from pyphocorehelpers.Filesystem.path_helpers import find_first_extant_path
+from pyphocorehelpers.function_helpers import function_attributes
 
 # pyPhoPlaceCellAnalysis:
 
@@ -59,7 +60,7 @@ class BatchRun(object):
             self.execute_session(curr_session_context) # evaluate a single session
 
 
-
+@function_attributes(short_name='run_diba_batch', tags=['batch', 'automated', 'kdiba'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-03-28 04:46')
 def run_diba_batch(global_data_root_parent_path: Path, execute_all:bool = False, extant_batch_run = None, debug_print:bool=False):
     """ 
     from pyphoplacecellanalysis.General.Batch.runBatch import BatchRun, run_diba_batch, run_specific_batch
@@ -167,7 +168,7 @@ def run_diba_batch(global_data_root_parent_path: Path, execute_all:bool = False,
 
     # session_batch_status
 
-
+@function_attributes(short_name='run_specific_batch', tags=['batch', 'automated'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-03-28 04:46')
 def run_specific_batch(active_batch_run: BatchRun, curr_session_context: IdentifyingContext, curr_session_basedir: Path, force_reload=True):
     # curr_session_context
     
@@ -201,7 +202,7 @@ def run_specific_batch(active_batch_run: BatchRun, curr_session_context: Identif
 
 
 
-
+@function_attributes(short_name='main', tags=['batch', 'automated'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-03-28 04:46')
 def main(active_global_batch_result_filename='global_batch_result.pkl', debug_print=True):
     """ 
     from pyphoplacecellanalysis.General.Batch.runBatch import main, BatchRun, run_diba_batch, run_specific_batch

@@ -771,20 +771,9 @@ def _SHELL_analyze_leave_one_out_decoding_results(active_pos_df, active_filter_e
 
     all_cells_computed_epoch_one_left_out_to_global_surprises = {}
 
-
-    def shuffle_ids(neuron_ids, seed:int=1337):
-        import random
-        if not isinstance(neuron_ids, np.ndarray):
-            neuron_ids = np.array(neuron_ids)
-        shuffle_IDXs = list(range(len(neuron_ids)))
-        random.Random(seed).shuffle(shuffle_IDXs) # shuffle the list of indicies
-        shuffle_IDXs = np.array(shuffle_IDXs)
-        return neuron_ids[shuffle_IDXs], shuffle_IDXs
-
     shuffled_aclus, shuffle_IDXs = shuffle_ids(original_1D_decoder.neuron_IDs)
 
     result = LeaveOneOutDecodingResult(shuffle_IDXs=shuffle_IDXs)
-    result.one_left_out_posterior_to_scrambled_pf_surprises
 
 
     # Secondary computations

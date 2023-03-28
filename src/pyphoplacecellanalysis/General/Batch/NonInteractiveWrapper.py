@@ -34,6 +34,7 @@ from neuropy.utils.misc import compute_paginated_grid_config # for paginating sh
 from pyphocorehelpers.DataStructure.enum_helpers import ExtendedEnum # required for SessionBatchProgress
 from pyphocorehelpers.DataStructure.dynamic_parameters import DynamicParameters
 from pyphocorehelpers.indexing_helpers import compute_position_grid_size
+from pyphocorehelpers.function_helpers import function_attributes
 
 # pyPhoPlaceCellAnalysis:
 from pyphoplacecellanalysis.General.Mixins.CrossComputationComparisonHelpers import SplitPartitionMembership # needed for batch_extended_computations, batch_programmatic_figures
@@ -232,7 +233,7 @@ class NonInteractiveWrapper(object):
 # ==================================================================================================================== #
 
 
-
+@function_attributes(short_name='batch_load_session', tags=['batch', 'automated', 'session', 'load'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-03-28 04:46')
 def batch_load_session(global_data_root_parent_path, active_data_mode_name, basedir, force_reload=False, saving_mode=PipelineSavingScheme.SKIP_SAVING, fail_on_exception=True, skip_extended_batch_computations=False, **kwargs):
     """Loads and runs the entire pipeline for a session folder located at the path 'basedir'.
 
@@ -331,7 +332,7 @@ def batch_load_session(global_data_root_parent_path, active_data_mode_name, base
 
     return curr_active_pipeline
 
-
+@function_attributes(short_name='batch_extended_computations', tags=['batch', 'automated', 'session', 'compute'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-03-28 04:46')
 def batch_extended_computations(curr_active_pipeline, include_whitelist=None, include_global_functions=False, fail_on_exception=False, progress_print=True, debug_print=False):
     """ performs the remaining required global computations """
     newly_computed_values = []
@@ -527,7 +528,7 @@ def batch_extended_computations(curr_active_pipeline, include_whitelist=None, in
 # ==================================================================================================================== #
 # Batch Programmatic Figures - 2022-12-08 Batch Programmatic Figures (Currently only Jonathan-style)                                                                                           #
 # ==================================================================================================================== #
-
+@function_attributes(short_name='batch_programmatic_figures', tags=['batch', 'automated', 'session', 'display', 'figures'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-03-28 04:46')
 def batch_programmatic_figures(curr_active_pipeline):
     """ programmatically generates and saves the batch figures 2022-12-07 
         curr_active_pipeline is the pipeline for a given session with all computations done.
@@ -593,7 +594,7 @@ def batch_programmatic_figures(curr_active_pipeline):
 
 # import matplotlib as mpl
 # import matplotlib.pyplot as plt
-
+@function_attributes(short_name='batch_extended_programmatic_figures', tags=['batch', 'automated', 'session', 'display', 'figures', 'extended'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-03-28 04:46')
 def batch_extended_programmatic_figures(curr_active_pipeline):
     _bak_rcParams = mpl.rcParams.copy()
     mpl.rcParams['toolbar'] = 'None' # disable toolbars
