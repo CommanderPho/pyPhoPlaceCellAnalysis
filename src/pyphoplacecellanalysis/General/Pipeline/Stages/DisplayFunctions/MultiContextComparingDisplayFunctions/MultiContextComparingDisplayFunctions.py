@@ -213,12 +213,9 @@ class MultiContextComparingDisplayFunctions(AllFunctionEnumeratingMixin, metacla
                     %matplotlib qt
                     active_identifying_session_ctx = curr_active_pipeline.sess.get_context() # 'bapun_RatN_Day4_2019-10-15_11-30-06'
 
-                    graphics_output_dict = curr_active_pipeline.display('_display_batch_pho_jonathan_replay_firing_rate_comparison', active_identifying_session_ctx)
+                    graphics_output_dict = curr_active_pipeline.display('_display_short_long_pf1D_comparison', active_identifying_session_ctx)
                     fig, axs, plot_data = graphics_output_dict['fig'], graphics_output_dict['axs'], graphics_output_dict['plot_data']
-                    neuron_df, rdf, aclu_to_idx, irdf = plot_data['df'], plot_data['rdf'], plot_data['aclu_to_idx'], plot_data['irdf']
-                    # Grab the output axes:
-                    curr_axs_dict = axs[0]
-                    curr_firing_rate_ax, curr_lap_spikes_ax, curr_placefield_ax = curr_axs_dict['firing_rate'], curr_axs_dict['lap_spikes'], curr_axs_dict['placefield'] # Extract variables from the `curr_axs_dict` dictionary to the local workspace
+                    
 
             """
 
@@ -1270,33 +1267,72 @@ def _test_plot_conv(long_xbins, long_curve, short_xbins, short_curve, x, overlap
 
 
 
-
-def _plot_long_short_firing_rate_indicies(x_frs_index, y_frs_index, active_context, fig_save_parent_path=None, debug_print=False):
-	""" Plot long|short firing rate index 
-	Each datapoint is a neuron.
+@function_attributes(short_name='long_short_fr_indicies', tags=['long_short', 'long_short_firing_rate', 'firing_rate', 'display', 'matplotlib'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-03-28 14:20')
+def _plot_long_short_firing_rate_indicies(x_frs_index, y_frs_index, active_context, fig_save_parent_path=None, neurons_colors=None, debug_print=False):
+    """ Plot long|short firing rate index 
+    Each datapoint is a neuron.
 
     used in `_display_short_long_firing_rate_index_comparison()`
 
-	"""
-	fig = plt.figure(figsize=(8.5, 7.25), num=f'long|short fr indicies_{active_context.get_description(separator="/")}', clear=True)
-	plt.scatter(x_frs_index.values(), y_frs_index.values())
-	plt.xlabel('$\\frac{L_{R}-S_{R}}{L_{R} + S_{R}}$', fontsize=16)
-	plt.ylabel('$\\frac{L_{\\theta}-S_{\\theta}}{L_{\\theta} + S_{\\theta}}$', fontsize=16)
-	plt.title('Computed long ($L$)|short($S$) firing rate indicies')
-	plt.suptitle(f'{active_context.get_description(separator="/")}')
-	# fig = plt.gcf()
-	fig.set_size_inches([8.5, 7.25]) # size figure so the x and y labels aren't cut off
+    """
+    import mplcursors # for hover tooltips that specify the aclu of the selected point
 
-	temp_fig_filename = f'{active_context.get_description()}.png'
-	if debug_print:
-		print(f'temp_fig_filename: {temp_fig_filename}')
-	if fig_save_parent_path is None:
-		fig_save_parent_path = Path.cwd()
+    # from neuropy.utils.matplotlib_helpers import add_value_labels # for adding small labels beside each point indicating their ACLU
 
-	_temp_full_fig_save_path = fig_save_parent_path.joinpath(temp_fig_filename)
+    if neurons_colors is not None:
+        if isinstance(neurons_colors_array, dict):
+            point_colors = [neurons_colors[aclu] for aclu in list(x_frs_index.keys())]
+        else:
+            # otherwise assumed to be an array with the same length as the number of points
+            assert isinstance(neurons_colors, np.ndarray)
+            assert np.shape(point_colors)[0] == 4 # (4, n_neurons)
+            assert np.shape(point_colors)[1] == len(x_frs_index)
+            point_colors = neurons_colors
+            # point_colors = [f'{i}' for i in list(x_frs_index.keys())] 
 
-	with ProgressMessagePrinter(_temp_full_fig_save_path, 'Saving', 'plot_long_short_firing_rate_indicies results'):
-		fig.savefig(fname=_temp_full_fig_save_path, transparent=True)
-	fig.show()
-	return fig, _temp_full_fig_save_path
+    point_hover_labels = [f'{i}' for i in list(x_frs_index.keys())] # point_hover_labels will be added as tooltip annotations to the datapoints
+    fig, ax = plt.subplots(figsize=(8.5, 7.25), num=f'long|short fr indicies_{active_context.get_description(separator="/")}', clear=True)
+
+    scatter_plot = ax.scatter(x_frs_index.values(), y_frs_index.values(), c=point_colors) # , s=10, alpha=0.5
+    plt.xlabel('$\\frac{L_{R}-S_{R}}{L_{R} + S_{R}}$', fontsize=16)
+    plt.ylabel('$\\frac{L_{\\theta}-S_{\\theta}}{L_{\\theta} + S_{\\theta}}$', fontsize=16)
+    plt.title('Computed long ($L$)|short($S$) firing rate indicies')
+    plt.suptitle(f'{active_context.get_description(separator="/")}')
+    # fig = plt.gcf()
+    # fig.set_size_inches([8.5, 7.25]) # size figure so the x and y labels aren't cut off
+
+    # add static tiny labels beside each point
+    for i, (x, y, label) in enumerate(zip(x_frs_index.values(), y_frs_index.values(), point_hover_labels)):
+        # x = x_frs_index.values()[i]
+        # y = y_frs_index.values()[i]
+        ax.annotate(label, (x, y), textcoords="offset points", xytext=(2,2), ha='left', va='bottom', fontsize=8) # , color=rect.get_facecolor()
+
+    # add hover labels:
+    # https://stackoverflow.com/questions/7908636/possible-to-make-labels-appear-when-hovering-over-a-point-in-matplotlib
+    # https://stackoverflow.com/questions/7908636/possible-to-make-labels-appear-when-hovering-over-a-point-in-matplotlib/21654635#21654635
+    # add hover labels using mplcursors
+    mplcursors.cursor(scatter_plot, hover=True).connect("add", lambda sel: sel.annotation.set_text(point_hover_labels[sel.index]))
+
+    ## get current axes:
+    # ax = plt.gca()
+
+    # # Call the function above. All the magic happens there.
+    # add_value_labels(ax, labels=x_labels) # 
+
+    temp_fig_filename = f'{active_context.get_description()}.png'
+    if debug_print:
+        print(f'temp_fig_filename: {temp_fig_filename}')
+    if fig_save_parent_path is None:
+        fig_save_parent_path = Path.cwd()
+
+    _temp_full_fig_save_path = fig_save_parent_path.joinpath(temp_fig_filename)
+
+    with ProgressMessagePrinter(_temp_full_fig_save_path, 'Saving', 'plot_long_short_firing_rate_indicies results'):
+        fig.savefig(fname=_temp_full_fig_save_path, transparent=True)
+    fig.show()
+
+
+    return fig, _temp_full_fig_save_path
+    # return MatplotlibRenderPlots(name='', figures=(fig), axes=(ax))
+
 
