@@ -611,48 +611,68 @@ class LeaveOneOutDecodingResult(object):
 # from neuropy.utils.misc import split_array
 # import numpy.ma as ma # for masked array
 
-# def _supplement_results(a_results_obj):
-#     """ 2023-03-27 11:14pm - add the extra stuff to the surprise computation results """
-#     ## Flatten the measured spike counts over the time bins within all epochs to get something of the same shape as `flat_all_epochs_decoded_epoch_time_bins`:
-#     flat_all_epochs_measured_cell_spike_counts = np.hstack(a_results_obj.all_included_filter_epochs_decoder_result.spkcount) # .shape (65, 4584) -- (n_neurons, n_epochs * n_timebins_for_epoch_i), combines across all time_bins within all epochs
-#     ## Get the time bins where each cell is firing (has more than one spike):
-#     is_cell_firing_time_bin = (flat_all_epochs_measured_cell_spike_counts > 0) # .shape (97, 5815)
-#     a_results_obj.is_non_firing_time_bin = np.logical_not(is_cell_firing_time_bin) # .shape (97, 5815)
-#     ## Reshape to -for-each-epoch instead of -for-each-cell:
-#     n_epochs = a_results_obj.active_filter_epochs.n_epochs
-#     reverse_epoch_indicies_array = [] # a flat array containing the epoch_idx required to access into the dictionary or list variables:
-#     a_results_obj.all_epochs_num_epoch_time_bins = [] # one for each decoded epoch
-#     a_results_obj.all_epochs_computed_one_left_out_posterior_to_pf_surprises = []
-#     for decoded_epoch_idx in np.arange(n_epochs):
-#         num_curr_epoch_time_bins = [len(a_results_obj.result.one_left_out_posterior_to_pf_surprises[aclu][decoded_epoch_idx]) for aclu in a_results_obj.original_1D_decoder.neuron_IDs] # get the number of time bins in this epoch to build the reverse indexing array
-#         # all entries in `num_curr_epoch_time_bins` should be equal to the same value:
-#         num_curr_epoch_time_bins = num_curr_epoch_time_bins[0]
-#         a_results_obj.all_epochs_num_epoch_time_bins.append(num_curr_epoch_time_bins)
-#         reverse_epoch_indicies_array.append(np.repeat(decoded_epoch_idx, num_curr_epoch_time_bins)) # for all time bins from this epoch, append the decoded_epoch_idx to the reverse array so that it can be recovered from the flattened arrays.    
-#         # all_epochs_decoded_epoch_time_bins.append(np.array([all_cells_decoded_epoch_time_bins[aclu][decoded_epoch_idx].centers for aclu in original_1D_decoder.neuron_IDs])) # these are duplicated (and the same) for each cell
-#         a_results_obj.all_epochs_computed_one_left_out_posterior_to_pf_surprises.append(np.array([a_results_obj.result.one_left_out_posterior_to_pf_surprises[aclu][decoded_epoch_idx] for aclu in a_results_obj.original_1D_decoder.neuron_IDs]))
+def _supplement_results(a_results_obj):
+    """ 2023-03-27 11:14pm - add the extra stuff to the surprise computation results
+    TODO 2023-03-28 5:37pm [ ] - move into the `perform_full_session_leave_one_out_decoding_analysis` function or the supporting subfunctions
 
-#     a_results_obj.all_epochs_computed_one_left_out_posterior_to_pf_surprises = np.hstack(a_results_obj.all_epochs_computed_one_left_out_posterior_to_pf_surprises) # .shape (65, 4584) -- (n_neurons, n_epochs * n_timebins_for_epoch_i), combines across all time_bins within all epochs
-#     a_results_obj.all_epochs_reverse_flat_epoch_indicies_array = np.hstack(reverse_epoch_indicies_array)
-#     a_results_obj.all_epochs_num_epoch_time_bins = np.array(a_results_obj.all_epochs_num_epoch_time_bins)
+    Usage:
 
-#     n_neurons, n_all_epoch_timebins = a_results_obj.all_epochs_computed_one_left_out_posterior_to_pf_surprises.shape # (n_neurons, n_epochs * n_timebins_for_epoch_i)
-#     print(f'({n_neurons = }, {n_all_epoch_timebins = })')
+        short_results_obj = _supplement_results(short_results_obj)
+        long_results_obj = _supplement_results(long_results_obj)
 
-#     assert np.sum(a_results_obj.all_epochs_num_epoch_time_bins) == n_all_epoch_timebins
-#     assert len(a_results_obj.all_epochs_num_epoch_time_bins) == n_epochs
-#     flattened_time_bin_indicies = np.arange(n_all_epoch_timebins)
-#     a_results_obj.split_by_epoch_reverse_flattened_time_bin_indicies = split_array(flattened_time_bin_indicies, sub_element_lengths=a_results_obj.all_epochs_num_epoch_time_bins)
-#     assert len(a_results_obj.split_by_epoch_reverse_flattened_time_bin_indicies) == n_epochs
+    """
+    ## Flatten the measured spike counts over the time bins within all epochs to get something of the same shape as `flat_all_epochs_decoded_epoch_time_bins`:
+    flat_all_epochs_measured_cell_spike_counts = np.hstack(a_results_obj.all_included_filter_epochs_decoder_result.spkcount) # .shape (65, 4584) -- (n_neurons, n_epochs * n_timebins_for_epoch_i), combines across all time_bins within all epochs
+    ## Get the time bins where each cell is firing (has more than one spike):
+    is_cell_firing_time_bin = (flat_all_epochs_measured_cell_spike_counts > 0) # .shape (97, 5815)
+    a_results_obj.is_non_firing_time_bin = np.logical_not(is_cell_firing_time_bin) # .shape (97, 5815)
+    ## Reshape to -for-each-epoch instead of -for-each-cell:
+    n_epochs = a_results_obj.active_filter_epochs.n_epochs
+    reverse_epoch_indicies_array = [] # a flat array containing the epoch_idx required to access into the dictionary or list variables:
+    a_results_obj.all_epochs_num_epoch_time_bins = [] # one for each decoded epoch
+    a_results_obj.all_epochs_computed_one_left_out_posterior_to_pf_surprises = []
+    a_results_obj.all_epochs_computed_one_left_out_posterior_to_scrambled_pf_surprises = []
     
-#     # Specific advanced computations:
-#     a_results_obj.all_epochs_computed_one_left_out_posterior_to_pf_surprises = ma.array(a_results_obj.all_epochs_computed_one_left_out_posterior_to_pf_surprises, mask=a_results_obj.is_non_firing_time_bin) # make sure mask doesn't need to be inverted
-#     ## Compute mean by averaging over bins within each epoch
-#     a_results_obj.all_epochs_computed_cell_one_left_out_posterior_to_pf_surprises_mean = np.vstack([np.mean(a_results_obj.all_epochs_computed_one_left_out_posterior_to_pf_surprises[:, flat_linear_indicies], axis=1) for decoded_epoch_idx, flat_linear_indicies in zip(np.arange(n_epochs), a_results_obj.split_by_epoch_reverse_flattened_time_bin_indicies)]) # mean over all time bins in each epoch  # .shape (614, 65) - (n_epochs, n_neurons)
-#     ## Compute mean by averaging over each cell:
-#     a_results_obj.all_epochs_all_cells_one_left_out_posterior_to_pf_surprises_mean = np.mean(a_results_obj.all_epochs_computed_cell_one_left_out_posterior_to_pf_surprises_mean, axis=1) # average across all cells .shape (614,) - (n_epochs,)
+    for decoded_epoch_idx in np.arange(n_epochs):
+        num_curr_epoch_time_bins = [len(a_results_obj.result.one_left_out_posterior_to_pf_surprises[aclu][decoded_epoch_idx]) for aclu in a_results_obj.original_1D_decoder.neuron_IDs] # get the number of time bins in this epoch to build the reverse indexing array
+        # all entries in `num_curr_epoch_time_bins` should be equal to the same value:
+        num_curr_epoch_time_bins = num_curr_epoch_time_bins[0]
+        a_results_obj.all_epochs_num_epoch_time_bins.append(num_curr_epoch_time_bins)
+        reverse_epoch_indicies_array.append(np.repeat(decoded_epoch_idx, num_curr_epoch_time_bins)) # for all time bins from this epoch, append the decoded_epoch_idx to the reverse array so that it can be recovered from the flattened arrays.    
+        # all_epochs_decoded_epoch_time_bins.append(np.array([all_cells_decoded_epoch_time_bins[aclu][decoded_epoch_idx].centers for aclu in original_1D_decoder.neuron_IDs])) # these are duplicated (and the same) for each cell
+        a_results_obj.all_epochs_computed_one_left_out_posterior_to_pf_surprises.append(np.array([a_results_obj.result.one_left_out_posterior_to_pf_surprises[aclu][decoded_epoch_idx] for aclu in a_results_obj.original_1D_decoder.neuron_IDs]))
+        a_results_obj.all_epochs_computed_one_left_out_posterior_to_scrambled_pf_surprises.append(np.array([a_results_obj.result.one_left_out_posterior_to_scrambled_pf_surprises[aclu][decoded_epoch_idx] for aclu in a_results_obj.original_1D_decoder.neuron_IDs]))
+        
+        
+    a_results_obj.all_epochs_computed_one_left_out_posterior_to_pf_surprises = np.hstack(a_results_obj.all_epochs_computed_one_left_out_posterior_to_pf_surprises) # .shape (65, 4584) -- (n_neurons, n_epochs * n_timebins_for_epoch_i), combines across all time_bins within all epochs
+    a_results_obj.all_epochs_computed_one_left_out_posterior_to_scrambled_pf_surprises = np.hstack(a_results_obj.all_epochs_computed_one_left_out_posterior_to_scrambled_pf_surprises)
     
-#     return a_results_obj
+    a_results_obj.all_epochs_reverse_flat_epoch_indicies_array = np.hstack(reverse_epoch_indicies_array)
+    a_results_obj.all_epochs_num_epoch_time_bins = np.array(a_results_obj.all_epochs_num_epoch_time_bins)
+
+    n_neurons, n_all_epoch_timebins = a_results_obj.all_epochs_computed_one_left_out_posterior_to_pf_surprises.shape # (n_neurons, n_epochs * n_timebins_for_epoch_i)
+    print(f'({n_neurons = }, {n_all_epoch_timebins = })')
+
+    assert np.sum(a_results_obj.all_epochs_num_epoch_time_bins) == n_all_epoch_timebins
+    assert len(a_results_obj.all_epochs_num_epoch_time_bins) == n_epochs
+    flattened_time_bin_indicies = np.arange(n_all_epoch_timebins)
+    a_results_obj.split_by_epoch_reverse_flattened_time_bin_indicies = split_array(flattened_time_bin_indicies, sub_element_lengths=a_results_obj.all_epochs_num_epoch_time_bins)
+    assert len(a_results_obj.split_by_epoch_reverse_flattened_time_bin_indicies) == n_epochs
+    
+    # Specific advanced computations:
+    a_results_obj.all_epochs_computed_one_left_out_posterior_to_pf_surprises = ma.array(a_results_obj.all_epochs_computed_one_left_out_posterior_to_pf_surprises, mask=a_results_obj.is_non_firing_time_bin) # make sure mask doesn't need to be inverted
+    a_results_obj.all_epochs_computed_one_left_out_posterior_to_scrambled_pf_surprises = ma.array(a_results_obj.all_epochs_computed_one_left_out_posterior_to_scrambled_pf_surprises, mask=a_results_obj.is_non_firing_time_bin) # make sure mask doesn't need to be inverted
+    
+    ## Compute mean by averaging over bins within each epoch
+    a_results_obj.all_epochs_computed_cell_one_left_out_posterior_to_pf_surprises_mean = np.vstack([np.mean(a_results_obj.all_epochs_computed_one_left_out_posterior_to_pf_surprises[:, flat_linear_indicies], axis=1) for decoded_epoch_idx, flat_linear_indicies in zip(np.arange(n_epochs), a_results_obj.split_by_epoch_reverse_flattened_time_bin_indicies)]) # mean over all time bins in each epoch  # .shape (614, 65) - (n_epochs, n_neurons)
+    a_results_obj.all_epochs_computed_cell_one_left_out_posterior_to_scrambled_pf_surprises_mean = np.vstack([np.mean(a_results_obj.all_epochs_computed_one_left_out_posterior_to_scrambled_pf_surprises[:, flat_linear_indicies], axis=1) for decoded_epoch_idx, flat_linear_indicies in zip(np.arange(n_epochs), a_results_obj.split_by_epoch_reverse_flattened_time_bin_indicies)])
+    
+    ## Compute mean by averaging over each cell:
+    a_results_obj.all_epochs_all_cells_one_left_out_posterior_to_pf_surprises_mean = np.mean(a_results_obj.all_epochs_computed_cell_one_left_out_posterior_to_pf_surprises_mean, axis=1) # average across all cells .shape (614,) - (n_epochs,)
+    a_results_obj.all_epochs_all_cells_one_left_out_posterior_to_scrambled_pf_surprises_mean = np.mean(a_results_obj.all_epochs_computed_cell_one_left_out_posterior_to_scrambled_pf_surprises_mean, axis=1)
+    return a_results_obj
+
+
 
 
 def _analyze_leave_one_out_decoding_results(active_pos_df, active_filter_epochs, original_1D_decoder, all_included_filter_epochs_decoder_result, one_left_out_decoder_dict, one_left_out_filter_epochs_decoder_result_dict):

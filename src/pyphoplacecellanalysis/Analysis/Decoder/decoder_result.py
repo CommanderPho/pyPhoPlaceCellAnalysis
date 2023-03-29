@@ -324,6 +324,66 @@ class SurpriseAnalysisResult:
     result: LeaveOneOutDecodingResult = None
     
 
+    def supplement_results(self):
+        """ 2023-03-27 11:14pm - add the extra stuff to the surprise computation results
+        TODO 2023-03-28 5:37pm [ ] - move into the `perform_full_session_leave_one_out_decoding_analysis` function or the supporting subfunctions
+
+        Usage:
+
+            short_results_obj = _supplement_results(short_results_obj)
+            long_results_obj = _supplement_results(long_results_obj)
+
+        """
+        ## Flatten the measured spike counts over the time bins within all epochs to get something of the same shape as `flat_all_epochs_decoded_epoch_time_bins`:
+        flat_all_epochs_measured_cell_spike_counts = np.hstack(self.all_included_filter_epochs_decoder_result.spkcount) # .shape (65, 4584) -- (n_neurons, n_epochs * n_timebins_for_epoch_i), combines across all time_bins within all epochs
+        ## Get the time bins where each cell is firing (has more than one spike):
+        is_cell_firing_time_bin = (flat_all_epochs_measured_cell_spike_counts > 0) # .shape (97, 5815)
+        self.is_non_firing_time_bin = np.logical_not(is_cell_firing_time_bin) # .shape (97, 5815)
+        ## Reshape to -for-each-epoch instead of -for-each-cell:
+        n_epochs = self.active_filter_epochs.n_epochs
+        reverse_epoch_indicies_array = [] # a flat array containing the epoch_idx required to access into the dictionary or list variables:
+        self.all_epochs_num_epoch_time_bins = [] # one for each decoded epoch
+        self.all_epochs_computed_one_left_out_posterior_to_pf_surprises = []
+        self.all_epochs_computed_one_left_out_posterior_to_scrambled_pf_surprises = []
+        
+        for decoded_epoch_idx in np.arange(n_epochs):
+            num_curr_epoch_time_bins = [len(self.result.one_left_out_posterior_to_pf_surprises[aclu][decoded_epoch_idx]) for aclu in self.original_1D_decoder.neuron_IDs] # get the number of time bins in this epoch to build the reverse indexing array
+            # all entries in `num_curr_epoch_time_bins` should be equal to the same value:
+            num_curr_epoch_time_bins = num_curr_epoch_time_bins[0]
+            self.all_epochs_num_epoch_time_bins.append(num_curr_epoch_time_bins)
+            reverse_epoch_indicies_array.append(np.repeat(decoded_epoch_idx, num_curr_epoch_time_bins)) # for all time bins from this epoch, append the decoded_epoch_idx to the reverse array so that it can be recovered from the flattened arrays.    
+            # all_epochs_decoded_epoch_time_bins.append(np.array([all_cells_decoded_epoch_time_bins[aclu][decoded_epoch_idx].centers for aclu in original_1D_decoder.neuron_IDs])) # these are duplicated (and the same) for each cell
+            self.all_epochs_computed_one_left_out_posterior_to_pf_surprises.append(np.array([self.result.one_left_out_posterior_to_pf_surprises[aclu][decoded_epoch_idx] for aclu in self.original_1D_decoder.neuron_IDs]))
+            self.all_epochs_computed_one_left_out_posterior_to_scrambled_pf_surprises.append(np.array([self.result.one_left_out_posterior_to_scrambled_pf_surprises[aclu][decoded_epoch_idx] for aclu in self.original_1D_decoder.neuron_IDs]))
+            
+            
+        self.all_epochs_computed_one_left_out_posterior_to_pf_surprises = np.hstack(self.all_epochs_computed_one_left_out_posterior_to_pf_surprises) # .shape (65, 4584) -- (n_neurons, n_epochs * n_timebins_for_epoch_i), combines across all time_bins within all epochs
+        self.all_epochs_computed_one_left_out_posterior_to_scrambled_pf_surprises = np.hstack(self.all_epochs_computed_one_left_out_posterior_to_scrambled_pf_surprises)
+        
+        self.all_epochs_reverse_flat_epoch_indicies_array = np.hstack(reverse_epoch_indicies_array)
+        self.all_epochs_num_epoch_time_bins = np.array(self.all_epochs_num_epoch_time_bins)
+
+        n_neurons, n_all_epoch_timebins = self.all_epochs_computed_one_left_out_posterior_to_pf_surprises.shape # (n_neurons, n_epochs * n_timebins_for_epoch_i)
+        print(f'({n_neurons = }, {n_all_epoch_timebins = })')
+
+        assert np.sum(self.all_epochs_num_epoch_time_bins) == n_all_epoch_timebins
+        assert len(self.all_epochs_num_epoch_time_bins) == n_epochs
+        flattened_time_bin_indicies = np.arange(n_all_epoch_timebins)
+        self.split_by_epoch_reverse_flattened_time_bin_indicies = split_array(flattened_time_bin_indicies, sub_element_lengths=self.all_epochs_num_epoch_time_bins)
+        assert len(self.split_by_epoch_reverse_flattened_time_bin_indicies) == n_epochs
+        
+        # Specific advanced computations:
+        self.all_epochs_computed_one_left_out_posterior_to_pf_surprises = ma.array(self.all_epochs_computed_one_left_out_posterior_to_pf_surprises, mask=self.is_non_firing_time_bin) # make sure mask doesn't need to be inverted
+        self.all_epochs_computed_one_left_out_posterior_to_scrambled_pf_surprises = ma.array(self.all_epochs_computed_one_left_out_posterior_to_scrambled_pf_surprises, mask=self.is_non_firing_time_bin) # make sure mask doesn't need to be inverted
+        
+        ## Compute mean by averaging over bins within each epoch
+        self.all_epochs_computed_cell_one_left_out_posterior_to_pf_surprises_mean = np.vstack([np.mean(self.all_epochs_computed_one_left_out_posterior_to_pf_surprises[:, flat_linear_indicies], axis=1) for decoded_epoch_idx, flat_linear_indicies in zip(np.arange(n_epochs), self.split_by_epoch_reverse_flattened_time_bin_indicies)]) # mean over all time bins in each epoch  # .shape (614, 65) - (n_epochs, n_neurons)
+        self.all_epochs_computed_cell_one_left_out_posterior_to_scrambled_pf_surprises_mean = np.vstack([np.mean(self.all_epochs_computed_one_left_out_posterior_to_scrambled_pf_surprises[:, flat_linear_indicies], axis=1) for decoded_epoch_idx, flat_linear_indicies in zip(np.arange(n_epochs), self.split_by_epoch_reverse_flattened_time_bin_indicies)])
+        
+        ## Compute mean by averaging over each cell:
+        self.all_epochs_all_cells_one_left_out_posterior_to_pf_surprises_mean = np.mean(self.all_epochs_computed_cell_one_left_out_posterior_to_pf_surprises_mean, axis=1) # average across all cells .shape (614,) - (n_epochs,)
+        self.all_epochs_all_cells_one_left_out_posterior_to_scrambled_pf_surprises_mean = np.mean(self.all_epochs_computed_cell_one_left_out_posterior_to_scrambled_pf_surprises_mean, axis=1)
+        return self
 
 
     # def __attrs_post_init__(self):
@@ -463,10 +523,14 @@ def perform_full_session_leave_one_out_decoding_analysis(sess, original_1D_decod
     # (active_filter_epochs, original_1D_decoder, all_included_filter_epochs_decoder_result, flat_all_epochs_measured_cell_spike_counts, flat_all_epochs_measured_cell_firing_rates, flat_all_epochs_decoded_epoch_time_bins, flat_all_epochs_computed_surprises, flat_all_epochs_computed_expected_cell_firing_rates, flat_all_epochs_difference_from_expected_cell_spike_counts, flat_all_epochs_difference_from_expected_cell_firing_rates, all_epochs_decoded_epoch_time_bins_mean, all_epochs_computed_cell_surprises_mean, all_epochs_all_cells_computed_surprises_mean, flat_all_epochs_computed_one_left_out_to_global_surprises, all_epochs_computed_cell_one_left_out_to_global_surprises_mean, all_epochs_all_cells_computed_one_left_out_to_global_surprises_mean, one_left_out_omitted_aclu_distance_df, most_contributing_aclus)
 
 
-    return (active_filter_epochs, original_1D_decoder, all_included_filter_epochs_decoder_result, 
+    result_tuple = (active_filter_epochs, original_1D_decoder, all_included_filter_epochs_decoder_result, 
                                                             flat_all_epochs_measured_cell_spike_counts, flat_all_epochs_measured_cell_firing_rates, 
                                                             flat_all_epochs_decoded_epoch_time_bins, flat_all_epochs_computed_surprises, flat_all_epochs_computed_expected_cell_firing_rates,
                                                             flat_all_epochs_difference_from_expected_cell_spike_counts, flat_all_epochs_difference_from_expected_cell_firing_rates,
                                                             all_epochs_decoded_epoch_time_bins_mean, all_epochs_computed_cell_surprises_mean, all_epochs_all_cells_computed_surprises_mean,
                                                             flat_all_epochs_computed_one_left_out_to_global_surprises, all_epochs_computed_cell_one_left_out_to_global_surprises_mean, all_epochs_all_cells_computed_one_left_out_to_global_surprises_mean,
                                                             one_left_out_omitted_aclu_distance_df, most_contributing_aclus, result)
+    # build output object:
+    results_obj = SurpriseAnalysisResult(*result_tuple)
+    results_obj = results_obj.supplement_results() # compute the extra stuff
+    return results_obj
