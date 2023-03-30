@@ -25,7 +25,7 @@ These functions help render a vertically stacked column of subplots that represe
 # ==================================================================================================================== #
 # Stacked Epoch Slices View                                                                                            #
 # ==================================================================================================================== #
-def stacked_epoch_basic_setup(epoch_slices, epoch_labels=None, name='stacked_epoch_slices_view', plot_function_name='Stacked Epoch Slices View - PlotItem Version', single_plot_fixed_height=100.0, debug_test_max_num_slices=70, debug_print=False):
+def stacked_epoch_basic_setup(epoch_slices, epoch_labels=None, name='stacked_epoch_slices_view', plot_function_name='Stacked Epoch Slices View - PlotItem Version', single_plot_fixed_height=100.0, debug_test_max_num_slices=70, single_plot_fixed_width=200.0, debug_test_max_num_variants=64, debug_print=False):
     """ Builds the common setup/containers for all stacked-epoch type plots:
     
     epoch_description_list: list of length 
