@@ -289,7 +289,8 @@ def perform_leave_one_aclu_out_decoding_analysis(spikes_df, active_pos_df, activ
 from attrs import define, field
 # import cattrs 
 from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.DefaultComputationFunctions import LeaveOneOutDecodingResult
-
+from neuropy.utils.misc import split_array
+import numpy.ma as ma # for masked array
 
 @define(slots=False)
 class SurpriseAnalysisResult:
@@ -533,4 +534,8 @@ def perform_full_session_leave_one_out_decoding_analysis(sess, original_1D_decod
     # build output object:
     results_obj = SurpriseAnalysisResult(*result_tuple)
     results_obj = results_obj.supplement_results() # compute the extra stuff
+    ## Add in the one-left-out decoders:
+    results_obj.one_left_out_decoder_dict = one_left_out_decoder_dict
+    results_obj.one_left_out_filter_epochs_decoder_result_dict = one_left_out_filter_epochs_decoder_result_dict
+
     return results_obj

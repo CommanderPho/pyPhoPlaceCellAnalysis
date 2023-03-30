@@ -1,6 +1,7 @@
 import numpy as np
 import pandas as pd
 
+from pyphocorehelpers.function_helpers import function_attributes
 from pyphocorehelpers.DataStructure.general_parameter_containers import VisualizationParameters, RenderPlotsData, RenderPlots
 from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer
 import pyphoplacecellanalysis.External.pyqtgraph as pg
@@ -62,7 +63,7 @@ def stacked_epoch_basic_setup(epoch_slices, epoch_labels=None, name='stacked_epo
         # Build defaults for the plots
         epoch_labels = [f'epoch[{a_slice_idx}]' for a_slice_idx in np.arange(num_slices)]
     else:
-        assert len(epoch_labels) == params.num_slices
+        assert len(epoch_labels) == params.num_slices, f"len(epoch_labels): {len(epoch_labels)} != params.num_slices: {params.num_slices}"
 
     params.epoch_labels = epoch_labels
     
@@ -73,6 +74,7 @@ def stacked_epoch_basic_setup(epoch_slices, epoch_labels=None, name='stacked_epo
 # ==================================================================================================================== #
 # PyQtGraph-based Versions                                                                                             #
 # ==================================================================================================================== #
+@function_attributes(short_name='stacked_epoch_slices_view', tags=['display','slices','stacked', 'scrollable'], input_requires=[], output_provides=[], uses=['stacked_epoch_basic_setup', 'build_scrollable_graphics_layout_widget_ui'], used_by=[], creation_date='2023-03-29 18:01')
 def stacked_epoch_slices_view(epoch_slices, position_times_list, position_traces_list, epoch_description_list, name='stacked_epoch_slices_view', debug_print=False):
     """ 
     position_times_list: list of timestamps

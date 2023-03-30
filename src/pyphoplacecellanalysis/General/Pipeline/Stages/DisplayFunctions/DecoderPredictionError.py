@@ -135,7 +135,7 @@ class DefaultDecoderDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Disp
     def _display_plot_decoded_epoch_slices(computation_result, active_config, active_context=None, filter_epochs='ripple', **kwargs):
         """ renders a plot with the 1D Marginals either (x and y position axes): the computed posterior for the position from the Bayesian decoder and overlays the animal's actual position over the top. 
         
-        This display function is currently atypically implemented. 
+        TODO: This display function is currently atypically implemented as it performs computations as needed.
 
         Depends on `_compute_specific_decoded_epochs` to compute the decoder for the epochs.
         The final step, which is where most display functions start, is calling the actual plot function:
