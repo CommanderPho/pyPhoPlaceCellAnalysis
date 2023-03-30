@@ -76,7 +76,8 @@ def stacked_epoch_basic_setup(epoch_slices, epoch_labels=None, name='stacked_epo
 # ==================================================================================================================== #
 @function_attributes(short_name='stacked_epoch_slices_view', tags=['display','slices','stacked', 'scrollable'], input_requires=[], output_provides=[], uses=['stacked_epoch_basic_setup', 'build_scrollable_graphics_layout_widget_ui'], used_by=[], creation_date='2023-03-29 18:01')
 def stacked_epoch_slices_view(epoch_slices, position_times_list, position_traces_list, epoch_description_list, name='stacked_epoch_slices_view', debug_print=False):
-    """ 
+    """ I think this version displays line plots of the position traces, but it's not explicitly used anywhere that I know of.
+
     position_times_list: list of timestamps
     position_traces_list: list of traces to be plotted. Must have the same first dimension as timestamps
     epoch_description_list: list of length 
