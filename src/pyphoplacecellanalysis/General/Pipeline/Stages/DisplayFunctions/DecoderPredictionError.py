@@ -131,7 +131,7 @@ class DefaultDecoderDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Disp
             axs[0].plot(active_time_window_variable, active_most_likely_positions_x, lw=1.0, color='#00ff7f99', alpha=0.6, label='2-step: most likely positions x') # (Num windows x 2)
             axs[1].plot(active_time_window_variable, active_most_likely_positions_y, lw=1.0, color='#00ff7f99', alpha=0.6, label='2-step: most likely positions y') # (Num windows x 2)
             
-    @function_attributes(short_name='decoded_epoch_slices', tags=['display', 'decoder', 'epoch'], input_requires=[], output_provides=[], creation_date='2023-03-23 15:49')
+    @function_attributes(short_name='decoded_epoch_slices', tags=['display', 'decoder', 'epoch'], input_requires=[], output_provides=[], uses=['plot_decoded_epoch_slices', '_compute_specific_decoded_epochs', 'DefaultComputationFunctions._perform_specific_epochs_decoding'], used_by=[], creation_date='2023-03-23 15:49')
     def _display_plot_decoded_epoch_slices(computation_result, active_config, active_context=None, filter_epochs='ripple', **kwargs):
         """ renders a plot with the 1D Marginals either (x and y position axes): the computed posterior for the position from the Bayesian decoder and overlays the animal's actual position over the top. 
         

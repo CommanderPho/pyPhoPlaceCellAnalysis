@@ -536,6 +536,7 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
             print(f'Spike3DRasterWindowWidget.on_render_window_duration_valueChanged(updated_val: {updated_val})')
         old_value = self.render_window_duration
         self.render_window_duration = updated_val
+        # TODO 2023-03-29 19:14: - [ ] need to set self.render_window_duration.timeWindow.window_duration = updated_val
         
 
 
@@ -592,6 +593,26 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
         # print(f'jump_change_time: {jump_change_time}')
         ## Update the window:
         self.update_animation(next_start_timestamp=next_target_jump_time)
+
+
+    @QtCore.Slot(float, float)
+    def perform_jump_specific_timestamp(self, next_start_timestamp: float, window_duration: float=None):
+        """ Jumps to a specific time window (needs window size too)
+        """
+        if self.enable_debug_print:
+            print(f'Spike3DRasterWindowWidget.perform_jump_specific_timestamp(next_start_timestamp: {next_start_timestamp}, window_duration: {window_duration})')
+        
+        # Set the window_duration first so it fits the window:
+        if window_duration is not None:
+            if window_duration != self.animation_active_time_window.window_duration:
+                if self.enable_debug_print:
+                    print(f'perform_jump_specific_timestamp(): window_duration changed: new_window_duration {window_duration} != self.animation_active_time_window.window_duration: {self.animation_active_time_window.window_duration}')
+                self.animation_active_time_window.timeWindow.window_duration = window_duration
+                # TODO 2023-03-29 19:18: - [ ] See if anything needs to be updated manually when window duration changes.
+        self.update_animation(next_start_timestamp=next_start_timestamp)
+        
+
+
 
     @QtCore.Slot(str)
     def perform_interval_series_remove_item(self, curr_series_name):
@@ -674,6 +695,8 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
         """ changes self.half_render_window_duration """
         if self.enable_debug_print:
             print(f'Spike3DRasterWindowWidget.on_window_duration_changed(start_t: {start_t}, end_t: {end_t}, duration: {duration})')
+        # TODO 2023-03-29 19:03: - [ ] Shouldn't this at least update the plots like on_window_changed does? I know duration changing is more involved than just start_t changing.
+
 
     @QtCore.Slot(float, float)
     def on_window_changed(self, start_t, end_t):
