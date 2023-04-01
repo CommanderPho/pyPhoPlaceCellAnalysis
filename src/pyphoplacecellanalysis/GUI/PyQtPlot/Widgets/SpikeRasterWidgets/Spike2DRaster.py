@@ -5,7 +5,7 @@ from indexed import IndexedOrderedDict
 
 import pyphoplacecellanalysis.External.pyqtgraph as pg
 from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtCore, QtGui, QtWidgets
-import pyphoplacecellanalysis.External.pyqtgraph.opengl as gl # for 3D raster plot
+from pyphocorehelpers.function_helpers import function_attributes
 
 # For Dynamic Plot Widget Adding
 # from pyphoplacecellanalysis.External.pyqtgraph.dockarea.DockArea import DockArea
@@ -258,8 +258,7 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
         # Compute the y for all windows, not just the current one:
         if 'visualization_raster_y_location' not in self.spikes_df.columns:
             self.logger.info('Spike2DRaster.setup(): adding "visualization_raster_y_location" column to spikes_df...')
-            all_y = [self.y_fragile_linear_neuron_IDX_map[a_cell_IDX] for a_cell_IDX in self.spikes_df['fragile_linear_neuron_IDX'].to_numpy()] # old
-            # all_y = [self.fragile_linear_neuron_IDX_to_spatial(self.cell_id_to_fragile_linear_neuron_IDX_map[a_cell_id]) for a_cell_id in self.spikes_df['fragile_linear_neuron_IDX'].to_numpy()] # copied from Spike3DRaster_Vedo. Note self.spikes_df's 'neuron_IDX' is identical to 'fragile_linear_neuron_IDX'
+            all_y = [self.y_fragile_linear_neuron_IDX_map[a_cell_IDX] for a_cell_IDX in self.spikes_df['fragile_linear_neuron_IDX'].to_numpy()]
             self.spikes_df['visualization_raster_y_location'] = all_y # adds as a column to the dataframe. Only needs to be updated when the number of active units changes. BUG? NO, RESOLVED: actually, this should be updated when anything that would change .y_fragile_linear_neuron_IDX_map would change, right? Meaning: .y, ... oh, I see. self.y doesn't change because self.params.center_mode, self.params.bin_position_mode, and self.params.side_bin_margins aren't expected to change. 
             self.logger.info('\tdone.')
             
@@ -277,7 +276,8 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
         self.params.time_curves_datasource = None # required before calling self._update_plot_ranges()
     
        
-
+    @function_attributes(short_name='_build_cell_configs', tags=['config','private'], input_requires=['self.params.neuron_qcolors_map'], output_provides=['self.params.config_items', 'self.config_fragile_linear_neuron_IDX_map'],
+        uses=['self.find_cell_ids_from_neuron_IDXs'], used_by=[], creation_date='2023-03-31 18:46')
     def _build_cell_configs(self):
         """ Adds the neuron/cell configurations that are used to color and format the scatterplot spikes and such. 
         Requires:

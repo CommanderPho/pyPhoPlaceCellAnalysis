@@ -5,8 +5,9 @@ tags: python, matplotlib, heatmap, visualization
 """
 import numpy as np
 import matplotlib.pyplot as plt
+from pyphocorehelpers.function_helpers import function_attributes
 
-
+@function_attributes(short_name='visualize_heatmap', tags=['display','matplotlib','heatmap'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-03-22 15:11')
 def visualize_heatmap(data, show_value_labels=False, title="Simple Heatmap", show_xticks=False, show_yticks=False, show_colorbar=False):
     """
     Creates a simple heatmap visualization of the given 2D numpy array data.
