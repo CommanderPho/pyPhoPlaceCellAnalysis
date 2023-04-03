@@ -331,8 +331,19 @@ def plot_raster_plot(spikes_df, shared_aclus, scatter_app_name='pho_test'):
 
     # Common Tick Label
     vtick = QtGui.QPainterPath()
-    vtick.moveTo(0, -0.5)
-    vtick.lineTo(0, 0.5)
+
+    # Defailt Tick Mark:
+    # # vtick.moveTo(0, -0.5)
+    # # vtick.lineTo(0, 0.5)
+    # vtick.moveTo(0, -0.5)
+    # vtick.lineTo(0, 0.5)
+
+    # Thicker Tick Label:
+    tick_width = 0.1
+    half_tick_width = 0.5 * tick_width
+    vtick.moveTo(-half_tick_width, -0.5)
+    vtick.addRect(-half_tick_width, -0.5, tick_width, 1.0) # x, y, width, height
+
 
     plots.scatter_plot = pg.ScatterPlotItem(name='spikeRasterOverviewWindowScatterPlotItem', pxMode=True, symbol=vtick, size=5, pen={'color': 'w', 'width': 1})
     plots.scatter_plot.setObjectName('scatter_plot') # this seems necissary, the 'name' parameter in addPlot(...) seems to only change some internal property related to the legend AND drastically slows down the plotting
