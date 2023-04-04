@@ -973,12 +973,12 @@ class BayesianPlacemapPositionDecoder(NeuronUnitSlicableObjectProtocol, Placemap
     # Class/Static Methods                                                                                                 #
     # ==================================================================================================================== #
 
+    @function_attributes(short_name='perform_decode_specific_epochs', tags=['decode','specific_epochs','epoch', 'classmethod'], input_requires=[], output_provides=[], uses=['active_decoder.decode', 'add_epochs_id_identity', 'epochs_spkcount', 'cls.perform_build_marginals'], used_by=[''], creation_date='2022-12-04 00:00')
     @classmethod
     def perform_decode_specific_epochs(cls, active_decoder, spikes_df, filter_epochs, decoding_time_bin_size = 0.05, debug_print=False) -> DecodedFilterEpochsResult:
         """Uses the decoder to decode the nerual activity (provided in spikes_df) for each epoch in filter_epochs
 
         NOTE: Uses active_decoder.decode(...) to actually do the decoding
-        
         
         Args:
             new_2D_decoder (_type_): _description_
@@ -988,7 +988,7 @@ class BayesianPlacemapPositionDecoder(NeuronUnitSlicableObjectProtocol, Placemap
             debug_print (bool, optional): _description_. Defaults to False.
 
         Returns:
-            _type_: _description_
+            DecodedFilterEpochsResult: _description_
         """
         # build output result object:
         filter_epochs_decoder_result = DynamicContainer(most_likely_positions_list=[], p_x_given_n_list=[], marginal_x_list=[], marginal_y_list=[], most_likely_position_indicies_list=[])
