@@ -345,7 +345,7 @@ def plot_raster_plot(spikes_df, shared_aclus, scatter_app_name='pho_test'):
     vtick.addRect(-half_tick_width, -0.5, tick_width, 1.0) # x, y, width, height
 
 
-    plots.scatter_plot = pg.ScatterPlotItem(name='spikeRasterOverviewWindowScatterPlotItem', pxMode=True, symbol=vtick, size=5, pen={'color': 'w', 'width': 1})
+    plots.scatter_plot = pg.ScatterPlotItem(name='spikeRasterOverviewWindowScatterPlotItem', pxMode=True, symbol=vtick, size=10, pen={'color': 'w', 'width': 1})
     plots.scatter_plot.setObjectName('scatter_plot') # this seems necissary, the 'name' parameter in addPlot(...) seems to only change some internal property related to the legend AND drastically slows down the plotting
     plots.scatter_plot.opts['useCache'] = True
     plots.scatter_plot.addPoints(plots_data.all_spots) # , hoverable=True
