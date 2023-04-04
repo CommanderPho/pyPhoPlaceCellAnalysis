@@ -13,19 +13,18 @@ from neuropy.utils.matplotlib_helpers import _build_variable_max_value_label, en
 from pyphoplacecellanalysis.GUI.PyQtPlot.BinnedImageRenderingWindow import BasicBinnedImageRenderingWindow # for display_all_pf_2D_pyqtgraph_binned_image_rendering
 from neuropy.core.neuron_identities import PlotStringBrevityModeEnum # for display_all_pf_2D_pyqtgraph_binned_image_rendering
 
-from pyphocorehelpers.geometry_helpers import compute_data_aspect_ratio, compute_data_extent
+from pyphocorehelpers.function_helpers import function_attributes
+# from pyphocorehelpers.geometry_helpers import compute_data_aspect_ratio, compute_data_extent
 from pyphocorehelpers.indexing_helpers import compute_paginated_grid_config
 
 import pyphoplacecellanalysis.External.pyqtgraph as pg
-from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtCore, QtGui
+# from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtCore, QtGui
 from pyphoplacecellanalysis.GUI.PyQtPlot.pyqtplot_common import pyqtplot_common_setup
 
 from pyphoplacecellanalysis.Pho2D.PyQtPlots.Extensions.pyqtgraph_helpers import pyqtplot_build_image_bounds_extent
 
 
-
-
-
+@function_attributes(short_name='pyqtplot_plot_image_array', tags=['display','pyqtgraph','plot','image','binned','2D'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2022-09-29 00:00')
 def pyqtplot_plot_image_array(xbin_edges, ybin_edges, images, occupancy, max_num_columns = 5, drop_below_threshold: float=0.0000001, app=None, parent_root_widget=None, root_render_widget=None, debug_print=False):
     """ Plots an array of images provided in 'images' argument
     images should be an nd.array with dimensions like: (10, 63, 63), where (N_Images, X_Dim, Y_Dim)
@@ -188,7 +187,7 @@ def pyqtplot_plot_image_array(xbin_edges, ybin_edges, images, occupancy, max_num
     return app, parent_root_widget, root_render_widget, plot_array, img_item_array, other_components_array
 
 
-
+@function_attributes(short_name='all_pf_2D_pyqtgraph_binned_image_rendering', tags=['display','pyqtgraph','plot','image','binned','2D'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2022-08-16 00:00')
 def display_all_pf_2D_pyqtgraph_binned_image_rendering(active_pf_2D, figure_format_config, debug_print=True): # , **kwargs
     """ 2022-08-16 - A fresh implementation of a pf_2D placefield renderer that uses the BasicBinnedImageRenderingWindow subclass. 
     
