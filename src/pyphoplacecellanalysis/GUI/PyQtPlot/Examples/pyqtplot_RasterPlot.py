@@ -280,7 +280,7 @@ class RasterScatterPlotManager:
 
 @function_attributes(short_name='plot_raster_plot', tags=['pyqtgraph','raster','2D'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-03-31 20:53')
 def plot_raster_plot(spikes_df, shared_aclus, scatter_app_name='pho_test'):
-    """ This uses pyqtgraph's scatter function like SpikeRaster2D
+    """ This uses pyqtgraph's scatter function like SpikeRaster2D to render a raster plot with colored ticks by default
 
     Usage:
 
