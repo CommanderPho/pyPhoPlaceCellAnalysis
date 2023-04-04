@@ -150,5 +150,5 @@ def visualize_heatmap_pyqtgraph(data, win=None, show_value_labels=False, title="
     if did_create_win and (not defer_show):
         app.exec_()
 
-    return win
+    return win, img
 

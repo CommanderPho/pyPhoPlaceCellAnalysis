@@ -1,8 +1,10 @@
 from copy import deepcopy
 from dataclasses import dataclass
 import matplotlib.pyplot as plt
+from matplotlib import cm # used for plot_kourosh_activity_style_figure version too to get a good colormap 
 import numpy as np
 import pandas as pd
+from pyphocorehelpers.DataStructure.general_parameter_containers import RenderPlots
 from scipy.spatial.distance import cdist
 
 # Neuropy:
@@ -260,10 +262,11 @@ def perform_leave_one_aclu_out_decoding_analysis(spikes_df, active_pos_df, activ
 
 
     spikes_df = deepcopy(spikes_df).spikes.sliced_by_neuron_type('pyramidal') ## get only the pyramidal spikes
-    active_pos = active_pos_df.position.to_Position_obj() # convert back to a full position object
+    
  
     ## Build placefield for the decoder to use:
     if original_all_included_decoder is None:
+        active_pos = active_pos_df.position.to_Position_obj() # convert back to a full position object
         original_decoder_pf1D = PfND(deepcopy(spikes_df), deepcopy(active_pos.linear_pos_obj)) # all other settings default
         ## Build the new decoder:
         original_all_included_decoder = BayesianPlacemapPositionDecoder(decoding_time_bin_size, original_decoder_pf1D, original_decoder_pf1D.filtered_spikes_df.copy(), debug_print=False)
@@ -620,6 +623,11 @@ def plot_kourosh_activity_style_figure(long_results_obj: SurpriseAnalysisResult,
 
         return plots, plots_data
 
+    # Get the colormap applied to the decoded posteriors:
+    colormap = cm.get_cmap("viridis")  # "nipy_spectral" cm.get_cmap("CMRmap")
+    colormap._init()
+    lut = (colormap._lut * 255).view(np.ndarray)  # Convert matplotlib colormap from 0-1 to 0 -255 for Qt
+
 
     ## 0. Precompute the active neurons in each timebin, and the epoch-timebin-flattened decoded posteriors makes it easier to compute for a given time bin:
     # a list of lists where each list contains the aclus that are active during that timebin:
@@ -691,8 +699,10 @@ def plot_kourosh_activity_style_figure(long_results_obj: SurpriseAnalysisResult,
     plots.epoch_posterior_plot = win.addPlot()
     active_epoch_p_x_given_n = long_results_obj.all_included_filter_epochs_decoder_result.p_x_given_n_list[epoch_idx] # all decoded posteriors for curent epoch
     # active_epoch_p_x_given_n.shape # (63, 13)
-    epoch_posterior_plot = visualize_heatmap_pyqtgraph(active_epoch_p_x_given_n.T, win=plots.epoch_posterior_plot, title=f"Epoch[{epoch_idx}]")
-    
+    epoch_posterior_win, epoch_posterior_img = visualize_heatmap_pyqtgraph(active_epoch_p_x_given_n.T, win=plots.epoch_posterior_plot, title=f"Epoch[{epoch_idx}]")
+    # Apply the colormap
+    epoch_posterior_img.setLookupTable(lut)
+
 
     ## Render the linear regions for each callout:
     plots.linear_regions = []
@@ -710,8 +720,12 @@ def plot_kourosh_activity_style_figure(long_results_obj: SurpriseAnalysisResult,
     def build_callout_subgraphic(callout_timebin_IDX = 6, axs=None):
         """ Builds a "callout" graphic for a single timebin within the epoch in question. 
 
-        Captures: _test_flat_p_x_given_n, long_results_obj
-
+        Captures: 
+            timebins_p_x_given_n
+            long_results_obj (for long_results_obj.original_1D_decoder.pf.ratemap.unit_max_tuning_curves)
+            timebins_active_neuron_IDXs
+            timebins_active_aclus
+            
         """
         # 1. Plot decoded posterior for this time bin
         # len(long_results_obj.all_included_filter_epochs_decoder_result.p_x_given_n_list)
@@ -745,8 +759,11 @@ def plot_kourosh_activity_style_figure(long_results_obj: SurpriseAnalysisResult,
     def build_callout_subgraphic_pyqtgraph(callout_timebin_IDX = 6, axs=None):
         """ Builds a "callout" graphic for a single timebin within the epoch in question. 
 
-        Captures: _test_flat_p_x_given_n, long_results_obj
-
+        Captures:
+            timebins_p_x_given_n
+            long_results_obj (for long_results_obj.original_1D_decoder.pf.ratemap.unit_max_tuning_curves)
+            timebins_active_neuron_IDXs
+            timebins_active_aclus
         """
         # 1. Plot decoded posterior for this time bin
         # len(long_results_obj.all_included_filter_epochs_decoder_result.p_x_given_n_list)
@@ -758,8 +775,9 @@ def plot_kourosh_activity_style_figure(long_results_obj: SurpriseAnalysisResult,
 
         # turn into a single row:
         curr_timebin_all_included_p_x_given_n = np.reshape(curr_timebin_all_included_p_x_given_n, (1, -1)).T
+        out_posterior_win, out_posterior_img = visualize_heatmap_pyqtgraph(curr_timebin_all_included_p_x_given_n, title=f"decoded posterior for example_timebin_IDX: {callout_timebin_IDX}", show_colorbar=False, win=axs[0])
+        out_posterior_img.setLookupTable(lut)
 
-        out_posterior = visualize_heatmap_pyqtgraph(curr_timebin_all_included_p_x_given_n, title=f"decoded posterior for example_timebin_IDX: {callout_timebin_IDX}", show_colorbar=False, win=axs[0])
         # 2. Get cells that were active during this time bin that contributed to this posterior, and get their placefields
         _temp_active_neuron_IDXs = timebins_active_neuron_IDXs[callout_timebin_IDX]
         _temp_active_neuron_aclus = timebins_active_aclus[callout_timebin_IDX]
@@ -767,15 +785,23 @@ def plot_kourosh_activity_style_figure(long_results_obj: SurpriseAnalysisResult,
 
         # 3. Plot their placefields as a column
         ## Plot a stacked heatmap for all place cells, with each row being a different cell:
-        out_pfs = visualize_heatmap_pyqtgraph(_temp_active_pfs.T, title=f"1D Placefields for active aclus during example_timebin_IDX: {callout_timebin_IDX}", show_colorbar=False, win=axs[1])
-
+        out_pfs_win, out_pfs_img = visualize_heatmap_pyqtgraph(_temp_active_pfs.T, title=f"1D Placefields for active aclus during example_timebin_IDX: {callout_timebin_IDX}", show_yticks=True, show_colorbar=False, win=axs[1])
+        
         # # Set y-ticks to show the unit IDs
-        # ax.set_yticks(np.arange(len(_temp_active_neuron_aclus)))
-        # ax.set_yticklabels(_temp_active_neuron_aclus)
-        # # Rotate the y-tick labels and set their alignment
-        # plt.xticks(rotation=45, ha="right")
-        # plt.setp(ax.get_yticklabels(), fontsize=10)
+        aclu_y_ticks = [(float(i)+0.5, f'{aclu}') for i, aclu in enumerate(_temp_active_neuron_aclus)] # offset by +0.5 to center each tick on the row
+        # print(f'aclu_y_ticks: {aclu_y_ticks}')
+        ## Setup the aclu labels
+        # Set the y range and ticks
+        # plots['root_plot'].setYRange(0, len(shared_aclus)-1)
+        # plots['root_plot'].setYTicks([(i+1, f'{aclu}') for i, aclu in enumerate(shared_aclus)])
+        # get the left y-axis:
+        ay = axs[1].getAxis('left')
+        # ay.setTicks(aclu_y_ticks)
+        ay.setTicks((aclu_y_ticks, [])) # add list of major ticks; no minor ticks
+        axs[1].showAxis('left') # show the axis
 
+
+        return axs
 
     ## Add linear regions:
     plots, plots_data = update_linear_regions(plots, plots_data)
@@ -803,10 +829,13 @@ def plot_kourosh_activity_style_figure(long_results_obj: SurpriseAnalysisResult,
         # mw.draw()
 
         # callout_glw = pg.GraphicsLayoutWidget(show=True, title="test")
-        # row_start_idx = 0
+        callout_glw = win.addLayout()
+        row_start_idx = 0
 
-        callout_glw = win
-        row_start_idx = 2
+        plots.callouts = RenderPlots('callouts', layout=callout_glw, posteriors=[], placefields=[])
+        
+        # callout_glw = win
+        # row_start_idx = 2
 
         ## Build callout subgraphics:
         # for top_ax, bottom_ax, a_callout_timebin_IDX in zip(top_axis_objs, bottom_axis_objs, plots_data.callout_flat_timebin_IDXs):
@@ -815,12 +844,11 @@ def plot_kourosh_activity_style_figure(long_results_obj: SurpriseAnalysisResult,
             # print(f'top_axis_idx: {top_axis_idx}, bottom_axis_idx: {bottom_axis_idx}')
             # top_ax = mw.getFigure().add_subplot(2, active_epoch_n_timebins, top_axis_idx)
             # bottom_ax = mw.getFigure().add_subplot(2, active_epoch_n_timebins, bottom_axis_idx)
-
             top_ax = callout_glw.addPlot(row=row_start_idx, col=col_idx)
             bottom_ax = callout_glw.addPlot(row=row_start_idx+1, col=col_idx)
-
-            build_callout_subgraphic_pyqtgraph(callout_timebin_IDX=a_callout_timebin_IDX, axs=[top_ax, bottom_ax])
-
+            curr_callout_axs = build_callout_subgraphic_pyqtgraph(callout_timebin_IDX=a_callout_timebin_IDX, axs=[top_ax, bottom_ax])
+            plots.callouts.posteriors.append(top_ax)
+            plots.callouts.placefields.append(bottom_ax)
 
         # win.addItem(callout_glw)
         # plots.mw.show()
