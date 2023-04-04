@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 from pyphocorehelpers.function_helpers import function_attributes
 
 @function_attributes(short_name='visualize_heatmap', tags=['display','matplotlib','heatmap'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-03-22 15:11')
-def visualize_heatmap(data, show_value_labels=False, title="Simple Heatmap", show_xticks=False, show_yticks=False, show_colorbar=False):
+def visualize_heatmap(data, ax=None, show_value_labels=False, title="Simple Heatmap", show_xticks=False, show_yticks=False, show_colorbar=False, defer_show:bool = False):
     """
     Creates a simple heatmap visualization of the given 2D numpy array data.
 
@@ -21,7 +21,15 @@ def visualize_heatmap(data, show_value_labels=False, title="Simple Heatmap", sho
     if data.ndim == 1:
         data = np.reshape(data, (1, -1))
     
-    fig, ax = plt.subplots(figsize=(20, 8))
+    if ax is None:
+        # Create a new figure and axes for output:
+        fig, ax = plt.subplots(figsize=(20, 8))
+    else:
+        # already provided an axes to plot into:
+        fig = ax.get_figure()
+        # fig.set_size_inches([23, 9.7])
+
+    # Perform the plot:
     im = ax.imshow(data)
 
     if show_colorbar:
@@ -57,6 +65,7 @@ def visualize_heatmap(data, show_value_labels=False, title="Simple Heatmap", sho
 
     ax.set_title(title)
     fig.tight_layout()
-    plt.show()
+    if not defer_show:
+        plt.show()
     
     return fig, ax, im
