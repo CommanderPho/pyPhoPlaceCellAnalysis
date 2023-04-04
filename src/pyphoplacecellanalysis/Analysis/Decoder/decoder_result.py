@@ -742,6 +742,40 @@ def plot_kourosh_activity_style_figure(long_results_obj: SurpriseAnalysisResult,
         plt.xticks(rotation=45, ha="right")
         plt.setp(ax.get_yticklabels(), fontsize=10)
 
+    def build_callout_subgraphic_pyqtgraph(callout_timebin_IDX = 6, axs=None):
+        """ Builds a "callout" graphic for a single timebin within the epoch in question. 
+
+        Captures: _test_flat_p_x_given_n, long_results_obj
+
+        """
+        # 1. Plot decoded posterior for this time bin
+        # len(long_results_obj.all_included_filter_epochs_decoder_result.p_x_given_n_list)
+        curr_timebin_all_included_p_x_given_n = timebins_p_x_given_n[:, callout_timebin_IDX] 
+        # curr_timebin_all_included_p_x_given_n #.shape # (63, ) (n_x_bins, )
+        
+        # use the existing axes:
+        assert len(axs) == 2
+
+        # turn into a single row:
+        curr_timebin_all_included_p_x_given_n = np.reshape(curr_timebin_all_included_p_x_given_n, (1, -1)).T
+
+        out_posterior = visualize_heatmap_pyqtgraph(curr_timebin_all_included_p_x_given_n, title=f"decoded posterior for example_timebin_IDX: {callout_timebin_IDX}", show_colorbar=False, win=axs[0])
+        # 2. Get cells that were active during this time bin that contributed to this posterior, and get their placefields
+        _temp_active_neuron_IDXs = timebins_active_neuron_IDXs[callout_timebin_IDX]
+        _temp_active_neuron_aclus = timebins_active_aclus[callout_timebin_IDX]
+        _temp_active_pfs = long_results_obj.original_1D_decoder.pf.ratemap.unit_max_tuning_curves[_temp_active_neuron_IDXs,:].copy() 
+
+        # 3. Plot their placefields as a column
+        ## Plot a stacked heatmap for all place cells, with each row being a different cell:
+        out_pfs = visualize_heatmap_pyqtgraph(_temp_active_pfs.T, title=f"1D Placefields for active aclus during example_timebin_IDX: {callout_timebin_IDX}", show_colorbar=False, win=axs[1])
+
+        # # Set y-ticks to show the unit IDs
+        # ax.set_yticks(np.arange(len(_temp_active_neuron_aclus)))
+        # ax.set_yticklabels(_temp_active_neuron_aclus)
+        # # Rotate the y-tick labels and set their alignment
+        # plt.xticks(rotation=45, ha="right")
+        # plt.setp(ax.get_yticklabels(), fontsize=10)
+
 
     ## Add linear regions:
     plots, plots_data = update_linear_regions(plots, plots_data)
@@ -750,30 +784,47 @@ def plot_kourosh_activity_style_figure(long_results_obj: SurpriseAnalysisResult,
         # Plot callout subgraphics in columns below:
         win.nextRow()
 
-
         ## CustomMatplotlibWidget:
-        plots.mw = CustomMatplotlibWidget(size=(15,15), dpi=72, constrained_layout=True, scrollable_figure=False, scrollAreaContents_MinimumHeight=200)
+        # plots.mw = CustomMatplotlibWidget(size=(15,15), dpi=72, constrained_layout=True, scrollable_figure=False, scrollAreaContents_MinimumHeight=200)
         # subplot = plots.mw.getFigure().add_subplot(2, active_epoch_n_timebins, 1)
 
-        top_axis_indicies = np.arange(active_epoch_n_timebins)+1 # must be 1-based, not zero based
-        bottom_axis_indicies = top_axis_indicies + active_epoch_n_timebins
+        # PyQtGraph Version:
+        # top_axis_indicies = np.arange(active_epoch_n_timebins)+1 # must be 1-based, not zero based
+        # bottom_axis_indicies = top_axis_indicies + active_epoch_n_timebins
 
-        top_axis_objs = [plots.mw.getFigure().add_subplot(2, active_epoch_n_timebins, an_idx) for an_idx in top_axis_indicies]
-        bottom_axis_objs = [plots.mw.getFigure().add_subplot(2, active_epoch_n_timebins, an_idx) for an_idx in bottom_axis_indicies]
+        # MATPLOTLIB version:
+        # top_axis_indicies = np.arange(active_epoch_n_timebins)+1 # must be 1-based, not zero based
+        # bottom_axis_indicies = top_axis_indicies + active_epoch_n_timebins
+        # top_axis_objs = [plots.mw.getFigure().add_subplot(2, active_epoch_n_timebins, an_idx) for an_idx in top_axis_indicies]
+        # bottom_axis_objs = [plots.mw.getFigure().add_subplot(2, active_epoch_n_timebins, an_idx) for an_idx in bottom_axis_indicies]
         
         # win.addItem(plots.mw)
         # subplot.plot(x,y)
         # mw.draw()
 
+        # callout_glw = pg.GraphicsLayoutWidget(show=True, title="test")
+        # row_start_idx = 0
+
+        callout_glw = win
+        row_start_idx = 2
+
         ## Build callout subgraphics:
-        for top_ax, bottom_ax, a_callout_timebin_IDX in zip(top_axis_objs, bottom_axis_objs, plots_data.callout_flat_timebin_IDXs):
+        # for top_ax, bottom_ax, a_callout_timebin_IDX in zip(top_axis_objs, bottom_axis_objs, plots_data.callout_flat_timebin_IDXs):
+        # for top_axis_idx, bottom_axis_idx, a_callout_timebin_IDX in zip(top_axis_indicies, top_axis_indicies, plots_data.callout_flat_timebin_IDXs):
+        for col_idx, a_callout_timebin_IDX in zip(np.arange(len(plots_data.callout_flat_timebin_IDXs)), plots_data.callout_flat_timebin_IDXs):
             # print(f'top_axis_idx: {top_axis_idx}, bottom_axis_idx: {bottom_axis_idx}')
             # top_ax = mw.getFigure().add_subplot(2, active_epoch_n_timebins, top_axis_idx)
             # bottom_ax = mw.getFigure().add_subplot(2, active_epoch_n_timebins, bottom_axis_idx)
-            build_callout_subgraphic(callout_timebin_IDX=a_callout_timebin_IDX, axs=[top_ax, bottom_ax])
 
-        plots.mw.show()
-        plots.mw.draw()
+            top_ax = callout_glw.addPlot(row=row_start_idx, col=col_idx)
+            bottom_ax = callout_glw.addPlot(row=row_start_idx+1, col=col_idx)
+
+            build_callout_subgraphic_pyqtgraph(callout_timebin_IDX=a_callout_timebin_IDX, axs=[top_ax, bottom_ax])
+
+
+        # win.addItem(callout_glw)
+        # plots.mw.show()
+        # plots.mw.draw()
 
     return app, win, plots, plots_data
     
