@@ -69,3 +69,86 @@ def visualize_heatmap(data, ax=None, show_value_labels=False, title="Simple Heat
         plt.show()
     
     return fig, ax, im
+
+
+
+import numpy as np
+import pyqtgraph as pg
+from pyqtgraph.Qt import QtCore, QtGui
+def visualize_heatmap_pyqtgraph(data, win=None, show_value_labels=False, title="Simple Heatmap", show_xticks=False, show_yticks=False, show_colorbar=False, defer_show:bool = False):
+    """
+    Creates a simple heatmap visualization of the given 2D numpy array data.
+
+    data: a 2D numpy array
+    win: a pyqtgraph PlotWidget object to plot into. If not provided, a new PlotWidget will be created.
+    show_value_labels: if True, display the values in each cell
+    title: the title of the plot
+    show_xticks: if True, display the x-tick labels
+    show_yticks: if True, display the y-tick labels
+    show_colorbar: if True, display the colorbar
+    defer_show: if True, do not show the plot immediately. Instead, return the plot object.
+
+    Returns: the PlotWidget object
+    """
+
+    # Reshape the 1D array into a 2D array with a single row
+    if data.ndim == 1:
+        data = np.reshape(data, (1, -1))
+
+    # Create a new PlotWidget if win is not provided
+    if win is None:
+        app = pg.mkQApp()
+        win = pg.PlotWidget()
+        win.setWindowTitle(title)
+        win.show()
+        did_create_win = True
+    else:
+        did_create_win = False
+
+    # Create an image item to display the heatmap
+    img = pg.ImageItem(data)
+
+    # Add the image item to the PlotWidget
+    win.addItem(img)
+
+    if show_colorbar:
+        # Add a colorbar to the PlotWidget
+        cbar = pg.GradientWidget(orientation='right')
+        cbar.setColorMap(pg.ColorMap(*pg.colorTuple('bwr')))
+        win.addItem(cbar)
+
+        # Link the range of the colorbar with the image item
+        cbar.linkedViewChanged(img)
+
+    # Set the tick labels
+    if show_xticks:
+        ax = win.getAxis('bottom')
+        ax.setTicks([[(i, str(i)) for i in range(data.shape[1])]])
+        ax.setLabel(text='X Axis')
+    else:
+        win.hideAxis('bottom')
+
+    if show_yticks:
+        ax = win.getAxis('left')
+        ax.setTicks([[(i, str(i)) for i in range(data.shape[0])]])
+        ax.setLabel(text='Y Axis')
+    else:
+        win.hideAxis('left')
+
+    # Display the value labels
+    if show_value_labels:
+        for i in range(data.shape[0]):
+            for j in range(data.shape[1]):
+                val = data[i, j]
+                text = pg.TextItem(f"{val:.2f}")
+                text.setPos(j, i)
+                win.addItem(text)
+
+    # Set the title of the plot
+    win.setTitle(title)
+
+    if did_create_win and (not defer_show):
+        app.exec_()
+
+    return win
+
