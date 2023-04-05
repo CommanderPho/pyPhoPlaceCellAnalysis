@@ -6,7 +6,7 @@ from attrs import define, field, Factory # for DecodedFilterEpochsResult
 import numpy as np
 import pandas as pd
 # from scipy.stats import multivariate_normal
-from scipy.special import factorial
+from scipy.special import factorial, logsumexp
 
 # import neuropy
 from neuropy.utils.dynamic_container import DynamicContainer # for decode_specific_epochs
@@ -248,6 +248,8 @@ class ZhangReconstructionImplementation:
 
         To get around this, I introduced a version that accumulates the multilications over the course of the loop.
             cell_prob = np.ones((nFlatPositionBins, nTimeBins))
+
+        Note: This means that the "Flat" implementation may be more susceptible to numerical underflow, as the intermediate products can become very small, whereas the "Full" implementation does not have this issue. However, the "Flat" implementation can be more efficient in terms of memory usage and computation time, as it avoids creating a large number of intermediate arrays.
 
         """
         assert(len(n) == np.shape(F)[1]), f'n must be a column vector with an entry for each place cell (neuron). Instead it is of np.shape(n): {np.shape(n)}. np.shape(F): {np.shape(F)}'        

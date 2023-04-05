@@ -799,8 +799,6 @@ def plot_kourosh_activity_style_figure(long_results_obj: SurpriseAnalysisResult,
         # ay.setTicks(aclu_y_ticks)
         ay.setTicks((aclu_y_ticks, [])) # add list of major ticks; no minor ticks
         axs[1].showAxis('left') # show the axis
-
-
         return axs
 
     ## Add linear regions:
