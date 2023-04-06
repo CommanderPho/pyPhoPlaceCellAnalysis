@@ -21,6 +21,8 @@ from pyphocorehelpers.indexing_helpers import BinningInfo, compute_spanning_bins
 from pyphocorehelpers.print_helpers import WrappingMessagePrinter, SimplePrintable, safe_get_variable_shape
 from pyphocorehelpers.mixins.serialized import SerializedAttributesSpecifyingClass
 
+from pyphoplacecellanalysis.General.Mixins.CrossComputationComparisonHelpers import _compare_computation_results # for finding common neurons in `prune_to_shared_aclus_only`
+
 
 # cut_bins = np.linspace(59200, 60800, 9)
 # pd.cut(df['column_name'], bins=cut_bins)
@@ -470,6 +472,9 @@ class BayesianPlacemapPositionDecoder(NeuronUnitSlicableObjectProtocol, Placemap
 
     Used to try to decode everything in one go, meaning it took the parameters (like the time window) and the spikes to decode as well and did the computation internally, but the concept of a decoder is that it is a stateless object that can be called on any spike data to decode it, so this concept is depricated.
 
+    Holds a PfND object in self.pf that is used for decoding.
+
+
     Call Hierarchy:
         Path 1:
             .decode_specific_epochs(...)
@@ -736,6 +741,23 @@ class BayesianPlacemapPositionDecoder(NeuronUnitSlicableObjectProtocol, Placemap
             self.marginal.y.p_x_given_n_and_x_prev = two_step_decoder_result.marginal.y.p_x_given_n.copy()
             self.marginal.y.two_step_most_likely_positions_1D = two_step_decoder_result.marginal.y.most_likely_positions_1D.copy()
 
+    def to_1D_maximum_projection(self, defer_compute_all:bool=True):
+        """ returns a copy of the decoder that is 1D """
+        # Perform the projection. Can only be ran once.
+        new_copy_decoder = deepcopy(self)
+        new_copy_decoder.pf = new_copy_decoder.pf.to_1D_maximum_projection() # project the placefields to 1D
+        # new_copy_decoder.pf.compute()
+        # Test the projection to make sure the dimensionality is correct:
+        test_projected_ratemap = new_copy_decoder.pf.ratemap
+        assert test_projected_ratemap.ndim == 1, f"projected 1D ratemap must be of dimension 1 but is {test_projected_ratemap.ndim}"
+        test_projected_placefields = new_copy_decoder.pf
+        assert test_projected_placefields.ndim == 1, f"projected 1D placefields must be of dimension 1 but is {test_projected_placefields.ndim}"
+        test_projected_decoder = new_copy_decoder
+        assert test_projected_decoder.ndim == 1, f"projected 1D decoder must be of dimension 1 but is {test_projected_decoder.ndim}"
+        self.setup()
+        if not defer_compute_all:
+            self.compute_all() # Needed?
+        return new_copy_decoder
 
     # ==================================================================================================================== #
     # Private Methods                                                                                                      #
@@ -1201,3 +1223,34 @@ class BayesianPlacemapPositionDecoder(NeuronUnitSlicableObjectProtocol, Placemap
         unit_specific_time_binned_firing_rate_global_fr_normalized = unit_specific_time_binned_spike_proportion_global_fr_normalized / pho_custom_decoder.time_window_edges_binning_info.step
         # Return the computed values, leaving the original data unchanged.
         return unit_specific_time_binned_spike_proportion_global_fr_normalized, unit_specific_time_binned_firing_rate, unit_specific_time_binned_firing_rate_global_fr_normalized
+
+
+    @function_attributes(short_name='prune_to_shared_aclus_only', tags=['decoder','aclu'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-04-06 12:19')
+    @classmethod
+    def prune_to_shared_aclus_only(cls, long_decoder, short_decoder):
+        """ determines the neuron_IDs present in both long and short decoders (shared aclus) and returns two copies of long_decoder and short_decoder that only contain the shared_aclus
+
+        Usage:
+            from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BayesianPlacemapPositionDecoder
+
+            shared_aclus, (long_shared_aclus_only_decoder, short_shared_aclus_only_decoder), long_short_pf_neurons_diff = BayesianPlacemapPositionDecoder.prune_to_shared_aclus_only(long_decoder, short_decoder)
+            n_neurons = len(shared_aclus)
+
+        """
+
+        long_neuron_IDs, short_neuron_IDs = long_decoder.neuron_IDs, short_decoder.neuron_IDs
+        # long_neuron_IDs, short_neuron_IDs = long_results_obj.original_1D_decoder.neuron_IDs, short_results_obj.original_1D_decoder.neuron_IDs
+        long_short_pf_neurons_diff = _compare_computation_results(long_neuron_IDs, short_neuron_IDs)
+
+        ## Get the normalized_tuning_curves only for the shared aclus (that are common across (long/short/global):
+        shared_aclus = long_short_pf_neurons_diff.intersection #.shape (56,)
+        # n_neurons = len(shared_aclus)
+        # long_is_included = np.isin(long_neuron_IDs, shared_aclus)  #.shape # (104, 63)
+        # short_is_included = np.isin(short_neuron_IDs, shared_aclus)
+
+        # Restrict the long decoder to only the aclus present on both decoders:
+        long_shared_aclus_only_decoder = long_decoder.get_by_id(shared_aclus)
+        short_shared_aclus_only_decoder = short_decoder.get_by_id(shared_aclus) # short currently has a subset of long's alcus so this isn't needed, but just for symmetry do it anyway
+        return shared_aclus, (long_shared_aclus_only_decoder, short_shared_aclus_only_decoder), long_short_pf_neurons_diff
+
+    
