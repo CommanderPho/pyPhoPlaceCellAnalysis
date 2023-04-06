@@ -487,6 +487,21 @@ class BayesianPlacemapPositionDecoder(NeuronUnitSlicableObjectProtocol, Placemap
                 .compute_corrected_positions(...)
 
     """
+    # # Time Binning:
+    # time_bin_size: float
+    # time_binning_container: BinningContainer
+    # unit_specific_time_binned_spike_counts: np.ndarray
+    # total_spike_counts_per_window: np.ndarray
+
+    # # Computed Results:
+    # flat_p_x_given_n: np.ndarray
+    # p_x_given_n: np.ndarray
+    # most_likely_position_flat_indicies: np.ndarray
+    # most_likely_position_indicies: type
+    # marginal: DynamicContainer
+    # most_likely_positions: np.ndarray
+    # revised_most_likely_positions: np.ndarray
+
     @property
     def flat_position_size(self):
         """The flat_position_size property."""
