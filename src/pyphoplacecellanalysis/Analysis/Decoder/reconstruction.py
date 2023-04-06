@@ -372,6 +372,225 @@ class DecodedFilterEpochsResult(object):
 # ==================================================================================================================== #
 # Placemap Position Decoders                                                                                           #
 # ==================================================================================================================== #
+
+
+# ==================================================================================================================== #
+# Stateless Decoders (New 2023-04-06)                                                                                  #
+# ==================================================================================================================== #
+from attrs import define, field, Factory
+from neuropy.analyses.placefields import PfND
+
+
+@define(slots=False)
+class BasePositionDecoder(NeuronUnitSlicableObjectProtocol):
+    """ 2023-04-06 - A simplified data-only version of the decoder that serves to remove all state related to specific computations to make each run independent 
+    Stores only the raw inputs that are used to decode, with the user specifying the specifics for a given decoding (like time_time_sizes, etc.
+
+    """
+    pf: PfND
+
+    neuron_IDXs: np.ndarray
+    neuron_IDs: np.ndarray
+    F: np.ndarray
+    P_x: np.ndarray
+
+    setup_on_init:bool = True 
+    post_load_on_init:bool = False
+    debug_print: bool = False
+    
+    # # Time Binning:
+    # time_bin_size: float
+    # time_binning_container: BinningContainer
+    # unit_specific_time_binned_spike_counts: np.ndarray
+    # total_spike_counts_per_window: np.ndarray
+
+    # # Computed Results:
+    # flat_p_x_given_n: np.ndarray
+    # p_x_given_n: np.ndarray
+    # most_likely_position_flat_indicies: np.ndarray
+    # most_likely_position_indicies: type
+    # marginal: DynamicContainer
+    # most_likely_positions: np.ndarray
+    # revised_most_likely_positions: np.ndarray
+
+
+    # Properties _________________________________________________________________________________________________________ #
+
+    # placefield properties:
+    @property
+    def ratemap(self):
+        return self.pf.ratemap
+
+    @property
+    def ndim(self):
+        return int(self.pf.ndim)
+
+    @property
+    def num_neurons(self):
+        """The num_neurons property."""
+        return self.ratemap.n_neurons # np.shape(self.neuron_IDs) # or self.ratemap.n_neurons
+
+    # @property
+    # def n_xbins(self):
+    #     """The num_neurons property."""
+    #     return np.shape(self.P_x)[0]
+            
+    # ratemap properties (xbin & ybin)  
+    @property
+    def xbin(self):
+        return self.ratemap.xbin
+    @property
+    def ybin(self):
+        return self.ratemap.ybin
+    @property
+    def xbin_centers(self):
+        return self.ratemap.xbin_centers
+    @property
+    def ybin_centers(self):
+        return self.ratemap.ybin_centers
+
+    @property
+    def original_position_data_shape(self):
+        """The original_position_data_shape property."""
+        return np.shape(self.pf.occupancy)    
+
+    @property
+    def flat_position_size(self):
+        """The flat_position_size property."""
+        return np.shape(self.F)[0] # like 288
+
+    def __attrs_post_init__(self):
+        """ called after initializer built by `attrs` library. """
+        # Perform the primary setup to build the placefield
+        if self.setup_on_init:
+            self.setup()
+            if self.post_load_on_init:
+                self.post_load()
+        else:
+            assert (not self.post_load_on_init), f"post_load_on_init can't be true if setup_on_init isn't true!"
+
+    def setup(self):
+        self.neuron_IDXs = None
+        self.neuron_IDs = None
+        self.F = None
+        self.P_x = None
+        
+        self._setup_concatenated_F()
+
+    def post_load(self):
+        """ Called after deserializing/loading saved result from disk to rebuild the needed computed variables. """
+        with WrappingMessagePrinter(f'post_load() called.', begin_line_ending='... ', finished_message='all rebuilding completed.', enable_print=self.debug_print):
+            self._setup_concatenated_F()
+            # self._setup_time_bin_spike_counts_N_i()
+            # self._setup_time_window_centers()
+            # self.p_x_given_n = self._reshape_output(self.flat_p_x_given_n)
+            # self.compute_most_likely_positions()
+
+
+
+    # for NeuronUnitSlicableObjectProtocol:
+    def get_by_id(self, ids): # defer_compute_all:bool = False
+        """Implementors return a copy of themselves with neuron_ids equal to ids
+            Needs to update: neuron_sliced_decoder.pf, ... (much more)
+
+        defer_compute_all: bool - should be set to False if you want to manually decode using custom epochs or something later. Otherwise it will compute for all spikes automatically.
+        """
+        # call .get_by_id(ids) on the placefield (pf):
+        neuron_sliced_pf = self.pf.get_by_id(ids)
+        ## apply the neuron_sliced_pf to the decoder:
+        neuron_sliced_decoder = BasePositionDecoder(neuron_sliced_pf, setup_on_init=self.setup_on_init, post_load_on_init=self.post_load_on_init, debug_print=self.debug_print)
+        return neuron_sliced_decoder
+
+    def conform_to_position_bins(self, target_one_step_decoder, force_recompute=True):
+        """ After the underlying placefield (self.pf)'s position bins are changed by calling pf.conform_to_position_bins(...) externally, the computations for the decoder will be messed up (and out of sync).
+            Calling this function detects this issue.
+            # 2022-12-09 - We want to be able to have both long/short track placefields have the same spatial bins.
+            Usage:
+                long_one_step_decoder_1D, short_one_step_decoder_1D  = [results_data.get('pf1D_Decoder', None) for results_data in (long_results, short_results)]
+                short_one_step_decoder_1D.conform_to_position_bins(long_one_step_decoder_1D)
+
+            Usage 1D:
+                long_pf1D = long_results.pf1D
+                short_pf1D = short_results.pf1D
+                
+                long_one_step_decoder_1D, short_one_step_decoder_1D  = [results_data.get('pf1D_Decoder', None) for results_data in (long_results, short_results)]
+                short_one_step_decoder_1D.conform_to_position_bins(long_one_step_decoder_1D)
+
+
+            Usage 2D:
+                long_pf2D = long_results.pf2D
+                short_pf2D = short_results.pf2D
+                long_one_step_decoder_2D, short_one_step_decoder_2D  = [results_data.get('pf2D_Decoder', None) for results_data in (long_results, short_results)]
+                short_one_step_decoder_2D.conform_to_position_bins(long_one_step_decoder_2D)
+
+        """
+        did_recompute = False
+        # Update the internal placefield's position bins if they're not the same as the target_one_step_decoder's:
+        self.pf, did_update_internal_pf_bins = self.pf.conform_to_position_bins(target_one_step_decoder.pf)
+        
+        # Update the one_step_decoders after the short bins have been updated:
+        if (force_recompute or did_update_internal_pf_bins): # or (self.p_x_given_n.shape[0] < target_one_step_decoder.p_x_given_n.shape[0])
+            # Compute:
+            print(f'self will be re-binned to match target_one_step_decoder...')
+            self.setup()
+            # self.compute_all()
+            did_recompute = True # set the update flag
+        else:
+            # No changes needed:
+            did_recompute = False
+
+        return self, did_recompute
+
+
+    # ==================================================================================================================== #
+    # Private Methods                                                                                                      #
+    # ==================================================================================================================== #
+    @function_attributes(short_name='_setup_concatenated_F', tags=['pr'], input_requires=[], output_provides=[], uses=['ZhangReconstructionImplementation.build_concatenated_F'], used_by=[], creation_date='2023-04-06 13:49')
+    def _setup_concatenated_F(self):
+        """ Sets up the computation variables F, P_x, neuron_IDs, neuron_IDXs
+
+            maps: (40, 48, 6)
+            np.shape(f_i[i]): (48, 6)
+            np.shape(F_i[i]): (288, 1)
+            np.shape(F): (288, 40)
+            np.shape(P_x): (288, 1)
+        """
+        self.neuron_IDXs, self.neuron_IDs, f_i, F_i, self.F, self.P_x = ZhangReconstructionImplementation.build_concatenated_F(self.pf, debug_print=self.debug_print)
+
+    @function_attributes(short_name='prune_to_shared_aclus_only', tags=['decoder','aclu'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-04-06 12:19')
+    @classmethod
+    def prune_to_shared_aclus_only(cls, long_decoder, short_decoder):
+        """ determines the neuron_IDs present in both long and short decoders (shared aclus) and returns two copies of long_decoder and short_decoder that only contain the shared_aclus
+
+        Usage:
+            from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BayesianPlacemapPositionDecoder
+
+            shared_aclus, (long_shared_aclus_only_decoder, short_shared_aclus_only_decoder), long_short_pf_neurons_diff = BayesianPlacemapPositionDecoder.prune_to_shared_aclus_only(long_decoder, short_decoder)
+            n_neurons = len(shared_aclus)
+
+        """
+
+        long_neuron_IDs, short_neuron_IDs = long_decoder.neuron_IDs, short_decoder.neuron_IDs
+        # long_neuron_IDs, short_neuron_IDs = long_results_obj.original_1D_decoder.neuron_IDs, short_results_obj.original_1D_decoder.neuron_IDs
+        long_short_pf_neurons_diff = _compare_computation_results(long_neuron_IDs, short_neuron_IDs)
+
+        ## Get the normalized_tuning_curves only for the shared aclus (that are common across (long/short/global):
+        shared_aclus = long_short_pf_neurons_diff.intersection #.shape (56,)
+        # n_neurons = len(shared_aclus)
+        # long_is_included = np.isin(long_neuron_IDs, shared_aclus)  #.shape # (104, 63)
+        # short_is_included = np.isin(short_neuron_IDs, shared_aclus)
+
+        # Restrict the long decoder to only the aclus present on both decoders:
+        long_shared_aclus_only_decoder = long_decoder.get_by_id(shared_aclus)
+        short_shared_aclus_only_decoder = short_decoder.get_by_id(shared_aclus) # short currently has a subset of long's alcus so this isn't needed, but just for symmetry do it anyway
+        return shared_aclus, (long_shared_aclus_only_decoder, short_shared_aclus_only_decoder), long_short_pf_neurons_diff
+
+
+
+# ==================================================================================================================== #
+# Stateful Decoders                                                                                                    #
+# ==================================================================================================================== #
+
 class PlacemapPositionDecoder(SerializedAttributesSpecifyingClass, SimplePrintable, object, metaclass=OrderedMeta):
     """docstring for PlacemapPositionDecoder.
     
@@ -395,7 +614,7 @@ class PlacemapPositionDecoder(SerializedAttributesSpecifyingClass, SimplePrintab
         super(PlacemapPositionDecoder, self).__init__()
         self.time_bin_size = time_bin_size
         self.pf = pf
-        self.spikes_df = spikes_df        
+        self.spikes_df = spikes_df
         self.debug_print = debug_print
         if setup_on_init:
             self.setup() # setup on init
@@ -467,7 +686,7 @@ class PlacemapPositionDecoder(SerializedAttributesSpecifyingClass, SimplePrintab
 # ==================================================================================================================== #
 # Bayesian Decoder                                                                                                     #
 # ==================================================================================================================== #
-class BayesianPlacemapPositionDecoder(NeuronUnitSlicableObjectProtocol, PlacemapPositionDecoder):
+class BayesianPlacemapPositionDecoder(PlacemapPositionDecoder):
     """ Holds the placefields. Can be called on any spike data to compute the most likely position given the spike data.
 
     Used to try to decode everything in one go, meaning it took the parameters (like the time window) and the spikes to decode as well and did the computation internally, but the concept of a decoder is that it is a stateless object that can be called on any spike data to decode it, so this concept is depricated.
@@ -487,14 +706,8 @@ class BayesianPlacemapPositionDecoder(NeuronUnitSlicableObjectProtocol, Placemap
                 .compute_corrected_positions(...)
 
     """
-    @property
-    def flat_position_size(self):
-        """The flat_position_size property."""
-        return np.shape(self.F)[0] # like 288
-    @property
-    def original_position_data_shape(self):
-        """The original_position_data_shape property."""
-        return np.shape(self.pf.occupancy)
+    
+
 
     # time_binning_container accessors ___________________________________________________________________________________ #
     @property
@@ -540,39 +753,7 @@ class BayesianPlacemapPositionDecoder(NeuronUnitSlicableObjectProtocol, Placemap
         # return np.where(self.total_spike_counts_per_window == 0)[0]
             
             
-    # placefield properties:
-    @property
-    def ratemap(self):
-        return self.pf.ratemap
 
-    @property
-    def ndim(self):
-        return int(self.pf.ndim)
-
-    @property
-    def num_neurons(self):
-        """The num_neurons property."""
-        return self.ratemap.n_neurons # np.shape(self.neuron_IDs) # or self.ratemap.n_neurons
-
-    # @property
-    # def n_xbins(self):
-    #     """The num_neurons property."""
-    #     return np.shape(self.P_x)[0]
-            
-    # ratemap properties (xbin & ybin)  
-    @property
-    def xbin(self):
-        return self.ratemap.xbin
-    @property
-    def ybin(self):
-        return self.ratemap.ybin
-    @property
-    def xbin_centers(self):
-        return self.ratemap.xbin_centers
-    @property
-    def ybin_centers(self):
-        return self.ratemap.ybin_centers
-    
     @classmethod
     def serialized_keys(cls):
         input_keys = ['time_bin_size', 'pf', 'spikes_df', 'debug_print']
@@ -742,7 +923,7 @@ class BayesianPlacemapPositionDecoder(NeuronUnitSlicableObjectProtocol, Placemap
             self.marginal.y.two_step_most_likely_positions_1D = two_step_decoder_result.marginal.y.most_likely_positions_1D.copy()
 
     def to_1D_maximum_projection(self, defer_compute_all:bool=True):
-        """ returns a copy of the decoder that is 1D """
+        """ 2023-04-06 - returns a copy of the decoder that is 1D """
         # Perform the projection. Can only be ran once.
         new_copy_decoder = deepcopy(self)
         new_copy_decoder.pf = new_copy_decoder.pf.to_1D_maximum_projection() # project the placefields to 1D
@@ -762,16 +943,6 @@ class BayesianPlacemapPositionDecoder(NeuronUnitSlicableObjectProtocol, Placemap
     # ==================================================================================================================== #
     # Private Methods                                                                                                      #
     # ==================================================================================================================== #
-    def _setup_concatenated_F(self):
-        """
-            maps: (40, 48, 6)
-            np.shape(f_i[i]): (48, 6)
-            np.shape(F_i[i]): (288, 1)
-            np.shape(F): (288, 40)
-            np.shape(P_x): (288, 1)
-        """
-        self.neuron_IDXs, self.neuron_IDs, f_i, F_i, self.F, self.P_x = ZhangReconstructionImplementation.build_concatenated_F(self.pf, debug_print=self.debug_print)
-        
     def _setup_time_bin_spike_counts_N_i(self, debug_print=False):
         """ updates: 
         
@@ -992,6 +1163,7 @@ class BayesianPlacemapPositionDecoder(NeuronUnitSlicableObjectProtocol, Placemap
         most_likely_positions, p_x_given_n, most_likely_position_indicies, flat_outputs_container = self.decode(spkcount, time_bin_size=decoding_time_bin_size, output_flat_versions=output_flat_versions, debug_print=debug_print)
         curr_unit_marginal_x, curr_unit_marginal_y = self.perform_build_marginals(p_x_given_n, most_likely_positions, debug_print=debug_print)
         return time_bin_container, p_x_given_n, most_likely_positions, curr_unit_marginal_x, curr_unit_marginal_y, flat_outputs_container
+
 
     # ==================================================================================================================== #
     # Class/Static Methods                                                                                                 #
@@ -1224,33 +1396,5 @@ class BayesianPlacemapPositionDecoder(NeuronUnitSlicableObjectProtocol, Placemap
         # Return the computed values, leaving the original data unchanged.
         return unit_specific_time_binned_spike_proportion_global_fr_normalized, unit_specific_time_binned_firing_rate, unit_specific_time_binned_firing_rate_global_fr_normalized
 
-
-    @function_attributes(short_name='prune_to_shared_aclus_only', tags=['decoder','aclu'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-04-06 12:19')
-    @classmethod
-    def prune_to_shared_aclus_only(cls, long_decoder, short_decoder):
-        """ determines the neuron_IDs present in both long and short decoders (shared aclus) and returns two copies of long_decoder and short_decoder that only contain the shared_aclus
-
-        Usage:
-            from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BayesianPlacemapPositionDecoder
-
-            shared_aclus, (long_shared_aclus_only_decoder, short_shared_aclus_only_decoder), long_short_pf_neurons_diff = BayesianPlacemapPositionDecoder.prune_to_shared_aclus_only(long_decoder, short_decoder)
-            n_neurons = len(shared_aclus)
-
-        """
-
-        long_neuron_IDs, short_neuron_IDs = long_decoder.neuron_IDs, short_decoder.neuron_IDs
-        # long_neuron_IDs, short_neuron_IDs = long_results_obj.original_1D_decoder.neuron_IDs, short_results_obj.original_1D_decoder.neuron_IDs
-        long_short_pf_neurons_diff = _compare_computation_results(long_neuron_IDs, short_neuron_IDs)
-
-        ## Get the normalized_tuning_curves only for the shared aclus (that are common across (long/short/global):
-        shared_aclus = long_short_pf_neurons_diff.intersection #.shape (56,)
-        # n_neurons = len(shared_aclus)
-        # long_is_included = np.isin(long_neuron_IDs, shared_aclus)  #.shape # (104, 63)
-        # short_is_included = np.isin(short_neuron_IDs, shared_aclus)
-
-        # Restrict the long decoder to only the aclus present on both decoders:
-        long_shared_aclus_only_decoder = long_decoder.get_by_id(shared_aclus)
-        short_shared_aclus_only_decoder = short_decoder.get_by_id(shared_aclus) # short currently has a subset of long's alcus so this isn't needed, but just for symmetry do it anyway
-        return shared_aclus, (long_shared_aclus_only_decoder, short_shared_aclus_only_decoder), long_short_pf_neurons_diff
 
     
