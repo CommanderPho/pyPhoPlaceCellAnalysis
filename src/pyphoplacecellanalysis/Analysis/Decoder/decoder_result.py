@@ -780,25 +780,32 @@ def plot_kourosh_activity_style_figure(long_results_obj: SurpriseAnalysisResult,
 
         # 2. Get cells that were active during this time bin that contributed to this posterior, and get their placefields
         _temp_active_neuron_IDXs = timebins_active_neuron_IDXs[callout_timebin_IDX]
-        _temp_active_neuron_aclus = timebins_active_aclus[callout_timebin_IDX]
-        _temp_active_pfs = long_results_obj.original_1D_decoder.pf.ratemap.unit_max_tuning_curves[_temp_active_neuron_IDXs,:].copy() 
+        _temp_n_active_neurons = _temp_active_neuron_IDXs.size
+        if _temp_n_active_neurons > 0:
+            _temp_active_neuron_aclus = timebins_active_aclus[callout_timebin_IDX]
+            _temp_active_pfs = long_results_obj.original_1D_decoder.pf.ratemap.unit_max_tuning_curves[_temp_active_neuron_IDXs,:].copy() 
 
-        # 3. Plot their placefields as a column
-        ## Plot a stacked heatmap for all place cells, with each row being a different cell:
-        out_pfs_win, out_pfs_img = visualize_heatmap_pyqtgraph(_temp_active_pfs.T, title=f"1D Placefields for active aclus during example_timebin_IDX: {callout_timebin_IDX}", show_yticks=True, show_colorbar=False, win=axs[1])
-        
-        # # Set y-ticks to show the unit IDs
-        aclu_y_ticks = [(float(i)+0.5, f'{aclu}') for i, aclu in enumerate(_temp_active_neuron_aclus)] # offset by +0.5 to center each tick on the row
-        # print(f'aclu_y_ticks: {aclu_y_ticks}')
-        ## Setup the aclu labels
-        # Set the y range and ticks
-        # plots['root_plot'].setYRange(0, len(shared_aclus)-1)
-        # plots['root_plot'].setYTicks([(i+1, f'{aclu}') for i, aclu in enumerate(shared_aclus)])
-        # get the left y-axis:
-        ay = axs[1].getAxis('left')
-        # ay.setTicks(aclu_y_ticks)
-        ay.setTicks((aclu_y_ticks, [])) # add list of major ticks; no minor ticks
-        axs[1].showAxis('left') # show the axis
+            # 3. Plot their placefields as a column
+            ## Plot a stacked heatmap for all place cells, with each row being a different cell:
+            out_pfs_win, out_pfs_img = visualize_heatmap_pyqtgraph(_temp_active_pfs.T, title=f"1D Placefields for active aclus during example_timebin_IDX: {callout_timebin_IDX}", show_yticks=True, show_colorbar=False, win=axs[1])
+            
+            # # Set y-ticks to show the unit IDs
+            aclu_y_ticks = [(float(i)+0.5, f'{aclu}') for i, aclu in enumerate(_temp_active_neuron_aclus)] # offset by +0.5 to center each tick on the row
+            # print(f'aclu_y_ticks: {aclu_y_ticks}')
+            ## Setup the aclu labels
+            # Set the y range and ticks
+            # plots['root_plot'].setYRange(0, len(shared_aclus)-1)
+            # plots['root_plot'].setYTicks([(i+1, f'{aclu}') for i, aclu in enumerate(shared_aclus)])
+            # get the left y-axis:
+            ay = axs[1].getAxis('left')
+            # ay.setTicks(aclu_y_ticks)
+            ay.setTicks((aclu_y_ticks, [])) # add list of major ticks; no minor ticks
+            axs[1].showAxis('left') # show the axis
+        else:
+            # empty bin with no firing
+            # TODO 2023-04-06 - Clear anything on ax[1]?
+            pass
+
         return axs
 
     ## Add linear regions:
