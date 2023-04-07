@@ -1253,12 +1253,13 @@ class BayesianPlacemapPositionDecoder(SerializedAttributesSpecifyingClass, BaseP
                 short_one_step_decoder_2D.conform_to_position_bins(long_one_step_decoder_2D)
 
         """
-        self, did_recompute = super().conform_to_position_bins(self, force_recompute=force_recompute)
+        self, did_recompute = super().conform_to_position_bins(target_one_step_decoder, force_recompute=force_recompute)
         if did_recompute or (self.p_x_given_n.shape[0] < target_one_step_decoder.p_x_given_n.shape[0]):
             self.setup() # re-setup the decoder
             self.compute_all()
             did_recompute = True
         return self, did_recompute
+
 
     def add_two_step_decoder_results(self, two_step_decoder_result):
         """ adds the results from the computed two_step_decoder to self (the one_step_decoder)
