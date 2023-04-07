@@ -13,7 +13,7 @@ from neuropy.utils.efficient_interval_search import get_non_overlapping_epochs #
 
 from pyphocorehelpers.DataStructure.dynamic_parameters import DynamicParameters
 from pyphoplacecellanalysis.General.Model.ComputationResults import ComputationResult
-
+from pyphocorehelpers.function_helpers import function_attributes
 from pyphocorehelpers.mixins.member_enumerating import AllFunctionEnumeratingMixin
 from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BayesianPlacemapPositionDecoder, Zhang_Two_Step
 
@@ -310,6 +310,8 @@ class DefaultComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Computa
 
         return computation_result
 
+
+    @function_attributes(short_name='_perform_specific_epochs_decoding', tags=['BasePositionDecoder', 'computation', 'decoder', 'epoch'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-04-07 02:16')
     def _perform_specific_epochs_decoding(computation_result: ComputationResult, active_config, decoder_ndim:int=2, filter_epochs='ripple', decoding_time_bin_size=0.02, **kwargs):
         """ TODO: meant to be used by `_display_plot_decoded_epoch_slices` but needs a smarter way to cache the computations and etc. 
         Eventually to replace `pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError._compute_specific_decoded_epochs`
@@ -536,6 +538,8 @@ class KnownFilterEpochs(ExtendedEnum):
 
         return active_filter_epochs, default_figure_name, epoch_description_list
 
+
+@function_attributes(short_name='_subfn_compute_decoded_epochs', tags=['BasePositionDecoder'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-04-07 02:15')
 def _subfn_compute_decoded_epochs(computation_result, active_config, filter_epochs='ripple', decoding_time_bin_size=0.02, decoder_ndim:int=2):
     """ compuites a plot with the 1D Marginals either (x and y position axes): the computed posterior for the position from the Bayesian decoder and overlays the animal's actual position over the top. 
     
@@ -609,7 +613,7 @@ class LeaveOneOutDecodingResult(object):
 
 
 
-
+@function_attributes(short_name='_analyze_leave_one_out_decoding_results', tags=['BasePositionDecoder'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-03-23 00:00')
 def _analyze_leave_one_out_decoding_results(active_pos_df, active_filter_epochs, original_1D_decoder, all_included_filter_epochs_decoder_result, one_left_out_decoder_dict, one_left_out_filter_epochs_decoder_result_dict):
     """ 2023-03-23 - Aims to generalize the `_analyze_leave_one_out_decoding_results`
 

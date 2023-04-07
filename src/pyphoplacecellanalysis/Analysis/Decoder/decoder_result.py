@@ -333,7 +333,7 @@ class SurpriseAnalysisResult:
         from pyphoplacecellanalysis.Analysis.Decoder.decoder_result import SurpriseAnalysisResult
     """
     active_filter_epochs: Epoch
-    original_1D_decoder: BayesianPlacemapPositionDecoder
+    original_1D_decoder: BasePositionDecoder # BayesianPlacemapPositionDecoder
     all_included_filter_epochs_decoder_result: DynamicContainer
     flat_all_epochs_measured_cell_spike_counts: np.ndarray = field(metadata={'shape': ('n_neurons', 'n_total_time_bins')})
     flat_all_epochs_measured_cell_firing_rates: np.ndarray = field(metadata={'shape': ('n_neurons', 'n_total_time_bins')})

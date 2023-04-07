@@ -54,22 +54,6 @@ class BasePositionDecoder(NeuronUnitSlicableObjectProtocol):
     setup_on_init:bool = True 
     post_load_on_init:bool = False
     debug_print: bool = False
-    
-    # # Time Binning:
-    # time_bin_size: float
-    # time_binning_container: BinningContainer
-    # unit_specific_time_binned_spike_counts: np.ndarray
-    # total_spike_counts_per_window: np.ndarray
-
-    # # Computed Results:
-    # flat_p_x_given_n: np.ndarray
-    # p_x_given_n: np.ndarray
-    # most_likely_position_flat_indicies: np.ndarray
-    # most_likely_position_indicies: type
-    # marginal: DynamicContainer
-    # most_likely_positions: np.ndarray
-    # revised_most_likely_positions: np.ndarray
-
 
     # Properties _________________________________________________________________________________________________________ #
 
@@ -133,8 +117,6 @@ class BasePositionDecoder(NeuronUnitSlicableObjectProtocol):
         # Return the new instance:
         return new_instance
 
-
-
     def setup(self):
         self.neuron_IDXs = None
         self.neuron_IDs = None
@@ -151,8 +133,6 @@ class BasePositionDecoder(NeuronUnitSlicableObjectProtocol):
             # self._setup_time_window_centers()
             # self.p_x_given_n = self._reshape_output(self.flat_p_x_given_n)
             # self.compute_most_likely_positions()
-
-
 
     # for NeuronUnitSlicableObjectProtocol:
     def get_by_id(self, ids, defer_compute_all:bool=False): # defer_compute_all:bool = False
@@ -208,7 +188,6 @@ class BasePositionDecoder(NeuronUnitSlicableObjectProtocol):
 
         return self, did_recompute
 
-
     def to_1D_maximum_projection(self, defer_compute_all:bool=True):
         """ returns a copy of the decoder that is 1D 
             defer_compute_all: TODO 2023-04-06 - REMOVE this argument. it is unused. It exists just for backwards compatibility with the stateful decoder.
@@ -227,7 +206,6 @@ class BasePositionDecoder(NeuronUnitSlicableObjectProtocol):
         new_copy_decoder.setup()
         return new_copy_decoder
 
-
     # ==================================================================================================================== #
     # Main computation functions:                                                                                          #
     # ==================================================================================================================== #
@@ -239,7 +217,6 @@ class BasePositionDecoder(NeuronUnitSlicableObjectProtocol):
             BayesianPlacemapPositionDecoder.perform_decode_specific_epochs(...)
         """
         return self.perform_decode_specific_epochs(self, spikes_df=spikes_df, filter_epochs=filter_epochs, decoding_time_bin_size=decoding_time_bin_size, debug_print=debug_print)
-
 
 	# ==================================================================================================================== #
     # Non-Modifying Methods:                                                                                               #
@@ -271,6 +248,10 @@ class BasePositionDecoder(NeuronUnitSlicableObjectProtocol):
             Used by BayesianPlacemapPositionDecoder.perform_decode_specific_epochs(...) to do the actual decoding after building the appropriate spike counts.
         
         """
+        ## Capture inputs for debugging:
+        # np.savez_compressed('test_parameters-neuropy_bayesian_prob_2023-04-07.npz', **{'tau':time_bin_size, 'P_x':self.P_x, 'F':self.F, 'n':unit_specific_time_binned_spike_counts})
+
+
         num_cells = np.shape(unit_specific_time_binned_spike_counts)[0]    
         num_time_windows = np.shape(unit_specific_time_binned_spike_counts)[1]
         if debug_print:
@@ -285,7 +266,7 @@ class BasePositionDecoder(NeuronUnitSlicableObjectProtocol):
             if debug_print:
                 print(f'curr_flat_p_x_given_n.shape: {curr_flat_p_x_given_n.shape}')
             # all computed
-            # Reshape the output variables:    
+            # Reshape the output variables:
             p_x_given_n = np.reshape(curr_flat_p_x_given_n, (*self.original_position_data_shape, num_time_windows)) # changed for compatibility with 1D decoder
             most_likely_position_flat_indicies, most_likely_position_indicies = self.perform_compute_most_likely_positions(curr_flat_p_x_given_n, self.original_position_data_shape)
 
@@ -304,7 +285,42 @@ class BasePositionDecoder(NeuronUnitSlicableObjectProtocol):
         
             return most_likely_positions, p_x_given_n, most_likely_position_indicies, flat_outputs_container
             
+    @function_attributes(short_name='hyper_perform_decode', tags=['decode', 'pure'], input_requires=['self.neuron_IDs'], output_provides=[], creation_date='2023-03-23 19:10',
+        uses=['self.decode', 'BayesianPlacemapPositionDecoder.perform_build_marginals', 'epochs_spkcount'],
+        used_by=[])
+    def hyper_perform_decode(self, spikes_df, decoding_time_bin_size=0.1, t_start=None, t_end=None, output_flat_versions=False, debug_print=False):
+        """ Fully decodes the neural activity from its internal placefields, internally calling `self.decode(...)` and then in addition building the marginals and additional outputs.
 
+        Does not alter the internal state of the decoder (doesn't change internal most_likely_positions or posterior, etc)
+
+        Requires:
+            self.neuron_IDs
+
+        Uses:
+            self.decode(...)
+            BayesianPlacemapPositionDecoder.perform_build_marginals(...)
+            epochs_spkcount(...)
+        """
+        # Range of the maze epoch (where position is valid):
+        if t_start is None:
+            t_maze_start = spikes_df[spikes_df.spikes.time_variable_name].loc[spikes_df.x.first_valid_index()] # 1048
+            t_start = t_maze_start
+    
+        if t_end is None:
+            t_maze_end = spikes_df[spikes_df.spikes.time_variable_name].loc[spikes_df.x.last_valid_index()] # 68159707
+            t_end = t_maze_end
+        
+        epochs_df = pd.DataFrame({'start':[t_start],'stop':[t_end],'label':['epoch']})
+
+        ## final step is to time_bin (relative to the start of each epoch) the time values of remaining spikes
+        spkcount, nbins, time_bin_containers_list = epochs_spkcount(spikes_df, epochs_df, decoding_time_bin_size, slideby=decoding_time_bin_size, export_time_bins=True, included_neuron_ids=self.neuron_IDs, debug_print=debug_print) ## time_bins returned are not correct, they're subsampled at a rate of 1000
+        spkcount = spkcount[0]
+        nbins = nbins[0]
+        time_bin_container = time_bin_containers_list[0] # neuropy.utils.mixins.binning_helpers.BinningContainer
+        
+        most_likely_positions, p_x_given_n, most_likely_position_indicies, flat_outputs_container = self.decode(spkcount, time_bin_size=decoding_time_bin_size, output_flat_versions=output_flat_versions, debug_print=debug_print)
+        curr_unit_marginal_x, curr_unit_marginal_y = self.perform_build_marginals(p_x_given_n, most_likely_positions, debug_print=debug_print)
+        return time_bin_container, p_x_given_n, most_likely_positions, curr_unit_marginal_x, curr_unit_marginal_y, flat_outputs_container
 
 
     # ==================================================================================================================== #
@@ -325,7 +341,6 @@ class BasePositionDecoder(NeuronUnitSlicableObjectProtocol):
             self.neuron_IDs = np.array(self.neuron_IDs)
         if not isinstance(self.neuron_IDXs, np.ndarray):
             self.neuron_IDXs = np.array(self.neuron_IDXs)
-
 
     # ==================================================================================================================== #
     # Class/Static Methods                                                                                                 #
