@@ -231,6 +231,9 @@ class DecoderResultDisplayingPlot2D(DecoderResultDisplayingBaseClass):
         # return (self.active_im,)
         return self.fig # returns fig
 
+from pyphoplacecellanalysis.Analysis.Decoder.decoder_stateless import BasePositionDecoder
+
+
 @function_attributes(short_name='one_aclu_loo_decoding_analysis', tags=['decoding', 'loo'], input_requires=[], output_provides=[], creation_date='2023-03-03 00:00')
 def perform_leave_one_aclu_out_decoding_analysis(spikes_df, active_pos_df, active_filter_epochs, original_all_included_decoder=None, filter_epoch_description_list=None, decoding_time_bin_size=0.025):
     """2023-03-03 - Performs a "leave-one-out" decoding analysis where we leave out each neuron one at a time and see how the decoding degrades (which serves as an indicator of the importance of that neuron on the decoding performance).
@@ -269,7 +272,12 @@ def perform_leave_one_aclu_out_decoding_analysis(spikes_df, active_pos_df, activ
         active_pos = active_pos_df.position.to_Position_obj() # convert back to a full position object
         original_decoder_pf1D = PfND(deepcopy(spikes_df), deepcopy(active_pos.linear_pos_obj)) # all other settings default
         ## Build the new decoder:
-        original_all_included_decoder = BayesianPlacemapPositionDecoder(decoding_time_bin_size, original_decoder_pf1D, original_decoder_pf1D.filtered_spikes_df.copy(), debug_print=False)
+        # original_all_included_decoder = BayesianPlacemapPositionDecoder(decoding_time_bin_size, original_decoder_pf1D, original_decoder_pf1D.filtered_spikes_df.copy(), debug_print=False)
+        original_all_included_decoder = BasePositionDecoder(pf=original_decoder_pf1D, debug_print=False)
+        
+        # original_decoder_pf1D.filtered_spikes_df.copy()
+
+
     else:
         print(f'USING EXISTING original_1D_decoder.')
 
