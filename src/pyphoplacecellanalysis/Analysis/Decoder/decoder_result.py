@@ -99,7 +99,12 @@ class DecoderResultDisplayingBaseClass:
         return self.decoder.most_likely_positions
 
 class DecoderResultDisplayingPlot2D(DecoderResultDisplayingBaseClass):
-    """ Displays the decoder for 2D position. """
+    """ Displays the decoder for 2D position.
+
+    Used by:
+        _display_decoder_result
+
+    """
     debug_print = False
     
     def __init__(self, decoder: BayesianPlacemapPositionDecoder, position_df):
@@ -274,7 +279,7 @@ def perform_leave_one_aclu_out_decoding_analysis(spikes_df, active_pos_df, activ
         ## Build the new decoder:
         # original_all_included_decoder = BayesianPlacemapPositionDecoder(decoding_time_bin_size, original_decoder_pf1D, original_decoder_pf1D.filtered_spikes_df.copy(), debug_print=False)
         original_all_included_decoder = BasePositionDecoder(pf=original_decoder_pf1D, debug_print=False)
-        
+
         # original_decoder_pf1D.filtered_spikes_df.copy()
 
 
@@ -523,9 +528,9 @@ def perform_full_session_leave_one_out_decoding_analysis(sess, original_1D_decod
     is_cell_firing_time_bin = (flat_all_epochs_measured_cell_spike_counts > 0)
 
     ## Convert spike counts to firing rates by dividing by the time bin size:
-    flat_all_epochs_measured_cell_firing_rates = flat_all_epochs_measured_cell_spike_counts / original_1D_decoder.time_bin_size
+    flat_all_epochs_measured_cell_firing_rates = flat_all_epochs_measured_cell_spike_counts / decoding_time_bin_size
     ## Convert the expected firing rates to spike counts by multiplying by the time bin size (NOTE: there can be fractional expected spikes):
-    flat_all_epochs_computed_expected_cell_spike_counts = flat_all_epochs_computed_expected_cell_firing_rates * original_1D_decoder.time_bin_size
+    flat_all_epochs_computed_expected_cell_spike_counts = flat_all_epochs_computed_expected_cell_firing_rates * decoding_time_bin_size
 
     ## Compute the difference from the expected firing rate observed for each cell (in each time bin):
     flat_all_epochs_difference_from_expected_cell_spike_counts = flat_all_epochs_computed_expected_cell_spike_counts - flat_all_epochs_measured_cell_spike_counts
@@ -696,11 +701,11 @@ def plot_kourosh_activity_style_figure(long_results_obj: SurpriseAnalysisResult,
     # plots['root_plot'].setXDivisions(active_epoch_n_timebins)
 
     # Manual Method:
-    for a_bin_start_t in start_t:
-        # time_bin_edge_pen_color = pg.mkColor((1.0, 1.0, 1.0, 0.5)) # white with 0.5 alpha
-        # time_bin_edge_pen = pg.mkPen(time_bin_edge_pen_color, width=1.5)
-        time_bin_edge_pen = 'w'
-        plots['root_plot'].addLine(x=a_bin_start_t, pen=time_bin_edge_pen)
+    # for a_bin_start_t in start_t:
+    #     # time_bin_edge_pen_color = pg.mkColor((1.0, 1.0, 1.0, 0.5)) # white with 0.5 alpha
+    #     # time_bin_edge_pen = pg.mkPen(time_bin_edge_pen_color, width=1.5)
+    #     time_bin_edge_pen = 'w'
+    #     plots['root_plot'].addLine(x=a_bin_start_t, pen=time_bin_edge_pen)
 
 
     ## Create the posterior plot for the decoded epoch
@@ -712,6 +717,19 @@ def plot_kourosh_activity_style_figure(long_results_obj: SurpriseAnalysisResult,
     # Apply the colormap
     epoch_posterior_img.setLookupTable(lut)
 
+    plots.root_plot.setXRange(*active_epoch[0])
+    # plots.scatter_plot.setXRange(*active_epoch[0])
+    # plots.epoch_posterior_plot.setXRange(*active_epoch[0]) # This does not work for the posterior plot, probably because it's an image, but this plot is aligned correctly anyway
+    # plots.root_plot.setXLink(plots.epoch_posterior_plot) # bind/link the two axes
+
+    for a_plot in (plots.epoch_posterior_plot, plots.root_plot):
+        # Disable Interactivity
+        a_plot.setMouseEnabled(x=False, y=False)
+        a_plot.setMenuEnabled(False)
+
+    # ## TODO: disable interactivity for callout plots too:
+    # placefield_axes_list = plots.callouts.placefields
+    # posteriors_axes_list = plots.callouts.posteriors
 
     ## Render the linear regions for each callout:
     plots.linear_regions = []
