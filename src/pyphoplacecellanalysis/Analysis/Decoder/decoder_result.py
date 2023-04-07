@@ -578,7 +578,7 @@ def perform_full_session_leave_one_out_decoding_analysis(sess, original_1D_decod
 # ==================================================================================================================== #
 
 @function_attributes(short_name='plot_kourosh_activity_style_figure', tags=['plot', 'figure', 'heatmaps'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-04-04 09:03')
-def plot_kourosh_activity_style_figure(long_results_obj: SurpriseAnalysisResult, long_session, shared_aclus: np.ndarray, epoch_idx: int, callout_epoch_IDXs: list, skip_rendering_callouts:bool = False):
+def plot_kourosh_activity_style_figure(results_obj: SurpriseAnalysisResult, long_session, shared_aclus: np.ndarray, epoch_idx: int, callout_epoch_IDXs: list, skip_rendering_callouts:bool = False):
     """ 2023-04-03 - plots a single epoch 
     ## Requirements:
     # The goal is to produce a Kourosh-style figure that shows a top panel which displays the decoded posteriors and a raster plot of spikes for a given epoch.
@@ -645,16 +645,16 @@ def plot_kourosh_activity_style_figure(long_results_obj: SurpriseAnalysisResult,
 
     ## 0. Precompute the active neurons in each timebin, and the epoch-timebin-flattened decoded posteriors makes it easier to compute for a given time bin:
     # a list of lists where each list contains the aclus that are active during that timebin:
-    timebins_active_neuron_IDXs = [np.array(long_results_obj.original_1D_decoder.neuron_IDXs)[a_timebin_is_cell_firing] for a_timebin_is_cell_firing in np.logical_not(long_results_obj.is_non_firing_time_bin).T]
-    timebins_active_aclus = [np.array(long_results_obj.original_1D_decoder.neuron_IDs)[an_IDX] for an_IDX in timebins_active_neuron_IDXs]
-    timebins_p_x_given_n = np.hstack(long_results_obj.all_included_filter_epochs_decoder_result.p_x_given_n_list) # # .shape: (239, 5) - (n_x_bins, n_epoch_time_bins)  --TO-->  .shape: (63, 4146) - (n_x_bins, n_flattened_all_epoch_time_bins)
+    timebins_active_neuron_IDXs = [np.array(results_obj.original_1D_decoder.neuron_IDXs)[a_timebin_is_cell_firing] for a_timebin_is_cell_firing in np.logical_not(results_obj.is_non_firing_time_bin).T]
+    timebins_active_aclus = [np.array(results_obj.original_1D_decoder.neuron_IDs)[an_IDX] for an_IDX in timebins_active_neuron_IDXs]
+    timebins_p_x_given_n = np.hstack(results_obj.all_included_filter_epochs_decoder_result.p_x_given_n_list) # # .shape: (239, 5) - (n_x_bins, n_epoch_time_bins)  --TO-->  .shape: (63, 4146) - (n_x_bins, n_flattened_all_epoch_time_bins)
     
     ## Default Method: Directly Provided epoch_idx:
-    active_epoch = long_results_obj.active_filter_epochs[epoch_idx]
+    active_epoch = results_obj.active_filter_epochs[epoch_idx]
     # Get a conversion between the epoch indicies and the flat indicies
-    flat_bin_indicies = long_results_obj.split_by_epoch_reverse_flattened_time_bin_indicies[epoch_idx]
+    flat_bin_indicies = results_obj.split_by_epoch_reverse_flattened_time_bin_indicies[epoch_idx]
     # print(f'long_results_obj.flat_all_epochs_decoded_epoch_time_bins.shape: {np.shape(long_results_obj.flat_all_epochs_decoded_epoch_time_bins)}') # (97, 5815)
-    flat_time_bin_center_times = np.array([long_results_obj.flat_all_epochs_decoded_epoch_time_bins[0, a_flat_time_bin_idx] for a_flat_time_bin_idx in flat_bin_indicies]) # flat_time_bin_times: [43.415 43.435 43.455 43.475 43.495]
+    flat_time_bin_center_times = np.array([results_obj.flat_all_epochs_decoded_epoch_time_bins[0, a_flat_time_bin_idx] for a_flat_time_bin_idx in flat_bin_indicies]) # flat_time_bin_times: [43.415 43.435 43.455 43.475 43.495]
     print(f'flat_time_bin_times: {flat_time_bin_center_times}')
     # the bins are centered, so we need to offset them (transfrom them into start/end)
     time_step = np.diff(flat_time_bin_center_times).mean()
@@ -711,7 +711,7 @@ def plot_kourosh_activity_style_figure(long_results_obj: SurpriseAnalysisResult,
     ## Create the posterior plot for the decoded epoch
     win.nextRow()
     plots.epoch_posterior_plot = win.addPlot()
-    active_epoch_p_x_given_n = long_results_obj.all_included_filter_epochs_decoder_result.p_x_given_n_list[epoch_idx] # all decoded posteriors for curent epoch
+    active_epoch_p_x_given_n = results_obj.all_included_filter_epochs_decoder_result.p_x_given_n_list[epoch_idx] # all decoded posteriors for curent epoch
     # active_epoch_p_x_given_n.shape # (63, 13)
     epoch_posterior_win, epoch_posterior_img = visualize_heatmap_pyqtgraph(active_epoch_p_x_given_n.T, win=plots.epoch_posterior_plot, title=f"Epoch[{epoch_idx}]")
     # Apply the colormap
@@ -770,7 +770,7 @@ def plot_kourosh_activity_style_figure(long_results_obj: SurpriseAnalysisResult,
         # 2. Get cells that were active during this time bin that contributed to this posterior, and get their placefields
         _temp_active_neuron_IDXs = timebins_active_neuron_IDXs[callout_timebin_IDX]
         _temp_active_neuron_aclus = timebins_active_aclus[callout_timebin_IDX]
-        _temp_active_pfs = long_results_obj.original_1D_decoder.pf.ratemap.unit_max_tuning_curves[_temp_active_neuron_IDXs,:].copy() 
+        _temp_active_pfs = results_obj.original_1D_decoder.pf.ratemap.unit_max_tuning_curves[_temp_active_neuron_IDXs,:].copy() 
 
         # 3. Plot their placefields as a column
         ## Plot a stacked heatmap for all place cells, with each row being a different cell:
@@ -810,7 +810,7 @@ def plot_kourosh_activity_style_figure(long_results_obj: SurpriseAnalysisResult,
         _temp_n_active_neurons = _temp_active_neuron_IDXs.size
         if _temp_n_active_neurons > 0:
             _temp_active_neuron_aclus = timebins_active_aclus[callout_timebin_IDX]
-            _temp_active_pfs = long_results_obj.original_1D_decoder.pf.ratemap.unit_max_tuning_curves[_temp_active_neuron_IDXs,:].copy() 
+            _temp_active_pfs = results_obj.original_1D_decoder.pf.ratemap.unit_max_tuning_curves[_temp_active_neuron_IDXs,:].copy() 
 
             # 3. Plot their placefields as a column
             ## Plot a stacked heatmap for all place cells, with each row being a different cell:
