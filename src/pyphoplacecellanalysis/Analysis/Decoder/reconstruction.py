@@ -349,7 +349,7 @@ class Zhang_Two_Step:
     
 
 
-@define
+@define(slots=False)
 class DecodedFilterEpochsResult(object):
     """ Container for the results of decoding a set of epochs (filter_epochs) using a decoder (active_decoder) 
     Usage:
@@ -664,7 +664,7 @@ class BayesianPlacemapPositionDecoder(NeuronUnitSlicableObjectProtocol, Placemap
     # External Updating __________________________________________________________________________________________________ #
 
     # for NeuronUnitSlicableObjectProtocol:
-    def get_by_id(self, ids, defer_compute_all:bool = False):
+    def get_by_id(self, ids, defer_compute_all:bool=False):
         """Implementors return a copy of themselves with neuron_ids equal to ids
             Needs to update: neuron_sliced_decoder.pf, ... (much more)
 
@@ -751,6 +751,7 @@ class BayesianPlacemapPositionDecoder(NeuronUnitSlicableObjectProtocol, Placemap
             self.marginal.y.p_x_given_n_and_x_prev = two_step_decoder_result.marginal.y.p_x_given_n.copy()
             self.marginal.y.two_step_most_likely_positions_1D = two_step_decoder_result.marginal.y.most_likely_positions_1D.copy()
 
+    @function_attributes(short_name='to_1D_maximum_projection', tags=['factored_out'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-04-06 22:06')
     def to_1D_maximum_projection(self, defer_compute_all:bool=True):
         """ returns a copy of the decoder that is 1D """
         # Perform the projection. Can only be ran once.

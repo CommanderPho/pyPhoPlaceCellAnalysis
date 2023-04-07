@@ -27,6 +27,7 @@ from pyphoplacecellanalysis.General.Mixins.CrossComputationComparisonHelpers imp
 
 from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import ZhangReconstructionImplementation # for BasePositionDecoder
 from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import DecodedFilterEpochsResult
+from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BayesianPlacemapPositionDecoder
 
 # ==================================================================================================================== #
 # Stateless Decoders (New 2023-04-06)                                                                                  #
@@ -36,6 +37,11 @@ from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import DecodedFilter
 class BasePositionDecoder(NeuronUnitSlicableObjectProtocol):
     """ 2023-04-06 - A simplified data-only version of the decoder that serves to remove all state related to specific computations to make each run independent 
     Stores only the raw inputs that are used to decode, with the user specifying the specifics for a given decoding (like time_time_sizes, etc.
+
+
+    Usage:
+        from pyphoplacecellanalysis.Analysis.Decoder.decoder_stateless import BasePositionDecoder
+
 
     """
     pf: PfND
@@ -105,6 +111,9 @@ class BasePositionDecoder(NeuronUnitSlicableObjectProtocol):
         """The flat_position_size property."""
         return np.shape(self.F)[0] # like 288
 
+    # ==================================================================================================================== #
+    # Initialization                                                                                                       #
+    # ==================================================================================================================== #
     def __attrs_post_init__(self):
         """ called after initializer built by `attrs` library. """
         # Perform the primary setup to build the placefield
@@ -114,6 +123,17 @@ class BasePositionDecoder(NeuronUnitSlicableObjectProtocol):
                 self.post_load()
         else:
             assert (not self.post_load_on_init), f"post_load_on_init can't be true if setup_on_init isn't true!"
+
+
+    @classmethod
+    def init_from_stateful_decoder(cls, stateful_decoder: BayesianPlacemapPositionDecoder):
+        """ 2023-04-06 - Creates a new instance of this class from a stateful decoder. """
+        # Create the new instance:
+        new_instance = cls(pf=deepcopy(stateful_decoder.pf), debug_print=stateful_decoder.debug_print)
+        # Return the new instance:
+        return new_instance
+
+
 
     def setup(self):
         self.neuron_IDXs = None
@@ -135,11 +155,12 @@ class BasePositionDecoder(NeuronUnitSlicableObjectProtocol):
 
 
     # for NeuronUnitSlicableObjectProtocol:
-    def get_by_id(self, ids): # defer_compute_all:bool = False
+    def get_by_id(self, ids, defer_compute_all:bool=False): # defer_compute_all:bool = False
         """Implementors return a copy of themselves with neuron_ids equal to ids
             Needs to update: neuron_sliced_decoder.pf, ... (much more)
 
         defer_compute_all: bool - should be set to False if you want to manually decode using custom epochs or something later. Otherwise it will compute for all spikes automatically.
+            TODO 2023-04-06 - REMOVE this argument. it is unused. It exists just for backwards compatibility with the stateful decoder.
         """
         # call .get_by_id(ids) on the placefield (pf):
         neuron_sliced_pf = self.pf.get_by_id(ids)
@@ -186,6 +207,38 @@ class BasePositionDecoder(NeuronUnitSlicableObjectProtocol):
             did_recompute = False
 
         return self, did_recompute
+
+
+    def to_1D_maximum_projection(self, defer_compute_all:bool=True):
+        """ returns a copy of the decoder that is 1D 
+            defer_compute_all: TODO 2023-04-06 - REMOVE this argument. it is unused. It exists just for backwards compatibility with the stateful decoder.
+        """
+        # Perform the projection. Can only be ran once.
+        new_copy_decoder = deepcopy(self)
+        new_copy_decoder.pf = new_copy_decoder.pf.to_1D_maximum_projection() # project the placefields to 1D
+        # new_copy_decoder.pf.compute()
+        # Test the projection to make sure the dimensionality is correct:
+        test_projected_ratemap = new_copy_decoder.pf.ratemap
+        assert test_projected_ratemap.ndim == 1, f"projected 1D ratemap must be of dimension 1 but is {test_projected_ratemap.ndim}"
+        test_projected_placefields = new_copy_decoder.pf
+        assert test_projected_placefields.ndim == 1, f"projected 1D placefields must be of dimension 1 but is {test_projected_placefields.ndim}"
+        test_projected_decoder = new_copy_decoder
+        assert test_projected_decoder.ndim == 1, f"projected 1D decoder must be of dimension 1 but is {test_projected_decoder.ndim}"
+        new_copy_decoder.setup()
+        return new_copy_decoder
+
+
+    # ==================================================================================================================== #
+    # Main computation functions:                                                                                          #
+    # ==================================================================================================================== #
+    @function_attributes(short_name='decode_specific_epochs', tags=['decode'], input_requires=[], output_provides=[], creation_date='2023-03-23 19:10',
+        uses=['BayesianPlacemapPositionDecoder.perform_decode_specific_epochs'], used_by=[])
+    def decode_specific_epochs(self, spikes_df, filter_epochs, decoding_time_bin_size = 0.05, debug_print=False):
+        """ 
+        Uses:
+            BayesianPlacemapPositionDecoder.perform_decode_specific_epochs(...)
+        """
+        return self.perform_decode_specific_epochs(self, spikes_df=spikes_df, filter_epochs=filter_epochs, decoding_time_bin_size=decoding_time_bin_size, debug_print=debug_print)
 
 
 	# ==================================================================================================================== #
@@ -382,4 +435,118 @@ class BasePositionDecoder(NeuronUnitSlicableObjectProtocol):
         
         return DecodedFilterEpochsResult(**filter_epochs_decoder_result.to_dict()) # dump the dynamic dict as kwargs into the class
     
+    @classmethod
+    def perform_build_marginals(cls, p_x_given_n, most_likely_positions, debug_print=False):
+        """ builds the marginal distributions, which for the 1D decoder are the same as the main posterior.
 
+
+        # For 1D Decoder:
+            p_x_given_n.shape # (63, 106)
+            most_likely_positions.shape # (106,)
+
+            curr_unit_marginal_x['p_x_given_n'].shape # (63, 106)
+            curr_unit_marginal_x['most_likely_positions_1D'].shape # (106,)
+
+            curr_unit_marginal_y: None
+
+        External validations:
+
+            assert np.allclose(curr_epoch_result['marginal_x']['p_x_given_n'], curr_epoch_result['p_x_given_n']), f"1D Decoder should have an x-posterior equal to its own posterior"
+            assert np.allclose(curr_epoch_result['marginal_x']['most_likely_positions_1D'], curr_epoch_result['most_likely_positions']), f"1D Decoder should have an x-posterior with most_likely_positions_1D equal to its own most_likely_positions"
+
+        """
+        is_1D_decoder = (most_likely_positions.ndim < 2) # check if we're dealing with a 1D decoder, in which case there is no y-marginal (y doesn't exist)
+        if debug_print:
+            print(f'perform_build_marginals(...): is_1D_decoder: {is_1D_decoder}')
+            print(f"\t{p_x_given_n = }\n\t{most_likely_positions = }")
+            print(f"\t{np.shape(p_x_given_n) = }\n\t{np.shape(most_likely_positions) = }")
+
+        # p_x_given_n_shape = np.shape(p_x_given_n)
+
+        # Compute Marginal 1D Posterior:
+        ## Build a container to hold the marginal distribution and its related values:
+        curr_unit_marginal_x = DynamicContainer(p_x_given_n=None, most_likely_positions_1D=None)
+        
+        if is_1D_decoder:
+            # 1D Decoder:
+            # p_x_given_n should come in with shape (x_bins, time_bins)
+            curr_unit_marginal_x.p_x_given_n = p_x_given_n.copy() # Result should be [x_bins, time_bins]
+            curr_unit_marginal_x.p_x_given_n = curr_unit_marginal_x.p_x_given_n # / np.sum(curr_unit_marginal_x.p_x_given_n, axis=0) # should already be normalized but do it again anyway just in case (so there's a normalized distribution at each timestep)
+            # for the 1D decoder case, there are no y-positions
+            curr_unit_marginal_y = None
+
+        else:
+            # a 2D decoder
+            # Collapse the 2D position posterior into two separate 1D (X & Y) marginal posteriors. Be sure to re-normalize each marginal after summing
+            curr_unit_marginal_x.p_x_given_n = np.squeeze(np.sum(p_x_given_n, 1)) # sum over all y. Result should be [x_bins x time_bins]
+            curr_unit_marginal_x.p_x_given_n = curr_unit_marginal_x.p_x_given_n / np.sum(curr_unit_marginal_x.p_x_given_n, axis=0) # sum over all positions for each time_bin (so there's a normalized distribution at each timestep)
+            ## Ensures that the marginal posterior is at least 2D:
+            if curr_unit_marginal_x.p_x_given_n.ndim == 0:
+                curr_unit_marginal_x.p_x_given_n = curr_unit_marginal_x.p_x_given_n.reshape(1, 1)
+            elif curr_unit_marginal_x.p_x_given_n.ndim == 1:
+                curr_unit_marginal_x.p_x_given_n = curr_unit_marginal_x.p_x_given_n[:, np.newaxis]
+                if debug_print:
+                    print(f'\t added dimension to curr_posterior for marginal_x: {curr_unit_marginal_x.p_x_given_n.shape}')
+
+            # y-axis marginal:
+            curr_unit_marginal_y = DynamicContainer(p_x_given_n=None, most_likely_positions_1D=None)
+            curr_unit_marginal_y.p_x_given_n = np.squeeze(np.sum(p_x_given_n, 0)) # sum over all x. Result should be [y_bins x time_bins]
+            curr_unit_marginal_y.p_x_given_n = curr_unit_marginal_y.p_x_given_n / np.sum(curr_unit_marginal_y.p_x_given_n, axis=0) # sum over all positions for each time_bin (so there's a normalized distribution at each timestep)
+            ## Ensures that the marginal posterior is at least 2D:
+            if curr_unit_marginal_y.p_x_given_n.ndim == 0:
+                curr_unit_marginal_y.p_x_given_n = curr_unit_marginal_y.p_x_given_n.reshape(1, 1)
+            elif curr_unit_marginal_y.p_x_given_n.ndim == 1:
+                curr_unit_marginal_y.p_x_given_n = curr_unit_marginal_y.p_x_given_n[:, np.newaxis]
+                if debug_print:
+                    print(f'\t added dimension to curr_posterior for marginal_y: {curr_unit_marginal_y.p_x_given_n.shape}')
+                
+        ## Add the most-likely positions to the posterior_x container:
+        if is_1D_decoder:
+            ## 1D Decoder Case, there is no y marginal (y doesn't exist)
+            if debug_print:
+                print(f'np.shape(most_likely_positions): {np.shape(most_likely_positions)}')
+            curr_unit_marginal_x.most_likely_positions_1D = np.atleast_1d(most_likely_positions).T # already 1D positions, don't need to extract x-component
+
+            # Validate 1D Conditions:
+            assert np.allclose(curr_unit_marginal_x['p_x_given_n'], p_x_given_n, equal_nan=True), f"1D Decoder should have an x-posterior equal to its own posterior"
+            assert np.allclose(curr_unit_marginal_x['most_likely_positions_1D'], most_likely_positions, equal_nan=True), f"1D Decoder should have an x-posterior with most_likely_positions_1D equal to its own most_likely_positions"
+
+
+            # # Same as np.amax(x, axis=-1)
+            # np.take_along_axis(x, np.expand_dims(index_array, axis=-1), axis=-1).squeeze(axis=-1)
+
+
+        else:
+            curr_unit_marginal_x.most_likely_positions_1D = most_likely_positions[:,0].T
+            curr_unit_marginal_y.most_likely_positions_1D = most_likely_positions[:,1].T
+        
+        return curr_unit_marginal_x, curr_unit_marginal_y
+
+    @classmethod
+    def perform_compute_most_likely_positions(cls, flat_p_x_given_n, original_position_data_shape):
+        """ Computes the most likely positions at each timestep from flat_p_x_given_n and the shape of the original position data """
+        most_likely_position_flat_indicies = np.argmax(flat_p_x_given_n, axis=0)        
+        most_likely_position_indicies = np.array(np.unravel_index(most_likely_position_flat_indicies, original_position_data_shape)) # convert back to an array
+        # np.shape(most_likely_position_flat_indicies) # (85841,)
+        # np.shape(most_likely_position_indicies) # (2, 85841)
+        return most_likely_position_flat_indicies, most_likely_position_indicies
+
+    @classmethod
+    def perform_compute_forward_filled_positions(cls, most_likely_positions: np.ndarray, is_non_firing_bin: np.ndarray) -> np.ndarray:
+        """ applies the forward fill to a copy of the positions based on the is_non_firing_bin boolean array
+        zero_bin_indicies.shape # (9307,)
+        self.most_likely_positions.shape # (11880, 2)
+        
+        # NaN out the position bins that were determined without any spikes
+        # Forward fill the now NaN positions with the last good value (for the both axes)
+        
+        """
+        revised_most_likely_positions = most_likely_positions.copy()
+        # NaN out the position bins that were determined without any spikes
+        if (most_likely_positions.ndim < 2):
+            revised_most_likely_positions[is_non_firing_bin] = np.nan 
+        else:
+            revised_most_likely_positions[is_non_firing_bin, :] = np.nan 
+        # Forward fill the now NaN positions with the last good value (for the both axes):
+        revised_most_likely_positions = np_ffill_1D(revised_most_likely_positions.T).T
+        return revised_most_likely_positions
