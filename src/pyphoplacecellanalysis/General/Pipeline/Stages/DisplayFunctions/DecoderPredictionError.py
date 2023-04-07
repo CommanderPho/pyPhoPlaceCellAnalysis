@@ -51,7 +51,7 @@ class DefaultDecoderDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Disp
             # _temp_debug_two_step_plots_animated_imshow(active_one_step_decoder, active_two_step_decoder, variable_name='p_x_given_n_and_x_prev')
             return # end
 
-    @function_attributes(short_name='decoder_result', tags=['display'], input_requires=[], output_provides=[], creation_date='2023-03-23 15:49')
+    @function_attributes(short_name='decoder_result', tags=['display', 'untested'], input_requires=[], output_provides=[], uses=['DecoderResultDisplayingPlot2D'], creation_date='2023-03-23 15:49')
     def _display_decoder_result(computation_result, active_config, **kwargs):
         renderer = DecoderResultDisplayingPlot2D(computation_result.computed_data['pf2D_Decoder'], computation_result.sess.position.to_dataframe())
         def animate(i):
