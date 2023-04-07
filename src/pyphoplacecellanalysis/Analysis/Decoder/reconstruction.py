@@ -568,11 +568,6 @@ class BayesianPlacemapPositionDecoder(NeuronUnitSlicableObjectProtocol, Placemap
     def num_neurons(self):
         """The num_neurons property."""
         return self.ratemap.n_neurons # np.shape(self.neuron_IDs) # or self.ratemap.n_neurons
-
-    # @property
-    # def n_xbins(self):
-    #     """The num_neurons property."""
-    #     return np.shape(self.P_x)[0]
             
     # ratemap properties (xbin & ybin)  
     @property
@@ -910,7 +905,7 @@ class BayesianPlacemapPositionDecoder(NeuronUnitSlicableObjectProtocol, Placemap
     # ==================================================================================================================== #
     # Non-Modifying Methods:                                                                                               #
     # ==================================================================================================================== #
-    @function_attributes(short_name='decode', tags=['decode', 'pure'], input_requires=[], output_provides=[], creation_date='2023-03-23 19:10',
+    @function_attributes(short_name='decode', tags=['factored_out', 'decode', 'pure'], input_requires=[], output_provides=[], creation_date='2023-03-23 19:10',
         uses=['BayesianPlacemapPositionDecoder.perform_compute_most_likely_positions', 'ZhangReconstructionImplementation.neuropy_bayesian_prob'],
         used_by=['BayesianPlacemapPositionDecoder.perform_decode_specific_epochs'])
     def decode(self, unit_specific_time_binned_spike_counts, time_bin_size, output_flat_versions=False, debug_print=True):
@@ -1012,7 +1007,7 @@ class BayesianPlacemapPositionDecoder(NeuronUnitSlicableObjectProtocol, Placemap
     # Class/Static Methods                                                                                                 #
     # ==================================================================================================================== #
 
-    @function_attributes(short_name='perform_decode_specific_epochs', tags=['decode','specific_epochs','epoch', 'classmethod'], input_requires=[], output_provides=[], uses=['active_decoder.decode', 'add_epochs_id_identity', 'epochs_spkcount', 'cls.perform_build_marginals'], used_by=[''], creation_date='2022-12-04 00:00')
+    @function_attributes(short_name='perform_decode_specific_epochs', tags=['factored_out','decode','specific_epochs','epoch', 'classmethod'], input_requires=[], output_provides=[], uses=['active_decoder.decode', 'add_epochs_id_identity', 'epochs_spkcount', 'cls.perform_build_marginals'], used_by=[''], creation_date='2022-12-04 00:00')
     @classmethod
     def perform_decode_specific_epochs(cls, active_decoder, spikes_df, filter_epochs, decoding_time_bin_size = 0.05, debug_print=False) -> DecodedFilterEpochsResult:
         """Uses the decoder to decode the nerual activity (provided in spikes_df) for each epoch in filter_epochs
@@ -1240,7 +1235,7 @@ class BayesianPlacemapPositionDecoder(NeuronUnitSlicableObjectProtocol, Placemap
         return unit_specific_time_binned_spike_proportion_global_fr_normalized, unit_specific_time_binned_firing_rate, unit_specific_time_binned_firing_rate_global_fr_normalized
 
 
-    @function_attributes(short_name='prune_to_shared_aclus_only', tags=['decoder','aclu'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-04-06 12:19')
+    @function_attributes(short_name='prune_to_shared_aclus_only', tags=['factored_out','decoder','aclu'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-04-06 12:19')
     @classmethod
     def prune_to_shared_aclus_only(cls, long_decoder, short_decoder):
         """ determines the neuron_IDs present in both long and short decoders (shared aclus) and returns two copies of long_decoder and short_decoder that only contain the shared_aclus
