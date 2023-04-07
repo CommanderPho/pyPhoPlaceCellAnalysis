@@ -571,7 +571,7 @@ def perform_full_session_leave_one_out_decoding_analysis(sess, original_1D_decod
 
 
 
-
+from pyphocorehelpers.indexing_helpers import build_pairwise_indicies # used in plot_kourosh_activity_style_figure
 
 # ==================================================================================================================== #
 # Plotting                                                                                                             #
@@ -619,7 +619,7 @@ def plot_kourosh_activity_style_figure(results_obj: SurpriseAnalysisResult, long
         # plots_data.callout_time_bins
         # plots_data.callout_flat_timebin_IDXs
         start_ts, end_ts = plots_data.callout_time_bins
-        
+        print(f'start_ts: {start_ts}, end_ts: {end_ts}')
         # for a_flat_timebin_idx in callout_flat_timebin_indicies:
         for start_t, end_t, a_flat_timebin_idx in zip(start_ts, end_ts, plots_data.callout_flat_timebin_IDXs):
             # Add the linear region overlay:
@@ -632,6 +632,7 @@ def plot_kourosh_activity_style_figure(results_obj: SurpriseAnalysisResult, long
             plots.linear_regions.append(scroll_window_region)
             # Set the position:
             # plots_data.callout_time_bins[a_flat_timebin_idx]
+            print(f'setting region[{a_flat_timebin_idx}]: {start_t}, {end_t} :: end_t - start_t = {end_t - start_t}')
             scroll_window_region.setRegion([start_t, end_t]) # adjust scroll control
 
 
@@ -653,16 +654,29 @@ def plot_kourosh_activity_style_figure(results_obj: SurpriseAnalysisResult, long
     active_epoch = results_obj.active_filter_epochs[epoch_idx]
     # Get a conversion between the epoch indicies and the flat indicies
     flat_bin_indicies = results_obj.split_by_epoch_reverse_flattened_time_bin_indicies[epoch_idx]
-    # print(f'long_results_obj.flat_all_epochs_decoded_epoch_time_bins.shape: {np.shape(long_results_obj.flat_all_epochs_decoded_epoch_time_bins)}') # (97, 5815)
-    flat_time_bin_center_times = np.array([results_obj.flat_all_epochs_decoded_epoch_time_bins[0, a_flat_time_bin_idx] for a_flat_time_bin_idx in flat_bin_indicies]) # flat_time_bin_times: [43.415 43.435 43.455 43.475 43.495]
-    print(f'flat_time_bin_times: {flat_time_bin_center_times}')
-    # the bins are centered, so we need to offset them (transfrom them into start/end)
-    time_step = np.diff(flat_time_bin_center_times).mean()
-    half_time_step = time_step / 2.0
-    start_t = flat_time_bin_center_times - half_time_step
-    end_t = flat_time_bin_center_times + half_time_step
+    # # print(f'long_results_obj.flat_all_epochs_decoded_epoch_time_bins.shape: {np.shape(long_results_obj.flat_all_epochs_decoded_epoch_time_bins)}') # (97, 5815)
+    # flat_time_bin_center_times = np.array([results_obj.flat_all_epochs_decoded_epoch_time_bins[0, a_flat_time_bin_idx] for a_flat_time_bin_idx in flat_bin_indicies]) # flat_time_bin_times: [43.415 43.435 43.455 43.475 43.495]
+    # print(f'flat_time_bin_times: {flat_time_bin_center_times}')
+    # # the bins are centered, so we need to offset them (transfrom them into start/end)
+    # time_step = np.diff(flat_time_bin_center_times).mean()
+    # half_time_step = time_step / 2.0
+    # start_t = flat_time_bin_center_times - half_time_step
+    # end_t = flat_time_bin_center_times + half_time_step
+    # active_epoch_n_timebins = len(flat_time_bin_center_times) # get the number of timebins in the current epoch
 
-    active_epoch_n_timebins = len(flat_time_bin_center_times) # get the number of timebins in the current epoch
+    ## New Timebin method:
+    # assert len(results_obj.all_included_filter_epochs_decoder_result.time_bin_containers) == len(results_obj.all_included_filter_epochs_decoder_result.p_x_given_n_list) # num epochs
+    active_epoch_time_bin_container = results_obj.all_included_filter_epochs_decoder_result.time_bin_containers[epoch_idx]
+    active_epoch_time_bin_start_stops = active_epoch_time_bin_container.edges[build_pairwise_indicies(np.arange(active_epoch_time_bin_container.edge_info.num_bins))] # .shape # (4153, 2)
+    # active_epoch_time_bin_start_stops: array([[45.367, 45.392],
+    #    [45.392, 45.417],
+    #    [45.417, 45.442],
+    #    [45.442, 45.467],
+    #    [45.467, 45.492]]) # shape: (5, 2)
+    assert np.shape(active_epoch_time_bin_start_stops)[1] == 2
+    start_t = active_epoch_time_bin_start_stops[:,0] # shape: (5,)
+    end_t = active_epoch_time_bin_start_stops[:,1] # shape: (5,)
+    active_epoch_n_timebins = np.shape(active_epoch_time_bin_start_stops)[0] # get the number of timebins in the current epoch
     print(f'{active_epoch_n_timebins = }')
 
     ## Alternative Method: reverse-determine the epoch from the timebin provided:
@@ -736,13 +750,13 @@ def plot_kourosh_activity_style_figure(results_obj: SurpriseAnalysisResult, long
 
     ## Render Callouts within the epoch:
     callout_flat_timebin_IDXs = np.array([flat_bin_indicies[an_epoch_relative_IDX] for an_epoch_relative_IDX in callout_epoch_IDXs]) # get absolute flat indicies
-    callout_time_bin_center_times = np.array([flat_time_bin_center_times[an_epoch_relative_IDX] for an_epoch_relative_IDX in callout_epoch_IDXs]) # [43.415 43.435 43.455 43.475 43.495]
+    # callout_time_bin_center_times = np.array([flat_time_bin_center_times[an_epoch_relative_IDX] for an_epoch_relative_IDX in callout_epoch_IDXs]) # [43.415 43.435 43.455 43.475 43.495]
     callout_start_t = start_t[callout_epoch_IDXs]
     callout_end_t = end_t[callout_epoch_IDXs]
-    print(f'{callout_flat_timebin_IDXs = }, {callout_time_bin_center_times = }')	
+    print(f'{callout_flat_timebin_IDXs = }') # , {callout_time_bin_center_times = }	
     plots_data.callout_flat_timebin_IDXs = callout_flat_timebin_IDXs
     plots_data.callout_time_bins = [callout_start_t, callout_end_t]
-    print(f'time_step: {time_step}, plots_data.callout_time_bins: {plots_data.callout_time_bins}')
+    print(f'plots_data.callout_time_bins: {plots_data.callout_time_bins}') # time_step: {time_step}, 
 
     def build_callout_subgraphic(callout_timebin_IDX = 6, axs=None):
         """ Builds a "callout" graphic for a single timebin within the epoch in question. 
@@ -759,7 +773,6 @@ def plot_kourosh_activity_style_figure(results_obj: SurpriseAnalysisResult, long
         curr_timebin_all_included_p_x_given_n = timebins_p_x_given_n[:, callout_timebin_IDX] 
         # curr_timebin_all_included_p_x_given_n #.shape # (63, ) (n_x_bins, )
 
-        
         if axs is None:
             fig, axs = plt.subplots(2, 1, sharex=True, figsize=(20, 8)) # nrows, ncolumns
         else:
