@@ -155,14 +155,12 @@ class ZhangReconstructionImplementation:
         """ returns flattened versions of the occupancy (P_x), and the tuning_curves (F) """
         neuron_IDs = pf.ratemap.neuron_ids
         neuron_IDXs = np.arange(len(neuron_IDs))
-        # maps = pf.ratemap.normalized_tuning_curves  # (40, 48) for 1D, (40, 48, 10) for 2D
-        
-        ## 2022-09-19 - TODO: should this be the non-normalized tuning curves instead of the normalized ones?
-        # e.g. maps = pf.ratemap.tuning_curves
+        ## 2022-09-19 - should this be the non-normalized tuning curves instead of the normalized ones?
+        #   2023-04-07 - CONFIRMED: yes, this should be the non-normalized tuning curves instead of the normalized ones
         maps = pf.ratemap.tuning_curves  # (40, 48) for 1D, (40, 48, 10) for 2D
         if debug_print:
             print(f'maps: {np.shape(maps)}') # maps: (40, 48, 10)
-        
+
         try:
             f_i = [np.squeeze(maps[i,:,:]) for i in neuron_IDXs] # produces a list of (48 x 10) maps
         except IndexError as e:
@@ -244,10 +242,12 @@ class ZhangReconstructionImplementation:
 
     
     @staticmethod
-    def neuropy_bayesian_prob(tau, P_x, F, n, use_flat_computation_mode=True, debug_print=False):
+    def neuropy_bayesian_prob(tau, P_x, F, n, use_flat_computation_mode=True, debug_intermediates_mode=False, debug_print=False):
         """ 
             n_i: the number of spikes fired by each cell during the time window of consideration
             use_flat_computation_mode: bool - if True, a more memory efficient accumulating computation is performed that avoids `MemoryError: Unable to allocate 65.4 GiB for an array with shape (3969, 21896, 101) and data type float64` caused by allocating the full `cell_prob` matrix
+            debug_intermediates_mode: bool - if True, the intermediate computations are stored and returned for debugging purposes. MUCH slower.
+
 
         NOTES: Flat vs. Full computation modes:
         Originally 
@@ -270,7 +270,15 @@ class ZhangReconstructionImplementation:
         nFlatPositionBins = np.shape(P_x)[0]
 
         F = F.T # Transpose F so it's of the right form
-        
+
+        if debug_intermediates_mode:
+            assert (not use_flat_computation_mode), "debug_intermediates_mode is only supported when use_flat_computation_mode is False"
+            print(f'neuropy_bayesian_prob is running in debug_intermediates_mode. This will be much slower than normal.')
+            # To save test parameters:
+            out_save_path = 'data/test_parameters-neuropy_bayesian_prob_2023-04-07.npz'
+            np.savez_compressed(out_save_path, **{'tau':tau, 'P_x':P_x, 'F':F, 'n':n})
+            print(f'saved test parameters to {out_save_path}')
+
         if use_flat_computation_mode:
             ## Single-cell flat version which updates each iteration:
             cell_prob = np.ones((nFlatPositionBins, nTimeBins)) # Must start with ONES (not Zeros) since we're accumulating multiplications
@@ -295,7 +303,13 @@ class ZhangReconstructionImplementation:
             else:
                 # Full Version:
                 # broadcasting
-                cell_prob[:, :, cell] = (((tau * cell_ratemap) ** cell_spkcnt) * coeff) * (np.exp(-tau * cell_ratemap))
+                if debug_intermediates_mode:
+                    t0 = ((tau * cell_ratemap) ** cell_spkcnt)
+                    t1 = coeff
+                    t2 = (np.exp(-tau * cell_ratemap))
+                    cell_prob[:, :, cell] = (t0 * t1) * t2
+                else:
+                    cell_prob[:, :, cell] = (((tau * cell_ratemap) ** cell_spkcnt) * coeff) * (np.exp(-tau * cell_ratemap))
 
         if use_flat_computation_mode:
             # Single-cell flat Version:
@@ -600,7 +614,14 @@ class BasePositionDecoder(NeuronUnitSlicableObjectProtocol):
         
         """
         ## Capture inputs for debugging:
-        # np.savez_compressed('test_parameters-neuropy_bayesian_prob_2023-04-07.npz', **{'tau':time_bin_size, 'P_x':self.P_x, 'F':self.F, 'n':unit_specific_time_binned_spike_counts})
+        computation_debug_mode = False
+        if computation_debug_mode:
+            debug_intermediates_mode=True
+            use_flat_computation_mode=False
+            # np.savez_compressed('test_parameters-neuropy_bayesian_prob_2023-04-07.npz', **{'tau':time_bin_size, 'P_x':self.P_x, 'F':self.F, 'n':unit_specific_time_binned_spike_counts})
+        else:
+            debug_intermediates_mode=False
+            use_flat_computation_mode=True
 
         num_cells = np.shape(unit_specific_time_binned_spike_counts)[0]    
         num_time_windows = np.shape(unit_specific_time_binned_spike_counts)[1]
@@ -612,7 +633,7 @@ class BasePositionDecoder(NeuronUnitSlicableObjectProtocol):
                 time_bin_size = self.time_bin_size
             
             # Single sweep decoding:
-            curr_flat_p_x_given_n = ZhangReconstructionImplementation.neuropy_bayesian_prob(time_bin_size, self.P_x, self.F, unit_specific_time_binned_spike_counts, debug_print=(debug_print or self.debug_print))
+            curr_flat_p_x_given_n = ZhangReconstructionImplementation.neuropy_bayesian_prob(time_bin_size, self.P_x, self.F, unit_specific_time_binned_spike_counts, debug_intermediates_mode=debug_intermediates_mode, use_flat_computation_mode=use_flat_computation_mode, debug_print=(debug_print or self.debug_print))
             if debug_print:
                 print(f'curr_flat_p_x_given_n.shape: {curr_flat_p_x_given_n.shape}')
             # all computed
