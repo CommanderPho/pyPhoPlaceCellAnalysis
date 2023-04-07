@@ -26,6 +26,7 @@ from pyphocorehelpers.mixins.serialized import SerializedAttributesSpecifyingCla
 from pyphoplacecellanalysis.General.Mixins.CrossComputationComparisonHelpers import _compare_computation_results # for finding common neurons in `prune_to_shared_aclus_only`
 
 from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import ZhangReconstructionImplementation # for BasePositionDecoder
+from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import DecodedFilterEpochsResult
 
 # ==================================================================================================================== #
 # Stateless Decoders (New 2023-04-06)                                                                                  #
@@ -39,10 +40,10 @@ class BasePositionDecoder(NeuronUnitSlicableObjectProtocol):
     """
     pf: PfND
 
-    neuron_IDXs: np.ndarray
-    neuron_IDs: np.ndarray
-    F: np.ndarray
-    P_x: np.ndarray
+    neuron_IDXs: np.ndarray = None
+    neuron_IDs: np.ndarray = None
+    F: np.ndarray = None
+    P_x: np.ndarray = None
 
     setup_on_init:bool = True 
     post_load_on_init:bool = False
@@ -267,6 +268,15 @@ class BasePositionDecoder(NeuronUnitSlicableObjectProtocol):
             np.shape(P_x): (288, 1)
         """
         self.neuron_IDXs, self.neuron_IDs, f_i, F_i, self.F, self.P_x = ZhangReconstructionImplementation.build_concatenated_F(self.pf, debug_print=self.debug_print)
+        if not isinstance(self.neuron_IDs, np.ndarray):
+            self.neuron_IDs = np.array(self.neuron_IDs)
+        if not isinstance(self.neuron_IDXs, np.ndarray):
+            self.neuron_IDXs = np.array(self.neuron_IDXs)
+
+
+    # ==================================================================================================================== #
+    # Class/Static Methods                                                                                                 #
+    # ==================================================================================================================== #
 
     @function_attributes(short_name='prune_to_shared_aclus_only', tags=['decoder','aclu'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-04-06 12:19')
     @classmethod
@@ -295,3 +305,81 @@ class BasePositionDecoder(NeuronUnitSlicableObjectProtocol):
         long_shared_aclus_only_decoder = long_decoder.get_by_id(shared_aclus)
         short_shared_aclus_only_decoder = short_decoder.get_by_id(shared_aclus) # short currently has a subset of long's alcus so this isn't needed, but just for symmetry do it anyway
         return shared_aclus, (long_shared_aclus_only_decoder, short_shared_aclus_only_decoder), long_short_pf_neurons_diff
+
+    @function_attributes(short_name='perform_decode_specific_epochs', tags=['decode','specific_epochs','epoch', 'classmethod'], input_requires=[], output_provides=[], uses=['active_decoder.decode', 'add_epochs_id_identity', 'epochs_spkcount', 'cls.perform_build_marginals'], used_by=[''], creation_date='2022-12-04 00:00')
+    @classmethod
+    def perform_decode_specific_epochs(cls, active_decoder, spikes_df, filter_epochs, decoding_time_bin_size = 0.05, debug_print=False) -> DecodedFilterEpochsResult:
+        """Uses the decoder to decode the nerual activity (provided in spikes_df) for each epoch in filter_epochs
+
+        NOTE: Uses active_decoder.decode(...) to actually do the decoding
+        
+        Args:
+            new_2D_decoder (_type_): _description_
+            spikes_df (_type_): _description_
+            filter_epochs (_type_): _description_
+            decoding_time_bin_size (float, optional): _description_. Defaults to 0.05.
+            debug_print (bool, optional): _description_. Defaults to False.
+
+        Returns:
+            DecodedFilterEpochsResult: _description_
+        """
+        # build output result object:
+        filter_epochs_decoder_result = DynamicContainer(most_likely_positions_list=[], p_x_given_n_list=[], marginal_x_list=[], marginal_y_list=[], most_likely_position_indicies_list=[])
+        
+        if isinstance(filter_epochs, pd.DataFrame):
+            filter_epochs_df = filter_epochs
+        else:
+            filter_epochs_df = filter_epochs.to_dataframe()
+            
+        if debug_print:
+            print(f'filter_epochs: {filter_epochs.n_epochs}')
+        ## Get the spikes during these epochs to attempt to decode from:
+        filter_epoch_spikes_df = deepcopy(spikes_df)
+        ## Add the epoch ids to each spike so we can easily filter on them:
+        filter_epoch_spikes_df = add_epochs_id_identity(filter_epoch_spikes_df, filter_epochs_df, epoch_id_key_name='temp_epoch_id', epoch_label_column_name=None, no_interval_fill_value=-1)
+        if debug_print:
+            print(f'np.shape(filter_epoch_spikes_df): {np.shape(filter_epoch_spikes_df)}')
+        filter_epoch_spikes_df = filter_epoch_spikes_df[filter_epoch_spikes_df['temp_epoch_id'] != -1] # Drop all non-included spikes
+        if debug_print:
+            print(f'np.shape(filter_epoch_spikes_df): {np.shape(filter_epoch_spikes_df)}')
+
+        ## final step is to time_bin (relative to the start of each epoch) the time values of remaining spikes
+        spkcount, nbins, time_bin_containers_list = epochs_spkcount(filter_epoch_spikes_df, filter_epochs, decoding_time_bin_size, slideby=decoding_time_bin_size, export_time_bins=True, included_neuron_ids=active_decoder.neuron_IDs, debug_print=debug_print) ## time_bins returned are not correct, they're subsampled at a rate of 1000
+        num_filter_epochs = len(nbins) # one for each epoch in filter_epochs
+
+        filter_epochs_decoder_result.spkcount = spkcount
+        filter_epochs_decoder_result.nbins = nbins
+        filter_epochs_decoder_result.time_bin_containers = time_bin_containers_list
+        filter_epochs_decoder_result.decoding_time_bin_size = decoding_time_bin_size
+        filter_epochs_decoder_result.num_filter_epochs = num_filter_epochs
+        if debug_print:
+            print(f'num_filter_epochs: {num_filter_epochs}, nbins: {nbins}') # the number of time bins that compose each decoding epoch e.g. nbins: [7 2 7 1 5 2 7 6 8 5 8 4 1 3 5 6 6 6 3 3 4 3 6 7 2 6 4 1 7 7 5 6 4 8 8 5 2 5 5 8]
+
+        # bins = np.arange(epoch.start, epoch.stop, 0.001)
+        filter_epochs_decoder_result.most_likely_positions_list = []
+        filter_epochs_decoder_result.p_x_given_n_list = []
+        # filter_epochs_decoder_result.marginal_x_p_x_given_n_list = []
+        filter_epochs_decoder_result.most_likely_position_indicies_list = []
+        # filter_epochs_decoder_result.time_bin_centers = []
+        filter_epochs_decoder_result.time_bin_edges = []
+        
+        filter_epochs_decoder_result.marginal_x_list = []
+        filter_epochs_decoder_result.marginal_y_list = []
+
+        # Looks like we're iterating over each epoch in filter_epochs:
+        for i, curr_filter_epoch_spkcount, curr_epoch_num_time_bins, curr_filter_epoch_time_bin_container in zip(np.arange(num_filter_epochs), spkcount, nbins, time_bin_containers_list):
+            ## New 2022-09-26 method with working time_bin_centers_list returned from epochs_spkcount
+            filter_epochs_decoder_result.time_bin_edges.append(curr_filter_epoch_time_bin_container.edges)            
+            most_likely_positions, p_x_given_n, most_likely_position_indicies, flat_outputs_container = active_decoder.decode(curr_filter_epoch_spkcount, time_bin_size=decoding_time_bin_size, output_flat_versions=False, debug_print=debug_print)
+            filter_epochs_decoder_result.most_likely_positions_list.append(most_likely_positions)
+            filter_epochs_decoder_result.p_x_given_n_list.append(p_x_given_n)
+            filter_epochs_decoder_result.most_likely_position_indicies_list.append(most_likely_position_indicies)
+
+            # Add the marginal container to the list
+            curr_unit_marginal_x, curr_unit_marginal_y = cls.perform_build_marginals(p_x_given_n, most_likely_positions, debug_print=debug_print)
+            filter_epochs_decoder_result.marginal_x_list.append(curr_unit_marginal_x)
+            filter_epochs_decoder_result.marginal_y_list.append(curr_unit_marginal_y)
+        
+        return DecodedFilterEpochsResult(**filter_epochs_decoder_result.to_dict()) # dump the dynamic dict as kwargs into the class
+    
+
