@@ -236,7 +236,7 @@ class DecoderResultDisplayingPlot2D(DecoderResultDisplayingBaseClass):
         # return (self.active_im,)
         return self.fig # returns fig
 
-from pyphoplacecellanalysis.Analysis.Decoder.decoder_stateless import BasePositionDecoder
+from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BasePositionDecoder
 
 
 @function_attributes(short_name='one_aclu_loo_decoding_analysis', tags=['decoding', 'loo'], input_requires=[], output_provides=[], creation_date='2023-03-03 00:00')
