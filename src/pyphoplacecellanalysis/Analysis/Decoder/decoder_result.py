@@ -496,7 +496,7 @@ def perform_full_session_leave_one_out_decoding_analysis(sess, original_1D_decod
         active_pos = active_pos_df.position.to_Position_obj() # convert back to a full position object
         original_decoder_pf1D = PfND(deepcopy(pyramidal_only_spikes_df), deepcopy(active_pos.linear_pos_obj)) # all other settings default
         ## Build the new decoder:
-        original_1D_decoder = BayesianPlacemapPositionDecoder(decoding_time_bin_size, original_decoder_pf1D, original_decoder_pf1D.filtered_spikes_df.copy(), debug_print=False)
+        original_1D_decoder = BayesianPlacemapPositionDecoder(time_bin_size=decoding_time_bin_size, pf=original_decoder_pf1D, spikes_df=original_decoder_pf1D.filtered_spikes_df.copy(), debug_print=False)
     else:
         print(f'reusing extant decoder.')
 

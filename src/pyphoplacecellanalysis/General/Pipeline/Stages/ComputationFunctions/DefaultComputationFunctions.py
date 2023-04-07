@@ -43,10 +43,10 @@ class DefaultComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Computa
         def position_decoding_computation(active_session, pf_computation_config, prev_output_result):
             """ uses the pf2D property of "prev_output_result.computed_data['pf2D'] """
             ## filtered_spikes_df version:
-            prev_output_result.computed_data['pf1D_Decoder'] = BayesianPlacemapPositionDecoder(pf_computation_config.time_bin_size, prev_output_result.computed_data['pf1D'], prev_output_result.computed_data['pf1D'].filtered_spikes_df.copy(), debug_print=False)
+            prev_output_result.computed_data['pf1D_Decoder'] = BayesianPlacemapPositionDecoder(time_bin_size=pf_computation_config.time_bin_size, pf=prev_output_result.computed_data['pf1D'], spikes_df=prev_output_result.computed_data['pf1D'].filtered_spikes_df.copy(), debug_print=False)
             prev_output_result.computed_data['pf1D_Decoder'].compute_all() #
 
-            prev_output_result.computed_data['pf2D_Decoder'] = BayesianPlacemapPositionDecoder(pf_computation_config.time_bin_size, prev_output_result.computed_data['pf2D'], prev_output_result.computed_data['pf2D'].filtered_spikes_df.copy(), debug_print=False)
+            prev_output_result.computed_data['pf2D_Decoder'] = BayesianPlacemapPositionDecoder(time_bin_size=pf_computation_config.time_bin_size, pf=prev_output_result.computed_data['pf2D'], spikes_df=prev_output_result.computed_data['pf2D'].filtered_spikes_df.copy(), debug_print=False)
             prev_output_result.computed_data['pf2D_Decoder'].compute_all() #
             return prev_output_result
 
@@ -254,13 +254,13 @@ class DefaultComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Computa
                 ## 1D Decoder
                 new_decoder_pf1D = active_pf_1D
                 new_1D_decoder_spikes_df = new_decoder_pf1D.filtered_spikes_df.copy()
-                new_1D_decoder = BayesianPlacemapPositionDecoder(pf_computation_config.time_bin_size, new_decoder_pf1D, new_1D_decoder_spikes_df, debug_print=False) 
+                new_1D_decoder = BayesianPlacemapPositionDecoder(time_bin_size=pf_computation_config.time_bin_size, pf=new_decoder_pf1D, spikes_df=new_1D_decoder_spikes_df, debug_print=False) 
                 new_1D_decoder.compute_all() #  --> TODO: NOTE: 1D .compute_all() has just been recently added due to a previous error in ffill
 
                 ## Custom Manual 2D Decoder:
                 new_decoder_pf2D = active_pf_2D # 
                 new_decoder_spikes_df = new_decoder_pf2D.filtered_spikes_df.copy()
-                new_2D_decoder = BayesianPlacemapPositionDecoder(pf_computation_config.time_bin_size, new_decoder_pf2D, new_decoder_spikes_df, debug_print=False)
+                new_2D_decoder = BayesianPlacemapPositionDecoder(time_bin_size=pf_computation_config.time_bin_size, pf=new_decoder_pf2D, spikes_df=new_decoder_spikes_df, debug_print=False)
                 new_2D_decoder.compute_all() #  --> n = self.
                 
                 return new_1D_decoder, new_2D_decoder
