@@ -79,7 +79,7 @@ class TestDecodersMethods(unittest.TestCase):
         # Test excluding certain neurons from the decoder
 
         ## Build placefield for the decoder to use:
-        original_decoder_pf1D = PfND(deepcopy(self.spikes_df).spikes.sliced_by_neuron_type('pyramidal'), deepcopy(self.active_pos.linear_pos_obj), frate_thresh=0.0) # all other settings default
+        original_decoder_pf1D = PfND.from_config_values(spikes_df=deepcopy(self.spikes_df).spikes.sliced_by_neuron_type('pyramidal'), position=deepcopy(self.active_pos.linear_pos_obj), frate_thresh=0.0) # all other settings default
 
         ## Build the new decoder with custom params:
         new_decoder_pf_params = deepcopy(original_decoder_pf1D.config) # should be a PlacefieldComputationParameters
@@ -90,7 +90,7 @@ class TestDecodersMethods(unittest.TestCase):
         new_1D_decoder_spikes_df = original_decoder_pf1D.filtered_spikes_df.copy()
 
         # Why would it need both the pf1D and the spikes? Doesn't the pf1D include the spikes (and determine the placefields, which are all that are used)???
-        original_1D_decoder = BayesianPlacemapPositionDecoder(new_decoder_pf_params.time_bin_size, original_decoder_pf1D, new_1D_decoder_spikes_df, debug_print=False)
+        original_1D_decoder = BayesianPlacemapPositionDecoder(time_bin_size=new_decoder_pf_params.time_bin_size, pf=original_decoder_pf1D, spikes_df=new_1D_decoder_spikes_df, debug_print=False)
         original_1D_decoder.compute_all()
 
         original_decoder = original_1D_decoder # strangely this makes original_pf.included_neuron_IDs wrapped in an extra list!
