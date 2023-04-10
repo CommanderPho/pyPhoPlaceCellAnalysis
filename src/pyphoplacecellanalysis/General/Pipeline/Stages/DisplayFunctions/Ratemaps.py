@@ -63,7 +63,6 @@ class DefaultRatemapDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Disp
         # if should_save_to_disk:
         #     _save_displayed_figure_if_needed(active_config.plotting_config, plot_type_name='_display_2d_placefield_result_plot_ratemaps_2D', active_variant_name=plot_variable_name, active_figures=active_pf_2D_figures)
 
-
         # return dict(fig=active_figure, ax=ax_pf_1D)
         return MatplotlibRenderPlots(figures=[active_figure], axes=[ax_pf_1D])   
 
