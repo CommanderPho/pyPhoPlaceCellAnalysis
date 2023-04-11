@@ -21,8 +21,7 @@ from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.FiringStati
 from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.MultiContextComparingDisplayFunctions.MultiContextComparingDisplayFunctions import MultiContextComparingDisplayFunctions
 
 
-
-class Plot(object):
+class Plot:
     """a member dot accessor for display functions.
 
     2022-12-13
@@ -47,9 +46,19 @@ class Plot(object):
             def _dummy():
                 pass
             return _dummy
-        # return self[k]
-        # return self._pipeline_reference.display(display_function=k, active_identifying_session_ctx=self._pipeline_reference.sess.get_context())
-        return self._pipeline_reference.display(display_function=k, active_session_configuration_context=list(self._pipeline_reference.filtered_contexts.values())[-1])
+        # Check if arguments are passed
+        def display_wrapper(*args, **kwargs):
+            if len(args) == 0:
+                # if no args passed, get global context, otherwise assume first arg is context:
+                active_session_configuration_context = kwargs.pop('active_session_configuration_context', list(self._pipeline_reference.filtered_contexts.values())[-1])
+            else:
+                # otherwise assume first arg is context:
+                active_session_configuration_context = args[0]
+                args = args[1:]
+            return self._pipeline_reference.display(display_function=k, active_session_configuration_context=active_session_configuration_context, *args, **kwargs)
+        return display_wrapper 
+        # Return display_wrapper as a property, allowing use without parentheses if desired
+        # return property(display_wrapper)
 
 
 
