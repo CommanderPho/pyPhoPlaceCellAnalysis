@@ -1304,6 +1304,8 @@ def pipeline_complete_compute_long_short_fr_indicies(curr_active_pipeline, temp_
     Returns:
         _type_: _description_
     """
+    from neuropy.core.epoch import Epoch
+
     active_identifying_session_ctx = curr_active_pipeline.sess.get_context() # 'bapun_RatN_Day4_2019-10-15_11-30-06' # curr_sess_ctx # IdentifyingContext<('kdiba', 'gor01', 'one', '2006-6-07_11-26-53')>
     long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
     # long_session, short_session, global_session = [curr_active_pipeline.filtered_sessions[an_epoch_name] for an_epoch_name in [long_epoch_name, short_epoch_name, global_epoch_name]]
@@ -1312,10 +1314,14 @@ def pipeline_complete_compute_long_short_fr_indicies(curr_active_pipeline, temp_
 
     active_context = active_identifying_session_ctx.adding_context(collision_prefix='fn', fn_name='long_short_firing_rate_indicies')
 
-    spikes_df = curr_active_pipeline.sess.spikes_df
+    spikes_df = curr_active_pipeline.sess.spikes_df # TODO: CORRECTNESS: should I be using this spikes_df instead of the filtered ones?
 
     # Get existing laps from session:
-    long_laps, short_laps, global_laps = [curr_active_pipeline.filtered_sessions[an_epoch_name].laps.as_epoch_obj() for an_epoch_name in [long_epoch_name, short_epoch_name, global_epoch_name]]
+    # long_laps, short_laps, global_laps = [curr_active_pipeline.filtered_sessions[an_epoch_name].laps.as_epoch_obj() for an_epoch_name in [long_epoch_name, short_epoch_name, global_epoch_name]]
+
+    long_laps, short_laps, global_laps = [Epoch.filter_epochs(curr_active_pipeline.filtered_sessions[an_epoch_name].laps.as_epoch_obj(), pos_df=curr_active_pipeline.filtered_sessions[an_epoch_name].position.to_dataframe(), spikes_df=curr_active_pipeline.filtered_sessions[an_epoch_name].spikes_df, min_epoch_included_duration=1.0, max_epoch_included_duration=10.0, maximum_speed_thresh=None, min_num_unique_aclu_inclusions=3) for an_epoch_name in [long_epoch_name, short_epoch_name, global_epoch_name]]
+    # TODO 2023-04-11 - Note this doesn't assign these filtered laps objects to the session or anything yet, it just returns them.
+    
 
     # Get existing replays from session:
     # minimum_valid_replay_duration = 5.0 * decoding_time_bin_size
