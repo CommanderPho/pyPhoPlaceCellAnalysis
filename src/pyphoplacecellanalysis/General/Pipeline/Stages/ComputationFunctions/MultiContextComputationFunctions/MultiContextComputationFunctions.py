@@ -8,6 +8,7 @@ import pandas as pd
 from neuropy.utils.misc import safe_pandas_get_group # for _compute_pybursts_burst_interval_detection
 
 from pyphocorehelpers.mixins.member_enumerating import AllFunctionEnumeratingMixin
+from pyphocorehelpers.function_helpers import function_attributes
 from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.ComputationFunctionRegistryHolder import ComputationFunctionRegistryHolder
 from pyphoplacecellanalysis.General.Model.ComputationResults import ComputationResult
 from pyphocorehelpers.DataStructure.dynamic_parameters import DynamicParameters
@@ -295,6 +296,7 @@ class MultiContextComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Co
         return global_computation_results
 
 
+    @function_attributes(short_name='_perform_short_long_firing_rate_analyses', tags=['short_long','firing_rate', 'computation'], input_requires=[], output_provides=[], uses=['pipeline_complete_compute_long_short_fr_indicies'], used_by=[], creation_date='2023-04-11 00:00')
     def _perform_short_long_firing_rate_analyses(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_whitelist=None, debug_print=False):
         """ 
         
