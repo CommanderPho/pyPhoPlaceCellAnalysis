@@ -175,7 +175,7 @@ def create_daily_programmatic_display_function_testing_folder_if_needed(out_path
         out_path = Path(r'EXTERNAL/Screenshots/ProgrammaticDisplayFunctionTesting').joinpath(out_day_date_folder_name).resolve()
     else:
         out_path = Path(out_path) # make sure it's a Path
-    out_path.mkdir(exist_ok=True)
+    out_path.mkdir(exist_ok=True, parents=True) # parents=True creates all necessary parent folders
     return out_path
 
 def session_context_to_relative_path(parent_path, session_ctx):

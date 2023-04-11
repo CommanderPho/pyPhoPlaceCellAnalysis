@@ -5,6 +5,8 @@ import numpy as np
 from enum import unique # SessionBatchProgress
 import traceback # for stack trace formatting
 
+from attrs import define, Factory, fields
+
 ## MATPLOTLIB Imports:
 import matplotlib
 import matplotlib.pyplot as plt
@@ -59,16 +61,14 @@ filters should be checkable to express whether we want to build that one or not
 
 """
 
+
+
+@define(slots=False)
 class NonInteractiveWrapper(object):
     """A wrapper class that performs a non-interactive version of the jupyter-lab notebook for loading and processing the pipeline. """
-    def __init__(self, enable_saving_to_disk=False):
-        super(NonInteractiveWrapper, self).__init__()
-        self.enable_saving_to_disk = enable_saving_to_disk
-        # common_parent_foldername = Path(r'R:\Dropbox (Personal)\Active\Kamran Diba Lib\Pho-Kamran-Meetings\Final Placemaps 2021-01-14')
-        # self.common_parent_foldername = Path(r'R:\Dropbox (Personal)\Active\Kamran Diba Lib\Pho-Kamran-Meetings\2022-01-16')
-        self.common_parent_foldername = Path(r'C:\Users\pho\repos\PhoPy3DPositionAnalysis2021\output')
-
-        
+    enable_saving_to_disk:bool = False
+    common_parent_foldername:Path = Path(r'C:\Users\pho\repos\PhoPy3DPositionAnalysis2021\output')
+   
     
     @staticmethod
     def compute_position_grid_bin_size(x, y, num_bins=(64,64), debug_print=False):
@@ -115,8 +115,6 @@ class NonInteractiveWrapper(object):
         return pipeline
 
 
-        
-  
   
     @staticmethod
     def bapun_format_all(pipeline):
@@ -124,9 +122,6 @@ class NonInteractiveWrapper(object):
         pipeline = NonInteractiveWrapper.perform_filtering(pipeline, active_session_filter_configurations)
         pipeline = NonInteractiveWrapper.perform_computation(pipeline, active_session_computation_configs)
         return pipeline, active_session_computation_configs, active_session_filter_configurations
-
-     
-     
      
     @staticmethod
     def bapun_format_define_configs(curr_bapun_pipeline):
@@ -154,7 +149,6 @@ class NonInteractiveWrapper(object):
             maze_only_filters = build_custom_epochs_filters(sess, epoch_name_whitelist=maze_only_name_filter_fn)
             # print(f'maze_only_filters: {maze_only_filters}')
             return maze_only_filters
-
 
         active_session_filter_configurations = build_bapun_any_maze_epochs_filters(curr_bapun_pipeline.sess)
         for i in np.arange(len(active_session_computation_configs)):
@@ -585,7 +579,9 @@ def batch_programmatic_figures(curr_active_pipeline):
 
 
     # Plot long|short firing rate index:
-    fig_save_parent_path = Path(r'E:\Dropbox (Personal)\Active\Kamran Diba Lab\Results from 2023-01-20 - LongShort Firing Rate Indicies')
+    # fig_save_parent_path = Path(r'E:\Dropbox (Personal)\Active\Kamran Diba Lab\Results from 2023-01-20 - LongShort Firing Rate Indicies')
+    fig_save_parent_path = Path(r'E:\Dropbox (Personal)\Active\Kamran Diba Lab\Pho-Kamran-Meetings\Results from 2023-04-11')
+
     curr_active_pipeline.display('_display_short_long_firing_rate_index_comparison', curr_active_pipeline.sess.get_context(), fig_save_parent_path=fig_save_parent_path)
 
 
@@ -594,7 +590,7 @@ def batch_programmatic_figures(curr_active_pipeline):
 
 # import matplotlib as mpl
 # import matplotlib.pyplot as plt
-@function_attributes(short_name='batch_extended_programmatic_figures', tags=['batch', 'automated', 'session', 'display', 'figures', 'extended'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-03-28 04:46')
+@function_attributes(short_name='batch_extended_programmatic_figures', tags=['batch', 'automated', 'session', 'display', 'figures', 'extended', 'matplotlib'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-03-28 04:46')
 def batch_extended_programmatic_figures(curr_active_pipeline):
     _bak_rcParams = mpl.rcParams.copy()
     mpl.rcParams['toolbar'] = 'None' # disable toolbars
