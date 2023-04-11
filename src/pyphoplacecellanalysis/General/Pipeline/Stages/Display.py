@@ -55,6 +55,10 @@ class Plot:
                 # otherwise assume first arg is context:
                 active_session_configuration_context = args[0]
                 args = args[1:]
+
+            if isinstance(active_session_configuration_context, str):
+                    # if first arg is context, remove it from args:
+                    active_session_configuration_context = self._pipeline_reference.filtered_contexts[active_session_configuration_context] # if the passed argument is a string (like 'maze1'), find it in the filtered contexts dict
             return self._pipeline_reference.display(display_function=k, active_session_configuration_context=active_session_configuration_context, *args, **kwargs)
         return display_wrapper 
         # Return display_wrapper as a property, allowing use without parentheses if desired
