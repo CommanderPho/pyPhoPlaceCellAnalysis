@@ -78,6 +78,8 @@ class CustomMatplotlibWidget(QtWidgets.QWidget):
         else:
             self._buildUI_buildNonScrollableWidget()
 
+        self.ui.canvas.manager.set_window_title(self.params.window_title) # sets the window's title
+
     def _buildUI_buildNonScrollableWidget(self):
         """ sets up the widget to contain a basic layout with no scrollability """
         self.ui.root_vbox = QtWidgets.QVBoxLayout()
