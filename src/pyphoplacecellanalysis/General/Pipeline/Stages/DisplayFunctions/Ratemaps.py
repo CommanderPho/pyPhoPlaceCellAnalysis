@@ -20,7 +20,7 @@ from neuropy.utils.dynamic_container import overriding_dict_with
 
 from pyphocorehelpers.DataStructure.RenderPlots.MatplotLibRenderPlots import MatplotlibRenderPlots
 from pyphocorehelpers.DataStructure.RenderPlots.PyqtgraphRenderPlots import PyqtgraphRenderPlots
-
+from pyphocorehelpers.function_helpers import function_attributes
 # from pyphoplacecellanalysis.GUI.PyQtPlot.BinnedImageRenderingWindow import BasicBinnedImageRenderingWindow, add_bin_ticks, build_binned_imageItem
 from neuropy.utils.matplotlib_helpers import _build_variable_max_value_label, enumTuningMap2DPlotMode, enumTuningMap2DPlotVariables, _determine_best_placefield_2D_layout, _scale_current_placefield_to_acceptable_range
 from pyphoplacecellanalysis.Pho2D.PyQtPlots.plot_placefields import display_all_pf_2D_pyqtgraph_binned_image_rendering
@@ -38,6 +38,7 @@ from pyphoplacecellanalysis.General.Mixins.CrossComputationComparisonHelpers imp
 class DefaultRatemapDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=DisplayFunctionRegistryHolder):
     """ Functions related to visualizing Bayesian Decoder performance. """
     
+    @function_attributes(short_name='1d_placefields', tags=['display', 'placefields', '1D', 'matplotlib'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-04-11 03:05')
     def _display_1d_placefields(computation_result, active_config, owning_pipeline=None, active_context=None, **kwargs):
         assert active_context is not None
         assert owning_pipeline is not None
@@ -66,14 +67,13 @@ class DefaultRatemapDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Disp
         # return dict(fig=active_figure, ax=ax_pf_1D)
         return MatplotlibRenderPlots(figures=[active_figure], axes=[ax_pf_1D])   
 
-
+    @function_attributes(short_name='2d_placefield_result_plot_ratemaps_2D', tags=['display', 'placefields', '2D', 'matplotlib'], input_requires=[], output_provides=[], uses=['PfND.plot_ratemaps_2D', 'neuropy.plotting.ratemaps.plot_ratemap_2D'], used_by=[], creation_date='2023-04-11 03:05')
     def _display_2d_placefield_result_plot_ratemaps_2D(computation_result, active_config, enable_saving_to_disk=False, **kwargs):
         """ displays 2D placefields in a MATPLOTLIB window 
         
         Internally wraps `PfND.plot_ratemaps_2D` which itself wraps `neuropy.plotting.ratemaps.plot_ratemap_2D`
         
             optionally shows peak firing rates
-            
             
         TODO: plot the information about the source of the data, such as the session information? Or perhaps we could just leave that encoded in the exported file name? It is hard to track the figures though
         
@@ -104,7 +104,7 @@ class DefaultRatemapDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Disp
         # return active_pf_2D_figures
         return MatplotlibRenderPlots(figures=active_pf_2D_figures, axes=display_outputs[1], graphics=display_outputs[2])
 
-    
+    @function_attributes(short_name='normal', tags=['display', 'placefields', '2D', 'matplotlib'], input_requires=[], output_provides=[], uses=['neuropy.plotting.placemaps.plot_all_placefields', 'neuropy.plotting.ratemaps.plot_ratemap_2D'], used_by=[], creation_date='2023-04-11 03:05')
     def _display_normal(computation_result, active_config, **kwargs):
         """
         
@@ -120,6 +120,7 @@ class DefaultRatemapDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Disp
         # return occupancy_fig, active_pf_2D_figures
         return MatplotlibRenderPlots(figures=[occupancy_fig, active_pf_2D_figures])   
 
+    @function_attributes(short_name='placemaps_pyqtplot_2D', tags=['display', 'placefields', '2D', 'pyqtplot'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-04-11 03:05')
     def _display_placemaps_pyqtplot_2D(computation_result, active_config, enable_saving_to_disk=False, active_context=None, defer_show:bool=False, **kwargs):
         """  displays 2D placefields in a pyqtgraph window
         """
@@ -152,7 +153,7 @@ class DefaultRatemapDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Disp
 
         return PyqtgraphRenderPlots(parent_root_widget=out_all_pf_2D_pyqtgraph_binned_image_fig)
 
-
+    @function_attributes(short_name='recurrsive_latent_placefield_comparisons', tags=['display', 'recurrsive', 'placefields', '2D', 'pyqtplot'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-04-11 03:05')
     def _display_recurrsive_latent_placefield_comparisons(computation_result, active_config, owning_pipeline_reference=None, enable_saving_to_disk=False, active_context=None, defer_show:bool=False, **kwargs):
             """ Create `master_dock_win` - centralized plot output window to collect individual figures/controls in (2022-08-18) 
             NOTE: Ignores `active_config` because context_nested_docks is for all contexts
