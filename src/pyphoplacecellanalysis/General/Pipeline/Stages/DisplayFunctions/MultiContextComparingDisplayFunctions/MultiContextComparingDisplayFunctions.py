@@ -180,6 +180,7 @@ class MultiContextComparingDisplayFunctions(AllFunctionEnumeratingMixin, metacla
 
             ## Proper global-computations based way:
             sess = owning_pipeline_reference.sess
+            active_identifying_session_ctx = sess.get_context()
             t_split = sess.paradigm[0][0,1] # passed to _make_pho_jonathan_batch_plots(t_split, ...)
 
             aclu_to_idx = global_computation_results.computed_data['jonathan_firing_rate_analysis']['rdf']['aclu_to_idx']
@@ -198,6 +199,13 @@ class MultiContextComparingDisplayFunctions(AllFunctionEnumeratingMixin, metacla
             n_max_plot_rows = kwargs.pop('n_max_plot_rows', 6)
             show_inter_replay_frs = kwargs.pop('show_inter_replay_frs', True)
             included_unit_neuron_IDs = kwargs.pop('included_unit_neuron_IDs', None)
+
+            active_context = active_identifying_session_ctx.adding_context(collision_prefix='fn', fn_name='batch_pho_jonathan_interactive_replay_firing_rate_comparison')
+            curr_fig_num = kwargs.pop('fignum', None)
+            if curr_fig_num is None:
+                ## Set the fig_num, if not already set:
+                curr_fig_num = f'long|short fr indicies_{active_context.get_description(separator="/")}'
+            kwargs['fignum'] = curr_fig_num
 
             graphics_output_dict = _make_pho_jonathan_batch_plots(t_split, time_bins, neuron_replay_stats_df, time_binned_unit_specific_binned_spike_rate, pf1D_all, aclu_to_idx, rdf, irdf,
                 show_inter_replay_frs=show_inter_replay_frs, n_max_plot_rows=n_max_plot_rows, included_unit_neuron_IDs=included_unit_neuron_IDs, cell_spikes_dfs_dict=cell_spikes_dfs_dict, time_variable_name=time_variable_name, **kwargs)
@@ -327,7 +335,7 @@ class MultiContextComparingDisplayFunctions(AllFunctionEnumeratingMixin, metacla
 
             return graphics_output_dict
 
-
+    @function_attributes(short_name='short_long_firing_rate_index_comparison', tags=['display','short_long','firing_rate', 'fr_index'], input_requires=[], output_provides=[], uses=['_plot_long_short_firing_rate_indicies'], used_by=[], creation_date='2023-04-11 08:08')
     def _display_short_long_firing_rate_index_comparison(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_whitelist=None, **kwargs):
             """ Displays a figure for comparing the 1D placefields across-epochs (between the short and long tracks)
                 Usage:
@@ -852,6 +860,7 @@ def _plot_general_all_spikes(ax_activity_v_time, active_spikes_df, time_variable
     return ax_activity_v_time
 
 
+@function_attributes(short_name='_plot_pho_jonathan_batch_plot_single_cell', tags=['private'], input_requires=[], output_provides=[], uses=['plot_1D_placecell_validation', '_temp_draw_jonathan_ax', '_plot_general_all_spikes'], used_by=['_make_pho_jonathan_batch_plots'], creation_date='2023-04-11 08:06')
 def _plot_pho_jonathan_batch_plot_single_cell(t_split, time_bins, unit_specific_time_binned_firing_rates, pf1D_all, rdf_aclu_to_idx, rdf, irdf, show_inter_replay_frs, pf1D_aclu_to_idx, aclu, curr_fig, colors, debug_print=False, **kwargs):
     """ Plots a single cell's plots for a stacked Jonathan-style firing-rate-across-epochs-plot
     Internally calls `plot_1D_placecell_validation`, `_temp_draw_jonathan_ax`, and `_plot_general_all_spikes`
@@ -942,7 +951,7 @@ def _plot_pho_jonathan_batch_plot_single_cell(t_split, time_bins, unit_specific_
 
 
 
-
+@function_attributes(short_name='_make_pho_jonathan_batch_plots', tags=['private'], input_requires=[], output_provides=[], uses=['_plot_pho_jonathan_batch_plot_single_cell'], used_by=[], creation_date='2023-04-11 08:06')
 def _make_pho_jonathan_batch_plots(t_split, time_bins, neuron_replay_stats_df, unit_specific_time_binned_firing_rates, pf1D_all, aclu_to_idx, rdf, irdf, show_inter_replay_frs=False, included_unit_neuron_IDs=None, n_max_plot_rows:int=4, debug_print=False, **kwargs):
     """ Stacked Jonathan-style firing-rate-across-epochs-plot
     Internally calls `_plot_pho_jonathan_batch_plot_single_cell`
@@ -1270,7 +1279,7 @@ def _test_plot_conv(long_xbins, long_curve, short_xbins, short_curve, x, overlap
 
 
 
-@function_attributes(short_name='long_short_fr_indicies', tags=['long_short', 'long_short_firing_rate', 'firing_rate', 'display', 'matplotlib'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-03-28 14:20')
+@function_attributes(short_name='long_short_fr_indicies', tags=['private', 'long_short', 'long_short_firing_rate', 'firing_rate', 'display', 'matplotlib'], input_requires=[], output_provides=[], uses=[], used_by=['_display_short_long_firing_rate_index_comparison'], creation_date='2023-03-28 14:20')
 def _plot_long_short_firing_rate_indicies(x_frs_index, y_frs_index, active_context, fig_save_parent_path=None, neurons_colors=None, debug_print=False):
     """ Plot long|short firing rate index 
     Each datapoint is a neuron.
@@ -1283,7 +1292,7 @@ def _plot_long_short_firing_rate_indicies(x_frs_index, y_frs_index, active_conte
     # from neuropy.utils.matplotlib_helpers import add_value_labels # for adding small labels beside each point indicating their ACLU
 
     if neurons_colors is not None:
-        if isinstance(neurons_colors_array, dict):
+        if isinstance(neurons_colors, dict):
             point_colors = [neurons_colors[aclu] for aclu in list(x_frs_index.keys())]
         else:
             # otherwise assumed to be an array with the same length as the number of points
@@ -1292,6 +1301,8 @@ def _plot_long_short_firing_rate_indicies(x_frs_index, y_frs_index, active_conte
             assert np.shape(point_colors)[1] == len(x_frs_index)
             point_colors = neurons_colors
             # point_colors = [f'{i}' for i in list(x_frs_index.keys())] 
+    else:
+        point_colors = None
 
     point_hover_labels = [f'{i}' for i in list(x_frs_index.keys())] # point_hover_labels will be added as tooltip annotations to the datapoints
     fig, ax = plt.subplots(figsize=(8.5, 7.25), num=f'long|short fr indicies_{active_context.get_description(separator="/")}', clear=True)
