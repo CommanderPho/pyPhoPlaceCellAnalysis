@@ -1182,6 +1182,8 @@ def _epoch_unit_avg_firing_rates(spikes_df, filter_epochs, included_neuron_ids=N
 
     TODO: very inefficient.
 
+    WARNING: NaNs will emerge when the filter_epoch is of length 0.
+
     """
     epoch_avg_firing_rate = {}
     # .spikes.get_unit_spiketrains()
