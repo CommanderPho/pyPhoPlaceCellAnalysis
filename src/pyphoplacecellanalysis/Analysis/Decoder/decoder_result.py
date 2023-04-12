@@ -25,7 +25,7 @@ import matplotlib
 import matplotlib.pyplot as plt
 from pyphocorehelpers.function_helpers import function_attributes
 from pyphoplacecellanalysis.Pho2D.matplotlib.visualize_heatmap import visualize_heatmap, visualize_heatmap_pyqtgraph # used in `plot_kourosh_activity_style_figure`
-from pyphoplacecellanalysis.GUI.PyQtPlot.Examples.pyqtplot_RasterPlot import plot_raster_plot # used in `plot_kourosh_activity_style_figure`
+from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.SpikeRasters import plot_raster_plot # used in `plot_kourosh_activity_style_figure`
 import pyphoplacecellanalysis.External.pyqtgraph as pg # used in `plot_kourosh_activity_style_figure`
 from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.GraphicsObjects.CustomLinearRegionItem import CustomLinearRegionItem # used in `plot_kourosh_activity_style_figure`
 from pyphoplacecellanalysis.Pho2D.matplotlib.CustomMatplotlibWidget import CustomMatplotlibWidget # used in `plot_kourosh_activity_style_figure` # for embedded matplotlib figure
@@ -577,9 +577,9 @@ from pyphocorehelpers.indexing_helpers import build_pairwise_indicies # used in 
 # Plotting                                                                                                             #
 # ==================================================================================================================== #
 
-@function_attributes(short_name='plot_kourosh_activity_style_figure', tags=['plot', 'figure', 'heatmaps'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-04-04 09:03')
+@function_attributes(short_name='plot_kourosh_activity_style_figure', tags=['plot', 'figure', 'heatmaps', 'matplotlib','pyqtgraph'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-04-04 09:03')
 def plot_kourosh_activity_style_figure(results_obj: SurpriseAnalysisResult, long_session, shared_aclus: np.ndarray, epoch_idx: int, callout_epoch_IDXs: list, skip_rendering_callouts:bool = False):
-    """ 2023-04-03 - plots a single epoch 
+    """ 2023-04-03 - plots a Kourosh-style figure that shows a top panel which displays the decoded posteriors and a raster plot of spikes for a single epoch 
     ## Requirements:
     # The goal is to produce a Kourosh-style figure that shows a top panel which displays the decoded posteriors and a raster plot of spikes for a given epoch.
         ## The example regions are indicated by linearRegions over the raster.
