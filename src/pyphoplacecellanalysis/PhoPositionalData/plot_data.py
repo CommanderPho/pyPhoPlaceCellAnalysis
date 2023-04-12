@@ -84,6 +84,7 @@ def lines_from_points(points):
 # Plot raster plot:
 # Set different colors for each neuron
 def plot_raster_plot(spike_list, spike_positions_list):
+    """ UNUSED? """
     min_timestep = 0
     max_timestep = 4000
     active_spike_indices, active_spike_list, active_spike_positions_list = get_filtered_window(spike_list, spike_positions_list, min_timestep=0, max_timestep=400)

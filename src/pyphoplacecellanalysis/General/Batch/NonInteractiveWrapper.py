@@ -511,7 +511,6 @@ def batch_extended_computations(curr_active_pipeline, include_whitelist=None, in
                 newly_computed_values.append(_comp_name)
             except Exception as e:
                 raise e
-        
 
     if progress_print:
         print('done with all batch_extended_computations(...).')
