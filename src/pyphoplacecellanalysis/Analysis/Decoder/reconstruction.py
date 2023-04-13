@@ -369,7 +369,7 @@ class Zhang_Two_Step:
     
 
 
-@define(slots=False)
+@define(slots=False, repr=False)
 class DecodedFilterEpochsResult(object):
     """ Container for the results of decoding a set of epochs (filter_epochs) using a decoder (active_decoder) 
     Usage:
@@ -388,6 +388,16 @@ class DecodedFilterEpochsResult(object):
     num_filter_epochs: int
     time_bin_edges: list
     epoch_description_list: list[str] = Factory(list)
+
+    def flatten(self):
+        """ flattens the result over all epochs to produce one per time bin """
+        # returns a flattened version of self over all epochs
+        n_timebins = np.sum(self.nbins)
+        flat_time_bin_containers = np.hstack(self.time_bin_containers)
+        # timebins_p_x_given_n = [].extend(self.p_x_given_n_list)
+        timebins_p_x_given_n = np.hstack(self.p_x_given_n_list) # # .shape: (239, 5) - (n_x_bins, n_epoch_time_bins)  --TO-->  .shape: (63, 4146) - (n_x_bins, n_flattened_all_epoch_time_bins)
+        # TODO 2023-04-13 -can these squished similar way?: most_likely_positions_list, most_likely_position_indicies_list 
+        return n_timebins, flat_time_bin_containers, timebins_p_x_given_n
 
 # ==================================================================================================================== #
 # Placemap Position Decoders                                                                                           #
