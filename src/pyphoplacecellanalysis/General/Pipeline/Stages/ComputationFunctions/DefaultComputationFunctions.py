@@ -594,7 +594,7 @@ def _subfn_compute_decoded_epochs(computation_result, active_config, filter_epoc
 from attrs import define, field, Factory
 
 
-@define(slots=False)
+@define(slots=False, repr=False)
 class LeaveOneOutDecodingResult(object):
     """Newer things to merge into SurpriseAnalysisResult
     

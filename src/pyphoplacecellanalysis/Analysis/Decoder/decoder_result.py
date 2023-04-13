@@ -313,7 +313,7 @@ from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.Default
 from neuropy.utils.misc import split_array
 import numpy.ma as ma # for masked array
 
-@define(slots=False)
+@define(slots=False, repr=False)
 class SurpriseAnalysisResult:
     """ 
 
@@ -436,7 +436,7 @@ class SurpriseAnalysisResult:
 
 @function_attributes(short_name='session_loo_decoding_analysis', tags=['decoding', 'loo'], input_requires=[], output_provides=[], creation_date='2023-03-17 00:00')
 def perform_full_session_leave_one_out_decoding_analysis(sess, original_1D_decoder=None, decoding_time_bin_size = 0.02, cache_suffix = '', skip_cache_save:bool = True, perform_cache_load:bool = False) -> SurpriseAnalysisResult:
-    """ 2023-03-17 - Performs a full session leave one out decoding analysis.
+    """ 2023-03-17 - Performs a leave one out decoding analysis for a full session
 
     Args:
         sess: a Session object
