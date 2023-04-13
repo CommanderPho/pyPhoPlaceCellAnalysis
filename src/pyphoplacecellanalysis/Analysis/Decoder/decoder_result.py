@@ -21,14 +21,7 @@ from pyphocorehelpers.function_helpers import function_attributes
 from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BayesianPlacemapPositionDecoder # perform_leave_one_aclu_out_decoding_analysis
 
 # Plotting ___________________________________________________________________________________________________________ #
-import matplotlib
-import matplotlib.pyplot as plt
-from pyphocorehelpers.function_helpers import function_attributes
-from pyphoplacecellanalysis.Pho2D.matplotlib.visualize_heatmap import visualize_heatmap, visualize_heatmap_pyqtgraph # used in `plot_kourosh_activity_style_figure`
-from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.SpikeRasters import plot_raster_plot # used in `plot_kourosh_activity_style_figure`
-import pyphoplacecellanalysis.External.pyqtgraph as pg # used in `plot_kourosh_activity_style_figure`
-from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.GraphicsObjects.CustomLinearRegionItem import CustomLinearRegionItem # used in `plot_kourosh_activity_style_figure`
-from pyphoplacecellanalysis.Pho2D.matplotlib.CustomMatplotlibWidget import CustomMatplotlibWidget # used in `plot_kourosh_activity_style_figure` # for embedded matplotlib figure
+
 
 
 
@@ -607,6 +600,12 @@ def plot_kourosh_activity_style_figure(results_obj: SurpriseAnalysisResult, long
         app, win, plots, plots_data = plot_kourosh_activity_style_figure(long_results_obj, long_session, pyramidal_only_shared_aclus, epoch_idx=5, callout_epoch_IDXs=[0,1,2,3], skip_rendering_callouts=False)
 
     """
+    from pyphoplacecellanalysis.Pho2D.matplotlib.visualize_heatmap import visualize_heatmap, visualize_heatmap_pyqtgraph # used in `plot_kourosh_activity_style_figure`
+    from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.SpikeRasters import plot_raster_plot # used in `plot_kourosh_activity_style_figure`
+    import pyphoplacecellanalysis.External.pyqtgraph as pg # used in `plot_kourosh_activity_style_figure`
+    from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.GraphicsObjects.CustomLinearRegionItem import CustomLinearRegionItem # used in `plot_kourosh_activity_style_figure`
+    from pyphoplacecellanalysis.Pho2D.matplotlib.CustomMatplotlibWidget import CustomMatplotlibWidget # used in `plot_kourosh_activity_style_figure` # for embedded matplotlib figure
+
     ## Add linear regions to indicate the time bins
     def update_linear_regions(plots, plots_data):
         """ Updates the active time bin window indicators
