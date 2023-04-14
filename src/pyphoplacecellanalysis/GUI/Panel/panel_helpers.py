@@ -6,7 +6,7 @@ from panel.viewable import Viewer
 def build_carousel_scroller(items):
     """ 
     Usage:
-        item_layout = widgets.Layout(height='120px', min_width='40px')
+        item_layout = pn.widgets.Layout(height='120px', min_width='40px')
         items = [pn.Row(a_widget, layout=item_layout, margin=0, background='black') for a_widget in single_pf_output_panels]
         # items = [widgets.Button(layout=item_layout, description=str(i), button_style='success') for i in range(40)]
         # build_carousel_scroller(items)
