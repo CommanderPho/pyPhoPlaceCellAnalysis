@@ -296,6 +296,14 @@ class PipelineWithDisplayPipelineStageMixin:
         self._plot_object = None
         self._plot_object = Plot(self)
 
+    def clear_display_outputs(self):
+        """ removes any display outputs """
+        ## Clear any hanging display outputs:
+        # do I need to close them before I just remove them?
+        for a_display_output_key in self.display_output_history_list:
+            # a_display_output.close()
+            del self.display_output[a_display_output_key]
+        self.display_output_history_list.clear()
 
 
         
