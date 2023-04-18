@@ -307,7 +307,7 @@ def perform_leave_one_aclu_out_decoding_analysis(spikes_df, active_pos_df, activ
 # ==================================================================================================================== #
 # 2023-03-17 Surprise Analysis                                                                                         #
 # ==================================================================================================================== #
-from attrs import define, field
+from attrs import define, field, Factory
 # import cattrs 
 from neuropy.utils.misc import split_array
 import numpy.ma as ma # for masked array
@@ -777,12 +777,186 @@ def perform_full_session_leave_one_out_decoding_analysis(sess, original_1D_decod
     return results_obj
 
 
-
-from pyphocorehelpers.indexing_helpers import build_pairwise_indicies # used in plot_kourosh_activity_style_figure
-
 # ==================================================================================================================== #
 # Plotting                                                                                                             #
 # ==================================================================================================================== #
+from pyphocorehelpers.indexing_helpers import build_pairwise_indicies # used in plot_kourosh_activity_style_figure
+import pyphoplacecellanalysis.External.pyqtgraph as pg # required for `DiagnosticDistanceMetricFigure`
+
+
+@define(slots=False, repr=False)
+class DiagnosticDistanceMetricFigure:
+    """ 2023-04-14 - Metric Figure - Plots a vertical stack of 3 subplots with synchronized x-axes. 
+    TOP: At the top is the placefield of the first firing cell in the current timebin.
+    MID: The middle shows a placefield of a randomly chosen cell from the set that wasn't firing in this timebin.
+    BOTTOM: The bottom shows the current timebin's decoded posterior (p_x_given_n)
+
+
+    Usage: (for use in Jupyter Notebook)
+        ```python
+        from PendingNotebookCode import DiagnosticDistanceMetricFigure
+        import ipywidgets as widgets
+        from IPython.display import display
+
+        def integer_slider(update_func):
+            slider = widgets.IntSlider(description='Slider:', min=0, max=100, value=0)
+            def on_slider_change(change):
+                if change['type'] == 'change' and change['name'] == 'value':
+                    # Call the user-provided update function with the current slider index
+                    update_func(change['new'])
+            slider.observe(on_slider_change)
+            display(slider)
+
+
+        timebinned_neuron_info = long_results_obj.timebinned_neuron_info
+        active_fig_obj, update_function = DiagnosticDistanceMetricFigure.build_interactive_diagnostic_distance_metric_figure(long_results_obj, timebinned_neuron_info, result)
+        # Call the integer_slider function with the update function
+        integer_slider(update_function)
+        ```
+
+    History:
+        2023-04-17 - Refactored to class from standalone function `_build_interactive_diagnostic_distance_metric_figure`
+    """
+
+    results_obj: SurpriseAnalysisResult
+    timebinned_neuron_info: TimebinnedNeuronActivity
+    result: LeaveOneOutDecodingResult
+    hardcoded_sub_epoch_item_idx: int = 0
+
+    ## derived
+    plot_dict: dict = Factory(dict) # holds the pyqtgraph plot objects
+    plot_data: dict = Factory(dict)
+    is_valid: bool = False
+    ## Graphics
+    win: pg.GraphicsLayoutWidget = None
+
+    @property
+    def n_timebins(self):
+        """The total number of timebins."""
+        return np.sum(self.results_obj.all_epochs_num_epoch_time_bins)
+
+
+    # ==================================================================================================================== #
+    # Initializer                                                                                                          #
+    # ==================================================================================================================== #
+
+    def __attrs_post_init__(self):
+        """ called after initializer built by `attrs` library. """
+        # Perform the primary setup to build the placefield
+        self.win = pg.GraphicsLayoutWidget(show=True, title='diagnostic_plot')
+        # plot_data = {'curr_cell_pf_curve': curr_cell_pf_curve, 'curr_random_not_firing_cell_pf_curve': curr_random_not_firing_cell_pf_curve, 'curr_timebin_p_x_given_n': curr_timebin_p_x_given_n}
+        # plot_data = {'curr_cell_pf_curve': None, 'curr_random_not_firing_cell_pf_curve': None, 'curr_timebin_p_x_given_n': None}
+
+        is_valid = False
+        for index in np.arange(self.timebinned_neuron_info.n_timebins):
+            # find the first valid index
+            if not is_valid:
+                self.plot_data, is_valid, (normal_surprise, random_surprise) = self._get_updated_plot_data(index)
+                print(f'first valid index: {index}')
+
+        self.plot_dict = self._initialize_plots()
+
+
+    # Private Methods ____________________________________________________________________________________________________ #
+    def _get_updated_plot_data(self, index):
+        """ called to actually get the plot data for any given timebin index """
+        curr_random_not_firing_cell_pf_curve = self.result.random_noise_curves[index]
+        curr_decoded_timebins_p_x_given_n = self.result.decoded_timebins_p_x_given_n[index]
+        neuron_IDX, aclu = self.timebinned_neuron_info.active_IDXs[index], self.timebinned_neuron_info.active_aclus[index]
+        if len(neuron_IDX) > 0:
+            # Get first index
+            is_valid = True
+            neuron_IDX = neuron_IDX[self.hardcoded_sub_epoch_item_idx]
+            aclu = aclu[self.hardcoded_sub_epoch_item_idx]
+            # curr_cell_pf_curve = long_results_obj.original_1D_decoder.pf.ratemap.tuning_curves[neuron_IDX]
+            curr_cell_pf_curve = self.results_obj.original_1D_decoder.pf.ratemap.unit_max_tuning_curves[neuron_IDX]
+
+            if curr_random_not_firing_cell_pf_curve.ndim > 1:
+                curr_random_not_firing_cell_pf_curve = curr_random_not_firing_cell_pf_curve[self.hardcoded_sub_epoch_item_idx]
+
+            if curr_decoded_timebins_p_x_given_n.ndim > 1:
+                curr_decoded_timebins_p_x_given_n = curr_decoded_timebins_p_x_given_n[self.hardcoded_sub_epoch_item_idx]
+
+            # curr_timebin_p_x_given_n = curr_timebins_p_x_given_n[:, index]
+            curr_timebin_p_x_given_n = curr_decoded_timebins_p_x_given_n
+            normal_surprise, random_surprise = self.result.one_left_out_posterior_to_pf_surprises[index][self.hardcoded_sub_epoch_item_idx], self.result.one_left_out_posterior_to_scrambled_pf_surprises[index][self.hardcoded_sub_epoch_item_idx]
+            updated_plot_data = {'curr_cell_pf_curve': curr_cell_pf_curve, 'curr_random_not_firing_cell_pf_curve': curr_random_not_firing_cell_pf_curve, 'curr_timebin_p_x_given_n': curr_timebin_p_x_given_n}
+            
+        else:
+            # Invalid period
+            is_valid = False
+            normal_surprise, random_surprise = None, None
+            updated_plot_data = {'curr_cell_pf_curve': None, 'curr_random_not_firing_cell_pf_curve': None, 'curr_timebin_p_x_given_n': None}
+
+        return updated_plot_data, is_valid, (normal_surprise, random_surprise)
+
+
+    @staticmethod 
+    def _add_plot(win: pg.GraphicsLayoutWidget, data, name:str):
+        plot = win.addPlot() # PlotItem has to be built first?
+        curve = plot.plot(data, name=name, label=name)
+        plot.setLabel('top', name)
+        return plot, curve
+
+    
+    def _initialize_plots(self):
+        for i, (name, data) in enumerate(self.plot_data.items()):
+            plot_item, curve = self._add_plot(self.win, data=data, name=name)
+            self.plot_dict[name] = {'plot_item':plot_item,'curve':curve}
+            if i == 0:
+                first_curve_name = name
+            else:
+                self.plot_dict[name]['plot_item'].setYLink(first_curve_name)  ## test linking by name
+            self.win.nextRow()
+        return self.plot_dict
+
+
+    def _update_plots(self, updated_plot_data):
+        """ updates the plots created with `_initialize_plots`"""
+        for i, (name, data) in enumerate(updated_plot_data.items()):
+            curr_plot = self.plot_dict[name]['plot_item']
+            curr_curve = self.plot_dict[name]['curve']
+            if data is not None:
+                curr_curve.setData(data)
+            else:
+                curr_curve.setData([])
+
+    # Public Functions ___________________________________________________________________________________________________ #
+    def update_function(self, index):
+        """ Define an update function that will be called with the current slider index 
+        Captures plot_dict, and all data variables
+        """
+        # print(f'Slider index: {index}')
+        hardcoded_sub_epoch_item_idx = 0
+        updated_plot_data, is_valid, (normal_surprise, random_surprise) = self._get_updated_plot_data(index)
+        self.plot_data = updated_plot_data
+        self.is_valid = is_valid
+
+        if is_valid:
+            if normal_surprise > random_surprise:
+                # Set the pen color to green
+                pen = pg.mkPen(color='g')
+            else:
+                pen = pg.mkPen(color='w')
+
+            self._update_plots(updated_plot_data)
+            self.plot_dict['curr_cell_pf_curve']['plot_item'].setLabel('bottom', f"{normal_surprise}")
+            self.plot_dict['curr_random_not_firing_cell_pf_curve']['plot_item'].setLabel('bottom', f"{random_surprise}")
+            curr_curve = self.plot_dict['curr_cell_pf_curve']['curve']
+            curr_curve.setPen(pen)
+
+        else:
+            # Invalid period
+            self.plot_dict['curr_cell_pf_curve']['plot_item'].setLabel('bottom', f"NO ACTIVITY")
+            self.plot_dict['curr_random_not_firing_cell_pf_curve']['plot_item'].setLabel('bottom', f"NO ACTIVITY")
+            self._update_plots(updated_plot_data)
+
+
+    @classmethod
+    def build_interactive_diagnostic_distance_metric_figure(cls, results_obj, timebinned_neuron_info, result):
+        out_obj = cls(results_obj, timebinned_neuron_info, result)
+        return out_obj, out_obj.update_function
+    
 
 @function_attributes(short_name='plot_kourosh_activity_style_figure', tags=['plot', 'figure', 'heatmaps', 'matplotlib','pyqtgraph'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-04-04 09:03')
 def plot_kourosh_activity_style_figure(results_obj: SurpriseAnalysisResult, long_session, shared_aclus: np.ndarray, epoch_idx: int, callout_epoch_IDXs: list, skip_rendering_callouts:bool = False):
