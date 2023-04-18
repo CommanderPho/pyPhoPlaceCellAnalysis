@@ -2,6 +2,7 @@ from enum import Enum
 from pathlib import Path
 import numpy as np
 
+from pyphocorehelpers.function_helpers import function_attributes
 from pyphocorehelpers.DataStructure.general_parameter_containers import VisualizationParameters, RenderPlotsData, RenderPlots
 from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer
 
@@ -216,6 +217,33 @@ def build_scrollable_graphics_layout_widget_with_nested_viewbox_ui(name, window_
     ui.nested_graphics_layout = ui.graphics_layout.addLayout(border=(50,0,0))
     ui.nested_graphics_layout.setContentsMargins(10, 10, 10, 10)
     return ui
+
+
+
+# ==================================================================================================================== #
+# Plotting Helpers                                                                                                     #
+# ==================================================================================================================== #
+@function_attributes(short_name='build_pyqtgraph_epoch_indicator_regions', tags=['pyqtgraph','epoch','render','plot','CustomLinearRegionItem'], input_requires=[], output_provides=[],
+    uses=['pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.GraphicsObjects.CustomLinearRegionItem', 'pg.InfLineLabel'], used_by=[], creation_date='2023-04-18 08:37')
+def build_pyqtgraph_epoch_indicator_regions(win: pg.PlotWidget, t_start:float, t_stop:float, epoch_label:str = 'short', **kwargs):
+    """ 2023-04-17 - Build a CustomLinearRegionItem that sits behind the data in a pyqtgraph PlotItem that indicates the timerange of the current epoch. 
+
+    Usage:
+        epoch_linear_region, epoch_region_label = build_pyqtgraph_epoch_indicator_regions(win, t_start=curr_active_pipeline.filtered_epochs[long_epoch_name].t_start, t_stop=curr_active_pipeline.filtered_epochs[long_epoch_name].t_stop, epoch_label='long', **dict(pen=pg.mkPen('#0b0049'), brush=pg.mkBrush('#0099ff42'), hoverBrush=pg.mkBrush('#fff400'), hoverPen=pg.mkPen('#00ff00')))
+        epoch_linear_region, epoch_region_label = build_pyqtgraph_epoch_indicator_regions(win, t_start=curr_active_pipeline.filtered_epochs[short_epoch_name].t_start, t_stop=curr_active_pipeline.filtered_epochs[short_epoch_name].t_stop, epoch_label='short', **dict(pen=pg.mkPen('#490000'), brush=pg.mkBrush('#f5161659'), hoverBrush=pg.mkBrush('#fff400'), hoverPen=pg.mkPen('#00ff00')))
+    """
+    from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.GraphicsObjects.CustomLinearRegionItem import CustomLinearRegionItem # used in `plot_kourosh_activity_style_figure`
+
+    # Add the linear region overlay:
+    epoch_linear_region:CustomLinearRegionItem = CustomLinearRegionItem(**(dict(pen=pg.mkPen('#fff'), brush=pg.mkBrush('#f004'), hoverBrush=pg.mkBrush('#fff4'), hoverPen=pg.mkPen('#f00'))|kwargs), movable=False) #, clipItem=plots['difference']  bound the LinearRegionItem to the plotted data
+    epoch_linear_region.setObjectName(f'epoch[{epoch_label}]')
+    epoch_linear_region.setZValue(-3) # put it in the back
+    epoch_region_label:pg.InfLineLabel = pg.InfLineLabel(epoch_linear_region.lines[0], f"{epoch_label}", position=0.95, rotateAxis=(1,0), anchor=(1, 1)) # add the label for the short epoch
+    # Add the LinearRegionItem to the ViewBox, but tell the ViewBox to exclude this item when doing auto-range calculations.
+    win.addItem(epoch_linear_region, ignoreBounds=True)
+    # Set the position:
+    epoch_linear_region.setRegion([t_start, t_stop]) # adjust scroll control
+    return epoch_linear_region, epoch_region_label
 
 
 
