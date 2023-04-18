@@ -613,7 +613,7 @@ class LeaveOneOutDecodingResult(object):
 
 
 
-@function_attributes(short_name='_analyze_leave_one_out_decoding_results', tags=['BasePositionDecoder'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-03-23 00:00')
+@function_attributes(short_name='_analyze_leave_one_out_decoding_results', tags=['surprise', 'decoder', 'loo', 'BasePositionDecoder'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-03-23 00:00')
 def _analyze_leave_one_out_decoding_results(active_pos_df, active_filter_epochs, original_1D_decoder, all_included_filter_epochs_decoder_result, one_left_out_decoder_dict, one_left_out_filter_epochs_decoder_result_dict):
     """ 2023-03-23 - Aims to generalize the `_analyze_leave_one_out_decoding_results`
 
