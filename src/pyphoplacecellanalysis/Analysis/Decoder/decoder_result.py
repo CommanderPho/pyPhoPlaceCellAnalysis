@@ -309,9 +309,56 @@ def perform_leave_one_aclu_out_decoding_analysis(spikes_df, active_pos_df, activ
 # ==================================================================================================================== #
 from attrs import define, field
 # import cattrs 
-from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.DefaultComputationFunctions import LeaveOneOutDecodingResult
 from neuropy.utils.misc import split_array
 import numpy.ma as ma # for masked array
+
+# Distance metrics used by `_new_compute_surprise`
+from scipy.spatial import distance # for Jensen-Shannon distance in `_subfn_compute_leave_one_out_analysis`
+import random # for random.choice(mylist)
+# from PendingNotebookCode import _scramble_curve
+from scipy.stats import wasserstein_distance
+from scipy.stats import pearsonr
+
+from pyphocorehelpers.indexing_helpers import safe_np_vstack # for `_new_compute_surprise`
+from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.DefaultComputationFunctions import LeaveOneOutDecodingResult
+
+@define(slots=False, repr=False)
+class TimebinnedNeuronActivity:
+    """ keeps track of which neurons are active and inactive in each decoded timebin """
+    n_timebins: int
+    active_IDXs: np.ndarray
+    active_aclus: np.ndarray
+    inactive_IDXs: np.ndarray
+    inactive_aclus: np.ndarray
+    
+    time_bin_centers: np.ndarray # the timebin center times that each time bin corresponds to
+
+    # derived
+    num_timebin_active_aclus: np.ndarray = None # int ndarray, the number of active aclus in each timebin
+    is_timebin_valid: np.ndarray = None # bool ndarray, whether there is at least one aclu active in each timebin
+
+    def __attrs_post_init__(self):
+        """ called after initializer built by `attrs` library. """
+        self.num_timebin_active_aclus = np.array([len(timebin_aclus) for timebin_aclus in self.active_aclus]) # .shape # (2917,)
+        self.is_timebin_valid = (self.num_timebin_active_aclus > 0) # NEVERMIND: already is the leave-one-out result, so don't do TWO or more aclus in each timebin constraint due to leave-one-out-requirements
+
+    @classmethod
+    def init_from_results_obj(cls, results_obj: "SurpriseAnalysisResult"):
+        n_timebins = np.sum(results_obj.all_included_filter_epochs_decoder_result.nbins)
+        # a list of lists where each list contains the aclus that are active during that timebin:
+        timebins_active_neuron_IDXs = [np.array(results_obj.original_1D_decoder.neuron_IDXs)[a_timebin_is_cell_firing] for a_timebin_is_cell_firing in np.logical_not(results_obj.is_non_firing_time_bin).T]
+        timebins_active_aclus = [np.array(results_obj.original_1D_decoder.neuron_IDs)[an_IDX] for an_IDX in timebins_active_neuron_IDXs]
+
+        timebins_inactive_neuron_IDXs = [np.array(results_obj.original_1D_decoder.neuron_IDXs)[a_timebin_is_cell_firing] for a_timebin_is_cell_firing in results_obj.is_non_firing_time_bin.T]
+        timebins_inactive_aclus = [np.array(results_obj.original_1D_decoder.neuron_IDs)[an_IDX] for an_IDX in timebins_inactive_neuron_IDXs]
+        # timebins_p_x_given_n = np.hstack(results_obj.all_included_filter_epochs_decoder_result.p_x_given_n_list) # # .shape: (239, 5) - (n_x_bins, n_epoch_time_bins)  --TO-->  .shape: (63, 4146) - (n_x_bins, n_flattened_all_epoch_time_bins)        
+
+        assert np.shape(results_obj.flat_all_epochs_decoded_epoch_time_bins)[1] == n_timebins, f"the last dimension of long_results_obj.flat_all_epochs_decoded_epoch_time_bins should be equal to n_timebins but instead np.shape(results_obj.flat_all_epochs_decoded_epoch_time_bins): {np.shape(results_obj.flat_all_epochs_decoded_epoch_time_bins)} " 
+        # long_results_obj.flat_all_epochs_decoded_epoch_time_bins[0].shape
+        time_bin_centers = results_obj.flat_all_epochs_decoded_epoch_time_bins[0].copy()
+        return cls(n_timebins=n_timebins, active_IDXs=timebins_active_neuron_IDXs, active_aclus=timebins_active_aclus, inactive_IDXs=timebins_inactive_neuron_IDXs, inactive_aclus=timebins_inactive_aclus,
+                    time_bin_centers=time_bin_centers)
+
 
 @define(slots=False, repr=False)
 class SurpriseAnalysisResult:
@@ -343,8 +390,11 @@ class SurpriseAnalysisResult:
     all_epochs_all_cells_computed_one_left_out_to_global_surprises_mean: np.ndarray = field(metadata={'shape': ('n_epochs',)})
     one_left_out_omitted_aclu_distance_df: pd.core.frame.DataFrame = field(metadata={'shape': ('n_neurons', 3)})
     most_contributing_aclus: np.ndarray = field(metadata={'shape': ('n_neurons',)})
+
     result: LeaveOneOutDecodingResult = None
-    
+    timebinned_neuron_info: "TimebinnedNeuronActivity" = None
+    result_df: pd.DataFrame = None
+    result_df_grouped: pd.DataFrame = None
 
     def supplement_results(self):
         """ 2023-03-27 11:14pm - add the extra stuff to the surprise computation results
@@ -405,7 +455,161 @@ class SurpriseAnalysisResult:
         ## Compute mean by averaging over each cell:
         self.all_epochs_all_cells_one_left_out_posterior_to_pf_surprises_mean = np.mean(self.all_epochs_computed_cell_one_left_out_posterior_to_pf_surprises_mean, axis=1) # average across all cells .shape (614,) - (n_epochs,)
         self.all_epochs_all_cells_one_left_out_posterior_to_scrambled_pf_surprises_mean = np.mean(self.all_epochs_computed_cell_one_left_out_posterior_to_scrambled_pf_surprises_mean, axis=1)
+
+        self.timebinned_neuron_info = TimebinnedNeuronActivity.init_from_results_obj(self)
+
+        active_surprise_metric_fn = lambda pf, p_x_given_n: distance.jensenshannon(pf, p_x_given_n)
+        self._new_compute_surprise(active_surprise_metric_fn=active_surprise_metric_fn) # call self._new_compute_surprise()
+
         return self
+
+    @function_attributes(short_name='_new_compute_surprise', tags=[], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-04-14 00:00')
+    def _new_compute_surprise(self, active_surprise_metric_fn):
+        """ 2023-04-14 - To Finish factoring out
+            long_results_obj.timebinned_neuron_info = TimebinnedNeuronActivity.init_from_results_obj(long_results_obj)
+            short_results_obj.timebinned_neuron_info = TimebinnedNeuronActivity.init_from_results_obj(short_results_obj)
+            assert long_results_obj.timebinned_neuron_info.n_timebins == short_results_obj.timebinned_neuron_info.n_timebins
+
+
+        Usage:
+
+            # active_surprise_metric_fn = lambda pf, p_x_given_n: distance.jensenshannon(pf, p_x_given_n)
+            # active_surprise_metric_fn = lambda pf, p_x_given_n: distance.correlation(pf, p_x_given_n)
+            # active_surprise_metric_fn = lambda pf, p_x_given_n: distance.sqeuclidean(pf, p_x_given_n)
+            # active_surprise_metric_fn = lambda pf, p_x_given_n: wasserstein_distance(pf, p_x_given_n) # Figure out the correct function for this, it's in my old notebooks
+            active_surprise_metric_fn = lambda pf, p_x_given_n: pearsonr(pf, p_x_given_n)[0] # this returns just the correlation coefficient (R), not the p-value due to the [0]
+
+        Sets/Updates self.result, self.result_df, self.result_df_grouped
+
+        """
+        # Extract important things from the decoded data, like the time bins which are the same for all:
+        n_epochs = self.all_included_filter_epochs_decoder_result.num_filter_epochs
+        n_timebins = np.sum(self.all_included_filter_epochs_decoder_result.nbins)
+        shared_timebin_containers = self.all_included_filter_epochs_decoder_result.time_bin_containers
+
+        # self.timebinned_neuron_info = TimebinnedNeuronActivity.init_from_results_obj(self) # should already have that from self.supplement_results()
+
+        # @define(slots=False, repr=False)
+        # class PlacefieldPosteriorComputationHelper:
+
+        # 	def compute(self, curr_cell_pf_curve, curr_timebin_p_x_given_n):
+        # 		result.one_left_out_posterior_to_pf_surprises[timebin_IDX].append(distance.jensenshannon(curr_cell_pf_curve, curr_timebin_p_x_given_n))
+        # 		result.one_left_out_posterior_to_pf_correlations[timebin_IDX].append(distance.correlation(curr_cell_pf_curve, curr_timebin_p_x_given_n))
+
+
+        if active_surprise_metric_fn is None:
+            # active_surprise_metric_fn = lambda pf, p_x_given_n: distance.jensenshannon(pf, p_x_given_n)
+            # active_surprise_metric_fn = lambda pf, p_x_given_n: distance.correlation(pf, p_x_given_n)
+            # active_surprise_metric_fn = lambda pf, p_x_given_n: distance.sqeuclidean(pf, p_x_given_n)
+            # active_surprise_metric_fn = lambda pf, p_x_given_n: wasserstein_distance(pf, p_x_given_n) # Figure out the correct function for this, it's in my old notebooks
+            active_surprise_metric_fn = lambda pf, p_x_given_n: pearsonr(pf, p_x_given_n)[0] # this returns just the correlation coefficient (R), not the p-value due to the [0]
+
+
+        timebinned_neuron_info = self.timebinned_neuron_info
+        assert timebinned_neuron_info is not None
+        # self.result = LeaveOneOutDecodingResult(shuffle_IDXs=None)
+        assert self.result is not None
+
+        pf_shape = (len(self.original_1D_decoder.pf.ratemap.xbin_centers),) # (59, )
+        self.result.random_noise_curves = {}
+        # result.random_noise_curves = np.random.uniform(low=0, high=1, size=(timebinned_neuron_info.n_timebins, *pf_shape))
+        # result.random_noise_curves = (result.random_noise_curves.T / np.sum(result.random_noise_curves, axis=1)).T # normalize
+        # result.random_noise_curves = (result.random_noise_curves.T / np.max(result.random_noise_curves, axis=1)).T # unit max normalization
+        self.result.decoded_timebins_p_x_given_n = {}
+
+        for index in np.arange(timebinned_neuron_info.n_timebins):
+            # iterate through timebins
+            ## Pre loop: add empty array for accumulation
+            if index not in self.result.one_left_out_posterior_to_pf_surprises:
+                self.result.one_left_out_posterior_to_pf_surprises[index] = []
+            if index not in self.result.one_left_out_posterior_to_scrambled_pf_surprises:
+                self.result.one_left_out_posterior_to_scrambled_pf_surprises[index] = []
+
+            # curr_random_not_firing_cell_pf_curve = np.random.uniform(low=0, high=1, size=curr_cell_pf_curve.shape) # generate one at a time
+            # curr_random_not_firing_cell_pf_curve = curr_random_not_firing_cell_pf_curve / np.sum(curr_random_not_firing_cell_pf_curve) # normalize
+            # result.random_noise_curves.append(curr_random_not_firing_cell_pf_curve)
+
+            # curr_random_not_firing_cell_pf_curve = result.random_noise_curves[index]
+
+            self.result.random_noise_curves[index] = [] # list
+            self.result.decoded_timebins_p_x_given_n[index] = []
+
+            for neuron_IDX, aclu in zip(timebinned_neuron_info.active_IDXs[index], timebinned_neuron_info.active_aclus[index]):
+                # iterate through only the active cells
+                # 1. Get set of cells active in a given time bin, for each compute the surprise of its placefield with the leave-one-out decoded posterior.
+                left_out_decoder_result = self.one_left_out_filter_epochs_decoder_result_dict[aclu]
+                # curr_cell_pf_curve = results_obj.original_1D_decoder.pf.ratemap.tuning_curves[neuron_IDX] # normalized pdf tuning curve
+                # curr_cell_spike_curve = original_1D_decoder.pf.ratemap.spikes_maps[unit_IDX] ## not occupancy weighted... is this the right one to use for computing the expected spike rate? NO... doesn't seem like it
+                curr_cell_pf_curve = self.original_1D_decoder.pf.ratemap.unit_max_tuning_curves[neuron_IDX] # Unit max tuning curve
+
+                _, _, curr_timebins_p_x_given_n = left_out_decoder_result.flatten()
+                curr_timebin_p_x_given_n = curr_timebins_p_x_given_n[:, index] # .shape: (239, 5) - (n_x_bins, n_epoch_time_bins)
+                assert curr_timebin_p_x_given_n.shape[0] == curr_cell_pf_curve.shape[0], f"{curr_timebin_p_x_given_n.shape = } == {curr_cell_pf_curve.shape = }"
+                
+                # if aclu not in result.one_left_out_posterior_to_pf_surprises:
+                # 	result.one_left_out_posterior_to_pf_surprises[aclu] = []
+                # result.one_left_out_posterior_to_pf_surprises[aclu].append(distance.jensenshannon(curr_cell_pf_curve, curr_timebin_p_x_given_n))
+
+                self.result.one_left_out_posterior_to_pf_surprises[index].append(active_surprise_metric_fn(curr_cell_pf_curve, curr_timebin_p_x_given_n))
+                # result.one_left_out_posterior_to_pf_correlations[timebin_IDX].append(distance.correlation(curr_cell_pf_curve, curr_timebin_p_x_given_n))
+
+                # 2. From the remainder of cells (those not active), randomly choose one to grab the placefield of and compute the surprise with that and the same posterior.
+                # shuffled_cell_pf_curve = results_obj.original_1D_decoder.pf.ratemap.tuning_curves[shuffle_IDXs[i]]
+
+                # a) Use a random non-firing cell's placefield:
+                random_not_firing_neuron_IDX = random.choice(timebinned_neuron_info.inactive_IDXs[index])
+                # random_not_firing_neuron_IDX = random.choices(timebinned_neuron_info.inactive_IDXs[index], k=)
+
+                # random_not_firing_aclu = random.choice(timebinned_neuron_info.inactive_aclus[i])
+                # curr_random_not_firing_cell_pf_curve = results_obj.original_1D_decoder.pf.ratemap.tuning_curves[random_not_firing_neuron_IDX] # normalized pdf tuning curve
+                curr_random_not_firing_cell_pf_curve = self.original_1D_decoder.pf.ratemap.unit_max_tuning_curves[random_not_firing_neuron_IDX] # Unit max tuning curve
+
+                # b) Use a scrambled version of the real curve:
+                # curr_random_not_firing_cell_pf_curve = _scramble_curve(curr_cell_pf_curve)
+
+
+                ## Save the curve for this neuron
+                self.result.random_noise_curves[index].append(curr_random_not_firing_cell_pf_curve)
+
+                # Save the posteriors for this neuron:
+                self.result.decoded_timebins_p_x_given_n[index].append(curr_timebin_p_x_given_n)
+
+                # if aclu not in result.one_left_out_posterior_to_scrambled_pf_surprises:
+                # 	result.one_left_out_posterior_to_scrambled_pf_surprises[aclu] = []
+                # # The shuffled cell's placefield and the posterior from leaving a cell out:
+                # result.one_left_out_posterior_to_scrambled_pf_surprises[aclu].append(distance.jensenshannon(curr_random_not_firing_cell_pf_curve, curr_timebin_p_x_given_n))
+                
+                # The shuffled cell's placefield and the posterior from leaving a cell out:
+                self.result.one_left_out_posterior_to_scrambled_pf_surprises[index].append(active_surprise_metric_fn(curr_random_not_firing_cell_pf_curve, curr_timebin_p_x_given_n))
+                # result.one_left_out_posterior_to_scrambled_pf_correlations[timebin_IDX].append(distance.correlation(curr_random_not_firing_cell_pf_curve, curr_timebin_p_x_given_n))
+
+            # END Neuron Loop
+            ## Post neuron loops: convert lists to np.arrays
+            self.result.one_left_out_posterior_to_pf_surprises[index] = np.array(self.result.one_left_out_posterior_to_pf_surprises[index])
+            self.result.one_left_out_posterior_to_scrambled_pf_surprises[index] = np.array(self.result.one_left_out_posterior_to_scrambled_pf_surprises[index])
+            self.result.random_noise_curves[index] = safe_np_vstack(self.result.random_noise_curves[index]) # without this check np.vstack throws `ValueError: need at least one array to concatenate` for empty lists
+            self.result.decoded_timebins_p_x_given_n[index] = safe_np_vstack(self.result.decoded_timebins_p_x_given_n[index]) # without this check np.vstack throws `ValueError: need at least one array to concatenate` for empty lists
+
+        # End Timebin Loop
+        ## Post timebin loops compute mean variables:
+        self.result.one_left_out_posterior_to_pf_surprises_mean = {k:np.mean(v) for k, v in self.result.one_left_out_posterior_to_pf_surprises.items() if np.size(v) > 0}
+        self.result.one_left_out_posterior_to_scrambled_pf_surprises_mean = {k:np.mean(v) for k, v in self.result.one_left_out_posterior_to_scrambled_pf_surprises.items() if np.size(v) > 0}
+        assert len(self.result.one_left_out_posterior_to_scrambled_pf_surprises_mean) == len(self.result.one_left_out_posterior_to_pf_surprises_mean)
+        assert list(self.result.one_left_out_posterior_to_scrambled_pf_surprises_mean.keys()) == list(self.result.one_left_out_posterior_to_pf_surprises_mean.keys())
+
+        valid_time_bin_indicies = np.array(list(self.result.one_left_out_posterior_to_pf_surprises_mean.keys()))
+        one_left_out_posterior_to_pf_surprises_mean = np.array(list(self.result.one_left_out_posterior_to_pf_surprises_mean.values()))
+        one_left_out_posterior_to_scrambled_pf_surprises_mean = np.array(list(self.result.one_left_out_posterior_to_scrambled_pf_surprises_mean.values()))
+        
+        # Build Output Dataframes:
+        self.result_df = pd.DataFrame({'time_bin_indices': valid_time_bin_indicies, 'time_bin_centers': timebinned_neuron_info.time_bin_centers[timebinned_neuron_info.is_timebin_valid], 'epoch_IDX': self.all_epochs_reverse_flat_epoch_indicies_array[valid_time_bin_indicies],
+            'posterior_to_pf_mean_surprise': one_left_out_posterior_to_pf_surprises_mean, 'posterior_to_scrambled_pf_mean_surprise': one_left_out_posterior_to_scrambled_pf_surprises_mean})
+        self.result_df['surprise_diff'] = self.result_df['posterior_to_scrambled_pf_mean_surprise'] - self.result_df['posterior_to_pf_mean_surprise']
+        # 24.9 seconds to compute
+
+        ## Compute Aggregate Dataframe for Epoch means:
+        # Group by 'epoch_IDX' and compute means of all columns
+        self.result_df_grouped = self.result_df.groupby('epoch_IDX').mean()
 
 
     # def __attrs_post_init__(self):
@@ -432,6 +636,12 @@ class SurpriseAnalysisResult:
     # def _build_results_dict(a_results_tuple):
     #     active_filter_epochs, original_1D_decoder, all_included_filter_epochs_decoder_result, flat_all_epochs_measured_cell_spike_counts, flat_all_epochs_measured_cell_firing_rates, flat_all_epochs_decoded_epoch_time_bins, flat_all_epochs_computed_surprises, flat_all_epochs_computed_expected_cell_firing_rates, flat_all_epochs_difference_from_expected_cell_spike_counts, flat_all_epochs_difference_from_expected_cell_firing_rates, all_epochs_decoded_epoch_time_bins_mean, all_epochs_computed_cell_surprises_mean, all_epochs_all_cells_computed_surprises_mean = a_results_tuple
     #     return {'active_filter_epochs':active_filter_epochs, 'original_1D_decoder':original_1D_decoder, 'all_included_filter_epochs_decoder_result':all_included_filter_epochs_decoder_result, 'flat_all_epochs_measured_cell_spike_counts':flat_all_epochs_measured_cell_spike_counts, 'flat_all_epochs_measured_cell_firing_rates':flat_all_epochs_measured_cell_firing_rates, 'flat_all_epochs_decoded_epoch_time_bins':flat_all_epochs_decoded_epoch_time_bins, 'flat_all_epochs_computed_surprises':flat_all_epochs_computed_surprises, 'flat_all_epochs_computed_expected_cell_firing_rates':flat_all_epochs_computed_expected_cell_firing_rates, 'flat_all_epochs_difference_from_expected_cell_spike_counts':flat_all_epochs_difference_from_expected_cell_spike_counts, 'flat_all_epochs_difference_from_expected_cell_firing_rates':flat_all_epochs_difference_from_expected_cell_firing_rates, 'all_epochs_decoded_epoch_time_bins_mean':all_epochs_decoded_epoch_time_bins_mean, 'all_epochs_computed_cell_surprises_mean':all_epochs_computed_cell_surprises_mean, 'all_epochs_all_cells_computed_surprises_mean':all_epochs_all_cells_computed_surprises_mean}
+
+
+
+
+
+
 
 
 @function_attributes(short_name='session_loo_decoding_analysis', tags=['decoding', 'loo'], input_requires=[], output_provides=[], creation_date='2023-03-17 00:00')
