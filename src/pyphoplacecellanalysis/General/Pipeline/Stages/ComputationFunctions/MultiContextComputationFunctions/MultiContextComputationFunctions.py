@@ -27,6 +27,7 @@ from pyphoplacecellanalysis.General.Mixins.CrossComputationComparisonHelpers imp
 
 from neuropy.analyses import detect_pbe_epochs # used in `_perform_jonathan_replay_firing_rate_analyses(.)` if replays are missing
 
+from pyphocorehelpers.function_helpers import function_attributes
 from pyphoplacecellanalysis.General.Pipeline.Stages.Loading import saveData # for `pipeline_complete_compute_long_short_fr_indicies`
 from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.DefaultComputationFunctions import KnownFilterEpochs # for `pipeline_complete_compute_long_short_fr_indicies`
 from neuropy.core.session.dataSession import DataSession # for `pipeline_complete_compute_long_short_fr_indicies`
@@ -737,7 +738,7 @@ def _compute_neuron_replay_stats(rdf, aclu_to_idx):
                  
     return out_replay_df, out_neuron_df
 
-
+@function_attributes(short_name='compute_evening_morning_parition', tags=['evening_morning', 'compute', 'firing_rates', 'replay'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-04-18 13:23')
 def compute_evening_morning_parition(neuron_replay_stats_df, firing_rates_activity_source:FiringRateActivitySource=FiringRateActivitySource.ONLY_REPLAY, debug_print=True):
     """ 2022-11-27 - Computes the cells that are either appearing or disappearing across the transition from the long to short track.
     
@@ -1223,9 +1224,13 @@ def _epoch_unit_avg_firing_rates(spikes_df, filter_epochs, included_neuron_ids=N
 
     return epoch_avg_firing_rate, {aclu:np.mean(unit_epoch_avg_frs) for aclu, unit_epoch_avg_frs in epoch_avg_firing_rate.items()}
 
+
+@function_attributes(short_name='_fr_index', tags=['long_short', 'compute', 'fr_index'], input_requires=[], output_provides=[], uses=[], used_by=['_compute_long_short_firing_rate_indicies'], creation_date='2023-01-19 00:00')
 def _fr_index(long_fr, short_fr):
     return ((long_fr - short_fr) / (long_fr + short_fr))
 
+
+@function_attributes(short_name='_compute_long_short_firing_rate_indicies', tags=['long_short', 'compute', 'fr_index'], input_requires=[], output_provides=[], uses=[], used_by=['pipeline_complete_compute_long_short_fr_indicies'], creation_date='2023-01-19 00:00')
 def _compute_long_short_firing_rate_indicies(spikes_df, long_laps, long_replays, short_laps, short_replays, save_path=None):
     """A computation for the long/short firing rate index that Kamran and I discussed as one of three metrics during our meeting on 2023-01-19.
 
@@ -1287,7 +1292,7 @@ def _compute_epochs_num_aclu_inclusions(all_epochs_frs_mat, min_inclusion_fr_thr
 
 
 
-
+@function_attributes(short_name='pipeline_complete_compute_long_short_fr_indicies', tags=['long_short', 'compute', 'fr_index'], input_requires=[], output_provides=[], uses=['_compute_long_short_firing_rate_indicies'], used_by=[], creation_date='2023-01-19 00:00')
 def pipeline_complete_compute_long_short_fr_indicies(curr_active_pipeline, temp_save_filename=None):
     """ wraps `compute_long_short_firing_rate_indicies(...)` to compute the long_short_fr_index for the complete pipeline
 
