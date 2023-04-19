@@ -957,6 +957,43 @@ class DiagnosticDistanceMetricFigure:
         out_obj = cls(results_obj, timebinned_neuron_info, result)
         return out_obj, out_obj.update_function
     
+    # ==================================================================================================================== #
+    # Public Jupyter-Lab Methods                                                                                           #
+    # ==================================================================================================================== #
+    @classmethod
+    def integer_slider(cls, n_timebins:int, update_func):
+        """ 2023-04-13 - Displays an integer slider in a jupyter-notebook (below the cell calling this code) that the user can adjust. WORKS!!!
+        
+
+        Args:
+            update_func (function): A user-provided update function that will be called with the current slider index.
+
+        Usage:
+            from pyphoplacecellanalysis.Analysis.Decoder.decoder_result import DiagnosticDistanceMetricFigure
+    
+            n_timebins = np.sum(long_results_obj.all_epochs_num_epoch_time_bins)
+            timebinned_neuron_info = long_results_obj.timebinned_neuron_info
+            result = long_results_obj.new_result
+            active_fig_obj, update_function = DiagnosticDistanceMetricFigure.build_interactive_diagnostic_distance_metric_figure(long_results_obj, timebinned_neuron_info, result)
+            active_fig_obj.integer_slider(n_timebins=n_timebins, update_func=update_function)
+
+
+        """
+        import ipywidgets as widgets
+        from IPython.display import display
+        slider = widgets.IntSlider(description='Slider:', min=0, max=n_timebins-1, value=0)
+
+        def on_slider_change(change):
+            """Callback function for slider value change."""
+            if change['type'] == 'change' and change['name'] == 'value':
+                # Call the user-provided update function with the current slider index
+                update_func(change['new'])
+
+        slider.observe(on_slider_change)
+        display(slider)
+
+    def interactive_slider(self):
+
 
 @function_attributes(short_name='plot_kourosh_activity_style_figure', tags=['plot', 'figure', 'heatmaps', 'matplotlib','pyqtgraph'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-04-04 09:03')
 def plot_kourosh_activity_style_figure(results_obj: SurpriseAnalysisResult, long_session, shared_aclus: np.ndarray, epoch_idx: int, callout_epoch_IDXs: list, skip_rendering_callouts:bool = False):
