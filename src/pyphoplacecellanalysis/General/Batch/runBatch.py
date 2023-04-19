@@ -123,6 +123,8 @@ def run_diba_batch(global_data_root_parent_path: Path, execute_all:bool = False,
 
                 else:
                     print(f'EXTANT SESSION! curr_session_context: {curr_session_context} curr_session_status: {curr_session_status}, curr_session_errors: {active_batch_run.session_batch_errors.get(curr_session_context, None)}')
+                    ## TODO 2023-04-19: shouldn't computation happen here too if needed?
+
 
     ## end for
     return active_batch_run
@@ -208,7 +210,7 @@ def main(active_global_batch_result_filename='global_batch_result.pkl', debug_pr
     from pyphoplacecellanalysis.General.Batch.runBatch import main, BatchRun, run_diba_batch, run_specific_batch
 
     """
-    global_data_root_parent_path = find_first_extant_path([Path(r'W:\Data'), Path(r'/media/MAX/Data'), Path(r'/Volumes/MoverNew/data')])
+    global_data_root_parent_path = find_first_extant_path([Path(r'W:\Data'), Path(r'/media/MAX/Data'), Path(r'/Volumes/MoverNew/data'), Path(r'/home/halechr/turbo/Data')])
     assert global_data_root_parent_path.exists(), f"global_data_root_parent_path: {global_data_root_parent_path} does not exist! Is the right computer's config commented out above?"
     
     ## TODO: load the batch result initially:
@@ -229,7 +231,7 @@ def main(active_global_batch_result_filename='global_batch_result.pkl', debug_pr
     global_batch_run = run_diba_batch(global_data_root_parent_path, execute_all=False, extant_batch_run=global_batch_run, debug_print=True)
     print(f'global_batch_result: {global_batch_run}')
     # Save to file:
-    saveData(finalized_loaded_global_batch_result_pickle_path, global_batch_run)
+    saveData(finalized_loaded_global_batch_result_pickle_path, global_batch_run) # Update the global batch run dictionary
 
 
 if __name__ == "__main__":

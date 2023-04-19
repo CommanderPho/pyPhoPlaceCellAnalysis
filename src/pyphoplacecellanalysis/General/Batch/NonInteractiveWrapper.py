@@ -115,7 +115,11 @@ class NonInteractiveWrapper(object):
         return pipeline
 
 
+    # ==================================================================================================================== #
+    # Specific Format Type Helpers                                                                                         #
+    # ==================================================================================================================== #
   
+    # Bapun ______________________________________________________________________________________________________________ #
     @staticmethod
     def bapun_format_all(pipeline):
         active_session_computation_configs, active_session_filter_configurations = NonInteractiveWrapper.bapun_format_define_configs(pipeline)
@@ -156,13 +160,13 @@ class NonInteractiveWrapper(object):
         return active_session_computation_configs, active_session_filter_configurations
 
 
+    # KDIBA ______________________________________________________________________________________________________________ #
     @staticmethod
     def kdiba_format_all(pipeline):
         active_session_computation_configs, active_session_filter_configurations = NonInteractiveWrapper.kdiba_format_define_configs(pipeline)
         pipeline = NonInteractiveWrapper.perform_filtering(pipeline, active_session_filter_configurations)
         pipeline = NonInteractiveWrapper.perform_computation(pipeline, active_session_computation_configs)
         return pipeline, active_session_computation_configs, active_session_filter_configurations
-
 
     @staticmethod
     def kdiba_format_define_configs(curr_kdiba_pipeline):
@@ -299,7 +303,7 @@ def batch_load_session(global_data_root_parent_path, active_data_mode_name, base
                                             '_perform_firing_rate_trends_computation',
                                             '_perform_pf_find_ratemap_peaks_computation',
                                             # '_perform_time_dependent_pf_sequential_surprise_computation'
-                                            '_perform_two_step_position_decoding_computation',
+                                            # '_perform_two_step_position_decoding_computation',
                                             # '_perform_recursive_latent_placefield_decoding'
                                         ]  # '_perform_pf_find_ratemap_peaks_peak_prominence2d_computation'
         computation_functions_name_blacklist=None
@@ -579,7 +583,12 @@ def batch_programmatic_figures(curr_active_pipeline):
 
     # Plot long|short firing rate index:
     # fig_save_parent_path = Path(r'E:\Dropbox (Personal)\Active\Kamran Diba Lab\Results from 2023-01-20 - LongShort Firing Rate Indicies')
-    fig_save_parent_path = Path(r'E:\Dropbox (Personal)\Active\Kamran Diba Lab\Pho-Kamran-Meetings\Results from 2023-04-11')
+    # override_fig_save_parent_path = Path(r'E:\Dropbox (Personal)\Active\Kamran Diba Lab\Pho-Kamran-Meetings\Results from 2023-04-11')
+    override_fig_save_parent_path = None
+    if override_fig_save_parent_path is None:
+        fig_save_parent_path = active_session_figures_out_path
+    else:
+        fig_save_parent_path = override_fig_save_parent_path
 
     curr_active_pipeline.display('_display_short_long_firing_rate_index_comparison', curr_active_pipeline.sess.get_context(), fig_save_parent_path=fig_save_parent_path)
 

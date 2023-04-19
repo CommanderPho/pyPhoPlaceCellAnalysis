@@ -21,6 +21,7 @@ from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer  # for context_ne
 
 from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DisplayFunctionRegistryHolder import DisplayFunctionRegistryHolder
 
+import pyphoplacecellanalysis.External.pyqtgraph as pg
 from pyphoplacecellanalysis.GUI.PyQtPlot.DockingWidgets.DynamicDockDisplayAreaContent import CustomDockDisplayConfig # for context_nested_docks/single_context_nested_docks
 from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.DockAreaWrapper import DockAreaWrapper # for context_nested_docks/single_context_nested_docks
 from pyphoplacecellanalysis.GUI.Qt.Widgets.DecoderPlotSelectorControls.DecoderPlotSelectorWidget import DecoderPlotSelectorWidget # for context_nested_docks/single_context_nested_docks
@@ -1355,8 +1356,30 @@ def _plot_long_short_firing_rate_indicies(x_frs_index, y_frs_index, active_conte
 # ==================================================================================================================== #
 # 2023-04-19 Surprise                                                                                                  #
 # ==================================================================================================================== #
-import pyphoplacecellanalysis.External.pyqtgraph as pg
 
+
+@function_attributes(short_name=None, tags=['pyqtgraph', 'helper', 'long_short', 'regions', 'rectangles'], input_requires=['pyphoplacecellanalysis.Pho2D.PyQtPlots.Extensions.pyqtgraph_helpers.build_pyqtgraph_epoch_indicator_regions'], output_provides=[], uses=[], used_by=[], creation_date='2023-04-19 19:04')
+def _helper_add_long_short_session_indicator_regions(win, long_epoch, short_epoch):
+    """Add session indicators to pyqtgraph plot for the long and the short epoch
+
+            from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.MultiContextComparingDisplayFunctions.MultiContextComparingDisplayFunctions import _helper_add_long_short_session_indicator_regions
+
+            long_epoch = curr_active_pipeline.filtered_epochs[long_epoch_name]
+            short_epoch = curr_active_pipeline.filtered_epochs[short_epoch_name]
+            long_epoch_indicator_region_items, short_epoch_indicator_region_items = _helper_add_long_short_session_indicator_regions(win, long_epoch, short_epoch)
+
+            long_epoch_linear_region, long_epoch_region_label = long_epoch_indicator_region_items
+            short_epoch_linear_region, short_epoch_region_label = short_epoch_indicator_region_items
+    """
+    from pyphoplacecellanalysis.Pho2D.PyQtPlots.Extensions.pyqtgraph_helpers import build_pyqtgraph_epoch_indicator_regions # Add session indicators to pyqtgraph plot
+    long_epoch_config = dict(epoch_label='long', pen=pg.mkPen('#0b0049'), brush=pg.mkBrush('#0099ff42'), hoverBrush=pg.mkBrush('#fff400'), hoverPen=pg.mkPen('#00ff00'))
+    short_epoch_config = dict(epoch_label='short', pen=pg.mkPen('#490000'), brush=pg.mkBrush('#f5161659'), hoverBrush=pg.mkBrush('#fff400'), hoverPen=pg.mkPen('#00ff00'))
+    
+    long_epoch_indicator_region_items = build_pyqtgraph_epoch_indicator_regions(win, t_start=long_epoch.t_start, t_stop=long_epoch.t_stop, **long_epoch_config)
+    short_epoch_indicator_region_items = build_pyqtgraph_epoch_indicator_regions(win, t_start=short_epoch.t_start, t_stop=short_epoch.t_stop, **short_epoch_config)
+    return long_epoch_indicator_region_items, short_epoch_indicator_region_items
+
+@function_attributes(short_name='plot_long_short_expected_vs_observed_firing_rates', tags=['pyqtgraph','long_short'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-03-28 17:26')
 def plot_long_short_expected_vs_observed_firing_rates(long_results_obj, short_results_obj, limit_aclus=None):
     """ 2023-03-28 4:30pm - Expected vs. Observed Firing Rates for each cell and each epoch 
     
@@ -1412,6 +1435,7 @@ def plot_long_short_expected_vs_observed_firing_rates(long_results_obj, short_re
     win.graphicsItem().setLabel(axis='bottom', text='time')
     return win, plots_tuple, legend
 
+@function_attributes(short_name='plot_long_short_any_values', tags=['pyqtgraph','long_short'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-03-28 17:27')
 def plot_long_short_any_values(long_results_obj, short_results_obj, x, y, limit_aclus=None):
     """ 2023-03-28 4:31pm - Any values, specified by a lambda function for each cell and each epoch 
 
@@ -1476,6 +1500,7 @@ def plot_long_short_any_values(long_results_obj, short_results_obj, x, y, limit_
     win.graphicsItem().setLabel(axis='bottom', text='time')
     return win, plots_tuple, legend
 
+@function_attributes(short_name='plot_long_short', tags=['pyqtgraph','long_short'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-04-19 17:26')
 def plot_long_short(long_results_obj, short_results_obj):
     win = pg.plot()
     win.setWindowTitle('Short v. Long - Leave-one-out All Cell Average Surprise Outputs')
