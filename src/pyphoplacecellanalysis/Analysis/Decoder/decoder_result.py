@@ -992,8 +992,6 @@ class DiagnosticDistanceMetricFigure:
         slider.observe(on_slider_change)
         display(slider)
 
-    def interactive_slider(self):
-
 
 @function_attributes(short_name='plot_kourosh_activity_style_figure', tags=['plot', 'figure', 'heatmaps', 'matplotlib','pyqtgraph'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-04-04 09:03')
 def plot_kourosh_activity_style_figure(results_obj: SurpriseAnalysisResult, long_session, shared_aclus: np.ndarray, epoch_idx: int, callout_epoch_IDXs: list, skip_rendering_callouts:bool = False):
