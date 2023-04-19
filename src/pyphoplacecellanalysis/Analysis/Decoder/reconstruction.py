@@ -21,7 +21,7 @@ from pyphocorehelpers.function_helpers import function_attributes
 from pyphocorehelpers.general_helpers import OrderedMeta
 from pyphocorehelpers.indexing_helpers import BinningInfo, compute_spanning_bins, build_spanning_grid_matrix, np_ffill_1D # for compute_corrected_positions(...)
 from pyphocorehelpers.print_helpers import WrappingMessagePrinter, SimplePrintable, safe_get_variable_shape
-from pyphocorehelpers.mixins.serialized import SerializedAttributesSpecifyingClass
+from pyphocorehelpers.mixins.serialized import SerializedAttributesAllowBlockSpecifyingClass
 
 from pyphoplacecellanalysis.General.Mixins.CrossComputationComparisonHelpers import _compare_computation_results # for finding common neurons in `prune_to_shared_aclus_only`
 
@@ -1066,7 +1066,7 @@ class BasePositionDecoder(NeuronUnitSlicableObjectProtocol):
 # Bayesian Decoder                                                                                                     #
 # ==================================================================================================================== #
 @define(slots=False)
-class BayesianPlacemapPositionDecoder(SerializedAttributesSpecifyingClass, BasePositionDecoder):
+class BayesianPlacemapPositionDecoder(SerializedAttributesAllowBlockSpecifyingClass, BasePositionDecoder):
     """ Holds the placefields. Can be called on any spike data to compute the most likely position given the spike data.
 
     Used to try to decode everything in one go, meaning it took the parameters (like the time window) and the spikes to decode as well and did the computation internally, but the concept of a decoder is that it is a stateless object that can be called on any spike data to decode it, so this concept is depricated.
@@ -1147,9 +1147,9 @@ class BayesianPlacemapPositionDecoder(SerializedAttributesSpecifyingClass, BaseP
         return (self.total_spike_counts_per_window == 0)
         # return np.where(self.total_spike_counts_per_window == 0)[0]
             
-    
+
     @classmethod
-    def serialized_keys(cls):
+    def serialized_key_allowlist(cls):
         input_keys = ['time_bin_size', 'pf', 'spikes_df', 'debug_print']
         # intermediate_keys = ['unit_specific_time_binned_spike_counts', 'time_window_edges', 'time_window_edges_binning_info']
         saved_result_keys = ['flat_p_x_given_n']
@@ -1160,8 +1160,9 @@ class BayesianPlacemapPositionDecoder(SerializedAttributesSpecifyingClass, BaseP
         new_obj = BayesianPlacemapPositionDecoder(time_bin_size=val_dict.get('time_bin_size', 0.25), pf=val_dict.get('pf', None), spikes_df=val_dict.get('spikes_df', None), setup_on_init=val_dict.get('setup_on_init', True), post_load_on_init=val_dict.get('post_load_on_init', False), debug_print=val_dict.get('debug_print', False))
         return new_obj
 
-    def to_dict(self):
-        return self.__dict__
+    ## Take the default `SerializedAttributesAllowBlockSpecifyingClass.to_dict() implementation`
+    # def to_dict(self):
+    #     return self.__dict__
     
     # ==================================================================================================================== #
     # Methods                                                                                                              #
