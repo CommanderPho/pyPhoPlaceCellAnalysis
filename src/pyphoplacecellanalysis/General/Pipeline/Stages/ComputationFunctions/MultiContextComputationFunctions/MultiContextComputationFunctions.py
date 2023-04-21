@@ -1251,6 +1251,12 @@ def _compute_long_short_firing_rate_indicies(spikes_df, long_laps, long_replays,
     long_mean_laps_frs, long_mean_replays_frs, short_mean_laps_frs, short_mean_replays_frs, x_frs_index, y_frs_index = loadData("data/temp_2023-01-20_results.pkl").values()
 
     """
+    assert short_laps.n_epochs > 0, f"No short laps!\t long: (laps: {long_laps.n_epochs > 0}, replays: {long_replays.n_epochs}), \t short: (laps: {short_laps.n_epochs}, replays: {short_replays.n_epochs})"
+    assert long_laps.n_epochs > 0, "No long laps!\t long: (laps: {long_laps.n_epochs > 0}, replays: {long_replays.n_epochs}), \t short: (laps: {short_laps.n_epochs}, replays: {short_replays.n_epochs})"
+    assert long_replays.n_epochs > 0, f"No short replays!\t long: (laps: {long_laps.n_epochs > 0}, replays: {long_replays.n_epochs}), \t short: (laps: {short_laps.n_epochs}, replays: {short_replays.n_epochs})"
+    assert short_replays.n_epochs > 0, f"No long replays!\t long: (laps: {long_laps.n_epochs > 0}, replays: {long_replays.n_epochs}), \t short: (laps: {short_laps.n_epochs}, replays: {short_replays.n_epochs})"
+
+
     long_mean_laps_all_frs, long_mean_laps_frs = _epoch_unit_avg_firing_rates(spikes_df, long_laps)
     long_mean_replays_all_frs, long_mean_replays_frs = _epoch_unit_avg_firing_rates(spikes_df, long_replays)
 
