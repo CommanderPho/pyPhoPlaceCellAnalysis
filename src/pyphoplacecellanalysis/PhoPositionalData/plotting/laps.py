@@ -245,6 +245,7 @@ def plot_laps_2d(sess, legacy_plotting_mode=True):
     # _plot_helper_render_lap(pos_df['t'].to_numpy(), pos_df['x'].to_numpy(), asc_crossing_beginings, None, asc_crossing_endings, color='g', ax=out_axes_list[0])
     
     out_axes_list[0].set_title('Laps')
+    fig.canvas.manager.set_window_title('Laps')
     # fig.suptitle('Laps', fontsize=22)
     return fig, out_axes_list
 
