@@ -1331,6 +1331,10 @@ def _plot_long_short_firing_rate_indicies(x_frs_index, y_frs_index, active_conte
     ## get current axes:
     # ax = plt.gca()
 
+    # Set the x and y axes to standard limits for easy visual comparison across sessions
+    ax.set_xlim([-1.1, 1.1])
+    ax.set_ylim([-1.1, 1.1])
+
     # # Call the function above. All the magic happens there.
     # add_value_labels(ax, labels=x_labels) # 
 
@@ -1345,7 +1349,6 @@ def _plot_long_short_firing_rate_indicies(x_frs_index, y_frs_index, active_conte
     with ProgressMessagePrinter(_temp_full_fig_save_path, 'Saving', 'plot_long_short_firing_rate_indicies results'):
         fig.savefig(fname=_temp_full_fig_save_path, transparent=True)
     fig.show()
-
 
     return fig, _temp_full_fig_save_path
     # return MatplotlibRenderPlots(name='', figures=(fig), axes=(ax))
