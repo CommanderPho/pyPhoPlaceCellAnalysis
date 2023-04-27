@@ -844,9 +844,7 @@ class DiagnosticDistanceMetricFigure:
         """ called after initializer built by `attrs` library. """
         # Perform the primary setup to build the placefield
         self.win = pg.GraphicsLayoutWidget(show=True, title='diagnostic_plot')
-        # plot_data = {'curr_cell_pf_curve': curr_cell_pf_curve, 'curr_random_not_firing_cell_pf_curve': curr_random_not_firing_cell_pf_curve, 'curr_timebin_p_x_given_n': curr_timebin_p_x_given_n}
-        # plot_data = {'curr_cell_pf_curve': None, 'curr_random_not_firing_cell_pf_curve': None, 'curr_timebin_p_x_given_n': None}
-
+        
         is_valid = False
         for index in np.arange(self.timebinned_neuron_info.n_timebins):
             # find the first valid index
@@ -957,6 +955,11 @@ class DiagnosticDistanceMetricFigure:
         out_obj = cls(results_obj, timebinned_neuron_info, result)
         return out_obj, out_obj.update_function
     
+
+    def export(self, **kwargs):
+        from pyphoplacecellanalysis.General.Mixins.ExportHelpers import export_pyqtgraph_plot # works pretty well seemingly
+        export_pyqtgraph_plot(self.win, **kwargs)
+        
     # ==================================================================================================================== #
     # Public Jupyter-Lab Methods                                                                                           #
     # ==================================================================================================================== #
