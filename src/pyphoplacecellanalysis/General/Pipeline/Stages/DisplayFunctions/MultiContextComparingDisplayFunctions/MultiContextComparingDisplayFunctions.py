@@ -217,7 +217,7 @@ class MultiContextComparingDisplayFunctions(AllFunctionEnumeratingMixin, metacla
 
             return graphics_output_dict
 
-
+    @function_attributes(short_name='short_long_pf1D_comparison', tags=['long_short','1D','placefield'], input_requires=[], output_provides=[], uses=['plot_short_v_long_pf1D_comparison'], used_by=[], creation_date='2023-04-26 06:12')
     def _display_short_long_pf1D_comparison(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_whitelist=None, **kwargs):
             """ Displays a figure for comparing the 1D placefields across-epochs (between the short and long tracks). By default renders the second track's placefield flipped over the x-axis and hatched. 
                 Usage:
@@ -336,7 +336,7 @@ class MultiContextComparingDisplayFunctions(AllFunctionEnumeratingMixin, metacla
 
             return graphics_output_dict
 
-    @function_attributes(short_name='short_long_firing_rate_index_comparison', tags=['display','short_long','firing_rate', 'fr_index'], input_requires=[], output_provides=[], uses=['_plot_long_short_firing_rate_indicies'], used_by=[], creation_date='2023-04-11 08:08')
+    @function_attributes(short_name='short_long_firing_rate_index_comparison', tags=['display','long_short','short_long','firing_rate', 'fr_index'], input_requires=[], output_provides=[], uses=['_plot_long_short_firing_rate_indicies'], used_by=[], creation_date='2023-04-11 08:08')
     def _display_short_long_firing_rate_index_comparison(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_whitelist=None, **kwargs):
             """ Displays a figure for comparing the 1D placefields across-epochs (between the short and long tracks)
                 Usage:
