@@ -2,7 +2,6 @@ import sys
 from warnings import warn
 import numpy as np
 import pandas as pd
-from findpeaks import findpeaks # for _perform_pf_find_ratemap_peaks_computation. Install with pip install findpeaks 
 import itertools # for _perform_placefield_overlap_computation
 
 import matplotlib
@@ -222,6 +221,7 @@ class PlacefieldDensityAnalysisComputationFunctions(AllFunctionEnumeratingMixin,
                     computed_data['RatemapPeaksAnalysis']['final_filtered_results']['peak_xy_points_pos_list']:
                     
             """            
+            from findpeaks import findpeaks # for _perform_pf_find_ratemap_peaks_computation. Install with pip install findpeaks. Specifically used in `ratemap_find_placefields` subfunction
             def ratemap_find_placefields(ratemap, debug_print=False):
                 """ Uses the `findpeaks` library for finding local maxima of TuningMaps
                 Input:
