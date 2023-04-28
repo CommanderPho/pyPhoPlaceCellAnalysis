@@ -73,8 +73,8 @@ def visualize_heatmap(data, ax=None, show_value_labels=False, title="Simple Heat
 
 
 import numpy as np
-import pyqtgraph as pg
-from pyqtgraph.Qt import QtCore, QtGui
+import pyphoplacecellanalysis.External.pyqtgraph as pg
+from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtCore, QtGui
 def visualize_heatmap_pyqtgraph(data, win=None, show_value_labels=False, title="Simple Heatmap", show_xticks=False, show_yticks=False, show_colorbar=False, defer_show:bool = False):
     """
     Creates a simple heatmap visualization of the given 2D numpy array data.
