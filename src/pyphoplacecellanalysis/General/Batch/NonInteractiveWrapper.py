@@ -50,9 +50,10 @@ class SessionBatchProgress(ExtendedEnum):
     NOT_STARTED = "NOT_STARTED"
     RUNNING = "RUNNING"
     COMPLETED = "COMPLETED"
+    FAILED = "FAILED"
     ABORTED = "ABORTED"
+    
 
- 
 """ 
 
 filters should be checkable to express whether we want to build that one or not
@@ -231,7 +232,7 @@ class NonInteractiveWrapper(object):
 # ==================================================================================================================== #
 
 
-@function_attributes(short_name='batch_load_session', tags=['batch', 'automated', 'session', 'load'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-03-28 04:46')
+@function_attributes(short_name='batch_load_session', tags=['main', 'batch', 'automated', 'session', 'load'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-03-28 04:46')
 def batch_load_session(global_data_root_parent_path, active_data_mode_name, basedir, force_reload=False, saving_mode=PipelineSavingScheme.SKIP_SAVING, fail_on_exception=True, skip_extended_batch_computations=False, **kwargs):
     """Loads and runs the entire pipeline for a session folder located at the path 'basedir'.
 
