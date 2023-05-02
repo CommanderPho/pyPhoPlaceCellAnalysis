@@ -83,14 +83,14 @@ class MultiContextComparingDisplayFunctions(AllFunctionEnumeratingMixin, metacla
         # return master_dock_win, app, out_items
         return {'master_dock_win': master_dock_win, 'app': app, 'out_items': out_items}
 
-    @function_attributes(short_name='jonathan_interactive_replay_firing_rate_comparison', tags=['display','interactive','jonathan', 'firing_rate', 'pyqtgraph'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-04-11 03:14')
+    @function_attributes(short_name='jonathan_interactive_replay_firing_rate_comparison', tags=['display','interactive','jonathan', 'firing_rate', 'pyqtgraph'], input_requires=[], output_provides=[], uses=['_make_jonathan_interactive_plot'], used_by=[], creation_date='2023-04-11 03:14')
     def _display_jonathan_interactive_replay_firing_rate_comparison(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_whitelist=None, **kwargs):
             """ Jonathan's interactive display. Currently hacked up to directly compute the results to display within this function
                 Internally calls `_make_jonathan_interactive_plot(...)`
 
                 Usage:
                 active_identifying_session_ctx = curr_active_pipeline.sess.get_context() # 'bapun_RatN_Day4_2019-10-15_11-30-06'
-                curr_active_pipeline.display('_display_jonathan_replay_firing_rate_comparison', active_identifying_session_ctx)
+                curr_active_pipeline.display('_display_jonathan_interactive_replay_firing_rate_comparison', active_identifying_session_ctx)
 
             """
             if include_whitelist is None:
@@ -125,7 +125,7 @@ class MultiContextComparingDisplayFunctions(AllFunctionEnumeratingMixin, metacla
 
             neuron_replay_stats_df = global_computation_results.computed_data['jonathan_firing_rate_analysis']['neuron_replay_stats_df']
 
-            graphics_output_dict, neuron_df = _make_jonathan_interactive_plot(sess, time_bins, neuron_replay_stats_df, time_binned_unit_specific_binned_spike_rate, pos_df, aclu_to_idx, rdf, irdf, show_inter_replay_frs=False)
+            graphics_output_dict, neuron_df = _make_jonathan_interactive_plot(sess, time_bins, neuron_replay_stats_df, time_binned_unit_specific_binned_spike_rate, pos_df, aclu_to_idx, rdf, irdf, show_inter_replay_frs=True)
             graphics_output_dict['plot_data'] = {'df': neuron_replay_stats_df, 'rdf':rdf, 'aclu_to_idx':aclu_to_idx, 'irdf':irdf, 'time_binned_unit_specific_spike_rate': global_computation_results.computed_data['jonathan_firing_rate_analysis']['time_binned_unit_specific_spike_rate']}
 
             return graphics_output_dict
@@ -216,6 +216,8 @@ class MultiContextComparingDisplayFunctions(AllFunctionEnumeratingMixin, metacla
                 'time_variable_name':time_variable_name}
 
             return graphics_output_dict
+
+
 
     @function_attributes(short_name='short_long_pf1D_comparison', tags=['long_short','1D','placefield'], input_requires=[], output_provides=[], uses=['plot_short_v_long_pf1D_comparison'], used_by=[], creation_date='2023-04-26 06:12')
     def _display_short_long_pf1D_comparison(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_whitelist=None, **kwargs):
