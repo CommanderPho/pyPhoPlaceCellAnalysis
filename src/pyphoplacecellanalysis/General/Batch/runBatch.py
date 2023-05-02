@@ -222,7 +222,7 @@ def main(active_global_batch_result_filename='global_batch_result.pkl', debug_pr
     # try to load an existing batch result:
     try:
         global_batch_run = loadData(finalized_loaded_global_batch_result_pickle_path, debug_print=debug_print)
-    except (FileNotFoundError):
+    except (FileNotFoundError, TypeError):
         # loading failed
         print(f'Failure loading {finalized_loaded_global_batch_result_pickle_path}.')
         global_batch_run = None

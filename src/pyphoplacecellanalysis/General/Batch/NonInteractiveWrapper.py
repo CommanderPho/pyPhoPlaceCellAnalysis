@@ -263,7 +263,7 @@ def batch_load_session(global_data_root_parent_path, active_data_mode_name, base
     active_data_mode_type_properties = known_data_session_type_properties_dict[active_data_mode_name]
 
     curr_active_pipeline = NeuropyPipeline.try_init_from_saved_pickle_or_reload_if_needed(active_data_mode_name, active_data_mode_type_properties,
-        override_basepath=Path(basedir), override_post_load_functions=[], force_reload=force_reload, active_pickle_filename=active_pickle_filename, skip_save_on_initial_load=True)
+        override_basepath=Path(basedir), force_reload=force_reload, active_pickle_filename=active_pickle_filename, skip_save_on_initial_load=True)
 
     active_session_filter_configurations = active_data_mode_registered_class.build_default_filter_functions(sess=curr_active_pipeline.sess, epoch_name_whitelist=epoch_name_whitelist) # build_filters_pyramidal_epochs(sess=curr_kdiba_pipeline.sess)
     if debug_print:
