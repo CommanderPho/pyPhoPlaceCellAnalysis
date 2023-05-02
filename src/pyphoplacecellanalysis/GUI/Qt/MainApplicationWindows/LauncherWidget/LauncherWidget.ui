@@ -158,7 +158,16 @@ QHeaderView::section { background-color: red };
             </item>
             <item>
              <property name="text">
-              <string notr="true">Occupancy</string>
+              <string notr="true" extracomment="TEST OCCUPANCY COMMENT">Occupancy</string>
+             </property>
+             <property name="toolTip">
+              <string notr="true" extracomment="TEST OCCUPANCY TOOLTIP"/>
+             </property>
+             <property name="statusTip">
+              <string notr="true"/>
+             </property>
+             <property name="whatsThis">
+              <string notr="true"/>
              </property>
              <property name="icon">
               <iconset resource="../../../../Resources/ActionIcons.qrc">
