@@ -924,7 +924,9 @@ def _plot_pho_jonathan_batch_plot_single_cell(t_split, time_bins, unit_specific_
     curr_ax_cell_label.axis('off')
 
     custom_replay_scatter_markers_plot_kwargs_list = kwargs.pop('custom_replay_scatter_markers_plot_kwargs_list', None)
-
+    # Whether to plot the orange horizontal indicator lines that show where spikes occur. Slows down plots a lot.
+    should_plot_spike_indicator_points_on_placefield = kwargs.pop('should_plot_spike_indicator_points_on_placefield', False)
+    
     ## New ax[0,1] draw method:
     _temp_draw_jonathan_ax(t_split, time_bins, unit_specific_time_binned_firing_rates, rdf_aclu_to_idx, rdf, irdf, show_inter_replay_frs=show_inter_replay_frs, colors=colors, fig=curr_fig, ax=curr_ax_firing_rate, active_aclu=aclu,
                         include_horizontal_labels=False, include_vertical_labels=False, should_render=False, custom_replay_markers=custom_replay_scatter_markers_plot_kwargs_list)
@@ -954,7 +956,8 @@ def _plot_pho_jonathan_batch_plot_single_cell(t_split, time_bins, unit_specific_
     if cell_linear_fragile_IDX is None:
         print(f'WARNING: aclu {aclu} is not present in the pf1D_all ratemaps. Which contain aclus: {pf1D_all.ratemap.neuron_ids}')
     _ = plot_1D_placecell_validation(pf1D_all, cell_linear_fragile_IDX, extant_fig=curr_fig, extant_axes=(curr_ax_lap_spikes, curr_ax_placefield),
-            **({'should_include_labels': False, 'should_plot_spike_indicator_points_on_placefield': False, 'spike_indicator_lines_alpha': 0.2,
+            **({'should_include_labels': False, 'should_plot_spike_indicator_points_on_placefield': should_plot_spike_indicator_points_on_placefield, 
+                'should_plot_spike_indicator_lines_on_trajectory': False, 'spike_indicator_lines_alpha': 0.2,
                 'spikes_color':(0.1, 0.1, 0.1), 'spikes_alpha':0.1, 'should_include_spikes': False} | kwargs))
 
     # Custom All Spikes: Note that I set `'should_include_spikes': False` in call to `plot_1D_placecell_validation` above so the native spikes aren't plotted
