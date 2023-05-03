@@ -332,8 +332,18 @@ def batch_load_session(global_data_root_parent_path, active_data_mode_name, base
     return curr_active_pipeline
 
 @function_attributes(short_name='batch_extended_computations', tags=['batch', 'automated', 'session', 'compute'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-03-28 04:46')
-def batch_extended_computations(curr_active_pipeline, include_whitelist=None, include_global_functions=False, fail_on_exception=False, progress_print=True, debug_print=False):
+def batch_extended_computations(curr_active_pipeline, include_whitelist=None, include_global_functions=False, fail_on_exception=False, progress_print=True, debug_print=False, force_recompute:bool = False):
     """ performs the remaining required global computations """
+    def _subfn_on_already_computed(_comp_name):
+        """ captures: `progress_print`, `force_recompute`
+        raises AttributeError if force_recompute is true to trigger recomputation """
+        if progress_print:
+            print(f'{_comp_name} already computed.')
+        if force_recompute:
+            if progress_print:
+                print(f'\tforce_recompute is true so recomputing anyway')
+            raise AttributeError # just raise an AttributeError to trigger recomputation    
+
     newly_computed_values = []
 
     non_global_comp_names = ['firing_rate_trends', 'relative_entropy_analyses']
@@ -394,8 +404,9 @@ def batch_extended_computations(curr_active_pipeline, include_whitelist=None, in
             flat_jensen_shannon_distance_results = active_relative_entropy_results['flat_jensen_shannon_distance_results'] # (149, 63) - (nSnapshots, nXbins)
             flat_jensen_shannon_distance_across_all_positions = np.sum(flat_jensen_shannon_distance_results, axis=1) # sum across all position bins # (4152,) - (nSnapshots)
             flat_surprise_across_all_positions = np.sum(flat_relative_entropy_results, axis=1) # sum across all position bins # (4152,) - (nSnapshots)
-            if progress_print:
-                print(f'{_comp_name} already computed.')
+            _subfn_on_already_computed(_comp_name)
+                
+
         except (AttributeError, KeyError) as e:
             if progress_print or debug_print:
                 print(f'{_comp_name} missing.')
@@ -427,8 +438,8 @@ def batch_extended_computations(curr_active_pipeline, include_whitelist=None, in
                 ## Get global 'jonathan_firing_rate_analysis' results:
                 curr_jonathan_firing_rate_analysis = curr_active_pipeline.global_computation_results.computed_data['jonathan_firing_rate_analysis']
                 neuron_replay_stats_df, rdf, aclu_to_idx, irdf = curr_jonathan_firing_rate_analysis['neuron_replay_stats_df'], curr_jonathan_firing_rate_analysis['rdf']['rdf'], curr_jonathan_firing_rate_analysis['rdf']['aclu_to_idx'], curr_jonathan_firing_rate_analysis['irdf']['irdf']
-                if progress_print:
-                    print(f'{_comp_name} already computed.')
+                _subfn_on_already_computed(_comp_name)
+                    
             except (AttributeError, KeyError) as e:
                 if progress_print or debug_print:
                     print(f'{_comp_name} missing.')
@@ -455,8 +466,7 @@ def batch_extended_computations(curr_active_pipeline, include_whitelist=None, in
                 prod_overlap_dict = short_long_pf_overlap_analyses['product_overlap_dict']
                 relative_entropy_overlap_dict = short_long_pf_overlap_analyses['relative_entropy_overlap_dict']
                 relative_entropy_overlap_scalars_df = short_long_pf_overlap_analyses['relative_entropy_overlap_scalars_df']
-                if progress_print:
-                    print(f'{_comp_name} already computed.')
+                _subfn_on_already_computed(_comp_name)
             except (AttributeError, KeyError) as e:
                 if progress_print or debug_print:
                     print(f'{_comp_name} missing.')
@@ -499,8 +509,7 @@ def batch_extended_computations(curr_active_pipeline, include_whitelist=None, in
                 long_short_fr_indicies_analysis_results = curr_active_pipeline.global_computation_results.computed_data['long_short_fr_indicies_analysis']
                 x_frs_index, y_frs_index = long_short_fr_indicies_analysis_results['x_frs_index'], long_short_fr_indicies_analysis_results['y_frs_index'] # use the all_results_dict as the computed data value
                 active_context = long_short_fr_indicies_analysis_results['active_context']
-                if progress_print:
-                    print(f'{_comp_name} already computed.')
+                _subfn_on_already_computed(_comp_name)
             except (AttributeError, KeyError) as e:
                 if progress_print or debug_print:
                     print(f'{_comp_name} missing.')

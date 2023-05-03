@@ -156,6 +156,10 @@ def plot_1D_placecell_validation(active_epoch_placefields1D, placefield_cell_ind
     
     placefield_cell_index: an flat index into active_epoch_placefields1D.cell_ids. Must be between 0 and len(active_epoch_placefields1D.cell_ids). NOT the cell's original ID!
 
+    
+    spike_indicator_lines_alpha
+    should_plot_spike_indicator_lines_on_trajectory
+    
     Implementation:
         Internally relies on:
             active_epoch_placefields1D.plotRaw_v_time(...) to plot the main position vs. spike curve
@@ -250,7 +254,7 @@ def plot_1D_placecell_validation(active_epoch_placefields1D, placefield_cell_ind
         if should_plot_spike_indicator_lines_on_trajectory:
             # plot the orange lines that span across the position plot to the right
             ax_activity_v_time.hlines(y=curr_cell_interpolated_spike_positions, xmin=curr_cell_spike_times, xmax=t_end,
-                        linestyles='solid', color='orange', alpha=spike_indicator_lines_alpha, linewidth=spike_indcator_lines_linewidth, zorder=0) # plot the lines that underlie the spike points
+                        linestyles='solid', color='orange', alpha=spike_indicator_lines_alpha, linewidth=spike_indcator_lines_linewidth, zorder=0, rasterized=True) # plot the lines that underlie the spike points
         ax_activity_v_time.set_xlim((t_start, t_end)) # We don't want to clip to only the spiketimes for this cell, we want it for all cells, or even when the recording started/ended
 
         ## The computed placefield on the right-hand side:
