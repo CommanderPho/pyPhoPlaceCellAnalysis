@@ -1,3 +1,4 @@
+from copy import deepcopy
 from enum import Enum
 from pathlib import Path
 import numpy as np
@@ -12,6 +13,8 @@ from neuropy.plotting.figure import Fig # for plot_short_v_long_pf1D_comparison 
 from neuropy.plotting.ratemaps import plot_ratemap_1D # for plot_short_v_long_pf1D_comparison (_display_short_long_pf1D_comparison)
 from neuropy.utils.matplotlib_helpers import build_or_reuse_figure # used for `_make_pho_jonathan_batch_plots(...)`
 from neuropy.utils.mixins.print_helpers import ProgressMessagePrinter # for `_plot_long_short_firing_rate_indicies`
+from neuropy.core.neurons import NeuronType
+
 
 from pyphocorehelpers.function_helpers import function_attributes
 from pyphocorehelpers.mixins.member_enumerating import AllFunctionEnumeratingMixin
@@ -84,7 +87,7 @@ class MultiContextComparingDisplayFunctions(AllFunctionEnumeratingMixin, metacla
         return {'master_dock_win': master_dock_win, 'app': app, 'out_items': out_items}
 
     @function_attributes(short_name='jonathan_interactive_replay_firing_rate_comparison', tags=['display','interactive','jonathan', 'firing_rate', 'pyqtgraph'], input_requires=[], output_provides=[], uses=['_make_jonathan_interactive_plot'], used_by=[], creation_date='2023-04-11 03:14')
-    def _display_jonathan_interactive_replay_firing_rate_comparison(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_whitelist=None, **kwargs):
+    def _display_jonathan_interactive_replay_firing_rate_comparison(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_whitelist=None, included_neuron_types=None, require_placefield=True, **kwargs):
             """ Jonathan's interactive display. Currently hacked up to directly compute the results to display within this function
                 Internally calls `_make_jonathan_interactive_plot(...)`
 
@@ -96,6 +99,10 @@ class MultiContextComparingDisplayFunctions(AllFunctionEnumeratingMixin, metacla
             if include_whitelist is None:
                 include_whitelist = owning_pipeline_reference.active_completed_computation_result_names # ['maze', 'sprinkle']
 
+            if included_neuron_types is None:
+                included_neuron_types = NeuronType.from_any_string_series(['pyr'])
+
+
             long_epoch_name = include_whitelist[0] # 'maze1_PYR'
             short_epoch_name = include_whitelist[1] # 'maze2_PYR'
             if len(include_whitelist) > 2:
@@ -103,6 +110,9 @@ class MultiContextComparingDisplayFunctions(AllFunctionEnumeratingMixin, metacla
             else:
                 print(f'WARNING: no global_epoch detected.')
                 global_epoch_name = '' # None
+                
+
+            NeuronType
 
             print(f'include_whitelist: {include_whitelist}\nlong_epoch_name: {long_epoch_name}, short_epoch_name: {short_epoch_name}, global_epoch_name: {global_epoch_name}')
             pf1d_long = computation_results[long_epoch_name]['computed_data']['pf1D']
@@ -123,7 +133,18 @@ class MultiContextComparingDisplayFunctions(AllFunctionEnumeratingMixin, metacla
             # time_bins = global_computation_results.computed_data['jonathan_firing_rate_analysis']['time_binned_instantaneous_unit_specific_spike_rate']['time_bins']
             # time_binned_unit_specific_binned_spike_rate = global_computation_results.computed_data['jonathan_firing_rate_analysis']['time_binned_instantaneous_unit_specific_spike_rate']['instantaneous_unit_specific_spike_rate_values']
 
-            neuron_replay_stats_df = global_computation_results.computed_data['jonathan_firing_rate_analysis']['neuron_replay_stats_df']
+            neuron_replay_stats_df = deepcopy(global_computation_results.computed_data['jonathan_firing_rate_analysis']['neuron_replay_stats_df'])
+
+            if 'neuron_type' not in neuron_replay_stats_df.columns:
+                ## Add neuron type to the replay stats dataframe:
+                neuron_replay_stats_df['neuron_type'] = [sess.neurons.aclu_to_neuron_type_map[aclu] for aclu in neuron_replay_stats_df.index.to_numpy()]
+
+            # Filter by the included neuron types:
+            neuron_replay_stats_df = neuron_replay_stats_df[np.isin([v.value for v in neuron_replay_stats_df['neuron_type']], [v.value for v in included_neuron_types])]
+
+            if require_placefield:
+                ## Require placefield presence on either the long or the short
+                neuron_replay_stats_df = neuron_replay_stats_df[np.logical_or(neuron_replay_stats_df['has_long_pf'], neuron_replay_stats_df['has_short_pf'])]
 
             graphics_output_dict, neuron_df = _make_jonathan_interactive_plot(sess, time_bins, neuron_replay_stats_df, time_binned_unit_specific_binned_spike_rate, pos_df, aclu_to_idx, rdf, irdf, show_inter_replay_frs=True)
             graphics_output_dict['plot_data'] = {'df': neuron_replay_stats_df, 'rdf':rdf, 'aclu_to_idx':aclu_to_idx, 'irdf':irdf, 'time_binned_unit_specific_spike_rate': global_computation_results.computed_data['jonathan_firing_rate_analysis']['time_binned_unit_specific_spike_rate']}

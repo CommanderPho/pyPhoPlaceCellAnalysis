@@ -232,6 +232,10 @@ class MultiContextComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Co
                         num_shared_neuron_participating=num_shared_neuron_participating,
                         num_short_only_neuron_participating=num_short_only_neuron_participating)
 
+
+        final_jonathan_df['neuron_type'] = [sess.neurons.aclu_to_neuron_type_map[aclu] for aclu in final_jonathan_df.index.to_numpy()]
+        
+
         global_computation_results.computed_data['jonathan_firing_rate_analysis'] = DynamicParameters.init_from_dict({
             'rdf': DynamicParameters.init_from_dict({
                 'rdf': rdf,
