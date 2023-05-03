@@ -35,7 +35,7 @@ from pyphoplacecellanalysis.Pho2D.PyQtPlots.plot_placefields import pyqtplot_plo
 
 from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.MultiContextComputationFunctions import make_fr
 from pyphoplacecellanalysis.General.Mixins.CrossComputationComparisonHelpers import _compare_computation_results, _find_any_context_neurons, build_neurons_color_map # for plot_short_v_long_pf1D_comparison
-from pyphoplacecellanalysis.General.Mixins.CrossComputationComparisonHelpers import build_replays_custom_scatter_markers # used in _make_pho_jonathan_batch_plots
+from pyphoplacecellanalysis.General.Mixins.CrossComputationComparisonHelpers import build_replays_custom_scatter_markers, CustomScatterMarkerMode # used in _make_pho_jonathan_batch_plots
 from pyphoplacecellanalysis.General.Mixins.CrossComputationComparisonHelpers import _build_neuron_type_distribution_color # used in _make_pho_jonathan_batch_plots
 
 
@@ -975,8 +975,8 @@ def _plot_pho_jonathan_batch_plot_single_cell(t_split, time_bins, unit_specific_
 
 
 
-@function_attributes(short_name='_make_pho_jonathan_batch_plots', tags=['private'], input_requires=[], output_provides=[], uses=['_plot_pho_jonathan_batch_plot_single_cell'], used_by=[], creation_date='2023-04-11 08:06')
-def _make_pho_jonathan_batch_plots(t_split, time_bins, neuron_replay_stats_df, unit_specific_time_binned_firing_rates, pf1D_all, aclu_to_idx, rdf, irdf, show_inter_replay_frs=False, included_unit_neuron_IDs=None, n_max_plot_rows:int=4, debug_print=False, **kwargs):
+@function_attributes(short_name='_make_pho_jonathan_batch_plots', tags=['private'], input_requires=[], output_provides=[], uses=['_plot_pho_jonathan_batch_plot_single_cell', 'build_replays_custom_scatter_markers', '_build_neuron_type_distribution_color'], used_by=[], creation_date='2023-04-11 08:06')
+def _make_pho_jonathan_batch_plots(t_split, time_bins, neuron_replay_stats_df, unit_specific_time_binned_firing_rates, pf1D_all, aclu_to_idx, rdf, irdf, show_inter_replay_frs=False, included_unit_neuron_IDs=None, marker_split_mode=CustomScatterMarkerMode.TriSplit, n_max_plot_rows:int=4, debug_print=False, **kwargs):
     """ Stacked Jonathan-style firing-rate-across-epochs-plot
     Internally calls `_plot_pho_jonathan_batch_plot_single_cell`
         n_max_plot_rows: the maximum number of rows to plot
@@ -1021,7 +1021,7 @@ def _make_pho_jonathan_batch_plots(t_split, time_bins, neuron_replay_stats_df, u
     rdf, (_percent_long_only, _percent_shared, _percent_short_only, _percent_short_long_diff) = _build_neuron_type_distribution_color(rdf)
 
     # Build custom replay markers:
-    custom_replay_scatter_markers_plot_kwargs_list = build_replays_custom_scatter_markers(rdf, debug_print=debug_print)
+    custom_replay_scatter_markers_plot_kwargs_list = build_replays_custom_scatter_markers(rdf, marker_split_mode=marker_split_mode, debug_print=debug_print)
     kwargs['custom_replay_scatter_markers_plot_kwargs_list'] = custom_replay_scatter_markers_plot_kwargs_list
 
 

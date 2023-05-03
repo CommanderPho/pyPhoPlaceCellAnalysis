@@ -150,6 +150,7 @@ def build_neurons_color_map(n_neurons:int, sortby=None, cmap=None):
 # ==================================================================================================================== #
 # Custom Scatterplot Markers with Multi-Color Filling                                                                  #
 # ==================================================================================================================== #
+from enum import Enum
 
 import matplotlib.path as mpath
 import matplotlib.pyplot as plt
@@ -160,6 +161,14 @@ from matplotlib.colors import Normalize
 # from matplotlib.patches import Circle
 from matplotlib.transforms import Bbox
 
+
+
+class CustomScatterMarkerMode(Enum):
+    """Docstring for CustomScatterMarkerMode."""
+    NoSplit = "NoSplit"
+    TwoSplit = "TwoSplitMode"
+    TriSplit = "TriSplitMode"
+    
 # from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.MultiContextComputationFunctions import make_fr
 
 
@@ -209,7 +218,7 @@ def _build_neuron_type_distribution_color(rdf):
 ch_rng = lambda x: 2.0*x-1.0 # map from [0, 1] -> [-1, 1] (the space where the paths are built)
 # validation: [ch_rng(v) for v in [0, 0.25, 0.5, 0.75, 1.0]] # [-1.0, -0.5, 0.0, 0.5, 1.0]
 
-def build_replays_custom_scatter_markers(rdf, is_tri_mode=False, debug_print=False):
+def build_replays_custom_scatter_markers(rdf, marker_split_mode=CustomScatterMarkerMode.TriSplit, debug_print=False):
     """ Builds all custom scatter markers for the rdf (replay dataframe), one for each replay
     Usage:
         from pyphoplacecellanalysis.General.Mixins.CrossComputationComparisonHelpers import build_replays_custom_scatter_markers, build_custom_scatter_marker
@@ -232,7 +241,7 @@ def build_replays_custom_scatter_markers(rdf, is_tri_mode=False, debug_print=Fal
     # custom_markers_dict_list = [_build_marker(long, shared, short, long_to_short_balance, is_tri_mode=False, debug_print=False) for long, shared, short, long_to_short_balance in list(zip(_percent_long_only, _percent_shared, _percent_short_only, _long_to_short_balances))]
     # scatter_plot_kwargs_list, scatter_markerstyles_list, scatter_marker_paths_list = custom_markers_dict_list['plot_kwargs'], custom_markers_dict_list['markerstyles'], custom_markers_dict_list['paths'] # Extract variables from the `custom_markers_dict_list` dictionary to the local workspace
 
-    custom_markers_tuple_list = [_subfn_build_custom_scatter_marker(long, shared, short, long_to_short_balance, is_tri_mode=is_tri_mode, debug_print=False) for long, shared, short, long_to_short_balance in list(zip(_percent_long_only, _percent_shared, _percent_short_only, _long_to_short_balances))]
+    custom_markers_tuple_list = [_subfn_build_custom_scatter_marker(long, shared, short, long_to_short_balance, marker_split_mode=marker_split_mode, debug_print=False) for long, shared, short, long_to_short_balance in list(zip(_percent_long_only, _percent_shared, _percent_short_only, _long_to_short_balances))]
     
 
     out_plot_kwargs_list = [a_tuple[0] for a_tuple in custom_markers_tuple_list]
@@ -250,7 +259,8 @@ def build_replays_custom_scatter_markers(rdf, is_tri_mode=False, debug_print=Fal
     return out_plot_kwargs_list
     # return (scatter_markerstyles_0_list, scatter_markerstyles_1_list)
 
-def _subfn_build_custom_scatter_marker(long, shared, short, long_to_short_balance, is_tri_mode=True, debug_print=False):
+
+def _subfn_build_custom_scatter_marker(long, shared, short, long_to_short_balance, marker_split_mode=CustomScatterMarkerMode.TriSplit, debug_print=False):
     """ Builds a single custom scatterplot marker representing a replay and its distribution of (long_only, both, short_only) cells 
     Usage:
     
@@ -311,7 +321,7 @@ def _subfn_build_custom_scatter_marker(long, shared, short, long_to_short_balanc
     ################ BEGIN FUNCTION BODY
     
     # Tri-split mode:
-    if is_tri_mode:
+    if marker_split_mode.value == CustomScatterMarkerMode.TriSplit.value:
         # colors = ['r','g','b'] # should these be reversed too since the two-split version are? I assume so.
         colors = ['b','g','g'] # should these be reversed too since the two-split version are? I assume so.
         cum_long, cum_shared, cum_short = long, (long+shared), (long+shared+short)
@@ -320,15 +330,22 @@ def _subfn_build_custom_scatter_marker(long, shared, short, long_to_short_balanc
         clip_bboxs = (Bbox(((-1.0, -1.0),(ch_rng(cum_long), 1.0))),
               Bbox(((ch_rng(cum_long), -1.0),(ch_rng(cum_shared), 1.0))),
               Bbox(((ch_rng(cum_shared), -1.0),(ch_rng(cum_short), 1.0))))
-
-    else:
+        
+    elif marker_split_mode.value == CustomScatterMarkerMode.TwoSplit.value:
         # Two-split mode:
         # colors = ['r','b'] # OLD: noted that I had to reverse these to make the plot correct, but I'm honestly not sure why. I'm thinking it has to do with the order they are plotted or something
         colors = ['b','r']
         if debug_print:
             print(f'long_to_short_balance: {long_to_short_balance}')
         clip_bboxs = (Bbox(((-1.0, -1.0),(long_to_short_balance, 1.0))),
-                      Bbox(((long_to_short_balance, -1.0),(1.0, 1.0))),                  )
+                      Bbox(((long_to_short_balance, -1.0),(1.0, 1.0))), )
+    else:
+        # No-split mode:
+        colors = ['g']
+        if debug_print:
+            print(f'long_to_short_balance: {long_to_short_balance}')
+        clip_bboxs = (Bbox(((-1.0, -1.0),(1.0, 1.0))), )
+
     if debug_print:
         print(f'clip_bboxs: {clip_bboxs}')
 
