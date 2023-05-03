@@ -162,8 +162,6 @@ class MultiContextComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Co
             # replays_df = sess.ripple.to_dataframe()
         except Exception as e:
             raise e
-        
-
         # else:
         #     replays_df = replays_df.copy() # make a copy of the provided df
 
@@ -173,14 +171,14 @@ class MultiContextComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Co
 
         ## time_binned_unit_specific_binned_spike_rate mode:
         try:
-            active_firing_rate_trends = computation_results[global_epoch_name]['computed_data']['firing_rate_trends']    
+            active_firing_rate_trends = computation_results[global_epoch_name]['computed_data']['firing_rate_trends']
             time_bins = active_firing_rate_trends.all_session_spikes.time_binning_container.centers
             time_binned_unit_specific_binned_spike_rate = active_firing_rate_trends.all_session_spikes.time_binned_unit_specific_binned_spike_rate
         except KeyError:
             time_bins, time_binned_unit_specific_binned_spike_rate = {}, {}
         time_binned_unit_specific_spike_rate_result = DynamicParameters.init_from_dict({
             'time_bins': time_bins.copy(),
-            'time_binned_unit_specific_binned_spike_rate': time_binned_unit_specific_binned_spike_rate,           
+            'time_binned_unit_specific_binned_spike_rate': time_binned_unit_specific_binned_spike_rate,
         })
 
         ## instantaneous_unit_specific_spike_rate mode:
@@ -249,7 +247,7 @@ class MultiContextComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Co
 
 
     def _perform_short_long_pf_overlap_analyses(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_whitelist=None, debug_print=False):
-        """ 
+        """ Computes multiple forms of overlap between the short and the long placefields
         
         Requires:
             ['sess']
@@ -284,8 +282,6 @@ class MultiContextComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Co
         conv_overlap_dict, conv_overlap_scalars_df = compute_convolution_overlap(long_results, short_results, debug_print=debug_print)
         product_overlap_dict, product_overlap_scalars_df = compute_dot_product_overlap(long_results, short_results, debug_print=debug_print)
         relative_entropy_overlap_dict, relative_entropy_overlap_scalars_df = compute_relative_entropy_divergence_overlap(long_results, short_results, debug_print=debug_print)
-
-
 
         global_computation_results.computed_data['short_long_pf_overlap_analyses'] = DynamicParameters.init_from_dict({
             'short_long_neurons_diff': pf_neurons_diff,
