@@ -586,9 +586,7 @@ def batch_programmatic_figures(curr_active_pipeline):
     # backend_qt5agg
     matplotlib.use('AGG') # non-interactive backend ## 2022-08-16 - Surprisingly this works to make the matplotlib figures render only to .png file, not appear on the screen!
 
-    n_max_page_rows = 10
-    _batch_plot_kwargs_list = BatchPhoJonathanFiguresHelper._build_batch_plot_kwargs(long_only_aclus, short_only_aclus, shared_aclus, active_identifying_session_ctx, n_max_page_rows=n_max_page_rows)
-    active_out_figures_list = BatchPhoJonathanFiguresHelper._perform_batch_plot(curr_active_pipeline, _batch_plot_kwargs_list, figures_parent_out_path=active_session_figures_out_path, write_pdf=False, write_png=True, progress_print=True, debug_print=False)
+    active_out_figures_list, active_session_figures_out_path = BatchPhoJonathanFiguresHelper.run(curr_active_pipeline, neuron_replay_stats_df, n_max_page_rows = 10)
 
 
     # Plot long|short firing rate index:
@@ -637,6 +635,43 @@ class BatchPhoJonathanFiguresHelper(object):
     """
 
     @classmethod
+    def run(cls, curr_active_pipeline, neuron_replay_stats_df, n_max_page_rows = 10):
+        """ The only public function. Performs the batch plotting. """
+
+        ## 🗨️🟢 2022-11-05 - Pho-Jonathan Batch Outputs of Firing Rate Figures
+        # %matplotlib qt
+        short_only_df = neuron_replay_stats_df[neuron_replay_stats_df.track_membership == SplitPartitionMembership.RIGHT_ONLY]
+        short_only_aclus = short_only_df.index.values.tolist()
+        long_only_df = neuron_replay_stats_df[neuron_replay_stats_df.track_membership == SplitPartitionMembership.LEFT_ONLY]
+        long_only_aclus = long_only_df.index.values.tolist()
+        shared_df = neuron_replay_stats_df[neuron_replay_stats_df.track_membership == SplitPartitionMembership.SHARED]
+        shared_aclus = shared_df.index.values.tolist()
+        print(f'shared_aclus: {shared_aclus}')
+        print(f'long_only_aclus: {long_only_aclus}')
+        print(f'short_only_aclus: {short_only_aclus}')
+
+        active_identifying_session_ctx = curr_active_pipeline.sess.get_context() # 'bapun_RatN_Day4_2019-10-15_11-30-06'
+        # curr_sess_ctx # IdentifyingContext<('kdiba', 'gor01', 'one', '2006-6-07_11-26-53')>
+        figures_parent_out_path = create_daily_programmatic_display_function_testing_folder_if_needed()
+        active_session_figures_out_path = session_context_to_relative_path(figures_parent_out_path, active_identifying_session_ctx)
+        print(f'curr_session_parent_out_path: {active_session_figures_out_path}')
+        active_session_figures_out_path.mkdir(parents=True, exist_ok=True) # make folder if needed
+                
+
+
+        # %matplotlib qtagg
+        import matplotlib
+        # configure backend here
+        # matplotlib.use('Qt5Agg')
+        # backend_qt5agg
+        matplotlib.use('AGG') # non-interactive backend ## 2022-08-16 - Surprisingly this works to make the matplotlib figures render only to .png file, not appear on the screen!
+
+        _batch_plot_kwargs_list = cls._build_batch_plot_kwargs(long_only_aclus, short_only_aclus, shared_aclus, active_identifying_session_ctx, n_max_page_rows=n_max_page_rows)
+        active_out_figures_list = cls._perform_batch_plot(curr_active_pipeline, _batch_plot_kwargs_list, figures_parent_out_path=active_session_figures_out_path, write_pdf=False, write_png=True, progress_print=True, debug_print=False)
+        
+        return active_out_figures_list, active_session_figures_out_path
+
+    @classmethod
     def _subfn_batch_plot_automated(cls, curr_active_pipeline, included_unit_neuron_IDs=None, active_identifying_ctx=None, fignum=None, fig_idx=0, n_max_page_rows=10):
         """ the a programmatic wrapper for automated output using `_display_batch_pho_jonathan_replay_firing_rate_comparison`. The specific plot function called. 
         Called ONLY by `_perform_batch_plot(...)`
@@ -658,7 +693,7 @@ class BatchPhoJonathanFiguresHelper(object):
 
     @classmethod
     def _build_batch_plot_kwargs(cls, long_only_aclus, short_only_aclus, shared_aclus, active_identifying_session_ctx, n_max_page_rows=10):
-        """ builds the list of kwargs for all aclus """
+        """ builds the list of kwargs for all aclus. """
         _batch_plot_kwargs_list = [] # empty list to start
         ## {long_only, short_only} plot configs (doesn't include the shared_aclus)
         if len(long_only_aclus) > 0:        
@@ -697,7 +732,7 @@ class BatchPhoJonathanFiguresHelper(object):
 
     @classmethod
     def _perform_batch_plot(cls, curr_active_pipeline, active_kwarg_list, figures_parent_out_path=None, subset_whitelist=None, subset_blacklist=None, write_pdf=False, write_png=True, progress_print=True, debug_print=False):
-        """ Plots everything using the kwargs provided in `active_kwarg_list`
+        """ Plots everything by calling `cls._subfn_batch_plot_automated` using the kwargs provided in `active_kwarg_list`
 
         Args:
             active_kwarg_list (_type_): generated by `_build_batch_plot_kwargs(...)`
