@@ -1552,7 +1552,7 @@ def plot_long_short(long_results_obj, short_results_obj):
 import matplotlib.pyplot as plt
 
 @function_attributes(short_name=None, tags=['matplotlib', 'long_short_fr_indicies_analysis', 'rate_remapping'], input_requires=['long_short_fr_indicies_analysis'], output_provides=[], uses=[], used_by=[], creation_date='2023-05-03 23:12')
-def plot_rr_aclu(aclu: list, rr_laps: np.ndarray, rr_replays: np.ndarray):
+def plot_rr_aclu(aclu: list, rr_laps: np.ndarray, rr_replays: np.ndarray, sort=None):
     """ Plots rate remapping (rr) values computed from `long_short_fr_indicies_analysis`
     Renders a vertical stack (one for each aclu) of 1D number lines ranging from -1 ("Long Only") to 1 ("Short Only"), where 0 means equal rates on both long and short.
         It plots two points for each of these, a triangle corresponding to that cell's rr_laps and a open circle for the rr_replays.
@@ -1627,10 +1627,27 @@ def plot_rr_aclu(aclu: list, rr_laps: np.ndarray, rr_replays: np.ndarray):
     n_aclus = len(rr_replays)
     aclu_indicies = np.arange(n_aclus)
     
+
     fig, axs = plt.subplots(nrows=len(rr_replays))
 
-    ## Sort on 'rr_replays'
-    sort_indicies = np.argsort(rr_replays)
+    sort_indicies = np.arange(n_aclus) # default sort is the one passed in unless otherwise specified.
+    
+    if sort is not None:
+        if isinstance(sort, str):
+            if sort == 'rr_replays':                
+                ## Sort on 'rr_replays'
+                sort_indicies = np.argsort(rr_replays)
+            else:
+                raise NotImplementedError # only 'rr_replays' sort is implemented.
+        elif isinstance(sort, np.ndarray):
+            # a set of sort indicies
+            sort_indicies = sort
+        else:
+            # Unknown or no sort
+            pass
+    else:
+        # No sort
+        pass
 
     ## Sort all the variables:
     aclu = aclu[sort_indicies]
