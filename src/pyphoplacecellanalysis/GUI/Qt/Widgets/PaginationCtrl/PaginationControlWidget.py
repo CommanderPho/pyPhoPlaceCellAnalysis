@@ -64,6 +64,19 @@ class PaginationControlWidgetState:
 class PaginationControlWidget(QWidget):
     """ 2023-05-08 - Provides a basic pagination management widget with a left arrow button, a integer spin-box, and a right arrow button to control the active pages
     
+
+    ## Simple example:
+
+        def on_paginator_control_widget_jump_to_page(page_idx: int):
+            print(f'on_paginator_control_widget_jump_to_page(page_idx: {page_idx})')
+
+        a_paginator_controller_widget.jump_to_page.connect(on_paginator_control_widget_jump_to_page)
+
+
+    ## Practical Example of using PaginationControlWidget to update a plot:
+
+
+
     """
     # Jump Target Items
     jump_previous_page = QtCore.pyqtSignal()
