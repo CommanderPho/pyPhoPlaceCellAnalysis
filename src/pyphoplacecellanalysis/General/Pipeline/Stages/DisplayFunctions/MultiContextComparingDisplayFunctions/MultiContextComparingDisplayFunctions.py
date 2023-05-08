@@ -1552,7 +1552,7 @@ def plot_long_short(long_results_obj, short_results_obj):
 import matplotlib.pyplot as plt
 
 @function_attributes(short_name=None, tags=['matplotlib', 'long_short_fr_indicies_analysis', 'rate_remapping'], input_requires=['long_short_fr_indicies_analysis'], output_provides=[], uses=[], used_by=[], creation_date='2023-05-03 23:12')
-def plot_rr_aclu(aclu: list, rr_laps: np.ndarray, rr_replays: np.ndarray, sort=None):
+def plot_rr_aclu(aclu: list, rr_laps: np.ndarray, rr_replays: np.ndarray, sort=None, fig=None, axs=None):
     """ Plots rate remapping (rr) values computed from `long_short_fr_indicies_analysis`
     Renders a vertical stack (one for each aclu) of 1D number lines ranging from -1 ("Long Only") to 1 ("Short Only"), where 0 means equal rates on both long and short.
         It plots two points for each of these, a triangle corresponding to that cell's rr_laps and a open circle for the rr_replays.
@@ -1617,21 +1617,24 @@ def plot_rr_aclu(aclu: list, rr_laps: np.ndarray, rr_replays: np.ndarray, sort=N
         _subfn_remove_all_ax_features(ax)
         ax.set_ylim(-0.5, 0.5)
 
-    # Create figure and axis
-    # fig, ax = plt.subplots()
-    # _subfn_draw_single_aclu_num_line(ax, aclu, aclu_y=0.0, rr_laps=rr_laps, rr_replays=rr_replays)
-    # axs = (ax)
-
     if not isinstance(aclu, np.ndarray):
         aclu = np.array(aclu) # convert to ndarray
-    n_aclus = len(rr_replays)
+    n_aclus = len(aclu)
     aclu_indicies = np.arange(n_aclus)
     
 
-    fig, axs = plt.subplots(nrows=len(rr_replays))
+    if (fig is None) or (axs is None):
+        ## Create a new figure and set of subplots
+        fig, axs = plt.subplots(nrows=len(rr_replays))
+    else:
+        assert len(axs) >= n_aclus, f"make sure that there are enough axes to display each aclu provided."
+        # Clear existing axes:
+        for ax in axs:
+            ax.clear()
 
-    sort_indicies = np.arange(n_aclus) # default sort is the one passed in unless otherwise specified.
-    
+
+    ## Sort process (local sort):
+    sort_indicies = np.arange(n_aclus) # default sort is the one passed in unless otherwise specified.    
     if sort is not None:
         if isinstance(sort, str):
             if sort == 'rr_replays':                
@@ -1654,8 +1657,9 @@ def plot_rr_aclu(aclu: list, rr_laps: np.ndarray, rr_replays: np.ndarray, sort=N
     rr_replays = rr_replays[sort_indicies]
     rr_laps = rr_laps[sort_indicies]
 
+    ## Main Loop:
     for ax, an_aclu_index, an_aclu, an_rr_laps, an_rr_replays in zip(axs, aclu_indicies, aclu, rr_laps, rr_replays):
-        is_last_iteration = an_aclu_index == aclu_indicies[-1] # labels will be surpressed on all but the last iteration
+        is_last_iteration = (an_aclu_index == aclu_indicies[-1]) # labels will be surpressed on all but the last iteration
         _subfn_draw_single_aclu_num_line(ax, an_aclu, aclu_y=0.0, rr_laps=an_rr_laps, rr_replays=an_rr_replays, supress_labels=(not is_last_iteration)) # (float(an_aclu_index)*0.5)
 
     # Add title to the plot
