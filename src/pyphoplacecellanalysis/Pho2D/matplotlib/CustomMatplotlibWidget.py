@@ -7,10 +7,13 @@ from qtpy import QtCore, QtWidgets, QtGui
 
 from pyphocorehelpers.DataStructure.general_parameter_containers import VisualizationParameters, RenderPlotsData, RenderPlots
 from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer
+from pyphocorehelpers.function_helpers import function_attributes
+
 
 
 __all__ = ['CustomMatplotlibWidget']
 
+@function_attributes(short_name=None, tags=['matplotlib'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-05-08 14:20')
 class CustomMatplotlibWidget(QtWidgets.QWidget):
     """
     Implements a Matplotlib figure inside a QWidget.
