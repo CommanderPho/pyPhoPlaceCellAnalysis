@@ -1,0 +1,110 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <author>Pho Hale</author>
+ <class>RootWidget</class>
+ <widget class="QWidget" name="RootWidget">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>386</width>
+    <height>73</height>
+   </rect>
+  </property>
+  <property name="windowTitle">
+   <string>PaginationControlWidget</string>
+  </property>
+  <property name="styleSheet">
+   <string notr="true">background-color: rgb(71, 58, 46);
+border-color: rgb(207, 207, 207);
+background-color: rgba(71, 65, 60, 180);
+color: rgb(244, 244, 244);
+border-color: rgb(0, 0, 0);</string>
+  </property>
+  <widget class="QFrame" name="paginationControlWidget">
+   <property name="geometry">
+    <rect>
+     <x>10</x>
+     <y>10</y>
+     <width>370</width>
+     <height>34</height>
+    </rect>
+   </property>
+   <layout class="QHBoxLayout" name="horizontalLayout" stretch="0,0,0">
+    <property name="topMargin">
+     <number>0</number>
+    </property>
+    <property name="bottomMargin">
+     <number>0</number>
+    </property>
+    <item>
+     <widget class="QToolButton" name="btnJumpToPrevious">
+      <property name="enabled">
+       <bool>false</bool>
+      </property>
+      <property name="toolTip">
+       <string>Jump to Previous</string>
+      </property>
+      <property name="statusTip">
+       <string>Jump to Previous</string>
+      </property>
+      <property name="text">
+       <string>&lt;</string>
+      </property>
+      <property name="shortcut">
+       <string>Left</string>
+      </property>
+     </widget>
+    </item>
+    <item>
+     <widget class="QSpinBox" name="spinBoxPage">
+      <property name="sizePolicy">
+       <sizepolicy hsizetype="Minimum" vsizetype="Fixed">
+        <horstretch>1</horstretch>
+        <verstretch>0</verstretch>
+       </sizepolicy>
+      </property>
+      <property name="buttonSymbols">
+       <enum>QAbstractSpinBox::UpDownArrows</enum>
+      </property>
+      <property name="correctionMode">
+       <enum>QAbstractSpinBox::CorrectToNearestValue</enum>
+      </property>
+     </widget>
+    </item>
+    <item>
+     <widget class="QToolButton" name="btnJumpToNext">
+      <property name="enabled">
+       <bool>false</bool>
+      </property>
+      <property name="toolTip">
+       <string>Jump to Next</string>
+      </property>
+      <property name="statusTip">
+       <string>Jump to Next</string>
+      </property>
+      <property name="text">
+       <string>&gt;</string>
+      </property>
+      <property name="shortcut">
+       <string>Right</string>
+      </property>
+     </widget>
+    </item>
+   </layout>
+  </widget>
+  <action name="actionConnect">
+   <property name="text">
+    <string>Connect</string>
+   </property>
+   <property name="toolTip">
+    <string>Connect this window's timeline to another window</string>
+   </property>
+  </action>
+ </widget>
+ <resources>
+  <include location="../../../../Resources/GuiResources.qrc"/>
+  <include location="../../../../Resources/ActionIcons.qrc"/>
+ </resources>
+ <connections/>
+</ui>
