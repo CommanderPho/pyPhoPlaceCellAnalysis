@@ -380,14 +380,14 @@ class DecodedFilterEpochsResult(object):
         from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import DecodedFilterEpochsResult
 
     """
-    most_likely_positions_list: list
-    p_x_given_n_list: list
-    marginal_x_list: list
-    marginal_y_list: list
-    most_likely_position_indicies_list: list
-    spkcount: list
+    most_likely_positions_list: list = field(metadata={'shape': ('n_epochs',)})
+    p_x_given_n_list: list = field(metadata={'shape': ('n_epochs',)})
+    marginal_x_list: list = field(metadata={'shape': ('n_epochs',)})
+    marginal_y_list: list = field(metadata={'shape': ('n_epochs',)})
+    most_likely_position_indicies_list: list = field(metadata={'shape': ('n_epochs',)})
+    spkcount: list = field(metadata={'shape': ('n_epochs',)})
     nbins: np.ndarray
-    time_bin_containers: list
+    time_bin_containers: list = field(metadata={'shape': ('n_epochs',)})
     decoding_time_bin_size: float
     num_filter_epochs: int
     time_bin_edges: list
