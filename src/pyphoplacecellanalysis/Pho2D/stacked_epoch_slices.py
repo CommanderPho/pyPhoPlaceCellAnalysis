@@ -58,7 +58,6 @@ def stacked_epoch_basic_setup(epoch_slices, epoch_labels=None, name='stacked_epo
     params.single_plot_fixed_height = single_plot_fixed_height
     params.all_plots_height = float(params.active_num_slices) * float(params.single_plot_fixed_height)
 
-
     if (epoch_labels is None) or (epoch_labels == []):
         # Build defaults for the plots
         epoch_labels = [f'epoch[{a_slice_idx}]' for a_slice_idx in np.arange(num_slices)]
