@@ -54,6 +54,25 @@ def _wrap_multi_context_computation_function(global_comp_fcn):
     return _
 
 
+from attrs import define, field # used for `JonathanFiringRateAnalysisResult`
+
+@define(slots=False)
+class JonathanFiringRateAnalysisResult:
+    """ holds the outputs of `_perform_jonathan_replay_firing_rate_analyses` 
+    Usage:
+        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.MultiContextComputationFunctions import JonathanFiringRateAnalysisResult
+        jonathan_firing_rate_analysis_result = JonathanFiringRateAnalysisResult(**curr_active_pipeline.global_computation_results.computed_data.jonathan_firing_rate_analysis.to_dict())
+        jonathan_firing_rate_analysis_result.neuron_replay_stats_df.to_clipboard()
+    """
+    rdf: DynamicParameters
+    irdf: DynamicParameters
+    time_binned_unit_specific_spike_rate: DynamicParameters
+    time_binned_instantaneous_unit_specific_spike_rate: DynamicParameters
+    neuron_replay_stats_df: pd.DataFrame
+
+
+
+
 class MultiContextComputationFunctions(AllFunctionEnumeratingMixin, metaclass=ComputationFunctionRegistryHolder):
     
     _computationGroupName = 'multi_context'
@@ -247,6 +266,10 @@ class MultiContextComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Co
             'time_binned_instantaneous_unit_specific_spike_rate': instantaneous_unit_specific_spike_rate_result,
             'neuron_replay_stats_df': final_jonathan_df
         })
+
+        # Convert to explicit `JonathanFiringRateAnalysisResult` object:
+        # jonathan_firing_rate_analysis_result = JonathanFiringRateAnalysisResult(**global_computation_results.computed_data['jonathan_firing_rate_analysis'].to_dict())
+        
         return global_computation_results
 
 
