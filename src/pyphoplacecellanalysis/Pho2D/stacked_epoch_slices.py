@@ -314,6 +314,49 @@ def stacked_epoch_slices_view_viewbox(epoch_slices, position_times_list, positio
 # matplotlib-based versions                                                                                            #
 # ==================================================================================================================== #
 
+# Pieces of plotting for pagination __________________________________________________________________________________ #
+def _pagination_helper_plot_single_epoch_slice(curr_ax, params, plots_data, plots, ui, a_slice_idx, is_first_setup=True, debug_print=False):
+    """ plots the data corresponding to `a_slice_idx` on the provided axes (`curr_ax`) 
+    
+    is_first_setup is True by default, and performs the axes initialization such as setting non-changing labels and such
+    when calling to update the plot, set is_first_setup=False to skip this initialization and it will only update the stuff the changes every time
+    
+    """
+    if debug_print:
+        print(f'a_slice_idx: {a_slice_idx}')
+    a_slice_start_t = plots_data.epoch_slices[a_slice_idx, 0]
+    a_slice_end_t = plots_data.epoch_slices[a_slice_idx, 1]
+    a_slice_label = params.epoch_labels[a_slice_idx]
+    if debug_print:
+        print(f'a_slice_start_t: {a_slice_start_t}, a_slice_end_t: {a_slice_end_t}, a_slice_label: {a_slice_label}')
+    curr_ax.set_xlim(*plots_data.epoch_slices[a_slice_idx,:])
+    
+    if is_first_setup:
+        curr_ax.tick_params(labelleft=False, labelbottom=True)
+        curr_ax.set_title('') # remove the title
+
+    if is_first_setup or (not plots.has_attr('secondary_yaxes')): # if it were a plain dict, `hasattr(plots, 'secondary_yaxes')` would be correct. But for a DynamicParameters object I need to do 
+        plots.secondary_yaxes = {} # initialize to an empty dictionary
+
+    # Left side y-label for the start time
+    curr_ax.set_ylabel(f'{a_slice_label}\n{a_slice_start_t:.2f}') # format to two decimal places
+    
+    ## Add the right-aligned axis
+    # From http://notes.brooks.nu/2008/03/plotting-on-left-and-right-axis-simulateously-using-matplotlib-and-numpy
+    # Create right axis and plots.  It is the frameon=False that makes this plot transparent so that you can see the left axis plot that will be underneath it. The sharex option causes
+    # if is_first_setup:
+    secax_y = plots.secondary_yaxes.get(curr_ax, None) # get the existing one or create one
+    if secax_y is None:
+        secax_y = curr_ax.secondary_yaxis('right', functions=None)
+        plots.secondary_yaxes[curr_ax] = secax_y # set the secondary axis for this curr_ax
+        
+    assert secax_y is not None
+    secax_y.set_ylabel(f'{a_slice_end_t:.2f}')
+    if is_first_setup:
+        secax_y.tick_params(labelleft=False, labelbottom=False, labelright=False) # Turn off all ticks for the secondary axis
+    # Do I need to save this temporary axes? No, it appears that's not needed
+
+
 # Helper Figure/Plots Builders _______________________________________________________________________________________ #
 def stacked_epoch_slices_matplotlib_build_view(epoch_slices, name='stacked_epoch_slices_matplotlib_subplots_laps', plot_function_name=None, epoch_labels=None, single_plot_fixed_height=100.0, debug_test_max_num_slices=127, debug_print=False):
     """ Builds a matplotlib figure view with empty subplots that can be plotted after the fact by iterating through plots.axs
@@ -362,30 +405,7 @@ def stacked_epoch_slices_matplotlib_build_view(epoch_slices, name='stacked_epoch
         plots.axs = [plots.axs]
 
     for a_slice_idx, curr_ax in enumerate(plots.axs):
-        if debug_print:
-            print(f'a_slice_idx: {a_slice_idx}')
-        
-        ## Get values:
-        # Create inset in data coordinates using ax.transData as transform
-        a_slice_start_t = plots_data.epoch_slices[a_slice_idx, 0]
-        a_slice_end_t = plots_data.epoch_slices[a_slice_idx, 1]
-        a_slice_label = params.epoch_labels[a_slice_idx]
-        if debug_print:
-            print(f'a_slice_start_t: {a_slice_start_t}, a_slice_end_t: {a_slice_end_t}, a_slice_label: {a_slice_label}')
-        curr_ax.set_xlim(*plots_data.epoch_slices[a_slice_idx,:])
-        curr_ax.tick_params(labelleft=False, labelbottom=True)
-        curr_ax.set_title('') # remove the title
-        
-        # Left side y-label for the start time
-        curr_ax.set_ylabel(f'{a_slice_label}\n{a_slice_start_t:.2f}') # format to two decimal places
-        
-        ## Add the right-aligned axis
-        # From http://notes.brooks.nu/2008/03/plotting-on-left-and-right-axis-simulateously-using-matplotlib-and-numpy
-        # Create right axis and plots.  It is the frameon=False that makes this plot transparent so that you can see the left axis plot that will be underneath it. The sharex option causes
-        secax_y = curr_ax.secondary_yaxis('right', functions=None)
-        secax_y.set_ylabel(f'{a_slice_end_t:.2f}')
-        secax_y.tick_params(labelleft=False, labelbottom=False, labelright=False) # Turn off all ticks for the secondary axis
-        # Do I need to save this temporary axes? No, it appears that's not needed
+        _pagination_helper_plot_single_epoch_slice(curr_ax, params, plots_data, plots, ui, a_slice_idx=a_slice_idx, is_first_setup=True, debug_print=debug_print)
 
     ## Required only for MatplotlibTimeSynchronizedWidget-embedded version:
     ui.mw.draw()

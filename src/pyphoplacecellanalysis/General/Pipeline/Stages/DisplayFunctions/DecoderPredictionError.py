@@ -491,6 +491,45 @@ def _temp_debug_two_step_plots_animated_imshow(active_one_step_decoder, active_t
 # Functions for rendering a stack of decoded epochs in a stacked_epoch_slices-style manner                             #
 # ==================================================================================================================== #
 
+def _subfn_update_decoded_epoch_slices(params, plots_data, plots, ui, debug_print=False):
+    """ attempts to update existing plots created by:
+    
+       params, plots_data, plots, ui = stacked_epoch_slices_matplotlib_build_view(epoch_slices, epoch_labels=epoch_labels, name=name, plot_function_name=plot_function_name, debug_test_max_num_slices=debug_test_max_num_slices, debug_print=debug_print)
+
+       Requires: `plots_data.filter_epochs_decoder_result`
+    """
+    
+    for i, curr_ax in enumerate(plots.axs):
+        curr_time_bin_container = plots_data.filter_epochs_decoder_result.time_bin_containers[i]
+        curr_time_bins = curr_time_bin_container.centers
+        curr_posterior_container = plots_data.filter_epochs_decoder_result.marginal_x_list[i]
+        curr_posterior = curr_posterior_container.p_x_given_n
+        curr_most_likely_positions = curr_posterior_container.most_likely_positions_1D
+        
+        params, plots_data, plots, ui = _helper_update_decoded_single_epoch_slice_plot(curr_ax, params, plots_data, plots, ui, i, curr_time_bins, curr_posterior, curr_most_likely_positions, debug_print=debug_print)
+
+
+def _helper_update_decoded_single_epoch_slice_plot(curr_ax, params, plots_data, plots, ui, i, curr_time_bins, curr_posterior, curr_most_likely_positions, debug_print=False):
+    """ 2023-05-08 - Factored out of plot_decoded_epoch_slices to enable paged 
+
+    Needs only: curr_time_bins, curr_posterior, curr_most_likely_positions
+    Accesses: plots_data.epoch_slices[i,:]
+    """    
+    if debug_print:
+        print(f'i : {i}, curr_posterior.shape: {curr_posterior.shape}')
+    _temp_fig, curr_ax = plot_1D_most_likely_position_comparsions(plots_data.global_pos_df, ax=curr_ax, time_window_centers=curr_time_bins, variable_name=params.variable_name, xbin=params.xbin,
+                                                        posterior=curr_posterior,
+                                                        active_most_likely_positions_1D=curr_most_likely_positions,
+                                                        enable_flat_line_drawing=params.enable_flat_line_drawing, debug_print=debug_print)
+    if _temp_fig is not None:
+        plots.fig = _temp_fig
+    
+    curr_ax.set_xlim(*plots_data.epoch_slices[i,:])
+    curr_ax.set_title(f'') # needs to be set to empty string '' because this is the title that appears above each subplot/slice
+    return params, plots_data, plots, ui
+
+
+@function_attributes(short_name=None, tags=['epoch','slices','decoder','figure'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-05-08 16:31', related_items=[])
 def plot_decoded_epoch_slices(filter_epochs, filter_epochs_decoder_result, global_pos_df, variable_name:str='lin_pos', xbin=None, enable_flat_line_drawing=False, debug_test_max_num_slices=20, name='stacked_epoch_slices_matplotlib_subplots', debug_print=False):
     """ plots the decoded epoch results in a stacked slices view 
     
@@ -554,25 +593,15 @@ def plot_decoded_epoch_slices(filter_epochs, filter_epochs_decoder_result, globa
     plot_function_name = 'Stacked Epoch Slices View - MATPLOTLIB subplots Version'
     params, plots_data, plots, ui = stacked_epoch_slices_matplotlib_build_view(epoch_slices, epoch_labels=epoch_labels, name=name, plot_function_name=plot_function_name, debug_test_max_num_slices=debug_test_max_num_slices, debug_print=debug_print)
 
-    for i, curr_ax in enumerate(plots.axs):
-        curr_time_bin_container = filter_epochs_decoder_result.time_bin_containers[i]
-        curr_time_bins = curr_time_bin_container.centers
-        curr_posterior_container = filter_epochs_decoder_result.marginal_x_list[i]
-        curr_posterior = curr_posterior_container.p_x_given_n
-        curr_most_likely_positions = curr_posterior_container.most_likely_positions_1D
-        
-        if debug_print:
-            print(f'i : {i}, curr_posterior.shape: {curr_posterior.shape}')
+    ## Add required variables to `params` and `plots_data`:
+    params.variable_name = variable_name
+    params.xbin = xbin.copy()
+    params.enable_flat_line_drawing = enable_flat_line_drawing
+    
+    plots_data.global_pos_df = global_pos_df.copy()
+    plots_data.filter_epochs_decoder_result = deepcopy(filter_epochs_decoder_result)
 
-        _temp_fig, curr_ax = plot_1D_most_likely_position_comparsions(global_pos_df, ax=curr_ax, time_window_centers=curr_time_bins, variable_name=variable_name, xbin=xbin,
-                                                           posterior=curr_posterior,
-                                                           active_most_likely_positions_1D=curr_most_likely_positions,
-                                                           enable_flat_line_drawing=enable_flat_line_drawing, debug_print=debug_print)
-        if _temp_fig is not None:
-            plots.fig = _temp_fig
-        
-        curr_ax.set_xlim(*plots_data.epoch_slices[i,:])
-        curr_ax.set_title(f'') # needs to be set to empty string '' because this is the title that appears above each subplot/slice
+    _subfn_update_decoded_epoch_slices(params, plots_data, plots, ui, debug_print=debug_print)
 
     return params, plots_data, plots, ui
 
