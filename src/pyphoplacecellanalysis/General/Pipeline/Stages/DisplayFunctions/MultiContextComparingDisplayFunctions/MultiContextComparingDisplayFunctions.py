@@ -1794,7 +1794,7 @@ class RateRemappingPaginatedFigureController(PaginatedFigureController):
         
         
         if self.params.active_identifying_figure_ctx is not None:
-            active_identifying_ctx = self.params.active_identifying_figure_ctx.adding_context(collision_prefix='_RateRemapping_plot_test', display_fn_name='plot_rr_aclu', plot_result_set='shared', page=f'{page_idx+1}of{self.a_paginator.num_pages}', aclus=f"{included_page_data_indicies}")
+            active_identifying_ctx = self.params.active_identifying_figure_ctx.adding_context(collision_prefix='_RateRemapping_plot_test', display_fn_name='plot_rr_aclu', plot_result_set='shared', page=f'{page_idx+1}of{self.paginator.num_pages}', aclus=f"{included_page_data_indicies}")
         else:
             active_identifying_ctx = None
 
