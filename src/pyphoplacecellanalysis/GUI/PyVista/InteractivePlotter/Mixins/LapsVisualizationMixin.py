@@ -114,4 +114,6 @@ class LapsVisualizationMixin:
         line["scalars"] = np.arange(line.n_points)
         tube = line.tube(radius=0.2)
         # tube.plot(smooth_shading=True)
-        p.add_mesh(tube, **({'name': 'lap_location_trail_spline[{}]'.format(int(curr_lap_id)), 'render_lines_as_tubes': False, 'show_scalar_bar': False, 'cmap': 'bmy', 'lighting': False, 'render': False} | kwargs))
+        color_map_name = 'bmy' # old
+        color_map_name = 'cividis' # 2023-05-09 and newer
+        p.add_mesh(tube, **({'name': 'lap_location_trail_spline[{}]'.format(int(curr_lap_id)), 'render_lines_as_tubes': False, 'show_scalar_bar': False, 'cmap': color_map_name, 'lighting': False, 'render': False} | kwargs))
