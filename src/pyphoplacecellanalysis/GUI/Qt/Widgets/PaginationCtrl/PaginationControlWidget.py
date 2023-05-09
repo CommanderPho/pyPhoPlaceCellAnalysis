@@ -34,7 +34,7 @@ from attrs import define
 
 @define(slots=False)
 class PaginationControlWidgetState:
-    """docstring for PaginationControlWidgetState."""
+    """Contains the current state (the current_page_idx)."""
     n_pages: int = 0
     current_page_idx: int = 0
 
@@ -42,7 +42,6 @@ class PaginationControlWidgetState:
     def _max_valid_index(self):
         """The maximum valid index that current_page_idx can take."""
         return (self.n_pages-1)
-
 
     @property
     def can_move_left(self):
