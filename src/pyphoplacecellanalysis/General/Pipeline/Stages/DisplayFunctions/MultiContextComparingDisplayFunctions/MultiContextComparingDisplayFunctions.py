@@ -1598,7 +1598,7 @@ def plot_rr_aclu(aclu: list, rr_laps: np.ndarray, rr_replays: np.ndarray, rr_neu
             ax.text(x, label_start_y-0.1, sub_label, fontsize=8, ha='center')
         
 
-    def _subfn_draw_single_aclu_num_line(ax, aclu, aclu_y: float, rr_laps: float, rr_replays: float, supress_labels=False):
+    def _subfn_draw_single_aclu_num_line(ax, aclu, aclu_y: float, rr_laps: float, rr_replays: float, rr_neuron_types = None, supress_labels=False):
         """ plots a single aclu's plot centered vertically at `aclu_y` """
         # Add thick black baseline line segment along y=0 between -1 and 1
         ax.plot([-1, 1], [aclu_y, aclu_y], color='black', linewidth=2)
@@ -1658,10 +1658,19 @@ def plot_rr_aclu(aclu: list, rr_laps: np.ndarray, rr_replays: np.ndarray, rr_neu
     rr_replays = rr_replays[sort_indicies]
     rr_laps = rr_laps[sort_indicies]
 
+    if rr_neuron_types is None:
+        rr_neuron_types = [None] * len(aclu) # a list containing all None values
+        assert len(rr_neuron_types) == len(aclu)
+
+    else:
+        # if rr_neuron_types is not None:
+        assert len(rr_neuron_types) == len(aclu)
+        rr_neuron_types = rr_neuron_types[sort_indicies]
+
     ## Main Loop:
-    for ax, an_aclu_index, an_aclu, an_rr_laps, an_rr_replays in zip(axs, aclu_indicies, aclu, rr_laps, rr_replays):
+    for ax, an_aclu_index, an_aclu, an_rr_laps, an_rr_replays, an_rr_neuron_types in zip(axs, aclu_indicies, aclu, rr_laps, rr_replays, rr_neuron_types):
         is_last_iteration = (an_aclu_index == aclu_indicies[-1]) # labels will be surpressed on all but the last iteration
-        _subfn_draw_single_aclu_num_line(ax, an_aclu, aclu_y=0.0, rr_laps=an_rr_laps, rr_replays=an_rr_replays, supress_labels=(not is_last_iteration)) # (float(an_aclu_index)*0.5)
+        _subfn_draw_single_aclu_num_line(ax, an_aclu, aclu_y=0.0, rr_laps=an_rr_laps, rr_replays=an_rr_replays, rr_neuron_types=an_rr_neuron_types, supress_labels=(not is_last_iteration)) # (float(an_aclu_index)*0.5)
 
     # Add title to the plot
     # ax.set_title('Long-Short Equity')
@@ -1708,7 +1717,7 @@ class RateRemappingPaginatedFigureController(PaginatedFigureController):
         super(RateRemappingPaginatedFigureController, self).__init__(params, plots_data, plots, ui, parent=parent)
 
     @classmethod
-    def init_from_paginator(cls, a_paginator, a_name:str = 'RateRemappingPaginatedFigureController', plot_function_name='plot_rr_aclu', parent=None):
+    def init_from_paginator(cls, a_paginator, a_name:str = 'RateRemappingPaginatedFigureController', plot_function_name='plot_rr_aclu', active_context=None, parent=None):
         new_obj = cls(params=VisualizationParameters(name=a_name), plots_data=RenderPlotsData(name=a_name, paginator=a_paginator), plots=RenderPlots(name=a_name), ui=PhoUIContainer(name=a_name, connections=PhoUIContainer(name=a_name)), parent=parent)
         # new_obj.ui.connections = PhoUIContainer(name=name)
         num_slices = a_paginator.max_num_items_per_page
@@ -1716,6 +1725,7 @@ class RateRemappingPaginatedFigureController(PaginatedFigureController):
         new_obj.params.name = a_name
         new_obj.params.window_title = plot_function_name
         new_obj.params.num_slices = num_slices # not sure if needed
+        new_obj.params.active_identifying_figure_ctx = active_context
         
         # new_obj.params._debug_test_max_num_slices = debug_test_max_num_slices
         # new_obj.params.active_num_slices = min(num_slices, new_obj.params._debug_test_max_num_slices)
@@ -1775,19 +1785,49 @@ class RateRemappingPaginatedFigureController(PaginatedFigureController):
     def on_paginator_control_widget_jump_to_page(self, page_idx: int):
         """ Update captures `a_paginator`, 'mw' """
         from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.MultiContextComparingDisplayFunctions.MultiContextComparingDisplayFunctions import plot_rr_aclu
-        
+        from pyphoplacecellanalysis.General.Mixins.ExportHelpers import build_figure_basename_from_display_context, session_context_to_relative_path
+
 
         # print(f'on_paginator_control_widget_jump_to_page(page_idx: {page_idx})')
         # included_page_data_indicies, (curr_page_rr_aclus, curr_page_rr_laps, curr_page_rr_replays, *curr_page_rr_extras_tuple) = self.paginator.get_page_data(page_idx=page_idx)
         included_page_data_indicies, (curr_page_rr_aclus, curr_page_rr_laps, curr_page_rr_replays, curr_page_rr_neuron_type) = self.paginator.get_page_data(page_idx=page_idx)
         
+        
+        if self.params.active_identifying_figure_ctx is not None:
+            active_identifying_ctx = self.params.active_identifying_figure_ctx.adding_context(collision_prefix='_RateRemapping_plot_test', display_fn_name='plot_rr_aclu', plot_result_set='shared', page=f'{page_idx+1}of{self.a_paginator.num_pages}', aclus=f"{included_page_data_indicies}")
+        else:
+            active_identifying_ctx = None
+
+
         # print(f'\tincluded_page_data_indicies: {included_page_data_indicies}')
         fig = self.ui.mw.getFigure()
         axs = self.ui.mw.axes
         # print(f'axs: {axs}')
-        fig, axs, sort_indicies = plot_rr_aclu([str(aclu) for aclu in curr_page_rr_aclus], rr_laps=curr_page_rr_laps, rr_replays=curr_page_rr_replays, fig=fig, axs=axs)
+        fig, axs, sort_indicies = plot_rr_aclu([str(aclu) for aclu in curr_page_rr_aclus], rr_laps=curr_page_rr_laps, rr_replays=curr_page_rr_replays, rr_neuron_types=curr_page_rr_neuron_type, fig=fig, axs=axs)
         # print(f'\t done.')
+
+        if active_identifying_ctx is not None:
+            final_context = active_identifying_ctx # Display/Variable context mode
+            active_identifying_ctx_string = final_context.get_description(separator='|') # Get final discription string
+            print(f'active_identifying_ctx_string: "{active_identifying_ctx_string}"')
+            # active_figure_save_basename = build_figure_basename_from_display_context(final_context)
+            self.update_titles(active_identifying_ctx_string)
+        else:
+            self.update_titles("no context set!")
+
+
         self.ui.mw.draw()
+
+
+    def update_titles(self, window_title: str, suptitle: str = None):
+        """ sets the titles for the figure """
+        if suptitle is None:
+            suptitle = window_title # same as window title
+        # Set the window title:
+        self.ui.mw.setWindowTitle(window_title)
+        self.ui.mw.fig.suptitle(suptitle) # set the plot suptitle
+        self.ui.mw.draw()
+
 
     # def perform_plot(self, debug_print=False):
     #     self.params.debug_print = debug_print
