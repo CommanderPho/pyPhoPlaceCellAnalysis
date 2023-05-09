@@ -491,24 +491,6 @@ def _temp_debug_two_step_plots_animated_imshow(active_one_step_decoder, active_t
 # Functions for rendering a stack of decoded epochs in a stacked_epoch_slices-style manner                             #
 # ==================================================================================================================== #
 
-def _subfn_update_decoded_epoch_slices(params, plots_data, plots, ui, debug_print=False):
-    """ attempts to update existing plots created by:
-    
-       params, plots_data, plots, ui = stacked_epoch_slices_matplotlib_build_view(epoch_slices, epoch_labels=epoch_labels, name=name, plot_function_name=plot_function_name, debug_test_max_num_slices=debug_test_max_num_slices, debug_print=debug_print)
-
-       Requires: `plots_data.filter_epochs_decoder_result`
-    """
-    
-    for i, curr_ax in enumerate(plots.axs):
-        curr_time_bin_container = plots_data.filter_epochs_decoder_result.time_bin_containers[i]
-        curr_time_bins = curr_time_bin_container.centers
-        curr_posterior_container = plots_data.filter_epochs_decoder_result.marginal_x_list[i]
-        curr_posterior = curr_posterior_container.p_x_given_n
-        curr_most_likely_positions = curr_posterior_container.most_likely_positions_1D
-        
-        params, plots_data, plots, ui = _helper_update_decoded_single_epoch_slice_plot(curr_ax, params, plots_data, plots, ui, i, curr_time_bins, curr_posterior, curr_most_likely_positions, debug_print=debug_print)
-
-
 def _helper_update_decoded_single_epoch_slice_plot(curr_ax, params, plots_data, plots, ui, i, curr_time_bins, curr_posterior, curr_most_likely_positions, debug_print=False):
     """ 2023-05-08 - Factored out of plot_decoded_epoch_slices to enable paged 
 
@@ -527,6 +509,26 @@ def _helper_update_decoded_single_epoch_slice_plot(curr_ax, params, plots_data, 
     curr_ax.set_xlim(*plots_data.epoch_slices[i,:])
     curr_ax.set_title(f'') # needs to be set to empty string '' because this is the title that appears above each subplot/slice
     return params, plots_data, plots, ui
+
+def _subfn_update_decoded_epoch_slices(params, plots_data, plots, ui, debug_print=False):
+    """ attempts to update existing plots created by:
+    
+       params, plots_data, plots, ui = stacked_epoch_slices_matplotlib_build_view(epoch_slices, epoch_labels=epoch_labels, name=name, plot_function_name=plot_function_name, debug_test_max_num_slices=debug_test_max_num_slices, debug_print=debug_print)
+
+       Requires: `plots_data.filter_epochs_decoder_result`
+    """
+    
+    for i, curr_ax in enumerate(plots.axs):
+        curr_time_bin_container = plots_data.filter_epochs_decoder_result.time_bin_containers[i]
+        curr_time_bins = curr_time_bin_container.centers
+        curr_posterior_container = plots_data.filter_epochs_decoder_result.marginal_x_list[i]
+        curr_posterior = curr_posterior_container.p_x_given_n
+        curr_most_likely_positions = curr_posterior_container.most_likely_positions_1D
+        
+        params, plots_data, plots, ui = _helper_update_decoded_single_epoch_slice_plot(curr_ax, params, plots_data, plots, ui, i, curr_time_bins, curr_posterior, curr_most_likely_positions, debug_print=debug_print)
+
+
+
 
 
 @function_attributes(short_name=None, tags=['epoch','slices','decoder','figure'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-05-08 16:31', related_items=[])
