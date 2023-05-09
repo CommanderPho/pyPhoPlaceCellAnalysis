@@ -524,15 +524,17 @@ def stacked_epoch_slices_matplotlib_build_insets_view(epoch_slices, name='stacke
 # ==================================================================================================================== #
 # Paginated Versions                                                                                                   #
 # ==================================================================================================================== #
-from pyphoplacecellanalysis.GUI.Qt.Mixins.PaginationMixins import PaginatedFigureController
-from pyphocorehelpers.indexing_helpers import Paginator
 from neuropy.core.epoch import Epoch
-from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import plot_decoded_epoch_slices #, _helper_update_decoded_single_epoch_slice_plot #, _subfn_update_decoded_epoch_slices
-from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import plot_1D_most_likely_position_comparsions # used in `plot_decoded_epoch_slices`
 
-from pyphoplacecellanalysis.External.pyqtgraph import QtCore
+from pyphocorehelpers.indexing_helpers import Paginator
 from pyphocorehelpers.DataStructure.general_parameter_containers import VisualizationParameters, RenderPlotsData, RenderPlots
 from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer
+
+
+from pyphoplacecellanalysis.External.pyqtgraph import QtCore
+from pyphoplacecellanalysis.GUI.Qt.Mixins.PaginationMixins import PaginatedFigureController
+
+
 
 class DecodedEpochSlicesPaginatedFigureController(PaginatedFigureController):
     """2023-05-09 - Aims to refactor `plot_paginated_decoded_epoch_slices`, a series of nested functions, into a stateful class
@@ -617,6 +619,8 @@ class DecodedEpochSlicesPaginatedFigureController(PaginatedFigureController):
     @QtCore.pyqtSlot(int)
     def on_paginator_control_widget_jump_to_page(self, page_idx: int):
         """ Update: made to depend on self """
+        from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import plot_1D_most_likely_position_comparsions # used in `plot_decoded_epoch_slices`
+        
         # print(f'on_paginator_control_widget_jump_to_page(page_idx: {page_idx})')
         included_page_data_indicies, (curr_page_active_filter_epochs, curr_page_epoch_labels, curr_page_time_bin_containers, curr_page_posterior_containers) = self.plots_data.paginator.get_page_data(page_idx=page_idx)
         # print(f'\tincluded_page_data_indicies: {included_page_data_indicies}')
@@ -651,6 +655,7 @@ class DecodedEpochSlicesPaginatedFigureController(PaginatedFigureController):
 
     def plot_paginated_decoded_epoch_slices(self, active_filter_epochs, filter_epochs_decoder_result, xbin, global_pos_df, max_subplots_per_page=20, debug_print=False):
         """ 2023-05-08 - plots a paginated decoded_epoch_slices figure """
+        from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import plot_decoded_epoch_slices #, _helper_update_decoded_single_epoch_slice_plot #, _subfn_update_decoded_epoch_slices
 
         active_filter_epochs = deepcopy(active_filter_epochs)
         filter_epochs_decoder_result = deepcopy(filter_epochs_decoder_result) # DecodedFilterEpochsResult
