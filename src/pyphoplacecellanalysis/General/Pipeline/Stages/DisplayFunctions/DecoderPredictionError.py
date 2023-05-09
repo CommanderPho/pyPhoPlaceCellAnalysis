@@ -11,8 +11,10 @@ from neuropy.utils.dynamic_container import overriding_dict_with # required for 
 from neuropy.utils.efficient_interval_search import get_non_overlapping_epochs # used in _display_plot_decoded_epoch_slices to get only the valid (non-overlapping) epochs
 
 from pyphocorehelpers.function_helpers import function_attributes
+from pyphocorehelpers.programming_helpers import metadata_attributes
 from pyphocorehelpers.gui.interaction_helpers import CallbackWrapper
 from pyphocorehelpers.indexing_helpers import interleave_elements
+
 
 from pyphocorehelpers.mixins.member_enumerating import AllFunctionEnumeratingMixin
 from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DisplayFunctionRegistryHolder import DisplayFunctionRegistryHolder
@@ -51,14 +53,14 @@ class DefaultDecoderDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Disp
             # _temp_debug_two_step_plots_animated_imshow(active_one_step_decoder, active_two_step_decoder, variable_name='p_x_given_n_and_x_prev')
             return # end
 
-    @function_attributes(short_name='decoder_result', tags=['display', 'untested'], input_requires=[], output_provides=[], uses=['DecoderResultDisplayingPlot2D'], creation_date='2023-03-23 15:49')
+    @function_attributes(short_name='decoder_result', tags=['display', 'untested','decoder'], input_requires=[], output_provides=[], uses=['DecoderResultDisplayingPlot2D'], creation_date='2023-03-23 15:49')
     def _display_decoder_result(computation_result, active_config, **kwargs):
         renderer = DecoderResultDisplayingPlot2D(computation_result.computed_data['pf2D_Decoder'], computation_result.sess.position.to_dataframe())
         def animate(i):
             # print(f'animate({i})')
             return renderer.display(i)
         
-    @function_attributes(short_name='marginal_1D_most_likely_pos_compare', tags=['display'], input_requires=[], output_provides=[], creation_date='2023-03-23 15:49')
+    @function_attributes(short_name='marginal_1D_most_likely_pos_compare', tags=['display','marginal','1D','most_likely','position'], input_requires=[], output_provides=[], creation_date='2023-03-23 15:49')
     def _display_plot_marginal_1D_most_likely_position_comparisons(computation_result, active_config, variable_name='x', posterior_name='p_x_given_n', most_likely_positions_mode='corrected', **kwargs):
         """ renders a plot with the 1D Marginals either (x and y position axes): the computed posterior for the position from the Bayesian decoder and overlays the animal's actual position over the top. 
         
@@ -105,7 +107,7 @@ class DefaultDecoderDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Disp
         return fig, curr_ax
 
 
-    @function_attributes(short_name='plot_most_likely_position_compare', tags=['display'], input_requires=[], output_provides=[], creation_date='2023-03-23 15:49')
+    @function_attributes(short_name='plot_most_likely_position_compare', tags=['display','most_likely','position'], input_requires=[], output_provides=[], creation_date='2023-03-23 15:49')
     def _display_plot_most_likely_position_comparisons(computation_result, active_config, **kwargs):
         """ renders a 2D plot with separate subplots for the (x and y position axes): the computed posterior for the position from the Bayesian decoder and overlays the animal's actual position over the top. """
         
@@ -131,7 +133,7 @@ class DefaultDecoderDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Disp
             axs[0].plot(active_time_window_variable, active_most_likely_positions_x, lw=1.0, color='#00ff7f99', alpha=0.6, label='2-step: most likely positions x') # (Num windows x 2)
             axs[1].plot(active_time_window_variable, active_most_likely_positions_y, lw=1.0, color='#00ff7f99', alpha=0.6, label='2-step: most likely positions y') # (Num windows x 2)
             
-    @function_attributes(short_name='decoded_epoch_slices', tags=['display', 'decoder', 'epoch'], input_requires=[], output_provides=[], uses=['plot_decoded_epoch_slices', '_compute_specific_decoded_epochs', 'DefaultComputationFunctions._perform_specific_epochs_decoding'], used_by=[], creation_date='2023-03-23 15:49')
+    @function_attributes(short_name='decoded_epoch_slices', tags=['display', 'decoder', 'epoch','slices'], input_requires=[], output_provides=[], uses=['plot_decoded_epoch_slices', '_compute_specific_decoded_epochs', 'DefaultComputationFunctions._perform_specific_epochs_decoding'], used_by=[], creation_date='2023-03-23 15:49')
     def _display_plot_decoded_epoch_slices(computation_result, active_config, active_context=None, filter_epochs='ripple', **kwargs):
         """ renders a plot with the 1D Marginals either (x and y position axes): the computed posterior for the position from the Bayesian decoder and overlays the animal's actual position over the top. 
         
