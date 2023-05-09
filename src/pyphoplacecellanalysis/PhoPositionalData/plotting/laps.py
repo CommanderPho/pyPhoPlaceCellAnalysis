@@ -8,13 +8,16 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.collections import LineCollection, BrokenBarHCollection
 from matplotlib.colors import ListedColormap, BoundaryNorm
-from pyphoplacecellanalysis.Pho3D.PyVista.spikeAndPositions import _build_flat_arena_data, perform_plot_flat_arena
-from pyphoplacecellanalysis.GUI.PyVista.InteractivePlotter.Mixins.LapsVisualizationMixin import LapsVisualizationMixin
-from pyphocorehelpers.gui.PyVista.PhoCustomVtkWidgets import PhoWidgetHelper
 import pyvista as pv
 import pyvistaqt as pvqt
 
 from neuropy.utils.matplotlib_helpers import plot_position_curves_figure # for plot_laps_2d
+
+from pyphocorehelpers.function_helpers import function_attributes
+
+from pyphoplacecellanalysis.Pho3D.PyVista.spikeAndPositions import _build_flat_arena_data, perform_plot_flat_arena
+from pyphoplacecellanalysis.GUI.PyVista.InteractivePlotter.Mixins.LapsVisualizationMixin import LapsVisualizationMixin
+from pyphocorehelpers.gui.PyVista.PhoCustomVtkWidgets import PhoWidgetHelper
 
 """ 
 
@@ -190,6 +193,8 @@ def _plot_helper_render_laps(pos_t_rel_seconds, pos_value, crossing_beginings, c
 # MAIN FUNCTIONS                                                                                                       #
 # ==================================================================================================================== #
     
+@function_attributes(short_name=None, tags=['lap','trajectories','2D','matplotlib','plotting','paginated'], input_requires=[], output_provides=[],
+    uses=['plot_position_curves_figure','_plot_helper_add_span_where_ranges','_plot_helper_render_laps'], used_by=['estimation_session_laps'], creation_date='2023-05-09 05:13', related_items=[])
 def plot_laps_2d(sess, legacy_plotting_mode=True):
     """ This generates a position/velocity/acceleration curve for the animal and highlights the currently recognized track epochs using green and red span overlays (corresponding to egress and ingress directions) 
         TODO: currently legacy_plotting_mode=True does not function if the session has been filtered because the indicies no longer line up. 
@@ -205,7 +210,6 @@ def plot_laps_2d(sess, legacy_plotting_mode=True):
     pos_df = position_obj.to_dataframe()
     
     curr_laps_df = sess.laps.to_dataframe()
-    
     
     fig, out_axes_list = plot_position_curves_figure(position_obj, include_velocity=True, include_accel=True, figsize=(24, 10))    
 
@@ -250,6 +254,8 @@ def plot_laps_2d(sess, legacy_plotting_mode=True):
     return fig, out_axes_list
 
 
+
+@function_attributes(short_name=None, tags=['lap','trajectories','3D','pyvista','qt','multiplotter','plotting','paginated'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-05-09 05:13', related_items=[])
 def plot_lap_trajectories_3d(sess, curr_num_subplots=1, active_page_index=0, included_lap_idxs=None, maximum_fixed_columns:int=5, single_combined_plot=True, lap_start_z = 0.0, lap_id_dependent_z_offset = 1.0, plot_stacked_arena_guides=False, existing_plotter=None, debug_print=False):
     """ Plots a PyVista Qt Multiplotter with either:
         1. several overhead 3D views, each showing a specific lap over the maze in one of its subplots
@@ -416,9 +422,7 @@ def plot_lap_trajectories_3d(sess, curr_num_subplots=1, active_page_index=0, inc
     _add_specific_lap_trajectory(p, linear_plotter_indicies, row_column_indicies, active_page_laps_ids, lap_specific_position_traces, lap_specific_time_ranges, single_combined_plot=single_combined_plot, lap_start_z=lap_start_z, lap_id_dependent_z_offset=lap_id_dependent_z_offset)
     return p, laps_pages
 
-
-
-
+@function_attributes(short_name=None, tags=['lap','trajectories','2D','matplotlib','plotting','paginated'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-05-09 05:13', related_items=[])
 def plot_lap_trajectories_2d(sess, curr_num_subplots=5, active_page_index=0):
     """ Plots a MatplotLib 2D Figure with each lap being shown in one of its subplots """
     def _chunks(iterable, size=10):
