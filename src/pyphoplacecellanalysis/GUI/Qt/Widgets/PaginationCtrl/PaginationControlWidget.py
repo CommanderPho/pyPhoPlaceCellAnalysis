@@ -90,7 +90,6 @@ class PaginationControlWidget(QWidget):
     def current_page_idx(self):
         """ the 0-based index of the current page. """
         return self.state.current_page_idx
-    
     @current_page_idx.setter
     def current_page_idx(self, value):
         print(f'current_page_idx setter should be depricated!')

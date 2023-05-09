@@ -26,7 +26,12 @@ class PaginatedFigureController(QtCore.QObject):
     plots_data: RenderPlotsData
     plots: RenderPlots
     ui: PhoUIContainer
-    
+
+    @property
+    def current_page_idx(self):
+        """The curr_page_index property."""
+        return self.ui.mw.ui.paginator_controller_widget.current_page_idx
+
     def __init__(self, params, plots_data, plots, ui, parent=None):
         super(PaginatedFigureController, self).__init__(parent=parent)
         self.params, self.plots_data, self.plots, self.ui = params, plots_data, plots, ui
