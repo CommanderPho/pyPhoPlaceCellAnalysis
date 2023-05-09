@@ -15,8 +15,9 @@ from neuropy.utils.matplotlib_helpers import build_or_reuse_figure # used for `_
 from neuropy.utils.mixins.print_helpers import ProgressMessagePrinter # for `_plot_long_short_firing_rate_indicies`
 from neuropy.core.neurons import NeuronType
 
-
 from pyphocorehelpers.function_helpers import function_attributes
+from pyphocorehelpers.programming_helpers import metadata_attributes
+
 from pyphocorehelpers.mixins.member_enumerating import AllFunctionEnumeratingMixin
 from pyphocorehelpers.plotting.figure_management import PhoActiveFigureManager2D # for plot_short_v_long_pf1D_comparison (_display_short_long_pf1D_comparison)
 from pyphocorehelpers.DataStructure.RenderPlots.MatplotLibRenderPlots import MatplotlibRenderPlots
@@ -1552,7 +1553,7 @@ def plot_long_short(long_results_obj, short_results_obj):
 import matplotlib.pyplot as plt
 
 @function_attributes(short_name=None, tags=['matplotlib', 'long_short_fr_indicies_analysis', 'rate_remapping'], input_requires=['long_short_fr_indicies_analysis'], output_provides=[], uses=[], used_by=[], creation_date='2023-05-03 23:12')
-def plot_rr_aclu(aclu: list, rr_laps: np.ndarray, rr_replays: np.ndarray, sort=None, fig=None, axs=None):
+def plot_rr_aclu(aclu: list, rr_laps: np.ndarray, rr_replays: np.ndarray, rr_neuron_types: np.ndarray, sort=None, fig=None, axs=None):
     """ Plots rate remapping (rr) values computed from `long_short_fr_indicies_analysis`
     Renders a vertical stack (one for each aclu) of 1D number lines ranging from -1 ("Long Only") to 1 ("Short Only"), where 0 means equal rates on both long and short.
         It plots two points for each of these, a triangle corresponding to that cell's rr_laps and a open circle for the rr_replays.
@@ -1671,3 +1672,131 @@ def plot_rr_aclu(aclu: list, rr_laps: np.ndarray, rr_replays: np.ndarray, sort=N
     return fig, axs, sort_indicies
 
 
+from pyphoplacecellanalysis.External.pyqtgraph import QtCore
+from pyphocorehelpers.DataStructure.general_parameter_containers import VisualizationParameters, RenderPlotsData, RenderPlots
+from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer
+
+from pyphoplacecellanalysis.GUI.Qt.Mixins.PaginationMixins import PaginatedFigureController
+from pyphoplacecellanalysis.Pho2D.matplotlib.CustomMatplotlibWidget import CustomMatplotlibWidget # used by RateRemappingPaginatedFigureController
+
+@metadata_attributes(short_name=None, tags=['rate_remapping', 'matplotlib', 'long_short_fr_indicies_analysis', 'paginated'], input_requires=[], output_provides=[], uses=['plot_rr_aclu'], used_by=[], creation_date='2023-05-09 11:29', related_items=[])
+class RateRemappingPaginatedFigureController(PaginatedFigureController):
+    """2023-05-09 - Aims to refactor `build_figure_and_control_widget_from_paginator`, a series of nested functions, into a stateful class
+
+    Usage:
+        import matplotlib.pyplot as plt
+        %matplotlib qt
+        from pyphocorehelpers.indexing_helpers import Paginator
+        from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.MultiContextComparingDisplayFunctions.MultiContextComparingDisplayFunctions import RateRemappingPaginatedFigureController
+
+        a_paginator = Paginator.init_from_data((rr_aclus, rr_laps, rr_replays), max_num_columns=1, max_subplots_per_page=20, data_indicies=None, last_figure_subplots_same_layout=False)
+        _out_rr_pagination_controller = RateRemappingPaginatedFigureController.init_from_paginator(a_paginator, a_name='TestRateRemappingPaginatedFigureController')
+        _out_rr_pagination_controller
+    """
+
+    @property
+    def paginator(self):
+        """The paginator property."""
+        return self.plots_data.paginator
+
+    @property
+    def current_page_idx(self):
+        """The curr_page_index property."""
+        return self.ui.mw.ui.paginator_controller_widget.current_page_idx
+
+    def __init__(self, params, plots_data, plots, ui, parent=None):
+        super(RateRemappingPaginatedFigureController, self).__init__(params, plots_data, plots, ui, parent=parent)
+
+    @classmethod
+    def init_from_paginator(cls, a_paginator, a_name:str = 'RateRemappingPaginatedFigureController', plot_function_name='plot_rr_aclu', parent=None):
+        new_obj = cls(params=VisualizationParameters(name=a_name), plots_data=RenderPlotsData(name=a_name, paginator=a_paginator), plots=RenderPlots(name=a_name), ui=PhoUIContainer(name=a_name, connections=PhoUIContainer(name=a_name)), parent=parent)
+        # new_obj.ui.connections = PhoUIContainer(name=name)
+        num_slices = a_paginator.max_num_items_per_page
+        # Setup equivalent to that performed in `pyphoplacecellanalysis.Pho2D.stacked_epoch_slices.stacked_epoch_basic_setup`
+        new_obj.params.name = a_name
+        new_obj.params.window_title = plot_function_name
+        new_obj.params.num_slices = num_slices # not sure if needed
+        
+        # new_obj.params._debug_test_max_num_slices = debug_test_max_num_slices
+        # new_obj.params.active_num_slices = min(num_slices, new_obj.params._debug_test_max_num_slices)
+        
+        # new_obj.params.single_plot_fixed_height = single_plot_fixed_height
+        # new_obj.params.all_plots_height = float(new_obj.params.active_num_slices) * float(new_obj.params.single_plot_fixed_height)
+
+        ## Real setup:
+        new_obj.configure()
+        new_obj.initialize()
+        return new_obj
+    
+
+    def configure(self, **kwargs):
+        """ assigns and computes needed variables for rendering. """
+        self.params.debug_print = kwargs.pop('debug_print', False)
+
+    def initialize(self, **kwargs):
+        """ sets up Figures """
+        # self.fig, self.axs = plt.subplots(nrows=len(rr_replays))
+        self._build_figure_widget_from_paginator()
+        ## 2. Update:
+        self.on_paginator_control_widget_jump_to_page(page_idx=0)
+        _a_connection = self.ui.mw.ui.paginator_controller_widget.jump_to_page.connect(self.on_paginator_control_widget_jump_to_page) # bind connection
+        self.ui.connections['paginator_controller_widget_jump_to_page'] = _a_connection
+
+
+    def update(self, **kwargs):
+        """ called to specifically render data on the figure. """
+        pass
+
+    def on_close(self):
+        """ called when the figure is closed. """
+        pass
+    
+
+    def _build_figure_widget_from_paginator(self):
+        """ builds new CustomMatplotlibWidget in self.ui.mw to hold the matplotlib plot """
+        ## Build Widget to hold the matplotlib plot:
+        self.ui.mw = CustomMatplotlibWidget(size=(15,15), dpi=72, constrained_layout=True, scrollable_figure=False)
+
+        ## Add the PaginationControlWidget
+        self._subfn_helper_add_pagination_control_widget(self.plots_data.paginator, self.ui.mw, defer_render=False)
+
+        ## Setup figure by building axes:
+        fig = self.ui.mw.getFigure()
+
+        ## LIMITATION: Only works for 1D subplot configurations:
+        # NOTE: fig.add_subplot(nrows, ncols, index) 
+        axs = [fig.add_subplot(self.plots_data.paginator.max_num_items_per_page, 1, i+1) for i in np.arange(self.plots_data.paginator.max_num_items_per_page)] # here we're aiming to approximate the `plt.subplots(nrows=len(included_page_data_indicies)) # one row for each page` setup
+
+        self.ui.mw.draw()
+        self.ui.mw.show()
+            
+
+    @QtCore.pyqtSlot(int)
+    def on_paginator_control_widget_jump_to_page(self, page_idx: int):
+        """ Update captures `a_paginator`, 'mw' """
+        from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.MultiContextComparingDisplayFunctions.MultiContextComparingDisplayFunctions import plot_rr_aclu
+        
+
+        # print(f'on_paginator_control_widget_jump_to_page(page_idx: {page_idx})')
+        # included_page_data_indicies, (curr_page_rr_aclus, curr_page_rr_laps, curr_page_rr_replays, *curr_page_rr_extras_tuple) = self.paginator.get_page_data(page_idx=page_idx)
+        included_page_data_indicies, (curr_page_rr_aclus, curr_page_rr_laps, curr_page_rr_replays, curr_page_rr_neuron_type) = self.paginator.get_page_data(page_idx=page_idx)
+        
+        # print(f'\tincluded_page_data_indicies: {included_page_data_indicies}')
+        fig = self.ui.mw.getFigure()
+        axs = self.ui.mw.axes
+        # print(f'axs: {axs}')
+        fig, axs, sort_indicies = plot_rr_aclu([str(aclu) for aclu in curr_page_rr_aclus], rr_laps=curr_page_rr_laps, rr_replays=curr_page_rr_replays, fig=fig, axs=axs)
+        # print(f'\t done.')
+        self.ui.mw.draw()
+
+    # def perform_plot(self, debug_print=False):
+    #     self.params.debug_print = debug_print
+    #     self._build_figure_widget_from_paginator()
+        
+    #     ## 2. Update:
+    #     self.on_paginator_control_widget_jump_to_page(page_idx=0)
+        
+    #     # ui.on_paginator_control_widget_jump_to_page = on_paginator_control_widget_jump_to_page
+    #     _a_connection = self.ui.mw.ui.paginator_controller_widget.jump_to_page.connect(self.on_paginator_control_widget_jump_to_page) # bind connection
+    #     self.ui.connections['paginator_controller_widget_jump_to_page'] = _a_connection
+        
