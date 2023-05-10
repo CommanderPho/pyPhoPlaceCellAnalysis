@@ -555,11 +555,35 @@ class DecodedEpochSlicesPaginatedFigureController(PaginatedFigureController):
     """
 
     @classmethod
-    def init_from_decoder_data(cls, active_filter_epochs, filter_epochs_decoder_result, xbin, global_pos_df, a_name:str = 'DecodedEpochSlicesPaginationController', active_context=None, max_subplots_per_page=20):
-        new_obj = cls(params=VisualizationParameters(name=a_name), plots_data=RenderPlotsData(name=a_name), plots=RenderPlots(name=a_name), ui=PhoUIContainer(name=a_name))
-        ## Real setup:
+    def init_from_decoder_data(cls, active_filter_epochs, filter_epochs_decoder_result, xbin, global_pos_df, a_name:str = 'DecodedEpochSlicesPaginationController', active_context=None, max_subplots_per_page=20, debug_print=False):
+        """ new version (replacing `plot_paginated_decoded_epoch_slices`) calls `plot_decoded_epoch_slices` which produces the state variables (params, plots_data, plots, ui), a new instance of this object type is then initialized with those variables and then updated with any specific properties. """
+        from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import plot_decoded_epoch_slices #, _helper_update_decoded_single_epoch_slice_plot #, _subfn_update_decoded_epoch_slices
+        
+        params, plots_data, plots, ui = plot_decoded_epoch_slices(deepcopy(active_filter_epochs), deepcopy(filter_epochs_decoder_result), global_pos_df=global_pos_df, variable_name='lin_pos', xbin=xbin,
+                                                                name=a_name, debug_print=False, debug_test_max_num_slices=max_subplots_per_page)
+        # new_obj = cls(params=params, plots_data=plots_data, plots=plots, ui=ui)
+
+        new_obj = cls(params, plots_data, plots, ui)
+        
+        new_obj.params.debug_print = debug_print
+        new_obj.plots_data.paginator = new_obj._subfn_helper_build_paginator(active_filter_epochs, filter_epochs_decoder_result, max_subplots_per_page, new_obj.params.debug_print)  # assign the paginator
         new_obj.params.active_identifying_figure_ctx = active_context # set context before calling `plot_paginated_decoded_epoch_slices` which will set the rest of the properties
-        new_obj.plot_paginated_decoded_epoch_slices(active_filter_epochs, filter_epochs_decoder_result, xbin, global_pos_df, max_subplots_per_page=max_subplots_per_page)
+
+        ## Add the PaginationControlWidget
+        new_obj._subfn_helper_add_pagination_control_widget(new_obj.plots_data.paginator, new_obj.ui.mw, defer_render=False)
+
+        ## Setup Selectability
+        new_obj._subfn_helper_setup_selectability()
+
+        ## 2. Update:
+        new_obj.on_paginator_control_widget_jump_to_page(page_idx=0)
+        _a_connection = new_obj.ui.mw.ui.paginator_controller_widget.jump_to_page.connect(new_obj.on_paginator_control_widget_jump_to_page) # bind connection
+        new_obj.ui.connections['paginator_controller_widget_jump_to_page'] = _a_connection
+
+        # new_obj = cls(params=VisualizationParameters(name=a_name, active_identifying_figure_ctx=active_context), plots_data=RenderPlotsData(name=a_name), plots=RenderPlots(name=a_name), ui=PhoUIContainer(name=a_name))
+        # ## Real setup:
+        # # new_obj.params.active_identifying_figure_ctx = active_context # set context before calling `plot_paginated_decoded_epoch_slices` which will set the rest of the properties
+        # new_obj.plot_paginated_decoded_epoch_slices(active_filter_epochs, filter_epochs_decoder_result, xbin, global_pos_df, active_context=active_context, max_subplots_per_page=max_subplots_per_page)
         ## TODO: context should still be there after setup
         return new_obj
     
@@ -612,7 +636,7 @@ class DecodedEpochSlicesPaginatedFigureController(PaginatedFigureController):
         epoch_slices_paginator = Paginator.init_from_data((epoch_slices, epoch_labels, time_bin_containers, posterior_containers), max_num_columns=1, max_subplots_per_page=max_subplots_per_page, data_indicies=None, last_figure_subplots_same_layout=False)
         return epoch_slices_paginator
 
-    # @QtCore.pyqtSlot(int)
+    
     def on_paginator_control_widget_jump_to_page(self, page_idx: int):
         """ Update: made to depend on self """
         from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import plot_1D_most_likely_position_comparsions # used in `plot_decoded_epoch_slices`
@@ -657,28 +681,28 @@ class DecodedEpochSlicesPaginatedFigureController(PaginatedFigureController):
         self.perform_update_titles_from_context(page_idx=page_idx, included_page_data_indicies=included_page_data_indicies, collision_prefix='_DecodedEpochSlices_plot_test', display_fn_name='plot_single_epoch_slice', plot_result_set='shared')
         self.ui.mw.draw()
 
-    def plot_paginated_decoded_epoch_slices(self, active_filter_epochs, filter_epochs_decoder_result, xbin, global_pos_df, max_subplots_per_page=20, debug_print=False):
-        """ 2023-05-08 - plots a paginated decoded_epoch_slices figure """
-        from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import plot_decoded_epoch_slices #, _helper_update_decoded_single_epoch_slice_plot #, _subfn_update_decoded_epoch_slices
+    # def plot_paginated_decoded_epoch_slices(self, active_filter_epochs, filter_epochs_decoder_result, xbin, global_pos_df, active_context=None, max_subplots_per_page=20, debug_print=False):
+    #     """ 2023-05-08 - plots a paginated decoded_epoch_slices figure """
+    #     from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import plot_decoded_epoch_slices #, _helper_update_decoded_single_epoch_slice_plot #, _subfn_update_decoded_epoch_slices
 
-        active_filter_epochs = deepcopy(active_filter_epochs)
-        filter_epochs_decoder_result = deepcopy(filter_epochs_decoder_result) # DecodedFilterEpochsResult
+    #     active_filter_epochs = deepcopy(active_filter_epochs)
+    #     filter_epochs_decoder_result = deepcopy(filter_epochs_decoder_result) # DecodedFilterEpochsResult
         
-        self.params, self.plots_data, self.plots, self.ui = plot_decoded_epoch_slices(active_filter_epochs, filter_epochs_decoder_result, global_pos_df=global_pos_df, variable_name='lin_pos', xbin=xbin,
-                                                                name='stacked_epoch_slices_long_results_obj', debug_print=False, debug_test_max_num_slices=max_subplots_per_page)
+    #     self.params, self.plots_data, self.plots, self.ui = plot_decoded_epoch_slices(active_filter_epochs, filter_epochs_decoder_result, global_pos_df=global_pos_df, variable_name='lin_pos', xbin=xbin,
+    #                                                             name='stacked_epoch_slices_long_results_obj', debug_print=False, debug_test_max_num_slices=max_subplots_per_page)
         
-        self.params.debug_print = debug_print
-        self.plots_data.paginator = self._subfn_helper_build_paginator(active_filter_epochs, filter_epochs_decoder_result, max_subplots_per_page, self.params.debug_print)  # assign the paginator
+    #     self.params.debug_print = debug_print
+    #     self.plots_data.paginator = self._subfn_helper_build_paginator(active_filter_epochs, filter_epochs_decoder_result, max_subplots_per_page, self.params.debug_print)  # assign the paginator
 
 
-        ## Add the PaginationControlWidget
-        self._subfn_helper_add_pagination_control_widget(self.plots_data.paginator, self.ui.mw, defer_render=False)
+    #     ## Add the PaginationControlWidget
+    #     self._subfn_helper_add_pagination_control_widget(self.plots_data.paginator, self.ui.mw, defer_render=False)
 
-        ## Setup Selectability
-        self._subfn_helper_setup_selectability()
+    #     ## Setup Selectability
+    #     self._subfn_helper_setup_selectability()
 
-        ## 2. Update:
-        self.on_paginator_control_widget_jump_to_page(page_idx=0)
-        _a_connection = self.ui.mw.ui.paginator_controller_widget.jump_to_page.connect(self.on_paginator_control_widget_jump_to_page) # bind connection
-        self.ui.connections['paginator_controller_widget_jump_to_page'] = _a_connection
+    #     ## 2. Update:
+    #     self.on_paginator_control_widget_jump_to_page(page_idx=0)
+    #     _a_connection = self.ui.mw.ui.paginator_controller_widget.jump_to_page.connect(self.on_paginator_control_widget_jump_to_page) # bind connection
+    #     self.ui.connections['paginator_controller_widget_jump_to_page'] = _a_connection
 

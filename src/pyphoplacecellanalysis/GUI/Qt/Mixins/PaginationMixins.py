@@ -41,9 +41,8 @@ class PaginatedFigureBaseController:
         """The total number of items (subplots usually) to be shown across all pages)."""
         return self.paginator.nItemsToShow
 
-    def __attrs_pre_init__(self):
-        super().__init__(parent=None)
-        
+    # def __attrs_pre_init__(self):
+    #     super().__init__(parent=None)
 
     # Selectability/Interactivity Helpers ________________________________________________________________________________ #
     def on_click(self, event):
@@ -168,6 +167,9 @@ class PaginatedFigureController(PaginatedFigureBaseController):
         
     """
 
+    # ==================================================================================================================== #
+    # Common lifecycle that inheritors can override                                                                        #
+    # ==================================================================================================================== #
     def configure(self, **kwargs):
         """ assigns and computes needed variables for rendering. """
         self._subfn_helper_setup_selectability()
@@ -185,8 +187,6 @@ class PaginatedFigureController(PaginatedFigureBaseController):
         """ called when the figure is closed. """
         pass
     
-
-
 
 
 # class PaginatedFigureController(QtCore.QObject):

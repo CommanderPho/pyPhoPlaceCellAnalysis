@@ -1770,7 +1770,6 @@ class RateRemappingPaginatedFigureController(PaginatedFigureController):
         self.ui.mw.draw()
         self.ui.mw.show()
 
-    @QtCore.pyqtSlot(int)
     def on_paginator_control_widget_jump_to_page(self, page_idx: int):
         """ Update captures `a_paginator`, 'mw' """
         from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.MultiContextComparingDisplayFunctions.MultiContextComparingDisplayFunctions import plot_rr_aclu
