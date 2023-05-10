@@ -347,7 +347,7 @@ def batch_extended_computations(curr_active_pipeline, include_whitelist=None, in
     newly_computed_values = []
 
     non_global_comp_names = ['firing_rate_trends', 'relative_entropy_analyses']
-    global_comp_names = ['jonathan_firing_rate_analysis', 'short_long_pf_overlap_analyses', 'long_short_fr_indicies_analyses']
+    global_comp_names = ['jonathan_firing_rate_analysis', 'short_long_pf_overlap_analyses', 'long_short_fr_indicies_analyses', 'long_short_decoding_analyses']
 
     if include_whitelist is None:
         # include all:
@@ -551,9 +551,6 @@ def batch_extended_computations(curr_active_pipeline, include_whitelist=None, in
             except Exception as e:
                 raise e
             
-
-
-
 
     if progress_print:
         print('done with all batch_extended_computations(...).')
