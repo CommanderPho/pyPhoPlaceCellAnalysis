@@ -5,6 +5,7 @@ import sys
 import typing
 from typing import Optional
 
+from attrs import define, field # used for `ComputedResult`
 
 import numpy as np
 from neuropy import core
@@ -32,3 +33,32 @@ class ComputationResult(DynamicParameters):
 
 
 
+
+
+@define(slots=False, repr=False)
+class ComputedResult:
+    """ 2023-05-10 - an object to replace DynamicContainers and static dicts for holding specific computed results
+    
+    Usage:
+        from pyphoplacecellanalysis.General.Model.ComputationResults import ComputedResult
+
+        @define(slots=False, repr=False)
+        class LeaveOneOutDecodingAnalysis(ComputedResult):
+            is_global: bool = True
+            
+            long_decoder: BayesianPlacemapPositionDecoder
+            short_decoder: BayesianPlacemapPositionDecoder
+            long_replays: pd.DataFrame
+            short_replays: pd.DataFrame
+            global_replays: pd.DataFrame
+            long_shared_aclus_only_decoder: BasePositionDecoder
+            short_shared_aclus_only_decoder: BasePositionDecoder
+            shared_aclus: np.ndarray
+            long_short_pf_neurons_diff: SetPartition
+            n_neurons: int
+            long_results_obj: SurpriseAnalysisResult
+            short_results_obj: SurpriseAnalysisResult
+
+            
+    """
+    is_global: bool = False

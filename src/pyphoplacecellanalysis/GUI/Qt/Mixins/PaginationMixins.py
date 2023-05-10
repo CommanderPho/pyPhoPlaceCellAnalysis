@@ -3,6 +3,7 @@ import numpy as np
 from pyphocorehelpers.indexing_helpers import Paginator
 from pyphocorehelpers.DataStructure.general_parameter_containers import VisualizationParameters, RenderPlotsData, RenderPlots
 from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer
+from pyphocorehelpers.indexing_helpers import safe_find_index_in_list
 
 from pyphoplacecellanalysis.External.pyqtgraph import QtCore
 from pyphoplacecellanalysis.GUI.Qt.Widgets.PaginationCtrl.PaginationControlWidget import PaginationControlWidget
@@ -167,7 +168,8 @@ class PaginatedFigureController(QtCore.QObject):
         # LIMITATION: only works on non-scrollable figures:
         mw.ui.paginator_controller_widget = PaginationControlWidget(n_pages=a_paginator.num_pages)
         mw.ui.root_vbox.addWidget(mw.ui.paginator_controller_widget) # add the pagination control widget
-        mw.ui.paginator_controller_widget.setMinimumHeight(38) # Set minimum height so it doesn't disappear
+        mw.ui.paginator_controller_widget.setFixedHeight(21)
+        # mw.ui.paginator_controller_widget.setMinimumHeight(24) # Set minimum height so it doesn't disappear
         if not defer_render:
             mw.draw()
             mw.show()

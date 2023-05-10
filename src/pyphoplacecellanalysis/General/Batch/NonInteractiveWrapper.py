@@ -526,6 +526,35 @@ def batch_extended_computations(curr_active_pipeline, include_whitelist=None, in
             except Exception as e:
                 raise e
 
+        ## long_short_decoding_analyses:
+        _comp_name = 'long_short_decoding_analyses'
+        if _comp_name in include_whitelist:
+            try:
+                ## Get global 'long_short_decoding_analyses' results:
+                curr_long_short_decoding_analyses = curr_active_pipeline.global_computation_results.computed_data['long_short_leave_one_out_decoding_analysis']
+                long_results_obj, short_results_obj = curr_long_short_decoding_analyses.long_results_obj, curr_long_short_decoding_analyses.short_results_obj
+                _subfn_on_already_computed(_comp_name)
+                    
+            except (AttributeError, KeyError) as e:
+                if progress_print or debug_print:
+                    print(f'{_comp_name} missing.')
+                if debug_print:
+                    print(f'\t encountered error: {e}\n{traceback.format_exc()}\n.')
+                if progress_print or debug_print:
+                    print(f'\t Recomputing {_comp_name}...')
+                curr_active_pipeline.perform_specific_computation(computation_functions_name_whitelist=['_perform_long_short_decoding_analyses'], fail_on_exception=True, debug_print=False) # fail_on_exception MUST be True or error handling is all messed up 
+                print(f'\t done.')
+                curr_long_short_decoding_analyses = curr_active_pipeline.global_computation_results.computed_data['long_short_leave_one_out_decoding_analysis']
+                # TODO: check contents
+                long_results_obj, short_results_obj = curr_long_short_decoding_analyses.long_results_obj, curr_long_short_decoding_analyses.short_results_obj
+                newly_computed_values.append(_comp_name)
+            except Exception as e:
+                raise e
+            
+
+
+
+
     if progress_print:
         print('done with all batch_extended_computations(...).')
 
