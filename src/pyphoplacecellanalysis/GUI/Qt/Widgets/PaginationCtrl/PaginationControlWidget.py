@@ -99,9 +99,9 @@ class PaginationControlWidget(QWidget):
 
     def __init__(self, n_pages:int = 9, parent=None):
         super().__init__(parent=parent) # Call the inherited classes __init__ method
-        self.ui = uic.loadUi(uiFile, self) # Load the .ui file
         self.state = PaginationControlWidgetState(n_pages=n_pages, current_page_idx=0)
-
+        
+        self.ui = uic.loadUi(uiFile, self) # Load the .ui file
         self.initUI()
         self.show() # Show the GUI
 

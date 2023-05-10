@@ -542,6 +542,8 @@ def batch_extended_computations(curr_active_pipeline, include_whitelist=None, in
                     print(f'\t encountered error: {e}\n{traceback.format_exc()}\n.')
                 if progress_print or debug_print:
                     print(f'\t Recomputing {_comp_name}...')
+                    
+                # When this fails due to unwrapping from the load, add `, computation_kwargs_list=[{'perform_cache_load': False}]` as an argument to the `perform_specific_computation` call below
                 curr_active_pipeline.perform_specific_computation(computation_functions_name_whitelist=['_perform_long_short_decoding_analyses'], fail_on_exception=True, debug_print=False) # fail_on_exception MUST be True or error handling is all messed up 
                 print(f'\t done.')
                 curr_long_short_decoding_analyses = curr_active_pipeline.global_computation_results.computed_data['long_short_leave_one_out_decoding_analysis']

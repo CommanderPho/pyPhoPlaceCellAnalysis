@@ -106,7 +106,18 @@ class LongShortTrackComputations(AllFunctionEnumeratingMixin, metaclass=Computat
         #     'leave_one_out_decoding_analysis': leave_one_out_decoding_analysis_obj
         # } # end long_short
         global_computation_results.computed_data['long_short_leave_one_out_decoding_analysis'] = leave_one_out_decoding_analysis_obj # end long_short
+        # TODO 2023-05-10 - Do I want long_one_step_decoder_2D, short_one_step_decoder_2D that I computed?
 
+        """ Getting outputs:
+        
+        
+            ## long_short_decoding_analyses:
+            curr_long_short_decoding_analyses = curr_active_pipeline.global_computation_results.computed_data['long_short_leave_one_out_decoding_analysis']
+            ## Extract variables from results object:
+            long_one_step_decoder_1D, short_one_step_decoder_1D, long_replays, short_replays, global_replays, long_shared_aclus_only_decoder, short_shared_aclus_only_decoder, shared_aclus, long_short_pf_neurons_diff, n_neurons, long_results_obj, short_results_obj, is_global = curr_long_short_decoding_analyses.long_decoder, curr_long_short_decoding_analyses.short_decoder, curr_long_short_decoding_analyses.long_replays, curr_long_short_decoding_analyses.short_replays, curr_long_short_decoding_analyses.global_replays, curr_long_short_decoding_analyses.long_shared_aclus_only_decoder, curr_long_short_decoding_analyses.short_shared_aclus_only_decoder, curr_long_short_decoding_analyses.shared_aclus, curr_long_short_decoding_analyses.long_short_pf_neurons_diff, curr_long_short_decoding_analyses.n_neurons, curr_long_short_decoding_analyses.long_results_obj, curr_long_short_decoding_analyses.short_results_obj, curr_long_short_decoding_analyses.is_global
+
+
+        """
         return global_computation_results
 
 
