@@ -9,7 +9,22 @@ from pyphoplacecellanalysis.External.pyqtgraph.graphicsItems.GraphicsLayout impo
 
 # """ 
 
+"""
 
+Analagous to `neuropy.utils.matplotlib_helpers`
+
+# PyQtGraph Properties:
+win.setBackground
+win.setWindowTitle
+win.setBackgroundBrush
+win.setXRange
+win.setYRange
+
+'Show X Grid'
+'Show Y Grid'
+"""
+
+# visual_config = dict(pen=pg.mkPen('#fff'), brush=pg.mkBrush('#f004'), hoverBrush=pg.mkBrush('#fff4'), hoverPen=pg.mkPen('#f00'))
 
 # plot_items = [a_child for a_child in main_graphics_layout_widget.items() if isinstance(a_child, (PlotItem))] # ScatterPlotItem
 # plot_items
@@ -146,6 +161,55 @@ class RectangleRenderTupleHelpers:
         seralized_tuples_data = cls.get_serialized_data(tuples_data).copy()
         return cls.get_deserialized_data(seralized_tuples_data)
 
+
+
+
+
+
+def _helper_make_scatterplot_clickable(main_scatter_plot, enable_hover:bool=False):
+    """ pyqtgraph 
+    
+    Usage:
+    
+    lastClicked, clickedPen, (main_scatter_hovered_connection, main_scatter_clicked_connection) = _helper_make_scatterplot_clickable(a_plot)
+    
+    """
+    # Highlights the hovered spikes white:
+    # main_scatter_plot.addPoints(hoverable=True,
+    # 	# hoverSymbol=vtick, # hoverSymbol='s',
+    # 	hoverSize=7, # default is 5
+    # 	)
+
+
+    ## Clickable/Selectable Spikes:
+    # Will make all plots clickable
+    clickedPen = pg.mkPen('#DDD', width=2)
+    lastClicked = []
+    def _test_scatter_plot_clicked(plot, points):
+        global lastClicked
+        for p in lastClicked:
+            p.resetPen()
+        print("clicked points", points)
+        for p in points:
+            p.setPen(clickedPen)
+        lastClicked = points
+
+    main_scatter_clicked_connection = main_scatter_plot.sigClicked.connect(_test_scatter_plot_clicked)
+
+    ## Hoverable Spikes:
+    if enable_hover:
+        def _test_scatter_plot_hovered(plt, points, ev):
+            # sigHovered(self, points, ev)
+            print(f'_test_scatter_plot_hovered(plt: {plt}, points: {points}, ev: {ev})')
+            if (len(points) > 0):
+                curr_point = points[0]
+                # self.
+                # curr_point.index
+        main_scatter_hovered_connection = main_scatter_plot.sigHovered.connect(_test_scatter_plot_hovered)
+    else:
+        main_scatter_hovered_connection = None
+
+    return lastClicked, clickedPen, (main_scatter_hovered_connection, main_scatter_clicked_connection)
 
 
 

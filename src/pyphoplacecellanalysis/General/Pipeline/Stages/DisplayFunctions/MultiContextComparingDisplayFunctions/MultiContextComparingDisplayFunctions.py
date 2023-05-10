@@ -1747,6 +1747,9 @@ class RateRemappingPaginatedFigureController(PaginatedFigureController):
         """ sets up Figures """
         # self.fig, self.axs = plt.subplots(nrows=len(rr_replays))
         self._build_figure_widget_from_paginator()
+        ## Setup Selectability
+        self._subfn_helper_setup_selectability()
+
         ## 2. Update:
         self.on_paginator_control_widget_jump_to_page(page_idx=0)
         _a_connection = self.ui.mw.ui.paginator_controller_widget.jump_to_page.connect(self.on_paginator_control_widget_jump_to_page) # bind connection
@@ -1779,7 +1782,6 @@ class RateRemappingPaginatedFigureController(PaginatedFigureController):
 
         self.ui.mw.draw()
         self.ui.mw.show()
-            
 
     @QtCore.pyqtSlot(int)
     def on_paginator_control_widget_jump_to_page(self, page_idx: int):
@@ -1787,17 +1789,14 @@ class RateRemappingPaginatedFigureController(PaginatedFigureController):
         from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.MultiContextComparingDisplayFunctions.MultiContextComparingDisplayFunctions import plot_rr_aclu
         from pyphoplacecellanalysis.General.Mixins.ExportHelpers import build_figure_basename_from_display_context, session_context_to_relative_path
 
-
         # print(f'on_paginator_control_widget_jump_to_page(page_idx: {page_idx})')
         # included_page_data_indicies, (curr_page_rr_aclus, curr_page_rr_laps, curr_page_rr_replays, *curr_page_rr_extras_tuple) = self.paginator.get_page_data(page_idx=page_idx)
         included_page_data_indicies, (curr_page_rr_aclus, curr_page_rr_laps, curr_page_rr_replays, curr_page_rr_neuron_type) = self.paginator.get_page_data(page_idx=page_idx)
         
-        
-        if self.params.active_identifying_figure_ctx is not None:
-            active_identifying_ctx = self.params.active_identifying_figure_ctx.adding_context(collision_prefix='_RateRemapping_plot_test', display_fn_name='plot_rr_aclu', plot_result_set='shared', page=f'{page_idx+1}of{self.paginator.num_pages}', aclus=f"{included_page_data_indicies}")
-        else:
-            active_identifying_ctx = None
-
+        # if self.params.active_identifying_figure_ctx is not None:
+        #     active_identifying_ctx = self.params.active_identifying_figure_ctx.adding_context(collision_prefix='_RateRemapping_plot_test', display_fn_name='plot_rr_aclu', plot_result_set='shared', page=f'{page_idx+1}of{self.paginator.num_pages}', aclus=f"{included_page_data_indicies}")
+        # else:
+        #     active_identifying_ctx = None
 
         # print(f'\tincluded_page_data_indicies: {included_page_data_indicies}')
         fig = self.ui.mw.getFigure()
@@ -1806,27 +1805,15 @@ class RateRemappingPaginatedFigureController(PaginatedFigureController):
         fig, axs, sort_indicies = plot_rr_aclu([str(aclu) for aclu in curr_page_rr_aclus], rr_laps=curr_page_rr_laps, rr_replays=curr_page_rr_replays, rr_neuron_types=curr_page_rr_neuron_type, fig=fig, axs=axs)
         # print(f'\t done.')
 
-        if active_identifying_ctx is not None:
-            final_context = active_identifying_ctx # Display/Variable context mode
-            active_identifying_ctx_string = final_context.get_description(separator='|') # Get final discription string
-            print(f'active_identifying_ctx_string: "{active_identifying_ctx_string}"')
-            # active_figure_save_basename = build_figure_basename_from_display_context(final_context)
-            self.update_titles(active_identifying_ctx_string)
-        else:
-            self.update_titles("no context set!")
+        self.perform_update_titles_from_context(page_idx=page_idx, included_page_data_indicies=included_page_data_indicies, collision_prefix='_RateRemapping_plot_test', display_fn_name='plot_rr_aclu', plot_result_set='shared')
 
+        # Update selections for all axes on this page:
+        self.perform_update_selections()
 
         self.ui.mw.draw()
 
 
-    def update_titles(self, window_title: str, suptitle: str = None):
-        """ sets the titles for the figure """
-        if suptitle is None:
-            suptitle = window_title # same as window title
-        # Set the window title:
-        self.ui.mw.setWindowTitle(window_title)
-        self.ui.mw.fig.suptitle(suptitle) # set the plot suptitle
-        self.ui.mw.draw()
+    
 
 
     # def perform_plot(self, debug_print=False):
