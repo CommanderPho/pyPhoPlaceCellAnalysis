@@ -19,7 +19,7 @@ TypeError: super(type, obj): obj must be an instance or subtype of type
 """
 
 @define(slots=False)
-class PaginatedFigureBaseController(QtCore.QObject):
+class PaginatedFigureBaseController:
     params: VisualizationParameters = VisualizationParameters(name='PaginatedFigureBaseController')
     plots_data: RenderPlotsData = RenderPlotsData(name='PaginatedFigureBaseController')
     plots: RenderPlots = RenderPlots(name='PaginatedFigureBaseController')
