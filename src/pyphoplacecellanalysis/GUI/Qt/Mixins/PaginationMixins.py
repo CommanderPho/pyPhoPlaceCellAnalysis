@@ -134,7 +134,7 @@ class PaginatedFigureController(QtCore.QObject):
 
         Requires: `self.params.active_identifying_figure_ctx`, `self.paginator.num_pages`
         """
-        if self.params.active_identifying_figure_ctx is not None:
+        if self.params.get('active_identifying_figure_ctx', None) is not None:
             active_identifying_ctx = self.params.active_identifying_figure_ctx.adding_context(**kwargs, page=f'{page_idx+1}of{self.paginator.num_pages}', aclus=f"{included_page_data_indicies}")
             final_context = active_identifying_ctx # Display/Variable context mode
             active_identifying_ctx_string = final_context.get_description(separator='|') # Get final discription string
