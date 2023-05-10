@@ -3,31 +3,27 @@ import numpy as np
 from pyphocorehelpers.indexing_helpers import Paginator
 from pyphocorehelpers.DataStructure.general_parameter_containers import VisualizationParameters, RenderPlotsData, RenderPlots
 from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer
+from pyphocorehelpers.gui.Qt.connections_container import ConnectionsContainer
+
 from pyphocorehelpers.indexing_helpers import safe_find_index_in_list
 
 from pyphoplacecellanalysis.External.pyqtgraph import QtCore
 from pyphoplacecellanalysis.GUI.Qt.Widgets.PaginationCtrl.PaginationControlWidget import PaginationControlWidget
 
+from attrs import define, field, Factory
 
-class PaginatedFigureController(QtCore.QObject):
-    """2023-05-08 - Holds the current state for real-time pagination 
-    
-    Potential existing similar implementations
-        - that Spike3DWindow event jump utility used to jump to next/prev/specific event (like replays, etc)
-        - create_new_figure_if_needed(a_name) or something similar
-        - that tabbed matplotlib figure implementation
-        - docking widgets in figures
-        - from pyphoplacecellanalysis.GUI.Qt.PlaybackControls.Spike3DRasterBottomPlaybackControlBarWidget import Spike3DRasterBottomPlaybackControlBar, on_jump_left
-        
-	Usage:
-    
-    from pyphoplacecellanalysis.GUI.Qt.Mixins.PaginationMixins import PaginatedFigureController
-        
-    """
-    params: VisualizationParameters
-    plots_data: RenderPlotsData
-    plots: RenderPlots
-    ui: PhoUIContainer
+""" refactored to avoid:
+
+TypeError: super(type, obj): obj must be an instance or subtype of type
+
+"""
+
+@define(slots=False)
+class PaginatedFigureBaseController(QtCore.QObject):
+    params: VisualizationParameters = VisualizationParameters(name='PaginatedFigureBaseController')
+    plots_data: RenderPlotsData = RenderPlotsData(name='PaginatedFigureBaseController')
+    plots: RenderPlots = RenderPlots(name='PaginatedFigureBaseController')
+    ui: PhoUIContainer = PhoUIContainer(name='PaginatedFigureBaseController', connections=ConnectionsContainer())
 
     ## Computed properties:
     @property
@@ -45,27 +41,9 @@ class PaginatedFigureController(QtCore.QObject):
         """The total number of items (subplots usually) to be shown across all pages)."""
         return self.paginator.nItemsToShow
 
-    def __init__(self, params, plots_data, plots, ui, parent=None):
-        super(PaginatedFigureController, self).__init__(parent=parent)
-        self.params, self.plots_data, self.plots, self.ui = params, plots_data, plots, ui
-
-    def configure(self, **kwargs):
-        """ assigns and computes needed variables for rendering. """
-        self._subfn_helper_setup_selectability()
-
-    def initialize(self, **kwargs):
-        """ sets up Figures """
-        # self.fig, self.axs = plt.subplots(nrows=len(rr_replays))
-        pass
-
-    def update(self, **kwargs):
-        """ called to specifically render data on the figure. """
-        pass
-
-    def on_close(self):
-        """ called when the figure is closed. """
-        pass
-    
+    def __attrs_pre_init__(self):
+        super().__init__(parent=None)
+        
 
     # Selectability/Interactivity Helpers ________________________________________________________________________________ #
     def on_click(self, event):
@@ -127,8 +105,6 @@ class PaginatedFigureController(QtCore.QObject):
         ## Initialize `params.is_selected` to False for each item:
         self.params.is_selected = dict(zip(self.params.flat_all_data_indicies, np.repeat(False, self.total_number_of_items_to_show))) # Repeat "False" for each item
 
-
-
     # Context and titles _________________________________________________________________________________________________ #
     def perform_update_titles_from_context(self, page_idx:int, included_page_data_indicies, **kwargs):
         """ Tries to update ethe figure suptitle and the window title from the self.params.active_identifying_figure_ctx if it's set
@@ -173,3 +149,100 @@ class PaginatedFigureController(QtCore.QObject):
         if not defer_render:
             mw.draw()
             mw.show()
+            
+
+@define(slots=False)
+class PaginatedFigureController(PaginatedFigureBaseController):
+    """2023-05-08 - Holds the current state for real-time pagination 
+    
+    Potential existing similar implementations
+        - that Spike3DWindow event jump utility used to jump to next/prev/specific event (like replays, etc)
+        - create_new_figure_if_needed(a_name) or something similar
+        - that tabbed matplotlib figure implementation
+        - docking widgets in figures
+        - from pyphoplacecellanalysis.GUI.Qt.PlaybackControls.Spike3DRasterBottomPlaybackControlBarWidget import Spike3DRasterBottomPlaybackControlBar, on_jump_left
+        
+	Usage:
+    
+    from pyphoplacecellanalysis.GUI.Qt.Mixins.PaginationMixins import PaginatedFigureController
+        
+    """
+
+    def configure(self, **kwargs):
+        """ assigns and computes needed variables for rendering. """
+        self._subfn_helper_setup_selectability()
+
+    def initialize(self, **kwargs):
+        """ sets up Figures """
+        # self.fig, self.axs = plt.subplots(nrows=len(rr_replays))
+        pass
+
+    def update(self, **kwargs):
+        """ called to specifically render data on the figure. """
+        pass
+
+    def on_close(self):
+        """ called when the figure is closed. """
+        pass
+    
+
+
+
+
+# class PaginatedFigureController(QtCore.QObject):
+#     """2023-05-08 - Holds the current state for real-time pagination 
+    
+#     Potential existing similar implementations
+#         - that Spike3DWindow event jump utility used to jump to next/prev/specific event (like replays, etc)
+#         - create_new_figure_if_needed(a_name) or something similar
+#         - that tabbed matplotlib figure implementation
+#         - docking widgets in figures
+#         - from pyphoplacecellanalysis.GUI.Qt.PlaybackControls.Spike3DRasterBottomPlaybackControlBarWidget import Spike3DRasterBottomPlaybackControlBar, on_jump_left
+        
+# 	Usage:
+    
+#     from pyphoplacecellanalysis.GUI.Qt.Mixins.PaginationMixins import PaginatedFigureController
+        
+#     """
+#     params: VisualizationParameters
+#     plots_data: RenderPlotsData
+#     plots: RenderPlots
+#     ui: PhoUIContainer
+
+#     ## Computed properties:
+#     @property
+#     def paginator(self):
+#         """The paginator property."""
+#         return self.plots_data.paginator
+
+#     @property
+#     def current_page_idx(self):
+#         """The curr_page_index property."""
+#         return self.ui.mw.ui.paginator_controller_widget.current_page_idx
+
+#     @property
+#     def total_number_of_items_to_show(self):
+#         """The total number of items (subplots usually) to be shown across all pages)."""
+#         return self.paginator.nItemsToShow
+
+#     def __init__(self, params, plots_data, plots, ui, parent=None):
+#         super(PaginatedFigureController, self).__init__(parent=parent)
+#         self.params, self.plots_data, self.plots, self.ui = params, plots_data, plots, ui
+
+#     def configure(self, **kwargs):
+#         """ assigns and computes needed variables for rendering. """
+#         self._subfn_helper_setup_selectability()
+
+#     def initialize(self, **kwargs):
+#         """ sets up Figures """
+#         # self.fig, self.axs = plt.subplots(nrows=len(rr_replays))
+#         pass
+
+#     def update(self, **kwargs):
+#         """ called to specifically render data on the figure. """
+#         pass
+
+#     def on_close(self):
+#         """ called when the figure is closed. """
+#         pass
+    

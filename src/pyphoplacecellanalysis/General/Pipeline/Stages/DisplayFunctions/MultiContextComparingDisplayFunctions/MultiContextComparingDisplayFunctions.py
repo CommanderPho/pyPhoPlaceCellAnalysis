@@ -1702,23 +1702,10 @@ class RateRemappingPaginatedFigureController(PaginatedFigureController):
         _out_rr_pagination_controller = RateRemappingPaginatedFigureController.init_from_paginator(a_paginator, a_name='TestRateRemappingPaginatedFigureController')
         _out_rr_pagination_controller
     """
-
-    @property
-    def paginator(self):
-        """The paginator property."""
-        return self.plots_data.paginator
-
-    @property
-    def current_page_idx(self):
-        """The curr_page_index property."""
-        return self.ui.mw.ui.paginator_controller_widget.current_page_idx
-
-    def __init__(self, params, plots_data, plots, ui, parent=None):
-        super(RateRemappingPaginatedFigureController, self).__init__(params, plots_data, plots, ui, parent=parent)
-
+    
     @classmethod
-    def init_from_paginator(cls, a_paginator, a_name:str = 'RateRemappingPaginatedFigureController', plot_function_name='plot_rr_aclu', active_context=None, parent=None):
-        new_obj = cls(params=VisualizationParameters(name=a_name), plots_data=RenderPlotsData(name=a_name, paginator=a_paginator), plots=RenderPlots(name=a_name), ui=PhoUIContainer(name=a_name, connections=PhoUIContainer(name=a_name)), parent=parent)
+    def init_from_paginator(cls, a_paginator, a_name:str = 'RateRemappingPaginatedFigureController', plot_function_name='plot_rr_aclu', active_context=None):
+        new_obj = cls(params=VisualizationParameters(name=a_name), plots_data=RenderPlotsData(name=a_name, paginator=a_paginator), plots=RenderPlots(name=a_name), ui=PhoUIContainer(name=a_name, connections=PhoUIContainer(name=a_name)))
         # new_obj.ui.connections = PhoUIContainer(name=name)
         num_slices = a_paginator.max_num_items_per_page
         # Setup equivalent to that performed in `pyphoplacecellanalysis.Pho2D.stacked_epoch_slices.stacked_epoch_basic_setup`
@@ -1812,18 +1799,3 @@ class RateRemappingPaginatedFigureController(PaginatedFigureController):
 
         self.ui.mw.draw()
 
-
-    
-
-
-    # def perform_plot(self, debug_print=False):
-    #     self.params.debug_print = debug_print
-    #     self._build_figure_widget_from_paginator()
-        
-    #     ## 2. Update:
-    #     self.on_paginator_control_widget_jump_to_page(page_idx=0)
-        
-    #     # ui.on_paginator_control_widget_jump_to_page = on_paginator_control_widget_jump_to_page
-    #     _a_connection = self.ui.mw.ui.paginator_controller_widget.jump_to_page.connect(self.on_paginator_control_widget_jump_to_page) # bind connection
-    #     self.ui.connections['paginator_controller_widget_jump_to_page'] = _a_connection
-        

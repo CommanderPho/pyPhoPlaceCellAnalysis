@@ -535,7 +535,7 @@ from pyphoplacecellanalysis.External.pyqtgraph import QtCore
 from pyphoplacecellanalysis.GUI.Qt.Mixins.PaginationMixins import PaginatedFigureController
 
 
-
+# @define
 class DecodedEpochSlicesPaginatedFigureController(PaginatedFigureController):
     """2023-05-09 - Aims to refactor `plot_paginated_decoded_epoch_slices`, a series of nested functions, into a stateful class
         Builds a matplotlib Figure in a CustomMatplotlibWidget that displays paginated axes using a Paginator by creating a `PaginationControlWidget`
@@ -555,27 +555,9 @@ class DecodedEpochSlicesPaginatedFigureController(PaginatedFigureController):
         _out_pagination_controller
     """
 
-    @property
-    def paginator(self):
-        """The paginator property."""
-        return self.plots_data.paginator
-
-    @property
-    def current_page_idx(self):
-        """The curr_page_index property."""
-        return self.ui.mw.ui.paginator_controller_widget.current_page_idx
-
-    @property
-    def total_number_of_items_to_show(self):
-        """The total number of items (subplots usually) to be shown across all pages)."""
-        return self.paginator.nItemsToShow
-
-    def __init__(self, params, plots_data, plots, ui, parent=None):
-        super(DecodedEpochSlicesPaginatedFigureController, self).__init__(params, plots_data, plots, ui, parent=parent)
-
     @classmethod
-    def init_from_decoder_data(cls, active_filter_epochs, filter_epochs_decoder_result, xbin, global_pos_df, a_name:str = 'DecodedEpochSlicesPaginationController', active_context=None, max_subplots_per_page=20, parent=None):
-        new_obj = cls(params=VisualizationParameters(name=a_name), plots_data=RenderPlotsData(name=a_name), plots=RenderPlots(name=a_name), ui=PhoUIContainer(name=a_name), parent=parent)
+    def init_from_decoder_data(cls, active_filter_epochs, filter_epochs_decoder_result, xbin, global_pos_df, a_name:str = 'DecodedEpochSlicesPaginationController', active_context=None, max_subplots_per_page=20):
+        new_obj = cls(params=VisualizationParameters(name=a_name), plots_data=RenderPlotsData(name=a_name), plots=RenderPlots(name=a_name), ui=PhoUIContainer(name=a_name))
         ## Real setup:
         new_obj.params.active_identifying_figure_ctx = active_context # set context before calling `plot_paginated_decoded_epoch_slices` which will set the rest of the properties
         new_obj.plot_paginated_decoded_epoch_slices(active_filter_epochs, filter_epochs_decoder_result, xbin, global_pos_df, max_subplots_per_page=max_subplots_per_page)
@@ -631,7 +613,7 @@ class DecodedEpochSlicesPaginatedFigureController(PaginatedFigureController):
         epoch_slices_paginator = Paginator.init_from_data((epoch_slices, epoch_labels, time_bin_containers, posterior_containers), max_num_columns=1, max_subplots_per_page=max_subplots_per_page, data_indicies=None, last_figure_subplots_same_layout=False)
         return epoch_slices_paginator
 
-    @QtCore.pyqtSlot(int)
+    # @QtCore.pyqtSlot(int)
     def on_paginator_control_widget_jump_to_page(self, page_idx: int):
         """ Update: made to depend on self """
         from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import plot_1D_most_likely_position_comparsions # used in `plot_decoded_epoch_slices`
@@ -675,8 +657,6 @@ class DecodedEpochSlicesPaginatedFigureController(PaginatedFigureController):
 
         self.perform_update_titles_from_context(page_idx=page_idx, included_page_data_indicies=included_page_data_indicies, collision_prefix='_DecodedEpochSlices_plot_test', display_fn_name='plot_single_epoch_slice', plot_result_set='shared')
         self.ui.mw.draw()
-
-
 
     def plot_paginated_decoded_epoch_slices(self, active_filter_epochs, filter_epochs_decoder_result, xbin, global_pos_df, max_subplots_per_page=20, debug_print=False):
         """ 2023-05-08 - plots a paginated decoded_epoch_slices figure """
