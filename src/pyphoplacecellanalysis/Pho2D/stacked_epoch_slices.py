@@ -662,7 +662,8 @@ class DecodedEpochSlicesPaginatedFigureController(PaginatedFigureController):
                                                             enable_flat_line_drawing=self.params.enable_flat_line_drawing, debug_print=self.params.debug_print)
             if _temp_fig is not None:
                 self.plots.fig = _temp_fig
-                self.params.callback_id = self.plots.fig.fig.canvas.mpl_connect('button_press_event', self.on_click)
+                if not self.params.has_attr('callback_id'):
+                    self.params.callback_id = self.plots.fig.canvas.mpl_connect('button_press_event', self.on_click)
 
             curr_ax.set_xlim(*curr_epoch_slice)
             curr_ax.set_title(f'') # needs to be set to empty string '' because this is the title that appears above each subplot/slice

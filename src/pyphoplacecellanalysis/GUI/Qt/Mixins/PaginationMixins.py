@@ -80,9 +80,9 @@ class PaginatedFigureController(QtCore.QObject):
         found_data_index = curr_page_data_indicies[found_index]
         # print(f'{current_page_idx = }, {found_data_index =}')
         # Toggle the selection status of the clicked Axes
-        self.is_selected[found_data_index] = not self.is_selected.get(found_data_index, False) # if never set before, assume that it's not selected
+        self.params.is_selected[found_data_index] = not self.params.is_selected.get(found_data_index, False) # if never set before, assume that it's not selected
         ## Update visual apperance of axis:
-        self.perform_update_ax_selected_state(ax=ax, is_selected=self.is_selected[found_data_index])
+        self.perform_update_ax_selected_state(ax=ax, is_selected=self.params.is_selected[found_data_index])
 
         # Redraw the figure to show the updated selection
         event.canvas.draw()
@@ -104,7 +104,7 @@ class PaginatedFigureController(QtCore.QObject):
             # print(f'found_data_idx: {found_data_idx}')
             # found_data_index = curr_page_data_indicies[found_index]
             # print(f'{current_page_idx = }, {found_data_index =}')
-            is_selected = self.is_selected.get(found_data_idx, False)
+            is_selected = self.params.is_selected.get(found_data_idx, False)
             self.perform_update_ax_selected_state(ax=ax, is_selected=is_selected)
                 
         # Redraw the figure to show the updated selection
