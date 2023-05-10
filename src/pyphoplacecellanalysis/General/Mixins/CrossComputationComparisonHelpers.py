@@ -169,8 +169,6 @@ class CustomScatterMarkerMode(Enum):
     TwoSplit = "TwoSplitMode"
     TriSplit = "TriSplitMode"
     
-# from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.MultiContextComputationFunctions import make_fr
-
 
 def _build_neuron_type_distribution_color(rdf):
     """

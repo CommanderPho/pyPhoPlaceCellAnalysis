@@ -28,9 +28,7 @@ class LeaveOneOutDecodingAnalysis(ComputedResult):
     """ 2023-05-10 - holds the results of a leave-one-out decoding analysis of the long and short track 
     Usage:
         leave_one_out_decoding_analysis_obj = LeaveOneOutDecodingAnalysis(long_decoder, short_decoder, long_replays, short_replays, global_replays, long_shared_aclus_only_decoder, short_shared_aclus_only_decoder, shared_aclus, long_short_pf_neurons_diff, n_neurons, long_results_obj, short_results_obj)
-    """
-    is_global: bool = True
-    
+    """    
     long_decoder: BayesianPlacemapPositionDecoder
     short_decoder: BayesianPlacemapPositionDecoder
     long_replays: pd.DataFrame
@@ -43,7 +41,8 @@ class LeaveOneOutDecodingAnalysis(ComputedResult):
     n_neurons: int
     long_results_obj: SurpriseAnalysisResult
     short_results_obj: SurpriseAnalysisResult
-    
+
+    is_global: bool = True
 
 class LongShortTrackComputations(AllFunctionEnumeratingMixin, metaclass=ComputationFunctionRegistryHolder):
     
@@ -82,7 +81,7 @@ class LongShortTrackComputations(AllFunctionEnumeratingMixin, metaclass=Computat
             decoding_time_bin_size = long_one_step_decoder_1D.time_bin_size # 1.0/30.0 # 0.03333333333333333
         else:
             # check if decoding_time_bin_size is the same
-            if not (decoding_time_bin_size == long_one_step_decoder_1D.time_bin_size)
+            if not (decoding_time_bin_size == long_one_step_decoder_1D.time_bin_size):
                 print(f'decoding_time_bin_size different than decoder: decoding_time_bin_size: {decoding_time_bin_size}, long_one_step_decoder_1D.time_bin_size: {long_one_step_decoder_1D.time_bin_size}')
                 raise NotImplementedError
                 # TODO: invalidate cached
