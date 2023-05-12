@@ -1,12 +1,15 @@
 import matplotlib.pyplot as plt
 import numpy as np
 
+from pyphocorehelpers.programming_helpers import metadata_attributes
+from pyphocorehelpers.function_helpers import function_attributes
 from pyphocorehelpers.print_helpers import WrappingMessagePrinter
 from pyphocorehelpers.plotting.mixins.figure_param_text_box import add_figure_text_box # for _display_add_computation_param_text_box
 
 from pyphoplacecellanalysis.General.DataSeriesToSpatial import DataSeriesToSpatial # required for debug_print_axes_locations(...)
 
 # Used by _display_2d_placefield_result_plot_ratemaps_2D
+@function_attributes(short_name=None, tags=['save','figure','if_needed'], input_requires=[], output_provides=[], uses=[], used_by=['_display_2d_placefield_result_plot_ratemaps_2D'], creation_date='2023-05-11 19:55', related_items=[])
 def _save_displayed_figure_if_needed(plotting_config, plot_type_name='plot', active_variant_name=None, active_figures=list(), debug_print=False):
     if active_variant_name is not None:
         active_plot_filename = '-'.join([plot_type_name, active_variant_name])
@@ -21,6 +24,7 @@ def _save_displayed_figure_if_needed(plotting_config, plot_type_name='plot', act
     
     
 # Post plotting figure helpers:
+@function_attributes(short_name=None, tags=['save','figure','param','text','text_box'], input_requires=[], output_provides=[], uses=[], used_by=['_display_2d_placefield_result_plot_ratemaps_2D'], creation_date='2023-05-11 19:55', related_items=[])
 def _display_add_computation_param_text_box(fig, computation_config):
     """ Adds a small box containing the computation parmaters to the matplotlib figure. 
     Usage:
@@ -41,7 +45,7 @@ TODO: EXPLORE: REVIEW: thse debug_print_* functions seem very useful and I didn'
 # ==================================================================================================================== #
 # General                                                                                                              #
 # ==================================================================================================================== #
-
+@function_attributes(short_name=None, tags=['debug_print','debug','print','QRect'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-05-11 19:55', related_items=[])
 def debug_print_QRect(rect, prefix_string='rect: ', indent_string = '\t', include_edge_positions=False):
     """ Prints QRectF in a more readible format
     By default printing QRectF objects results in output like 'PyQt5.QtCore.QRectF(57.847549828567, -0.007193522045074202, 15.76451934295443, 1.0150365839255244)'
@@ -63,6 +67,9 @@ def debug_print_QRect(rect, prefix_string='rect: ', indent_string = '\t', includ
 # Specific                                                                                                             #
 # ==================================================================================================================== #
 
+
+
+@function_attributes(short_name=None, tags=['debug_print','debug','print','session'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-05-11 19:55', related_items=[])
 def debug_print_identity_properties_from_session(curr_sess, debug_print=True):
     """ 
     Usage:
@@ -92,6 +99,7 @@ def debug_print_identity_properties_from_session(curr_sess, debug_print=True):
         print(f'\t\t curr_map_keys: {curr_map_keys}\n \t\t curr_map_values: {curr_map_values}')
     return n_cells, curr_map_keys, curr_map_values
 
+@function_attributes(short_name=None, tags=['debug_print','debug','print','spikes', 'spikes_df'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-05-11 19:55', related_items=[])
 def debug_print_identity_properties(spikes_df, debug_print=True):
     """ 
     Usage:
@@ -117,6 +125,7 @@ def debug_print_identity_properties(spikes_df, debug_print=True):
         print(f'\t\t fragile_linear_neuron_IDXs: {fragile_linear_neuron_IDXs}\n \t\t cell_ids: {cell_ids}')
     return n_cells, fragile_linear_neuron_IDXs, cell_ids
 
+@function_attributes(short_name=None, tags=['debug_print','debug','print','spike_raster_plt', 'axes'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-05-11 19:55', related_items=[])
 def debug_print_axes_locations(spike_raster_plt):
     """ debugs the active and global (data) windows. 
     
@@ -169,6 +178,7 @@ def debug_print_axes_locations(spike_raster_plt):
     return ((active_t_start, active_t_end, active_window_t_duration), (global_start_t, global_end_t, global_total_data_duration), 
             (active_x_start, active_x_end, (active_x_end - active_x_start)), (global_x_start, global_x_end, (global_x_end - global_x_start)))
 
+@function_attributes(short_name=None, tags=['debug_print','debug','print','app', 'info', 'qt', 'QApp'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-05-11 19:55', related_items=[])
 def debug_print_app_info(qt_app):
     """ prints the informationa bout the active QtApp. 
     
@@ -180,11 +190,13 @@ def debug_print_app_info(qt_app):
     if qt_app.objectName() != '':
         print(f'.objectName(): {qt_app.objectName()}')
 
+@function_attributes(short_name=None, tags=['debug_print','debug','print','raster_plotter', 'info'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-05-11 19:55', related_items=[])
 def debug_print_base_raster_plotter_info(raster_plotter):
     print(f'raster_plotter:\nmemory address: {hex(id(raster_plotter))}')
     debug_print_app_info(raster_plotter.app)
     print(f'.spikes_window address: {hex(id(raster_plotter.spikes_window))}')
 
+@function_attributes(short_name=None, tags=['debug_print','debug','print','spikes', 'animation'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-05-11 19:55', related_items=[])
 def _debug_print_spike_raster_window_animation_properties(spike_raster_window):
     """ dumps debug properties related to animation for a spike_raster_window
     Usage:
@@ -214,7 +226,7 @@ def _debug_print_spike_raster_window_animation_properties(spike_raster_window):
     x_duration = max_x - min_x
     print(f'\tspike_raster_plt_2d.ui.scroll_window_region\n\t\tmin_x: {min_x}, max_x: {max_x}, x_duration: {x_duration}') # min_x: 7455.820603311667, max_x: 7532.52160713601, x_duration: 76.70100382434339 -- NOTE: these are the real seconds!
 
-
+@function_attributes(short_name=None, tags=['debug_print','debug','print','firing_rate', 'overview'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-05-11 19:55', related_items=[])
 def debug_print_active_firing_rate_trends_result_overview(active_firing_rate_trends):
     """ 
     
@@ -241,6 +253,7 @@ def debug_print_active_firing_rate_trends_result_overview(active_firing_rate_tre
     print(f"\tpf_included_spikes_only: ")
     _print_single_result(active_firing_rate_trends['pf_included_spikes_only'])
 
+@function_attributes(short_name=None, tags=['debug_print','debug','print','spikes', 'spikes_df'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-05-11 19:55', related_items=[])
 def debug_print_spikes_df_column_info(spikes_df):
     """ Prints info about the spikes_df (spikes dataframe)
     Usage:
@@ -258,8 +271,8 @@ def debug_print_spikes_df_column_info(spikes_df):
 # ==================================================================================================================== #
 
 ## NEED to figure out
-
     
+@function_attributes(short_name=None, tags=['debug_print','debug','print','raster_plot', 'temporal','info'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-05-11 19:55', related_items=[])
 def debug_print_temporal_info(active_2d_plot, prefix_string='active_2d_plot.', indent_string = '\t'):
     """ NOTE: used by Spike2DRaster's debug_print_spike_raster_timeline_alignments(...) function """
     print(f'{indent_string}{prefix_string}temporal_axis_length: {active_2d_plot.temporal_axis_length}')

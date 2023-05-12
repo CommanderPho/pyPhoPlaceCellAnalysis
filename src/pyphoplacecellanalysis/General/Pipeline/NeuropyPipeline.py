@@ -327,7 +327,7 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
             )
             
             
-        if a_pipeline.is_computed:    
+        if a_pipeline.is_computed:
             if hasattr(a_pipeline, 'computation_results'):
                 comp_config_results_list = {}
                 for a_name, a_result in a_pipeline.computation_results.items():

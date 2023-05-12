@@ -10,6 +10,8 @@ from pyphoplacecellanalysis.General.Model.ComputationResults import ComputationR
 
 from neuropy.utils.colors_util import get_neuron_colors # required for build_neurons_color_map 
 
+from pyphocorehelpers.programming_helpers import metadata_attributes
+from pyphocorehelpers.function_helpers import function_attributes
 
 from enum import Enum
 
@@ -50,6 +52,7 @@ class SetPartition(object):
         self._shared = value
 
 
+@function_attributes(short_name=None, tags=['compare','private','computation_result'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-05-11 20:06', related_items=[])
 def _compare_computation_results(lhs_computation_results, rhs_computation_results) -> SetPartition:
     """Computes the differences between two separate computation results, such as those computed for different epochs
 
@@ -129,7 +132,7 @@ def _find_any_context_neurons(*args):
     # reduce(np.union1d, ([1, 3, 4, 3], [3, 1, 2, 1], [6, 3, 4, 2]))
     return reduce(np.union1d, tuple(args))
 
-
+@function_attributes(short_name=None, tags=['color', 'neuron'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-05-11 20:07', related_items=[])
 def build_neurons_color_map(n_neurons:int, sortby=None, cmap=None):
     """ returns the list of colors, an RGBA np.array of shape: 4 x n_neurons. 
     neurons_colors_array = build_neurons_color_map(n_neurons, sortby=shared_fragile_neuron_IDXs, cmap=None) 
