@@ -580,11 +580,6 @@ class DecodedEpochSlicesPaginatedFigureController(PaginatedFigureController):
         _a_connection = new_obj.ui.mw.ui.paginator_controller_widget.jump_to_page.connect(new_obj.on_paginator_control_widget_jump_to_page) # bind connection
         new_obj.ui.connections['paginator_controller_widget_jump_to_page'] = _a_connection
 
-        # new_obj = cls(params=VisualizationParameters(name=a_name, active_identifying_figure_ctx=active_context), plots_data=RenderPlotsData(name=a_name), plots=RenderPlots(name=a_name), ui=PhoUIContainer(name=a_name))
-        # ## Real setup:
-        # # new_obj.params.active_identifying_figure_ctx = active_context # set context before calling `plot_paginated_decoded_epoch_slices` which will set the rest of the properties
-        # new_obj.plot_paginated_decoded_epoch_slices(active_filter_epochs, filter_epochs_decoder_result, xbin, global_pos_df, active_context=active_context, max_subplots_per_page=max_subplots_per_page)
-        ## TODO: context should still be there after setup
         return new_obj
     
     def configure(self, **kwargs):
@@ -667,8 +662,6 @@ class DecodedEpochSlicesPaginatedFigureController(PaginatedFigureController):
                                                             enable_flat_line_drawing=self.params.enable_flat_line_drawing, debug_print=self.params.debug_print)
             if _temp_fig is not None:
                 self.plots.fig = _temp_fig
-                if not self.params.has_attr('callback_id'):
-                    self.params.callback_id = self.plots.fig.canvas.mpl_connect('button_press_event', self.on_click)
 
             curr_ax.set_xlim(*curr_epoch_slice)
             curr_ax.set_title(f'') # needs to be set to empty string '' because this is the title that appears above each subplot/slice
@@ -680,29 +673,4 @@ class DecodedEpochSlicesPaginatedFigureController(PaginatedFigureController):
 
         self.perform_update_titles_from_context(page_idx=page_idx, included_page_data_indicies=included_page_data_indicies, collision_prefix='_DecodedEpochSlices_plot_test', display_fn_name='plot_single_epoch_slice', plot_result_set='shared')
         self.ui.mw.draw()
-
-    # def plot_paginated_decoded_epoch_slices(self, active_filter_epochs, filter_epochs_decoder_result, xbin, global_pos_df, active_context=None, max_subplots_per_page=20, debug_print=False):
-    #     """ 2023-05-08 - plots a paginated decoded_epoch_slices figure """
-    #     from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import plot_decoded_epoch_slices #, _helper_update_decoded_single_epoch_slice_plot #, _subfn_update_decoded_epoch_slices
-
-    #     active_filter_epochs = deepcopy(active_filter_epochs)
-    #     filter_epochs_decoder_result = deepcopy(filter_epochs_decoder_result) # DecodedFilterEpochsResult
-        
-    #     self.params, self.plots_data, self.plots, self.ui = plot_decoded_epoch_slices(active_filter_epochs, filter_epochs_decoder_result, global_pos_df=global_pos_df, variable_name='lin_pos', xbin=xbin,
-    #                                                             name='stacked_epoch_slices_long_results_obj', debug_print=False, debug_test_max_num_slices=max_subplots_per_page)
-        
-    #     self.params.debug_print = debug_print
-    #     self.plots_data.paginator = self._subfn_helper_build_paginator(active_filter_epochs, filter_epochs_decoder_result, max_subplots_per_page, self.params.debug_print)  # assign the paginator
-
-
-    #     ## Add the PaginationControlWidget
-    #     self._subfn_helper_add_pagination_control_widget(self.plots_data.paginator, self.ui.mw, defer_render=False)
-
-    #     ## Setup Selectability
-    #     self._subfn_helper_setup_selectability()
-
-    #     ## 2. Update:
-    #     self.on_paginator_control_widget_jump_to_page(page_idx=0)
-    #     _a_connection = self.ui.mw.ui.paginator_controller_widget.jump_to_page.connect(self.on_paginator_control_widget_jump_to_page) # bind connection
-    #     self.ui.connections['paginator_controller_widget_jump_to_page'] = _a_connection
 
