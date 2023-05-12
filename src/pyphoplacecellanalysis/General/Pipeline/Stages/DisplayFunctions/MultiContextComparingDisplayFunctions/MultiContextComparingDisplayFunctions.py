@@ -1736,6 +1736,9 @@ class RateRemappingPaginatedFigureController(PaginatedFigureController):
         self._build_figure_widget_from_paginator()
         ## Setup Selectability
         self._subfn_helper_setup_selectability()
+        ## Setup on_click callback:
+        if not self.params.has_attr('callback_id') or self.params.get('callback_id', None) is None:
+            self.params.callback_id = self.plots.fig.canvas.mpl_connect('button_press_event', self.on_click) ## TypeError: unhashable type: 'DecodedEpochSlicesPaginatedFigureController'
 
         ## 2. Update:
         self.on_paginator_control_widget_jump_to_page(page_idx=0)

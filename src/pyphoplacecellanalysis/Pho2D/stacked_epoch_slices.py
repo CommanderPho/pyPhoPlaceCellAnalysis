@@ -574,6 +574,7 @@ class DecodedEpochSlicesPaginatedFigureController(PaginatedFigureController):
 
         ## Setup Selectability
         new_obj._subfn_helper_setup_selectability()
+        new_obj.connect_on_click_callback() # connect the page
 
         ## 2. Update:
         new_obj.on_paginator_control_widget_jump_to_page(page_idx=0)
@@ -582,6 +583,23 @@ class DecodedEpochSlicesPaginatedFigureController(PaginatedFigureController):
 
         return new_obj
     
+    
+    @property
+    def selected_epoch_times(self):
+        """The Determine the Epochs that have actually been selected so they can be saved/stored somehow."""
+        assert np.shape(self.plots_data.epoch_slices)[0] == len(self.is_selected), f"Selection length must be the same as the number of epoch_slices, otherwise we do not know what we are selecting! np.shape(_out_pagination_controller.plots_data.epoch_slices): {np.shape(_out_pagination_controller.plots_data.epoch_slices)}, len(_out_pagination_controller.params.is_selected): {len(_out_pagination_controller.params.is_selected)}"
+        return self.plots_data.epoch_slices[self.is_selected] # returns an S x 2 array of epoch start/end times that are currently selected.
+
+    ## Supposed to be the right callback:
+    def on_selected_epochs_changed(self, event):
+        ## Forward the click event to the `_out_pagination_controller.on_click` callback. This will update the `_out_pagination_controller.params.is_selected`
+        print(f'on_selected_epochs_changed(...)')
+        self.on_click(event=event)
+        ## Determine the Epochs that have actually been selected so they can be saved/stored somehow:
+        # selected_epoch_times = self.selected_epoch_times # returns an S x 2 array of epoch start/end times that are currently selected.
+        print(f'\tselection_indicies: {self.selected_indicies}')
+
+    # Lifecycle Methods __________________________________________________________________________________________________ #
     def configure(self, **kwargs):
         """ assigns and computes needed variables for rendering. """
         pass
@@ -630,6 +648,17 @@ class DecodedEpochSlicesPaginatedFigureController(PaginatedFigureController):
         
         epoch_slices_paginator = Paginator.init_from_data((epoch_slices, epoch_labels, time_bin_containers, posterior_containers), max_num_columns=1, max_subplots_per_page=max_subplots_per_page, data_indicies=None, last_figure_subplots_same_layout=False)
         return epoch_slices_paginator
+
+
+    def connect_on_click_callback(self):
+        """ connects the button_press_event callback to self.on_selected_epochs_changed """
+        if not self.params.has_attr('callback_id') or self.params.get('callback_id', None) is None:
+            # _out_pagination_controller.params.callback_id = _out_pagination_controller.plots.fig.canvas.mpl_connect('button_press_event', _out_pagination_controller.on_click) ## TypeError: unhashable type: 'DecodedEpochSlicesPaginatedFigureController'
+            self.params.callback_id = self.plots.fig.canvas.mpl_connect('button_press_event', self.on_selected_epochs_changed) ## TypeError: unhashable type: 'DecodedEpochSlicesPaginatedFigureController'
+    def disconnect_on_click_callback(self):
+        """ disconnects the button_press_event callback for the figure."""
+        self.plots.fig.canvas.mpl_disconnect(self.params.callback_id)
+        self.params.callback_id = None
 
     
     def on_paginator_control_widget_jump_to_page(self, page_idx: int):
