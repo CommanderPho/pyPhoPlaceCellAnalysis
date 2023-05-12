@@ -60,3 +60,6 @@ src/pyphoplacecellanalysis/Resources/rc_ActionIcons.py
 src/pyphoplacecellanalysis/Resources/rc_GuiResources.py
 desktop.ini
 *.sha256
+src/cscope.files
+src/cscope.out
+src/myproject.db
