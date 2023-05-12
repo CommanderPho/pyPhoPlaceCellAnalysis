@@ -18,7 +18,7 @@ TypeError: super(type, obj): obj must be an instance or subtype of type
 
 """
 
-@define(slots=False)
+@define(slots=False, eq=False) # eq=False makes hashing and equality by identity, which is appropriate for this type of object
 class PaginatedFigureBaseController:
     params: VisualizationParameters = VisualizationParameters(name='PaginatedFigureBaseController')
     plots_data: RenderPlotsData = RenderPlotsData(name='PaginatedFigureBaseController')
@@ -86,7 +86,7 @@ class PaginatedFigureBaseController:
                 
         # Redraw the figure to show the updated selection
         if not defer_render:
-            self.fig.canvas.draw()
+            self.plots.fig.canvas.draw()
 
     def _subfn_helper_setup_selectability(self):
         """ sets up selectability of items. 
@@ -150,7 +150,7 @@ class PaginatedFigureBaseController:
             mw.show()
             
 
-@define(slots=False)
+@define(slots=False, eq=False) # eq=False makes hashing and equality by identity, which is appropriate for this type of object
 class PaginatedFigureController(PaginatedFigureBaseController):
     """2023-05-08 - Holds the current state for real-time pagination 
     
