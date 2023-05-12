@@ -1785,10 +1785,10 @@ class RateRemappingPaginatedFigureController(PaginatedFigureController):
         #     active_identifying_ctx = None
 
         # print(f'\tincluded_page_data_indicies: {included_page_data_indicies}')
-        fig = self.ui.mw.getFigure()
-        axs = self.ui.mw.axes
+        self.plots.fig = self.ui.mw.getFigure()
+        self.plots.axs = self.ui.mw.axes
         # print(f'axs: {axs}')
-        fig, axs, sort_indicies = plot_rr_aclu([str(aclu) for aclu in curr_page_rr_aclus], rr_laps=curr_page_rr_laps, rr_replays=curr_page_rr_replays, rr_neuron_types=curr_page_rr_neuron_type, fig=fig, axs=axs)
+        self.plots.fig, self.plots.axs, sort_indicies = plot_rr_aclu([str(aclu) for aclu in curr_page_rr_aclus], rr_laps=curr_page_rr_laps, rr_replays=curr_page_rr_replays, rr_neuron_types=curr_page_rr_neuron_type, fig=self.plots.fig, axs=self.plots.axs)
         # print(f'\t done.')
 
         self.perform_update_titles_from_context(page_idx=page_idx, included_page_data_indicies=included_page_data_indicies, collision_prefix='_RateRemapping_plot_test', display_fn_name='plot_rr_aclu', plot_result_set='shared')
