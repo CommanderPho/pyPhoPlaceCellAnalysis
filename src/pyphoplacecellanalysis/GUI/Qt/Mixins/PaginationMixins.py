@@ -66,7 +66,7 @@ class PaginatedFigureBaseController:
         current_page_idx = self.current_page_idx
         curr_page_data_indicies = self.paginator.get_page_data(page_idx=current_page_idx)[0] # the [0] returns only the indicies and not the data
         found_data_index = curr_page_data_indicies[found_index]
-        # print(f'{current_page_idx = }, {found_data_index =}')
+        print(f'{current_page_idx = }, {found_data_index =}')
         # Toggle the selection status of the clicked Axes
         self.params.is_selected[found_data_index] = not self.params.is_selected.get(found_data_index, False) # if never set before, assume that it's not selected
         ## Update visual apperance of axis:

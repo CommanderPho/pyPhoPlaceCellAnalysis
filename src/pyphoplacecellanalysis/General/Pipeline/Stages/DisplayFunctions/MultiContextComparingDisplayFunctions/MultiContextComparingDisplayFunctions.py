@@ -1764,11 +1764,11 @@ class RateRemappingPaginatedFigureController(PaginatedFigureController):
         self._subfn_helper_add_pagination_control_widget(self.plots_data.paginator, self.ui.mw, defer_render=False)
 
         ## Setup figure by building axes:
-        fig = self.ui.mw.getFigure()
+        self.plots.fig = self.ui.mw.getFigure()
 
         ## LIMITATION: Only works for 1D subplot configurations:
         # NOTE: fig.add_subplot(nrows, ncols, index) 
-        axs = [fig.add_subplot(self.plots_data.paginator.max_num_items_per_page, 1, i+1) for i in np.arange(self.plots_data.paginator.max_num_items_per_page)] # here we're aiming to approximate the `plt.subplots(nrows=len(included_page_data_indicies)) # one row for each page` setup
+        self.plots.axs = [self.plots.fig.add_subplot(self.plots_data.paginator.max_num_items_per_page, 1, i+1) for i in np.arange(self.plots_data.paginator.max_num_items_per_page)] # here we're aiming to approximate the `plt.subplots(nrows=len(included_page_data_indicies)) # one row for each page` setup
 
         self.ui.mw.draw()
         self.ui.mw.show()
