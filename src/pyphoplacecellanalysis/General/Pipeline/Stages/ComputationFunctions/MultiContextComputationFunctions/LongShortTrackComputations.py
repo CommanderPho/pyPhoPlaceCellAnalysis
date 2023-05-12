@@ -100,7 +100,8 @@ class LongShortTrackComputations(AllFunctionEnumeratingMixin, metaclass=Computat
 
         # 3m 40.3s
 
-        leave_one_out_decoding_analysis_obj = _long_short_decoding_analysis_from_decoders(long_one_step_decoder_1D, short_one_step_decoder_1D, long_session, short_session, global_session, decoding_time_bin_size=decoding_time_bin_size, perform_cache_load=perform_cache_load)
+        leave_one_out_decoding_analysis_obj = _long_short_decoding_analysis_from_decoders(long_one_step_decoder_1D, short_one_step_decoder_1D, long_session, short_session, global_session,
+                                                                                           decoding_time_bin_size=decoding_time_bin_size, perform_cache_load=perform_cache_load)
         # TODO 2023-05-10 - need to update existing ['long_short'] if it exists:
         # global_computation_results.computed_data['long_short'] = {
         #     'leave_one_out_decoding_analysis': leave_one_out_decoding_analysis_obj
