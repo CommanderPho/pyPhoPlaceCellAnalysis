@@ -45,6 +45,17 @@ class PaginatedFigureBaseController:
     #     super().__init__(parent=None)
 
     # Selectability/Interactivity Helpers ________________________________________________________________________________ #
+    @property
+    def is_selected(self):
+        """The selected_indicies property."""
+        return np.array(list(self.params.is_selected.values()))
+    
+    @property
+    def selected_indicies(self):
+        """The selected_indicies property."""
+        return self.params.flat_all_data_indicies[self.is_selected]
+
+
     def on_click(self, event):
         """ called when an axis is clicked to toggle the selection. """
         # Get the clicked Axes object
