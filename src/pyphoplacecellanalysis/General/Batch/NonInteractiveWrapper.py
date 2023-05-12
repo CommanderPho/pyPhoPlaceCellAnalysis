@@ -570,7 +570,8 @@ def batch_programmatic_figures(curr_active_pipeline):
 
     ## TODO: curr_session_parent_out_path
 
-
+    active_identifying_session_ctx, active_session_figures_out_path, active_out_figures_list = batch_programmatic_figures(curr_active_pipeline)
+    
     """
     ## 🗨️🟢 2022-10-26 - Jonathan Firing Rate Analyses
     # Perform missing global computations                                                                                  #

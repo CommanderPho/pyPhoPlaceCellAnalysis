@@ -320,7 +320,7 @@ class MultiContextComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Co
         return global_computation_results
 
 
-    @function_attributes(short_name='_perform_short_long_firing_rate_analyses', tags=['short_long','firing_rate', 'computation'], input_requires=[], output_provides=[], uses=['pipeline_complete_compute_long_short_fr_indicies'], used_by=[], creation_date='2023-04-11 00:00')
+    @function_attributes(short_name='_perform_short_long_firing_rate_analyses', tags=['short_long','firing_rate', 'computation'], input_requires=[], output_provides=['long_short_fr_indicies_analysis'], uses=['pipeline_complete_compute_long_short_fr_indicies'], used_by=[], creation_date='2023-04-11 00:00')
     def _perform_short_long_firing_rate_analyses(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_whitelist=None, debug_print=False):
         """ 
         
@@ -328,9 +328,9 @@ class MultiContextComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Co
             ['sess']
             
         Provides:
-            computation_result.computed_data['short_long_pf_overlap_analyses']
-                ['short_long_pf_overlap_analyses']['short_long_neurons_diff']
-                ['short_long_pf_overlap_analyses']['poly_overlap_df']
+            computation_result.computed_data['long_short_fr_indicies_analysis']
+                ['long_short_fr_indicies_analysis']['short_long_neurons_diff']
+                ['long_short_fr_indicies_analysis']['poly_overlap_df']
         
         """
         # New unified `pipeline_complete_compute_long_short_fr_indicies(...)` method for entire pipeline:
