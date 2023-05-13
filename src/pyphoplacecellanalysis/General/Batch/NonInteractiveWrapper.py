@@ -232,7 +232,7 @@ class NonInteractiveWrapper(object):
 # ==================================================================================================================== #
 
 
-@function_attributes(short_name='batch_load_session', tags=['main', 'batch', 'automated', 'session', 'load'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-03-28 04:46')
+@function_attributes(short_name='batch_load_session', tags=['main', 'batch', 'automated', 'session', 'load'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2022-12-07 00:00')
 def batch_load_session(global_data_root_parent_path, active_data_mode_name, basedir, force_reload=False, saving_mode=PipelineSavingScheme.SKIP_SAVING, fail_on_exception=True, skip_extended_batch_computations=False, **kwargs):
     """Loads and runs the entire pipeline for a session folder located at the path 'basedir'.
 
@@ -251,10 +251,10 @@ def batch_load_session(global_data_root_parent_path, active_data_mode_name, base
     # skip_save = kwargs.get('skip_save', False)
     active_pickle_filename = kwargs.get('active_pickle_filename', 'loadedSessPickle.pkl')
 
-
     active_session_computation_configs = kwargs.get('active_session_computation_configs', None)
 
     computation_functions_name_whitelist = kwargs.get('computation_functions_name_whitelist', None)
+
 
     known_data_session_type_properties_dict = DataSessionFormatRegistryHolder.get_registry_known_data_session_type_dict()
     active_data_session_types_registered_classes_dict = DataSessionFormatRegistryHolder.get_registry_data_session_type_class_name_dict()
@@ -262,6 +262,7 @@ def batch_load_session(global_data_root_parent_path, active_data_mode_name, base
     active_data_mode_registered_class = active_data_session_types_registered_classes_dict[active_data_mode_name]
     active_data_mode_type_properties = known_data_session_type_properties_dict[active_data_mode_name]
 
+    ## Begin main run of the pipeline (load or execute):
     curr_active_pipeline = NeuropyPipeline.try_init_from_saved_pickle_or_reload_if_needed(active_data_mode_name, active_data_mode_type_properties,
         override_basepath=Path(basedir), force_reload=force_reload, active_pickle_filename=active_pickle_filename, skip_save_on_initial_load=True)
 
@@ -297,6 +298,7 @@ def batch_load_session(global_data_root_parent_path, active_data_mode_name, base
         assert 'time_bin_size' not in kwargs, f"time_bin_size kwarg provided but will not be used because a custom active_session_computation_configs was provided as well."
 
 
+    ## Setup Computation Functions to be executed:
     if computation_functions_name_whitelist is None:
         # Whitelist Mode:
         computation_functions_name_whitelist=['_perform_baseline_placefield_computation', '_perform_time_dependent_placefield_computation', '_perform_extended_statistics_computation',
@@ -330,6 +332,8 @@ def batch_load_session(global_data_root_parent_path, active_data_mode_name, base
         print(f'saving_mode.shouldSave == False, so not saving at the end of batch_load_session')
 
     return curr_active_pipeline
+
+
 
 @function_attributes(short_name='batch_extended_computations', tags=['batch', 'automated', 'session', 'compute'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-03-28 04:46')
 def batch_extended_computations(curr_active_pipeline, include_whitelist=None, include_global_functions=False, fail_on_exception=False, progress_print=True, debug_print=False, force_recompute:bool = False):
