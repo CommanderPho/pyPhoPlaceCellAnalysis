@@ -46,18 +46,19 @@ class BatchRun(object):
     session_batch_basedirs: dict = field(default_factory=lambda:{})
     session_batch_errors: dict = field(default_factory=lambda:{})
     enable_saving_to_disk: bool = False
+    ## TODO: could keep session-specific kwargs to be passed to run_specific_batch(...) as a member variable if needed
 
-    def execute_session(self, session_context):
+    def execute_session(self, session_context, **kwargs):
         curr_session_status = self.session_batch_status[session_context]
         if curr_session_status != SessionBatchProgress.COMPLETED:
                 curr_session_basedir = self.session_batch_basedirs[session_context]
-                self.session_batch_status[session_context], self.session_batch_errors[session_context] = run_specific_batch(self, session_context, curr_session_basedir)
+                self.session_batch_status[session_context], self.session_batch_errors[session_context] = run_specific_batch(self, session_context, curr_session_basedir, **kwargs)
         else:
             print(f'session {session_context} already completed.')
 
-    def execute_all(self):
+    def execute_all(self, **kwargs):
         for curr_session_context, curr_session_status in self.session_batch_status.items():
-            self.execute_session(curr_session_context) # evaluate a single session
+            self.execute_session(curr_session_context, **kwargs) # evaluate a single session
 
 
 @function_attributes(short_name='run_diba_batch', tags=['batch', 'automated', 'kdiba'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-03-28 04:46')
@@ -93,13 +94,13 @@ def run_diba_batch(global_data_root_parent_path: Path, execute_all:bool = False,
 
     animal_names = ['gor01', 'vvp01', 'pin01']
     experiment_names_lists = [['one', 'two'], ['one', 'two'], ['one']] # there is no 'two' for animal 'pin01'
-    blacklists = [['PhoHelpers', 'Spike3D-Minimal-Test', 'Unused'], [], [], [], ['redundant','showclus','sleep','tmaze']]
+    exclude_lists = [['PhoHelpers', 'Spike3D-Minimal-Test', 'Unused'], [], [], [], ['redundant','showclus','sleep','tmaze']]
 
-    for animal_name, an_experiment_names_list, blacklist in zip(animal_names, experiment_names_lists, blacklists):
+    for animal_name, an_experiment_names_list, exclude_list in zip(animal_names, experiment_names_lists, exclude_lists):
         for an_experiment_name in an_experiment_names_list:
             local_session_parent_context = local_session_root_parent_context.adding_context(collision_prefix='animal', animal=animal_name, exper_name=an_experiment_name)
             local_session_parent_path = local_session_root_parent_path.joinpath(local_session_parent_context.animal, local_session_parent_context.exper_name)
-            local_session_paths_list, local_session_names_list =  find_local_session_paths(local_session_parent_path, blacklist=blacklist)
+            local_session_paths_list, local_session_names_list =  find_local_session_paths(local_session_parent_path, exclude_list=exclude_list)
 
             if debug_print:
                 print(f'local_session_paths_list: {local_session_paths_list}')
@@ -138,25 +139,25 @@ def run_diba_batch(global_data_root_parent_path: Path, execute_all:bool = False,
     # ## Animal `gor01`:
     # local_session_parent_context = local_session_root_parent_context.adding_context(collision_prefix='animal', animal='gor01', exper_name='one') # IdentifyingContext<('kdiba', 'gor01', 'one')>
     # local_session_parent_path = local_session_root_parent_path.joinpath(local_session_parent_context.animal, local_session_parent_context.exper_name) # 'gor01', 'one'
-    # local_session_paths_list, local_session_names_list =  find_local_session_paths(local_session_parent_path, blacklist=['PhoHelpers', 'Spike3D-Minimal-Test', 'Unused'])
+    # local_session_paths_list, local_session_names_list =  find_local_session_paths(local_session_parent_path, exclude_list=['PhoHelpers', 'Spike3D-Minimal-Test', 'Unused'])
 
     # local_session_parent_context = local_session_root_parent_context.adding_context(collision_prefix='animal', animal='gor01', exper_name='two')
     # local_session_parent_path = local_session_root_parent_path.joinpath(local_session_parent_context.animal, local_session_parent_context.exper_name)
-    # local_session_paths_list, local_session_names_list =  find_local_session_paths(local_session_parent_path, blacklist=[])
+    # local_session_paths_list, local_session_names_list =  find_local_session_paths(local_session_parent_path, exclude_list=[])
 
     ### Animal `vvp01`:
     # local_session_parent_context = local_session_root_parent_context.adding_context(collision_prefix='animal', animal='vvp01', exper_name='one')
     # local_session_parent_path = local_session_root_parent_path.joinpath(local_session_parent_context.animal, local_session_parent_context.exper_name)
-    # local_session_paths_list, local_session_names_list =  find_local_session_paths(local_session_parent_path, blacklist=[])
+    # local_session_paths_list, local_session_names_list =  find_local_session_paths(local_session_parent_path, exclude_list=[])
 
     # local_session_parent_context = local_session_root_parent_context.adding_context(collision_prefix='animal', animal='vvp01', exper_name='two')
     # local_session_parent_path = local_session_root_parent_path.joinpath(local_session_parent_context.animal, local_session_parent_context.exper_name)
-    # local_session_paths_list, local_session_names_list =  find_local_session_paths(local_session_parent_path, blacklist=[])
+    # local_session_paths_list, local_session_names_list =  find_local_session_paths(local_session_parent_path, exclude_list=[])
 
     # ### Animal `pin01`:
     # local_session_parent_context = local_session_root_parent_context.adding_context(collision_prefix='animal', animal='pin01', exper_name='one')
     # local_session_parent_path = local_session_root_parent_path.joinpath(local_session_parent_context.animal, local_session_parent_context.exper_name) # no exper_name ('one' or 'two') folders for this animal.
-    # local_session_paths_list, local_session_names_list =  find_local_session_paths(local_session_parent_path, blacklist=['redundant','showclus','sleep','tmaze'])
+    # local_session_paths_list, local_session_names_list =  find_local_session_paths(local_session_parent_path, exclude_list=['redundant','showclus','sleep','tmaze'])
 
     # ## Build session contexts list:
     # local_session_contexts_list = [local_session_parent_context.adding_context(collision_prefix='sess', session_name=a_name) for a_name in local_session_names_list] # [IdentifyingContext<('kdiba', 'gor01', 'one', '2006-6-07_11-26-53')>, ..., IdentifyingContext<('kdiba', 'gor01', 'one', '2006-6-13_14-42-6')>]
@@ -171,10 +172,8 @@ def run_diba_batch(global_data_root_parent_path: Path, execute_all:bool = False,
     # session_batch_status
 
 @function_attributes(short_name='run_specific_batch', tags=['batch', 'automated'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-03-28 04:46')
-def run_specific_batch(active_batch_run: BatchRun, curr_session_context: IdentifyingContext, curr_session_basedir: Path, force_reload=True):
-    # curr_session_context
-    
-
+def run_specific_batch(active_batch_run: BatchRun, curr_session_context: IdentifyingContext, curr_session_basedir: Path, force_reload=True, **kwargs):
+    ## Extract the default session loading vars from the session context: 
     # basedir = local_session_paths_list[1] # NOT 3
     basedir = curr_session_basedir
     print(f'basedir: {str(basedir)}')
@@ -185,8 +184,8 @@ def run_specific_batch(active_batch_run: BatchRun, curr_session_context: Identif
     # Load Pipeline                                                                                                        #
     # ==================================================================================================================== #
     # epoch_name_whitelist = ['maze']
-    epoch_name_whitelist = None
-    active_computation_functions_name_whitelist=['_perform_baseline_placefield_computation', '_perform_time_dependent_placefield_computation', '_perform_extended_statistics_computation',
+    epoch_name_whitelist = kwargs.pop('epoch_name_whitelist', None)
+    active_computation_functions_name_whitelist = kwargs.pop('computation_functions_name_whitelist', None) or ['_perform_baseline_placefield_computation', '_perform_time_dependent_placefield_computation', '_perform_extended_statistics_computation',
                                             '_perform_position_decoding_computation', 
                                             '_perform_firing_rate_trends_computation',
                                             # '_perform_pf_find_ratemap_peaks_computation',
@@ -194,10 +193,16 @@ def run_specific_batch(active_batch_run: BatchRun, curr_session_context: Identif
                                             '_perform_two_step_position_decoding_computation',
                                             # '_perform_recursive_latent_placefield_decoding'
                                         ]
+    
+    saving_mode = kwargs.pop('saving_mode', None) or PipelineSavingScheme.OVERWRITE_IN_PLACE
+    skip_extended_batch_computations = kwargs.pop('skip_extended_batch_computations', True)
+    fail_on_exception = kwargs.pop('fail_on_exception', True)
+    debug_print = kwargs.pop('debug_print', False)
+
     try:
         curr_active_pipeline = batch_load_session(active_batch_run.global_data_root_parent_path, active_data_mode_name, basedir, epoch_name_whitelist=epoch_name_whitelist,
                                         computation_functions_name_whitelist=active_computation_functions_name_whitelist,
-                                        saving_mode=PipelineSavingScheme.OVERWRITE_IN_PLACE, force_reload=force_reload, skip_extended_batch_computations=True, debug_print=False, fail_on_exception=True)
+                                        saving_mode=saving_mode, force_reload=force_reload, skip_extended_batch_computations=skip_extended_batch_computations, debug_print=debug_print, fail_on_exception=fail_on_exception, **kwargs)
         return (SessionBatchProgress.COMPLETED, None) # return the success status and None to indicate that no error occured.
     except Exception as e:
         return (SessionBatchProgress.FAILED, e) # return the Failed status and the exception that occured.
