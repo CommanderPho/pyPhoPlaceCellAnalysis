@@ -159,6 +159,8 @@ def constrain_to_laps(curr_active_pipeline):
     for a_name, a_sess, a_result in zip((long_epoch_name, short_epoch_name, global_epoch_name), (long_session, short_session, global_session), (long_results, short_results, global_results)):
         # a_sess = estimate_session_laps(a_sess, should_plot_laps_2d=True)
         a_sess = a_sess.replace_session_laps_with_estimates(should_plot_laps_2d=False)
+        
+        ## The filter the laps specifically for use in the placefields with non-overlapping, duration, constraints:
         curr_laps_obj = a_sess.laps.as_epoch_obj() # set this to the laps object
         curr_laps_obj = curr_laps_obj.get_non_overlapping()
         curr_laps_obj = curr_laps_obj.filtered_by_duration(1.0, 10.0) # the lap must be at least 1 second long and at most 10 seconds long
@@ -171,13 +173,16 @@ def constrain_to_laps(curr_active_pipeline):
         else:
             # Must recompute since the computation_epochs changed
             print(f'setting new computation epochs because laps changed.')
-            curr_active_pipeline.active_configs[a_name].computation_config.pf_params.computation_epochs = curr_laps_obj
+            curr_active_pipeline.active_configs[a_name].computation_config.pf_params.computation_epochs = curr_laps_obj # TODO: does this change the config that's used for computations? I think it should. 
+            
+            # Get existing placefields:
             curr_pf1D, curr_pf2D = a_result.pf1D, a_result.pf2D
 
             lap_filtered_curr_pf1D = deepcopy(curr_pf1D)
             lap_filtered_curr_pf1D = PfND(spikes_df=lap_filtered_curr_pf1D.spikes_df, position=lap_filtered_curr_pf1D.position, epochs=deepcopy(curr_laps_obj), config=lap_filtered_curr_pf1D.config, compute_on_init=True)
             lap_filtered_curr_pf2D = deepcopy(curr_pf2D)
             lap_filtered_curr_pf2D = PfND(spikes_df=lap_filtered_curr_pf2D.spikes_df, position=lap_filtered_curr_pf2D.position, epochs=deepcopy(curr_laps_obj), config=lap_filtered_curr_pf2D.config, compute_on_init=True)
+            # Replace the result with the lap-filtered variety. This is perminant.
             a_result.pf1D = lap_filtered_curr_pf1D
             a_result.pf2D = lap_filtered_curr_pf2D
 
