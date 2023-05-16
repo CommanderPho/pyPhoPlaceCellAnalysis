@@ -1,5 +1,3 @@
-
-
 from dataclasses import dataclass
 
 from pyphocorehelpers.DataStructure.enum_helpers import OrderedEnum

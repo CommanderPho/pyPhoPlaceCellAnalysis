@@ -264,6 +264,8 @@ class PipelineWithDisplayPipelineStageMixin:
         """An interactive accessor object for display functions."""
         return self._plot_object
     
+
+    ## *_functions
     @property
     def registered_display_functions(self):
         """The registered_display_functions property."""
@@ -296,6 +298,8 @@ class PipelineWithDisplayPipelineStageMixin:
         self._plot_object = None
         self._plot_object = Plot(self)
 
+
+
     def clear_display_outputs(self):
         """ removes any display outputs """
         ## Clear any hanging display outputs:
@@ -305,8 +309,6 @@ class PipelineWithDisplayPipelineStageMixin:
             del self.display_output[a_display_output_key]
         self.display_output_history_list.clear()
 
-
-        
     def prepare_for_display(self, root_output_dir=r'W:\data\Output', should_smooth_maze=True):
         assert (self.is_computed), "Current self.is_computed must be true. Call self.perform_computations to reach this step."
         self.stage = DisplayPipelineStage(self.stage)  # build the Display stage
