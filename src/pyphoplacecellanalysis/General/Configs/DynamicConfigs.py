@@ -49,9 +49,11 @@ class PlottingConfig(DynamicParameters):
     def figure_output_directory(self):
         return self.active_output_parent_dir     
 
-    def get_figure_save_path(self, *args):
+    def get_figure_save_path(self, *args, enable_creating_directory:bool=True):
         """ If no *args are passed just returns the computed parent basepath. """
         # print('get_figure_save_path(...):')
+        
+
         args_list = list(args)
         if len(args) == 0:
             curr_parent_out_path = self.active_output_parent_dir
@@ -62,7 +64,8 @@ class PlottingConfig(DynamicParameters):
             curr_parent_out_path = self.active_output_parent_dir.joinpath(*subdirectories)
             out_path = curr_parent_out_path.joinpath(basename)
         
-        curr_parent_out_path.mkdir(parents=True, exist_ok=True)
+        if enable_creating_directory:
+            curr_parent_out_path.mkdir(parents=True, exist_ok=True)
         return out_path
     
     

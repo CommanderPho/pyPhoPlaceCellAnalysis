@@ -117,7 +117,7 @@ def update_figure_files_output_path(computation_result, active_config, root_outp
     """
     def _set_figure_save_root_day_computed_mode(plotting_config, active_session_name, active_epoch_name, root_output_dir='output', debug_print=False):
         """ Changes the plotting_config's output path to a path with the style of  f'output/2022-01-16/{active_session_name}/{active_epoch_name}' """
-        out_figure_save_original_root = plotting_config.get_figure_save_path('test') # 2022-01-16/
+        out_figure_save_original_root = plotting_config.get_figure_save_path('test', enable_creating_directory=False) # 2022-01-16/
         if debug_print:
             print(f'out_figure_save_original_root: {out_figure_save_original_root}')
         # Update output figure root:
@@ -143,7 +143,7 @@ def update_figure_files_output_path(computation_result, active_config, root_outp
     # get the output path for this figure name:
     
     if debug_print:
-        out_figure_save_root = active_config.plotting_config.get_figure_save_path('test_plot')
+        out_figure_save_root = active_config.plotting_config.get_figure_save_path('test_plot', enable_creating_directory=False)
         print(f'for a test plot with name "test_plot", the output path would be: {out_figure_save_root}')
     
     # Now convert the computation parameters for filename display:
@@ -152,7 +152,7 @@ def update_figure_files_output_path(computation_result, active_config, root_outp
     curr_computation_config_output_dir_name = active_config.computation_config.pf_params.str_for_filename(False)
     if debug_print:
         print(f'curr_computation_config_output_dir_name: {curr_computation_config_output_dir_name}')
-    out_figure_save_current_computation_dir = active_config.plotting_config.get_figure_save_path(curr_computation_config_output_dir_name)
+    out_figure_save_current_computation_dir = active_config.plotting_config.get_figure_save_path(curr_computation_config_output_dir_name, enable_creating_directory=False)
     if debug_print:
         print(f'out_figure_save_current_computation_dir: {out_figure_save_current_computation_dir}')
     # change finally to the computation config determined subdir:
@@ -331,7 +331,7 @@ class PipelineWithDisplayPipelineStageMixin:
                 self.active_configs[an_active_config_name] = add_neuron_identity_info_if_needed(self.computation_results[an_active_config_name], self.active_configs[an_active_config_name])
                 self.active_configs[an_active_config_name] = add_custom_plotting_options_if_needed(self.active_configs[an_active_config_name], should_smooth_maze=should_smooth_maze)
                 self.active_configs[an_active_config_name] = update_figure_files_output_path(self.computation_results[an_active_config_name], self.active_configs[an_active_config_name], root_output_dir=root_output_dir)
-
+        
         self.reload_default_display_functions() # reload default display functions first
 
 
