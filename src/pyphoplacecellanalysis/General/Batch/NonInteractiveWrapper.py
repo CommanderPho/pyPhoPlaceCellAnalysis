@@ -1,3 +1,4 @@
+from copy import deepcopy
 import importlib
 import sys
 from pathlib import Path
@@ -296,8 +297,9 @@ def batch_load_session(global_data_root_parent_path, active_data_mode_name, base
         # time_bin_size = 0.1 # 10 fps
         time_bin_size = kwargs.get('time_bin_size', 0.03333) # 0.03333 = 1.0/30.0 # decode at 30fps to match the position sampling frequency
         # time_bin_size = kwargs.get('time_bin_size', 0.1) # 10 fps
-        active_session_computation_configs = active_data_mode_registered_class.build_default_computation_configs(sess=curr_active_pipeline.sess, time_bin_size=time_bin_size, grid_bin_bounds=grid_bin_bounds) #1.0/30.0 # decode at 30fps to match the position sampling frequency
+        active_session_computation_configs = active_data_mode_registered_class.build_active_computation_configs(sess=curr_active_pipeline.sess, time_bin_size=time_bin_size) # , grid_bin_bounds=grid_bin_bounds
     else:
+        # Use the provided `active_session_computation_configs`:
         assert 'time_bin_size' not in kwargs, f"time_bin_size kwarg provided but will not be used because a custom active_session_computation_configs was provided as well."
 
 
