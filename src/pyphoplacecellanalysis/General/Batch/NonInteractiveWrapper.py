@@ -272,6 +272,9 @@ def batch_load_session(global_data_root_parent_path, active_data_mode_name, base
     
     curr_active_pipeline.filter_sessions(active_session_filter_configurations, changed_filters_ignore_list=['maze1','maze2','maze'], debug_print=False)
 
+    ## TODO 2023-05-16 - set `curr_active_pipeline.active_configs[a_name].computation_config.pf_params.computation_epochs = curr_laps_obj` equivalent
+    ## TODO 2023-05-16 - determine appropriate binning from `compute_short_long_constrained_decoders` so it's automatically from the long
+
     if active_session_computation_configs is None:
         """
         If there are is provided computation config, get the default:
