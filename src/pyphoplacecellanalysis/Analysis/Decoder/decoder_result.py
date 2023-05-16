@@ -690,6 +690,7 @@ def perform_full_session_leave_one_out_decoding_analysis(sess, original_1D_decod
 
     ### active_filter_epochs: sess.replay: 
     active_filter_epochs = sess.replay.epochs.get_valid_df().epochs.get_epochs_longer_than(minimum_duration=5.0*decoding_time_bin_size).epochs.get_non_overlapping_df()
+    assert len(active_filter_epochs) == 0, f'data frame empty after filtering!'
     if not 'stop' in active_filter_epochs.columns:
         # Make sure it has the 'stop' column which is expected as opposed to the 'end' column
         active_filter_epochs['stop'] = active_filter_epochs['end'].copy()
