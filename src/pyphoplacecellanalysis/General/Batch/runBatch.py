@@ -34,15 +34,15 @@ from pyphoplacecellanalysis.General.Pipeline.NeuropyPipeline import PipelineSavi
 from pyphoplacecellanalysis.General.Pipeline.Stages.Loading import saveData, loadData
 
 # TODO 2023-03-14 08:18: - [ ] Better/extant tool for enabling batch processing?
-from attrs import define, field
+from attrs import define, field, Factory
 
 @define(slots=True)
 class BatchRun:
     """Docstring for BatchRun."""
     global_data_root_parent_path: Path
-    session_batch_status: dict = field(default_factory=lambda:{})
-    session_batch_basedirs: dict = field(default_factory=lambda:{})
-    session_batch_errors: dict = field(default_factory=lambda:{})
+    session_batch_status: dict = Factory(dict)
+    session_batch_basedirs: dict = Factory(dict)
+    session_batch_errors: dict = Factory(dict)
     enable_saving_to_disk: bool = False
     ## TODO: could keep session-specific kwargs to be passed to run_specific_batch(...) as a member variable if needed
     _context_column_names = ['format_name', 'animal', 'exper_name', 'session_name']
