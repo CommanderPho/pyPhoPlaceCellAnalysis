@@ -187,14 +187,14 @@ def constrain_to_laps(curr_active_pipeline):
 
         return curr_active_pipeline
 
-def compute_short_long_constrained_decoders(curr_active_pipeline, enable_two_step_decoders:bool = False, recalculate_anyway:bool=True):
+def compute_long_short_constrained_decoders(curr_active_pipeline, enable_two_step_decoders:bool = False, recalculate_anyway:bool=True):
     """ 2023-04-14 - Computes both 1D & 2D Decoders constrained to each other's position bins 
     Usage:
 
-        (long_one_step_decoder_1D, short_one_step_decoder_1D), (long_one_step_decoder_2D, short_one_step_decoder_2D) = compute_short_long_constrained_decoders(curr_active_pipeline)
+        (long_one_step_decoder_1D, short_one_step_decoder_1D), (long_one_step_decoder_2D, short_one_step_decoder_2D) = compute_long_short_constrained_decoders(curr_active_pipeline)
 
         With Two-step Decoders:
-        (long_one_step_decoder_1D, short_one_step_decoder_1D, long_two_step_decoder_1D, short_two_step_decoder_1D), (long_one_step_decoder_2D, short_one_step_decoder_2D, long_two_step_decoder_2D, short_two_step_decoder_2D) = compute_short_long_constrained_decoders(curr_active_pipeline, enable_two_step_decoders=True)
+        (long_one_step_decoder_1D, short_one_step_decoder_1D, long_two_step_decoder_1D, short_two_step_decoder_1D), (long_one_step_decoder_2D, short_one_step_decoder_2D, long_two_step_decoder_2D, short_two_step_decoder_2D) = compute_long_short_constrained_decoders(curr_active_pipeline, enable_two_step_decoders=True)
 
     """
     long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
@@ -265,7 +265,7 @@ def compute_short_long_constrained_decoders(curr_active_pipeline, enable_two_ste
 # 2023-05-10 - Long Short Decoding Analysis                                                                            #
 # ==================================================================================================================== #
 
-def _long_short_decoding_analysis_from_decoders(long_one_step_decoder_1D, short_one_step_decoder_1D, long_session, short_session, global_session, decoding_time_bin_size = 0.025, perform_cache_load=True):
+def _long_short_decoding_analysis_from_decoders(long_one_step_decoder_1D, short_one_step_decoder_1D, long_session, short_session, global_session, decoding_time_bin_size = 0.025, perform_cache_load=False):
     """ Uses existing decoders and other long/short variables to run `perform_full_session_leave_one_out_decoding_analysis` on each. """
     # Get existing long/short decoders from the cell under "# 2023-02-24 Decoders"
     long_decoder, short_decoder = deepcopy(long_one_step_decoder_1D), deepcopy(short_one_step_decoder_1D)
@@ -308,6 +308,7 @@ def _long_short_decoding_analysis_from_decoders(long_one_step_decoder_1D, short_
     # } # end long_short
 
     return leave_one_out_decoding_analysis_obj
+
 
 
 
