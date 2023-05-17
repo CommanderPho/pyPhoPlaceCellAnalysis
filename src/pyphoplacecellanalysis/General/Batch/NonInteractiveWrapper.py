@@ -367,9 +367,9 @@ def batch_extended_computations(curr_active_pipeline, include_whitelist=None, in
     global_epoch_name = curr_active_pipeline.active_completed_computation_result_names[-1] # 'maze'
     global_results = curr_active_pipeline.computation_results[global_epoch_name]['computed_data']
 
-    ## Get existing `pf1D_dt`:
-    active_pf_1D = global_results.pf1D
-    active_pf_1D_dt = global_results.pf1D_dt
+    # ## Get existing `pf1D_dt`:
+    # active_pf_1D = global_results.pf1D
+    # active_pf_1D_dt = global_results.pf1D_dt
     if progress_print:
         print(f'Running batch_extended_computations(...) with global_epoch_name: "{global_epoch_name}"')
 
