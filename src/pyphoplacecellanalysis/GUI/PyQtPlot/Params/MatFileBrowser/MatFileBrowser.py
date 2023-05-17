@@ -15,7 +15,7 @@ import pyphoplacecellanalysis.External.pyqtgraph as pg
 from pyphoplacecellanalysis.GUI.PyQtPlot.Examples.pyqtplot_DataTreeWidget import plot_dataTreeWidget # for GUI
 
 class MatFileBrowser(object):
-    """ A helper class that allows the user to interactively browser .mat (MATLAB files in a filesystem directory) 
+    """ A helper class that allows the user to interactively browse .mat (MATLAB files in a filesystem directory) 
     
     NOTE: This actually does work (as a primise) but it displays the data very poorly. 
     
