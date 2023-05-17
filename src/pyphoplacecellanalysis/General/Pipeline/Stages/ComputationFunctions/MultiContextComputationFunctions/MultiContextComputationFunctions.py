@@ -1252,7 +1252,6 @@ def _epoch_unit_avg_firing_rates(spikes_df, filter_epochs, included_neuron_ids=N
 def _fr_index(long_fr, short_fr):
     return ((long_fr - short_fr) / (long_fr + short_fr))
 
-
 @function_attributes(short_name='_compute_long_short_firing_rate_indicies', tags=['long_short', 'compute', 'fr_index'], input_requires=[], output_provides=[], uses=[], used_by=['pipeline_complete_compute_long_short_fr_indicies'], creation_date='2023-01-19 00:00')
 def _compute_long_short_firing_rate_indicies(spikes_df, long_laps, long_replays, short_laps, short_replays, save_path=None):
     """A computation for the long/short firing rate index that Kamran and I discussed as one of three metrics during our meeting on 2023-01-19.
@@ -1320,7 +1319,6 @@ def _compute_epochs_num_aclu_inclusions(all_epochs_frs_mat, min_inclusion_fr_thr
     return num_cells_included_in_epoch_mat
 
 
-
 @function_attributes(short_name='pipeline_complete_compute_long_short_fr_indicies', tags=['long_short', 'compute', 'fr_index'], input_requires=[], output_provides=[], uses=['_compute_long_short_firing_rate_indicies'], used_by=[], creation_date='2023-01-19 00:00')
 def pipeline_complete_compute_long_short_fr_indicies(curr_active_pipeline, temp_save_filename=None):
     """ wraps `compute_long_short_firing_rate_indicies(...)` to compute the long_short_fr_index for the complete pipeline
@@ -1352,10 +1350,9 @@ def pipeline_complete_compute_long_short_fr_indicies(curr_active_pipeline, temp_
 
     # Get existing laps from session:
     # long_laps, short_laps, global_laps = [curr_active_pipeline.filtered_sessions[an_epoch_name].laps.as_epoch_obj() for an_epoch_name in [long_epoch_name, short_epoch_name, global_epoch_name]]
+    long_laps, short_laps, global_laps = [Epoch.filter_epochs(curr_active_pipeline.filtered_sessions[an_epoch_name].laps.as_epoch_obj(), pos_df=curr_active_pipeline.filtered_sessions[an_epoch_name].position.to_dataframe(), spikes_df=curr_active_pipeline.filtered_sessions[an_epoch_name].spikes_df, min_epoch_included_duration=1.0, max_epoch_included_duration=30.0, maximum_speed_thresh=None, min_num_unique_aclu_inclusions=3) for an_epoch_name in [long_epoch_name, short_epoch_name, global_epoch_name]]
 
-    long_laps, short_laps, global_laps = [Epoch.filter_epochs(curr_active_pipeline.filtered_sessions[an_epoch_name].laps.as_epoch_obj(), pos_df=curr_active_pipeline.filtered_sessions[an_epoch_name].position.to_dataframe(), spikes_df=curr_active_pipeline.filtered_sessions[an_epoch_name].spikes_df, min_epoch_included_duration=1.0, max_epoch_included_duration=10.0, maximum_speed_thresh=None, min_num_unique_aclu_inclusions=3) for an_epoch_name in [long_epoch_name, short_epoch_name, global_epoch_name]]
     # TODO 2023-04-11 - Note this doesn't assign these filtered laps objects to the session or anything yet, it just returns them.
-    
 
     # Get existing replays from session:
     # minimum_valid_replay_duration = 5.0 * decoding_time_bin_size
