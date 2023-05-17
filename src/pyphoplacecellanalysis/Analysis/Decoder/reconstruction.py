@@ -197,7 +197,7 @@ class ZhangReconstructionImplementation:
         
         """
         if time_window_edges is None or time_window_edges_binning_info is None:
-            # build time_window_edges/time_window_edges_binning_info AND adds 'binned_time' column to spikes_df
+            # build time_window_edges/time_window_edges_binning_info AND adds 'binned_time' column to spikes_df. # NOTE: the added 'binned_time' column is 1-indexed, which may explain why we use `time_window_edges_binning_info.bin_indicies[1:]` down below
             time_window_edges, time_window_edges_binning_info, spikes_df = ZhangReconstructionImplementation.compute_time_bins(spikes_df, max_time_bin_size=time_bin_size, debug_print=debug_print)
         else:
             # already have time bins (time_window_edges/time_window_edges_binning_info) so just add 'binned_time' column to spikes_df if needed:
