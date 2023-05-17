@@ -66,15 +66,40 @@ class LongShortTrackComputations(AllFunctionEnumeratingMixin, metaclass=Computat
         # x_frs_index, y_frs_index, active_context, all_results_dict = pipeline_complete_compute_long_short_fr_indicies(owning_pipeline_reference) # use the all_results_dict as the computed data value
         # global_computation_results.computed_data['long_short_fr_indicies_analysis'] = DynamicParameters.init_from_dict({**all_results_dict, 'active_context': active_context})
 
-        owning_pipeline_reference = constrain_to_laps(owning_pipeline_reference) # Constrains placefields to laps
-        
-        (long_one_step_decoder_1D, short_one_step_decoder_1D), (long_one_step_decoder_2D, short_one_step_decoder_2D) = compute_short_long_constrained_decoders(owning_pipeline_reference, recalculate_anyway=True)
-        long_epoch_name, short_epoch_name, global_epoch_name = owning_pipeline_reference.find_LongShortGlobal_epoch_names()
-        long_epoch_context, short_epoch_context, global_epoch_context = [owning_pipeline_reference.filtered_contexts[a_name] for a_name in (long_epoch_name, short_epoch_name, global_epoch_name)]
-        long_session, short_session, global_session = [owning_pipeline_reference.filtered_sessions[an_epoch_name] for an_epoch_name in [long_epoch_name, short_epoch_name, global_epoch_name]]
-        long_results, short_results, global_results = [owning_pipeline_reference.computation_results[an_epoch_name]['computed_data'] for an_epoch_name in [long_epoch_name, short_epoch_name, global_epoch_name]]
-        long_pf1D, short_pf1D, global_pf1D = long_results.pf1D, short_results.pf1D, global_results.pf1D
-        long_pf2D, short_pf2D, global_pf2D = long_results.pf2D, short_results.pf2D, global_results.pf2D
+        # 2023-05-16 - Correctly initialized pipelines (pfs limited to laps, decoders already long/short constrainted by default, replays already the estimated versions:
+        is_certain_properly_constrained = True
+
+
+        if not is_certain_properly_constrained:
+            owning_pipeline_reference = constrain_to_laps(owning_pipeline_reference) # Constrains placefields to laps
+            
+            (long_one_step_decoder_1D, short_one_step_decoder_1D), (long_one_step_decoder_2D, short_one_step_decoder_2D) = compute_long_short_constrained_decoders(owning_pipeline_reference, recalculate_anyway=True)
+            long_epoch_name, short_epoch_name, global_epoch_name = owning_pipeline_reference.find_LongShortGlobal_epoch_names()
+            long_epoch_context, short_epoch_context, global_epoch_context = [owning_pipeline_reference.filtered_contexts[a_name] for a_name in (long_epoch_name, short_epoch_name, global_epoch_name)]
+            long_session, short_session, global_session = [owning_pipeline_reference.filtered_sessions[an_epoch_name] for an_epoch_name in [long_epoch_name, short_epoch_name, global_epoch_name]]
+            long_results, short_results, global_results = [owning_pipeline_reference.computation_results[an_epoch_name]['computed_data'] for an_epoch_name in [long_epoch_name, short_epoch_name, global_epoch_name]]
+            long_pf1D, short_pf1D, global_pf1D = long_results.pf1D, short_results.pf1D, global_results.pf1D
+            long_pf2D, short_pf2D, global_pf2D = long_results.pf2D, short_results.pf2D, global_results.pf2D
+
+            # Compute/estimate replays if missing from session:
+            if not global_session.has_replays or always_recompute_replays:
+                if not global_session.has_replays:
+                    print(f'Replays missing from sessions. Computing replays...')
+                else:
+                    print(f'Replays exist but `always_recompute_replays` is True, so estimate_replay_epochs will be performed and the old ones will be overwritten.')
+                # Backup and replace loaded replays with computed ones:
+                long_replays, short_replays, global_replays = [a_session.replace_session_replays_with_estimates(require_intersecting_epoch=None, debug_print=False) for a_session in [long_session, short_session, global_session]]
+
+            # 3m 40.3s
+        else:
+            print(f'is_certain_properly_constrained: True - Correctly initialized pipelines (pfs limited to laps, decoders already long/short constrainted by default, replays already the estimated versions')
+            if always_recompute_replays:
+               print(f'\t is_certain_properly_constrained IGNORES always_recompute_replays!')
+            long_epoch_name, short_epoch_name, global_epoch_name = owning_pipeline_reference.find_LongShortGlobal_epoch_names()
+            long_session, short_session, global_session = [owning_pipeline_reference.filtered_sessions[an_epoch_name] for an_epoch_name in [long_epoch_name, short_epoch_name, global_epoch_name]]
+            long_results, short_results, global_results = [owning_pipeline_reference.computation_results[an_epoch_name]['computed_data'] for an_epoch_name in [long_epoch_name, short_epoch_name, global_epoch_name]]
+            long_one_step_decoder_1D, short_one_step_decoder_1D  = [deepcopy(results_data.get('pf1D_Decoder', None)) for results_data in (long_results, short_results)]
+
 
         if decoding_time_bin_size is None:
             decoding_time_bin_size = long_one_step_decoder_1D.time_bin_size # 1.0/30.0 # 0.03333333333333333
@@ -87,17 +112,7 @@ class LongShortTrackComputations(AllFunctionEnumeratingMixin, metaclass=Computat
                 perform_cache_load = False
                 ## Update `long_one_step_decoder_1D.time_bin_size` to the new size? TODO 2023-05-10 - redo computations with this size for `long_one_step_decoder_1D`?
                 long_one_step_decoder_1D.time_bin_size = decoding_time_bin_size
-
-        # Compute/estimate replays if missing from session:
-        if not global_session.has_replays or always_recompute_replays:
-            if not global_session.has_replays:
-                print(f'Replays missing from sessions. Computing replays...')
-            else:
-                print(f'Replays exist but `always_recompute_replays` is True, so estimate_replay_epochs will be performed and the old ones will be overwritten.')
-            # Backup and replace loaded replays with computed ones:
-            long_replays, short_replays, global_replays = [a_session.replace_session_replays_with_estimates(require_intersecting_epoch=None, debug_print=False) for a_session in [long_session, short_session, global_session]]
-
-        # 3m 40.3s
+                
 
         leave_one_out_decoding_analysis_obj = _long_short_decoding_analysis_from_decoders(long_one_step_decoder_1D, short_one_step_decoder_1D, long_session, short_session, global_session,
                                                                                            decoding_time_bin_size=decoding_time_bin_size, perform_cache_load=perform_cache_load)
