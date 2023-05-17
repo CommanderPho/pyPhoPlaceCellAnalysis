@@ -36,7 +36,7 @@ from pyphoplacecellanalysis.General.Pipeline.Stages.Loading import saveData, loa
 # TODO 2023-03-14 08:18: - [ ] Better/extant tool for enabling batch processing?
 from attrs import define, field, Factory
 
-@define(slots=True)
+@define(slots=False)
 class BatchRun:
     """Docstring for BatchRun."""
     global_data_root_parent_path: Path
