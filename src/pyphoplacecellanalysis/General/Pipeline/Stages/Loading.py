@@ -36,11 +36,15 @@ def loadData(pkl_path, debug_print=False, **kwargs):
     with ProgressMessagePrinter(pkl_path, 'Loading', 'loaded session pickle file'):
         with open(pkl_path, 'rb') as dbfile:
             db = pickle.load(dbfile, **kwargs)
-            if debug_print:
+            dbfile.close()
+        if debug_print:
+            try:
                 for keys in db:
                     print(keys, '=>', db[keys])
-            dbfile.close()
-            return db
+            except Exception as e:
+                print(f'encountered exception {e} while printing. Turning into a warning and continuing.')
+                # raise e
+        # return db
     return db
 
 
