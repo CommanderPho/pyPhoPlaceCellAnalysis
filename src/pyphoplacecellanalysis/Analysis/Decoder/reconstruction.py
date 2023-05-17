@@ -88,6 +88,9 @@ class ZhangReconstructionImplementation:
         """ 
         spikes_df: a dataframe with at least the ['aclu','binned_time'] columns
         time_bin_indicies: np.ndarray of indicies that will be used for the produced output dataframe of the binned spike counts for each unit. (e.g. time_bin_indicies = time_window_edges_binning_info.bin_indicies[1:]).
+        
+        TODO 2023-05-16 - CHECK - CORRECTNESS - Figure out correct indexing and whether it returns binned data for edges or counts.
+        
         """
         time_variable_name = spikes_df.spikes.time_variable_name # 't_rel_seconds'
         assert 'binned_time' in spikes_df.columns
@@ -190,6 +193,8 @@ class ZhangReconstructionImplementation:
         Example:
             unit_specific_binned_spike_counts, out_digitized_variable_bins, out_binning_info = ZhangReconstructionImplementation.time_bin_spike_counts_N_i(sess.spikes_df.copy(), time_bin_size, debug_print=debug_print) # unit_specific_binned_spike_counts.to_numpy(): (40, 85841)
             
+        TODO 2023-05-16 - CHECK - CORRECTNESS - Figure out correct indexing and whether it returns binned data for edges or counts.
+        
         """
         if time_window_edges is None or time_window_edges_binning_info is None:
             # build time_window_edges/time_window_edges_binning_info AND adds 'binned_time' column to spikes_df
@@ -201,7 +206,7 @@ class ZhangReconstructionImplementation:
                 spikes_df = spikes_df.spikes.add_binned_time_column(time_window_edges, time_window_edges_binning_info, debug_print=debug_print)
         
         # either way to compute the unit_specific_binned_spike_counts:
-        unit_specific_binned_spike_counts = ZhangReconstructionImplementation.compute_unit_specific_bin_specific_spike_counts(spikes_df, time_window_edges_binning_info.bin_indicies[1:], debug_print=debug_print) # requires 'binned_time' in spikes_df
+        unit_specific_binned_spike_counts = ZhangReconstructionImplementation.compute_unit_specific_bin_specific_spike_counts(spikes_df, time_window_edges_binning_info.bin_indicies[1:], debug_print=debug_print) # requires 'binned_time' in spikes_df. TODO 2023-05-16 - ERROR: isn't getting centers. time_window_edges_binning_info.bin_indicies[1:]
         unit_specific_binned_spike_counts = unit_specific_binned_spike_counts.T # Want the outputs to have each time window as a column, with a single time window giving a column vector for each neuron
         if debug_print:
             print(f'unit_specific_binned_spike_counts.to_numpy(): {np.shape(unit_specific_binned_spike_counts.to_numpy())}') # (85841, 40)
@@ -1331,6 +1336,8 @@ class BayesianPlacemapPositionDecoder(SerializedAttributesAllowBlockSpecifyingCl
         .unit_specific_time_binned_spike_counts
         .total_spike_counts_per_window
         
+        TODO 2023-05-16 - CHECK - CORRECTNESS - Figure out correct indexing and whether it returns binned data for edges or counts.
+        
         """
         ## need to create new time_window_edges from the self.time_bin_size:
         if debug_print:
@@ -1373,6 +1380,8 @@ class BayesianPlacemapPositionDecoder(SerializedAttributesAllowBlockSpecifyingCl
             self.hyper_perform_decode(...)
             self.compute_corrected_positions(...)
 
+        TODO 2023-05-16 - CHECK - CORRECTNESS - Figure out correct indexing and whether it returns binned data for edges or counts.
+        
         """
         with WrappingMessagePrinter(f'compute_all final_p_x_given_n called. Computing windows...', begin_line_ending='... ', finished_message='compute_all completed.', enable_print=(debug_print or self.debug_print)):
             ## Single sweep decoding:
