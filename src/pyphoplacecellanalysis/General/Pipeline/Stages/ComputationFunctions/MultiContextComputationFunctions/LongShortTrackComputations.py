@@ -66,9 +66,9 @@ class LongShortTrackComputations(AllFunctionEnumeratingMixin, metaclass=Computat
         # x_frs_index, y_frs_index, active_context, all_results_dict = pipeline_complete_compute_long_short_fr_indicies(owning_pipeline_reference) # use the all_results_dict as the computed data value
         # global_computation_results.computed_data['long_short_fr_indicies_analysis'] = DynamicParameters.init_from_dict({**all_results_dict, 'active_context': active_context})
 
+        is_certain_properly_constrained = False
         # 2023-05-16 - Correctly initialized pipelines (pfs limited to laps, decoders already long/short constrainted by default, replays already the estimated versions:
-        is_certain_properly_constrained = True
-
+        # is_certain_properly_constrained = True
 
         if not is_certain_properly_constrained:
             owning_pipeline_reference = constrain_to_laps(owning_pipeline_reference) # Constrains placefields to laps

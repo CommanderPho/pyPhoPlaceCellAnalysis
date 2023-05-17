@@ -1,8 +1,8 @@
 import sys
 import os
 from pathlib import Path
-# import numpy as np
-# import pandas as pd
+import numpy as np
+import pandas as pd
 
 # required to enable non-blocking interaction:
 # %gui qt5
@@ -34,12 +34,10 @@ from pyphoplacecellanalysis.General.Pipeline.NeuropyPipeline import PipelineSavi
 from pyphoplacecellanalysis.General.Pipeline.Stages.Loading import saveData, loadData
 
 # TODO 2023-03-14 08:18: - [ ] Better/extant tool for enabling batch processing?
+from attrs import define, field
 
-from dataclasses import dataclass, field
-
-
-@dataclass
-class BatchRun(object):
+@define(slots=True)
+class BatchRun:
     """Docstring for BatchRun."""
     global_data_root_parent_path: Path
     session_batch_status: dict = field(default_factory=lambda:{})
@@ -47,7 +45,36 @@ class BatchRun(object):
     session_batch_errors: dict = field(default_factory=lambda:{})
     enable_saving_to_disk: bool = False
     ## TODO: could keep session-specific kwargs to be passed to run_specific_batch(...) as a member variable if needed
+    _context_column_names = ['format_name', 'animal', 'exper_name', 'session_name']
+    
+    # Computed Properties ________________________________________________________________________________________________ #
+    @property
+    def session_contexts(self):
+        """The session_contexts property."""
+        return list(self.session_batch_status.keys())
 
+    
+    def to_dataframe(self, expand_context:bool=True):
+        """Get a dataframe representation of BatchRun."""
+        non_expanded_context_df = pd.DataFrame({'context': self.session_batch_status.keys(),
+                'basedirs': self.session_batch_basedirs.values(),
+                'status': self.session_batch_status.values(),
+                'errors': self.session_batch_errors.values()})
+        
+        if expand_context:
+            assert len(self.session_contexts) > 0 # must have at least one element
+            first_context = self.session_contexts[0]
+            context_column_names = list(first_context.keys()) # ['format_name', 'animal', 'exper_name', 'session_name']
+            
+            # TODO: self._context_column_names
+            
+            all_sess_context_tuples = [a_ctx.as_tuple() for a_ctx in self.session_contexts] #[('kdiba', 'gor01', 'one', '2006-6-07_11-26-53'), ('kdiba', 'gor01', 'one', '2006-6-08_14-26-15'), ('kdiba', 'gor01', 'one', '2006-6-09_1-22-43'), ...]
+            expanded_context_df = pd.DataFrame.from_records(all_sess_context_tuples, columns=context_column_names)
+            return pd.concat((expanded_context_df, non_expanded_context_df), axis=1)
+        else:
+            return non_expanded_context_df
+
+    # Main functionality _________________________________________________________________________________________________ #
     def execute_session(self, session_context, **kwargs):
         curr_session_status = self.session_batch_status[session_context]
         if curr_session_status != SessionBatchProgress.COMPLETED:
@@ -59,6 +86,7 @@ class BatchRun(object):
     def execute_all(self, **kwargs):
         for curr_session_context, curr_session_status in self.session_batch_status.items():
             self.execute_session(curr_session_context, **kwargs) # evaluate a single session
+
 
 
 @function_attributes(short_name='run_diba_batch', tags=['batch', 'automated', 'kdiba'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-03-28 04:46')
