@@ -1337,6 +1337,99 @@ def plot_long_short(long_results_obj, short_results_obj):
     win.graphicsItem().setLabel(axis='bottom', text='time')
     return win, (ax_long, ax_short), legend
 
+from pyphocorehelpers.print_helpers import generate_html_string # used for `plot_long_short_surprise_difference_plot`
+
+def plot_long_short_surprise_difference_plot(curr_active_pipeline, long_results_obj, short_results_obj, long_epoch_name, short_epoch_name):
+	""" 2023-05-17 - Refactored into display functions file from notebook.
+    
+    Usage: 
+        from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.MultiContextComparingDisplayFunctions.LongShortTrackComparingDisplayFunctions import plot_long_short_surprise_difference_plot
+        win, self.plots = plot_long_short_surprise_difference_plot(long_results_obj, short_results_obj)
+    
+    """
+	# Private Subfunctions _______________________________________________________________________________________________ #
+	def _subfn_add_difference_plot_series(win, plots, result_df_grouped, series_suffix, **kwargs):
+		""" captures nothing
+		modifies `plots` """
+		x=result_df_grouped.time_bin_centers.to_numpy()
+		y=result_df_grouped['surprise_diff'].to_numpy()
+		series_id_str = f'difference_{series_suffix}'
+		plots[series_id_str] = win.plot(x=x, y=y, name=series_id_str, alpha=0.5, **kwargs) #  symbolBrush=pg.intColor(i,6,maxValue=128) , symbol=curr_symbol, symbolBrush=cell_color_symbol_brush[unit_IDX]
+
+	# BEGIN FUNCTION BODY ________________________________________________________________________________________________ #
+
+	# make a separate symbol_brush color for each cell:
+	# cell_color_symbol_brush = [pg.intColor(i,hues=9, values=3, alpha=180) for i, aclu in enumerate(long_results_obj.original_1D_decoder.neuron_IDs)] # maxValue=128
+	# All properties in common:
+	win = pg.plot() # PlotWidget
+	win.setWindowTitle('Long Sanity Check - Leave-one-out Custom Surprise Plot')
+	# legend_size = (80,60) # fixed size legend
+	legend_size = None # auto-sizing legend to contents
+	legend = pg.LegendItem(legend_size, offset=(-1,0)) # do this instead of # .addLegend
+	legend.setParentItem(win.graphicsItem())
+
+	plots = {}
+	label_prefix_list = ['normal', 'scrambled']
+	long_short_symbol_list = ['t', 'o'] # note: 's' is a square. 'o', 't1': triangle pointing upwards0
+
+	# Use mean time_bin and surprise for each epoch
+	# plots['normal'] = win.plot(x=valid_time_bin_indicies, y=one_left_out_posterior_to_pf_surprises_mean, pen=None, symbol='t', symbolBrush=pg.intColor(1,6,maxValue=128), name=f'normal', alpha=0.5) #  symbolBrush=pg.intColor(i,6,maxValue=128) , symbol=curr_symbol, symbolBrush=cell_color_symbol_brush[unit_IDX]
+	# plots['scrambled'] = win.plot(x=valid_time_bin_indicies, y=one_left_out_posterior_to_scrambled_pf_surprises_mean, pen=None, symbol='t', symbolBrush=pg.intColor(2,6,maxValue=128), name=f'scrambled', alpha=0.5) #  symbolBrush=pg.intColor(i,6,maxValue=128) , symbol=curr_symbol, symbolBrush=cell_color_symbol_brush[unit_IDX]
+
+	# curr_surprise_difference = one_left_out_posterior_to_scrambled_pf_surprises_mean - one_left_out_posterior_to_pf_surprises_mean
+
+	# x=valid_time_bin_indicies
+	# y=curr_surprise_difference
+	# x=result_df_grouped.time_bin_indices.to_numpy()
+
+	
+	_subfn_add_difference_plot_series(win, plots, long_results_obj.result_df_grouped, series_suffix='_long', **dict(pen=None, symbol='t', symbolBrush=pg.intColor(2,6,maxValue=128), clickable=True, hoverable=True, hoverSize=7))
+
+	_subfn_add_difference_plot_series(win, plots, short_results_obj.result_df_grouped, series_suffix='_short', **dict(pen=None, symbol='o', symbolBrush=pg.intColor(3,6,maxValue=128), clickable=True))
+
+	# dict(pen=None, symbol='t', symbolBrush=pg.intColor(2,6,maxValue=128))
+
+
+	# x=result_df_grouped.time_bin_centers.to_numpy()
+	# y=result_df_grouped['surprise_diff'].to_numpy()
+	# plots['difference'] = win.plot(x=x, y=y, pen=None, symbol='t', symbolBrush=pg.intColor(2,6,maxValue=128), name=f'difference', alpha=0.5) #  symbolBrush=pg.intColor(i,6,maxValue=128) , symbol=curr_symbol, symbolBrush=cell_color_symbol_brush[unit_IDX]
+
+	# long_results_obj.result, long_results_obj.result_df, long_results_obj.result_df_grouped
+
+	# short_results_obj.result, short_results_obj.result_df, short_results_obj.result_df_grouped
+
+
+	for k, v in plots.items():
+		legend.addItem(v, f'{k}')
+
+	win.graphicsItem().setLabel(axis='left', text='Normal v. Random - Surprise (Custom)')
+	win.graphicsItem().setLabel(axis='bottom', text='time')
+
+	win.showGrid(True, True)  # Show grid for reference
+
+	# Emphasize the y=0 crossing by drawing a horizontal line at y=0
+	vline = pg.InfiniteLine(pos=0, angle=0, movable=False, pen=pg.mkPen(color='w', width=2, style=pg.QtCore.Qt.DashLine))
+	win.addItem(vline)
+
+	# Add session indicators to pyqtgraph plot
+	long_epoch = curr_active_pipeline.filtered_epochs[long_epoch_name]
+	short_epoch = curr_active_pipeline.filtered_epochs[short_epoch_name]
+	long_epoch_indicator_region_items, short_epoch_indicator_region_items = _helper_add_long_short_session_indicator_regions(win, long_epoch, short_epoch)
+
+	# epoch_linear_region, epoch_region_label = build_pyqtgraph_epoch_indicator_regions(win, t_start=curr_active_pipeline.filtered_epochs[long_epoch_name].t_start, t_stop=curr_active_pipeline.filtered_epochs[long_epoch_name].t_stop, epoch_label='long', **dict(pen=pg.mkPen('#0b0049'), brush=pg.mkBrush('#0099ff42'), hoverBrush=pg.mkBrush('#fff400'), hoverPen=pg.mkPen('#00ff00')))
+	# epoch_linear_region, epoch_region_label = build_pyqtgraph_epoch_indicator_regions(win, t_start=curr_active_pipeline.filtered_epochs[short_epoch_name].t_start, t_stop=curr_active_pipeline.filtered_epochs[short_epoch_name].t_stop, epoch_label='short', **dict(pen=pg.mkPen('#490000'), brush=pg.mkBrush('#f5161659'), hoverBrush=pg.mkBrush('#fff400'), hoverPen=pg.mkPen('#00ff00')))
+
+	i_str = generate_html_string('i', color='white', bold=True)
+	j_str = generate_html_string('j', color='red', bold=True)
+	title_str = generate_html_string(f'JSD(p_x_given_n, pf[{i_str}]) - JSD(p_x_given_n, pf[{j_str}]) where {j_str} non-firing')
+	win.setTitle(title_str)
+
+	win.setWindowTitle('Long Sanity Check - Leave-one-out Custom Surprise Plot - JSD')
+
+	return win, plots
+
+
+
 
 # ==================================================================================================================== #
 # 2023-05-02 Laps/Replay Rate Remapping 1D Index Line                                                                  #
