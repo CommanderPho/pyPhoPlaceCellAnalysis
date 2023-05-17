@@ -43,6 +43,7 @@ class BatchRun:
     session_batch_status: dict = Factory(dict)
     session_batch_basedirs: dict = Factory(dict)
     session_batch_errors: dict = Factory(dict)
+    session_batch_outputs: dict = Factory(dict) # optional selected outputs that can hold information from the computation
     enable_saving_to_disk: bool = False
     ## TODO: could keep session-specific kwargs to be passed to run_specific_batch(...) as a member variable if needed
     _context_column_names = ['format_name', 'animal', 'exper_name', 'session_name']
@@ -75,11 +76,11 @@ class BatchRun:
             return non_expanded_context_df
 
     # Main functionality _________________________________________________________________________________________________ #
-    def execute_session(self, session_context, **kwargs):
+    def execute_session(self, session_context, post_run_callback_fn=None, **kwargs):
         curr_session_status = self.session_batch_status[session_context]
         if curr_session_status != SessionBatchProgress.COMPLETED:
                 curr_session_basedir = self.session_batch_basedirs[session_context]
-                self.session_batch_status[session_context], self.session_batch_errors[session_context] = run_specific_batch(self, session_context, curr_session_basedir, **kwargs)
+                self.session_batch_status[session_context], self.session_batch_errors[session_context], self.session_batch_outputs[session_context] = run_specific_batch(self, session_context, curr_session_basedir, post_run_callback_fn=post_run_callback_fn, **kwargs)
         else:
             print(f'session {session_context} already completed.')
 
@@ -90,7 +91,7 @@ class BatchRun:
 
 
 @function_attributes(short_name='run_diba_batch', tags=['batch', 'automated', 'kdiba'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-03-28 04:46')
-def run_diba_batch(global_data_root_parent_path: Path, execute_all:bool = False, extant_batch_run = None, debug_print:bool=False):
+def run_diba_batch(global_data_root_parent_path: Path, execute_all:bool = False, extant_batch_run = None, debug_print:bool=False, post_run_callback_fn=None):
     """ 
     from pyphoplacecellanalysis.General.Batch.runBatch import BatchRun, run_diba_batch, run_specific_batch
 
@@ -148,7 +149,7 @@ def run_diba_batch(global_data_root_parent_path: Path, execute_all:bool = False,
 
                     ## TODO: 2023-03-14 - Kick off computation?
                     if execute_all:
-                        active_batch_run.session_batch_status[curr_session_context], active_batch_run.session_batch_errors[curr_session_context] = run_specific_batch(active_batch_run, curr_session_context, curr_session_basedir)
+                        active_batch_run.session_batch_status[curr_session_context], active_batch_run.session_batch_errors[curr_session_context], active_batch_run.session_batch_outputs[curr_session_context] = run_specific_batch(active_batch_run, curr_session_context, curr_session_basedir, post_run_callback_fn=post_run_callback_fn)
 
                 else:
                     print(f'EXTANT SESSION! curr_session_context: {curr_session_context} curr_session_status: {curr_session_status}, curr_session_errors: {active_batch_run.session_batch_errors.get(curr_session_context, None)}')
@@ -200,14 +201,16 @@ def run_diba_batch(global_data_root_parent_path: Path, execute_all:bool = False,
     # session_batch_status
 
 @function_attributes(short_name='run_specific_batch', tags=['batch', 'automated'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-03-28 04:46')
-def run_specific_batch(active_batch_run: BatchRun, curr_session_context: IdentifyingContext, curr_session_basedir: Path, force_reload=True, **kwargs):
+def run_specific_batch(active_batch_run: BatchRun, curr_session_context: IdentifyingContext, curr_session_basedir: Path, force_reload=True, post_run_callback_fn=None, **kwargs):
     ## Extract the default session loading vars from the session context: 
     # basedir = local_session_paths_list[1] # NOT 3
     basedir = curr_session_basedir
     print(f'basedir: {str(basedir)}')
     active_data_mode_name = curr_session_context.format_name
     print(f'active_data_mode_name: {active_data_mode_name}')
-
+    # post_run_callback_fn = kwargs.pop('post_run_callback_fn', None)
+    post_run_callback_fn_output = None
+    
     # ==================================================================================================================== #
     # Load Pipeline                                                                                                        #
     # ==================================================================================================================== #
@@ -231,9 +234,14 @@ def run_specific_batch(active_batch_run: BatchRun, curr_session_context: Identif
         curr_active_pipeline = batch_load_session(active_batch_run.global_data_root_parent_path, active_data_mode_name, basedir, epoch_name_whitelist=epoch_name_whitelist,
                                         computation_functions_name_whitelist=active_computation_functions_name_whitelist,
                                         saving_mode=saving_mode, force_reload=force_reload, skip_extended_batch_computations=skip_extended_batch_computations, debug_print=debug_print, fail_on_exception=fail_on_exception, **kwargs)
-        return (SessionBatchProgress.COMPLETED, None) # return the success status and None to indicate that no error occured.
+        try:
+            if post_run_callback_fn is not None:
+                post_run_callback_fn_output = post_run_callback_fn(curr_session_context, curr_session_basedir, curr_active_pipeline)
+        except Exception as e:
+            print(f'error occured in post_run_callback_fn: {e}. Suppressing.')
+        return (SessionBatchProgress.COMPLETED, None, post_run_callback_fn_output) # return the success status and None to indicate that no error occured.
     except Exception as e:
-        return (SessionBatchProgress.FAILED, e) # return the Failed status and the exception that occured.
+        return (SessionBatchProgress.FAILED, e, None) # return the Failed status and the exception that occured.
 
 
 
