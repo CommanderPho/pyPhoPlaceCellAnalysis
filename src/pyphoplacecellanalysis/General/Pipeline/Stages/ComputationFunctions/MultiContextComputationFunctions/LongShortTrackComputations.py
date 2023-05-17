@@ -162,7 +162,7 @@ def constrain_to_laps(curr_active_pipeline):
         ## The filter the laps specifically for use in the placefields with non-overlapping, duration, constraints:
         curr_laps_obj = a_sess.laps.as_epoch_obj() # set this to the laps object
         curr_laps_obj = curr_laps_obj.get_non_overlapping()
-        curr_laps_obj = curr_laps_obj.filtered_by_duration(1.0, 10.0) # the lap must be at least 1 second long and at most 10 seconds long
+        curr_laps_obj = curr_laps_obj.filtered_by_duration(1.0, 30.0) # the lap must be at least 1 second long and at most 10 seconds long
         # curr_laps_obj = a_sess.estimate_laps().as_epoch_obj()
 
         ## Check if already the same:
