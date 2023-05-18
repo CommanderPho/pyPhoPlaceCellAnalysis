@@ -16,6 +16,7 @@ from neuropy.core.neurons import NeuronType
 
 from pyphocorehelpers.function_helpers import function_attributes
 from pyphocorehelpers.programming_helpers import metadata_attributes
+from pyphocorehelpers.indexing_helpers import Paginator
 
 from pyphocorehelpers.DataStructure.general_parameter_containers import VisualizationParameters, RenderPlotsData, RenderPlots
 from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer
@@ -1584,6 +1585,20 @@ class RateRemappingPaginatedFigureController(PaginatedFigureController):
     
     @classmethod
     def init_from_paginator(cls, a_paginator, a_name:str = 'RateRemappingPaginatedFigureController', plot_function_name='plot_rr_aclu', active_context=None):
+        """ 
+        Usage:
+
+            from pyphocorehelpers.indexing_helpers import Paginator
+            from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.MultiContextComparingDisplayFunctions.LongShortTrackComparingDisplayFunctions import RateRemappingPaginatedFigureController
+            ## Paginated multi-plot
+            # Provide a tuple or list containing equally sized sequences of items:
+            a_paginator = Paginator.init_from_data((rr_aclus, rr_laps, rr_replays, rr_neuron_type), max_num_columns=1, max_subplots_per_page=20, data_indicies=None, last_figure_subplots_same_layout=False)
+
+            ## Build GUI components:
+            active_identifying_session_ctx = curr_active_pipeline.sess.get_context()
+            _out_rr_pagination_controller = RateRemappingPaginatedFigureController.init_from_paginator(a_paginator, a_name='TestRateRemappingPaginatedFigureController', active_context=active_identifying_session_ctx)
+
+        """
         new_obj = cls(params=VisualizationParameters(name=a_name), plots_data=RenderPlotsData(name=a_name, paginator=a_paginator), plots=RenderPlots(name=a_name), ui=PhoUIContainer(name=a_name, connections=PhoUIContainer(name=a_name)))
         # new_obj.ui.connections = PhoUIContainer(name=name)
         num_slices = a_paginator.max_num_items_per_page
@@ -1604,6 +1619,31 @@ class RateRemappingPaginatedFigureController(PaginatedFigureController):
         new_obj.initialize()
         return new_obj
     
+
+    @classmethod
+    def init_from_rr_data(cls, rr_aclus, rr_laps, rr_replays, rr_neuron_type, max_subplots_per_page:int=20, a_name:str = 'RateRemappingPaginatedFigureController', plot_function_name='plot_rr_aclu', active_context=None):
+        """ initializes directly from the rate-remapping data arrays. Builds the paginator.
+        
+        The Paginator can be accessed via `self.plots_data.paginator` if needed.
+        
+        Usage:
+        
+            from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.MultiContextComparingDisplayFunctions.LongShortTrackComparingDisplayFunctions import RateRemappingPaginatedFigureController
+
+            ## Paginated multi-plot
+            active_identifying_session_ctx = curr_active_pipeline.sess.get_context()
+            _out_rr_pagination_controller = RateRemappingPaginatedFigureController.init_from_rr_data(rr_aclus, rr_laps, rr_replays, rr_neuron_type, max_subplots_per_page=20, a_name='TestRateRemappingPaginatedFigureController', active_context=active_identifying_session_ctx)
+            a_paginator = _out_rr_pagination_controller.plots_data.paginator
+        """
+        ## Paginated multi-plot
+        a_paginator = Paginator.init_from_data((rr_aclus, rr_laps, rr_replays, rr_neuron_type), max_num_columns=1, max_subplots_per_page=max_subplots_per_page, data_indicies=None, last_figure_subplots_same_layout=False)
+
+        ## Build GUI components:
+        new_obj = cls.init_from_paginator(a_paginator, a_name=a_name, plot_function_name=plot_function_name, active_context=active_context)
+        return new_obj
+    
+
+
 
     def configure(self, **kwargs):
         """ assigns and computes needed variables for rendering. """
