@@ -136,6 +136,73 @@ class LongShortTrackComputations(AllFunctionEnumeratingMixin, metaclass=Computat
         return global_computation_results
 
 
+    
+    def _perform_long_short_pf_overlap_analyses(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_whitelist=None, debug_print=False):
+        """ Computes multiple forms of overlap between the short and the long placefields
+        
+        Requires:
+            ['sess']
+            
+        Provides:
+            computation_result.computed_data['short_long_pf_overlap_analyses']
+                ['short_long_pf_overlap_analyses']['short_long_neurons_diff']
+                ['short_long_pf_overlap_analyses']['poly_overlap_df']
+        
+        """
+        if include_whitelist is None:
+            include_whitelist = owning_pipeline_reference.active_completed_computation_result_names # ['maze', 'sprinkle']
+
+        # Epoch dataframe stuff:
+        long_epoch_name = include_whitelist[0] # 'maze1_PYR'
+        short_epoch_name = include_whitelist[1] # 'maze2_PYR'
+        if len(include_whitelist) > 2:
+            global_epoch_name = include_whitelist[-1] # 'maze_PYR'
+        else:
+            print(f'WARNING: no global_epoch detected.')
+            global_epoch_name = '' # None
+
+        if debug_print:
+            print(f'include_whitelist: {include_whitelist}\nlong_epoch_name: {long_epoch_name}, short_epoch_name: {short_epoch_name}, global_epoch_name: {global_epoch_name}')
+
+        long_results = computation_results[long_epoch_name]['computed_data']
+        short_results = computation_results[short_epoch_name]['computed_data']
+
+        # Compute various forms of 1D placefield overlaps:        
+        pf_neurons_diff = _compare_computation_results(long_results.pf1D.ratemap.neuron_ids, short_results.pf1D.ratemap.neuron_ids) # get shared neuron info
+        poly_overlap_df = compute_polygon_overlap(long_results, short_results, debug_print=debug_print)
+        conv_overlap_dict, conv_overlap_scalars_df = compute_convolution_overlap(long_results, short_results, debug_print=debug_print)
+        product_overlap_dict, product_overlap_scalars_df = compute_dot_product_overlap(long_results, short_results, debug_print=debug_print)
+        relative_entropy_overlap_dict, relative_entropy_overlap_scalars_df = compute_relative_entropy_divergence_overlap(long_results, short_results, debug_print=debug_print)
+
+        global_computation_results.computed_data['short_long_pf_overlap_analyses'] = DynamicParameters.init_from_dict({
+            'short_long_neurons_diff': pf_neurons_diff,
+            'poly_overlap_df': poly_overlap_df,
+            'conv_overlap_dict': conv_overlap_dict, 'conv_overlap_scalars_df': conv_overlap_scalars_df,
+            'product_overlap_dict': product_overlap_dict, 'product_overlap_scalars_df': product_overlap_scalars_df,
+            'relative_entropy_overlap_dict': relative_entropy_overlap_dict, 'relative_entropy_overlap_scalars_df': relative_entropy_overlap_scalars_df
+        })
+        return global_computation_results
+
+
+    @function_attributes(short_name='_perform_long_short_firing_rate_analyses', tags=['short_long','firing_rate', 'computation'], input_requires=[], output_provides=['long_short_fr_indicies_analysis'], uses=['pipeline_complete_compute_long_short_fr_indicies'], used_by=[], creation_date='2023-04-11 00:00')
+    def _perform_long_short_firing_rate_analyses(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_whitelist=None, debug_print=False):
+        """ 
+        
+        Requires:
+            ['sess']
+            
+        Provides:
+            computation_result.computed_data['long_short_fr_indicies_analysis']
+                ['long_short_fr_indicies_analysis']['short_long_neurons_diff']
+                ['long_short_fr_indicies_analysis']['poly_overlap_df']
+        
+        """
+        # New unified `pipeline_complete_compute_long_short_fr_indicies(...)` method for entire pipeline:
+        x_frs_index, y_frs_index, active_context, all_results_dict = pipeline_complete_compute_long_short_fr_indicies(owning_pipeline_reference) # use the all_results_dict as the computed data value
+        global_computation_results.computed_data['long_short_fr_indicies_analysis'] = DynamicParameters.init_from_dict({**all_results_dict, 'active_context': active_context})
+        return global_computation_results
+
+
 
 
 

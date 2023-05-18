@@ -483,7 +483,7 @@ def batch_extended_computations(curr_active_pipeline, include_whitelist=None, in
                     print(f'\t encountered error: {e}\n{traceback.format_exc()}\n.')
                 if progress_print or debug_print:
                     print(f'\t Recomputing {_comp_name}...')
-                curr_active_pipeline.perform_specific_computation(computation_functions_name_whitelist=['_perform_short_long_pf_overlap_analyses'], fail_on_exception=True, debug_print=False) # fail_on_exception MUST be True or error handling is all messed up 
+                curr_active_pipeline.perform_specific_computation(computation_functions_name_whitelist=['_perform_long_short_pf_overlap_analyses'], fail_on_exception=True, debug_print=False) # fail_on_exception MUST be True or error handling is all messed up 
                 print(f'\t done.')
                 short_long_pf_overlap_analyses = curr_active_pipeline.global_computation_results.computed_data.short_long_pf_overlap_analyses
                 conv_overlap_dict = short_long_pf_overlap_analyses['conv_overlap_dict']
@@ -526,7 +526,7 @@ def batch_extended_computations(curr_active_pipeline, include_whitelist=None, in
                     print(f'\t encountered error: {e}\n{traceback.format_exc()}\n.')
                 if progress_print or debug_print:
                     print(f'\t Recomputing {_comp_name}...')
-                curr_active_pipeline.perform_specific_computation(computation_functions_name_whitelist=['_perform_short_long_firing_rate_analyses'], fail_on_exception=True, debug_print=False) # fail_on_exception MUST be True or error handling is all messed up 
+                curr_active_pipeline.perform_specific_computation(computation_functions_name_whitelist=['_perform_long_short_firing_rate_analyses'], fail_on_exception=True, debug_print=False) # fail_on_exception MUST be True or error handling is all messed up 
                 print(f'\t done.')
                 long_short_fr_indicies_analysis_results = curr_active_pipeline.global_computation_results.computed_data['long_short_fr_indicies_analysis']
                 x_frs_index, y_frs_index = long_short_fr_indicies_analysis_results['x_frs_index'], long_short_fr_indicies_analysis_results['y_frs_index'] # use the all_results_dict as the computed data value
@@ -584,7 +584,7 @@ def batch_programmatic_figures(curr_active_pipeline):
     """
     ## 🗨️🟢 2022-10-26 - Jonathan Firing Rate Analyses
     # Perform missing global computations                                                                                  #
-    # curr_active_pipeline.perform_specific_computation(computation_functions_name_whitelist=['_perform_jonathan_replay_firing_rate_analyses', '_perform_short_long_pf_overlap_analyses'], fail_on_exception=True, debug_print=True)
+    # curr_active_pipeline.perform_specific_computation(computation_functions_name_whitelist=['_perform_jonathan_replay_firing_rate_analyses', '_perform_long_short_pf_overlap_analyses'], fail_on_exception=True, debug_print=True)
 
     ## Get global 'jonathan_firing_rate_analysis' results:
     curr_jonathan_firing_rate_analysis = curr_active_pipeline.global_computation_results.computed_data['jonathan_firing_rate_analysis']

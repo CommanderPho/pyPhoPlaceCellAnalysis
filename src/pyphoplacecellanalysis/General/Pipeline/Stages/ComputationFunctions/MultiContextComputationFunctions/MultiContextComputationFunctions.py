@@ -273,7 +273,7 @@ class MultiContextComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Co
         return global_computation_results
 
 
-    def _perform_short_long_pf_overlap_analyses(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_whitelist=None, debug_print=False):
+    def _perform_long_short_pf_overlap_analyses(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_whitelist=None, debug_print=False):
         """ Computes multiple forms of overlap between the short and the long placefields
         
         Requires:
@@ -320,8 +320,8 @@ class MultiContextComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Co
         return global_computation_results
 
 
-    @function_attributes(short_name='_perform_short_long_firing_rate_analyses', tags=['short_long','firing_rate', 'computation'], input_requires=[], output_provides=['long_short_fr_indicies_analysis'], uses=['pipeline_complete_compute_long_short_fr_indicies'], used_by=[], creation_date='2023-04-11 00:00')
-    def _perform_short_long_firing_rate_analyses(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_whitelist=None, debug_print=False):
+    @function_attributes(short_name='_perform_long_short_firing_rate_analyses', tags=['short_long','firing_rate', 'computation'], input_requires=[], output_provides=['long_short_fr_indicies_analysis'], uses=['pipeline_complete_compute_long_short_fr_indicies'], used_by=[], creation_date='2023-04-11 00:00')
+    def _perform_long_short_firing_rate_analyses(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_whitelist=None, debug_print=False):
         """ 
         
         Requires:
@@ -1327,7 +1327,7 @@ def pipeline_complete_compute_long_short_fr_indicies(curr_active_pipeline, temp_
         Session Laps
         If the session is missing .replay objects, uses `DataSession.compute_estimated_replay_epochs(...)` to compute them from session PBEs.
 
-    - called in `_perform_short_long_firing_rate_analyses`
+    - called in `_perform_long_short_firing_rate_analyses`
 
     Args:
         curr_active_pipeline (_type_): _description_
