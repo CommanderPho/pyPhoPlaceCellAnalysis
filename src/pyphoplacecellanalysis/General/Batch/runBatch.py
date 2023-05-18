@@ -88,7 +88,7 @@ class BatchRun:
     
 
     
-    def to_dataframe(self, expand_context:bool=True):
+    def to_dataframe(self, expand_context:bool=True, good_only:bool=False):
         """Get a dataframe representation of BatchRun."""
         non_expanded_context_df = pd.DataFrame({'context': self.session_batch_status.keys(),
                 'basedirs': self.session_batch_basedirs.values(),
@@ -114,6 +114,10 @@ class BatchRun:
         ## Add is_ready
         self.post_load_find_usable_sessions(out_df, min_required_replays_or_laps=5)
         
+        if good_only:
+            # Get only the good (is_ready) sessions
+            out_df = out_df[out_df['is_ready']]
+            
         return out_df
 
     # Main functionality _________________________________________________________________________________________________ #
@@ -129,6 +133,19 @@ class BatchRun:
         for curr_session_context, curr_session_status in self.session_batch_status.items():
             self.execute_session(curr_session_context, **kwargs) # evaluate a single session
 
+
+    # Updating ___________________________________________________________________________________________________________ #
+    def change_global_root_path(self, global_data_root_parent_path):
+        """ Changes the self.global_data_root_parent_path for this computer and converts all of the `session_batch_basedirs` paths."""
+        if isinstance(global_data_root_parent_path, str):
+            global_data_root_parent_path = Path(global_data_root_parent_path)
+            
+        if self.global_data_root_parent_path != global_data_root_parent_path:
+            print(f'switching data dir path from {str(self.global_data_root_parent_path)} to {str(global_data_root_parent_path)}')
+            self.global_data_root_parent_path = global_data_root_parent_path
+            self.session_batch_basedirs = {ctx:global_data_root_parent_path.joinpath(*ctx.as_tuple()).resolve() for ctx in self.session_contexts} # ctx.format_name, ctx.animal, ctx.exper_name
+        else:
+            print('no difference between provided and internal paths.')
 
 
 @function_attributes(short_name='run_diba_batch', tags=['batch', 'automated', 'kdiba'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-03-28 04:46')

@@ -13,7 +13,7 @@ pandas-flavor = "^0.3.0"
 elephant = "^0.11.2"
 dill = {version="==0.3.5.1", extras=["graph"]} #objgraph diagnostic tool
 klepto = "0.2.2" # {version = "^0.2.3", extras="archives"}
-findpeaks = "^2.4.4"
+findpeaks = {git = "https://github.com/CommanderPho/findpeaks.git"} # "^2.4.4"
 shapely = "^2.0.1"
 pybursts = {git = "https://github.com/CommanderPho/pybursts.git"}
 pyopengl-accelerate = {version = "^3.1.6", optional = true}

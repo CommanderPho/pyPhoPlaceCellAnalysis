@@ -329,27 +329,29 @@ def _long_short_decoding_analysis_from_decoders(long_one_step_decoder_1D, short_
 
 @define
 class LongShortPipelineTests(object):
-	"""2023-05-16 - Ensures that the laps are used for the placefield computation epochs, the number of bins are the same between the long and short tracks."""
-	curr_active_pipeline: "NeuropyPipeline"
+    """2023-05-16 - Ensures that the laps are used for the placefield computation epochs, the number of bins are the same between the long and short tracks."""
+    curr_active_pipeline: "NeuropyPipeline"
 
-	def validate_placefields(self):
-		""" 2023-05-16 - Ensures that the laps are used for the placefield computation epochs, the number of bins are the same between the long and short tracks. """
-		long_epoch_name, short_epoch_name, global_epoch_name = self.curr_active_pipeline.find_LongShortGlobal_epoch_names()
-		long_results, short_results, global_results = [self.curr_active_pipeline.computation_results[an_epoch_name]['computed_data'] for an_epoch_name in [long_epoch_name, short_epoch_name, global_epoch_name]]
-		# Assert conformance between the long and short position bins for both the 1D and 2D placefields. This should be the case because pf_params.grid_bin and pf_params.grid_bin_bounds are set to the same for both tracks:
-		assert np.all(long_results.pf1D.xbin == short_results.pf1D.xbin), f"long_results.pf1D.xbin: {len(long_results.pf1D.xbin)}, short_results.pf1D.xbin: {len(short_results.pf1D.xbin)}"
-		assert np.all(long_results.pf2D.xbin == short_results.pf2D.xbin), f"long_results.pf2D.xbin: {len(long_results.pf2D.xbin)}, short_results.pf2D.xbin: {len(short_results.pf2D.xbin)}"
-		assert np.all(long_results.pf2D.ybin == short_results.pf2D.ybin), f"long_results.pf2D.ybin: {len(long_results.pf2D.ybin)}, short_results.pf2D.ybin: {len(short_results.pf2D.ybin)}"
+    def validate_placefields(self):
+        """ 2023-05-16 - Ensures that the laps are used for the placefield computation epochs, the number of bins are the same between the long and short tracks. """
+        long_epoch_name, short_epoch_name, global_epoch_name = self.curr_active_pipeline.find_LongShortGlobal_epoch_names()
+        long_results, short_results, global_results = [self.curr_active_pipeline.computation_results[an_epoch_name]['computed_data'] for an_epoch_name in [long_epoch_name, short_epoch_name, global_epoch_name]]
+        # Assert conformance between the long and short position bins for both the 1D and 2D placefields. This should be the case because pf_params.grid_bin and pf_params.grid_bin_bounds are set to the same for both tracks:
+        assert np.all(long_results.pf1D.xbin == short_results.pf1D.xbin), f"long_results.pf1D.xbin: {len(long_results.pf1D.xbin)}, short_results.pf1D.xbin: {len(short_results.pf1D.xbin)}"
+        assert np.all(long_results.pf2D.xbin == short_results.pf2D.xbin), f"long_results.pf2D.xbin: {len(long_results.pf2D.xbin)}, short_results.pf2D.xbin: {len(short_results.pf2D.xbin)}"
+        assert np.all(long_results.pf2D.ybin == short_results.pf2D.ybin), f"long_results.pf2D.ybin: {len(long_results.pf2D.ybin)}, short_results.pf2D.ybin: {len(short_results.pf2D.ybin)}"
 
-	def validate_decoders(self):
-		## Decoders should also conform if placefields do from the onset prior to computations:
-		long_epoch_name, short_epoch_name, global_epoch_name = self.curr_active_pipeline.find_LongShortGlobal_epoch_names()
-		long_results, short_results, global_results = [self.curr_active_pipeline.computation_results[an_epoch_name]['computed_data'] for an_epoch_name in [long_epoch_name, short_epoch_name, global_epoch_name]]
-		assert np.all(long_results.pf1D_Decoder.xbin == short_results.pf1D_Decoder.xbin), f"long_results.pf1D_Decoder.xbin: {len(long_results.pf1D_Decoder.xbin)}, short_results.pf1D_Decoder.xbin: {len(short_results.pf1D_Decoder.xbin)}"
-		assert np.all(long_results.pf2D_Decoder.xbin == short_results.pf2D_Decoder.xbin), f"long_results.pf2D_Decoder.xbin: {len(long_results.pf2D_Decoder.xbin)}, short_results.pf2D_Decoder.xbin: {len(short_results.pf2D_Decoder.xbin)}"
-		assert np.all(long_results.pf2D_Decoder.ybin == short_results.pf2D_Decoder.ybin), f"long_results.pf2D_Decoder.ybin: {len(long_results.pf2D_Decoder.ybin)}, short_results.pf2D_Decoder.ybin: {len(short_results.pf2D_Decoder.ybin)}"
+    def validate_decoders(self):
+        ## Decoders should also conform if placefields do from the onset prior to computations:
+        long_epoch_name, short_epoch_name, global_epoch_name = self.curr_active_pipeline.find_LongShortGlobal_epoch_names()
+        long_results, short_results, global_results = [self.curr_active_pipeline.computation_results[an_epoch_name]['computed_data'] for an_epoch_name in [long_epoch_name, short_epoch_name, global_epoch_name]]
+        assert np.all(long_results.pf1D_Decoder.xbin == short_results.pf1D_Decoder.xbin), f"long_results.pf1D_Decoder.xbin: {len(long_results.pf1D_Decoder.xbin)}, short_results.pf1D_Decoder.xbin: {len(short_results.pf1D_Decoder.xbin)}"
+        assert np.all(long_results.pf2D_Decoder.xbin == short_results.pf2D_Decoder.xbin), f"long_results.pf2D_Decoder.xbin: {len(long_results.pf2D_Decoder.xbin)}, short_results.pf2D_Decoder.xbin: {len(short_results.pf2D_Decoder.xbin)}"
+        assert np.all(long_results.pf2D_Decoder.ybin == short_results.pf2D_Decoder.ybin), f"long_results.pf2D_Decoder.ybin: {len(long_results.pf2D_Decoder.ybin)}, short_results.pf2D_Decoder.ybin: {len(short_results.pf2D_Decoder.ybin)}"
 
+    def validate(self):
+        self.validate_placefields()
+        self.validate_decoders()
 
-	def validate(self):
-		self.validate_placefields()
-		self.validate_decoders()
+    def __call__(self):
+        self.validate()
