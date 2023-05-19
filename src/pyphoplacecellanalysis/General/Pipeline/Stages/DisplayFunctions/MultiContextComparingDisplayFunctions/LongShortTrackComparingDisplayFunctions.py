@@ -1199,6 +1199,7 @@ def _helper_add_long_short_session_indicator_regions(win, long_epoch, short_epoc
     short_epoch_indicator_region_items = build_pyqtgraph_epoch_indicator_regions(win, t_start=short_epoch.t_start, t_stop=short_epoch.t_stop, **short_epoch_config)
     return long_epoch_indicator_region_items, short_epoch_indicator_region_items
 
+
 @function_attributes(short_name='plot_long_short_expected_vs_observed_firing_rates', tags=['pyqtgraph','long_short'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-03-28 17:26')
 def plot_long_short_expected_vs_observed_firing_rates(long_results_obj, short_results_obj, limit_aclus=None):
     """ 2023-03-28 4:30pm - Expected vs. Observed Firing Rates for each cell and each epoch 
