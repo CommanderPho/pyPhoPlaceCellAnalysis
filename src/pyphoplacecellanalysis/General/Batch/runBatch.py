@@ -217,46 +217,6 @@ def run_diba_batch(global_data_root_parent_path: Path, execute_all:bool = False,
     ## end for
     return active_batch_run
 
-                # curr_session_status = active_batch_run.session_batch_status.get(curr_session_basedir, None)
-                # if curr_session_status is None:
-                #     active_batch_run.session_batch_status[curr_session_basedir] = SessionBatchProgress.NOT_STARTED # set to not started if not present
-                #     # session_batch_status[curr_session_basedir] = SessionBatchProgress.COMPLETED # set to not started if not present
-
-
-    # ## Animal `gor01`:
-    # local_session_parent_context = local_session_root_parent_context.adding_context(collision_prefix='animal', animal='gor01', exper_name='one') # IdentifyingContext<('kdiba', 'gor01', 'one')>
-    # local_session_parent_path = local_session_root_parent_path.joinpath(local_session_parent_context.animal, local_session_parent_context.exper_name) # 'gor01', 'one'
-    # local_session_paths_list, local_session_names_list =  find_local_session_paths(local_session_parent_path, exclude_list=['PhoHelpers', 'Spike3D-Minimal-Test', 'Unused'])
-
-    # local_session_parent_context = local_session_root_parent_context.adding_context(collision_prefix='animal', animal='gor01', exper_name='two')
-    # local_session_parent_path = local_session_root_parent_path.joinpath(local_session_parent_context.animal, local_session_parent_context.exper_name)
-    # local_session_paths_list, local_session_names_list =  find_local_session_paths(local_session_parent_path, exclude_list=[])
-
-    ### Animal `vvp01`:
-    # local_session_parent_context = local_session_root_parent_context.adding_context(collision_prefix='animal', animal='vvp01', exper_name='one')
-    # local_session_parent_path = local_session_root_parent_path.joinpath(local_session_parent_context.animal, local_session_parent_context.exper_name)
-    # local_session_paths_list, local_session_names_list =  find_local_session_paths(local_session_parent_path, exclude_list=[])
-
-    # local_session_parent_context = local_session_root_parent_context.adding_context(collision_prefix='animal', animal='vvp01', exper_name='two')
-    # local_session_parent_path = local_session_root_parent_path.joinpath(local_session_parent_context.animal, local_session_parent_context.exper_name)
-    # local_session_paths_list, local_session_names_list =  find_local_session_paths(local_session_parent_path, exclude_list=[])
-
-    # ### Animal `pin01`:
-    # local_session_parent_context = local_session_root_parent_context.adding_context(collision_prefix='animal', animal='pin01', exper_name='one')
-    # local_session_parent_path = local_session_root_parent_path.joinpath(local_session_parent_context.animal, local_session_parent_context.exper_name) # no exper_name ('one' or 'two') folders for this animal.
-    # local_session_paths_list, local_session_names_list =  find_local_session_paths(local_session_parent_path, exclude_list=['redundant','showclus','sleep','tmaze'])
-
-    # ## Build session contexts list:
-    # local_session_contexts_list = [local_session_parent_context.adding_context(collision_prefix='sess', session_name=a_name) for a_name in local_session_names_list] # [IdentifyingContext<('kdiba', 'gor01', 'one', '2006-6-07_11-26-53')>, ..., IdentifyingContext<('kdiba', 'gor01', 'one', '2006-6-13_14-42-6')>]
-
-    # ## Initialize `session_batch_status` with the NOT_STARTED status if it doesn't already have a different status
-    # for curr_session_basedir in local_session_paths_list:
-    # 	curr_session_status = session_batch_status.get(curr_session_basedir, None)
-    # 	if curr_session_status is None:
-    # 		session_batch_status[curr_session_basedir] = SessionBatchProgress.NOT_STARTED # set to not started if not present
-    # 		# session_batch_status[curr_session_basedir] = SessionBatchProgress.COMPLETED # set to not started if not present
-
-    # session_batch_status
 
 @function_attributes(short_name='run_specific_batch', tags=['batch', 'automated'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-03-28 04:46')
 def run_specific_batch(active_batch_run: BatchRun, curr_session_context: IdentifyingContext, curr_session_basedir: Path, force_reload=True, post_run_callback_fn=None, **kwargs):
@@ -274,12 +234,14 @@ def run_specific_batch(active_batch_run: BatchRun, curr_session_context: Identif
     # ==================================================================================================================== #
     # epoch_name_whitelist = ['maze']
     epoch_name_whitelist = kwargs.pop('epoch_name_whitelist', None)
-    active_computation_functions_name_whitelist = kwargs.pop('computation_functions_name_whitelist', None) or ['_perform_baseline_placefield_computation', '_perform_time_dependent_placefield_computation', '_perform_extended_statistics_computation',
+    active_computation_functions_name_whitelist = kwargs.pop('computation_functions_name_whitelist', None) or ['_perform_baseline_placefield_computation',
+                                            # '_perform_time_dependent_placefield_computation',
+                                            # '_perform_extended_statistics_computation',
                                             '_perform_position_decoding_computation', 
                                             '_perform_firing_rate_trends_computation',
                                             # '_perform_pf_find_ratemap_peaks_computation',
                                             # '_perform_time_dependent_pf_sequential_surprise_computation'
-                                            '_perform_two_step_position_decoding_computation',
+                                            # '_perform_two_step_position_decoding_computation',
                                             # '_perform_recursive_latent_placefield_decoding'
                                         ]
     

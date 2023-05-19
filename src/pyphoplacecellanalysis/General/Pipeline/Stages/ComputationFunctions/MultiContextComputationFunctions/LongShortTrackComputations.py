@@ -86,7 +86,7 @@ class LeaveOneOutDecodingAnalysis(ComputedResult):
 class LongShortPipelineTests:
     """2023-05-16 - Ensures that the laps are used for the placefield computation epochs, the number of bins are the same between the long and short tracks."""
     curr_active_pipeline: "NeuropyPipeline"
-
+    
     def validate_placefields(self):
         """ 2023-05-16 - Ensures that the laps are used for the placefield computation epochs, the number of bins are the same between the long and short tracks. """
         long_epoch_name, short_epoch_name, global_epoch_name = self.curr_active_pipeline.find_LongShortGlobal_epoch_names()
