@@ -83,7 +83,7 @@ class LeaveOneOutDecodingAnalysis(ComputedResult):
 
 
 @define(slots=False, repr=False)
-class LongShortPipelineTests(object):
+class LongShortPipelineTests:
     """2023-05-16 - Ensures that the laps are used for the placefield computation epochs, the number of bins are the same between the long and short tracks."""
     curr_active_pipeline: "NeuropyPipeline"
 
@@ -260,7 +260,7 @@ class LongShortTrackComputations(AllFunctionEnumeratingMixin, metaclass=Computat
 
     @function_attributes(short_name='_perform_long_short_firing_rate_analyses', tags=['short_long','firing_rate', 'computation'], input_requires=[], output_provides=['long_short_fr_indicies_analysis'], uses=['pipeline_complete_compute_long_short_fr_indicies'], used_by=[], creation_date='2023-04-11 00:00')
     def _perform_long_short_firing_rate_analyses(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_whitelist=None, debug_print=False):
-        """ 
+        """ Computes the firing rate indicies which is a measure of the changes in firing rate (rate-remapping) between the long and the short track
         
         Requires:
             ['sess']
@@ -720,6 +720,7 @@ def _epoch_unit_avg_firing_rates(spikes_df, filter_epochs, included_neuron_ids=N
 
 @function_attributes(short_name='_fr_index', tags=['long_short', 'compute', 'fr_index'], input_requires=[], output_provides=[], uses=[], used_by=['_compute_long_short_firing_rate_indicies'], creation_date='2023-01-19 00:00')
 def _fr_index(long_fr, short_fr):
+    """ Pho's 2023 firing-rate-index [`fri`] measure."""
     return ((long_fr - short_fr) / (long_fr + short_fr))
 
 @function_attributes(short_name='_compute_long_short_firing_rate_indicies', tags=['long_short', 'compute', 'fr_index'], input_requires=[], output_provides=[], uses=[], used_by=['pipeline_complete_compute_long_short_fr_indicies'], creation_date='2023-01-19 00:00')
@@ -885,6 +886,71 @@ def pipeline_complete_compute_long_short_fr_indicies(curr_active_pipeline, temp_
     return x_frs_index, y_frs_index, active_context, all_results_dict # TODO: add to computed_data instead
 
 
+@function_attributes(short_name=None, tags=['rr', 'rate_remapping', 'compute'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-05-18 18:58', related_items=[])
+def compute_rate_remapping_stats(long_short_fr_indicies_analysis, aclu_to_neuron_type_map, considerable_remapping_threshold:float=0.7):
+    """ 2023-05-18 - Yet another form of measuring rate-remapping. 
+    
+    Usage:
+
+        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.LongShortTrackComputations import compute_rate_remapping_stats
+        rate_remapping_df = compute_rate_remapping_stats(curr_active_pipeline.global_computation_results.computed_data.long_short_fr_indicies_analysis, global_session.neurons.aclu_to_neuron_type_map, considerable_remapping_threshold=0.7)
+
+        high_remapping_cells_only = rate_remapping_df[rate_remapping_df['has_considerable_remapping']] 
+        high_remapping_cells_only
+
+        ## Extract rr_* variables from rate_remapping_df
+        rr_aclus = rate_remapping_df.index.values
+        rr_laps, rr_replays, rr_skew, rr_neuron_type = [rate_remapping_df[n].values for n in ['laps', 'replays', 'skew', 'neuron_type']]
+
+
+        ## Display:
+        from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.MultiContextComparingDisplayFunctions.LongShortTrackComparingDisplayFunctions import plot_rr_aclu
+        n_debug_limit = 100
+        fig, ax = plot_rr_aclu([str(aclu) for aclu in rr_aclus[:n_debug_limit]], rr_laps=rr_laps[:n_debug_limit], rr_replays=rr_replays[:n_debug_limit])
+
+        ## Display Paginated multi-plot
+        from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.MultiContextComparingDisplayFunctions.LongShortTrackComparingDisplayFunctions import RateRemappingPaginatedFigureController
+        active_identifying_session_ctx = curr_active_pipeline.sess.get_context()
+        _out_rr_pagination_controller = RateRemappingPaginatedFigureController.init_from_rr_data(rr_aclus, rr_laps, rr_replays, rr_neuron_type, max_subplots_per_page=20, a_name='TestRateRemappingPaginatedFigureController', active_context=active_identifying_session_ctx)
+        a_paginator = _out_rr_pagination_controller.plots_data.paginator
+
+    """
+    rr_aclus = np.array(list(long_short_fr_indicies_analysis.y_frs_index.keys()))
+    rr_neuron_type = np.array([aclu_to_neuron_type_map[aclu] for aclu in rr_aclus])
+    rr_laps = np.array(list(long_short_fr_indicies_analysis.y_frs_index.values()))
+    rr_replays = np.array(list(long_short_fr_indicies_analysis.x_frs_index.values()))
+    rr_skew = rr_laps / rr_replays
+
+    ## Sort on 'rr_replays':
+    # sort_indicies = np.argsort(rr_replays)
+
+    ## Sort on 'rr_laps':
+    sort_indicies = np.argsort(rr_laps)
+
+    ## Sort all the variables:
+    rr_aclus = rr_aclus[sort_indicies]
+    rr_neuron_type = rr_neuron_type[sort_indicies] # NeuronType
+    rr_laps = rr_laps[sort_indicies]
+    rr_replays = rr_replays[sort_indicies]
+    rr_skew = rr_skew[sort_indicies]
+
+    # Build dataframe:
+    rate_remapping_df = pd.DataFrame({'aclu': rr_aclus, 'neuron_type': rr_neuron_type, 'laps': rr_laps, 'replays': rr_replays, 'skew': rr_skew})
+    rate_remapping_df.set_index('aclu', inplace=True)
+    rate_remapping_df.dropna('index', subset=['laps','replays'], how='any', inplace=True) # drop any cells that don't have any replays at all.
+
+    ## Add distances from the center to indicate how much remapping that cell engaged in so we can find the cells that remapped the most:
+    rate_remapping_df['max_axis_distance_from_center'] =  np.max(np.vstack((np.abs(rate_remapping_df['laps'].to_numpy()), np.abs(rate_remapping_df['replays'].to_numpy()))), axis=0)
+    rate_remapping_df['distance_from_center'] = np.sqrt(rate_remapping_df['laps'].to_numpy() ** 2 + rate_remapping_df['replays'].to_numpy() ** 2)
+
+    ## Find only the cells that exhibit considerable remapping:
+    considerable_remapping_threshold = 0.7 # cells exhibit "considerable remapping" when they exceed 0.7
+    rate_remapping_df['has_considerable_remapping'] = rate_remapping_df['max_axis_distance_from_center'] > considerable_remapping_threshold
+    
+    # rendering only:
+    rate_remapping_df['render_color'] = [a_neuron_type.renderColor for a_neuron_type in rate_remapping_df.neuron_type] # Get color corresponding to each neuron type (`NeuronType`):
+
+    return rate_remapping_df
 
 # ==================================================================================================================== #
 # Jonathan's helper functions                                                                                          #
@@ -1001,7 +1067,6 @@ def _subfn_computations_make_jonathan_firing_comparison_df(unit_specific_time_bi
     df['mean_diff'] = df['short_mean'] - df['long_mean']
 
     ## Compare the number of replay events between the long and the short
-    
 
     return df
 
