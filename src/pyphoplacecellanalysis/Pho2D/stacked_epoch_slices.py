@@ -664,38 +664,50 @@ class DecodedEpochSlicesPaginatedFigureController(PaginatedFigureController):
     def on_paginator_control_widget_jump_to_page(self, page_idx: int):
         """ Update: made to depend on self """
         from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import plot_1D_most_likely_position_comparsions # used in `plot_decoded_epoch_slices`
-        
-        # print(f'on_paginator_control_widget_jump_to_page(page_idx: {page_idx})')
+        if self.params.debug_print:
+            print(f'on_paginator_control_widget_jump_to_page(page_idx: {page_idx})') # for page_idx == max_index this is called but doesn't continue
         included_page_data_indicies, (curr_page_active_filter_epochs, curr_page_epoch_labels, curr_page_time_bin_containers, curr_page_posterior_containers) = self.plots_data.paginator.get_page_data(page_idx=page_idx)
-        # print(f'\tincluded_page_data_indicies: {included_page_data_indicies}')
-        # params, plots_data, plots, ui = stacked_epoch_slices_matplotlib_build_view(epoch_slices, epoch_labels=epoch_labels, name=name, plot_function_name=plot_function_name, debug_test_max_num_slices=debug_test_max_num_slices, debug_print=debug_print)
-
+        if self.params.debug_print:
+            print(f'\tincluded_page_data_indicies: {included_page_data_indicies}')
+    
         for i, curr_ax in enumerate(self.plots.axs):
-            curr_slice_idxs = included_page_data_indicies[i]
-            curr_epoch_slice = curr_page_active_filter_epochs[i]
-            curr_time_bin_container = curr_page_time_bin_containers[i]
-            curr_posterior_container = curr_page_posterior_containers[i]
-            curr_time_bins = curr_time_bin_container.centers
-            curr_posterior = curr_posterior_container.p_x_given_n
-            curr_most_likely_positions = curr_posterior_container.most_likely_positions_1D
+            try:
+                curr_slice_idxs = included_page_data_indicies[i]
+                curr_epoch_slice = curr_page_active_filter_epochs[i]
+                curr_time_bin_container = curr_page_time_bin_containers[i]
+                curr_posterior_container = curr_page_posterior_containers[i]
+                curr_time_bins = curr_time_bin_container.centers
+                curr_posterior = curr_posterior_container.p_x_given_n
+                curr_most_likely_positions = curr_posterior_container.most_likely_positions_1D
+                
+                if self.params.debug_print:
+                    print(f'i : {i}, curr_posterior.shape: {curr_posterior.shape}')
+
+                # Update the axes appropriately:
+                _pagination_helper_plot_single_epoch_slice(curr_ax, self.params, self.plots_data, self.plots, self.ui, a_slice_idx=curr_slice_idxs, is_first_setup=False, debug_print=self.params.debug_print)
+
+                _temp_fig, curr_ax = plot_1D_most_likely_position_comparsions(self.plots_data.global_pos_df, ax=curr_ax, time_window_centers=curr_time_bins, variable_name=self.params.variable_name, xbin=self.params.xbin,
+                                                                posterior=curr_posterior,
+                                                                active_most_likely_positions_1D=curr_most_likely_positions,
+                                                                enable_flat_line_drawing=self.params.enable_flat_line_drawing, debug_print=self.params.debug_print)
+                if _temp_fig is not None:
+                    self.plots.fig = _temp_fig
+
+                curr_ax.set_xlim(*curr_epoch_slice)
+                curr_ax.set_title(f'') # needs to be set to empty string '' because this is the title that appears above each subplot/slice
+                # Update selections:
+                self.perform_update_ax_selected_state(ax=curr_ax, is_selected=self.params.is_selected.get(curr_slice_idxs, False))
+                curr_ax.set_visible(True)
+                
+            except IndexError as e:
+                # Occurs when there are more plots on the page than there are data to plot for that page (happens on the last page)
+                if self.params.debug_print:
+                    print(f'WARNING: exceeded data indicies (probably on last page).')
+                curr_ax.set_visible(False)
+
+            except Exception as e:
+                raise e
             
-            if self.params.debug_print:
-                print(f'i : {i}, curr_posterior.shape: {curr_posterior.shape}')
-
-            # Update the axes appropriately:
-            _pagination_helper_plot_single_epoch_slice(curr_ax, self.params, self.plots_data, self.plots, self.ui, a_slice_idx=curr_slice_idxs, is_first_setup=False, debug_print=self.params.debug_print)
-
-            _temp_fig, curr_ax = plot_1D_most_likely_position_comparsions(self.plots_data.global_pos_df, ax=curr_ax, time_window_centers=curr_time_bins, variable_name=self.params.variable_name, xbin=self.params.xbin,
-                                                            posterior=curr_posterior,
-                                                            active_most_likely_positions_1D=curr_most_likely_positions,
-                                                            enable_flat_line_drawing=self.params.enable_flat_line_drawing, debug_print=self.params.debug_print)
-            if _temp_fig is not None:
-                self.plots.fig = _temp_fig
-
-            curr_ax.set_xlim(*curr_epoch_slice)
-            curr_ax.set_title(f'') # needs to be set to empty string '' because this is the title that appears above each subplot/slice
-            # Update selections:
-            self.perform_update_ax_selected_state(ax=curr_ax, is_selected=self.params.is_selected.get(curr_slice_idxs, False))
 
         # # Update selection (could also do just in above loop):
         # self.perform_update_selections()
