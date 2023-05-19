@@ -48,7 +48,7 @@ from neuropy.core.session.dataSession import DataSession # for `pipeline_complet
 class JonathanFiringRateAnalysisResult:
     """ holds the outputs of `_perform_jonathan_replay_firing_rate_analyses` 
     Usage:
-        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.MultiContextComputationFunctions import JonathanFiringRateAnalysisResult
+        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.LongShortTrackComputations import JonathanFiringRateAnalysisResult
         jonathan_firing_rate_analysis_result = JonathanFiringRateAnalysisResult(**curr_active_pipeline.global_computation_results.computed_data.jonathan_firing_rate_analysis.to_dict())
         jonathan_firing_rate_analysis_result.neuron_replay_stats_df.to_clipboard()
     """
@@ -900,7 +900,7 @@ def _final_compute_jonathan_replay_fr_analyses(sess, replays_df, debug_print=Fal
         _type_: _description_
 
     Usage:
-            from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.MultiContextComputationFunctions import _final_compute_jonathan_replay_fr_analyses
+            from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.LongShortTrackComputations import _final_compute_jonathan_replay_fr_analyses
             ## Compute for all the session spikes first:
             sess = owning_pipeline_reference.sess
             # BAD DOn'T DO THIS:
