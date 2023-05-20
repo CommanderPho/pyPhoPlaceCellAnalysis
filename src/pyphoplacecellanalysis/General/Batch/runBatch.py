@@ -1,5 +1,6 @@
 import sys
 import os
+import pathlib
 from pathlib import Path
 import numpy as np
 import pandas as pd
@@ -54,6 +55,63 @@ class BatchRun:
     def session_contexts(self):
         """The session_contexts property."""
         return list(self.session_batch_status.keys())
+
+
+    @classmethod
+    def try_init_from_file(cls, global_data_root_parent_path, active_global_batch_result_filename='global_batch_result.pkl', debug_print:bool=False):
+        """ initialize from a saved .pkl file if possible, otherwise start fresh. """
+        assert global_data_root_parent_path.exists(), f"global_data_root_parent_path: {global_data_root_parent_path} does not exist! Is the right computer's config commented out above?"
+        ## Build Pickle Path:
+        finalized_loaded_global_batch_result_pickle_path = Path(global_data_root_parent_path).joinpath(active_global_batch_result_filename).resolve() # Use Default
+        def _try_load_global_batch_result():
+            """ load the batch result initially. 
+            Captures: finalized_loaded_global_batch_result_pickle_path, debug_print
+            """
+            if debug_print:
+                print(f'finalized_loaded_global_batch_result_pickle_path: {finalized_loaded_global_batch_result_pickle_path}')
+            # try to load an existing batch result:
+            try:
+                global_batch_run = loadData(finalized_loaded_global_batch_result_pickle_path, debug_print=debug_print)
+                
+            except NotImplementedError:
+                # Fixes issue with pickled POSIX_PATH on windows for path.
+                posix_backup = pathlib.PosixPath # backup the PosixPath definition
+                try:
+                    pathlib.PosixPath = pathlib.PurePosixPath
+                    global_batch_run = loadData(finalized_loaded_global_batch_result_pickle_path, debug_print=debug_print) # Fails this time if it still throws an error
+                finally:
+                    pathlib.PosixPath = posix_backup # restore the backup posix path definition
+                    
+            except (FileNotFoundError, TypeError):
+                # loading failed
+                print(f'Failure loading {finalized_loaded_global_batch_result_pickle_path}.')
+                global_batch_run = None
+                
+            return global_batch_run
+
+        ##
+
+        global_batch_run = _try_load_global_batch_result()
+        if global_batch_run is not None:
+            # One was loaded from file, meaning it has the potential to have the wrong paths. Check.
+            global_batch_run.change_global_root_path(global_data_root_parent_path) # Convert the paths to work on the new system:
+        else:
+            ## Completely fresh, run the initial (pre-loading) results.
+            # Build `global_batch_run` pre-loading results (before execution)
+            global_batch_run = run_diba_batch(global_data_root_parent_path, execute_all=False, extant_batch_run=global_batch_run, debug_print=False)
+            # print(f'global_batch_result: {global_batch_run}')
+            # Save `global_batch_run` to file:
+            saveData(finalized_loaded_global_batch_result_pickle_path, global_batch_run) # Update the global batch run dictionary
+
+        ## I got it doing the bare-minimum loading and computations, so it should be ready to update the laps and constrain the placefields to those. Then we should be able to set up the replays at the same time.
+        # finally, we then finish by computing.
+        assert global_batch_run is not None
+        return global_batch_run
+    
+
+
+
+
 
 
 
@@ -148,6 +206,20 @@ class BatchRun:
             print('no difference between provided and internal paths.')
 
 
+    def reset_session(self, curr_session_context: IdentifyingContext):
+        """ resets all progress, dumping the outputs, errors, etc. """
+        self.session_batch_status[curr_session_context] = SessionBatchProgress.NOT_STARTED # set to not started if not present
+        self.session_batch_errors[curr_session_context] = None # indicate that there are no errors to start
+        self.session_batch_outputs[curr_session_context] = None # indicate that there are no outputs to start
+
+
+
+
+
+
+# ==================================================================================================================== #
+# Global/Helper Functions                                                                                              #
+# ==================================================================================================================== #
 @function_attributes(short_name='run_diba_batch', tags=['batch', 'automated', 'kdiba'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-03-28 04:46')
 def run_diba_batch(global_data_root_parent_path: Path, execute_all:bool = False, extant_batch_run = None, debug_print:bool=False, post_run_callback_fn=None):
     """ 
@@ -204,6 +276,7 @@ def run_diba_batch(global_data_root_parent_path: Path, execute_all:bool = False,
                     active_batch_run.session_batch_basedirs[curr_session_context] = curr_session_basedir # use the current basedir if we're compute from this machine instead of loading a previous computed session
                     active_batch_run.session_batch_status[curr_session_context] = SessionBatchProgress.NOT_STARTED # set to not started if not present
                     active_batch_run.session_batch_errors[curr_session_context] = None # indicate that there are no errors to start
+                    active_batch_run.session_batch_outputs[curr_session_context] = None # indicate that there are no outputs to start
 
                     ## TODO: 2023-03-14 - Kick off computation?
                     if execute_all:
