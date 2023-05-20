@@ -58,7 +58,7 @@ class BatchRun:
 
 
     @classmethod
-    def try_init_from_file(cls, global_data_root_parent_path, active_global_batch_result_filename='global_batch_result.pkl', on_needs_create_callback_fn=None, debug_print:bool=False):
+    def try_init_from_file(cls, global_data_root_parent_path, active_global_batch_result_filename='global_batch_result.pkl', debug_print:bool=False):
         """ initialize from a saved .pkl file if possible, otherwise start fresh by calling `on_needs_create_callback_fn`.
 
             `on_needs_create_callback_fn`: (global_data_root_parent_path: Path, execute_all:bool = False, extant_batch_run = None, debug_print:bool=False, post_run_callback_fn=None) -> BatchRun: Build `global_batch_run` pre-loading results (before execution)
@@ -101,9 +101,9 @@ class BatchRun:
         else:
             ## Completely fresh, run the initial (pre-loading) results.
             # Build `global_batch_run` pre-loading results (before execution)
-            assert on_needs_create_callback_fn is not None
+            # assert on_needs_create_callback_fn is not None
             
-            global_batch_run = on_needs_create_callback_fn(global_data_root_parent_path, execute_all=False, extant_batch_run=global_batch_run, debug_print=False)
+            global_batch_run = run_diba_batch(global_data_root_parent_path, execute_all=False, extant_batch_run=global_batch_run, debug_print=False)
             # print(f'global_batch_result: {global_batch_run}')
             # Save `global_batch_run` to file:
             saveData(finalized_loaded_global_batch_result_pickle_path, global_batch_run) # Update the global batch run dictionary

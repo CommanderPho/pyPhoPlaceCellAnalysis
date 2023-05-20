@@ -310,9 +310,9 @@ class LongShortTrackComputations(AllFunctionEnumeratingMixin, metaclass=Computat
                 new_pbe_epochs = _compute_custom_PBEs(sess)
             """
             print('computing PBE epochs for session...\n')
-            old_default_parameters = dict(sigma=0.02, thresh=(0, 3), min_dur=0.1, merge_dur=0.01, max_dur=1.0) # Default
-            old_kamran_parameters = dict(sigma=0.02, thresh=(0, 1.5), min_dur=0.06, merge_dur=0.06, max_dur=2.3) # Kamran's Parameters
-            new_papers_parameters = dict(sigma=0.030, thresh=(0, 1.5), min_dur=0.030, merge_dur=0.100, max_dur=0.300) # NewPaper's Parameters
+            old_default_parameters = DynamicParameters(sigma=0.02, thresh=(0, 3), min_dur=0.1, merge_dur=0.01, max_dur=1.0) # Default
+            old_kamran_parameters = DynamicParameters(sigma=0.02, thresh=(0, 1.5), min_dur=0.06, merge_dur=0.06, max_dur=2.3) # Kamran's Parameters
+            new_papers_parameters = DynamicParameters(sigma=0.030, thresh=(0, 1.5), min_dur=0.030, merge_dur=0.100, max_dur=0.300) # NewPaper's Parameters
             
             new_pbe_epochs = sess.compute_pbe_epochs(sess, active_parameters=new_papers_parameters) # NewPaper's Parameters # , **({'thresh': (0, 1.5), 'min_dur': 0.03, 'merge_dur': 0.1, 'max_dur': 0.3} | kwargs)
             return new_pbe_epochs
