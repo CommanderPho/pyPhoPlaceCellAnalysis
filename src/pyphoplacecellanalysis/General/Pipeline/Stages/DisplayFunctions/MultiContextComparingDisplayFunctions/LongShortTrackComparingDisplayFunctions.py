@@ -16,6 +16,7 @@ from neuropy.core.neurons import NeuronType
 
 from pyphocorehelpers.function_helpers import function_attributes
 from pyphocorehelpers.programming_helpers import metadata_attributes
+from pyphocorehelpers.indexing_helpers import Paginator
 
 from pyphocorehelpers.DataStructure.general_parameter_containers import VisualizationParameters, RenderPlotsData, RenderPlots
 from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer
@@ -30,7 +31,7 @@ from pyphoplacecellanalysis.GUI.Qt.Mixins.PaginationMixins import PaginatedFigur
 from pyphoplacecellanalysis.Pho2D.matplotlib.CustomMatplotlibWidget import CustomMatplotlibWidget # used by RateRemappingPaginatedFigureController
 import pyphoplacecellanalysis.External.pyqtgraph as pg
 
-from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.MultiContextComputationFunctions import make_fr
+from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.LongShortTrackComputations import make_fr
 from pyphoplacecellanalysis.General.Mixins.CrossComputationComparisonHelpers import _compare_computation_results, _find_any_context_neurons, build_neurons_color_map # for plot_short_v_long_pf1D_comparison
 from pyphoplacecellanalysis.General.Mixins.CrossComputationComparisonHelpers import build_replays_custom_scatter_markers, CustomScatterMarkerMode # used in _make_pho_jonathan_batch_plots
 from pyphoplacecellanalysis.General.Mixins.CrossComputationComparisonHelpers import _build_neuron_type_distribution_color # used in _make_pho_jonathan_batch_plots
@@ -1198,6 +1199,7 @@ def _helper_add_long_short_session_indicator_regions(win, long_epoch, short_epoc
     short_epoch_indicator_region_items = build_pyqtgraph_epoch_indicator_regions(win, t_start=short_epoch.t_start, t_stop=short_epoch.t_stop, **short_epoch_config)
     return long_epoch_indicator_region_items, short_epoch_indicator_region_items
 
+
 @function_attributes(short_name='plot_long_short_expected_vs_observed_firing_rates', tags=['pyqtgraph','long_short'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-03-28 17:26')
 def plot_long_short_expected_vs_observed_firing_rates(long_results_obj, short_results_obj, limit_aclus=None):
     """ 2023-03-28 4:30pm - Expected vs. Observed Firing Rates for each cell and each epoch 
@@ -1584,6 +1586,20 @@ class RateRemappingPaginatedFigureController(PaginatedFigureController):
     
     @classmethod
     def init_from_paginator(cls, a_paginator, a_name:str = 'RateRemappingPaginatedFigureController', plot_function_name='plot_rr_aclu', active_context=None):
+        """ 
+        Usage:
+
+            from pyphocorehelpers.indexing_helpers import Paginator
+            from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.MultiContextComparingDisplayFunctions.LongShortTrackComparingDisplayFunctions import RateRemappingPaginatedFigureController
+            ## Paginated multi-plot
+            # Provide a tuple or list containing equally sized sequences of items:
+            a_paginator = Paginator.init_from_data((rr_aclus, rr_laps, rr_replays, rr_neuron_type), max_num_columns=1, max_subplots_per_page=20, data_indicies=None, last_figure_subplots_same_layout=False)
+
+            ## Build GUI components:
+            active_identifying_session_ctx = curr_active_pipeline.sess.get_context()
+            _out_rr_pagination_controller = RateRemappingPaginatedFigureController.init_from_paginator(a_paginator, a_name='TestRateRemappingPaginatedFigureController', active_context=active_identifying_session_ctx)
+
+        """
         new_obj = cls(params=VisualizationParameters(name=a_name), plots_data=RenderPlotsData(name=a_name, paginator=a_paginator), plots=RenderPlots(name=a_name), ui=PhoUIContainer(name=a_name, connections=PhoUIContainer(name=a_name)))
         # new_obj.ui.connections = PhoUIContainer(name=name)
         num_slices = a_paginator.max_num_items_per_page
@@ -1604,6 +1620,31 @@ class RateRemappingPaginatedFigureController(PaginatedFigureController):
         new_obj.initialize()
         return new_obj
     
+
+    @classmethod
+    def init_from_rr_data(cls, rr_aclus, rr_laps, rr_replays, rr_neuron_type, max_subplots_per_page:int=20, a_name:str = 'RateRemappingPaginatedFigureController', plot_function_name='plot_rr_aclu', active_context=None):
+        """ initializes directly from the rate-remapping data arrays. Builds the paginator.
+        
+        The Paginator can be accessed via `self.plots_data.paginator` if needed.
+        
+        Usage:
+        
+            from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.MultiContextComparingDisplayFunctions.LongShortTrackComparingDisplayFunctions import RateRemappingPaginatedFigureController
+
+            ## Paginated multi-plot
+            active_identifying_session_ctx = curr_active_pipeline.sess.get_context()
+            _out_rr_pagination_controller = RateRemappingPaginatedFigureController.init_from_rr_data(rr_aclus, rr_laps, rr_replays, rr_neuron_type, max_subplots_per_page=20, a_name='TestRateRemappingPaginatedFigureController', active_context=active_identifying_session_ctx)
+            a_paginator = _out_rr_pagination_controller.plots_data.paginator
+        """
+        ## Paginated multi-plot
+        a_paginator = Paginator.init_from_data((rr_aclus, rr_laps, rr_replays, rr_neuron_type), max_num_columns=1, max_subplots_per_page=max_subplots_per_page, data_indicies=None, last_figure_subplots_same_layout=False)
+
+        ## Build GUI components:
+        new_obj = cls.init_from_paginator(a_paginator, a_name=a_name, plot_function_name=plot_function_name, active_context=active_context)
+        return new_obj
+    
+
+
 
     def configure(self, **kwargs):
         """ assigns and computes needed variables for rendering. """
@@ -1654,7 +1695,7 @@ class RateRemappingPaginatedFigureController(PaginatedFigureController):
 
     def on_paginator_control_widget_jump_to_page(self, page_idx: int):
         """ Update captures `a_paginator`, 'mw' """
-        from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.LongShortTrackComparingDisplayFunctions.LongShortTrackComparingDisplayFunctions import plot_rr_aclu
+        from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.MultiContextComparingDisplayFunctions.LongShortTrackComparingDisplayFunctions import plot_rr_aclu
         from pyphoplacecellanalysis.General.Mixins.ExportHelpers import build_figure_basename_from_display_context, session_context_to_relative_path
 
         # print(f'on_paginator_control_widget_jump_to_page(page_idx: {page_idx})')

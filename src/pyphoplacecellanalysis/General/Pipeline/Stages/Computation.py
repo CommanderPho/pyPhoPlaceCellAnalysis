@@ -5,17 +5,21 @@ from typing import Optional
 from warnings import warn
 import numpy as np
 import pandas as pd
+from pathlib import Path
+from enum import Enum # for EvaluationActions
+
 
 # NeuroPy (Diba Lab Python Repo) Loading
 from neuropy import core
 from neuropy.analyses.placefields import PlacefieldComputationParameters, perform_compute_placefields
-
-from pyphocorehelpers.DataStructure.dynamic_parameters import DynamicParameters # to replace simple PlacefieldComputationParameters
+from pyphocorehelpers.DataStructure.dynamic_parameters import DynamicParameters # to replace simple PlacefieldComputationParameters, `load_pickled_global_computation_results`
 from pyphocorehelpers.function_helpers import compose_functions, compose_functions_with_error_handling
 
 from pyphoplacecellanalysis.General.Pipeline.Stages.BaseNeuropyPipelineStage import BaseNeuropyPipelineStage, PipelineStage
 from pyphoplacecellanalysis.General.Pipeline.Stages.Filtering import FilterablePipelineStage
-from pyphoplacecellanalysis.General.Pipeline.Stages.Loading import LoadableInput, LoadableSessionInput, LoadedPipelineStage    
+from pyphoplacecellanalysis.General.Pipeline.Stages.Loading import LoadableInput, LoadableSessionInput, LoadedPipelineStage
+from pyphoplacecellanalysis.General.Pipeline.Stages.Loading import loadData # used for `load_pickled_global_computation_results`
+from pyphoplacecellanalysis.General.Pipeline.Stages.Loading import saveData # used for `save_global_computation_results`
 from pyphoplacecellanalysis.General.Model.ComputationResults import ComputationResult
 
 import pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions
@@ -25,7 +29,7 @@ from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiCo
 
 from pyphocorehelpers.print_helpers import CapturedException # used in _execute_computation_functions for error handling
 
-from enum import Enum # for EvaluationActions
+
 
 class EvaluationActions(Enum):
     """An enum specifying the available commands that can be performed in the ComputedPipelineStage in regards to computations. Allows generalizing a previously confusing set of functions."""
@@ -865,3 +869,33 @@ class PipelineWithComputedPipelineStageMixin:
 
         # print(f'\tpost keys: {list(self.active_configs.keys())}')
 
+    def get_output_path(self) -> Path:
+        """ returns the appropriate output path to store the outputs for this session. Usually '$session_folder/outputs/' """
+        return self.sess.get_output_path()
+
+    @property
+    def global_computation_results_pickle_path(self) -> Path:
+        """ The path to pickle the global_computation_results """
+        return self.get_output_path().joinpath(f'global_computation_results.pkl').resolve()
+
+    ## Global Computation Result Persistance Hacks:
+    def save_global_computation_results(self):
+        """Save out the `global_computation_results` which are not currently saved with the pipeline
+        Usage:
+            curr_active_pipeline.save_global_computation_results()
+        """
+        print(f'global_computation_results_pickle_path: {self.global_computation_results_pickle_path}')
+        saveData(self.global_computation_results_pickle_path, (self.global_computation_results.to_dict()))
+
+    def load_pickled_global_computation_results(self, override_global_computation_results_pickle_path=None):
+        """ loads the previously pickled `global_computation_results` into `self.global_computation_results`, replacing the current values.
+        Usage:
+            curr_active_pipeline.load_pickled_global_computation_results()
+        """
+        if override_global_computation_results_pickle_path is None:
+            # Use the default if no override is provided.
+            global_computation_results_pickle_path = self.global_computation_results_pickle_path
+        else:
+            global_computation_results_pickle_path = override_global_computation_results_pickle_path
+        loaded_global_computation_results = DynamicParameters(**loadData(global_computation_results_pickle_path))
+        self.stage.global_computation_results = loaded_global_computation_results # TODO 2023-05-19 - Merge results instead of replacing. Requires checking parameters.
