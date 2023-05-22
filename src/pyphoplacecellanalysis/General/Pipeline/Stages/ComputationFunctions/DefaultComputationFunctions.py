@@ -70,11 +70,14 @@ class DefaultComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Computa
         try:
             computation_result.sess.replace_session_laps_with_estimates(**lap_estimation_parameters, should_plot_laps_2d=False) # , time_variable_name=None
         except AssertionError as e:
-            
-            pass
+            print(f'RAISE - Laps Computation Assertion Error: {e}')
+            raise e
         except Exception as e:
             raise e
-        # filtered_laps = Epoch.filter_epochs(session.laps.as_epoch_obj(), pos_df=session.position.to_dataframe(), spikes_df=session.spikes_df, min_epoch_included_duration=1.0, max_epoch_included_duration=10.0, maximum_speed_thresh=None, min_num_unique_aclu_inclusions=3)
+        # filtered_laps = Epoch.filter_epochs(session.laps.as_epoch_obj(), pos_df=session.position.to_dataframe(), spikes_df=session.spikes_df, min_epoch_included_duration=1.0, max_epoch_included_duration=30.0, maximum_speed_thresh=None, min_num_unique_aclu_inclusions=3)
+        ## Apply the laps as the limiting computation epochs:
+        computation_result.computation_config.pf_params.computation_epochs = computation_result.sess.laps.as_epoch_obj().get_non_overlapping().filtered_by_duration(1.0, 30.0)
+        
 
 
         # ## TODO 2023-05-19 - FIX SLOPPY PBE HANDLING
