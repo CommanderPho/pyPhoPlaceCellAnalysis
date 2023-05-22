@@ -32,6 +32,49 @@ class DefaultComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Computa
     _computationPrecidence = 1 # must be done after PlacefieldComputations
     _is_global = False
 
+    def _perform_estimated_epochs_computation(computation_result: ComputationResult, **kwargs):
+        """ Discovers the relevant epochs for computation, such as PBEs, Laps, Replays, Ripples, etc.
+            
+        """
+        placefield_computation_config = computation_result.computation_config.pf_params # should be a PlacefieldComputationParameters
+        
+        new_papers_PBEs_parameters = dict(sigma=0.030, thresh=(0, 1.5), min_dur=0.030, merge_dur=0.100, max_dur=0.300) # NewPaper's Parameters
+        replay_estimation_parameters = dict(require_intersecting_epoch=None, min_epoch_included_duration=0.06, max_epoch_included_duration=None, maximum_speed_thresh=None, min_inclusion_fr_active_thresh=0.01, min_num_unique_aclu_inclusions=3)
+        
+        # Write the parameters:
+        computation_result.computation_config['epoch_compute_parameters'] = {'PBEs': new_papers_PBEs_parameters,
+            'replays': replay_estimation_parameters
+        }
+
+        ## Allow saving the input/output results:
+        # prev_output_result.computed_data['computed_epochs'] = 
+
+        # 2023-05-16 - Laps conformance function (TODO 2023-05-16 - factor out?)
+        try:
+            computation_result.sess.replace_session_laps_with_estimates(N=20, should_backup_extant_laps_obj=True, should_plot_laps_2d=False) # , time_variable_name=None
+        except AssertionError as e:
+            
+            pass
+        except Exception as e:
+            raise e
+        # filtered_laps = Epoch.filter_epochs(session.laps.as_epoch_obj(), pos_df=session.position.to_dataframe(), spikes_df=session.spikes_df, min_epoch_included_duration=1.0, max_epoch_included_duration=10.0, maximum_speed_thresh=None, min_num_unique_aclu_inclusions=3)
+
+
+        # ## TODO 2023-05-19 - FIX SLOPPY PBE HANDLING
+        # ## Get PBEs first:
+        new_pbe_epochs = computation_result.sess.compute_pbe_epochs(computation_result.sess, active_parameters=new_papers_PBEs_parameters)
+        computation_result.sess.pbe = new_pbe_epochs
+
+        # 2023-05-16 - Replace loaded replays (which are bad) with estimated ones:
+        # num_pre = session.replay.
+        computation_result.sess.replace_session_replays_with_estimates(**replay_estimation_parameters) # TODO: set requirements here?
+        # sess.replace_session_replays_with_estimates(**dict(require_intersecting_epoch=sess.ripple, min_epoch_included_duration=0.06, max_epoch_included_duration=None, maximum_speed_thresh=None, min_inclusion_fr_active_thresh=0.01, min_num_unique_aclu_inclusions=3)) # TODO: set requirements here?
+        
+        return computation_result
+
+
+
+
     def _perform_position_decoding_computation(computation_result: ComputationResult, **kwargs):
         """ Builds the 1D & 2D Placefield Decoder 
         
@@ -192,7 +235,7 @@ class DefaultComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Computa
         ## New 2022-09-15 direct neuropy.utils.mixins.binning_helpers.build_df_discretized_binned_position_columns version:
         computation_result.sess.position.df, (xbin, ybin), bin_infos = build_df_discretized_binned_position_columns(computation_result.sess.position.df, bin_values=(prev_one_step_bayesian_decoder.xbin_centers, prev_one_step_bayesian_decoder.ybin_centers), active_computation_config=computation_result.computation_config.pf_params, force_recompute=False, debug_print=debug_print)
         active_xbins = xbin
-        active_ybins = ybin      
+        active_ybins = ybin
 
         computation_result.computed_data[two_step_decoder_key] = _subfn_compute_two_step_decoder(active_xbins, active_ybins, prev_one_step_bayesian_decoder, computation_result.sess.position.df, computation_config=computation_result.computation_config, debug_print=debug_print)
         ## In this new mode we'll add the two-step properties to the original one-step decoder:
