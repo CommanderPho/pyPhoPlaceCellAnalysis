@@ -5,7 +5,7 @@ class LoadFunctionRegistryHolder(RegistryHolder):
     REGISTRY: Dict[str, "LoadFunctionRegistryHolder"] = {}
     
 
-""" LoadPipelineStage
+""" LoadedPipelineStage
 
 	self.registered_computation_function_dict = computed_stage.registered_computation_function_dict
 	self.registered_global_computation_function_dict = computed_stage.registered_global_computation_function_dict
@@ -38,7 +38,7 @@ class LoadFunctionRegistryHolder(RegistryHolder):
         
 """
 
-""" PipelineWithLoadPipelineStageMixin
+""" PipelineWithLoadableStage
 
     ## *_functions
     @property
