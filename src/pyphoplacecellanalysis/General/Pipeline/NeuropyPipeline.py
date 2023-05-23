@@ -39,7 +39,6 @@ from qtpy import QtCore, QtWidgets, QtGui
 
 # Pipeline Logging:
 import logging
-# from pyphoplacecellanalysis.General.Pipeline.Stages.BaseNeuropyPipelineStage import pipeline_module_logger
 from pyphocorehelpers.print_helpers import build_module_logger
 pipeline_module_logger = build_module_logger('Spike3D.pipeline')
 

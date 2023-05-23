@@ -67,7 +67,7 @@ filters should be checkable to express whether we want to build that one or not
 
 @define(slots=False)
 class NonInteractiveWrapper(object):
-    """A wrapper class that performs a non-interactive version of the jupyter-lab notebook for loading and processing the pipeline. """
+    """A wrapper class that performs a non-interactive version of the jupyter-lab notebook for use with the custom `PipelineComputationsNode` and `PipelineFilteringDataNote` Flowchart Notes: enables loading and processing the pipeline. """
     enable_saving_to_disk:bool = False
     common_parent_foldername:Path = Path(r'C:\Users\pho\repos\PhoPy3DPositionAnalysis2021\output')
    

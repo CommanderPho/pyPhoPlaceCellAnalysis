@@ -1,17 +1,11 @@
 import sys
 import os
+import neptune # for logging progress and results
 import pathlib
 from pathlib import Path
 import numpy as np
 import pandas as pd
 from copy import deepcopy
-
-# required to enable non-blocking interaction:
-# %gui qt5
-
-# Pho's Formatting Preferences
-# from pyphocorehelpers.preferences_helpers import set_pho_preferences, set_pho_preferences_concise, set_pho_preferences_verbose
-# set_pho_preferences_concise()
 
 ## Pho's Custom Libraries:
 from pyphocorehelpers.Filesystem.path_helpers import find_first_extant_path
@@ -35,7 +29,6 @@ from pyphoplacecellanalysis.General.Batch.NonInteractiveWrapper import batch_loa
 from pyphoplacecellanalysis.General.Pipeline.NeuropyPipeline import PipelineSavingScheme
 from pyphoplacecellanalysis.General.Pipeline.Stages.Loading import saveData, loadData
 
-# TODO 2023-03-14 08:18: - [ ] Better/extant tool for enabling batch processing?
 from attrs import define, field, Factory
 
 @define(slots=False)
@@ -59,7 +52,7 @@ class BatchRun:
 
     @classmethod
     def try_init_from_file(cls, global_data_root_parent_path, active_global_batch_result_filename='global_batch_result.pkl', debug_print:bool=False):
-        """ initialize from a saved .pkl file if possible, otherwise start fresh by calling `on_needs_create_callback_fn`.
+        """ Loads from a previously saved .pkl file if possible, otherwise start fresh by calling `on_needs_create_callback_fn`.
 
             `on_needs_create_callback_fn`: (global_data_root_parent_path: Path, execute_all:bool = False, extant_batch_run = None, debug_print:bool=False, post_run_callback_fn=None) -> BatchRun: Build `global_batch_run` pre-loading results (before execution)
         """
@@ -114,35 +107,7 @@ class BatchRun:
         return global_batch_run
 
 
-    ## Add detected laps/replays to the batch_progress_df:
-    @classmethod
-    def build_batch_lap_replay_counts_df(cls, global_batch_run):
-        """ returns lap_replay_counts_df """
-        out_counts = []
-        out_new_column_names = ['n_long_laps', 'n_long_replays', 'n_short_laps', 'n_short_replays']
-        for ctx, output_v in global_batch_run.session_batch_outputs.items():
-            if output_v is not None:
-                # {long_epoch_name:(long_laps, long_replays), short_epoch_name:(short_laps, short_replays)}
-                (long_laps, long_replays), (short_laps, short_replays) = output_v.values()
-                out_counts.append((long_laps.n_epochs, long_replays.n_epochs, short_laps.n_epochs, short_replays.n_epochs))
-            else:
-                out_counts.append((0, 0, 0, 0))
-        return pd.DataFrame.from_records(out_counts, columns=out_new_column_names)
-                
 
-
-    @classmethod
-    def post_load_find_usable_sessions(cls, batch_progress_df, min_required_replays_or_laps=5):
-        """ updates batch_progress_df['is_ready'] and returns only the good frames. """
-        has_no_errors = np.array([(an_err_v is None) for an_err_v in batch_progress_df['errors'].to_numpy()])
-        has_required_laps_and_replays = np.all((batch_progress_df[['n_long_laps','n_long_replays','n_short_laps','n_short_replays']].to_numpy() >= min_required_replays_or_laps), axis=1)
-        ## Adds 'is_ready' to the dataframe to indicate that all required properties are intact and that it's ready to process further:
-        batch_progress_df['is_ready'] = np.logical_and(has_no_errors, has_required_laps_and_replays) # Add 'is_ready' column
-        good_batch_progress_df = deepcopy(batch_progress_df)
-        good_batch_progress_df = good_batch_progress_df[good_batch_progress_df['is_ready']]
-        return good_batch_progress_df
-        
-    
 
     
     def to_dataframe(self, expand_context:bool=True, good_only:bool=False):
@@ -179,6 +144,7 @@ class BatchRun:
 
     # Main functionality _________________________________________________________________________________________________ #
     def execute_session(self, session_context, post_run_callback_fn=None, **kwargs):
+        """ calls `run_specific_batch(...)` to actually execute the session's run. """
         curr_session_status = self.session_batch_status[session_context]
         if curr_session_status != SessionBatchProgress.COMPLETED:
                 curr_session_basedir = self.session_batch_basedirs[session_context]
@@ -188,7 +154,9 @@ class BatchRun:
 
     def execute_all(self, **kwargs):
         for curr_session_context, curr_session_status in self.session_batch_status.items():
-            self.execute_session(curr_session_context, **kwargs) # evaluate a single session
+            with neptune.init_run() as run:
+                run[f"session/{curr_session_context}"] = curr_session_status
+                self.execute_session(curr_session_context, **kwargs) # evaluate a single session
 
 
     # Updating ___________________________________________________________________________________________________________ #
@@ -212,6 +180,36 @@ class BatchRun:
         self.session_batch_outputs[curr_session_context] = None # indicate that there are no outputs to start
 
 
+    # Class/Static Functions _____________________________________________________________________________________________ #
+    ## Add detected laps/replays to the batch_progress_df:
+    @classmethod
+    def build_batch_lap_replay_counts_df(cls, global_batch_run):
+        """ returns lap_replay_counts_df """
+        out_counts = []
+        out_new_column_names = ['n_long_laps', 'n_long_replays', 'n_short_laps', 'n_short_replays']
+        for ctx, output_v in global_batch_run.session_batch_outputs.items():
+            if output_v is not None:
+                # {long_epoch_name:(long_laps, long_replays), short_epoch_name:(short_laps, short_replays)}
+                (long_laps, long_replays), (short_laps, short_replays) = output_v.values()
+                out_counts.append((long_laps.n_epochs, long_replays.n_epochs, short_laps.n_epochs, short_replays.n_epochs))
+            else:
+                out_counts.append((0, 0, 0, 0))
+        return pd.DataFrame.from_records(out_counts, columns=out_new_column_names)
+                
+
+
+    @classmethod
+    def post_load_find_usable_sessions(cls, batch_progress_df, min_required_replays_or_laps=5):
+        """ updates batch_progress_df['is_ready'] and returns only the good frames. """
+        has_no_errors = np.array([(an_err_v is None) for an_err_v in batch_progress_df['errors'].to_numpy()])
+        has_required_laps_and_replays = np.all((batch_progress_df[['n_long_laps','n_long_replays','n_short_laps','n_short_replays']].to_numpy() >= min_required_replays_or_laps), axis=1)
+        ## Adds 'is_ready' to the dataframe to indicate that all required properties are intact and that it's ready to process further:
+        batch_progress_df['is_ready'] = np.logical_and(has_no_errors, has_required_laps_and_replays) # Add 'is_ready' column
+        good_batch_progress_df = deepcopy(batch_progress_df)
+        good_batch_progress_df = good_batch_progress_df[good_batch_progress_df['is_ready']]
+        return good_batch_progress_df
+        
+    
 
 
 
