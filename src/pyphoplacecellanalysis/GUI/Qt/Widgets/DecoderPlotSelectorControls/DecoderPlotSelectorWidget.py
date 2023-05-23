@@ -3,13 +3,7 @@
 import pyphoplacecellanalysis.External.pyqtgraph as pg
 from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtCore, QtGui, QtWidgets, mkQApp
 
-## Matplotlib Imports:
-import matplotlib as mpl
-mpl.use('Qt5Agg')
-# For Matplotlib figures in the GUI:
-from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
-import matplotlib.pyplot as plt
-from matplotlib.figure import Figure
+
 
 from pyphocorehelpers.DataStructure.general_parameter_containers import VisualizationParameters, RenderPlotsData, RenderPlots
 from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer
@@ -78,10 +72,7 @@ class DecoderPlotSelectorWidget(QtWidgets.QWidget):
         self.ui.cmbVariableName.currentTextChanged.connect(self.onSelectedVariableNameChanged)
         
         
-        # widget that the actual plot will be contained in
-        # self.ui.decoderPlotContainerWidget 
-        
-        
+        # widget that the actual plot will be contained in        
         # self.ui.decoderPlotContainerWidget.layout().addWidget(self.resultplot_figureCanvas)
         # self.ui.fig_container_layout_widget = pg.LayoutWidget(parent=self.ui.decoderPlotContainerWidget)
         
@@ -97,6 +88,15 @@ class DecoderPlotSelectorWidget(QtWidgets.QWidget):
         
     def _setup_matplotlib_mode(self):
         """ sets up the widget for matplot-style plotting """
+        ## Matplotlib Imports:
+        import matplotlib as mpl
+        mpl.use('Qt5Agg')
+        mpl.use('AGG') # non-interactive backend
+        
+        # For Matplotlib figures in the GUI:
+        from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
+        from matplotlib.figure import Figure
+        
         self.resultplot_figureCanvas = FigureCanvas(Figure(figsize=(15,15), constrained_layout=True))
         self.ui.fig_container_layout_widget.addWidget(self.resultplot_figureCanvas)
         fig = self.resultplot_figureCanvas.figure
