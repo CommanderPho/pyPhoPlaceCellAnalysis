@@ -733,7 +733,7 @@ def _plot_general_all_spikes(ax_activity_v_time, active_spikes_df, time_variable
     return ax_activity_v_time
 
 
-@function_attributes(short_name='_plot_pho_jonathan_batch_plot_single_cell', tags=['private'], input_requires=[], output_provides=[], uses=['plot_1D_placecell_validation', '_temp_draw_jonathan_ax', '_plot_general_all_spikes'], used_by=['_make_pho_jonathan_batch_plots'], creation_date='2023-04-11 08:06')
+@function_attributes(short_name='_plot_pho_jonathan_batch_plot_single_cell', tags=['private', 'matplotlib'], input_requires=[], output_provides=[], uses=['plot_1D_placecell_validation', '_temp_draw_jonathan_ax', '_plot_general_all_spikes'], used_by=['_make_pho_jonathan_batch_plots'], creation_date='2023-04-11 08:06')
 def _plot_pho_jonathan_batch_plot_single_cell(t_split, time_bins, unit_specific_time_binned_firing_rates, pf1D_all, rdf_aclu_to_idx, rdf, irdf, show_inter_replay_frs, pf1D_aclu_to_idx, aclu, curr_fig, colors, debug_print=False, **kwargs):
     """ Plots a single cell's plots for a stacked Jonathan-style firing-rate-across-epochs-plot
     Internally calls `plot_1D_placecell_validation`, `_temp_draw_jonathan_ax`, and `_plot_general_all_spikes`
@@ -825,7 +825,7 @@ def _plot_pho_jonathan_batch_plot_single_cell(t_split, time_bins, unit_specific_
     return {'firing_rate':curr_ax_firing_rate, 'lap_spikes': curr_ax_lap_spikes, 'placefield': curr_ax_placefield, 'labels': curr_ax_cell_label}
 
 
-@function_attributes(short_name='_make_pho_jonathan_batch_plots', tags=['private'], input_requires=[], output_provides=[], uses=['_plot_pho_jonathan_batch_plot_single_cell', 'build_replays_custom_scatter_markers', '_build_neuron_type_distribution_color'], used_by=[], creation_date='2023-04-11 08:06')
+@function_attributes(short_name='_make_pho_jonathan_batch_plots', tags=['private', 'matplotlib'], input_requires=[], output_provides=[], uses=['_plot_pho_jonathan_batch_plot_single_cell', 'build_replays_custom_scatter_markers', '_build_neuron_type_distribution_color'], used_by=[], creation_date='2023-04-11 08:06')
 def _make_pho_jonathan_batch_plots(t_split, time_bins, neuron_replay_stats_df, unit_specific_time_binned_firing_rates, pf1D_all, aclu_to_idx, rdf, irdf, show_inter_replay_frs=False, included_unit_neuron_IDs=None, marker_split_mode=CustomScatterMarkerMode.TriSplit, n_max_plot_rows:int=4, debug_print=False, **kwargs):
     """ Stacked Jonathan-style firing-rate-across-epochs-plot
     Internally calls `_plot_pho_jonathan_batch_plot_single_cell`
@@ -857,15 +857,10 @@ def _make_pho_jonathan_batch_plots(t_split, time_bins, neuron_replay_stats_df, u
 
     actual_num_subfigures = min(len(included_unit_neuron_IDs), n_max_plot_rows) # only include the possible rows 
 
-
-
     ## Figure Setup:
     fig = build_or_reuse_figure(fignum=kwargs.pop('fignum', None), fig=kwargs.pop('fig', None), fig_idx=kwargs.pop('fig_idx', 0), figsize=kwargs.pop('figsize', (10, 4)), dpi=kwargs.pop('dpi', None), constrained_layout=True) # , clear=True
     # fig = plt.figure(constrained_layout=True, figsize=(10, 4))
     subfigs = fig.subfigures(actual_num_subfigures, 1, wspace=0.07)
-
-    
-
     ##########################
 
     rdf, (_percent_long_only, _percent_shared, _percent_short_only, _percent_short_long_diff) = _build_neuron_type_distribution_color(rdf)
