@@ -271,7 +271,7 @@ class LongShortTrackComputations(AllFunctionEnumeratingMixin, metaclass=Computat
             ['sess']
             
         Provides:
-            computation_result.computed_data['long_short_fr_indicies_analysis']
+            global_computation_results.computed_data['long_short_fr_indicies_analysis']
                 ['long_short_fr_indicies_analysis']['short_long_neurons_diff']
                 ['long_short_fr_indicies_analysis']['poly_overlap_df']
         
@@ -749,7 +749,7 @@ def _compute_long_short_firing_rate_indicies(spikes_df, long_laps, long_replays,
 
     """
     assert short_laps.n_epochs > 0, f"No short laps!\t long: (laps: {long_laps.n_epochs > 0}, replays: {long_replays.n_epochs}), \t short: (laps: {short_laps.n_epochs}, replays: {short_replays.n_epochs})"
-    assert long_laps.n_epochs > 0, "No long laps!\t long: (laps: {long_laps.n_epochs > 0}, replays: {long_replays.n_epochs}), \t short: (laps: {short_laps.n_epochs}, replays: {short_replays.n_epochs})"
+    assert long_laps.n_epochs > 0, f"No long laps!\t long: (laps: {long_laps.n_epochs > 0}, replays: {long_replays.n_epochs}), \t short: (laps: {short_laps.n_epochs}, replays: {short_replays.n_epochs})"
     assert long_replays.n_epochs > 0, f"No short replays!\t long: (laps: {long_laps.n_epochs > 0}, replays: {long_replays.n_epochs}), \t short: (laps: {short_laps.n_epochs}, replays: {short_replays.n_epochs})"
     assert short_replays.n_epochs > 0, f"No long replays!\t long: (laps: {long_laps.n_epochs > 0}, replays: {long_replays.n_epochs}), \t short: (laps: {short_laps.n_epochs}, replays: {short_replays.n_epochs})"
 
@@ -826,29 +826,10 @@ def pipeline_complete_compute_long_short_fr_indicies(curr_active_pipeline, temp_
     # Get existing laps from session:
     # long_laps, short_laps, global_laps = [curr_active_pipeline.filtered_sessions[an_epoch_name].laps.as_epoch_obj() for an_epoch_name in [long_epoch_name, short_epoch_name, global_epoch_name]]
     long_laps, short_laps, global_laps = [Epoch.filter_epochs(curr_active_pipeline.filtered_sessions[an_epoch_name].laps.as_epoch_obj(), pos_df=curr_active_pipeline.filtered_sessions[an_epoch_name].position.to_dataframe(), spikes_df=curr_active_pipeline.filtered_sessions[an_epoch_name].spikes_df, min_epoch_included_duration=1.0, max_epoch_included_duration=30.0, maximum_speed_thresh=None, min_num_unique_aclu_inclusions=3) for an_epoch_name in [long_epoch_name, short_epoch_name, global_epoch_name]]
-
     # TODO 2023-04-11 - Note this doesn't assign these filtered laps objects to the session or anything yet, it just returns them.
 
     # Get existing replays from session:
-    # minimum_valid_replay_duration = 5.0 * decoding_time_bin_size
-    # def process_existing_replays_from_session(sess, minimum_valid_replay_duration=0.001):
-    #     """ captures `minimum_valid_replay_duration` """
-    #     from neuropy.core.epoch import Epoch
-    #     ## Use the existing replay epochs from the session but ensure they look valid:
-    #     active_filter_epochs = sess.replay.epochs.get_valid_df().epochs.get_epochs_longer_than(minimum_duration=minimum_valid_replay_duration).epochs.get_non_overlapping_df()
-    #     if not 'stop' in active_filter_epochs.columns:
-    #         # Make sure it has the 'stop' column which is expected as opposed to the 'end' column
-    #         active_filter_epochs['stop'] = active_filter_epochs['end'].copy()
-            
-    #     if not 'label' in active_filter_epochs.columns:
-    #         # Make sure it has the 'stop' column which is expected as opposed to the 'end' column
-    #         active_filter_epochs['label'] = active_filter_epochs['flat_replay_idx'].copy()
-
-    #     return Epoch(active_filter_epochs)
-    # long_replays, short_replays, global_replays = [process_existing_replays_from_session(curr_active_pipeline.filtered_sessions[an_epoch_name], minimum_valid_replay_duration=(5.0 * decoding_time_bin_size)) for an_epoch_name in [long_epoch_name, short_epoch_name, global_epoch_name]] # NOTE: this includes a few overlapping   epochs since the function to remove overlapping ones seems to be broken
-
     try:
-        # long_replays, short_replays, global_replays = [Epoch(curr_active_pipeline.filtered_sessions[an_epoch_name].replay.epochs.get_valid_df()) for an_epoch_name in [long_epoch_name, short_epoch_name, global_epoch_name]] # NOTE: this includes a few overlapping   epochs since the function to remove overlapping ones seems to be broken
         long_replays, short_replays, global_replays = [DataSession.filter_replay_epochs(curr_active_pipeline.filtered_sessions[an_epoch_name].replay, pos_df=curr_active_pipeline.filtered_sessions[an_epoch_name].position.to_dataframe(), spikes_df=curr_active_pipeline.filtered_sessions[an_epoch_name].spikes_df) for an_epoch_name in [long_epoch_name, short_epoch_name, global_epoch_name]] # NOTE: this includes a few overlapping   epochs since the function to remove overlapping ones seems to be broken
 
     except (AttributeError, KeyError) as e:
@@ -865,8 +846,7 @@ def pipeline_complete_compute_long_short_fr_indicies(curr_active_pipeline, temp_
         ## Working:
         # long_replays, short_replays, global_replays = [KnownFilterEpochs.perform_get_filter_epochs_df(sess=a_computation_result.sess, filter_epochs=filter_epochs, min_epoch_included_duration=min_epoch_included_duration) for a_computation_result in [long_computation_results, short_computation_results, global_computation_results]] # returns Epoch objects
         # New sess.compute_estimated_replay_epochs(...) based method:
-        long_replays, short_replays, global_replays = [curr_active_pipeline.filtered_sessions[an_epoch_name].estimate_replay_epochs() for an_epoch_name in [long_epoch_name, short_epoch_name, global_epoch_name]] # NOTE: this includes a few overlapping epochs since the function to remove overlapping ones seems to be broken
-
+        long_replays, short_replays, global_replays = [curr_active_pipeline.filtered_sessions[an_epoch_name].estimate_replay_epochs() for an_epoch_name in [long_epoch_name, short_epoch_name, global_epoch_name]]
 
 
 
