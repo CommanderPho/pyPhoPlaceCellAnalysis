@@ -267,6 +267,7 @@ def batch_load_session(global_data_root_parent_path, active_data_mode_name, base
     curr_active_pipeline = NeuropyPipeline.try_init_from_saved_pickle_or_reload_if_needed(active_data_mode_name, active_data_mode_type_properties,
         override_basepath=Path(basedir), force_reload=force_reload, active_pickle_filename=active_pickle_filename, skip_save_on_initial_load=True)
 
+
     active_session_filter_configurations = active_data_mode_registered_class.build_default_filter_functions(sess=curr_active_pipeline.sess, epoch_name_whitelist=epoch_name_whitelist) # build_filters_pyramidal_epochs(sess=curr_kdiba_pipeline.sess)
     if debug_print:
         print(f'active_session_filter_configurations: {active_session_filter_configurations}')
@@ -335,6 +336,12 @@ def batch_load_session(global_data_root_parent_path, active_data_mode_name, base
     curr_active_pipeline.save_pipeline(saving_mode=saving_mode)
     if not saving_mode.shouldSave:
         print(f'saving_mode.shouldSave == False, so not saving at the end of batch_load_session')
+
+
+    ## Load pickled global computations:
+    # If previously pickled global results were saved, they will typically no longer be relevent if the pipeline was recomputed. We need a system of invalidating/versioning the global results when the other computations they depend on change.
+    # Maybe move into `batch_extended_computations(...)` or integrate with that somehow
+    # curr_active_pipeline.load_pickled_global_computation_results()
 
     return curr_active_pipeline
 
@@ -671,6 +678,9 @@ class BatchPhoJonathanFiguresHelper(object):
     2022-12-01 - Automated programmatic output using `_display_batch_pho_jonathan_replay_firing_rate_comparison`
 
     """
+    _display_fn_name = '_display_batch_pho_jonathan_replay_firing_rate_comparison' # used as the display function called in `_subfn_batch_plot_automated(...)`
+    _display_fn_context_display_name = 'BatchPhoJonathanReplayFRC' # used in `_build_batch_plot_kwargs` as the display_fn_name for the generated context. Affects the output names of the figures like f'kdiba_gor01_one_2006-6-09_1-22-43_{cls._display_fn_context_display_name}_long_only_[5, 23, 29, 38, 70, 85, 97, 103].pdf'. 
+
 
     @classmethod
     def run(cls, curr_active_pipeline, neuron_replay_stats_df, n_max_page_rows = 10):
@@ -722,7 +732,7 @@ class BatchPhoJonathanFiguresHelper(object):
         num_cells = len(included_unit_neuron_IDs)
         desired_figure_size_inches = single_subfigure_size_inches.copy()
         desired_figure_size_inches[1] = desired_figure_size_inches[1] * num_cells
-        graphics_output_dict = curr_active_pipeline.display('_display_batch_pho_jonathan_replay_firing_rate_comparison', active_identifying_ctx,
+        graphics_output_dict = curr_active_pipeline.display(cls._display_fn_name, active_identifying_ctx,
                                                             n_max_plot_rows=n_max_page_rows, included_unit_neuron_IDs=included_unit_neuron_IDs,
                                                             show_inter_replay_frs=True, spikes_color=(0.1, 0.0, 0.1), spikes_alpha=0.5, fignum=fignum, fig_idx=fig_idx, figsize=desired_figure_size_inches)
         fig, subfigs, axs, plot_data = graphics_output_dict['fig'], graphics_output_dict['subfigs'], graphics_output_dict['axs'], graphics_output_dict['plot_data']
@@ -737,7 +747,7 @@ class BatchPhoJonathanFiguresHelper(object):
         if len(long_only_aclus) > 0:        
             _batch_plot_kwargs_list.append(dict(included_unit_neuron_IDs=long_only_aclus,
             active_identifying_ctx=active_identifying_session_ctx.adding_context(collision_prefix='_batch_plot_test',
-                display_fn_name='batch_plot_test', plot_result_set='long_only', aclus=f"{long_only_aclus}"
+                display_fn_name=cls._display_fn_context_display_name, plot_result_set='long_only', aclus=f"{long_only_aclus}"
             ),
             fignum='long_only', n_max_page_rows=len(long_only_aclus)))
         else:
@@ -746,7 +756,7 @@ class BatchPhoJonathanFiguresHelper(object):
         if len(short_only_aclus) > 0:
             _batch_plot_kwargs_list.append(dict(included_unit_neuron_IDs=short_only_aclus,
             active_identifying_ctx=active_identifying_session_ctx.adding_context(collision_prefix='_batch_plot_test',
-                display_fn_name='batch_plot_test', plot_result_set='short_only', aclus=f"{short_only_aclus}"
+                display_fn_name=cls._display_fn_context_display_name, plot_result_set='short_only', aclus=f"{short_only_aclus}"
             ),
             fignum='short_only', n_max_page_rows=len(short_only_aclus)))
         else:
@@ -761,7 +771,7 @@ class BatchPhoJonathanFiguresHelper(object):
             ## paginated outputs for shared cells
             included_unit_indicies_pages = [[curr_included_unit_index for (a_linear_index, curr_row, curr_col, curr_included_unit_index) in v] for page_idx, v in enumerate(included_combined_indicies_pages)] # a list of length `num_pages` containing up to 10 items
             paginated_shared_cells_kwarg_list = [dict(included_unit_neuron_IDs=curr_included_unit_indicies,
-                active_identifying_ctx=active_identifying_session_ctx.adding_context(collision_prefix='_batch_plot_test', display_fn_name='batch_plot_test', plot_result_set='shared', page=f'{page_idx+1}of{num_pages}', aclus=f"{curr_included_unit_indicies}"),
+                active_identifying_ctx=active_identifying_session_ctx.adding_context(collision_prefix='_batch_plot_test', display_fn_name=cls._display_fn_context_display_name, plot_result_set='shared', page=f'{page_idx+1}of{num_pages}', aclus=f"{curr_included_unit_indicies}"),
                 fignum=f'shared_{page_idx}', fig_idx=page_idx, n_max_page_rows=n_max_page_rows) for page_idx, curr_included_unit_indicies in enumerate(included_unit_indicies_pages)]
             _batch_plot_kwargs_list.extend(paginated_shared_cells_kwarg_list) # add paginated_shared_cells_kwarg_list to the list
         else:
