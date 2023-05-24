@@ -3,8 +3,10 @@ import dataclasses
 from dataclasses import dataclass
 from pathlib import Path
 
-
+from pyphocorehelpers.programming_helpers import metadata_attributes
+from pyphocorehelpers.function_helpers import function_attributes
 from pyphocorehelpers.function_helpers import compose_functions
+from pyphocorehelpers.DataStructure.dynamic_parameters import DynamicParameters # to replace simple PlacefieldComputationParameters
 from pyphoplacecellanalysis.General.Pipeline.Stages.BaseNeuropyPipelineStage import BaseNeuropyPipelineStage, PipelineStage
 from pyphoplacecellanalysis.General.Pipeline.Stages.LoadFunctions.LoadFunctionRegistryHolder import LoadFunctionRegistryHolder
 
@@ -102,6 +104,38 @@ class LoadableSessionInput:
     @session_name.setter
     def session_name(self, value):
         self.sess.name = value
+
+
+@metadata_attributes(short_name=None, tags=['registered_output_files'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-05-24 09:00', related_items=[])
+class RegisteredOutputsMixin:
+    """ Allow pipeline to register its outputs so they can be found/saved/moved, etc.  
+    Internal Properties:
+        self._registered_output_files
+    """
+    @property
+    def registered_output_files(self):
+        """The outputs property."""
+        if self._registered_output_files is None:
+            """ initialize if needed. """
+            self._registered_output_files = DynamicParameters()
+        return self._registered_output_files
+    @registered_output_files.setter
+    def registered_output_files(self, value):
+        self._registered_output_files = value
+
+    @property
+    def registered_output_files_list(self):
+        """The registered_output_files property."""
+        return list(self.registered_output_files.keys())
+
+    def register_output_file(self, output_path, output_metadata=None):
+        """ registers a new output file for the pipeline """
+        self.registered_output_files[output_path] = output_metadata or {}
+    
+    def clear_registered_output_files(self):
+        self.registered_output_files = DynamicParameters()
+                
+
 
 # ____________________________________________________________________________________________________________________ #
 
@@ -222,7 +256,7 @@ class LoadedPipelineStage(LoadableInput, LoadableSessionInput, BaseNeuropyPipeli
 # ==================================================================================================================== #
 # PIPELINE MIXIN                                                                                                       #
 # ==================================================================================================================== #
-class PipelineWithLoadableStage:
+class PipelineWithLoadableStage(RegisteredOutputsMixin):
     """ Has a lodable stage. """
     
     @property

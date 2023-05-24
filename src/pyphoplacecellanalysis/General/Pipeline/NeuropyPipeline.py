@@ -127,6 +127,7 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
         self._persistance_state = None # indicate that this pipeline doesn't have a corresponding pickle file that it was loaded from
         
         self._plot_object = None
+        self._registered_output_files = None # for RegisteredOutputsMixin
 
         _stage_changed_connection = self.sigStageChanged.connect(self.on_stage_changed)
         self.set_input(name=name, session_data_type=session_data_type, basedir=basedir, load_function=load_function, post_load_functions=post_load_functions)
@@ -531,6 +532,8 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
         del state['_logger']
         del state['_persistance_state']
         del state['_plot_object']
+        
+        del state['_registered_output_files']
         # del state['_pickle_path']
         return state
 
@@ -546,12 +549,14 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
 
         self._persistance_state = None # the pickle_path has to be set manually after loading
         self._plot_object = None
-
+        self._registered_output_files = None # for RegisteredOutputsMixin
+        
         _stage_changed_connection = self.sigStageChanged.connect(self.on_stage_changed)
          
         # Reload both the computation and display functions to get the updated values:
         self.reload_default_computation_functions()
         self.reload_default_display_functions()
+        self.clear_registered_output_files() # outputs are reset each load, should they be?
 
 
 
