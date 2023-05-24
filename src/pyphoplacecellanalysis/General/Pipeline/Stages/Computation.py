@@ -873,6 +873,14 @@ class PipelineWithComputedPipelineStageMixin:
         """ returns the appropriate output path to store the outputs for this session. Usually '$session_folder/outputs/' """
         return self.sess.get_output_path()
 
+
+    """ Global Computation Results Persistance: Loads/Saves out the `global_computation_results` which are not currently saved with the pipeline
+    
+    `self.global_computation_results_pickle_path`
+    `save_global_computation_results()`
+    `load_pickled_global_computation_results(self, override_global_computation_results_pickle_path=None)`
+    
+    """
     @property
     def global_computation_results_pickle_path(self) -> Path:
         """ The path to pickle the global_computation_results """
