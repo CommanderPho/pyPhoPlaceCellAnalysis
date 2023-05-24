@@ -119,7 +119,7 @@ class DefaultRatemapDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Disp
         active_identifying_sub_ctx = active_context.adding_context('display_fn', display_fn_name='plot_occupancy')
         active_identifying_sub_ctx_string = active_identifying_sub_ctx.get_description(separator='|')
         
-        display_outputs = computation_result.computed_data['pf2D'].plot_occupancy(**({'subplots': (None, 3), 'resolution_multiplier': 1.0, 'enable_spike_overlay': False, 'brev_mode': PlotStringBrevityModeEnum.MINIMAL} | kwargs))
+        display_outputs = computation_result.computed_data['pf2D'].plot_occupancy(**({} | kwargs))
         
         # plot_variable_name = ({'plot_variable': None} | kwargs)
         plot_variable_name = kwargs.get('plot_variable', enumTuningMap2DPlotVariables.OCCUPANCY).name
@@ -142,7 +142,7 @@ class DefaultRatemapDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Disp
         if should_save_to_disk:
             _save_displayed_figure_if_needed(active_config.plotting_config, plot_type_name='_display_2d_placefield_occupancy', active_variant_name=plot_variable_name, active_figures=active_pf_2D_figures)
 
-        return MatplotlibRenderPlots(figures=active_pf_2D_figures, axes=display_outputs[1], graphics=display_outputs[2])
+        return MatplotlibRenderPlots(figures=active_pf_2D_figures, axes=display_outputs[1], graphics=[])
 
 
     @function_attributes(short_name='normal', tags=['display', 'placefields', '2D', 'matplotlib'], input_requires=[], output_provides=[], uses=['neuropy.plotting.placemaps.plot_all_placefields', 'neuropy.plotting.ratemaps.plot_ratemap_2D'], used_by=[], creation_date='2023-04-11 03:05')
