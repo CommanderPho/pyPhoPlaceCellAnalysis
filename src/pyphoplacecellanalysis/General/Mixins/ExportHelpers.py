@@ -342,7 +342,7 @@ def programmatic_display_to_PDF(curr_active_pipeline, curr_display_function_name
                     pdf.savefig(a_fig, transparent=True)
                     pdf.attach_note(f'Page {i + 1}: "{active_identifying_ctx_string}"')
                     
-                curr_active_pipeline.register_output_file(output_path=active_pdf_save_path, output_metadata={'filtered_context': a_filtered_context, 'context': active_identifying_ctx})
+                curr_active_pipeline.register_output_file(output_path=active_pdf_save_path, output_metadata={'filtered_context': a_filtered_context, 'context': active_identifying_ctx, 'fig': out_fig_list})
 
 
 # ==================================================================================================================== #
