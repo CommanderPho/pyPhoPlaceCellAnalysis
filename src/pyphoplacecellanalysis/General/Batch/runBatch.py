@@ -106,9 +106,6 @@ class BatchRun:
         assert global_batch_run is not None
         return global_batch_run
 
-
-
-
     
     def to_dataframe(self, expand_context:bool=True, good_only:bool=False):
         """Get a dataframe representation of BatchRun."""
