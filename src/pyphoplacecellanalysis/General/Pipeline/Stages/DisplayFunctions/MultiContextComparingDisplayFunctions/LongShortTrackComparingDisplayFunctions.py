@@ -1718,3 +1718,121 @@ class RateRemappingPaginatedFigureController(PaginatedFigureController):
 
         self.ui.mw.draw()
 
+
+# ==================================================================================================================== #
+# 2023-05-25 - Long_replay|Long_laps and Short_replay|Short_laps plots                                                 #
+# ==================================================================================================================== #
+import matplotlib.pyplot as plt
+from neuropy.utils.matplotlib_helpers import fit_both_axes
+from pyphoplacecellanalysis.General.Mixins.ExportHelpers import build_figure_basename_from_display_context, create_daily_programmatic_display_function_testing_folder_if_needed
+
+
+def _plot_session_long_short_track_firing_rate_figures(curr_active_pipeline, jonathan_firing_rate_analysis_result, figures_parent_out_path=None):
+    """ 2023-05-25 - Plots
+    
+    Inputs:
+        `curr_active_pipeline`: is needed to register_output_file(...)
+        
+    Example:
+        from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.MultiContextComparingDisplayFunctions.LongShortTrackComparingDisplayFunctions import _plot_session_long_short_track_firing_rate_figures
+        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.LongShortTrackComputations import JonathanFiringRateAnalysisResult
+
+        jonathan_firing_rate_analysis_result = JonathanFiringRateAnalysisResult(**curr_active_pipeline.global_computation_results.computed_data.jonathan_firing_rate_analysis.to_dict())
+        long_plots, short_plots = _plot_session_long_short_track_firing_rate_figures(curr_active_pipeline, jonathan_firing_rate_analysis_result, figures_parent_out_path=None)
+
+    """
+    def _plot_single_track_firing_rate_compare(x_frs_dict, y_frs_dict, active_context, fig_save_parent_path=None, neurons_colors=None, debug_print=False, is_centered = False):
+        """ 2023-05-25 - Plot long_replay|long_laps firing rate index 
+        Each datapoint is a neuron.
+
+        is_centered: bool - if True, the spines are centered at (0, 0)
+
+        Copied from same file as `_display_short_long_firing_rate_index_comparison()`
+        """
+        if neurons_colors is not None:
+            if isinstance(neurons_colors, dict):
+                point_colors = [neurons_colors[aclu] for aclu in list(x_frs_dict.keys())]
+            else:
+                # otherwise assumed to be an array with the same length as the number of points
+                assert isinstance(neurons_colors, np.ndarray)
+                assert np.shape(point_colors)[0] == 4 # (4, n_neurons)
+                assert np.shape(point_colors)[1] == len(x_frs_dict)
+                point_colors = neurons_colors
+                # point_colors = [f'{i}' for i in list(x_frs_index.keys())] 
+        else:
+            point_colors = None
+            # point_colors = 'black'
+        
+        point_hover_labels = [f'{i}' for i in list(x_frs_dict.keys())] # point_hover_labels will be added as tooltip annotations to the datapoints
+        fig, ax = plt.subplots(figsize=(8.5, 7.25), num=f'track_replay|track_laps frs_{active_context.get_description(separator="/")}', clear=True)
+        
+        # TODO 2023-05-25 - build the display context:
+        active_display_context = active_context.adding_context('display_fn', display_fn_name='plot_single_track_firing_rate_compare')
+
+        xlabel_kwargs = {}
+        ylabel_kwargs = {}
+        if is_centered:
+            xlabel_kwargs = dict(loc='left')
+            ylabel_kwargs = dict(loc='bottom')
+
+        scatter_plot = ax.scatter(x_frs_dict.values(), y_frs_dict.values(), c=point_colors) # , s=10, alpha=0.5
+        plt.xlabel('Replay Firing Rate (Hz)', fontsize=16, **xlabel_kwargs)
+        plt.ylabel('Laps Firing Rate (Hz)', fontsize=16, **ylabel_kwargs)
+        plt.title('Computed track_replay|track_laps firing rate')
+        plt.suptitle(f'{active_display_context.get_description(separator="/")}')
+
+        # add static tiny labels beside each point
+        for i, (x, y, label) in enumerate(zip(x_frs_dict.values(), y_frs_dict.values(), point_hover_labels)):
+            ax.annotate(label, (x, y), textcoords="offset points", xytext=(2,2), ha='left', va='bottom', fontsize=8) # , color=rect.get_facecolor()
+
+        ## get current axes:
+        # ax = plt.gca()
+
+        if is_centered:
+            ## The "spines" are the vertical and horizontal "axis" bars where the tick marks are drawn.
+            ax.spines[['left', 'bottom']].set_position('center')
+            ax.spines[['top', 'right']].set_visible(False)
+
+        fig.show()
+
+        return fig, ax, active_display_context
+
+    def _save_out_single_track_fr_figure(curr_active_pipeline, fig, active_context, figures_parent_out_path=None):
+        """ TODO 2023-05-25 - Unfortunately saves the fig with the non-display-context name directly to the current directory. Copied from
+        
+            captures nothing. 
+        """
+        if figures_parent_out_path is None:
+            figures_parent_out_path = create_daily_programmatic_display_function_testing_folder_if_needed()
+            # figures_parent_out_path = Path.cwd()
+        curr_fig_save_basename = build_figure_basename_from_display_context(active_context, context_tuple_join_character='_')
+        temp_fig_filename = f'{curr_fig_save_basename}.png'
+        _temp_full_fig_save_path = figures_parent_out_path.joinpath(temp_fig_filename)
+        fig.savefig(fname=_temp_full_fig_save_path, transparent=True) # Save .png to file.
+        curr_active_pipeline.register_output_file(_temp_full_fig_save_path, output_metadata={'context': active_context, 'fig': fig})
+        return _temp_full_fig_save_path
+
+    # BEGIN FUNCTION BODY ________________________________________________________________________________________________ #
+    long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
+    long_epoch_context, short_epoch_context, global_epoch_context = [curr_active_pipeline.filtered_contexts[a_name] for a_name in (long_epoch_name, short_epoch_name, global_epoch_name)]
+
+
+    ## Long Track Replay|Laps FR Figure
+    neuron_replay_stats_df = jonathan_firing_rate_analysis_result.neuron_replay_stats_df.dropna(subset=['long_replay_mean', 'long_non_replay_mean'], inplace=False)
+    x_frs = {k:v for k,v in neuron_replay_stats_df['long_replay_mean'].items()}
+    y_frs = {k:v for k,v in neuron_replay_stats_df['long_non_replay_mean'].items()}
+    fig_L, ax_L, active_display_context_L = _plot_single_track_firing_rate_compare(x_frs, y_frs, active_context=long_epoch_context)
+
+
+    ## Short Track Replay|Laps FR Figure
+    neuron_replay_stats_df = jonathan_firing_rate_analysis_result.neuron_replay_stats_df.dropna(subset=['short_replay_mean', 'short_non_replay_mean'], inplace=False)
+    x_frs = {k:v for k,v in neuron_replay_stats_df['short_replay_mean'].items()}
+    y_frs = {k:v for k,v in neuron_replay_stats_df['short_non_replay_mean'].items()}
+    fig_S, ax_S, active_display_context_S = _plot_single_track_firing_rate_compare(x_frs, y_frs, active_context=short_epoch_context)
+
+    ## Fit both the axes:
+    fit_both_axes(ax_L, ax_S)
+
+    _save_out_single_track_fr_figure(curr_active_pipeline, fig_L, active_display_context_L, figures_parent_out_path=figures_parent_out_path)
+    _save_out_single_track_fr_figure(curr_active_pipeline, fig_S, active_display_context_S, figures_parent_out_path=figures_parent_out_path)
+    return (fig_L, ax_L, active_display_context_L), (fig_S, ax_S, active_display_context_S)
