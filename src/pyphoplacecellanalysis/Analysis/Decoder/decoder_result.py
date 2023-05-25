@@ -738,7 +738,7 @@ def perform_full_session_leave_one_out_decoding_analysis(sess, original_1D_decod
     ## Convert spike counts to firing rates by dividing by the time bin size:
     flat_all_epochs_measured_cell_firing_rates = flat_all_epochs_measured_cell_spike_counts / decoding_time_bin_size
     ## Convert the expected firing rates to spike counts by multiplying by the time bin size (NOTE: there can be fractional expected spikes):
-    flat_all_epochs_computed_expected_cell_spike_counts = flat_all_epochs_computed_expected_cell_firing_rates * decoding_time_bin_size
+    flat_all_epochs_computed_expected_cell_spike_counts = flat_all_epochs_computed_expected_cell_firing_rates * decoding_time_bin_size ## TODO: do some smarter sampling from a distribution or something?
 
     ## Compute the difference from the expected firing rate observed for each cell (in each time bin):
     flat_all_epochs_difference_from_expected_cell_spike_counts = flat_all_epochs_computed_expected_cell_spike_counts - flat_all_epochs_measured_cell_spike_counts
