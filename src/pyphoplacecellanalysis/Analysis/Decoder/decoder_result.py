@@ -778,6 +778,92 @@ def perform_full_session_leave_one_out_decoding_analysis(sess, original_1D_decod
     return results_obj
 
 
+
+
+# ==================================================================================================================== #
+# 2023-05-25 - Radon Transform for Fitting Lines to Replays                                                            #
+# ==================================================================================================================== #
+
+
+import numpy as np
+from neuropy.analyses.decoders import radon_transform, old_radon_transform
+
+_allow_parallel_run_general:bool = False
+
+def old_score_posterior(posterior, n_jobs:int=8):
+    """Old version scoring of epochs that uses `old_radon_transform`
+
+            score, slope = old_score_posterior(active_posterior)
+            slope.shape # (120,)
+            score.shape # (120,)
+            pd.DataFrame({'score': score, 'slope': slope})
+
+    Returns
+    -------
+    [type]
+        [description]
+
+    References
+    ----------
+    1) Kloosterman et al. 2012
+    """
+    run_parallel = _allow_parallel_run_general and (n_jobs > 1)
+    if run_parallel:
+        from joblib import Parallel, delayed
+        results = Parallel(n_jobs=n_jobs)( delayed(old_radon_transform)(epoch) for epoch in p )
+    else:
+        results = [old_radon_transform(epoch) for epoch in posterior]
+    
+    score = [res[0] for res in results]
+    slope = [res[1] for res in results]
+    return np.asarray(score), np.asarray(slope)
+
+def get_radon_transform(posterior, decoding_time_bin_duration:float, pos_bin_size:float, nlines=5000, margin=16, jump_stat=None, posteriors=None, n_jobs:int=8):
+        """ 2023-05-25 - Radon Transform to fit line to decoded replay epoch posteriors. Gives score, velocity, and intercept. 
+
+        Usage:
+            from pyphoplacecellanalysis.Analysis.Decoder.decoder_result import get_radon_transform
+            ## 2023-05-25 - Get the 1D Posteriors for each replay epoch so they can be analyzed via score_posterior(...) with a Radon Transform approch to find the line of best fit (which gives the velocity).
+            active_epoch_decoder_result = long_results_obj.all_included_filter_epochs_decoder_result
+            active_posterior = active_epoch_decoder_result.p_x_given_n_list # one for each epoch
+            # the size of the x_bin in [cm]
+            pos_bin_size = float(long_results_obj.original_1D_decoder.pf.bin_info['xstep'])
+            ## compute the Radon transform to get the lines of best fit
+            score, velocity, intercept = get_radon_transform(active_posterior, decoding_time_bin_duration=active_epoch_decoder_result.decoding_time_bin_size, pos_bin_size=pos_bin_size,
+                                                            nlines=5000, margin=16, jump_stat=None, posteriors=None, n_jobs=1)
+            pd.DataFrame({'score': score, 'velocity': velocity, 'intercept': intercept})
+            
+        """
+        if posteriors is None:
+            assert posterior is not None, "No posteriors found"
+            posteriors = posterior
+
+        x_binsize = pos_bin_size
+        neighbours = int(margin / x_binsize)
+
+        run_parallel = _allow_parallel_run_general and (n_jobs > 1)
+        if run_parallel:
+            from joblib import Parallel, delayed
+            results = Parallel(n_jobs=n_jobs)( delayed(radon_transform)(epoch, nlines=nlines, dt=decoding_time_bin_duration, dx=pos_bin_size, neighbours=neighbours) for epoch in posteriors)
+        else:
+            results = [radon_transform(epoch, nlines=nlines, dt=decoding_time_bin_duration, dx=pos_bin_size, neighbours=neighbours) for epoch in posteriors]
+        score, velocity, intercept = np.asarray(results).T
+
+        # if jump_stat is not None:
+        #     return score, velocity, intercept, self._get_jd(posteriors, jump_stat)
+        # else:
+        return score, velocity, intercept
+
+
+
+
+
+
+
+
+
+
+
 # ==================================================================================================================== #
 # Plotting                                                                                                             #
 # ==================================================================================================================== #
