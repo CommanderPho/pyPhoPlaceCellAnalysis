@@ -169,7 +169,13 @@ def build_pdf_export_metadata(session_descriptor_string, filter_name, out_path=N
 # Modern 2022-10-04 PDF                                                                                                #
 # from pyphoplacecellanalysis.General.Mixins.ExportHelpers import create_daily_programmatic_display_function_testing_folder_if_needed, build_pdf_metadata_from_display_context
 # ==================================================================================================================== #
+@function_attributes(tags=['folder','programmatic','daily','output','path','important','if_needed','filesystem'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-05-25 12:54')
 def create_daily_programmatic_display_function_testing_folder_if_needed(out_path=None):
+    """ Creates a folder with today's date like '2022-01-16' located in the `out_path` if provided or in 'EXTERNAL/Screenshots/ProgrammaticDisplayFunctionTesting' by default if none is specified. 
+    
+    from pyphoplacecellanalysis.General.Mixins.ExportHelpers import create_daily_programmatic_display_function_testing_folder_if_needed
+    
+    """
     if out_path is None:   
         out_day_date_folder_name = datetime.today().strftime('%Y-%m-%d') # A string with the day's date like '2022-01-16'
         out_path = Path(r'EXTERNAL/Screenshots/ProgrammaticDisplayFunctionTesting').joinpath(out_day_date_folder_name).resolve()
@@ -178,6 +184,8 @@ def create_daily_programmatic_display_function_testing_folder_if_needed(out_path
     out_path.mkdir(exist_ok=True, parents=True) # parents=True creates all necessary parent folders
     return out_path
 
+
+@function_attributes(tags=['context','output','path','important'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-05-25 12:54')
 def session_context_to_relative_path(parent_path, session_ctx):
     """_summary_
 
@@ -189,7 +197,8 @@ def session_context_to_relative_path(parent_path, session_ctx):
         _type_: _description_
 
     Usage:
-
+        from pyphoplacecellanalysis.General.Mixins.ExportHelpers import session_context_to_relative_path
+        
         curr_sess_ctx = local_session_contexts_list[0]
         # curr_sess_ctx # IdentifyingContext<('kdiba', 'gor01', 'one', '2006-6-07_11-26-53')>
         figures_parent_out_path = create_daily_programmatic_display_function_testing_folder_if_needed()
@@ -205,10 +214,11 @@ def session_context_to_relative_path(parent_path, session_ctx):
     return parent_path.joinpath(*curr_sess_ctx_tuple).resolve()
 
 
-
+@function_attributes(tags=['figure','context','output','path','important'], input_requires=[], output_provides=[], uses=[], used_by=['build_pdf_metadata_from_display_context'], creation_date='2023-05-25 12:54')
 def build_figure_basename_from_display_context(active_identifying_ctx, subset_whitelist=None, subset_blacklist=None, context_tuple_join_character='_', debug_print=False):
     """ 
     Usage:
+        from pyphoplacecellanalysis.General.Mixins.ExportHelpers import build_figure_basename_from_display_context
         curr_fig_save_basename = build_figure_basename_from_display_context(active_identifying_ctx, context_tuple_join_character='_')
         >>> 'kdiba_2006-6-09_1-22-43_batch_plot_test_long_only'
     """
@@ -220,6 +230,7 @@ def build_figure_basename_from_display_context(active_identifying_ctx, subset_wh
     return fig_save_basename
 
 
+@function_attributes(tags=['figure','pdf','context','output','path','important'], input_requires=[], output_provides=[], uses=['build_figure_basename_from_display_context'], used_by=[], creation_date='2023-05-25 12:54')
 def build_pdf_metadata_from_display_context(active_identifying_ctx, subset_whitelist=None, subset_blacklist=None, debug_print=False):
     """ Internally uses `build_figure_basename_from_display_context(...)` 
     Usage:

@@ -1163,6 +1163,8 @@ def _plot_long_short_firing_rate_indicies(x_frs_index, y_frs_index, active_conte
 
     with ProgressMessagePrinter(_temp_full_fig_save_path, 'Saving', 'plot_long_short_firing_rate_indicies results'):
         fig.savefig(fname=_temp_full_fig_save_path, transparent=True)
+        
+
     fig.show()
 
     return fig, _temp_full_fig_save_path
