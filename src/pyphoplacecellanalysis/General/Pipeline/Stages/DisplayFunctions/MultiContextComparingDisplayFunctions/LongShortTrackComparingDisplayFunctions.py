@@ -13,10 +13,12 @@ from neuropy.plotting.ratemaps import plot_ratemap_1D # for plot_short_v_long_pf
 from neuropy.utils.matplotlib_helpers import build_or_reuse_figure # used for `_make_pho_jonathan_batch_plots(...)`
 from neuropy.utils.mixins.print_helpers import ProgressMessagePrinter # for `_plot_long_short_firing_rate_indicies`
 from neuropy.core.neurons import NeuronType
+from neuropy.utils.matplotlib_helpers import fit_both_axes
 
 from pyphocorehelpers.function_helpers import function_attributes
 from pyphocorehelpers.programming_helpers import metadata_attributes
 from pyphocorehelpers.indexing_helpers import Paginator
+from pyphocorehelpers.print_helpers import generate_html_string # used for `plot_long_short_surprise_difference_plot`
 
 from pyphocorehelpers.DataStructure.general_parameter_containers import VisualizationParameters, RenderPlotsData, RenderPlots
 from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer
@@ -35,6 +37,7 @@ from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiCo
 from pyphoplacecellanalysis.General.Mixins.CrossComputationComparisonHelpers import _compare_computation_results, _find_any_context_neurons, build_neurons_color_map # for plot_short_v_long_pf1D_comparison
 from pyphoplacecellanalysis.General.Mixins.CrossComputationComparisonHelpers import build_replays_custom_scatter_markers, CustomScatterMarkerMode # used in _make_pho_jonathan_batch_plots
 from pyphoplacecellanalysis.General.Mixins.CrossComputationComparisonHelpers import _build_neuron_type_distribution_color # used in _make_pho_jonathan_batch_plots
+from pyphoplacecellanalysis.General.Mixins.ExportHelpers import build_figure_basename_from_display_context, create_daily_programmatic_display_function_testing_folder_if_needed
 
 from pyphoplacecellanalysis.PhoPositionalData.plotting.placefield import plot_1D_placecell_validation # for _make_pho_jonathan_batch_plots
 
@@ -362,6 +365,24 @@ class LongShortTrackComparingDisplayFunctions(AllFunctionEnumeratingMixin, metac
 # ==================================================================================================================== #
 # Private Display Helpers                                                                                              #
 # ==================================================================================================================== #
+def _generalized_persist_out_single_figure(curr_active_pipeline, fig, active_display_context, figures_parent_out_path=None):
+    """ 2023-05-25 - Persists the matplotlib figure to disk and registers the output with the pipeline
+    
+        captures nothing. 
+        
+        from pyphoplacecellanalysis.General.Batch.NonInteractiveWrapper import _generalized_persist_out_single_figure
+        
+    """
+    if figures_parent_out_path is None:
+        figures_parent_out_path = create_daily_programmatic_display_function_testing_folder_if_needed()
+        # figures_parent_out_path = Path.cwd()
+    curr_fig_save_basename = build_figure_basename_from_display_context(active_display_context, context_tuple_join_character='_')
+    temp_fig_filename = f'{curr_fig_save_basename}.png'
+    full_fig_save_path = figures_parent_out_path.joinpath(temp_fig_filename)
+    fig.savefig(fname=full_fig_save_path, transparent=True) # Save .png to file.
+    curr_active_pipeline.register_output_file(full_fig_save_path, output_metadata={'context': active_display_context, 'fig': fig})
+    return full_fig_save_path
+
 
 # ==================================================================================================================== #
 def _temp_draw_jonathan_ax(t_split, time_bins, unit_specific_time_binned_firing_rates, aclu_to_idx, rdf, irdf, show_inter_replay_frs=False, colors=None, fig=None, ax=None, active_aclu:int=0, custom_replay_markers=None, include_horizontal_labels=True, include_vertical_labels=True, should_render=False):
@@ -1164,7 +1185,9 @@ def _plot_long_short_firing_rate_indicies(x_frs_index, y_frs_index, active_conte
     with ProgressMessagePrinter(_temp_full_fig_save_path, 'Saving', 'plot_long_short_firing_rate_indicies results'):
         fig.savefig(fname=_temp_full_fig_save_path, transparent=True)
         
-
+    ## TODO 2023-05-25: replace this with `_generalized_persist_out_single_figure`
+    # _generalized_persist_out_single_figure(curr_active_pipeline, fig_L, active_display_context_L, figures_parent_out_path=figures_parent_out_path)
+    
     fig.show()
 
     return fig, _temp_full_fig_save_path
@@ -1336,8 +1359,6 @@ def plot_long_short(long_results_obj, short_results_obj):
     win.graphicsItem().setLabel(axis='bottom', text='time')
     return win, (ax_long, ax_short), legend
 
-from pyphocorehelpers.print_helpers import generate_html_string # used for `plot_long_short_surprise_difference_plot`
-
 def plot_long_short_surprise_difference_plot(curr_active_pipeline, long_results_obj, short_results_obj, long_epoch_name, short_epoch_name):
 	""" 2023-05-17 - Refactored into display functions file from notebook.
     
@@ -1433,7 +1454,6 @@ def plot_long_short_surprise_difference_plot(curr_active_pipeline, long_results_
 # ==================================================================================================================== #
 # 2023-05-02 Laps/Replay Rate Remapping 1D Index Line                                                                  #
 # ==================================================================================================================== #
-import matplotlib.pyplot as plt
 
 @function_attributes(short_name=None, tags=['matplotlib', 'long_short_fr_indicies_analysis', 'rate_remapping'], input_requires=['long_short_fr_indicies_analysis'], output_provides=[], uses=[], used_by=[], creation_date='2023-05-03 23:12')
 def plot_rr_aclu(aclu: list, rr_laps: np.ndarray, rr_replays: np.ndarray, rr_neuron_types: np.ndarray, sort=None, fig=None, axs=None):
@@ -1722,27 +1742,6 @@ class RateRemappingPaginatedFigureController(PaginatedFigureController):
 # ==================================================================================================================== #
 # 2023-05-25 - Long_replay|Long_laps and Short_replay|Short_laps plots                                                 #
 # ==================================================================================================================== #
-import matplotlib.pyplot as plt
-from neuropy.utils.matplotlib_helpers import fit_both_axes
-from pyphoplacecellanalysis.General.Mixins.ExportHelpers import build_figure_basename_from_display_context, create_daily_programmatic_display_function_testing_folder_if_needed
-
-def _generalized_persist_out_single_figure(curr_active_pipeline, fig, active_display_context, figures_parent_out_path=None):
-    """ 2023-05-25 - Persists the matplotlib figure to disk and registers the output with the pipeline
-    
-        captures nothing. 
-        
-        from pyphoplacecellanalysis.General.Batch.NonInteractiveWrapper import _generalized_persist_out_single_figure
-        
-    """
-    if figures_parent_out_path is None:
-        figures_parent_out_path = create_daily_programmatic_display_function_testing_folder_if_needed()
-        # figures_parent_out_path = Path.cwd()
-    curr_fig_save_basename = build_figure_basename_from_display_context(active_display_context, context_tuple_join_character='_')
-    temp_fig_filename = f'{curr_fig_save_basename}.png'
-    full_fig_save_path = figures_parent_out_path.joinpath(temp_fig_filename)
-    fig.savefig(fname=full_fig_save_path, transparent=True) # Save .png to file.
-    curr_active_pipeline.register_output_file(full_fig_save_path, output_metadata={'context': active_display_context, 'fig': fig})
-    return full_fig_save_path
 
 def _plot_session_long_short_track_firing_rate_figures(curr_active_pipeline, jonathan_firing_rate_analysis_result, figures_parent_out_path=None):
     """ 2023-05-25 - Plots
