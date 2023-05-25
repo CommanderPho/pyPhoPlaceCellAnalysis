@@ -354,8 +354,7 @@ class LongShortTrackComparingDisplayFunctions(AllFunctionEnumeratingMixin, metac
             owning_pipeline_reference.register_output_file(output_path=_temp_full_fig_save_path, output_metadata={'context': active_context}) 
 
             graphics_output_dict = MatplotlibRenderPlots(name='display_short_long_firing_rate_index_comparison', figures=(fig), axes=tuple(fig.axes), plot_data={})
-            # graphics_output_dict['plot_data'] = {'sort_indicies': (long_sort_ind, short_sort_ind), 'colors':(long_neurons_colors_array, short_neurons_colors_array)}
-
+            # graphics_output_dict['plot_data'] = {'sort_indicies': (long_sort_ind, short_sort_ind), 'colors':(long_neurons_colors_array, short_neurons_colors_array)}            
             return graphics_output_dict
 
 
