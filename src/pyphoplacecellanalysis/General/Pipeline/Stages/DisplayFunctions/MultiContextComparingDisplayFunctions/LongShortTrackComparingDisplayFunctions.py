@@ -1726,6 +1726,23 @@ import matplotlib.pyplot as plt
 from neuropy.utils.matplotlib_helpers import fit_both_axes
 from pyphoplacecellanalysis.General.Mixins.ExportHelpers import build_figure_basename_from_display_context, create_daily_programmatic_display_function_testing_folder_if_needed
 
+def _generalized_persist_out_single_figure(curr_active_pipeline, fig, active_display_context, figures_parent_out_path=None):
+    """ 2023-05-25 - Persists the matplotlib figure to disk and registers the output with the pipeline
+    
+        captures nothing. 
+        
+        from pyphoplacecellanalysis.General.Batch.NonInteractiveWrapper import _generalized_persist_out_single_figure
+        
+    """
+    if figures_parent_out_path is None:
+        figures_parent_out_path = create_daily_programmatic_display_function_testing_folder_if_needed()
+        # figures_parent_out_path = Path.cwd()
+    curr_fig_save_basename = build_figure_basename_from_display_context(active_display_context, context_tuple_join_character='_')
+    temp_fig_filename = f'{curr_fig_save_basename}.png'
+    full_fig_save_path = figures_parent_out_path.joinpath(temp_fig_filename)
+    fig.savefig(fname=full_fig_save_path, transparent=True) # Save .png to file.
+    curr_active_pipeline.register_output_file(full_fig_save_path, output_metadata={'context': active_display_context, 'fig': fig})
+    return full_fig_save_path
 
 def _plot_session_long_short_track_firing_rate_figures(curr_active_pipeline, jonathan_firing_rate_analysis_result, figures_parent_out_path=None):
     """ 2023-05-25 - Plots
@@ -1741,7 +1758,7 @@ def _plot_session_long_short_track_firing_rate_figures(curr_active_pipeline, jon
         long_plots, short_plots = _plot_session_long_short_track_firing_rate_figures(curr_active_pipeline, jonathan_firing_rate_analysis_result, figures_parent_out_path=None)
 
     """
-    def _plot_single_track_firing_rate_compare(x_frs_dict, y_frs_dict, active_context, fig_save_parent_path=None, neurons_colors=None, debug_print=False, is_centered = False):
+    def _plot_single_track_firing_rate_compare(x_frs_dict, y_frs_dict, active_context, neurons_colors=None, is_centered = False):
         """ 2023-05-25 - Plot long_replay|long_laps firing rate index 
         Each datapoint is a neuron.
 
@@ -1797,21 +1814,6 @@ def _plot_session_long_short_track_firing_rate_figures(curr_active_pipeline, jon
 
         return fig, ax, active_display_context
 
-    def _save_out_single_track_fr_figure(curr_active_pipeline, fig, active_context, figures_parent_out_path=None):
-        """ TODO 2023-05-25 - Unfortunately saves the fig with the non-display-context name directly to the current directory. Copied from
-        
-            captures nothing. 
-        """
-        if figures_parent_out_path is None:
-            figures_parent_out_path = create_daily_programmatic_display_function_testing_folder_if_needed()
-            # figures_parent_out_path = Path.cwd()
-        curr_fig_save_basename = build_figure_basename_from_display_context(active_context, context_tuple_join_character='_')
-        temp_fig_filename = f'{curr_fig_save_basename}.png'
-        _temp_full_fig_save_path = figures_parent_out_path.joinpath(temp_fig_filename)
-        fig.savefig(fname=_temp_full_fig_save_path, transparent=True) # Save .png to file.
-        curr_active_pipeline.register_output_file(_temp_full_fig_save_path, output_metadata={'context': active_context, 'fig': fig})
-        return _temp_full_fig_save_path
-
     # BEGIN FUNCTION BODY ________________________________________________________________________________________________ #
     long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
     long_epoch_context, short_epoch_context, global_epoch_context = [curr_active_pipeline.filtered_contexts[a_name] for a_name in (long_epoch_name, short_epoch_name, global_epoch_name)]
@@ -1833,6 +1835,6 @@ def _plot_session_long_short_track_firing_rate_figures(curr_active_pipeline, jon
     ## Fit both the axes:
     fit_both_axes(ax_L, ax_S)
 
-    _save_out_single_track_fr_figure(curr_active_pipeline, fig_L, active_display_context_L, figures_parent_out_path=figures_parent_out_path)
-    _save_out_single_track_fr_figure(curr_active_pipeline, fig_S, active_display_context_S, figures_parent_out_path=figures_parent_out_path)
+    _generalized_persist_out_single_figure(curr_active_pipeline, fig_L, active_display_context_L, figures_parent_out_path=figures_parent_out_path)
+    _generalized_persist_out_single_figure(curr_active_pipeline, fig_S, active_display_context_S, figures_parent_out_path=figures_parent_out_path)
     return (fig_L, ax_L, active_display_context_L), (fig_S, ax_S, active_display_context_S)
