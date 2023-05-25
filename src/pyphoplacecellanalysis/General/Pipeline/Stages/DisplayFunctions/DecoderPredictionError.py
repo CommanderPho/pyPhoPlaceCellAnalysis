@@ -495,7 +495,7 @@ def _helper_update_decoded_single_epoch_slice_plot(curr_ax, params, plots_data, 
     """ 2023-05-08 - Factored out of plot_decoded_epoch_slices to enable paged 
 
     Needs only: curr_time_bins, curr_posterior, curr_most_likely_positions
-    Accesses: plots_data.epoch_slices[i,:]
+    Accesses: plots_data.epoch_slices[i,:], plots_data.global_pos_df, params.variable_name, params.xbin, params.enable_flat_line_drawing
     """    
     if debug_print:
         print(f'i : {i}, curr_posterior.shape: {curr_posterior.shape}')
