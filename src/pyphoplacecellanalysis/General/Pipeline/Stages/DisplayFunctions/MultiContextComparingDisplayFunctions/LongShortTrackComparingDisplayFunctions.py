@@ -1234,8 +1234,8 @@ def plot_long_short_expected_vs_observed_firing_rates(long_results_obj, short_re
     cell_color_symbol_brush = [pg.intColor(i,hues=9, values=3, alpha=180) for i, aclu in enumerate(long_results_obj.original_1D_decoder.neuron_IDs)] # maxValue=128
     # All properties in common:
     win = pg.plot()
-     # win.setWindowTitle('Short v. Long - Leave-one-out Expected vs. Observed Firing Rates')
-    win.setWindowTitle('Short v. Long - Leave-one-out Expected vs. Observed Num Spikes')
+     # win.setWindowTitle('Long v. Short - Leave-one-out Expected vs. Observed Firing Rates')
+    win.setWindowTitle('Long v. Short - Leave-one-out Expected vs. Observed Num Spikes')
     # legend_size = (80,60) # fixed size legend
     legend_size = None # auto-sizing legend to contents
     legend = pg.LegendItem(legend_size, offset=(-1,0)) # do this instead of # .addLegend
@@ -1269,8 +1269,11 @@ def plot_long_short_expected_vs_observed_firing_rates(long_results_obj, short_re
             # curr_epoch_data = a_results_obj.flat_all_epochs_measured_cell_spike_counts[unit_IDX, curr_epoch_is_cell_active] # num measured spikes 
             curr_epoch_data = a_results_obj.flat_all_epochs_difference_from_expected_cell_spike_counts[unit_IDX, curr_epoch_is_cell_active] # num spikes diff
             # curr_epoch_data = a_results_obj.flat_all_epochs_difference_from_expected_cell_firing_rates[unit_IDX, :] # firing rate diff
-            plots[aclu] = win.plot(x=curr_epoch_time_bins, y=curr_epoch_data, pen=None, symbol=curr_symbol, symbolBrush=cell_color_symbol_brush[unit_IDX], name=f'{label_prefix}[{aclu}]', alpha=0.5) #  symbolBrush=pg.intColor(i,6,maxValue=128)
+            plots[aclu] = win.plot(x=curr_epoch_time_bins, y=curr_epoch_data, pen=cell_color_symbol_brush[unit_IDX], symbol=curr_symbol, symbolBrush=cell_color_symbol_brush[unit_IDX], name=f'{label_prefix}[{aclu}]', alpha=0.5) #  symbolBrush=pg.intColor(i,6,maxValue=128)
             legend.addItem(plots[aclu], f'{label_prefix}[{aclu}]')
+            ## Make error bars
+            # err = pg.ErrorBarItem(x=curr_epoch_time_bins, y=data.mean(axis=1), height=data.std(axis=1), beam=0.5, pen={'color':'w', 'width':2})
+            # win.addItem(err)
 
     win.graphicsItem().setLabel(axis='left', text='Short v. Long - Expected vs. Observed # Spikes')
     win.graphicsItem().setLabel(axis='bottom', text='time')
