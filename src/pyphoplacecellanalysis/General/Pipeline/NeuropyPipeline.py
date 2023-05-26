@@ -229,6 +229,17 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
                 # loading failed
                 print(f'Failure loading {finalized_loaded_sess_pickle_path}.')
                 loaded_pipeline = None
+            except EOFError:
+                # file corrupted.
+                print(f'Failure loading {finalized_loaded_sess_pickle_path}, the file is corrupted and incomplete (REACHED END OF FILE).')
+                print(f'\t deleting it and continuing. ')
+                finalized_loaded_sess_pickle_path.unlink() # .unlink() deletes a file
+                print(f"\t {finalized_loaded_sess_pickle_path} deleted.")
+                loaded_pipeline = None
+            except Exception as e:
+                raise e
+
+            
 
         else:
             # Otherwise force recompute:
