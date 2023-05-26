@@ -263,7 +263,7 @@ from attrs import define, field, Factory
 
 @define(slots=False, repr=False)
 class LeaveOneOutDecodingResult(object):
-    """Newer things to merge into SurpriseAnalysisResult
+    """Newer things to merge into LeaveOneOutDecodingAnalysisResult
     
     Usage:
         from pyphoplacecellanalysis.Analysis.Decoder.decoder_result import LeaveOneOutDecodingResult
@@ -275,7 +275,6 @@ class LeaveOneOutDecodingResult(object):
 
     one_left_out_to_global_surprises_mean: dict = Factory(dict)
     shuffle_IDXs: np.array = None
-
 
 
 @define(slots=False, repr=False)
@@ -299,7 +298,7 @@ class TimebinnedNeuronActivity:
         self.is_timebin_valid = (self.num_timebin_active_aclus > 0) # NEVERMIND: already is the leave-one-out result, so don't do TWO or more aclus in each timebin constraint due to leave-one-out-requirements
 
     @classmethod
-    def init_from_results_obj(cls, results_obj: "SurpriseAnalysisResult"):
+    def init_from_results_obj(cls, results_obj: "LeaveOneOutDecodingAnalysisResult"):
         n_timebins = np.sum(results_obj.all_included_filter_epochs_decoder_result.nbins)
         # a list of lists where each list contains the aclus that are active during that timebin:
         timebins_active_neuron_IDXs = [np.array(results_obj.original_1D_decoder.neuron_IDXs)[a_timebin_is_cell_firing] for a_timebin_is_cell_firing in np.logical_not(results_obj.is_non_firing_time_bin).T]
@@ -317,16 +316,16 @@ class TimebinnedNeuronActivity:
 
 
 @define(slots=False, repr=False)
-class SurpriseAnalysisResult:
+class LeaveOneOutDecodingAnalysisResult:
     """ 2023-03-27 - Holds the results from a surprise analysis
 
     Built with:
         from pyphocorehelpers.general_helpers import GeneratedClassDefinitionType, CodeConversion
-        CodeConversion.convert_dictionary_to_class_defn(long_results_dict, class_name='SurpriseAnalysisResult', class_definition_mode=GeneratedClassDefinitionType.DATACLASS)
+        CodeConversion.convert_dictionary_to_class_defn(long_results_dict, class_name='LeaveOneOutDecodingAnalysisResult', class_definition_mode=GeneratedClassDefinitionType.DATACLASS)
     n_neurons, n_epochs * n_timebins_for_epoch_i
     {'n_neurons':67, 'n_epochs':625, 'n_total_time_bins':6855}
     Usage:
-        from pyphoplacecellanalysis.Analysis.Decoder.decoder_result import SurpriseAnalysisResult
+        from pyphoplacecellanalysis.Analysis.Decoder.decoder_result import LeaveOneOutDecodingAnalysisResult
     """
     active_filter_epochs: Epoch
     original_1D_decoder: BasePositionDecoder # BayesianPlacemapPositionDecoder
@@ -824,8 +823,8 @@ def _analyze_leave_one_out_decoding_results(active_pos_df, active_filter_epochs,
 
 
 
-@function_attributes(short_name='session_loo_decoding_analysis', tags=['decoding', 'loo'], input_requires=[], output_provides=[], uses=['perform_leave_one_aclu_out_decoding_analysis', '_analyze_leave_one_out_decoding_results', 'SurpriseAnalysisResult'], creation_date='2023-03-17 00:00')
-def perform_full_session_leave_one_out_decoding_analysis(sess, original_1D_decoder=None, decoding_time_bin_size = 0.02, cache_suffix = '', skip_cache_save:bool = True, perform_cache_load:bool = False) -> SurpriseAnalysisResult:
+@function_attributes(short_name='session_loo_decoding_analysis', tags=['decoding', 'loo'], input_requires=[], output_provides=[], uses=['perform_leave_one_aclu_out_decoding_analysis', '_analyze_leave_one_out_decoding_results', 'LeaveOneOutDecodingAnalysisResult'], creation_date='2023-03-17 00:00')
+def perform_full_session_leave_one_out_decoding_analysis(sess, original_1D_decoder=None, decoding_time_bin_size = 0.02, cache_suffix = '', skip_cache_save:bool = True, perform_cache_load:bool = False) -> LeaveOneOutDecodingAnalysisResult:
     """ 2023-03-17 - Performs a leave one out decoding analysis for a full session
 
     Args:
@@ -944,7 +943,7 @@ def perform_full_session_leave_one_out_decoding_analysis(sess, original_1D_decod
                                                             flat_all_epochs_computed_one_left_out_to_global_surprises, all_epochs_computed_cell_one_left_out_to_global_surprises_mean, all_epochs_all_cells_computed_one_left_out_to_global_surprises_mean,
                                                             one_left_out_omitted_aclu_distance_df, most_contributing_aclus, result)
     # build output object:
-    results_obj = SurpriseAnalysisResult(*result_tuple)
+    results_obj = LeaveOneOutDecodingAnalysisResult(*result_tuple)
     ## Add in the one-left-out decoders:
     results_obj.one_left_out_decoder_dict = one_left_out_decoder_dict
     results_obj.one_left_out_filter_epochs_decoder_result_dict = one_left_out_filter_epochs_decoder_result_dict
@@ -1080,7 +1079,7 @@ class DiagnosticDistanceMetricFigure:
         2023-04-17 - Refactored to class from standalone function `_build_interactive_diagnostic_distance_metric_figure`
     """
 
-    results_obj: SurpriseAnalysisResult
+    results_obj: LeaveOneOutDecodingAnalysisResult
     timebinned_neuron_info: TimebinnedNeuronActivity
     result: LeaveOneOutDecodingResult
     hardcoded_sub_epoch_item_idx: int = 0
@@ -1259,7 +1258,7 @@ class DiagnosticDistanceMetricFigure:
 
 
 @function_attributes(short_name='plot_kourosh_activity_style_figure', tags=['plot', 'figure', 'heatmaps', 'matplotlib','pyqtgraph'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-04-04 09:03')
-def plot_kourosh_activity_style_figure(results_obj: SurpriseAnalysisResult, long_session, shared_aclus: np.ndarray, epoch_idx: int, callout_epoch_IDXs: list, skip_rendering_callouts:bool = False):
+def plot_kourosh_activity_style_figure(results_obj: LeaveOneOutDecodingAnalysisResult, long_session, shared_aclus: np.ndarray, epoch_idx: int, callout_epoch_IDXs: list, skip_rendering_callouts:bool = False):
     """ 2023-04-03 - plots a Kourosh-style figure that shows a top panel which displays the decoded posteriors and a raster plot of spikes for a single epoch 
     ## Requirements:
     # The goal is to produce a Kourosh-style figure that shows a top panel which displays the decoded posteriors and a raster plot of spikes for a given epoch.

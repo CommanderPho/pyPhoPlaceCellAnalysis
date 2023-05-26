@@ -16,7 +16,7 @@ from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BayesianPlace
 
 from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.ComputationFunctionRegistryHolder import ComputationFunctionRegistryHolder
 
-from pyphoplacecellanalysis.Analysis.Decoder.decoder_result import LeaveOneOutDecodingResult, SurpriseAnalysisResult, _analyze_leave_one_out_decoding_results ## !!DO_NOT_REMOVE_DILL!! 2023-05-26 - Required to unpickle pipelines, imported just for dill compatibility
+from pyphoplacecellanalysis.Analysis.Decoder.decoder_result import LeaveOneOutDecodingResult, LeaveOneOutDecodingAnalysisResult, _analyze_leave_one_out_decoding_results ## !!DO_NOT_REMOVE_DILL!! 2023-05-26 - Required to unpickle pipelines, imported just for dill compatibility
 
 # from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BayesianPlacemapPositionDecoder # For _perform_new_position_decoding_computation
 
