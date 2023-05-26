@@ -845,7 +845,7 @@ def _update_pipeline_missing_preprocessing_parameters(curr_active_pipeline):
     """
     def _subfn_update_session_missing_preprocessing_parameters(sess):
         """ 2023-05-24 - Adds the previously missing `sess.config.preprocessing_parameters` to a single session. Called only by `_update_pipeline_missing_preprocessing_parameters` """
-        preprocessing_parameters = getattr(curr_active_pipeline.sess.config, 'preprocessing_parameters', None)
+        preprocessing_parameters = getattr(sess.config, 'preprocessing_parameters', None)
         if preprocessing_parameters is None:
             print(f'no existing preprocessing parameters.')
             default_lap_estimation_parameters = DynamicContainer(N=20, should_backup_extant_laps_obj=True) # Passed as arguments to `sess.replace_session_laps_with_estimates(...)`
