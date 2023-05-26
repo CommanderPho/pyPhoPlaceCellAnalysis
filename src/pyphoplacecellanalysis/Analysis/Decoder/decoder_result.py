@@ -1,12 +1,20 @@
 from copy import deepcopy
 from dataclasses import dataclass
+from attrs import define, field, Factory # used for several things
 import matplotlib.pyplot as plt
 from matplotlib import cm # used for plot_kourosh_activity_style_figure version too to get a good colormap 
 import numpy as np
+import numpy.ma as ma # for masked array
 import pandas as pd
 from pyphocorehelpers.DataStructure.general_parameter_containers import RenderPlots
 from scipy.spatial.distance import cdist
+# Distance metrics used by `_new_compute_surprise`
 from scipy.spatial import distance # for Jensen-Shannon distance in `_subfn_compute_leave_one_out_analysis`
+import random # for random.choice(mylist)
+# from PendingNotebookCode import _scramble_curve
+from scipy.stats import wasserstein_distance
+from scipy.stats import pearsonr
+
 
 # Neuropy:
 from neuropy.core.position import build_position_df_resampled_to_time_windows # used in DecoderResultDisplayingPlot2D.setup()
@@ -16,11 +24,14 @@ from neuropy.analyses.placefields import PfND
 from neuropy.core.epoch import Epoch
 from neuropy.utils.dynamic_container import DynamicContainer
 from neuropy.utils.misc import shuffle_ids # used in _SHELL_analyze_leave_one_out_decoding_results
+from neuropy.utils.misc import split_array
 
 from pyphocorehelpers.indexing_helpers import find_neighbours
 from pyphocorehelpers.function_helpers import function_attributes
+from pyphocorehelpers.indexing_helpers import safe_np_vstack # for `_new_compute_surprise`
 
 from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BayesianPlacemapPositionDecoder # perform_leave_one_aclu_out_decoding_analysis
+
 
 # Plotting ___________________________________________________________________________________________________________ #
 
@@ -309,20 +320,7 @@ def perform_leave_one_aclu_out_decoding_analysis(spikes_df, active_pos_df, activ
 # ==================================================================================================================== #
 # 2023-03-17 Surprise Analysis                                                                                         #
 # ==================================================================================================================== #
-from attrs import define, field, Factory
-# import cattrs 
-from neuropy.utils.misc import split_array
-import numpy.ma as ma # for masked array
 
-# Distance metrics used by `_new_compute_surprise`
-from scipy.spatial import distance # for Jensen-Shannon distance in `_subfn_compute_leave_one_out_analysis`
-import random # for random.choice(mylist)
-# from PendingNotebookCode import _scramble_curve
-from scipy.stats import wasserstein_distance
-from scipy.stats import pearsonr
-
-from pyphocorehelpers.indexing_helpers import safe_np_vstack # for `_new_compute_surprise`
-from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.DefaultComputationFunctions import LeaveOneOutDecodingResult
 
 
 # ==================================================================================================================== #
@@ -349,7 +347,7 @@ class LeaveOneOutDecodingResult(object):
     """Newer things to merge into SurpriseAnalysisResult
     
     Usage:
-        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.DefaultComputationFunctions import LeaveOneOutDecodingResult
+        from pyphoplacecellanalysis.Analysis.Decoder.decoder_result import LeaveOneOutDecodingResult
 
     """
     one_left_out_to_global_surprises: dict = Factory(dict)
