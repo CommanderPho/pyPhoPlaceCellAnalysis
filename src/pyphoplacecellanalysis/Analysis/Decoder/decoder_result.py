@@ -328,6 +328,19 @@ from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.Default
 # ==================================================================================================================== #
 # 2023-03-15 Surprise/Leave-One-Out Analyses                                                                           #
 # ==================================================================================================================== #
+
+# def _subfn_reshape_for_each_epoch_to_for_each_cell(data, epoch_IDXs, neuron_IDs):
+#     """ UNUSED: Reshape to -for-each-epoch instead of -for-each-cell
+#         from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.DefaultComputationFunctions import _subfn_reshape_for_each_epoch_to_for_each_cell
+#         flat_all_epochs_cell_data, all_epochs_cell_data = _subfn_reshape_for_each_epoch_to_for_each_cell(data, epoch_IDXs=np.arange(active_filter_epochs.n_epochs), neuron_IDs=original_1D_decoder.neuron_IDs)
+#     """
+#     all_epochs_cell_data = []
+#     for decoded_epoch_idx in epoch_IDXs:
+#         all_epochs_cell_data.append(np.array([data[aclu][decoded_epoch_idx] for aclu in neuron_IDs]))
+#     flat_all_epochs_cell_data = np.hstack(all_epochs_cell_data) # .shape (65, 4584) -- (n_neurons, n_epochs * n_timebins_for_epoch_i), combines across all time_bins within all epochs
+#     return flat_all_epochs_cell_data, all_epochs_cell_data
+
+
 from attrs import define, field, Factory
 
 
