@@ -470,6 +470,21 @@ class LongShortTrackComputations(AllFunctionEnumeratingMixin, metaclass=Computat
 # ==================================================================================================================== #
 
 
+# ==================================================================================================================== #
+# Long/Short Curve Extrapolation and Management                                                                        #
+# ==================================================================================================================== #
+
+def extrapolate_short_curve_to_long(long_xbins, short_xbins, short_curve, debug_print=False):
+    """ extrapolate the short curve so that it is aligned with long_curve
+        
+    Usage:
+        extrapolated_short_xbins, extrapolated_short_curve = extrapolate_short_curve_to_long(long_xbins, short_xbins, short_curve, debug_print=False)
+
+    Known Uses:
+        compute_dot_product_overlap, 
+    """
+    extrapolated_short_curve = np.interp(long_xbins, short_xbins, short_curve, left=0.0, right=0.0)
+    return long_xbins, extrapolated_short_curve
 
 # ==================================================================================================================== #
 # 2023-04-07 - `constrain_to_laps`                                                                                     #
@@ -1324,18 +1339,6 @@ def compute_evening_morning_parition(neuron_replay_stats_df, firing_rates_activi
 # ==================================================================================================================== #
 # Overlap                                                                                                      #
 # ==================================================================================================================== #
-def extrapolate_short_curve_to_long(long_xbins, short_xbins, short_curve, debug_print=False):
-    """ extrapolate the short curve so that it is aligned with long_curve
-        
-    Usage:
-        extrapolated_short_xbins, extrapolated_short_curve = extrapolate_short_curve_to_long(long_xbins, short_xbins, short_curve, debug_print=False)
-
-    Known Uses:
-        compute_dot_product_overlap, 
-    """
-    extrapolated_short_curve = np.interp(long_xbins, short_xbins, short_curve, left=0.0, right=0.0)
-    return long_xbins, extrapolated_short_curve
-
 
 
 # Polygon Overlap ____________________________________________________________________________________________________ #
@@ -1590,4 +1593,5 @@ def compute_relative_entropy_divergence_overlap(long_results, short_results, deb
     overlap_scalars_df = pd.DataFrame(dict(aclu=curr_any_context_neurons, fragile_linear_IDX=shared_fragile_neuron_IDXs, long_short_relative_entropy=long_short_relative_entropy, short_long_relative_entropy=short_long_relative_entropy)).set_index('aclu')
 
     return overlap_dict, overlap_scalars_df
+
 
