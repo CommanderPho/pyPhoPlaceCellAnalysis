@@ -301,13 +301,25 @@ class PipelineWithDisplayPipelineStageMixin:
 
 
     def clear_display_outputs(self):
-        """ removes any display outputs """
+        """ removes any display outputs 
+        # display_output_history_list is derived from self.display_output, so we only need to clear one.
+        # seems that .clear() doesn't work for DynamicParameters for some reason. Doesn't seem to change anything.
+        """
         ## Clear any hanging display outputs:
         # do I need to close them before I just remove them?
-        for a_display_output_key in self.display_output_history_list:
-            # a_display_output.close()
-            del self.display_output[a_display_output_key]
-        self.display_output_history_list.clear()
+        # self.display_output.clear()
+        self.display_output = DynamicParameters() # drop all
+        # Loops through all the configs and ensure that they have the neuron identity info if they need it.
+        for an_active_config_name in self.active_configs.keys():
+            # ## Add the filter to the active context (IdentifyingContext)
+            self.display_output[self.filtered_contexts[an_active_config_name]] = DynamicParameters() # One display_output for each context
+        
+        # for a_display_output_key in self.display_output_history_list:
+        #     # a_display_output.close()
+        #     del self.display_output[a_display_output_key]
+        # self.display_output_history_list.clear()
+        # assert len(self.display_output_history_list) == 0 # should be empty now
+
 
     def prepare_for_display(self, root_output_dir=r'W:\data\Output', should_smooth_maze=True):
         assert (self.is_computed), "Current self.is_computed must be true. Call self.perform_computations to reach this step."
