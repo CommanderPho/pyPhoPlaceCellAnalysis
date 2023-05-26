@@ -287,6 +287,10 @@ def run_diba_batch(global_data_root_parent_path: Path, execute_all:bool = False,
 
 @function_attributes(short_name='run_specific_batch', tags=['batch', 'automated'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-03-28 04:46')
 def run_specific_batch(active_batch_run: BatchRun, curr_session_context: IdentifyingContext, curr_session_basedir: Path, force_reload=True, post_run_callback_fn=None, **kwargs):
+    """ For a specific session (identified by the session context) - calls batch_load_session(...) to get the curr_active_pipeline.
+            - Then calls `post_run_callback_fn(...)
+    
+    """
     ## Extract the default session loading vars from the session context: 
     # basedir = local_session_paths_list[1] # NOT 3
     basedir = curr_session_basedir

@@ -835,7 +835,7 @@ class BatchPhoJonathanFiguresHelper(object):
 from neuropy.utils.dynamic_container import DynamicContainer
 from pyphoplacecellanalysis.General.Pipeline.NeuropyPipeline import PipelineSavingScheme
 
-def _update_pipeline_missing_preprocessing_parameters(curr_active_pipeline):
+def _update_pipeline_missing_preprocessing_parameters(curr_active_pipeline, debug_print=False):
     """ 2023-05-24 - Adds the previously missing `sess.config.preprocessing_parameters` to each session (filtered and base) in the pipeline. 
     
     Usage:
@@ -847,7 +847,7 @@ def _update_pipeline_missing_preprocessing_parameters(curr_active_pipeline):
         """ 2023-05-24 - Adds the previously missing `sess.config.preprocessing_parameters` to a single session. Called only by `_update_pipeline_missing_preprocessing_parameters` """
         preprocessing_parameters = getattr(sess.config, 'preprocessing_parameters', None)
         if preprocessing_parameters is None:
-            print(f'no existing preprocessing parameters.')
+            print(f'No existing preprocessing parameters! Assigning them!')
             default_lap_estimation_parameters = DynamicContainer(N=20, should_backup_extant_laps_obj=True) # Passed as arguments to `sess.replace_session_laps_with_estimates(...)`
             default_PBE_estimation_parameters = DynamicContainer(sigma=0.030, thresh=(0, 1.5), min_dur=0.030, merge_dur=0.100, max_dur=0.300) # NewPaper's Parameters        
             default_replay_estimation_parameters = DynamicContainer(require_intersecting_epoch=None, min_epoch_included_duration=0.06, max_epoch_included_duration=None, maximum_speed_thresh=None, min_inclusion_fr_active_thresh=0.01, min_num_unique_aclu_inclusions=3)
@@ -859,7 +859,8 @@ def _update_pipeline_missing_preprocessing_parameters(curr_active_pipeline):
                 }))
             return True
         else:
-            print(f'preprocessing parameters exist.')
+            if debug_print:
+                print(f'preprocessing parameters exist.')
             return False
     
     # BEGIN MAIN FUNCTION BODY
