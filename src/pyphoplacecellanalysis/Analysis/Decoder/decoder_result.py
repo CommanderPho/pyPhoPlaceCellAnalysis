@@ -645,14 +645,13 @@ def perform_leave_one_aclu_out_decoding_analysis(spikes_df, active_pos_df, activ
     ## Decode all the epochs with the original decoder:
     all_included_filter_epochs_decoder_result = original_all_included_decoder.decode_specific_epochs(spikes_df, filter_epochs=active_filter_epochs, decoding_time_bin_size=decoding_time_bin_size, debug_print=False)
 
-
     # pretty dang inefficient, as there are 70 cells:
     one_left_out_decoder_dict = _build_one_left_out_decoders(original_all_included_decoder)
     ## `decode_specific_epochs` for each of the decoders:
     one_left_out_filter_epochs_decoder_result_dict = {}
     ### Loop through and perform the decoding for each epoch. This is the slow part.
     for left_out_aclu, curr_aclu_omitted_decoder in one_left_out_decoder_dict.items():
-        filter_epochs_decoder_result = curr_aclu_omitted_decoder.decode_specific_epochs(spikes_df['aclu'], filter_epochs=active_filter_epochs, decoding_time_bin_size=decoding_time_bin_size, debug_print=False) # get the spikes_df except spikes for the left-out cell
+        filter_epochs_decoder_result = curr_aclu_omitted_decoder.decode_specific_epochs(spikes_df[spikes_df['aclu'] != left_out_aclu], filter_epochs=active_filter_epochs, decoding_time_bin_size=decoding_time_bin_size, debug_print=False) # get the spikes_df except spikes for the left-out cell
         # if filter_epoch_description_list is None:
         #     filter_epoch_description_list = [f'Epoch {i}' for i in range(len(filter_epochs_decoder_result.epoch_description_list))]
         filter_epochs_decoder_result.epoch_description_list = deepcopy(filter_epoch_description_list) # PLOT_ONLY
