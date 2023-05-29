@@ -14,17 +14,10 @@ from pyphocorehelpers.function_helpers import function_attributes
 # pyPhoPlaceCellAnalysis:
 
 # NeuroPy (Diba Lab Python Repo) Loading
-# from neuropy.core.session.Formats.BaseDataSessionFormats import DataSessionFormatRegistryHolder
-# from neuropy.core.session.Formats.Specific.BapunDataSessionFormat import BapunDataSessionFormatRegisteredClass
-# from neuropy.core.session.Formats.Specific.KDibaOldDataSessionFormat import KDibaOldDataSessionFormatRegisteredClass
-# from neuropy.core.session.Formats.Specific.RachelDataSessionFormat import RachelDataSessionFormat
-# from neuropy.core.session.Formats.Specific.HiroDataSessionFormat import HiroDataSessionFormatRegisteredClass
-
 ## For computation parameters:
 from neuropy.utils.result_context import IdentifyingContext
 from neuropy.core.session.Formats.BaseDataSessionFormats import find_local_session_paths
 
-# from PendingNotebookCode import _perform_batch_plot, _build_batch_plot_kwargs
 from pyphoplacecellanalysis.General.Batch.NonInteractiveWrapper import batch_load_session, batch_extended_computations, SessionBatchProgress, batch_programmatic_figures, batch_extended_programmatic_figures
 from pyphoplacecellanalysis.General.Pipeline.NeuropyPipeline import PipelineSavingScheme
 from pyphoplacecellanalysis.General.Pipeline.Stages.Loading import saveData, loadData
