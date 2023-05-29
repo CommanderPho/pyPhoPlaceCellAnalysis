@@ -361,6 +361,29 @@ class LongShortTrackComparingDisplayFunctions(AllFunctionEnumeratingMixin, metac
             return graphics_output_dict
 
 
+    @function_attributes(short_name=None, tags=['display', 'long_short', 'laps', 'position', 'behavior'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-05-29 18:20', related_items=[])
+    def _display_long_short_laps(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_whitelist=None, **kwargs):
+            """ Displays a figure displaying the 1D laps detected for both the long and short tracks.
+                Usage:
+
+                    %matplotlib qt
+                    active_identifying_session_ctx = curr_active_pipeline.sess.get_context() # 'bapun_RatN_Day4_2019-10-15_11-30-06'
+
+                    graphics_output_dict = curr_active_pipeline.display('_display_short_long_pf1D_comparison', active_identifying_session_ctx)
+                    fig, axs, plot_data = graphics_output_dict['fig'], graphics_output_dict['axs'], graphics_output_dict['plot_data']
+                    
+
+            """
+            long_epoch_name, short_epoch_name, global_epoch_name = owning_pipeline_reference.find_LongShortGlobal_epoch_names()
+            # long_epoch_context, short_epoch_context, global_epoch_context = [owning_pipeline_reference.filtered_contexts[a_name] for a_name in (long_epoch_name, short_epoch_name, global_epoch_name)]
+            long_session, short_session, global_session = [owning_pipeline_reference.filtered_sessions[an_epoch_name] for an_epoch_name in [long_epoch_name, short_epoch_name, global_epoch_name]]
+            from pyphoplacecellanalysis.PhoPositionalData.plotting.laps import plot_laps_2d
+            fig, out_axes_list = plot_laps_2d(global_session, legacy_plotting_mode=False)
+            out_axes_list[0].set_title('Estimated Laps')
+            fig.canvas.manager.set_window_title('Estimated Laps')
+            graphics_output_dict = MatplotlibRenderPlots(name='_display_long_short_laps', figures=(fig,), axes=out_axes_list, plot_data={})
+            return graphics_output_dict
+
 
 # ==================================================================================================================== #
 # Private Display Helpers                                                                                              #
