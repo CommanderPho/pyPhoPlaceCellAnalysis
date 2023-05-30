@@ -511,6 +511,9 @@ def _helper_update_decoded_single_epoch_slice_plot(curr_ax, params, plots_data, 
     curr_ax.set_title(f'') # needs to be set to empty string '' because this is the title that appears above each subplot/slice
     return params, plots_data, plots, ui
 
+
+
+
 def _subfn_update_decoded_epoch_slices(params, plots_data, plots, ui, debug_print=False):
     """ attempts to update existing plots created by:
     
@@ -527,9 +530,13 @@ def _subfn_update_decoded_epoch_slices(params, plots_data, plots, ui, debug_prin
         curr_most_likely_positions = curr_posterior_container.most_likely_positions_1D
         
         params, plots_data, plots, ui = _helper_update_decoded_single_epoch_slice_plot(curr_ax, params, plots_data, plots, ui, i, curr_time_bins, curr_posterior, curr_most_likely_positions, debug_print=debug_print)
-
-
-
+        on_render_page_callbacks = params.get('on_render_page_callbacks', {})
+        for a_callback_name, a_callback in on_render_page_callbacks.items():
+            try:
+                params, plots_data, plots, ui = a_callback(curr_ax, params, plots_data, plots, ui, i, curr_time_bins, curr_posterior, curr_most_likely_positions, debug_print=debug_print)
+            except Exception as e:
+                print(f'\t encountered exception in callback: {e}')
+                pass            
 
 
 @function_attributes(short_name=None, tags=['epoch','slices','decoder','figure'], input_requires=[], output_provides=[], uses=['stacked_epoch_slices_matplotlib_build_view'], used_by=['_display_plot_decoded_epoch_slices'], creation_date='2023-05-08 16:31', related_items=[])
@@ -600,7 +607,8 @@ def plot_decoded_epoch_slices(filter_epochs, filter_epochs_decoder_result, globa
     params.variable_name = variable_name
     params.xbin = xbin.copy()
     params.enable_flat_line_drawing = enable_flat_line_drawing
-    
+      
+
     plots_data.global_pos_df = global_pos_df.copy()
     plots_data.filter_epochs_decoder_result = deepcopy(filter_epochs_decoder_result)
 

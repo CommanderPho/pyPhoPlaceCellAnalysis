@@ -694,9 +694,21 @@ class DecodedEpochSlicesPaginatedFigureController(PaginatedFigureController):
                                                                 posterior=curr_posterior,
                                                                 active_most_likely_positions_1D=curr_most_likely_positions,
                                                                 enable_flat_line_drawing=self.params.enable_flat_line_drawing, debug_print=self.params.debug_print)
+                
+                
                 if _temp_fig is not None:
                     self.plots.fig = _temp_fig
 
+                ## Perform callback here:
+                on_render_page_callbacks = self.params.get('on_render_page_callbacks', {})
+                for a_callback_name, a_callback in on_render_page_callbacks.items():
+                    print(f'performing callback with name: {a_callback_name}')
+                    try:
+                        self.params, self.plots_data, self.plots, self.ui = a_callback(curr_ax, self.params, self.plots_data, self.plots, self.ui, curr_slice_idxs, curr_time_bins, curr_posterior, curr_most_likely_positions, debug_print=self.params.debug_print)
+                    except Exception as e:
+                        print(f'\t encountered exception in callback: {e}')
+                        raise e
+                    
                 curr_ax.set_xlim(*curr_epoch_slice)
                 curr_ax.set_title(f'') # needs to be set to empty string '' because this is the title that appears above each subplot/slice
                 # Update selections:
