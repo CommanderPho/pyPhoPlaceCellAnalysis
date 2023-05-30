@@ -26,6 +26,7 @@ These functions help render a vertically stacked column of subplots that represe
 # ==================================================================================================================== #
 # Stacked Epoch Slices View                                                                                            #
 # ==================================================================================================================== #
+@function_attributes(short_name=None, tags=['helper', 'common', 'setup', 'axes', 'figure', 'stacked'], input_requires=[], output_provides=[], uses=[], used_by=['stacked_epoch_slices_view'], creation_date='2023-03-28 00:00', related_items=[])
 def stacked_epoch_basic_setup(epoch_slices, epoch_labels=None, name='stacked_epoch_slices_view', plot_function_name='Stacked Epoch Slices View - PlotItem Version', single_plot_fixed_height=100.0, debug_test_max_num_slices=70, single_plot_fixed_width=200.0, debug_test_max_num_variants=64, debug_print=False):
     """ Builds the common setup/containers for all stacked-epoch type plots:
     
@@ -175,7 +176,7 @@ def stacked_epoch_slices_view(epoch_slices, position_times_list, position_traces
         local_plots.plot_item = curr_plotItem
         
         # Set global/output variables
-        plots_data[curr_name] = local_plots_data                
+        plots_data[curr_name] = local_plots_data
         plots[curr_name] = local_plots
         plots[curr_name].mainPlotItem = curr_plotItem
         
@@ -335,7 +336,7 @@ def _pagination_helper_plot_single_epoch_slice(curr_ax, params, plots_data, plot
         curr_ax.tick_params(labelleft=False, labelbottom=True)
         curr_ax.set_title('') # remove the title
 
-    if is_first_setup or (not plots.has_attr('secondary_yaxes')): # if it were a plain dict, `hasattr(plots, 'secondary_yaxes')` would be correct. But for a DynamicParameters object I need to do 
+    if not plots.has_attr('secondary_yaxes'): # if it were a plain dict, `hasattr(plots, 'secondary_yaxes')` would be correct. But for a DynamicParameters object I need to do 
         plots.secondary_yaxes = {} # initialize to an empty dictionary
 
     # Left side y-label for the start time
@@ -352,12 +353,12 @@ def _pagination_helper_plot_single_epoch_slice(curr_ax, params, plots_data, plot
         
     assert secax_y is not None
     secax_y.set_ylabel(f'{a_slice_end_t:.2f}')
-    if is_first_setup:
-        secax_y.tick_params(labelleft=False, labelbottom=False, labelright=False) # Turn off all ticks for the secondary axis
+    secax_y.tick_params(labelleft=False, labelbottom=False, labelright=False) # Turn off all ticks for the secondary axis
     # Do I need to save this temporary axes? No, it appears that's not needed
 
 
 # Helper Figure/Plots Builders _______________________________________________________________________________________ #
+@function_attributes(short_name=None, tags=['epoch', 'stacked', 'matplotlib'], input_requires=[], output_provides=[], uses=['stacked_epoch_basic_setup', 'MatplotlibTimeSynchronizedWidget'], used_by=['plot_decoded_epoch_slices'], creation_date='2023-05-30 10:05', related_items=[])
 def stacked_epoch_slices_matplotlib_build_view(epoch_slices, name='stacked_epoch_slices_matplotlib_subplots_laps', plot_function_name=None, epoch_labels=None, single_plot_fixed_height=100.0, debug_test_max_num_slices=127, debug_print=False):
     """ Builds a matplotlib figure view with empty subplots that can be plotted after the fact by iterating through plots.axs
         
@@ -414,6 +415,7 @@ def stacked_epoch_slices_matplotlib_build_view(epoch_slices, name='stacked_epoch
     
     return params, plots_data, plots, ui
 
+@function_attributes(short_name=None, tags=['matplotlib', 'plot', 'figure', 'variant', 'helper'], input_requires=[], output_provides=[], uses=['stacked_epoch_basic_setup', 'MatplotlibTimeSynchronizedWidget'], used_by=[], creation_date='2023-05-30 10:06', related_items=[])
 def stacked_epoch_slices_matplotlib_build_insets_view(epoch_slices, name='stacked_epoch_slices_matplotlib_INSET_subplots_laps', plot_function_name=None, epoch_labels=None, debug_test_max_num_slices=12, debug_print=False):
     """ Builds a matplotlib figure view with empty subplots that can be plotted after the fact by iterating through plots.axs
         
@@ -539,6 +541,8 @@ class DecodedEpochSlicesPaginatedFigureController(PaginatedFigureController):
     """2023-05-09 - Aims to refactor `plot_paginated_decoded_epoch_slices`, a series of nested functions, into a stateful class
         Builds a matplotlib Figure in a CustomMatplotlibWidget that displays paginated axes using a Paginator by creating a `PaginationControlWidget`
         Specifically uses `plot_rr_aclu`, not general
+        
+        Ultimately plots the epochs via calls to `plot_1D_most_likely_position_comparsions`
         
     2023-05-09 - Refactored from  `build_figure_and_control_widget_from_paginator`
     
@@ -684,7 +688,7 @@ class DecodedEpochSlicesPaginatedFigureController(PaginatedFigureController):
                     print(f'i : {i}, curr_posterior.shape: {curr_posterior.shape}')
 
                 # Update the axes appropriately:
-                _pagination_helper_plot_single_epoch_slice(curr_ax, self.params, self.plots_data, self.plots, self.ui, a_slice_idx=curr_slice_idxs, is_first_setup=False, debug_print=self.params.debug_print)
+                _pagination_helper_plot_single_epoch_slice(curr_ax, self.params, self.plots_data, self.plots, self.ui, a_slice_idx=curr_slice_idxs, is_first_setup=False, debug_print=self.params.debug_print) # calling with is_first_setup=False doesn't set the right-hand Epoch end time labels right
 
                 _temp_fig, curr_ax = plot_1D_most_likely_position_comparsions(self.plots_data.global_pos_df, ax=curr_ax, time_window_centers=curr_time_bins, variable_name=self.params.variable_name, xbin=self.params.xbin,
                                                                 posterior=curr_posterior,
