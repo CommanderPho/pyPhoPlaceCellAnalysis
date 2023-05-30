@@ -140,7 +140,7 @@ class LongShortTrackComputations(AllFunctionEnumeratingMixin, metaclass=Computat
         # x_frs_index, y_frs_index, active_context, all_results_dict = pipeline_complete_compute_long_short_fr_indicies(owning_pipeline_reference) # use the all_results_dict as the computed data value
         # global_computation_results.computed_data['long_short_fr_indicies_analysis'] = DynamicParameters.init_from_dict({**all_results_dict, 'active_context': active_context})
 
-        is_certain_properly_constrained = True
+        is_certain_properly_constrained = False
         """ a properly constrained pipeline has the computation_epochs for its placefields equal to its laps, 
             - equal n_bins between short and long.
             
