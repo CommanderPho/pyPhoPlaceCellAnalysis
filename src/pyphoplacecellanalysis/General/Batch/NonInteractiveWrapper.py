@@ -618,7 +618,7 @@ def batch_programmatic_figures(curr_active_pipeline):
     active_session_figures_out_path = session_context_to_relative_path(figures_parent_out_path, active_identifying_session_ctx)
     print(f'curr_session_parent_out_path: {active_session_figures_out_path}')
     active_session_figures_out_path.mkdir(parents=True, exist_ok=True) # make folder if needed
-
+    ## MODE: this mode creates a special folder to contain the outputs for this session.
 
     # ==================================================================================================================== #
     # Output Figures to File                                                                                               #
@@ -674,9 +674,14 @@ def batch_extended_programmatic_figures(curr_active_pipeline):
 class BatchPhoJonathanFiguresHelper(object):
     """Private methods that help with batch figure generator for ClassName.
 
+    In .run(...) it builds the plot_kwargs ahead of time that will be passed to the specific plot function using `cls._build_batch_plot_kwargs(...)`
+        It then calls `active_out_figures_list = cls._perform_batch_plot(...)` to do the plotting, getting the list of figures and output paths
+    
     2022-12-08 - Batch Programmatic Figures (Currently only Jonathan-style) 
     2022-12-01 - Automated programmatic output using `_display_batch_pho_jonathan_replay_firing_rate_comparison`
 
+    
+    
     """
     _display_fn_name = '_display_batch_pho_jonathan_replay_firing_rate_comparison' # used as the display function called in `_subfn_batch_plot_automated(...)`
     _display_fn_context_display_name = 'BatchPhoJonathanReplayFRC' # used in `_build_batch_plot_kwargs` as the display_fn_name for the generated context. Affects the output names of the figures like f'kdiba_gor01_one_2006-6-09_1-22-43_{cls._display_fn_context_display_name}_long_only_[5, 23, 29, 38, 70, 85, 97, 103].pdf'. 
@@ -724,6 +729,7 @@ class BatchPhoJonathanFiguresHelper(object):
         """ the a programmatic wrapper for automated output using `_display_batch_pho_jonathan_replay_firing_rate_comparison`. The specific plot function called. 
         Called ONLY by `_perform_batch_plot(...)`
 
+        Calls `curr_active_pipeline.display(cls._display_fn_name, ...)
         """
         # size_dpi = 100.0,
         # single_subfigure_size_px = np.array([1920.0, 220.0])
@@ -812,6 +818,7 @@ class BatchPhoJonathanFiguresHelper(object):
                     pdf.savefig(a_fig)
                     curr_active_pipeline.register_output_file(output_path=curr_pdf_save_path, output_metadata={'context': curr_active_identifying_ctx, 'fig': (a_fig), 'pdf_metadata': active_pdf_metadata})
             else:
+                # Don't write the PDF and just plot interactively:
                 a_fig = cls._subfn_batch_plot_automated(curr_active_pipeline, **curr_batch_plot_kwargs)
                 active_out_figures_list.append(a_fig)
 
