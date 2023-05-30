@@ -157,35 +157,7 @@ class DefaultDecoderDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Disp
         active_display_fn_identifying_ctx = active_context.adding_context('display_fn', display_fn_name='display_plot_decoded_epoch_slices')
 
         active_decoder = computation_result.computed_data['pf2D_Decoder']
-        decoding_time_bin_size = kwargs.pop('decoding_time_bin_size', 1.0/30.0) # 0.03333333333333333
-        decoder_ndim = kwargs.pop('decoder_ndim', 2)
-        force_recompute = kwargs.pop('force_recompute', False)
-
-        ## Check for previous computations:
-        needs_compute = True # default to needing to recompute.
-        computation_tuple_key = (filter_epochs, decoding_time_bin_size, decoder_ndim)
-
-        ## Recompute using '_perform_specific_epochs_decoding' if needed:
-        specific_epochs_decoding = computation_result.computed_data.get('specific_epochs_decoding', None)
-        if specific_epochs_decoding is not None:
-            found_result = specific_epochs_decoding.get(computation_tuple_key, None)
-            if found_result is not None:
-                # Unwrap and reuse the result:
-                filter_epochs_decoder_result, active_filter_epochs, default_figure_name = found_result # computation_result.computed_data['specific_epochs_decoding'][('Laps', decoding_time_bin_size)]
-                needs_compute = False # we don't need to recompute
-                if force_recompute:
-                    print(f'found extant result but force_recompute is True, so recomputing anyway.')
-                    needs_compute = True
-                    print(f'\t discarding old result.')
-                    _discarded_result = specific_epochs_decoding.pop(computation_tuple_key, None)
-
-        if needs_compute:
-            ## Do the computation:
-            print(f'recomputing specific epoch decoding for {computation_tuple_key = }')
-            # I think it's bad to import DefaultComputationFunctions directly in the _display function. Perhaps don't allow recomputations on demand?
-            computation_result = DefaultComputationFunctions._perform_specific_epochs_decoding(computation_result, active_config, filter_epochs=filter_epochs, decoding_time_bin_size=decoding_time_bin_size, decoder_ndim=decoder_ndim)
-            filter_epochs_decoder_result, active_filter_epochs, default_figure_name = computation_result.computed_data['specific_epochs_decoding'][computation_tuple_key]
-
+        
         ## Actual plotting portion:
         out_plot_tuple = plot_decoded_epoch_slices(active_filter_epochs, filter_epochs_decoder_result, global_pos_df=computation_result.sess.position.to_dataframe(), xbin=active_decoder.xbin,
                                                                 **overriding_dict_with(lhs_dict={'name':default_figure_name, 'debug_test_max_num_slices':256, 'enable_flat_line_drawing':False, 'debug_print': False}, **kwargs))
@@ -216,6 +188,35 @@ class DefaultDecoderDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Disp
         
     
 
+def _cached_epoch_computation_if_needed(computation_result, active_config, active_context=None, filter_epochs='ripple', decoder_ndim:int=2, decoding_time_bin_size:float=(1.0/30.0), force_recompute:bool=False, **kwargs):
+    """ an abnormal cached epoch computation function that used to be in `_display_plot_decoded_epoch_slices` but was factored out on 2023-05-30
+    Operates on: computation_result.computed_data['specific_epochs_decoding'][computation_tuple_key]
+    
+    """
+    ## Check for previous computations:
+    needs_compute = True # default to needing to recompute.
+    computation_tuple_key = (filter_epochs, decoding_time_bin_size, decoder_ndim)
+
+    ## Recompute using '_perform_specific_epochs_decoding' if needed:
+    specific_epochs_decoding = computation_result.computed_data.get('specific_epochs_decoding', None)
+    if specific_epochs_decoding is not None:
+        found_result = specific_epochs_decoding.get(computation_tuple_key, None)
+        if found_result is not None:
+            # Unwrap and reuse the result:
+            filter_epochs_decoder_result, active_filter_epochs, default_figure_name = found_result # computation_result.computed_data['specific_epochs_decoding'][('Laps', decoding_time_bin_size)]
+            needs_compute = False # we don't need to recompute
+            if force_recompute:
+                print(f'found extant result but force_recompute is True, so recomputing anyway.')
+                needs_compute = True
+                print(f'\t discarding old result.')
+                _discarded_result = specific_epochs_decoding.pop(computation_tuple_key, None)
+
+    if needs_compute:
+        ## Do the computation:
+        print(f'recomputing specific epoch decoding for {computation_tuple_key = }')
+        # I think it's bad to import DefaultComputationFunctions directly in the _display function. Perhaps don't allow recomputations on demand?
+        computation_result = DefaultComputationFunctions._perform_specific_epochs_decoding(computation_result, active_config, filter_epochs=filter_epochs, decoding_time_bin_size=decoding_time_bin_size, decoder_ndim=decoder_ndim)
+        filter_epochs_decoder_result, active_filter_epochs, default_figure_name = computation_result.computed_data['specific_epochs_decoding'][computation_tuple_key]
 
 
 
@@ -531,7 +532,7 @@ def _subfn_update_decoded_epoch_slices(params, plots_data, plots, ui, debug_prin
 
 
 
-@function_attributes(short_name=None, tags=['epoch','slices','decoder','figure'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-05-08 16:31', related_items=[])
+@function_attributes(short_name=None, tags=['epoch','slices','decoder','figure'], input_requires=[], output_provides=[], uses=['stacked_epoch_slices_matplotlib_build_view'], used_by=['_display_plot_decoded_epoch_slices'], creation_date='2023-05-08 16:31', related_items=[])
 def plot_decoded_epoch_slices(filter_epochs, filter_epochs_decoder_result, global_pos_df, variable_name:str='lin_pos', xbin=None, enable_flat_line_drawing=False, debug_test_max_num_slices=20, name='stacked_epoch_slices_matplotlib_subplots', debug_print=False):
     """ plots the decoded epoch results in a stacked slices view 
     
