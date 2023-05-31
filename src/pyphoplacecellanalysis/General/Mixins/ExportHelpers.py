@@ -5,8 +5,6 @@ from pathlib import Path
 import pandas as pd
 import numpy as np
 
-from neuropy.utils.dynamic_container import overriding_dict_with # required for programmatic_display_to_PDF
-
 from pyphocorehelpers.DataStructure.dynamic_parameters import DynamicParameters
 from pyphocorehelpers.function_helpers import function_attributes
 
@@ -187,7 +185,7 @@ def create_daily_programmatic_display_function_testing_folder_if_needed(out_path
 
 @function_attributes(tags=['context','output','path','important'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-05-25 12:54')
 def session_context_to_relative_path(parent_path, session_ctx):
-    """_summary_
+    """Only uses the keys that define session: ['format_name','animal','exper_name', 'session_name'] to build the relative path
 
     Args:
         parent_path (Path): _description_
@@ -279,8 +277,9 @@ def programmatic_display_to_PDF(curr_active_pipeline, curr_display_function_name
     with plt.ioff():
         ## Disables showing the figure by default from within the context manager.
         # active_display_fn_kwargs = overriding_dict_with(lhs_dict=dict(filter_epochs='ripple', debug_test_max_num_slices=128), **kwargs)
-        active_display_fn_kwargs = overriding_dict_with(lhs_dict=dict(), **kwargs) # active_display_fn_kwargs = overriding_dict_with(lhs_dict=dict(filter_epochs='ripple', debug_test_max_num_slices=128), **kwargs)
-
+        # active_display_fn_kwargs = overriding_dict_with(lhs_dict=dict(), **kwargs) # this is always an error, if lhs_dict is empty the result will be empty regardless of the value of kwargs.
+        active_display_fn_kwargs = kwargs
+        
         # Perform for each filtered context:
         for filter_name, a_filtered_context in curr_active_pipeline.filtered_contexts.items():
             if debug_print:
