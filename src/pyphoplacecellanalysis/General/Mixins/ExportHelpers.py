@@ -355,6 +355,72 @@ def programmatic_display_to_PDF(curr_active_pipeline, curr_display_function_name
                 curr_active_pipeline.register_output_file(output_path=active_pdf_save_path, output_metadata={'filtered_context': a_filtered_context, 'context': active_identifying_ctx, 'fig': out_fig_list})
 
 
+@function_attributes(short_name=None, tags=['file','export','output','matplotlib','display','active','PDF','batch','automated'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-05-31 19:16', related_items=[])
+def perform_write_to_file(a_fig, active_identifying_ctx, figures_parent_out_path=None, subset_whitelist=None, subset_blacklist=None, write_pdf=False, write_png=True, register_output_file_fn=None, progress_print=True, debug_print=False):
+    """ Writes a single matplotlib figure out to one or more files based on whether write_png and write_pdf are specified. 
+    
+    Aims to eventually replace `programmatic_display_to_PDF` (working for both PDF and PNG outputs, working for global plots, along with successfully registering output files with the pipeline via `register_output_file_fn` argument)
+
+    
+    Usage:
+        # Plots in a shared folder for this session with fully distinct figure names:
+        active_session_figures_out_path = curr_active_pipeline.get_daily_programmatic_session_output_path()
+        final_context = curr_active_pipeline.sess.get_context().adding_context('display_fn', display_fn_name='plot_expected_vs_observed').adding_context('display_kwargs', **display_kwargs)
+        active_out_figure_paths = perform_write_to_file(fig, final_context, figures_parent_out_path=active_session_figures_out_path)
+
+        register_output_file_fn=curr_active_pipeline.register_output_file
+
+    Inputs:
+        register_output_file_fn: Callable[output_path:Path, output_metadata:dict] - function called to register outputs, by default should be `curr_active_pipeline.register_output_file`
+        
+    """
+    if figures_parent_out_path is None:
+        figures_parent_out_path = create_daily_programmatic_display_function_testing_folder_if_needed()
+
+    active_out_figure_paths = []
+    
+    # PDF:
+    if write_pdf:
+        try:
+            active_pdf_metadata, active_pdf_save_filename = build_pdf_metadata_from_display_context(active_identifying_ctx, subset_whitelist=subset_whitelist, subset_blacklist=subset_blacklist)
+            # print(f'active_pdf_save_filename: {active_pdf_save_filename}')
+            curr_pdf_save_path = figures_parent_out_path.joinpath(active_pdf_save_filename) # build the final output pdf path from the pdf_parent_out_path (which is the daily folder)
+        
+            with backend_pdf.PdfPages(curr_pdf_save_path, keep_empty=False, metadata=active_pdf_metadata) as pdf:
+                # a_fig = cls._subfn_batch_plot_automated(curr_active_pipeline, **curr_batch_plot_kwargs)
+                ## TODO UNFINISHED - Have to plot the figure here.
+                raise NotImplementedError
+                active_out_figure_paths.append(curr_pdf_save_path)
+                # Save out PDF page:
+                pdf.savefig(a_fig)
+                if register_output_file_fn is not None:
+                    register_output_file(output_path=curr_pdf_save_path, output_metadata={'context': active_identifying_ctx, 'fig': (a_fig), 'pdf_metadata': active_pdf_metadata})
+        except Exception as e:
+            print(f'Error occured while writing .pdf for fig. {e}. Skipping.')
+            # raise e
+
+    # PNG: .png versions:
+    if write_png:
+        # curr_page_str = f'pg{i+1}of{num_pages}'
+        try:
+            curr_fig_save_basename = build_figure_basename_from_display_context(active_identifying_ctx, subset_whitelist=subset_whitelist, subset_blacklist=subset_blacklist, context_tuple_join_character='_')
+            curr_fig_save_path = figures_parent_out_path.joinpath(curr_fig_save_basename)
+            fig_png_out_path = curr_fig_save_path.with_suffix('.png')
+            # fig_png_out_path = fig_png_out_path.with_stem(f'{curr_pdf_save_path.stem}_{curr_page_str}') # note this replaces the current .pdf extension with .png, resulting in a good filename for a .png
+            a_fig.savefig(fig_png_out_path)
+            if register_output_file_fn is not None:
+                register_output_file_fn(output_path=fig_png_out_path, output_metadata={'context': active_identifying_ctx, 'fig': (a_fig)})
+            if progress_print:
+                print(f'\t saved {fig_png_out_path}')
+            active_out_figure_paths.append(fig_png_out_path)
+        except Exception as e:
+            print(f'Error occured while writing .png for fig. {e}. Skipping.')
+            # raise e
+        
+    return active_out_figure_paths
+
+
+
 # ==================================================================================================================== #
 # Output PDF Merging/Manipulation                                                                                      #
 # ==================================================================================================================== #
