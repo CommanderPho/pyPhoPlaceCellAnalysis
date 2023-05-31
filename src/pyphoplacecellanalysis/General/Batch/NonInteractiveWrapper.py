@@ -613,11 +613,8 @@ def batch_programmatic_figures(curr_active_pipeline):
     print(f'short_only_aclus: {short_only_aclus}')
 
     active_identifying_session_ctx = curr_active_pipeline.sess.get_context() # 'bapun_RatN_Day4_2019-10-15_11-30-06'
-    # curr_sess_ctx # IdentifyingContext<('kdiba', 'gor01', 'one', '2006-6-07_11-26-53')>
-    figures_parent_out_path = create_daily_programmatic_display_function_testing_folder_if_needed()
-    active_session_figures_out_path = session_context_to_relative_path(figures_parent_out_path, active_identifying_session_ctx)
+    active_session_figures_out_path = curr_active_pipeline.get_daily_programmatic_session_output_path()
     print(f'curr_session_parent_out_path: {active_session_figures_out_path}')
-    active_session_figures_out_path.mkdir(parents=True, exist_ok=True) # make folder if needed
     ## MODE: this mode creates a special folder to contain the outputs for this session.
 
     # ==================================================================================================================== #
@@ -644,6 +641,8 @@ def batch_programmatic_figures(curr_active_pipeline):
         fig_save_parent_path = override_fig_save_parent_path
 
     curr_active_pipeline.display('_display_short_long_firing_rate_index_comparison', curr_active_pipeline.sess.get_context(), fig_save_parent_path=fig_save_parent_path)
+
+
 
     return active_identifying_session_ctx, active_session_figures_out_path, active_out_figures_list
 
