@@ -12,6 +12,8 @@ from enum import Enum # for EvaluationActions
 # NeuroPy (Diba Lab Python Repo) Loading
 from neuropy import core
 from neuropy.analyses.placefields import PlacefieldComputationParameters, perform_compute_placefields
+from neuropy.utils.result_context import IdentifyingContext
+
 from pyphocorehelpers.DataStructure.dynamic_parameters import DynamicParameters # to replace simple PlacefieldComputationParameters, `load_pickled_global_computation_results`
 from pyphocorehelpers.function_helpers import compose_functions, compose_functions_with_error_handling
 
@@ -873,6 +875,20 @@ class PipelineWithComputedPipelineStageMixin:
         """ returns the appropriate output path to store the outputs for this session. Usually '$session_folder/outputs/' """
         return self.sess.get_output_path()
 
+
+    def get_session_context(self) -> IdentifyingContext:
+        """ returns the context of the unfiltered session (self.sess) """
+        return self.sess.get_context()
+
+    def get_daily_programmatic_session_output_path(self, debug_print=False) -> Path:
+        from pyphoplacecellanalysis.General.Mixins.ExportHelpers import create_daily_programmatic_display_function_testing_folder_if_needed, session_context_to_relative_path # for `perform_write_to_file`
+        active_identifying_session_ctx = self.get_session_context() # 'bapun_RatN_Day4_2019-10-15_11-30-06'
+        figures_parent_out_path = create_daily_programmatic_display_function_testing_folder_if_needed()
+        active_session_figures_out_path = session_context_to_relative_path(figures_parent_out_path, active_identifying_session_ctx)
+        if debug_print:
+            print(f'curr_session_parent_out_path: {active_session_figures_out_path}')
+        active_session_figures_out_path.mkdir(parents=True, exist_ok=True) # make folder if needed
+        return active_session_figures_out_path
 
     """ Global Computation Results Persistance: Loads/Saves out the `global_computation_results` which are not currently saved with the pipeline
     
