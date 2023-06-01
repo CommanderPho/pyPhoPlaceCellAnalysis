@@ -604,23 +604,24 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
 
             new_obj_memory_usage_MB = print_object_memory_usage(self, enable_print=False)
 
+            is_temporary_file_used:bool = False
             _desired_finalized_loaded_sess_pickle_path = None
             if finalized_loaded_sess_pickle_path.exists():
                 # file already exists:
                 if saving_mode.name == PipelineSavingScheme.TEMP_THEN_OVERWRITE.name:
                     ## Save under a temporary name in the same output directory, and then compare post-hoc
                     _desired_finalized_loaded_sess_pickle_path = finalized_loaded_sess_pickle_path
-                    finalized_loaded_sess_pickle_path, _ = build_unique_filename(finalized_loaded_sess_pickle_path)
+                    finalized_loaded_sess_pickle_path, _ = build_unique_filename(finalized_loaded_sess_pickle_path) # changes the final path to the temporary file created.
+                    is_temporary_file_used = True # this is the only condition where this is true
                 elif saving_mode.name == PipelineSavingScheme.OVERWRITE_IN_PLACE.name:
                     print(f'WARNING: saving_mode is OVERWRITE_IN_PLACE so {finalized_loaded_sess_pickle_path} will be overwritten even though exists.')
                     self.logger.warning(f'WARNING: saving_mode is OVERWRITE_IN_PLACE so {finalized_loaded_sess_pickle_path} will be overwritten even though exists.')
-
-
+                
             # Save reloaded pipeline out to pickle for future loading
             saveData(finalized_loaded_sess_pickle_path, db=self) # Save the pipeline out to pickle.
 
             # If we saved to a temporary name, now see if we should overwrite or backup and then replace:
-            if saving_mode.name == PipelineSavingScheme.TEMP_THEN_OVERWRITE.name:
+            if (is_temporary_file_used and (saving_mode.name == PipelineSavingScheme.TEMP_THEN_OVERWRITE.name)):
                 assert _desired_finalized_loaded_sess_pickle_path is not None
                 prev_extant_file_size_MB = print_filesystem_file_size(_desired_finalized_loaded_sess_pickle_path, enable_print=False)
                 new_temporary_file_size_MB = print_filesystem_file_size(finalized_loaded_sess_pickle_path, enable_print=False)
