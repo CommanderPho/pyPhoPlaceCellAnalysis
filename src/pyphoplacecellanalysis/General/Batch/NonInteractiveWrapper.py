@@ -728,6 +728,14 @@ def batch_extended_programmatic_figures(curr_active_pipeline):
     # plot_long_short_firing_rate_indicies(x_frs_index, y_frs_index, active_context, fig_save_parent_path=fig_save_parent_path)
 
 
+    # 2023-06-01 - Hackish solution until I get it embedded in a global display function.
+    from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.MultiContextComparingDisplayFunctions.LongShortTrackComparingDisplayFunctions import _prepare_plot_expected_vs_observed
+    
+    try:
+        fig, axes, final_context, active_out_figure_paths = _prepare_plot_expected_vs_observed(curr_active_pipeline)
+    except Exception as e:
+        print(f'batch_extended_programmatic_figures(...): _prepare_plot_expected_vs_observed failed with error: {e}\n skipping.')
+    
 
 class BatchPhoJonathanFiguresHelper(object):
     """Private methods that help with batch figure generator for ClassName.

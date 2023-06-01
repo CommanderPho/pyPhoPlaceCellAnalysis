@@ -29,6 +29,7 @@ from pyphocorehelpers.plotting.figure_management import PhoActiveFigureManager2D
 from pyphocorehelpers.DataStructure.RenderPlots.MatplotLibRenderPlots import MatplotlibRenderPlots
 from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer  # for context_nested_docks/single_context_nested_docks
 
+from pyphoplacecellanalysis.General.Mixins.ExportHelpers import perform_write_to_file
 from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DisplayFunctionRegistryHolder import DisplayFunctionRegistryHolder
 from pyphoplacecellanalysis.GUI.Qt.Mixins.PaginationMixins import PaginatedFigureController
 from pyphoplacecellanalysis.Pho2D.matplotlib.CustomMatplotlibWidget import CustomMatplotlibWidget # used by RateRemappingPaginatedFigureController
@@ -384,6 +385,9 @@ class LongShortTrackComparingDisplayFunctions(AllFunctionEnumeratingMixin, metac
             fig.canvas.manager.set_window_title('Estimated Laps')
             graphics_output_dict = MatplotlibRenderPlots(name='_display_long_short_laps', figures=(fig,), axes=out_axes_list, plot_data={})
             return graphics_output_dict
+
+
+
 
 
 # ==================================================================================================================== #
@@ -1947,3 +1951,102 @@ def plot_expected_vs_observed(t_SHARED, y_SHORT, y_LONG, neuron_IDXs, neuron_IDs
     # plt.tight_layout()
     plt.suptitle('Expected vs. Observed Firing Rate Differences (by Replay Epoch)', wrap=True)
     return fig, axes
+
+
+def _prepare_plot_expected_vs_observed(curr_active_pipeline):
+    """ 2023-06-01 - Sets up the `plot_expected_vs_observed` plot and exports it. 
+    TODO 2023-06-01 - CONVERT TO A GLOBAL DISPLAY FUNCTION
+    
+    
+    Usage:
+        from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.MultiContextComparingDisplayFunctions.LongShortTrackComparingDisplayFunctions import _prepare_plot_expected_vs_observed
+        fig, axes, final_context, active_out_figure_paths = _prepare_plot_expected_vs_observed(curr_active_pipeline)
+    """
+    from pyphocorehelpers.geometry_helpers import map_value # _prepare_plot_expected_vs_observed
+
+    ## long_short_decoding_analyses:
+    curr_long_short_decoding_analyses = curr_active_pipeline.global_computation_results.computed_data['long_short_leave_one_out_decoding_analysis']
+    ## Extract variables from results object:
+    long_one_step_decoder_1D, short_one_step_decoder_1D, long_replays, short_replays, global_replays, long_shared_aclus_only_decoder, short_shared_aclus_only_decoder, shared_aclus, long_short_pf_neurons_diff, n_neurons, long_results_obj, short_results_obj, is_global = curr_long_short_decoding_analyses.long_decoder, curr_long_short_decoding_analyses.short_decoder, curr_long_short_decoding_analyses.long_replays, curr_long_short_decoding_analyses.short_replays, curr_long_short_decoding_analyses.global_replays, curr_long_short_decoding_analyses.long_shared_aclus_only_decoder, curr_long_short_decoding_analyses.short_shared_aclus_only_decoder, curr_long_short_decoding_analyses.shared_aclus, curr_long_short_decoding_analyses.long_short_pf_neurons_diff, curr_long_short_decoding_analyses.n_neurons, curr_long_short_decoding_analyses.long_results_obj, curr_long_short_decoding_analyses.short_results_obj, curr_long_short_decoding_analyses.is_global
+
+    ## TODO: add these to `expected_v_observed_result``:
+    decoder_1D_LONG = long_results_obj.original_1D_decoder
+    decoder_1D_SHORT = short_results_obj.original_1D_decoder
+    assert (decoder_1D_LONG.neuron_IDs == decoder_1D_SHORT.neuron_IDs).all()
+    neuron_IDs = decoder_1D_LONG.neuron_IDs.copy()
+    assert (decoder_1D_LONG.neuron_IDXs == decoder_1D_SHORT.neuron_IDXs).all()
+    neuron_IDXs = decoder_1D_LONG.neuron_IDXs.copy()
+
+    ## Get global 'long_short_post_decoding' results:
+    curr_long_short_post_decoding = curr_active_pipeline.global_computation_results.computed_data['long_short_post_decoding']
+    expected_v_observed_result = curr_long_short_post_decoding.expected_v_observed_result
+
+
+    num_epochs = len(expected_v_observed_result.num_timebins_in_epoch)
+    
+
+    ## Various sets of display args that can be used:
+    # display_kwargs = dict(x_variable='time', variable='decode_tbins_obs_exp_diff')
+    # t_SHARED = expected_v_observed_result.Flat_decoder_time_bin_centers.copy()
+    # y_LONG = expected_v_observed_result.Flat_all_epochs_computed_expected_cell_num_spikes_LONG.copy()
+    # y_SHORT = expected_v_observed_result.Flat_all_epochs_computed_expected_cell_num_spikes_SHORT.copy()
+
+
+    # display_kwargs = dict(x_variable='time', variable='obs_exp_diff_Max')
+    # t_SHARED = expected_v_observed_result.Flat_epoch_time_bins_mean.copy()
+    # y_LONG = expected_v_observed_result.all_epochs_computed_observed_from_expected_difference_maximum_LONG.copy()
+    # y_SHORT = expected_v_observed_result.all_epochs_computed_observed_from_expected_difference_maximum_SHORT.copy()
+
+
+    # t_SHARED = Flat_epoch_time_bins_mean.copy() # time mode
+    # display_kwargs = dict(x_variable='time', variable='obs_exp_diff_ptp')
+
+
+    display_kwargs = dict(x_variable='epoch_idx', variable='obs_exp_diff_ptp')
+    t_SHARED = np.arange(num_epochs) # one for each epoch if not using time
+    y_LONG = expected_v_observed_result.observed_from_expected_diff_ptp_LONG.copy()
+    y_SHORT = expected_v_observed_result.observed_from_expected_diff_ptp_SHORT.copy()
+    
+    # display_kwargs = dict(x_variable='epoch_idx', variable='obs_exp_diff_mean')
+    # y_LONG = observed_from_expected_diff_mean_LONG.copy()
+    # y_SHORT = observed_from_expected_diff_mean_SHORT.copy()
+    # assert y_LONG.shape[0] == t_SHARED.shape
+
+
+    ## Settings
+    # # sharey = False
+    # sharey=True
+    # shift_offset = 0 # num aclus to offset
+    # # y_scale = "log" # ax.set_yscale()
+    # y_scale = "linear" 
+
+    if display_kwargs['x_variable'] == 'epoch_idx':
+        # Map the times to the epoch index axes:
+        map_value_time_to_epoch_idx_space = lambda v: map_value(v, (expected_v_observed_result.Flat_epoch_time_bins_mean[0], expected_v_observed_result.Flat_epoch_time_bins_mean[-1]), (0, (num_epochs-1))) # same map
+        track_epochs_index_space = deepcopy(curr_active_pipeline.sess.epochs)
+        track_epochs_index_space._df[['start','stop','duration']] = map_value_time_to_epoch_idx_space(track_epochs_index_space._df[['start','stop','duration']]) # convert epochs to array index space        
+        track_epochs = track_epochs_index_space # index space
+    elif display_kwargs['x_variable'] == 'time':
+        track_epochs = curr_active_pipeline.sess.epochs # time space
+    else:
+        raise NotImplementedError
+        
+
+    # print(f'num_neurons: {expected_v_observed_result.num_neurons}')
+    # # active_num_rows = min(num_neurons, 20)
+    # active_num_rows = expected_v_observed_result.num_neurons
+
+    # # figsize=(32,16)
+    # figsize=(4, 13) #(24, 8)
+    
+    fig, axes = plot_expected_vs_observed(t_SHARED, y_SHORT, y_LONG, neuron_IDXs=neuron_IDXs, neuron_IDs=neuron_IDs, track_epochs=track_epochs, sharey=True, figsize=(4, 13), max_num_rows=150, y_scale="linear")
+    plt.show()
+
+    ## 2023-05-31 - Reference Output of matplotlib figure to file, along with building appropriate context.
+    active_session_figures_out_path = curr_active_pipeline.get_daily_programmatic_session_output_path()
+    final_context = curr_active_pipeline.sess.get_context().adding_context('display_fn', display_fn_name='plot_expected_vs_observed').adding_context('display_kwargs', **display_kwargs)
+    print(f'final_context: {final_context}')
+    active_out_figure_paths = perform_write_to_file(fig, final_context, figures_parent_out_path=active_session_figures_out_path, register_output_file_fn=curr_active_pipeline.register_output_file)
+
+    return fig, axes, final_context, active_out_figure_paths
+
