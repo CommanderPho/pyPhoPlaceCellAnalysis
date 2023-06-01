@@ -590,6 +590,8 @@ def compute_radon_transforms(decoder, decoder_result, nlines=5000, margin=16, ju
     Usage:
         from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.DefaultComputationFunctions import compute_radon_transforms
         epochs_linear_fit_df = compute_radon_transforms(long_results_obj.original_1D_decoder, long_results_obj.all_included_filter_epochs_decoder_result)
+        
+        Columns:         ['score', 'velocity', 'intercept', 'speed']
     """
     from pyphoplacecellanalysis.Analysis.Decoder.decoder_result import get_radon_transform
     # active_time_bins = active_epoch_decoder_result.time_bin_edges[0]

@@ -314,9 +314,9 @@ class LongShortTrackComputations(AllFunctionEnumeratingMixin, metaclass=Computat
             ['sess']
             
         Provides:
-            global_computation_results.computed_data['long_short_fr_indicies_analysis']
-                ['long_short_fr_indicies_analysis']['short_long_neurons_diff']
-                ['long_short_fr_indicies_analysis']['poly_overlap_df']
+            global_computation_results.computed_data['long_short_post_decoding']
+                ['long_short_post_decoding']['expected_v_observed_result']
+                ['long_short_post_decoding']['rate_remapping']
         
         """
         # New unified `pipeline_complete_compute_long_short_fr_indicies(...)` method for entire pipeline:
@@ -563,6 +563,8 @@ class LongShortTrackComputations(AllFunctionEnumeratingMixin, metaclass=Computat
 
         # call `simpler_compute_measured_vs_expected_firing_rates`
         returned_shape_tuple_LONG, (observed_from_expected_diff_ptp_LONG, observed_from_expected_diff_mean_LONG, observed_from_expected_diff_std_LONG) = simpler_compute_measured_vs_expected_firing_rates(active_pos_df, active_filter_epochs, a_decoder_1D=decoder_1D_LONG, a_decoder_result=decoder_result_LONG)
+        
+
         ## Short Specific:
         decoder_1D_SHORT = short_results_obj.original_1D_decoder
         decoder_result_SHORT = short_results_obj.all_included_filter_epochs_decoder_result
@@ -589,9 +591,11 @@ class LongShortTrackComputations(AllFunctionEnumeratingMixin, metaclass=Computat
         num_neurons, num_timebins_in_epoch, num_total_flat_timebins = returned_shape_tuple_LONG # after the assert they're guaranteed to be the same for short
         # assert not np.array([(Flat_all_epochs_computed_expected_cell_num_spikes_LONG[i] == Flat_all_epochs_computed_expected_cell_num_spikes_SHORT[i]).all() for i in np.arange(active_filter_epochs.n_epochs)]).all(), "all expected number spikes for all cells should not be the same for two different decoders! This likely indicates an error!"
 
-
+        
         ## Outputs: Flat_epoch_time_bins_mean, Flat_decoder_time_bin_centers, num_neurons, num_timebins_in_epoch, num_total_flat_timebins
 
+
+        ## More complex outputs:
 
         # 2023-05-30 9:30pm - just compute the aggregate stats for the short v long expected firing rates: ___________________ #
         ## Get the epochs that occur on the short and the long tracks:
@@ -621,11 +625,13 @@ class LongShortTrackComputations(AllFunctionEnumeratingMixin, metaclass=Computat
         ## 2023-05-25 - Get the 1D Posteriors for each replay epoch so they can be analyzed via score_posterior(...) with a Radon Transform approch to find the line of best fit (which gives the velocity).
         epochs_linear_fit_df_LONG = compute_radon_transforms(long_results_obj.original_1D_decoder, long_results_obj.all_included_filter_epochs_decoder_result)
         assert long_results_obj.active_filter_epochs.n_epochs == np.shape(epochs_linear_fit_df_LONG)[0]
-        long_results_obj.active_filter_epochs._df = long_results_obj.active_filter_epochs.to_dataframe().join(epochs_linear_fit_df_LONG) # add the newly computed columns to the Epochs object
+        long_results_obj.active_filter_epochs._df.drop(columns=['score', 'velocity', 'intercept', 'speed'], inplace=True, errors='ignore') # 'ignore' doesn't raise an exception if the columns don't already exist.
+        long_results_obj.active_filter_epochs._df = long_results_obj.active_filter_epochs.to_dataframe().join(epochs_linear_fit_df_LONG, ) # add the newly computed columns to the Epochs object
         # epochs_linear_fit_df_LONG
 
         epochs_linear_fit_df_SHORT = compute_radon_transforms(short_results_obj.original_1D_decoder, short_results_obj.all_included_filter_epochs_decoder_result)
         assert short_results_obj.active_filter_epochs.n_epochs == np.shape(epochs_linear_fit_df_SHORT)[0]
+        short_results_obj.active_filter_epochs._df.drop(columns=['score', 'velocity', 'intercept', 'speed'], inplace=True, errors='ignore') # 'ignore' doesn't raise an exception if the columns don't already exist.
         short_results_obj.active_filter_epochs._df = short_results_obj.active_filter_epochs.to_dataframe().join(epochs_linear_fit_df_SHORT) # add the newly computed columns to the Epochs object
         # epochs_linear_fit_df_SHORT
 
@@ -635,13 +641,18 @@ class LongShortTrackComputations(AllFunctionEnumeratingMixin, metaclass=Computat
         # combined_epochs_linear_fit_df
 
         assert active_filter_epochs.n_epochs == np.shape(combined_epochs_linear_fit_df)[0]
+        active_filter_epochs._df.drop(columns=['score_LONG', 'velocity_LONG', 'intercept_LONG', 'speed_LONG', 'score_SHORT', 'velocity_SHORT', 'intercept_SHORT', 'speed_SHORT'], inplace=True, errors='ignore') # 'ignore' doesn't raise an exception if the columns don't already exist.
         active_filter_epochs._df = active_filter_epochs.to_dataframe().join(combined_epochs_linear_fit_df) # add the newly computed columns to the Epochs object
         active_filter_epochs
 
-
+        
         # Add to computed results:
         expected_v_observed_result = DynamicParameters(Flat_epoch_time_bins_mean=Flat_epoch_time_bins_mean, Flat_decoder_time_bin_centers=Flat_decoder_time_bin_centers, num_neurons=num_neurons, num_timebins_in_epoch=num_timebins_in_epoch, num_total_flat_timebins=num_total_flat_timebins, 
-                                                    is_short_track_epoch=is_short_track_epoch, is_long_track_epoch=is_long_track_epoch, short_short_diff=short_short_diff, long_long_diff=long_long_diff)
+                                                    decoder_time_bin_centers_LONG=decoder_time_bin_centers_LONG, all_epochs_computed_expected_cell_num_spikes_LONG=all_epochs_computed_expected_cell_num_spikes_LONG, all_epochs_computed_observed_from_expected_difference_LONG=all_epochs_computed_observed_from_expected_difference_LONG, measured_pos_window_centers_LONG=measured_pos_window_centers_LONG, all_epochs_decoded_epoch_time_bins_mean_LONG=all_epochs_decoded_epoch_time_bins_mean_LONG, all_epochs_computed_expected_cell_firing_rates_mean_LONG=all_epochs_computed_expected_cell_firing_rates_mean_LONG, all_epochs_computed_expected_cell_firing_rates_stddev_LONG=all_epochs_computed_expected_cell_firing_rates_stddev_LONG, all_epochs_computed_observed_from_expected_difference_maximum_LONG=all_epochs_computed_observed_from_expected_difference_maximum_LONG, Flat_decoder_time_bin_centers_LONG=Flat_decoder_time_bin_centers_LONG, Flat_all_epochs_computed_expected_cell_num_spikes_LONG=Flat_all_epochs_computed_expected_cell_num_spikes_LONG, returned_shape_tuple_LONG=returned_shape_tuple_LONG, observed_from_expected_diff_ptp_LONG=observed_from_expected_diff_ptp_LONG, observed_from_expected_diff_mean_LONG=observed_from_expected_diff_mean_LONG, observed_from_expected_diff_std_LONG=observed_from_expected_diff_std_LONG,
+                                                    decoder_time_bin_centers_SHORT=decoder_time_bin_centers_SHORT, all_epochs_computed_expected_cell_num_spikes_SHORT=all_epochs_computed_expected_cell_num_spikes_SHORT, all_epochs_computed_observed_from_expected_difference_SHORT=all_epochs_computed_observed_from_expected_difference_SHORT, measured_pos_window_centers_SHORT=measured_pos_window_centers_SHORT, all_epochs_decoded_epoch_time_bins_mean_SHORT=all_epochs_decoded_epoch_time_bins_mean_SHORT, all_epochs_computed_expected_cell_firing_rates_mean_SHORT=all_epochs_computed_expected_cell_firing_rates_mean_SHORT, all_epochs_computed_expected_cell_firing_rates_stddev_SHORT=all_epochs_computed_expected_cell_firing_rates_stddev_SHORT, all_epochs_computed_observed_from_expected_difference_maximum_SHORT=all_epochs_computed_observed_from_expected_difference_maximum_SHORT, Flat_decoder_time_bin_centers_SHORT=Flat_decoder_time_bin_centers_SHORT, Flat_all_epochs_computed_expected_cell_num_spikes_SHORT=Flat_all_epochs_computed_expected_cell_num_spikes_SHORT, returned_shape_tuple_SHORT=returned_shape_tuple_SHORT, observed_from_expected_diff_ptp_SHORT=observed_from_expected_diff_ptp_SHORT, observed_from_expected_diff_mean_SHORT=observed_from_expected_diff_mean_SHORT, observed_from_expected_diff_std_SHORT=observed_from_expected_diff_std_SHORT,
+                                                    is_short_track_epoch=is_short_track_epoch, is_long_track_epoch=is_long_track_epoch, short_short_diff=short_short_diff, long_long_diff=long_long_diff,
+        )
+
 
         # Flat_epoch_time_bins_mean, Flat_decoder_time_bin_centers, num_neurons, num_timebins_in_epoch, num_total_flat_timebins
         
@@ -661,7 +672,8 @@ class LongShortTrackComputations(AllFunctionEnumeratingMixin, metaclass=Computat
             ## Extract variables from results object:
             expected_v_observed_result, curr_long_short_rr = curr_long_short_post_decoding.expected_v_observed_result, curr_long_short_post_decoding.rate_remapping
             rate_remapping_df, high_remapping_cells_only = curr_long_short_rr.rr_df, curr_long_short_rr.high_only_rr_df
-            expected_v_observed_result
+            Flat_epoch_time_bins_mean, Flat_decoder_time_bin_centers, num_neurons, num_timebins_in_epoch, num_total_flat_timebins, is_short_track_epoch, is_long_track_epoch, short_short_diff, long_long_diff = expected_v_observed_result['Flat_epoch_time_bins_mean'], expected_v_observed_result['Flat_decoder_time_bin_centers'], expected_v_observed_result['num_neurons'], expected_v_observed_result['num_timebins_in_epoch'], expected_v_observed_result['num_total_flat_timebins'], expected_v_observed_result['is_short_track_epoch'], expected_v_observed_result['is_long_track_epoch'], expected_v_observed_result['short_short_diff'], expected_v_observed_result['long_long_diff']
+
 
         """
         return global_computation_results
@@ -1670,7 +1682,7 @@ def simpler_compute_measured_vs_expected_firing_rates(active_pos_df, active_filt
 
 	## Awkward Array (Ragged-array) version:
 	ragged_expected_firing_rates_arr = ak.Array(all_cells_decoded_expected_firing_rates_list) # awkward array
-	num_timebins_in_epoch = ak.num(ragged_expected_firing_rates_arr, axis=1)
+	num_timebins_in_epoch = ak.num(ragged_expected_firing_rates_arr, axis=1).to_numpy()
 	num_total_flat_timebins: int = np.sum(num_timebins_in_epoch)
 	print(f'num_neurons: {num_neurons}, num_epochs: {num_epochs}, num_total_flat_timebins: {num_total_flat_timebins}')
 
