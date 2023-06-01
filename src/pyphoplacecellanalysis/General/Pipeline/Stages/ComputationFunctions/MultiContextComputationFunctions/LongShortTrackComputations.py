@@ -216,11 +216,11 @@ class LongShortTrackComputations(AllFunctionEnumeratingMixin, metaclass=Computat
     
 
     @function_attributes(tags=['long_short', 'short_long','replay', 'decoding', 'computation'], input_requires=['global_computation_results.computed_data.long_short_leave_one_out_decoding_analysis'], output_provides=[], uses=['compute_rate_remapping_stats'], used_by=[], creation_date='2023-05-31 13:57')
-    def _perform_long_short_decoding_rate_remapping_analyses(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_whitelist=None, debug_print=False, decoding_time_bin_size=None, perform_cache_load=False, always_recompute_replays=False):
-        """ Computes rate remapping statistics
+    def _perform_long_short_post_decoding_analysis(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_whitelist=None, debug_print=False):
+        """ Must be performed after `_perform_long_short_decoding_analyses`
         
         Requires:
-            ['global_computation_results.computed_data.long_short_leave_one_out_decoding_analysis']
+            ['global_computation_results.computed_data.long_short_leave_one_out_decoding_analysis', 'global_computation_results.computed_data.long_short_fr_indicies_analysis']
             
         Provides:
             computation_result.computed_data['long_short_rate_remapping']
@@ -228,35 +228,190 @@ class LongShortTrackComputations(AllFunctionEnumeratingMixin, metaclass=Computat
                 # ['long_short_rate_remapping']['high_only_rr_df']
         
         """
-        
+        import scipy.stats
         from neuropy.core.neurons import NeuronType
         from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.LongShortTrackComputations import compute_rate_remapping_stats
         
+        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.LongShortTrackComputations import compute_measured_vs_expected_firing_rates
+        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.LongShortTrackComputations import simpler_compute_measured_vs_expected_firing_rates
+        
         ## long_short_decoding_analyses:
-        curr_long_short_decoding_analyses = global_computation_results.computed_data['long_short_leave_one_out_decoding_analysis'] # end long_short
+        long_short_fr_indicies_analysis_results = global_computation_results.computed_data['long_short_fr_indicies_analysis']
+        # x_frs_dict, y_frs_dict = long_short_fr_indicies_analysis_results['x_frs_index'], long_short_fr_indicies_analysis_results['y_frs_index'] # use the all_results_dict as the computed data value
+
+        curr_long_short_decoding_analyses = global_computation_results.computed_data['long_short_leave_one_out_decoding_analysis'] 
         ## Extract variables from results object:
         long_one_step_decoder_1D, short_one_step_decoder_1D, long_replays, short_replays, global_replays, long_shared_aclus_only_decoder, short_shared_aclus_only_decoder, shared_aclus, long_short_pf_neurons_diff, n_neurons, long_results_obj, short_results_obj, is_global = curr_long_short_decoding_analyses.long_decoder, curr_long_short_decoding_analyses.short_decoder, curr_long_short_decoding_analyses.long_replays, curr_long_short_decoding_analyses.short_replays, curr_long_short_decoding_analyses.global_replays, curr_long_short_decoding_analyses.long_shared_aclus_only_decoder, curr_long_short_decoding_analyses.short_shared_aclus_only_decoder, curr_long_short_decoding_analyses.shared_aclus, curr_long_short_decoding_analyses.long_short_pf_neurons_diff, curr_long_short_decoding_analyses.n_neurons, curr_long_short_decoding_analyses.long_results_obj, curr_long_short_decoding_analyses.short_results_obj, curr_long_short_decoding_analyses.is_global
         long_epoch_name, short_epoch_name, global_epoch_name = owning_pipeline_reference.find_LongShortGlobal_epoch_names()
         # long_epoch_context, short_epoch_context, global_epoch_context = [owning_pipeline_reference.filtered_contexts[a_name] for a_name in (long_epoch_name, short_epoch_name, global_epoch_name)]
         long_session, short_session, global_session = [owning_pipeline_reference.filtered_sessions[an_epoch_name] for an_epoch_name in [long_epoch_name, short_epoch_name, global_epoch_name]]
         
+
+        ## Common to both Long and Short:
+        active_pos_df = global_session.position.to_dataframe()
+        assert (long_results_obj.active_filter_epochs.as_array() == short_results_obj.active_filter_epochs.as_array()).all() # ensure that the active_filter_epochs for both are the same.
+        active_filter_epochs = long_results_obj.active_filter_epochs
+        num_epochs = active_filter_epochs.n_epochs
+
+        ## Long Specific:
+        decoder_1D_LONG = long_results_obj.original_1D_decoder
+        decoder_result_LONG = long_results_obj.all_included_filter_epochs_decoder_result
+        # call `compute_measured_vs_expected_firing_rates`
+        decoder_time_bin_centers_LONG, all_epochs_computed_expected_cell_num_spikes_LONG, all_epochs_computed_observed_from_expected_difference_LONG, measured_pos_window_centers_LONG, (all_epochs_decoded_epoch_time_bins_mean_LONG, all_epochs_computed_expected_cell_firing_rates_mean_LONG, all_epochs_computed_expected_cell_firing_rates_stddev_LONG, all_epochs_computed_observed_from_expected_difference_maximum_LONG) = compute_measured_vs_expected_firing_rates(active_pos_df, active_filter_epochs, decoder_1D_LONG, decoder_result_LONG)
+        # The Flat_* versions exist because it's difficult to plot while all of the metrics are separated in lists.
+        Flat_decoder_time_bin_centers_LONG = np.concatenate(decoder_time_bin_centers_LONG) # .shape: (412,)
+        Flat_all_epochs_computed_expected_cell_num_spikes_LONG = np.vstack([np.concatenate([all_epochs_computed_observed_from_expected_difference_LONG[decoded_epoch_idx][target_neuron_IDX, :] for decoded_epoch_idx in np.arange(decoder_result_LONG.num_filter_epochs)]) for target_neuron_IDX in decoder_1D_LONG.neuron_IDXs]) #.shape (20, 22)
+
+        # call `simpler_compute_measured_vs_expected_firing_rates`
+        returned_shape_tuple_LONG, (observed_from_expected_diff_ptp_LONG, observed_from_expected_diff_mean_LONG, observed_from_expected_diff_std_LONG) = simpler_compute_measured_vs_expected_firing_rates(active_pos_df, active_filter_epochs, a_decoder_1D=decoder_1D_LONG, a_decoder_result=decoder_result_LONG)
+        ## Short Specific:
+        decoder_1D_SHORT = short_results_obj.original_1D_decoder
+        decoder_result_SHORT = short_results_obj.all_included_filter_epochs_decoder_result
+
+        # call `compute_measured_vs_expected_firing_rates`
+        decoder_time_bin_centers_SHORT, all_epochs_computed_expected_cell_num_spikes_SHORT, all_epochs_computed_observed_from_expected_difference_SHORT, measured_pos_window_centers_SHORT, (all_epochs_decoded_epoch_time_bins_mean_SHORT, all_epochs_computed_expected_cell_firing_rates_mean_SHORT, all_epochs_computed_expected_cell_firing_rates_stddev_SHORT, all_epochs_computed_observed_from_expected_difference_maximum_SHORT) = compute_measured_vs_expected_firing_rates(active_pos_df, active_filter_epochs, decoder_1D_SHORT, decoder_result_SHORT)
+        # The Flat_* versions exist because it's difficult to plot while all of the metrics are separated in lists.
+        Flat_decoder_time_bin_centers_SHORT = np.concatenate(decoder_time_bin_centers_SHORT) # .shape: (412,)
+        Flat_all_epochs_computed_expected_cell_num_spikes_SHORT = np.vstack([np.concatenate([all_epochs_computed_observed_from_expected_difference_SHORT[decoded_epoch_idx][target_neuron_IDX, :] for decoded_epoch_idx in np.arange(decoder_result_SHORT.num_filter_epochs)]) for target_neuron_IDX in decoder_1D_SHORT.neuron_IDXs]) #.shape (20, 22)
+        Flat_epoch_time_bins_mean = all_epochs_decoded_epoch_time_bins_mean_SHORT[:,0]
+
+        # call `simpler_compute_measured_vs_expected_firing_rates`
+        returned_shape_tuple_SHORT, (observed_from_expected_diff_ptp_SHORT, observed_from_expected_diff_mean_SHORT, observed_from_expected_diff_std_SHORT) = simpler_compute_measured_vs_expected_firing_rates(active_pos_df, active_filter_epochs, a_decoder_1D=decoder_1D_SHORT, a_decoder_result=decoder_result_SHORT)
+
+        ## Sanity Checks that the LONG and SHORT decoders and their decoded results aren't identical:
+        assert (Flat_decoder_time_bin_centers_SHORT == Flat_decoder_time_bin_centers_LONG).all()
+        Flat_decoder_time_bin_centers = Flat_decoder_time_bin_centers_LONG # equivalent
+        assert (decoder_1D_LONG.neuron_IDs == decoder_1D_SHORT.neuron_IDs).all()
+        assert not (decoder_1D_LONG.P_x == decoder_1D_SHORT.P_x).all() # the occupancies shouldn't be identical between the two encoders, this might indicate an error
+        assert not (decoder_1D_LONG.F == decoder_1D_SHORT.F).all() # the placefields shouldn't be identical between the two encoders, this might indicate an error
+
+        print(f"returned_shape_tuple_LONG: {returned_shape_tuple_LONG}, returned_shape_tuple_SHORT: {returned_shape_tuple_SHORT}")
+        assert (returned_shape_tuple_LONG[0] == returned_shape_tuple_SHORT[0]) and (returned_shape_tuple_LONG[-1] == returned_shape_tuple_SHORT[-1]) , f"returned_shape_tuple_LONG: {returned_shape_tuple_LONG}, returned_shape_tuple_SHORT: {returned_shape_tuple_SHORT}"
+        num_neurons, num_timebins_in_epoch, num_total_flat_timebins = returned_shape_tuple_LONG # after the assert they're guaranteed to be the same for short
+        # assert not np.array([(Flat_all_epochs_computed_expected_cell_num_spikes_LONG[i] == Flat_all_epochs_computed_expected_cell_num_spikes_SHORT[i]).all() for i in np.arange(active_filter_epochs.n_epochs)]).all(), "all expected number spikes for all cells should not be the same for two different decoders! This likely indicates an error!"
+
+
+        ## Outputs: Flat_epoch_time_bins_mean, Flat_decoder_time_bin_centers, num_neurons, num_timebins_in_epoch, num_total_flat_timebins
+
+
+        ## 2023-05-30 9:30pm - just compute the aggregate stats for the short v long expected firing rates:
+        
+
+        ## Get the epochs that occur on the short and the long tracks:
+        is_short_track_epoch = (Flat_epoch_time_bins_mean >= short_session.t_start)
+        is_long_track_epoch = np.logical_not(is_short_track_epoch)
+
+        # All comparisons should be (native - alternative), so a positive value (> 0) is expected
+        # analyze the decodings of the events on the short track:
+        short_short_diff = (observed_from_expected_diff_mean_SHORT[:, is_short_track_epoch] - observed_from_expected_diff_mean_LONG[:, is_short_track_epoch])
+        # expect that the short_short decoding is better than the long_short decoding, so short_short_diff should be significantly < 0.0
+
+        # analyze the decodings of the events on the long track:
+        long_long_diff = (observed_from_expected_diff_mean_LONG[:, is_long_track_epoch] - observed_from_expected_diff_mean_SHORT[:, is_long_track_epoch])
+
+        # np.mean(long_long_diff)
+        # np.mean(short_short_diff)
+
+        # ttest_results = scipy.stats.ttest_rel(long_long_diff, short_short_diff)
+
+        print(f'long_test: {np.mean(long_long_diff)}')
+        print(f'short_test: {np.mean(short_short_diff)}')
+
+
+        ### 2023-05-25 - Radon Transform approach to finding line of best fit for each replay Epoch. Modifies the original: `long_results_obj`, `short_results_obj`, `curr_long_short_decoding_analyses`
+        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.DefaultComputationFunctions import compute_radon_transforms
+
+        ## 2023-05-25 - Get the 1D Posteriors for each replay epoch so they can be analyzed via score_posterior(...) with a Radon Transform approch to find the line of best fit (which gives the velocity).
+        epochs_linear_fit_df_LONG = compute_radon_transforms(long_results_obj.original_1D_decoder, long_results_obj.all_included_filter_epochs_decoder_result)
+        assert long_results_obj.active_filter_epochs.n_epochs == np.shape(epochs_linear_fit_df_LONG)[0]
+        long_results_obj.active_filter_epochs._df = long_results_obj.active_filter_epochs.to_dataframe().join(epochs_linear_fit_df_LONG) # add the newly computed columns to the Epochs object
+        # epochs_linear_fit_df_LONG
+
+        epochs_linear_fit_df_SHORT = compute_radon_transforms(short_results_obj.original_1D_decoder, short_results_obj.all_included_filter_epochs_decoder_result)
+        assert short_results_obj.active_filter_epochs.n_epochs == np.shape(epochs_linear_fit_df_SHORT)[0]
+        short_results_obj.active_filter_epochs._df = short_results_obj.active_filter_epochs.to_dataframe().join(epochs_linear_fit_df_SHORT) # add the newly computed columns to the Epochs object
+        # epochs_linear_fit_df_SHORT
+
+        # Join the columns of LONG and SHORT dataframes with suffixes
+        assert np.shape(epochs_linear_fit_df_LONG)[0] == np.shape(epochs_linear_fit_df_SHORT)[0]
+        combined_epochs_linear_fit_df = epochs_linear_fit_df_LONG.join(epochs_linear_fit_df_SHORT, lsuffix='_LONG', rsuffix='_SHORT')
+        # combined_epochs_linear_fit_df
+
+        assert active_filter_epochs.n_epochs == np.shape(combined_epochs_linear_fit_df)[0]
+        active_filter_epochs._df = active_filter_epochs.to_dataframe().join(combined_epochs_linear_fit_df) # add the newly computed columns to the Epochs object
+        active_filter_epochs
+
+
+        # Add to computed results:
+        expected_v_observed_result = DynamicParameters(Flat_epoch_time_bins_mean=Flat_epoch_time_bins_mean, Flat_decoder_time_bin_centers=Flat_decoder_time_bin_centers, num_neurons=num_neurons, num_timebins_in_epoch=num_timebins_in_epoch, num_total_flat_timebins=num_total_flat_timebins, 
+                                                    is_short_track_epoch=is_short_track_epoch, is_long_track_epoch=is_long_track_epoch, short_short_diff=short_short_diff, long_long_diff=long_long_diff)
+
+        # Flat_epoch_time_bins_mean, Flat_decoder_time_bin_centers, num_neurons, num_timebins_in_epoch, num_total_flat_timebins
         
         ## Compute Rate Remapping Dataframe:
-        rate_remapping_df = compute_rate_remapping_stats(curr_long_short_decoding_analyses, global_session.neurons.aclu_to_neuron_type_map, considerable_remapping_threshold=0.7)
+        rate_remapping_df = compute_rate_remapping_stats(long_short_fr_indicies_analysis_results, global_session.neurons.aclu_to_neuron_type_map, considerable_remapping_threshold=0.7)
         high_remapping_cells_only = rate_remapping_df[rate_remapping_df['has_considerable_remapping']]
 
         # Add to computed results:
-        global_computation_results.computed_data['long_short_rate_remapping'] = ComputedResult(is_global=True, rr_df=rate_remapping_df, high_only_rr_df=high_remapping_cells_only)
+        global_computation_results.computed_data['long_short_post_decoding'] = DynamicParameters(expected_v_observed_result=expected_v_observed_result,
+                                                                                               rate_remapping=DynamicParameters(rr_df=rate_remapping_df, high_only_rr_df=high_remapping_cells_only)
+                                                                                            )
         
         """ Getting outputs:
         
-            ## long_short_rate_remapping:
-            curr_long_short_rr = curr_active_pipeline.global_computation_results.computed_data['long_short_rate_remapping']
+            ## long_short_post_decoding:
+            curr_long_short_post_decoding = curr_active_pipeline.global_computation_results.computed_data['long_short_post_decoding']
             ## Extract variables from results object:
+            expected_v_observed_result, curr_long_short_rr = curr_long_short_post_decoding.expected_v_observed_result, curr_long_short_post_decoding.rate_remapping
             rate_remapping_df, high_remapping_cells_only = curr_long_short_rr.rr_df, curr_long_short_rr.high_only_rr_df
+            expected_v_observed_result
 
         """
         return global_computation_results
+
+
+    # @function_attributes(tags=['long_short', 'short_long','replay', 'decoding', 'computation'], input_requires=['global_computation_results.computed_data.long_short_leave_one_out_decoding_analysis'], output_provides=[], uses=['compute_rate_remapping_stats'], used_by=[], creation_date='2023-05-31 13:57')
+    # def _perform_long_short_decoding_rate_remapping_analyses(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_whitelist=None, debug_print=False, decoding_time_bin_size=None, perform_cache_load=False, always_recompute_replays=False):
+    #     """ Computes rate remapping statistics
+        
+    #     Requires:
+    #         ['global_computation_results.computed_data.long_short_leave_one_out_decoding_analysis']
+            
+    #     Provides:
+    #         computation_result.computed_data['long_short_rate_remapping']
+    #             # ['long_short_rate_remapping']['rr_df']
+    #             # ['long_short_rate_remapping']['high_only_rr_df']
+        
+    #     """
+        
+    #     from neuropy.core.neurons import NeuronType
+    #     from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.LongShortTrackComputations import compute_rate_remapping_stats
+        
+    #     ## long_short_decoding_analyses:
+    #     curr_long_short_decoding_analyses = global_computation_results.computed_data['long_short_leave_one_out_decoding_analysis'] # end long_short
+    #     ## Extract variables from results object:
+    #     long_one_step_decoder_1D, short_one_step_decoder_1D, long_replays, short_replays, global_replays, long_shared_aclus_only_decoder, short_shared_aclus_only_decoder, shared_aclus, long_short_pf_neurons_diff, n_neurons, long_results_obj, short_results_obj, is_global = curr_long_short_decoding_analyses.long_decoder, curr_long_short_decoding_analyses.short_decoder, curr_long_short_decoding_analyses.long_replays, curr_long_short_decoding_analyses.short_replays, curr_long_short_decoding_analyses.global_replays, curr_long_short_decoding_analyses.long_shared_aclus_only_decoder, curr_long_short_decoding_analyses.short_shared_aclus_only_decoder, curr_long_short_decoding_analyses.shared_aclus, curr_long_short_decoding_analyses.long_short_pf_neurons_diff, curr_long_short_decoding_analyses.n_neurons, curr_long_short_decoding_analyses.long_results_obj, curr_long_short_decoding_analyses.short_results_obj, curr_long_short_decoding_analyses.is_global
+    #     long_epoch_name, short_epoch_name, global_epoch_name = owning_pipeline_reference.find_LongShortGlobal_epoch_names()
+    #     # long_epoch_context, short_epoch_context, global_epoch_context = [owning_pipeline_reference.filtered_contexts[a_name] for a_name in (long_epoch_name, short_epoch_name, global_epoch_name)]
+    #     long_session, short_session, global_session = [owning_pipeline_reference.filtered_sessions[an_epoch_name] for an_epoch_name in [long_epoch_name, short_epoch_name, global_epoch_name]]
+        
+        
+    #     ## Compute Rate Remapping Dataframe:
+    #     rate_remapping_df = compute_rate_remapping_stats(curr_long_short_decoding_analyses, global_session.neurons.aclu_to_neuron_type_map, considerable_remapping_threshold=0.7)
+    #     high_remapping_cells_only = rate_remapping_df[rate_remapping_df['has_considerable_remapping']]
+
+    #     # Add to computed results:
+    #     global_computation_results.computed_data['long_short_rate_remapping'] = ComputedResult(is_global=True, rr_df=rate_remapping_df, high_only_rr_df=high_remapping_cells_only)
+        
+    #     """ Getting outputs:
+        
+    #         ## long_short_rate_remapping:
+    #         curr_long_short_rr = curr_active_pipeline.global_computation_results.computed_data['long_short_rate_remapping']
+    #         ## Extract variables from results object:
+    #         rate_remapping_df, high_remapping_cells_only = curr_long_short_rr.rr_df, curr_long_short_rr.high_only_rr_df
+
+    #     """
+    #     return global_computation_results
 
 
 
