@@ -140,7 +140,7 @@ class PaginatedFigureBaseController:
             suptitle = window_title # same as window title
         # Set the window title:
         self.ui.mw.setWindowTitle(window_title)
-        self.ui.mw.fig.suptitle(suptitle) # set the plot suptitle
+        self.ui.mw.fig.suptitle(suptitle, wrap=True) # set the plot suptitle
         self.ui.mw.draw()
 
 

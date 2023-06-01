@@ -602,7 +602,7 @@ def compute_radon_transforms(decoder, decoder_result, nlines=5000, margin=16, ju
     ## compute the Radon transform to get the lines of best fit
     score, velocity, intercept = get_radon_transform(active_posterior, decoding_time_bin_duration=decoder_result.decoding_time_bin_size, pos_bin_size=pos_bin_size, posteriors=None, nlines=nlines, margin=margin, jump_stat=jump_stat, n_jobs=1)
 
-    epochs_linear_fit_df = pd.DataFrame({'score': score, 'velocity': velocity, 'intercept': intercept})
+    epochs_linear_fit_df = pd.DataFrame({'score': score, 'velocity': velocity, 'intercept': intercept, 'speed': np.abs(velocity)})
     return epochs_linear_fit_df
 
 
