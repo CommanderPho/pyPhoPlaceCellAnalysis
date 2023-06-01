@@ -180,7 +180,7 @@ class BatchRun:
         for ctx, output_v in global_batch_run.session_batch_outputs.items():
             if output_v is not None:
                 # {long_epoch_name:(long_laps, long_replays), short_epoch_name:(short_laps, short_replays)}
-                (long_laps, long_replays), (short_laps, short_replays) = list(output_v.values())[:4] # only get the first four outputs
+                (long_laps, long_replays), (short_laps, short_replays) = list(output_v.values())[:2] # only get the first four outputs
                 out_counts.append((long_laps.n_epochs, long_replays.n_epochs, short_laps.n_epochs, short_replays.n_epochs))
             else:
                 out_counts.append((0, 0, 0, 0))
