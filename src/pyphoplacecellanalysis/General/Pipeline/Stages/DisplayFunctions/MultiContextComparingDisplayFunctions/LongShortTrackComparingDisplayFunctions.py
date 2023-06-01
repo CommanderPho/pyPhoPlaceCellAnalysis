@@ -14,6 +14,7 @@ from neuropy.utils.matplotlib_helpers import build_or_reuse_figure # used for `_
 from neuropy.utils.mixins.print_helpers import ProgressMessagePrinter # for `_plot_long_short_firing_rate_indicies`
 from neuropy.core.neurons import NeuronType
 from neuropy.utils.matplotlib_helpers import fit_both_axes
+from neuropy.utils.matplotlib_helpers import draw_epoch_regions # plot_expected_vs_observed
 
 from pyphocorehelpers.function_helpers import function_attributes
 from pyphocorehelpers.programming_helpers import metadata_attributes
@@ -1863,3 +1864,86 @@ def _plot_session_long_short_track_firing_rate_figures(curr_active_pipeline, jon
     _generalized_persist_out_single_figure(curr_active_pipeline, fig_L, active_display_context_L, figures_parent_out_path=figures_parent_out_path)
     _generalized_persist_out_single_figure(curr_active_pipeline, fig_S, active_display_context_S, figures_parent_out_path=figures_parent_out_path)
     return (fig_L, ax_L, active_display_context_L), (fig_S, ax_S, active_display_context_S)
+
+
+
+# ==================================================================================================================== #
+# 2023-06-01 - New Averaged Long vs. Short Expected Firing Rates plots                                                 #
+# ==================================================================================================================== #
+
+def plot_expected_vs_observed(t_SHARED, y_SHORT, y_LONG, neuron_IDXs, neuron_IDs, track_epochs, sharey=True, figsize=(4, 13), max_num_rows:int=50, shift_offset:int=0, y_scale = "linear"):
+    """ 2023-05-31 - plots the expected firing rates for the decoded postions for both the long and short decoder vs. the observed
+    
+    plots one subplot for each neuron. 
+
+        t_SHARED, y_LONG, y_SHORT
+
+
+    Usage:
+
+        from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.MultiContextComparingDisplayFunctions.LongShortTrackComparingDisplayFunctions import plot_expected_vs_observed
+    
+    
+    """
+    num_neurons:int = len(neuron_IDXs)
+    assert len(neuron_IDXs) == len(neuron_IDs)
+
+    active_num_rows = min(num_neurons, max_num_rows)
+    # the y-min and max across all cells and time bins:
+    global_y_max_SHORT = np.max([np.max(v) for v in y_SHORT]) # 0.9280231494040394
+    global_y_min_SHORT = np.min([np.min(v) for v in y_SHORT]) # -4.850176354048617
+    print(f'global_y_min_SHORT: {global_y_min_SHORT}, global_y_max_SHORT: {global_y_max_SHORT}')
+
+    global_y_max_LONG = np.max([np.max(v) for v in y_LONG]) # 0.9280231494040394
+    global_y_min_LONG = np.min([np.min(v) for v in y_LONG]) # -4.850176354048617
+    print(f'global_y_min_LONG: {global_y_min_LONG}, global_y_max_LONG: {global_y_max_LONG}')
+
+    # the y-min and max across all cells and time bins:
+    global_y_max = np.max([global_y_max_LONG, global_y_max_SHORT]) # 0.9280231494040394
+    # global_y_min = np.min([global_y_min_LONG, global_y_min_SHORT]) # -4.850176354048617
+    global_y_min = 0.0 # y min is overriden to 0 for peak-to-peak (ptp) mode
+    print(f'global_y_min: {global_y_min}, global_y_max: {global_y_max}')
+
+    # global_x_min, global_x_max = Flat_decoder_time_bin_centers_LONG[0], Flat_decoder_time_bin_centers_LONG[-1]
+    global_x_min, global_x_max = t_SHARED[0], t_SHARED[-1]
+
+
+    fig, axes = plt.subplots(ncols=1, nrows=active_num_rows, sharex=True, sharey=sharey, figsize=figsize) # , sharey=True
+    # Set the x-axis and y-axis limits of the first subplot, which because sharex=True and sharey=True will set the rest of the plots too. NOTE: setting the axis limits FIRST disables autoscaling which cause problems when adding the epoch region indicator
+    axes[0].set_xlim([global_x_min, global_x_max])
+    axes[0].set_ylim([global_y_min, global_y_max])
+
+    for i, ax in enumerate(axes):
+        shifted_i = shift_offset + i
+        neuron_IDX = neuron_IDXs[shifted_i]
+        neuron_id = neuron_IDs[shifted_i]
+        
+        # convert y-axis to Logarithmic scale
+        ax.set_yscale(y_scale)
+
+        # ax.scatter(Flat_decoder_time_bin_centers, np.concatenate([all_epochs_computed_observed_from_expected_difference[decoded_epoch_idx][neuron_IDX, :] for decoded_epoch_idx in np.arange(decoder_result.num_filter_epochs)]), marker="o",  s=2)
+        # ax.scatter(Flat_decoder_time_bin_centers, Flat_all_epochs_computed_expected_cell_num_spikes[neuron_IDX], marker="o",  s=2, label=f'long[{neuron_id}]')
+        ax.axhline(y=0.0, linewidth=1, color='k') # the y=0.0 line
+        # Per-epoch result:
+        # ax.scatter(Flat_decoder_time_bin_centers_LONG, Flat_all_epochs_computed_expected_cell_num_spikes_LONG[neuron_IDX], marker="o",  s=2, label=f'Long[{neuron_id}]')
+        # ax.scatter(Flat_decoder_time_bin_centers_SHORT, Flat_all_epochs_computed_expected_cell_num_spikes_SHORT[neuron_IDX], marker="o",  s=2, label=f'Short[{neuron_id}]')
+
+        ## Add in the mean epoch difference:
+        _s_long = ax.scatter(t_SHARED, y_LONG[neuron_IDX, :], marker="s",  s=5, label=f'E<Long[{neuron_id}]>', alpha=0.8)
+        _s_short = ax.scatter(t_SHARED, y_SHORT[neuron_IDX, :], marker="s",  s=5, label=f'E<Short[{neuron_id}]>', alpha=0.8)
+
+        ax.set_ylabel(f'{neuron_id}')
+        
+        epochs_collection, epoch_labels = draw_epoch_regions(track_epochs, ax, defer_render=False, debug_print=False)
+        
+    # axes[-1].set_xlabel('time')
+    axes[-1].set_xlabel('replay idx')
+    # axes[-1].legend() # show the legend
+
+    axes[0].legend((_s_long, _s_short), ('E<Long>', 'E<Short>'), loc='lower left', bbox_to_anchor=(0.0, 1.01), ncol=2, borderaxespad=0, frameon=False)
+    # plt.legend(bbox_to_anchor=(0.5, 1.2), loc='upper center')
+
+    # (top=0.921, bottom=0.063, left=0.06, right=0.986, hspace=1.0, wspace=0.2)
+    # plt.tight_layout()
+    plt.suptitle('Expected vs. Observed Firing Rate Differences (by Replay Epoch)', wrap=True)
+    return fig, axes
