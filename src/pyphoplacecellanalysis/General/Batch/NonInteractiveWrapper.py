@@ -363,7 +363,7 @@ def batch_extended_computations(curr_active_pipeline, include_whitelist=None, in
     newly_computed_values = []
 
     non_global_comp_names = ['firing_rate_trends', 'relative_entropy_analyses']
-    global_comp_names = ['jonathan_firing_rate_analysis', 'short_long_pf_overlap_analyses', 'long_short_fr_indicies_analyses', 'long_short_decoding_analyses']
+    global_comp_names = ['jonathan_firing_rate_analysis', 'short_long_pf_overlap_analyses', 'long_short_fr_indicies_analyses', 'long_short_decoding_analyses', 'long_short_rate_remapping']
 
     if include_whitelist is None:
         # include all:
@@ -569,6 +569,34 @@ def batch_extended_computations(curr_active_pipeline, include_whitelist=None, in
             except Exception as e:
                 raise e
             
+        ## long_short_rate_remapping:
+        _comp_name = 'long_short_rate_remapping'
+        if _comp_name in include_whitelist:
+            try:
+                ## Get global 'long_short_rate_remapping' results:
+                curr_long_short_rr = curr_active_pipeline.global_computation_results.computed_data['long_short_rate_remapping']
+                rate_remapping_df, high_remapping_cells_only = curr_long_short_rr.rr_df, curr_long_short_rr.high_only_rr_df
+                _subfn_on_already_computed(_comp_name)
+                    
+            except (AttributeError, KeyError) as e:
+                if progress_print or debug_print:
+                    print(f'{_comp_name} missing.')
+                if debug_print:
+                    print(f'\t encountered error: {e}\n{traceback.format_exc()}\n.')
+                if progress_print or debug_print:
+                    print(f'\t Recomputing {_comp_name}...')
+                    
+                # When this fails due to unwrapping from the load, add `, computation_kwargs_list=[{'perform_cache_load': False}]` as an argument to the `perform_specific_computation` call below
+                curr_active_pipeline.perform_specific_computation(computation_functions_name_whitelist=['_perform_long_short_decoding_rate_remapping_analyses'], fail_on_exception=True, debug_print=False) # fail_on_exception MUST be True or error handling is all messed up 
+                print(f'\t done.')
+                curr_long_short_rr = curr_active_pipeline.global_computation_results.computed_data['long_short_rate_remapping']
+                rate_remapping_df, high_remapping_cells_only = curr_long_short_rr.rr_df, curr_long_short_rr.high_only_rr_df
+                newly_computed_values.append(_comp_name)
+            except Exception as e:
+                raise e
+
+
+
 
     if progress_print:
         print('done with all batch_extended_computations(...).')
