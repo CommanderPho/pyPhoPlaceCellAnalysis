@@ -472,7 +472,18 @@ class PipelineWithDisplaySavingMixin:
 
     @classmethod
     def conform(cls, obj):
-        """ makes the object conform to this mixin by adding its properties. """
+        """ makes the object conform to this mixin by adding its properties. 
+        Usage:
+            from pyphoplacecellanalysis.General.Pipeline.Stages.Computation import PipelineWithComputedPipelineStageMixin, ComputedPipelineStage
+            from pyphoplacecellanalysis.General.Pipeline.Stages.Display import PipelineWithDisplayPipelineStageMixin, PipelineWithDisplaySavingMixin
+            from pyphoplacecellanalysis.General.Pipeline.Stages.Filtering import FilteredPipelineMixin
+            from pyphoplacecellanalysis.General.Pipeline.Stages.Loading import PipelineWithInputStage, PipelineWithLoadableStage
+            from pyphoplacecellanalysis.General.Pipeline.Stages.BaseNeuropyPipelineStage import PipelineStage
+            from pyphoplacecellanalysis.General.Pipeline.NeuropyPipeline import NeuropyPipeline
+
+            PipelineWithDisplaySavingMixin.conform(curr_active_pipeline)
+
+        """
         def conform_to_implementing_method(func):
             """ captures 'obj', 'cls'"""
             setattr(type(obj), func.__name__, func)
