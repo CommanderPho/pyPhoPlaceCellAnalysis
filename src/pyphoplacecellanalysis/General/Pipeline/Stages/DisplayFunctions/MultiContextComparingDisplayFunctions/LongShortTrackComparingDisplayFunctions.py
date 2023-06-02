@@ -1953,7 +1953,7 @@ def plot_expected_vs_observed(t_SHARED, y_SHORT, y_LONG, neuron_IDXs, neuron_IDs
     return fig, axes
 
 
-def _prepare_plot_expected_vs_observed(curr_active_pipeline):
+def _prepare_plot_expected_vs_observed(curr_active_pipeline, defer_render=True):
     """ 2023-06-01 - Sets up the `plot_expected_vs_observed` plot and exports it. 
     TODO 2023-06-01 - CONVERT TO A GLOBAL DISPLAY FUNCTION
     
@@ -2040,7 +2040,8 @@ def _prepare_plot_expected_vs_observed(curr_active_pipeline):
     # figsize=(4, 13) #(24, 8)
     
     fig, axes = plot_expected_vs_observed(t_SHARED, y_SHORT, y_LONG, neuron_IDXs=neuron_IDXs, neuron_IDs=neuron_IDs, track_epochs=track_epochs, sharey=True, figsize=(4, 13), max_num_rows=150, y_scale="linear")
-    plt.show()
+    if not defer_render:
+        plt.show()
 
     ## 2023-05-31 - Reference Output of matplotlib figure to file, along with building appropriate context.
     active_session_figures_out_path = curr_active_pipeline.get_daily_programmatic_session_output_path()
