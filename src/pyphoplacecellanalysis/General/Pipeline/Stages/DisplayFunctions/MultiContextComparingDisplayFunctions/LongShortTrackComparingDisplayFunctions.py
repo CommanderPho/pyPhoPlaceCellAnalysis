@@ -1952,7 +1952,7 @@ def plot_expected_vs_observed(t_SHARED, y_SHORT, y_LONG, neuron_IDXs, neuron_IDs
     plt.suptitle('Expected vs. Observed Firing Rate Differences (by Replay Epoch)', wrap=True)
     return fig, axes
 
-
+@function_attributes(short_name=None, tags=['temp'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-06-01 00:00')
 def _prepare_plot_expected_vs_observed(curr_active_pipeline, defer_render=True):
     """ 2023-06-01 - Sets up the `plot_expected_vs_observed` plot and exports it. 
     TODO 2023-06-01 - CONVERT TO A GLOBAL DISPLAY FUNCTION
@@ -2050,4 +2050,44 @@ def _prepare_plot_expected_vs_observed(curr_active_pipeline, defer_render=True):
     active_out_figure_paths = perform_write_to_file(fig, final_context, figures_parent_out_path=active_session_figures_out_path, register_output_file_fn=curr_active_pipeline.register_output_file)
 
     return fig, axes, final_context, active_out_figure_paths
+
+
+@function_attributes(short_name=None, tags=['temp'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-06-02 14:12')
+def _prepare_plot_long_and_short_epochs(curr_active_pipeline, defer_render=True):
+    """ 2023-06-01 - Sets up the `plot_expected_vs_observed` plot and exports it. 
+    TODO 2023-06-01 - CONVERT TO A GLOBAL DISPLAY FUNCTION
+    
+    ## TODO 2023-06-02 NOW, NEXT: this might not work in 'AGG' mode because it tries to render it with QT, but we can see.
+    
+    Usage:
+        from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.MultiContextComparingDisplayFunctions.LongShortTrackComparingDisplayFunctions import _prepare_plot_long_and_short_epochs
+        (fig_L, fig_S), (ax_L, ax_S), (final_context_L, final_context_S), (active_out_figure_paths_L, active_out_figure_paths_S) = _prepare_plot_long_and_short_epochs(curr_active_pipeline, defer_render=False)
+    """
+    from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import plot_decoded_epoch_slices_paginated
+    
+
+    ## long_short_decoding_analyses:
+    curr_long_short_decoding_analyses = curr_active_pipeline.global_computation_results.computed_data['long_short_leave_one_out_decoding_analysis']
+    ## Extract variables from results object:
+    long_one_step_decoder_1D, short_one_step_decoder_1D, long_replays, short_replays, global_replays, long_shared_aclus_only_decoder, short_shared_aclus_only_decoder, shared_aclus, long_short_pf_neurons_diff, n_neurons, long_results_obj, short_results_obj, is_global = curr_long_short_decoding_analyses.long_decoder, curr_long_short_decoding_analyses.short_decoder, curr_long_short_decoding_analyses.long_replays, curr_long_short_decoding_analyses.short_replays, curr_long_short_decoding_analyses.global_replays, curr_long_short_decoding_analyses.long_shared_aclus_only_decoder, curr_long_short_decoding_analyses.short_shared_aclus_only_decoder, curr_long_short_decoding_analyses.shared_aclus, curr_long_short_decoding_analyses.long_short_pf_neurons_diff, curr_long_short_decoding_analyses.n_neurons, curr_long_short_decoding_analyses.long_results_obj, curr_long_short_decoding_analyses.short_results_obj, curr_long_short_decoding_analyses.is_global
+    long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
+
+    pagination_controller_L, active_out_figure_paths_L, final_context_L = plot_decoded_epoch_slices_paginated(curr_active_pipeline, long_results_obj, curr_active_pipeline.build_display_context_for_session(display_fn_name='DecodedEpochSlices', epochs='replays', decoder='long_results_obj'), save_figure=True)
+    fig_L = pagination_controller_L.plots.fig
+    ax_L = fig_L.get_axes()
+    if defer_render:
+        widget_L = pagination_controller_L.ui.mw # MatplotlibTimeSynchronizedWidget
+        widget_L.close()
+        pagination_controller_L = None
+
+    
+    pagination_controller_S, active_out_figure_paths_S, final_context_S = plot_decoded_epoch_slices_paginated(curr_active_pipeline, short_results_obj, curr_active_pipeline.build_display_context_for_session(display_fn_name='DecodedEpochSlices', epochs='replays', decoder='short_results_obj'), save_figure=True)
+    fig_S = pagination_controller_S.plots.fig
+    ax_S = fig_S.get_axes()
+    if defer_render:
+        widget_S = pagination_controller_S.ui.mw # MatplotlibTimeSynchronizedWidget
+        widget_S.close()
+        pagination_controller_S = None
+
+    return (pagination_controller_L, pagination_controller_S), (fig_L, fig_S), (ax_L, ax_S), (final_context_L, final_context_S), (active_out_figure_paths_L, active_out_figure_paths_S)
 

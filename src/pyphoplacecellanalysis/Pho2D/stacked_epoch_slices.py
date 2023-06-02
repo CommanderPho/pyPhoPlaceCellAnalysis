@@ -702,7 +702,8 @@ class DecodedEpochSlicesPaginatedFigureController(PaginatedFigureController):
                 ## Perform callback here:
                 on_render_page_callbacks = self.params.get('on_render_page_callbacks', {})
                 for a_callback_name, a_callback in on_render_page_callbacks.items():
-                    print(f'performing callback with name: {a_callback_name}')
+                    if self.params.debug_print:
+                        print(f'performing callback with name: {a_callback_name}')
                     try:
                         self.params, self.plots_data, self.plots, self.ui = a_callback(curr_ax, self.params, self.plots_data, self.plots, self.ui, curr_slice_idxs, curr_time_bins, curr_posterior, curr_most_likely_positions, debug_print=self.params.debug_print)
                     except Exception as e:
