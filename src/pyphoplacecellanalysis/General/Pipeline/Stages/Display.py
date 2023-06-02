@@ -468,7 +468,7 @@ class PipelineWithDisplaySavingMixin:
         if debug_print:
             print(f'final_context: {final_context}')
         active_out_figure_paths = perform_write_to_file(fig, final_context, figures_parent_out_path=active_session_figures_out_path, register_output_file_fn=self.register_output_file)
-        return active_out_figure_paths
+        return active_out_figure_paths, final_context
 
     @classmethod
     def conform(cls, obj):

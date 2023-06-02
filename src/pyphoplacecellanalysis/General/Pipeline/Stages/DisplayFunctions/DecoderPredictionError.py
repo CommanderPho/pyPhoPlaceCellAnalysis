@@ -9,6 +9,7 @@ from matplotlib import patheffects
 from neuropy.core import Epoch
 from neuropy.utils.dynamic_container import overriding_dict_with # required for safely_accepts_kwargs
 from neuropy.utils.efficient_interval_search import get_non_overlapping_epochs # used in _display_plot_decoded_epoch_slices to get only the valid (non-overlapping) epochs
+from neuropy.utils.result_context import IdentifyingContext
 
 from pyphocorehelpers.function_helpers import function_attributes
 from pyphocorehelpers.programming_helpers import metadata_attributes
@@ -511,9 +512,6 @@ def _helper_update_decoded_single_epoch_slice_plot(curr_ax, params, plots_data, 
     curr_ax.set_title(f'') # needs to be set to empty string '' because this is the title that appears above each subplot/slice
     return params, plots_data, plots, ui
 
-
-
-
 def _subfn_update_decoded_epoch_slices(params, plots_data, plots, ui, debug_print=False):
     """ attempts to update existing plots created by:
     
@@ -615,6 +613,95 @@ def plot_decoded_epoch_slices(filter_epochs, filter_epochs_decoder_result, globa
     _subfn_update_decoded_epoch_slices(params, plots_data, plots, ui, debug_print=debug_print)
 
     return params, plots_data, plots, ui
+
+
+
+
+
+
+@function_attributes(short_name=None, tags=['epoch','slices','decoder','figure','paginated','output'], input_requires=[], output_provides=[], uses=['DecodedEpochSlicesPaginatedFigureController'], used_by=[], creation_date='2023-06-02 13:36')
+def plot_decoded_epoch_slices_paginated(curr_active_pipeline, curr_results_obj, display_context, save_figure=True):
+    """ Plots a `DecodedEpochSlicesPaginatedFigureController`
+
+        display_context is kinda mixed up, DecodedEpochSlicesPaginatedFigureController builds its own kind of display context but this isn't the one that we want for the file outputs usually.
+
+    Usage:
+        from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import plot_decoded_epoch_slices_paginated
+    """
+    from pyphoplacecellanalysis.Pho2D.stacked_epoch_slices import DecodedEpochSlicesPaginatedFigureController # `plot_decoded_epoch_slices_paginated`
+
+    if display_context is None:
+        display_context = IdentifyingContext(display_fn_name='DecodedEpochSlices')
+        
+
+    long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
+    long_session, short_session, global_session = [curr_active_pipeline.filtered_sessions[an_epoch_name] for an_epoch_name in [long_epoch_name, short_epoch_name, global_epoch_name]]
+    
+    active_identifying_session_ctx = curr_active_pipeline.sess.get_context()
+    _out_pagination_controller = DecodedEpochSlicesPaginatedFigureController.init_from_decoder_data(curr_results_obj.active_filter_epochs, curr_results_obj.all_included_filter_epochs_decoder_result, 
+        xbin=curr_results_obj.original_1D_decoder.xbin, global_pos_df=global_session.position.df, a_name='TestDecodedEpochSlicesPaginationController', active_context=active_identifying_session_ctx,  max_subplots_per_page=200) # 10
+    # _out_pagination_controller
+
+    ### 2023-05-30 - Add the radon-transformed linear fits to each epoch to the stacked epoch plots:
+    # `active_filter_epochs_df` native columns approach
+    active_filter_epochs_df = curr_results_obj.active_filter_epochs.to_dataframe().copy()
+    assert np.isin(['velocity', 'intercept'], active_filter_epochs_df.columns).all()
+    epochs_linear_fit_df = active_filter_epochs_df[['velocity', 'intercept']].copy() # get the `epochs_linear_fit_df` as a subset of the filter epochs df
+
+    # epochs_linear_fit_df approach
+    assert curr_results_obj.all_included_filter_epochs_decoder_result.num_filter_epochs == np.shape(epochs_linear_fit_df)[0]
+
+    radon_transform_plots = []
+    _out_pagination_controller.plots_data.radon_transform_line_data = []
+
+    for epoch_idx, epoch_vel, epoch_intercept in zip(np.arange(curr_results_obj.all_included_filter_epochs_decoder_result.num_filter_epochs), epochs_linear_fit_df['velocity'].values, epochs_linear_fit_df['intercept'].values):
+        # build the discrete line over the centered time bins:
+        epoch_time_bins = curr_results_obj.all_included_filter_epochs_decoder_result.time_bin_containers[epoch_idx].centers
+        epoch_time_bins = epoch_time_bins - epoch_time_bins[0] # all values should be relative to the start of the epoch:
+        epoch_line_eqn = (epoch_vel * epoch_time_bins) + epoch_intercept
+        _out_pagination_controller.plots_data.radon_transform_line_data.append(epoch_line_eqn)
+
+    def _callback_update_decoded_single_epoch_slice_plot(curr_ax, params: "VisualizationParameters", plots_data: "RenderPlotsData", plots: "RenderPlots", ui: "PhoUIContainer", i:int, curr_time_bins, *args, **kwargs): # curr_posterior, curr_most_likely_positions, debug_print:bool=False
+        """ 2023-05-30 - Based off of `_helper_update_decoded_single_epoch_slice_plot` to enable plotting radon transform lines on paged decoded epochs
+
+        Needs only: curr_time_bins, plots_data, i
+        Accesses: plots_data.epoch_slices[i,:], plots_data.global_pos_df, params.variable_name, params.xbin, params.enable_flat_line_drawing
+        """
+        debug_print = kwargs.pop('debug_print', False)
+        if debug_print:
+            print(f'_callback_update_decoded_single_epoch_slice_plot(..., i: {i}, curr_time_bins: {curr_time_bins})')
+        # plot the radon transform line on the epoch:
+        radon_transform_plot = curr_ax.plot(curr_time_bins, plots_data.radon_transform_line_data[i], label=f'computed radon transform', linestyle='dashed', linewidth=1, color='#e5ff00', alpha=0.8, marker='+', markersize=10) # Opaque RED # , linestyle='dashed', linewidth=2, color='#ff0000ff'
+        if debug_print:
+            print(f'\t success!')
+        return params, plots_data, plots, ui
+
+
+    # .params.on_render_page_callbacks: a dict of callbacks to be called when the page changes and needs to be re-rendered
+    on_render_page_callbacks = _out_pagination_controller.params.get('on_render_page_callbacks', None)
+    if on_render_page_callbacks is None:
+        _out_pagination_controller.params.on_render_page_callbacks = {} # allocate a new list
+    ## add or update this callback:
+    _out_pagination_controller.params.on_render_page_callbacks['plot_radon_transform_line_data'] = _callback_update_decoded_single_epoch_slice_plot
+    # Trigger the update
+    _out_pagination_controller.on_paginator_control_widget_jump_to_page(0)
+
+    # ## 2023-05-31 - Reference Output of matplotlib figure to file, along with building appropriate context.
+    # active_session_figures_out_path = curr_active_pipeline.get_daily_programmatic_session_output_path()
+    final_context = _out_pagination_controller.params.active_identifying_figure_ctx | display_context
+    # print(f'final_context: {final_context}')
+    # active_out_figure_paths = perform_write_to_file(fig, final_context, figures_parent_out_path=active_session_figures_out_path, register_output_file_fn=curr_active_pipeline.register_output_file)
+
+    if save_figure:
+        fig = _out_pagination_controller.plots.fig # get the figure
+        active_out_figure_paths, final_context = curr_active_pipeline.write_figure_to_daily_programmatic_session_output_path(fig, final_context, debug_print=True)
+    else:
+        active_out_figure_paths = None
+
+    return _out_pagination_controller, active_out_figure_paths, final_context
+
+
+
 
 # ==================================================================================================================== #
 # Rendering various different methods of normalizing spike counts and firing rates  (Matplotlib-based)                 #
