@@ -427,3 +427,58 @@ class PipelineWithDisplayPipelineStageMixin:
     # def _pdf_display(self, display_function, active_session_configuration_context, **kwargs):
     #     ## TODO:
     
+
+class PipelineWithDisplaySavingMixin:
+    """ provides functionality for saving figures to file.
+    
+    from pyphoplacecellanalysis.General.Pipeline.Stages.Display import PipelineWithDisplaySavingMixin
+    
+    """
+    
+    def build_display_context_for_session(self, display_fn_name:str, **kwargs) -> "IdentifyingContext":
+        """ builds a new display context for the session out of kwargs 
+        Usage:
+            curr_active_pipeline.build_display_context_for_session(display_fn_name='DecodedEpochSlices', epochs='replays', decoder='long_results_obj')
+        """
+        assert isinstance(display_fn_name, str), '"display_fn_name" must be provided as a string.'
+        active_identifying_session_ctx = self.sess.get_context()
+        display_subcontext = IdentifyingContext(display_fn_name=display_fn_name, **kwargs)
+        return active_identifying_session_ctx.merging_context('display_', display_subcontext)
+    
+
+    def build_display_context_for_filtered_session(self, filtered_session_name:str, display_fn_name:str, **kwargs) -> "IdentifyingContext":
+        """ builds a new display context for a filtered session out of kwargs 
+        Usage:
+            curr_active_pipeline.build_display_context_for_session(display_fn_name='DecodedEpochSlices', epochs='replays', decoder='long_results_obj')
+        """
+        assert isinstance(display_fn_name, str), '"display_fn_name" must be provided as a string.'
+        active_identifying_session_ctx = self.filtered_contexts[filtered_session_name]
+        display_subcontext = IdentifyingContext(display_fn_name=display_fn_name, **kwargs)
+        return active_identifying_session_ctx.merging_context('display_', display_subcontext)
+
+
+
+    def write_figure_to_daily_programmatic_session_output_path(self, fig, display_context=None, debug_print=True):
+        from pyphoplacecellanalysis.General.Mixins.ExportHelpers import perform_write_to_file
+        
+        active_session_figures_out_path = self.get_daily_programmatic_session_output_path()
+        active_identifying_session_ctx = self.sess.get_context()
+        if display_context is not None:
+            final_context = active_identifying_session_ctx | display_context
+        if debug_print:
+            print(f'final_context: {final_context}')
+        active_out_figure_paths = perform_write_to_file(fig, final_context, figures_parent_out_path=active_session_figures_out_path, register_output_file_fn=self.register_output_file)
+        return active_out_figure_paths
+
+    @classmethod
+    def conform(cls, obj):
+        """ makes the object conform to this mixin by adding its properties. """
+        def conform_to_implementing_method(func):
+            """ captures 'obj', 'cls'"""
+            setattr(type(obj), func.__name__, func)
+        
+        conform_to_implementing_method(cls.build_display_context_for_session)
+        conform_to_implementing_method(cls.build_display_context_for_filtered_session)
+        conform_to_implementing_method(cls.write_figure_to_daily_programmatic_session_output_path)
+
+
