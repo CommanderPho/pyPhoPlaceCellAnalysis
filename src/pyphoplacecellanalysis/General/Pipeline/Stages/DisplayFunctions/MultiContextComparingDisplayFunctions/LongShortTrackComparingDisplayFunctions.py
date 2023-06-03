@@ -1775,7 +1775,7 @@ class RateRemappingPaginatedFigureController(PaginatedFigureController):
 # ==================================================================================================================== #
 
 def _plot_session_long_short_track_firing_rate_figures(curr_active_pipeline, jonathan_firing_rate_analysis_result, figures_parent_out_path=None):
-    """ 2023-05-25 - Plots
+    """ 2023-05-25 - Plots a comparison of the lap vs. replay firing rates for a single track.
     
     Inputs:
         `curr_active_pipeline`: is needed to register_output_file(...)
