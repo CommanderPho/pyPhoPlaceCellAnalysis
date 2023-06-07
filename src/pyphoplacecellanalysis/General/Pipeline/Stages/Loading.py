@@ -1,6 +1,7 @@
 from typing import Callable, List
 import dataclasses
 from dataclasses import dataclass
+import pathlib
 from pathlib import Path
 
 from pyphocorehelpers.programming_helpers import metadata_attributes
@@ -38,8 +39,40 @@ def loadData(pkl_path, debug_print=False, **kwargs):
     db = None
     with ProgressMessagePrinter(pkl_path, 'Loading', 'loaded session pickle file'):
         with open(pkl_path, 'rb') as dbfile:
-            db = pickle.load(dbfile, **kwargs)
-            dbfile.close()
+            try:
+                db = pickle.load(dbfile, **kwargs)
+                
+            except NotImplementedError as err:
+                error_message = str(err)
+                if 'WindowsPath' in error_message:  # Check if WindowsPath is missing
+                    print("Issue with pickled WindowsPath on Linux for path {}, performing pathlib workaround...".format(pkl_path))
+                    win_backup = pathlib.WindowsPath  # Backup the WindowsPath definition
+                    try:
+                        pathlib.WindowsPath = pathlib.PureWindowsPath
+                        db = pickle.load(dbfile, **kwargs) # Fails this time if it still throws an error
+                    finally:
+                        pathlib.WindowsPath = win_backup  # Restore the backup WindowsPath definition
+                        
+                elif 'PosixPath' in error_message:  # Check if PosixPath is missing
+                    # Fixes issue with pickled POSIX_PATH on windows for path.
+                    posix_backup = pathlib.PosixPath # backup the PosixPath definition
+                    try:
+                        pathlib.PosixPath = pathlib.PurePosixPath
+                        db = pickle.load(dbfile, **kwargs) # Fails this time if it still throws an error
+                    finally:
+                        pathlib.PosixPath = posix_backup # restore the backup posix path definition
+                                        
+                else:
+                    print("Unknown issue with pickled path for path {}, performing pathlib workaround...".format(pkl_path))
+                    raise
+                                
+            except Exception as e:
+                # unhandled exception
+                raise
+            finally:
+                dbfile.close()
+            
+            
         if debug_print:
             try:
                 for keys in db:
