@@ -3,7 +3,7 @@ from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtGui, QtCore
 from pyphoplacecellanalysis.External.pyqtgraph.widgets.ProgressDialog import ProgressDialog
 
 # pyPhoPlaceCellAnalysis:
-from pyphoplacecellanalysis.General.Batch.NonInteractiveWrapper import NonInteractiveWrapper
+from pyphoplacecellanalysis.General.Batch.NonInteractiveProcessing import NonInteractiveProcessing
 from pyphoplacecellanalysis.GUI.PyQtPlot.Flowchart.CustomNodes.MiscNodes.ExtendedCtrlNode import ExtendedCtrlNode
 from pyphoplacecellanalysis.GUI.Qt.Mixins.CheckTableCtrlOwningMixin import CheckTableCtrlOwningMixin
 
@@ -94,7 +94,7 @@ class PipelineFilteringDataNode(CheckTableCtrlOwningMixin, ExtendedCtrlNode):
              for an_enabled_filter_name in self.enabled_filters:
                  enabled_session_filter_configs[an_enabled_filter_name] = active_session_filter_configs[an_enabled_filter_name]
              
-             pipeline = NonInteractiveWrapper.perform_filtering(pipeline, enabled_session_filter_configs)
+             pipeline = NonInteractiveProcessing.perform_filtering(pipeline, enabled_session_filter_configs)
         
         return {'computation_configs': active_session_computation_configs, 'filter_configs':active_session_filter_configs, 'filtered_pipeline': pipeline}
 

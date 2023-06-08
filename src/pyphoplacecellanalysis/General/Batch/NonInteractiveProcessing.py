@@ -66,7 +66,7 @@ filters should be checkable to express whether we want to build that one or not
 
 
 @define(slots=False)
-class NonInteractiveWrapper(object):
+class NonInteractiveProcessing(object):
     """A wrapper class that performs a non-interactive version of the jupyter-lab notebook for use with the custom `PipelineComputationsNode` and `PipelineFilteringDataNote` Flowchart Notes: enables loading and processing the pipeline. """
     enable_saving_to_disk:bool = False
     common_parent_foldername:Path = Path(r'C:\Users\pho\repos\PhoPy3DPositionAnalysis2021\output')
@@ -103,7 +103,7 @@ class NonInteractiveWrapper(object):
             # (1.874, 0.518) # for (128, 128) bins
 
         """
-        return [DynamicParameters(pf_params=PlacefieldComputationParameters(speed_thresh=10.0, grid_bin=NonInteractiveWrapper.compute_position_grid_bin_size(sess.position.x, sess.position.y, num_bins=(64, 64)), smooth=(2.0, 2.0), frate_thresh=0.2, time_bin_size=1.0, computation_epochs = None))]
+        return [DynamicParameters(pf_params=PlacefieldComputationParameters(speed_thresh=10.0, grid_bin=NonInteractiveProcessing.compute_position_grid_bin_size(sess.position.x, sess.position.y, num_bins=(64, 64)), smooth=(2.0, 2.0), frate_thresh=0.2, time_bin_size=1.0, computation_epochs = None))]
         
     @staticmethod
     def perform_computation(pipeline, active_computation_configs, enabled_filter_names=None):
@@ -124,16 +124,16 @@ class NonInteractiveWrapper(object):
     # Bapun ______________________________________________________________________________________________________________ #
     @staticmethod
     def bapun_format_all(pipeline):
-        active_session_computation_configs, active_session_filter_configurations = NonInteractiveWrapper.bapun_format_define_configs(pipeline)
-        pipeline = NonInteractiveWrapper.perform_filtering(pipeline, active_session_filter_configurations)
-        pipeline = NonInteractiveWrapper.perform_computation(pipeline, active_session_computation_configs)
+        active_session_computation_configs, active_session_filter_configurations = NonInteractiveProcessing.bapun_format_define_configs(pipeline)
+        pipeline = NonInteractiveProcessing.perform_filtering(pipeline, active_session_filter_configurations)
+        pipeline = NonInteractiveProcessing.perform_computation(pipeline, active_session_computation_configs)
         return pipeline, active_session_computation_configs, active_session_filter_configurations
      
     @staticmethod
     def bapun_format_define_configs(curr_bapun_pipeline):
         # curr_bapun_pipeline = NeuropyPipeline(name='bapun_pipeline', session_data_type='bapun', basedir=known_data_session_type_dict['bapun'].basedir, load_function=known_data_session_type_dict['bapun'].load_function)
         # curr_bapun_pipeline = NeuropyPipeline.init_from_known_data_session_type('bapun', known_data_session_type_dict['bapun'])
-        active_session_computation_configs = NonInteractiveWrapper._build_active_computation_configs(curr_bapun_pipeline.sess)
+        active_session_computation_configs = NonInteractiveProcessing._build_active_computation_configs(curr_bapun_pipeline.sess)
         # active_session_computation_config.grid_bin = compute_position_grid_bin_size(curr_bapun_pipeline.sess.position.x, curr_bapun_pipeline.sess.position.y, num_bins=(64, 64))
                 
         # Bapun/DataFrame style session filter functions:
@@ -165,9 +165,9 @@ class NonInteractiveWrapper(object):
     # KDIBA ______________________________________________________________________________________________________________ #
     @staticmethod
     def kdiba_format_all(pipeline):
-        active_session_computation_configs, active_session_filter_configurations = NonInteractiveWrapper.kdiba_format_define_configs(pipeline)
-        pipeline = NonInteractiveWrapper.perform_filtering(pipeline, active_session_filter_configurations)
-        pipeline = NonInteractiveWrapper.perform_computation(pipeline, active_session_computation_configs)
+        active_session_computation_configs, active_session_filter_configurations = NonInteractiveProcessing.kdiba_format_define_configs(pipeline)
+        pipeline = NonInteractiveProcessing.perform_filtering(pipeline, active_session_filter_configurations)
+        pipeline = NonInteractiveProcessing.perform_computation(pipeline, active_session_computation_configs)
         return pipeline, active_session_computation_configs, active_session_filter_configurations
 
     @staticmethod
@@ -183,7 +183,7 @@ class NonInteractiveWrapper(object):
         # curr_kdiba_pipeline = NeuropyPipeline.init_from_known_data_session_type('kdiba', known_data_session_type_dict['kdiba'])
         # active_grid_bin = compute_position_grid_bin_size(curr_kdiba_pipeline.sess.position.x, curr_kdiba_pipeline.sess.position.y, num_bins=(64, 64))
         # active_session_computation_config.grid_bin = active_grid_bin
-        active_session_computation_configs = NonInteractiveWrapper._build_active_computation_configs(curr_kdiba_pipeline.sess)
+        active_session_computation_configs = NonInteractiveProcessing._build_active_computation_configs(curr_kdiba_pipeline.sess)
         
         def build_any_maze_epochs_filters(sess):
             sess.epochs.t_start = 22.26 # exclude the first short period where the animal isn't on the maze yet
@@ -919,7 +919,7 @@ def _update_pipeline_missing_preprocessing_parameters(curr_active_pipeline, debu
     """ 2023-05-24 - Adds the previously missing `sess.config.preprocessing_parameters` to each session (filtered and base) in the pipeline. 
     
     Usage:
-        from pyphoplacecellanalysis.General.Batch.NonInteractiveWrapper import _update_pipeline_missing_preprocessing_parameters
+        from pyphoplacecellanalysis.General.Batch.NonInteractiveProcessing import _update_pipeline_missing_preprocessing_parameters
         was_updated = _update_pipeline_missing_preprocessing_parameters(curr_active_pipeline)
         was_updated
     """
@@ -968,7 +968,7 @@ def neptune_output_figures(curr_active_pipeline):
     """ Uploads the completed figures to neptune.ai from the pipeline's `.registered_output_files` items. 
     
     Usage:
-        from pyphoplacecellanalysis.General.Batch.NonInteractiveWrapper import neptune_output_figures
+        from pyphoplacecellanalysis.General.Batch.NonInteractiveProcessing import neptune_output_figures
         neptune_output_figures(curr_active_pipeline)
     """
     import neptune # for logging progress and results

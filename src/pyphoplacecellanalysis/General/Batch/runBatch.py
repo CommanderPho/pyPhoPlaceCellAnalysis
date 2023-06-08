@@ -18,7 +18,7 @@ from pyphocorehelpers.function_helpers import function_attributes
 from neuropy.utils.result_context import IdentifyingContext
 from neuropy.core.session.Formats.BaseDataSessionFormats import find_local_session_paths
 
-from pyphoplacecellanalysis.General.Batch.NonInteractiveWrapper import batch_load_session, batch_extended_computations, SessionBatchProgress, batch_programmatic_figures, batch_extended_programmatic_figures
+from pyphoplacecellanalysis.General.Batch.NonInteractiveProcessing import batch_load_session, batch_extended_computations, SessionBatchProgress, batch_programmatic_figures, batch_extended_programmatic_figures
 from pyphoplacecellanalysis.General.Pipeline.NeuropyPipeline import PipelineSavingScheme
 from pyphoplacecellanalysis.General.Pipeline.Stages.Loading import saveData, loadData
 
