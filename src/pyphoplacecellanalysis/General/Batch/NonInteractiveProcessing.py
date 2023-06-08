@@ -264,24 +264,22 @@ def batch_extended_computations(curr_active_pipeline, include_whitelist=None, in
     if progress_print:
         print(f'Running batch_extended_computations(...) with global_epoch_name: "{global_epoch_name}"')
 
-    comp_is_global = [False, False, True, True, True, True, True, True]
-    comp_names = ['firing_rate_trends', 'relative_entropy_analyses', 'jonathan_firing_rate_analysis', 'short_long_pf_overlap_analyses', 'long_short_fr_indicies_analyses', 'long_short_decoding_analyses', 'long_short_post_decoding']
-    comp_functions = ['_perform_firing_rate_trends_computation', '_perform_time_dependent_pf_sequential_surprise_computation', '_perform_jonathan_replay_firing_rate_analyses', '_perform_long_short_pf_overlap_analyses', '_perform_long_short_firing_rate_analyses', '_perform_long_short_decoding_analyses', '_perform_long_short_post_decoding_analysis']
-    comp_validate_computation_tests = [
-        lambda curr_active_pipeline: (curr_active_pipeline.computation_results[global_epoch_name].computed_data['firing_rate_trends'], curr_active_pipeline.computation_results[global_epoch_name].computed_data['extended_stats']['time_binned_position_df']),
-        lambda curr_active_pipeline: (np.sum(curr_active_pipeline.global_computation_results.computed_data['relative_entropy_analyses']['flat_relative_entropy_results'], axis=1), np.sum(curr_active_pipeline.global_computation_results.computed_data['relative_entropy_analyses']['flat_jensen_shannon_distance_results'], axis=1)),  # flat_surprise_across_all_positions
-        lambda curr_active_pipeline: curr_active_pipeline.global_computation_results.computed_data['jonathan_firing_rate_analysis']['neuron_replay_stats_df'],  # active_context
-        lambda curr_active_pipeline: (curr_active_pipeline.global_computation_results.computed_data['short_long_pf_overlap_analyses']['relative_entropy_overlap_scalars_df'], curr_active_pipeline.global_computation_results.computed_data['short_long_pf_overlap_analyses']['relative_entropy_overlap_dict']), # relative_entropy_overlap_scalars_df
-        lambda curr_active_pipeline: curr_active_pipeline.global_computation_results.computed_data['long_short_fr_indicies_analysis']['x_frs_index'],  # active_context
-        lambda curr_active_pipeline: (curr_active_pipeline.global_computation_results.computed_data['long_short_leave_one_out_decoding_analysis'].long_results_obj, curr_active_pipeline.global_computation_results.computed_data['long_short_leave_one_out_decoding_analysis'].short_results_obj),
-        lambda curr_active_pipeline: curr_active_pipeline.global_computation_results.computed_data['long_short_post_decoding'].rate_remapping.rr_df
+    ## Specify the computations and the requirements to validate them.
+    _comp_specifiers = [
+        SpecificComputationValidator(short_name='firing_rate_trends', computation_fn_name='_perform_firing_rate_trends_computation', validate_computation_test=lambda curr_active_pipeline: (curr_active_pipeline.computation_results[global_epoch_name].computed_data['firing_rate_trends'], curr_active_pipeline.computation_results[global_epoch_name].computed_data['extended_stats']['time_binned_position_df']), is_global=False),
+        SpecificComputationValidator(short_name='relative_entropy_analyses', computation_fn_name='_perform_time_dependent_pf_sequential_surprise_computation', validate_computation_test=lambda curr_active_pipeline: (np.sum(curr_active_pipeline.global_computation_results.computed_data['relative_entropy_analyses']['flat_relative_entropy_results'], axis=1), np.sum(curr_active_pipeline.global_computation_results.computed_data['relative_entropy_analyses']['flat_jensen_shannon_distance_results'], axis=1)), is_global=False),  # flat_surprise_across_all_positions
+        SpecificComputationValidator(short_name='jonathan_firing_rate_analysis', computation_fn_name='_perform_jonathan_replay_firing_rate_analyses', validate_computation_test=lambda curr_active_pipeline: curr_active_pipeline.global_computation_results.computed_data['jonathan_firing_rate_analysis']['neuron_replay_stats_df'], is_global=True),  # active_context
+        SpecificComputationValidator(short_name='short_long_pf_overlap_analyses', computation_fn_name='_perform_long_short_pf_overlap_analyses', validate_computation_test=lambda curr_active_pipeline: (curr_active_pipeline.global_computation_results.computed_data['short_long_pf_overlap_analyses']['relative_entropy_overlap_scalars_df'], curr_active_pipeline.global_computation_results.computed_data['short_long_pf_overlap_analyses']['relative_entropy_overlap_dict']), is_global=True),  # relative_entropy_overlap_scalars_df
+        SpecificComputationValidator(short_name='long_short_fr_indicies_analyses', computation_fn_name='_perform_long_short_firing_rate_analyses', validate_computation_test=lambda curr_active_pipeline: curr_active_pipeline.global_computation_results.computed_data['long_short_fr_indicies_analysis']['x_frs_index'], is_global=True),  # active_context
+        SpecificComputationValidator(short_name='long_short_decoding_analyses', computation_fn_name='_perform_long_short_decoding_analyses', validate_computation_test=lambda curr_active_pipeline: (curr_active_pipeline.global_computation_results.computed_data['long_short_leave_one_out_decoding_analysis'].long_results_obj, curr_active_pipeline.global_computation_results.computed_data['long_short_leave_one_out_decoding_analysis'].short_results_obj), is_global=True),
+        SpecificComputationValidator(short_name='long_short_post_decoding', computation_fn_name='_perform_long_short_post_decoding_analysis', validate_computation_test=lambda curr_active_pipeline: curr_active_pipeline.global_computation_results.computed_data['long_short_post_decoding'].rate_remapping.rr_df, is_global=True)
     ]
- 
-    for _comp_name, _comp_fcn_name, _comp_validate_computation_test, is_global in zip(comp_names, comp_functions, comp_validate_computation_tests, comp_is_global):
-        if (not is_global) or include_global_functions:
-            _comp_specifier = SpecificComputationValidator(short_name=_comp_name, computation_fn_name=_comp_fcn_name, validate_computation_test=_comp_validate_computation_test, is_global=is_global)
+
+    for _comp_specifier in _comp_specifiers:
+        if (not _comp_specifier.is_global) or include_global_functions:
             if _comp_specifier.short_name in include_whitelist:
                 newly_computed_values += _comp_specifier.try_computation_if_needed(curr_active_pipeline, on_already_computed_fn=_subfn_on_already_computed, fail_on_exception=fail_on_exception, progress_print=progress_print, debug_print=debug_print, force_recompute=force_recompute)
+
 
     # if include_global_functions:
         
