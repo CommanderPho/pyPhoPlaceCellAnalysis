@@ -728,19 +728,15 @@ def batch_extended_programmatic_figures(curr_active_pipeline):
     # plot_long_short_firing_rate_indicies(x_frs_index, y_frs_index, active_context, fig_save_parent_path=fig_save_parent_path)
 
 
-    # 2023-06-01 - Hackish solution until I get it embedded in a global display function.
-    from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.MultiContextComparingDisplayFunctions.LongShortTrackComparingDisplayFunctions import _prepare_plot_expected_vs_observed, _prepare_plot_long_and_short_epochs
-    
+    # 2023-06-01 - Hackish solution until I get it embedded in a global display function.    
     try:
-        # fig, axes, final_context, active_out_figure_paths = _prepare_plot_expected_vs_observed(curr_active_pipeline, defer_render=True)
         _out = curr_active_pipeline.display('_display_long_short_expected_v_observed_firing_rate', curr_active_pipeline.get_session_context(), defer_render=True)
     except Exception as e:
         print(f'batch_extended_programmatic_figures(...): _prepare_plot_expected_vs_observed failed with error: {e}\n skipping.')
     
     ## TODO 2023-06-02 NOW, NEXT: this might not work in 'AGG' mode because it tries to render it with QT, but we can see.
     try:
-        _out = _prepare_plot_long_and_short_epochs(curr_active_pipeline, defer_render=True)
-        
+        _out = curr_active_pipeline.display('_display_long_and_short_stacked_epoch_slices', curr_active_pipeline.get_session_context(), defer_render=True)
     except Exception as e:
         print(f'batch_extended_programmatic_figures(...): _prepare_plot_long_and_short_epochs failed with error: {e}\n skipping.')
     
