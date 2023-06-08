@@ -2,10 +2,9 @@ from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtGui, QtCore
 from pyphoplacecellanalysis.External.pyqtgraph.widgets.ProgressDialog import ProgressDialog
 
 # pyPhoPlaceCellAnalysis:
-from pyphoplacecellanalysis.General.Batch.NonInteractiveProcessing import NonInteractiveProcessing
 from pyphoplacecellanalysis.GUI.Qt.Mixins.CheckTableCtrlOwningMixin import CheckTableCtrlOwningMixin
 from pyphoplacecellanalysis.GUI.PyQtPlot.Flowchart.CustomNodes.MiscNodes.ExtendedCtrlNode import ExtendedCtrlNode
-
+from pyphoplacecellanalysis.GUI.PyQtPlot.Flowchart.CustomNodes.Mixins.FlowchartNodePipelineHelpers import FlowchartNodePipelineHelpers
 
 
 class PipelineComputationsNode(CheckTableCtrlOwningMixin, ExtendedCtrlNode):
@@ -96,7 +95,7 @@ class PipelineComputationsNode(CheckTableCtrlOwningMixin, ExtendedCtrlNode):
             pipeline = None
         else:
             with ProgressDialog("Pipeline Computations...", 0, 1, cancelText="Cancel", parent=None, busyCursor=True, wait=250) as dlg:
-                pipeline = NonInteractiveProcessing.perform_computation(pipeline, computation_configs, enabled_filter_names=self.enabled_filters)
+                pipeline = FlowchartNodePipelineHelpers.perform_computation(pipeline, computation_configs, enabled_filter_names=self.enabled_filters)
 
         return {'updated_computation_configs': computation_configs,'computed_pipeline': pipeline}
 
