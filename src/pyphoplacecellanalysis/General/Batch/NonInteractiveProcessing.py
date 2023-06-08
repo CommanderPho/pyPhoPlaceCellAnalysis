@@ -44,23 +44,16 @@ filters should be checkable to express whether we want to build that one or not
 
 """
 
-@define(repr=None, slots=False)
-class SpecificComputationValidator:
-    short_name:str # 'long_short_post_decoding'
-    computation_fn_name:str # '_perform_long_short_post_decoding_analysis'
-    validate_computation_test:Callable
-    computation_fn_kwargs:dict = Factory(dict) # {'perform_cache_load': False}]`
-    
 
-    # def validate_computation_test(self, curr_active_pipeline):
-    #     """ *SPECIFIC* test function for a specific computation (like 'long_short_post_decoding') that tries to access the results added by the computation function to see if it's needed or ready.
-    #     Throws an (AttributeError, KeyError) during its accesses if the data isn't there. 
-    #     """
-    #     ## Get global 'long_short_post_decoding' results:
-    #     curr_long_short_post_decoding = curr_active_pipeline.global_computation_results.computed_data['long_short_post_decoding']
-    #     ## Extract variables from results object:
-    #     expected_v_observed_result, curr_long_short_rr = curr_long_short_post_decoding.expected_v_observed_result, curr_long_short_post_decoding.rate_remapping
-    #     rate_remapping_df, high_remapping_cells_only = curr_long_short_rr.rr_df, curr_long_short_rr.high_only_rr_df
+# def validate_computation_test(self, curr_active_pipeline):
+#     """ *SPECIFIC* test function for a specific computation (like 'long_short_post_decoding') that tries to access the results added by the computation function to see if it's needed or ready.
+#     Throws an (AttributeError, KeyError) during its accesses if the data isn't there. 
+#     """
+#     ## Get global 'long_short_post_decoding' results:
+#     curr_long_short_post_decoding = curr_active_pipeline.global_computation_results.computed_data['long_short_post_decoding']
+#     ## Extract variables from results object:
+#     expected_v_observed_result, curr_long_short_rr = curr_long_short_post_decoding.expected_v_observed_result, curr_long_short_post_decoding.rate_remapping
+#     rate_remapping_df, high_remapping_cells_only = curr_long_short_rr.rr_df, curr_long_short_rr.high_only_rr_df
 
 
 # def a_validate_computation_test(curr_active_pipeline):
@@ -72,37 +65,48 @@ class SpecificComputationValidator:
 # SpecificComputationValidator(short_name='long_short_post_decoding', computation_fn_name='_perform_long_short_post_decoding_analysis', validate_computation_test=a_validate_computation_test)
 
 
-def _try_computation_if_needed(curr_active_pipeline, comp_specifier: SpecificComputationValidator, on_already_computed_fn=None, fail_on_exception=False, progress_print=True, debug_print=False, force_recompute:bool=False):
-    """ 2023-06-08 - tries to perform the computation if the results are missing and it's needed. 
+@define(repr=None, slots=False)
+class SpecificComputationValidator:
+    short_name:str # 'long_short_post_decoding'
+    computation_fn_name:str # '_perform_long_short_post_decoding_analysis'
+    validate_computation_test:Callable
+    computation_fn_kwargs:dict = Factory(dict) # {'perform_cache_load': False}]`
     
-    Usage:
-        if _comp_name in include_whitelist:
-            newly_computed_values += _try_computation_if_needed(curr_active_pipeline, comp_specifier=SpecificComputationValidator(short_name='long_short_post_decoding', computation_fn_name='_perform_long_short_post_decoding_analysis', validate_computation_test=a_validate_computation_test), on_already_computed_fn=_subfn_on_already_computed, fail_on_exception=fail_on_exception, progress_print=progress_print, debug_print=debug_print, force_recompute=force_recompute)
-    """
-    comp_short_name: str = comp_specifier.short_name
-    newly_computed_values = []
-    try:
+    def try_computation_if_needed(self, curr_active_pipeline, **kwargs):
+        return self._perform_try_computation_if_needed(self, curr_active_pipeline, **kwargs)
+
+    @classmethod
+    def _perform_try_computation_if_needed(cls, comp_specifier: "SpecificComputationValidator", curr_active_pipeline, on_already_computed_fn=None, fail_on_exception=False, progress_print=True, debug_print=False, force_recompute:bool=False):
+        """ 2023-06-08 - tries to perform the computation if the results are missing and it's needed. 
         
-        comp_specifier.validate_computation_test(curr_active_pipeline)
-        if on_already_computed_fn is not None:
-            on_already_computed_fn(comp_short_name)
-            
-    except (AttributeError, KeyError) as e:
-        if progress_print or debug_print:
-            print(f'{comp_short_name} missing.')
-        if debug_print:
-            print(f'\t encountered error: {e}\n{traceback.format_exc()}\n.')
-        if progress_print or debug_print:
-            print(f'\t Recomputing {comp_short_name}...')
-        # When this fails due to unwrapping from the load, add `, computation_kwargs_list=[{'perform_cache_load': False}]` as an argument to the `perform_specific_computation` call below
-        curr_active_pipeline.perform_specific_computation(computation_functions_name_whitelist=[comp_specifier.computation_fn_name], computation_kwargs_list=[comp_specifier.computation_fn_kwargs], fail_on_exception=True, debug_print=False) # fail_on_exception MUST be True or error handling is all messed up 
-        print(f'\t done.')
-        # try the validation again.
-        comp_specifier.validate_computation_test(curr_active_pipeline)
-        newly_computed_values.append(comp_short_name)
-    except Exception as e:
-        raise e
-    return newly_computed_values
+        Usage:
+            if _comp_name in include_whitelist:
+                newly_computed_values += _try_computation_if_needed(curr_active_pipeline, comp_specifier=SpecificComputationValidator(short_name='long_short_post_decoding', computation_fn_name='_perform_long_short_post_decoding_analysis', validate_computation_test=a_validate_computation_test), on_already_computed_fn=_subfn_on_already_computed, fail_on_exception=fail_on_exception, progress_print=progress_print, debug_print=debug_print, force_recompute=force_recompute)
+        """
+        comp_short_name: str = comp_specifier.short_name
+        newly_computed_values = []
+        try:
+            comp_specifier.validate_computation_test(curr_active_pipeline)
+            if on_already_computed_fn is not None:
+                on_already_computed_fn(comp_short_name)
+                
+        except (AttributeError, KeyError) as e:
+            if progress_print or debug_print:
+                print(f'{comp_short_name} missing.')
+            if debug_print:
+                print(f'\t encountered error: {e}\n{traceback.format_exc()}\n.')
+            if progress_print or debug_print:
+                print(f'\t Recomputing {comp_short_name}...')
+            # When this fails due to unwrapping from the load, add `, computation_kwargs_list=[{'perform_cache_load': False}]` as an argument to the `perform_specific_computation` call below
+            curr_active_pipeline.perform_specific_computation(computation_functions_name_whitelist=[comp_specifier.computation_fn_name], computation_kwargs_list=[comp_specifier.computation_fn_kwargs], fail_on_exception=True, debug_print=False) # fail_on_exception MUST be True or error handling is all messed up 
+            if progress_print or debug_print:
+                print(f'\t done.')
+            # try the validation again.
+            comp_specifier.validate_computation_test(curr_active_pipeline)
+            newly_computed_values.append(comp_short_name)
+        except Exception as e:
+            raise e
+        return newly_computed_values
 
 # ==================================================================================================================== #
 # 2022-12-07 - batch_load_session - Computes Entire Pipeline                                                           #
@@ -444,11 +448,14 @@ def batch_extended_computations(curr_active_pipeline, include_whitelist=None, in
                 newly_computed_values.append(_comp_name)
             except Exception as e:
                 raise e
+
+
             
         _comp_validate_computation_test = lambda curr_active_pipeline: curr_active_pipeline.global_computation_results.computed_data['long_short_leave_one_out_decoding_analysis'].long_results_obj # tests just a single deep value.
         _comp_specifier = SpecificComputationValidator(short_name='long_short_decoding_analyses', computation_fn_name='_perform_long_short_decoding_analyses', validate_computation_test=_comp_validate_computation_test)
         if _comp_specifier.short_name in include_whitelist:
-            newly_computed_values += _try_computation_if_needed(curr_active_pipeline, comp_specifier=_comp_specifier, on_already_computed_fn=_subfn_on_already_computed, fail_on_exception=fail_on_exception, progress_print=progress_print, debug_print=debug_print, force_recompute=force_recompute)
+            # newly_computed_values += _try_computation_if_needed(curr_active_pipeline, comp_specifier=_comp_specifier, on_already_computed_fn=_subfn_on_already_computed, fail_on_exception=fail_on_exception, progress_print=progress_print, debug_print=debug_print, force_recompute=force_recompute)
+            newly_computed_values += _comp_specifier.try_computation_if_needed(curr_active_pipeline, on_already_computed_fn=_subfn_on_already_computed, fail_on_exception=fail_on_exception, progress_print=progress_print, debug_print=debug_print, force_recompute=force_recompute)
 
             
 
@@ -462,7 +469,7 @@ def batch_extended_computations(curr_active_pipeline, include_whitelist=None, in
         _comp_validate_computation_test = lambda curr_active_pipeline: curr_active_pipeline.global_computation_results.computed_data['long_short_post_decoding'].rate_remapping.rr_df # tests just a single deep value.
         _comp_specifier = SpecificComputationValidator(short_name='long_short_post_decoding', computation_fn_name='_perform_long_short_post_decoding_analysis', validate_computation_test=_comp_validate_computation_test)
         if _comp_specifier.short_name in include_whitelist:
-            newly_computed_values += _try_computation_if_needed(curr_active_pipeline, comp_specifier=_comp_specifier, on_already_computed_fn=_subfn_on_already_computed, fail_on_exception=fail_on_exception, progress_print=progress_print, debug_print=debug_print, force_recompute=force_recompute)
+            newly_computed_values += _comp_specifier.try_computation_if_needed(curr_active_pipeline, on_already_computed_fn=_subfn_on_already_computed, fail_on_exception=fail_on_exception, progress_print=progress_print, debug_print=debug_print, force_recompute=force_recompute)
 
         
         # ## long_short_rate_remapping:
