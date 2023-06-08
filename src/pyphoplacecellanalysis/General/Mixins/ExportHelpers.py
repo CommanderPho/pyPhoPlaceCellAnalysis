@@ -365,34 +365,67 @@ def programmatic_display_to_PDF(curr_active_pipeline, curr_display_function_name
                 curr_active_pipeline.register_output_file(output_path=active_pdf_save_path, output_metadata={'filtered_context': a_filtered_context, 'context': active_identifying_ctx, 'fig': out_fig_list})
 
 
-                    if debug_print:
-                        print(f'main_out_display_context: "{main_out_display_context}"')
-                    main_out_display_dict = out_display_var[main_out_display_context]
-                    ui = main_out_display_dict['ui']
-                    # out_plot_tuple = curr_active_pipeline.display(curr_display_function_name, filter_name, filter_epochs='ripple', fignum=active_identifying_ctx_string, **figure_format_config)
-                    # params, plots_data, plots, ui = out_plot_tuple 
-                    out_fig = ui.mw.getFigure() # TODO: Only works for MatplotlibWidget wrapped figures
-                    out_fig_list.append(out_fig)
-                elif isinstance(out_display_var, MatplotlibRenderPlots):
-                    # Newest style plots: 2022-12-09
-                    out_fig_list.extend(out_display_var.figures)
 
-                else:
-                    # Non-dictionary type item, older style:
-                    if not isinstance(out_display_var, (list, tuple)):
-                        # not a list, just a scalar object
-                        plots = [out_display_var] # make a single-element list
-                    else:
-                        # it is a list
-                        if len(out_display_var) == 2:
-                            fig0, figList1 = out_display_var # unpack
-                            plots = [fig0, *figList1]
-                        else:
-                            # otherwise just try and set the plots to the list
-                            plots = out_display_var
 
-                    out_fig_list.extend(plots)
 
+@function_attributes(short_name=None, tags=['PDF', 'export', 'output', 'matplotlib', 'display', 'file', 'active'], input_requires=[], output_provides=[], uses=['extract_figures_from_display_function_output'], used_by=[], creation_date='2023-06-08 11:55', related_items=[])
+def programmatic_render_to_file(curr_active_pipeline, curr_display_function_name='_display_plot_decoded_epoch_slices', subset_whitelist=None, subset_blacklist=None, write_pdf=False, write_png=True, debug_print=False, **kwargs):
+    """ TODO 2023-06-08 - INCOMPLETE
+    Newer Programmatic .png and .pdf outputs
+    curr_display_function_name = '_display_plot_decoded_epoch_slices' 
+
+    Looks it this is done for EACH filtered context (in the loop below) whereas the original just did a single specific context
+    """
+
+    ## Get the output path (active_session_figures_out_path) for this session (and all of its filtered_contexts as well):
+    active_identifying_session_ctx = curr_active_pipeline.sess.get_context() # 'bapun_RatN_Day4_2019-10-15_11-30-06'
+    figures_parent_out_path = create_daily_programmatic_display_function_testing_folder_if_needed()
+    active_session_figures_out_path = session_context_to_relative_path(figures_parent_out_path, active_identifying_session_ctx)
+    if debug_print:
+        print(f'curr_session_parent_out_path: {active_session_figures_out_path}')
+    active_session_figures_out_path.mkdir(parents=True, exist_ok=True) # make folder if needed
+
+    with plt.ioff():
+        ## Disables showing the figure by default from within the context manager.
+        # active_display_fn_kwargs = overriding_dict_with(lhs_dict=dict(filter_epochs='ripple', debug_test_max_num_slices=128), **kwargs)
+        # active_display_fn_kwargs = overriding_dict_with(lhs_dict=dict(), **kwargs) # this is always an error, if lhs_dict is empty the result will be empty regardless of the value of kwargs.
+        active_display_fn_kwargs = kwargs
+        
+        # Perform for each filtered context:
+        for filter_name, a_filtered_context in curr_active_pipeline.filtered_contexts.items():
+            if debug_print:
+                print(f'filter_name: {filter_name}: "{a_filtered_context.get_description()}"')
+            # Get the desired display function context:
+            active_identifying_display_ctx = a_filtered_context.adding_context('display_fn', display_fn_name=curr_display_function_name)
+            # final_context = active_identifying_display_ctx # Display only context    
+
+            # # Add in the desired display variable:
+            active_identifying_ctx = active_identifying_display_ctx.adding_context('filter_epochs', **active_display_fn_kwargs) # , filter_epochs='ripple' ## TODO: this is only right for a single function!
+            final_context = active_identifying_ctx # Display/Variable context mode
+
+            active_identifying_ctx_string = final_context.get_description(separator='|') # Get final discription string
+            if debug_print:
+                print(f'active_identifying_ctx_string: "{active_identifying_ctx_string}"')
+
+            ## Build PDF Output Info
+            active_pdf_metadata, active_pdf_save_filename = build_pdf_metadata_from_display_context(final_context, subset_whitelist=subset_whitelist, subset_blacklist=subset_blacklist)
+            active_pdf_save_path = active_session_figures_out_path.joinpath(active_pdf_save_filename) # build the final output pdf path from the pdf_parent_out_path (which is the daily folder)
+
+            ## BEGIN DISPLAY/SAVE
+            with backend_pdf.PdfPages(active_pdf_save_path, keep_empty=False, metadata=active_pdf_metadata) as pdf:
+                out_fig_list = [] # Separate PDFs mode:
+
+                if debug_print:
+                    print(f'active_pdf_save_path: {active_pdf_save_path}\nactive_pdf_metadata: {active_pdf_metadata}')
+                    print(f'active_display_fn_kwargs: {active_display_fn_kwargs}')
+                    
+                out_display_var = curr_active_pipeline.display(curr_display_function_name, a_filtered_context, **active_display_fn_kwargs) # , filter_epochs='ripple', debug_test_max_num_slices=128
+                # , fignum=active_identifying_ctx_string, **figure_format_config
+    
+                if debug_print:
+                    print(f'completed display(...) call. type(out_display_var): {type(out_display_var)}\n out_display_var: {out_display_var}, active_display_fn_kwargs: {active_display_fn_kwargs}')
+
+                out_fig_list = extract_figures_from_display_function_output(out_display_var=out_display_var, out_fig_list=out_fig_list)
 
                 if debug_print:
                     print(f'out_fig_list: {out_fig_list}')
@@ -403,6 +436,10 @@ def programmatic_display_to_PDF(curr_active_pipeline, curr_display_function_name
                     pdf.attach_note(f'Page {i + 1}: "{active_identifying_ctx_string}"')
                     
                 curr_active_pipeline.register_output_file(output_path=active_pdf_save_path, output_metadata={'filtered_context': a_filtered_context, 'context': active_identifying_ctx, 'fig': out_fig_list})
+
+
+
+
 
 
 @function_attributes(short_name=None, tags=['file','export','output','matplotlib','display','active','PDF','batch','automated'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-05-31 19:16', related_items=[])
