@@ -727,8 +727,6 @@ def batch_extended_programmatic_figures(curr_active_pipeline):
     # active_context = long_short_fr_indicies_analysis_results['active_context']
     # plot_long_short_firing_rate_indicies(x_frs_index, y_frs_index, active_context, fig_save_parent_path=fig_save_parent_path)
 
-
-    # 2023-06-01 - Hackish solution until I get it embedded in a global display function.    
     try:
         _out = curr_active_pipeline.display('_display_long_short_expected_v_observed_firing_rate', curr_active_pipeline.get_session_context(), defer_render=True)
     except Exception as e:
