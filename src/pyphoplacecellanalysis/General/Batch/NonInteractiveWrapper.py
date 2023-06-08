@@ -732,7 +732,8 @@ def batch_extended_programmatic_figures(curr_active_pipeline):
     from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.MultiContextComparingDisplayFunctions.LongShortTrackComparingDisplayFunctions import _prepare_plot_expected_vs_observed, _prepare_plot_long_and_short_epochs
     
     try:
-        fig, axes, final_context, active_out_figure_paths = _prepare_plot_expected_vs_observed(curr_active_pipeline, defer_render=True)
+        # fig, axes, final_context, active_out_figure_paths = _prepare_plot_expected_vs_observed(curr_active_pipeline, defer_render=True)
+        _out = curr_active_pipeline.display('_display_long_short_expected_v_observed_firing_rate', curr_active_pipeline.get_session_context(), defer_render=True)
     except Exception as e:
         print(f'batch_extended_programmatic_figures(...): _prepare_plot_expected_vs_observed failed with error: {e}\n skipping.')
     

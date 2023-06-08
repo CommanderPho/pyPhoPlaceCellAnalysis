@@ -506,11 +506,11 @@ class LongShortTrackComparingDisplayFunctions(AllFunctionEnumeratingMixin, metac
     
 
     @function_attributes(short_name='long_short_expected_v_observed_firing_rate', tags=['display','long_short','firing_rate', 'output_registering', 'figure_saving', 'expected','observed'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-06-08 10:48')
-    def _display_long_short_expected_v_observed_firing_rate(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_whitelist=None, **kwargs):
+    def _display_long_short_expected_v_observed_firing_rate(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_whitelist=None, defer_render=False, **kwargs):
         """ Displays expected v observed firing rate for each cell independently
 
         """
-        def _subfn_prepare_plot_expected_vs_observed(curr_active_pipeline, defer_render=True):
+        def _subfn_prepare_plot_expected_vs_observed(curr_active_pipeline, defer_render:bool):
             """ 2023-06-01 - Sets up the `plot_expected_vs_observed` plot and exports it. 
             TODO 2023-06-01 - CONVERT TO A GLOBAL DISPLAY FUNCTION
             
@@ -608,7 +608,7 @@ class LongShortTrackComparingDisplayFunctions(AllFunctionEnumeratingMixin, metac
             return fig, axes, final_context, active_out_figure_paths
 
         # BEGIN FUNCTION BODY ________________________________________________________________________________________________ #
-        fig, axes, final_context, active_out_figure_paths = _subfn_prepare_plot_expected_vs_observed(owning_pipeline_reference)
+        fig, axes, final_context, active_out_figure_paths = _subfn_prepare_plot_expected_vs_observed(owning_pipeline_reference, defer_render=defer_render)
 
         graphics_output_dict = MatplotlibRenderPlots(name='long_short_expected_v_observed_firing_rate', figures=(fig,), axes=(axes,), plot_data={'context': final_context, 'path': active_out_figure_paths})
         return graphics_output_dict
