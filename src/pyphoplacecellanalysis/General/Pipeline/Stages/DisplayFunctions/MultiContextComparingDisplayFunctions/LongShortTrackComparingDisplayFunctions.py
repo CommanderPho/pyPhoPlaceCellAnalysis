@@ -61,7 +61,7 @@ class LongShortTrackComparingDisplayFunctions(AllFunctionEnumeratingMixin, metac
     Must have a signature of: (owning_pipeline_reference, global_computation_results, computation_results, active_configs, ..., **kwargs) at a minimum
     """
 
-    @function_attributes(short_name='jonathan_interactive_replay_firing_rate_comparison', tags=['display','interactive','jonathan', 'firing_rate', 'pyqtgraph'], input_requires=[], output_provides=[], uses=['_make_jonathan_interactive_plot'], used_by=[], creation_date='2023-04-11 03:14')
+    @function_attributes(short_name='jonathan_interactive_replay_firing_rate_comparison', tags=['display','interactive','jonathan', 'firing_rate', 'pyqtgraph'], input_requires=[], output_provides=[], uses=['_make_jonathan_interactive_plot'], used_by=[], creation_date='2023-04-11 03:14', is_global=True)
     def _display_jonathan_interactive_replay_firing_rate_comparison(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_whitelist=None, included_neuron_types=None, require_placefield=True, **kwargs):
             """ Jonathan's interactive display. Currently hacked up to directly compute the results to display within this function
                 Internally calls `_make_jonathan_interactive_plot(...)`
@@ -126,7 +126,7 @@ class LongShortTrackComparingDisplayFunctions(AllFunctionEnumeratingMixin, metac
 
             return graphics_output_dict
 
-    @function_attributes(short_name='batch_pho_jonathan_interactive_replay_firing_rate_comparison', tags=['display','interactive','jonathan', 'firing_rate', 'matplotlib', 'batch'], input_requires=[], output_provides=[], uses=['_make_pho_jonathan_batch_plots'], used_by=[], creation_date='2023-04-11 03:14')
+    @function_attributes(short_name='batch_pho_jonathan_interactive_replay_firing_rate_comparison', tags=['display','interactive','jonathan', 'firing_rate', 'matplotlib', 'batch'], input_requires=[], output_provides=[], uses=['_make_pho_jonathan_batch_plots'], used_by=[], creation_date='2023-04-11 03:14', is_global=True)
     def _display_batch_pho_jonathan_replay_firing_rate_comparison(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_whitelist=None, **kwargs):
             """ Stacked Jonathan-style firing-rate-across-epochs-plot. Pho's batch adaptation of the primary elements from Jonathan's interactive display.
                 Usage:
@@ -213,7 +213,7 @@ class LongShortTrackComparingDisplayFunctions(AllFunctionEnumeratingMixin, metac
 
             return graphics_output_dict
 
-    @function_attributes(short_name='short_long_pf1D_comparison', tags=['long_short','1D','placefield'], input_requires=[], output_provides=[], uses=['plot_short_v_long_pf1D_comparison'], used_by=[], creation_date='2023-04-26 06:12')
+    @function_attributes(short_name='short_long_pf1D_comparison', tags=['long_short','1D','placefield'], input_requires=[], output_provides=[], uses=['plot_short_v_long_pf1D_comparison'], used_by=[], creation_date='2023-04-26 06:12', is_global=True)
     def _display_short_long_pf1D_comparison(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_whitelist=None, **kwargs):
             """ Displays a figure for comparing the 1D placefields across-epochs (between the short and long tracks). By default renders the second track's placefield flipped over the x-axis and hatched. 
                 Usage:
@@ -263,7 +263,7 @@ class LongShortTrackComparingDisplayFunctions(AllFunctionEnumeratingMixin, metac
 
             return graphics_output_dict
 
-
+    @function_attributes(short_name='short_long_pf1D_scalar_overlap_comparison', tags=['display','long_short'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-06-08 12:44', is_global=True)
     def _display_short_long_pf1D_scalar_overlap_comparison(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_whitelist=None, **kwargs):
             """ Displays a figure for comparing the scalar comparison quantities computed for 1D placefields across-epochs (between the short and long tracks)
                 This currently renders as a bar-graph
@@ -332,7 +332,7 @@ class LongShortTrackComparingDisplayFunctions(AllFunctionEnumeratingMixin, metac
 
             return graphics_output_dict
 
-    @function_attributes(short_name='short_long_firing_rate_index_comparison', tags=['display','long_short','short_long','firing_rate', 'fr_index'], input_requires=[], output_provides=[], uses=['_plot_long_short_firing_rate_indicies'], used_by=[], creation_date='2023-04-11 08:08')
+    @function_attributes(short_name='short_long_firing_rate_index_comparison', tags=['display','long_short','short_long','firing_rate', 'fr_index'], input_requires=[], output_provides=[], uses=['_plot_long_short_firing_rate_indicies'], used_by=[], creation_date='2023-04-11 08:08', is_global=True)
     def _display_short_long_firing_rate_index_comparison(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_whitelist=None, **kwargs):
             """ Displays a figure for comparing the 1D placefields across-epochs (between the short and long tracks)
                 Usage:
@@ -362,8 +362,7 @@ class LongShortTrackComparingDisplayFunctions(AllFunctionEnumeratingMixin, metac
             # graphics_output_dict['plot_data'] = {'sort_indicies': (long_sort_ind, short_sort_ind), 'colors':(long_neurons_colors_array, short_neurons_colors_array)}            
             return graphics_output_dict
 
-
-    @function_attributes(short_name=None, tags=['display', 'long_short', 'laps', 'position', 'behavior'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-05-29 18:20', related_items=[])
+    @function_attributes(short_name=None, tags=['display', 'long_short', 'laps', 'position', 'behavior'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-05-29 18:20', related_items=[], is_global=True)
     def _display_long_short_laps(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_whitelist=None, **kwargs):
             """ Displays a figure displaying the 1D laps detected for both the long and short tracks.
                 Usage:
@@ -386,8 +385,7 @@ class LongShortTrackComparingDisplayFunctions(AllFunctionEnumeratingMixin, metac
             graphics_output_dict = MatplotlibRenderPlots(name='_display_long_short_laps', figures=(fig,), axes=out_axes_list, plot_data={})
             return graphics_output_dict
 
-
-    @function_attributes(short_name='long_and_short_firing_rate_replays_v_laps', tags=['display','long_short','firing_rate', 'output_registering', 'figure_saving'], input_requires=[], output_provides=[], uses=['_plot_session_long_short_track_firing_rate_figures'], used_by=[], creation_date='2023-06-08 10:22')
+    @function_attributes(short_name='long_and_short_firing_rate_replays_v_laps', tags=['display','long_short','firing_rate'], conforms_to=['output_registering', 'figure_saving'], input_requires=[], output_provides=[], uses=['_plot_session_long_short_track_firing_rate_figures'], used_by=[], creation_date='2023-06-08 10:22', is_global=True)
     def _display_long_and_short_firing_rate_replays_v_laps(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_whitelist=None, **kwargs):
         """ Displays two figures, one for the long and one for the short track, that compare the firing rates during running (laps) and those during decoded replays.
             Usage:
@@ -404,9 +402,7 @@ class LongShortTrackComparingDisplayFunctions(AllFunctionEnumeratingMixin, metac
         graphics_output_dict = MatplotlibRenderPlots(name='long_and_short_firing_rate_replays_v_laps', figures=(fig_L, fig_S), axes=(ax_L, ax_S), plot_data={'context': (active_display_context_L, active_display_context_S)})
         return graphics_output_dict
 
-
-
-    @function_attributes(short_name='running_and_replay_speeds_over_time', tags=['speed', 'laps', 'replay', 'velocity', 'time', 'running', 'fit', 'output_registering', 'figure_saving'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-06-07 21:13', related_items=[])
+    @function_attributes(short_name='running_and_replay_speeds_over_time', tags=['speed', 'laps', 'replay', 'velocity', 'time', 'running', 'fit'], conforms_to=['output_registering', 'figure_saving'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-06-07 21:13', related_items=[], is_global=True)
     def _display_running_and_replay_speeds_over_time(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_whitelist=None, **kwargs):
         """ plots the animal's running speed and the decoded replay velocities (as computed by the Radon transform method) across the recording session. 
         Renders a vertical stack of two subplots.
@@ -504,16 +500,13 @@ class LongShortTrackComparingDisplayFunctions(AllFunctionEnumeratingMixin, metac
         graphics_output_dict = MatplotlibRenderPlots(name='_display_running_and_replay_speeds_over_time', figures=(fig,), axes=[ax1, ax2], plot_data=plot_data_dict, context=final_context, saved_figures=active_out_figure_paths)
         return graphics_output_dict
     
-
-    @function_attributes(short_name='long_short_expected_v_observed_firing_rate', tags=['display','long_short','firing_rate', 'output_registering', 'figure_saving', 'expected','observed'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-06-08 10:48')
+    @function_attributes(short_name='long_short_expected_v_observed_firing_rate', tags=['display','long_short','firing_rate', 'expected','observed'], conforms_to=['output_registering', 'figure_saving'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-06-08 10:48', is_global=True)
     def _display_long_short_expected_v_observed_firing_rate(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_whitelist=None, defer_render=False, **kwargs):
         """ Displays expected v observed firing rate for each cell independently
 
         """
         def _subfn_prepare_plot_expected_vs_observed(curr_active_pipeline, defer_render:bool):
             """ 2023-06-01 - Sets up the `plot_expected_vs_observed` plot and exports it. 
-            TODO 2023-06-01 - CONVERT TO A GLOBAL DISPLAY FUNCTION
-            
             
             Usage:
                 fig, axes, final_context, active_out_figure_paths = _subfn_prepare_plot_expected_vs_observed(curr_active_pipeline)
@@ -613,8 +606,7 @@ class LongShortTrackComparingDisplayFunctions(AllFunctionEnumeratingMixin, metac
         graphics_output_dict = MatplotlibRenderPlots(name='long_short_expected_v_observed_firing_rate', figures=(fig,), axes=(axes,), plot_data={'context': final_context, 'path': active_out_figure_paths})
         return graphics_output_dict
 
-
-    @function_attributes(short_name=None, tags=['long_short_stacked_epoch_slices'], input_requires=[], output_provides=[], uses=['plot_decoded_epoch_slices_paginated'], used_by=[], creation_date='2023-06-02 14:12')
+    @function_attributes(short_name=None, tags=['long_short_stacked_epoch_slices'], input_requires=[], output_provides=[], uses=['plot_decoded_epoch_slices_paginated'], used_by=[], creation_date='2023-06-02 14:12', is_global=True)
     def _display_long_and_short_stacked_epoch_slices(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_whitelist=None, defer_render=False, save_figure=True, **kwargs):
         """ Plots two figures showing the entire stack of decoded epochs for both the long and short, including their Radon transformed lines if that information is available.
 
@@ -1509,7 +1501,7 @@ def _helper_add_long_short_session_indicator_regions(win, long_epoch, short_epoc
     return long_epoch_indicator_region_items, short_epoch_indicator_region_items
 
 
-@function_attributes(short_name='plot_long_short_expected_vs_observed_firing_rates', tags=['pyqtgraph','long_short'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-03-28 17:26')
+@function_attributes(short_name='plot_long_short_expected_vs_observed_firing_rates', tags=['pyqtgraph','long_short'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-03-28 17:26', is_global=True)
 def plot_long_short_expected_vs_observed_firing_rates(long_results_obj, short_results_obj, limit_aclus=None):
     """ 2023-03-28 4:30pm - Expected vs. Observed Firing Rates for each cell and each epoch 
     
