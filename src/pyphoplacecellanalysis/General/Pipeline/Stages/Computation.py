@@ -1,5 +1,6 @@
 from collections import OrderedDict
 import sys
+from datetime import datetime
 import typing
 from typing import Optional
 from warnings import warn
@@ -505,7 +506,7 @@ class ComputedPipelineStage(LoadableInput, LoadableSessionInput, FilterablePipel
             [type]: [description]
         """
         # only requires that active_session has the .spikes_df and .position  properties
-        output_result = ComputationResult(active_session, computation_config, computed_data=DynamicParameters(), accumulated_errors=DynamicParameters()) # Note that this active_session should be correctly filtered
+        output_result = ComputationResult(active_session, computation_config, computed_data=DynamicParameters(), accumulated_errors=DynamicParameters(), computation_times=DynamicParameters()) # Note that this active_session should be correctly filtered
         
         return output_result
 
@@ -530,6 +531,8 @@ class ComputedPipelineStage(LoadableInput, LoadableSessionInput, FilterablePipel
                 # Wrap the active functions in the wrapper that extracts their arguments:
                 active_computation_functions = [_wrap_multi_context_computation_function(a_global_fcn) for a_global_fcn in active_computation_functions]
             
+            computation_times = dict() # empty list to keep track of when the computations were completed
+            
             if fail_on_exception:
                 ## normal version that fails on any exception:
                 total_num_funcs = len(active_computation_functions)
@@ -537,7 +540,9 @@ class ComputedPipelineStage(LoadableInput, LoadableSessionInput, FilterablePipel
                     if progress_logger_callback is not None:
                         progress_logger_callback(f'Executing [{i}/{total_num_funcs}]: {f}')
                     previous_computation_result = f(previous_computation_result, **computation_kwargs_list[i])
-
+                    # Log the computation copmlete time:
+                    computation_times[f] = datetime.now()
+                
                 # Since there's no error handling, gettin ghere means that there were no accumulated errors
                 accumulated_errors = None
             else:
@@ -547,12 +552,14 @@ class ComputedPipelineStage(LoadableInput, LoadableSessionInput, FilterablePipel
                 else:
                     error_logger = (lambda x: print(f'ERROR: {x}'))
                 accumulated_errors = dict() # empty list for keeping track of exceptions
+                
                 total_num_funcs = len(active_computation_functions)
                 for i, f in enumerate(reversed(active_computation_functions)):
                     if progress_logger_callback is not None:
                         progress_logger_callback(f'Executing [{i}/{total_num_funcs}]: {f}')
                     try:
-                        temp_result = f(previous_computation_result, **computation_kwargs_list[i]) # evaluate the function 'f' using the result provided from the previous output or the initial input
+                        # evaluate the function 'f' using the result provided from the previous output or the initial input
+                        temp_result = f(previous_computation_result, **computation_kwargs_list[i]) 
                     except (TypeError, ValueError, NameError, AttributeError, KeyError, NotImplementedError) as e:
                         exception_info = sys.exc_info()
                         accumulated_errors[f] = CapturedException(e, exception_info, previous_computation_result)
@@ -561,15 +568,20 @@ class ComputedPipelineStage(LoadableInput, LoadableSessionInput, FilterablePipel
                         # result shouldn't be updated unless there wasn't an error, so it should be fine to move on to the next function
                         if error_logger is not None:
                             error_logger(f'\t Encountered error: {accumulated_errors[f]} continuing.')
+                    except Exception as e:
+                        print(f'UNHANDLED EXCEPTION: {e}')
+                        raise
                     else:
                         # only if no error occured do we commit the temp_result to result
                         previous_computation_result = temp_result
                         if progress_logger_callback is not None:
                             progress_logger_callback('\t done.')
+                        # Log the computation copmlete time:
+                        computation_times[f] = datetime.now()
 
             
             if debug_print:
-                print(f'_execute_computation_functions(...): \n\taccumulated_errors: {accumulated_errors}')
+                print(f'_execute_computation_functions(...): \n\taccumulated_errors: {accumulated_errors}\n\tcomputation_times: {computation_times}')
             
 
             if are_global:
@@ -579,8 +591,18 @@ class ComputedPipelineStage(LoadableInput, LoadableSessionInput, FilterablePipel
                 previous_computation_result = previous_computation_result[1] # get the global_computation_results object
                 assert isinstance(previous_computation_result, ComputationResult)
 
-            # Add the function to the computation result:
-            previous_computation_result.accumulated_errors = accumulated_errors
+            # Add the computation_time to the computation result:
+            previous_computation_result.computation_times |= (computation_times or {})
+            # for k,v in (computation_times or {}).items():
+            #     previous_computation_result.computation_times[k] = v
+        
+            # previous_computation_result.computation_times.update(DynamicParameters.init_from_dict(computation_times))
+            # Add the accumulated_errors to the computation result:
+            # Used to just replace `previous_computation_result.accumulated_errors`:
+            # previous_computation_result.accumulated_errors = (accumulated_errors or {})
+            previous_computation_result.accumulated_errors |= (accumulated_errors or {})
+            # for k,v in (accumulated_errors or {}).items():
+            #     previous_computation_result.accumulated_errors[k] = v
             if len(accumulated_errors or {}) > 0:
                 if progress_logger_callback is not None:
                     progress_logger_callback(f'WARNING: there were {len(accumulated_errors)} that occurred during computation. Check these out by looking at computation_result.accumulated_errors.')
@@ -596,6 +618,7 @@ class ComputedPipelineStage(LoadableInput, LoadableSessionInput, FilterablePipel
             return previous_computation_result
             
         else:
+            ## empty active_computation_functions list: nothing to compute!
             if progress_logger_callback is not None:
                 progress_logger_callback(f'No registered_computation_functions, skipping extended computations.')
                 
