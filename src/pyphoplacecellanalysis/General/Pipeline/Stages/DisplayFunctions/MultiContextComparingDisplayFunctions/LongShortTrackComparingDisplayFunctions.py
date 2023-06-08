@@ -387,13 +387,30 @@ class LongShortTrackComparingDisplayFunctions(AllFunctionEnumeratingMixin, metac
             return graphics_output_dict
 
 
+    @function_attributes(short_name='long_and_short_firing_rate_replays_v_laps', tags=['display','long_short','firing_rate', 'output_registering', 'figure_saving'], input_requires=[], output_provides=[], uses=['_plot_session_long_short_track_firing_rate_figures'], used_by=[], creation_date='2023-06-08 10:22')
+    def _display_long_and_short_firing_rate_replays_v_laps(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_whitelist=None, **kwargs):
+        """ Displays two figures, one for the long and one for the short track, that compare the firing rates during running (laps) and those during decoded replays.
+            Usage:
 
-    @function_attributes(short_name=None, tags=['speed', 'laps', 'replay', 'velocity', 'time', 'running', 'fit'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-06-07 21:13', related_items=[])
+        """
+        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.LongShortTrackComputations import JonathanFiringRateAnalysisResult
+
+        jonathan_firing_rate_analysis_result = JonathanFiringRateAnalysisResult(**owning_pipeline_reference.global_computation_results.computed_data.jonathan_firing_rate_analysis.to_dict())
+        (fig_L, ax_L, active_display_context_L), (fig_S, ax_S, active_display_context_S) = _plot_session_long_short_track_firing_rate_figures(owning_pipeline_reference, jonathan_firing_rate_analysis_result, figures_parent_out_path=None)
+
+        graphics_output_dict = MatplotlibRenderPlots(name='long_and_short_firing_rate_replays_v_laps', figures=(fig_L, fig_S), axes=(ax_L, ax_S), plot_data={'context': (active_display_context_L, active_display_context_S)})
+        return graphics_output_dict
+
+
+
+    @function_attributes(short_name='running_and_replay_speeds_over_time', tags=['speed', 'laps', 'replay', 'velocity', 'time', 'running', 'fit', 'output_registering', 'figure_saving'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-06-07 21:13', related_items=[])
     def _display_running_and_replay_speeds_over_time(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_whitelist=None, **kwargs):
         """ plots the animal's running speed and the decoded replay velocities (as computed by the Radon transform method) across the recording session. 
         Renders a vertical stack of two subplots.
         
-        fig, (ax1, ax2) = plot_speeds_over_time(curr_active_pipeline)
+        %matplotlib qt
+        _out = curr_active_pipeline.display('_display_running_and_replay_speeds_over_time', curr_active_pipeline.get_session_context())
+        _out
         
         TODO 2023-06-07 - Do I need to set up defer_render:bool=True for non-interactive plotting (like when writing to a file)?
 
@@ -461,7 +478,7 @@ class LongShortTrackComparingDisplayFunctions(AllFunctionEnumeratingMixin, metac
         long_epoch_name, short_epoch_name, global_epoch_name = owning_pipeline_reference.find_LongShortGlobal_epoch_names()
         long_epoch_context, short_epoch_context, global_epoch_context = [owning_pipeline_reference.filtered_contexts[a_name] for a_name in (long_epoch_name, short_epoch_name, global_epoch_name)]
         long_session, short_session, global_session = [owning_pipeline_reference.filtered_sessions[an_epoch_name] for an_epoch_name in [long_epoch_name, short_epoch_name, global_epoch_name]]
-        global_session.position.compute_higher_order_derivatives()
+        global_session.position.compute_higher_order_derivatives() # make sure the higher order derivatives are computed
         running_pos_df = global_session.position.to_dataframe()
 
         ## long_short_decoding_analyses:
@@ -475,30 +492,23 @@ class LongShortTrackComparingDisplayFunctions(AllFunctionEnumeratingMixin, metac
         
         # output approach copied from `_display_long_short_laps`
         fig.canvas.manager.set_window_title('Running vs. Replay Speeds over time')
-        graphics_output_dict = MatplotlibRenderPlots(name='_display_running_and_replay_speeds_over_time', figures=(fig,), axes=[ax1, ax2], plot_data=plot_data_dict)
+        
+        ## 2023-05-31 - Reference Output of matplotlib figure to file, along with building appropriate context.
+        active_session_figures_out_path = owning_pipeline_reference.get_daily_programmatic_session_output_path()
+        final_context = owning_pipeline_reference.sess.get_context().adding_context('display_fn', display_fn_name='running_and_replay_speeds_over_time')
+        print(f'final_context: {final_context}')
+        active_out_figure_paths = perform_write_to_file(fig, final_context, figures_parent_out_path=active_session_figures_out_path, register_output_file_fn=owning_pipeline_reference.register_output_file)
+        graphics_output_dict = MatplotlibRenderPlots(name='_display_running_and_replay_speeds_over_time', figures=(fig,), axes=[ax1, ax2], plot_data=plot_data_dict, context=final_context, saved_figures=active_out_figure_paths)
         return graphics_output_dict
+    
+
+
 
 
 # ==================================================================================================================== #
 # Private Display Helpers                                                                                              #
 # ==================================================================================================================== #
-def _generalized_persist_out_single_figure(curr_active_pipeline, fig, active_display_context, figures_parent_out_path=None):
-    """ 2023-05-25 - Persists the matplotlib figure to disk and registers the output with the pipeline
-    
-        captures nothing. 
-        
-        from pyphoplacecellanalysis.General.Batch.NonInteractiveWrapper import _generalized_persist_out_single_figure
-        
-    """
-    if figures_parent_out_path is None:
-        figures_parent_out_path = create_daily_programmatic_display_function_testing_folder_if_needed()
-        # figures_parent_out_path = Path.cwd()
-    curr_fig_save_basename = build_figure_basename_from_display_context(active_display_context, context_tuple_join_character='_')
-    temp_fig_filename = f'{curr_fig_save_basename}.png'
-    full_fig_save_path = figures_parent_out_path.joinpath(temp_fig_filename)
-    fig.savefig(fname=full_fig_save_path, transparent=True) # Save .png to file.
-    curr_active_pipeline.register_output_file(full_fig_save_path, output_metadata={'context': active_display_context, 'fig': fig})
-    return full_fig_save_path
+
 
 
 # ==================================================================================================================== #
@@ -1875,6 +1885,7 @@ def _plot_session_long_short_track_firing_rate_figures(curr_active_pipeline, jon
 
         jonathan_firing_rate_analysis_result = JonathanFiringRateAnalysisResult(**curr_active_pipeline.global_computation_results.computed_data.jonathan_firing_rate_analysis.to_dict())
         long_plots, short_plots = _plot_session_long_short_track_firing_rate_figures(curr_active_pipeline, jonathan_firing_rate_analysis_result, figures_parent_out_path=None)
+        (fig_L, ax_L, active_display_context_L), (fig_S, ax_S, active_display_context_S) = long_plots, short_plots
 
     """
     def _plot_single_track_firing_rate_compare(x_frs_dict, y_frs_dict, active_context, neurons_colors=None, is_centered = False):
@@ -1954,8 +1965,13 @@ def _plot_session_long_short_track_firing_rate_figures(curr_active_pipeline, jon
     ## Fit both the axes:
     fit_both_axes(ax_L, ax_S)
 
-    _generalized_persist_out_single_figure(curr_active_pipeline, fig_L, active_display_context_L, figures_parent_out_path=figures_parent_out_path)
-    _generalized_persist_out_single_figure(curr_active_pipeline, fig_S, active_display_context_S, figures_parent_out_path=figures_parent_out_path)
+    ## 2023-05-31 - Reference Output of matplotlib figure to file, along with building appropriate context.
+    active_session_figures_out_path = curr_active_pipeline.get_daily_programmatic_session_output_path()
+    
+    # could output to `figures_parent_out_path` or `active_session_figures_out_path`
+    active_out_figure_paths_L = perform_write_to_file(fig_L, active_display_context_L, figures_parent_out_path=active_session_figures_out_path, register_output_file_fn=curr_active_pipeline.register_output_file)
+    active_out_figure_paths_S = perform_write_to_file(fig_S, active_display_context_S, figures_parent_out_path=active_session_figures_out_path, register_output_file_fn=curr_active_pipeline.register_output_file)
+    
     return (fig_L, ax_L, active_display_context_L), (fig_S, ax_S, active_display_context_S)
 
 
