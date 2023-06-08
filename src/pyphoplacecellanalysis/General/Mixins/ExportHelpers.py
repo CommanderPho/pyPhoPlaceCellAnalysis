@@ -2,6 +2,7 @@ from copy import deepcopy
 from datetime import datetime
 from enum import Enum # for getting the current date to set the ouptut folder name
 from pathlib import Path
+from typing import List
 import pandas as pd
 import numpy as np
 
@@ -254,7 +255,45 @@ import matplotlib.pyplot as plt
 ## PDF Output, NOTE this is single plot stuff: uses active_config_name
 from matplotlib.backends import backend_pdf # Needed for
 # from pyphoplacecellanalysis.General.Mixins.ExportHelpers import create_daily_programmatic_display_function_testing_folder_if_needed, build_pdf_metadata_from_display_context
-from pyphocorehelpers.DataStructure.RenderPlots.MatplotLibRenderPlots import MatplotlibRenderPlots # required for programmatic_display_to_PDF
+from pyphocorehelpers.DataStructure.RenderPlots.MatplotLibRenderPlots import MatplotlibRenderPlots # required for extract_figures_from_display_function_output
+
+@function_attributes(short_name=None, tags=[], input_requires=[], output_provides=[], uses=['MatplotlibRenderPlots'], used_by=['programmatic_render_to_file'], creation_date='2023-06-08 12:15')
+def extract_figures_from_display_function_output(out_display_var, out_fig_list:List=None, debug_print=False)->List:
+    """ overcomes the lack of standardization in the display function outputs (some return dicts, some lists of figures, some wrapped with `MatplotlibRenderPlots` to extract the figures and add them to the `out_fig_list` """
+    if out_fig_list is None:
+        out_fig_list = []
+
+    if isinstance(out_display_var, dict):
+        main_out_display_context = list(out_display_var.keys())[0]
+        if debug_print:
+            print(f'main_out_display_context: "{main_out_display_context}"')
+        main_out_display_dict = out_display_var[main_out_display_context]
+        ui = main_out_display_dict['ui']
+        # out_plot_tuple = curr_active_pipeline.display(curr_display_function_name, filter_name, filter_epochs='ripple', fignum=active_identifying_ctx_string, **figure_format_config)
+        # params, plots_data, plots, ui = out_plot_tuple 
+        out_fig = ui.mw.getFigure() # TODO: Only works for MatplotlibWidget wrapped figures
+        out_fig_list.append(out_fig)
+    elif isinstance(out_display_var, MatplotlibRenderPlots):
+        # Newest style plots: 2022-12-09
+        out_fig_list.extend(out_display_var.figures)
+
+    else:
+        # Non-dictionary type item, older style:
+        if not isinstance(out_display_var, (list, tuple)):
+            # not a list, just a scalar object
+            plots = [out_display_var] # make a single-element list
+        else:
+            # it is a list
+            if len(out_display_var) == 2:
+                fig0, figList1 = out_display_var # unpack
+                plots = [fig0, *figList1]
+            else:
+                # otherwise just try and set the plots to the list
+                plots = out_display_var
+
+        out_fig_list.extend(plots)
+        return out_fig_list
+    
 
 ## 2022-10-04 Modern Programmatic PDF outputs:
 @function_attributes(short_name=None, tags=['PDF', 'export', 'output', 'matplotlib', 'display', 'file', 'active'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2022-10-04 00:00', related_items=[])
@@ -313,8 +352,19 @@ def programmatic_display_to_PDF(curr_active_pipeline, curr_display_function_name
                 if debug_print:
                     print(f'completed display(...) call. type(out_display_var): {type(out_display_var)}\n out_display_var: {out_display_var}, active_display_fn_kwargs: {active_display_fn_kwargs}')
 
-                if isinstance(out_display_var, dict):
-                    main_out_display_context = list(out_display_var.keys())[0]
+                out_fig_list = extract_figures_from_display_function_output(out_display_var=out_display_var, out_fig_list=out_fig_list)
+
+                if debug_print:
+                    print(f'out_fig_list: {out_fig_list}')
+
+                # Finally iterate through and do the saving to PDF
+                for i, a_fig in enumerate(out_fig_list):
+                    pdf.savefig(a_fig, transparent=True)
+                    pdf.attach_note(f'Page {i + 1}: "{active_identifying_ctx_string}"')
+                    
+                curr_active_pipeline.register_output_file(output_path=active_pdf_save_path, output_metadata={'filtered_context': a_filtered_context, 'context': active_identifying_ctx, 'fig': out_fig_list})
+
+
                     if debug_print:
                         print(f'main_out_display_context: "{main_out_display_context}"')
                     main_out_display_dict = out_display_var[main_out_display_context]
