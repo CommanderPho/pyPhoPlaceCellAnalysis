@@ -71,6 +71,7 @@ class SpecificComputationValidator:
     computation_fn_name:str # '_perform_long_short_post_decoding_analysis'
     validate_computation_test:Callable
     computation_fn_kwargs:dict = Factory(dict) # {'perform_cache_load': False}]`
+    is_global:bool = False
     
     def try_computation_if_needed(self, curr_active_pipeline, **kwargs):
         return self._perform_try_computation_if_needed(self, curr_active_pipeline, **kwargs)
@@ -245,6 +246,9 @@ def batch_extended_computations(curr_active_pipeline, include_whitelist=None, in
     non_global_comp_names = ['firing_rate_trends', 'relative_entropy_analyses']
     global_comp_names = ['jonathan_firing_rate_analysis', 'short_long_pf_overlap_analyses', 'long_short_fr_indicies_analyses', 'long_short_decoding_analyses', 'long_short_post_decoding'] # , 'long_short_rate_remapping'
 
+    # 'firing_rate_trends', 'relative_entropy_analyses'
+    # '_perform_firing_rate_trends_computation', '_perform_time_dependent_pf_sequential_surprise_computation'
+    
     if include_whitelist is None:
         # include all:
         include_whitelist = non_global_comp_names + global_comp_names
@@ -260,217 +264,26 @@ def batch_extended_computations(curr_active_pipeline, include_whitelist=None, in
     if progress_print:
         print(f'Running batch_extended_computations(...) with global_epoch_name: "{global_epoch_name}"')
 
-    ## firing_rate_trends:
-    _comp_name = 'firing_rate_trends'
-    if _comp_name in include_whitelist:
-        try:
-            active_extended_stats = curr_active_pipeline.computation_results[global_epoch_name].computed_data['extended_stats']
-            time_binned_pos_df = active_extended_stats['time_binned_position_df']
-            firing_rate_trends = curr_active_pipeline.computation_results[global_epoch_name].computed_data['firing_rate_trends']
-            if progress_print:
-                print(f'{_comp_name} already computed.')
-        except (AttributeError, KeyError) as e:
-            if progress_print or debug_print:
-                print(f'{_comp_name} missing.')
-            if debug_print:
-                print(f'\t encountered error: {e}\n{traceback.format_exc()}\n.')
-            if progress_print or debug_print:
-                print(f'\t Recomputing {_comp_name}...')
-            curr_active_pipeline.perform_specific_computation(computation_functions_name_whitelist=['_perform_firing_rate_trends_computation'], enabled_filter_names=[global_epoch_name], fail_on_exception=fail_on_exception, debug_print=False) 
-            print(f'\t done.')
-            active_extended_stats = curr_active_pipeline.computation_results[global_epoch_name].computed_data['extended_stats']
-            time_binned_pos_df = active_extended_stats['time_binned_position_df']
-            firing_rate_trends = curr_active_pipeline.computation_results[global_epoch_name].computed_data['firing_rate_trends']
-            newly_computed_values.append(_comp_name)
-        except Exception as e:
-            raise e
+    comp_is_global = [False, False, True, True, True, True, True, True]
+    comp_names = ['firing_rate_trends', 'relative_entropy_analyses', 'jonathan_firing_rate_analysis', 'short_long_pf_overlap_analyses', 'long_short_fr_indicies_analyses', 'long_short_decoding_analyses', 'long_short_post_decoding']
+    comp_functions = ['_perform_firing_rate_trends_computation', '_perform_time_dependent_pf_sequential_surprise_computation', '_perform_jonathan_replay_firing_rate_analyses', '_perform_long_short_pf_overlap_analyses', '_perform_long_short_firing_rate_analyses', '_perform_long_short_decoding_analyses', '_perform_long_short_post_decoding_analysis']
+    comp_validate_computation_tests = [
+        lambda curr_active_pipeline: (curr_active_pipeline.computation_results[global_epoch_name].computed_data['firing_rate_trends'], curr_active_pipeline.computation_results[global_epoch_name].computed_data['extended_stats']['time_binned_position_df']),
+        lambda curr_active_pipeline: (np.sum(curr_active_pipeline.global_computation_results.computed_data['relative_entropy_analyses']['flat_relative_entropy_results'], axis=1), np.sum(curr_active_pipeline.global_computation_results.computed_data['relative_entropy_analyses']['flat_jensen_shannon_distance_results'], axis=1)),  # flat_surprise_across_all_positions
+        lambda curr_active_pipeline: curr_active_pipeline.global_computation_results.computed_data['jonathan_firing_rate_analysis']['neuron_replay_stats_df'],  # active_context
+        lambda curr_active_pipeline: (curr_active_pipeline.global_computation_results.computed_data['short_long_pf_overlap_analyses']['relative_entropy_overlap_scalars_df'], curr_active_pipeline.global_computation_results.computed_data['short_long_pf_overlap_analyses']['relative_entropy_overlap_dict']), # relative_entropy_overlap_scalars_df
+        lambda curr_active_pipeline: curr_active_pipeline.global_computation_results.computed_data['long_short_fr_indicies_analysis']['x_frs_index'],  # active_context
+        lambda curr_active_pipeline: (curr_active_pipeline.global_computation_results.computed_data['long_short_leave_one_out_decoding_analysis'].long_results_obj, curr_active_pipeline.global_computation_results.computed_data['long_short_leave_one_out_decoding_analysis'].short_results_obj),
+        lambda curr_active_pipeline: curr_active_pipeline.global_computation_results.computed_data['long_short_post_decoding'].rate_remapping.rr_df
+    ]
+ 
+    for _comp_name, _comp_fcn_name, _comp_validate_computation_test, is_global in zip(comp_names, comp_functions, comp_validate_computation_tests, comp_is_global):
+        if (not is_global) or include_global_functions:
+            _comp_specifier = SpecificComputationValidator(short_name=_comp_name, computation_fn_name=_comp_fcn_name, validate_computation_test=_comp_validate_computation_test, is_global=is_global)
+            if _comp_specifier.short_name in include_whitelist:
+                newly_computed_values += _comp_specifier.try_computation_if_needed(curr_active_pipeline, on_already_computed_fn=_subfn_on_already_computed, fail_on_exception=fail_on_exception, progress_print=progress_print, debug_print=debug_print, force_recompute=force_recompute)
 
-    ## relative_entropy_analyses:
-    # must have '_perform_firing_rate_trends_computation's fring rate trends
-    _comp_name = 'relative_entropy_analyses'
-    if _comp_name in include_whitelist:
-        try:
-            active_relative_entropy_results = active_extended_stats['relative_entropy_analyses']
-            post_update_times = active_relative_entropy_results['post_update_times'] # (4152,) = (n_post_update_times,)
-            snapshot_differences_result_dict = active_relative_entropy_results['snapshot_differences_result_dict']
-            time_intervals = active_relative_entropy_results['time_intervals']
-            long_short_rel_entr_curves_frames = active_relative_entropy_results['long_short_rel_entr_curves_frames'] # (4152, 108, 63) = (n_post_update_times, n_neurons, n_xbins)
-            short_long_rel_entr_curves_frames = active_relative_entropy_results['short_long_rel_entr_curves_frames'] # (4152, 108, 63) = (n_post_update_times, n_neurons, n_xbins)
-            flat_relative_entropy_results = active_relative_entropy_results['flat_relative_entropy_results'] # (149, 63) - (nSnapshots, nXbins)
-            flat_jensen_shannon_distance_results = active_relative_entropy_results['flat_jensen_shannon_distance_results'] # (149, 63) - (nSnapshots, nXbins)
-            flat_jensen_shannon_distance_across_all_positions = np.sum(flat_jensen_shannon_distance_results, axis=1) # sum across all position bins # (4152,) - (nSnapshots)
-            flat_surprise_across_all_positions = np.sum(flat_relative_entropy_results, axis=1) # sum across all position bins # (4152,) - (nSnapshots)
-            _subfn_on_already_computed(_comp_name)
-                
-
-        except (AttributeError, KeyError) as e:
-            if progress_print or debug_print:
-                print(f'{_comp_name} missing.')
-            if debug_print:
-                print(f'\t encountered error: {e}\n{traceback.format_exc()}\n.')
-            if progress_print or debug_print:
-                print(f'\t Recomputing {_comp_name}...')
-            curr_active_pipeline.perform_specific_computation(computation_functions_name_whitelist=['_perform_time_dependent_pf_sequential_surprise_computation'], enabled_filter_names=[global_epoch_name], fail_on_exception=fail_on_exception, debug_print=False)
-            print(f'\t done.')
-            active_relative_entropy_results = active_extended_stats['relative_entropy_analyses']
-            post_update_times = active_relative_entropy_results['post_update_times'] # (4152,) = (n_post_update_times,)
-            snapshot_differences_result_dict = active_relative_entropy_results['snapshot_differences_result_dict']
-            time_intervals = active_relative_entropy_results['time_intervals']
-            long_short_rel_entr_curves_frames = active_relative_entropy_results['long_short_rel_entr_curves_frames'] # (4152, 108, 63) = (n_post_update_times, n_neurons, n_xbins)
-            short_long_rel_entr_curves_frames = active_relative_entropy_results['short_long_rel_entr_curves_frames'] # (4152, 108, 63) = (n_post_update_times, n_neurons, n_xbins)
-            flat_relative_entropy_results = active_relative_entropy_results['flat_relative_entropy_results'] # (149, 63) - (nSnapshots, nXbins)
-            flat_jensen_shannon_distance_results = active_relative_entropy_results['flat_jensen_shannon_distance_results'] # (149, 63) - (nSnapshots, nXbins)
-            flat_jensen_shannon_distance_across_all_positions = np.sum(np.abs(flat_jensen_shannon_distance_results), axis=1) # sum across all position bins # (4152,) - (nSnapshots)
-            flat_surprise_across_all_positions = np.sum(np.abs(flat_relative_entropy_results), axis=1) # sum across all position bins # (4152,) - (nSnapshots)
-            newly_computed_values.append(_comp_name)
-        except Exception as e:
-            raise e
-
-    if include_global_functions:
-        ## jonathan_firing_rate_analysis:
-        _comp_name = 'jonathan_firing_rate_analysis'
-        if _comp_name in include_whitelist:
-            try:
-                ## Get global 'jonathan_firing_rate_analysis' results:
-                curr_jonathan_firing_rate_analysis = curr_active_pipeline.global_computation_results.computed_data['jonathan_firing_rate_analysis']
-                neuron_replay_stats_df, rdf, aclu_to_idx, irdf = curr_jonathan_firing_rate_analysis['neuron_replay_stats_df'], curr_jonathan_firing_rate_analysis['rdf']['rdf'], curr_jonathan_firing_rate_analysis['rdf']['aclu_to_idx'], curr_jonathan_firing_rate_analysis['irdf']['irdf']
-                _subfn_on_already_computed(_comp_name)
-                    
-            except (AttributeError, KeyError) as e:
-                if progress_print or debug_print:
-                    print(f'{_comp_name} missing.')
-                if debug_print:
-                    print(f'\t encountered error: {e}\n{traceback.format_exc()}\n.')
-                if progress_print or debug_print:
-                    print(f'\t Recomputing {_comp_name}...')
-                curr_active_pipeline.perform_specific_computation(computation_functions_name_whitelist=['_perform_jonathan_replay_firing_rate_analyses'], fail_on_exception=True, debug_print=False) # fail_on_exception MUST be True or error handling is all messed up 
-                print(f'\t done.')
-                curr_jonathan_firing_rate_analysis = curr_active_pipeline.global_computation_results.computed_data['jonathan_firing_rate_analysis']
-                neuron_replay_stats_df, rdf, aclu_to_idx, irdf = curr_jonathan_firing_rate_analysis['neuron_replay_stats_df'], curr_jonathan_firing_rate_analysis['rdf']['rdf'], curr_jonathan_firing_rate_analysis['rdf']['aclu_to_idx'], curr_jonathan_firing_rate_analysis['irdf']['irdf']
-                newly_computed_values.append(_comp_name)
-            except Exception as e:
-                raise e
-
-        ## short_long_pf_overlap_analyses:
-        _comp_name = 'short_long_pf_overlap_analyses'
-        if _comp_name in include_whitelist:
-            try:
-                ## Get global `short_long_pf_overlap_analyses` results:
-                short_long_pf_overlap_analyses = curr_active_pipeline.global_computation_results.computed_data.short_long_pf_overlap_analyses
-                conv_overlap_dict = short_long_pf_overlap_analyses['conv_overlap_dict']
-                conv_overlap_scalars_df = short_long_pf_overlap_analyses['conv_overlap_scalars_df']
-                prod_overlap_dict = short_long_pf_overlap_analyses['product_overlap_dict']
-                relative_entropy_overlap_dict = short_long_pf_overlap_analyses['relative_entropy_overlap_dict']
-                relative_entropy_overlap_scalars_df = short_long_pf_overlap_analyses['relative_entropy_overlap_scalars_df']
-                _subfn_on_already_computed(_comp_name)
-            except (AttributeError, KeyError) as e:
-                if progress_print or debug_print:
-                    print(f'{_comp_name} missing.')
-                if debug_print:
-                    print(f'\t encountered error: {e}\n{traceback.format_exc()}\n.')
-                if progress_print or debug_print:
-                    print(f'\t Recomputing {_comp_name}...')
-                curr_active_pipeline.perform_specific_computation(computation_functions_name_whitelist=['_perform_long_short_pf_overlap_analyses'], fail_on_exception=True, debug_print=False) # fail_on_exception MUST be True or error handling is all messed up 
-                print(f'\t done.')
-                short_long_pf_overlap_analyses = curr_active_pipeline.global_computation_results.computed_data.short_long_pf_overlap_analyses
-                conv_overlap_dict = short_long_pf_overlap_analyses['conv_overlap_dict']
-                conv_overlap_scalars_df = short_long_pf_overlap_analyses['conv_overlap_scalars_df']
-                prod_overlap_dict = short_long_pf_overlap_analyses['product_overlap_dict']
-                relative_entropy_overlap_dict = short_long_pf_overlap_analyses['relative_entropy_overlap_dict']
-                relative_entropy_overlap_scalars_df = short_long_pf_overlap_analyses['relative_entropy_overlap_scalars_df']
-                newly_computed_values.append(_comp_name)
-            except Exception as e:
-                raise e
-
-        # short_only_df = neuron_replay_stats_df[neuron_replay_stats_df.track_membership == SplitPartitionMembership.RIGHT_ONLY]
-        # short_only_aclus = short_only_df.index.values.tolist()
-        # long_only_df = neuron_replay_stats_df[neuron_replay_stats_df.track_membership == SplitPartitionMembership.LEFT_ONLY]
-        # long_only_aclus = long_only_df.index.values.tolist()
-        # shared_df = neuron_replay_stats_df[neuron_replay_stats_df.track_membership == SplitPartitionMembership.SHARED]
-        # shared_aclus = shared_df.index.values.tolist()
-        # if debug_print:
-        #     print(f'shared_aclus: {shared_aclus}')
-        #     print(f'long_only_aclus: {long_only_aclus}')
-        #     print(f'short_only_aclus: {short_only_aclus}')
-
-        # active_identifying_session_ctx = curr_active_pipeline.sess.get_context() # 'bapun_RatN_Day4_2019-10-15_11-30-06'
-
-        
-        ## pipeline_complete_compute_long_short_fr_indicies:
-        # TODO 2023-01-26 - NOTE - not really a computation function, a hack.  Should be moved to a separate function.
-        _comp_name = 'long_short_fr_indicies_analyses'
-        if _comp_name in include_whitelist:
-            try:
-                ## Get global `long_short_fr_indicies_analysis` results:
-                long_short_fr_indicies_analysis_results = curr_active_pipeline.global_computation_results.computed_data['long_short_fr_indicies_analysis']
-                x_frs_index, y_frs_index = long_short_fr_indicies_analysis_results['x_frs_index'], long_short_fr_indicies_analysis_results['y_frs_index'] # use the all_results_dict as the computed data value
-                active_context = long_short_fr_indicies_analysis_results['active_context']
-                _subfn_on_already_computed(_comp_name)
-            except (AttributeError, KeyError) as e:
-                if progress_print or debug_print:
-                    print(f'{_comp_name} missing.')
-                if debug_print:
-                    print(f'\t encountered error: {e}\n{traceback.format_exc()}\n.')
-                if progress_print or debug_print:
-                    print(f'\t Recomputing {_comp_name}...')
-                curr_active_pipeline.perform_specific_computation(computation_functions_name_whitelist=['_perform_long_short_firing_rate_analyses'], fail_on_exception=True, debug_print=False) # fail_on_exception MUST be True or error handling is all messed up 
-                print(f'\t done.')
-                long_short_fr_indicies_analysis_results = curr_active_pipeline.global_computation_results.computed_data['long_short_fr_indicies_analysis']
-                x_frs_index, y_frs_index = long_short_fr_indicies_analysis_results['x_frs_index'], long_short_fr_indicies_analysis_results['y_frs_index'] # use the all_results_dict as the computed data value
-                active_context = long_short_fr_indicies_analysis_results['active_context']
-                newly_computed_values.append(_comp_name)
-            except Exception as e:
-                raise e
-
-        ## long_short_decoding_analyses:
-        _comp_name = 'long_short_decoding_analyses'
-        if _comp_name in include_whitelist:
-            try:
-                ## Get global 'long_short_decoding_analyses' results:
-                curr_long_short_decoding_analyses = curr_active_pipeline.global_computation_results.computed_data['long_short_leave_one_out_decoding_analysis']
-                long_results_obj, short_results_obj = curr_long_short_decoding_analyses.long_results_obj, curr_long_short_decoding_analyses.short_results_obj
-                _subfn_on_already_computed(_comp_name)
-                    
-            except (AttributeError, KeyError) as e:
-                if progress_print or debug_print:
-                    print(f'{_comp_name} missing.')
-                if debug_print:
-                    print(f'\t encountered error: {e}\n{traceback.format_exc()}\n.')
-                if progress_print or debug_print:
-                    print(f'\t Recomputing {_comp_name}...')
-                    
-                # When this fails due to unwrapping from the load, add `, computation_kwargs_list=[{'perform_cache_load': False}]` as an argument to the `perform_specific_computation` call below
-                curr_active_pipeline.perform_specific_computation(computation_functions_name_whitelist=['_perform_long_short_decoding_analyses'], fail_on_exception=True, debug_print=False) # fail_on_exception MUST be True or error handling is all messed up 
-                print(f'\t done.')
-                curr_long_short_decoding_analyses = curr_active_pipeline.global_computation_results.computed_data['long_short_leave_one_out_decoding_analysis']
-                # TODO: check contents
-                long_results_obj, short_results_obj = curr_long_short_decoding_analyses.long_results_obj, curr_long_short_decoding_analyses.short_results_obj
-                newly_computed_values.append(_comp_name)
-            except Exception as e:
-                raise e
-
-
-            
-        _comp_validate_computation_test = lambda curr_active_pipeline: curr_active_pipeline.global_computation_results.computed_data['long_short_leave_one_out_decoding_analysis'].long_results_obj # tests just a single deep value.
-        _comp_specifier = SpecificComputationValidator(short_name='long_short_decoding_analyses', computation_fn_name='_perform_long_short_decoding_analyses', validate_computation_test=_comp_validate_computation_test)
-        if _comp_specifier.short_name in include_whitelist:
-            # newly_computed_values += _try_computation_if_needed(curr_active_pipeline, comp_specifier=_comp_specifier, on_already_computed_fn=_subfn_on_already_computed, fail_on_exception=fail_on_exception, progress_print=progress_print, debug_print=debug_print, force_recompute=force_recompute)
-            newly_computed_values += _comp_specifier.try_computation_if_needed(curr_active_pipeline, on_already_computed_fn=_subfn_on_already_computed, fail_on_exception=fail_on_exception, progress_print=progress_print, debug_print=debug_print, force_recompute=force_recompute)
-
-            
-
-        ## long_short_post_decoding:
-        # def _comp_validate_computation_test(curr_active_pipeline):
-        #     ## Get global 'long_short_post_decoding' results:
-        #     curr_long_short_post_decoding = curr_active_pipeline.global_computation_results.computed_data['long_short_post_decoding'].rate_remapping.rr_df
-        #     ## Extract variables from results object:
-        #     expected_v_observed_result, curr_long_short_rr = curr_long_short_post_decoding.expected_v_observed_result, curr_long_short_post_decoding.rate_remapping
-        #     rate_remapping_df, high_remapping_cells_only = curr_long_short_rr.rr_df, curr_long_short_rr.high_only_rr_df
-        _comp_validate_computation_test = lambda curr_active_pipeline: curr_active_pipeline.global_computation_results.computed_data['long_short_post_decoding'].rate_remapping.rr_df # tests just a single deep value.
-        _comp_specifier = SpecificComputationValidator(short_name='long_short_post_decoding', computation_fn_name='_perform_long_short_post_decoding_analysis', validate_computation_test=_comp_validate_computation_test)
-        if _comp_specifier.short_name in include_whitelist:
-            newly_computed_values += _comp_specifier.try_computation_if_needed(curr_active_pipeline, on_already_computed_fn=_subfn_on_already_computed, fail_on_exception=fail_on_exception, progress_print=progress_print, debug_print=debug_print, force_recompute=force_recompute)
-
+    # if include_global_functions:
         
         # ## long_short_rate_remapping:
         # _comp_name = 'long_short_rate_remapping'
@@ -497,8 +310,6 @@ def batch_extended_computations(curr_active_pipeline, include_whitelist=None, in
         #         newly_computed_values.append(_comp_name)
         #     except Exception as e:
         #         raise e
-
-
 
 
     if progress_print:
