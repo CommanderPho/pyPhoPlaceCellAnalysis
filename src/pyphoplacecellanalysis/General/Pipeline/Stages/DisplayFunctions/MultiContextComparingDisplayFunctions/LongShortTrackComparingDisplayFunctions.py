@@ -388,97 +388,94 @@ class LongShortTrackComparingDisplayFunctions(AllFunctionEnumeratingMixin, metac
 
 
 
+    @function_attributes(short_name=None, tags=['speed', 'laps', 'replay', 'velocity', 'time', 'running', 'fit'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-06-07 21:13', related_items=[])
     def _display_running_and_replay_speeds_over_time(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_whitelist=None, **kwargs):
-    
+        """ plots the animal's running speed and the decoded replay velocities (as computed by the Radon transform method) across the recording session. 
+        Renders a vertical stack of two subplots.
+        
+        fig, (ax1, ax2) = plot_speeds_over_time(curr_active_pipeline)
+        
+        TODO 2023-06-07 - Do I need to set up defer_render:bool=True for non-interactive plotting (like when writing to a file)?
 
-        def plot_speeds_over_time(curr_active_pipeline):
-            """ plots the animal's running speed and the decoded replay velocities (as computed by the Radon transform method) across the recording session. 
-            Renders a vertical stack of two subplots.
+        """
+        def _subfn_add_replay_velocities(df, ax):
+            """ plots the replay velocities from the dataframe on the ax """
+            df['center'] = (df['stop'] + df['start'])/2.0
+            for index, row in df.iterrows():
+                start = row['start']
+                stop = row['stop']
+                center = row['center']
+                
+                # Single Version:
+                # velocity = row['velocity']
+                # ax.plot([start, stop], [velocity, velocity], label=row['label'], marker='s', markersize=4.5, color='k') # , linewidth=2.5
+
+                # LONG/SHORT Version:
+                velocity_L = row['velocity_LONG']
+                ax.plot([start, stop], [velocity_L, velocity_L], label=f"{row['label']}_Long", marker='s', markersize=3.5, color='g') # , linewidth=2.5
+                velocity_S = row['velocity_SHORT']
+                ax.plot([start, stop], [velocity_S, velocity_S], label=f"{row['label']}_Short", marker='s', markersize=3.5, color='r') # , linewidth=2.5
+                # Draw directed line
+                head_length = 40.0
+                # arrow_start = (start, velocity_L)
+                # arrow_end = (stop, velocity_S)
+                arrow_start = (center, velocity_L)
+                arrow_end = (center, velocity_S) # - (head_length * 0.5) subtract off half the head-length so the arrow ends at the point
+                arrow_dx = arrow_end[0] - arrow_start[0]
+                arrow_dy = arrow_end[1] - arrow_start[1]
+                ax.arrow(*arrow_start, arrow_dx, arrow_dy, head_width=20.0, head_length=head_length, fc='k', ec='k')
+                
+            # Set labels and title
+            ax.set_xlabel('time')
+            ax.set_ylabel('Velocity')
+            ax.set_title('Replay Velocities over Time')
+
+            # Display legend
+            # ax.legend()
+
+            return plt.gcf(), ax
+
+        def _subfn_perform_plot(pos_df, replay_result_df, maze_epochs):
+            # Create subplots grid
+            fig, (ax1, ax2) = plt.subplots(nrows=2, ncols=1, figsize=(12, 10), sharex=True)
+
+            # Plotting Running Speed over Time
+            pos_df.plot(x='t', y=['lin_pos', 'speed'], title='Running Speed over Time', ax=ax1)
+            epochs_collection, epoch_labels = draw_epoch_regions(maze_epochs, ax1, defer_render=False, debug_print=False)
+
+            # plot replay velocities:
+            _subfn_add_replay_velocities(replay_result_df, ax2)
+
+            # Adjust spacing between subplots
+            plt.tight_layout()
+
+            # Show the combined plot
+            plt.show()
+            return fig, (ax1, ax2)
             
-            fig, (ax1, ax2) = plot_speeds_over_time(curr_active_pipeline)
+        # BEGIN FUNCTION BODY ________________________________________________________________________________________________ #
+        ### Extract Relevant Data from owning_pipeline_reference:
+
+        # Running Speed:
+        # Look at lap speed over time
+        long_epoch_name, short_epoch_name, global_epoch_name = owning_pipeline_reference.find_LongShortGlobal_epoch_names()
+        long_epoch_context, short_epoch_context, global_epoch_context = [owning_pipeline_reference.filtered_contexts[a_name] for a_name in (long_epoch_name, short_epoch_name, global_epoch_name)]
+        long_session, short_session, global_session = [owning_pipeline_reference.filtered_sessions[an_epoch_name] for an_epoch_name in [long_epoch_name, short_epoch_name, global_epoch_name]]
+        global_session.position.compute_higher_order_derivatives()
+        running_pos_df = global_session.position.to_dataframe()
+
+        ## long_short_decoding_analyses:
+        curr_long_short_decoding_analyses = global_computation_results.computed_data['long_short_leave_one_out_decoding_analysis']
+        ## Extract variables from results object:
+        replay_result_df = deepcopy(curr_long_short_decoding_analyses.long_results_obj.active_filter_epochs.to_dataframe())
+        maze_epochs = owning_pipeline_reference.sess.epochs
             
-            """
-            from neuropy.utils.matplotlib_helpers import draw_epoch_regions
-            def _subfn_add_replay_velocities(df, ax):
-                """ plots the replay velocities from the dataframe on the ax """
-                df['center'] = (df['stop'] + df['start'])/2.0
-                for index, row in df.iterrows():
-                    start = row['start']
-                    stop = row['stop']
-                    center = row['center']
-                    
-                    # Single Version:
-                    # velocity = row['velocity']
-                    # ax.plot([start, stop], [velocity, velocity], label=row['label'], marker='s', markersize=4.5, color='k') # , linewidth=2.5
+        fig, (ax1, ax2) = _subfn_perform_plot(running_pos_df, replay_result_df, maze_epochs=maze_epochs)
 
-                    # LONG/SHORT Version:
-                    velocity_L = row['velocity_LONG']
-                    ax.plot([start, stop], [velocity_L, velocity_L], label=f"{row['label']}_Long", marker='s', markersize=3.5, color='g') # , linewidth=2.5
-                    velocity_S = row['velocity_SHORT']
-                    ax.plot([start, stop], [velocity_S, velocity_S], label=f"{row['label']}_Short", marker='s', markersize=3.5, color='r') # , linewidth=2.5
-                    # Draw directed line
-                    head_length = 40.0
-                    # arrow_start = (start, velocity_L)
-                    # arrow_end = (stop, velocity_S)
-                    arrow_start = (center, velocity_L)
-                    arrow_end = (center, velocity_S) # - (head_length * 0.5) subtract off half the head-length so the arrow ends at the point
-                    arrow_dx = arrow_end[0] - arrow_start[0]
-                    arrow_dy = arrow_end[1] - arrow_start[1]
-                    ax.arrow(*arrow_start, arrow_dx, arrow_dy, head_width=20.0, head_length=head_length, fc='k', ec='k')
-                    
-                # Set labels and title
-                ax.set_xlabel('time')
-                ax.set_ylabel('Velocity')
-                ax.set_title('Replay Velocities over Time')
-
-                # Display legend
-                # ax.legend()
-
-                return plt.gcf(), ax
-
-            def _subfn_perform_plot(pos_df, replay_result_df, maze_epochs):
-                # Create subplots grid
-                fig, (ax1, ax2) = plt.subplots(nrows=2, ncols=1, figsize=(12, 10), sharex=True)
-
-                # Plotting Running Speed over Time
-                pos_df.plot(x='t', y=['lin_pos', 'speed'], title='Running Speed over Time', ax=ax1)
-                epochs_collection, epoch_labels = draw_epoch_regions(maze_epochs, ax1, defer_render=False, debug_print=False)
-
-                # plot replay velocities:
-                _subfn_add_replay_velocities(replay_result_df, ax2)
-
-                # Adjust spacing between subplots
-                plt.tight_layout()
-
-                # Show the combined plot
-                plt.show()
-                return fig, (ax1, ax2)
-            
-            ### Extract Relevant Data from curr_active_pipeline:
-
-            # Running Speed:
-            # Look at lap speed over time
-            
-
-
-
-            return _subfn_perform_plot(running_pos_df, replay_result_df, maze_epochs=curr_active_pipeline.sess.epochs)
-
-            long_epoch_name, short_epoch_name, global_epoch_name = owning_pipeline_reference.find_LongShortGlobal_epoch_names()
-            long_epoch_context, short_epoch_context, global_epoch_context = [owning_pipeline_reference.filtered_contexts[a_name] for a_name in (long_epoch_name, short_epoch_name, global_epoch_name)]
-            long_session, short_session, global_session = [owning_pipeline_reference.filtered_sessions[an_epoch_name] for an_epoch_name in [long_epoch_name, short_epoch_name, global_epoch_name]]
-            global_session.position.compute_higher_order_derivatives()
-            running_pos_df = global_session.position.to_dataframe()
-
-            ## long_short_decoding_analyses:
-            curr_long_short_decoding_analyses = global_computation_results.computed_data['long_short_leave_one_out_decoding_analysis']
-            ## Extract variables from results object:
-            replay_result_df = deepcopy(curr_long_short_decoding_analyses.long_results_obj.active_filter_epochs.to_dataframe())
-            maze_epochs = curr_active_pipeline.sess.epochs
-            
-
-        fig, (ax1, ax2) = plot_speeds_over_time(owning_pipeline_reference)
-
+        # output approach copied from `_display_long_short_laps`
+        fig.canvas.manager.set_window_title('Running vs. Replay Speeds over time')
+        graphics_output_dict = MatplotlibRenderPlots(name='_display_running_and_replay_speeds_over_time', figures=(fig,), axes=[ax1, ax2], plot_data={})
+        return graphics_output_dict
 
 
 # ==================================================================================================================== #
