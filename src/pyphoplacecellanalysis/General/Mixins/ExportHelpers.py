@@ -357,7 +357,7 @@ def programmatic_display_to_PDF(curr_active_pipeline, curr_display_function_name
 
 @function_attributes(short_name=None, tags=['file','export','output','matplotlib','display','active','PDF','batch','automated'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-05-31 19:16', related_items=[])
 def perform_write_to_file(a_fig, active_identifying_ctx, figures_parent_out_path=None, subset_whitelist=None, subset_blacklist=None, write_pdf=False, write_png=True, register_output_file_fn=None, progress_print=True, debug_print=False):
-    """ Writes a single matplotlib figure out to one or more files based on whether write_png and write_pdf are specified. 
+    """ Writes a single matplotlib figure out to one or more files based on whether write_png and write_pdf are specified AND registers the output using `register_output_file_fn` if one is provided. 
     
     Aims to eventually replace `programmatic_display_to_PDF` (working for both PDF and PNG outputs, working for global plots, along with successfully registering output files with the pipeline via `register_output_file_fn` argument)
 
