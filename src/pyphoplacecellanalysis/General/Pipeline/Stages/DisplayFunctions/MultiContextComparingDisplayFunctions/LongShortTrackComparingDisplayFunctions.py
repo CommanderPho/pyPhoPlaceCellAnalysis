@@ -451,7 +451,7 @@ class LongShortTrackComparingDisplayFunctions(AllFunctionEnumeratingMixin, metac
 
             # Show the combined plot
             plt.show()
-            return fig, (ax1, ax2)
+            return fig, (ax1, ax2), {'epochs_collection': epochs_collection, 'epoch_labels': epoch_labels}
             
         # BEGIN FUNCTION BODY ________________________________________________________________________________________________ #
         ### Extract Relevant Data from owning_pipeline_reference:
@@ -470,11 +470,12 @@ class LongShortTrackComparingDisplayFunctions(AllFunctionEnumeratingMixin, metac
         replay_result_df = deepcopy(curr_long_short_decoding_analyses.long_results_obj.active_filter_epochs.to_dataframe())
         maze_epochs = owning_pipeline_reference.sess.epochs
             
-        fig, (ax1, ax2) = _subfn_perform_plot(running_pos_df, replay_result_df, maze_epochs=maze_epochs)
-
+        fig, (ax1, ax2), plot_data_dict = _subfn_perform_plot(running_pos_df, replay_result_df, maze_epochs=maze_epochs)
+        ax1.set_xlim(maze_epochs.t_start, maze_epochs.t_stop) # clip the x-lims to the maze epochs
+        
         # output approach copied from `_display_long_short_laps`
         fig.canvas.manager.set_window_title('Running vs. Replay Speeds over time')
-        graphics_output_dict = MatplotlibRenderPlots(name='_display_running_and_replay_speeds_over_time', figures=(fig,), axes=[ax1, ax2], plot_data={})
+        graphics_output_dict = MatplotlibRenderPlots(name='_display_running_and_replay_speeds_over_time', figures=(fig,), axes=[ax1, ax2], plot_data=plot_data_dict)
         return graphics_output_dict
 
 
