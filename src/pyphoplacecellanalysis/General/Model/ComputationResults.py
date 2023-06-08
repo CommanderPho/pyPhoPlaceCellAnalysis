@@ -56,8 +56,8 @@ class ComputedResult:
             shared_aclus: np.ndarray
             long_short_pf_neurons_diff: SetPartition
             n_neurons: int
-            long_results_obj: SurpriseAnalysisResult
-            short_results_obj: SurpriseAnalysisResult
+            long_results_obj: LeaveOneOutDecodingAnalysisResult
+            short_results_obj: LeaveOneOutDecodingAnalysisResult
 
             
     """

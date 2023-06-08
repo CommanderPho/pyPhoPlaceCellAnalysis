@@ -1,6 +1,7 @@
 import numpy as np
 import pandas as pd
 from copy import deepcopy
+from attrs import define
 import matplotlib.pyplot as plt
 from matplotlib.widgets import Slider
 from matplotlib.patches import FancyArrowPatch, FancyArrow
@@ -9,6 +10,7 @@ from matplotlib import patheffects
 from neuropy.core import Epoch
 from neuropy.utils.dynamic_container import overriding_dict_with # required for safely_accepts_kwargs
 from neuropy.utils.efficient_interval_search import get_non_overlapping_epochs # used in _display_plot_decoded_epoch_slices to get only the valid (non-overlapping) epochs
+from neuropy.utils.result_context import IdentifyingContext
 
 from pyphocorehelpers.function_helpers import function_attributes
 from pyphocorehelpers.programming_helpers import metadata_attributes
@@ -157,35 +159,7 @@ class DefaultDecoderDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Disp
         active_display_fn_identifying_ctx = active_context.adding_context('display_fn', display_fn_name='display_plot_decoded_epoch_slices')
 
         active_decoder = computation_result.computed_data['pf2D_Decoder']
-        decoding_time_bin_size = kwargs.pop('decoding_time_bin_size', 1.0/30.0) # 0.03333333333333333
-        decoder_ndim = kwargs.pop('decoder_ndim', 2)
-        force_recompute = kwargs.pop('force_recompute', False)
-
-        ## Check for previous computations:
-        needs_compute = True # default to needing to recompute.
-        computation_tuple_key = (filter_epochs, decoding_time_bin_size, decoder_ndim)
-
-        ## Recompute using '_perform_specific_epochs_decoding' if needed:
-        specific_epochs_decoding = computation_result.computed_data.get('specific_epochs_decoding', None)
-        if specific_epochs_decoding is not None:
-            found_result = specific_epochs_decoding.get(computation_tuple_key, None)
-            if found_result is not None:
-                # Unwrap and reuse the result:
-                filter_epochs_decoder_result, active_filter_epochs, default_figure_name = found_result # computation_result.computed_data['specific_epochs_decoding'][('Laps', decoding_time_bin_size)]
-                needs_compute = False # we don't need to recompute
-                if force_recompute:
-                    print(f'found extant result but force_recompute is True, so recomputing anyway.')
-                    needs_compute = True
-                    print(f'\t discarding old result.')
-                    _discarded_result = specific_epochs_decoding.pop(computation_tuple_key, None)
-
-        if needs_compute:
-            ## Do the computation:
-            print(f'recomputing specific epoch decoding for {computation_tuple_key = }')
-            # I think it's bad to import DefaultComputationFunctions directly in the _display function. Perhaps don't allow recomputations on demand?
-            computation_result = DefaultComputationFunctions._perform_specific_epochs_decoding(computation_result, active_config, filter_epochs=filter_epochs, decoding_time_bin_size=decoding_time_bin_size, decoder_ndim=decoder_ndim)
-            filter_epochs_decoder_result, active_filter_epochs, default_figure_name = computation_result.computed_data['specific_epochs_decoding'][computation_tuple_key]
-
+        
         ## Actual plotting portion:
         out_plot_tuple = plot_decoded_epoch_slices(active_filter_epochs, filter_epochs_decoder_result, global_pos_df=computation_result.sess.position.to_dataframe(), xbin=active_decoder.xbin,
                                                                 **overriding_dict_with(lhs_dict={'name':default_figure_name, 'debug_test_max_num_slices':256, 'enable_flat_line_drawing':False, 'debug_print': False}, **kwargs))
@@ -216,6 +190,35 @@ class DefaultDecoderDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Disp
         
     
 
+def _cached_epoch_computation_if_needed(computation_result, active_config, active_context=None, filter_epochs='ripple', decoder_ndim:int=2, decoding_time_bin_size:float=(1.0/30.0), force_recompute:bool=False, **kwargs):
+    """ an abnormal cached epoch computation function that used to be in `_display_plot_decoded_epoch_slices` but was factored out on 2023-05-30
+    Operates on: computation_result.computed_data['specific_epochs_decoding'][computation_tuple_key]
+    
+    """
+    ## Check for previous computations:
+    needs_compute = True # default to needing to recompute.
+    computation_tuple_key = (filter_epochs, decoding_time_bin_size, decoder_ndim)
+
+    ## Recompute using '_perform_specific_epochs_decoding' if needed:
+    specific_epochs_decoding = computation_result.computed_data.get('specific_epochs_decoding', None)
+    if specific_epochs_decoding is not None:
+        found_result = specific_epochs_decoding.get(computation_tuple_key, None)
+        if found_result is not None:
+            # Unwrap and reuse the result:
+            filter_epochs_decoder_result, active_filter_epochs, default_figure_name = found_result # computation_result.computed_data['specific_epochs_decoding'][('Laps', decoding_time_bin_size)]
+            needs_compute = False # we don't need to recompute
+            if force_recompute:
+                print(f'found extant result but force_recompute is True, so recomputing anyway.')
+                needs_compute = True
+                print(f'\t discarding old result.')
+                _discarded_result = specific_epochs_decoding.pop(computation_tuple_key, None)
+
+    if needs_compute:
+        ## Do the computation:
+        print(f'recomputing specific epoch decoding for {computation_tuple_key = }')
+        # I think it's bad to import DefaultComputationFunctions directly in the _display function. Perhaps don't allow recomputations on demand?
+        computation_result = DefaultComputationFunctions._perform_specific_epochs_decoding(computation_result, active_config, filter_epochs=filter_epochs, decoding_time_bin_size=decoding_time_bin_size, decoder_ndim=decoder_ndim)
+        filter_epochs_decoder_result, active_filter_epochs, default_figure_name = computation_result.computed_data['specific_epochs_decoding'][computation_tuple_key]
 
 
 
@@ -495,7 +498,7 @@ def _helper_update_decoded_single_epoch_slice_plot(curr_ax, params, plots_data, 
     """ 2023-05-08 - Factored out of plot_decoded_epoch_slices to enable paged 
 
     Needs only: curr_time_bins, curr_posterior, curr_most_likely_positions
-    Accesses: plots_data.epoch_slices[i,:]
+    Accesses: plots_data.epoch_slices[i,:], plots_data.global_pos_df, params.variable_name, params.xbin, params.enable_flat_line_drawing
     """    
     if debug_print:
         print(f'i : {i}, curr_posterior.shape: {curr_posterior.shape}')
@@ -526,12 +529,16 @@ def _subfn_update_decoded_epoch_slices(params, plots_data, plots, ui, debug_prin
         curr_most_likely_positions = curr_posterior_container.most_likely_positions_1D
         
         params, plots_data, plots, ui = _helper_update_decoded_single_epoch_slice_plot(curr_ax, params, plots_data, plots, ui, i, curr_time_bins, curr_posterior, curr_most_likely_positions, debug_print=debug_print)
+        on_render_page_callbacks = params.get('on_render_page_callbacks', {})
+        for a_callback_name, a_callback in on_render_page_callbacks.items():
+            try:
+                params, plots_data, plots, ui = a_callback(curr_ax, params, plots_data, plots, ui, i, curr_time_bins, curr_posterior, curr_most_likely_positions, debug_print=debug_print)
+            except Exception as e:
+                print(f'\t encountered exception in callback: {e}')
+                pass            
 
 
-
-
-
-@function_attributes(short_name=None, tags=['epoch','slices','decoder','figure'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-05-08 16:31', related_items=[])
+@function_attributes(short_name=None, tags=['epoch','slices','decoder','figure'], input_requires=[], output_provides=[], uses=['stacked_epoch_slices_matplotlib_build_view'], used_by=['_display_plot_decoded_epoch_slices'], creation_date='2023-05-08 16:31', related_items=[])
 def plot_decoded_epoch_slices(filter_epochs, filter_epochs_decoder_result, global_pos_df, variable_name:str='lin_pos', xbin=None, enable_flat_line_drawing=False, debug_test_max_num_slices=20, name='stacked_epoch_slices_matplotlib_subplots', debug_print=False):
     """ plots the decoded epoch results in a stacked slices view 
     
@@ -599,13 +606,128 @@ def plot_decoded_epoch_slices(filter_epochs, filter_epochs_decoder_result, globa
     params.variable_name = variable_name
     params.xbin = xbin.copy()
     params.enable_flat_line_drawing = enable_flat_line_drawing
-    
+      
+
     plots_data.global_pos_df = global_pos_df.copy()
     plots_data.filter_epochs_decoder_result = deepcopy(filter_epochs_decoder_result)
 
     _subfn_update_decoded_epoch_slices(params, plots_data, plots, ui, debug_print=debug_print)
 
     return params, plots_data, plots, ui
+
+
+
+@define
+class RadonTransformPlotData:
+    line_y: np.ndarray
+    score_text: str
+    speed_text: str
+
+
+@function_attributes(short_name=None, tags=['epoch','slices','decoder','figure','paginated','output'], input_requires=[], output_provides=[], uses=['DecodedEpochSlicesPaginatedFigureController'], used_by=[], creation_date='2023-06-02 13:36')
+def plot_decoded_epoch_slices_paginated(curr_active_pipeline, curr_results_obj, display_context, save_figure=True):
+    """ Plots a `DecodedEpochSlicesPaginatedFigureController`
+
+        display_context is kinda mixed up, DecodedEpochSlicesPaginatedFigureController builds its own kind of display context but this isn't the one that we want for the file outputs usually.
+
+    Usage:
+        from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import plot_decoded_epoch_slices_paginated
+    """
+    from pyphoplacecellanalysis.Pho2D.stacked_epoch_slices import DecodedEpochSlicesPaginatedFigureController # `plot_decoded_epoch_slices_paginated`
+    from neuropy.utils.matplotlib_helpers import add_inner_title # plot_decoded_epoch_slices_paginated
+
+    if display_context is None:
+        display_context = IdentifyingContext(display_fn_name='DecodedEpochSlices')
+        
+
+    long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
+    long_session, short_session, global_session = [curr_active_pipeline.filtered_sessions[an_epoch_name] for an_epoch_name in [long_epoch_name, short_epoch_name, global_epoch_name]]
+    
+    # active_identifying_session_ctx = curr_active_pipeline.sess.get_context()
+    _out_pagination_controller = DecodedEpochSlicesPaginatedFigureController.init_from_decoder_data(curr_results_obj.active_filter_epochs, curr_results_obj.all_included_filter_epochs_decoder_result, 
+        xbin=curr_results_obj.original_1D_decoder.xbin, global_pos_df=global_session.position.df, a_name='TestDecodedEpochSlicesPaginationController', active_context=display_context,  max_subplots_per_page=200) # 10
+    # _out_pagination_controller
+
+    ### 2023-05-30 - Add the radon-transformed linear fits to each epoch to the stacked epoch plots:
+    # `active_filter_epochs_df` native columns approach
+    active_filter_epochs_df = curr_results_obj.active_filter_epochs.to_dataframe().copy()
+    assert np.isin(['score', 'velocity', 'intercept', 'speed'], active_filter_epochs_df.columns).all()
+    epochs_linear_fit_df = active_filter_epochs_df[['score', 'velocity', 'intercept', 'speed']].copy() # get the `epochs_linear_fit_df` as a subset of the filter epochs df
+
+    # epochs_linear_fit_df approach
+    assert curr_results_obj.all_included_filter_epochs_decoder_result.num_filter_epochs == np.shape(epochs_linear_fit_df)[0]
+
+    _out_pagination_controller.plots_data.radon_transform_data = {}
+    _out_pagination_controller.plots['radon_transform'] = {}
+
+
+    for epoch_idx, epoch_vel, epoch_intercept, epoch_score, epoch_speed in zip(np.arange(curr_results_obj.all_included_filter_epochs_decoder_result.num_filter_epochs), epochs_linear_fit_df['velocity'].values, epochs_linear_fit_df['intercept'].values, epochs_linear_fit_df['score'].values, epochs_linear_fit_df['speed'].values):
+        # build the discrete line over the centered time bins:
+        epoch_time_bins = curr_results_obj.all_included_filter_epochs_decoder_result.time_bin_containers[epoch_idx].centers
+        epoch_time_bins = epoch_time_bins - epoch_time_bins[0] # all values should be relative to the start of the epoch:
+        epoch_line_eqn = (epoch_vel * epoch_time_bins) + epoch_intercept
+        with np.printoptions(precision=3, suppress=True, threshold=5):
+            score_text = f"score: " + str(np.array([epoch_score])).lstrip("[").rstrip("]") # output is just the number, as initially it is '[0.67]' but then the [ and ] are stripped.
+            speed_text = f"speed: " + str(np.array([epoch_speed])).lstrip("[").rstrip("]")
+        _out_pagination_controller.plots_data.radon_transform_data[epoch_idx] = RadonTransformPlotData(line_y=epoch_line_eqn, score_text=score_text, speed_text=speed_text)
+
+    def _callback_update_decoded_single_epoch_slice_plot(curr_ax, params: "VisualizationParameters", plots_data: "RenderPlotsData", plots: "RenderPlots", ui: "PhoUIContainer", i:int, curr_time_bins, *args, **kwargs): # curr_posterior, curr_most_likely_positions, debug_print:bool=False
+        """ 2023-05-30 - Based off of `_helper_update_decoded_single_epoch_slice_plot` to enable plotting radon transform lines on paged decoded epochs
+
+        Needs only: curr_time_bins, plots_data, i
+        Accesses: plots_data.epoch_slices[i,:], plots_data.global_pos_df, params.variable_name, params.xbin, params.enable_flat_line_drawing
+        """
+        debug_print = kwargs.pop('debug_print', False)
+        if debug_print:
+            print(f'_callback_update_decoded_single_epoch_slice_plot(..., i: {i}, curr_time_bins: {curr_time_bins})')
+        extant_plots = plots['radon_transform'].get(i, {})
+        extant_line = extant_plots.get('line', None)
+        extant_score_text = extant_plots.get('score_text', None)
+        # plot the radon transform line on the epoch:    
+        if (extant_line is not None) or (extant_score_text is not None):
+            # already exists, clear the existing ones. 
+            curr_ax.clear()
+
+        radon_transform_plot = curr_ax.plot(curr_time_bins, plots_data.radon_transform_data[i].line_y, label=f'computed radon transform', linestyle='dashed', linewidth=1, color='#e5ff00', alpha=0.8, marker='+', markersize=10) # Opaque RED # , linestyle='dashed', linewidth=2, color='#ff0000ff'
+
+        # Add replay score text to top-right corner:
+        final_text = f"{plots_data.radon_transform_data[i].score_text}\n{plots_data.radon_transform_data[i].speed_text}"
+        anchored_text = add_inner_title(curr_ax, final_text, loc='upper right', strokewidth=5, stroke_foreground='k', text_foreground='#e5ff00') # loc = 'upper right', 'upper left', 'lower left', 'lower right', 'right', 'center left', 'center right', 'lower center', 'upper center', 'center'
+        anchored_text.patch.set_ec("none")
+        anchored_text.set_alpha(0.4)
+
+        # Store the plot objects for future updates:
+        plots['radon_transform'][i] = {'line':radon_transform_plot, 'score_text':anchored_text}
+        
+        if debug_print:
+            print(f'\t success!')
+        return params, plots_data, plots, ui
+
+
+    # .params.on_render_page_callbacks: a dict of callbacks to be called when the page changes and needs to be re-rendered
+    on_render_page_callbacks = _out_pagination_controller.params.get('on_render_page_callbacks', None)
+    if on_render_page_callbacks is None:
+        _out_pagination_controller.params.on_render_page_callbacks = {} # allocate a new list
+    ## add or update this callback:
+    _out_pagination_controller.params.on_render_page_callbacks['plot_radon_transform_line_data'] = _callback_update_decoded_single_epoch_slice_plot
+    # Trigger the update
+    _out_pagination_controller.on_paginator_control_widget_jump_to_page(0)
+
+    # ## 2023-05-31 - Reference Output of matplotlib figure to file, along with building appropriate context.
+    # active_session_figures_out_path = curr_active_pipeline.get_daily_programmatic_session_output_path()
+    final_context = _out_pagination_controller.params.active_identifying_figure_ctx | display_context
+    # print(f'final_context: {final_context}')
+    # active_out_figure_paths = perform_write_to_file(fig, final_context, figures_parent_out_path=active_session_figures_out_path, register_output_file_fn=curr_active_pipeline.register_output_file)
+    if save_figure:
+        fig = _out_pagination_controller.plots.fig # get the figure
+        active_out_figure_paths, final_context = curr_active_pipeline.write_figure_to_daily_programmatic_session_output_path(fig, final_context, debug_print=True)
+    else:
+        active_out_figure_paths = None
+
+    return _out_pagination_controller, active_out_figure_paths, final_context
+
+
+
 
 # ==================================================================================================================== #
 # Rendering various different methods of normalizing spike counts and firing rates  (Matplotlib-based)                 #

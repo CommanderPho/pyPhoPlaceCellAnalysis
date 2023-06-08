@@ -4,8 +4,6 @@ from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtGui, QtCore, QtWidget
 
 # Must be called before any figures are created:
 import matplotlib
-# matplotlib.use('qtagg')
-matplotlib.use('Qt5Agg')
 
 from pyphoplacecellanalysis.External.pyqtgraph.console import ConsoleWidget
 from pyphoplacecellanalysis.External.pyqtgraph.widgets.MatplotlibWidget import MatplotlibWidget
@@ -33,7 +31,10 @@ def plot_flowchartWidget(title='PhoFlowchartApp'):
         from pyphoplacecellanalysis.GUI.PyQtPlot.Flowchart.pyqtplot_Flowchart import plot_flowchartWidget
         pipeline_flowchart_window, pipeline_flowchart_app = plot_flowchartWidget(title='PhoMainPipelineFlowchartApp')
     """
-    
+    ## TODO: does this always entail a matplotlib figure?
+    # matplotlib.use('qtagg')
+    matplotlib.use('Qt5Agg')
+
     # Use the widget defined in the designer as the central widget   
     mainAppWindow = PhoPipelineMainWindow(title)
     mainAppWindow.setWindowTitle(f'PhoFlowchartApp: pyqtgraph FlowchartCustomNodes: {title}')

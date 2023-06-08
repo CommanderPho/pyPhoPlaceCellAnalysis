@@ -1,6 +1,7 @@
 from collections import OrderedDict
 from datetime import datetime
 from pathlib import Path
+from typing import Optional
 import numpy as np
 
 from neuropy.core.neuron_identities import NeuronIdentity, build_units_colormap, PlotStringBrevityModeEnum
@@ -217,6 +218,7 @@ class DisplayPipelineStage(ComputedPipelineStage):
         
     def register_display_function(self, registered_name, display_function):
         """ registers a new custom display function"""
+        display_function.is_global = getattr(display_function, 'is_global', False) # sets the 'is_global' property on the function with its current value if it has one, otherwise it assume that it's not global and sets False
         self.registered_display_function_dict[registered_name] = display_function
         
 # ==================================================================================================================== #
@@ -301,13 +303,25 @@ class PipelineWithDisplayPipelineStageMixin:
 
 
     def clear_display_outputs(self):
-        """ removes any display outputs """
+        """ removes any display outputs 
+        # display_output_history_list is derived from self.display_output, so we only need to clear one.
+        # seems that .clear() doesn't work for DynamicParameters for some reason. Doesn't seem to change anything.
+        """
         ## Clear any hanging display outputs:
         # do I need to close them before I just remove them?
-        for a_display_output_key in self.display_output_history_list:
-            # a_display_output.close()
-            del self.display_output[a_display_output_key]
-        self.display_output_history_list.clear()
+        # self.display_output.clear()
+        self.display_output = DynamicParameters() # drop all
+        # Loops through all the configs and ensure that they have the neuron identity info if they need it.
+        for an_active_config_name in self.active_configs.keys():
+            # ## Add the filter to the active context (IdentifyingContext)
+            self.display_output[self.filtered_contexts[an_active_config_name]] = DynamicParameters() # One display_output for each context
+        
+        # for a_display_output_key in self.display_output_history_list:
+        #     # a_display_output.close()
+        #     del self.display_output[a_display_output_key]
+        # self.display_output_history_list.clear()
+        # assert len(self.display_output_history_list) == 0 # should be empty now
+
 
     def prepare_for_display(self, root_output_dir=r'W:\data\Output', should_smooth_maze=True):
         assert (self.is_computed), "Current self.is_computed must be true. Call self.perform_computations to reach this step."
@@ -336,7 +350,7 @@ class PipelineWithDisplayPipelineStageMixin:
 
 
     # MAIN FUNCTION ______________________________________________________________________________________________________ #
-    def display(self, display_function, active_session_configuration_context, **kwargs):
+    def display(self, display_function, active_session_configuration_context=None, **kwargs):
         """ Called to actually perform the display. Should output a figure/widget/graphic of some kind. 
         Inputs:
             display_function: either a Callable display function (e.g. DefaultDisplayFunctions._display_1d_placefield_validations) or a str containing the name of a registered display function (e.g. '_display_1d_placefield_validations')
@@ -355,23 +369,24 @@ class PipelineWithDisplayPipelineStageMixin:
             # if the display_function is a str (name of the function) instead of a callable, try to get the actual callable
             assert (display_function in self.registered_display_function_names), f"ERROR: The display function with the name {display_function} could not be found! Is it registered?"
             display_function = self.registered_display_function_dict[display_function] # find the actual function from the name
+        
+        active_session_configuration_name: Optional[str] = None
+        
+        ## Old form: active_session_filter_configuration: str compared to updated 2022-09-12-style call with an identifying context (IdentifyingContext) object
+        if active_session_configuration_context is None:
+            # This is only allowed for global functions:
+            assert getattr(display_function, 'is_global', False), f"display_function must be global if `active_session_configuration_context` is not specified but it is not! {display_function}"
+            assert not hasattr(active_session_configuration_context, 'filter_name'), f"global functions should NOT have filter_name specified in their contexts: \n\tdisplay_function:{display_function}\n\tactive_session_configuration_context: {active_session_configuration_context}"
+            active_session_configuration_context = self.sess.get_context() # get the appropriate context for global display functions
             
-        ## Old form: active_session_filter_configuration: str
-        if isinstance(active_session_configuration_context, str):
-            ## Old strictly name-based version (pre 2022-09-12):
+        elif isinstance(active_session_configuration_context, str):
+            ## Old strictly name-based version (pre 2022-09-12). Extract the actual context from self.filtered_contexts:
             active_session_configuration_name = active_session_configuration_context
-            
-            ## TODO: get the appropriate IdentifyingContext from the config name
             assert active_session_configuration_name in self.filtered_contexts, f'active_session_configuration_name: {active_session_configuration_name} is NOT in the self.filtered_contexts dict: {list(self.filtered_contexts.keys())}'
             active_session_configuration_context = self.filtered_contexts[active_session_configuration_name]
-            
-            
-        elif isinstance(active_session_configuration_context, IdentifyingContext):
-            # NEW 2022-09-12-style call with an identifying context (IdentifyingContext) object
-            active_session_configuration_name = None    
+
         else:
-            print(f'WARNING: active_session_configuration_context: {active_session_configuration_context} with type: {type(active_session_configuration_context)}')
-            raise NotImplementedError
+            pass # hope that it's an IdentifyingContext, but well check soon.
         
         ## Sets the active_context kwarg that's passed in to the display function:
         assert isinstance(active_session_configuration_context, IdentifyingContext)
@@ -383,22 +398,27 @@ class PipelineWithDisplayPipelineStageMixin:
             ## Global session-level context (not filtered, so not corresponding to a specific config name):
             ## For a global-style display function, pass ALL of the computation_results and active_configs just to preserve the argument style.
             # NOTE: global-style display functions have re-arranged arguments of the form (owning_pipeline_reference, global_computation_results, computation_results, active_configs, **kwargs). This differs from standard ones.
-            return display_function(self, self.global_computation_results, self.computation_results, self.active_configs, active_config_name=None, **kwargs)
+            assert getattr(display_function, 'is_global', False), f"display_function must be global if `active_session_configuration_context` does not have a `filter_name` property, but it is not!\n\tdisplay_function:{display_function}\n\tactive_session_configuration_context: {active_session_configuration_context}"
+            
+            curr_display_output = display_function(self, self.global_computation_results, self.computation_results, self.active_configs, active_config_name=None, **kwargs) # CALL GLOBAL DISPLAY FUNCTION
         
         else:
-            ## The expected filtered context:
+            ## Non-global display functions: The expected filtered context:
             if active_session_configuration_name is not None:
                 assert active_session_configuration_context.filter_name == active_session_configuration_name
     
             active_session_configuration_name = active_session_configuration_context.filter_name
-        
-        ## Sanity checking:
-        assert (active_session_configuration_name in self.computation_results), f"self.computation_results doesn't contain a key for the provided active_session_filter_configuration ('{active_session_configuration_name}'). Did you only enable computation with enabled_filter_names in perform_computation that didn't include this key?"
-        # We pop the active_config_name parameter from the kwargs, as this was an outdated workaround to optionally get the display functions this string but now it's passed directly by the call below        
-        kwarg_active_config_name = kwargs.pop('active_config_name', None)
-        if kwarg_active_config_name is not None:
-            assert kwarg_active_config_name == active_session_configuration_name # they better be equal or else there is a conflict.
+                    
+            ## Sanity checking:
+            assert (active_session_configuration_name in self.computation_results), f"self.computation_results doesn't contain a key for the provided active_session_filter_configuration ('{active_session_configuration_name}'). Did you only enable computation with enabled_filter_names in perform_computation that didn't include this key?"
+            # We pop the active_config_name parameter from the kwargs, as this was an outdated workaround to optionally get the display functions this string but now it's passed directly by the call below        
+            kwarg_active_config_name = kwargs.pop('active_config_name', None)
+            if kwarg_active_config_name is not None:
+                assert kwarg_active_config_name == active_session_configuration_name # they better be equal or else there is a conflict.
 
+            curr_display_output = display_function(self.computation_results[active_session_configuration_name], self.active_configs[active_session_configuration_name], owning_pipeline=self, active_config_name=active_session_configuration_name, **kwargs)
+            
+    
         ## Build the final display context: 
         found_display_fcn_index = self.registered_display_functions.index(display_function)
         display_fn_name = self.registered_display_function_names[found_display_fcn_index]
@@ -406,7 +426,6 @@ class PipelineWithDisplayPipelineStageMixin:
 
         # Add the display outputs to the active context. Each display function should return a structure like: dict(fig=active_figure, ax=ax_pf_1D)
         # owning_pipeline.display_output[active_display_fn_identifying_ctx] = (active_figure, ax_pf_1D)
-        curr_display_output = display_function(self.computation_results[active_session_configuration_name], self.active_configs[active_session_configuration_name], owning_pipeline=self, active_config_name=active_session_configuration_name, **kwargs)
         self.display_output[active_display_fn_identifying_ctx] = curr_display_output # sets the internal display reference to that item
 
         return curr_display_output
@@ -415,3 +434,90 @@ class PipelineWithDisplayPipelineStageMixin:
     # def _pdf_display(self, display_function, active_session_configuration_context, **kwargs):
     #     ## TODO:
     
+
+class PipelineWithDisplaySavingMixin:
+    """ provides functionality for saving figures to file.
+    
+    from pyphoplacecellanalysis.General.Pipeline.Stages.Display import PipelineWithDisplaySavingMixin
+    
+    """
+    
+    def build_display_context_for_session(self, display_fn_name:str, **kwargs) -> "IdentifyingContext":
+        """ builds a new display context for the session out of kwargs 
+        Usage:
+            curr_active_pipeline.build_display_context_for_session(display_fn_name='DecodedEpochSlices', epochs='replays', decoder='long_results_obj')
+        """
+        assert isinstance(display_fn_name, str), '"display_fn_name" must be provided as a string.'
+        active_identifying_session_ctx = self.sess.get_context()
+        display_subcontext = IdentifyingContext(display_fn_name=display_fn_name, **kwargs)
+        return active_identifying_session_ctx.merging_context('display_', display_subcontext)
+    
+
+    def build_display_context_for_filtered_session(self, filtered_session_name:str, display_fn_name:str, **kwargs) -> "IdentifyingContext":
+        """ builds a new display context for a filtered session out of kwargs 
+        Usage:
+            curr_active_pipeline.build_display_context_for_session(display_fn_name='DecodedEpochSlices', epochs='replays', decoder='long_results_obj')
+        """
+        assert isinstance(display_fn_name, str), '"display_fn_name" must be provided as a string.'
+        active_identifying_session_ctx = self.filtered_contexts[filtered_session_name]
+        display_subcontext = IdentifyingContext(display_fn_name=display_fn_name, **kwargs)
+        return active_identifying_session_ctx.merging_context('display_', display_subcontext)
+
+
+
+
+    def write_figure_to_daily_programmatic_session_output_path(self, fig, display_context=None, override_figures_parent_out_path=None, debug_print=True):
+        """ Writes the provided figure to the daily_programmatic_session_output_path.
+            This function writes a figure to the daily programmatic session output path.
+            It imports the perform_write_to_file function from the ExportHelpers Mixin.
+            It then gets the daily programmatic session output path and the session context.
+            If a display context is provided, it combines the active identifying session context
+        """
+        from pyphoplacecellanalysis.General.Mixins.ExportHelpers import perform_write_to_file
+        if override_figures_parent_out_path is not None:
+            active_figures_out_path = override_figures_parent_out_path
+        else:
+            active_figures_out_path = self.get_daily_programmatic_session_output_path()
+        return self.write_figure_to_output_path(fig, figures_parent_out_path=active_figures_out_path, display_context=display_context, debug_print=debug_print)
+    
+
+    def write_figure_to_output_path(self, fig, figures_parent_out_path, display_context=None, debug_print=True):
+        """ Writes the provided figure to the figures_parent_out_path. """
+        from pyphoplacecellanalysis.General.Mixins.ExportHelpers import perform_write_to_file
+        
+        active_identifying_session_ctx = self.sess.get_context()
+        if display_context is not None:
+            final_context = active_identifying_session_ctx | display_context
+
+        if debug_print:
+            print(f'final_context: {final_context}')
+        active_out_figure_paths = perform_write_to_file(fig, final_context, figures_parent_out_path=figures_parent_out_path, register_output_file_fn=self.register_output_file)
+        return active_out_figure_paths, final_context
+
+
+
+    @classmethod
+    def conform(cls, obj):
+        """ makes the object conform to this mixin by adding its properties. 
+        Usage:
+            from pyphoplacecellanalysis.General.Pipeline.Stages.Computation import PipelineWithComputedPipelineStageMixin, ComputedPipelineStage
+            from pyphoplacecellanalysis.General.Pipeline.Stages.Display import PipelineWithDisplayPipelineStageMixin, PipelineWithDisplaySavingMixin
+            from pyphoplacecellanalysis.General.Pipeline.Stages.Filtering import FilteredPipelineMixin
+            from pyphoplacecellanalysis.General.Pipeline.Stages.Loading import PipelineWithInputStage, PipelineWithLoadableStage
+            from pyphoplacecellanalysis.General.Pipeline.Stages.BaseNeuropyPipelineStage import PipelineStage
+            from pyphoplacecellanalysis.General.Pipeline.NeuropyPipeline import NeuropyPipeline
+
+            PipelineWithDisplaySavingMixin.conform(curr_active_pipeline)
+
+        """
+        def conform_to_implementing_method(func):
+            """ captures 'obj', 'cls'"""
+            setattr(type(obj), func.__name__, func)
+        
+        conform_to_implementing_method(cls.build_display_context_for_session)
+        conform_to_implementing_method(cls.build_display_context_for_filtered_session)
+        conform_to_implementing_method(cls.write_figure_to_daily_programmatic_session_output_path)
+        conform_to_implementing_method(cls.write_figure_to_output_path)
+
+
+

@@ -1,24 +1,10 @@
 import numpy as np
 import pandas as pd
 
-
-## All matplotlib-related stuff is for _display_pf_peak_prominence2d_plots
-import matplotlib
-# configure backend here
-matplotlib.use('Qt5Agg')
-import matplotlib.pyplot as plt
-from mpl_toolkits.mplot3d import Axes3D
-from matplotlib.path import Path
-import matplotlib.patches as patches
-from matplotlib.patches import Rectangle
-from matplotlib.pyplot import cm
-
-
-
 from pyphocorehelpers.mixins.member_enumerating import AllFunctionEnumeratingMixin
 from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DisplayFunctionRegistryHolder import DisplayFunctionRegistryHolder
 
-import pyphoplacecellanalysis.External.pyqtgraph as pg
+import pyphoplacecellanalysis.External.pyqtgraph as pg # for _display_speed_vs_PFoverlapDensity_plots
 
 from pyphoplacecellanalysis.External.peak_prominence2d import plot_Prominence # required for _plot_promenence_peaks
 
@@ -105,6 +91,14 @@ class EloyAnalysisDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Displa
                 figure, ax = curr_active_pipeline.display(curr_display_function_name, active_config_name, neuron_id=5) 
 
             """
+            ## All matplotlib-related stuff is for _display_pf_peak_prominence2d_plots
+            import matplotlib
+            # configure backend here
+            matplotlib.use('Qt5Agg')
+            import matplotlib.pyplot as plt # # used in `_plot_single_neuron_result`
+            from matplotlib.patches import Rectangle # used in `_plot_single_neuron_result`
+            from matplotlib.pyplot import cm # used in `_plot_single_neuron_result`
+
             def _plot_single_neuron_result(neuron_id, a_result, promenence_plot_threshold = 1.0, included_level_indicies=[1], debug_print=False):
                 ## Create figure:
                 figure = plt.figure(figsize=(12,10), dpi=100)

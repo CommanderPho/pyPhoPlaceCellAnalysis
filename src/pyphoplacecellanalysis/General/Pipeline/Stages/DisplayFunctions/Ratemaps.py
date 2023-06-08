@@ -104,6 +104,48 @@ class DefaultRatemapDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Disp
         # return active_pf_2D_figures
         return MatplotlibRenderPlots(figures=active_pf_2D_figures, axes=display_outputs[1], graphics=display_outputs[2])
 
+    @function_attributes(short_name='2d_placefield_occupancy', tags=['display', 'placefields', '2D', 'occupancy', 'matplotlib'], input_requires=[], output_provides=[], uses=['PfND.plot_ratemaps_2D', 'neuropy.plotting.ratemaps.plot_ratemap_2D'], used_by=[], creation_date='2023-04-11 03:05')
+    def _display_2d_placefield_occupancy(computation_result, active_config, enable_saving_to_disk=False, active_context=None, **kwargs):
+        """ displays placefield occupancy in a MATPLOTLIB window 
+        
+        Internally wraps `PfND.plot_ratemaps_2D` which itself wraps `neuropy.plotting.ratemaps.plot_ratemap_2D`
+        
+            optionally shows peak firing rates
+            
+        TODO: plot the information about the source of the data, such as the session information? Or perhaps we could just leave that encoded in the exported file name? It is hard to track the figures though
+        
+        """
+        assert active_context is not None
+        active_identifying_sub_ctx = active_context.adding_context('display_fn', display_fn_name='plot_occupancy')
+        active_identifying_sub_ctx_string = active_identifying_sub_ctx.get_description(separator='|')
+        
+        display_outputs = computation_result.computed_data['pf2D'].plot_occupancy(**({} | kwargs))
+        
+        # plot_variable_name = ({'plot_variable': None} | kwargs)
+        plot_variable_name = kwargs.get('plot_variable', enumTuningMap2DPlotVariables.OCCUPANCY).name
+        active_figure = plt.gcf()
+        
+        # TODO 2023-06-02 - should drop the computation_epochs, speed_thresh
+        active_pf_computation_params = unwrap_placefield_computation_parameters(active_config.computation_config)
+        _display_add_computation_param_text_box(active_figure, active_pf_computation_params) # Adds the parameters text.
+        
+        ## Setup the plot title and add the session information:
+        session_identifier = computation_result.sess.get_description() # 'sess_bapun_RatN_Day4_2019-10-15_11-30-06'
+        fig_label = f'{plot_variable_name} | plot_occupancy_2D | {session_identifier} | {active_figure.number}'
+        # print(f'fig_label: {fig_label}')
+        active_figure.set_label(fig_label)
+        active_figure.canvas.manager.set_window_title(fig_label) # sets the window's title
+        
+        active_pf_2D_figures = [active_figure]            
+        
+        # Save the figure out to disk if we need to:
+        should_save_to_disk = enable_saving_to_disk
+        if should_save_to_disk:
+            _save_displayed_figure_if_needed(active_config.plotting_config, plot_type_name='_display_2d_placefield_occupancy', active_variant_name=plot_variable_name, active_figures=active_pf_2D_figures)
+
+        return MatplotlibRenderPlots(figures=active_pf_2D_figures, axes=display_outputs[1], graphics=[])
+
+
     @function_attributes(short_name='normal', tags=['display', 'placefields', '2D', 'matplotlib'], input_requires=[], output_provides=[], uses=['neuropy.plotting.placemaps.plot_all_placefields', 'neuropy.plotting.ratemaps.plot_ratemap_2D'], used_by=[], creation_date='2023-04-11 03:05')
     def _display_normal(computation_result, active_config, **kwargs):
         """

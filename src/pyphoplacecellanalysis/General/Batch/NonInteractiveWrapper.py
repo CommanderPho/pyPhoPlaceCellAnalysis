@@ -67,7 +67,7 @@ filters should be checkable to express whether we want to build that one or not
 
 @define(slots=False)
 class NonInteractiveWrapper(object):
-    """A wrapper class that performs a non-interactive version of the jupyter-lab notebook for loading and processing the pipeline. """
+    """A wrapper class that performs a non-interactive version of the jupyter-lab notebook for use with the custom `PipelineComputationsNode` and `PipelineFilteringDataNote` Flowchart Notes: enables loading and processing the pipeline. """
     enable_saving_to_disk:bool = False
     common_parent_foldername:Path = Path(r'C:\Users\pho\repos\PhoPy3DPositionAnalysis2021\output')
    
@@ -267,6 +267,7 @@ def batch_load_session(global_data_root_parent_path, active_data_mode_name, base
     curr_active_pipeline = NeuropyPipeline.try_init_from_saved_pickle_or_reload_if_needed(active_data_mode_name, active_data_mode_type_properties,
         override_basepath=Path(basedir), force_reload=force_reload, active_pickle_filename=active_pickle_filename, skip_save_on_initial_load=True)
 
+
     active_session_filter_configurations = active_data_mode_registered_class.build_default_filter_functions(sess=curr_active_pipeline.sess, epoch_name_whitelist=epoch_name_whitelist) # build_filters_pyramidal_epochs(sess=curr_kdiba_pipeline.sess)
     if debug_print:
         print(f'active_session_filter_configurations: {active_session_filter_configurations}')
@@ -336,6 +337,12 @@ def batch_load_session(global_data_root_parent_path, active_data_mode_name, base
     if not saving_mode.shouldSave:
         print(f'saving_mode.shouldSave == False, so not saving at the end of batch_load_session')
 
+
+    ## Load pickled global computations:
+    # If previously pickled global results were saved, they will typically no longer be relevent if the pipeline was recomputed. We need a system of invalidating/versioning the global results when the other computations they depend on change.
+    # Maybe move into `batch_extended_computations(...)` or integrate with that somehow
+    # curr_active_pipeline.load_pickled_global_computation_results()
+
     return curr_active_pipeline
 
 
@@ -356,7 +363,7 @@ def batch_extended_computations(curr_active_pipeline, include_whitelist=None, in
     newly_computed_values = []
 
     non_global_comp_names = ['firing_rate_trends', 'relative_entropy_analyses']
-    global_comp_names = ['jonathan_firing_rate_analysis', 'short_long_pf_overlap_analyses', 'long_short_fr_indicies_analyses', 'long_short_decoding_analyses']
+    global_comp_names = ['jonathan_firing_rate_analysis', 'short_long_pf_overlap_analyses', 'long_short_fr_indicies_analyses', 'long_short_decoding_analyses', 'long_short_post_decoding'] # , 'long_short_rate_remapping'
 
     if include_whitelist is None:
         # include all:
@@ -563,6 +570,65 @@ def batch_extended_computations(curr_active_pipeline, include_whitelist=None, in
                 raise e
             
 
+        ## long_short_post_decoding:
+        _comp_name = 'long_short_post_decoding'
+        if _comp_name in include_whitelist:
+            try:
+                ## Get global 'long_short_post_decoding' results:
+                curr_long_short_post_decoding = curr_active_pipeline.global_computation_results.computed_data['long_short_post_decoding']
+                ## Extract variables from results object:
+                expected_v_observed_result, curr_long_short_rr = curr_long_short_post_decoding.expected_v_observed_result, curr_long_short_post_decoding.rate_remapping
+                rate_remapping_df, high_remapping_cells_only = curr_long_short_rr.rr_df, curr_long_short_rr.high_only_rr_df
+                _subfn_on_already_computed(_comp_name)
+                    
+            except (AttributeError, KeyError) as e:
+                if progress_print or debug_print:
+                    print(f'{_comp_name} missing.')
+                if debug_print:
+                    print(f'\t encountered error: {e}\n{traceback.format_exc()}\n.')
+                if progress_print or debug_print:
+                    print(f'\t Recomputing {_comp_name}...')
+                    
+                # When this fails due to unwrapping from the load, add `, computation_kwargs_list=[{'perform_cache_load': False}]` as an argument to the `perform_specific_computation` call below
+                curr_active_pipeline.perform_specific_computation(computation_functions_name_whitelist=['_perform_long_short_post_decoding_analysis'], fail_on_exception=True, debug_print=False) # fail_on_exception MUST be True or error handling is all messed up 
+                print(f'\t done.')
+                curr_long_short_post_decoding = curr_active_pipeline.global_computation_results.computed_data['long_short_post_decoding']
+                expected_v_observed_result, curr_long_short_rr = curr_long_short_post_decoding.expected_v_observed_result, curr_long_short_post_decoding.rate_remapping
+                rate_remapping_df, high_remapping_cells_only = curr_long_short_rr.rr_df, curr_long_short_rr.high_only_rr_df
+                newly_computed_values.append(_comp_name)
+            except Exception as e:
+                raise e
+
+
+        # ## long_short_rate_remapping:
+        # _comp_name = 'long_short_rate_remapping'
+        # if _comp_name in include_whitelist:
+        #     try:
+        #         ## Get global 'long_short_rate_remapping' results:
+        #         curr_long_short_rr = curr_active_pipeline.global_computation_results.computed_data['long_short_rate_remapping']
+        #         rate_remapping_df, high_remapping_cells_only = curr_long_short_rr.rr_df, curr_long_short_rr.high_only_rr_df
+        #         _subfn_on_already_computed(_comp_name)
+                    
+        #     except (AttributeError, KeyError) as e:
+        #         if progress_print or debug_print:
+        #             print(f'{_comp_name} missing.')
+        #         if debug_print:
+        #             print(f'\t encountered error: {e}\n{traceback.format_exc()}\n.')
+        #         if progress_print or debug_print:
+        #             print(f'\t Recomputing {_comp_name}...')
+                    
+        #         # When this fails due to unwrapping from the load, add `, computation_kwargs_list=[{'perform_cache_load': False}]` as an argument to the `perform_specific_computation` call below
+        #         curr_active_pipeline.perform_specific_computation(computation_functions_name_whitelist=['_perform_long_short_decoding_rate_remapping_analyses'], fail_on_exception=True, debug_print=False) # fail_on_exception MUST be True or error handling is all messed up 
+        #         print(f'\t done.')
+        #         curr_long_short_rr = curr_active_pipeline.global_computation_results.computed_data['long_short_rate_remapping']
+        #         rate_remapping_df, high_remapping_cells_only = curr_long_short_rr.rr_df, curr_long_short_rr.high_only_rr_df
+        #         newly_computed_values.append(_comp_name)
+        #     except Exception as e:
+        #         raise e
+
+
+
+
     if progress_print:
         print('done with all batch_extended_computations(...).')
 
@@ -606,12 +672,9 @@ def batch_programmatic_figures(curr_active_pipeline):
     print(f'short_only_aclus: {short_only_aclus}')
 
     active_identifying_session_ctx = curr_active_pipeline.sess.get_context() # 'bapun_RatN_Day4_2019-10-15_11-30-06'
-    # curr_sess_ctx # IdentifyingContext<('kdiba', 'gor01', 'one', '2006-6-07_11-26-53')>
-    figures_parent_out_path = create_daily_programmatic_display_function_testing_folder_if_needed()
-    active_session_figures_out_path = session_context_to_relative_path(figures_parent_out_path, active_identifying_session_ctx)
+    active_session_figures_out_path = curr_active_pipeline.get_daily_programmatic_session_output_path()
     print(f'curr_session_parent_out_path: {active_session_figures_out_path}')
-    active_session_figures_out_path.mkdir(parents=True, exist_ok=True) # make folder if needed
-
+    ## MODE: this mode creates a special folder to contain the outputs for this session.
 
     # ==================================================================================================================== #
     # Output Figures to File                                                                                               #
@@ -639,6 +702,7 @@ def batch_programmatic_figures(curr_active_pipeline):
     curr_active_pipeline.display('_display_short_long_firing_rate_index_comparison', curr_active_pipeline.sess.get_context(), fig_save_parent_path=fig_save_parent_path)
 
 
+
     return active_identifying_session_ctx, active_session_figures_out_path, active_out_figures_list
 
 
@@ -653,7 +717,8 @@ def batch_extended_programmatic_figures(curr_active_pipeline):
     programmatic_display_to_PDF(curr_active_pipeline, curr_display_function_name='_display_1d_placefields', debug_print=False) # 🟢✅ Now seems to be working and saving to PDF!! Still using matplotlib.use('Qt5Agg') mode and plots still appear.
     programmatic_display_to_PDF(curr_active_pipeline, curr_display_function_name='_display_1d_placefield_validations') # , filter_name=active_config_name 🟢✅ Now seems to be working and saving to PDF!! Still using matplotlib.use('Qt5Agg') mode and plots still appear. Moderate visual improvements can still be made (titles overlap and stuff). Works with %%capture
     programmatic_display_to_PDF(curr_active_pipeline, curr_display_function_name='_display_2d_placefield_result_plot_ratemaps_2D') #  🟢✅ Now seems to be working and saving to PDF!! Still using matplotlib.use('Qt5Agg') mode and plots still appear.
-
+    programmatic_display_to_PDF(curr_active_pipeline, curr_display_function_name='_display_2d_placefield_occupancy') #  🟢✅ 2023-05-25
+    # programmatic_display_to_PDF(curr_active_pipeline, curr_display_function_name='_display_long_short_laps') #  UNTESTED 2023-05-29
 
     # # Plot long|short firing rate index:
     # fig_save_parent_path = Path(r'E:\Dropbox (Personal)\Active\Kamran Diba Lab\Results from 2023-01-20 - LongShort Firing Rate Indicies')
@@ -662,15 +727,36 @@ def batch_extended_programmatic_figures(curr_active_pipeline):
     # active_context = long_short_fr_indicies_analysis_results['active_context']
     # plot_long_short_firing_rate_indicies(x_frs_index, y_frs_index, active_context, fig_save_parent_path=fig_save_parent_path)
 
+    try:
+        _out = curr_active_pipeline.display('_display_long_short_expected_v_observed_firing_rate', curr_active_pipeline.get_session_context(), defer_render=True)
+    except Exception as e:
+        print(f'batch_extended_programmatic_figures(...): _prepare_plot_expected_vs_observed failed with error: {e}\n skipping.')
+    
+    ## TODO 2023-06-02 NOW, NEXT: this might not work in 'AGG' mode because it tries to render it with QT, but we can see.
+    try:
+        _out = curr_active_pipeline.display('_display_long_and_short_stacked_epoch_slices', curr_active_pipeline.get_session_context(), defer_render=True)
+    except Exception as e:
+        print(f'batch_extended_programmatic_figures(...): _prepare_plot_long_and_short_epochs failed with error: {e}\n skipping.')
+    
+
+
 
 
 class BatchPhoJonathanFiguresHelper(object):
     """Private methods that help with batch figure generator for ClassName.
 
+    In .run(...) it builds the plot_kwargs ahead of time that will be passed to the specific plot function using `cls._build_batch_plot_kwargs(...)`
+        It then calls `active_out_figures_list = cls._perform_batch_plot(...)` to do the plotting, getting the list of figures and output paths
+    
     2022-12-08 - Batch Programmatic Figures (Currently only Jonathan-style) 
     2022-12-01 - Automated programmatic output using `_display_batch_pho_jonathan_replay_firing_rate_comparison`
 
+    
+    
     """
+    _display_fn_name = '_display_batch_pho_jonathan_replay_firing_rate_comparison' # used as the display function called in `_subfn_batch_plot_automated(...)`
+    _display_fn_context_display_name = 'BatchPhoJonathanReplayFRC' # used in `_build_batch_plot_kwargs` as the display_fn_name for the generated context. Affects the output names of the figures like f'kdiba_gor01_one_2006-6-09_1-22-43_{cls._display_fn_context_display_name}_long_only_[5, 23, 29, 38, 70, 85, 97, 103].pdf'. 
+
 
     @classmethod
     def run(cls, curr_active_pipeline, neuron_replay_stats_df, n_max_page_rows = 10):
@@ -688,9 +774,11 @@ class BatchPhoJonathanFiguresHelper(object):
         print(f'long_only_aclus: {long_only_aclus}')
         print(f'short_only_aclus: {short_only_aclus}')
 
+        
+        figures_parent_out_path = create_daily_programmatic_display_function_testing_folder_if_needed()
+
         active_identifying_session_ctx = curr_active_pipeline.sess.get_context() # 'bapun_RatN_Day4_2019-10-15_11-30-06'
         # curr_sess_ctx # IdentifyingContext<('kdiba', 'gor01', 'one', '2006-6-07_11-26-53')>
-        figures_parent_out_path = create_daily_programmatic_display_function_testing_folder_if_needed()
         active_session_figures_out_path = session_context_to_relative_path(figures_parent_out_path, active_identifying_session_ctx)
         print(f'curr_session_parent_out_path: {active_session_figures_out_path}')
         active_session_figures_out_path.mkdir(parents=True, exist_ok=True) # make folder if needed
@@ -714,6 +802,7 @@ class BatchPhoJonathanFiguresHelper(object):
         """ the a programmatic wrapper for automated output using `_display_batch_pho_jonathan_replay_firing_rate_comparison`. The specific plot function called. 
         Called ONLY by `_perform_batch_plot(...)`
 
+        Calls `curr_active_pipeline.display(cls._display_fn_name, ...)
         """
         # size_dpi = 100.0,
         # single_subfigure_size_px = np.array([1920.0, 220.0])
@@ -722,7 +811,7 @@ class BatchPhoJonathanFiguresHelper(object):
         num_cells = len(included_unit_neuron_IDs)
         desired_figure_size_inches = single_subfigure_size_inches.copy()
         desired_figure_size_inches[1] = desired_figure_size_inches[1] * num_cells
-        graphics_output_dict = curr_active_pipeline.display('_display_batch_pho_jonathan_replay_firing_rate_comparison', active_identifying_ctx,
+        graphics_output_dict = curr_active_pipeline.display(cls._display_fn_name, active_identifying_ctx,
                                                             n_max_plot_rows=n_max_page_rows, included_unit_neuron_IDs=included_unit_neuron_IDs,
                                                             show_inter_replay_frs=True, spikes_color=(0.1, 0.0, 0.1), spikes_alpha=0.5, fignum=fignum, fig_idx=fig_idx, figsize=desired_figure_size_inches)
         fig, subfigs, axs, plot_data = graphics_output_dict['fig'], graphics_output_dict['subfigs'], graphics_output_dict['axs'], graphics_output_dict['plot_data']
@@ -737,7 +826,7 @@ class BatchPhoJonathanFiguresHelper(object):
         if len(long_only_aclus) > 0:        
             _batch_plot_kwargs_list.append(dict(included_unit_neuron_IDs=long_only_aclus,
             active_identifying_ctx=active_identifying_session_ctx.adding_context(collision_prefix='_batch_plot_test',
-                display_fn_name='batch_plot_test', plot_result_set='long_only', aclus=f"{long_only_aclus}"
+                display_fn_name=cls._display_fn_context_display_name, plot_result_set='long_only', aclus=f"{long_only_aclus}"
             ),
             fignum='long_only', n_max_page_rows=len(long_only_aclus)))
         else:
@@ -746,7 +835,7 @@ class BatchPhoJonathanFiguresHelper(object):
         if len(short_only_aclus) > 0:
             _batch_plot_kwargs_list.append(dict(included_unit_neuron_IDs=short_only_aclus,
             active_identifying_ctx=active_identifying_session_ctx.adding_context(collision_prefix='_batch_plot_test',
-                display_fn_name='batch_plot_test', plot_result_set='short_only', aclus=f"{short_only_aclus}"
+                display_fn_name=cls._display_fn_context_display_name, plot_result_set='short_only', aclus=f"{short_only_aclus}"
             ),
             fignum='short_only', n_max_page_rows=len(short_only_aclus)))
         else:
@@ -761,7 +850,7 @@ class BatchPhoJonathanFiguresHelper(object):
             ## paginated outputs for shared cells
             included_unit_indicies_pages = [[curr_included_unit_index for (a_linear_index, curr_row, curr_col, curr_included_unit_index) in v] for page_idx, v in enumerate(included_combined_indicies_pages)] # a list of length `num_pages` containing up to 10 items
             paginated_shared_cells_kwarg_list = [dict(included_unit_neuron_IDs=curr_included_unit_indicies,
-                active_identifying_ctx=active_identifying_session_ctx.adding_context(collision_prefix='_batch_plot_test', display_fn_name='batch_plot_test', plot_result_set='shared', page=f'{page_idx+1}of{num_pages}', aclus=f"{curr_included_unit_indicies}"),
+                active_identifying_ctx=active_identifying_session_ctx.adding_context(collision_prefix='_batch_plot_test', display_fn_name=cls._display_fn_context_display_name, plot_result_set='shared', page=f'{page_idx+1}of{num_pages}', aclus=f"{curr_included_unit_indicies}"),
                 fignum=f'shared_{page_idx}', fig_idx=page_idx, n_max_page_rows=n_max_page_rows) for page_idx, curr_included_unit_indicies in enumerate(included_unit_indicies_pages)]
             _batch_plot_kwargs_list.extend(paginated_shared_cells_kwarg_list) # add paginated_shared_cells_kwarg_list to the list
         else:
@@ -800,7 +889,9 @@ class BatchPhoJonathanFiguresHelper(object):
                     active_out_figures_list.append(a_fig)
                     # Save out PDF page:
                     pdf.savefig(a_fig)
+                    curr_active_pipeline.register_output_file(output_path=curr_pdf_save_path, output_metadata={'context': curr_active_identifying_ctx, 'fig': (a_fig), 'pdf_metadata': active_pdf_metadata})
             else:
+                # Don't write the PDF and just plot interactively:
                 a_fig = cls._subfn_batch_plot_automated(curr_active_pipeline, **curr_batch_plot_kwargs)
                 active_out_figures_list.append(a_fig)
 
@@ -810,10 +901,103 @@ class BatchPhoJonathanFiguresHelper(object):
                 fig_png_out_path = curr_pdf_save_path.with_suffix('.png')
                 # fig_png_out_path = fig_png_out_path.with_stem(f'{curr_pdf_save_path.stem}_{curr_page_str}') # note this replaces the current .pdf extension with .png, resulting in a good filename for a .png
                 a_fig.savefig(fig_png_out_path)
+                curr_active_pipeline.register_output_file(output_path=fig_png_out_path, output_metadata={'context': curr_active_identifying_ctx, 'fig': (a_fig)})
                 if progress_print:
                     print(f'\t saved {fig_png_out_path}')
 
         return active_out_figures_list
 
 
+# ==================================================================================================================== #
+# 2023-05-25 - Pipeline Preprocessing Parameter Saving                                                                 #
+# ==================================================================================================================== #
+
+from neuropy.utils.dynamic_container import DynamicContainer
+from pyphoplacecellanalysis.General.Pipeline.NeuropyPipeline import PipelineSavingScheme
+
+def _update_pipeline_missing_preprocessing_parameters(curr_active_pipeline, debug_print=False):
+    """ 2023-05-24 - Adds the previously missing `sess.config.preprocessing_parameters` to each session (filtered and base) in the pipeline. 
+    
+    Usage:
+        from pyphoplacecellanalysis.General.Batch.NonInteractiveWrapper import _update_pipeline_missing_preprocessing_parameters
+        was_updated = _update_pipeline_missing_preprocessing_parameters(curr_active_pipeline)
+        was_updated
+    """
+    def _subfn_update_session_missing_preprocessing_parameters(sess):
+        """ 2023-05-24 - Adds the previously missing `sess.config.preprocessing_parameters` to a single session. Called only by `_update_pipeline_missing_preprocessing_parameters` """
+        preprocessing_parameters = getattr(sess.config, 'preprocessing_parameters', None)
+        if preprocessing_parameters is None:
+            print(f'No existing preprocessing parameters! Assigning them!')
+            default_lap_estimation_parameters = DynamicContainer(N=20, should_backup_extant_laps_obj=True) # Passed as arguments to `sess.replace_session_laps_with_estimates(...)`
+            default_PBE_estimation_parameters = DynamicContainer(sigma=0.030, thresh=(0, 1.5), min_dur=0.030, merge_dur=0.100, max_dur=0.300) # NewPaper's Parameters        
+            default_replay_estimation_parameters = DynamicContainer(require_intersecting_epoch=None, min_epoch_included_duration=0.06, max_epoch_included_duration=None, maximum_speed_thresh=None, min_inclusion_fr_active_thresh=0.01, min_num_unique_aclu_inclusions=3)
+            
+            sess.config.preprocessing_parameters = DynamicContainer(epoch_estimation_parameters=DynamicContainer.init_from_dict({
+                    'laps': default_lap_estimation_parameters,
+                    'PBEs': default_PBE_estimation_parameters,
+                    'replays': default_replay_estimation_parameters
+                }))
+            return True
+        else:
+            if debug_print:
+                print(f'preprocessing parameters exist.')
+            return False
+    
+    # BEGIN MAIN FUNCTION BODY
+    was_updated = False
+    was_updated = was_updated | _subfn_update_session_missing_preprocessing_parameters(curr_active_pipeline.sess)
+
+    long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
+    for an_epoch_name in [long_epoch_name, short_epoch_name, global_epoch_name]:
+        was_updated = was_updated | _subfn_update_session_missing_preprocessing_parameters(curr_active_pipeline.filtered_sessions[an_epoch_name])
+
+    if was_updated:
+        print(f'config was updated. Saving pipeline.')
+        curr_active_pipeline.save_pipeline(saving_mode=PipelineSavingScheme.OVERWRITE_IN_PLACE)
+    return was_updated
+
+
+
+# ==================================================================================================================== #
+# 2023-05-25 - Separate Generalized Plot Saving/Registering Function                                                   #
+# ==================================================================================================================== #
+# from pyphoplacecellanalysis.General.Mixins.ExportHelpers import build_figure_basename_from_display_context
+
+@function_attributes(short_name=None, tags=['neptune', 'figures', 'output', 'cloud', 'logging', 'pipeline'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-05-25 04:34', related_items=[])
+def neptune_output_figures(curr_active_pipeline):
+    """ Uploads the completed figures to neptune.ai from the pipeline's `.registered_output_files` items. 
+    
+    Usage:
+        from pyphoplacecellanalysis.General.Batch.NonInteractiveWrapper import neptune_output_figures
+        neptune_output_figures(curr_active_pipeline)
+    """
+    import neptune # for logging progress and results
+    from neptune.types import File
+
+    neptune_kwargs = {'project':"commander.pho/PhoDibaLongShort2023",
+    'api_token':"eyJhcGlfYWRkcmVzcyI6Imh0dHBzOi8vYXBwLm5lcHR1bmUuYWkiLCJhcGlfdXJsIjoiaHR0cHM6Ly9hcHAubmVwdHVuZS5haSIsImFwaV9rZXkiOiIxOGIxODU2My1lZTNhLTQ2ZWMtOTkzNS02ZTRmNzM5YmNjNjIifQ=="}
+
+    # kdiba_gor01_one_2006-6-09_1-22-43_sess
+    active_session_context_string = str(curr_active_pipeline.active_sess_config)
+
+    with neptune.init_run(**neptune_kwargs) as run:
+        for a_fig_path, fig_metadata in curr_active_pipeline.registered_output_files.items():
+            ## Get list of figures output and register them to neptune:
+            a_fig_context = fig_metadata['context']
+            a_full_figure_path_key = f"session/{active_session_context_string}/figures/{str(a_fig_context)}"
+            print(f'a_fig_path: {a_fig_path}, a_fig_context: {a_fig_context}\n\t{a_full_figure_path_key}')
+            # fig_objects = fig_metadata.get('fig', None)
+            # if fig_objects is not None:
+            # 	# upload the actual figure objects
+            # 	if not isinstance(fig_objects, (tuple, list)):
+            # 		fig_objects = (fig_objects,) # wrap in a tuple or convert list to tuple
+            # 	# now fig_objects better be a tuple
+            # 	assert isinstance(fig_objects, tuple), f"{fig_objects} should be a tuple!"
+            # 	# run[a_full_figure_path_key].upload(fig_metadata['fig'])
+            # 	for a_fig_obj in fig_objects:
+            # 		run[a_full_figure_path_key].append(a_fig_obj) # append the whole series of related figures
+            # else:
+            # upload as file
+            run[a_full_figure_path_key].upload(str(a_fig_path))
+                        
 

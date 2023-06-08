@@ -211,7 +211,7 @@ def plot_laps_2d(sess, legacy_plotting_mode=True):
     
     curr_laps_df = sess.laps.to_dataframe()
     
-    fig, out_axes_list = plot_position_curves_figure(position_obj, include_velocity=True, include_accel=True, figsize=(24, 10))    
+    fig, out_axes_list = plot_position_curves_figure(position_obj, include_velocity=True, include_accel=True, figsize=(24, 10))
 
     ## Draw on top of the existing position curves with the lap colors:
     if legacy_plotting_mode:
@@ -425,7 +425,7 @@ def plot_lap_trajectories_3d(sess, curr_num_subplots=1, active_page_index=0, inc
 @function_attributes(short_name=None, tags=['lap','trajectories','2D','matplotlib','plotting','paginated'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-05-09 05:13', related_items=[])
 def plot_lap_trajectories_2d(sess, curr_num_subplots=5, active_page_index=0):
     """ Plots a MatplotLib 2D Figure with each lap being shown in one of its subplots """
-    def _chunks(iterable, size=10):
+    def _subfn_chunks(iterable, size=10):
         iterator = iter(iterable)
         for first in iterator:    # stops when iterator is depleted
             def chunk():          # construct generator for next chunk
@@ -433,9 +433,8 @@ def plot_lap_trajectories_2d(sess, curr_num_subplots=5, active_page_index=0):
                 for more in islice(iterator, size - 1):
                     yield more    # yield more elements from the iterator
             yield chunk()         # in outer generator, yield next chunk
-
         
-    def _build_laps_multiplotter(nfields, linear_plot_data=None):
+    def _subfn_build_laps_multiplotter(nfields, linear_plot_data=None):
         linear_plotter_indicies = np.arange(nfields)
         fixed_columns = 2
         needed_rows = int(np.ceil(nfields / fixed_columns))
@@ -449,7 +448,7 @@ def plot_lap_trajectories_2d(sess, curr_num_subplots=5, active_page_index=0):
             
         return mp, axs, linear_plotter_indicies, row_column_indicies
     
-    def _add_specific_lap_trajectory(p, axs, linear_plotter_indicies, row_column_indicies, active_page_laps_ids, laps_position_traces, lap_time_ranges, use_time_gradient_line=True):
+    def _subfn_add_specific_lap_trajectory(p, axs, linear_plotter_indicies, row_column_indicies, active_page_laps_ids, laps_position_traces, lap_time_ranges, use_time_gradient_line=True):
         # Add the lap trajectory:                            
         for a_linear_index in linear_plotter_indicies:
             curr_lap_id = active_page_laps_ids[a_linear_index]
@@ -484,6 +483,8 @@ def plot_lap_trajectories_2d(sess, curr_num_subplots=5, active_page_index=0):
             axs[curr_row][curr_col].text(250, 126, curr_lap_label_text, horizontalalignment='right', size=12)
             # PhoWidgetHelper.perform_add_text(p[curr_row, curr_col], curr_lap_label_text, name='lblLapIdIndicator')
 
+    # BEGIN FUNCTION BODY ________________________________________________________________________________________________ #
+
     # Compute required data from session:
     curr_position_df, lap_specific_position_dfs = LapsVisualizationMixin._compute_laps_specific_position_dfs(sess)
     laps_position_traces_list = [lap_pos_df[['x','y']].to_numpy().T for lap_pos_df in lap_specific_position_dfs]
@@ -497,10 +498,10 @@ def plot_lap_trajectories_2d(sess, curr_num_subplots=5, active_page_index=0):
     all_maze_positions = curr_position_df[['x','y']].to_numpy().T # (2, 59308)
     # np.shape(all_maze_positions)
     all_maze_data = [all_maze_positions for i in  np.arange(curr_num_subplots)] # repeat the maze data for each subplot. (2, 593080)
-    p, axs, linear_plotter_indicies, row_column_indicies = _build_laps_multiplotter(curr_num_subplots, all_maze_data)
+    p, axs, linear_plotter_indicies, row_column_indicies = _subfn_build_laps_multiplotter(curr_num_subplots, all_maze_data)
     # generate the pages
-    laps_pages = [list(chunk) for chunk in _chunks(sess.laps.lap_id, curr_num_subplots)]
+    laps_pages = [list(chunk) for chunk in _subfn_chunks(sess.laps.lap_id, curr_num_subplots)]
     active_page_laps_ids = laps_pages[active_page_index]
-    _add_specific_lap_trajectory(p, axs, linear_plotter_indicies, row_column_indicies, active_page_laps_ids, lap_position_traces, lap_time_ranges, use_time_gradient_line=True)
+    _subfn_add_specific_lap_trajectory(p, axs, linear_plotter_indicies, row_column_indicies, active_page_laps_ids, lap_position_traces, lap_time_ranges, use_time_gradient_line=True)
     plt.ylim((125, 152))
     return p, axs, laps_pages

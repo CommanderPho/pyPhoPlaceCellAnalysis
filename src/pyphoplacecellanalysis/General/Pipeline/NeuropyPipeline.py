@@ -30,7 +30,7 @@ from neuropy.core.session.Formats.BaseDataSessionFormats import DataSessionForma
 from neuropy.core.session.KnownDataSessionTypeProperties import KnownDataSessionTypeProperties
 
 from pyphoplacecellanalysis.General.Pipeline.Stages.Computation import PipelineWithComputedPipelineStageMixin, ComputedPipelineStage
-from pyphoplacecellanalysis.General.Pipeline.Stages.Display import PipelineWithDisplayPipelineStageMixin
+from pyphoplacecellanalysis.General.Pipeline.Stages.Display import PipelineWithDisplayPipelineStageMixin, PipelineWithDisplaySavingMixin
 from pyphoplacecellanalysis.General.Pipeline.Stages.Filtering import FilteredPipelineMixin
 from pyphoplacecellanalysis.General.Pipeline.Stages.Loading import PipelineWithInputStage, PipelineWithLoadableStage, loadData, saveData
 from pyphoplacecellanalysis.General.Pipeline.Stages.BaseNeuropyPipelineStage import PipelineStage
@@ -39,7 +39,6 @@ from qtpy import QtCore, QtWidgets, QtGui
 
 # Pipeline Logging:
 import logging
-# from pyphoplacecellanalysis.General.Pipeline.Stages.BaseNeuropyPipelineStage import pipeline_module_logger
 from pyphocorehelpers.print_helpers import build_module_logger
 pipeline_module_logger = build_module_logger('Spike3D.pipeline')
 
@@ -84,7 +83,7 @@ class LoadedObjectPersistanceState(object):
 
     
 
-class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, FilteredPipelineMixin, PipelineWithComputedPipelineStageMixin, PipelineWithDisplayPipelineStageMixin, QtCore.QObject):
+class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, FilteredPipelineMixin, PipelineWithComputedPipelineStageMixin, PipelineWithDisplayPipelineStageMixin, PipelineWithDisplaySavingMixin, QtCore.QObject):
     """ 
     
     Exposes the active sessions via its .sess member.
@@ -128,6 +127,7 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
         self._persistance_state = None # indicate that this pipeline doesn't have a corresponding pickle file that it was loaded from
         
         self._plot_object = None
+        self._registered_output_files = None # for RegisteredOutputsMixin
 
         _stage_changed_connection = self.sigStageChanged.connect(self.on_stage_changed)
         self.set_input(name=name, session_data_type=session_data_type, basedir=basedir, load_function=load_function, post_load_functions=post_load_functions)
@@ -229,6 +229,17 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
                 # loading failed
                 print(f'Failure loading {finalized_loaded_sess_pickle_path}.')
                 loaded_pipeline = None
+            except EOFError:
+                # file corrupted.
+                print(f'Failure loading {finalized_loaded_sess_pickle_path}, the file is corrupted and incomplete (REACHED END OF FILE).')
+                print(f'\t deleting it and continuing. ')
+                finalized_loaded_sess_pickle_path.unlink() # .unlink() deletes a file
+                print(f"\t {finalized_loaded_sess_pickle_path} deleted.")
+                loaded_pipeline = None
+            except Exception as e:
+                raise e
+
+            
 
         else:
             # Otherwise force recompute:
@@ -532,6 +543,8 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
         del state['_logger']
         del state['_persistance_state']
         del state['_plot_object']
+        
+        del state['_registered_output_files']
         # del state['_pickle_path']
         return state
 
@@ -547,12 +560,14 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
 
         self._persistance_state = None # the pickle_path has to be set manually after loading
         self._plot_object = None
-
+        self._registered_output_files = None # for RegisteredOutputsMixin
+        
         _stage_changed_connection = self.sigStageChanged.connect(self.on_stage_changed)
          
         # Reload both the computation and display functions to get the updated values:
         self.reload_default_computation_functions()
         self.reload_default_display_functions()
+        self.clear_registered_output_files() # outputs are reset each load, should they be?
 
 
 
@@ -589,23 +604,24 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
 
             new_obj_memory_usage_MB = print_object_memory_usage(self, enable_print=False)
 
+            is_temporary_file_used:bool = False
             _desired_finalized_loaded_sess_pickle_path = None
             if finalized_loaded_sess_pickle_path.exists():
                 # file already exists:
                 if saving_mode.name == PipelineSavingScheme.TEMP_THEN_OVERWRITE.name:
                     ## Save under a temporary name in the same output directory, and then compare post-hoc
                     _desired_finalized_loaded_sess_pickle_path = finalized_loaded_sess_pickle_path
-                    finalized_loaded_sess_pickle_path, _ = build_unique_filename(finalized_loaded_sess_pickle_path)
+                    finalized_loaded_sess_pickle_path, _ = build_unique_filename(finalized_loaded_sess_pickle_path) # changes the final path to the temporary file created.
+                    is_temporary_file_used = True # this is the only condition where this is true
                 elif saving_mode.name == PipelineSavingScheme.OVERWRITE_IN_PLACE.name:
                     print(f'WARNING: saving_mode is OVERWRITE_IN_PLACE so {finalized_loaded_sess_pickle_path} will be overwritten even though exists.')
                     self.logger.warning(f'WARNING: saving_mode is OVERWRITE_IN_PLACE so {finalized_loaded_sess_pickle_path} will be overwritten even though exists.')
-
-
+                
             # Save reloaded pipeline out to pickle for future loading
             saveData(finalized_loaded_sess_pickle_path, db=self) # Save the pipeline out to pickle.
 
             # If we saved to a temporary name, now see if we should overwrite or backup and then replace:
-            if saving_mode.name == PipelineSavingScheme.TEMP_THEN_OVERWRITE.name:
+            if (is_temporary_file_used and (saving_mode.name == PipelineSavingScheme.TEMP_THEN_OVERWRITE.name)):
                 assert _desired_finalized_loaded_sess_pickle_path is not None
                 prev_extant_file_size_MB = print_filesystem_file_size(_desired_finalized_loaded_sess_pickle_path, enable_print=False)
                 new_temporary_file_size_MB = print_filesystem_file_size(finalized_loaded_sess_pickle_path, enable_print=False)

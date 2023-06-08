@@ -117,12 +117,13 @@ class PaginatedFigureBaseController:
 
     # Context and titles _________________________________________________________________________________________________ #
     def perform_update_titles_from_context(self, page_idx:int, included_page_data_indicies, **kwargs):
-        """ Tries to update ethe figure suptitle and the window title from the self.params.active_identifying_figure_ctx if it's set
+        """ Tries to update the figure suptitle and the window title from the self.params.active_identifying_figure_ctx if it's set
 
         Requires: `self.params.active_identifying_figure_ctx`, `self.paginator.num_pages`
         """
         if self.params.get('active_identifying_figure_ctx', None) is not None:
-            active_identifying_ctx = self.params.active_identifying_figure_ctx.adding_context(**kwargs, page=f'{page_idx+1}of{self.paginator.num_pages}', aclus=f"{included_page_data_indicies}")
+            collision_prefix = kwargs.pop('collision_prefix', '_DecodedEpochSlices_plot_test_')
+            active_identifying_ctx = self.params.active_identifying_figure_ctx.adding_context(collision_prefix, **kwargs, page=f'{page_idx+1}of{self.paginator.num_pages}', aclus=f"{included_page_data_indicies}")
             final_context = active_identifying_ctx # Display/Variable context mode
             active_identifying_ctx_string = final_context.get_description(separator='|') # Get final discription string
             print(f'active_identifying_ctx_string: "{active_identifying_ctx_string}"')
@@ -134,13 +135,14 @@ class PaginatedFigureBaseController:
 
         return active_identifying_ctx
 
+
     def update_titles(self, window_title: str, suptitle: str = None):
-        """ sets the titles for the figure """
+        """ sets the suptitle and window title for the figure """
         if suptitle is None:
             suptitle = window_title # same as window title
         # Set the window title:
         self.ui.mw.setWindowTitle(window_title)
-        self.ui.mw.fig.suptitle(suptitle) # set the plot suptitle
+        self.ui.mw.fig.suptitle(suptitle, wrap=True) # set the plot suptitle
         self.ui.mw.draw()
 
 
