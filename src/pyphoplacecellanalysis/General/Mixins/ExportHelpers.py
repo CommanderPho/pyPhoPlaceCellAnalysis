@@ -290,9 +290,9 @@ def extract_figures_from_display_function_output(out_display_var, out_fig_list:L
             else:
                 # otherwise just try and set the plots to the list
                 plots = out_display_var
-
         out_fig_list.extend(plots)
-        return out_fig_list
+        
+    return out_fig_list
     
 
 ## 2022-10-04 Modern Programmatic PDF outputs:
