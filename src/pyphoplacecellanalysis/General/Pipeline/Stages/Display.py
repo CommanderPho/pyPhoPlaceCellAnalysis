@@ -458,7 +458,14 @@ class PipelineWithDisplaySavingMixin:
 
 
 
+
     def write_figure_to_daily_programmatic_session_output_path(self, fig, display_context=None, debug_print=True):
+        """ Writes the provided figure to the daily_programmatic_session_output_path.
+            This function writes a figure to the daily programmatic session output path.
+            It imports the perform_write_to_file function from the ExportHelpers Mixin.
+            It then gets the daily programmatic session output path and the session context.
+            If a display context is provided, it combines the active identifying session context
+        """
         from pyphoplacecellanalysis.General.Mixins.ExportHelpers import perform_write_to_file
         
         active_session_figures_out_path = self.get_daily_programmatic_session_output_path()
