@@ -5,7 +5,9 @@ from pyphoplacecellanalysis.General.Mixins.ExportHelpers import get_default_pipe
 
 """ ExportPipelineParametersTree
 Usage:
+
     from pyphoplacecellanalysis.GUI.PyQtPlot.Params.ParameterTrees.ExportPipelineParametersTree import build_export_parameters_tree
+    from pyphoplacecellanalysis.External.pyqtgraph.parametertree.ParameterTree import ParameterTree
     
     ## Build the actual ParameterTree widget, the core GUI
     title = 'ExportParamsTest'

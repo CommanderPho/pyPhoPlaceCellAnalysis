@@ -543,6 +543,7 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
         del state['_logger']
         del state['_persistance_state']
         del state['_plot_object']
+        #TODO 2023-06-09 12:06: - [ ] What about the display objects?
         
         del state['_registered_output_files']
         # del state['_pickle_path']
