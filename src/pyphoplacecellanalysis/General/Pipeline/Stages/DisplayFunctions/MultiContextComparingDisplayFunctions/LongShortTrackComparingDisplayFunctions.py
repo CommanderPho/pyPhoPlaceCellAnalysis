@@ -62,7 +62,7 @@ class LongShortTrackComparingDisplayFunctions(AllFunctionEnumeratingMixin, metac
     """
 
     @function_attributes(short_name='jonathan_interactive_replay_firing_rate_comparison', tags=['display','interactive','jonathan', 'firing_rate', 'pyqtgraph'], input_requires=[], output_provides=[], uses=['_make_jonathan_interactive_plot'], used_by=[], creation_date='2023-04-11 03:14', is_global=True)
-    def _display_jonathan_interactive_replay_firing_rate_comparison(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_whitelist=None, included_neuron_types=None, require_placefield=True, **kwargs):
+    def _display_jonathan_interactive_replay_firing_rate_comparison(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_whitelist=None, included_neuron_types=None, require_placefield=True, save_figure=True, **kwargs):
             """ Jonathan's interactive display. Currently hacked up to directly compute the results to display within this function
                 Internally calls `_make_jonathan_interactive_plot(...)`
 
@@ -127,7 +127,7 @@ class LongShortTrackComparingDisplayFunctions(AllFunctionEnumeratingMixin, metac
             return graphics_output_dict
 
     @function_attributes(short_name='batch_pho_jonathan_interactive_replay_firing_rate_comparison', tags=['display','interactive','jonathan', 'firing_rate', 'matplotlib', 'batch'], input_requires=[], output_provides=[], uses=['_make_pho_jonathan_batch_plots'], used_by=[], creation_date='2023-04-11 03:14', is_global=True)
-    def _display_batch_pho_jonathan_replay_firing_rate_comparison(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_whitelist=None, **kwargs):
+    def _display_batch_pho_jonathan_replay_firing_rate_comparison(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_whitelist=None, defer_render=False, save_figure=True, **kwargs):
             """ Stacked Jonathan-style firing-rate-across-epochs-plot. Pho's batch adaptation of the primary elements from Jonathan's interactive display.
                 Usage:
 
@@ -197,24 +197,37 @@ class LongShortTrackComparingDisplayFunctions(AllFunctionEnumeratingMixin, metac
             show_inter_replay_frs = kwargs.pop('show_inter_replay_frs', True)
             included_unit_neuron_IDs = kwargs.pop('included_unit_neuron_IDs', None)
 
-            active_context = active_identifying_session_ctx.adding_context(collision_prefix='fn', fn_name='batch_pho_jonathan_interactive_replay_firing_rate_comparison')
+            active_context = active_identifying_session_ctx.adding_context(collision_prefix='display_fn', display_fn_name='batch_pho_jonathan_interactive_replay_firing_rate_comparison')
             curr_fig_num = kwargs.pop('fignum', None)
             if curr_fig_num is None:
                 ## Set the fig_num, if not already set:
                 curr_fig_num = f'long|short fr indicies_{active_context.get_description(separator="/")}'
             kwargs['fignum'] = curr_fig_num
 
-            graphics_output_dict = _make_pho_jonathan_batch_plots(t_split, time_bins, neuron_replay_stats_df, time_binned_unit_specific_binned_spike_rate, pf1D_all, aclu_to_idx, rdf, irdf,
-                show_inter_replay_frs=show_inter_replay_frs, n_max_plot_rows=n_max_plot_rows, included_unit_neuron_IDs=included_unit_neuron_IDs, cell_spikes_dfs_dict=cell_spikes_dfs_dict, time_variable_name=time_variable_name, **kwargs)
+            graphics_output_dict: MatplotlibRenderPlots = _make_pho_jonathan_batch_plots(t_split, time_bins, neuron_replay_stats_df, time_binned_unit_specific_binned_spike_rate, pf1D_all, aclu_to_idx, rdf, irdf,
+                show_inter_replay_frs=show_inter_replay_frs, n_max_plot_rows=n_max_plot_rows, included_unit_neuron_IDs=included_unit_neuron_IDs, cell_spikes_dfs_dict=cell_spikes_dfs_dict, time_variable_name=time_variable_name, defer_render=defer_render, **kwargs)
 
+            final_context = active_context
+            graphics_output_dict['context'] = final_context
+            graphics_output_dict['plot_data'] |= {'df': neuron_replay_stats_df, 'rdf':rdf, 'aclu_to_idx':aclu_to_idx, 'irdf':irdf, 'time_binned_unit_specific_spike_rate': global_computation_results.computed_data['jonathan_firing_rate_analysis']['time_binned_unit_specific_spike_rate'],
+                'time_variable_name':time_variable_name, 'fignum':curr_fig_num}
 
-            graphics_output_dict['plot_data'] = {'df': neuron_replay_stats_df, 'rdf':rdf, 'aclu_to_idx':aclu_to_idx, 'irdf':irdf, 'time_binned_unit_specific_spike_rate': global_computation_results.computed_data['jonathan_firing_rate_analysis']['time_binned_unit_specific_spike_rate'],
-                'time_variable_name':time_variable_name}
+            def _perform_write_to_file_callback(active_session_figures_out_path: Path = None):
+                ## 2023-05-31 - Reference Output of matplotlib figure to file, along with building appropriate context.
+                active_session_figures_out_path = active_session_figures_out_path or owning_pipeline_reference.get_daily_programmatic_session_output_path()
+                return perform_write_to_file(graphics_output_dict.figures[0], final_context, figures_parent_out_path=active_session_figures_out_path, register_output_file_fn=owning_pipeline_reference.register_output_file)
+            
+            if save_figure:
+                active_out_figure_paths = _perform_write_to_file_callback(kwargs.pop('fig_save_parent_path', None))
+            else:
+                active_out_figure_paths = []
 
+            graphics_output_dict['saved_figures'] = active_out_figure_paths
+            
             return graphics_output_dict
 
-    @function_attributes(short_name='short_long_pf1D_comparison', tags=['long_short','1D','placefield'], input_requires=[], output_provides=[], uses=['plot_short_v_long_pf1D_comparison'], used_by=[], creation_date='2023-04-26 06:12', is_global=True)
-    def _display_short_long_pf1D_comparison(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_whitelist=None, **kwargs):
+    @function_attributes(short_name='short_long_pf1D_comparison', tags=['long_short','1D','placefield'], conforms_to=['output_registering', 'figure_saving'], input_requires=[], output_provides=[], uses=['plot_short_v_long_pf1D_comparison'], used_by=[], creation_date='2023-04-26 06:12', is_global=True)
+    def _display_short_long_pf1D_comparison(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_whitelist=None, save_figure=True, **kwargs):
             """ Displays a figure for comparing the 1D placefields across-epochs (between the short and long tracks). By default renders the second track's placefield flipped over the x-axis and hatched. 
                 Usage:
 
@@ -258,13 +271,27 @@ class LongShortTrackComparingDisplayFunctions(AllFunctionEnumeratingMixin, metac
             (fig_long_pf_1D, ax_long_pf_1D, long_sort_ind, long_neurons_colors_array), (fig_short_pf_1D, ax_short_pf_1D, short_sort_ind, short_neurons_colors_array) = plot_short_v_long_pf1D_comparison(long_results, short_results, curr_any_context_neurons, reuse_axs_tuple=reuse_axs_tuple, single_figure=single_figure,
                 shared_kwargs=shared_kwargs, long_kwargs=long_kwargs, short_kwargs=short_kwargs, debug_print=debug_print)
 
-            graphics_output_dict = MatplotlibRenderPlots(name='display_short_long_pf1D_comparison', figures=(fig_long_pf_1D, fig_short_pf_1D), axes=(ax_long_pf_1D, ax_short_pf_1D), plot_data={})
+            final_context = owning_pipeline_reference.sess.get_context().adding_context('display_fn', display_fn_name='display_short_long_pf1D_comparison')
+    
+            def _perform_write_to_file_callback(active_session_figures_out_path: Path = None):
+                ## 2023-05-31 - Reference Output of matplotlib figure to file, along with building appropriate context.
+                active_session_figures_out_path = active_session_figures_out_path or owning_pipeline_reference.get_daily_programmatic_session_output_path()
+                return perform_write_to_file(fig, final_context, figures_parent_out_path=active_session_figures_out_path, register_output_file_fn=owning_pipeline_reference.register_output_file)
+            
+            if save_figure:
+                active_out_figure_paths = _perform_write_to_file_callback(kwargs.pop('fig_save_parent_path', None))
+            else:
+                active_out_figure_paths = []
+
+
+
+            graphics_output_dict = MatplotlibRenderPlots(name='display_short_long_pf1D_comparison', figures=(fig_long_pf_1D, fig_short_pf_1D), axes=(ax_long_pf_1D, ax_short_pf_1D), plot_data={}, context=final_context, saved_figures=active_out_figure_paths)
             graphics_output_dict['plot_data'] = {'sort_indicies': (long_sort_ind, short_sort_ind), 'colors':(long_neurons_colors_array, short_neurons_colors_array)}
 
             return graphics_output_dict
 
-    @function_attributes(short_name='short_long_pf1D_scalar_overlap_comparison', tags=['display','long_short'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-06-08 12:44', is_global=True)
-    def _display_short_long_pf1D_scalar_overlap_comparison(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_whitelist=None, **kwargs):
+    @function_attributes(short_name='short_long_pf1D_scalar_overlap_comparison', tags=['display','long_short'], conforms_to=['output_registering', 'figure_saving'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-06-08 12:44', is_global=True)
+    def _display_short_long_pf1D_scalar_overlap_comparison(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_whitelist=None, save_figure=True, **kwargs):
             """ Displays a figure for comparing the scalar comparison quantities computed for 1D placefields across-epochs (between the short and long tracks)
                 This currently renders as a bar-graph
 
@@ -302,7 +329,6 @@ class LongShortTrackComparingDisplayFunctions(AllFunctionEnumeratingMixin, metac
             if debug_print:
                 print(f'include_whitelist: {include_whitelist}\nlong_epoch_name: {long_epoch_name}, short_epoch_name: {short_epoch_name}, global_epoch_name: {global_epoch_name}')           
     
-
             short_long_pf_overlap_analyses_results = global_computation_results['computed_data']['short_long_pf_overlap_analyses']
             pf_neurons_diff = short_long_pf_overlap_analyses_results['short_long_neurons_diff'] # get shared neuron info:
             n_neurons = pf_neurons_diff.shared.n_neurons
@@ -327,13 +353,24 @@ class LongShortTrackComparingDisplayFunctions(AllFunctionEnumeratingMixin, metac
             else:
                 raise NotImplementedError
             
-            graphics_output_dict = MatplotlibRenderPlots(name='_display_short_long_pf1D_poly_overlap_comparison', figures=(fig), axes=(ax), plot_data={'colors': neurons_colors_array})
+            final_context = owning_pipeline_reference.sess.get_context().adding_context('display_fn', display_fn_name='display_short_long_pf1D_scalar_overlap_comparison')
+    
+            def _perform_write_to_file_callback(active_session_figures_out_path: Path = None):
+                ## 2023-05-31 - Reference Output of matplotlib figure to file, along with building appropriate context.
+                active_session_figures_out_path = active_session_figures_out_path or owning_pipeline_reference.get_daily_programmatic_session_output_path()
+                return perform_write_to_file(fig, final_context, figures_parent_out_path=active_session_figures_out_path, register_output_file_fn=owning_pipeline_reference.register_output_file)
+            
+            if save_figure:
+                active_out_figure_paths = _perform_write_to_file_callback(kwargs.pop('fig_save_parent_path', None))
+            else:
+                active_out_figure_paths = []
+            graphics_output_dict = MatplotlibRenderPlots(name='_display_short_long_pf1D_poly_overlap_comparison', figures=(fig), axes=(ax), plot_data={'colors': neurons_colors_array}, context=final_context, saved_figures=active_out_figure_paths)
             # graphics_output_dict['plot_data'] = {'sort_indicies': (long_sort_ind, short_sort_ind), 'colors':(long_neurons_colors_array, short_neurons_colors_array)}
 
             return graphics_output_dict
 
-    @function_attributes(short_name='short_long_firing_rate_index_comparison', tags=['display','long_short','short_long','firing_rate', 'fr_index'], input_requires=[], output_provides=[], uses=['_plot_long_short_firing_rate_indicies'], used_by=[], creation_date='2023-04-11 08:08', is_global=True)
-    def _display_short_long_firing_rate_index_comparison(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_whitelist=None, **kwargs):
+    @function_attributes(short_name='short_long_firing_rate_index_comparison', tags=['display','long_short','short_long','firing_rate', 'fr_index'], conforms_to=['output_registering', 'figure_saving'], input_requires=[], output_provides=[], uses=['_plot_long_short_firing_rate_indicies'], used_by=[], creation_date='2023-04-11 08:08', is_global=True)
+    def _display_short_long_firing_rate_index_comparison(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_whitelist=None, defer_render=False, save_figure=True, **kwargs):
             """ Displays a figure for comparing the 1D placefields across-epochs (between the short and long tracks)
                 Usage:
 
@@ -348,22 +385,36 @@ class LongShortTrackComparingDisplayFunctions(AllFunctionEnumeratingMixin, metac
                     curr_firing_rate_ax, curr_lap_spikes_ax, curr_placefield_ax = curr_axs_dict['firing_rate'], curr_axs_dict['lap_spikes'], curr_axs_dict['placefield'] # Extract variables from the `curr_axs_dict` dictionary to the local workspace
 
             """
-            fig_save_parent_path = kwargs.pop('fig_save_parent_path', Path(r'E:\Dropbox (Personal)\Active\Kamran Diba Lab\Results from 2023-01-20 - LongShort Firing Rate Indicies'))            
+            fig_save_parent_path = kwargs.pop('fig_save_parent_path', owning_pipeline_reference.get_daily_programmatic_session_output_path())            
             debug_print = kwargs.pop('debug_print', False)
 
             # Plot long|short firing rate index:
             long_short_fr_indicies_analysis_results = global_computation_results.computed_data['long_short_fr_indicies_analysis']
             x_frs_index, y_frs_index = long_short_fr_indicies_analysis_results['x_frs_index'], long_short_fr_indicies_analysis_results['y_frs_index'] # use the all_results_dict as the computed data value
             active_context = long_short_fr_indicies_analysis_results['active_context']
-            fig, _temp_full_fig_save_path = _plot_long_short_firing_rate_indicies(x_frs_index, y_frs_index, active_context, fig_save_parent_path=fig_save_parent_path, debug_print=debug_print)
-            owning_pipeline_reference.register_output_file(output_path=_temp_full_fig_save_path, output_metadata={'context': active_context, 'fig': (fig)}) 
-
-            graphics_output_dict = MatplotlibRenderPlots(name='display_short_long_firing_rate_index_comparison', figures=(fig), axes=tuple(fig.axes), plot_data={})
+            
+            final_context = active_context.adding_context('display_fn', display_fn_name='display_long_short_laps')
+            fig = _plot_long_short_firing_rate_indicies(x_frs_index, y_frs_index, final_context, debug_print=debug_print)
+            
+            if not defer_render:
+                fig.show()
+        
+            def _perform_write_to_file_callback(active_session_figures_out_path: Path = None):
+                ## 2023-05-31 - Reference Output of matplotlib figure to file, along with building appropriate context.
+                active_session_figures_out_path = active_session_figures_out_path or owning_pipeline_reference.get_daily_programmatic_session_output_path()
+                return perform_write_to_file(fig, final_context, figures_parent_out_path=active_session_figures_out_path, register_output_file_fn=owning_pipeline_reference.register_output_file)
+            
+            if save_figure:
+                active_out_figure_paths = _perform_write_to_file_callback(fig_save_parent_path)
+            else:
+                active_out_figure_paths = []
+                
+            graphics_output_dict = MatplotlibRenderPlots(name='display_short_long_firing_rate_index_comparison', figures=(fig), axes=tuple(fig.axes), plot_data={}, context=final_context, saved_figures=active_out_figure_paths)
             # graphics_output_dict['plot_data'] = {'sort_indicies': (long_sort_ind, short_sort_ind), 'colors':(long_neurons_colors_array, short_neurons_colors_array)}            
             return graphics_output_dict
 
-    @function_attributes(short_name=None, tags=['display', 'long_short', 'laps', 'position', 'behavior'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-05-29 18:20', related_items=[], is_global=True)
-    def _display_long_short_laps(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_whitelist=None, **kwargs):
+    @function_attributes(short_name=None, tags=['display', 'long_short', 'laps', 'position', 'behavior'], conforms_to=['output_registering', 'figure_saving'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-05-29 18:20', related_items=[], is_global=True)
+    def _display_long_short_laps(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_whitelist=None, save_figure=True, **kwargs):
             """ Displays a figure displaying the 1D laps detected for both the long and short tracks.
                 Usage:
 
@@ -382,11 +433,24 @@ class LongShortTrackComparingDisplayFunctions(AllFunctionEnumeratingMixin, metac
             fig, out_axes_list = plot_laps_2d(global_session, legacy_plotting_mode=False)
             out_axes_list[0].set_title('Estimated Laps')
             fig.canvas.manager.set_window_title('Estimated Laps')
-            graphics_output_dict = MatplotlibRenderPlots(name='_display_long_short_laps', figures=(fig,), axes=out_axes_list, plot_data={})
+
+            final_context = owning_pipeline_reference.sess.get_context().adding_context('display_fn', display_fn_name='display_long_short_laps')
+
+            def _perform_write_to_file_callback(active_session_figures_out_path: Path = None):
+                ## 2023-05-31 - Reference Output of matplotlib figure to file, along with building appropriate context.
+                active_session_figures_out_path = active_session_figures_out_path or owning_pipeline_reference.get_daily_programmatic_session_output_path()
+                return perform_write_to_file(fig, final_context, figures_parent_out_path=active_session_figures_out_path, register_output_file_fn=owning_pipeline_reference.register_output_file)
+            
+            if save_figure:
+                active_out_figure_paths = _perform_write_to_file_callback()
+            else:
+                active_out_figure_paths = []
+                            
+            graphics_output_dict = MatplotlibRenderPlots(name='_display_long_short_laps', figures=(fig,), axes=out_axes_list, plot_data={}, saved_figures=active_out_figure_paths)
             return graphics_output_dict
 
     @function_attributes(short_name='long_and_short_firing_rate_replays_v_laps', tags=['display','long_short','firing_rate'], conforms_to=['output_registering', 'figure_saving'], input_requires=[], output_provides=[], uses=['_plot_session_long_short_track_firing_rate_figures'], used_by=[], creation_date='2023-06-08 10:22', is_global=True)
-    def _display_long_and_short_firing_rate_replays_v_laps(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_whitelist=None, **kwargs):
+    def _display_long_and_short_firing_rate_replays_v_laps(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_whitelist=None, save_figure=True, **kwargs):
         """ Displays two figures, one for the long and one for the short track, that compare the firing rates during running (laps) and those during decoded replays.
             Usage:
             
@@ -397,13 +461,18 @@ class LongShortTrackComparingDisplayFunctions(AllFunctionEnumeratingMixin, metac
         from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.LongShortTrackComputations import JonathanFiringRateAnalysisResult
 
         jonathan_firing_rate_analysis_result = JonathanFiringRateAnalysisResult(**global_computation_results.computed_data.jonathan_firing_rate_analysis.to_dict())
-        (fig_L, ax_L, active_display_context_L), (fig_S, ax_S, active_display_context_S) = _plot_session_long_short_track_firing_rate_figures(owning_pipeline_reference, jonathan_firing_rate_analysis_result, figures_parent_out_path=None)
+        (fig_L, ax_L, active_display_context_L), (fig_S, ax_S, active_display_context_S), _perform_write_to_file_callback = _plot_session_long_short_track_firing_rate_figures(owning_pipeline_reference, jonathan_firing_rate_analysis_result, figures_parent_out_path=None)
+        
+        if save_figure:
+            active_out_figure_paths = _perform_write_to_file_callback()
+        else:
+            active_out_figure_paths = []
 
-        graphics_output_dict = MatplotlibRenderPlots(name='long_and_short_firing_rate_replays_v_laps', figures=(fig_L, fig_S), axes=(ax_L, ax_S), plot_data={'context': (active_display_context_L, active_display_context_S)})
+        graphics_output_dict = MatplotlibRenderPlots(name='long_and_short_firing_rate_replays_v_laps', figures=(fig_L, fig_S), axes=(ax_L, ax_S), plot_data={'context': (active_display_context_L, active_display_context_S)}, saved_figures=active_out_figure_paths)
         return graphics_output_dict
 
     @function_attributes(short_name='running_and_replay_speeds_over_time', tags=['speed', 'laps', 'replay', 'velocity', 'time', 'running', 'fit'], conforms_to=['output_registering', 'figure_saving'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-06-07 21:13', related_items=[], is_global=True)
-    def _display_running_and_replay_speeds_over_time(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_whitelist=None, **kwargs):
+    def _display_running_and_replay_speeds_over_time(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_whitelist=None, save_figure=True, **kwargs):
         """ plots the animal's running speed and the decoded replay velocities (as computed by the Radon transform method) across the recording session. 
         Renders a vertical stack of two subplots.
         
@@ -491,17 +560,24 @@ class LongShortTrackComparingDisplayFunctions(AllFunctionEnumeratingMixin, metac
         
         # output approach copied from `_display_long_short_laps`
         fig.canvas.manager.set_window_title('Running vs. Replay Speeds over time')
-        
-        ## 2023-05-31 - Reference Output of matplotlib figure to file, along with building appropriate context.
-        active_session_figures_out_path = owning_pipeline_reference.get_daily_programmatic_session_output_path()
         final_context = owning_pipeline_reference.sess.get_context().adding_context('display_fn', display_fn_name='running_and_replay_speeds_over_time')
-        print(f'final_context: {final_context}')
-        active_out_figure_paths = perform_write_to_file(fig, final_context, figures_parent_out_path=active_session_figures_out_path, register_output_file_fn=owning_pipeline_reference.register_output_file)
+
+
+        def _perform_write_to_file_callback(active_session_figures_out_path: Path = None):
+            ## 2023-05-31 - Reference Output of matplotlib figure to file, along with building appropriate context.
+            active_session_figures_out_path = active_session_figures_out_path or owning_pipeline_reference.get_daily_programmatic_session_output_path()
+            return perform_write_to_file(fig, final_context, figures_parent_out_path=active_session_figures_out_path, register_output_file_fn=owning_pipeline_reference.register_output_file)
+        
+        if save_figure:
+            active_out_figure_paths = _perform_write_to_file_callback()
+        else:
+            active_out_figure_paths = []
+            
         graphics_output_dict = MatplotlibRenderPlots(name='_display_running_and_replay_speeds_over_time', figures=(fig,), axes=[ax1, ax2], plot_data=plot_data_dict, context=final_context, saved_figures=active_out_figure_paths)
         return graphics_output_dict
     
     @function_attributes(short_name='long_short_expected_v_observed_firing_rate', tags=['display','long_short','firing_rate', 'expected','observed'], conforms_to=['output_registering', 'figure_saving'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-06-08 10:48', is_global=True)
-    def _display_long_short_expected_v_observed_firing_rate(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_whitelist=None, defer_render=False, **kwargs):
+    def _display_long_short_expected_v_observed_firing_rate(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_whitelist=None, defer_render=False, save_figure=True, **kwargs):
         """ Displays expected v observed firing rate for each cell independently
 
         """
@@ -592,11 +668,13 @@ class LongShortTrackComparingDisplayFunctions(AllFunctionEnumeratingMixin, metac
             if not defer_render:
                 plt.show()
 
-            ## 2023-05-31 - Reference Output of matplotlib figure to file, along with building appropriate context.
-            active_session_figures_out_path = curr_active_pipeline.get_daily_programmatic_session_output_path()
-            final_context = curr_active_pipeline.sess.get_context().adding_context('display_fn', display_fn_name='plot_expected_vs_observed').adding_context('display_kwargs', **display_kwargs)
-            print(f'final_context: {final_context}')
-            active_out_figure_paths = perform_write_to_file(fig, final_context, figures_parent_out_path=active_session_figures_out_path, register_output_file_fn=curr_active_pipeline.register_output_file)
+            if save_figure:
+                ## 2023-05-31 - Reference Output of matplotlib figure to file, along with building appropriate context.
+                active_session_figures_out_path = curr_active_pipeline.get_daily_programmatic_session_output_path()
+                final_context = curr_active_pipeline.sess.get_context().adding_context('display_fn', display_fn_name='plot_expected_vs_observed').adding_context('display_kwargs', **display_kwargs)
+                active_out_figure_paths = perform_write_to_file(fig, final_context, figures_parent_out_path=active_session_figures_out_path, register_output_file_fn=curr_active_pipeline.register_output_file)
+            else:
+                active_out_figure_paths = []
 
             return fig, axes, final_context, active_out_figure_paths
 
@@ -606,7 +684,7 @@ class LongShortTrackComparingDisplayFunctions(AllFunctionEnumeratingMixin, metac
         graphics_output_dict = MatplotlibRenderPlots(name='long_short_expected_v_observed_firing_rate', figures=(fig,), axes=(axes,), plot_data={'context': final_context, 'path': active_out_figure_paths})
         return graphics_output_dict
 
-    @function_attributes(short_name=None, tags=['long_short_stacked_epoch_slices'], input_requires=[], output_provides=[], uses=['plot_decoded_epoch_slices_paginated'], used_by=[], creation_date='2023-06-02 14:12', is_global=True)
+    @function_attributes(short_name=None, tags=['long_short_stacked_epoch_slices'], conforms_to=['output_registering', 'figure_saving'], input_requires=[], output_provides=[], uses=['plot_decoded_epoch_slices_paginated'], used_by=[], creation_date='2023-06-02 14:12', is_global=True)
     def _display_long_and_short_stacked_epoch_slices(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_whitelist=None, defer_render=False, save_figure=True, **kwargs):
         """ Plots two figures showing the entire stack of decoded epochs for both the long and short, including their Radon transformed lines if that information is available.
 
@@ -1128,7 +1206,7 @@ def _plot_pho_jonathan_batch_plot_single_cell(t_split, time_bins, unit_specific_
 
 
 @function_attributes(short_name='_make_pho_jonathan_batch_plots', tags=['private', 'matplotlib'], input_requires=[], output_provides=[], uses=['_plot_pho_jonathan_batch_plot_single_cell', 'build_replays_custom_scatter_markers', '_build_neuron_type_distribution_color'], used_by=[], creation_date='2023-04-11 08:06')
-def _make_pho_jonathan_batch_plots(t_split, time_bins, neuron_replay_stats_df, unit_specific_time_binned_firing_rates, pf1D_all, aclu_to_idx, rdf, irdf, show_inter_replay_frs=False, included_unit_neuron_IDs=None, marker_split_mode=CustomScatterMarkerMode.TriSplit, n_max_plot_rows:int=4, debug_print=False, **kwargs):
+def _make_pho_jonathan_batch_plots(t_split, time_bins, neuron_replay_stats_df, unit_specific_time_binned_firing_rates, pf1D_all, aclu_to_idx, rdf, irdf, show_inter_replay_frs=False, included_unit_neuron_IDs=None, marker_split_mode=CustomScatterMarkerMode.TriSplit, n_max_plot_rows:int=4, debug_print=False, defer_render=False, **kwargs) -> MatplotlibRenderPlots:
     """ Stacked Jonathan-style firing-rate-across-epochs-plot
     Internally calls `_plot_pho_jonathan_batch_plot_single_cell`
         n_max_plot_rows: the maximum number of rows to plot
@@ -1191,7 +1269,7 @@ def _make_pho_jonathan_batch_plots(t_split, time_bins, neuron_replay_stats_df, u
             print(f"selected neuron has index: {i} aclu: {aclu}")
         
         try:
-            curr_fig = subfigs[i] 
+            curr_fig = subfigs[i] # TypeError: 'SubFigure' object is not subscriptable
         except TypeError as e:
             # TypeError: 'SubFigure' object is not subscriptable ->  # single subfigure, not subscriptable
             curr_fig = subfigs
@@ -1207,8 +1285,11 @@ def _make_pho_jonathan_batch_plots(t_split, time_bins, neuron_replay_stats_df, u
     if isinstance(subfigs, FigureBase):
         subfigs = [subfigs] # wrap it to be a single item list
 
-    graphics_output_dict = {'fig': fig, 'subfigs': subfigs, 'axs': axs_list, 'colors': colors}
-    fig.show()
+    # graphics_output_dict = {'fig': fig, 'subfigs': subfigs, 'axs': axs_list, 'colors': colors}
+    graphics_output_dict = MatplotlibRenderPlots(name='make_pho_jonathan_batch_plots', figures=(fig,), subfigs=subfigs, axes=axs_list, plot_data={'colors': colors})
+
+    if not defer_render:
+        fig.show()
     return graphics_output_dict
 
 
@@ -1383,7 +1464,7 @@ def plot_short_v_long_pf1D_scalar_overlap_comparison(overlap_scalars_df, pf_neur
 
 
 @function_attributes(short_name='long_short_fr_indicies', tags=['private', 'long_short', 'long_short_firing_rate', 'firing_rate', 'display', 'matplotlib'], input_requires=[], output_provides=[], uses=[], used_by=['_display_short_long_firing_rate_index_comparison'], creation_date='2023-03-28 14:20')
-def _plot_long_short_firing_rate_indicies(x_frs_index, y_frs_index, active_context, fig_save_parent_path=None, neurons_colors=None, debug_print=False, is_centered = False):
+def _plot_long_short_firing_rate_indicies(x_frs_index, y_frs_index, active_context, neurons_colors=None, debug_print=False, is_centered = False):
     """ Plot long|short firing rate index 
     Each datapoint is a neuron.
 
@@ -1455,23 +1536,7 @@ def _plot_long_short_firing_rate_indicies(x_frs_index, y_frs_index, active_conte
     # # Call the function above. All the magic happens there.
     # add_value_labels(ax, labels=x_labels) # 
 
-    temp_fig_filename = f'{active_context.get_description()}.png'
-    if debug_print:
-        print(f'temp_fig_filename: {temp_fig_filename}')
-    if fig_save_parent_path is None:
-        fig_save_parent_path = Path.cwd()
-
-    _temp_full_fig_save_path = fig_save_parent_path.joinpath(temp_fig_filename)
-
-    with ProgressMessagePrinter(_temp_full_fig_save_path, 'Saving', 'plot_long_short_firing_rate_indicies results'):
-        fig.savefig(fname=_temp_full_fig_save_path, transparent=True)
-        
-    ## TODO 2023-05-25: replace this with `_generalized_persist_out_single_figure`
-    # _generalized_persist_out_single_figure(curr_active_pipeline, fig_L, active_display_context_L, figures_parent_out_path=figures_parent_out_path)
-    
-    fig.show()
-
-    return fig, _temp_full_fig_save_path
+    return fig
     # return MatplotlibRenderPlots(name='', figures=(fig), axes=(ax))
 
 
@@ -2119,14 +2184,15 @@ def _plot_session_long_short_track_firing_rate_figures(curr_active_pipeline, jon
     ## Fit both the axes:
     fit_both_axes(ax_L, ax_S)
 
-    ## 2023-05-31 - Reference Output of matplotlib figure to file, along with building appropriate context.
-    active_session_figures_out_path = curr_active_pipeline.get_daily_programmatic_session_output_path()
+    def _perform_write_to_file_callback(active_session_figures_out_path: Path = None):
+        ## 2023-05-31 - Reference Output of matplotlib figure to file, along with building appropriate context.
+        active_session_figures_out_path = active_session_figures_out_path or curr_active_pipeline.get_daily_programmatic_session_output_path()
+        
+        # could output to `figures_parent_out_path` or `active_session_figures_out_path`
+        active_out_figure_paths_L = perform_write_to_file(fig_L, active_display_context_L, figures_parent_out_path=active_session_figures_out_path, register_output_file_fn=curr_active_pipeline.register_output_file)
+        active_out_figure_paths_S = perform_write_to_file(fig_S, active_display_context_S, figures_parent_out_path=active_session_figures_out_path, register_output_file_fn=curr_active_pipeline.register_output_file)
     
-    # could output to `figures_parent_out_path` or `active_session_figures_out_path`
-    active_out_figure_paths_L = perform_write_to_file(fig_L, active_display_context_L, figures_parent_out_path=active_session_figures_out_path, register_output_file_fn=curr_active_pipeline.register_output_file)
-    active_out_figure_paths_S = perform_write_to_file(fig_S, active_display_context_S, figures_parent_out_path=active_session_figures_out_path, register_output_file_fn=curr_active_pipeline.register_output_file)
-    
-    return (fig_L, ax_L, active_display_context_L), (fig_S, ax_S, active_display_context_S)
+    return (fig_L, ax_L, active_display_context_L), (fig_S, ax_S, active_display_context_S), _perform_write_to_file_callback
 
 
 
