@@ -592,6 +592,33 @@ class BatchPhoJonathanFiguresHelper(object):
         return active_out_figures_list
 
 
+
+def batch_perform_all_plots(curr_active_pipeline, enable_neptune=True):
+    """ 2023-05-25 - Performs all the batch plotting commands. """
+    from pyphoplacecellanalysis.General.Batch.NeptuneAiHelpers import set_environment_variables, neptune_output_figures
+    
+    curr_active_pipeline.reload_default_display_functions()
+    try:
+        active_identifying_session_ctx, active_session_figures_out_path, active_out_figures_list = batch_programmatic_figures(curr_active_pipeline)
+    except Exception as e:
+        print(f'in `_perform_plots(...)`: batch_programmatic_figures(...) failed with exception: {e}. Continuing.')
+    
+    try:
+        batch_extended_programmatic_figures(curr_active_pipeline=curr_active_pipeline)
+    except Exception as e:
+        print(f'in `_perform_plots(...)`: batch_extended_programmatic_figures(...) failed with exception: {e}. Continuing.')
+    
+    if enable_neptune:
+        try:
+            neptune_output_figures(curr_active_pipeline)
+        except Exception as e:
+            print(f'in `_perform_plots(...)`: neptune_output_figures(...) failed with exception: {e}. Continuing.')
+    
+
+
+
+
+
 # ==================================================================================================================== #
 # 2023-05-25 - Pipeline Preprocessing Parameter Saving                                                                 #
 # ==================================================================================================================== #
