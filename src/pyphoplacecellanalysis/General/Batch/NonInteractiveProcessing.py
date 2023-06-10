@@ -596,10 +596,12 @@ class BatchPhoJonathanFiguresHelper(object):
 # ==================================================================================================================== #
 # Main Public Plot Function                                                                                            #
 # ==================================================================================================================== #
-def batch_perform_all_plots(curr_active_pipeline, enable_neptune=True):
+def batch_perform_all_plots(curr_active_pipeline, enable_neptune=True, neptuner=None):
     """ 2023-05-25 - Performs all the batch plotting commands. """
-    from pyphoplacecellanalysis.General.Batch.NeptuneAiHelpers import set_environment_variables, neptune_output_figures
-    
+    from pyphoplacecellanalysis.General.Batch.NeptuneAiHelpers import set_environment_variables, Neptuner
+    if neptuner is None:
+        neptuner = Neptuner.init_with_pipeline(curr_active_pipeline)
+        
     curr_active_pipeline.reload_default_display_functions()
     try:
         active_identifying_session_ctx, active_session_figures_out_path, active_out_figures_list = batch_programmatic_figures(curr_active_pipeline)
@@ -613,9 +615,15 @@ def batch_perform_all_plots(curr_active_pipeline, enable_neptune=True):
     
     if enable_neptune:
         try:
-            neptune_output_figures(curr_active_pipeline)
+            succeeded_fig_paths, failed_fig_paths = neptuner.upload_figures(curr_active_pipeline)
+            # neptune_output_figures(curr_active_pipeline)
         except Exception as e:
             print(f'in `_perform_plots(...)`: neptune_output_figures(...) failed with exception: {e}. Continuing.')
+        finally:
+            neptuner.stop()
+        neptuner.stop()
+        
+    return neptuner
     
 
 
