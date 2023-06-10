@@ -592,7 +592,9 @@ class BatchPhoJonathanFiguresHelper(object):
         return active_out_figures_list
 
 
-
+# ==================================================================================================================== #
+# Main Public Plot Function                                                                                            #
+# ==================================================================================================================== #
 def batch_perform_all_plots(curr_active_pipeline, enable_neptune=True):
     """ 2023-05-25 - Performs all the batch plotting commands. """
     from pyphoplacecellanalysis.General.Batch.NeptuneAiHelpers import set_environment_variables, neptune_output_figures
