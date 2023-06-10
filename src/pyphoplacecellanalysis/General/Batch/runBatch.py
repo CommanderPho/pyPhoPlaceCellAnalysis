@@ -1,6 +1,5 @@
 import sys
 import os
-import neptune # for logging progress and results
 import pathlib
 from pathlib import Path
 import numpy as np
@@ -18,7 +17,7 @@ from pyphocorehelpers.function_helpers import function_attributes
 from neuropy.utils.result_context import IdentifyingContext
 from neuropy.core.session.Formats.BaseDataSessionFormats import find_local_session_paths
 
-from pyphoplacecellanalysis.General.Batch.NonInteractiveWrapper import batch_load_session, batch_extended_computations, SessionBatchProgress, batch_programmatic_figures, batch_extended_programmatic_figures
+from pyphoplacecellanalysis.General.Batch.NonInteractiveProcessing import batch_load_session, batch_extended_computations, SessionBatchProgress, batch_programmatic_figures, batch_extended_programmatic_figures
 from pyphoplacecellanalysis.General.Pipeline.NeuropyPipeline import PipelineSavingScheme
 from pyphoplacecellanalysis.General.Pipeline.Stages.Loading import saveData, loadData
 
@@ -144,7 +143,7 @@ class BatchRun:
 
     def execute_all(self, **kwargs):
         for curr_session_context, curr_session_status in self.session_batch_status.items():
-            with neptune.init_run() as run:
+            with neptune.init_run() as run: #TODO 2023-06-09 11:37: - [ ] refactor neptune
                 run[f"session/{curr_session_context}"] = curr_session_status
                 self.execute_session(curr_session_context, **kwargs) # evaluate a single session
 

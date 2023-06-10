@@ -25,11 +25,14 @@ class ComputationResult(DynamicParameters):
     computation_config: Optional[DynamicParameters]
     computed_data: Optional[DynamicParameters]
     accumulated_errors: Optional[DynamicParameters]
+    computation_times: Optional[DynamicParameters]
 
-    def __init__(self, sess: DataSession, computation_config: DynamicParameters, computed_data: DynamicParameters, accumulated_errors: Optional[DynamicParameters]=None):
+    def __init__(self, sess: DataSession, computation_config: DynamicParameters, computed_data: DynamicParameters, accumulated_errors: Optional[DynamicParameters]=None, computation_times: Optional[DynamicParameters]=None):
         if accumulated_errors is None:
             accumulated_errors = DynamicParameters()
-        super(ComputationResult, self).__init__(sess=sess, computation_config=computation_config, computed_data=computed_data, accumulated_errors=accumulated_errors)
+        if computation_times is None:
+            computation_times = DynamicParameters()
+        super(ComputationResult, self).__init__(sess=sess, computation_config=computation_config, computed_data=computed_data, accumulated_errors=accumulated_errors, computation_times=computation_times)
 
 
 
