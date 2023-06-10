@@ -67,6 +67,7 @@ filters should be checkable to express whether we want to build that one or not
 
 @define(repr=None, slots=False)
 class SpecificComputationValidator:
+    """ This encapsulates the logic for testing if a computation already complete or needs to be completed, and calling the compute function if needed. """
     short_name:str # 'long_short_post_decoding'
     computation_fn_name:str # '_perform_long_short_post_decoding_analysis'
     validate_computation_test:Callable
