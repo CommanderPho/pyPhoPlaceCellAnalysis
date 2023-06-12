@@ -596,6 +596,7 @@ class BatchPhoJonathanFiguresHelper(object):
 # ==================================================================================================================== #
 # Main Public Plot Function                                                                                            #
 # ==================================================================================================================== #
+@function_attributes(short_name=None, tags=['active', 'batch', 'public'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-06-12 14:23', related_items=[])
 def batch_perform_all_plots(curr_active_pipeline, enable_neptune=True, neptuner=None):
     """ 2023-05-25 - Performs all the batch plotting commands. 
     

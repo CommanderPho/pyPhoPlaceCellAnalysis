@@ -143,9 +143,9 @@ class BatchRun:
 
     def execute_all(self, **kwargs):
         for curr_session_context, curr_session_status in self.session_batch_status.items():
-            with neptune.init_run() as run: #TODO 2023-06-09 11:37: - [ ] refactor neptune
-                run[f"session/{curr_session_context}"] = curr_session_status
-                self.execute_session(curr_session_context, **kwargs) # evaluate a single session
+            # with neptune.init_run() as run: #TODO 2023-06-09 11:37: - [ ] refactor neptune
+            #     run[f"session/{curr_session_context}"] = curr_session_status
+            self.execute_session(curr_session_context, **kwargs) # evaluate a single session
 
 
     # Updating ___________________________________________________________________________________________________________ #

@@ -791,8 +791,6 @@ def plot_spike_count_and_firing_rate_normalizations(pho_custom_decoder, axs=None
 # from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import plot_most_likely_position_comparsions, plot_1D_most_likely_position_comparsions
 
 
-
-
 # ==================================================================================================================== #
 # Menu Commands                                                                                                        #
 # ==================================================================================================================== #
@@ -822,7 +820,6 @@ class CreateNewStackedDecodedEpochSlicesPlotCommand(BaseMenuCommand):
         self._display_output[_out_display_key] = _out_plot_tuple
         
 
-
 class AddNewDecodedPosition_MatplotlibPlotCommand(BaseMenuCommand):
     """ analagous to CreateNewDataExplorer_ipspikes_PlotterCommand, holds references to the variables needed to perform the entire action (such as the reference to the decoder) which aren't accessible during the building of the menus. """
     def __init__(self, spike_raster_window, curr_active_pipeline, active_config_name, display_output={}) -> None:
@@ -847,11 +844,9 @@ class AddNewDecodedPosition_MatplotlibPlotCommand(BaseMenuCommand):
         active_2d_plot.sync_matplotlib_render_plot_widget('MenuCommand_display_plot_marginal_1D_most_likely_position_comparisons') # Sync it with the active window:
         # print(f'\t AddNewDecodedPosition_MatplotlibPlotCommand.execute() is done.')
         
-        
 # ==================================================================================================================== #
 # Potentially Unused                                                                                                   #
 # ==================================================================================================================== #
-
         
 def _temp_debug_two_step_plots(active_one_step_decoder, active_two_step_decoder, variable_name='all_scaling_factors_k', override_variable_value=None):
     """ Handles plots using the plot command """
@@ -872,7 +867,6 @@ def _temp_debug_two_step_plots(active_one_step_decoder, active_two_step_decoder,
     plt.xlabel('time window')
     plt.ylabel(variable_name)
     plt.title(f'debug_two_step: variable_name={variable_name}')
-    
     
 def _temp_debug_two_step_plots_imshow(active_one_step_decoder, active_two_step_decoder, variable_name='p_x_given_n_and_x_prev', override_variable_value=None, timewindow: int=None):
     if override_variable_value is None:
@@ -909,8 +903,6 @@ def _temp_debug_two_step_plots_imshow(active_one_step_decoder, active_two_step_d
     plt.title(f'debug_two_step: {variable_name}')
     # return im_out
 
-    
-    
 # ==================================================================================================================== #
 # Functions for drawing the decoded position and the animal position as a callback                                     #
 # ==================================================================================================================== #
@@ -946,8 +938,6 @@ def _temp_debug_draw_predicted_position_difference(predicted_positions, measured
     fig.legend((predicted_line, measured_line), ('Predicted', 'Measured'), 'upper right')
     return {'ax':ax, 'predicted_line':predicted_line, 'measured_line':measured_line, 'active_arrow':active_arrow}
     # update function:
-    
-    
     
 def _temp_debug_draw_update_predicted_position_difference(predicted_positions, measured_positions, time_window, ax=None, predicted_line=None, measured_line=None, active_arrow=None):
     assert measured_line is not None, "measured_line is required!"

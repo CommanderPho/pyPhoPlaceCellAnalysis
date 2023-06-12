@@ -346,6 +346,9 @@ def programmatic_display_to_PDF(curr_active_pipeline, curr_display_function_name
                 if debug_print:
                     print(f'active_pdf_save_path: {active_pdf_save_path}\nactive_pdf_metadata: {active_pdf_metadata}')
                     print(f'active_display_fn_kwargs: {active_display_fn_kwargs}')
+                    
+
+                # All display is done here:
                 out_display_var = curr_active_pipeline.display(curr_display_function_name, a_filtered_context, **active_display_fn_kwargs) # , filter_epochs='ripple', debug_test_max_num_slices=128
                 # , fignum=active_identifying_ctx_string, **figure_format_config
     
