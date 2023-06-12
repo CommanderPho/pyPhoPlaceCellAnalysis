@@ -6,7 +6,10 @@ import numpy as np
 
 from neuropy.core.neuron_identities import NeuronIdentity, build_units_colormap, PlotStringBrevityModeEnum
 from neuropy.utils.result_context import IdentifyingContext
+
 from pyphocorehelpers.DataStructure.dynamic_parameters import DynamicParameters # to replace simple PlacefieldComputationParameters
+from pyphocorehelpers.programming_helpers import metadata_attributes
+from pyphocorehelpers.function_helpers import function_attributes
 
 from pyphoplacecellanalysis.General.Pipeline.Stages.Computation import ComputedPipelineStage
 from pyphoplacecellanalysis.General.Pipeline.Stages.BaseNeuropyPipelineStage import PipelineStage
@@ -21,6 +24,9 @@ from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.Interactive
 from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.FiringStatisticsDisplayFunctions import FiringStatisticsDisplayFunctions
 from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.MultiContextComparingDisplayFunctions.MultiContextComparingDisplayFunctions import MultiContextComparingDisplayFunctions
 from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.MultiContextComparingDisplayFunctions.LongShortTrackComparingDisplayFunctions import LongShortTrackComparingDisplayFunctions
+
+
+
 
 class Plot:
     """a member dot accessor for display functions.
@@ -453,6 +459,7 @@ class PipelineWithDisplaySavingMixin:
         return active_identifying_session_ctx.merging_context('display_', display_subcontext)
     
 
+    
     def build_display_context_for_filtered_session(self, filtered_session_name:str, display_fn_name:str, **kwargs) -> "IdentifyingContext":
         """ builds a new display context for a filtered session out of kwargs 
         Usage:
@@ -465,7 +472,7 @@ class PipelineWithDisplaySavingMixin:
 
 
 
-
+    @function_attributes(short_name=None, tags=['save','figure'], input_requires=[], output_provides=[], uses=['perform_write_to_file'], used_by=[], creation_date='2023-06-12 15:07', related_items=[])
     def write_figure_to_daily_programmatic_session_output_path(self, fig, display_context=None, override_figures_parent_out_path=None, debug_print=True):
         """ Writes the provided figure to the daily_programmatic_session_output_path.
             This function writes a figure to the daily programmatic session output path.
@@ -473,7 +480,6 @@ class PipelineWithDisplaySavingMixin:
             It then gets the daily programmatic session output path and the session context.
             If a display context is provided, it combines the active identifying session context
         """
-        from pyphoplacecellanalysis.General.Mixins.ExportHelpers import perform_write_to_file
         if override_figures_parent_out_path is not None:
             active_figures_out_path = override_figures_parent_out_path
         else:
@@ -481,6 +487,7 @@ class PipelineWithDisplaySavingMixin:
         return self.write_figure_to_output_path(fig, figures_parent_out_path=active_figures_out_path, display_context=display_context, debug_print=debug_print)
     
 
+    @function_attributes(short_name=None, tags=['save','figure'], input_requires=[], output_provides=[], uses=['perform_write_to_file'], used_by=[], creation_date='2023-06-12 15:07', related_items=[])
     def write_figure_to_output_path(self, fig, figures_parent_out_path, display_context=None, debug_print=True):
         """ Writes the provided figure to the figures_parent_out_path. """
         from pyphoplacecellanalysis.General.Mixins.ExportHelpers import perform_write_to_file

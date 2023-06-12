@@ -296,7 +296,7 @@ def extract_figures_from_display_function_output(out_display_var, out_fig_list:L
     
 
 ## 2022-10-04 Modern Programmatic PDF outputs:
-@function_attributes(short_name=None, tags=['PDF', 'export', 'output', 'matplotlib', 'display', 'file', 'active'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2022-10-04 00:00', related_items=[])
+@function_attributes(short_name=None, tags=['Depricating', 'PDF', 'export', 'output', 'matplotlib', 'display', 'file', 'active'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2022-10-04 00:00', related_items=[])
 def programmatic_display_to_PDF(curr_active_pipeline, curr_display_function_name='_display_plot_decoded_epoch_slices', subset_whitelist=None, subset_blacklist=None,  debug_print=False, **kwargs):
     """
     2022-10-04 Modern Programmatic PDF outputs
