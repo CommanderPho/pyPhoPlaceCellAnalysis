@@ -464,27 +464,28 @@ def perform_write_to_file(a_fig, active_identifying_ctx, figures_parent_out_path
         register_output_file_fn: Callable[output_path:Path, output_metadata:dict] - function called to register outputs, by default should be `curr_active_pipeline.register_output_file`
         
     """
+    active_out_figure_paths = []
+    write_any_figs = write_pdf or write_png
+    if not write_any_figs:
+        return active_out_figure_paths # return empty list if no output formats are requested.
+
     if figures_parent_out_path is None:
         figures_parent_out_path = create_daily_programmatic_display_function_testing_folder_if_needed()
 
-    active_out_figure_paths = []
-    
     # PDF:
     if write_pdf:
         try:
             active_pdf_metadata, active_pdf_save_filename = build_pdf_metadata_from_display_context(active_identifying_ctx, subset_whitelist=subset_whitelist, subset_blacklist=subset_blacklist)
             # print(f'active_pdf_save_filename: {active_pdf_save_filename}')
-            curr_pdf_save_path = figures_parent_out_path.joinpath(active_pdf_save_filename) # build the final output pdf path from the pdf_parent_out_path (which is the daily folder)
-        
+            curr_pdf_save_path = figures_parent_out_path.joinpath(active_pdf_save_filename) # build the final output pdf path from the pdf_parent_out_path (which is the daily folder)        
             with backend_pdf.PdfPages(curr_pdf_save_path, keep_empty=False, metadata=active_pdf_metadata) as pdf:
-                # a_fig = cls._subfn_batch_plot_automated(curr_active_pipeline, **curr_batch_plot_kwargs)
-                ## TODO UNFINISHED - Have to plot the figure here.
-                raise NotImplementedError
-                active_out_figure_paths.append(curr_pdf_save_path)
                 # Save out PDF page:
                 pdf.savefig(a_fig)
                 if register_output_file_fn is not None:
-                    register_output_file(output_path=curr_pdf_save_path, output_metadata={'context': active_identifying_ctx, 'fig': (a_fig), 'pdf_metadata': active_pdf_metadata})
+                    register_output_file_fn(output_path=curr_pdf_save_path, output_metadata={'context': active_identifying_ctx, 'fig': (a_fig), 'pdf_metadata': active_pdf_metadata})
+                if progress_print:
+                    print(f'\t saved {curr_pdf_save_path}')
+                active_out_figure_paths.append(curr_pdf_save_path)
         except Exception as e:
             print(f'Error occured while writing .pdf for fig. {e}. Skipping.')
             # raise e
