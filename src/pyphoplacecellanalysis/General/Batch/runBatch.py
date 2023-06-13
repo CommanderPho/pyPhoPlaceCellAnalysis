@@ -99,7 +99,7 @@ class BatchRun:
         return global_batch_run
 
     
-    def to_dataframe(self, expand_context:bool=True, good_only:bool=False):
+    def to_dataframe(self, expand_context:bool=True, good_only:bool=False) -> pd.DataFrame:
         """Get a dataframe representation of BatchRun."""
         non_expanded_context_df = pd.DataFrame({'context': self.session_batch_status.keys(),
                 'basedirs': self.session_batch_basedirs.values(),
@@ -170,6 +170,48 @@ class BatchRun:
 
 
     # Class/Static Functions _____________________________________________________________________________________________ #
+
+    @classmethod
+    def from_dataframe(cls, df: pd.DataFrame):
+        """Create a BatchRun object from a dataframe representation."""
+        #TODO 2023-06-13 16:31: - [ ] Not yet completed!
+
+        # Extract non-expanded context columns
+        non_expanded_context_df = df[['context', 'basedirs', 'status', 'errors']]
+        
+        # Extract expanded context columns
+        expand_context = any(col.startswith('format_name') for col in df.columns)
+        if expand_context:
+            context_columns = [col for col in df.columns if col.startswith('format_name')]
+            expanded_context_df = df[context_columns]
+            session_contexts = []
+            for _, row in expanded_context_df.iterrows():
+                context = {col: row[col] for col in context_columns}
+                session_contexts.append(context)
+        else:
+            session_contexts = []
+
+        #TODO 2023-06-13 16:31: - [ ] Not yet completed, can't re-derive output object from just the number of epochs.
+        for index, row in df.iterrows():
+            ctx = index
+            long_laps = row['n_long_laps']
+            long_replays = row['n_long_replays']
+            short_laps = row['n_short_laps']
+            short_replays = row['n_short_replays']
+
+
+        # Create BatchRun object
+        batch_run = cls()
+        batch_run.session_batch_status = dict(zip(non_expanded_context_df['context'], non_expanded_context_df['status']))
+        batch_run.session_batch_basedirs = dict(zip(non_expanded_context_df['context'], non_expanded_context_df['basedirs']))
+        batch_run.session_batch_errors = dict(zip(non_expanded_context_df['context'], non_expanded_context_df['errors']))
+        batch_run.session_batch_outputs = dict(zip(non_expanded_context_df['context'], non_expanded_context_df['errors']))
+        
+        batch_run.session_contexts = session_contexts
+        
+        return batch_run
+
+
     ## Add detected laps/replays to the batch_progress_df:
     @classmethod
     def build_batch_lap_replay_counts_df(cls, global_batch_run):
@@ -199,8 +241,77 @@ class BatchRun:
         return good_batch_progress_df
         
     
+    # ==================================================================================================================== #
+    # New 2023-06-13 File Loading functions                                                                                #
+    # ==================================================================================================================== #
+    @classmethod
+    def load_batch_progress_df_from_h5(cls, df_path) -> pd.DataFrame:
+        """ loads from an .h5 file. """
+        try:
+            # db = pickle.load(dbfile, **kwargs)
+            batch_progress_df = pd.read_hdf(df_path, key='batch_progress_df')
+            
+        except NotImplementedError as err:
+            error_message = str(err)
+            if 'WindowsPath' in error_message:  # Check if WindowsPath is missing
+                print("Issue with saved WindowsPath on Linux for path {}, performing pathlib workaround...".format(df_path))
+                win_backup = pathlib.WindowsPath  # Backup the WindowsPath definition
+                try:
+                    pathlib.WindowsPath = pathlib.PureWindowsPath
+                    # db = pickle.load(dbfile, **kwargs) # Fails this time if it still throws an error
+                    batch_progress_df = pd.read_hdf(df_path, key='batch_progress_df')
+                finally:
+                    pathlib.WindowsPath = win_backup  # Restore the backup WindowsPath definition
+                    
+            elif 'PosixPath' in error_message:  # Check if PosixPath is missing
+                # Fixes issue with saved POSIX_PATH on windows for path.
+                posix_backup = pathlib.PosixPath # backup the PosixPath definition
+                try:
+                    pathlib.PosixPath = pathlib.PurePosixPath
+                    # db = pickle.load(dbfile, **kwargs) # Fails this time if it still throws an error
+                    batch_progress_df = pd.read_hdf(df_path, key='batch_progress_df')
+                finally:
+                    pathlib.PosixPath = posix_backup # restore the backup posix path definition
+            else:
+                print("Unknown issue with saved path for path {}, performing pathlib workaround...".format(df_path))
+                raise
+        except Exception as e:
+            # unhandled exception
+            raise
 
+        return batch_progress_df
 
+    @staticmethod
+    def find_global_root_path(batch_progress_df: pd.DataFrame) -> str:
+        """ extracts the common prefix from the 'basedirs' column of the df and returns it. """
+        paths = batch_progress_df['basedirs'].apply(lambda x: str(x)).to_list()
+        common_prefix = os.path.commonprefix(paths) # '/nfs/turbo/umms-kdiba/Data/KDIBA/'
+        return common_prefix
+
+    @staticmethod
+    def rebuild_basedirs(batch_progress_df, global_data_root_parent_path):
+        """ replaces basedirs with ones that have been rebuilt from the local `global_data_root_parent_path` and hopefully point to extant paths. 
+        
+        adds: ['locally_folder_exists', 'locally_is_ready']
+        updates: ['basedirs']
+        
+        Usage:
+        
+            updated_batch_progress_df = rebuild_basedirs(batch_progress_df, global_data_root_parent_path)
+            updated_batch_progress_df
+
+        """
+        _context_column_names = ['format_name', 'animal', 'exper_name', 'session_name']
+
+        assert global_data_root_parent_path.exists()
+        session_batch_basedirs = [global_data_root_parent_path.joinpath(*ctx_tuple).resolve() for ctx_tuple in batch_progress_df[_context_column_names].itertuples(index=False)]
+        session_basedir_exists_locally = [a_basedir.resolve().exists() for a_basedir in session_batch_basedirs]
+
+        updated_batch_progress_df = deepcopy(batch_progress_df)
+        updated_batch_progress_df['basedirs'] = session_batch_basedirs
+        updated_batch_progress_df['locally_folder_exists'] = session_basedir_exists_locally
+        updated_batch_progress_df['locally_is_ready'] = np.logical_and(updated_batch_progress_df.is_ready, session_basedir_exists_locally)
+        return updated_batch_progress_df
 
 
 # ==================================================================================================================== #
@@ -356,6 +467,31 @@ def main(active_global_batch_result_filename='global_batch_result.pkl', debug_pr
     print(f'global_batch_result: {global_batch_run}')
     # Save to file:
     saveData(finalized_loaded_global_batch_result_pickle_path, global_batch_run) # Update the global batch run dictionary
+
+
+
+def dataframe_functions_test():
+    """ 2023-06-13 - Tests loading saved .h5 `global_batch_result` Dataframe. And updating it for the local platform.
+
+    #TODO 2023-06-13 18:09: - [ ] Finish this implementation up and make decision deciding how to use it
+        
+    """
+    global_data_root_parent_path = find_first_extant_path([Path(r'W:\Data'), Path(r'/media/MAX/Data'), Path(r'/Volumes/MoverNew/data'), Path(r'/home/halechr/turbo/Data')])
+    assert global_data_root_parent_path.exists(), f"global_data_root_parent_path: {global_data_root_parent_path} does not exist! Is the right computer's config commented out above?"
+
+    ## Build Pickle Path:
+    pkl_path = 'global_batch_result_2023-06-08.pkl'
+    csv_path = 'global_batch_result_2023-06-08.csv'
+    h5_path = 'global_batch_result_2023-06-08.h5'
+
+    global_batch_result_file_path = Path(global_data_root_parent_path).joinpath(h5_path).resolve() # Use Default
+
+    batch_progress_df = BatchRun.load_batch_progress_df_from_h5(global_batch_result_file_path)
+    batch_progress_df = BatchRun.rebuild_basedirs(batch_progress_df, global_data_root_parent_path)
+
+    good_only_batch_progress_df = batch_progress_df[batch_progress_df['locally_is_ready']].copy()
+    good_only_batch_progress_df
+    return good_only_batch_progress_df, batch_progress_df
 
 
 if __name__ == "__main__":
