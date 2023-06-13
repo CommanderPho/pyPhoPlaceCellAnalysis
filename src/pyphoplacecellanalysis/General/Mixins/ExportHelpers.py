@@ -373,7 +373,7 @@ def programmatic_display_to_PDF(curr_active_pipeline, curr_display_function_name
 
 @function_attributes(short_name=None, tags=['PDF', 'export', 'output', 'matplotlib', 'display', 'file', 'active'], input_requires=[], output_provides=[], uses=['extract_figures_from_display_function_output'], used_by=[], creation_date='2023-06-08 11:55', related_items=[])
 def programmatic_render_to_file(curr_active_pipeline, curr_display_function_name='_display_plot_decoded_epoch_slices', subset_whitelist=None, subset_blacklist=None, write_pdf=False, write_png=True, debug_print=False, **kwargs):
-    """ TODO 2023-06-08 - INCOMPLETE
+    """ Loops through the individual epochs in a session (e.g. ['maze1', 'maze2', 'maze']) analagous to the structure of `programmatic_display_to_PDF` and programmatically calls `perform_write_to_file` with the appropriate parameters.
     Newer Programmatic .png and .pdf outputs
     curr_display_function_name = '_display_plot_decoded_epoch_slices' 
 
@@ -410,35 +410,41 @@ def programmatic_render_to_file(curr_active_pipeline, curr_display_function_name
             if debug_print:
                 print(f'active_identifying_ctx_string: "{active_identifying_ctx_string}"')
 
-            ## Build PDF Output Info
-            active_pdf_metadata, active_pdf_save_filename = build_pdf_metadata_from_display_context(final_context, subset_whitelist=subset_whitelist, subset_blacklist=subset_blacklist)
-            active_pdf_save_path = active_session_figures_out_path.joinpath(active_pdf_save_filename) # build the final output pdf path from the pdf_parent_out_path (which is the daily folder)
 
-            ## BEGIN DISPLAY/SAVE
-            with backend_pdf.PdfPages(active_pdf_save_path, keep_empty=False, metadata=active_pdf_metadata) as pdf:
-                out_fig_list = [] # Separate PDFs mode:
 
-                if debug_print:
-                    print(f'active_pdf_save_path: {active_pdf_save_path}\nactive_pdf_metadata: {active_pdf_metadata}')
-                    print(f'active_display_fn_kwargs: {active_display_fn_kwargs}')
+
+            # ## Build PDF Output Info
+            # active_pdf_metadata, active_pdf_save_filename = build_pdf_metadata_from_display_context(final_context, subset_whitelist=subset_whitelist, subset_blacklist=subset_blacklist)
+            # active_pdf_save_path = active_session_figures_out_path.joinpath(active_pdf_save_filename) # build the final output pdf path from the pdf_parent_out_path (which is the daily folder)
+
+            # ## BEGIN DISPLAY/SAVE
+            # with backend_pdf.PdfPages(active_pdf_save_path, keep_empty=False, metadata=active_pdf_metadata) as pdf:
+            #     out_fig_list = [] # Separate PDFs mode:
+
+            #     if debug_print:
+            #         print(f'active_pdf_save_path: {active_pdf_save_path}\nactive_pdf_metadata: {active_pdf_metadata}')
+            #         print(f'active_display_fn_kwargs: {active_display_fn_kwargs}')
                     
-                out_display_var = curr_active_pipeline.display(curr_display_function_name, a_filtered_context, **active_display_fn_kwargs) # , filter_epochs='ripple', debug_test_max_num_slices=128
-                # , fignum=active_identifying_ctx_string, **figure_format_config
+            #     out_display_var = curr_active_pipeline.display(curr_display_function_name, a_filtered_context, **active_display_fn_kwargs) # , filter_epochs='ripple', debug_test_max_num_slices=128
+            #     # , fignum=active_identifying_ctx_string, **figure_format_config
     
-                if debug_print:
-                    print(f'completed display(...) call. type(out_display_var): {type(out_display_var)}\n out_display_var: {out_display_var}, active_display_fn_kwargs: {active_display_fn_kwargs}')
+            #     if debug_print:
+            #         print(f'completed display(...) call. type(out_display_var): {type(out_display_var)}\n out_display_var: {out_display_var}, active_display_fn_kwargs: {active_display_fn_kwargs}')
 
-                out_fig_list = extract_figures_from_display_function_output(out_display_var=out_display_var, out_fig_list=out_fig_list)
+            #     out_fig_list = extract_figures_from_display_function_output(out_display_var=out_display_var, out_fig_list=out_fig_list)
 
-                if debug_print:
-                    print(f'out_fig_list: {out_fig_list}')
+            #     if debug_print:
+            #         print(f'out_fig_list: {out_fig_list}')
 
-                # Finally iterate through and do the saving to PDF
-                for i, a_fig in enumerate(out_fig_list):
-                    pdf.savefig(a_fig, transparent=True)
-                    pdf.attach_note(f'Page {i + 1}: "{active_identifying_ctx_string}"')
+            #     # Finally iterate through and do the saving to PDF
+            #     for i, a_fig in enumerate(out_fig_list):
+            #         pdf.savefig(a_fig, transparent=True)
+            #         pdf.attach_note(f'Page {i + 1}: "{active_identifying_ctx_string}"')
                     
-                curr_active_pipeline.register_output_file(output_path=active_pdf_save_path, output_metadata={'filtered_context': a_filtered_context, 'context': active_identifying_ctx, 'fig': out_fig_list})
+            #     curr_active_pipeline.register_output_file(output_path=active_pdf_save_path, output_metadata={'filtered_context': a_filtered_context, 'context': active_identifying_ctx, 'fig': out_fig_list})
+
+
+
 
 
 
@@ -472,7 +478,7 @@ def perform_write_to_file(a_fig, active_identifying_ctx, figures_parent_out_path
     if figures_parent_out_path is None:
         figures_parent_out_path = create_daily_programmatic_display_function_testing_folder_if_needed()
 
-    # PDF:
+    # PDF: .pdf versions:
     if write_pdf:
         try:
             active_pdf_metadata, active_pdf_save_filename = build_pdf_metadata_from_display_context(active_identifying_ctx, subset_whitelist=subset_whitelist, subset_blacklist=subset_blacklist)
@@ -509,6 +515,134 @@ def perform_write_to_file(a_fig, active_identifying_ctx, figures_parent_out_path
             # raise e
         
     return active_out_figure_paths
+
+
+# ==================================================================================================================== #
+# 2023-06-13 - Conceptual Outline                                                                                      #
+# ==================================================================================================================== #
+"""
+
+# 1. Setting up initial configuration prior to plot (making plot not display, removing plot toolbar, setting rendering defaults, etc).
+
+# 2. Iterating through filtered contexts (e.g. ['maze1', 'maze2', 'maze']) and results for non-global display functions
+
+    # 2a. Generating Final Display Context
+
+    # 2b. Performing display function call to actually generate figure
+
+    # 3b. Writing file to disk
+
+    
+
+"""
+
+@function_attributes(short_name=None, tags=['batch','filtered_context','session','figures'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-06-13 10:27', related_items=[])
+def batch_plot_local_context(curr_active_pipeline, curr_display_function_name='_display_plot_decoded_epoch_slices', subset_filtered_context_includelist=None, subset_filtered_context_excludelist=None, write_pdf=False, write_png=True, debug_print=False, **kwargs):
+    """ For a local display function specified by `curr_display_function_name`, loops through the individual epochs in a session (e.g. ['maze1', 'maze2', 'maze']) analagous to the structure of `programmatic_display_to_PDF` and for each:
+        # 2a. Generates Final Display Context
+
+        # 2b. Performing display function call to actually generate figure
+
+        # 3b. Writing file to disk - programmatically calls `perform_write_to_file` with the appropriate parameters.
+    
+            
+    Newer Programmatic .png and .pdf outputs
+    curr_display_function_name = '_display_plot_decoded_epoch_slices' 
+
+    """
+
+    ## Get the output path (active_session_figures_out_path) for this session (and all of its filtered_contexts as well):
+    # active_identifying_session_ctx = curr_active_pipeline.sess.get_context() # 'bapun_RatN_Day4_2019-10-15_11-30-06'
+    # figures_parent_out_path = create_daily_programmatic_display_function_testing_folder_if_needed()
+    # active_session_figures_out_path = session_context_to_relative_path(figures_parent_out_path, active_identifying_session_ctx)
+    # if debug_print:
+    #     print(f'curr_session_parent_out_path: {active_session_figures_out_path}')
+    # active_session_figures_out_path.mkdir(parents=True, exist_ok=True) # make folder if needed
+
+    active_included_contexts_list = []
+    if subset_filtered_context_includelist is None:
+        if subset_filtered_context_excludelist is not None:
+            print(f'using excludelist: {subset_filtered_context_excludelist}')
+            active_included_contexts_list = {k:v for k, v in curr_active_pipeline.filtered_contexts.items() if ((k not in subset_filtered_context_excludelist) and (v not in subset_filtered_context_excludelist))} 
+        else:
+            # no exclude list: include all
+            active_included_contexts_list = curr_active_pipeline.filtered_contexts # include all by default
+    else:
+        # use the includelist only
+        assert subset_filtered_context_excludelist is None, f"No excludelist can be used if includelist is provided!"
+        print(f'using includelist: {subset_filtered_context_includelist}')
+        if isinstance(subset_filtered_context_includelist, dict):
+            active_included_contexts_list = subset_filtered_context_includelist
+        else:
+            # assume it's a list of keys like ['maze1','maze2']
+            active_included_contexts_list = {k:v for k, v in curr_active_pipeline.filtered_contexts.items() if (k in subset_filtered_context_includelist)}
+
+        
+
+    with plt.ioff():
+        ## Disables showing the figure by default from within the context manager.
+        # active_display_fn_kwargs = overriding_dict_with(lhs_dict=dict(filter_epochs='ripple', debug_test_max_num_slices=128), **kwargs)
+        # active_display_fn_kwargs = overriding_dict_with(lhs_dict=dict(), **kwargs) # this is always an error, if lhs_dict is empty the result will be empty regardless of the value of kwargs.
+        active_display_fn_kwargs = kwargs
+        
+        # Perform for each filtered context:
+        for filter_name, a_filtered_context in active_included_contexts_list.items():
+            if debug_print:
+                print(f'filter_name: {filter_name}: "{a_filtered_context.get_description()}"')
+            # Get the desired display function context:
+            active_identifying_display_ctx = a_filtered_context.adding_context('display_fn', display_fn_name=curr_display_function_name)
+            # final_context = active_identifying_display_ctx # Display only context    
+
+            # # Add in the desired display variable:
+            # active_identifying_ctx = active_identifying_display_ctx.adding_context('filter_epochs', **active_display_fn_kwargs) # , filter_epochs='ripple' ## TODO: this is only right for a single function!
+            # final_context = active_identifying_ctx # Display/Variable context mode
+            final_context = active_identifying_display_ctx
+
+            active_identifying_ctx_string = final_context.get_description(separator='|') # Get final discription string
+            if debug_print:
+                print(f'active_identifying_ctx_string: "{active_identifying_ctx_string}"')
+
+
+
+            out_fig_list = []
+            
+            # all display functions should return: their final display context, their figures, their optional save function override?
+            
+
+            # ## Build PDF Output Info
+            # active_pdf_metadata, active_pdf_save_filename = build_pdf_metadata_from_display_context(final_context, subset_whitelist=subset_whitelist, subset_blacklist=subset_blacklist)
+            # active_pdf_save_path = active_session_figures_out_path.joinpath(active_pdf_save_filename) # build the final output pdf path from the pdf_parent_out_path (which is the daily folder)
+
+            # ## BEGIN DISPLAY/SAVE
+            # with backend_pdf.PdfPages(active_pdf_save_path, keep_empty=False, metadata=active_pdf_metadata) as pdf:
+            #     out_fig_list = [] # Separate PDFs mode:
+
+            #     if debug_print:
+            #         print(f'active_pdf_save_path: {active_pdf_save_path}\nactive_pdf_metadata: {active_pdf_metadata}')
+            #         print(f'active_display_fn_kwargs: {active_display_fn_kwargs}')
+                    
+            #     out_display_var = curr_active_pipeline.display(curr_display_function_name, a_filtered_context, **active_display_fn_kwargs) # , filter_epochs='ripple', debug_test_max_num_slices=128
+            #     # , fignum=active_identifying_ctx_string, **figure_format_config
+    
+            #     if debug_print:
+            #         print(f'completed display(...) call. type(out_display_var): {type(out_display_var)}\n out_display_var: {out_display_var}, active_display_fn_kwargs: {active_display_fn_kwargs}')
+
+            #     out_fig_list = extract_figures_from_display_function_output(out_display_var=out_display_var, out_fig_list=out_fig_list)
+
+            #     if debug_print:
+            #         print(f'out_fig_list: {out_fig_list}')
+
+            #     # Finally iterate through and do the saving to PDF
+            #     for i, a_fig in enumerate(out_fig_list):
+            #         pdf.savefig(a_fig, transparent=True)
+            #         pdf.attach_note(f'Page {i + 1}: "{active_identifying_ctx_string}"')
+                    
+            #     curr_active_pipeline.register_output_file(output_path=active_pdf_save_path, output_metadata={'filtered_context': a_filtered_context, 'context': active_identifying_ctx, 'fig': out_fig_list})
+
+
+
+
+
 
 
 
