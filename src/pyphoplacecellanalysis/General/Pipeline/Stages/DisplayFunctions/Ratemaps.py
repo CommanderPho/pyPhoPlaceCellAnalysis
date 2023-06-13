@@ -136,7 +136,7 @@ class DefaultRatemapDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Disp
         plot_variable_name = kwargs.get('plot_variable', enumTuningMap2DPlotVariables.OCCUPANCY).name
         active_figure = plt.gcf()
         
-        # TODO 2023-06-02 - should drop the computation_epochs, speed_thresh
+        # TODO 2023-06-02 - should drop the: 'computation_epochs', 'speed_thresh', 'frate_thresh', 'time_bin_size'
         active_pf_computation_params = unwrap_placefield_computation_parameters(active_config.computation_config)
         _display_add_computation_param_text_box(active_figure, active_pf_computation_params) # Adds the parameters text.
         
