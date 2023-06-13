@@ -82,7 +82,7 @@ class SpecificComputationValidator:
         """ 2023-06-08 - tries to perform the computation if the results are missing and it's needed. 
         
         Usage:
-            if _comp_name in include_whitelist:
+            if _comp_name in include_includelist:
                 newly_computed_values += _try_computation_if_needed(curr_active_pipeline, comp_specifier=SpecificComputationValidator(short_name='long_short_post_decoding', computation_fn_name='_perform_long_short_post_decoding_analysis', validate_computation_test=a_validate_computation_test), on_already_computed_fn=_subfn_on_already_computed, fail_on_exception=fail_on_exception, progress_print=progress_print, debug_print=debug_print, force_recompute=force_recompute)
         """
         comp_short_name: str = comp_specifier.short_name
@@ -100,7 +100,7 @@ class SpecificComputationValidator:
             if progress_print or debug_print:
                 print(f'\t Recomputing {comp_short_name}...')
             # When this fails due to unwrapping from the load, add `, computation_kwargs_list=[{'perform_cache_load': False}]` as an argument to the `perform_specific_computation` call below
-            curr_active_pipeline.perform_specific_computation(computation_functions_name_whitelist=[comp_specifier.computation_fn_name], computation_kwargs_list=[comp_specifier.computation_fn_kwargs], fail_on_exception=True, debug_print=False) # fail_on_exception MUST be True or error handling is all messed up 
+            curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=[comp_specifier.computation_fn_name], computation_kwargs_list=[comp_specifier.computation_fn_kwargs], fail_on_exception=True, debug_print=False) # fail_on_exception MUST be True or error handling is all messed up 
             if progress_print or debug_print:
                 print(f'\t done.')
             # try the validation again.
@@ -128,7 +128,7 @@ def batch_load_session(global_data_root_parent_path, active_data_mode_name, base
         _type_: _description_
     """
     saving_mode = PipelineSavingScheme.init(saving_mode)
-    epoch_name_whitelist = kwargs.get('epoch_name_whitelist', ['maze1','maze2','maze'])
+    epoch_name_includelist = kwargs.get('epoch_name_includelist', ['maze1','maze2','maze'])
     debug_print = kwargs.get('debug_print', False)
     assert 'skip_save' not in kwargs, f"use saving_mode=PipelineSavingScheme.SKIP_SAVING instead"
     # skip_save = kwargs.get('skip_save', False)
@@ -136,7 +136,7 @@ def batch_load_session(global_data_root_parent_path, active_data_mode_name, base
 
     active_session_computation_configs = kwargs.get('active_session_computation_configs', None)
 
-    computation_functions_name_whitelist = kwargs.get('computation_functions_name_whitelist', None)
+    computation_functions_name_includelist = kwargs.get('computation_functions_name_includelist', None)
 
 
     known_data_session_type_properties_dict = DataSessionFormatRegistryHolder.get_registry_known_data_session_type_dict()
@@ -150,7 +150,7 @@ def batch_load_session(global_data_root_parent_path, active_data_mode_name, base
         override_basepath=Path(basedir), force_reload=force_reload, active_pickle_filename=active_pickle_filename, skip_save_on_initial_load=True)
 
 
-    active_session_filter_configurations = active_data_mode_registered_class.build_default_filter_functions(sess=curr_active_pipeline.sess, epoch_name_whitelist=epoch_name_whitelist) # build_filters_pyramidal_epochs(sess=curr_kdiba_pipeline.sess)
+    active_session_filter_configurations = active_data_mode_registered_class.build_default_filter_functions(sess=curr_active_pipeline.sess, epoch_name_includelist=epoch_name_includelist) # build_filters_pyramidal_epochs(sess=curr_kdiba_pipeline.sess)
     if debug_print:
         print(f'active_session_filter_configurations: {active_session_filter_configurations}')
     
@@ -187,9 +187,9 @@ def batch_load_session(global_data_root_parent_path, active_data_mode_name, base
 
 
     ## Setup Computation Functions to be executed:
-    if computation_functions_name_whitelist is None:
-        # Whitelist Mode:
-        computation_functions_name_whitelist=['_perform_baseline_placefield_computation', '_perform_time_dependent_placefield_computation', '_perform_extended_statistics_computation',
+    if computation_functions_name_includelist is None:
+        # includelist Mode:
+        computation_functions_name_includelist=['_perform_baseline_placefield_computation', '_perform_time_dependent_placefield_computation', '_perform_extended_statistics_computation',
                                             '_perform_position_decoding_computation', 
                                             '_perform_firing_rate_trends_computation',
                                             '_perform_pf_find_ratemap_peaks_computation',
@@ -197,21 +197,21 @@ def batch_load_session(global_data_root_parent_path, active_data_mode_name, base
                                             # '_perform_two_step_position_decoding_computation',
                                             # '_perform_recursive_latent_placefield_decoding'
                                         ]  # '_perform_pf_find_ratemap_peaks_peak_prominence2d_computation'
-        computation_functions_name_blacklist=None
+        computation_functions_name_excludelist=None
     else:
-        print(f'using provided computation_functions_name_whitelist: {computation_functions_name_whitelist}')
-        computation_functions_name_blacklist=None
+        print(f'using provided computation_functions_name_includelist: {computation_functions_name_includelist}')
+        computation_functions_name_excludelist=None
 
-    # # Blacklist Mode:
-    # computation_functions_name_whitelist=None
-    # computation_functions_name_blacklist=['_perform_spike_burst_detection_computation','_perform_recursive_latent_placefield_decoding']
+    # # excludelist Mode:
+    # computation_functions_name_includelist=None
+    # computation_functions_name_excludelist=['_perform_spike_burst_detection_computation','_perform_recursive_latent_placefield_decoding']
 
     ## TODO 2023-01-15 - perform_computations for all configs!!
-    curr_active_pipeline.perform_computations(active_session_computation_configs[0], computation_functions_name_whitelist=computation_functions_name_whitelist, computation_functions_name_blacklist=computation_functions_name_blacklist, fail_on_exception=fail_on_exception, debug_print=debug_print) #, overwrite_extant_results=False  ], fail_on_exception=True, debug_print=False)
+    curr_active_pipeline.perform_computations(active_session_computation_configs[0], computation_functions_name_includelist=computation_functions_name_includelist, computation_functions_name_excludelist=computation_functions_name_excludelist, fail_on_exception=fail_on_exception, debug_print=debug_print) #, overwrite_extant_results=False  ], fail_on_exception=True, debug_print=False)
 
     if not skip_extended_batch_computations:
         batch_extended_computations(curr_active_pipeline, include_global_functions=False, fail_on_exception=fail_on_exception, progress_print=True, debug_print=False)
-    # curr_active_pipeline.perform_computations(active_session_computation_configs[0], computation_functions_name_blacklist=['_perform_spike_burst_detection_computation'], debug_print=False, fail_on_exception=False) # whitelist: ['_perform_baseline_placefield_computation']
+    # curr_active_pipeline.perform_computations(active_session_computation_configs[0], computation_functions_name_excludelist=['_perform_spike_burst_detection_computation'], debug_print=False, fail_on_exception=False) # includelist: ['_perform_baseline_placefield_computation']
 
     curr_active_pipeline.prepare_for_display(root_output_dir=global_data_root_parent_path.joinpath('Output'), should_smooth_maze=True) # TODO: pass a display config
 
@@ -230,7 +230,7 @@ def batch_load_session(global_data_root_parent_path, active_data_mode_name, base
 
 
 @function_attributes(short_name='batch_extended_computations', tags=['batch', 'automated', 'session', 'compute'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-03-28 04:46')
-def batch_extended_computations(curr_active_pipeline, include_whitelist=None, include_global_functions=False, fail_on_exception=False, progress_print=True, debug_print=False, force_recompute:bool = False):
+def batch_extended_computations(curr_active_pipeline, include_includelist=None, include_global_functions=False, fail_on_exception=False, progress_print=True, debug_print=False, force_recompute:bool = False):
     """ performs the remaining required global computations """
     def _subfn_on_already_computed(_comp_name):
         """ captures: `progress_print`, `force_recompute`
@@ -250,11 +250,11 @@ def batch_extended_computations(curr_active_pipeline, include_whitelist=None, in
     # 'firing_rate_trends', 'relative_entropy_analyses'
     # '_perform_firing_rate_trends_computation', '_perform_time_dependent_pf_sequential_surprise_computation'
     
-    if include_whitelist is None:
+    if include_includelist is None:
         # include all:
-        include_whitelist = non_global_comp_names + global_comp_names
+        include_includelist = non_global_comp_names + global_comp_names
     else:
-        print(f'included whitelist is specified: {include_whitelist}, so only performing these extended computations.')
+        print(f'included includelist is specified: {include_includelist}, so only performing these extended computations.')
     ## Get computed relative entropy measures:
     global_epoch_name = curr_active_pipeline.active_completed_computation_result_names[-1] # 'maze'
     global_results = curr_active_pipeline.computation_results[global_epoch_name]['computed_data']
@@ -278,7 +278,7 @@ def batch_extended_computations(curr_active_pipeline, include_whitelist=None, in
 
     for _comp_specifier in _comp_specifiers:
         if (not _comp_specifier.is_global) or include_global_functions:
-            if _comp_specifier.short_name in include_whitelist:
+            if _comp_specifier.short_name in include_includelist:
                 newly_computed_values += _comp_specifier.try_computation_if_needed(curr_active_pipeline, on_already_computed_fn=_subfn_on_already_computed, fail_on_exception=fail_on_exception, progress_print=progress_print, debug_print=debug_print, force_recompute=force_recompute)
 
 
@@ -286,7 +286,7 @@ def batch_extended_computations(curr_active_pipeline, include_whitelist=None, in
         
         # ## long_short_rate_remapping:
         # _comp_name = 'long_short_rate_remapping'
-        # if _comp_name in include_whitelist:
+        # if _comp_name in include_includelist:
         #     try:
         #         ## Get global 'long_short_rate_remapping' results:
         #         curr_long_short_rr = curr_active_pipeline.global_computation_results.computed_data['long_short_rate_remapping']
@@ -302,7 +302,7 @@ def batch_extended_computations(curr_active_pipeline, include_whitelist=None, in
         #             print(f'\t Recomputing {_comp_name}...')
                     
         #         # When this fails due to unwrapping from the load, add `, computation_kwargs_list=[{'perform_cache_load': False}]` as an argument to the `perform_specific_computation` call below
-        #         curr_active_pipeline.perform_specific_computation(computation_functions_name_whitelist=['_perform_long_short_decoding_rate_remapping_analyses'], fail_on_exception=True, debug_print=False) # fail_on_exception MUST be True or error handling is all messed up 
+        #         curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=['_perform_long_short_decoding_rate_remapping_analyses'], fail_on_exception=True, debug_print=False) # fail_on_exception MUST be True or error handling is all messed up 
         #         print(f'\t done.')
         #         curr_long_short_rr = curr_active_pipeline.global_computation_results.computed_data['long_short_rate_remapping']
         #         rate_remapping_df, high_remapping_cells_only = curr_long_short_rr.rr_df, curr_long_short_rr.high_only_rr_df
@@ -334,7 +334,7 @@ def batch_programmatic_figures(curr_active_pipeline):
     """
     ## 🗨️🟢 2022-10-26 - Jonathan Firing Rate Analyses
     # Perform missing global computations                                                                                  #
-    # curr_active_pipeline.perform_specific_computation(computation_functions_name_whitelist=['_perform_jonathan_replay_firing_rate_analyses', '_perform_long_short_pf_overlap_analyses'], fail_on_exception=True, debug_print=True)
+    # curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=['_perform_jonathan_replay_firing_rate_analyses', '_perform_long_short_pf_overlap_analyses'], fail_on_exception=True, debug_print=True)
 
     ## Get global 'jonathan_firing_rate_analysis' results:
     curr_jonathan_firing_rate_analysis = curr_active_pipeline.global_computation_results.computed_data['jonathan_firing_rate_analysis']
@@ -403,6 +403,11 @@ def batch_extended_programmatic_figures(curr_active_pipeline):
     programmatic_display_to_PDF(curr_active_pipeline, curr_display_function_name='_display_2d_placefield_result_plot_ratemaps_2D') #  🟢✅ Now seems to be working and saving to PDF!! Still using matplotlib.use('Qt5Agg') mode and plots still appear.
     programmatic_display_to_PDF(curr_active_pipeline, curr_display_function_name='_display_2d_placefield_occupancy') #  🟢✅ 2023-05-25
     # programmatic_display_to_PDF(curr_active_pipeline, curr_display_function_name='_display_long_short_laps') #  UNTESTED 2023-05-29
+
+
+
+    programmatic_render_to_file(curr_active_pipeline, curr_display_function_name='_display_1d_placefields', debug_print=False, write_png=True, write_pdf=True)
+    
 
     # # Plot long|short firing rate index:
     # fig_save_parent_path = Path(r'E:\Dropbox (Personal)\Active\Kamran Diba Lab\Results from 2023-01-20 - LongShort Firing Rate Indicies')
@@ -543,7 +548,7 @@ class BatchPhoJonathanFiguresHelper(object):
         return _batch_plot_kwargs_list
 
     @classmethod
-    def _perform_batch_plot(cls, curr_active_pipeline, active_kwarg_list, figures_parent_out_path=None, subset_whitelist=None, subset_blacklist=None, write_pdf=False, write_png=True, progress_print=True, debug_print=False):
+    def _perform_batch_plot(cls, curr_active_pipeline, active_kwarg_list, figures_parent_out_path=None, subset_includelist=None, subset_excludelist=None, write_pdf=False, write_png=True, progress_print=True, debug_print=False):
         """ Plots everything by calling `cls._subfn_batch_plot_automated` using the kwargs provided in `active_kwarg_list`
 
         Args:
@@ -564,7 +569,7 @@ class BatchPhoJonathanFiguresHelper(object):
         for i, curr_batch_plot_kwargs in enumerate(active_kwarg_list):
             curr_active_identifying_ctx = curr_batch_plot_kwargs['active_identifying_ctx']
             # print(f'curr_active_identifying_ctx: {curr_active_identifying_ctx}')
-            active_pdf_metadata, active_pdf_save_filename = build_pdf_metadata_from_display_context(curr_active_identifying_ctx, subset_whitelist=subset_whitelist, subset_blacklist=subset_blacklist)
+            active_pdf_metadata, active_pdf_save_filename = build_pdf_metadata_from_display_context(curr_active_identifying_ctx, subset_includelist=subset_includelist, subset_excludelist=subset_excludelist)
             # print(f'active_pdf_save_filename: {active_pdf_save_filename}')
             curr_pdf_save_path = figures_parent_out_path.joinpath(active_pdf_save_filename) # build the final output pdf path from the pdf_parent_out_path (which is the daily folder)
             # One plot at a time to PDF:

@@ -124,7 +124,7 @@ class LongShortTrackComputations(AllFunctionEnumeratingMixin, metaclass=Computat
     _is_global = True
 
     @function_attributes(short_name='_perform_long_short_decoding_analyses', tags=['long_short', 'short_long','replay', 'decoding', 'computation'], input_requires=[], output_provides=['global_computation_results.computed_data.long_short_leave_one_out_decoding_analysis'], uses=['_long_short_decoding_analysis_from_decoders'], used_by=[], creation_date='2023-05-10 15:10')
-    def _perform_long_short_decoding_analyses(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_whitelist=None, debug_print=False, decoding_time_bin_size=None, perform_cache_load=False, always_recompute_replays=False):
+    def _perform_long_short_decoding_analyses(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, debug_print=False, decoding_time_bin_size=None, perform_cache_load=False, always_recompute_replays=False):
         """ 
         
         Requires:
@@ -216,7 +216,7 @@ class LongShortTrackComputations(AllFunctionEnumeratingMixin, metaclass=Computat
     
 
     # @function_attributes(tags=['long_short', 'short_long','replay', 'decoding', 'computation'], input_requires=['global_computation_results.computed_data.long_short_leave_one_out_decoding_analysis'], output_provides=[], uses=['compute_rate_remapping_stats'], used_by=[], creation_date='2023-05-31 13:57')
-    # def _perform_long_short_decoding_rate_remapping_analyses(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_whitelist=None, debug_print=False, decoding_time_bin_size=None, perform_cache_load=False, always_recompute_replays=False):
+    # def _perform_long_short_decoding_rate_remapping_analyses(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, debug_print=False, decoding_time_bin_size=None, perform_cache_load=False, always_recompute_replays=False):
     #     """ Computes rate remapping statistics
         
     #     Requires:
@@ -259,7 +259,7 @@ class LongShortTrackComputations(AllFunctionEnumeratingMixin, metaclass=Computat
     #     return global_computation_results
 
     
-    def _perform_long_short_pf_overlap_analyses(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_whitelist=None, debug_print=False):
+    def _perform_long_short_pf_overlap_analyses(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, debug_print=False):
         """ Computes multiple forms of overlap between the short and the long placefields
         
         Requires:
@@ -271,20 +271,20 @@ class LongShortTrackComputations(AllFunctionEnumeratingMixin, metaclass=Computat
                 ['short_long_pf_overlap_analyses']['poly_overlap_df']
         
         """
-        if include_whitelist is None:
-            include_whitelist = owning_pipeline_reference.active_completed_computation_result_names # ['maze', 'sprinkle']
+        if include_includelist is None:
+            include_includelist = owning_pipeline_reference.active_completed_computation_result_names # ['maze', 'sprinkle']
 
         # Epoch dataframe stuff:
-        long_epoch_name = include_whitelist[0] # 'maze1_PYR'
-        short_epoch_name = include_whitelist[1] # 'maze2_PYR'
-        if len(include_whitelist) > 2:
-            global_epoch_name = include_whitelist[-1] # 'maze_PYR'
+        long_epoch_name = include_includelist[0] # 'maze1_PYR'
+        short_epoch_name = include_includelist[1] # 'maze2_PYR'
+        if len(include_includelist) > 2:
+            global_epoch_name = include_includelist[-1] # 'maze_PYR'
         else:
             print(f'WARNING: no global_epoch detected.')
             global_epoch_name = '' # None
 
         if debug_print:
-            print(f'include_whitelist: {include_whitelist}\nlong_epoch_name: {long_epoch_name}, short_epoch_name: {short_epoch_name}, global_epoch_name: {global_epoch_name}')
+            print(f'include_includelist: {include_includelist}\nlong_epoch_name: {long_epoch_name}, short_epoch_name: {short_epoch_name}, global_epoch_name: {global_epoch_name}')
 
         long_results = computation_results[long_epoch_name]['computed_data']
         short_results = computation_results[short_epoch_name]['computed_data']
@@ -307,7 +307,7 @@ class LongShortTrackComputations(AllFunctionEnumeratingMixin, metaclass=Computat
 
 
     @function_attributes(short_name='_perform_long_short_firing_rate_analyses', tags=['short_long','firing_rate', 'computation'], input_requires=[], output_provides=['long_short_fr_indicies_analysis'], uses=['pipeline_complete_compute_long_short_fr_indicies'], used_by=[], creation_date='2023-04-11 00:00')
-    def _perform_long_short_firing_rate_analyses(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_whitelist=None, debug_print=False):
+    def _perform_long_short_firing_rate_analyses(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, debug_print=False):
         """ Computes the firing rate indicies which is a measure of the changes in firing rate (rate-remapping) between the long and the short track
         
         Requires:
@@ -326,7 +326,7 @@ class LongShortTrackComputations(AllFunctionEnumeratingMixin, metaclass=Computat
 
 
 
-    def _perform_jonathan_replay_firing_rate_analyses(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_whitelist=None, debug_print=False):
+    def _perform_jonathan_replay_firing_rate_analyses(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, debug_print=False):
         """ Ported from Jonathan's `Gould_22-09-29.ipynb` Notebook
         
         Requires:
@@ -367,20 +367,20 @@ class LongShortTrackComputations(AllFunctionEnumeratingMixin, metaclass=Computat
 
         # BEGIN MAIN FUNCTION:
         replays_df = None
-        if include_whitelist is None:
-            include_whitelist = owning_pipeline_reference.active_completed_computation_result_names # ['maze', 'sprinkle']
+        if include_includelist is None:
+            include_includelist = owning_pipeline_reference.active_completed_computation_result_names # ['maze', 'sprinkle']
 
         # Epoch dataframe stuff:
-        long_epoch_name = include_whitelist[0] # 'maze1_PYR'
-        short_epoch_name = include_whitelist[1] # 'maze2_PYR'
-        if len(include_whitelist) > 2:
-            global_epoch_name = include_whitelist[-1] # 'maze_PYR'
+        long_epoch_name = include_includelist[0] # 'maze1_PYR'
+        short_epoch_name = include_includelist[1] # 'maze2_PYR'
+        if len(include_includelist) > 2:
+            global_epoch_name = include_includelist[-1] # 'maze_PYR'
         else:
             print(f'WARNING: no global_epoch detected.')
             global_epoch_name = '' # None
 
         if debug_print:
-            print(f'include_whitelist: {include_whitelist}\nlong_epoch_name: {long_epoch_name}, short_epoch_name: {short_epoch_name}, global_epoch_name: {global_epoch_name}')
+            print(f'include_includelist: {include_includelist}\nlong_epoch_name: {long_epoch_name}, short_epoch_name: {short_epoch_name}, global_epoch_name: {global_epoch_name}')
         pf1d_long = computation_results[long_epoch_name]['computed_data']['pf1D']
         pf1d_short = computation_results[short_epoch_name]['computed_data']['pf1D']
         # pf1d = computation_results[global_epoch_name]['computed_data']['pf1D']
@@ -510,7 +510,7 @@ class LongShortTrackComputations(AllFunctionEnumeratingMixin, metaclass=Computat
 
     @function_attributes(tags=['long_short', 'short_long','replay', 'decoding', 'computation'], input_requires=['global_computation_results.computed_data.long_short_leave_one_out_decoding_analysis', 'global_computation_results.computed_data.long_short_fr_indicies_analysis'], output_provides=[],
                           uses=['compute_rate_remapping_stats', 'compute_measured_vs_expected_firing_rates', 'simpler_compute_measured_vs_expected_firing_rates', 'compute_radon_transforms'], used_by=[], creation_date='2023-05-31 13:57')
-    def _perform_long_short_post_decoding_analysis(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_whitelist=None, debug_print=False):
+    def _perform_long_short_post_decoding_analysis(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, debug_print=False):
         """ Must be performed after `_perform_long_short_decoding_analyses` and `_perform_long_short_firing_rate_analyses`
         
         Currently an amalgamation of a bunch of computations that make use of the previous global decoding results to add features like:
@@ -774,7 +774,7 @@ def compute_long_short_constrained_decoders(curr_active_pipeline, enable_two_ste
     # 1D Decoders constrained to each other
     def compute_short_long_constrained_decoders_1D(curr_active_pipeline, enable_two_step_decoders:bool = False):
         """ 2023-04-14 - 1D Decoders constrained to each other, captures: recalculate_anyway, long_epoch_name, short_epoch_name """
-        curr_active_pipeline.perform_specific_computation(computation_functions_name_whitelist=['_perform_position_decoding_computation'], computation_kwargs_list=[dict(ndim=1)], enabled_filter_names=[long_epoch_name, short_epoch_name], fail_on_exception=True, debug_print=True)
+        curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=['_perform_position_decoding_computation'], computation_kwargs_list=[dict(ndim=1)], enabled_filter_names=[long_epoch_name, short_epoch_name], fail_on_exception=True, debug_print=True)
         long_results, short_results = [curr_active_pipeline.computation_results[an_epoch_name]['computed_data'] for an_epoch_name in [long_epoch_name, short_epoch_name]]
 
         # long_one_step_decoder_1D, short_one_step_decoder_1D  = [results_data.get('pf1D_Decoder', None) for results_data in (long_results, short_results)]
@@ -786,7 +786,7 @@ def compute_long_short_constrained_decoders(curr_active_pipeline, enable_two_ste
         if enable_two_step_decoders:
             long_two_step_decoder_1D, short_two_step_decoder_1D  = [results_data.get('pf1D_TwoStepDecoder', None) for results_data in (long_results, short_results)]
             if recalculate_anyway or did_recompute or (long_two_step_decoder_1D is None) or (short_two_step_decoder_1D is None):
-                curr_active_pipeline.perform_specific_computation(computation_functions_name_whitelist=['_perform_two_step_position_decoding_computation'], computation_kwargs_list=[dict(ndim=1)], enabled_filter_names=[long_epoch_name, short_epoch_name], fail_on_exception=True, debug_print=True)
+                curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=['_perform_two_step_position_decoding_computation'], computation_kwargs_list=[dict(ndim=1)], enabled_filter_names=[long_epoch_name, short_epoch_name], fail_on_exception=True, debug_print=True)
                 long_two_step_decoder_1D, short_two_step_decoder_1D  = [results_data.get('pf1D_TwoStepDecoder', None) for results_data in (long_results, short_results)]
                 assert (long_two_step_decoder_1D is not None and short_two_step_decoder_1D is not None)
         else:
@@ -796,7 +796,7 @@ def compute_long_short_constrained_decoders(curr_active_pipeline, enable_two_ste
 
     def compute_short_long_constrained_decoders_2D(curr_active_pipeline, enable_two_step_decoders:bool = False):
         """ 2023-04-14 - 2D Decoders constrained to each other, captures: recalculate_anyway, long_epoch_name, short_epoch_name """
-        curr_active_pipeline.perform_specific_computation(computation_functions_name_whitelist=['_perform_position_decoding_computation'], computation_kwargs_list=[dict(ndim=2)], enabled_filter_names=[long_epoch_name, short_epoch_name], fail_on_exception=True, debug_print=True)
+        curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=['_perform_position_decoding_computation'], computation_kwargs_list=[dict(ndim=2)], enabled_filter_names=[long_epoch_name, short_epoch_name], fail_on_exception=True, debug_print=True)
         long_results, short_results = [curr_active_pipeline.computation_results[an_epoch_name]['computed_data'] for an_epoch_name in [long_epoch_name, short_epoch_name]]
         # Make the 2D Placefields and Decoders conform between the long and the short epochs:
         long_one_step_decoder_2D, short_one_step_decoder_2D  = [results_data.get('pf2D_Decoder', None) for results_data in (long_results, short_results)]
@@ -806,7 +806,7 @@ def compute_long_short_constrained_decoders(curr_active_pipeline, enable_two_ste
         if enable_two_step_decoders:
             long_two_step_decoder_2D, short_two_step_decoder_2D  = [results_data.get('pf2D_TwoStepDecoder', None) for results_data in (long_results, short_results)]
             if recalculate_anyway or did_recompute or (long_two_step_decoder_2D is None) or (short_two_step_decoder_2D is None):
-                curr_active_pipeline.perform_specific_computation(computation_functions_name_whitelist=['_perform_two_step_position_decoding_computation'], computation_kwargs_list=[dict(ndim=2)], enabled_filter_names=[long_epoch_name, short_epoch_name], fail_on_exception=True, debug_print=True)
+                curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=['_perform_two_step_position_decoding_computation'], computation_kwargs_list=[dict(ndim=2)], enabled_filter_names=[long_epoch_name, short_epoch_name], fail_on_exception=True, debug_print=True)
                 long_two_step_decoder_2D, short_two_step_decoder_2D  = [results_data.get('pf2D_TwoStepDecoder', None) for results_data in (long_results, short_results)]
                 assert (long_two_step_decoder_2D is not None and short_two_step_decoder_2D is not None)
         else:

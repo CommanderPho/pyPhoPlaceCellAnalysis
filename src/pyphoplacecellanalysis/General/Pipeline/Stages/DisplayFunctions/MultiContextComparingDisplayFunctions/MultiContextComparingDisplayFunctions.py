@@ -28,7 +28,7 @@ class MultiContextComparingDisplayFunctions(AllFunctionEnumeratingMixin, metacla
     """
 
     @function_attributes(short_name='context_nested_docks', tags=['display','docks','pyqtgraph', 'interactive'], is_global=True, input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-04-11 03:14')
-    def _display_context_nested_docks(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_whitelist=None, **kwargs):
+    def _display_context_nested_docks(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, **kwargs):
         """ Create `master_dock_win` - centralized plot output window to collect individual figures/controls in (2022-08-18)
         NOTE: Ignores `active_config` because context_nested_docks is for all contexts
 
@@ -45,11 +45,11 @@ class MultiContextComparingDisplayFunctions(AllFunctionEnumeratingMixin, metacla
         """
         assert owning_pipeline_reference is not None
         #
-        if include_whitelist is None:
-            include_whitelist = owning_pipeline_reference.active_completed_computation_result_names # ['maze', 'sprinkle']
+        if include_includelist is None:
+            include_includelist = owning_pipeline_reference.active_completed_computation_result_names # ['maze', 'sprinkle']
 
         out_items = {}
-        master_dock_win, app, out_items = _context_nested_docks(owning_pipeline_reference, active_config_names=include_whitelist, **overriding_dict_with(lhs_dict={'enable_gui': False, 'debug_print': False}, **kwargs))
+        master_dock_win, app, out_items = _context_nested_docks(owning_pipeline_reference, active_config_names=include_includelist, **overriding_dict_with(lhs_dict={'enable_gui': False, 'debug_print': False}, **kwargs))
 
         # return master_dock_win, app, out_items
         return {'master_dock_win': master_dock_win, 'app': app, 'out_items': out_items}
@@ -161,7 +161,7 @@ def _context_nested_docks(curr_active_pipeline, active_config_names, enable_gui=
     Usage:
         master_dock_win, app, out_items = context_nested_docks(curr_active_pipeline, enable_gui=False, debug_print=True)
     """
-    # include_whitelist = curr_active_pipeline.active_completed_computation_result_names # ['maze', 'sprinkle']
+    # include_includelist = curr_active_pipeline.active_completed_computation_result_names # ['maze', 'sprinkle']
 
     if enable_gui:
         master_dock_win, app = DockAreaWrapper._build_default_dockAreaWindow(title='active_global_window', defer_show=False)

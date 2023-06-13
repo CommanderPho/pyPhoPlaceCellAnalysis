@@ -205,16 +205,16 @@ def session_context_to_relative_path(parent_path, session_ctx):
 
     """
     parent_path = Path(parent_path)
-    subset_whitelist=['format_name','animal','exper_name', 'session_name']
-    all_keys_found, found_keys, missing_keys = session_ctx.check_keys(subset_whitelist, debug_print=False)
+    subset_includelist=['format_name','animal','exper_name', 'session_name']
+    all_keys_found, found_keys, missing_keys = session_ctx.check_keys(subset_includelist, debug_print=False)
     if not all_keys_found:
         print(f'WARNING: missing {len(missing_keys)} keys from context: {missing_keys}. Building path anyway.')
-    curr_sess_ctx_tuple = session_ctx.as_tuple(subset_whitelist=subset_whitelist, drop_missing=True) # ('kdiba', 'gor01', 'one', '2006-6-07_11-26-53')
+    curr_sess_ctx_tuple = session_ctx.as_tuple(subset_includelist=subset_includelist, drop_missing=True) # ('kdiba', 'gor01', 'one', '2006-6-07_11-26-53')
     return parent_path.joinpath(*curr_sess_ctx_tuple).resolve()
 
 
 @function_attributes(tags=['figure','context','output','path','important'], input_requires=[], output_provides=[], uses=[], used_by=['build_pdf_metadata_from_display_context'], creation_date='2023-05-25 12:54')
-def build_figure_basename_from_display_context(active_identifying_ctx, subset_whitelist=None, subset_blacklist=None, context_tuple_join_character='_', debug_print=False):
+def build_figure_basename_from_display_context(active_identifying_ctx, subset_includelist=None, subset_excludelist=None, context_tuple_join_character='_', debug_print=False):
     """ 
     Usage:
         from pyphoplacecellanalysis.General.Mixins.ExportHelpers import build_figure_basename_from_display_context
@@ -222,7 +222,7 @@ def build_figure_basename_from_display_context(active_identifying_ctx, subset_wh
         >>> 'kdiba_2006-6-09_1-22-43_batch_plot_test_long_only'
     """
     ## Note that active_identifying_ctx.as_tuple() can have non-string elements (e.g. debug_test_max_num_slices=128, which is an int). This is what we want, but for setting the metadata we need to convert them to strings
-    context_tuple = [str(v) for v in list(active_identifying_ctx.as_tuple(subset_whitelist=subset_whitelist, subset_blacklist=subset_blacklist, drop_missing=True))]
+    context_tuple = [str(v) for v in list(active_identifying_ctx.as_tuple(subset_includelist=subset_includelist, subset_excludelist=subset_excludelist, drop_missing=True))]
     fig_save_basename = context_tuple_join_character.join(context_tuple) # joins the elements of the context_tuple with '_'
     if debug_print:
         print(f'fig_save_basename: "{fig_save_basename}"')
@@ -230,7 +230,7 @@ def build_figure_basename_from_display_context(active_identifying_ctx, subset_wh
 
 
 @function_attributes(tags=['figure','pdf','context','output','path','important'], input_requires=[], output_provides=[], uses=['build_figure_basename_from_display_context'], used_by=[], creation_date='2023-05-25 12:54')
-def build_pdf_metadata_from_display_context(active_identifying_ctx, subset_whitelist=None, subset_blacklist=None, debug_print=False):
+def build_pdf_metadata_from_display_context(active_identifying_ctx, subset_includelist=None, subset_excludelist=None, debug_print=False):
     """ Internally uses `build_figure_basename_from_display_context(...)` 
     Usage:
         curr_built_pdf_metadata, curr_pdf_save_filename = build_pdf_metadata_from_display_context(active_identifying_ctx)
@@ -241,7 +241,7 @@ def build_pdf_metadata_from_display_context(active_identifying_ctx, subset_white
         print(f'session_descriptor_string: "{session_descriptor_string}"')
     built_pdf_metadata = {'Creator': 'Spike3D - TestNeuroPyPipeline227', 'Author': 'Pho Hale', 'Title': session_descriptor_string, 'Subject': '', 'Keywords': [session_descriptor_string]}
     # context_tuple = [str(v) for v in list(active_identifying_ctx.as_tuple())]
-    curr_fig_save_basename = build_figure_basename_from_display_context(active_identifying_ctx, subset_whitelist=subset_whitelist, subset_blacklist=subset_blacklist, context_tuple_join_character='_')
+    curr_fig_save_basename = build_figure_basename_from_display_context(active_identifying_ctx, subset_includelist=subset_includelist, subset_excludelist=subset_excludelist, context_tuple_join_character='_')
     built_pdf_metadata['Title'] = curr_fig_save_basename
     built_pdf_metadata['Subject'] = active_identifying_ctx.display_fn_name
     built_pdf_metadata['Keywords'] = build_figure_basename_from_display_context(active_identifying_ctx, context_tuple_join_character=' | ') # ' | '.join(context_tuple)
@@ -297,7 +297,7 @@ def extract_figures_from_display_function_output(out_display_var, out_fig_list:L
 
 ## 2022-10-04 Modern Programmatic PDF outputs:
 @function_attributes(short_name=None, tags=['Depricating', 'PDF', 'export', 'output', 'matplotlib', 'display', 'file', 'active'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2022-10-04 00:00', related_items=[])
-def programmatic_display_to_PDF(curr_active_pipeline, curr_display_function_name='_display_plot_decoded_epoch_slices', subset_whitelist=None, subset_blacklist=None,  debug_print=False, **kwargs):
+def programmatic_display_to_PDF(curr_active_pipeline, curr_display_function_name='_display_plot_decoded_epoch_slices', subset_includelist=None, subset_excludelist=None,  debug_print=False, **kwargs):
     """
     2022-10-04 Modern Programmatic PDF outputs
     curr_display_function_name = '_display_plot_decoded_epoch_slices' 
@@ -336,7 +336,7 @@ def programmatic_display_to_PDF(curr_active_pipeline, curr_display_function_name
                 print(f'active_identifying_ctx_string: "{active_identifying_ctx_string}"')
 
             ## Build PDF Output Info
-            active_pdf_metadata, active_pdf_save_filename = build_pdf_metadata_from_display_context(final_context, subset_whitelist=subset_whitelist, subset_blacklist=subset_blacklist)
+            active_pdf_metadata, active_pdf_save_filename = build_pdf_metadata_from_display_context(final_context, subset_includelist=subset_includelist, subset_excludelist=subset_excludelist)
             active_pdf_save_path = active_session_figures_out_path.joinpath(active_pdf_save_filename) # build the final output pdf path from the pdf_parent_out_path (which is the daily folder)
 
             ## BEGIN DISPLAY/SAVE
@@ -372,7 +372,7 @@ def programmatic_display_to_PDF(curr_active_pipeline, curr_display_function_name
 
 
 @function_attributes(short_name=None, tags=['PDF', 'export', 'output', 'matplotlib', 'display', 'file', 'active'], input_requires=[], output_provides=[], uses=['extract_figures_from_display_function_output'], used_by=[], creation_date='2023-06-08 11:55', related_items=[])
-def programmatic_render_to_file(curr_active_pipeline, curr_display_function_name='_display_plot_decoded_epoch_slices', subset_whitelist=None, subset_blacklist=None, write_pdf=False, write_png=True, debug_print=False, **kwargs):
+def programmatic_render_to_file(curr_active_pipeline, curr_display_function_name='_display_plot_decoded_epoch_slices', subset_includelist=None, subset_excludelist=None, write_pdf=False, write_png=True, debug_print=False, **kwargs):
     """ Loops through the individual epochs in a session (e.g. ['maze1', 'maze2', 'maze']) analagous to the structure of `programmatic_display_to_PDF` and programmatically calls `perform_write_to_file` with the appropriate parameters.
     Newer Programmatic .png and .pdf outputs
     curr_display_function_name = '_display_plot_decoded_epoch_slices' 
@@ -414,7 +414,7 @@ def programmatic_render_to_file(curr_active_pipeline, curr_display_function_name
 
 
             # ## Build PDF Output Info
-            # active_pdf_metadata, active_pdf_save_filename = build_pdf_metadata_from_display_context(final_context, subset_whitelist=subset_whitelist, subset_blacklist=subset_blacklist)
+            # active_pdf_metadata, active_pdf_save_filename = build_pdf_metadata_from_display_context(final_context, subset_includelist=subset_includelist, subset_excludelist=subset_excludelist)
             # active_pdf_save_path = active_session_figures_out_path.joinpath(active_pdf_save_filename) # build the final output pdf path from the pdf_parent_out_path (which is the daily folder)
 
             # ## BEGIN DISPLAY/SAVE
@@ -452,7 +452,7 @@ def programmatic_render_to_file(curr_active_pipeline, curr_display_function_name
 
 
 @function_attributes(short_name=None, tags=['file','export','output','matplotlib','display','active','PDF','batch','automated'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-05-31 19:16', related_items=[])
-def perform_write_to_file(a_fig, active_identifying_ctx, figures_parent_out_path=None, subset_whitelist=None, subset_blacklist=None, write_pdf=False, write_png=True, register_output_file_fn=None, progress_print=True, debug_print=False):
+def perform_write_to_file(a_fig, active_identifying_ctx, figures_parent_out_path=None, subset_includelist=None, subset_excludelist=None, write_pdf=False, write_png=True, register_output_file_fn=None, progress_print=True, debug_print=False):
     """ Writes a single matplotlib figure out to one or more files based on whether write_png and write_pdf are specified AND registers the output using `register_output_file_fn` if one is provided. 
     
     Aims to eventually replace `programmatic_display_to_PDF` (working for both PDF and PNG outputs, working for global plots, along with successfully registering output files with the pipeline via `register_output_file_fn` argument)
@@ -481,7 +481,7 @@ def perform_write_to_file(a_fig, active_identifying_ctx, figures_parent_out_path
     # PDF: .pdf versions:
     if write_pdf:
         try:
-            active_pdf_metadata, active_pdf_save_filename = build_pdf_metadata_from_display_context(active_identifying_ctx, subset_whitelist=subset_whitelist, subset_blacklist=subset_blacklist)
+            active_pdf_metadata, active_pdf_save_filename = build_pdf_metadata_from_display_context(active_identifying_ctx, subset_includelist=subset_includelist, subset_excludelist=subset_excludelist)
             # print(f'active_pdf_save_filename: {active_pdf_save_filename}')
             curr_pdf_save_path = figures_parent_out_path.joinpath(active_pdf_save_filename) # build the final output pdf path from the pdf_parent_out_path (which is the daily folder)        
             with backend_pdf.PdfPages(curr_pdf_save_path, keep_empty=False, metadata=active_pdf_metadata) as pdf:
@@ -500,7 +500,7 @@ def perform_write_to_file(a_fig, active_identifying_ctx, figures_parent_out_path
     if write_png:
         # curr_page_str = f'pg{i+1}of{num_pages}'
         try:
-            curr_fig_save_basename = build_figure_basename_from_display_context(active_identifying_ctx, subset_whitelist=subset_whitelist, subset_blacklist=subset_blacklist, context_tuple_join_character='_')
+            curr_fig_save_basename = build_figure_basename_from_display_context(active_identifying_ctx, subset_includelist=subset_includelist, subset_excludelist=subset_excludelist, context_tuple_join_character='_')
             curr_fig_save_path = figures_parent_out_path.joinpath(curr_fig_save_basename)
             fig_png_out_path = curr_fig_save_path.with_suffix('.png')
             # fig_png_out_path = fig_png_out_path.with_stem(f'{curr_pdf_save_path.stem}_{curr_page_str}') # note this replaces the current .pdf extension with .png, resulting in a good filename for a .png
@@ -607,10 +607,10 @@ def batch_plot_local_context(curr_active_pipeline, curr_display_function_name='_
             out_fig_list = []
             
             # all display functions should return: their final display context, their figures, their optional save function override?
-            
+
 
             # ## Build PDF Output Info
-            # active_pdf_metadata, active_pdf_save_filename = build_pdf_metadata_from_display_context(final_context, subset_whitelist=subset_whitelist, subset_blacklist=subset_blacklist)
+            # active_pdf_metadata, active_pdf_save_filename = build_pdf_metadata_from_display_context(final_context, subset_includelist=subset_includelist, subset_excludelist=subset_excludelist)
             # active_pdf_save_path = active_session_figures_out_path.joinpath(active_pdf_save_filename) # build the final output pdf path from the pdf_parent_out_path (which is the daily folder)
 
             # ## BEGIN DISPLAY/SAVE

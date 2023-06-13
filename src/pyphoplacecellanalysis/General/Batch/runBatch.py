@@ -295,9 +295,9 @@ def run_specific_batch(active_batch_run: BatchRun, curr_session_context: Identif
     # ==================================================================================================================== #
     # Load Pipeline                                                                                                        #
     # ==================================================================================================================== #
-    # epoch_name_whitelist = ['maze']
-    epoch_name_whitelist = kwargs.pop('epoch_name_whitelist', None)
-    active_computation_functions_name_whitelist = kwargs.pop('computation_functions_name_whitelist', None) or ['_perform_baseline_placefield_computation',
+    # epoch_name_includelist = ['maze']
+    epoch_name_includelist = kwargs.pop('epoch_name_includelist', None)
+    active_computation_functions_name_includelist = kwargs.pop('computation_functions_name_includelist', None) or ['_perform_baseline_placefield_computation',
                                             # '_perform_time_dependent_placefield_computation',
                                             # '_perform_extended_statistics_computation',
                                             '_perform_position_decoding_computation', 
@@ -314,8 +314,8 @@ def run_specific_batch(active_batch_run: BatchRun, curr_session_context: Identif
     debug_print = kwargs.pop('debug_print', False)
 
     try:
-        curr_active_pipeline = batch_load_session(active_batch_run.global_data_root_parent_path, active_data_mode_name, basedir, epoch_name_whitelist=epoch_name_whitelist,
-                                        computation_functions_name_whitelist=active_computation_functions_name_whitelist,
+        curr_active_pipeline = batch_load_session(active_batch_run.global_data_root_parent_path, active_data_mode_name, basedir, epoch_name_includelist=epoch_name_includelist,
+                                        computation_functions_name_includelist=active_computation_functions_name_includelist,
                                         saving_mode=saving_mode, force_reload=force_reload, skip_extended_batch_computations=skip_extended_batch_computations, debug_print=debug_print, fail_on_exception=fail_on_exception, **kwargs)
         try:
             if post_run_callback_fn is not None:

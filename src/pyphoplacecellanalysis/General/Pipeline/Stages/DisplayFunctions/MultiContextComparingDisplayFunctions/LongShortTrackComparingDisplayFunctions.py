@@ -62,7 +62,7 @@ class LongShortTrackComparingDisplayFunctions(AllFunctionEnumeratingMixin, metac
     """
 
     @function_attributes(short_name='jonathan_interactive_replay_firing_rate_comparison', tags=['display','interactive','jonathan', 'firing_rate', 'pyqtgraph'], input_requires=[], output_provides=[], uses=['_make_jonathan_interactive_plot'], used_by=[], creation_date='2023-04-11 03:14', is_global=True)
-    def _display_jonathan_interactive_replay_firing_rate_comparison(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_whitelist=None, included_neuron_types=None, require_placefield=True, save_figure=True, **kwargs):
+    def _display_jonathan_interactive_replay_firing_rate_comparison(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, included_neuron_types=None, require_placefield=True, save_figure=True, **kwargs):
             """ Jonathan's interactive display. Currently hacked up to directly compute the results to display within this function
                 Internally calls `_make_jonathan_interactive_plot(...)`
 
@@ -71,17 +71,17 @@ class LongShortTrackComparingDisplayFunctions(AllFunctionEnumeratingMixin, metac
                 curr_active_pipeline.display('_display_jonathan_interactive_replay_firing_rate_comparison', active_identifying_session_ctx)
 
             """
-            if include_whitelist is None:
-                include_whitelist = owning_pipeline_reference.active_completed_computation_result_names # ['maze', 'sprinkle']
+            if include_includelist is None:
+                include_includelist = owning_pipeline_reference.active_completed_computation_result_names # ['maze', 'sprinkle']
 
             if included_neuron_types is None:
                 included_neuron_types = NeuronType.from_any_string_series(['pyr'])
 
 
-            long_epoch_name = include_whitelist[0] # 'maze1_PYR'
-            short_epoch_name = include_whitelist[1] # 'maze2_PYR'
-            if len(include_whitelist) > 2:
-                global_epoch_name = include_whitelist[-1] # 'maze_PYR'
+            long_epoch_name = include_includelist[0] # 'maze1_PYR'
+            short_epoch_name = include_includelist[1] # 'maze2_PYR'
+            if len(include_includelist) > 2:
+                global_epoch_name = include_includelist[-1] # 'maze_PYR'
             else:
                 print(f'WARNING: no global_epoch detected.')
                 global_epoch_name = '' # None
@@ -89,7 +89,7 @@ class LongShortTrackComparingDisplayFunctions(AllFunctionEnumeratingMixin, metac
 
             NeuronType
 
-            print(f'include_whitelist: {include_whitelist}\nlong_epoch_name: {long_epoch_name}, short_epoch_name: {short_epoch_name}, global_epoch_name: {global_epoch_name}')
+            print(f'include_includelist: {include_includelist}\nlong_epoch_name: {long_epoch_name}, short_epoch_name: {short_epoch_name}, global_epoch_name: {global_epoch_name}')
             pf1d_long = computation_results[long_epoch_name]['computed_data']['pf1D']
             pf1d_short = computation_results[short_epoch_name]['computed_data']['pf1D']
             pf1d = computation_results[global_epoch_name]['computed_data']['pf1D']
@@ -127,7 +127,7 @@ class LongShortTrackComparingDisplayFunctions(AllFunctionEnumeratingMixin, metac
             return graphics_output_dict
 
     @function_attributes(short_name='batch_pho_jonathan_replay_firing_rate_comparison', tags=['display','jonathan', 'firing_rate', 'matplotlib', 'batch'], input_requires=[], output_provides=[], uses=['_make_pho_jonathan_batch_plots'], used_by=[], creation_date='2023-04-11 03:14', is_global=True)
-    def _display_batch_pho_jonathan_replay_firing_rate_comparison(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_whitelist=None, defer_render=False, save_figure=True, **kwargs):
+    def _display_batch_pho_jonathan_replay_firing_rate_comparison(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, defer_render=False, save_figure=True, **kwargs):
             """ Stacked Jonathan-style firing-rate-across-epochs-plot. Pho's batch adaptation of the primary elements from Jonathan's interactive display.
                 Usage:
 
@@ -142,14 +142,14 @@ class LongShortTrackComparingDisplayFunctions(AllFunctionEnumeratingMixin, metac
                     curr_firing_rate_ax, curr_lap_spikes_ax, curr_placefield_ax = curr_axs_dict['firing_rate'], curr_axs_dict['lap_spikes'], curr_axs_dict['placefield'] # Extract variables from the `curr_axs_dict` dictionary to the local workspace
 
             """
-            if include_whitelist is None:
-                include_whitelist = owning_pipeline_reference.active_completed_computation_result_names # ['maze', 'sprinkle']
+            if include_includelist is None:
+                include_includelist = owning_pipeline_reference.active_completed_computation_result_names # ['maze', 'sprinkle']
 
-            long_epoch_name = include_whitelist[0] # 'maze1_PYR'
-            short_epoch_name = include_whitelist[1] # 'maze2_PYR'
-            assert len(include_whitelist) > 2
-            global_epoch_name = include_whitelist[-1] # 'maze_PYR'
-            print(f'include_whitelist: {include_whitelist}\nlong_epoch_name: {long_epoch_name}, short_epoch_name: {short_epoch_name}, global_epoch_name: {global_epoch_name}')
+            long_epoch_name = include_includelist[0] # 'maze1_PYR'
+            short_epoch_name = include_includelist[1] # 'maze2_PYR'
+            assert len(include_includelist) > 2
+            global_epoch_name = include_includelist[-1] # 'maze_PYR'
+            print(f'include_includelist: {include_includelist}\nlong_epoch_name: {long_epoch_name}, short_epoch_name: {short_epoch_name}, global_epoch_name: {global_epoch_name}')
 
             ## TODO: move this computation elsewhere, this is BAD:
             long_results = computation_results[long_epoch_name]
@@ -227,7 +227,7 @@ class LongShortTrackComparingDisplayFunctions(AllFunctionEnumeratingMixin, metac
             return graphics_output_dict
 
     @function_attributes(short_name='short_long_pf1D_comparison', tags=['long_short','1D','placefield'], conforms_to=['output_registering', 'figure_saving'], input_requires=[], output_provides=[], uses=['plot_short_v_long_pf1D_comparison'], used_by=[], creation_date='2023-04-26 06:12', is_global=True)
-    def _display_short_long_pf1D_comparison(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_whitelist=None, save_figure=True, **kwargs):
+    def _display_short_long_pf1D_comparison(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, save_figure=True, **kwargs):
             """ Displays a figure for comparing the 1D placefields across-epochs (between the short and long tracks). By default renders the second track's placefield flipped over the x-axis and hatched. 
                 Usage:
 
@@ -253,15 +253,15 @@ class LongShortTrackComparingDisplayFunctions(AllFunctionEnumeratingMixin, metac
             long_kwargs = kwargs.pop('long_kwargs', None)
             short_kwargs = kwargs.pop('short_kwargs', None)
 
-            if include_whitelist is None:
-                include_whitelist = owning_pipeline_reference.active_completed_computation_result_names # ['maze', 'sprinkle']
+            if include_includelist is None:
+                include_includelist = owning_pipeline_reference.active_completed_computation_result_names # ['maze', 'sprinkle']
 
-            long_epoch_name = include_whitelist[0] # 'maze1_PYR'
-            short_epoch_name = include_whitelist[1] # 'maze2_PYR'
-            assert len(include_whitelist) > 2
-            global_epoch_name = include_whitelist[-1] # 'maze_PYR'
+            long_epoch_name = include_includelist[0] # 'maze1_PYR'
+            short_epoch_name = include_includelist[1] # 'maze2_PYR'
+            assert len(include_includelist) > 2
+            global_epoch_name = include_includelist[-1] # 'maze_PYR'
             if debug_print:
-                print(f'include_whitelist: {include_whitelist}\nlong_epoch_name: {long_epoch_name}, short_epoch_name: {short_epoch_name}, global_epoch_name: {global_epoch_name}')           
+                print(f'include_includelist: {include_includelist}\nlong_epoch_name: {long_epoch_name}, short_epoch_name: {short_epoch_name}, global_epoch_name: {global_epoch_name}')           
     
             long_results = computation_results[long_epoch_name]['computed_data']
             short_results = computation_results[short_epoch_name]['computed_data']
@@ -291,7 +291,7 @@ class LongShortTrackComparingDisplayFunctions(AllFunctionEnumeratingMixin, metac
             return graphics_output_dict
 
     @function_attributes(short_name='short_long_pf1D_scalar_overlap_comparison', tags=['display','long_short'], conforms_to=['output_registering', 'figure_saving'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-06-08 12:44', is_global=True)
-    def _display_short_long_pf1D_scalar_overlap_comparison(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_whitelist=None, save_figure=True, **kwargs):
+    def _display_short_long_pf1D_scalar_overlap_comparison(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, save_figure=True, **kwargs):
             """ Displays a figure for comparing the scalar comparison quantities computed for 1D placefields across-epochs (between the short and long tracks)
                 This currently renders as a bar-graph
 
@@ -319,15 +319,15 @@ class LongShortTrackComparingDisplayFunctions(AllFunctionEnumeratingMixin, metac
             single_figure = kwargs.pop('single_figure', True)
             debug_print = kwargs.pop('debug_print', False)
 
-            if include_whitelist is None:
-                include_whitelist = owning_pipeline_reference.active_completed_computation_result_names # ['maze', 'sprinkle']
+            if include_includelist is None:
+                include_includelist = owning_pipeline_reference.active_completed_computation_result_names # ['maze', 'sprinkle']
 
-            long_epoch_name = include_whitelist[0] # 'maze1_PYR'
-            short_epoch_name = include_whitelist[1] # 'maze2_PYR'
-            assert len(include_whitelist) > 2
-            global_epoch_name = include_whitelist[-1] # 'maze_PYR'
+            long_epoch_name = include_includelist[0] # 'maze1_PYR'
+            short_epoch_name = include_includelist[1] # 'maze2_PYR'
+            assert len(include_includelist) > 2
+            global_epoch_name = include_includelist[-1] # 'maze_PYR'
             if debug_print:
-                print(f'include_whitelist: {include_whitelist}\nlong_epoch_name: {long_epoch_name}, short_epoch_name: {short_epoch_name}, global_epoch_name: {global_epoch_name}')           
+                print(f'include_includelist: {include_includelist}\nlong_epoch_name: {long_epoch_name}, short_epoch_name: {short_epoch_name}, global_epoch_name: {global_epoch_name}')           
     
             short_long_pf_overlap_analyses_results = global_computation_results['computed_data']['short_long_pf_overlap_analyses']
             pf_neurons_diff = short_long_pf_overlap_analyses_results['short_long_neurons_diff'] # get shared neuron info:
@@ -370,7 +370,7 @@ class LongShortTrackComparingDisplayFunctions(AllFunctionEnumeratingMixin, metac
             return graphics_output_dict
 
     @function_attributes(short_name='short_long_firing_rate_index_comparison', tags=['display','long_short','short_long','firing_rate', 'fr_index'], conforms_to=['output_registering', 'figure_saving'], input_requires=[], output_provides=[], uses=['_plot_long_short_firing_rate_indicies'], used_by=[], creation_date='2023-04-11 08:08', is_global=True)
-    def _display_short_long_firing_rate_index_comparison(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_whitelist=None, defer_render=False, save_figure=True, **kwargs):
+    def _display_short_long_firing_rate_index_comparison(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, defer_render=False, save_figure=True, **kwargs):
             """ Displays a figure for comparing the 1D placefields across-epochs (between the short and long tracks)
                 Usage:
 
@@ -414,7 +414,7 @@ class LongShortTrackComparingDisplayFunctions(AllFunctionEnumeratingMixin, metac
             return graphics_output_dict
 
     @function_attributes(short_name=None, tags=['display', 'long_short', 'laps', 'position', 'behavior'], conforms_to=['output_registering', 'figure_saving'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-05-29 18:20', related_items=[], is_global=True)
-    def _display_long_short_laps(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_whitelist=None, save_figure=True, **kwargs):
+    def _display_long_short_laps(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, save_figure=True, **kwargs):
             """ Displays a figure displaying the 1D laps detected for both the long and short tracks.
                 Usage:
 
@@ -450,7 +450,7 @@ class LongShortTrackComparingDisplayFunctions(AllFunctionEnumeratingMixin, metac
             return graphics_output_dict
 
     @function_attributes(short_name='long_and_short_firing_rate_replays_v_laps', tags=['display','long_short','firing_rate'], conforms_to=['output_registering', 'figure_saving'], input_requires=[], output_provides=[], uses=['_plot_session_long_short_track_firing_rate_figures'], used_by=[], creation_date='2023-06-08 10:22', is_global=True)
-    def _display_long_and_short_firing_rate_replays_v_laps(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_whitelist=None, save_figure=True, **kwargs):
+    def _display_long_and_short_firing_rate_replays_v_laps(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, save_figure=True, **kwargs):
         """ Displays two figures, one for the long and one for the short track, that compare the firing rates during running (laps) and those during decoded replays.
             Usage:
             
@@ -472,7 +472,7 @@ class LongShortTrackComparingDisplayFunctions(AllFunctionEnumeratingMixin, metac
         return graphics_output_dict
 
     @function_attributes(short_name='running_and_replay_speeds_over_time', tags=['speed', 'laps', 'replay', 'velocity', 'time', 'running', 'fit'], conforms_to=['output_registering', 'figure_saving'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-06-07 21:13', related_items=[], is_global=True)
-    def _display_running_and_replay_speeds_over_time(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_whitelist=None, save_figure=True, **kwargs):
+    def _display_running_and_replay_speeds_over_time(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, save_figure=True, **kwargs):
         """ plots the animal's running speed and the decoded replay velocities (as computed by the Radon transform method) across the recording session. 
         Renders a vertical stack of two subplots.
         
@@ -577,7 +577,7 @@ class LongShortTrackComparingDisplayFunctions(AllFunctionEnumeratingMixin, metac
         return graphics_output_dict
     
     @function_attributes(short_name='long_short_expected_v_observed_firing_rate', tags=['display','long_short','firing_rate', 'expected','observed'], conforms_to=['output_registering', 'figure_saving'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-06-08 10:48', is_global=True)
-    def _display_long_short_expected_v_observed_firing_rate(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_whitelist=None, defer_render=False, save_figure=True, **kwargs):
+    def _display_long_short_expected_v_observed_firing_rate(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, defer_render=False, save_figure=True, **kwargs):
         """ Displays expected v observed firing rate for each cell independently
 
         """
@@ -685,7 +685,7 @@ class LongShortTrackComparingDisplayFunctions(AllFunctionEnumeratingMixin, metac
         return graphics_output_dict
 
     @function_attributes(short_name=None, tags=['long_short_stacked_epoch_slices'], conforms_to=['output_registering', 'figure_saving'], input_requires=[], output_provides=[], uses=['plot_decoded_epoch_slices_paginated'], used_by=[], creation_date='2023-06-02 14:12', is_global=True)
-    def _display_long_and_short_stacked_epoch_slices(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_whitelist=None, defer_render=False, save_figure=True, **kwargs):
+    def _display_long_and_short_stacked_epoch_slices(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, defer_render=False, save_figure=True, **kwargs):
         """ Plots two figures showing the entire stack of decoded epochs for both the long and short, including their Radon transformed lines if that information is available.
 
         """
