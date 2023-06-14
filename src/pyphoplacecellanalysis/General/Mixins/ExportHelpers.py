@@ -5,6 +5,9 @@ from pathlib import Path
 from typing import List
 import pandas as pd
 import numpy as np
+from attrs import define, field, Factory
+
+from neuropy.utils.result_context import IdentifyingContext
 
 from pyphocorehelpers.DataStructure.dynamic_parameters import DynamicParameters
 from pyphocorehelpers.function_helpers import function_attributes
@@ -228,6 +231,184 @@ def build_figure_basename_from_display_context(active_identifying_ctx, subset_in
         print(f'fig_save_basename: "{fig_save_basename}"')
     return fig_save_basename
 
+
+# ==================================================================================================================== #
+# 2023-06-14 - Configurable Figure Output Functions                                                                    #
+# ==================================================================================================================== #
+
+
+class FigureOutputLocation(Enum):
+    """Docstring for FigureOutputLocation."""
+    DAILY_PROGRAMMATIC_OUTPUT_FOLDER = "daily_programmatic_output_folder" # the common folder for today's date
+    SESSION_OUTPUT_FOLDER = "session_output_folder" # the session-specific output folder. f"{session_path}/output/figures"
+    CUSTOM = "custom" # other folder. Must be specified.
+    
+    def get_figures_output_parent_path(self, overriding_root_path=None, make_folder_if_needed:bool=True) -> Path:
+        """ DAILY_PROGRAMMATIC_OUTPUT_FOLDER: All figures are located in a subdirectory of a daily programmatic output folder:
+        /c/Users/pho/repos/Spike3DWorkEnv/Spike3D/EXTERNAL/Screenshots/ProgrammaticDisplayFunctionTesting/2023-06-14/kdiba/gor01/two/2006-6-08_21-16-25/kdiba_gor01_two_2006-6-08_21-16-25_batch_pho_jonathan_replay_firing_rate_comparison.png
+        """
+        if self.name == FigureOutputLocation.DAILY_PROGRAMMATIC_OUTPUT_FOLDER.name:
+            # figures_parent_out_path = create_daily_programmatic_display_function_testing_folder_if_needed()
+            out_day_date_folder_name = datetime.today().strftime('%Y-%m-%d') # A string with the day's date like '2022-01-16'
+            relative_out_path = Path(r'EXTERNAL/Screenshots/ProgrammaticDisplayFunctionTesting').joinpath(out_day_date_folder_name)
+            
+            if overriding_root_path is not None:
+                if isinstance(overriding_root_path, str):
+                    overriding_root_path = Path(overriding_root_path)
+                assert isinstance(overriding_root_path, Path)
+                absolute_out_path = overriding_root_path.joinpath(relative_out_path).resolve()
+            else:
+                absolute_out_path = relative_out_path.resolve()
+            
+        elif self.name == FigureOutputLocation.SESSION_OUTPUT_FOLDER.name:
+            raise NotImplementedError
+            absolute_out_path = None
+        else:
+            raise NotImplementedError
+
+        # end if		
+        if make_folder_if_needed:
+            absolute_out_path.mkdir(exist_ok=True, parents=True) # parents=True creates all necessary parent folders
+        return absolute_out_path
+
+
+class ContextToPathMode(Enum):
+    """ Controls how hierarchical contexts (IdentityContext) are mapped to relative output paths.
+    In HIERARCHY_UNIQUE mode the folder hierarchy partially specifies the context (mainly the session part, e.g. './kdiba/gor01/two/2006-6-08_21-16-25/') so the filenames don't need to be completely unique (they can drop the 'kdiba_gor01_two_2006-6-08_21-16-25_' portion)
+        'output/kdiba/gor01/two/2006-6-08_21-16-25/batch_pho_jonathan_replay_firing_rate_comparison.png
+
+    In GLOBAL_UNIQUE mode the outputs are placed in a flat folder structure ('output/'), meaning the filenames need to be completely unique and specify all parts of the context:
+        'output/kdiba_gor01_two_2006-6-08_21-16-25_batch_pho_jonathan_replay_firing_rate_comparison.png'
+    """
+    HIERARCHY_UNIQUE = "hierarchy_unique"
+    GLOBAL_UNIQUE = "global_unique"
+
+    @function_attributes(tags=['context','output','path','important'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-05-25 12:54')
+    def session_context_to_relative_path(self, parent_path, session_ctx) -> Path:
+        """Only uses the keys that define session: ['format_name','animal','exper_name', 'session_name'] to build the relative path
+
+        Args:
+            parent_path (Path): _description_
+            session_ctx (IdentifyingContext): _description_
+
+        Returns:
+            _type_: _description_
+
+        Usage:
+            from pyphoplacecellanalysis.General.Mixins.ExportHelpers import session_context_to_relative_path
+            
+            curr_sess_ctx = local_session_contexts_list[0]
+            # curr_sess_ctx # IdentifyingContext<('kdiba', 'gor01', 'one', '2006-6-07_11-26-53')>
+            figures_parent_out_path = create_daily_programmatic_display_function_testing_folder_if_needed()
+            session_context_to_relative_path(figures_parent_out_path, curr_sess_ctx)
+
+        """
+        if isinstance(parent_path, str):
+            parent_path = Path(parent_path)
+
+        if self.name == ContextToPathMode.GLOBAL_UNIQUE.name:
+            return parent_path.resolve() # in this mode everything is globally unique, so it's all output in the same base folder. Just return the unaltered base folder.
+
+        elif self.name == ContextToPathMode.HIERARCHY_UNIQUE.name:
+            subset_includelist=['format_name','animal','exper_name', 'session_name']
+            all_keys_found, found_keys, missing_keys = session_ctx.check_keys(subset_includelist, debug_print=False)
+            if not all_keys_found:
+                print(f'WARNING: missing {len(missing_keys)} keys from context: {missing_keys}. Building path anyway.')
+            curr_sess_ctx_tuple = session_ctx.as_tuple(subset_includelist=subset_includelist, drop_missing=True) # ('kdiba', 'gor01', 'one', '2006-6-07_11-26-53')
+            return parent_path.joinpath(*curr_sess_ctx_tuple).resolve()
+        else:
+            raise NotImplementedError
+
+    @function_attributes(tags=['figure','context','output','path','important'], input_requires=[], output_provides=[], uses=[], used_by=['build_pdf_metadata_from_display_context'], creation_date='2023-05-25 12:54')
+    def build_figure_basename_from_display_context(self, active_identifying_ctx, subset_includelist=None, subset_excludelist=None, context_tuple_join_character='_', debug_print=False) -> str:
+        """ 
+        Usage:
+            from pyphoplacecellanalysis.General.Mixins.ExportHelpers import build_figure_basename_from_display_context
+            curr_fig_save_basename = build_figure_basename_from_display_context(active_identifying_ctx, context_tuple_join_character='_')
+            >>> 'kdiba_2006-6-09_1-22-43_batch_plot_test_long_only'
+        """
+        subset_excludelist = (subset_excludelist or [])
+        
+        if self.name == ContextToPathMode.GLOBAL_UNIQUE.name:
+            ## Note that active_identifying_ctx.as_tuple() can have non-string elements (e.g. debug_test_max_num_slices=128, which is an int). This is what we want, but for setting the metadata we need to convert them to strings
+            pass # nothing needs to be added to the subset_exclude list
+
+        elif self.name == ContextToPathMode.HIERARCHY_UNIQUE.name:
+            session_subset_excludelist = ['format_name','animal','exper_name', 'session_name']
+            subset_excludelist = subset_excludelist + session_subset_excludelist # add the session keys to the subset_excludelist
+        else:
+            raise NotImplementedError
+        
+        context_tuple = [str(v) for v in list(active_identifying_ctx.as_tuple(subset_includelist=subset_includelist, subset_excludelist=subset_excludelist, drop_missing=True))]
+        fig_save_basename = context_tuple_join_character.join(context_tuple) # joins the elements of the context_tuple with '_'
+        if debug_print:
+            print(f'fig_save_basename: "{fig_save_basename}"')
+        return fig_save_basename
+
+
+
+
+@define(slots=False)
+class FigureOutputManager:
+    """ 2023-06-14 - Manages figure output. Singleton/not persisted.
+
+    Usage:
+        fig_man = FigureOutputManager(figure_output_location=FigureOutputLocation.DAILY_PROGRAMMATIC_OUTPUT_FOLDER, context_to_path_mode=ContextToPathMode.GLOBAL_UNIQUE)
+        test_context = IdentifyingContext(format_name='kdiba',animal='gor01',exper_name='one',session_name='2006-6-08_14-26-15',display_fn_name='display_long_short_laps')
+        fig_man.get_figure_output_path(test_context, make_folder_if_needed=False)
+        >>> Path('/home/halechr/repo/Spike3D/EXTERNAL/Screenshots/ProgrammaticDisplayFunctionTesting/2023-06-14/kdiba_gor01_one_2006-6-08_14-26-15_display_long_short_laps')
+    """
+    figure_output_location: FigureOutputLocation
+    context_to_path_mode: ContextToPathMode
+    
+    def get_figure_output_path(self, final_context: IdentifyingContext, make_folder_if_needed:bool=True, **kwargs) -> Path:
+        """ gets the final output path for the figure to be saved specified by final_context """
+        figures_parent_out_path = self.figure_output_location.get_figures_output_parent_path(make_folder_if_needed=make_folder_if_needed)
+        fig_save_path = self.context_to_path_mode.session_context_to_relative_path(figures_parent_out_path, session_ctx=final_context)
+        if make_folder_if_needed:
+            fig_save_path.mkdir(parents=True, exist_ok=True) # make folder if needed
+        fig_save_basename = self.context_to_path_mode.build_figure_basename_from_display_context(final_context, **kwargs)
+        return fig_save_path.joinpath(fig_save_basename).resolve()
+        
+
+
+# def get_relative_path(self, context: IdentifyingContext) -> Path:
+    # 	""" 
+    # 	curr_fig_save_basename = build_figure_basename_from_display_context(active_identifying_ctx, subset_includelist=subset_includelist, subset_excludelist=subset_excludelist, context_tuple_join_character='_')
+    # 	curr_fig_save_path = figures_parent_out_path.joinpath(curr_fig_save_basename)
+    # 	fig_png_out_path = curr_fig_save_path.with_suffix('.png')
+        
+    # 	active_pdf_metadata, active_pdf_save_filename = build_pdf_metadata_from_display_context(active_identifying_ctx, subset_includelist=subset_includelist, subset_excludelist=subset_excludelist)
+        
+    # 	figures_parent_out_path = create_daily_programmatic_display_function_testing_folder_if_needed()
+        
+    # 	active_out_figure_paths, final_context = curr_active_pipeline.write_figure_to_output_path(fig=fig, figures_parent_out_path=active_session_figures_out_path, display_context=extracted_context, write_pdf=write_pdf, write_png=write_png, debug_print=debug_print) # TODO: store this `final_context` too.
+    # 	all_out_fig_paths.extend(active_out_figure_paths)
+        
+        
+    # 	 ## Get the output path (active_session_figures_out_path) for this session (and all of its filtered_contexts as well):
+    # 	active_identifying_session_ctx = curr_active_pipeline.sess.get_context() # 'bapun_RatN_Day4_2019-10-15_11-30-06'
+    # 	figures_parent_out_path = create_daily_programmatic_display_function_testing_folder_if_needed()
+    # 	active_session_figures_out_path = session_context_to_relative_path(figures_parent_out_path, active_identifying_session_ctx)
+    # 	if debug_print:
+    # 		print(f'curr_session_parent_out_path: {active_session_figures_out_path}')
+    # 	active_session_figures_out_path.mkdir(parents=True, exist_ok=True) # make folder if needed
+        
+        
+    # 	"""
+    # 	if self.name == ContextToPathMode.GLOBAL_UNIQUE.name:
+    # 		pass
+    # 	elif self.name == ContextToPathMode.HIERARCHY_UNIQUE.name:
+    # 		pass
+    # 	else:
+    # 		raise NotImplementedError
+
+
+
+
+# ==================================================================================================================== #
+# Split Pre-2023-06-14 Functions                                                                                       #
+# ==================================================================================================================== #
 
 @function_attributes(tags=['figure','pdf','context','output','path','important'], input_requires=[], output_provides=[], uses=['build_figure_basename_from_display_context'], used_by=[], creation_date='2023-05-25 12:54')
 def build_pdf_metadata_from_display_context(active_identifying_ctx, subset_includelist=None, subset_excludelist=None, debug_print=False):
