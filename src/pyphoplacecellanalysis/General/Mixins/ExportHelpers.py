@@ -414,10 +414,16 @@ def programmatic_render_to_file(curr_active_pipeline, curr_display_function_name
             try:
                 extracted_context = out_display_var.context
             except Exception as e:
-                # raise e
                 print(f'could not extract the context: {e}')
+                # raise e
+                extracted_context = None
+
+
+            if extracted_context is None:
                 active_identifying_display_ctx = a_filtered_context.adding_context('display_fn', display_fn_name=curr_display_function_name)
                 extracted_context = active_identifying_display_ctx
+                if hasattr(out_display_var, 'context'):
+                    out_display_var.context = extracted_context
                 
             # Extract the figures:
             out_fig_list = extract_figures_from_display_function_output(out_display_var=out_display_var, out_fig_list=[]) # I think out_fig_list needs to be [] so it doesn't accumulate figures over the filtered_context?

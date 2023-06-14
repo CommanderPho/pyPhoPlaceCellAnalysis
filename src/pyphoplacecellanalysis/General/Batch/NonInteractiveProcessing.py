@@ -393,22 +393,22 @@ def batch_programmatic_figures(curr_active_pipeline):
 # import matplotlib as mpl
 # import matplotlib.pyplot as plt
 @function_attributes(short_name='batch_extended_programmatic_figures', tags=['batch', 'automated', 'session', 'display', 'figures', 'extended', 'matplotlib'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-03-28 04:46')
-def batch_extended_programmatic_figures(curr_active_pipeline):
+def batch_extended_programmatic_figures(curr_active_pipeline, write_pdf=False, write_png=True, debug_print=True):
     _bak_rcParams = mpl.rcParams.copy()
     mpl.rcParams['toolbar'] = 'None' # disable toolbars
     matplotlib.use('AGG') # non-interactive backend ## 2022-08-16 - Surprisingly this works to make the matplotlib figures render only to .png file, not appear on the screen!
     # active_identifying_session_ctx = curr_active_pipeline.sess.get_context() # 'bapun_RatN_Day4_2019-10-15_11-30-06'
-    programmatic_display_to_PDF(curr_active_pipeline, curr_display_function_name='_display_1d_placefields', debug_print=False) # 🟢✅ Now seems to be working and saving to PDF!! Still using matplotlib.use('Qt5Agg') mode and plots still appear.
-    programmatic_display_to_PDF(curr_active_pipeline, curr_display_function_name='_display_1d_placefield_validations') # , filter_name=active_config_name 🟢✅ Now seems to be working and saving to PDF!! Still using matplotlib.use('Qt5Agg') mode and plots still appear. Moderate visual improvements can still be made (titles overlap and stuff). Works with %%capture
-    programmatic_display_to_PDF(curr_active_pipeline, curr_display_function_name='_display_2d_placefield_result_plot_ratemaps_2D') #  🟢✅ Now seems to be working and saving to PDF!! Still using matplotlib.use('Qt5Agg') mode and plots still appear.
-    programmatic_display_to_PDF(curr_active_pipeline, curr_display_function_name='_display_2d_placefield_occupancy') #  🟢✅ 2023-05-25
+    programmatic_render_to_file(curr_active_pipeline, curr_display_function_name='_display_1d_placefields', write_pdf=write_pdf, write_png=write_png, debug_print=debug_print) # 🟢✅ Now seems to be working and saving to PDF!! Still using matplotlib.use('Qt5Agg') mode and plots still appear.
+    
+    # '_display_1d_placefield_validations' can't use `programmatic_render_to_file` yet and must rely on `programmatic_display_to_PDF` because it doesn't get a new session for each figure and it overwrites itself a bunch
+    programmatic_display_to_PDF(curr_active_pipeline, curr_display_function_name='_display_1d_placefield_validations', debug_print=debug_print) # , filter_name=active_config_name 🟢✅ Now seems to be working and saving to PDF!! Still using matplotlib.use('Qt5Agg') mode and plots still appear. Moderate visual improvements can still be made (titles overlap and stuff). Works with %%capture
+    # programmatic_render_to_file(curr_active_pipeline, curr_display_function_name='_display_1d_placefield_validations', write_pdf=write_pdf, write_png=write_png, debug_print=debug_print) #  UNTESTED 2023-05-29 
+    
+    programmatic_render_to_file(curr_active_pipeline, curr_display_function_name='_display_2d_placefield_result_plot_ratemaps_2D', write_pdf=write_pdf, write_png=write_png, debug_print=debug_print) #  🟢✅ Now seems to be working and saving to PDF!! Still using matplotlib.use('Qt5Agg') mode and plots still appear.
+    programmatic_render_to_file(curr_active_pipeline, curr_display_function_name='_display_2d_placefield_occupancy', write_pdf=write_pdf, write_png=write_png, debug_print=debug_print) #  🟢✅ 2023-05-25
     # programmatic_display_to_PDF(curr_active_pipeline, curr_display_function_name='_display_long_short_laps') #  UNTESTED 2023-05-29
 
-
-
-    programmatic_render_to_file(curr_active_pipeline, curr_display_function_name='_display_1d_placefields', debug_print=False, write_png=True, write_pdf=True)
-    
-
+   
     # # Plot long|short firing rate index:
     # fig_save_parent_path = Path(r'E:\Dropbox (Personal)\Active\Kamran Diba Lab\Results from 2023-01-20 - LongShort Firing Rate Indicies')
     # long_short_fr_indicies_analysis_results = curr_active_pipeline.global_computation_results.computed_data['long_short_fr_indicies_analysis']
