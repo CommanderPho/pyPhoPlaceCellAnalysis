@@ -433,10 +433,6 @@ def programmatic_render_to_file(curr_active_pipeline, curr_display_function_name
             for fig in out_fig_list:
                 # curr_active_pipeline.write
                 active_out_figure_paths, final_context = curr_active_pipeline.write_figure_to_output_path(fig=fig, figures_parent_out_path=active_session_figures_out_path, display_context=extracted_context, write_pdf=write_pdf, write_png=write_png, debug_print=debug_print) # TODO: store this `final_context` too.
-                # Plots in a shared folder for this session with fully distinct figure names:
-                # active_session_figures_out_path = curr_active_pipeline.get_daily_programmatic_session_output_path()
-                # final_context = curr_active_pipeline.sess.get_context().adding_context('display_fn', display_fn_name='plot_expected_vs_observed').adding_context('display_kwargs', **display_kwargs)
-                # active_out_figure_paths = perform_write_to_file(fig, extracted_context, figures_parent_out_path=active_session_figures_out_path)
                 all_out_fig_paths.extend(active_out_figure_paths)
 
             # ## Build PDF Output Info

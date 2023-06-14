@@ -276,7 +276,7 @@ class LongShortTrackComparingDisplayFunctions(AllFunctionEnumeratingMixin, metac
             def _perform_write_to_file_callback(active_session_figures_out_path: Path = None):
                 ## 2023-05-31 - Reference Output of matplotlib figure to file, along with building appropriate context.
                 active_session_figures_out_path = active_session_figures_out_path or owning_pipeline_reference.get_daily_programmatic_session_output_path()
-                return perform_write_to_file(fig, final_context, figures_parent_out_path=active_session_figures_out_path, register_output_file_fn=owning_pipeline_reference.register_output_file)
+                return perform_write_to_file(fig_short_pf_1D, final_context, figures_parent_out_path=active_session_figures_out_path, register_output_file_fn=owning_pipeline_reference.register_output_file)
             
             if save_figure:
                 active_out_figure_paths = _perform_write_to_file_callback(kwargs.pop('fig_save_parent_path', None))
@@ -364,7 +364,7 @@ class LongShortTrackComparingDisplayFunctions(AllFunctionEnumeratingMixin, metac
                 active_out_figure_paths = _perform_write_to_file_callback(kwargs.pop('fig_save_parent_path', None))
             else:
                 active_out_figure_paths = []
-            graphics_output_dict = MatplotlibRenderPlots(name='_display_short_long_pf1D_poly_overlap_comparison', figures=(fig), axes=(ax), context=final_context, plot_data={'colors': neurons_colors_array}, context=final_context, saved_figures=active_out_figure_paths)
+            graphics_output_dict = MatplotlibRenderPlots(name='_display_short_long_pf1D_poly_overlap_comparison', figures=(fig), axes=(ax), context=final_context, plot_data={'colors': neurons_colors_array}, saved_figures=active_out_figure_paths)
             # graphics_output_dict['plot_data'] = {'sort_indicies': (long_sort_ind, short_sort_ind), 'colors':(long_neurons_colors_array, short_neurons_colors_array)}
 
             return graphics_output_dict
@@ -583,6 +583,7 @@ class LongShortTrackComparingDisplayFunctions(AllFunctionEnumeratingMixin, metac
         """
         def _subfn_prepare_plot_expected_vs_observed(curr_active_pipeline, defer_render:bool):
             """ 2023-06-01 - Sets up the `plot_expected_vs_observed` plot and exports it. 
+            Captures: 'save_figure'
             
             Usage:
                 fig, axes, final_context, active_out_figure_paths = _subfn_prepare_plot_expected_vs_observed(curr_active_pipeline)
@@ -657,6 +658,7 @@ class LongShortTrackComparingDisplayFunctions(AllFunctionEnumeratingMixin, metac
                 raise NotImplementedError
                 
 
+            final_context = curr_active_pipeline.sess.get_context().adding_context('display_fn', display_fn_name='plot_expected_vs_observed').adding_context('display_kwargs', **display_kwargs)
             # print(f'num_neurons: {expected_v_observed_result.num_neurons}')
             # # active_num_rows = min(num_neurons, 20)
             # active_num_rows = expected_v_observed_result.num_neurons
@@ -671,7 +673,6 @@ class LongShortTrackComparingDisplayFunctions(AllFunctionEnumeratingMixin, metac
             if save_figure:
                 ## 2023-05-31 - Reference Output of matplotlib figure to file, along with building appropriate context.
                 active_session_figures_out_path = curr_active_pipeline.get_daily_programmatic_session_output_path()
-                final_context = curr_active_pipeline.sess.get_context().adding_context('display_fn', display_fn_name='plot_expected_vs_observed').adding_context('display_kwargs', **display_kwargs)
                 active_out_figure_paths = perform_write_to_file(fig, final_context, figures_parent_out_path=active_session_figures_out_path, register_output_file_fn=curr_active_pipeline.register_output_file)
             else:
                 active_out_figure_paths = []
