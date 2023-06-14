@@ -364,7 +364,7 @@ class LongShortTrackComparingDisplayFunctions(AllFunctionEnumeratingMixin, metac
                 active_out_figure_paths = _perform_write_to_file_callback(kwargs.pop('fig_save_parent_path', None))
             else:
                 active_out_figure_paths = []
-            graphics_output_dict = MatplotlibRenderPlots(name='_display_short_long_pf1D_poly_overlap_comparison', figures=(fig), axes=(ax), plot_data={'colors': neurons_colors_array}, context=final_context, saved_figures=active_out_figure_paths)
+            graphics_output_dict = MatplotlibRenderPlots(name='_display_short_long_pf1D_poly_overlap_comparison', figures=(fig), axes=(ax), context=final_context, plot_data={'colors': neurons_colors_array}, context=final_context, saved_figures=active_out_figure_paths)
             # graphics_output_dict['plot_data'] = {'sort_indicies': (long_sort_ind, short_sort_ind), 'colors':(long_neurons_colors_array, short_neurons_colors_array)}
 
             return graphics_output_dict
@@ -446,7 +446,7 @@ class LongShortTrackComparingDisplayFunctions(AllFunctionEnumeratingMixin, metac
             else:
                 active_out_figure_paths = []
                             
-            graphics_output_dict = MatplotlibRenderPlots(name='_display_long_short_laps', figures=(fig,), axes=out_axes_list, plot_data={}, saved_figures=active_out_figure_paths)
+            graphics_output_dict = MatplotlibRenderPlots(name='_display_long_short_laps', figures=(fig,), axes=out_axes_list, plot_data={}, context=final_context, saved_figures=active_out_figure_paths)
             return graphics_output_dict
 
     @function_attributes(short_name='long_and_short_firing_rate_replays_v_laps', tags=['display','long_short','firing_rate'], conforms_to=['output_registering', 'figure_saving'], input_requires=[], output_provides=[], uses=['_plot_session_long_short_track_firing_rate_figures'], used_by=[], creation_date='2023-06-08 10:22', is_global=True)
@@ -468,7 +468,7 @@ class LongShortTrackComparingDisplayFunctions(AllFunctionEnumeratingMixin, metac
         else:
             active_out_figure_paths = []
 
-        graphics_output_dict = MatplotlibRenderPlots(name='long_and_short_firing_rate_replays_v_laps', figures=(fig_L, fig_S), axes=(ax_L, ax_S), plot_data={'context': (active_display_context_L, active_display_context_S)}, saved_figures=active_out_figure_paths)
+        graphics_output_dict = MatplotlibRenderPlots(name='long_and_short_firing_rate_replays_v_laps', figures=(fig_L, fig_S), axes=(ax_L, ax_S), context=(active_display_context_L, active_display_context_S), plot_data={'context': (active_display_context_L, active_display_context_S)}, saved_figures=active_out_figure_paths)
         return graphics_output_dict
 
     @function_attributes(short_name='running_and_replay_speeds_over_time', tags=['speed', 'laps', 'replay', 'velocity', 'time', 'running', 'fit'], conforms_to=['output_registering', 'figure_saving'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-06-07 21:13', related_items=[], is_global=True)
@@ -681,7 +681,7 @@ class LongShortTrackComparingDisplayFunctions(AllFunctionEnumeratingMixin, metac
         # BEGIN FUNCTION BODY ________________________________________________________________________________________________ #
         fig, axes, final_context, active_out_figure_paths = _subfn_prepare_plot_expected_vs_observed(owning_pipeline_reference, defer_render=defer_render)
 
-        graphics_output_dict = MatplotlibRenderPlots(name='long_short_expected_v_observed_firing_rate', figures=(fig,), axes=(axes,), plot_data={'context': final_context, 'path': active_out_figure_paths})
+        graphics_output_dict = MatplotlibRenderPlots(name='long_short_expected_v_observed_firing_rate', figures=(fig,), axes=(axes,), context=final_context, plot_data={'context': final_context, 'path': active_out_figure_paths})
         return graphics_output_dict
 
     @function_attributes(short_name=None, tags=['long_short_stacked_epoch_slices'], conforms_to=['output_registering', 'figure_saving'], input_requires=[], output_provides=[], uses=['plot_decoded_epoch_slices_paginated'], used_by=[], creation_date='2023-06-02 14:12', is_global=True)
@@ -728,7 +728,7 @@ class LongShortTrackComparingDisplayFunctions(AllFunctionEnumeratingMixin, metac
 
         # BEGIN FUNCTION BODY ________________________________________________________________________________________________ #
         pagination_controllers, figs, axs, ctxts, out_figure_paths = _subfn_prepare_plot_long_and_short_stacked_epoch_slices(owning_pipeline_reference, defer_render=defer_render, save_figure=save_figure)
-        graphics_output_dict = MatplotlibRenderPlots(name='long_short_stacked_epoch_slices', figures=figs, axes=axs, plot_data={'context': ctxts, 'path': out_figure_paths})
+        graphics_output_dict = MatplotlibRenderPlots(name='long_short_stacked_epoch_slices', figures=figs, axes=axs, context=ctxts, plot_data={'context': ctxts, 'path': out_figure_paths})
         if not defer_render:
             graphics_output_dict.plot_data['controllers'] = pagination_controllers
             
