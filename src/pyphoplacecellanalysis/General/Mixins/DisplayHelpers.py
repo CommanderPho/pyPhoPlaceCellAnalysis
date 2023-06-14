@@ -25,14 +25,14 @@ def _save_displayed_figure_if_needed(plotting_config, plot_type_name='plot', act
     
 # Post plotting figure helpers:
 @function_attributes(short_name=None, tags=['save','figure','param','text','text_box'], input_requires=[], output_provides=[], uses=[], used_by=['_display_2d_placefield_result_plot_ratemaps_2D'], creation_date='2023-05-11 19:55', related_items=[])
-def _display_add_computation_param_text_box(fig, computation_config):
+def _display_add_computation_param_text_box(fig, computation_config, **kwargs):
     """ Adds a small box containing the computation parmaters to the matplotlib figure. 
     Usage:
         _display_add_computation_param_text_box(plt.gcf(), active_session_computation_config)
     """
     if fig is None:
         fig = plt.gcf()
-    render_text = computation_config.str_for_attributes_list_display(key_val_sep_char=':')
+    render_text = computation_config.str_for_attributes_list_display(key_val_sep_char=':', **kwargs)
     return add_figure_text_box(fig, render_text=render_text)
 # used by _display_2d_placefield_result_plot_ratemaps_2D
 

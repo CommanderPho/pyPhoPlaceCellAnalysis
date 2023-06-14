@@ -399,19 +399,38 @@ def programmatic_render_to_file(curr_active_pipeline, curr_display_function_name
             if debug_print:
                 print(f'filter_name: {filter_name}: "{a_filtered_context.get_description()}"')
             # Get the desired display function context:
-            active_identifying_display_ctx = a_filtered_context.adding_context('display_fn', display_fn_name=curr_display_function_name)
+            
             # final_context = active_identifying_display_ctx # Display only context    
 
             # # Add in the desired display variable:
-            active_identifying_ctx = active_identifying_display_ctx.adding_context('filter_epochs', **active_display_fn_kwargs) # , filter_epochs='ripple' ## TODO: this is only right for a single function!
-            final_context = active_identifying_ctx # Display/Variable context mode
+            # active_identifying_ctx = active_identifying_display_ctx.adding_context('filter_epochs', **active_display_fn_kwargs) # , filter_epochs='ripple' ## TODO: this is only right for a single function!
+            # final_context = active_identifying_ctx # Display/Variable context mode
 
-            active_identifying_ctx_string = final_context.get_description(separator='|') # Get final discription string
-            if debug_print:
-                print(f'active_identifying_ctx_string: "{active_identifying_ctx_string}"')
+            out_display_var = curr_active_pipeline.display(curr_display_function_name, a_filtered_context, **active_display_fn_kwargs)
+            
+            try:
+                extracted_context = out_display_var.context
+            except Exception as e:
+                # raise e
+                print(f'could not extract the context: {e}')
+                active_identifying_display_ctx = a_filtered_context.adding_context('display_fn', display_fn_name=curr_display_function_name)
+                extracted_context = active_identifying_display_ctx
+                
+            # Extract the figures:
+            out_fig_list = extract_figures_from_display_function_output(out_display_var=out_display_var, out_fig_list=out_fig_list)
 
+            print(f'extracted_context: {extracted_context}')
 
-
+            all_out_fig_paths = []
+            
+            for fig in out_fig_list:
+                # curr_active_pipeline.write
+                
+                # Plots in a shared folder for this session with fully distinct figure names:
+                # active_session_figures_out_path = curr_active_pipeline.get_daily_programmatic_session_output_path()
+                # final_context = curr_active_pipeline.sess.get_context().adding_context('display_fn', display_fn_name='plot_expected_vs_observed').adding_context('display_kwargs', **display_kwargs)
+                active_out_figure_paths = perform_write_to_file(fig, extracted_context, figures_parent_out_path=active_session_figures_out_path)
+                all_out_fig_paths.extend(active_out_figure_paths)
 
             # ## Build PDF Output Info
             # active_pdf_metadata, active_pdf_save_filename = build_pdf_metadata_from_display_context(final_context, subset_includelist=subset_includelist, subset_excludelist=subset_excludelist)
