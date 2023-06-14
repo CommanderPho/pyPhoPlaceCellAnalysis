@@ -498,8 +498,10 @@ def perform_write_to_file(a_fig, active_identifying_ctx, figures_parent_out_path
     if not write_any_figs:
         return active_out_figure_paths # return empty list if no output formats are requested.
 
-    if figures_parent_out_path is None:
-        figures_parent_out_path = create_daily_programmatic_display_function_testing_folder_if_needed()
+    assert figures_parent_out_path is not None, f"Disabled automatic parent output path generation."
+    # if figures_parent_out_path is None:
+    #     figures_parent_out_path = create_daily_programmatic_display_function_testing_folder_if_needed()
+
 
     # PDF: .pdf versions:
     if write_pdf:
@@ -559,7 +561,7 @@ def perform_write_to_file(a_fig, active_identifying_ctx, figures_parent_out_path
 
 """
 
-@function_attributes(short_name=None, tags=['batch','filtered_context','session','figures'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-06-13 10:27', related_items=[])
+@function_attributes(short_name=None, tags=['UNUSED','UNFINISHED','batch','filtered_context','session','figures'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-06-13 10:27', related_items=[])
 def batch_plot_local_context(curr_active_pipeline, curr_display_function_name='_display_plot_decoded_epoch_slices', subset_filtered_context_includelist=None, subset_filtered_context_excludelist=None, write_pdf=False, write_png=True, debug_print=False, **kwargs):
     """ For a local display function specified by `curr_display_function_name`, loops through the individual epochs in a session (e.g. ['maze1', 'maze2', 'maze']) analagous to the structure of `programmatic_display_to_PDF` and for each:
         # 2a. Generates Final Display Context
