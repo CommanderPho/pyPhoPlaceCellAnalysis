@@ -475,41 +475,51 @@ class PipelineWithDisplaySavingMixin:
 
 
 
-    @function_attributes(short_name=None, tags=['save','figure'], input_requires=[], output_provides=[], uses=['perform_write_to_file'], used_by=[], creation_date='2023-06-12 15:07', related_items=[])
-    def write_figure_to_daily_programmatic_session_output_path(self, fig, display_context=None, override_figures_parent_out_path=None, debug_print=True):
-        """ Writes the provided figure to the daily_programmatic_session_output_path.
-            This function writes a figure to the daily programmatic session output path.
-            It imports the perform_write_to_file function from the ExportHelpers Mixin.
-            It then gets the daily programmatic session output path and the session context.
-            If a display context is provided, it combines the active identifying session context
-        """
-        if override_figures_parent_out_path is not None:
-            active_figures_out_path = override_figures_parent_out_path
-        else:
-            active_figures_out_path = self.get_daily_programmatic_session_output_path()
-        return self.write_figure_to_output_path(fig, figures_parent_out_path=active_figures_out_path, display_context=display_context, debug_print=debug_print)
+    # @function_attributes(short_name=None, tags=['save','figure'], input_requires=[], output_provides=[], uses=['perform_write_to_file'], used_by=[], creation_date='2023-06-12 15:07', related_items=[])
+    # def write_figure_to_daily_programmatic_session_output_path(self, fig, display_context=None, override_figures_parent_out_path=None, debug_print=True):
+    #     """ Writes the provided figure to the daily_programmatic_session_output_path.
+    #         This function writes a figure to the daily programmatic session output path.
+    #         It imports the perform_write_to_file function from the ExportHelpers Mixin.
+    #         It then gets the daily programmatic session output path and the session context.
+    #         If a display context is provided, it combines the active identifying session context
+    #     """
+    #     if override_figures_parent_out_path is not None:
+    #         active_figures_out_path = override_figures_parent_out_path
+    #     else:
+    #         active_figures_out_path = self.get_daily_programmatic_session_output_path()
+    #     return self.write_figure_to_output_path(fig, figures_parent_out_path=active_figures_out_path, display_context=display_context, debug_print=debug_print)
     
 
-    @function_attributes(short_name=None, tags=['save','figure'], input_requires=[], output_provides=[], uses=['perform_write_to_file'], used_by=[], creation_date='2023-06-12 15:07', related_items=[])
-    def write_figure_to_output_path(self, fig, figures_parent_out_path, display_context=None, write_pdf:bool=False, write_png:bool=True, debug_print=True):
-        """ Writes the provided figure to the figures_parent_out_path. """
-        from pyphoplacecellanalysis.General.Mixins.ExportHelpers import perform_write_to_file
-        from pyphoplacecellanalysis.General.Mixins.ExportHelpers import FigureOutputManager, FigureOutputLocation, ContextToPathMode
+    # @function_attributes(short_name=None, tags=['save','figure'], input_requires=[], output_provides=[], uses=['perform_write_to_file'], used_by=[], creation_date='2023-06-12 15:07', related_items=[])
+    # def write_figure_to_output_path(self, fig, figures_parent_out_path, display_context=None, write_pdf:bool=False, write_png:bool=True, debug_print=True):
+    #     """ Writes the provided figure to the figures_parent_out_path. """
+    #     from pyphoplacecellanalysis.General.Mixins.ExportHelpers import perform_write_to_file
+    #     from pyphoplacecellanalysis.General.Mixins.ExportHelpers import FigureOutputManager, FigureOutputLocation, ContextToPathMode
         
         
-        active_identifying_session_ctx = self.sess.get_context()
-        if display_context is not None:
-            final_context = active_identifying_session_ctx | display_context
+    #     active_identifying_session_ctx = self.sess.get_context()
+    #     if display_context is not None:
+    #         final_context = active_identifying_session_ctx | display_context
 
-        if debug_print:
-            print(f'final_context: {final_context}')
+    #     if debug_print:
+    #         print(f'final_context: {final_context}')
 
-        fig_man: FigureOutputManager = self.get_output_manager() # get the output manager
-        figures_parent_out_path, fig_save_basename = fig_man.get_figure_output_parent_and_basename(final_context, make_folder_if_needed=False)
+    #     fig_man: FigureOutputManager = self.get_output_manager() # get the output manager
+    #     figures_parent_out_path, fig_save_basename = fig_man.get_figure_output_parent_and_basename(final_context, make_folder_if_needed=False)
 
-        active_out_figure_paths = perform_write_to_file(fig, final_context, figures_parent_out_path=figures_parent_out_path, write_pdf=write_pdf, write_png=write_png, register_output_file_fn=self.register_output_file)
+    #     active_out_figure_paths = perform_write_to_file(fig, final_context, figures_parent_out_path=figures_parent_out_path, write_pdf=write_pdf, write_png=write_png, register_output_file_fn=self.register_output_file)
+    #     return active_out_figure_paths, final_context
+
+
+    @function_attributes(short_name=None, tags=['save','figure'], input_requires=[], output_provides=[], uses=['build_and_write_to_file'], used_by=[], creation_date='2023-06-14 19:26', related_items=[])
+    def output_figure(self, final_context: IdentifyingContext, fig, write_pdf:bool=False, write_png:bool=True, debug_print=True):
+        """ outputs the figure using the provided context. """
+        from pyphoplacecellanalysis.General.Mixins.ExportHelpers import build_and_write_to_file
+        # fig_man: FigureOutputManager = self.get_output_manager() # get the output manager
+        # figures_parent_out_path, fig_save_basename = fig_man.get_figure_output_parent_and_basename(final_context, make_folder_if_needed=True)
+        # active_out_figure_paths = perform_write_to_file(fig, final_context, figures_parent_out_path=figures_parent_out_path, write_pdf=write_pdf, write_png=write_png, register_output_file_fn=self.register_output_file)
+        active_out_figure_paths = build_and_write_to_file(fig, final_context, self.get_output_manager(), write_pdf=write_pdf, write_png=write_png, register_output_file_fn=self.register_output_file)
         return active_out_figure_paths, final_context
-
 
 
     @classmethod
@@ -532,8 +542,10 @@ class PipelineWithDisplaySavingMixin:
         
         conform_to_implementing_method(cls.build_display_context_for_session)
         conform_to_implementing_method(cls.build_display_context_for_filtered_session)
-        conform_to_implementing_method(cls.write_figure_to_daily_programmatic_session_output_path)
-        conform_to_implementing_method(cls.write_figure_to_output_path)
+        # conform_to_implementing_method(cls.write_figure_to_daily_programmatic_session_output_path)
+        # conform_to_implementing_method(cls.write_figure_to_output_path)
+        conform_to_implementing_method(cls.output_figure)
+        
 
 
 
