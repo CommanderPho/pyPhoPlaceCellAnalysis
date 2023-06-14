@@ -417,18 +417,21 @@ def build_pdf_metadata_from_display_context(active_identifying_ctx, subset_inclu
         curr_built_pdf_metadata, curr_pdf_save_filename = build_pdf_metadata_from_display_context(active_identifying_ctx)
 
     """
-    session_descriptor_string = '_'.join([active_identifying_ctx.format_name, active_identifying_ctx.session_name]) # 'kdiba_2006-6-08_14-26-15'
-    if debug_print:
-        print(f'session_descriptor_string: "{session_descriptor_string}"')
-    built_pdf_metadata = {'Creator': 'Spike3D - TestNeuroPyPipeline227', 'Author': 'Pho Hale', 'Title': session_descriptor_string, 'Subject': '', 'Keywords': [session_descriptor_string]}
-    # context_tuple = [str(v) for v in list(active_identifying_ctx.as_tuple())]
+    # Filename:
     curr_fig_save_basename = build_figure_basename_from_display_context(active_identifying_ctx, subset_includelist=subset_includelist, subset_excludelist=subset_excludelist, context_tuple_join_character='_')
-    built_pdf_metadata['Title'] = curr_fig_save_basename
-    built_pdf_metadata['Subject'] = active_identifying_ctx.display_fn_name
-    built_pdf_metadata['Keywords'] = build_figure_basename_from_display_context(active_identifying_ctx, context_tuple_join_character=' | ') # ' | '.join(context_tuple)
     curr_pdf_save_filename = curr_fig_save_basename + '.pdf'
     if debug_print:
         print(f'curr_pdf_save_filename: "{curr_pdf_save_filename}"')
+
+    # PDF metadata:
+    session_descriptor_string = '_'.join([active_identifying_ctx.format_name, active_identifying_ctx.session_name]) # 'kdiba_2006-6-08_14-26-15'
+    if debug_print:
+        print(f'session_descriptor_string: "{session_descriptor_string}"')
+    built_pdf_metadata = {'Creator': 'Spike3D - TestNeuroPyPipeline227', 'Author': 'Pho Hale', 'Title': session_descriptor_string, 'Subject': '', 'Keywords': [session_descriptor_string]}   
+    built_pdf_metadata['Title'] = curr_fig_save_basename
+    built_pdf_metadata['Subject'] = active_identifying_ctx.display_fn_name
+    built_pdf_metadata['Keywords'] = build_figure_basename_from_display_context(active_identifying_ctx, context_tuple_join_character=' | ') # ' | '.join(context_tuple)
+
     return built_pdf_metadata, curr_pdf_save_filename
 
 
