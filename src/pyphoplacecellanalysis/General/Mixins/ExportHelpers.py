@@ -2,7 +2,7 @@ from copy import deepcopy
 from datetime import datetime
 from enum import Enum # for getting the current date to set the ouptut folder name
 from pathlib import Path
-from typing import List
+from typing import Any, Callable, List, Optional
 import pandas as pd
 import numpy as np
 from attrs import define, field, Factory
@@ -569,12 +569,12 @@ def programmatic_render_to_file(curr_active_pipeline, curr_display_function_name
     """
 
     ## Get the output path (active_session_figures_out_path) for this session (and all of its filtered_contexts as well):
-    fig_man = curr_active_pipeline.get_output_manager() # get the output manager
-    figures_parent_out_path, fig_save_basename = fig_man.get_figure_output_parent_and_basename(final_context, make_folder_if_needed=True)
-    active_session_figures_out_path = figures_parent_out_path
+    # fig_man = curr_active_pipeline.get_output_manager() # get the output manager
+    # figures_parent_out_path, fig_save_basename = fig_man.get_figure_output_parent_and_basename(final_context, make_folder_if_needed=True)
+    # active_session_figures_out_path = figures_parent_out_path
     
-    if debug_print:
-        print(f'curr_session_parent_out_path: {active_session_figures_out_path}')
+    # if debug_print:
+    #     print(f'curr_session_parent_out_path: {active_session_figures_out_path}')
         
     all_out_fig_paths = []
     
@@ -620,7 +620,11 @@ def programmatic_render_to_file(curr_active_pipeline, curr_display_function_name
 
             for fig in out_fig_list:
                 # curr_active_pipeline.write
-                active_out_figure_paths, final_context = curr_active_pipeline.write_figure_to_output_path(fig=fig, figures_parent_out_path=active_session_figures_out_path, display_context=extracted_context, write_pdf=write_pdf, write_png=write_png, debug_print=debug_print) # TODO: store this `final_context` too.
+                # active_out_figure_paths, final_context = curr_active_pipeline.write_figure_to_output_path(fig=fig, figures_parent_out_path=active_session_figures_out_path, display_context=extracted_context, write_pdf=write_pdf, write_png=write_png, debug_print=debug_print) # TODO: store this `final_context` too.
+                
+                active_out_figure_paths = curr_active_pipeline.output_figure(extracted_context, fig, write_pdf=write_pdf, write_png=write_png, debug_print=debug_print) 
+                final_context = extracted_context
+                
                 all_out_fig_paths.extend(active_out_figure_paths)
 
             # ## Build PDF Output Info
@@ -659,12 +663,31 @@ def programmatic_render_to_file(curr_active_pipeline, curr_display_function_name
 
 
 
+@function_attributes(short_name=None, tags=['file','export','output','matplotlib','display','active','PDF','batch','automated'], input_requires=[], output_provides=[], uses=['write_to_file'], used_by=[], creation_date='2023-06-14 19:06', related_items=[])
+def build_and_write_to_file(a_fig, active_identifying_ctx, fig_man:Optional[FigureOutputManager]=None, subset_includelist=None, subset_excludelist=None, write_pdf=False, write_png=True, register_output_file_fn=None, progress_print=True, debug_print=False):
+    """ From the context, fig_man, and arguments builds the final save path for the figure and calls `write_to_file` with these values. """
+    active_out_figure_paths = []
+    write_any_figs = write_pdf or write_png
+    if not write_any_figs:
+        return active_out_figure_paths # return empty list if no output formats are requested.
 
+    # Use fig_man to build the path
+    fig_man = fig_man or FigureOutputManager(figure_output_location=FigureOutputLocation.DAILY_PROGRAMMATIC_OUTPUT_FOLDER, context_to_path_mode=ContextToPathMode.GLOBAL_UNIQUE)
+    # figures_parent_out_path, fig_save_basename = fig_man.get_figure_output_parent_and_basename(active_identifying_ctx, make_folder_if_needed=True, subset_includelist=subset_includelist, subset_excludelist=subset_excludelist, context_tuple_join_character='_')
+    curr_fig_save_path = fig_man.get_figure_output_path(active_identifying_ctx, make_folder_if_needed=True, subset_includelist=subset_includelist, subset_excludelist=subset_excludelist, context_tuple_join_character='_')
 
+    # if write_pdf:
+    #     active_pdf_metadata, _unused_old_pdf_save_filename = build_pdf_metadata_from_display_context(active_identifying_ctx, subset_includelist=subset_includelist, subset_excludelist=subset_excludelist) # ignores `active_pdf_save_filename`
 
-@function_attributes(short_name=None, tags=['file','export','output','matplotlib','display','active','PDF','batch','automated'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-05-31 19:16', related_items=[])
-def perform_write_to_file(a_fig, active_identifying_ctx, figures_parent_out_path=None, subset_includelist=None, subset_excludelist=None, write_pdf=False, write_png=True, register_output_file_fn=None, progress_print=True, debug_print=False):
-    """ Writes a single matplotlib figure out to one or more files based on whether write_png and write_pdf are specified AND registers the output using `register_output_file_fn` if one is provided. 
+    
+    return write_to_file(a_fig, active_identifying_ctx, final_fig_save_basename_path=curr_fig_save_path, subset_includelist=subset_includelist, subset_excludelist=subset_excludelist, write_pdf=write_pdf, write_png=write_png, register_output_file_fn=register_output_file_fn, progress_print=progress_print, debug_print=debug_print)
+    
+
+@function_attributes(short_name=None, tags=['file','export','output','matplotlib','display','active','PDF','batch','automated'], input_requires=[], output_provides=[], uses=[], used_by=['build_and_write_to_file'], creation_date='2023-05-31 19:16', related_items=['build_and_write_to_file'])
+def write_to_file(a_fig, active_identifying_ctx: IdentifyingContext, final_fig_save_basename_path:Path, subset_includelist=None, subset_excludelist=None, write_pdf=False, write_png=True, register_output_file_fn=None, progress_print=True, debug_print=False):
+    """ Lowest level figure write function. Writes a single matplotlib figure out to one or more files based on whether write_png and write_pdf are specified AND registers the output using `register_output_file_fn` if one is provided. 
+    
+    History: `perform_write_to_file`
     
     Aims to eventually replace `programmatic_display_to_PDF` (working for both PDF and PNG outputs, working for global plots, along with successfully registering output files with the pipeline via `register_output_file_fn` argument)
 
@@ -686,18 +709,16 @@ def perform_write_to_file(a_fig, active_identifying_ctx, figures_parent_out_path
     if not write_any_figs:
         return active_out_figure_paths # return empty list if no output formats are requested.
 
-    assert figures_parent_out_path is not None, f"Disabled automatic parent output path generation."
-    # if figures_parent_out_path is None:
-    #     figures_parent_out_path = create_daily_programmatic_display_function_testing_folder_if_needed()
-    fig_man = FigureOutputManager(figure_output_location=FigureOutputLocation.DAILY_PROGRAMMATIC_OUTPUT_FOLDER, context_to_path_mode=ContextToPathMode.GLOBAL_UNIQUE)
+    assert final_fig_save_basename_path is not None, f"Disabled automatic parent output path generation."
     
-
     # PDF: .pdf versions:
     if write_pdf:
         try:
-            active_pdf_metadata, active_pdf_save_filename = build_pdf_metadata_from_display_context(active_identifying_ctx, subset_includelist=subset_includelist, subset_excludelist=subset_excludelist)
+            active_pdf_metadata, _unused_old_pdf_save_filename = build_pdf_metadata_from_display_context(active_identifying_ctx, subset_includelist=subset_includelist, subset_excludelist=subset_excludelist) # ignores `active_pdf_save_filename`
             # print(f'active_pdf_save_filename: {active_pdf_save_filename}')
-            curr_pdf_save_path = figures_parent_out_path.joinpath(active_pdf_save_filename) # build the final output pdf path from the pdf_parent_out_path (which is the daily folder)        
+            # curr_pdf_save_path = figures_parent_out_path.joinpath(active_pdf_save_filename) # build the final output pdf path from the pdf_parent_out_path (which is the daily folder)
+            curr_pdf_save_path = final_fig_save_basename_path.with_suffix('.pdf')
+            
             with backend_pdf.PdfPages(curr_pdf_save_path, keep_empty=False, metadata=active_pdf_metadata) as pdf:
                 # Save out PDF page:
                 pdf.savefig(a_fig)
@@ -708,7 +729,6 @@ def perform_write_to_file(a_fig, active_identifying_ctx, figures_parent_out_path
                 active_out_figure_paths.append(curr_pdf_save_path)
         except Exception as e:
             print(f'Error occured while writing .pdf for fig. {e}. Skipping.')
-            # raise e
 
     # PNG: .png versions:
     if write_png:
@@ -716,8 +736,8 @@ def perform_write_to_file(a_fig, active_identifying_ctx, figures_parent_out_path
         try:
             # curr_fig_save_basename = build_figure_basename_from_display_context(active_identifying_ctx, subset_includelist=subset_includelist, subset_excludelist=subset_excludelist, context_tuple_join_character='_')
             # curr_fig_save_path = figures_parent_out_path.joinpath(curr_fig_save_basename)
-            curr_fig_save_path = fig_man.get_figure_output_path(active_identifying_ctx, make_folder_if_needed=True, subset_includelist=subset_includelist, subset_excludelist=subset_excludelist, context_tuple_join_character='_')
-            fig_png_out_path = curr_fig_save_path.with_suffix('.png')
+            # curr_fig_save_path = fig_man.get_figure_output_path(active_identifying_ctx, make_folder_if_needed=True, subset_includelist=subset_includelist, subset_excludelist=subset_excludelist, context_tuple_join_character='_')
+            fig_png_out_path = final_fig_save_basename_path.with_suffix('.png')
             # fig_png_out_path = fig_png_out_path.with_stem(f'{curr_pdf_save_path.stem}_{curr_page_str}') # note this replaces the current .pdf extension with .png, resulting in a good filename for a .png
             a_fig.savefig(fig_png_out_path)
             if register_output_file_fn is not None:
@@ -727,7 +747,6 @@ def perform_write_to_file(a_fig, active_identifying_ctx, figures_parent_out_path
             active_out_figure_paths.append(fig_png_out_path)
         except Exception as e:
             print(f'Error occured while writing .png for fig. {e}. Skipping.')
-            # raise e
         
     return active_out_figure_paths
 
