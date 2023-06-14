@@ -488,7 +488,7 @@ class PipelineWithDisplaySavingMixin:
     
 
     @function_attributes(short_name=None, tags=['save','figure'], input_requires=[], output_provides=[], uses=['perform_write_to_file'], used_by=[], creation_date='2023-06-12 15:07', related_items=[])
-    def write_figure_to_output_path(self, fig, figures_parent_out_path, display_context=None, debug_print=True):
+    def write_figure_to_output_path(self, fig, figures_parent_out_path, display_context=None, write_pdf:bool=False, write_png:bool=True, debug_print=True):
         """ Writes the provided figure to the figures_parent_out_path. """
         from pyphoplacecellanalysis.General.Mixins.ExportHelpers import perform_write_to_file
         
@@ -498,7 +498,7 @@ class PipelineWithDisplaySavingMixin:
 
         if debug_print:
             print(f'final_context: {final_context}')
-        active_out_figure_paths = perform_write_to_file(fig, final_context, figures_parent_out_path=figures_parent_out_path, register_output_file_fn=self.register_output_file)
+        active_out_figure_paths = perform_write_to_file(fig, final_context, figures_parent_out_path=figures_parent_out_path, write_pdf=write_pdf, write_png=write_png, register_output_file_fn=self.register_output_file)
         return active_out_figure_paths, final_context
 
 

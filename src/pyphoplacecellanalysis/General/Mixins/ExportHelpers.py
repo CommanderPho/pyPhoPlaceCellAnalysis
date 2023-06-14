@@ -388,6 +388,8 @@ def programmatic_render_to_file(curr_active_pipeline, curr_display_function_name
         print(f'curr_session_parent_out_path: {active_session_figures_out_path}')
     active_session_figures_out_path.mkdir(parents=True, exist_ok=True) # make folder if needed
 
+    all_out_fig_paths = []
+    
     with plt.ioff():
         ## Disables showing the figure by default from within the context manager.
         # active_display_fn_kwargs = overriding_dict_with(lhs_dict=dict(filter_epochs='ripple', debug_test_max_num_slices=128), **kwargs)
@@ -406,6 +408,7 @@ def programmatic_render_to_file(curr_active_pipeline, curr_display_function_name
             # active_identifying_ctx = active_identifying_display_ctx.adding_context('filter_epochs', **active_display_fn_kwargs) # , filter_epochs='ripple' ## TODO: this is only right for a single function!
             # final_context = active_identifying_ctx # Display/Variable context mode
 
+            # out_fig_list = [] # list just for figures of this filtered context.
             out_display_var = curr_active_pipeline.display(curr_display_function_name, a_filtered_context, **active_display_fn_kwargs)
             
             try:
@@ -417,19 +420,17 @@ def programmatic_render_to_file(curr_active_pipeline, curr_display_function_name
                 extracted_context = active_identifying_display_ctx
                 
             # Extract the figures:
-            out_fig_list = extract_figures_from_display_function_output(out_display_var=out_display_var, out_fig_list=out_fig_list)
+            out_fig_list = extract_figures_from_display_function_output(out_display_var=out_display_var, out_fig_list=[]) # I think out_fig_list needs to be [] so it doesn't accumulate figures over the filtered_context?
 
             print(f'extracted_context: {extracted_context}')
 
-            all_out_fig_paths = []
-            
             for fig in out_fig_list:
                 # curr_active_pipeline.write
-                
+                active_out_figure_paths, final_context = curr_active_pipeline.write_figure_to_output_path(fig=fig, figures_parent_out_path=active_session_figures_out_path, display_context=extracted_context, write_pdf=write_pdf, write_png=write_png, debug_print=debug_print) # TODO: store this `final_context` too.
                 # Plots in a shared folder for this session with fully distinct figure names:
                 # active_session_figures_out_path = curr_active_pipeline.get_daily_programmatic_session_output_path()
                 # final_context = curr_active_pipeline.sess.get_context().adding_context('display_fn', display_fn_name='plot_expected_vs_observed').adding_context('display_kwargs', **display_kwargs)
-                active_out_figure_paths = perform_write_to_file(fig, extracted_context, figures_parent_out_path=active_session_figures_out_path)
+                # active_out_figure_paths = perform_write_to_file(fig, extracted_context, figures_parent_out_path=active_session_figures_out_path)
                 all_out_fig_paths.extend(active_out_figure_paths)
 
             # ## Build PDF Output Info
@@ -461,7 +462,8 @@ def programmatic_render_to_file(curr_active_pipeline, curr_display_function_name
             #         pdf.attach_note(f'Page {i + 1}: "{active_identifying_ctx_string}"')
                     
             #     curr_active_pipeline.register_output_file(output_path=active_pdf_save_path, output_metadata={'filtered_context': a_filtered_context, 'context': active_identifying_ctx, 'fig': out_fig_list})
-
+    # end with plt.ioff():
+    return all_out_fig_paths
 
 
 
