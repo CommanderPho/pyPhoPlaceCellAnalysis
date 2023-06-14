@@ -24,6 +24,7 @@ from pyphoplacecellanalysis.General.Pipeline.Stages.Loading import LoadableInput
 from pyphoplacecellanalysis.General.Pipeline.Stages.Loading import loadData # used for `load_pickled_global_computation_results`
 from pyphoplacecellanalysis.General.Pipeline.Stages.Loading import saveData # used for `save_global_computation_results`
 from pyphoplacecellanalysis.General.Model.ComputationResults import ComputationResult
+from pyphoplacecellanalysis.General.Mixins.ExportHelpers import FigureOutputManager, FigureOutputLocation, ContextToPathMode
 
 import pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions
 # from General.Pipeline.Stages.ComputationFunctions import ComputationFunctionRegistryHolder # should include ComputationFunctionRegistryHolder and all specifics
@@ -901,15 +902,20 @@ class PipelineWithComputedPipelineStageMixin:
         """ returns the context of the unfiltered session (self.sess) """
         return self.sess.get_context()
 
-    def get_daily_programmatic_session_output_path(self, debug_print=False) -> Path:
-        from pyphoplacecellanalysis.General.Mixins.ExportHelpers import create_daily_programmatic_display_function_testing_folder_if_needed, session_context_to_relative_path # for `perform_write_to_file`
-        active_identifying_session_ctx = self.get_session_context() # 'bapun_RatN_Day4_2019-10-15_11-30-06'
-        figures_parent_out_path = create_daily_programmatic_display_function_testing_folder_if_needed()
-        active_session_figures_out_path = session_context_to_relative_path(figures_parent_out_path, active_identifying_session_ctx)
-        if debug_print:
-            print(f'curr_session_parent_out_path: {active_session_figures_out_path}')
-        active_session_figures_out_path.mkdir(parents=True, exist_ok=True) # make folder if needed
-        return active_session_figures_out_path
+    # @property
+    def get_output_manager(self) -> FigureOutputManager:
+        """ returns the FigureOutputManager that specifies where outputs are stored. """
+        return FigureOutputManager(figure_output_location=FigureOutputLocation.DAILY_PROGRAMMATIC_OUTPUT_FOLDER, context_to_path_mode=ContextToPathMode.GLOBAL_UNIQUE)
+
+    # def get_daily_programmatic_session_output_path(self, debug_print=False) -> Path:
+    #     from pyphoplacecellanalysis.General.Mixins.ExportHelpers import create_daily_programmatic_display_function_testing_folder_if_needed, session_context_to_relative_path # for `perform_write_to_file`
+    #     active_identifying_session_ctx = self.get_session_context() # 'bapun_RatN_Day4_2019-10-15_11-30-06'
+    #     figures_parent_out_path = create_daily_programmatic_display_function_testing_folder_if_needed()
+    #     active_session_figures_out_path = session_context_to_relative_path(figures_parent_out_path, active_identifying_session_ctx)
+    #     if debug_print:
+    #         print(f'curr_session_parent_out_path: {active_session_figures_out_path}')
+    #     active_session_figures_out_path.mkdir(parents=True, exist_ok=True) # make folder if needed
+    #     return active_session_figures_out_path
 
     """ Global Computation Results Persistance: Loads/Saves out the `global_computation_results` which are not currently saved with the pipeline
     
