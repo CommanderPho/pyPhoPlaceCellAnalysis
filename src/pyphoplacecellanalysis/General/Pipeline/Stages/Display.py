@@ -441,6 +441,9 @@ class PipelineWithDisplayPipelineStageMixin:
     #     ## TODO:
     
 
+# ==================================================================================================================== #
+# Figure Saving and Outputs                                                                                            #
+# ==================================================================================================================== #
 class PipelineWithDisplaySavingMixin:
     """ provides functionality for saving figures to file.
     

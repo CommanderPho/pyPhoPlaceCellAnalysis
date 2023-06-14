@@ -720,7 +720,8 @@ def plot_decoded_epoch_slices_paginated(curr_active_pipeline, curr_results_obj, 
     # active_out_figure_paths = perform_write_to_file(fig, final_context, figures_parent_out_path=active_session_figures_out_path, register_output_file_fn=curr_active_pipeline.register_output_file)
     if save_figure:
         fig = _out_pagination_controller.plots.fig # get the figure
-        active_out_figure_paths, final_context = curr_active_pipeline.write_figure_to_daily_programmatic_session_output_path(fig, final_context, debug_print=True)
+        # active_out_figure_paths, final_context = curr_active_pipeline.write_figure_to_daily_programmatic_session_output_path(fig, final_context, debug_print=True)
+        active_out_figure_paths = curr_active_pipeline.output_figure(final_context, fig, debug_print=True) 
     else:
         active_out_figure_paths = None
 
