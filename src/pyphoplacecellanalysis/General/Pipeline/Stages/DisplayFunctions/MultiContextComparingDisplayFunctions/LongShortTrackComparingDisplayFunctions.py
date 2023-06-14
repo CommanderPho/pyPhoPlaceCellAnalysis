@@ -211,13 +211,12 @@ class LongShortTrackComparingDisplayFunctions(AllFunctionEnumeratingMixin, metac
             graphics_output_dict['plot_data'] |= {'df': neuron_replay_stats_df, 'rdf':rdf, 'aclu_to_idx':aclu_to_idx, 'irdf':irdf, 'time_binned_unit_specific_spike_rate': global_computation_results.computed_data['jonathan_firing_rate_analysis']['time_binned_unit_specific_spike_rate'],
                 'time_variable_name':time_variable_name, 'fignum':curr_fig_num}
 
-            def _perform_write_to_file_callback(active_session_figures_out_path: Path = None):
+            def _perform_write_to_file_callback():
                 ## 2023-05-31 - Reference Output of matplotlib figure to file, along with building appropriate context.
-                active_session_figures_out_path = active_session_figures_out_path or owning_pipeline_reference.get_daily_programmatic_session_output_path()
-                return perform_write_to_file(graphics_output_dict.figures[0], final_context, figures_parent_out_path=active_session_figures_out_path, register_output_file_fn=owning_pipeline_reference.register_output_file)
+                return owning_pipeline_reference.output_figure(final_context, graphics_output_dict.figures[0])
             
             if save_figure:
-                active_out_figure_paths = _perform_write_to_file_callback(kwargs.pop('fig_save_parent_path', None))
+                active_out_figure_paths = _perform_write_to_file_callback()
             else:
                 active_out_figure_paths = []
 
@@ -272,13 +271,12 @@ class LongShortTrackComparingDisplayFunctions(AllFunctionEnumeratingMixin, metac
 
             final_context = owning_pipeline_reference.sess.get_context().adding_context('display_fn', display_fn_name='display_short_long_pf1D_comparison')
     
-            def _perform_write_to_file_callback(active_session_figures_out_path: Path = None):
+            def _perform_write_to_file_callback():
                 ## 2023-05-31 - Reference Output of matplotlib figure to file, along with building appropriate context.
-                active_session_figures_out_path = active_session_figures_out_path or owning_pipeline_reference.get_daily_programmatic_session_output_path()
-                return perform_write_to_file(fig_short_pf_1D, final_context, figures_parent_out_path=active_session_figures_out_path, register_output_file_fn=owning_pipeline_reference.register_output_file)
+                return owning_pipeline_reference.output_figure(final_context, fig_short_pf_1D)
             
             if save_figure:
-                active_out_figure_paths = _perform_write_to_file_callback(kwargs.pop('fig_save_parent_path', None))
+                active_out_figure_paths = _perform_write_to_file_callback()
             else:
                 active_out_figure_paths = []
 
@@ -354,10 +352,8 @@ class LongShortTrackComparingDisplayFunctions(AllFunctionEnumeratingMixin, metac
             
             final_context = owning_pipeline_reference.sess.get_context().adding_context('display_fn', display_fn_name='display_short_long_pf1D_scalar_overlap_comparison')
     
-            def _perform_write_to_file_callback(active_session_figures_out_path: Path = None):
-                ## 2023-05-31 - Reference Output of matplotlib figure to file, along with building appropriate context.
-                active_session_figures_out_path = active_session_figures_out_path or owning_pipeline_reference.get_daily_programmatic_session_output_path()
-                return perform_write_to_file(fig, final_context, figures_parent_out_path=active_session_figures_out_path, register_output_file_fn=owning_pipeline_reference.register_output_file)
+            def _perform_write_to_file_callback():
+                return owning_pipeline_reference.output_figure(final_context, fig)
             
             if save_figure:
                 active_out_figure_paths = _perform_write_to_file_callback(kwargs.pop('fig_save_parent_path', None))
@@ -398,10 +394,8 @@ class LongShortTrackComparingDisplayFunctions(AllFunctionEnumeratingMixin, metac
             if not defer_render:
                 fig.show()
         
-            def _perform_write_to_file_callback(active_session_figures_out_path: Path = None):
-                ## 2023-05-31 - Reference Output of matplotlib figure to file, along with building appropriate context.
-                active_session_figures_out_path = active_session_figures_out_path or owning_pipeline_reference.get_daily_programmatic_session_output_path()
-                return perform_write_to_file(fig, final_context, figures_parent_out_path=active_session_figures_out_path, register_output_file_fn=owning_pipeline_reference.register_output_file)
+            def _perform_write_to_file_callback():
+                return owning_pipeline_reference.output_figure(final_context, fig)
             
             if save_figure:
                 active_out_figure_paths = _perform_write_to_file_callback(fig_save_parent_path)
@@ -435,10 +429,8 @@ class LongShortTrackComparingDisplayFunctions(AllFunctionEnumeratingMixin, metac
 
             final_context = owning_pipeline_reference.sess.get_context().adding_context('display_fn', display_fn_name='display_long_short_laps')
 
-            def _perform_write_to_file_callback(active_session_figures_out_path: Path = None):
-                ## 2023-05-31 - Reference Output of matplotlib figure to file, along with building appropriate context.
-                active_session_figures_out_path = active_session_figures_out_path or owning_pipeline_reference.get_daily_programmatic_session_output_path()
-                return perform_write_to_file(fig, final_context, figures_parent_out_path=active_session_figures_out_path, register_output_file_fn=owning_pipeline_reference.register_output_file)
+            def _perform_write_to_file_callback():
+                return owning_pipeline_reference.output_figure(final_context, fig)
             
             if save_figure:
                 active_out_figure_paths = _perform_write_to_file_callback()
@@ -562,10 +554,8 @@ class LongShortTrackComparingDisplayFunctions(AllFunctionEnumeratingMixin, metac
         final_context = owning_pipeline_reference.sess.get_context().adding_context('display_fn', display_fn_name='running_and_replay_speeds_over_time')
 
 
-        def _perform_write_to_file_callback(active_session_figures_out_path: Path = None):
-            ## 2023-05-31 - Reference Output of matplotlib figure to file, along with building appropriate context.
-            active_session_figures_out_path = active_session_figures_out_path or owning_pipeline_reference.get_daily_programmatic_session_output_path()
-            return perform_write_to_file(fig, final_context, figures_parent_out_path=active_session_figures_out_path, register_output_file_fn=owning_pipeline_reference.register_output_file)
+        def _perform_write_to_file_callback():
+            return owning_pipeline_reference.output_figure(final_context, fig)
         
         if save_figure:
             active_out_figure_paths = _perform_write_to_file_callback()
@@ -670,9 +660,7 @@ class LongShortTrackComparingDisplayFunctions(AllFunctionEnumeratingMixin, metac
                 plt.show()
 
             if save_figure:
-                ## 2023-05-31 - Reference Output of matplotlib figure to file, along with building appropriate context.
-                active_session_figures_out_path = curr_active_pipeline.get_daily_programmatic_session_output_path()
-                active_out_figure_paths = perform_write_to_file(fig, final_context, figures_parent_out_path=active_session_figures_out_path, register_output_file_fn=curr_active_pipeline.register_output_file)
+                active_out_figure_paths = owning_pipeline_reference.output_figure(final_context, fig)
             else:
                 active_out_figure_paths = []
 
@@ -691,7 +679,6 @@ class LongShortTrackComparingDisplayFunctions(AllFunctionEnumeratingMixin, metac
         """
         def _subfn_prepare_plot_long_and_short_stacked_epoch_slices(curr_active_pipeline, defer_render=True, save_figure=True):
             """ 2023-06-01 - 
-            TODO 2023-06-01 - CONVERT TO A GLOBAL DISPLAY FUNCTION
             
             ## TODO 2023-06-02 NOW, NEXT: this might not work in 'AGG' mode because it tries to render it with QT, but we can see.
             
@@ -2184,14 +2171,10 @@ def _plot_session_long_short_track_firing_rate_figures(curr_active_pipeline, jon
     ## Fit both the axes:
     fit_both_axes(ax_L, ax_S)
 
-    def _perform_write_to_file_callback(active_session_figures_out_path: Path = None):
-        ## 2023-05-31 - Reference Output of matplotlib figure to file, along with building appropriate context.
-        active_session_figures_out_path = active_session_figures_out_path or curr_active_pipeline.get_daily_programmatic_session_output_path()
-        
-        # could output to `figures_parent_out_path` or `active_session_figures_out_path`
-        active_out_figure_paths_L = perform_write_to_file(fig_L, active_display_context_L, figures_parent_out_path=active_session_figures_out_path, register_output_file_fn=curr_active_pipeline.register_output_file)
-        active_out_figure_paths_S = perform_write_to_file(fig_S, active_display_context_S, figures_parent_out_path=active_session_figures_out_path, register_output_file_fn=curr_active_pipeline.register_output_file)
-    
+    def _perform_write_to_file_callback():
+        active_out_figure_paths_L = curr_active_pipeline.output_figure(active_display_context_L, fig_L)
+        active_out_figure_paths_S = curr_active_pipeline.output_figure(active_display_context_S, fig_S)
+        return (active_out_figure_paths_L + active_out_figure_paths_S)
     return (fig_L, ax_L, active_display_context_L), (fig_S, ax_S, active_display_context_S), _perform_write_to_file_callback
 
 
