@@ -283,7 +283,7 @@ class DefaultRatemapDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Disp
 
 
 
-def _plot_latent_recursive_pfs_depth_level(master_dock_win, active_decoder, active_identifying_ctx, active_dock_config=None, plot_ratemaps_2D_kwargs=None): # , recursive_depth = 1, recursive_depth_label = 'second'
+def _plot_latent_recursive_pfs_depth_level(master_dock_win, active_decoder, active_identifying_ctx, active_dock_config=None, plot_ratemaps_2D_kwargs=None, defer_render=False): # , recursive_depth = 1, recursive_depth_label = 'second'
     """ Used by _display_recurrsive_latent_placefield_comparisons to plot a single depth level of the latent recursive pf analysis.
 
     active_second_order_2D_decoder = active_recursive_latent_pf_2Ds[recursive_depth].get('pf2D_Decoder', None)
@@ -298,7 +298,8 @@ def _plot_latent_recursive_pfs_depth_level(master_dock_win, active_decoder, acti
     mw = CustomMatplotlibWidget(size=(15,15), dpi=72, constrained_layout=True, scrollable_figure=False) # , scrollAreaContents_MinimumHeight=params.all_plots_height
     subplot = mw.getFigure().add_subplot(111)
     active_decoder.pf.plot_occupancy(fig=mw.getFigure(), ax=subplot)
-    mw.show()
+    if not defer_render:
+        mw.show()
     ## Install the matplotlib-widget in the dock
     # dockAddLocationOpts = ['right', _last_dock_item] # position relative to the _last_dock_outer_nested_item for this figure
     dockAddLocationOpts = ['bottom']
@@ -317,7 +318,8 @@ def _plot_latent_recursive_pfs_depth_level(master_dock_win, active_decoder, acti
     _out_plot_ratemaps = active_decoder.pf.plot_ratemaps_2D(fig=mw.getFigure(), **({'subplots': (None, 3), 'brev_mode': PlotStringBrevityModeEnum.NONE, 'plot_variable': enumTuningMap2DPlotVariables.TUNING_MAPS, 'bg_rendering_mode': BackgroundRenderingOptions.EMPTY} | plot_ratemaps_2D_kwargs)) # 5
 
     mw.getFigure().tight_layout() ## This actually fixes the tiny figure in the middle
-    mw.show()
+    if not defer_render:
+        mw.show()
     ## Install the matplotlib-widget in the dock
     # dockAddLocationOpts = ['bottom', _last_dock_item] # position relative to the _last_dock_outer_nested_item for this figure
     dockAddLocationOpts = ['bottom']

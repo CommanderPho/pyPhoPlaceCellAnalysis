@@ -405,7 +405,7 @@ class LongShortTrackComparingDisplayFunctions(AllFunctionEnumeratingMixin, metac
             return graphics_output_dict
 
     @function_attributes(short_name=None, tags=['display', 'long_short', 'laps', 'position', 'behavior'], conforms_to=['output_registering', 'figure_saving'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-05-29 18:20', related_items=[], is_global=True)
-    def _display_long_short_laps(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, save_figure=True, **kwargs):
+    def _display_long_short_laps(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, defer_render=False, save_figure=True, **kwargs):
             """ Displays a figure displaying the 1D laps detected for both the long and short tracks.
                 Usage:
 
@@ -439,7 +439,7 @@ class LongShortTrackComparingDisplayFunctions(AllFunctionEnumeratingMixin, metac
             return graphics_output_dict
 
     @function_attributes(short_name='long_and_short_firing_rate_replays_v_laps', tags=['display','long_short','firing_rate'], conforms_to=['output_registering', 'figure_saving'], input_requires=[], output_provides=[], uses=['_plot_session_long_short_track_firing_rate_figures'], used_by=[], creation_date='2023-06-08 10:22', is_global=True)
-    def _display_long_and_short_firing_rate_replays_v_laps(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, save_figure=True, **kwargs):
+    def _display_long_and_short_firing_rate_replays_v_laps(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, defer_render=False, save_figure=True, **kwargs):
         """ Displays two figures, one for the long and one for the short track, that compare the firing rates during running (laps) and those during decoded replays.
             Usage:
             
@@ -450,7 +450,7 @@ class LongShortTrackComparingDisplayFunctions(AllFunctionEnumeratingMixin, metac
         from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.LongShortTrackComputations import JonathanFiringRateAnalysisResult
 
         jonathan_firing_rate_analysis_result = JonathanFiringRateAnalysisResult(**global_computation_results.computed_data.jonathan_firing_rate_analysis.to_dict())
-        (fig_L, ax_L, active_display_context_L), (fig_S, ax_S, active_display_context_S), _perform_write_to_file_callback = _plot_session_long_short_track_firing_rate_figures(owning_pipeline_reference, jonathan_firing_rate_analysis_result, figures_parent_out_path=None)
+        (fig_L, ax_L, active_display_context_L), (fig_S, ax_S, active_display_context_S), _perform_write_to_file_callback = _plot_session_long_short_track_firing_rate_figures(owning_pipeline_reference, jonathan_firing_rate_analysis_result)
         
         if save_figure:
             active_out_figure_paths = _perform_write_to_file_callback()
@@ -461,7 +461,7 @@ class LongShortTrackComparingDisplayFunctions(AllFunctionEnumeratingMixin, metac
         return graphics_output_dict
 
     @function_attributes(short_name='running_and_replay_speeds_over_time', tags=['speed', 'laps', 'replay', 'velocity', 'time', 'running', 'fit'], conforms_to=['output_registering', 'figure_saving'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-06-07 21:13', related_items=[], is_global=True)
-    def _display_running_and_replay_speeds_over_time(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, save_figure=True, **kwargs):
+    def _display_running_and_replay_speeds_over_time(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, defer_render=False, save_figure=True, **kwargs):
         """ plots the animal's running speed and the decoded replay velocities (as computed by the Radon transform method) across the recording session. 
         Renders a vertical stack of two subplots.
         
@@ -524,7 +524,8 @@ class LongShortTrackComparingDisplayFunctions(AllFunctionEnumeratingMixin, metac
             plt.tight_layout()
 
             # Show the combined plot
-            plt.show()
+            if not defer_render:
+                plt.show()
             return fig, (ax1, ax2), {'epochs_collection': epochs_collection, 'epoch_labels': epoch_labels}
             
         # BEGIN FUNCTION BODY ________________________________________________________________________________________________ #
@@ -1790,7 +1791,7 @@ def plot_long_short_surprise_difference_plot(curr_active_pipeline, long_results_
 # ==================================================================================================================== #
 
 @function_attributes(short_name=None, tags=['matplotlib', 'long_short_fr_indicies_analysis', 'rate_remapping'], input_requires=['long_short_fr_indicies_analysis'], output_provides=[], uses=[], used_by=[], creation_date='2023-05-03 23:12')
-def plot_rr_aclu(aclu: list, rr_laps: np.ndarray, rr_replays: np.ndarray, rr_neuron_types: np.ndarray, sort=None, fig=None, axs=None):
+def plot_rr_aclu(aclu: list, rr_laps: np.ndarray, rr_replays: np.ndarray, rr_neuron_types: np.ndarray, sort=None, fig=None, axs=None, defer_render=False):
     """ Plots rate remapping (rr) values computed from `long_short_fr_indicies_analysis`
     Renders a vertical stack (one for each aclu) of 1D number lines ranging from -1 ("Long Only") to 1 ("Short Only"), where 0 means equal rates on both long and short.
         It plots two points for each of these, a triangle corresponding to that cell's rr_laps and a open circle for the rr_replays.
@@ -1913,7 +1914,8 @@ def plot_rr_aclu(aclu: list, rr_laps: np.ndarray, rr_replays: np.ndarray, rr_neu
     # ax.set_title('Long-Short Equity')
 
     # Show plot
-    plt.show()
+    if not defer_render:            
+        plt.show()
 
     return fig, axs, sort_indicies
 

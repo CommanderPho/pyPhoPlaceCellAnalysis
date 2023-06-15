@@ -606,7 +606,6 @@ def programmatic_render_to_file(curr_active_pipeline, curr_display_function_name
                 # raise e
                 extracted_context = None
 
-
             if extracted_context is None:
                 active_identifying_display_ctx = a_filtered_context.adding_context('display_fn', display_fn_name=curr_display_function_name)
                 extracted_context = active_identifying_display_ctx
@@ -616,15 +615,13 @@ def programmatic_render_to_file(curr_active_pipeline, curr_display_function_name
             # Extract the figures:
             out_fig_list = extract_figures_from_display_function_output(out_display_var=out_display_var, out_fig_list=[]) # I think out_fig_list needs to be [] so it doesn't accumulate figures over the filtered_context?
 
-            print(f'extracted_context: {extracted_context}')
+            if debug_print:
+                print(f'extracted_context: {extracted_context}')
 
             for fig in out_fig_list:
                 # curr_active_pipeline.write
                 # active_out_figure_paths, final_context = curr_active_pipeline.write_figure_to_output_path(fig=fig, figures_parent_out_path=active_session_figures_out_path, display_context=extracted_context, write_pdf=write_pdf, write_png=write_png, debug_print=debug_print) # TODO: store this `final_context` too.
-                
-                active_out_figure_paths = curr_active_pipeline.output_figure(extracted_context, fig, write_pdf=write_pdf, write_png=write_png, debug_print=debug_print) 
-                final_context = extracted_context
-                
+                active_out_figure_paths = curr_active_pipeline.output_figure(extracted_context, fig, write_pdf=write_pdf, write_png=write_png, debug_print=debug_print)                 
                 all_out_fig_paths.extend(active_out_figure_paths)
 
             # ## Build PDF Output Info
