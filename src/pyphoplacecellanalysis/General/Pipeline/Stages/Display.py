@@ -428,7 +428,7 @@ class PipelineWithDisplayPipelineStageMixin:
         ## Build the final display context: 
         found_display_fcn_index = self.registered_display_functions.index(display_function)
         display_fn_name = self.registered_display_function_names[found_display_fcn_index]
-        active_display_fn_identifying_ctx = active_session_configuration_context.adding_context('display_fn', display_fn_name=display_fn_name) # display_fn_name should be like '_display_1d_placefields'
+        active_display_fn_identifying_ctx = active_session_configuration_context.adding_context_if_missing(display_fn_name=display_fn_name) # display_fn_name should be like '_display_1d_placefields'
 
         # Add the display outputs to the active context. Each display function should return a structure like: dict(fig=active_figure, ax=ax_pf_1D)
         # owning_pipeline.display_output[active_display_fn_identifying_ctx] = (active_figure, ax_pf_1D)
@@ -480,6 +480,7 @@ class PipelineWithDisplaySavingMixin:
         # fig_man: FigureOutputManager = self.get_output_manager() # get the output manager
         # figures_parent_out_path, fig_save_basename = fig_man.get_figure_output_parent_and_basename(final_context, make_folder_if_needed=True)
         # active_out_figure_paths = perform_write_to_file(fig, final_context, figures_parent_out_path=figures_parent_out_path, write_pdf=write_pdf, write_png=write_png, register_output_file_fn=self.register_output_file)
+        # final_context = final_context.adding_context_if_missing(self.sess.get_context()) # add the session context if it's missing
         active_out_figure_paths = build_and_write_to_file(fig, final_context, self.get_output_manager(), write_pdf=write_pdf, write_png=write_png, register_output_file_fn=self.register_output_file)
         return active_out_figure_paths, final_context
 

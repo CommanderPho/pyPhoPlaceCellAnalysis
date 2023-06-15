@@ -194,8 +194,12 @@ class LongShortTrackComparingDisplayFunctions(AllFunctionEnumeratingMixin, metac
             n_max_plot_rows = kwargs.pop('n_max_plot_rows', 6)
             show_inter_replay_frs = kwargs.pop('show_inter_replay_frs', True)
             included_unit_neuron_IDs = kwargs.pop('included_unit_neuron_IDs', None)
+            
+            # Get the provided context or use the session context:
+            active_context = kwargs.get('active_context', active_identifying_session_ctx)
 
-            active_context = active_identifying_session_ctx.adding_context(collision_prefix='display_fn', display_fn_name='batch_pho_jonathan_replay_firing_rate_comparison')
+
+            active_context = active_context.adding_context_if_missing(display_fn_name='batch_pho_jonathan_replay_firing_rate_comparison')
             curr_fig_num = kwargs.pop('fignum', None)
             if curr_fig_num is None:
                 ## Set the fig_num, if not already set:
