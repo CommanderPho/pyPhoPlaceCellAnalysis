@@ -428,15 +428,21 @@ def run_specific_batch(active_batch_run: BatchRun, curr_session_context: Identif
         curr_active_pipeline = batch_load_session(active_batch_run.global_data_root_parent_path, active_data_mode_name, basedir, epoch_name_includelist=epoch_name_includelist,
                                         computation_functions_name_includelist=active_computation_functions_name_includelist,
                                         saving_mode=saving_mode, force_reload=force_reload, skip_extended_batch_computations=skip_extended_batch_computations, debug_print=debug_print, fail_on_exception=fail_on_exception, **kwargs)
-        try:
-            if post_run_callback_fn is not None:
-                post_run_callback_fn_output = post_run_callback_fn(curr_session_context, curr_session_basedir, curr_active_pipeline)
-        except Exception as e:
-            print(f'error occured in post_run_callback_fn: {e}. Suppressing.')
-        return (SessionBatchProgress.COMPLETED, None, post_run_callback_fn_output) # return the success status and None to indicate that no error occured.
+        
     except Exception as e:
         return (SessionBatchProgress.FAILED, e, None) # return the Failed status and the exception that occured.
 
+    if post_run_callback_fn is not None:
+        if fail_on_exception:
+            post_run_callback_fn_output = post_run_callback_fn(active_batch_run, curr_session_context, curr_session_basedir, curr_active_pipeline)
+        else:
+            try:
+                # handle exceptions in callback:
+                post_run_callback_fn_output = post_run_callback_fn(active_batch_run, curr_session_context, curr_session_basedir, curr_active_pipeline)
+            except Exception as e:
+                print(f'error occured in post_run_callback_fn: {e}. Suppressing.')
+                
+    return (SessionBatchProgress.COMPLETED, None, post_run_callback_fn_output) # return the success status and None to indicate that no error occured.
 
 
 @function_attributes(short_name='main', tags=['batch', 'automated'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-03-28 04:46')
