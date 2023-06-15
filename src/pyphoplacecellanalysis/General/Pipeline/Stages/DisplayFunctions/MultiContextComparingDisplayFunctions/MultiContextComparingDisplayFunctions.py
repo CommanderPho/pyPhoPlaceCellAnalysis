@@ -29,7 +29,7 @@ class MultiContextComparingDisplayFunctions(AllFunctionEnumeratingMixin, metacla
     """
 
     @function_attributes(short_name='grid_bin_bounds_validation', tags=['grid_bin_bounds','validation','pandas'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-06-14 18:17', related_items=[], is_global=True)
-    def _display_grid_bin_bounds_validation(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, **kwargs):
+    def _display_grid_bin_bounds_validation(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, defer_render=False, save_figure=True, **kwargs):
         """ Renders a single figure that shows the 1D linearized position from several different sources to ensure sufficient overlap. Useful for validating that the grid_bin_bounds are chosen reasonably.
 
         """
@@ -60,8 +60,11 @@ class MultiContextComparingDisplayFunctions(AllFunctionEnumeratingMixin, metacla
         
         final_context = owning_pipeline_reference.sess.get_context().adding_context('display_fn', display_fn_name='_display_grid_bin_bounds_validation')
         
-        out_man = owning_pipeline_reference.get_output_manager()
-        
+        if save_figure:
+            saved_figure_paths = owning_pipeline_reference.output_figure(final_context, fig)
+        else:
+            saved_figure_paths = []
+
         graphics_output_dict = MatplotlibRenderPlots(name='_display_grid_bin_bounds_validation', figures=(fig,), axes=(ax,), plot_data={}, context=final_context, saved_figures=[])
         return graphics_output_dict
  
