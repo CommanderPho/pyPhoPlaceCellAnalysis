@@ -589,12 +589,12 @@ class BatchPhoJonathanFiguresHelper(object):
         active_out_figures_list = [] # empty list to hold figures
         num_pages = len(active_kwarg_list)
         for i, curr_batch_plot_kwargs in enumerate(active_kwarg_list):
-            curr_active_identifying_ctx = curr_batch_plot_kwargs['active_identifying_ctx']
+            curr_active_identifying_ctx = curr_batch_plot_kwargs['active_identifying_ctx'] # this context is good
             
-            ## 2023-06-14 - New way using `fig_man.get_figure_output_path(...)`
+            ## 2023-06-14 - New way using `fig_man.get_figure_output_path(...)` - this is correct
             figures_parent_out_path = fig_man.get_figure_output_path(curr_active_identifying_ctx, make_folder_if_needed=True)
 
-            # print(f'curr_active_identifying_ctx: {curr_active_identifying_ctx}')
+            # print(f'curr_active_identifying_ctx: {curr_active_identifying_ctx}'). active_pdf_save_filename is correct.
             active_pdf_metadata, active_pdf_save_filename = build_pdf_metadata_from_display_context(curr_active_identifying_ctx, subset_includelist=subset_includelist, subset_excludelist=subset_excludelist)
             # print(f'active_pdf_save_filename: {active_pdf_save_filename}')
             curr_pdf_save_path = figures_parent_out_path.joinpath(active_pdf_save_filename) # build the final output pdf path from the pdf_parent_out_path (which is the daily folder)
