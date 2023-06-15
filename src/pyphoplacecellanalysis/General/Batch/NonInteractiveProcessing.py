@@ -483,16 +483,15 @@ class BatchPhoJonathanFiguresHelper(object):
         print(f'long_only_aclus: {long_only_aclus}')
         print(f'short_only_aclus: {short_only_aclus}')
 
-        
-        figures_parent_out_path = create_daily_programmatic_display_function_testing_folder_if_needed()
-
         active_identifying_session_ctx = curr_active_pipeline.sess.get_context() # 'bapun_RatN_Day4_2019-10-15_11-30-06'
-        # curr_sess_ctx # IdentifyingContext<('kdiba', 'gor01', 'one', '2006-6-07_11-26-53')>
-        active_session_figures_out_path = session_context_to_relative_path(figures_parent_out_path, active_identifying_session_ctx)
-        print(f'curr_session_parent_out_path: {active_session_figures_out_path}')
-        active_session_figures_out_path.mkdir(parents=True, exist_ok=True) # make folder if needed
-                
 
+        # figures_parent_out_path = create_daily_programmatic_display_function_testing_folder_if_needed()
+        # active_session_figures_out_path = session_context_to_relative_path(figures_parent_out_path, active_identifying_session_ctx)
+        # active_session_figures_out_path.mkdir(parents=True, exist_ok=True) # make folder if needed
+        
+        active_session_figures_out_path = curr_active_pipeline.get_output_manager().get_figure_output_path(active_identifying_session_ctx, make_folder_if_needed=True)
+        print(f'curr_session_parent_out_path: {active_session_figures_out_path}')
+                
 
         # %matplotlib qtagg
         import matplotlib
