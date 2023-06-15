@@ -450,7 +450,7 @@ class LongShortTrackComparingDisplayFunctions(AllFunctionEnumeratingMixin, metac
         from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.LongShortTrackComputations import JonathanFiringRateAnalysisResult
 
         jonathan_firing_rate_analysis_result = JonathanFiringRateAnalysisResult(**global_computation_results.computed_data.jonathan_firing_rate_analysis.to_dict())
-        (fig_L, ax_L, active_display_context_L), (fig_S, ax_S, active_display_context_S), _perform_write_to_file_callback = _plot_session_long_short_track_firing_rate_figures(owning_pipeline_reference, jonathan_firing_rate_analysis_result)
+        (fig_L, ax_L, active_display_context_L), (fig_S, ax_S, active_display_context_S), _perform_write_to_file_callback = _plot_session_long_short_track_firing_rate_figures(owning_pipeline_reference, jonathan_firing_rate_analysis_result, defer_render=defer_render)
         
         if save_figure:
             active_out_figure_paths = _perform_write_to_file_callback()
@@ -2079,7 +2079,7 @@ class RateRemappingPaginatedFigureController(PaginatedFigureController):
 # 2023-05-25 - Long_replay|Long_laps and Short_replay|Short_laps plots                                                 #
 # ==================================================================================================================== #
 
-def _plot_session_long_short_track_firing_rate_figures(curr_active_pipeline, jonathan_firing_rate_analysis_result, defer_show=False):
+def _plot_session_long_short_track_firing_rate_figures(curr_active_pipeline, jonathan_firing_rate_analysis_result, defer_render=False):
     """ 2023-05-25 - Plots a comparison of the lap vs. replay firing rates for a single track.
     
     Inputs:
@@ -2148,7 +2148,7 @@ def _plot_session_long_short_track_firing_rate_figures(curr_active_pipeline, jon
             ax.spines[['left', 'bottom']].set_position('center')
             ax.spines[['top', 'right']].set_visible(False)
 
-        if not defer_show:
+        if not defer_render:
             fig.show()
 
         return fig, ax, active_display_context
