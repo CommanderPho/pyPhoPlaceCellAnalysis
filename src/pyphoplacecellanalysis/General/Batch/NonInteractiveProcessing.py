@@ -582,13 +582,21 @@ class BatchPhoJonathanFiguresHelper(object):
         Returns:
             _type_: _description_
         """
-        if figures_parent_out_path is None:
-            figures_parent_out_path = create_daily_programmatic_display_function_testing_folder_if_needed()
+        # if figures_parent_out_path is None:
+        #     figures_parent_out_path = create_daily_programmatic_display_function_testing_folder_if_needed()
+
         #TODO 2023-06-14 21:53: - [ ] REPLACE `create_daily_programmatic_display_function_testing_folder_if_needed` with `curr_active_pipeline.get_figure_manager()` approach
+        fig_man = curr_active_pipeline.get_output_manager()
+        # fig_man.get_figure_output_path(test_context, make_folder_if_needed=False)
+
         active_out_figures_list = [] # empty list to hold figures
         num_pages = len(active_kwarg_list)
         for i, curr_batch_plot_kwargs in enumerate(active_kwarg_list):
             curr_active_identifying_ctx = curr_batch_plot_kwargs['active_identifying_ctx']
+            
+            ## 2023-06-14 - New way using `fig_man.get_figure_output_path(...)`
+            figures_parent_out_path = fig_man.get_figure_output_path(curr_active_identifying_ctx, make_folder_if_needed=True)
+
             # print(f'curr_active_identifying_ctx: {curr_active_identifying_ctx}')
             active_pdf_metadata, active_pdf_save_filename = build_pdf_metadata_from_display_context(curr_active_identifying_ctx, subset_includelist=subset_includelist, subset_excludelist=subset_excludelist)
             # print(f'active_pdf_save_filename: {active_pdf_save_filename}')
