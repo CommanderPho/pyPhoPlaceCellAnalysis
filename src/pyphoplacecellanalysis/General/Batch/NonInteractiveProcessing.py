@@ -355,9 +355,7 @@ def batch_programmatic_figures(curr_active_pipeline):
     print(f'long_only_aclus: {long_only_aclus}')
     print(f'short_only_aclus: {short_only_aclus}')
 
-    active_identifying_session_ctx = curr_active_pipeline.sess.get_context() # 'bapun_RatN_Day4_2019-10-15_11-30-06'
-    active_session_figures_out_path = curr_active_pipeline.get_daily_programmatic_session_output_path()
-    print(f'curr_session_parent_out_path: {active_session_figures_out_path}')
+    active_identifying_session_ctx = curr_active_pipeline.sess.get_context() # 'bapun_RatN_Day4_2019-10-15_11-30-06'    
     ## MODE: this mode creates a special folder to contain the outputs for this session.
 
     # ==================================================================================================================== #
@@ -372,7 +370,7 @@ def batch_programmatic_figures(curr_active_pipeline):
     matplotlib.use('AGG') # non-interactive backend ## 2022-08-16 - Surprisingly this works to make the matplotlib figures render only to .png file, not appear on the screen!
 
     active_out_figures_list, active_session_figures_out_path = BatchPhoJonathanFiguresHelper.run(curr_active_pipeline, neuron_replay_stats_df, n_max_page_rows = 10)
-
+    print(f'curr_session_parent_out_path: {active_session_figures_out_path}')
 
     # Plot long|short firing rate index:
     # fig_save_parent_path = Path(r'E:\Dropbox (Personal)\Active\Kamran Diba Lab\Results from 2023-01-20 - LongShort Firing Rate Indicies')
