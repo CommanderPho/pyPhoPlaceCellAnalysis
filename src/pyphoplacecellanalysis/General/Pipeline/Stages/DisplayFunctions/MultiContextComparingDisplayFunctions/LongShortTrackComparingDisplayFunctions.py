@@ -379,7 +379,6 @@ class LongShortTrackComparingDisplayFunctions(AllFunctionEnumeratingMixin, metac
                     curr_firing_rate_ax, curr_lap_spikes_ax, curr_placefield_ax = curr_axs_dict['firing_rate'], curr_axs_dict['lap_spikes'], curr_axs_dict['placefield'] # Extract variables from the `curr_axs_dict` dictionary to the local workspace
 
             """
-            fig_save_parent_path = kwargs.pop('fig_save_parent_path', owning_pipeline_reference.get_daily_programmatic_session_output_path())            
             debug_print = kwargs.pop('debug_print', False)
 
             # Plot long|short firing rate index:
@@ -397,7 +396,7 @@ class LongShortTrackComparingDisplayFunctions(AllFunctionEnumeratingMixin, metac
                 return owning_pipeline_reference.output_figure(final_context, fig)
             
             if save_figure:
-                active_out_figure_paths = _perform_write_to_file_callback(fig_save_parent_path)
+                active_out_figure_paths = _perform_write_to_file_callback()
             else:
                 active_out_figure_paths = []
                 
@@ -2078,7 +2077,7 @@ class RateRemappingPaginatedFigureController(PaginatedFigureController):
 # 2023-05-25 - Long_replay|Long_laps and Short_replay|Short_laps plots                                                 #
 # ==================================================================================================================== #
 
-def _plot_session_long_short_track_firing_rate_figures(curr_active_pipeline, jonathan_firing_rate_analysis_result, figures_parent_out_path=None):
+def _plot_session_long_short_track_firing_rate_figures(curr_active_pipeline, jonathan_firing_rate_analysis_result, defer_show=False):
     """ 2023-05-25 - Plots a comparison of the lap vs. replay firing rates for a single track.
     
     Inputs:
@@ -2100,6 +2099,8 @@ def _plot_session_long_short_track_firing_rate_figures(curr_active_pipeline, jon
         is_centered: bool - if True, the spines are centered at (0, 0)
 
         Copied from same file as `_display_short_long_firing_rate_index_comparison()`
+        
+        Captures: `defer_show`
         """
         if neurons_colors is not None:
             if isinstance(neurons_colors, dict):
@@ -2145,7 +2146,8 @@ def _plot_session_long_short_track_firing_rate_figures(curr_active_pipeline, jon
             ax.spines[['left', 'bottom']].set_position('center')
             ax.spines[['top', 'right']].set_visible(False)
 
-        fig.show()
+        if not defer_show:
+            fig.show()
 
         return fig, ax, active_display_context
 
