@@ -299,6 +299,30 @@ class ComputedPipelineStage(LoadableInput, LoadableSessionInput, FilterablePipel
                 
         return complete_computed_config_names_list, incomplete_computed_config_dict
 
+    def get_computation_times(self, debug_print=False):
+        """ gets the latest computation_times from `curr_active_pipeline.computation_results`
+        
+        Usage:
+            any_most_recent_computation_time, each_epoch_latest_computation_time, each_epoch_each_result_computation_completion_times = curr_active_pipeline.stage.get_computation_times()
+            each_epoch_latest_computation_time
+        """
+        each_epoch_each_result_computation_completion_times = {}
+        each_epoch_latest_computation_time = {} # the most recent computation for each of the epochs
+        # find update time of latest function:
+        for k, v in self.computation_results.items():
+            extracted_computation_times_dict = v['computation_times']
+            each_epoch_each_result_computation_completion_times[k] = {k.__name__:v for k,v in extracted_computation_times_dict.items()}
+            each_epoch_latest_computation_time[k] = max(list(each_epoch_each_result_computation_completion_times[k].values()))
+
+        any_most_recent_computation_time: datetime = max(list(each_epoch_latest_computation_time.values())) # newest computation out of any of the epochs
+        if debug_print:
+            print(f'any_most_recent_computation_time: {any_most_recent_computation_time}')
+            print(f'each_epoch_latest_computation_time: {each_epoch_latest_computation_time}')
+        return any_most_recent_computation_time, each_epoch_latest_computation_time, each_epoch_each_result_computation_completion_times
+        
+
+
+
     def find_LongShortGlobal_epoch_names(self):
         """ Helper function to returns the [long, short, global] epoch names. They must exist.
         Usage:
@@ -906,6 +930,10 @@ class PipelineWithComputedPipelineStageMixin:
     def get_output_manager(self) -> FigureOutputManager:
         """ returns the FigureOutputManager that specifies where outputs are stored. """
         return FigureOutputManager(figure_output_location=FigureOutputLocation.DAILY_PROGRAMMATIC_OUTPUT_FOLDER, context_to_path_mode=ContextToPathMode.GLOBAL_UNIQUE)
+
+    def get_computation_times(self, debug_print=False):
+        return self.stage.get_computation_times(debug_print=debug_print)
+    
 
     # def get_daily_programmatic_session_output_path(self, debug_print=False) -> Path:
     #     from pyphoplacecellanalysis.General.Mixins.ExportHelpers import create_daily_programmatic_display_function_testing_folder_if_needed, session_context_to_relative_path # for `perform_write_to_file`
