@@ -369,21 +369,8 @@ def batch_programmatic_figures(curr_active_pipeline):
     # backend_qt5agg
     matplotlib.use('AGG') # non-interactive backend ## 2022-08-16 - Surprisingly this works to make the matplotlib figures render only to .png file, not appear on the screen!
 
-    active_out_figures_list, active_session_figures_out_path = BatchPhoJonathanFiguresHelper.run(curr_active_pipeline, neuron_replay_stats_df, n_max_page_rows = 10)
+    active_out_figures_list, active_session_figures_out_path = BatchPhoJonathanFiguresHelper.run(curr_active_pipeline, neuron_replay_stats_df, n_max_page_rows=10)
     print(f'curr_session_parent_out_path: {active_session_figures_out_path}')
-
-    # Plot long|short firing rate index:
-    # fig_save_parent_path = Path(r'E:\Dropbox (Personal)\Active\Kamran Diba Lab\Results from 2023-01-20 - LongShort Firing Rate Indicies')
-    # override_fig_save_parent_path = Path(r'E:\Dropbox (Personal)\Active\Kamran Diba Lab\Pho-Kamran-Meetings\Results from 2023-04-11')
-    override_fig_save_parent_path = None
-    if override_fig_save_parent_path is None:
-        fig_save_parent_path = active_session_figures_out_path
-    else:
-        fig_save_parent_path = override_fig_save_parent_path
-
-    curr_active_pipeline.display('_display_short_long_firing_rate_index_comparison', curr_active_pipeline.sess.get_context(), fig_save_parent_path=fig_save_parent_path)
-
-
 
     return active_identifying_session_ctx, active_session_figures_out_path, active_out_figures_list
 
@@ -391,7 +378,7 @@ def batch_programmatic_figures(curr_active_pipeline):
 # import matplotlib as mpl
 # import matplotlib.pyplot as plt
 @function_attributes(short_name='batch_extended_programmatic_figures', tags=['batch', 'automated', 'session', 'display', 'figures', 'extended', 'matplotlib'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-03-28 04:46')
-def batch_extended_programmatic_figures(curr_active_pipeline, write_pdf=False, write_png=True, debug_print=True):
+def batch_extended_programmatic_figures(curr_active_pipeline, write_pdf=False, write_png=True, debug_print=False):
     _bak_rcParams = mpl.rcParams.copy()
     mpl.rcParams['toolbar'] = 'None' # disable toolbars
     matplotlib.use('AGG') # non-interactive backend ## 2022-08-16 - Surprisingly this works to make the matplotlib figures render only to .png file, not appear on the screen!
@@ -404,17 +391,15 @@ def batch_extended_programmatic_figures(curr_active_pipeline, write_pdf=False, w
     
     programmatic_render_to_file(curr_active_pipeline, curr_display_function_name='_display_2d_placefield_result_plot_ratemaps_2D', write_pdf=write_pdf, write_png=write_png, debug_print=debug_print) #  🟢✅ Now seems to be working and saving to PDF!! Still using matplotlib.use('Qt5Agg') mode and plots still appear.
     programmatic_render_to_file(curr_active_pipeline, curr_display_function_name='_display_2d_placefield_occupancy', write_pdf=write_pdf, write_png=write_png, debug_print=debug_print) #  🟢✅ 2023-05-25
-    # programmatic_display_to_PDF(curr_active_pipeline, curr_display_function_name='_display_long_short_laps') #  UNTESTED 2023-05-29
-
    
-    # # Plot long|short firing rate index:
-    # fig_save_parent_path = Path(r'E:\Dropbox (Personal)\Active\Kamran Diba Lab\Results from 2023-01-20 - LongShort Firing Rate Indicies')
-    # long_short_fr_indicies_analysis_results = curr_active_pipeline.global_computation_results.computed_data['long_short_fr_indicies_analysis']
-    # x_frs_index, y_frs_index = long_short_fr_indicies_analysis_results['x_frs_index'], long_short_fr_indicies_analysis_results['y_frs_index'] # use the all_results_dict as the computed data value
-    # active_context = long_short_fr_indicies_analysis_results['active_context']
-    # plot_long_short_firing_rate_indicies(x_frs_index, y_frs_index, active_context, fig_save_parent_path=fig_save_parent_path)
-
     #TODO 2023-06-14 05:30: - [ ] Refactor these (the global placefields) into a form compatible with the local ones using some sort of shortcut method like `programmatic_render_to_file`
+
+    # Plot long|short firing rate index:
+    try:
+        _out = curr_active_pipeline.display('_display_short_long_firing_rate_index_comparison', curr_active_pipeline.get_session_context(), defer_render=True, save_figure=True)
+    except Exception as e:
+        print(f'batch_extended_programmatic_figures(...): _display_short_long_firing_rate_index_comparison failed with error: {e}\n skipping.')
+    
     try:
         _out = curr_active_pipeline.display('_display_long_short_expected_v_observed_firing_rate', curr_active_pipeline.get_session_context(), defer_render=True, save_figure=True)
     except Exception as e:
@@ -466,7 +451,7 @@ class BatchPhoJonathanFiguresHelper(object):
 
 
     @classmethod
-    def run(cls, curr_active_pipeline, neuron_replay_stats_df, n_max_page_rows = 10):
+    def run(cls, curr_active_pipeline, neuron_replay_stats_df, n_max_page_rows=10, write_pdf=False, write_png=True):
         """ The only public function. Performs the batch plotting. """
 
         ## 🗨️🟢 2022-11-05 - Pho-Jonathan Batch Outputs of Firing Rate Figures
@@ -487,9 +472,10 @@ class BatchPhoJonathanFiguresHelper(object):
         # active_session_figures_out_path = session_context_to_relative_path(figures_parent_out_path, active_identifying_session_ctx)
         # active_session_figures_out_path.mkdir(parents=True, exist_ok=True) # make folder if needed
         
+        ## TODO: BAD
         active_session_figures_out_path = curr_active_pipeline.get_output_manager().get_figure_output_path(active_identifying_session_ctx, make_folder_if_needed=True)
         print(f'curr_session_parent_out_path: {active_session_figures_out_path}')
-                
+
 
         # %matplotlib qtagg
         import matplotlib
@@ -499,7 +485,7 @@ class BatchPhoJonathanFiguresHelper(object):
         matplotlib.use('AGG') # non-interactive backend ## 2022-08-16 - Surprisingly this works to make the matplotlib figures render only to .png file, not appear on the screen!
 
         _batch_plot_kwargs_list = cls._build_batch_plot_kwargs(long_only_aclus, short_only_aclus, shared_aclus, active_identifying_session_ctx, n_max_page_rows=n_max_page_rows)
-        active_out_figures_list = cls._perform_batch_plot(curr_active_pipeline, _batch_plot_kwargs_list, figures_parent_out_path=active_session_figures_out_path, write_pdf=False, write_png=True, progress_print=True, debug_print=False)
+        active_out_figures_list = cls._perform_batch_plot(curr_active_pipeline, _batch_plot_kwargs_list, figures_parent_out_path=active_session_figures_out_path, write_pdf=write_pdf, write_png=write_png, progress_print=True, debug_print=False)
         
         return active_out_figures_list, active_session_figures_out_path
 

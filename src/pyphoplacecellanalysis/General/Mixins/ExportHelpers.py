@@ -371,7 +371,9 @@ class FigureOutputManager:
         return fig_save_path.resolve(), fig_save_basename
 
     def get_figure_output_path(self, final_context: IdentifyingContext, make_folder_if_needed:bool=True, **kwargs) -> Path:
-        """ like `get_figure_output_parent_and_basename` but returns a single output path instead of the parent_path and basename. """
+        """ like `get_figure_output_parent_and_basename` but returns a single output path instead of the parent_path and basename.
+        
+        """ #TODO 2023-06-15 21:16: - [ ] Rename to indicate that this returns the complete basepath. Make sure it hasn't been substituted for getting the figure parent output directory due to its poor naming.
         parent_save_path, fig_save_basename = self.get_figure_output_parent_and_basename(final_context, make_folder_if_needed=make_folder_if_needed, **kwargs)
         return parent_save_path.joinpath(fig_save_basename).resolve()
 
