@@ -290,7 +290,7 @@ class LongShortTrackComparingDisplayFunctions(AllFunctionEnumeratingMixin, metac
                 final_context = owning_pipeline_reference.sess.get_context().adding_context('display_fn', display_fn_name='display_short_long_pf1D_comparison')
             else:
                 base_final_context = owning_pipeline_reference.sess.get_context().adding_context('display_fn', display_fn_name='display_short_long_pf1D_comparison')
-                final_context = (base_final_context.adding_context(maze='long'), base_final_context.adding_context(maze='short'),) # final context is a tuple of contexts
+                final_context = (base_final_context.overwriting_context(track='long'), base_final_context.overwriting_context(track='short'),) # final context is a tuple of contexts
 
             def _perform_write_to_file_callback():
                 ## 2023-05-31 - Reference Output of matplotlib figure to file, along with building appropriate context.
