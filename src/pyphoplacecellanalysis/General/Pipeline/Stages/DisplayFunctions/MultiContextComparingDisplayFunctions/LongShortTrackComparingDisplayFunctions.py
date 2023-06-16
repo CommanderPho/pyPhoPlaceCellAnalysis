@@ -251,9 +251,9 @@ class LongShortTrackComparingDisplayFunctions(AllFunctionEnumeratingMixin, metac
 
 
             # Plot 1D Keywoard args:
-            shared_kwargs = kwargs.pop('shared_kwargs', None)
-            long_kwargs = kwargs.pop('long_kwargs', None)
-            short_kwargs = kwargs.pop('short_kwargs', None)
+            shared_kwargs = kwargs.pop('shared_kwargs', {})
+            long_kwargs = kwargs.pop('long_kwargs', {})
+            short_kwargs = kwargs.pop('short_kwargs', {})
 
             if include_includelist is None:
                 include_includelist = owning_pipeline_reference.active_completed_computation_result_names # ['maze', 'sprinkle']
@@ -286,18 +286,24 @@ class LongShortTrackComparingDisplayFunctions(AllFunctionEnumeratingMixin, metac
             (fig_long_pf_1D, ax_long_pf_1D, long_sort_ind, long_neurons_colors_array), (fig_short_pf_1D, ax_short_pf_1D, short_sort_ind, short_neurons_colors_array) = plot_short_v_long_pf1D_comparison(long_results, short_results, curr_any_context_neurons, reuse_axs_tuple=reuse_axs_tuple, single_figure=single_figure,
                 shared_kwargs=shared_kwargs, long_kwargs=long_kwargs, short_kwargs=short_kwargs, debug_print=debug_print)
 
-            final_context = owning_pipeline_reference.sess.get_context().adding_context('display_fn', display_fn_name='display_short_long_pf1D_comparison')
-    
+            if single_figure:
+                final_context = owning_pipeline_reference.sess.get_context().adding_context('display_fn', display_fn_name='display_short_long_pf1D_comparison')
+            else:
+                base_final_context = owning_pipeline_reference.sess.get_context().adding_context('display_fn', display_fn_name='display_short_long_pf1D_comparison')
+                final_context = (base_final_context.adding_context(maze='long'), base_final_context.adding_context(maze='short'),) # final context is a tuple of contexts
+
             def _perform_write_to_file_callback():
                 ## 2023-05-31 - Reference Output of matplotlib figure to file, along with building appropriate context.
-                return owning_pipeline_reference.output_figure(final_context, fig_short_pf_1D)
-            
+                if single_figure:
+                    return owning_pipeline_reference.output_figure(final_context, fig_short_pf_1D)
+                else:
+                    owning_pipeline_reference.output_figure(final_context[0], fig_long_pf_1D)
+                    owning_pipeline_reference.output_figure(final_context[1], fig_short_pf_1D)
+
             if save_figure:
                 active_out_figure_paths = _perform_write_to_file_callback()
             else:
                 active_out_figure_paths = []
-
-
 
             graphics_output_dict = MatplotlibRenderPlots(name='display_short_long_pf1D_comparison', figures=(fig_long_pf_1D, fig_short_pf_1D), axes=(ax_long_pf_1D, ax_short_pf_1D), plot_data={}, context=final_context, saved_figures=active_out_figure_paths)
             graphics_output_dict['plot_data'] = {'sort_indicies': (long_sort_ind, short_sort_ind), 'colors':(long_neurons_colors_array, short_neurons_colors_array)}
@@ -430,7 +436,7 @@ class LongShortTrackComparingDisplayFunctions(AllFunctionEnumeratingMixin, metac
                     %matplotlib qt
                     active_identifying_session_ctx = curr_active_pipeline.sess.get_context() # 'bapun_RatN_Day4_2019-10-15_11-30-06'
 
-                    graphics_output_dict = curr_active_pipeline.display('_display_short_long_pf1D_comparison', active_identifying_session_ctx)
+                    graphics_output_dict = curr_active_pipeline.display('_display_long_short_laps', active_identifying_session_ctx)
                     fig, axs, plot_data = graphics_output_dict['fig'], graphics_output_dict['axs'], graphics_output_dict['plot_data']
                     
 
@@ -1332,10 +1338,8 @@ def plot_short_v_long_pf1D_comparison(long_results, short_results, curr_any_cont
     # Shared/Common kwargs:
     plot_ratemap_1D_kwargs = (dict(pad=2, brev_mode=PlotStringBrevityModeEnum.NONE, normalize=True, debug_print=debug_print, normalize_tuning_curve=True) | shared_kwargs)
     
-
     single_cell_pfmap_processing_fn_identity = lambda i, aclu, pfmap: pfmap # flip over the y-axis
     single_cell_pfmap_processing_fn_flipped_y = lambda i, aclu, pfmap: -1.0 * pfmap # flip over the y-axis
-
 
     n_neurons = len(curr_any_context_neurons)
     shared_fragile_neuron_IDXs = np.arange(n_neurons)
@@ -1355,7 +1359,7 @@ def plot_short_v_long_pf1D_comparison(long_results, short_results, curr_any_cont
             ax_long_pf_1D, ax_short_pf_1D = reuse_axs_tuple
             fig_long_pf_1D = ax_long_pf_1D.get_figure()
             fig_short_pf_1D = ax_short_pf_1D.get_figure()
-            PhoActiveFigureManager2D.reshow_figure_if_needed(fig_long_pf_1D)
+            PhoActiveFigureManager2D.reshow_figure_if_needed(fig_long_pf_1D) # TODO 2023-06-16 13:35: - [ ] Do I need to disable these for defer_render=True?
             PhoActiveFigureManager2D.reshow_figure_if_needed(fig_short_pf_1D)
         else:
             # single figure
@@ -2287,7 +2291,7 @@ def plot_expected_vs_observed(t_SHARED, y_SHORT, y_LONG, neuron_IDXs, neuron_IDs
 
 
 
-@function_attributes(short_name=None, tags=[], conforms_to=[], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-06-16 13:01')
+@function_attributes(short_name=None, tags=[], conforms_to=[], input_requires=[], output_provides=[], uses=['JonathanFiringRateAnalysisResult'], used_by=['_display_short_long_pf1D_comparison'], creation_date='2023-06-16 13:01')
 def determine_long_short_pf1D_indicies_sort_by_peak(curr_active_pipeline, curr_any_context_neurons, debug_print=False):
     """ Builds proper sort indicies for '_display_short_long_pf1D_comparison'
     Captures Nothing
