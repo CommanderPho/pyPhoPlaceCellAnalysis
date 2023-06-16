@@ -578,20 +578,23 @@ class BatchPhoJonathanFiguresHelper(object):
             curr_active_identifying_ctx = curr_batch_plot_kwargs['active_identifying_ctx'] # this context is good
             
             ## 2023-06-14 - New way using `fig_man.get_figure_output_path(...)` - this is correct
-            figures_parent_out_path = fig_man.get_figure_output_path(curr_active_identifying_ctx, make_folder_if_needed=True)
-
-            # print(f'curr_active_identifying_ctx: {curr_active_identifying_ctx}'). active_pdf_save_filename is correct.
-            active_pdf_metadata, active_pdf_save_filename = build_pdf_metadata_from_display_context(curr_active_identifying_ctx, subset_includelist=subset_includelist, subset_excludelist=subset_excludelist)
-            # print(f'active_pdf_save_filename: {active_pdf_save_filename}')
-            curr_pdf_save_path = figures_parent_out_path.joinpath(active_pdf_save_filename) # build the final output pdf path from the pdf_parent_out_path (which is the daily folder)
+            final_figure_file_path = fig_man.get_figure_output_path(curr_active_identifying_ctx, make_folder_if_needed=True) # complete file path without extension: e.g. '/ProgrammaticDisplayFunctionTesting/2023-06-15/kdiba_pin01_one_11-03_12-3-25_BatchPhoJonathanReplayFRC_short_only_[13, 22, 28]'
+            # parent_save_path, fig_save_basename = fig_man.get_figure_output_parent_and_basename(curr_active_identifying_ctx, make_folder_if_needed=True)
+            
             # One plot at a time to PDF:
             if write_pdf:
+                active_pdf_metadata, _UNUSED_pdf_save_filename = build_pdf_metadata_from_display_context(curr_active_identifying_ctx, subset_includelist=subset_includelist, subset_excludelist=subset_excludelist)
+                # print(f'active_pdf_save_filename: {active_pdf_save_filename}')
+                # curr_pdf_save_path = figures_parent_out_path.joinpath(active_pdf_save_filename) # build the final output pdf path from the pdf_parent_out_path (which is the daily folder)
+                curr_pdf_save_path = final_figure_file_path.with_suffix('.pdf')
                 with backend_pdf.PdfPages(curr_pdf_save_path, keep_empty=False, metadata=active_pdf_metadata) as pdf:
                     a_fig = cls._subfn_batch_plot_automated(curr_active_pipeline, **curr_batch_plot_kwargs)
                     active_out_figures_list.append(a_fig)
                     # Save out PDF page:
                     pdf.savefig(a_fig)
                     curr_active_pipeline.register_output_file(output_path=curr_pdf_save_path, output_metadata={'context': curr_active_identifying_ctx, 'fig': (a_fig), 'pdf_metadata': active_pdf_metadata})
+                    if progress_print:
+                        print(f'\t saved {curr_pdf_save_path}')
             else:
                 # Don't write the PDF and just plot interactively:
                 a_fig = cls._subfn_batch_plot_automated(curr_active_pipeline, **curr_batch_plot_kwargs)
@@ -600,12 +603,13 @@ class BatchPhoJonathanFiguresHelper(object):
             # Also save .png versions:
             if write_png:
                 # curr_page_str = f'pg{i+1}of{num_pages}'
-                fig_png_out_path = curr_pdf_save_path.with_suffix('.png')
+                fig_png_out_path = final_figure_file_path.with_suffix('.png')
                 # fig_png_out_path = fig_png_out_path.with_stem(f'{curr_pdf_save_path.stem}_{curr_page_str}') # note this replaces the current .pdf extension with .png, resulting in a good filename for a .png
                 a_fig.savefig(fig_png_out_path)
                 curr_active_pipeline.register_output_file(output_path=fig_png_out_path, output_metadata={'context': curr_active_identifying_ctx, 'fig': (a_fig)})
                 if progress_print:
                     print(f'\t saved {fig_png_out_path}')
+
 
         return active_out_figures_list
 
