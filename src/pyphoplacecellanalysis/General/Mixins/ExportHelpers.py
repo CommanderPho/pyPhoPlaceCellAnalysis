@@ -355,7 +355,7 @@ class FigureOutputManager:
     Usage:
         fig_man = FigureOutputManager(figure_output_location=FigureOutputLocation.DAILY_PROGRAMMATIC_OUTPUT_FOLDER, context_to_path_mode=ContextToPathMode.GLOBAL_UNIQUE)
         test_context = IdentifyingContext(format_name='kdiba',animal='gor01',exper_name='one',session_name='2006-6-08_14-26-15',display_fn_name='display_long_short_laps')
-        fig_man.get_figure_output_path(test_context, make_folder_if_needed=False)
+        fig_man.get_figure_save_file_path(test_context, make_folder_if_needed=False)
         >>> Path('/home/halechr/repo/Spike3D/EXTERNAL/Screenshots/ProgrammaticDisplayFunctionTesting/2023-06-14/kdiba_gor01_one_2006-6-08_14-26-15_display_long_short_laps')
     """
     figure_output_location: FigureOutputLocation
@@ -370,10 +370,17 @@ class FigureOutputManager:
         fig_save_basename = self.context_to_path_mode.build_figure_basename_from_display_context(final_context, **kwargs)
         return fig_save_path.resolve(), fig_save_basename
 
-    def get_figure_output_path(self, final_context: IdentifyingContext, make_folder_if_needed:bool=True, **kwargs) -> Path:
-        """ like `get_figure_output_parent_and_basename` but returns a single output path instead of the parent_path and basename.
+    def get_figure_output_parent_path(self, final_context: IdentifyingContext, make_folder_if_needed:bool=True, **kwargs) -> Path:
+        """ Returns the parent path for figure output. Typically shouldn't be used except for drop-in compatibility.        
+        """
+        parent_save_path, _ = self.get_figure_output_parent_and_basename(final_context, make_folder_if_needed=make_folder_if_needed, **kwargs)
+        return parent_save_path
+
+
+    def get_figure_save_file_path(self, final_context: IdentifyingContext, make_folder_if_needed:bool=True, **kwargs) -> Path:
+        """ Returns a complete path to a file without the extension (as a basepath). Same information output by `get_figure_output_parent_and_basename` but returns a single output path instead of the parent_path and basename.
         
-        """ #TODO 2023-06-15 21:16: - [ ] Rename to indicate that this returns the complete basepath. Make sure it hasn't been substituted for getting the figure parent output directory due to its poor naming.
+        """ 
         parent_save_path, fig_save_basename = self.get_figure_output_parent_and_basename(final_context, make_folder_if_needed=make_folder_if_needed, **kwargs)
         return parent_save_path.joinpath(fig_save_basename).resolve()
 
@@ -673,7 +680,7 @@ def build_and_write_to_file(a_fig, active_identifying_ctx, fig_man:Optional[Figu
     # Use fig_man to build the path
     fig_man = fig_man or FigureOutputManager(figure_output_location=FigureOutputLocation.DAILY_PROGRAMMATIC_OUTPUT_FOLDER, context_to_path_mode=ContextToPathMode.GLOBAL_UNIQUE)
     # figures_parent_out_path, fig_save_basename = fig_man.get_figure_output_parent_and_basename(active_identifying_ctx, make_folder_if_needed=True, subset_includelist=subset_includelist, subset_excludelist=subset_excludelist, context_tuple_join_character='_')
-    curr_fig_save_path = fig_man.get_figure_output_path(active_identifying_ctx, make_folder_if_needed=True, subset_includelist=subset_includelist, subset_excludelist=subset_excludelist, context_tuple_join_character='_')
+    curr_fig_save_path = fig_man.get_figure_save_file_path(active_identifying_ctx, make_folder_if_needed=True, subset_includelist=subset_includelist, subset_excludelist=subset_excludelist, context_tuple_join_character='_')
 
     # if write_pdf:
     #     active_pdf_metadata, _unused_old_pdf_save_filename = build_pdf_metadata_from_display_context(active_identifying_ctx, subset_includelist=subset_includelist, subset_excludelist=subset_excludelist) # ignores `active_pdf_save_filename`
@@ -714,8 +721,6 @@ def write_to_file(a_fig, active_identifying_ctx: IdentifyingContext, final_fig_s
     if write_pdf:
         try:
             active_pdf_metadata, _unused_old_pdf_save_filename = build_pdf_metadata_from_display_context(active_identifying_ctx, subset_includelist=subset_includelist, subset_excludelist=subset_excludelist) # ignores `active_pdf_save_filename`
-            # print(f'active_pdf_save_filename: {active_pdf_save_filename}')
-            # curr_pdf_save_path = figures_parent_out_path.joinpath(active_pdf_save_filename) # build the final output pdf path from the pdf_parent_out_path (which is the daily folder)
             curr_pdf_save_path = final_fig_save_basename_path.with_suffix('.pdf')
             
             with backend_pdf.PdfPages(curr_pdf_save_path, keep_empty=False, metadata=active_pdf_metadata) as pdf:
@@ -733,9 +738,6 @@ def write_to_file(a_fig, active_identifying_ctx: IdentifyingContext, final_fig_s
     if write_png:
         # curr_page_str = f'pg{i+1}of{num_pages}'
         try:
-            # curr_fig_save_basename = build_figure_basename_from_display_context(active_identifying_ctx, subset_includelist=subset_includelist, subset_excludelist=subset_excludelist, context_tuple_join_character='_')
-            # curr_fig_save_path = figures_parent_out_path.joinpath(curr_fig_save_basename)
-            # curr_fig_save_path = fig_man.get_figure_output_path(active_identifying_ctx, make_folder_if_needed=True, subset_includelist=subset_includelist, subset_excludelist=subset_excludelist, context_tuple_join_character='_')
             fig_png_out_path = final_fig_save_basename_path.with_suffix('.png')
             # fig_png_out_path = fig_png_out_path.with_stem(f'{curr_pdf_save_path.stem}_{curr_page_str}') # note this replaces the current .pdf extension with .png, resulting in a good filename for a .png
             a_fig.savefig(fig_png_out_path)

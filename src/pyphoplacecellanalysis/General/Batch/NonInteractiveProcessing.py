@@ -451,7 +451,7 @@ class BatchPhoJonathanFiguresHelper(object):
 
 
     @classmethod
-    def run(cls, curr_active_pipeline, neuron_replay_stats_df, n_max_page_rows=10, write_pdf=False, write_png=True):
+    def run(cls, curr_active_pipeline, neuron_replay_stats_df, n_max_page_rows=10, write_pdf=False, write_png=True, progress_print=True, debug_print=False):
         """ The only public function. Performs the batch plotting. """
 
         ## 🗨️🟢 2022-11-05 - Pho-Jonathan Batch Outputs of Firing Rate Figures
@@ -467,16 +467,7 @@ class BatchPhoJonathanFiguresHelper(object):
         print(f'short_only_aclus: {short_only_aclus}')
 
         active_identifying_session_ctx = curr_active_pipeline.sess.get_context() # 'bapun_RatN_Day4_2019-10-15_11-30-06'
-
-        # figures_parent_out_path = create_daily_programmatic_display_function_testing_folder_if_needed()
-        # active_session_figures_out_path = session_context_to_relative_path(figures_parent_out_path, active_identifying_session_ctx)
-        # active_session_figures_out_path.mkdir(parents=True, exist_ok=True) # make folder if needed
         
-        ## TODO: BAD
-        active_session_figures_out_path = curr_active_pipeline.get_output_manager().get_figure_output_path(active_identifying_session_ctx, make_folder_if_needed=True)
-        print(f'curr_session_parent_out_path: {active_session_figures_out_path}')
-
-
         # %matplotlib qtagg
         import matplotlib
         # configure backend here
@@ -485,9 +476,11 @@ class BatchPhoJonathanFiguresHelper(object):
         matplotlib.use('AGG') # non-interactive backend ## 2022-08-16 - Surprisingly this works to make the matplotlib figures render only to .png file, not appear on the screen!
 
         _batch_plot_kwargs_list = cls._build_batch_plot_kwargs(long_only_aclus, short_only_aclus, shared_aclus, active_identifying_session_ctx, n_max_page_rows=n_max_page_rows)
-        active_out_figures_list = cls._perform_batch_plot(curr_active_pipeline, _batch_plot_kwargs_list, figures_parent_out_path=active_session_figures_out_path, write_pdf=write_pdf, write_png=write_png, progress_print=True, debug_print=False)
+        active_out_figures_list = cls._perform_batch_plot(curr_active_pipeline, _batch_plot_kwargs_list, write_pdf=write_pdf, write_png=write_png, progress_print=progress_print, debug_print=debug_print)
         
-        return active_out_figures_list, active_session_figures_out_path
+        ## PITFALL: Note that depending on the figure output mode there might not be a common parent path for all files from this session, so this variable is just kept around for compatibility.
+        active_session_figures_parent_path = curr_active_pipeline.get_output_manager().get_figure_output_parent_path(active_identifying_session_ctx, make_folder_if_needed=False)
+        return active_out_figures_list, active_session_figures_parent_path
 
     @classmethod
     def _subfn_batch_plot_automated(cls, curr_active_pipeline, included_unit_neuron_IDs=None, active_identifying_ctx=None, fignum=None, fig_idx=0, n_max_page_rows=10):
@@ -505,7 +498,7 @@ class BatchPhoJonathanFiguresHelper(object):
         desired_figure_size_inches[1] = desired_figure_size_inches[1] * num_cells
         graphics_output_dict = curr_active_pipeline.display(cls._display_fn_name, active_identifying_ctx,
                                                             n_max_plot_rows=n_max_page_rows, included_unit_neuron_IDs=included_unit_neuron_IDs,
-                                                            show_inter_replay_frs=True, spikes_color=(0.1, 0.0, 0.1), spikes_alpha=0.5, fignum=fignum, fig_idx=fig_idx, figsize=desired_figure_size_inches, save_figure=True, defer_render=True)
+                                                            show_inter_replay_frs=True, spikes_color=(0.1, 0.0, 0.1), spikes_alpha=0.5, fignum=fignum, fig_idx=fig_idx, figsize=desired_figure_size_inches, save_figure=False, defer_render=True) # save_figure will be false because we're saving afterwards
         # fig, subfigs, axs, plot_data = graphics_output_dict['fig'], graphics_output_dict['subfigs'], graphics_output_dict['axs'], graphics_output_dict['plot_data']
         fig, subfigs, axs, plot_data = graphics_output_dict.figures[0], graphics_output_dict.subfigs, graphics_output_dict.axes, graphics_output_dict.plot_data
         fig.suptitle(active_identifying_ctx.get_description()) # 'kdiba_2006-6-08_14-26-15_[4, 13, 36, 58, 60]'
@@ -551,7 +544,7 @@ class BatchPhoJonathanFiguresHelper(object):
         return _batch_plot_kwargs_list
 
     @classmethod
-    def _perform_batch_plot(cls, curr_active_pipeline, active_kwarg_list, figures_parent_out_path=None, subset_includelist=None, subset_excludelist=None, write_pdf=False, write_png=True, progress_print=True, debug_print=False):
+    def _perform_batch_plot(cls, curr_active_pipeline, active_kwarg_list, subset_includelist=None, subset_excludelist=None, write_pdf=False, write_png=True, progress_print=True, debug_print=False):
         """ Plots everything by calling `cls._subfn_batch_plot_automated` using the kwargs provided in `active_kwarg_list`
 
         Args:
@@ -570,22 +563,18 @@ class BatchPhoJonathanFiguresHelper(object):
 
         #TODO 2023-06-14 21:53: - [ ] REPLACE `create_daily_programmatic_display_function_testing_folder_if_needed` with `curr_active_pipeline.get_figure_manager()` approach
         fig_man = curr_active_pipeline.get_output_manager()
-        # fig_man.get_figure_output_path(test_context, make_folder_if_needed=False)
 
         active_out_figures_list = [] # empty list to hold figures
         num_pages = len(active_kwarg_list)
         for i, curr_batch_plot_kwargs in enumerate(active_kwarg_list):
             curr_active_identifying_ctx = curr_batch_plot_kwargs['active_identifying_ctx'] # this context is good
             
-            ## 2023-06-14 - New way using `fig_man.get_figure_output_path(...)` - this is correct
-            final_figure_file_path = fig_man.get_figure_output_path(curr_active_identifying_ctx, make_folder_if_needed=True) # complete file path without extension: e.g. '/ProgrammaticDisplayFunctionTesting/2023-06-15/kdiba_pin01_one_11-03_12-3-25_BatchPhoJonathanReplayFRC_short_only_[13, 22, 28]'
-            # parent_save_path, fig_save_basename = fig_man.get_figure_output_parent_and_basename(curr_active_identifying_ctx, make_folder_if_needed=True)
+            ## 2023-06-14 - New way using `fig_man.get_figure_save_file_path(...)` - this is correct
+            final_figure_file_path = fig_man.get_figure_save_file_path(curr_active_identifying_ctx, make_folder_if_needed=True) # complete file path without extension: e.g. '/ProgrammaticDisplayFunctionTesting/2023-06-15/kdiba_pin01_one_11-03_12-3-25_BatchPhoJonathanReplayFRC_short_only_[13, 22, 28]'
             
             # One plot at a time to PDF:
             if write_pdf:
                 active_pdf_metadata, _UNUSED_pdf_save_filename = build_pdf_metadata_from_display_context(curr_active_identifying_ctx, subset_includelist=subset_includelist, subset_excludelist=subset_excludelist)
-                # print(f'active_pdf_save_filename: {active_pdf_save_filename}')
-                # curr_pdf_save_path = figures_parent_out_path.joinpath(active_pdf_save_filename) # build the final output pdf path from the pdf_parent_out_path (which is the daily folder)
                 curr_pdf_save_path = final_figure_file_path.with_suffix('.pdf')
                 with backend_pdf.PdfPages(curr_pdf_save_path, keep_empty=False, metadata=active_pdf_metadata) as pdf:
                     a_fig = cls._subfn_batch_plot_automated(curr_active_pipeline, **curr_batch_plot_kwargs)
