@@ -85,8 +85,6 @@ class LongShortTrackComparingDisplayFunctions(AllFunctionEnumeratingMixin, metac
                 global_epoch_name = '' # None
                 
 
-            NeuronType
-
             print(f'include_includelist: {include_includelist}\nlong_epoch_name: {long_epoch_name}, short_epoch_name: {short_epoch_name}, global_epoch_name: {global_epoch_name}')
             pf1d_long = computation_results[long_epoch_name]['computed_data']['pf1D']
             pf1d_short = computation_results[short_epoch_name]['computed_data']['pf1D']
@@ -1325,6 +1323,10 @@ def plot_short_v_long_pf1D_comparison(long_results, short_results, curr_any_cont
 
     n_neurons = len(curr_any_context_neurons)
     shared_fragile_neuron_IDXs = np.arange(n_neurons)
+    
+    ## sort has to be done here on `shared_fragile_neuron_IDXs`, as this is used for sortby below for both.
+
+
     # neurons_colors_array = build_neurons_color_map(n_neurons, sortby=shared_fragile_neuron_IDXs, cmap=None, included_unit_indicies=None, included_unit_neuron_IDs=curr_any_context_neurons)
     if debug_print:
         print(f'n_neurons: {n_neurons}')
