@@ -35,6 +35,7 @@ from pyphoplacecellanalysis.Pho2D.matplotlib.CustomMatplotlibWidget import Custo
 import pyphoplacecellanalysis.External.pyqtgraph as pg
 
 from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.LongShortTrackComputations import make_fr
+from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.LongShortTrackComputations import JonathanFiringRateAnalysisResult # used in _display_short_long_pf1D_comparison
 from pyphoplacecellanalysis.General.Mixins.CrossComputationComparisonHelpers import _compare_computation_results, _find_any_context_neurons, build_neurons_color_map # for plot_short_v_long_pf1D_comparison
 from pyphoplacecellanalysis.General.Mixins.CrossComputationComparisonHelpers import build_replays_custom_scatter_markers, CustomScatterMarkerMode # used in _make_pho_jonathan_batch_plots
 from pyphoplacecellanalysis.General.Mixins.CrossComputationComparisonHelpers import _build_neuron_type_distribution_color # used in _make_pho_jonathan_batch_plots
@@ -225,7 +226,10 @@ class LongShortTrackComparingDisplayFunctions(AllFunctionEnumeratingMixin, metac
             
             return graphics_output_dict
 
-    @function_attributes(short_name='short_long_pf1D_comparison', tags=['long_short','1D','placefield'], conforms_to=['output_registering', 'figure_saving'], input_requires=[], output_provides=[], uses=['plot_short_v_long_pf1D_comparison'], used_by=[], creation_date='2023-04-26 06:12', is_global=True)
+
+
+
+    @function_attributes(short_name='short_long_pf1D_comparison', tags=['long_short','1D','placefield'], conforms_to=['output_registering', 'figure_saving'], input_requires=[], output_provides=[], uses=['plot_short_v_long_pf1D_comparison', 'determine_long_short_pf1D_indicies_sort_by_peak'], used_by=[], creation_date='2023-04-26 06:12', is_global=True)
     def _display_short_long_pf1D_comparison(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, save_figure=True, **kwargs):
             """ Displays a figure for comparing the 1D placefields across-epochs (between the short and long tracks). By default renders the second track's placefield flipped over the x-axis and hatched. 
                 Usage:
@@ -238,7 +242,6 @@ class LongShortTrackComparingDisplayFunctions(AllFunctionEnumeratingMixin, metac
                     
 
             """
-
             reuse_axs_tuple = kwargs.pop('reuse_axs_tuple', None)            
             # reuse_axs_tuple = None # plot fresh
             # reuse_axs_tuple=(ax_long_pf_1D, ax_short_pf_1D)
@@ -267,6 +270,19 @@ class LongShortTrackComparingDisplayFunctions(AllFunctionEnumeratingMixin, metac
             # curr_any_context_neurons = _find_any_context_neurons(*[owning_pipeline_reference.computation_results[k].computed_data.pf1D.ratemap.neuron_ids for k in [long_epoch_name, short_epoch_name]])
             curr_any_context_neurons = _find_any_context_neurons(*[a_result.pf1D.ratemap.neuron_ids for a_result in [long_results, short_results]])
 
+            # SORT BY LONG PEAK LOCATION: Determine the sort indicies to align the placefields by the position on the long:
+            ### to use this mode, you must pass the string 'peak_long' for both long_kwargs['sortby'] and short_kwargs['sortby']
+            long_sortby = long_kwargs.get('sortby', None)
+            short_sortby = short_kwargs.get('sortby', None)
+            if (long_sortby is not None and isinstance(long_sortby, str)) and (short_sortby is not None and isinstance(short_sortby, str)):
+                assert long_sortby == 'peak_long'
+                assert short_sortby == 'peak_long'
+                new_all_aclus_sort_indicies = determine_long_short_pf1D_indicies_sort_by_peak(owning_pipeline_reference, curr_any_context_neurons, debug_print=False)
+                # shared_kwargs['sortby'] = (shared_kwargs.get('sortby', None) or new_all_aclus_sort_indicies)
+                long_kwargs['sortby'] = new_all_aclus_sort_indicies # (long_kwargs.get('sortby', None) or 
+                short_kwargs['sortby'] = new_all_aclus_sort_indicies # (short_kwargs.get('sortby', None) or 
+                print(f'DEBUG: new_all_aclus_sort_indicies: {new_all_aclus_sort_indicies}')
+            
             (fig_long_pf_1D, ax_long_pf_1D, long_sort_ind, long_neurons_colors_array), (fig_short_pf_1D, ax_short_pf_1D, short_sort_ind, short_neurons_colors_array) = plot_short_v_long_pf1D_comparison(long_results, short_results, curr_any_context_neurons, reuse_axs_tuple=reuse_axs_tuple, single_figure=single_figure,
                 shared_kwargs=shared_kwargs, long_kwargs=long_kwargs, short_kwargs=short_kwargs, debug_print=debug_print)
 
@@ -2269,6 +2285,70 @@ def plot_expected_vs_observed(t_SHARED, y_SHORT, y_LONG, neuron_IDXs, neuron_IDs
     plt.suptitle('Expected vs. Observed Firing Rate Differences (by Replay Epoch)', wrap=True)
     return fig, axes
 
+
+
+@function_attributes(short_name=None, tags=[], conforms_to=[], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-06-16 13:01')
+def determine_long_short_pf1D_indicies_sort_by_peak(curr_active_pipeline, curr_any_context_neurons, debug_print=False):
+    """ Builds proper sort indicies for '_display_short_long_pf1D_comparison'
+    Captures Nothing
+
+    curr_any_context_neurons: 
+    
+    long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
+    long_results, short_results, global_results = [curr_active_pipeline.computation_results[an_epoch_name]['computed_data'] for an_epoch_name in [long_epoch_name, short_epoch_name, global_epoch_name]]
+    long_pf1D, short_pf1D, global_pf1D = long_results.pf1D, short_results.pf1D, global_results.pf1D
+    ## Builds proper sort indicies for '_display_short_long_pf1D_comparison'
+    long_ratemap = long_pf1D.ratemap
+    short_ratemap = short_pf1D.ratemap
+    # gets the curr_any_context_neurons: aclus of neurons to sort
+    curr_any_context_neurons = _find_any_context_neurons(*[k.neuron_ids for k in [long_ratemap, short_ratemap]])
+    
+    """
+    def _subfn_sort_desired(extant_arr, desired_sort_arr):
+        """ 
+        Want to find the set of sort indicies that can be applied to extant_arr s.t.
+        (extant_arr[out_sort_idxs] == desired_sort_arr)
+        
+        INEFFICIENT: O^n^2
+        
+        Usage:
+        
+            new_all_aclus_sort_indicies = _sort_desired(active_2d_plot.neuron_ids, all_sorted_aclus)
+            assert len(new_all_aclus_sort_indicies) == len(active_2d_plot.neuron_ids), f"need to have one new_all_aclus_sort_indicies value for each neuron_id"
+            assert np.all(active_2d_plot.neuron_ids[new_all_aclus_sort_indicies] == all_sorted_aclus), f"must sort "
+            new_all_aclus_sort_indicies
+        """
+        missing_aclu_indicies = np.isin(extant_arr, desired_sort_arr, invert=True)
+        missing_aclus = extant_arr[missing_aclu_indicies] # array([ 3,  4,  8, 13, 24, 34, 56, 87])
+        if len(missing_aclus) > 0:
+            desired_sort_arr = np.concatenate((desired_sort_arr, missing_aclus)) # the final desired output order of aclus. Want to compute the indicies that are required to sort an ordered array of indicies in this order
+            ## TODO: what about entries in desired_sort_arr that might be missing in extant_arr?? Hopefully never happens.
+        assert len(desired_sort_arr) == len(extant_arr), f"need to have one all_sorted_aclu value for each neuron_id but len(desired_sort_arr): {len(desired_sort_arr)} and len(extant_arr): {len(extant_arr)}"
+        # sort_idxs = np.array([desired_sort_arr.tolist().index(v) for v in extant_arr])
+        sort_idxs = np.array([extant_arr.tolist().index(v) for v in desired_sort_arr])
+        assert len(sort_idxs) == len(extant_arr), f"need to have one new_all_aclus_sort_indicies value for each neuron_id"
+        assert np.all(extant_arr[sort_idxs] == desired_sort_arr), f"must sort: extant_arr[sort_idxs]: {extant_arr[sort_idxs]}\n desired_sort_arr: {desired_sort_arr}"
+        return sort_idxs, desired_sort_arr
+
+    #### BEGIN FUNCTION BODY ###
+    
+
+    ## Sorts aclus using `neuron_replay_stats_df`'s columns (  neuron_replay_stats_df = curr_active_pipeline.global_computation_results.computed_data['jonathan_firing_rate_analysis']['neuron_replay_stats_df'] -- this is produced by '_perform_jonathan_replay_firing_rate_analyses') :
+    jonathan_firing_rate_analysis_result = JonathanFiringRateAnalysisResult(**curr_active_pipeline.global_computation_results.computed_data.jonathan_firing_rate_analysis.to_dict())
+    neuron_replay_stats_df = jonathan_firing_rate_analysis_result.neuron_replay_stats_df.copy()
+    _sorted_neuron_stats_df = neuron_replay_stats_df.sort_values(by=["long_pf_peak_x", "short_pf_peak_x", 'neuron_IDX'], ascending=[True, True, True]).copy() # also did test_df = neuron_replay_stats_df.sort_values(by=['long_pf_peak_x'], inplace=False, ascending=True).copy()
+    _sorted_neuron_stats_df = _sorted_neuron_stats_df[np.isin(_sorted_neuron_stats_df.index, curr_any_context_neurons)] # clip to only those neurons included in `curr_any_context_neurons`
+    _sorted_aclus = _sorted_neuron_stats_df.index.to_numpy()
+    _sorted_neuron_IDXs = _sorted_neuron_stats_df.neuron_IDX.to_numpy()
+    if debug_print:
+        print(f'_sorted_aclus: {_sorted_aclus}')
+        print(f'_sorted_neuron_IDXs: {_sorted_neuron_IDXs}')
+
+    ## Use this sort for the 'curr_any_context_neurons' sort order:
+    new_all_aclus_sort_indicies, desired_sort_arr = _subfn_sort_desired(curr_any_context_neurons, _sorted_aclus)
+    if debug_print:
+        print(f'new_all_aclus_sort_indicies: {new_all_aclus_sort_indicies}')
+    return new_all_aclus_sort_indicies
 
 
 
