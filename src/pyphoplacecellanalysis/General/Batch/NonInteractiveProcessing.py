@@ -431,7 +431,16 @@ def batch_extended_programmatic_figures(curr_active_pipeline, write_pdf=False, w
     except Exception as e:
         print(f'batch_extended_programmatic_figures(...): _display_long_and_short_firing_rate_replays_v_laps failed with error: {e}\n skipping.')
                 
-
+    try:
+        long_single_cell_pfmap_processing_fn = None
+        short_single_cell_pfmap_processing_fn = None
+        sort_idx = 'peak_long'
+        _out = curr_active_pipeline.display('_display_short_long_pf1D_comparison', curr_active_pipeline.get_session_context(), single_figure=False, debug_print=False, fignum='Short v Long pf1D Comparison',
+                                   long_kwargs={'sortby': sort_idx, 'single_cell_pfmap_processing_fn': long_single_cell_pfmap_processing_fn},
+                                   short_kwargs={'sortby': sort_idx, 'single_cell_pfmap_processing_fn': short_single_cell_pfmap_processing_fn, 'curve_hatch_style': {'hatch':'///', 'edgecolor':'k'}},
+                                   defer_render=True, save_figure=True)
+    except Exception as e:
+        print(f'batch_extended_programmatic_figures(...): _display_short_long_pf1D_comparison failed with error: {e}\n skipping.')
 
 
 class BatchPhoJonathanFiguresHelper(object):
