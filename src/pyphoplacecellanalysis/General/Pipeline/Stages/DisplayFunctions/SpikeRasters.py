@@ -432,7 +432,7 @@ def plot_raster_plot(spikes_df, shared_aclus, scatter_app_name='pho_test'):
     pg.setConfigOptions(antialias=True)
 
     # # Actually setup the plot:
-    plots.root_plot = win.addPlot()
+    plots.root_plot = win.addPlot() # this seems to be the equivalent to an 'axes'
 
     # p1 = win.addPlot(title="SpikesDataframe", x=x, y=y, connect='pairs')
     # p1.setLabel('bottom', 'Timestamp', units='[sec]') # set the x-axis label
@@ -463,6 +463,126 @@ def plot_raster_plot(spikes_df, shared_aclus, scatter_app_name='pho_test'):
     return app, win, plots, plots_data
 
 
+def _plot_empty_raster_plot_frame(scatter_app_name='pho_test', defer_show=False):
+    ## Perform the plotting:
+    app = pg.mkQApp(scatter_app_name)
+    win = pg.GraphicsLayoutWidget(show=(not defer_show), title=scatter_app_name)
+    win.resize(1000,600)
+    win.setWindowTitle(f'pyqtgraph: Raster Spikes: {scatter_app_name}')
+
+    # Enable antialiasing for prettier plots
+    pg.setConfigOptions(antialias=True)
+    
+    plots = RenderPlots(scatter_app_name)
+    plots_data = RenderPlotsData(scatter_app_name)
+
+    return app, win, plots, plots_data
+
+def plot_multiple_raster_plot(spikes_dfs_list, shared_aclus, scatter_app_name='pho_test'):
+    """ This uses pyqtgraph's scatter function like SpikeRaster2D to render a raster plot with colored ticks by default
+
+    Usage:
+        from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.SpikeRasters import plot_raster_plot
+
+        app, win, plots, plots_data = plot_raster_plot(_temp_active_spikes_df, shared_aclus)
+
+    """
+    neuron_ids = deepcopy(shared_aclus)
+    n_cells = len(shared_aclus)
+    fragile_linear_neuron_IDXs = np.arange(n_cells)
+    unit_sort_order = np.arange(n_cells) # in-line sort order
+    params = RasterPlotParams()
+    params.build_neurons_color_data(fragile_linear_neuron_IDXs=fragile_linear_neuron_IDXs)
+    manager = UnitSortOrderManager(neuron_ids=neuron_ids, fragile_linear_neuron_IDXs=fragile_linear_neuron_IDXs, n_cells=n_cells, unit_sort_order=unit_sort_order, params=params)
+    manager.update_series_identity_y_values()
+    raster_plot_manager = RasterScatterPlotManager(unit_sort_manager=manager)
+    raster_plot_manager._build_cell_configs()
+
+    # Update the dataframe
+    spikes_df = _add_spikes_df_visualization_columns(manager, spikes_df)
+
+    # make root container for plots
+    
+    
+    ## Perform the plotting:
+    app, win, plots, plots_data = _plot_empty_raster_plot_frame(scatter_app_name=scatter_app_name)
+    
+    # each entry in `config_fragile_linear_neuron_IDX_map` has the form:
+    # 	(i, fragile_linear_neuron_IDX, curr_pen, _series_identity_lower_y_values[i], _series_identity_upper_y_values[i])
+
+    # ## Build the spots for the raster plot:
+    # plots_data.all_spots = Render2DScrollWindowPlotMixin.build_spikes_all_spots_from_df(spikes_df, raster_plot_manager.config_fragile_linear_neuron_IDX_map)
+
+    # Build the spots for the raster plot
+    all_spots = []
+    for spikes_df in spikes_dfs_list:
+        spots = Render2DScrollWindowPlotMixin.build_spikes_all_spots_from_df(spikes_df, raster_plot_manager.config_fragile_linear_neuron_IDX_map)
+        all_spots.extend(spots)
+        
+
+    
+    
+    # # Actually setup the plot:
+    plots.root_plot = win.addPlot() # this seems to be the equivalent to an 'axes'
+
+    # p1 = win.addPlot(title="SpikesDataframe", x=x, y=y, connect='pairs')
+    # p1.setLabel('bottom', 'Timestamp', units='[sec]') # set the x-axis label
+
+    # Common Tick Label
+    vtick = QtGui.QPainterPath()
+
+    # Defailt Tick Mark:
+    # # vtick.moveTo(0, -0.5)
+    # # vtick.lineTo(0, 0.5)
+    # vtick.moveTo(0, -0.5)
+    # vtick.lineTo(0, 0.5)
+
+    # Thicker Tick Label:
+    tick_width = 0.1
+    half_tick_width = 0.5 * tick_width
+    vtick.moveTo(-half_tick_width, -0.5)
+    vtick.addRect(-half_tick_width, -0.5, tick_width, 1.0) # x, y, width, height
+
+    plots.scatter_plot = pg.ScatterPlotItem(name='spikeRasterOverviewWindowScatterPlotItem', pxMode=True, symbol=vtick, size=10, pen={'color': 'w', 'width': 1})
+    plots.scatter_plot.setObjectName('scatter_plot') # this seems necissary, the 'name' parameter in addPlot(...) seems to only change some internal property related to the legend AND drastically slows down the plotting
+    plots.scatter_plot.opts['useCache'] = True
+    plots.scatter_plot.addPoints(plots_data.all_spots) # , hoverable=True
+    plots.root_plot.addItem(plots.scatter_plot)
+
+    plots.scatter_plot.addPoints(plots_data.all_spots)
+
+    return app, win, plots, plots_data
+
+
+def _plot_single_raster_plot(ax, all_spots):
+    """ 
+    _plot_single_raster_plot(ax=plots.root_plot)
+    
+    """
+    # Common Tick Label
+    vtick = QtGui.QPainterPath()
+
+    # Defailt Tick Mark:
+    # # vtick.moveTo(0, -0.5)
+    # # vtick.lineTo(0, 0.5)
+    # vtick.moveTo(0, -0.5)
+    # vtick.lineTo(0, 0.5)
+
+    # Thicker Tick Label:
+    tick_width = 0.1
+    half_tick_width = 0.5 * tick_width
+    vtick.moveTo(-half_tick_width, -0.5)
+    vtick.addRect(-half_tick_width, -0.5, tick_width, 1.0) # x, y, width, height
+
+    scatter_plot = pg.ScatterPlotItem(name='spikeRasterOverviewWindowScatterPlotItem', pxMode=True, symbol=vtick, size=10, pen={'color': 'w', 'width': 1})
+    scatter_plot.setObjectName('scatter_plot') # this seems necissary, the 'name' parameter in addPlot(...) seems to only change some internal property related to the legend AND drastically slows down the plotting
+    scatter_plot.opts['useCache'] = True
+    scatter_plot.addPoints(all_spots) # , hoverable=True
+    ax.addItem(scatter_plot)
+    # scatter_plot.addPoints(all_spots) # why done twice??
+    return scatter_plot
+
+    
 
 # ==================================================================================================================== #
 # Menu Builders                                                                                                        #
