@@ -386,8 +386,24 @@ class RasterScatterPlotManager:
 
 # Note that these raster plots could implement some variant of HideShowSpikeRenderingMixin, SpikeRenderingMixin, etc but these classes frankly suck. 
 
+def _plot_empty_raster_plot_frame(scatter_app_name='pho_test', defer_show=False):
+    """ simple helper to initialize the mkQApp, spawn the window, and build the plots and plots_data. """
+    ## Perform the plotting:
+    app = pg.mkQApp(scatter_app_name)
+    win = pg.GraphicsLayoutWidget(show=(not defer_show), title=scatter_app_name)
+    win.resize(1000,600)
+    win.setWindowTitle(f'pyqtgraph: Raster Spikes: {scatter_app_name}')
 
-@function_attributes(short_name='plot_raster_plot', tags=['pyqtgraph','raster','2D'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-03-31 20:53')
+    # Enable antialiasing for prettier plots
+    pg.setConfigOptions(antialias=True)
+    
+    plots = RenderPlots(scatter_app_name)
+    plots_data = RenderPlotsData(scatter_app_name)
+
+    return app, win, plots, plots_data
+
+
+@function_attributes(short_name='plot_raster_plot', tags=['pyqtgraph','raster','2D'], input_requires=[], output_provides=[], uses=['_plot_empty_raster_plot_frame'], used_by=[], creation_date='2023-03-31 20:53')
 def plot_raster_plot(spikes_df, shared_aclus, scatter_app_name='pho_test'):
     """ This uses pyqtgraph's scatter function like SpikeRaster2D to render a raster plot with colored ticks by default
 
@@ -412,24 +428,13 @@ def plot_raster_plot(spikes_df, shared_aclus, scatter_app_name='pho_test'):
     spikes_df = _add_spikes_df_visualization_columns(manager, spikes_df)
 
     # make root container for plots
-    
-    plots = RenderPlots(scatter_app_name)
-    plots_data = RenderPlotsData(scatter_app_name)
+    app, win, plots, plots_data = _plot_empty_raster_plot_frame(scatter_app_name=scatter_app_name, defer_show=False)
 
     # each entry in `config_fragile_linear_neuron_IDX_map` has the form:
     # 	(i, fragile_linear_neuron_IDX, curr_pen, _series_identity_lower_y_values[i], _series_identity_upper_y_values[i])
 
     ## Build the spots for the raster plot:
     plots_data.all_spots = Render2DScrollWindowPlotMixin.build_spikes_all_spots_from_df(spikes_df, raster_plot_manager.config_fragile_linear_neuron_IDX_map)
-
-    ## Perform the plotting:
-    app = pg.mkQApp(scatter_app_name)
-    win = pg.GraphicsLayoutWidget(show=True, title=scatter_app_name)
-    win.resize(1000,600)
-    win.setWindowTitle(f'pyqtgraph: Raster Spikes: {scatter_app_name}')
-
-    # Enable antialiasing for prettier plots
-    pg.setConfigOptions(antialias=True)
 
     # # Actually setup the plot:
     plots.root_plot = win.addPlot() # this seems to be the equivalent to an 'axes'
@@ -463,22 +468,10 @@ def plot_raster_plot(spikes_df, shared_aclus, scatter_app_name='pho_test'):
     return app, win, plots, plots_data
 
 
-def _plot_empty_raster_plot_frame(scatter_app_name='pho_test', defer_show=False):
-    ## Perform the plotting:
-    app = pg.mkQApp(scatter_app_name)
-    win = pg.GraphicsLayoutWidget(show=(not defer_show), title=scatter_app_name)
-    win.resize(1000,600)
-    win.setWindowTitle(f'pyqtgraph: Raster Spikes: {scatter_app_name}')
 
-    # Enable antialiasing for prettier plots
-    pg.setConfigOptions(antialias=True)
-    
-    plots = RenderPlots(scatter_app_name)
-    plots_data = RenderPlotsData(scatter_app_name)
 
-    return app, win, plots, plots_data
-
-def plot_multiple_raster_plot(filter_epochs_df, shared_aclus, scatter_app_name='pho_test'):
+@function_attributes(short_name=None, tags=['pyqtgraph','raster','2D'], input_requires=[], output_provides=[], uses=['_plot_empty_raster_plot_frame'], used_by=[], creation_date='2023-06-16 20:45', related_items=['plot_raster_plot'])
+def plot_multiple_raster_plot(filter_epochs_df, shared_aclus, scatter_app_name="Pho Stacked Replays"):
     """ This uses pyqtgraph's scatter function like SpikeRaster2D to render a raster plot with colored ticks by default
 
     Usage:
@@ -489,7 +482,7 @@ def plot_multiple_raster_plot(filter_epochs_df, shared_aclus, scatter_app_name='
     """
     # ## Create the raster plot for the replay:
     # app, win, plots, plots_data = plot_raster_plot(_active_epoch_spikes_df, shared_aclus, scatter_app_name=f"Raster Epoch[{epoch_idx}]")
-    app, win, plots, plots_data = _plot_empty_raster_plot_frame(scatter_app_name="Pho Stacked Replays", defer_show=False)
+    app, win, plots, plots_data = _plot_empty_raster_plot_frame(scatter_app_name=scatter_app_name, defer_show=False)
 
     plots.layout = win.addLayout()
     plots.ax = {}
@@ -548,34 +541,6 @@ def plot_multiple_raster_plot(filter_epochs_df, shared_aclus, scatter_app_name='
 
     return app, win, plots, plots_data
 
-
-def _plot_single_raster_plot(ax, all_spots):
-    """ 
-    _plot_single_raster_plot(ax=plots.root_plot)
-    
-    """
-    # Common Tick Label
-    vtick = QtGui.QPainterPath()
-
-    # Defailt Tick Mark:
-    # # vtick.moveTo(0, -0.5)
-    # # vtick.lineTo(0, 0.5)
-    # vtick.moveTo(0, -0.5)
-    # vtick.lineTo(0, 0.5)
-
-    # Thicker Tick Label:
-    tick_width = 0.1
-    half_tick_width = 0.5 * tick_width
-    vtick.moveTo(-half_tick_width, -0.5)
-    vtick.addRect(-half_tick_width, -0.5, tick_width, 1.0) # x, y, width, height
-
-    scatter_plot = pg.ScatterPlotItem(name='spikeRasterOverviewWindowScatterPlotItem', pxMode=True, symbol=vtick, size=10, pen={'color': 'w', 'width': 1})
-    scatter_plot.setObjectName('scatter_plot') # this seems necissary, the 'name' parameter in addPlot(...) seems to only change some internal property related to the legend AND drastically slows down the plotting
-    scatter_plot.opts['useCache'] = True
-    scatter_plot.addPoints(all_spots) # , hoverable=True
-    ax.addItem(scatter_plot)
-    # scatter_plot.addPoints(all_spots) # why done twice??
-    return scatter_plot
 
     
 
