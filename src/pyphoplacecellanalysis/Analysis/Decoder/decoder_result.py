@@ -1256,7 +1256,7 @@ class DiagnosticDistanceMetricFigure:
         display(slider)
 
 
-@function_attributes(short_name='plot_kourosh_activity_style_figure', tags=['plot', 'figure', 'heatmaps', 'matplotlib','pyqtgraph'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-04-04 09:03')
+@function_attributes(short_name='plot_kourosh_activity_style_figure', tags=['plot', 'figure', 'heatmaps', 'matplotlib','pyqtgraph'], input_requires=[], output_provides=[], uses=['plot_raster_plot','visualize_heatmap_pyqtgraph','visualize_heatmap','CustomLinearRegionItem'], used_by=[], creation_date='2023-04-04 09:03')
 def plot_kourosh_activity_style_figure(results_obj: LeaveOneOutDecodingAnalysisResult, long_session, shared_aclus: np.ndarray, epoch_idx: int, callout_epoch_IDXs: list, skip_rendering_callouts:bool = False):
     """ 2023-04-03 - plots a Kourosh-style figure that shows a top panel which displays the decoded posteriors and a raster plot of spikes for a single epoch 
     ## Requirements:
