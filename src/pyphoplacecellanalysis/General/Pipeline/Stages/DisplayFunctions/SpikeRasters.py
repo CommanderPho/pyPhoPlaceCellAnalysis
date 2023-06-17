@@ -478,7 +478,7 @@ def _plot_empty_raster_plot_frame(scatter_app_name='pho_test', defer_show=False)
 
     return app, win, plots, plots_data
 
-def plot_multiple_raster_plot(spikes_dfs_list, shared_aclus, scatter_app_name='pho_test'):
+def plot_multiple_raster_plot(filter_epochs_df, shared_aclus, scatter_app_name='pho_test'):
     """ This uses pyqtgraph's scatter function like SpikeRaster2D to render a raster plot with colored ticks by default
 
     Usage:
@@ -487,6 +487,14 @@ def plot_multiple_raster_plot(spikes_dfs_list, shared_aclus, scatter_app_name='p
         app, win, plots, plots_data = plot_raster_plot(_temp_active_spikes_df, shared_aclus)
 
     """
+    # ## Create the raster plot for the replay:
+    # app, win, plots, plots_data = plot_raster_plot(_active_epoch_spikes_df, shared_aclus, scatter_app_name=f"Raster Epoch[{epoch_idx}]")
+    app, win, plots, plots_data = _plot_empty_raster_plot_frame(scatter_app_name="Pho Stacked Replays", defer_show=False)
+
+    plots.layout = win.addLayout()
+    plots.ax = {}
+    plots_data.all_spots_dict = {}
+
     neuron_ids = deepcopy(shared_aclus)
     n_cells = len(shared_aclus)
     fragile_linear_neuron_IDXs = np.arange(n_cells)
@@ -497,59 +505,46 @@ def plot_multiple_raster_plot(spikes_dfs_list, shared_aclus, scatter_app_name='p
     manager.update_series_identity_y_values()
     raster_plot_manager = RasterScatterPlotManager(unit_sort_manager=manager)
     raster_plot_manager._build_cell_configs()
-
     # Update the dataframe
-    spikes_df = _add_spikes_df_visualization_columns(manager, spikes_df)
+    filter_epoch_spikes_df = _add_spikes_df_visualization_columns(manager, filter_epoch_spikes_df)
 
-    # make root container for plots
-    
-    
-    ## Perform the plotting:
-    app, win, plots, plots_data = _plot_empty_raster_plot_frame(scatter_app_name=scatter_app_name)
-    
-    # each entry in `config_fragile_linear_neuron_IDX_map` has the form:
-    # 	(i, fragile_linear_neuron_IDX, curr_pen, _series_identity_lower_y_values[i], _series_identity_upper_y_values[i])
+    ## Build the individual epoch raster plot rows:
+    for an_epoch in filter_epochs_df.itertuples():
+        # print(f'an_epoch: {an_epoch}')
+        if an_epoch.Index < 10:
+            _active_epoch_spikes_df = filter_epoch_spikes_df[filter_epoch_spikes_df['temp_epoch_id'] == an_epoch.Index]
+            _active_plot_title: str = f"Epoch[{an_epoch.label}]"
+            
+            ## Create the raster plot for the replay:
+            # if win is None:
+            # 	# Initialize
+            # 	app, win, plots, plots_data = plot_raster_plot(_active_epoch_spikes_df, shared_aclus, scatter_app_name=f"Raster Epoch[{an_epoch.label}]")
+            # else:
+            # add a new row
+            new_ax = plots.layout.addPlot(row=int(an_epoch.Index), col=0)
+            spots = Render2DScrollWindowPlotMixin.build_spikes_all_spots_from_df(_active_epoch_spikes_df, raster_plot_manager.config_fragile_linear_neuron_IDX_map)
+            plots_data.all_spots_dict[an_epoch.Index] = spots
 
-    # ## Build the spots for the raster plot:
-    # plots_data.all_spots = Render2DScrollWindowPlotMixin.build_spikes_all_spots_from_df(spikes_df, raster_plot_manager.config_fragile_linear_neuron_IDX_map)
+            # Common Tick Label
+            vtick = QtGui.QPainterPath()
 
-    # Build the spots for the raster plot
-    all_spots = []
-    for spikes_df in spikes_dfs_list:
-        spots = Render2DScrollWindowPlotMixin.build_spikes_all_spots_from_df(spikes_df, raster_plot_manager.config_fragile_linear_neuron_IDX_map)
-        all_spots.extend(spots)
-        
+            # Thicker Tick Label:
+            tick_width = 0.1
+            half_tick_width = 0.5 * tick_width
+            vtick.moveTo(-half_tick_width, -0.5)
+            vtick.addRect(-half_tick_width, -0.5, tick_width, 1.0) # x, y, width, height
 
-    
-    
-    # # Actually setup the plot:
-    plots.root_plot = win.addPlot() # this seems to be the equivalent to an 'axes'
-
-    # p1 = win.addPlot(title="SpikesDataframe", x=x, y=y, connect='pairs')
-    # p1.setLabel('bottom', 'Timestamp', units='[sec]') # set the x-axis label
-
-    # Common Tick Label
-    vtick = QtGui.QPainterPath()
-
-    # Defailt Tick Mark:
-    # # vtick.moveTo(0, -0.5)
-    # # vtick.lineTo(0, 0.5)
-    # vtick.moveTo(0, -0.5)
-    # vtick.lineTo(0, 0.5)
-
-    # Thicker Tick Label:
-    tick_width = 0.1
-    half_tick_width = 0.5 * tick_width
-    vtick.moveTo(-half_tick_width, -0.5)
-    vtick.addRect(-half_tick_width, -0.5, tick_width, 1.0) # x, y, width, height
-
-    plots.scatter_plot = pg.ScatterPlotItem(name='spikeRasterOverviewWindowScatterPlotItem', pxMode=True, symbol=vtick, size=10, pen={'color': 'w', 'width': 1})
-    plots.scatter_plot.setObjectName('scatter_plot') # this seems necissary, the 'name' parameter in addPlot(...) seems to only change some internal property related to the legend AND drastically slows down the plotting
-    plots.scatter_plot.opts['useCache'] = True
-    plots.scatter_plot.addPoints(plots_data.all_spots) # , hoverable=True
-    plots.root_plot.addItem(plots.scatter_plot)
-
-    plots.scatter_plot.addPoints(plots_data.all_spots)
+            scatter_plot = pg.ScatterPlotItem(name='spikeRasterOverviewWindowScatterPlotItem', pxMode=True, symbol=vtick, size=10, pen={'color': 'w', 'width': 1})
+            scatter_plot.setObjectName(f'scatter_plot_{_active_plot_title}') # this seems necissary, the 'name' parameter in addPlot(...) seems to only change some internal property related to the legend AND drastically slows down the plotting
+            scatter_plot.opts['useCache'] = True
+            scatter_plot.addPoints(plots_data.all_spots_dict[an_epoch.Index]) # , hoverable=True
+            new_ax.addItem(scatter_plot)
+            new_ax.setXRange(an_epoch.start, an_epoch.end)
+            new_ax.setYRange(0, len(shared_aclus)-1)
+            # Disable Interactivity
+            new_ax.setMouseEnabled(x=False, y=False)
+            new_ax.setMenuEnabled(False)
+            plots.ax[an_epoch.Index] = new_ax
 
     return app, win, plots, plots_data
 
