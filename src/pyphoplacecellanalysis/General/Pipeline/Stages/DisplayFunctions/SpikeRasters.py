@@ -471,13 +471,14 @@ def plot_raster_plot(spikes_df, shared_aclus, scatter_app_name='pho_test'):
 
 
 @function_attributes(short_name=None, tags=['pyqtgraph','raster','2D'], input_requires=[], output_provides=[], uses=['_plot_empty_raster_plot_frame'], used_by=[], creation_date='2023-06-16 20:45', related_items=['plot_raster_plot'])
-def plot_multiple_raster_plot(filter_epochs_df, shared_aclus, scatter_app_name="Pho Stacked Replays"):
+def plot_multiple_raster_plot(filter_epochs_df: pd.DataFrame, filter_epoch_spikes_df: pd.DataFrame, included_neuron_ids=None, epoch_id_key_name='temp_epoch_id', scatter_app_name="Pho Stacked Replays"):
     """ This renders a stack of raster plots
 
     Usage:
         from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.SpikeRasters import plot_multiple_raster_plot
 
-        app, win, plots, plots_data = plot_raster_plot(_temp_active_spikes_df, shared_aclus)
+        
+        app, win, plots, plots_data = plot_multiple_raster_plot(filter_epochs_df, filter_epoch_spikes_df, included_neuron_ids=shared_aclus, epoch_id_key_name='replay_epoch_id', scatter_app_name="Pho Stacked Replays")
 
     """
     # ## Create the raster plot for the replay:
@@ -488,8 +489,13 @@ def plot_multiple_raster_plot(filter_epochs_df, shared_aclus, scatter_app_name="
     plots.ax = {}
     plots_data.all_spots_dict = {}
 
-    neuron_ids = deepcopy(shared_aclus)
-    n_cells = len(shared_aclus)
+    if included_neuron_ids is not None:
+        neuron_ids = deepcopy(included_neuron_ids) # use the provided neuron_ids
+    else:
+        neuron_ids = np.sort(filter_epoch_spikes_df.aclu.unique()) # get all the aclus from the entire spikes_df frame
+        # aclu_to_idx = {aclus[i]:i for i in range(len(aclus))}        
+
+    n_cells = len(neuron_ids)
     fragile_linear_neuron_IDXs = np.arange(n_cells)
     unit_sort_order = np.arange(n_cells) # in-line sort order
     params = RasterPlotParams()
@@ -500,12 +506,24 @@ def plot_multiple_raster_plot(filter_epochs_df, shared_aclus, scatter_app_name="
     raster_plot_manager._build_cell_configs()
     # Update the dataframe
     filter_epoch_spikes_df = _add_spikes_df_visualization_columns(manager, filter_epoch_spikes_df)
+    
+    # Common Tick Label
+    vtick = QtGui.QPainterPath()
+
+    # Thicker Tick Label:
+    # tick_width = 0.1
+    tick_width = 1.0
+    half_tick_width = 0.5 * tick_width
+    vtick.moveTo(-half_tick_width, -0.5)
+    vtick.addRect(-half_tick_width, -0.5, tick_width, 1.0) # x, y, width, height
+
+    scatter_plot_kwargs = dict(pxMode=True, symbol=vtick, size=2, pen={'color': 'w', 'width': 1})
 
     ## Build the individual epoch raster plot rows:
     for an_epoch in filter_epochs_df.itertuples():
         # print(f'an_epoch: {an_epoch}')
         if an_epoch.Index < 10:
-            _active_epoch_spikes_df = filter_epoch_spikes_df[filter_epoch_spikes_df['temp_epoch_id'] == an_epoch.Index]
+            _active_epoch_spikes_df = filter_epoch_spikes_df[filter_epoch_spikes_df[epoch_id_key_name] == an_epoch.Index]
             _active_plot_title: str = f"Epoch[{an_epoch.label}]"
             
             ## Create the raster plot for the replay:
@@ -518,22 +536,13 @@ def plot_multiple_raster_plot(filter_epochs_df, shared_aclus, scatter_app_name="
             spots = Render2DScrollWindowPlotMixin.build_spikes_all_spots_from_df(_active_epoch_spikes_df, raster_plot_manager.config_fragile_linear_neuron_IDX_map)
             plots_data.all_spots_dict[an_epoch.Index] = spots
 
-            # Common Tick Label
-            vtick = QtGui.QPainterPath()
-
-            # Thicker Tick Label:
-            tick_width = 0.1
-            half_tick_width = 0.5 * tick_width
-            vtick.moveTo(-half_tick_width, -0.5)
-            vtick.addRect(-half_tick_width, -0.5, tick_width, 1.0) # x, y, width, height
-
-            scatter_plot = pg.ScatterPlotItem(name='spikeRasterOverviewWindowScatterPlotItem', pxMode=True, symbol=vtick, size=10, pen={'color': 'w', 'width': 1})
+            scatter_plot = pg.ScatterPlotItem(name='spikeRasterOverviewWindowScatterPlotItem', **scatter_plot_kwargs)
             scatter_plot.setObjectName(f'scatter_plot_{_active_plot_title}') # this seems necissary, the 'name' parameter in addPlot(...) seems to only change some internal property related to the legend AND drastically slows down the plotting
             scatter_plot.opts['useCache'] = True
             scatter_plot.addPoints(plots_data.all_spots_dict[an_epoch.Index]) # , hoverable=True
             new_ax.addItem(scatter_plot)
             new_ax.setXRange(an_epoch.start, an_epoch.end)
-            new_ax.setYRange(0, len(shared_aclus)-1)
+            new_ax.setYRange(0, n_cells-1)
             # Disable Interactivity
             new_ax.setMouseEnabled(x=False, y=False)
             new_ax.setMenuEnabled(False)
@@ -543,6 +552,54 @@ def plot_multiple_raster_plot(filter_epochs_df, shared_aclus, scatter_app_name="
 
 
     
+@function_attributes(short_name=None, tags=['spikes_df', 'raster', 'helper',' filter'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-06-19 15:25', related_items=['plot_multiple_raster_plot'])
+def _prepare_spikes_df_from_filter_epochs(spikes_df: pd.DataFrame, filter_epochs, included_neuron_ids=None, epoch_id_key_name='temp_epoch_id', no_interval_fill_value=-1, debug_print=False) -> pd.DataFrame:
+    """ Prepares the spikes_df to be plotted for a given set of filter_epochs and included_neuron_ids by restricting to these periods/aclus.
+    
+    Usage:
+        from pyphoplacecellanalysis.General.Mixins.CrossComputationComparisonHelpers import _find_any_context_neurons
+        from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.SpikeRasters import _prepare_spikes_df_from_filter_epochs
+
+        long_ratemap = long_pf1D.ratemap
+        short_ratemap = short_pf1D.ratemap
+        curr_any_context_neurons = _find_any_context_neurons(*[k.neuron_ids for k in [long_ratemap, short_ratemap]])
+
+        filter_epoch_spikes_df = _prepare_spikes_df_from_filter_epochs(long_session.spikes_df, filter_epochs=long_replays, included_neuron_ids=curr_any_context_neurons, epoch_id_key_name='replay_epoch_id', debug_print=False) # replay_epoch_id
+        filter_epoch_spikes_df
+
+    """
+    from neuropy.utils.mixins.time_slicing import add_epochs_id_identity
+
+
+    if isinstance(filter_epochs, pd.DataFrame):
+        filter_epochs_df = filter_epochs
+    else:
+        filter_epochs_df = filter_epochs.to_dataframe()
+        
+    if debug_print:
+        print(f'filter_epochs: {filter_epochs.epochs.n_epochs}')
+        
+
+    ## Get the spikes during these epochs to attempt to decode from:
+    filter_epoch_spikes_df = deepcopy(spikes_df)
+    filter_epochs_df = deepcopy(filter_epochs_df) # copy just to make sure no modifications happen.
+        
+    if included_neuron_ids is not None:
+        filter_epoch_spikes_df = filter_epoch_spikes_df[filter_epoch_spikes_df['aclu'].isin(included_neuron_ids)] ## restrict to only the shared aclus for both short and long
+        
+    filter_epoch_spikes_df, _temp_neuron_id_to_new_IDX_map = filter_epoch_spikes_df.spikes.rebuild_fragile_linear_neuron_IDXs() # I think this must be done prior to restricting to the current epoch, but after restricting to the shared_aclus
+
+    ## Add the epoch ids to each spike so we can easily filter on them:
+    filter_epoch_spikes_df = add_epochs_id_identity(filter_epoch_spikes_df, filter_epochs_df, epoch_id_key_name=epoch_id_key_name, epoch_label_column_name=None, no_interval_fill_value=no_interval_fill_value)
+    if debug_print:
+        print(f'np.shape(filter_epoch_spikes_df): {np.shape(filter_epoch_spikes_df)}')
+    filter_epoch_spikes_df = filter_epoch_spikes_df[filter_epoch_spikes_df[epoch_id_key_name] != no_interval_fill_value] # Drop all non-included spikes
+    if debug_print:
+        print(f'np.shape(filter_epoch_spikes_df): {np.shape(filter_epoch_spikes_df)}')
+
+    # returns `filter_epoch_spikes_df`
+    return filter_epoch_spikes_df
+
 
 # ==================================================================================================================== #
 # Menu Builders                                                                                                        #
