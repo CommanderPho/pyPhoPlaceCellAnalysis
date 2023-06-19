@@ -472,10 +472,10 @@ def plot_raster_plot(spikes_df, shared_aclus, scatter_app_name='pho_test'):
 
 @function_attributes(short_name=None, tags=['pyqtgraph','raster','2D'], input_requires=[], output_provides=[], uses=['_plot_empty_raster_plot_frame'], used_by=[], creation_date='2023-06-16 20:45', related_items=['plot_raster_plot'])
 def plot_multiple_raster_plot(filter_epochs_df, shared_aclus, scatter_app_name="Pho Stacked Replays"):
-    """ This uses pyqtgraph's scatter function like SpikeRaster2D to render a raster plot with colored ticks by default
+    """ This renders a stack of raster plots
 
     Usage:
-        from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.SpikeRasters import plot_raster_plot
+        from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.SpikeRasters import plot_multiple_raster_plot
 
         app, win, plots, plots_data = plot_raster_plot(_temp_active_spikes_df, shared_aclus)
 
