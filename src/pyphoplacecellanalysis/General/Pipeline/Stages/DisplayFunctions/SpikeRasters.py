@@ -404,7 +404,7 @@ def _plot_empty_raster_plot_frame(scatter_app_name='pho_test', defer_show=False)
 
 
 @function_attributes(short_name='plot_raster_plot', tags=['pyqtgraph','raster','2D'], input_requires=[], output_provides=[], uses=['_plot_empty_raster_plot_frame'], used_by=[], creation_date='2023-03-31 20:53')
-def plot_raster_plot(spikes_df, shared_aclus, scatter_app_name='pho_test'):
+def plot_raster_plot(spikes_df, shared_aclus, unit_sort_order=None, scatter_app_name='pho_test'):
     """ This uses pyqtgraph's scatter function like SpikeRaster2D to render a raster plot with colored ticks by default
 
     Usage:
@@ -416,7 +416,10 @@ def plot_raster_plot(spikes_df, shared_aclus, scatter_app_name='pho_test'):
     neuron_ids = deepcopy(shared_aclus)
     n_cells = len(shared_aclus)
     fragile_linear_neuron_IDXs = np.arange(n_cells)
-    unit_sort_order = np.arange(n_cells) # in-line sort order
+    if unit_sort_order is None:
+        unit_sort_order = np.arange(n_cells) # in-line sort order
+    else:
+        assert len(unit_sort_order) == n_cells        
     params = RasterPlotParams()
     params.build_neurons_color_data(fragile_linear_neuron_IDXs=fragile_linear_neuron_IDXs)
     manager = UnitSortOrderManager(neuron_ids=neuron_ids, fragile_linear_neuron_IDXs=fragile_linear_neuron_IDXs, n_cells=n_cells, unit_sort_order=unit_sort_order, params=params)
