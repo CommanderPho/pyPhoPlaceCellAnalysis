@@ -484,6 +484,8 @@ def plot_multiple_raster_plot(filter_epochs_df: pd.DataFrame, filter_epoch_spike
         app, win, plots, plots_data = plot_multiple_raster_plot(filter_epochs_df, filter_epoch_spikes_df, included_neuron_ids=shared_aclus, epoch_id_key_name='replay_epoch_id', scatter_app_name="Pho Stacked Replays")
 
     """
+
+    #TODO 2023-06-20 08:59: - [ ] Can potentially reuse `stacked_epoch_slices_view` (the pyqtgraph version)?
     # ## Create the raster plot for the replay:
     # app, win, plots, plots_data = plot_raster_plot(_active_epoch_spikes_df, shared_aclus, scatter_app_name=f"Raster Epoch[{epoch_idx}]")
     app, win, plots, plots_data = _plot_empty_raster_plot_frame(scatter_app_name=scatter_app_name, defer_show=False)
@@ -550,6 +552,14 @@ def plot_multiple_raster_plot(filter_epochs_df: pd.DataFrame, filter_epoch_spike
         new_ax.addItem(scatter_plot)
         new_ax.setXRange(an_epoch.start, an_epoch.stop)
         new_ax.setYRange(0, n_cells-1)
+        # new_ax.showAxes(True, showValues=(True, True, True, False)) # showValues=(left: True, bottom: True, right: False, top: False) # , size=10       
+        new_ax.hideButtons() # Hides the auto-scale button
+        new_ax.setDefaultPadding(0.0)  # plot without padding data range
+        # Format Labels:        
+        # new_ax.getAxis('left').setLabel(f'Epoch[{an_epoch.label}]: {an_epoch.start}')
+        # new_ax.getAxis('bottom').setLabel('t')
+        # new_ax.getAxis('right').setLabel(f'Epoch[{an_epoch.label}]: {an_epoch.stop}')
+
         # Disable Interactivity
         new_ax.setMouseEnabled(x=False, y=False)
         new_ax.setMenuEnabled(False)
