@@ -1,22 +1,60 @@
 import numpy as np
+import pandas as pd
+from attrs import define, field, Factory
+from benedict import benedict # https://github.com/fabiocaccamo/python-benedict#usage
+
+from neuropy.utils.mixins.dict_representable import SubsettableDictRepresentable
 
 from pyphocorehelpers.indexing_helpers import Paginator
 from pyphocorehelpers.DataStructure.general_parameter_containers import VisualizationParameters, RenderPlotsData, RenderPlots
 from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer
 from pyphocorehelpers.gui.Qt.connections_container import ConnectionsContainer
-
 from pyphocorehelpers.indexing_helpers import safe_find_index_in_list
 
 from pyphoplacecellanalysis.External.pyqtgraph import QtCore
 from pyphoplacecellanalysis.GUI.Qt.Widgets.PaginationCtrl.PaginationControlWidget import PaginationControlWidget
 
-from attrs import define, field, Factory
+
 
 """ refactored to avoid:
 
 TypeError: super(type, obj): obj must be an instance or subtype of type
 
 """
+
+@define(slots=False, eq=False)
+class SelectionsObject(SubsettableDictRepresentable):
+	global_epoch_start_t: float
+	global_epoch_end_t: float
+	variable_name: str
+	figure_ctx: "IdentifyingContext" = field(alias='active_identifying_figure_ctx')
+
+	flat_all_data_indicies: np.ndarray
+	is_selected: np.ndarray
+	epoch_labels: np.ndarray
+
+	@property
+	def selected_indicies(self):
+		"""The selected_indicies property."""
+		return self.flat_all_data_indicies[self.is_selected]
+	
+	def to_dataframe(self) -> pd.DataFrame:
+		# to dataframe:
+		dict_repr = self.to_dict()
+		selection_epochs_df = pd.DataFrame(dict_repr.subset(['epoch_labels', 'flat_all_data_indicies']))
+		selection_epochs_df['is_selected'] = dict_repr['is_selected'].values()
+		return selection_epochs_df
+
+
+	@classmethod
+	def init_from_visualization_params(cls, params: VisualizationParameters):
+		active_params_dict: benedict = benedict(params.to_dict())
+		active_params_dict = active_params_dict.subset(['global_epoch_start_t', 'global_epoch_end_t', 'variable_name', 'active_identifying_figure_ctx', 'flat_all_data_indicies', 'epoch_labels', 'is_selected'])
+		active_params_dict['is_selected'] = np.array(list(active_params_dict['is_selected'].values())) # dump the keys
+		return cls(**active_params_dict)
+        
+
+
 
 @define(slots=False, eq=False) # eq=False makes hashing and equality by identity, which is appropriate for this type of object
 class PaginatedFigureBaseController:
@@ -54,6 +92,32 @@ class PaginatedFigureBaseController:
     def selected_indicies(self):
         """The selected_indicies property."""
         return self.params.flat_all_data_indicies[self.is_selected]
+
+
+    def save_selection(self):
+        # active_params_backup: VisualizationParameters = _out_pagination_controller.params
+        # list(_out_pagination_controller.params.keys())
+        # active_params_dict: benedict = benedict(active_params_backup.to_dict())
+        # active_params_dict = active_params_dict.subset(['global_epoch_start_t', 'global_epoch_end_t', 'variable_name', 'active_identifying_figure_ctx', 'flat_all_data_indicies', 'epoch_labels', 'is_selected'])
+        # active_params_dict['is_selected'] = active_params_dict['is_selected'].values() # dump
+        active_selections_object = SelectionsObject.init_from_visualization_params(self.params)
+        return active_selections_object
+
+    def restore_selections(self, selections: SelectionsObject, defer_render=False):
+        # if not isinstance(selections_dict, benedict):
+        # 	selections_dict = benedict(selections_dict)
+        # Validate the restore by making sure that we're restoring onto the valid objects
+        assert self.params.active_identifying_figure_ctx == selections.figure_ctx
+        assert self.params.variable_name == selections.variable_name
+        # were_any_updated = False
+        for a_selected_index in selections.selected_indicies:
+            assert a_selected_index in self.params.flat_all_data_indicies, f"a_selected_index: {a_selected_index} is not in flat_all_data_indicies: {self.params.flat_all_data_indicies}"
+            self.params.is_selected[a_selected_index] = True
+        # Post:
+        self.perform_update_selections(defer_render=defer_render)
+        
+
+
 
 
     def on_click(self, event):
