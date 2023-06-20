@@ -43,6 +43,12 @@ from pyphoplacecellanalysis.General.Pipeline.Stages.Loading import saveData # fo
 from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.DefaultComputationFunctions import KnownFilterEpochs # for `pipeline_complete_compute_long_short_fr_indicies`
 from neuropy.core.session.dataSession import DataSession # for `pipeline_complete_compute_long_short_fr_indicies`
 
+@define(slots=False, eq=False)
+class TrackExclusivePartitionSubset:
+	is_track_exclusive_pf: np.ndarray
+	track_exclusive_aclus: np.ndarray
+	track_exclusive_df: pd.DataFrame
+
 
 @define(slots=False)
 class JonathanFiringRateAnalysisResult:
@@ -57,6 +63,72 @@ class JonathanFiringRateAnalysisResult:
     time_binned_unit_specific_spike_rate: DynamicParameters
     time_binned_instantaneous_unit_specific_spike_rate: DynamicParameters
     neuron_replay_stats_df: pd.DataFrame
+    
+    def get_cell_track_partitions(self):
+        """ 2023-06-20 - Partition the neuron_replay_stats_df into subsets by seeing whether each aclu has a placefield for the long/short track.
+            # Four distinct subgroups are formed:  pf on neither, pf on both, pf on only long, pf on only short
+            # L_only_aclus, S_only_aclus
+
+            #TODO 2023-05-23 - Can do more detailed peaks analysis with: long_results.RatemapPeaksAnalysis and short_results.RatemapPeaksAnalysis
+        """
+        # needs `neuron_replay_stats_df`
+        neuron_replay_stats_df = self.neuron_replay_stats_df.copy()
+        neuron_replay_stats_df = neuron_replay_stats_df.sort_values(by=['long_pf_peak_x'], inplace=False, ascending=True)
+
+        ## 2023-05-19 - Get S-only pfs
+        is_S_pf_only = np.logical_and(np.logical_not(neuron_replay_stats_df['has_long_pf']), neuron_replay_stats_df['has_short_pf'])
+        _is_S_only = neuron_replay_stats_df.track_membership == SplitPartitionMembership.RIGHT_ONLY
+        assert (is_S_pf_only == _is_S_only).all()
+        S_only_aclus = neuron_replay_stats_df.index[_is_S_only].to_numpy()
+        S_only_df = neuron_replay_stats_df[is_S_pf_only]
+
+        ## Show L-only pfs stop replaying on S
+        is_L_pf_only = np.logical_and(np.logical_not(neuron_replay_stats_df['has_short_pf']), neuron_replay_stats_df['has_long_pf'])
+        _is_L_only = neuron_replay_stats_df.track_membership == SplitPartitionMembership.LEFT_ONLY
+        assert (is_L_pf_only == _is_L_only).all()
+        L_only_aclus = neuron_replay_stats_df.index[_is_L_only].to_numpy()
+        L_only_df = neuron_replay_stats_df[_is_L_only]
+
+        ## For ('kdiba', 'gor01', 'one', '2006-6-09_1-22-43') - Have L-only cells [24, 98] that have ['short_num_replays'] = [8, 7]. We were hoping that there would be few to no replays on the S-track that involved L-only cells.
+        ## 2023-05-23 - Get Common (SHARED) placefields
+        ## Goal 1: From the cells with the placefields on both tracks, compute the degree to which they remap in position and sort them according to their distance.
+        is_BOTH_pf_only = np.logical_and(neuron_replay_stats_df['has_short_pf'], neuron_replay_stats_df['has_long_pf']) # (63,)
+        BOTH_pf_only_aclus = neuron_replay_stats_df.index[is_BOTH_pf_only].to_numpy()
+
+        ## NOTE: is_BOTH_pf_only is a much more stringent requirement (and a strict subset) than `is_BOTH_only`
+        _is_BOTH_only = neuron_replay_stats_df.track_membership == SplitPartitionMembership.SHARED # (99,)
+        _BOTH_only_aclus = neuron_replay_stats_df.index[_is_BOTH_only].to_numpy()
+        assert _BOTH_only_aclus.shape[0] >= BOTH_pf_only_aclus.shape[0]
+
+        BOTH_pf_only_df = neuron_replay_stats_df[is_BOTH_pf_only].copy()
+        BOTH_pf_only_df['long_short_pf_peak_x_displacement'] = BOTH_pf_only_df['long_pf_peak_x'].values - BOTH_pf_only_df['short_pf_peak_x'].values
+        BOTH_pf_only_df['long_short_pf_peak_x_distance'] = BOTH_pf_only_df['long_short_pf_peak_x_displacement'].abs()
+        BOTH_pf_only_df.sort_values(by=['long_short_pf_peak_x_distance'], inplace=True, ascending=False)
+
+        is_EITHER_pf_only = np.logical_or(neuron_replay_stats_df['has_short_pf'], neuron_replay_stats_df['has_long_pf']) # (63,)
+        EITHER_pf_only_aclus = neuron_replay_stats_df.index[is_EITHER_pf_only].to_numpy()
+
+        is_XOR_pf_only = np.logical_xor(neuron_replay_stats_df['has_short_pf'], neuron_replay_stats_df['has_long_pf'])
+        # XOR_pf_only_aclus = np.hstack((L_only_aclus, S_only_aclus))
+        XOR_pf_only_aclus = neuron_replay_stats_df.index[is_XOR_pf_only].to_numpy()
+        XOR_only_df = neuron_replay_stats_df[is_XOR_pf_only]
+
+        is_NEITHER_pf_only = np.logical_and(np.logical_not(neuron_replay_stats_df['has_short_pf']), np.logical_not(neuron_replay_stats_df['has_long_pf'])) # (63,)
+        NEITHER_pf_only_aclus = neuron_replay_stats_df.index[is_NEITHER_pf_only].to_numpy()
+        NEITHER_only_df = neuron_replay_stats_df[is_NEITHER_pf_only]
+
+        # is_S_pf_only, is_L_pf_only, is_BOTH_pf_only, is_EITHER_pf_only
+        # S_only_aclus, L_only_aclus, BOTH_pf_only_aclus, EITHER_pf_only_aclus
+        # S_only_df, L_only_df, BOTH_pf_only_df, neuron_replay_stats_df
+
+        short_exclusive = TrackExclusivePartitionSubset(is_S_pf_only, S_only_aclus, S_only_df)
+        long_exclusive = TrackExclusivePartitionSubset(is_L_pf_only, L_only_aclus, L_only_df)
+        BOTH_subset = TrackExclusivePartitionSubset(is_BOTH_pf_only, BOTH_pf_only_aclus, BOTH_pf_only_df)
+        EITHER_subset = TrackExclusivePartitionSubset(is_EITHER_pf_only, EITHER_pf_only_aclus, BOTH_pf_only_df)
+        XOR_subset = TrackExclusivePartitionSubset(is_XOR_pf_only, XOR_pf_only_aclus, XOR_only_df)
+        NEITHER_subset = TrackExclusivePartitionSubset(is_NEITHER_pf_only, NEITHER_pf_only_aclus, NEITHER_only_df)
+        return neuron_replay_stats_df, short_exclusive, long_exclusive, BOTH_subset, EITHER_subset, XOR_subset, NEITHER_subset
+
 
 
 @define(slots=False, repr=False)

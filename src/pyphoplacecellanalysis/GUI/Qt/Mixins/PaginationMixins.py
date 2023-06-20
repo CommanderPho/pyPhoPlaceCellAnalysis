@@ -94,7 +94,7 @@ class PaginatedFigureBaseController:
         return self.params.flat_all_data_indicies[self.is_selected]
 
 
-    def save_selection(self):
+    def save_selection(self) -> SelectionsObject:
         # active_params_backup: VisualizationParameters = _out_pagination_controller.params
         # list(_out_pagination_controller.params.keys())
         # active_params_dict: benedict = benedict(active_params_backup.to_dict())
