@@ -73,7 +73,9 @@ class PaginatedFigureBaseController:
         self.perform_update_ax_selected_state(ax=ax, is_selected=self.params.is_selected[found_data_index])
 
         # Redraw the figure to show the updated selection
-        event.canvas.draw()
+        # event.canvas.draw()
+        event.canvas.draw_idle()
+
 
     def perform_update_ax_selected_state(self, ax, is_selected: bool):
         """ simply updates the visual appearance of the provided ax to indicate whether it's selected. """
@@ -97,7 +99,7 @@ class PaginatedFigureBaseController:
                 
         # Redraw the figure to show the updated selection
         if not defer_render:
-            self.plots.fig.canvas.draw()
+            self.plots.fig.canvas.draw_idle()
 
     def _subfn_helper_setup_selectability(self):
         """ sets up selectability of items. 
