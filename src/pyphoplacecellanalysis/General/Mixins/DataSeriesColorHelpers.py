@@ -73,12 +73,18 @@ class DataSeriesColorHelpers:
 
 
     @classmethod
-    def qColorsList_to_NDarray(cls, neuron_qcolors_list) -> np.ndarray:
-        """ takes a list[QColor] and returns a [4, nCell] np.array with the color for each in the list """
+    def qColorsList_to_NDarray(cls, neuron_qcolors_list, is_255_array:bool) -> np.ndarray:
+        """ takes a list[QColor] and returns a [4, nCell] np.array with the color for each in the list 
+        
+        is_255_array: bool - if False, all RGB color values are (0.0 - 1.0), else they are (0.0 - 255.0)
+        I was having issues with this list being in the range 0.0-1.0 instead of 0-255.
+        """
         # allocate new neuron_colors array:
         n_cells = len(neuron_qcolors_list)
         neuron_colors = np.zeros((4, n_cells))
         for i, curr_qcolor in enumerate(neuron_qcolors_list):
             curr_color = curr_qcolor.getRgbF() # (1.0, 0.0, 0.0, 0.5019607843137255)
             neuron_colors[:, i] = curr_color[:]
+        if is_255_array:
+            neuron_colors[0:2, :] *= 255 # [1.0, 0.0, 0.0, 1.0]
         return neuron_colors
