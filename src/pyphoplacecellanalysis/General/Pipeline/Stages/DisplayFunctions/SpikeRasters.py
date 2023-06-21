@@ -491,6 +491,7 @@ def plot_multiple_raster_plot(filter_epochs_df: pd.DataFrame, filter_epoch_spike
 
     plots.layout = win.addLayout()
     plots.ax = {}
+    plots.scatter_plots = {} # index is the ax
     plots_data.all_spots_dict = {}
 
     if included_neuron_ids is not None:
@@ -546,9 +547,10 @@ def plot_multiple_raster_plot(filter_epochs_df: pd.DataFrame, filter_epoch_spike
 
         scatter_plot = pg.ScatterPlotItem(name='spikeRasterOverviewWindowScatterPlotItem', **scatter_plot_kwargs)
         scatter_plot.setObjectName(f'scatter_plot_{_active_plot_title}') # this seems necissary, the 'name' parameter in addPlot(...) seems to only change some internal property related to the legend AND drastically slows down the plotting
-        scatter_plot.opts['useCache'] = True
+        scatter_plot.opts['useCache'] = False
         scatter_plot.addPoints(plots_data.all_spots_dict[an_epoch.Index]) # , hoverable=True
         new_ax.addItem(scatter_plot)
+        plots.scatter_plots[an_epoch.Index] = scatter_plot
         new_ax.setXRange(an_epoch.start, an_epoch.stop)
         new_ax.setYRange(0, n_cells-1)
         # new_ax.showAxes(True, showValues=(True, True, True, False)) # showValues=(left: True, bottom: True, right: False, top: False) # , size=10       
