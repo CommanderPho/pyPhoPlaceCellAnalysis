@@ -74,7 +74,7 @@ class JonathanFiringRateAnalysisResult:
         """
         # needs `neuron_replay_stats_df`
         neuron_replay_stats_df = self.neuron_replay_stats_df.copy()
-        neuron_replay_stats_df = neuron_replay_stats_df.sort_values(by=['long_pf_peak_x'], inplace=False, ascending=True)
+        # neuron_replay_stats_df = neuron_replay_stats_df.sort_values(by=['long_pf_peak_x'], inplace=False, ascending=True)
 
         ## 2023-05-19 - Get S-only pfs
         is_S_pf_only = np.logical_and(np.logical_not(neuron_replay_stats_df['has_long_pf']), neuron_replay_stats_df['has_short_pf'])
@@ -130,6 +130,11 @@ class JonathanFiringRateAnalysisResult:
         EITHER_subset = TrackExclusivePartitionSubset(is_EITHER_pf_only, EITHER_pf_only_aclus, EITHER_pf_only_df)
         XOR_subset = TrackExclusivePartitionSubset(is_XOR_pf_only, XOR_pf_only_aclus, XOR_only_df)
         NEITHER_subset = TrackExclusivePartitionSubset(is_NEITHER_pf_only, NEITHER_pf_only_aclus, NEITHER_only_df)
+        
+        # Sort dataframe by 'long_pf_peak_x' now so the aclus aren't out of order.
+        neuron_replay_stats_df.sort_values(by=['long_pf_peak_x'], inplace=True, ascending=True)
+
+
         return neuron_replay_stats_df, short_exclusive, long_exclusive, BOTH_subset, EITHER_subset, XOR_subset, NEITHER_subset
 
 
