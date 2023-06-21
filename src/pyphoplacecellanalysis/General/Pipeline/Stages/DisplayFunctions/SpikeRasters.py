@@ -341,7 +341,7 @@ class RasterScatterPlotManager:
         # SpikeEmphasisState
         state_alpha = {SpikeEmphasisState.Hidden: 0.01,
                         SpikeEmphasisState.Deemphasized: 0.1,
-                        SpikeEmphasisState.Default: 0.5,
+                        SpikeEmphasisState.Default: 0.95, # SpikeEmphasisState.Default: 0.5,
                         SpikeEmphasisState.Emphasized: 1.0,
         }
         
