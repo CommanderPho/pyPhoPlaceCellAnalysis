@@ -7,10 +7,10 @@ import numpy as np
 import matplotlib.pyplot as plt
 from pyphocorehelpers.function_helpers import function_attributes
 
-@function_attributes(short_name='visualize_heatmap', tags=['display','matplotlib','heatmap'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-03-22 15:11')
+@function_attributes(short_name='visualize_heatmap', tags=['display','matplotlib','heatmap'], input_requires=[], output_provides=[], uses=[], used_by=['build_callout_subgraphic'], creation_date='2023-03-22 15:11')
 def visualize_heatmap(data, ax=None, show_value_labels=False, title="Simple Heatmap", show_xticks=False, show_yticks=False, show_colorbar=False, defer_show:bool = False):
     """
-    Creates a simple heatmap visualization of the given 2D numpy array data.
+    A MATPLOTLIB-based simple heatmap plot of the given 2D numpy array data.
 
 	from pyphoplacecellanalysis.Pho2D.matplotlib.visualize_heatmap import visualize_heatmap
 	data = np.array([[0, 1, 2], [3, 4, 5], [6, 7, 8]])
@@ -75,6 +75,8 @@ def visualize_heatmap(data, ax=None, show_value_labels=False, title="Simple Heat
 import numpy as np
 import pyphoplacecellanalysis.External.pyqtgraph as pg
 from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtCore, QtGui
+
+@function_attributes(short_name=None, tags=['pyqtgraph', 'app', 'window'], input_requires=[], output_provides=[], uses=[], used_by=['plot_kourosh_activity_style_figure'], creation_date='2023-06-21 15:27', related_items=[])
 def visualize_heatmap_pyqtgraph(data, win=None, show_value_labels=False, title="Simple Heatmap", show_xticks=False, show_yticks=False, show_colorbar=False, defer_show:bool = False):
     """
     Creates a simple heatmap visualization of the given 2D numpy array data.

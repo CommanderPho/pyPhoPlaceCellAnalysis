@@ -573,9 +573,9 @@ def plot_multiple_raster_plot(filter_epochs_df: pd.DataFrame, filter_epoch_spike
         new_ax.hideButtons() # Hides the auto-scale button
         new_ax.setDefaultPadding(0.0)  # plot without padding data range
         # Format Labels:        
-        # new_ax.getAxis('left').setLabel(f'Epoch[{an_epoch.label}]: {an_epoch.start}')
+        new_ax.getAxis('left').setLabel(f'Epoch[{an_epoch.label}]: {an_epoch.start:.2f}')
         # new_ax.getAxis('bottom').setLabel('t')
-        # new_ax.getAxis('right').setLabel(f'Epoch[{an_epoch.label}]: {an_epoch.stop}')
+        # new_ax.getAxis('right').setLabel(f'Epoch[{an_epoch.label}]: {an_epoch.stop:.2f}')
 
         # Disable Interactivity
         new_ax.setMouseEnabled(x=False, y=False)
