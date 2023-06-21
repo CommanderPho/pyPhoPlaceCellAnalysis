@@ -184,32 +184,32 @@ class RasterPlotParams:
         Requires:
             fragile_linear_neuron_IDXs
             
-    Sets:
-        params.neuron_qcolors
-        params.neuron_qcolors_map
-        params.neuron_colors: ndarray of shape (4, self.n_cells)
-        params.neuron_colors_hex
+        Sets:
+            params.neuron_qcolors
+            params.neuron_qcolors_map
+            params.neuron_colors: ndarray of shape (4, self.n_cells)
+            params.neuron_colors_hex
 
-    Known Calls: Seemingly only called from:
-        SpikesRenderingBaseMixin.helper_setup_neuron_colors_and_order(...)
+        Known Calls: Seemingly only called from:
+            SpikesRenderingBaseMixin.helper_setup_neuron_colors_and_order(...)
 
-    History: Factored out of SpikeRasterBase on 2023-03-31
+        History: Factored out of SpikeRasterBase on 2023-03-31
 
-    Usage:
+        Usage:
 
-        params = build_neurons_color_data(params, fragile_linear_neuron_IDXs)
-        params
+            params = build_neurons_color_data(params, fragile_linear_neuron_IDXs)
+            params
 
-    """	
-    unsorted_fragile_linear_neuron_IDXs = fragile_linear_neuron_IDXs
-    n_cells = len(unsorted_fragile_linear_neuron_IDXs)
+        """
+        unsorted_fragile_linear_neuron_IDXs = fragile_linear_neuron_IDXs
+        n_cells = len(unsorted_fragile_linear_neuron_IDXs)
 
-    if neuron_colors_list is None:
-        neuron_qcolors_list = DataSeriesColorHelpers._build_cell_color_map(unsorted_fragile_linear_neuron_IDXs, mode=coloring_mode, provided_cell_colors=None)
-        for a_color in neuron_qcolors_list:
-            a_color.setAlphaF(0.5)
-    else:
-        neuron_qcolors_list = DataSeriesColorHelpers._build_cell_color_map(unsorted_fragile_linear_neuron_IDXs, mode=coloring_mode, provided_cell_colors=neuron_colors_list.copy()) # builts a list of qcolors
+        if neuron_colors_list is None:
+            neuron_qcolors_list = DataSeriesColorHelpers._build_cell_color_map(unsorted_fragile_linear_neuron_IDXs, mode=coloring_mode, provided_cell_colors=None)
+            for a_color in neuron_qcolors_list:
+                a_color.setAlphaF(0.5)
+        else:
+            neuron_qcolors_list = DataSeriesColorHelpers._build_cell_color_map(unsorted_fragile_linear_neuron_IDXs, mode=coloring_mode, provided_cell_colors=neuron_colors_list.copy()) # builts a list of qcolors
                                 
         neuron_qcolors_map = dict(zip(unsorted_fragile_linear_neuron_IDXs, neuron_qcolors_list))
 
@@ -473,7 +473,7 @@ def plot_raster_plot(spikes_df, shared_aclus, unit_sort_order=None, scatter_app_
 
 
 @function_attributes(short_name=None, tags=['pyqtgraph','raster','2D'], input_requires=[], output_provides=[], uses=['_plot_empty_raster_plot_frame'], used_by=[], creation_date='2023-06-16 20:45', related_items=['plot_raster_plot'])
-def plot_multiple_raster_plot(filter_epochs_df: pd.DataFrame, filter_epoch_spikes_df: pd.DataFrame, included_neuron_ids=None, unit_sort_order=None, epoch_id_key_name='temp_epoch_id', scatter_app_name="Pho Stacked Replays"):
+def plot_multiple_raster_plot(filter_epochs_df: pd.DataFrame, filter_epoch_spikes_df: pd.DataFrame, included_neuron_ids=None, unit_sort_order=None, unit_colors_list=None, scatter_plot_kwargs=None, epoch_id_key_name='temp_epoch_id', scatter_app_name="Pho Stacked Replays"):
     """ This renders a stack of raster plots
 
     Usage:
@@ -510,13 +510,19 @@ def plot_multiple_raster_plot(filter_epochs_df: pd.DataFrame, filter_epoch_spike
         assert len(unit_sort_order) == n_cells
     
     params = RasterPlotParams()
-    params.build_neurons_color_data(fragile_linear_neuron_IDXs=fragile_linear_neuron_IDXs)
+    # params.build_neurons_color_data(fragile_linear_neuron_IDXs=fragile_linear_neuron_IDXs) # normal coloring of neurons
+
+    params.build_neurons_color_data(fragile_linear_neuron_IDXs=fragile_linear_neuron_IDXs, neuron_colors_list=unit_colors_list)
     manager = UnitSortOrderManager(neuron_ids=neuron_ids, fragile_linear_neuron_IDXs=fragile_linear_neuron_IDXs, n_cells=n_cells, unit_sort_order=unit_sort_order, params=params)
     manager.update_series_identity_y_values()
     raster_plot_manager = RasterScatterPlotManager(unit_sort_manager=manager)
     raster_plot_manager._build_cell_configs()
     # Update the dataframe
-    filter_epoch_spikes_df = _add_spikes_df_visualization_columns(manager, filter_epoch_spikes_df)
+    filter_epoch_spikes_df = manager.update_spikes_df_visualization_columns(filter_epoch_spikes_df)
+    
+    plots_data.params = params
+    plots_data.unit_sort_manager = manager
+    plots_data.raster_plot_manager = raster_plot_manager
     
     # Common Tick Label
     vtick = QtGui.QPainterPath()
@@ -528,7 +534,15 @@ def plot_multiple_raster_plot(filter_epochs_df: pd.DataFrame, filter_epoch_spike
     vtick.moveTo(-half_tick_width, -0.5)
     vtick.addRect(-half_tick_width, -0.5, tick_width, 1.0) # x, y, width, height
 
-    scatter_plot_kwargs = dict(pxMode=True, symbol=vtick, size=2, pen={'color': 'w', 'width': 1})
+    default_scatter_plot_kwargs = dict(pxMode=True, symbol=vtick, size=2, pen={'color': 'w', 'width': 1})
+
+    if scatter_plot_kwargs is None:
+        scatter_plot_kwargs = default_scatter_plot_kwargs
+    else:
+        # merge the two
+        scatter_plot_kwargs = default_scatter_plot_kwargs | scatter_plot_kwargs
+
+    print(f'scatter_plot_kwargs: {scatter_plot_kwargs}')
 
     ## Build the individual epoch raster plot rows:
     for an_epoch in filter_epochs_df.itertuples():
