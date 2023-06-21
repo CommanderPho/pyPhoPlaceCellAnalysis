@@ -46,9 +46,9 @@ from neuropy.core.session.dataSession import DataSession # for `pipeline_complet
 @define(slots=False, eq=False)
 class TrackExclusivePartitionSubset:
     """ holds information about a subset of aclus, e.g. that contain long-only placefields, etc. """
-	is_aclu_pf_track_exclusive: np.ndarray
-	track_exclusive_aclus: np.ndarray
-	track_exclusive_df: pd.DataFrame
+    is_aclu_pf_track_exclusive: np.ndarray
+    track_exclusive_aclus: np.ndarray
+    track_exclusive_df: pd.DataFrame
 
 
 @define(slots=False)
@@ -1633,145 +1633,145 @@ import awkward as ak # `simpler_compute_measured_vs_expected_firing_rates` new A
 
 @function_attributes(short_name=None, tags=['measured_vs_expected', 'firing_rate'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-05-26 00:00', related_items=[])
 def compute_measured_vs_expected_firing_rates(active_pos_df, active_filter_epochs, a_decoder_1D: "BasePositionDecoder", a_decoder_result: "DecodedFilterEpochsResult"):
-	""" 2023-05-26 - Goal is to compute the expected and measured firing rates for each cell for each epoch. 
+    """ 2023-05-26 - Goal is to compute the expected and measured firing rates for each cell for each epoch. 
 
-	Want to be able to get a vector of firing rates (one for each cell) for an epoch i.
+    Want to be able to get a vector of firing rates (one for each cell) for an epoch i.
 
-	"""
-	all_cells_decoded_epoch_time_bins = {}
-	all_cells_decoded_expected_firing_rates = {}
-	
-	# all_cells_decoded_expected_firing_rates_arr: List[np.ndarray] = [a_decoder_1D.F[np.squeeze(curr_most_likely_position_indicies),:] for curr_most_likely_position_indicies in a_decoder_result.most_likely_position_indicies_list]
-	# assert len(all_cells_decoded_expected_firing_rates_arr) == a_decoder_result.num_filter_epochs # one for each epoch
+    """
+    all_cells_decoded_epoch_time_bins = {}
+    all_cells_decoded_expected_firing_rates = {}
+    
+    # all_cells_decoded_expected_firing_rates_arr: List[np.ndarray] = [a_decoder_1D.F[np.squeeze(curr_most_likely_position_indicies),:] for curr_most_likely_position_indicies in a_decoder_result.most_likely_position_indicies_list]
+    # assert len(all_cells_decoded_expected_firing_rates_arr) == a_decoder_result.num_filter_epochs # one for each epoch
 
-	# num_timebins_in_epoch: NDArray[Shape["num_epochs"], Int] = np.array([np.shape(epoch_values)[0] for epoch_values in all_cells_decoded_expected_firing_rates_arr])
-	# num_total_flat_timebins: int = np.sum(num_timebins_in_epoch) # number of timebins across all epochs
-	# flat_epoch_idxs: NDArray[Shape["Num_total_flat_timebins"], Int] = np.concatenate([np.repeat(i, np.shape(epoch_values)[0]) for i, epoch_values in enumerate(all_cells_decoded_expected_firing_rates_arr)]) # for each time bin repeat the epoch_id so we can recover it if needed
-	
-	# flat_expected_firing_rates: NDArray[Shape["Num_total_flat_timebins, num_neurons"], Any] = np.vstack(all_cells_decoded_expected_firing_rates_arr)
-	# flat_expected_num_spikes: NDArray[Shape["num_total_flat_timebins, num_neurons"], Any] = flat_expected_firing_rates * a_decoder_result.decoding_time_bin_size
-	# flat_observed_num_spikes: NDArray[Shape["num_total_flat_timebins, num_neurons"], Any] = np.hstack(a_decoder_result.spkcount).T
-	# flat_observed_from_expected_difference: NDArray[Shape["num_total_flat_timebins, num_neurons"], Any] = flat_expected_num_spikes - flat_observed_num_spikes
-	
-	## for each cell:
-	for i, left_out_aclu in enumerate(a_decoder_1D.neuron_IDs):
-		# aclu = decoder_1D.neuron_IDs[i]
-		left_out_neuron_IDX = a_decoder_1D.neuron_IDXs[i] # should just be i, but just to be safe
-		## TODO: only look at bins where the cell fires (is_cell_firing_time_bin[i])
+    # num_timebins_in_epoch: NDArray[Shape["num_epochs"], Int] = np.array([np.shape(epoch_values)[0] for epoch_values in all_cells_decoded_expected_firing_rates_arr])
+    # num_total_flat_timebins: int = np.sum(num_timebins_in_epoch) # number of timebins across all epochs
+    # flat_epoch_idxs: NDArray[Shape["Num_total_flat_timebins"], Int] = np.concatenate([np.repeat(i, np.shape(epoch_values)[0]) for i, epoch_values in enumerate(all_cells_decoded_expected_firing_rates_arr)]) # for each time bin repeat the epoch_id so we can recover it if needed
+    
+    # flat_expected_firing_rates: NDArray[Shape["Num_total_flat_timebins, num_neurons"], Any] = np.vstack(all_cells_decoded_expected_firing_rates_arr)
+    # flat_expected_num_spikes: NDArray[Shape["num_total_flat_timebins, num_neurons"], Any] = flat_expected_firing_rates * a_decoder_result.decoding_time_bin_size
+    # flat_observed_num_spikes: NDArray[Shape["num_total_flat_timebins, num_neurons"], Any] = np.hstack(a_decoder_result.spkcount).T
+    # flat_observed_from_expected_difference: NDArray[Shape["num_total_flat_timebins, num_neurons"], Any] = flat_expected_num_spikes - flat_observed_num_spikes
+    
+    ## for each cell:
+    for i, left_out_aclu in enumerate(a_decoder_1D.neuron_IDs):
+        # aclu = decoder_1D.neuron_IDs[i]
+        left_out_neuron_IDX = a_decoder_1D.neuron_IDXs[i] # should just be i, but just to be safe
+        ## TODO: only look at bins where the cell fires (is_cell_firing_time_bin[i])
 
-		## single cell outputs:
-		curr_cell_decoded_epoch_time_bins = [] # will be a list of the time bins in each epoch that correspond to each surprise in the corresponding list in curr_cell_computed_epoch_surprises 
-		
-		curr_cell_pf_curve = a_decoder_1D.pf.ratemap.tuning_curves[left_out_neuron_IDX]
-		# curr_cell_spike_curve = decoder_1D.pf.ratemap.spikes_maps[unit_IDX] ## not occupancy weighted... is this the right one to use for computing the expected spike rate? NO... doesn't seem like it
+        ## single cell outputs:
+        curr_cell_decoded_epoch_time_bins = [] # will be a list of the time bins in each epoch that correspond to each surprise in the corresponding list in curr_cell_computed_epoch_surprises 
+        
+        curr_cell_pf_curve = a_decoder_1D.pf.ratemap.tuning_curves[left_out_neuron_IDX]
+        # curr_cell_spike_curve = decoder_1D.pf.ratemap.spikes_maps[unit_IDX] ## not occupancy weighted... is this the right one to use for computing the expected spike rate? NO... doesn't seem like it
 
-		## Must pre-allocate each with an empty list:
-		all_cells_decoded_expected_firing_rates[left_out_aclu] = [] 
-		
-		for decoded_epoch_idx in np.arange(a_decoder_result.num_filter_epochs):
-			curr_epoch_time_bin_container = a_decoder_result.time_bin_containers[decoded_epoch_idx]
-			curr_cell_decoded_epoch_time_bins.append(curr_epoch_time_bin_container)
-			curr_time_bins = curr_epoch_time_bin_container.centers
-			curr_epoch_p_x_given_n = a_decoder_result.p_x_given_n_list[decoded_epoch_idx] # .shape: (239, 5) - (n_x_bins, n_epoch_time_bins)
-			assert curr_epoch_p_x_given_n.shape[0] == curr_cell_pf_curve.shape[0]
-			
-			## Need to exclude estimates from bins that didn't have any spikes in them (in general these glitch around):
-			curr_total_spike_counts_per_window = np.sum(a_decoder_result.spkcount[decoded_epoch_idx], axis=0) # left_out_decoder_result.spkcount[i].shape # (69, 222) - (nCells, nTimeWindowCenters)
-			curr_is_time_bin_non_firing = (curr_total_spike_counts_per_window == 0) # this would mean that no cells fired in this time bin
-			# curr_non_firing_time_bin_indicies = np.where(curr_is_time_bin_non_firing)[0] # TODO: could also filter on a minimum number of spikes larger than zero (e.g. at least 2 spikes are required).
-			# curr_posterior_container = decoder_result.marginal_x_list[decoded_epoch_idx]
-			# curr_posterior = curr_posterior_container.p_x_given_n # TODO: check the posteriors too!
-			# curr_most_likely_positions = curr_posterior_container.most_likely_positions_1D # (n_epoch_time_bins, ) one position for each time bin in the replay
-			curr_most_likely_position_indicies = a_decoder_result.most_likely_position_indicies_list[decoded_epoch_idx] # (n_epoch_time_bins, ) one position for each time bin in the replay
-			
-			# curr_epoch_observed_num_spikes = decoder_result.spkcount[decoded_epoch_idx] # (nCells, n_epoch_time_bins)
-			
-			# From the firing map of the placefields for this neuron (`decoder_1D.F.T[left_out_neuron_IDX]`) get the value for each position bin index in the epoch
-			curr_epoch_expected_fr = np.squeeze(a_decoder_1D.F.T[left_out_neuron_IDX][curr_most_likely_position_indicies])
-			# expected_num_spikes = curr_epoch_expected_fr * decoder_result.decoding_time_bin_size
+        ## Must pre-allocate each with an empty list:
+        all_cells_decoded_expected_firing_rates[left_out_aclu] = [] 
+        
+        for decoded_epoch_idx in np.arange(a_decoder_result.num_filter_epochs):
+            curr_epoch_time_bin_container = a_decoder_result.time_bin_containers[decoded_epoch_idx]
+            curr_cell_decoded_epoch_time_bins.append(curr_epoch_time_bin_container)
+            curr_time_bins = curr_epoch_time_bin_container.centers
+            curr_epoch_p_x_given_n = a_decoder_result.p_x_given_n_list[decoded_epoch_idx] # .shape: (239, 5) - (n_x_bins, n_epoch_time_bins)
+            assert curr_epoch_p_x_given_n.shape[0] == curr_cell_pf_curve.shape[0]
+            
+            ## Need to exclude estimates from bins that didn't have any spikes in them (in general these glitch around):
+            curr_total_spike_counts_per_window = np.sum(a_decoder_result.spkcount[decoded_epoch_idx], axis=0) # left_out_decoder_result.spkcount[i].shape # (69, 222) - (nCells, nTimeWindowCenters)
+            curr_is_time_bin_non_firing = (curr_total_spike_counts_per_window == 0) # this would mean that no cells fired in this time bin
+            # curr_non_firing_time_bin_indicies = np.where(curr_is_time_bin_non_firing)[0] # TODO: could also filter on a minimum number of spikes larger than zero (e.g. at least 2 spikes are required).
+            # curr_posterior_container = decoder_result.marginal_x_list[decoded_epoch_idx]
+            # curr_posterior = curr_posterior_container.p_x_given_n # TODO: check the posteriors too!
+            # curr_most_likely_positions = curr_posterior_container.most_likely_positions_1D # (n_epoch_time_bins, ) one position for each time bin in the replay
+            curr_most_likely_position_indicies = a_decoder_result.most_likely_position_indicies_list[decoded_epoch_idx] # (n_epoch_time_bins, ) one position for each time bin in the replay
+            
+            # curr_epoch_observed_num_spikes = decoder_result.spkcount[decoded_epoch_idx] # (nCells, n_epoch_time_bins)
+            
+            # From the firing map of the placefields for this neuron (`decoder_1D.F.T[left_out_neuron_IDX]`) get the value for each position bin index in the epoch
+            curr_epoch_expected_fr = np.squeeze(a_decoder_1D.F.T[left_out_neuron_IDX][curr_most_likely_position_indicies])
+            # expected_num_spikes = curr_epoch_expected_fr * decoder_result.decoding_time_bin_size
 
-			# Eqn 1:
-			# p_n_given_x = lambda n: (1.0/factorial(n)) * pow(expected_num_spikes, n) * np.exp(-expected_num_spikes) # likelihood function
-			
-			# Compute the expected firing rate for this cell during each bin by taking the computed position posterior and taking the sum of the element-wise product with the cell's placefield.
-			# curr_epoch_expected_fr = decoder_1D.pf.ratemap.tuning_curve_unsmoothed_peak_firing_rates[left_out_neuron_IDX] * np.array([np.sum(curr_cell_pf_curve * curr_p_x_given_n) for curr_p_x_given_n in curr_epoch_p_x_given_n.T]) # * decoder_1D.pf.ratemap.
-			
-			all_cells_decoded_expected_firing_rates[left_out_aclu].append(curr_epoch_expected_fr)
+            # Eqn 1:
+            # p_n_given_x = lambda n: (1.0/factorial(n)) * pow(expected_num_spikes, n) * np.exp(-expected_num_spikes) # likelihood function
+            
+            # Compute the expected firing rate for this cell during each bin by taking the computed position posterior and taking the sum of the element-wise product with the cell's placefield.
+            # curr_epoch_expected_fr = decoder_1D.pf.ratemap.tuning_curve_unsmoothed_peak_firing_rates[left_out_neuron_IDX] * np.array([np.sum(curr_cell_pf_curve * curr_p_x_given_n) for curr_p_x_given_n in curr_epoch_p_x_given_n.T]) # * decoder_1D.pf.ratemap.
+            
+            all_cells_decoded_expected_firing_rates[left_out_aclu].append(curr_epoch_expected_fr)
 
 
-		## End loop over decoded epochs
-		# assert len(curr_cell_decoded_epoch_time_bins) == len(curr_cell_computed_epoch_surprises)
-		all_cells_decoded_epoch_time_bins[left_out_aclu] = curr_cell_decoded_epoch_time_bins
+        ## End loop over decoded epochs
+        # assert len(curr_cell_decoded_epoch_time_bins) == len(curr_cell_computed_epoch_surprises)
+        all_cells_decoded_epoch_time_bins[left_out_aclu] = curr_cell_decoded_epoch_time_bins
 
-	# ## End loop over cells
+    # ## End loop over cells
 
-	## Reshape to -for-each-epoch instead of -for-each-cell
-	all_epochs_decoded_epoch_time_bins = []
-	all_epochs_computed_expected_cell_firing_rates = []
-	for decoded_epoch_idx in np.arange(active_filter_epochs.n_epochs):
-		all_epochs_decoded_epoch_time_bins.append(np.array([all_cells_decoded_epoch_time_bins[aclu][decoded_epoch_idx].centers for aclu in a_decoder_1D.neuron_IDs])) # these are duplicated (and the same) for each cell
-		all_epochs_computed_expected_cell_firing_rates.append(np.array([all_cells_decoded_expected_firing_rates[aclu][decoded_epoch_idx] for aclu in a_decoder_1D.neuron_IDs]))
+    ## Reshape to -for-each-epoch instead of -for-each-cell
+    all_epochs_decoded_epoch_time_bins = []
+    all_epochs_computed_expected_cell_firing_rates = []
+    for decoded_epoch_idx in np.arange(active_filter_epochs.n_epochs):
+        all_epochs_decoded_epoch_time_bins.append(np.array([all_cells_decoded_epoch_time_bins[aclu][decoded_epoch_idx].centers for aclu in a_decoder_1D.neuron_IDs])) # these are duplicated (and the same) for each cell
+        all_epochs_computed_expected_cell_firing_rates.append(np.array([all_cells_decoded_expected_firing_rates[aclu][decoded_epoch_idx] for aclu in a_decoder_1D.neuron_IDs]))
 
-	## These are already in the -for-each-epoch form and just need conversion:
-	decoder_time_bin_centers = [a_decoder_result.time_bin_containers[decoded_epoch_idx].centers for decoded_epoch_idx in np.arange(a_decoder_result.num_filter_epochs)]
-	all_epochs_computed_expected_cell_num_spikes = [(all_epochs_computed_expected_cell_firing_rates[decoded_epoch_idx] * a_decoder_result.decoding_time_bin_size) for decoded_epoch_idx in np.arange(a_decoder_result.num_filter_epochs)]
-	all_epochs_computed_observed_from_expected_difference = [(all_epochs_computed_expected_cell_num_spikes[decoded_epoch_idx] - a_decoder_result.spkcount[decoded_epoch_idx]) for decoded_epoch_idx in np.arange(a_decoder_result.num_filter_epochs)]
-	# Interpolate the measured positions to the window center times:
-	measured_pos_window_centers = [np.interp(curr_time_bins, active_pos_df.t, active_pos_df.lin_pos) for curr_time_bins in decoder_time_bin_centers] # TODO 2023-05-26: do I want .x or .lin_pos?
-	
-	## These aggregate over all time bins in each epoch:
-		# Note that some of these correspond to values that are still separate by cell
-	all_epochs_decoded_epoch_time_bins_mean = np.vstack([np.mean(curr_epoch_time_bins, axis=1) for curr_epoch_time_bins in all_epochs_decoded_epoch_time_bins]) # mean over all time bins in each epoch  # .shape (614, 65) - (n_epochs, n_neurons)
-	all_epochs_computed_expected_cell_firing_rates_mean = np.vstack([np.mean(curr_epoch_values, axis=1) for curr_epoch_values in all_epochs_computed_expected_cell_firing_rates]) # mean over all time bins in each epoch  # .shape (614, 65) - (n_epochs, n_neurons)
-	all_epochs_computed_expected_cell_firing_rates_stddev = np.vstack([np.std(curr_epoch_values, axis=1) for curr_epoch_values in all_epochs_computed_expected_cell_firing_rates]) # mean over all time bins in each epoch  # .shape (614, 65) - (n_epochs, n_neurons)
+    ## These are already in the -for-each-epoch form and just need conversion:
+    decoder_time_bin_centers = [a_decoder_result.time_bin_containers[decoded_epoch_idx].centers for decoded_epoch_idx in np.arange(a_decoder_result.num_filter_epochs)]
+    all_epochs_computed_expected_cell_num_spikes = [(all_epochs_computed_expected_cell_firing_rates[decoded_epoch_idx] * a_decoder_result.decoding_time_bin_size) for decoded_epoch_idx in np.arange(a_decoder_result.num_filter_epochs)]
+    all_epochs_computed_observed_from_expected_difference = [(all_epochs_computed_expected_cell_num_spikes[decoded_epoch_idx] - a_decoder_result.spkcount[decoded_epoch_idx]) for decoded_epoch_idx in np.arange(a_decoder_result.num_filter_epochs)]
+    # Interpolate the measured positions to the window center times:
+    measured_pos_window_centers = [np.interp(curr_time_bins, active_pos_df.t, active_pos_df.lin_pos) for curr_time_bins in decoder_time_bin_centers] # TODO 2023-05-26: do I want .x or .lin_pos?
+    
+    ## These aggregate over all time bins in each epoch:
+        # Note that some of these correspond to values that are still separate by cell
+    all_epochs_decoded_epoch_time_bins_mean = np.vstack([np.mean(curr_epoch_time_bins, axis=1) for curr_epoch_time_bins in all_epochs_decoded_epoch_time_bins]) # mean over all time bins in each epoch  # .shape (614, 65) - (n_epochs, n_neurons)
+    all_epochs_computed_expected_cell_firing_rates_mean = np.vstack([np.mean(curr_epoch_values, axis=1) for curr_epoch_values in all_epochs_computed_expected_cell_firing_rates]) # mean over all time bins in each epoch  # .shape (614, 65) - (n_epochs, n_neurons)
+    all_epochs_computed_expected_cell_firing_rates_stddev = np.vstack([np.std(curr_epoch_values, axis=1) for curr_epoch_values in all_epochs_computed_expected_cell_firing_rates]) # mean over all time bins in each epoch  # .shape (614, 65) - (n_epochs, n_neurons)
 
-	# the maximum magnitude difference is found for all timebins within each epoch. This gives 1 value for each epoch
-	all_epochs_computed_observed_from_expected_difference_max_index = [np.argmax(np.abs(all_epochs_computed_observed_from_expected_difference[decoded_epoch_idx]), axis=1, keepdims=False) for decoded_epoch_idx in np.arange(a_decoder_result.num_filter_epochs)]
-	all_epochs_computed_observed_from_expected_difference_maximum = [np.array([all_epochs_computed_observed_from_expected_difference[decoded_epoch_idx][neuron_IDX, all_epochs_computed_observed_from_expected_difference_max_index[decoded_epoch_idx][neuron_IDX]] for neuron_IDX in np.arange(len(a_decoder_1D.neuron_IDs))]) for decoded_epoch_idx in np.arange(a_decoder_result.num_filter_epochs)]
-	
-	return decoder_time_bin_centers, all_epochs_computed_expected_cell_num_spikes, all_epochs_computed_observed_from_expected_difference, measured_pos_window_centers, (all_epochs_decoded_epoch_time_bins_mean, all_epochs_computed_expected_cell_firing_rates_mean, all_epochs_computed_expected_cell_firing_rates_stddev, all_epochs_computed_observed_from_expected_difference_maximum)
+    # the maximum magnitude difference is found for all timebins within each epoch. This gives 1 value for each epoch
+    all_epochs_computed_observed_from_expected_difference_max_index = [np.argmax(np.abs(all_epochs_computed_observed_from_expected_difference[decoded_epoch_idx]), axis=1, keepdims=False) for decoded_epoch_idx in np.arange(a_decoder_result.num_filter_epochs)]
+    all_epochs_computed_observed_from_expected_difference_maximum = [np.array([all_epochs_computed_observed_from_expected_difference[decoded_epoch_idx][neuron_IDX, all_epochs_computed_observed_from_expected_difference_max_index[decoded_epoch_idx][neuron_IDX]] for neuron_IDX in np.arange(len(a_decoder_1D.neuron_IDs))]) for decoded_epoch_idx in np.arange(a_decoder_result.num_filter_epochs)]
+    
+    return decoder_time_bin_centers, all_epochs_computed_expected_cell_num_spikes, all_epochs_computed_observed_from_expected_difference, measured_pos_window_centers, (all_epochs_decoded_epoch_time_bins_mean, all_epochs_computed_expected_cell_firing_rates_mean, all_epochs_computed_expected_cell_firing_rates_stddev, all_epochs_computed_observed_from_expected_difference_maximum)
 
 @function_attributes(short_name=None, tags=['measured_vs_expected', 'firing_rate'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-05-30 00:00', related_items=[])
 def simpler_compute_measured_vs_expected_firing_rates(active_pos_df, active_filter_epochs, a_decoder_1D: "BasePositionDecoder", a_decoder_result: "DecodedFilterEpochsResult"):
-	""" 2023-05-30 - Goal is to compute the expected and measured firing rates for each cell for each epoch. 
-			Attempting a smarter and more refined implementation.
-	Want to be able to get a vector of firing rates (one for each cell) for an epoch i.
+    """ 2023-05-30 - Goal is to compute the expected and measured firing rates for each cell for each epoch. 
+            Attempting a smarter and more refined implementation.
+    Want to be able to get a vector of firing rates (one for each cell) for an epoch i.
 
-	"""
-	num_neurons = a_decoder_1D.num_neurons
-	num_epochs = a_decoder_result.num_filter_epochs
-	
-	all_cells_decoded_expected_firing_rates_list: List[np.ndarray] = [a_decoder_1D.F[np.squeeze(curr_most_likely_position_indicies),:] for curr_most_likely_position_indicies in a_decoder_result.most_likely_position_indicies_list]
-	assert len(all_cells_decoded_expected_firing_rates_list) == a_decoder_result.num_filter_epochs # one for each epoch
+    """
+    num_neurons = a_decoder_1D.num_neurons
+    num_epochs = a_decoder_result.num_filter_epochs
+    
+    all_cells_decoded_expected_firing_rates_list: List[np.ndarray] = [a_decoder_1D.F[np.squeeze(curr_most_likely_position_indicies),:] for curr_most_likely_position_indicies in a_decoder_result.most_likely_position_indicies_list]
+    assert len(all_cells_decoded_expected_firing_rates_list) == a_decoder_result.num_filter_epochs # one for each epoch
 
-	num_timebins_in_epoch: NDArray[Shape["Num_epochs"], Int] = np.array([np.shape(epoch_values)[0] for epoch_values in all_cells_decoded_expected_firing_rates_list])
-	num_total_flat_timebins: int = np.sum(num_timebins_in_epoch) # number of timebins across all epochs
-	flat_epoch_idxs: NDArray[Shape["N_total_flat_timebins"], Int] = np.concatenate([np.repeat(i, np.shape(epoch_values)[0]) for i, epoch_values in enumerate(all_cells_decoded_expected_firing_rates_list)]) # for each time bin repeat the epoch_id so we can recover it if needed
-	
-	flat_expected_firing_rates: NDArray[Shape["N_total_flat_timebins, N_neurons"], Any] = np.vstack(all_cells_decoded_expected_firing_rates_list)
-	flat_expected_num_spikes: NDArray[Shape["N_total_flat_timebins, N_neurons"], Any] = flat_expected_firing_rates * a_decoder_result.decoding_time_bin_size
-	flat_observed_num_spikes: NDArray[Shape["N_total_flat_timebins, N_neurons"], Any] = np.hstack(a_decoder_result.spkcount).T
-	flat_observed_from_expected_difference: NDArray[Shape["N_total_flat_timebins, N_neurons"], Any] = flat_expected_num_spikes - flat_observed_num_spikes
+    num_timebins_in_epoch: NDArray[Shape["Num_epochs"], Int] = np.array([np.shape(epoch_values)[0] for epoch_values in all_cells_decoded_expected_firing_rates_list])
+    num_total_flat_timebins: int = np.sum(num_timebins_in_epoch) # number of timebins across all epochs
+    flat_epoch_idxs: NDArray[Shape["N_total_flat_timebins"], Int] = np.concatenate([np.repeat(i, np.shape(epoch_values)[0]) for i, epoch_values in enumerate(all_cells_decoded_expected_firing_rates_list)]) # for each time bin repeat the epoch_id so we can recover it if needed
+    
+    flat_expected_firing_rates: NDArray[Shape["N_total_flat_timebins, N_neurons"], Any] = np.vstack(all_cells_decoded_expected_firing_rates_list)
+    flat_expected_num_spikes: NDArray[Shape["N_total_flat_timebins, N_neurons"], Any] = flat_expected_firing_rates * a_decoder_result.decoding_time_bin_size
+    flat_observed_num_spikes: NDArray[Shape["N_total_flat_timebins, N_neurons"], Any] = np.hstack(a_decoder_result.spkcount).T
+    flat_observed_from_expected_difference: NDArray[Shape["N_total_flat_timebins, N_neurons"], Any] = flat_expected_num_spikes - flat_observed_num_spikes
 
-	## Awkward Array (Ragged-array) version:
-	ragged_expected_firing_rates_arr = ak.Array(all_cells_decoded_expected_firing_rates_list) # awkward array
-	num_timebins_in_epoch = ak.num(ragged_expected_firing_rates_arr, axis=1).to_numpy()
-	num_total_flat_timebins: int = np.sum(num_timebins_in_epoch)
-	print(f'num_neurons: {num_neurons}, num_epochs: {num_epochs}, num_total_flat_timebins: {num_total_flat_timebins}')
+    ## Awkward Array (Ragged-array) version:
+    ragged_expected_firing_rates_arr = ak.Array(all_cells_decoded_expected_firing_rates_list) # awkward array
+    num_timebins_in_epoch = ak.num(ragged_expected_firing_rates_arr, axis=1).to_numpy()
+    num_total_flat_timebins: int = np.sum(num_timebins_in_epoch)
+    print(f'num_neurons: {num_neurons}, num_epochs: {num_epochs}, num_total_flat_timebins: {num_total_flat_timebins}')
 
-	ragged_expected_num_spikes_arr = ragged_expected_firing_rates_arr * a_decoder_result.decoding_time_bin_size
-	ragged_observed_from_expected_diff = ragged_expected_num_spikes_arr - ak.Array([v.T for v in a_decoder_result.spkcount])
-	# ragged_observed_from_expected_diff_MAXIMUMS = ragged_observed_from_expected_diff[ak.argmax(np.abs(ragged_observed_from_expected_diff), axis=1, keepdims=False)]
-	# flat_observed_from_expected_diff_MAXIMUMS = ak.flatten(ragged_observed_from_expected_diff_MAXIMUMS, axis=1)
+    ragged_expected_num_spikes_arr = ragged_expected_firing_rates_arr * a_decoder_result.decoding_time_bin_size
+    ragged_observed_from_expected_diff = ragged_expected_num_spikes_arr - ak.Array([v.T for v in a_decoder_result.spkcount])
+    # ragged_observed_from_expected_diff_MAXIMUMS = ragged_observed_from_expected_diff[ak.argmax(np.abs(ragged_observed_from_expected_diff), axis=1, keepdims=False)]
+    # flat_observed_from_expected_diff_MAXIMUMS = ak.flatten(ragged_observed_from_expected_diff_MAXIMUMS, axis=1)
 
-	## By epoch quantities, this is correct:
-	observed_from_expected_diff_ptp = ak.to_regular(ak.ptp(ragged_observed_from_expected_diff, axis=1)).to_numpy().T # type: 120 * 30 * float64
-	observed_from_expected_diff_mean = ak.to_regular(ak.mean(ragged_observed_from_expected_diff, axis=1)).to_numpy().T # type: 120 * 30 * float64
-	observed_from_expected_diff_std = ak.to_regular(ak.std(ragged_observed_from_expected_diff, axis=1)).to_numpy().T # type: 120 * 30 * float64
+    ## By epoch quantities, this is correct:
+    observed_from_expected_diff_ptp = ak.to_regular(ak.ptp(ragged_observed_from_expected_diff, axis=1)).to_numpy().T # type: 120 * 30 * float64
+    observed_from_expected_diff_mean = ak.to_regular(ak.mean(ragged_observed_from_expected_diff, axis=1)).to_numpy().T # type: 120 * 30 * float64
+    observed_from_expected_diff_std = ak.to_regular(ak.std(ragged_observed_from_expected_diff, axis=1)).to_numpy().T # type: 120 * 30 * float64
 
-	# df = pd.DataFrame(dict(zip(('epoch_idx', 'expected_fr', 'expected_spikes', 'observed_spikes', 'observed_from_expected_diff'), (flat_epoch_idxs, flat_expected_firing_rates, flat_expected_num_spikes, flat_observed_num_spikes, flat_observed_from_expected_difference))))
-	# return df, num_total_flat_timebins, num_timebins_in_epoch
-	return (num_neurons, num_timebins_in_epoch, num_total_flat_timebins), (observed_from_expected_diff_ptp, observed_from_expected_diff_mean, observed_from_expected_diff_std)
+    # df = pd.DataFrame(dict(zip(('epoch_idx', 'expected_fr', 'expected_spikes', 'observed_spikes', 'observed_from_expected_diff'), (flat_epoch_idxs, flat_expected_firing_rates, flat_expected_num_spikes, flat_observed_num_spikes, flat_observed_from_expected_difference))))
+    # return df, num_total_flat_timebins, num_timebins_in_epoch
+    return (num_neurons, num_timebins_in_epoch, num_total_flat_timebins), (observed_from_expected_diff_ptp, observed_from_expected_diff_mean, observed_from_expected_diff_std)
 
 # returned_shape_tuple, (observed_from_expected_diff_ptp, observed_from_expected_diff_mean, observed_from_expected_diff_std) = simpler_compute_measured_vs_expected_firing_rates(active_pos_df, active_filter_epochs, a_decoder_1D=decoder_1D_LONG, a_decoder_result=decoder_result_LONG)
 
