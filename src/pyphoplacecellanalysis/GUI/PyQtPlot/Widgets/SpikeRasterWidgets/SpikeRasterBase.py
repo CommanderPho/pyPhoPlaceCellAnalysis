@@ -1,7 +1,7 @@
 from copy import deepcopy
 import time
 import sys
-from typing import OrderedDict
+from typing import OrderedDict, Union
 import pyphoplacecellanalysis.External.pyqtgraph as pg
 from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtCore, QtGui, QtWidgets
 import pyphoplacecellanalysis.External.pyqtgraph.opengl as gl # for 3D raster plot
@@ -25,7 +25,7 @@ from pyphoplacecellanalysis.General.DataSeriesToSpatial import DataSeriesToSpati
 from pyphoplacecellanalysis.GUI.Qt.Mixins.RenderWindowControlsMixin import RenderWindowControlsMixin, RenderPlaybackControlsMixin
 
 from pyphoplacecellanalysis.General.Mixins.TimeWindowPlaybackMixin import TimeWindowPlaybackPropertiesMixin, TimeWindowPlaybackController
-from pyphoplacecellanalysis.General.Mixins.DataSeriesColorHelpers import DataSeriesColorHelpers
+from pyphoplacecellanalysis.General.Mixins.DataSeriesColorHelpers import DataSeriesColorHelpers, UnitColoringMode
 
 # Pipeline Logging:
 import logging
@@ -354,7 +354,7 @@ class SpikeRasterBase(UnitSortableMixin, DataSeriesToSpatialTransformingMixin, N
     
     """ Cell Coloring functions:
     """
-    def _setup_neurons_color_data(self, neuron_colors_list=None, coloring_mode='color_by_index_order'):
+    def _setup_neurons_color_data(self, neuron_colors_list=None, coloring_mode:Union[UnitColoringMode,str]=UnitColoringMode.COLOR_BY_INDEX_ORDER):
         """ 
         neuron_colors_list: a list of neuron colors
             if None provided will call DataSeriesColorHelpers._build_cell_color_map(...) to build them.
