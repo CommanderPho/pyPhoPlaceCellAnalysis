@@ -48,7 +48,7 @@ class DataSeriesColorHelpers:
             assert provided_cell_colors.shape[0] == 4, f"provided_cell_colors should be a (4, n_cells) {(4, {n_cells})} array of colors but provided_cell_colors.shape: {provided_cell_colors.shape}"
             assert provided_cell_colors.shape[1] >= n_cells, f"provided_cell_colors should be a (4, n_cells) {(4, {n_cells})} array of colors but provided_cell_colors.shape: {provided_cell_colors.shape}"
             
-        if mode == UnitColoringMode.PRESERVE_FRAGILE_LINEAR_NEURON_IDXS:
+        if mode.name == UnitColoringMode.PRESERVE_FRAGILE_LINEAR_NEURON_IDXS.name:
             # color is assigned based off of fragile_linear_neuron_IDX value, meaning after re-sorting the fragile_linear_neuron_IDXs the colors will appear visually different along y but will correspond to the same units as before the sort.
             fragile_linear_neuron_IDXs_sort_index = np.argsort(fragile_linear_neuron_IDXs) # get the indicies of the sorted ids
             # sorted_fragile_linear_neuron_IDXs = np.sort(fragile_linear_neuron_IDXs)
@@ -61,7 +61,7 @@ class DataSeriesColorHelpers:
             else:
                 return [pg.mkColor((fragile_linear_neuron_IDX, n_cells*1.3)) for i, fragile_linear_neuron_IDX in enumerate(sorted_fragile_linear_neuron_IDXs)]
             
-        elif mode == UnitColoringMode.COLOR_BY_INDEX_ORDER:
+        elif mode.name == UnitColoringMode.COLOR_BY_INDEX_ORDER.name:
             # color is assigned based of the raw index order of the passed-in unit ids. This means after re-sorting the units the colors will appear visually the same along y, but will not correspond to the same units.
             if provided_cell_colors is not None:
                 return [pg.mkColor(provided_cell_colors[:, i]) for i, fragile_linear_neuron_IDX in enumerate(fragile_linear_neuron_IDXs)]
