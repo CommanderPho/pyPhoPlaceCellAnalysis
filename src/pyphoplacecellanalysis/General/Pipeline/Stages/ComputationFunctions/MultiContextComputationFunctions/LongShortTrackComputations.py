@@ -108,6 +108,8 @@ class JonathanFiringRateAnalysisResult:
 
         is_EITHER_pf_only = np.logical_or(neuron_replay_stats_df['has_short_pf'], neuron_replay_stats_df['has_long_pf']) # (63,)
         EITHER_pf_only_aclus = neuron_replay_stats_df.index[is_EITHER_pf_only].to_numpy()
+        EITHER_pf_only_df = neuron_replay_stats_df[is_EITHER_pf_only].copy()
+        
 
         is_XOR_pf_only = np.logical_xor(neuron_replay_stats_df['has_short_pf'], neuron_replay_stats_df['has_long_pf'])
         # XOR_pf_only_aclus = np.hstack((L_only_aclus, S_only_aclus))
@@ -125,7 +127,7 @@ class JonathanFiringRateAnalysisResult:
         short_exclusive = TrackExclusivePartitionSubset(is_S_pf_only, S_only_aclus, S_only_df)
         long_exclusive = TrackExclusivePartitionSubset(is_L_pf_only, L_only_aclus, L_only_df)
         BOTH_subset = TrackExclusivePartitionSubset(is_BOTH_pf_only, BOTH_pf_only_aclus, BOTH_pf_only_df)
-        EITHER_subset = TrackExclusivePartitionSubset(is_EITHER_pf_only, EITHER_pf_only_aclus, BOTH_pf_only_df)
+        EITHER_subset = TrackExclusivePartitionSubset(is_EITHER_pf_only, EITHER_pf_only_aclus, EITHER_pf_only_df)
         XOR_subset = TrackExclusivePartitionSubset(is_XOR_pf_only, XOR_pf_only_aclus, XOR_only_df)
         NEITHER_subset = TrackExclusivePartitionSubset(is_NEITHER_pf_only, NEITHER_pf_only_aclus, NEITHER_only_df)
         return neuron_replay_stats_df, short_exclusive, long_exclusive, BOTH_subset, EITHER_subset, XOR_subset, NEITHER_subset
