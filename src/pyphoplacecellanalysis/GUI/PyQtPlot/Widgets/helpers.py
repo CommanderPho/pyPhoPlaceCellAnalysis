@@ -1,6 +1,8 @@
 ### Graphics Items Children Discovery - Programmatically getting rows/columns of GraphicsLayoutWidget
 from collections import namedtuple
 import numpy as np
+from pyphocorehelpers.programming_helpers import metadata_attributes
+from pyphocorehelpers.function_helpers import function_attributes
 import pyphoplacecellanalysis.External.pyqtgraph as pg
 import pyphoplacecellanalysis.External.pyqtgraph.graphicsItems as graphicsItems
 from pyphoplacecellanalysis.External.pyqtgraph.graphicsItems.PlotItem import PlotItem #, PlotCurveItem
@@ -41,6 +43,8 @@ win.setYRange
 # """
 
 
+
+@function_attributes(short_name=None, tags=['pyqtgraph'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-06-21 13:44', related_items=[])
 def recover_graphics_layout_widget_item_indicies(graphics_layout_widget, debug_print=False):
     """ ✅WORKS✅ Recovers the row/column indicies for the items of a graphics_layout_widget 
     
@@ -95,6 +99,8 @@ def recover_graphics_layout_widget_item_indicies(graphics_layout_widget, debug_p
 QPenTuple = namedtuple('QPenTuple', ['color', 'width'])
 QBrushTuple = namedtuple('QBrushTuple', ['color'])
 
+
+@metadata_attributes(short_name=None, tags=['class', 'helper', 'pyqtgraph', 'QPen', 'Qt', 'QBrush', 'Helpful', 'TO_REFACTOR'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-06-21 13:45', related_items=[])
 class RectangleRenderTupleHelpers:
     """ class for use in copying, serializing, etc the list of tuples used by IntervalRectsItem
 
@@ -136,7 +142,6 @@ class RectangleRenderTupleHelpers:
     def QBrush_to_tuple(a_brush):
         return QBrushTuple(color=pg.colorStr(a_brush.color()))
 
-
     
     @classmethod
     def get_serialized_data(cls, tuples_data):
@@ -165,7 +170,7 @@ class RectangleRenderTupleHelpers:
 
 
 
-
+@function_attributes(short_name=None, tags=['pyqtgraph', 'scatterplot', 'clickable', 'interactive'], conforms_to=[], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-06-21 13:37')
 def _helper_make_scatterplot_clickable(main_scatter_plot, enable_hover:bool=False):
     """ pyqtgraph 
     
@@ -182,11 +187,13 @@ def _helper_make_scatterplot_clickable(main_scatter_plot, enable_hover:bool=Fals
 
 
     ## Clickable/Selectable Spikes:
+    # global lastClicked  # Declare lastClicked as a global variable
     # Will make all plots clickable
     clickedPen = pg.mkPen('#DDD', width=2)
     lastClicked = []
     def _test_scatter_plot_clicked(plot, points):
-        global lastClicked
+        """ captures `lastClicked` """
+        global lastClicked  # Declare lastClicked as a global variable
         for p in lastClicked:
             p.resetPen()
         print("clicked points", points)
@@ -203,8 +210,6 @@ def _helper_make_scatterplot_clickable(main_scatter_plot, enable_hover:bool=Fals
             print(f'_test_scatter_plot_hovered(plt: {plt}, points: {points}, ev: {ev})')
             if (len(points) > 0):
                 curr_point = points[0]
-                # self.
-                # curr_point.index
         main_scatter_hovered_connection = main_scatter_plot.sigHovered.connect(_test_scatter_plot_hovered)
     else:
         main_scatter_hovered_connection = None
