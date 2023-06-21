@@ -153,24 +153,37 @@ class SpikeRastersDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Displa
 """
 
 # Windowing helpers for spikes_df:
-def _add_spikes_df_visualization_columns(manager, spikes_df):
-    if 'visualization_raster_y_location' not in spikes_df.columns:
-        all_y = [manager.y_fragile_linear_neuron_IDX_map[a_cell_IDX] for a_cell_IDX in spikes_df['fragile_linear_neuron_IDX'].to_numpy()]
-        spikes_df['visualization_raster_y_location'] = all_y # adds as a column to the dataframe. Only needs to be updated when the number of active units changes. BUG? NO, RESOLVED: actually, this should be updated when anything that would change .y_fragile_linear_neuron_IDX_map would change, right? Meaning: .y, ... oh, I see. y doesn't change because params.center_mode, params.bin_position_mode, and params.side_bin_margins aren't expected to change. 
 
-    if 'visualization_raster_emphasis_state' not in spikes_df.columns:
-        spikes_df['visualization_raster_emphasis_state'] = SpikeEmphasisState.Default
-    return spikes_df
+@define 
+class RasterPlotParams:
+    """ factored out of Spike2DRaster to do standalone pyqtgraph plotting of the 2D raster plot. """
+    center_mode: str = 'starting_at_zero' # or 'zero_centered'
+    bin_position_mode: str = 'bin_center' # or 'left_edges'
+    side_bin_margins: float = 0.0
 
-def _build_neurons_color_data(params, fragile_linear_neuron_IDXs, neuron_colors_list=None, coloring_mode='color_by_index_order'):
-    """ Cell Coloring function
+    # Colors:
+    neuron_qcolors: list = None
+    neuron_colors: np.ndarray = None # of shape (4, self.n_cells)
+    neuron_colors_hex: np.ndarray = None #
+    neuron_qcolors_map: dict = Factory(dict)
 
-    neuron_colors_list: a list of neuron colors
-        if None provided will call DataSeriesColorHelpers._build_cell_color_map(...) to build them.
-    
-    Requires:
-        fragile_linear_neuron_IDXs
+    # Configs:
+    config_items: IndexedOrderedDict = Factory(IndexedOrderedDict)
+
+    def build_neurons_color_data(self, fragile_linear_neuron_IDXs, neuron_colors_list=None, coloring_mode:Union[UnitColoringMode,str]=UnitColoringMode.COLOR_BY_INDEX_ORDER) -> None:
+        """ Cell Coloring function
+
+        Inputs:
+            neuron_colors_list: a list of neuron colors
+                if None provided will call DataSeriesColorHelpers._build_cell_color_map(...) to build them.
+            
+            mode:
+                'preserve_fragile_linear_neuron_IDXs': color is assigned based off of fragile_linear_neuron_IDX value, meaning after re-sorting the fragile_linear_neuron_IDXs the colors will appear visually different along y but will correspond to the same units as before the sort.
+                'color_by_index_order': color is assigned based of the raw index order of the passed-in unit ids. This means after re-sorting the units the colors will appear visually the same along y, but will not correspond to the same units.
         
+        Requires:
+            fragile_linear_neuron_IDXs
+            
     Sets:
         params.neuron_qcolors
         params.neuron_qcolors_map
@@ -197,56 +210,28 @@ def _build_neurons_color_data(params, fragile_linear_neuron_IDXs, neuron_colors_
             a_color.setAlphaF(0.5)
     else:
         neuron_qcolors_list = DataSeriesColorHelpers._build_cell_color_map(unsorted_fragile_linear_neuron_IDXs, mode=coloring_mode, provided_cell_colors=neuron_colors_list.copy()) # builts a list of qcolors
-                            
-    neuron_qcolors_map = dict(zip(unsorted_fragile_linear_neuron_IDXs, neuron_qcolors_list))
+                                
+        neuron_qcolors_map = dict(zip(unsorted_fragile_linear_neuron_IDXs, neuron_qcolors_list))
 
-    params.neuron_qcolors = deepcopy(neuron_qcolors_list)
-    params.neuron_qcolors_map = deepcopy(neuron_qcolors_map)
+        self.neuron_qcolors = deepcopy(neuron_qcolors_list)
+        self.neuron_qcolors_map = deepcopy(neuron_qcolors_map)
 
-    # allocate new neuron_colors array:
-    params.neuron_colors = np.zeros((4, n_cells))
-    for i, curr_qcolor in enumerate(params.neuron_qcolors):
-        curr_color = curr_qcolor.getRgbF() # (1.0, 0.0, 0.0, 0.5019607843137255)
-        params.neuron_colors[:, i] = curr_color[:]
-    
-    params.neuron_colors_hex = None
-    
-    # get hex colors:
-    params.neuron_colors_hex = [params.neuron_qcolors[i].name(QtGui.QColor.HexRgb) for i, cell_id in enumerate(fragile_linear_neuron_IDXs)]
-    return params
+        # allocate new neuron_colors array:
+        self.neuron_colors = np.zeros((4, n_cells))
+        for i, curr_qcolor in enumerate(self.neuron_qcolors):
+            curr_color = curr_qcolor.getRgbF() # (1.0, 0.0, 0.0, 0.5019607843137255)
+            self.neuron_colors[:, i] = curr_color[:]
+        
+        self.neuron_colors_hex = None
+        
+        # get hex colors:
+        self.neuron_colors_hex = [self.neuron_qcolors[i].name(QtGui.QColor.HexRgb) for i, cell_id in enumerate(fragile_linear_neuron_IDXs)]
+        return self
 
-@define 
-class RasterPlotParams:
-    """ factored out of Spike2DRaster to do standalone pyqtgraph plotting of the 2D raster plot. """
-    center_mode: str = 'starting_at_zero' # or 'zero_centered'
-    bin_position_mode: str = 'bin_center' # or 'left_edges'
-    side_bin_margins: float = 0.0
 
-    # Colors:
-    neuron_qcolors: list = None
-    neuron_colors: np.ndarray = None # of shape (4, self.n_cells)
-    neuron_colors_hex: np.ndarray = None #
-    neuron_qcolors_map: dict = Factory(dict)
 
-    # Configs:
-    config_items: IndexedOrderedDict = Factory(IndexedOrderedDict)
 
-    def build_neurons_color_data(self, fragile_linear_neuron_IDXs, neuron_colors_list=None, coloring_mode='color_by_index_order'):
-        """ Cell Coloring function
 
-        neuron_colors_list: a list of neuron colors
-            if None provided will call DataSeriesColorHelpers._build_cell_color_map(...) to build them.
-            
-        Sets:
-            params.neuron_qcolors
-            params.neuron_qcolors_map
-            params.neuron_colors: ndarray of shape (4, self.n_cells)
-            params.neuron_colors_hex
-
-        History: Factored out of SpikeRasterBase on 2023-03-31
-
-        """
-        self = _build_neurons_color_data(self, fragile_linear_neuron_IDXs, neuron_colors_list=neuron_colors_list, coloring_mode=coloring_mode)
 
 @define
 class UnitSortOrderManager(NeuronIdentityAccessingMixin):
@@ -297,7 +282,6 @@ class UnitSortOrderManager(NeuronIdentityAccessingMixin):
                 print(f'update_series_identity_y_values(): (self.unit_sort_order == self.fragile_linear_neuron_IDXs) (default sort).')
             self.y_fragile_linear_neuron_IDX_map = dict(zip(self.fragile_linear_neuron_IDXs, self._series_identity_y_values)) # Old way 
 
-
     ## Required for DataSeriesToSpatialTransformingMixin
     def fragile_linear_neuron_IDX_to_spatial(self, fragile_linear_neuron_IDXs):
         """ transforms the fragile_linear_neuron_IDXs in fragile_linear_neuron_IDXs to a spatial offset (such as the y-positions for a 3D raster plot) """
@@ -305,6 +289,19 @@ class UnitSortOrderManager(NeuronIdentityAccessingMixin):
             self.update_series_identity_y_values()
         fragile_linear_neuron_IDX_series_indicies = self.unit_sort_order[fragile_linear_neuron_IDXs] # get the appropriate series index for each fragile_linear_neuron_IDX given their sort order
         return self.series_identity_y_values[fragile_linear_neuron_IDX_series_indicies]
+
+
+    def update_spikes_df_visualization_columns(self, spikes_df: pd.DataFrame, overwrite_existing:bool=True):
+        """ updates spike_df's columns: ['visualization_raster_y_location', 'visualization_raster_emphasis_state'] """
+        if overwrite_existing or ('visualization_raster_y_location' not in spikes_df.columns):
+            all_y = [self.y_fragile_linear_neuron_IDX_map[a_cell_IDX] for a_cell_IDX in spikes_df['fragile_linear_neuron_IDX'].to_numpy()]
+            spikes_df['visualization_raster_y_location'] = all_y # adds as a column to the dataframe. Only needs to be updated when the number of active units changes. BUG? NO, RESOLVED: actually, this should be updated when anything that would change .y_fragile_linear_neuron_IDX_map would change, right? Meaning: .y, ... oh, I see. y doesn't change because params.center_mode, params.bin_position_mode, and params.side_bin_margins aren't expected to change. 
+
+        if overwrite_existing or ('visualization_raster_emphasis_state' not in spikes_df.columns):
+            # TODO: This might be the one we don't want to overwrite unless it's missing, as we probably don't want to always reset it to default emphasis if a column with customized values already exists.
+            spikes_df['visualization_raster_emphasis_state'] = SpikeEmphasisState.Default
+        return spikes_df
+
 
 @define
 class RasterScatterPlotManager:
@@ -430,7 +427,7 @@ def plot_raster_plot(spikes_df, shared_aclus, unit_sort_order=None, scatter_app_
     raster_plot_manager._build_cell_configs()
 
     # Update the dataframe
-    spikes_df = _add_spikes_df_visualization_columns(manager, spikes_df)
+    spikes_df = manager.update_spikes_df_visualization_columns(spikes_df)
 
     # make root container for plots
     app, win, plots, plots_data = _plot_empty_raster_plot_frame(scatter_app_name=scatter_app_name, defer_show=False)
