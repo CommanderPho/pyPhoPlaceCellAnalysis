@@ -488,6 +488,8 @@ def plot_multiple_raster_plot(filter_epochs_df: pd.DataFrame, filter_epoch_spike
     # ## Create the raster plot for the replay:
     # app, win, plots, plots_data = plot_raster_plot(_active_epoch_spikes_df, shared_aclus, scatter_app_name=f"Raster Epoch[{epoch_idx}]")
     app, win, plots, plots_data = _plot_empty_raster_plot_frame(scatter_app_name=scatter_app_name, defer_show=False)
+    # setting plot window background color to white
+    win.setBackground('w')
 
     plots.layout = win.addLayout()
     plots.ax = {}
