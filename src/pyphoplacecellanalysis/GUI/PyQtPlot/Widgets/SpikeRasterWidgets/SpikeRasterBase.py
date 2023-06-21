@@ -354,7 +354,7 @@ class SpikeRasterBase(UnitSortableMixin, DataSeriesToSpatialTransformingMixin, N
     
     """ Cell Coloring functions:
     """
-    def _setup_neurons_color_data(self, neuron_colors_list=None, coloring_mode:Union[UnitColoringMode,str]=UnitColoringMode.COLOR_BY_INDEX_ORDER):
+    def _setup_neurons_color_data(self, neuron_colors_list=None, coloring_mode:UnitColoringMode=UnitColoringMode.COLOR_BY_INDEX_ORDER):
         """ 
         neuron_colors_list: a list of neuron colors
             if None provided will call DataSeriesColorHelpers._build_cell_color_map(...) to build them.

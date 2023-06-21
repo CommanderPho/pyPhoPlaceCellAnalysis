@@ -24,7 +24,7 @@ class DataSeriesColorHelpers:
     debug_logging = False
     
     @classmethod
-    def _build_cell_color_map(cls, fragile_linear_neuron_IDXs, mode:Union[UnitColoringMode,str]=UnitColoringMode.COLOR_BY_INDEX_ORDER, provided_cell_colors=None, debug_print=False):
+    def _build_cell_color_map(cls, fragile_linear_neuron_IDXs, mode:UnitColoringMode=UnitColoringMode.COLOR_BY_INDEX_ORDER, provided_cell_colors=None, debug_print=False):
         """ builds a list of pg.mkColors from the cell index id:
 
         mode:

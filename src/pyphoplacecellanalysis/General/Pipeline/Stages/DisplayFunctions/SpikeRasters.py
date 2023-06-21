@@ -170,7 +170,7 @@ class RasterPlotParams:
     # Configs:
     config_items: IndexedOrderedDict = Factory(IndexedOrderedDict)
 
-    def build_neurons_color_data(self, fragile_linear_neuron_IDXs, neuron_colors_list=None, coloring_mode:Union[UnitColoringMode,str]=UnitColoringMode.COLOR_BY_INDEX_ORDER) -> None:
+    def build_neurons_color_data(self, fragile_linear_neuron_IDXs, neuron_colors_list=None, coloring_mode:UnitColoringMode=UnitColoringMode.COLOR_BY_INDEX_ORDER) -> None:
         """ Cell Coloring function
 
         Inputs:
@@ -403,7 +403,7 @@ def _plot_empty_raster_plot_frame(scatter_app_name='pho_test', defer_show=False)
 
 
 @function_attributes(short_name='plot_raster_plot', tags=['pyqtgraph','raster','2D'], input_requires=[], output_provides=[], uses=['_plot_empty_raster_plot_frame'], used_by=[], creation_date='2023-03-31 20:53')
-def plot_raster_plot(spikes_df, shared_aclus, unit_sort_order=None, scatter_app_name='pho_test'):
+def plot_raster_plot(spikes_df: pd.DataFrame, included_neuron_ids, unit_sort_order=None, unit_colors_list=None, scatter_app_name='pho_test'):
     """ This uses pyqtgraph's scatter function like SpikeRaster2D to render a raster plot with colored ticks by default
 
     Usage:
@@ -412,15 +412,27 @@ def plot_raster_plot(spikes_df, shared_aclus, unit_sort_order=None, scatter_app_
         app, win, plots, plots_data = plot_raster_plot(_temp_active_spikes_df, shared_aclus)
 
     """
-    neuron_ids = deepcopy(shared_aclus)
-    n_cells = len(shared_aclus)
+    
+    # make root container for plots
+    app, win, plots, plots_data = _plot_empty_raster_plot_frame(scatter_app_name=scatter_app_name, defer_show=False)
+    
+
+    if included_neuron_ids is not None:
+        neuron_ids = deepcopy(included_neuron_ids) # use the provided neuron_ids
+    else:
+        neuron_ids = np.sort(spikes_df.aclu.unique()) # get all the aclus from the entire spikes_df frame
+    n_cells = len(neuron_ids)
     fragile_linear_neuron_IDXs = np.arange(n_cells)
     if unit_sort_order is None:
         unit_sort_order = np.arange(n_cells) # in-line sort order
     else:
-        assert len(unit_sort_order) == n_cells        
+        assert len(unit_sort_order) == n_cells
+
     params = RasterPlotParams()
     params.build_neurons_color_data(fragile_linear_neuron_IDXs=fragile_linear_neuron_IDXs)
+    params.build_neurons_color_data(fragile_linear_neuron_IDXs=fragile_linear_neuron_IDXs, neuron_colors_list=unit_colors_list)
+    
+
     manager = UnitSortOrderManager(neuron_ids=neuron_ids, fragile_linear_neuron_IDXs=fragile_linear_neuron_IDXs, n_cells=n_cells, unit_sort_order=unit_sort_order, params=params)
     manager.update_series_identity_y_values()
     raster_plot_manager = RasterScatterPlotManager(unit_sort_manager=manager)
@@ -429,8 +441,11 @@ def plot_raster_plot(spikes_df, shared_aclus, unit_sort_order=None, scatter_app_
     # Update the dataframe
     spikes_df = manager.update_spikes_df_visualization_columns(spikes_df)
 
-    # make root container for plots
-    app, win, plots, plots_data = _plot_empty_raster_plot_frame(scatter_app_name=scatter_app_name, defer_show=False)
+    ## Add the managers to the plot_data
+    plots_data.params = params
+    plots_data.unit_sort_manager = manager
+    plots_data.raster_plot_manager = raster_plot_manager
+
 
     # each entry in `config_fragile_linear_neuron_IDX_map` has the form:
     # 	(i, fragile_linear_neuron_IDX, curr_pen, _series_identity_lower_y_values[i], _series_identity_upper_y_values[i])
@@ -511,8 +526,8 @@ def plot_multiple_raster_plot(filter_epochs_df: pd.DataFrame, filter_epoch_spike
     
     params = RasterPlotParams()
     # params.build_neurons_color_data(fragile_linear_neuron_IDXs=fragile_linear_neuron_IDXs) # normal coloring of neurons
-
     params.build_neurons_color_data(fragile_linear_neuron_IDXs=fragile_linear_neuron_IDXs, neuron_colors_list=unit_colors_list)
+    
     manager = UnitSortOrderManager(neuron_ids=neuron_ids, fragile_linear_neuron_IDXs=fragile_linear_neuron_IDXs, n_cells=n_cells, unit_sort_order=unit_sort_order, params=params)
     manager.update_series_identity_y_values()
     raster_plot_manager = RasterScatterPlotManager(unit_sort_manager=manager)
