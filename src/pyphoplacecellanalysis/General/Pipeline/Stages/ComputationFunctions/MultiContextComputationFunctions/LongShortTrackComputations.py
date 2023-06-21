@@ -45,7 +45,8 @@ from neuropy.core.session.dataSession import DataSession # for `pipeline_complet
 
 @define(slots=False, eq=False)
 class TrackExclusivePartitionSubset:
-	is_track_exclusive_pf: np.ndarray
+    """ holds information about a subset of aclus, e.g. that contain long-only placefields, etc. """
+	is_aclu_pf_track_exclusive: np.ndarray
 	track_exclusive_aclus: np.ndarray
 	track_exclusive_df: pd.DataFrame
 
