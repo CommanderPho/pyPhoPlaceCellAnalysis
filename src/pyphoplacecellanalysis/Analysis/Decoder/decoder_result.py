@@ -1256,7 +1256,7 @@ class DiagnosticDistanceMetricFigure:
         display(slider)
 
 
-@function_attributes(short_name='plot_kourosh_activity_style_figure', tags=['plot', 'figure', 'heatmaps', 'matplotlib','pyqtgraph'], input_requires=[], output_provides=[], uses=['plot_raster_plot','visualize_heatmap_pyqtgraph','visualize_heatmap','CustomLinearRegionItem'], used_by=[], creation_date='2023-04-04 09:03')
+@function_attributes(short_name='plot_kourosh_activity_style_figure', tags=['plot', 'figure', 'heatmaps','pyqtgraph'], input_requires=[], output_provides=[], uses=['plot_raster_plot','visualize_heatmap_pyqtgraph','CustomLinearRegionItem'], used_by=[], creation_date='2023-04-04 09:03')
 def plot_kourosh_activity_style_figure(results_obj: LeaveOneOutDecodingAnalysisResult, long_session, shared_aclus: np.ndarray, epoch_idx: int, callout_epoch_IDXs: list, skip_rendering_callouts:bool = False):
     """ 2023-04-03 - plots a Kourosh-style figure that shows a top panel which displays the decoded posteriors and a raster plot of spikes for a single epoch 
     ## Requirements:
@@ -1285,16 +1285,11 @@ def plot_kourosh_activity_style_figure(results_obj: LeaveOneOutDecodingAnalysisR
         # app, win, plots, plots_data = plot_kourosh_activity_style_figure(long_results_obj, long_session, shared_aclus, epoch_idx=5, callout_epoch_IDXs=[0,1,2,3], skip_rendering_callouts=True)
         app, win, plots, plots_data = plot_kourosh_activity_style_figure(long_results_obj, long_session, pyramidal_only_shared_aclus, epoch_idx=5, callout_epoch_IDXs=[0,1,2,3], skip_rendering_callouts=False)
 
-        
-    NOTE: initially uses `visualize_heatmap_pyqtgraph` to plot the main posterior and raster in a reusable pyqtgraph-window.
-        In the subfunction `build_callout_subgraphic` tt then uses the MATPLOTLIB-based `visualize_heatmap` to add the posteriors to the existing window.
-        
     """
     from pyphoplacecellanalysis.Pho2D.matplotlib.visualize_heatmap import visualize_heatmap, visualize_heatmap_pyqtgraph # used in `plot_kourosh_activity_style_figure`
     from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.SpikeRasters import plot_raster_plot # used in `plot_kourosh_activity_style_figure`
     import pyphoplacecellanalysis.External.pyqtgraph as pg # used in `plot_kourosh_activity_style_figure`
     from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.GraphicsObjects.CustomLinearRegionItem import CustomLinearRegionItem # used in `plot_kourosh_activity_style_figure`
-    from pyphoplacecellanalysis.Pho2D.matplotlib.CustomMatplotlibWidget import CustomMatplotlibWidget # used in `plot_kourosh_activity_style_figure` # for embedded matplotlib figure
 
     ## Add linear regions to indicate the time bins
     def update_linear_regions(plots, plots_data):
@@ -1343,35 +1338,17 @@ def plot_kourosh_activity_style_figure(results_obj: LeaveOneOutDecodingAnalysisR
     active_epoch = results_obj.active_filter_epochs[epoch_idx]
     # Get a conversion between the epoch indicies and the flat indicies
     flat_bin_indicies = results_obj.split_by_epoch_reverse_flattened_time_bin_indicies[epoch_idx]
-    # # print(f'long_results_obj.flat_all_epochs_decoded_epoch_time_bins.shape: {np.shape(long_results_obj.flat_all_epochs_decoded_epoch_time_bins)}') # (97, 5815)
-    # flat_time_bin_center_times = np.array([results_obj.flat_all_epochs_decoded_epoch_time_bins[0, a_flat_time_bin_idx] for a_flat_time_bin_idx in flat_bin_indicies]) # flat_time_bin_times: [43.415 43.435 43.455 43.475 43.495]
-    # print(f'flat_time_bin_times: {flat_time_bin_center_times}')
-    # # the bins are centered, so we need to offset them (transfrom them into start/end)
-    # time_step = np.diff(flat_time_bin_center_times).mean()
-    # half_time_step = time_step / 2.0
-    # start_t = flat_time_bin_center_times - half_time_step
-    # end_t = flat_time_bin_center_times + half_time_step
-    # active_epoch_n_timebins = len(flat_time_bin_center_times) # get the number of timebins in the current epoch
-
+    
     ## New Timebin method:
     # assert len(results_obj.all_included_filter_epochs_decoder_result.time_bin_containers) == len(results_obj.all_included_filter_epochs_decoder_result.p_x_given_n_list) # num epochs
     active_epoch_time_bin_container = results_obj.all_included_filter_epochs_decoder_result.time_bin_containers[epoch_idx]
     active_epoch_time_bin_start_stops = active_epoch_time_bin_container.edges[build_pairwise_indicies(np.arange(active_epoch_time_bin_container.edge_info.num_bins))] # .shape # (4153, 2)
-    # active_epoch_time_bin_start_stops: array([[45.367, 45.392],
-    #    [45.392, 45.417],
-    #    [45.417, 45.442],
-    #    [45.442, 45.467],
-    #    [45.467, 45.492]]) # shape: (5, 2)
+    # active_epoch_time_bin_start_stops # shape: (5, 2)
     assert np.shape(active_epoch_time_bin_start_stops)[1] == 2
     start_t = active_epoch_time_bin_start_stops[:,0] # shape: (5,)
     end_t = active_epoch_time_bin_start_stops[:,1] # shape: (5,)
     active_epoch_n_timebins = np.shape(active_epoch_time_bin_start_stops)[0] # get the number of timebins in the current epoch
     print(f'{active_epoch_n_timebins = }')
-
-    ## Alternative Method: reverse-determine the epoch from the timebin provided:
-    # example_timebin_containing_Epoch_IDX = long_results_obj.all_epochs_reverse_flat_epoch_indicies_array[callout_timebin_IDX]
-    # example_epoch = long_results_obj.active_filter_epochs[example_timebin_containing_Epoch_IDX]
-    # print(f'{callout_timebin_IDX = }, epoch: {example_timebin_containing_Epoch_IDX = }')
 
     ## Render Top (Epoch-level) panel:
     _active_epoch_spikes_df = deepcopy(long_session.spikes_df)
@@ -1380,8 +1357,7 @@ def plot_kourosh_activity_style_figure(results_obj: LeaveOneOutDecodingAnalysisR
     _active_epoch_spikes_df = _active_epoch_spikes_df[_active_epoch_spikes_df['aclu'].isin(shared_aclus)] ## restrict to only the shared aclus for both short and long
     _active_epoch_spikes_df, _temp_neuron_id_to_new_IDX_map = _active_epoch_spikes_df.spikes.rebuild_fragile_linear_neuron_IDXs() # I think this must be done prior to restricting to the current epoch, but after restricting to the shared_aclus
     _active_epoch_spikes_df = _active_epoch_spikes_df.spikes.time_sliced(*active_epoch[0]) # restrict to the active epoch
-    # _temp_active_spikes_df = _temp_active_spikes_df[_temp_active_spikes_df['aclu'].isin(_temp_active_neuron_aclus)] ## restrict to active neurons only	
-    
+   
     print(f'{len(shared_aclus) = }')
 
     ## Create the raster plot:
@@ -1403,14 +1379,7 @@ def plot_kourosh_activity_style_figure(results_obj: LeaveOneOutDecodingAnalysisR
     # plots['root_plot'].setXRange(0, 6)
     # plots['root_plot'].setXDivisions(active_epoch_n_timebins)
 
-    # Manual Method:
-    # for a_bin_start_t in start_t:
-    #     # time_bin_edge_pen_color = pg.mkColor((1.0, 1.0, 1.0, 0.5)) # white with 0.5 alpha
-    #     # time_bin_edge_pen = pg.mkPen(time_bin_edge_pen_color, width=1.5)
-    #     time_bin_edge_pen = 'w'
-    #     plots['root_plot'].addLine(x=a_bin_start_t, pen=time_bin_edge_pen)
-
-
+    
     ## Create the posterior plot for the decoded epoch
     win.nextRow()
     plots.epoch_posterior_plot = win.addPlot()
@@ -1421,18 +1390,11 @@ def plot_kourosh_activity_style_figure(results_obj: LeaveOneOutDecodingAnalysisR
     epoch_posterior_img.setLookupTable(lut)
 
     plots.root_plot.setXRange(*active_epoch[0])
-    # plots.scatter_plot.setXRange(*active_epoch[0])
-    # plots.epoch_posterior_plot.setXRange(*active_epoch[0]) # This does not work for the posterior plot, probably because it's an image, but this plot is aligned correctly anyway
-    # plots.root_plot.setXLink(plots.epoch_posterior_plot) # bind/link the two axes
-
+    
     for a_plot in (plots.epoch_posterior_plot, plots.root_plot):
         # Disable Interactivity
         a_plot.setMouseEnabled(x=False, y=False)
         a_plot.setMenuEnabled(False)
-
-    # ## TODO: disable interactivity for callout plots too:
-    # placefield_axes_list = plots.callouts.placefields
-    # posteriors_axes_list = plots.callouts.posteriors
 
     ## Render the linear regions for each callout:
     plots.linear_regions = []
@@ -1446,44 +1408,6 @@ def plot_kourosh_activity_style_figure(results_obj: LeaveOneOutDecodingAnalysisR
     plots_data.callout_flat_timebin_IDXs = callout_flat_timebin_IDXs
     plots_data.callout_time_bins = [callout_start_t, callout_end_t]
     print(f'plots_data.callout_time_bins: {plots_data.callout_time_bins}') # time_step: {time_step}, 
-
-    def build_callout_subgraphic(callout_timebin_IDX = 6, axs=None):
-        """ Builds a "callout" graphic for a single timebin within the epoch in question. 
-
-        Captures: 
-            timebins_p_x_given_n
-            long_results_obj (for long_results_obj.original_1D_decoder.pf.ratemap.unit_max_tuning_curves)
-            timebins_active_neuron_IDXs
-            timebins_active_aclus
-            
-        """
-        # 1. Plot decoded posterior for this time bin
-        # len(long_results_obj.all_included_filter_epochs_decoder_result.p_x_given_n_list)
-        curr_timebin_all_included_p_x_given_n = timebins_p_x_given_n[:, callout_timebin_IDX] 
-        # curr_timebin_all_included_p_x_given_n #.shape # (63, ) (n_x_bins, )
-
-        if axs is None:
-            fig, axs = plt.subplots(2, 1, sharex=True, figsize=(20, 8)) # nrows, ncolumns
-        else:
-            # use the existing axes:
-            assert len(axs) == 2
-
-        fig, ax, im = visualize_heatmap(curr_timebin_all_included_p_x_given_n, title=f"decoded posterior for example_timebin_IDX: {callout_timebin_IDX}", show_colorbar=False, ax=axs[0])
-        # 2. Get cells that were active during this time bin that contributed to this posterior, and get their placefields
-        _temp_active_neuron_IDXs = timebins_active_neuron_IDXs[callout_timebin_IDX]
-        _temp_active_neuron_aclus = timebins_active_aclus[callout_timebin_IDX]
-        _temp_active_pfs = results_obj.original_1D_decoder.pf.ratemap.unit_max_tuning_curves[_temp_active_neuron_IDXs,:].copy() 
-
-        # 3. Plot their placefields as a column
-        ## Plot a stacked heatmap for all place cells, with each row being a different cell:
-        fig, ax, im = visualize_heatmap(_temp_active_pfs, title=f"1D Placefields for active aclus during example_timebin_IDX: {callout_timebin_IDX}", show_colorbar=False, ax=axs[1])
-
-        # Set y-ticks to show the unit IDs
-        ax.set_yticks(np.arange(len(_temp_active_neuron_aclus)))
-        ax.set_yticklabels(_temp_active_neuron_aclus)
-        # Rotate the y-tick labels and set their alignment
-        plt.xticks(rotation=45, ha="right")
-        plt.setp(ax.get_yticklabels(), fontsize=10)
 
     def build_callout_subgraphic_pyqtgraph(callout_timebin_IDX = 6, axs=None):
         """ Builds a "callout" graphic for a single timebin within the epoch in question. 
@@ -1543,50 +1467,18 @@ def plot_kourosh_activity_style_figure(results_obj: LeaveOneOutDecodingAnalysisR
     if not skip_rendering_callouts:
         # Plot callout subgraphics in columns below:
         win.nextRow()
-
-        ## CustomMatplotlibWidget:
-        # plots.mw = CustomMatplotlibWidget(size=(15,15), dpi=72, constrained_layout=True, scrollable_figure=False, scrollAreaContents_MinimumHeight=200)
-        # subplot = plots.mw.getFigure().add_subplot(2, active_epoch_n_timebins, 1)
-
-        # PyQtGraph Version:
-        # top_axis_indicies = np.arange(active_epoch_n_timebins)+1 # must be 1-based, not zero based
-        # bottom_axis_indicies = top_axis_indicies + active_epoch_n_timebins
-
-        # MATPLOTLIB version:
-        # top_axis_indicies = np.arange(active_epoch_n_timebins)+1 # must be 1-based, not zero based
-        # bottom_axis_indicies = top_axis_indicies + active_epoch_n_timebins
-        # top_axis_objs = [plots.mw.getFigure().add_subplot(2, active_epoch_n_timebins, an_idx) for an_idx in top_axis_indicies]
-        # bottom_axis_objs = [plots.mw.getFigure().add_subplot(2, active_epoch_n_timebins, an_idx) for an_idx in bottom_axis_indicies]
-        
-        # win.addItem(plots.mw)
-        # subplot.plot(x,y)
-        # mw.draw()
-
-        # callout_glw = pg.GraphicsLayoutWidget(show=True, title="test")
         callout_glw = win.addLayout()
         row_start_idx = 0
 
         plots.callouts = RenderPlots('callouts', layout=callout_glw, posteriors=[], placefields=[])
         
-        # callout_glw = win
-        # row_start_idx = 2
-
         ## Build callout subgraphics:
-        # for top_ax, bottom_ax, a_callout_timebin_IDX in zip(top_axis_objs, bottom_axis_objs, plots_data.callout_flat_timebin_IDXs):
-        # for top_axis_idx, bottom_axis_idx, a_callout_timebin_IDX in zip(top_axis_indicies, top_axis_indicies, plots_data.callout_flat_timebin_IDXs):
         for col_idx, a_callout_timebin_IDX in zip(np.arange(len(plots_data.callout_flat_timebin_IDXs)), plots_data.callout_flat_timebin_IDXs):
-            # print(f'top_axis_idx: {top_axis_idx}, bottom_axis_idx: {bottom_axis_idx}')
-            # top_ax = mw.getFigure().add_subplot(2, active_epoch_n_timebins, top_axis_idx)
-            # bottom_ax = mw.getFigure().add_subplot(2, active_epoch_n_timebins, bottom_axis_idx)
             top_ax = callout_glw.addPlot(row=row_start_idx, col=col_idx)
             bottom_ax = callout_glw.addPlot(row=row_start_idx+1, col=col_idx)
             curr_callout_axs = build_callout_subgraphic_pyqtgraph(callout_timebin_IDX=a_callout_timebin_IDX, axs=[top_ax, bottom_ax])
             plots.callouts.posteriors.append(top_ax)
             plots.callouts.placefields.append(bottom_ax)
-
-        # win.addItem(callout_glw)
-        # plots.mw.show()
-        # plots.mw.draw()
 
     return app, win, plots, plots_data
     
