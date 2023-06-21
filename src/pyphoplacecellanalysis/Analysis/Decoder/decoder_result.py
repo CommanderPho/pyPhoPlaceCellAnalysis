@@ -1285,6 +1285,10 @@ def plot_kourosh_activity_style_figure(results_obj: LeaveOneOutDecodingAnalysisR
         # app, win, plots, plots_data = plot_kourosh_activity_style_figure(long_results_obj, long_session, shared_aclus, epoch_idx=5, callout_epoch_IDXs=[0,1,2,3], skip_rendering_callouts=True)
         app, win, plots, plots_data = plot_kourosh_activity_style_figure(long_results_obj, long_session, pyramidal_only_shared_aclus, epoch_idx=5, callout_epoch_IDXs=[0,1,2,3], skip_rendering_callouts=False)
 
+        
+    NOTE: initially uses `visualize_heatmap_pyqtgraph` to plot the main posterior and raster in a reusable pyqtgraph-window.
+        In the subfunction `build_callout_subgraphic` tt then uses the MATPLOTLIB-based `visualize_heatmap` to add the posteriors to the existing window.
+        
     """
     from pyphoplacecellanalysis.Pho2D.matplotlib.visualize_heatmap import visualize_heatmap, visualize_heatmap_pyqtgraph # used in `plot_kourosh_activity_style_figure`
     from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.SpikeRasters import plot_raster_plot # used in `plot_kourosh_activity_style_figure`
@@ -1412,7 +1416,7 @@ def plot_kourosh_activity_style_figure(results_obj: LeaveOneOutDecodingAnalysisR
     plots.epoch_posterior_plot = win.addPlot()
     active_epoch_p_x_given_n = results_obj.all_included_filter_epochs_decoder_result.p_x_given_n_list[epoch_idx] # all decoded posteriors for curent epoch
     # active_epoch_p_x_given_n.shape # (63, 13)
-    epoch_posterior_win, epoch_posterior_img = visualize_heatmap_pyqtgraph(active_epoch_p_x_given_n.T, win=plots.epoch_posterior_plot, title=f"Epoch[{epoch_idx}]")
+    epoch_posterior_win, epoch_posterior_img = visualize_heatmap_pyqtgraph(active_epoch_p_x_given_n, win=plots.epoch_posterior_plot, title=f"Epoch[{epoch_idx}]") # .T
     # Apply the colormap
     epoch_posterior_img.setLookupTable(lut)
 
