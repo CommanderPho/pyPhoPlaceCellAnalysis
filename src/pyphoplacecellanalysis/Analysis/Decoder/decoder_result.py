@@ -30,7 +30,7 @@ from pyphocorehelpers.indexing_helpers import find_neighbours
 from pyphocorehelpers.function_helpers import function_attributes
 from pyphocorehelpers.indexing_helpers import safe_np_vstack # for `_new_compute_surprise`
 
-from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BayesianPlacemapPositionDecoder # perform_leave_one_aclu_out_decoding_analysis
+from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BayesianPlacemapPositionDecoder, DecodedFilterEpochsResult # perform_leave_one_aclu_out_decoding_analysis
 
 
 # Plotting ___________________________________________________________________________________________________________ #
@@ -573,6 +573,22 @@ class LeaveOneOutDecodingAnalysisResult:
         # Group by 'epoch_IDX' and compute means of all columns
         self.result_df_grouped = self.result_df.groupby('epoch_IDX').mean()
 
+    @classmethod
+    def get_results_subset(cls, epochs_df: pd.DataFrame, epochs_decoder_result: DecodedFilterEpochsResult, included_epoch_indicies: Union[list, np.ndarray]):
+        """ Subsets the passed epochs_df and epochs_decoder_result by the included_epoch_indicies
+        
+        Usage:
+            subset_filter_epochs, subset = curr_results_obj.get_subset_by_epoch(epochs_df=curr_results_obj.active_filter_epochs.to_dataframe(),
+                                            epochs_decoder_result=curr_results_obj.all_included_filter_epochs_decoder_result,
+                                            included_epoch_indicies=good_epoch_indicies_L)
+
+        """
+        # Filter the active filter epochs:
+        is_included_in_subset = np.isin(epochs_df.index, included_epoch_indicies)
+        subset_filter_epochs = epochs_df[is_included_in_subset]
+        subset = epochs_decoder_result.filtered_by_epochs(included_epoch_indicies)
+        return subset_filter_epochs, subset
+    
 
     # def __attrs_post_init__(self):
     #     self.z = self.x + self.y
