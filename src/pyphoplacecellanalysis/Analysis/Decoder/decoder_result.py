@@ -1,5 +1,6 @@
 from copy import deepcopy
 from dataclasses import dataclass
+from typing import Union
 from attrs import define, field, Factory # used for several things
 import matplotlib.pyplot as plt
 from matplotlib import cm # used for plot_kourosh_activity_style_figure version too to get a good colormap 
@@ -578,11 +579,14 @@ class LeaveOneOutDecodingAnalysisResult:
         """ Subsets the passed epochs_df and epochs_decoder_result by the included_epoch_indicies
         
         Usage:
-            subset_filter_epochs, subset = curr_results_obj.get_subset_by_epoch(epochs_df=curr_results_obj.active_filter_epochs.to_dataframe(),
+            subset_filter_epochs, subset = LeaveOneOutDecodingAnalysisResult.get_results_subset(epochs_df=curr_results_obj.active_filter_epochs.to_dataframe(),
                                             epochs_decoder_result=curr_results_obj.all_included_filter_epochs_decoder_result,
                                             included_epoch_indicies=good_epoch_indicies_L)
 
         """
+        if not isinstance(included_epoch_indicies, np.ndarray):
+            included_epoch_indicies = np.array(included_epoch_indicies)
+            
         # Filter the active filter epochs:
         is_included_in_subset = np.isin(epochs_df.index, included_epoch_indicies)
         subset_filter_epochs = epochs_df[is_included_in_subset]

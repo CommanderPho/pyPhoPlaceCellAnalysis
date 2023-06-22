@@ -413,7 +413,7 @@ class DecodedFilterEpochsResult(object):
     def filtered_by_epochs(self, included_epoch_indicies):
         """Returns a copy of itself with the fields with the n_epochs related metadata sliced by the included_epoch_indicies."""
         subset = deepcopy(self)
-        
+        original_num_filter_epochs = subset.num_filter_epochs
         subset.most_likely_positions_list = [subset.most_likely_positions_list[i] for i in included_epoch_indicies]
         subset.p_x_given_n_list = [subset.p_x_given_n_list[i] for i in included_epoch_indicies]
         subset.marginal_x_list = [subset.marginal_x_list[i] for i in included_epoch_indicies]
@@ -424,8 +424,10 @@ class DecodedFilterEpochsResult(object):
         subset.time_bin_containers = [subset.time_bin_containers[i] for i in included_epoch_indicies]
         subset.num_filter_epochs = len(included_epoch_indicies)
         subset.time_bin_edges = [subset.time_bin_edges[i] for i in included_epoch_indicies]
-        subset.epoch_description_list = [subset.epoch_description_list[i] for i in included_epoch_indicies]
-        
+        if len(subset.epoch_description_list) == original_num_filter_epochs:
+            # sometimes epoch_description_list is empty and so it doesn't need to be subsetted.
+            subset.epoch_description_list = [subset.epoch_description_list[i] for i in included_epoch_indicies]
+            
         # Only `decoding_time_bin_size` is unchanged
         return subset
 # ==================================================================================================================== #
