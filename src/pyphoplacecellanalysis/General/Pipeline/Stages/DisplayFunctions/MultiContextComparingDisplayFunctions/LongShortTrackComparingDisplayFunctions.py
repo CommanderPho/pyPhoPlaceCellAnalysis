@@ -468,7 +468,7 @@ class LongShortTrackComparingDisplayFunctions(AllFunctionEnumeratingMixin, metac
             Usage:
             
             
-            NOTE: this could be made non-global as it does operate on separate epochs independently ('maze1', 'maze2').
+            Option: this relies on the global result `jonathan_firing_rate_analysis_result.neuron_replay_stats_df`, but otherwise it could be made non-global as it does operate on separate epochs independently ('maze1', 'maze2').
 
         """
         from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.LongShortTrackComputations import JonathanFiringRateAnalysisResult
