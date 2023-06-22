@@ -2163,9 +2163,10 @@ def _plot_session_long_short_track_firing_rate_figures(curr_active_pipeline, jon
         plt.suptitle(f'{active_display_context.get_description(separator="/")}')
 
         # add static tiny labels beside each point
-        for i, (x, y, label) in enumerate(zip(x_frs_dict.values(), y_frs_dict.values(), point_hover_labels)):
-            ax.annotate(label, (x, y), textcoords="offset points", xytext=(2,2), ha='left', va='bottom', fontsize=8) # , color=rect.get_facecolor()
-
+        text_kwargs = dict(textcoords="offset points", xytext=(0,0)) # (2,2)
+        texts = [ax.annotate(label, (x, y), ha='left', va='bottom', fontsize=8, **text_kwargs) for i, (x, y, label) in enumerate(zip(x_frs_dict.values(), y_frs_dict.values(), point_hover_labels))]
+        # texts = [ax.text(x, y, label, ha='center', va='center', fontsize=8) for i, (x, y, label) in enumerate(zip(x_frs_dict.values(), y_frs_dict.values(), point_hover_labels))]
+        
         ## get current axes:
         # ax = plt.gca()
 
