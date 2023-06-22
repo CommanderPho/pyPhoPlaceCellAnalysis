@@ -136,7 +136,7 @@ class DefaultDecoderDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Disp
             axs[1].plot(active_time_window_variable, active_most_likely_positions_y, lw=1.0, color='#00ff7f99', alpha=0.6, label='2-step: most likely positions y') # (Num windows x 2)
             
     @function_attributes(short_name='decoded_epoch_slices', tags=['display', 'decoder', 'epoch','slices'], input_requires=[], output_provides=[], uses=['plot_decoded_epoch_slices', '_compute_specific_decoded_epochs', 'DefaultComputationFunctions._perform_specific_epochs_decoding'], used_by=[], creation_date='2023-03-23 15:49')
-    def _display_plot_decoded_epoch_slices(computation_result, active_config, active_context=None, filter_epochs='ripple', **kwargs):
+    def _display_plot_decoded_epoch_slices(computation_result, active_config, active_context=None, filter_epochs='ripple', included_epoch_indicies=None, **kwargs):
         """ renders a plot with the 1D Marginals either (x and y position axes): the computed posterior for the position from the Bayesian decoder and overlays the animal's actual position over the top. 
         
         TODO: This display function is currently atypically implemented as it performs computations as needed.
@@ -161,7 +161,7 @@ class DefaultDecoderDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Disp
         active_decoder = computation_result.computed_data['pf2D_Decoder']
         
         ## Actual plotting portion:
-        out_plot_tuple = plot_decoded_epoch_slices(active_filter_epochs, filter_epochs_decoder_result, global_pos_df=computation_result.sess.position.to_dataframe(), xbin=active_decoder.xbin,
+        out_plot_tuple = plot_decoded_epoch_slices(active_filter_epochs, filter_epochs_decoder_result, global_pos_df=computation_result.sess.position.to_dataframe(), xbin=active_decoder.xbin, included_epoch_indicies=included_epoch_indicies,
                                                                 **overriding_dict_with(lhs_dict={'name':default_figure_name, 'debug_test_max_num_slices':256, 'enable_flat_line_drawing':False, 'debug_print': False}, **kwargs))
         params, plots_data, plots, ui = out_plot_tuple
         
@@ -539,12 +539,12 @@ def _subfn_update_decoded_epoch_slices(params, plots_data, plots, ui, debug_prin
 
 
 @function_attributes(short_name=None, tags=['epoch','slices','decoder','figure'], input_requires=[], output_provides=[], uses=['stacked_epoch_slices_matplotlib_build_view'], used_by=['_display_plot_decoded_epoch_slices'], creation_date='2023-05-08 16:31', related_items=[])
-def plot_decoded_epoch_slices(filter_epochs, filter_epochs_decoder_result, global_pos_df, variable_name:str='lin_pos', xbin=None, enable_flat_line_drawing=False, debug_test_max_num_slices=20, name='stacked_epoch_slices_matplotlib_subplots', debug_print=False):
+def plot_decoded_epoch_slices(filter_epochs, filter_epochs_decoder_result, global_pos_df, included_epoch_indicies=None, variable_name:str='lin_pos', xbin=None, enable_flat_line_drawing=False, debug_test_max_num_slices=20, name='stacked_epoch_slices_matplotlib_subplots', debug_print=False):
     """ plots the decoded epoch results in a stacked slices view 
     
     Parameters:
     variable_name: str - the name of the column in the global_pos_df that contains the variable to plot. 
-
+    included_epoch_indicies: Optional[np.ndarray] - an optional list of epoch indicies to plot instead of all of them in filter_epochs. Uses `.filtered_by_epochs(...)` to filter the filter_epochs_decoder_result.
 
     Usage:    
         from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import plot_decoded_epoch_slices
@@ -590,6 +590,16 @@ def plot_decoded_epoch_slices(filter_epochs, filter_epochs_decoder_result, globa
     else:
         raise NotImplementedError
     
+    if included_epoch_indicies is not None:
+        # Allow specifying a subset of the epochs to be plotted
+        if not isinstance(included_epoch_indicies, np.ndarray):
+            included_epoch_indicies = np.array(included_epoch_indicies)
+            
+        # Filter the active filter epochs:
+        is_included_in_subset = np.isin(epochs_df.index, included_epoch_indicies)
+        epochs_df = epochs_df[is_included_in_subset]
+        filter_epochs_decoder_result = filter_epochs_decoder_result.filtered_by_epochs(included_epoch_indicies)
+
     # if 'label' not in epochs_df.columns:
     epochs_df['label'] = epochs_df.index.to_numpy() # integer ripple indexing
     epoch_slices = epochs_df[['start', 'stop']].to_numpy()
