@@ -391,7 +391,9 @@ def _plot_empty_raster_plot_frame(scatter_app_name='pho_test', defer_show=False)
     app = pg.mkQApp(scatter_app_name)
     win = pg.GraphicsLayoutWidget(show=(not defer_show), title=scatter_app_name)
     win.resize(1000,600)
-    win.setWindowTitle(f'pyqtgraph: Raster Spikes: {scatter_app_name}')
+    # window_title_prefix = 'pyqtgraph: Raster Spikes: '
+    window_title_prefix = '' # no prefix before the provided title
+    win.setWindowTitle(f'{window_title_prefix}{scatter_app_name}')
 
     # Enable antialiasing for prettier plots
     pg.setConfigOptions(antialias=True)
