@@ -489,7 +489,7 @@ def plot_raster_plot(spikes_df: pd.DataFrame, included_neuron_ids, unit_sort_ord
 
 
 
-@function_attributes(short_name=None, tags=['pyqtgraph','raster','2D'], input_requires=[], output_provides=[], uses=['_plot_empty_raster_plot_frame'], used_by=[], creation_date='2023-06-16 20:45', related_items=['plot_raster_plot'])
+@function_attributes(short_name=None, tags=['pyqtgraph','raster','2D'], input_requires=[], output_provides=[], uses=['_prepare_spikes_df_from_filter_epochs', '_plot_empty_raster_plot_frame'], used_by=[], creation_date='2023-06-16 20:45', related_items=['plot_raster_plot'])
 def plot_multiple_raster_plot(filter_epochs_df: pd.DataFrame, filter_epoch_spikes_df: pd.DataFrame, included_neuron_ids=None, unit_sort_order=None, unit_colors_list=None, scatter_plot_kwargs=None, epoch_id_key_name='temp_epoch_id', scatter_app_name="Pho Stacked Replays"):
     """ This renders a stack of raster plots
 
@@ -502,12 +502,23 @@ def plot_multiple_raster_plot(filter_epochs_df: pd.DataFrame, filter_epoch_spike
     """
 
     #TODO 2023-06-20 08:59: - [ ] Can potentially reuse `stacked_epoch_slices_view` (the pyqtgraph version)?
+
+    rebuild_spikes_df_anyway = True # if True, `_prepare_spikes_df_from_filter_epochs` is called to rebuild spikes_df given the filter_epochs_df even if it contains the desired column already.
+    if rebuild_spikes_df_anyway:
+        filter_epoch_spikes_df = filter_epoch_spikes_df.copy() # don't modify the original dataframe
+        filter_epochs_df = filter_epochs_df.copy()
+
+    if rebuild_spikes_df_anyway or (epoch_id_key_name not in filter_epoch_spikes_df.columns):
+        # missing epoch_id column in the spikes_df, need to rebuild
+        filter_epoch_spikes_df = _prepare_spikes_df_from_filter_epochs(filter_epoch_spikes_df, filter_epochs=filter_epochs_df, included_neuron_ids=included_neuron_ids, epoch_id_key_name=epoch_id_key_name, debug_print=False) # replay_epoch_id
+
     # ## Create the raster plot for the replay:
     # app, win, plots, plots_data = plot_raster_plot(_active_epoch_spikes_df, shared_aclus, scatter_app_name=f"Raster Epoch[{epoch_idx}]")
     app, win, plots, plots_data = _plot_empty_raster_plot_frame(scatter_app_name=scatter_app_name, defer_show=False)
     # setting plot window background color to white
     win.setBackground('w')
-
+    # win.setForeground('k')
+    
     plots.layout = win.addLayout()
     plots.ax = {}
     plots.scatter_plots = {} # index is the ax
@@ -559,7 +570,7 @@ def plot_multiple_raster_plot(filter_epochs_df: pd.DataFrame, filter_epoch_spike
         # merge the two
         scatter_plot_kwargs = default_scatter_plot_kwargs | scatter_plot_kwargs
 
-    print(f'scatter_plot_kwargs: {scatter_plot_kwargs}')
+    # print(f'scatter_plot_kwargs: {scatter_plot_kwargs}')
 
     ## Build the individual epoch raster plot rows:
     for an_epoch in filter_epochs_df.itertuples():
@@ -594,6 +605,10 @@ def plot_multiple_raster_plot(filter_epochs_df: pd.DataFrame, filter_epoch_spike
         # new_ax.getAxis('bottom').setLabel('t')
         # new_ax.getAxis('right').setLabel(f'Epoch[{an_epoch.label}]: {an_epoch.stop:.2f}')
 
+        # new_ax.getAxis('bottom').setTickSpacing(1.0) # 5.0, 1.0 .setTickSpacing(x=[None], y=[1.0])
+        # new_ax.showGrid(x=False, y=True, alpha=1.0)
+        new_ax.getAxis('bottom').setStyle(showValues=False)
+
         # Disable Interactivity
         new_ax.setMouseEnabled(x=False, y=False)
         new_ax.setMenuEnabled(False)
@@ -603,9 +618,11 @@ def plot_multiple_raster_plot(filter_epochs_df: pd.DataFrame, filter_epoch_spike
 
 
     
-@function_attributes(short_name=None, tags=['spikes_df', 'raster', 'helper',' filter'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-06-19 15:25', related_items=['plot_multiple_raster_plot'])
+@function_attributes(short_name=None, tags=['spikes_df', 'raster', 'helper',' filter'], input_requires=[], output_provides=[], uses=[], used_by=['plot_multiple_raster_plot'], creation_date='2023-06-19 15:25', related_items=['plot_multiple_raster_plot'])
 def _prepare_spikes_df_from_filter_epochs(spikes_df: pd.DataFrame, filter_epochs, included_neuron_ids=None, epoch_id_key_name='temp_epoch_id', no_interval_fill_value=-1, debug_print=False) -> pd.DataFrame:
-    """ Prepares the spikes_df to be plotted for a given set of filter_epochs and included_neuron_ids by restricting to these periods/aclus.
+    """ Prepares the spikes_df to be plotted for a given set of filter_epochs and included_neuron_ids by restricting to these periods/aclus, 
+            - rebuilding the fragile_linear_neuron_IDXs by calling `.rebuild_fragile_linear_neuron_IDXs(...)`
+            - adding an additional column to each spike specifying the epoch it belongs to (`epoch_id_key_name`).
     
     Usage:
         from pyphoplacecellanalysis.General.Mixins.CrossComputationComparisonHelpers import _find_any_context_neurons
@@ -627,17 +644,15 @@ def _prepare_spikes_df_from_filter_epochs(spikes_df: pd.DataFrame, filter_epochs
     else:
         filter_epochs_df = filter_epochs.to_dataframe()
         
-    if debug_print:
-        print(f'filter_epochs: {filter_epochs.epochs.n_epochs}')
         
-
     ## Get the spikes during these epochs to attempt to decode from:
     filter_epoch_spikes_df = deepcopy(spikes_df)
     filter_epochs_df = deepcopy(filter_epochs_df) # copy just to make sure no modifications happen.
         
     if included_neuron_ids is not None:
-        filter_epoch_spikes_df = filter_epoch_spikes_df[filter_epoch_spikes_df['aclu'].isin(included_neuron_ids)] ## restrict to only the shared aclus for both short and long
-        
+        # filter_epoch_spikes_df = filter_epoch_spikes_df[filter_epoch_spikes_df['aclu'].isin(included_neuron_ids)]
+        filter_epoch_spikes_df = filter_epoch_spikes_df.spikes.sliced_by_neuron_id(included_neuron_ids) ## restrict to only the shared aclus for both short and long
+
     filter_epoch_spikes_df, _temp_neuron_id_to_new_IDX_map = filter_epoch_spikes_df.spikes.rebuild_fragile_linear_neuron_IDXs() # I think this must be done prior to restricting to the current epoch, but after restricting to the shared_aclus
 
     ## Add the epoch ids to each spike so we can easily filter on them:
