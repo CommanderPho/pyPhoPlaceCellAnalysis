@@ -1026,7 +1026,7 @@ def _epoch_unit_avg_firing_rates(spikes_df, filter_epochs, included_neuron_ids=N
         for aclu, unit_epoch_spikes_df in zip(included_neuron_ids, epoch_spikes_df.spikes.get_split_by_unit(included_neuron_ids=included_neuron_ids)):
             if aclu not in epoch_avg_firing_rate:
                 epoch_avg_firing_rate[aclu] = []
-            epoch_avg_firing_rate[aclu].append((float(np.shape(unit_epoch_spikes_df)[0]) / (epoch_end - epoch_start)))
+            epoch_avg_firing_rate[aclu].append((float(np.shape(unit_epoch_spikes_df)[0]) / (epoch_end - epoch_start)))  #TODO 2023-06-23 11:52: - [ ] This uses the naive method of computating firing rates (num_spikes/epoch_duration) but this doesn't make sense necissarily as the cell isn't supposed to be firing for the whole epoch.
 
     return epoch_avg_firing_rate, {aclu:np.mean(unit_epoch_avg_frs) for aclu, unit_epoch_avg_frs in epoch_avg_firing_rate.items()}
 
