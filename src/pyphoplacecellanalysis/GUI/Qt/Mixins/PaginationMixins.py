@@ -189,11 +189,19 @@ class PaginatedFigureBaseController:
         """
         if self.params.get('active_identifying_figure_ctx', None) is not None:
             collision_prefix = kwargs.pop('collision_prefix', '_DecodedEpochSlices_plot_test_')
-            active_identifying_ctx = self.params.active_identifying_figure_ctx.adding_context(collision_prefix, **kwargs, page=f'{page_idx+1}of{self.paginator.num_pages}', aclus=f"{included_page_data_indicies}")
+            context_kwargs = kwargs
+            if (self.paginator.num_pages > 1):
+                 # ideally wouldn't include page number unless (self.paginator.num_pages > 1)
+                 context_kwargs['page'] = f'{page_idx+1}of{self.paginator.num_pages}'
+            context_kwargs['aclus'] = f"{included_page_data_indicies}" # BUG: these aren't aclus when plotting epochs or something else.
+            # Build the context:
+            active_identifying_ctx = self.params.active_identifying_figure_ctx
+            if len(context_kwargs) > 0:
+                active_identifying_ctx = active_identifying_ctx.adding_context(collision_prefix, **context_kwargs) 
+
             final_context = active_identifying_ctx # Display/Variable context mode
             active_identifying_ctx_string = final_context.get_description(separator='|') # Get final discription string
             print(f'active_identifying_ctx_string: "{active_identifying_ctx_string}"')
-            # active_figure_save_basename = build_figure_basename_from_display_context(final_context)
             self.update_titles(active_identifying_ctx_string)
         else:
             active_identifying_ctx = None
