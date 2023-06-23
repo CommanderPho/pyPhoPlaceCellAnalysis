@@ -253,6 +253,8 @@ def plot_1D_most_likely_position_comparsions(measured_position_df, time_window_c
                                                         enable_flat_line_drawing=False, debug_print=False)
         fig.show()
             
+        
+    NOTES: `, animated=True` allows blitting to speed up updates in the future with only minor overhead if blitting isn't fully implemented.
             
     """
     with plt.ion():
@@ -263,9 +265,10 @@ def plot_1D_most_likely_position_comparsions(measured_position_df, time_window_c
             # fig = plt.gcf()
         
         # Actual Position Plots (red line):
-        ax.plot(measured_position_df['t'].to_numpy(), measured_position_df[variable_name].to_numpy(), label=f'measured {variable_name}', color='#ff000066', alpha=0.8, marker='+', markersize=4) # Opaque RED # , linestyle='dashed', linewidth=2, color='#ff0000ff'
+        ax.plot(measured_position_df['t'].to_numpy(), measured_position_df[variable_name].to_numpy(), label=f'measured {variable_name}', color='#ff000066', alpha=0.8, marker='+', markersize=4, animated=True) # Opaque RED # , linestyle='dashed', linewidth=2, color='#ff0000ff'
         ax.set_title(variable_name)
        
+        # Posterior distribution heatmap:
         if posterior is not None:
             # Compute extents for imshow:
             main_plot_kwargs = {
@@ -278,15 +281,15 @@ def plot_1D_most_likely_position_comparsions(measured_position_df, time_window_c
             }
                 
             # Posterior distribution heatmaps at each point.
-
             # X
             xmin, xmax, ymin, ymax = (time_window_centers[0], time_window_centers[-1], xbin[0], xbin[-1])           
             x_first_extent = (xmin, xmax, ymin, ymax)
             active_extent = x_first_extent
-            im_posterior_x = ax.imshow(posterior, extent=active_extent, **main_plot_kwargs)
+            im_posterior_x = ax.imshow(posterior, extent=active_extent, animated=True, **main_plot_kwargs)
             ax.set_xlim((xmin, xmax))
             ax.set_ylim((ymin, ymax))
 
+        # Most-likely Estimated Position Plots (grey line):
         if active_most_likely_positions_1D is not None:
             # Most likely position plots:
 
@@ -309,11 +312,11 @@ def plot_1D_most_likely_position_comparsions(measured_position_df, time_window_c
             else:
                 active_time_window_variable = time_window_centers
             
-            ax.plot(active_time_window_variable, active_most_likely_positions_1D, lw=1.0, color='gray', alpha=0.8, marker='+', markersize=6, label=f'1-step: most likely positions {variable_name}') # (Num windows x 2)
+            ax.plot(active_time_window_variable, active_most_likely_positions_1D, lw=1.0, color='gray', alpha=0.8, marker='+', markersize=6, label=f'1-step: most likely positions {variable_name}', animated=True) # (Num windows x 2)
             # ax.plot(active_time_window_variable, active_most_likely_positions_1D, lw=1.0, color='gray', alpha=0.4, label=f'1-step: most likely positions {variable_name}') # (Num windows x 2)
-            
-            
+        
         return fig, ax
+    
 
 def plot_most_likely_position_comparsions(pho_custom_decoder, position_df, axs=None, show_posterior=True, show_one_step_most_likely_positions_plots=True, enable_flat_line_drawing=True, debug_print=False):
     """ renders a 2D plot in MATPLOTLIB with separate subplots for the (x and y position axes): the computed posterior for the position from the Bayesian decoder and overlays the animal's actual position over the top.
@@ -543,8 +546,8 @@ def plot_decoded_epoch_slices(filter_epochs, filter_epochs_decoder_result, globa
     """ plots the decoded epoch results in a stacked slices view 
     
     Parameters:
-    variable_name: str - the name of the column in the global_pos_df that contains the variable to plot. 
-    included_epoch_indicies: Optional[np.ndarray] - an optional list of epoch indicies to plot instead of all of them in filter_epochs. Uses `.filtered_by_epochs(...)` to filter the filter_epochs_decoder_result.
+        variable_name: str - the name of the column in the global_pos_df that contains the variable to plot. 
+        included_epoch_indicies: Optional[np.ndarray] - an optional list of epoch indicies to plot instead of all of them in filter_epochs. Uses `.filtered_by_epochs(...)` to filter the filter_epochs_decoder_result.
 
     Usage:    
         from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import plot_decoded_epoch_slices
