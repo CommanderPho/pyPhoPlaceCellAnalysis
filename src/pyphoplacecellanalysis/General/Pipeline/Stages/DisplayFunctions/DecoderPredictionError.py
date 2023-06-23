@@ -635,7 +635,7 @@ class RadonTransformPlotData:
 
 
 @function_attributes(short_name=None, tags=['epoch','slices','decoder','figure','paginated','output'], input_requires=[], output_provides=[], uses=['DecodedEpochSlicesPaginatedFigureController'], used_by=[], creation_date='2023-06-02 13:36')
-def plot_decoded_epoch_slices_paginated(curr_active_pipeline, curr_results_obj, display_context, save_figure=True):
+def plot_decoded_epoch_slices_paginated(curr_active_pipeline, curr_results_obj, display_context, included_epoch_indicies=None, save_figure=True):
     """ Plots a `DecodedEpochSlicesPaginatedFigureController`
 
         display_context is kinda mixed up, DecodedEpochSlicesPaginatedFigureController builds its own kind of display context but this isn't the one that we want for the file outputs usually.
@@ -647,6 +647,7 @@ def plot_decoded_epoch_slices_paginated(curr_active_pipeline, curr_results_obj, 
     
     """
     #TODO 2023-06-21 14:58: - [ ] Need to be able to filter down to just a few epochs with a list
+        #TODO 2023-06-23 02:00: - [ ] Added `included_epoch_indicies` filtering of the epochs, but need to use this value to also filter the `epochs_linear_fit_df`, the `curr_results_obj.all_included_filter_epochs_decoder_result` which is used to get `.num_filter_epochs` and `.time_bin_containers[epoch_idx].centers` 
 
     from pyphoplacecellanalysis.Pho2D.stacked_epoch_slices import DecodedEpochSlicesPaginatedFigureController # `plot_decoded_epoch_slices_paginated`
     from neuropy.utils.matplotlib_helpers import add_inner_title # plot_decoded_epoch_slices_paginated
@@ -660,7 +661,7 @@ def plot_decoded_epoch_slices_paginated(curr_active_pipeline, curr_results_obj, 
     
     # active_identifying_session_ctx = curr_active_pipeline.sess.get_context()
     _out_pagination_controller = DecodedEpochSlicesPaginatedFigureController.init_from_decoder_data(curr_results_obj.active_filter_epochs, curr_results_obj.all_included_filter_epochs_decoder_result, 
-        xbin=curr_results_obj.original_1D_decoder.xbin, global_pos_df=global_session.position.df, a_name='TestDecodedEpochSlicesPaginationController', active_context=display_context,  max_subplots_per_page=200) # 10
+        xbin=curr_results_obj.original_1D_decoder.xbin, global_pos_df=global_session.position.df, a_name='TestDecodedEpochSlicesPaginationController', active_context=display_context,  max_subplots_per_page=200, included_epoch_indicies=included_epoch_indicies) # 10
     # _out_pagination_controller
 
     ### 2023-05-30 - Add the radon-transformed linear fits to each epoch to the stacked epoch plots:
@@ -729,7 +730,6 @@ def plot_decoded_epoch_slices_paginated(curr_active_pipeline, curr_results_obj, 
     _out_pagination_controller.on_paginator_control_widget_jump_to_page(0)
 
     # ## 2023-05-31 - Reference Output of matplotlib figure to file, along with building appropriate context.
-    # active_session_figures_out_path = curr_active_pipeline.get_daily_programmatic_session_output_path()
     final_context = _out_pagination_controller.params.active_identifying_figure_ctx | display_context
     # print(f'final_context: {final_context}')
     # active_out_figure_paths = perform_write_to_file(fig, final_context, figures_parent_out_path=active_session_figures_out_path, register_output_file_fn=curr_active_pipeline.register_output_file)
