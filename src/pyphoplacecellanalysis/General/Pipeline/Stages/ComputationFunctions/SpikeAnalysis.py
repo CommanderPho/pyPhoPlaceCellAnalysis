@@ -40,12 +40,10 @@ class SpikeRateTrends:
     inst_fr_signals_list: list[AnalogSignal]
     # a `inst_fr_df` is a df with time bins along the rows and aclu values along the columns in the style of unit_specific_binned_spike_counts
 
-    epoch_agg_inst_fr_list: np.ndarray = field(init=False)
-    cell_agg_inst_fr_list: np.ndarray = field(init=False)
+    epoch_agg_inst_fr_list: np.ndarray = field(init=False) # .shape (n_epochs, n_cells)
+    cell_agg_inst_fr_list: np.ndarray = field(init=False) # .shape (n_cells,)
+    all_agg_inst_fr: float = field(init=False) # the scalar value that results from aggregating over ALL (timebins, epochs, cells)
     
-    # def __attrs_post_init__(self):
-    #     self.epoch_avg_firing_rates_list = neptune.init_project(project=self.project_name, api_token=self.api_token)
-    #     self.run = None
 
     @classmethod
     def init_from_spikes_and_epochs(cls, spikes_df: pd.DataFrame, filter_epochs, included_neuron_ids=None, instantaneous_time_bin_size_seconds=0.02, kernel=GaussianKernel(20*ms)) -> "SpikeRateTrends":
@@ -54,13 +52,13 @@ class SpikeRateTrends:
         n_epochs = len(epoch_inst_fr_df_list)
         assert n_epochs > 0        
         n_cells = epoch_inst_fr_df_list[0].shape[1]
-        epoch_agg_firing_rates_list = np.vstack([a_signal.max(axis=0) for a_signal in _out.inst_fr_signals_list]) # find the peak within each epoch (for all cells) using `.max(...)`
+        epoch_agg_firing_rates_list = np.vstack([a_signal.max(axis=0).magnitude for a_signal in _out.inst_fr_signals_list]) # find the peak within each epoch (for all cells) using `.max(...)`
         assert epoch_agg_firing_rates_list.shape == (n_epochs, n_cells)
         _out.epoch_agg_inst_fr_list = epoch_agg_firing_rates_list # .shape (n_epochs, n_cells)
         cell_agg_firing_rates_list = epoch_agg_firing_rates_list.max(axis=0) # find the peak over all epochs (for all cells) using `.max(...)`
         assert cell_agg_firing_rates_list.shape == (n_cells,)
         _out.cell_agg_inst_fr_list = cell_agg_firing_rates_list # .shape (n_cells,)
-
+        _out.all_agg_inst_fr = cell_agg_firing_rates_list.max() # .magnitude.item() # scalar
         return _out
 
 
