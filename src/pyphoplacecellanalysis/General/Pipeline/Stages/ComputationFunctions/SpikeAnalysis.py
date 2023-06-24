@@ -93,10 +93,9 @@ class SpikeRateTrends:
     @classmethod
     def compute_epochs_unit_avg_inst_firing_rates(cls, spikes_df: pd.DataFrame, filter_epochs, included_neuron_ids=None, instantaneous_time_bin_size_seconds=0.02, kernel=GaussianKernel(20*ms), debug_print=False):
         """Computes the average firing rate for each neuron (unit) in each epoch. 
-        Usage:
+            Usage:
             epoch_inst_fr_df_list, epoch_avg_firing_rates_list = SpikeRateTrends.compute_epochs_unit_avg_inst_firing_rates(spikes_df=filter_epoch_spikes_df_L, filter_epochs=epochs_df_L, included_neuron_ids=EITHER_subset.track_exclusive_aclus, debug_print=True)
         """
-        # instantaneous_time_bin_size_seconds = 0.02 # 20ms
         epoch_inst_fr_df_list = []
         epoch_inst_fr_signal_list = []
         epoch_avg_firing_rates_list = []
@@ -112,26 +111,24 @@ class SpikeRateTrends:
         if debug_print:
             print(f'filter_epochs: {filter_epochs.epochs.n_epochs}')
         
-        # for epoch_start, epoch_end in filter_epochs:
         for epoch_id in np.arange(np.shape(filter_epochs_df)[0]):
             epoch_start = filter_epochs_df.start.values[epoch_id]
             epoch_end = filter_epochs_df.stop.values[epoch_id]
             epoch_spikes_df = spikes_df.spikes.time_sliced(t_start=epoch_start, t_stop=epoch_end)
-            # epoch_spikes_df = filter_epoch_spikes_df[filter_epoch_spikes_df['temp_epoch_id'] == epoch_id]
 
-            # unit_specific_inst_spike_rate_values_df: pd.DataFrame (n_time_bins, n_cells)
-            # unit_specific_inst_spike_rate: AnalogSignal, looks cool but strange type
             unit_specific_inst_spike_rate_values_df, unit_specific_inst_spike_rate_signal, _unit_split_spiketrains = SpikeRateTrends.compute_instantaneous_time_firing_rates(epoch_spikes_df, time_bin_size_seconds=instantaneous_time_bin_size_seconds, kernel=kernel,
                                                                                                                                                                             t_start=epoch_start, t_stop=epoch_end, included_neuron_ids=included_neuron_ids)
             epoch_inst_fr_df_list.append(unit_specific_inst_spike_rate_values_df)
-            epoch_inst_fr_signal_list.append(unit_specific_inst_spike_rate_signal) # IDK if this is worth saving or just redundent data.
+            epoch_inst_fr_signal_list.append(unit_specific_inst_spike_rate_signal)
 
-            # for some reason .max(axis=0) works but .nanmax(axis=0) returns a single scalar result
-            epoch_avg_firing_rates_list.append(unit_specific_inst_spike_rate_signal.max(axis=0))
+            # Compute average firing rate for each neuron
+            unit_avg_firing_rates = np.nanmean(unit_specific_inst_spike_rate_signal.magnitude, axis=0)
+            epoch_avg_firing_rates_list.append(unit_avg_firing_rates)
             
-        epoch_avg_firing_rates_list = np.vstack(epoch_avg_firing_rates_list) # .shape: (n_epochs, n_cells) (2, 39)
+        epoch_avg_firing_rates_list = np.vstack(epoch_avg_firing_rates_list)
 
-        return epoch_inst_fr_df_list, epoch_inst_fr_signal_list, epoch_avg_firing_rates_list #, {aclu:np.mean(unit_epoch_avg_frs) for aclu, unit_epoch_avg_frs in epoch_avg_firing_rate.items()}
+        return epoch_inst_fr_df_list, epoch_inst_fr_signal_list, epoch_avg_firing_rates_list
+
 
 
 
