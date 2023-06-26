@@ -48,7 +48,7 @@ class SpikeRateTrends:
     
 
     @classmethod
-    def init_from_spikes_and_epochs(cls, spikes_df: pd.DataFrame, filter_epochs, included_neuron_ids=None, instantaneous_time_bin_size_seconds=0.02, kernel=GaussianKernel(20*ms)) -> "SpikeRateTrends":
+    def init_from_spikes_and_epochs(cls, spikes_df: pd.DataFrame, filter_epochs, included_neuron_ids=None, instantaneous_time_bin_size_seconds=0.01, kernel=GaussianKernel(10*ms)) -> "SpikeRateTrends":
         epoch_inst_fr_df_list, epoch_inst_fr_signal_list, epoch_agg_firing_rates_list = cls.compute_epochs_unit_avg_inst_firing_rates(spikes_df=spikes_df, filter_epochs=filter_epochs, included_neuron_ids=included_neuron_ids, instantaneous_time_bin_size_seconds=instantaneous_time_bin_size_seconds, kernel=kernel)
         _out = cls(inst_fr_df_list=epoch_inst_fr_df_list, inst_fr_signals_list=epoch_inst_fr_signal_list)
         n_epochs = len(epoch_inst_fr_df_list)
@@ -76,14 +76,28 @@ class SpikeRateTrends:
 
     @classmethod
     def compute_instantaneous_time_firing_rates(cls, active_spikes_df, time_bin_size_seconds=0.5, kernel=GaussianKernel(200*ms), t_start=0.0, t_stop=1000.0, included_neuron_ids=None):
+        """ I think the error is actually occuring when: `time_bin_size_seconds > (t_stop - t_start)` """
+        is_smaller_than_single_bin = (time_bin_size_seconds > (t_stop - t_start))
+        assert not is_smaller_than_single_bin, f"ERROR: time_bin_size_seconds ({time_bin_size_seconds}) > (t_stop - t_start) ({t_stop - t_start}). Reduce the bin size or exclude this epoch."
         
         if included_neuron_ids is None:
             included_neuron_ids = np.unique(active_spikes_df.aclu)
         # unit_split_spiketrains = [SpikeTrain(t_start=computation_result.sess.t_start, t_stop=computation_result.sess.t_stop, times=spiketrain_times, units=s) for spiketrain_times in computation_result.sess.spikes_df.spikes.time_sliced(t_start=computation_result.sess.t_start, t_stop=computation_result.sess.t_stop).spikes.get_unit_spiketrains()]
         unit_split_spiketrains = [SpikeTrain(t_start=t_start, t_stop=t_stop, times=spiketrain_times, units=s) for spiketrain_times in active_spikes_df.spikes.time_sliced(t_start=t_start, t_stop=t_stop).spikes.get_unit_spiketrains(included_neuron_ids=included_neuron_ids)]
         # len(unit_split_spiketrains) # 52
-        # inst_rate = instantaneous_rate(unit_split_spiketrains, sampling_period=50*ms, kernel=GaussianKernel(200*ms))
-        inst_rate = instantaneous_rate(unit_split_spiketrains, sampling_period=time_bin_size_seconds*s, kernel=kernel)
+        # is_spiketrain_empty = [np.size(spiketrain) == 0 for spiketrain in unit_split_spiketrains]
+        # neo.core.spiketrain.SpikeTrain
+        # rate : neo.AnalogSignal
+        #         2D matrix that contains the rate estimation in unit hertz (Hz) of shape
+        #         ``(time, len(spiketrains))`` or ``(time, 1)`` in case of a single
+        #         input spiketrain. `rate.times` contains the time axis of the rate
+        #         estimate: the unit of this property is the same as the resolution that
+        #         is given via the argument `sampling_period` to the function.
+
+        # elephant.statistics.instantaneous_rate
+
+        inst_rate = instantaneous_rate(unit_split_spiketrains, sampling_period=time_bin_size_seconds*s, kernel=kernel) # ValueError: `bins` must be positive, when an integer
+        # AnalogSignal
         # print(type(inst_rate), f"of shape {inst_rate.shape}: {inst_rate.shape[0]} samples, {inst_rate.shape[1]} channel")
         # print('sampling rate:', inst_rate.sampling_rate)
         # print('times (first 10 samples): ', inst_rate.times[:10])
