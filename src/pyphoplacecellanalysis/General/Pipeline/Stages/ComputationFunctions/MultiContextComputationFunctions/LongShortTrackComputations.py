@@ -947,18 +947,6 @@ def _long_short_decoding_analysis_from_decoders(long_one_step_decoder_1D, short_
 
     leave_one_out_decoding_analysis_obj = LeaveOneOutDecodingAnalysis(long_decoder, short_decoder, long_replays, short_replays, global_replays, long_shared_aclus_only_decoder, short_shared_aclus_only_decoder, shared_aclus, long_short_pf_neurons_diff, n_neurons, long_results_obj, short_results_obj, is_global=True)
 
-    ## Dict mode for result    
-    # owning_pipeline_reference.global_computation_results.computed_data.long_short = {
-    #     'leave_one_out_decoding_analysis': {
-    #             'long_decoder': long_decoder,  'short_decoder': short_decoder, 
-    #             'long_replays': long_replays,  'short_replays': short_replays,  'global_replays': global_replays,
-    #             'long_shared_aclus_only_decoder': long_shared_aclus_only_decoder,  'short_shared_aclus_only_decoder': short_shared_aclus_only_decoder, 
-    #             'shared_aclus': shared_aclus,  'long_shared_aclus_only_decoder': long_shared_aclus_only_decoder,  'short_shared_aclus_only_decoder': short_shared_aclus_only_decoder,  'long_short_pf_neurons_diff': long_short_pf_neurons_diff, 
-    #             'n_neurons': n_neurons,
-    #             'long_results_obj': long_results_obj,  'short_results_obj': short_results_obj
-    #     }
-    # } # end long_short
-
     return leave_one_out_decoding_analysis_obj
 
 
