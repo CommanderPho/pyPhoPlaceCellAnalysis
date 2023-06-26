@@ -2161,7 +2161,7 @@ def _plot_session_long_short_track_firing_rate_figures(curr_active_pipeline, jon
         plt.title('Computed track_replay|track_laps firing rate')
         plt.suptitle(f'{active_display_context.get_description(separator="/")}')
 
-        # add static tiny labels beside each point
+        # add static tiny labels for the neuron_id beside each data point
         text_kwargs = dict(textcoords="offset points", xytext=(0,0)) # (2,2)
         texts = [ax.annotate(label, (x, y), ha='left', va='bottom', fontsize=8, **text_kwargs) for i, (x, y, label) in enumerate(zip(x_frs_dict.values(), y_frs_dict.values(), point_hover_labels))]
         # texts = [ax.text(x, y, label, ha='center', va='center', fontsize=8) for i, (x, y, label) in enumerate(zip(x_frs_dict.values(), y_frs_dict.values(), point_hover_labels))]
