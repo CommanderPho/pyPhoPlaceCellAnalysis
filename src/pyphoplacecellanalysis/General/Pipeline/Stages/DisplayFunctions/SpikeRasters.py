@@ -667,66 +667,6 @@ def _prepare_spikes_df_from_filter_epochs(spikes_df: pd.DataFrame, filter_epochs
     return filter_epoch_spikes_df
 
 
-def _find_example_epochs(spikes_df: pd.DataFrame, filter_epochs, exclusive_aclus, included_neuron_ids=None):
-    """ aims to find epochs for use as examples in Figure 1:
-        1. Contain spikes from aclus that are exclusive to one of the two tracks (either short or long)
-        2. Are labeled as "good replays" by my user annotations
-        
-        Adds: 'contains_one_exclusive_aclu' column to filter_epochs_df
-        
-        Usage:
-            from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.SpikeRasters import _find_example_epochs
-            # included_neuron_ids = deepcopy(exclusive_aclus)
-            # included_neuron_ids = None
-            included_neuron_ids = EITHER_subset.track_exclusive_aclus
-            spikes_df: pd.DataFrame = deepcopy(curr_active_pipeline.sess.spikes_df).spikes.sliced_by_neuron_type('pyr')
-            # filter_epochs = deepcopy(curr_active_pipeline.sess.replay)
-            # spikes_df = deepcopy(long_results_obj.spikes_df) # LeaveOneOutDecodingAnalysisResult
-            # spikes_df[np.isin(spikes_df.aclu, included_neuron_ids)]
-            filter_epochs = deepcopy(long_results_obj.active_filter_epochs)
-
-            filter_epoch_spikes_df, filter_epochs_df = _find_example_epochs(spikes_df, filter_epochs, EITHER_subset.track_exclusive_aclus, included_neuron_ids=included_neuron_ids)
-
-    """
-
-    if included_neuron_ids is None:
-        included_neuron_ids = spikes_df.spikes.neuron_ids
-
-    if isinstance(filter_epochs, pd.DataFrame):
-        filter_epochs_df = filter_epochs
-    else:
-        filter_epochs_df = filter_epochs.to_dataframe()
-        
-    filter_epoch_spikes_df = deepcopy(spikes_df)
-    filter_epoch_spikes_df = _prepare_spikes_df_from_filter_epochs(filter_epoch_spikes_df, filter_epochs=filter_epochs_df, included_neuron_ids=included_neuron_ids, epoch_id_key_name='replay_epoch_id', debug_print=False) # replay_epoch_id
-
-    unique_replay_epoch_id_values, epoch_split_spikes_df_list = partition(filter_epoch_spikes_df, 'replay_epoch_id')
-    # filter_epoch_spikes_df.groupby('replay_epoch_id')
-    # unique_replay_epoch_id_values # (198,)
-    epoch_spikes_unique_aclus_list = [] # a list of each aclu that fires at least once in the epoch
-    epoch_contains_any_exclusive_aclus = []
-
-    for an_epoch_id, epoch_specific_spikes_df in zip(unique_replay_epoch_id_values, epoch_split_spikes_df_list):
-        # Loop through the epochs
-        # find epochs containing at least one in `exclusive_aclus`:
-        epoch_spikes_unique_aclus = epoch_specific_spikes_df.aclu.unique()
-        epoch_spikes_unique_aclus_list.append(epoch_spikes_unique_aclus)
-        # epoch_spikes_unique_aclus # finds lists of all the active aclus in the given epoch
-        if len(epoch_spikes_unique_aclus) > 0:	
-            epoch_contains_any_exclusive_aclus.append(np.isin(epoch_spikes_unique_aclus, exclusive_aclus).any())
-        else:
-            epoch_contains_any_exclusive_aclus.append(False)
-        # epoch_contains_any_exclusive_aclus # returns True if the epoch contains one ore more spikes from the search list `exclusive_aclus`
-
-    assert len(epoch_contains_any_exclusive_aclus) == np.shape(filter_epochs_df)[0]
-    filter_epochs_df['contains_one_exclusive_aclu'] = epoch_contains_any_exclusive_aclus # adds the appropriate column to the filter_epochs_df
-    filter_epochs_df['active_unique_aclus'] = epoch_spikes_unique_aclus_list
-    return filter_epoch_spikes_df, filter_epochs_df
-
-
-
-
-
 
 
 
