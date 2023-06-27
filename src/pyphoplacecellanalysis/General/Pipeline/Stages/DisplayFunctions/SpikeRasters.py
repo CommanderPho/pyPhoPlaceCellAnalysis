@@ -586,8 +586,7 @@ def plot_multiple_raster_plot(filter_epochs_df: pd.DataFrame, filter_epoch_spike
         # else:
         # add a new row
         new_ax = plots.layout.addPlot(row=int(an_epoch.Index), col=0)
-        spots = Render2DScrollWindowPlotMixin.build_spikes_all_spots_from_df(_active_epoch_spikes_df, raster_plot_manager.config_fragile_linear_neuron_IDX_map)
-        plots_data.all_spots_dict[an_epoch.Index] = spots
+        plots_data.all_spots_dict[an_epoch.Index] = Render2DScrollWindowPlotMixin.build_spikes_all_spots_from_df(_active_epoch_spikes_df, raster_plot_manager.config_fragile_linear_neuron_IDX_map)
 
         scatter_plot = pg.ScatterPlotItem(name='spikeRasterOverviewWindowScatterPlotItem', **scatter_plot_kwargs)
         scatter_plot.setObjectName(f'scatter_plot_{_active_plot_title}') # this seems necissary, the 'name' parameter in addPlot(...) seems to only change some internal property related to the legend AND drastically slows down the plotting
@@ -601,7 +600,7 @@ def plot_multiple_raster_plot(filter_epochs_df: pd.DataFrame, filter_epoch_spike
         new_ax.hideButtons() # Hides the auto-scale button
         new_ax.setDefaultPadding(0.0)  # plot without padding data range
         # Format Labels:        
-        new_ax.getAxis('left').setLabel(f'Epoch[{an_epoch.label}]: {an_epoch.start:.2f}')
+        new_ax.getAxis('left').setLabel(f'Epoch[{an_epoch.label}]') # : {an_epoch.start:.2f}
         # new_ax.getAxis('bottom').setLabel('t')
         # new_ax.getAxis('right').setLabel(f'Epoch[{an_epoch.label}]: {an_epoch.stop:.2f}')
 
