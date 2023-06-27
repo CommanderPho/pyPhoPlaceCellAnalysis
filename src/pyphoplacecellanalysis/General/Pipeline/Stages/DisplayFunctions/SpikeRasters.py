@@ -1,4 +1,4 @@
-from typing import Union
+from typing import Any, Union
 from copy import deepcopy
 import numpy as np
 import pandas as pd
@@ -385,7 +385,7 @@ class RasterScatterPlotManager:
 
 # Note that these raster plots could implement some variant of HideShowSpikeRenderingMixin, SpikeRenderingMixin, etc but these classes frankly suck. 
 
-def _plot_empty_raster_plot_frame(scatter_app_name='pho_test', defer_show=False):
+def _plot_empty_raster_plot_frame(scatter_app_name='pho_test', defer_show=False) -> tuple[Any, pg.GraphicsLayoutWidget, RenderPlots, RenderPlotsData]:
     """ simple helper to initialize the mkQApp, spawn the window, and build the plots and plots_data. """
     ## Perform the plotting:
     app = pg.mkQApp(scatter_app_name)
@@ -405,7 +405,7 @@ def _plot_empty_raster_plot_frame(scatter_app_name='pho_test', defer_show=False)
 
 
 @function_attributes(short_name='plot_raster_plot', tags=['pyqtgraph','raster','2D'], input_requires=[], output_provides=[], uses=['_plot_empty_raster_plot_frame'], used_by=[], creation_date='2023-03-31 20:53')
-def plot_raster_plot(spikes_df: pd.DataFrame, included_neuron_ids, unit_sort_order=None, unit_colors_list=None, scatter_app_name='pho_test'):
+def plot_raster_plot(spikes_df: pd.DataFrame, included_neuron_ids, unit_sort_order=None, unit_colors_list=None, scatter_app_name='pho_test') -> tuple[Any, pg.GraphicsLayoutWidget, RenderPlots, RenderPlotsData]:
     """ This uses pyqtgraph's scatter function like SpikeRaster2D to render a raster plot with colored ticks by default
 
     Usage:
@@ -482,7 +482,7 @@ def plot_raster_plot(spikes_df: pd.DataFrame, included_neuron_ids, unit_sort_ord
     plots.scatter_plot.addPoints(plots_data.all_spots) # , hoverable=True
     plots.root_plot.addItem(plots.scatter_plot)
 
-    plots.scatter_plot.addPoints(plots_data.all_spots)
+    # plots.scatter_plot.addPoints(plots_data.all_spots) # why do we add them twice??
 
     return app, win, plots, plots_data
 

@@ -117,9 +117,6 @@ class PaginatedFigureBaseController:
         self.perform_update_selections(defer_render=defer_render)
         
 
-
-
-
     def on_click(self, event):
         """ called when an axis is clicked to toggle the selection. """
         # Get the clicked Axes object
