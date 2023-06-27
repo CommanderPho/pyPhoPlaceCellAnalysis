@@ -403,6 +403,22 @@ def _plot_empty_raster_plot_frame(scatter_app_name='pho_test', defer_show=False)
 
     return app, win, plots, plots_data
 
+def _build_default_tick(tick_width: float = 0.1) -> QtGui.QPainterPath:
+    # Common Tick Label
+    vtick = QtGui.QPainterPath()
+
+    # Defailt Tick Mark:
+    # # vtick.moveTo(0, -0.5)
+    # # vtick.lineTo(0, 0.5)
+    # vtick.moveTo(0, -0.5)
+    # vtick.lineTo(0, 0.5)
+
+    # Thicker (Rect) Tick Label:
+    half_tick_width = 0.5 * tick_width
+    vtick.moveTo(-half_tick_width, -0.5)
+    vtick.addRect(-half_tick_width, -0.5, tick_width, 1.0) # x, y, width, height
+    return vtick
+    
 
 @function_attributes(short_name='plot_raster_plot', tags=['pyqtgraph','raster','2D'], input_requires=[], output_provides=[], uses=['_plot_empty_raster_plot_frame'], used_by=[], creation_date='2023-03-31 20:53')
 def plot_raster_plot(spikes_df: pd.DataFrame, included_neuron_ids, unit_sort_order=None, unit_colors_list=None, scatter_app_name='pho_test') -> tuple[Any, pg.GraphicsLayoutWidget, RenderPlots, RenderPlotsData]:
@@ -461,20 +477,9 @@ def plot_raster_plot(spikes_df: pd.DataFrame, included_neuron_ids, unit_sort_ord
     # p1 = win.addPlot(title="SpikesDataframe", x=x, y=y, connect='pairs')
     # p1.setLabel('bottom', 'Timestamp', units='[sec]') # set the x-axis label
 
-    # Common Tick Label
-    vtick = QtGui.QPainterPath()
+    vtick = _build_default_tick(tick_width = 0.1)
 
-    # Defailt Tick Mark:
-    # # vtick.moveTo(0, -0.5)
-    # # vtick.lineTo(0, 0.5)
-    # vtick.moveTo(0, -0.5)
-    # vtick.lineTo(0, 0.5)
 
-    # Thicker Tick Label:
-    tick_width = 0.1
-    half_tick_width = 0.5 * tick_width
-    vtick.moveTo(-half_tick_width, -0.5)
-    vtick.addRect(-half_tick_width, -0.5, tick_width, 1.0) # x, y, width, height
 
     plots.scatter_plot = pg.ScatterPlotItem(name='spikeRasterOverviewWindowScatterPlotItem', pxMode=True, symbol=vtick, size=10, pen={'color': 'w', 'width': 1})
     plots.scatter_plot.setObjectName('scatter_plot') # this seems necissary, the 'name' parameter in addPlot(...) seems to only change some internal property related to the legend AND drastically slows down the plotting
@@ -552,16 +557,8 @@ def plot_multiple_raster_plot(filter_epochs_df: pd.DataFrame, filter_epoch_spike
     plots_data.unit_sort_manager = manager
     plots_data.raster_plot_manager = raster_plot_manager
     
-    # Common Tick Label
-    vtick = QtGui.QPainterPath()
-
-    # Thicker Tick Label:
-    # tick_width = 0.1
-    tick_width = 1.0
-    half_tick_width = 0.5 * tick_width
-    vtick.moveTo(-half_tick_width, -0.5)
-    vtick.addRect(-half_tick_width, -0.5, tick_width, 1.0) # x, y, width, height
-
+    # Common Tick Label 
+    vtick = _build_default_tick(tick_width=1.0)
     default_scatter_plot_kwargs = dict(pxMode=True, symbol=vtick, size=2, pen={'color': 'w', 'width': 1})
 
     if scatter_plot_kwargs is None:
@@ -577,7 +574,8 @@ def plot_multiple_raster_plot(filter_epochs_df: pd.DataFrame, filter_epoch_spike
         # print(f'an_epoch: {an_epoch}')
         # if an_epoch.Index < 10:
         _active_epoch_spikes_df = filter_epoch_spikes_df[filter_epoch_spikes_df[epoch_id_key_name] == an_epoch.Index]
-        _active_plot_title: str = f"Epoch[{an_epoch.label}]"
+        _active_plot_title: str = f"Epoch[{an_epoch.label}]" # Epoch[idx]
+        # _active_plot_title: str = f"[{an_epoch.label}]" # [idx]
         
         ## Create the raster plot for the replay:
         # if win is None:
@@ -599,8 +597,11 @@ def plot_multiple_raster_plot(filter_epochs_df: pd.DataFrame, filter_epoch_spike
         # new_ax.showAxes(True, showValues=(True, True, True, False)) # showValues=(left: True, bottom: True, right: False, top: False) # , size=10       
         new_ax.hideButtons() # Hides the auto-scale button
         new_ax.setDefaultPadding(0.0)  # plot without padding data range
-        # Format Labels:        
-        new_ax.getAxis('left').setLabel(f'Epoch[{an_epoch.label}]') # : {an_epoch.start:.2f}
+        # Format Labels:
+        # left_label: str = f'Epoch[{an_epoch.label}]: {an_epoch.start:.2f}' # Full label
+        # left_label: str = f'Epoch[{an_epoch.label}]' # Epoch[idx] style label
+        left_label: str = f'[{an_epoch.label}]' # very short (index only) label
+        new_ax.getAxis('left').setLabel(left_label)
         # new_ax.getAxis('bottom').setLabel('t')
         # new_ax.getAxis('right').setLabel(f'Epoch[{an_epoch.label}]: {an_epoch.stop:.2f}')
 

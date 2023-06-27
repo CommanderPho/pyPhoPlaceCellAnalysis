@@ -1330,7 +1330,7 @@ def plot_kourosh_activity_style_figure(results_obj: LeaveOneOutDecodingAnalysisR
             # Add the linear region overlay:
             scroll_window_region = CustomLinearRegionItem(pen=pg.mkPen('#fff'), brush=pg.mkBrush('#f004'), hoverBrush=pg.mkBrush('#fff4'), hoverPen=pg.mkPen('#f00'), clipItem=plots['scatter_plot'], movable=False) # bound the LinearRegionItem to the plotted data
             scroll_window_region.setObjectName(f'scroll_window_region[{a_flat_timebin_idx}]')
-            scroll_window_region.setZValue(10)
+            scroll_window_region.setZValue(-11) # moves the linear regions to the back so the scatter points are clickable/hoverable
             # Add the LinearRegionItem to the ViewBox, but tell the ViewBox to exclude this item when doing auto-range calculations.
             plots['root_plot'].addItem(scroll_window_region, ignoreBounds=True)
 
