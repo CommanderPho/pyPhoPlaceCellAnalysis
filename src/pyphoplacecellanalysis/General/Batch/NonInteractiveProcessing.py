@@ -281,36 +281,6 @@ def batch_extended_computations(curr_active_pipeline, include_includelist=None, 
             if _comp_specifier.short_name in include_includelist:
                 newly_computed_values += _comp_specifier.try_computation_if_needed(curr_active_pipeline, on_already_computed_fn=_subfn_on_already_computed, fail_on_exception=fail_on_exception, progress_print=progress_print, debug_print=debug_print, force_recompute=force_recompute)
 
-
-    # if include_global_functions:
-        
-        # ## long_short_rate_remapping:
-        # _comp_name = 'long_short_rate_remapping'
-        # if _comp_name in include_includelist:
-        #     try:
-        #         ## Get global 'long_short_rate_remapping' results:
-        #         curr_long_short_rr = curr_active_pipeline.global_computation_results.computed_data['long_short_rate_remapping']
-        #         rate_remapping_df, high_remapping_cells_only = curr_long_short_rr.rr_df, curr_long_short_rr.high_only_rr_df
-        #         _subfn_on_already_computed(_comp_name)
-                    
-        #     except (AttributeError, KeyError) as e:
-        #         if progress_print or debug_print:
-        #             print(f'{_comp_name} missing.')
-        #         if debug_print:
-        #             print(f'\t encountered error: {e}\n{traceback.format_exc()}\n.')
-        #         if progress_print or debug_print:
-        #             print(f'\t Recomputing {_comp_name}...')
-                    
-        #         # When this fails due to unwrapping from the load, add `, computation_kwargs_list=[{'perform_cache_load': False}]` as an argument to the `perform_specific_computation` call below
-        #         curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=['_perform_long_short_decoding_rate_remapping_analyses'], fail_on_exception=True, debug_print=False) # fail_on_exception MUST be True or error handling is all messed up 
-        #         print(f'\t done.')
-        #         curr_long_short_rr = curr_active_pipeline.global_computation_results.computed_data['long_short_rate_remapping']
-        #         rate_remapping_df, high_remapping_cells_only = curr_long_short_rr.rr_df, curr_long_short_rr.high_only_rr_df
-        #         newly_computed_values.append(_comp_name)
-        #     except Exception as e:
-        #         raise e
-
-
     if progress_print:
         print('done with all batch_extended_computations(...).')
 
@@ -382,6 +352,8 @@ def batch_extended_programmatic_figures(curr_active_pipeline, write_pdf=False, w
     _bak_rcParams = mpl.rcParams.copy()
     mpl.rcParams['toolbar'] = 'None' # disable toolbars
     matplotlib.use('AGG') # non-interactive backend ## 2022-08-16 - Surprisingly this works to make the matplotlib figures render only to .png file, not appear on the screen!
+    from neuropy.plotting.ratemaps import BackgroundRenderingOptions
+    
     # active_identifying_session_ctx = curr_active_pipeline.sess.get_context() # 'bapun_RatN_Day4_2019-10-15_11-30-06'
     programmatic_render_to_file(curr_active_pipeline, curr_display_function_name='_display_1d_placefields', write_pdf=write_pdf, write_png=write_png, debug_print=debug_print) # 🟢✅ Now seems to be working and saving to PDF!! Still using matplotlib.use('Qt5Agg') mode and plots still appear.
     
@@ -389,7 +361,7 @@ def batch_extended_programmatic_figures(curr_active_pipeline, write_pdf=False, w
     programmatic_display_to_PDF(curr_active_pipeline, curr_display_function_name='_display_1d_placefield_validations', debug_print=debug_print) # , filter_name=active_config_name 🟢✅ Now seems to be working and saving to PDF!! Still using matplotlib.use('Qt5Agg') mode and plots still appear. Moderate visual improvements can still be made (titles overlap and stuff). Works with %%capture
     # programmatic_render_to_file(curr_active_pipeline, curr_display_function_name='_display_1d_placefield_validations', write_pdf=write_pdf, write_png=write_png, debug_print=debug_print) #  UNTESTED 2023-05-29 
     
-    programmatic_render_to_file(curr_active_pipeline, curr_display_function_name='_display_2d_placefield_result_plot_ratemaps_2D', write_pdf=write_pdf, write_png=write_png, debug_print=debug_print) #  🟢✅ Now seems to be working and saving to PDF!! Still using matplotlib.use('Qt5Agg') mode and plots still appear.
+    programmatic_render_to_file(curr_active_pipeline, curr_display_function_name='_display_2d_placefield_result_plot_ratemaps_2D', write_pdf=write_pdf, write_png=write_png, debug_print=debug_print, bg_rendering_mode=BackgroundRenderingOptions.EMPTY) #  🟢✅ Now seems to be working and saving to PDF!! Still using matplotlib.use('Qt5Agg') mode and plots still appear.
     programmatic_render_to_file(curr_active_pipeline, curr_display_function_name='_display_2d_placefield_occupancy', write_pdf=write_pdf, write_png=write_png, debug_print=debug_print) #  🟢✅ 2023-05-25
    
     #TODO 2023-06-14 05:30: - [ ] Refactor these (the global placefields) into a form compatible with the local ones using some sort of shortcut method like `programmatic_render_to_file`
