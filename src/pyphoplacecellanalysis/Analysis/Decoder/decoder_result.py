@@ -1457,7 +1457,7 @@ def plot_kourosh_activity_style_figure(results_obj: LeaveOneOutDecodingAnalysisR
 
         # turn into a single row:
         curr_timebin_all_included_p_x_given_n = np.reshape(curr_timebin_all_included_p_x_given_n, (1, -1)).T
-        out_posterior_win, out_posterior_img = visualize_heatmap_pyqtgraph(curr_timebin_all_included_p_x_given_n, title=f"decoded posterior for example_timebin_IDX: {callout_timebin_IDX}", show_colorbar=False, win=axs[0])
+        out_posterior_win, out_posterior_img = visualize_heatmap_pyqtgraph(curr_timebin_all_included_p_x_given_n, title=f"decoded posterior for timebin_IDX: {callout_timebin_IDX}", show_colorbar=False, win=axs[0])
         out_posterior_img.setLookupTable(lut)
 
         # 2. Get cells that were active during this time bin that contributed to this posterior, and get their placefields
@@ -1468,11 +1468,24 @@ def plot_kourosh_activity_style_figure(results_obj: LeaveOneOutDecodingAnalysisR
             _temp_active_pfs = results_obj.original_1D_decoder.pf.ratemap.unit_max_tuning_curves[_temp_active_neuron_IDXs,:].copy() 
 
             # 3. Plot their placefields as a column
-            out_pfs_win, out_pfs_img = visualize_heatmap_pyqtgraph(_temp_active_pfs.T, title=f"1D Placefields for active aclus during example_timebin_IDX: {callout_timebin_IDX}", show_yticks=True, show_colorbar=False, win=axs[1])
-            aclu_y_ticks = [(float(i)+0.5, f'{aclu}') for i, aclu in enumerate(_temp_active_neuron_aclus)]
-            ay = axs[1].getAxis('left')
-            ay.setTicks((aclu_y_ticks, []))
-            axs[1].showAxis('left')
+            out_pfs_win, out_pfs_img = visualize_heatmap_pyqtgraph(_temp_active_pfs.T, title=f"Active Cell's pf1D during timebin_IDX: {callout_timebin_IDX}", show_yticks=False, show_xticks=True, show_colorbar=False, win=axs[1])
+            aclu_x_ticks = [(float(i)+0.5, f'{aclu}') for i, aclu in enumerate(_temp_active_neuron_aclus)]
+            ax_x = axs[1].getAxis('bottom')
+            ax_x.setTicks((aclu_x_ticks, [])) # the second ones are the minor ticks, but why aren't they showing up?
+            ax_x.setLabel(text='active placefields', units=None, unitPrefix=None, **{'font-size': '10pt', 'color': '#d8d8d8dd'})
+            # [
+            #     [ (majorTickValue1, majorTickString1), (majorTickValue2, majorTickString2), ... ],
+            #     [ (minorTickValue1, minorTickString1), (minorTickValue2, minorTickString2), ... ],
+            #     ...
+            # ]
+
+            # axs[1].showAxis('left')
+            # # 4. Add label for each _temp_active_neuron_aclus centered on the bin
+            # for i, aclu in enumerate(_temp_active_neuron_aclus):
+            #     bin_aclu_label = pg.TextItem(text=f'{aclu}', anchor=(0.5, 0.5), color='w', fill=(0, 0, 0, 100), border=None)
+            #     axs[1].addItem(bin_aclu_label)
+            #     # bin_aclu_label.setPos(callout_timebin_IDX, i)
+
         else:
             pass
 
