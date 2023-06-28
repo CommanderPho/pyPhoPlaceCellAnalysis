@@ -1277,7 +1277,7 @@ class DiagnosticDistanceMetricFigure:
 
 
 @function_attributes(short_name='plot_kourosh_activity_style_figure', tags=['plot', 'figure', 'heatmaps','pyqtgraph'], input_requires=[], output_provides=[], uses=['plot_raster_plot','visualize_heatmap_pyqtgraph','CustomLinearRegionItem'], used_by=[], creation_date='2023-04-04 09:03')
-def plot_kourosh_activity_style_figure(results_obj: LeaveOneOutDecodingAnalysisResult, long_session, shared_aclus: np.ndarray, epoch_idx: int, callout_epoch_IDXs: list, skip_rendering_callouts:bool = False, debug_print=False):
+def plot_kourosh_activity_style_figure(results_obj: LeaveOneOutDecodingAnalysisResult, long_session, shared_aclus: np.ndarray, epoch_idx: int, callout_epoch_IDXs: list, unit_sort_order=None, unit_colors_list=None, skip_rendering_callouts:bool = False, debug_print=False):
     """ 2023-04-03 - plots a Kourosh-style figure that shows a top panel which displays the decoded posteriors and a raster plot of spikes for a single epoch 
     ## Requirements:
     # The goal is to produce a Kourosh-style figure that shows a top panel which displays the decoded posteriors and a raster plot of spikes for a given epoch.
@@ -1384,8 +1384,8 @@ def plot_kourosh_activity_style_figure(results_obj: LeaveOneOutDecodingAnalysisR
         print(f'{len(shared_aclus) = }')
 
     ## Create the raster plot:
-    app, win, plots, plots_data = plot_raster_plot(_active_epoch_spikes_df, shared_aclus, scatter_app_name=f"Raster Epoch[{epoch_idx}]")
-
+    app, win, plots, plots_data = plot_raster_plot(_active_epoch_spikes_df, shared_aclus, unit_sort_order=unit_sort_order, unit_colors_list=unit_colors_list, scatter_app_name=f"Raster Epoch[{epoch_idx}]")
+    
     ## Setup the aclu labels
     # Set the y range and ticks
     plots['root_plot'].setYRange(0, len(shared_aclus)-1)

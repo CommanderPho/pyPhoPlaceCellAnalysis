@@ -420,8 +420,75 @@ def _build_default_tick(tick_width: float = 0.1) -> QtGui.QPainterPath:
     return vtick
     
 
+def build_scatter_plot_kwargs(scatter_plot_kwargs=None):
+    """build the default scatter plot kwargs, and merge them with the provided kwargs"""
+    # Common Tick Label 
+    vtick = _build_default_tick(tick_width=1.0)
+    default_scatter_plot_kwargs = dict(name='spikeRasterOverviewWindowScatterPlotItem', pxMode=True, symbol=vtick, size=2, pen={'color': 'w', 'width': 1})
+
+    if scatter_plot_kwargs is None:
+        scatter_plot_kwargs = default_scatter_plot_kwargs
+    else:
+        # merge the two
+        scatter_plot_kwargs = default_scatter_plot_kwargs | scatter_plot_kwargs
+    return scatter_plot_kwargs
+
+
+def _build_units_y_grid(plot_item) -> pg.GridItem:
+	"""create a GridItem and add it to the plot
+	
+	Usage:
+		grid = _build_units_y_grid(plot_item)
+	
+	"""
+	grid = pg.GridItem()
+	plot_item.addItem(grid)
+	# set the properties of the grid
+	grid.setTickSpacing([], [1, 5, 10 ]) # on the y-axis (units) set lines every 1, 5, and 10 units. Looks great on linux.
+	grid.setPen(pg.mkPen('#888888', width=1))
+	grid.setZValue(-100)
+	return grid
+
+def _build_scatterplot(new_ax) -> pg.GridItem:
+    """create a GridItem and add it to the plot
+
+    Usage:
+        plots.scatter_plots[an_epoch.Index] = _build_scatterplot(new_ax)
+
+    """
+    scatter_plot = pg.ScatterPlotItem(name='spikeRasterOverviewWindowScatterPlotItem', **scatter_plot_kwargs)
+    scatter_plot.setObjectName(f'scatter_plot_{_active_plot_title}') # this seems necissary, the 'name' parameter in addPlot(...) seems to only change some internal property related to the legend AND drastically slows down the plotting
+    scatter_plot.opts['useCache'] = False
+    scatter_plot.addPoints(plots_data.all_spots_dict[an_epoch.Index]) # , hoverable=True
+
+    ## Add to the axis and set up the axis:
+    new_ax.addItem(scatter_plot)
+
+    new_ax.setXRange(an_epoch.start, an_epoch.stop)
+    new_ax.setYRange(0, n_cells-1)
+    # new_ax.showAxes(True, showValues=(True, True, True, False)) # showValues=(left: True, bottom: True, right: False, top: False) # , size=10       
+    new_ax.hideButtons() # Hides the auto-scale button
+    new_ax.setDefaultPadding(0.0)  # plot without padding data range
+    # Format Labels:
+    # left_label: str = f'Epoch[{an_epoch.label}]: {an_epoch.start:.2f}' # Full label
+    # left_label: str = f'Epoch[{an_epoch.label}]' # Epoch[idx] style label
+    left_label: str = f'[{an_epoch.label}]' # very short (index only) label
+    new_ax.getAxis('left').setLabel(left_label)
+    # new_ax.getAxis('bottom').setLabel('t')
+    # new_ax.getAxis('right').setLabel(f'Epoch[{an_epoch.label}]: {an_epoch.stop:.2f}')
+
+    # new_ax.getAxis('bottom').setTickSpacing(1.0) # 5.0, 1.0 .setTickSpacing(x=[None], y=[1.0])
+    # new_ax.showGrid(x=False, y=True, alpha=1.0)
+    new_ax.getAxis('bottom').setStyle(showValues=False)
+
+    # Disable Interactivity
+    new_ax.setMouseEnabled(x=False, y=False)
+    new_ax.setMenuEnabled(False)
+    return scatter_plot
+
+
 @function_attributes(short_name='plot_raster_plot', tags=['pyqtgraph','raster','2D'], input_requires=[], output_provides=[], uses=['_plot_empty_raster_plot_frame'], used_by=[], creation_date='2023-03-31 20:53')
-def plot_raster_plot(spikes_df: pd.DataFrame, included_neuron_ids, unit_sort_order=None, unit_colors_list=None, scatter_app_name='pho_test') -> tuple[Any, pg.GraphicsLayoutWidget, RenderPlots, RenderPlotsData]:
+def plot_raster_plot(spikes_df: pd.DataFrame, included_neuron_ids, unit_sort_order=None, unit_colors_list=None, scatter_plot_kwargs=None, scatter_app_name='pho_test') -> tuple[Any, pg.GraphicsLayoutWidget, RenderPlots, RenderPlotsData]:
     """ This uses pyqtgraph's scatter function like SpikeRaster2D to render a raster plot with colored ticks by default
 
     Usage:
@@ -434,7 +501,39 @@ def plot_raster_plot(spikes_df: pd.DataFrame, included_neuron_ids, unit_sort_ord
     # make root container for plots
     app, win, plots, plots_data = _plot_empty_raster_plot_frame(scatter_app_name=scatter_app_name, defer_show=False)
     
+    plots_data = _build_scatter_plotting_managers(plots_data, included_neuron_ids=included_neuron_ids, unit_sort_order=unit_sort_order, unit_colors_list=unit_colors_list)
 
+
+    # Update the dataframe
+    spikes_df = plots_data.unit_sort_manager.update_spikes_df_visualization_columns(spikes_df)
+    
+    ## Build the spots for the raster plot:
+    plots_data.all_spots = Render2DScrollWindowPlotMixin.build_spikes_all_spots_from_df(spikes_df, plots_data.raster_plot_manager.config_fragile_linear_neuron_IDX_map)
+
+    # # Actually setup the plot:
+    plots.root_plot = win.addPlot() # this seems to be the equivalent to an 'axes'
+
+    scatter_plot_kwargs = build_scatter_plot_kwargs(scatter_plot_kwargs=scatter_plot_kwargs)
+    
+    plots.scatter_plot = pg.ScatterPlotItem(**scatter_plot_kwargs)
+    plots.scatter_plot.setObjectName('scatter_plot') # this seems necissary, the 'name' parameter in addPlot(...) seems to only change some internal property related to the legend AND drastically slows down the plotting
+    plots.scatter_plot.opts['useCache'] = True
+    plots.scatter_plot.addPoints(plots_data.all_spots) # , hoverable=True
+    plots.root_plot.addItem(plots.scatter_plot)
+
+    # build the y-axis grid to separate the units
+    plots.grid = _build_units_y_grid(plots.root_plot)
+
+    return app, win, plots, plots_data
+
+
+def _build_scatter_plotting_managers(plots_data, included_neuron_ids=None, unit_sort_order=None, unit_colors_list=None):
+    """ 
+
+
+    Usage:
+        plots_data = _build_scatter_plotting_managers(plots_data, included_neuron_ids=included_neuron_ids, unit_sort_order=unit_sort_order, unit_colors_list=unit_colors_list)
+    """
     if included_neuron_ids is not None:
         neuron_ids = deepcopy(included_neuron_ids) # use the provided neuron_ids
     else:
@@ -447,51 +546,18 @@ def plot_raster_plot(spikes_df: pd.DataFrame, included_neuron_ids, unit_sort_ord
         assert len(unit_sort_order) == n_cells
 
     params = RasterPlotParams()
-    params.build_neurons_color_data(fragile_linear_neuron_IDXs=fragile_linear_neuron_IDXs)
+    # params.build_neurons_color_data(fragile_linear_neuron_IDXs=fragile_linear_neuron_IDXs) # normal coloring of neurons
     params.build_neurons_color_data(fragile_linear_neuron_IDXs=fragile_linear_neuron_IDXs, neuron_colors_list=unit_colors_list)
     
-
     manager = UnitSortOrderManager(neuron_ids=neuron_ids, fragile_linear_neuron_IDXs=fragile_linear_neuron_IDXs, n_cells=n_cells, unit_sort_order=unit_sort_order, params=params)
     manager.update_series_identity_y_values()
     raster_plot_manager = RasterScatterPlotManager(unit_sort_manager=manager)
     raster_plot_manager._build_cell_configs()
-
-    # Update the dataframe
-    spikes_df = manager.update_spikes_df_visualization_columns(spikes_df)
-
     ## Add the managers to the plot_data
     plots_data.params = params
     plots_data.unit_sort_manager = manager
     plots_data.raster_plot_manager = raster_plot_manager
-
-
-    # each entry in `config_fragile_linear_neuron_IDX_map` has the form:
-    # 	(i, fragile_linear_neuron_IDX, curr_pen, _series_identity_lower_y_values[i], _series_identity_upper_y_values[i])
-
-    ## Build the spots for the raster plot:
-    plots_data.all_spots = Render2DScrollWindowPlotMixin.build_spikes_all_spots_from_df(spikes_df, raster_plot_manager.config_fragile_linear_neuron_IDX_map)
-
-    # # Actually setup the plot:
-    plots.root_plot = win.addPlot() # this seems to be the equivalent to an 'axes'
-
-    # p1 = win.addPlot(title="SpikesDataframe", x=x, y=y, connect='pairs')
-    # p1.setLabel('bottom', 'Timestamp', units='[sec]') # set the x-axis label
-
-    vtick = _build_default_tick(tick_width = 0.1)
-
-
-
-    plots.scatter_plot = pg.ScatterPlotItem(name='spikeRasterOverviewWindowScatterPlotItem', pxMode=True, symbol=vtick, size=10, pen={'color': 'w', 'width': 1})
-    plots.scatter_plot.setObjectName('scatter_plot') # this seems necissary, the 'name' parameter in addPlot(...) seems to only change some internal property related to the legend AND drastically slows down the plotting
-    plots.scatter_plot.opts['useCache'] = True
-    plots.scatter_plot.addPoints(plots_data.all_spots) # , hoverable=True
-    plots.root_plot.addItem(plots.scatter_plot)
-
-    # plots.scatter_plot.addPoints(plots_data.all_spots) # why do we add them twice??
-
-    return app, win, plots, plots_data
-
-
+    return plots_data
 
 
 @function_attributes(short_name=None, tags=['pyqtgraph','raster','2D'], input_requires=[], output_provides=[], uses=['_prepare_spikes_df_from_filter_epochs', '_plot_empty_raster_plot_frame'], used_by=[], creation_date='2023-06-16 20:45', related_items=['plot_raster_plot'])
@@ -526,47 +592,18 @@ def plot_multiple_raster_plot(filter_epochs_df: pd.DataFrame, filter_epoch_spike
     
     plots.layout = win.addLayout()
     plots.ax = {}
-    plots.scatter_plots = {} # index is the ax
+    plots.scatter_plots = {} # index is the an_epoch.Index
+    plots.grid = {} # index is the an_epoch.Index
+    
     plots_data.all_spots_dict = {}
 
-    if included_neuron_ids is not None:
-        neuron_ids = deepcopy(included_neuron_ids) # use the provided neuron_ids
-    else:
-        neuron_ids = np.sort(filter_epoch_spikes_df.aclu.unique()) # get all the aclus from the entire spikes_df frame
-        # aclu_to_idx = {aclus[i]:i for i in range(len(aclus))}        
+    plots_data = _build_scatter_plotting_managers(plots_data, included_neuron_ids=included_neuron_ids, unit_sort_order=unit_sort_order, unit_colors_list=unit_colors_list)
 
-    n_cells = len(neuron_ids)
-    fragile_linear_neuron_IDXs = np.arange(n_cells)
-    if unit_sort_order is None:
-        unit_sort_order = np.arange(n_cells) # in-line sort order
-    else:
-        assert len(unit_sort_order) == n_cells
-    
-    params = RasterPlotParams()
-    # params.build_neurons_color_data(fragile_linear_neuron_IDXs=fragile_linear_neuron_IDXs) # normal coloring of neurons
-    params.build_neurons_color_data(fragile_linear_neuron_IDXs=fragile_linear_neuron_IDXs, neuron_colors_list=unit_colors_list)
-    
-    manager = UnitSortOrderManager(neuron_ids=neuron_ids, fragile_linear_neuron_IDXs=fragile_linear_neuron_IDXs, n_cells=n_cells, unit_sort_order=unit_sort_order, params=params)
-    manager.update_series_identity_y_values()
-    raster_plot_manager = RasterScatterPlotManager(unit_sort_manager=manager)
-    raster_plot_manager._build_cell_configs()
     # Update the dataframe
-    filter_epoch_spikes_df = manager.update_spikes_df_visualization_columns(filter_epoch_spikes_df)
-    
-    plots_data.params = params
-    plots_data.unit_sort_manager = manager
-    plots_data.raster_plot_manager = raster_plot_manager
+    spikes_df = plots_data.unit_sort_manager.update_spikes_df_visualization_columns(spikes_df)
     
     # Common Tick Label 
-    vtick = _build_default_tick(tick_width=1.0)
-    default_scatter_plot_kwargs = dict(pxMode=True, symbol=vtick, size=2, pen={'color': 'w', 'width': 1})
-
-    if scatter_plot_kwargs is None:
-        scatter_plot_kwargs = default_scatter_plot_kwargs
-    else:
-        # merge the two
-        scatter_plot_kwargs = default_scatter_plot_kwargs | scatter_plot_kwargs
-
+    scatter_plot_kwargs = build_scatter_plot_kwargs(scatter_plot_kwargs=scatter_plot_kwargs)
     # print(f'scatter_plot_kwargs: {scatter_plot_kwargs}')
 
     ## Build the individual epoch raster plot rows:
@@ -584,9 +621,9 @@ def plot_multiple_raster_plot(filter_epochs_df: pd.DataFrame, filter_epoch_spike
         # else:
         # add a new row
         new_ax = plots.layout.addPlot(row=int(an_epoch.Index), col=0)
-        plots_data.all_spots_dict[an_epoch.Index] = Render2DScrollWindowPlotMixin.build_spikes_all_spots_from_df(_active_epoch_spikes_df, raster_plot_manager.config_fragile_linear_neuron_IDX_map)
+        plots_data.all_spots_dict[an_epoch.Index] = Render2DScrollWindowPlotMixin.build_spikes_all_spots_from_df(_active_epoch_spikes_df, plots_data.raster_plot_manager.config_fragile_linear_neuron_IDX_map)
 
-        scatter_plot = pg.ScatterPlotItem(name='spikeRasterOverviewWindowScatterPlotItem', **scatter_plot_kwargs)
+        scatter_plot = pg.ScatterPlotItem(**scatter_plot_kwargs)
         scatter_plot.setObjectName(f'scatter_plot_{_active_plot_title}') # this seems necissary, the 'name' parameter in addPlot(...) seems to only change some internal property related to the legend AND drastically slows down the plotting
         scatter_plot.opts['useCache'] = False
         scatter_plot.addPoints(plots_data.all_spots_dict[an_epoch.Index]) # , hoverable=True
@@ -612,6 +649,10 @@ def plot_multiple_raster_plot(filter_epochs_df: pd.DataFrame, filter_epoch_spike
         # Disable Interactivity
         new_ax.setMouseEnabled(x=False, y=False)
         new_ax.setMenuEnabled(False)
+
+        # build the y-axis grid to separate the units
+        plots.grid[an_epoch.Index] = _build_units_y_grid(new_ax)
+
         plots.ax[an_epoch.Index] = new_ax
 
     return app, win, plots, plots_data
