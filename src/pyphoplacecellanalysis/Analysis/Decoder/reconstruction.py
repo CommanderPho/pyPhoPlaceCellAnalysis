@@ -748,7 +748,7 @@ class BasePositionDecoder(NeuronUnitSlicableObjectProtocol):
             np.shape(F): (288, 40)
             np.shape(P_x): (288, 1)
         """
-        self.neuron_IDXs, self.neuron_IDs, f_i, F_i, self.F, self.P_x = ZhangReconstructionImplementation.build_concatenated_F(self.pf, debug_print=self.debug_print)
+        self.neuron_IDXs, self.neuron_IDs, f_i, F_i, self.F, self.P_x = ZhangReconstructionImplementation.build_concatenated_F(self.pf, debug_print=self.debug_print) # fails when `self.pf.ratemap.n_neurons == 0` aka `self.pf.ratemap.ndim == 0`
         if not isinstance(self.neuron_IDs, np.ndarray):
             self.neuron_IDs = np.array(self.neuron_IDs)
         if not isinstance(self.neuron_IDXs, np.ndarray):
