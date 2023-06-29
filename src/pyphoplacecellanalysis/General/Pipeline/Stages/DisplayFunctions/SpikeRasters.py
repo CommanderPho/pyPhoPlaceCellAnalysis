@@ -424,14 +424,20 @@ def build_scatter_plot_kwargs(scatter_plot_kwargs=None):
     """build the default scatter plot kwargs, and merge them with the provided kwargs"""
     # Common Tick Label 
     vtick = _build_default_tick(tick_width=1.0)
-    default_scatter_plot_kwargs = dict(name='spikeRasterOverviewWindowScatterPlotItem', pxMode=True, symbol=vtick, size=2, pen={'color': 'w', 'width': 1})
+    default_scatter_plot_kwargs = dict(name='spikeRasterOverviewWindowScatterPlotItem', pxMode=True, symbol=vtick, size=2, pen={'color': 'w', 'width': 1}, hoverable=True)
 
     if scatter_plot_kwargs is None:
-        scatter_plot_kwargs = default_scatter_plot_kwargs
+        merged_kwargs = default_scatter_plot_kwargs
     else:
         # merge the two
-        scatter_plot_kwargs = default_scatter_plot_kwargs | scatter_plot_kwargs
-    return scatter_plot_kwargs
+        # scatter_plot_kwargs = default_scatter_plot_kwargs | scatter_plot_kwargs
+        # Merge the default kwargs with the user-provided kwargs
+        merged_kwargs = {**default_scatter_plot_kwargs, **scatter_plot_kwargs}
+
+    print(f'merged_kwargs: {merged_kwargs}')
+    return merged_kwargs
+
+
 
 
 def _build_units_y_grid(plot_item) -> pg.GridItem:
@@ -448,6 +454,40 @@ def _build_units_y_grid(plot_item) -> pg.GridItem:
 	grid.setPen(pg.mkPen('#888888', width=1))
 	grid.setZValue(-100)
 	return grid
+
+
+def _build_scatter_plotting_managers(plots_data, spikes_df, included_neuron_ids=None, unit_sort_order=None, unit_colors_list=None):
+    """ 
+    Does not modify `spikes_df` and it's unused when included_neuron_ids is provided
+
+    Usage:
+        plots_data = _build_scatter_plotting_managers(plots_data, included_neuron_ids=included_neuron_ids, unit_sort_order=unit_sort_order, unit_colors_list=unit_colors_list)
+    """
+    if included_neuron_ids is not None:
+        neuron_ids = deepcopy(included_neuron_ids) # use the provided neuron_ids
+    else:
+        neuron_ids = np.sort(spikes_df.aclu.unique()) # get all the aclus from the entire spikes_df frame
+    plots_data.n_cells = len(neuron_ids)
+    fragile_linear_neuron_IDXs = np.arange(plots_data.n_cells)
+    if unit_sort_order is None:
+        unit_sort_order = np.arange(plots_data.n_cells) # in-line sort order
+    else:
+        assert len(unit_sort_order) == plots_data.n_cells
+
+    params = RasterPlotParams()
+    # params.build_neurons_color_data(fragile_linear_neuron_IDXs=fragile_linear_neuron_IDXs) # normal coloring of neurons
+    params.build_neurons_color_data(fragile_linear_neuron_IDXs=fragile_linear_neuron_IDXs, neuron_colors_list=unit_colors_list)
+    
+    manager = UnitSortOrderManager(neuron_ids=neuron_ids, fragile_linear_neuron_IDXs=fragile_linear_neuron_IDXs, n_cells=plots_data.n_cells, unit_sort_order=unit_sort_order, params=params)
+    manager.update_series_identity_y_values()
+    raster_plot_manager = RasterScatterPlotManager(unit_sort_manager=manager)
+    raster_plot_manager._build_cell_configs()
+    ## Add the managers to the plot_data
+    plots_data.params = params
+    plots_data.unit_sort_manager = manager
+    plots_data.raster_plot_manager = raster_plot_manager
+    return plots_data
+
 
 def _build_scatterplot(new_ax) -> pg.GridItem:
     """create a GridItem and add it to the plot
@@ -501,14 +541,12 @@ def plot_raster_plot(spikes_df: pd.DataFrame, included_neuron_ids, unit_sort_ord
     # make root container for plots
     app, win, plots, plots_data = _plot_empty_raster_plot_frame(scatter_app_name=scatter_app_name, defer_show=False)
     
-    plots_data = _build_scatter_plotting_managers(plots_data, included_neuron_ids=included_neuron_ids, unit_sort_order=unit_sort_order, unit_colors_list=unit_colors_list)
-
-
+    plots_data = _build_scatter_plotting_managers(plots_data, spikes_df=spikes_df, included_neuron_ids=included_neuron_ids, unit_sort_order=unit_sort_order, unit_colors_list=unit_colors_list)
     # Update the dataframe
     spikes_df = plots_data.unit_sort_manager.update_spikes_df_visualization_columns(spikes_df)
     
     ## Build the spots for the raster plot:
-    plots_data.all_spots = Render2DScrollWindowPlotMixin.build_spikes_all_spots_from_df(spikes_df, plots_data.raster_plot_manager.config_fragile_linear_neuron_IDX_map)
+    plots_data.all_spots, plots_data.all_scatterplot_tooltips_kwargs = Render2DScrollWindowPlotMixin.build_spikes_all_spots_from_df(spikes_df, plots_data.raster_plot_manager.config_fragile_linear_neuron_IDX_map, should_return_data_tooltips_kwargs=True)
 
     # # Actually setup the plot:
     plots.root_plot = win.addPlot() # this seems to be the equivalent to an 'axes'
@@ -518,7 +556,7 @@ def plot_raster_plot(spikes_df: pd.DataFrame, included_neuron_ids, unit_sort_ord
     plots.scatter_plot = pg.ScatterPlotItem(**scatter_plot_kwargs)
     plots.scatter_plot.setObjectName('scatter_plot') # this seems necissary, the 'name' parameter in addPlot(...) seems to only change some internal property related to the legend AND drastically slows down the plotting
     plots.scatter_plot.opts['useCache'] = True
-    plots.scatter_plot.addPoints(plots_data.all_spots) # , hoverable=True
+    plots.scatter_plot.addPoints(plots_data.all_spots, **(plots_data.all_scatterplot_tooltips_kwargs or {})) # , hoverable=True
     plots.root_plot.addItem(plots.scatter_plot)
 
     # build the y-axis grid to separate the units
@@ -526,49 +564,15 @@ def plot_raster_plot(spikes_df: pd.DataFrame, included_neuron_ids, unit_sort_ord
 
     return app, win, plots, plots_data
 
-
-def _build_scatter_plotting_managers(plots_data, included_neuron_ids=None, unit_sort_order=None, unit_colors_list=None):
-    """ 
-
-
-    Usage:
-        plots_data = _build_scatter_plotting_managers(plots_data, included_neuron_ids=included_neuron_ids, unit_sort_order=unit_sort_order, unit_colors_list=unit_colors_list)
-    """
-    if included_neuron_ids is not None:
-        neuron_ids = deepcopy(included_neuron_ids) # use the provided neuron_ids
-    else:
-        neuron_ids = np.sort(spikes_df.aclu.unique()) # get all the aclus from the entire spikes_df frame
-    n_cells = len(neuron_ids)
-    fragile_linear_neuron_IDXs = np.arange(n_cells)
-    if unit_sort_order is None:
-        unit_sort_order = np.arange(n_cells) # in-line sort order
-    else:
-        assert len(unit_sort_order) == n_cells
-
-    params = RasterPlotParams()
-    # params.build_neurons_color_data(fragile_linear_neuron_IDXs=fragile_linear_neuron_IDXs) # normal coloring of neurons
-    params.build_neurons_color_data(fragile_linear_neuron_IDXs=fragile_linear_neuron_IDXs, neuron_colors_list=unit_colors_list)
-    
-    manager = UnitSortOrderManager(neuron_ids=neuron_ids, fragile_linear_neuron_IDXs=fragile_linear_neuron_IDXs, n_cells=n_cells, unit_sort_order=unit_sort_order, params=params)
-    manager.update_series_identity_y_values()
-    raster_plot_manager = RasterScatterPlotManager(unit_sort_manager=manager)
-    raster_plot_manager._build_cell_configs()
-    ## Add the managers to the plot_data
-    plots_data.params = params
-    plots_data.unit_sort_manager = manager
-    plots_data.raster_plot_manager = raster_plot_manager
-    return plots_data
-
-
 @function_attributes(short_name=None, tags=['pyqtgraph','raster','2D'], input_requires=[], output_provides=[], uses=['_prepare_spikes_df_from_filter_epochs', '_plot_empty_raster_plot_frame'], used_by=[], creation_date='2023-06-16 20:45', related_items=['plot_raster_plot'])
-def plot_multiple_raster_plot(filter_epochs_df: pd.DataFrame, filter_epoch_spikes_df: pd.DataFrame, included_neuron_ids=None, unit_sort_order=None, unit_colors_list=None, scatter_plot_kwargs=None, epoch_id_key_name='temp_epoch_id', scatter_app_name="Pho Stacked Replays"):
+def plot_multiple_raster_plot(filter_epochs_df: pd.DataFrame, spikes_df: pd.DataFrame, included_neuron_ids=None, unit_sort_order=None, unit_colors_list=None, scatter_plot_kwargs=None, epoch_id_key_name='temp_epoch_id', scatter_app_name="Pho Stacked Replays"):
     """ This renders a stack of raster plots
 
     Usage:
         from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.SpikeRasters import plot_multiple_raster_plot
 
         
-        app, win, plots, plots_data = plot_multiple_raster_plot(filter_epochs_df, filter_epoch_spikes_df, included_neuron_ids=shared_aclus, epoch_id_key_name='replay_epoch_id', scatter_app_name="Pho Stacked Replays")
+        app, win, plots, plots_data = plot_multiple_raster_plot(filter_epochs_df, spikes_df, included_neuron_ids=shared_aclus, epoch_id_key_name='replay_epoch_id', scatter_app_name="Pho Stacked Replays")
 
     """
 
@@ -576,12 +580,12 @@ def plot_multiple_raster_plot(filter_epochs_df: pd.DataFrame, filter_epoch_spike
 
     rebuild_spikes_df_anyway = True # if True, `_prepare_spikes_df_from_filter_epochs` is called to rebuild spikes_df given the filter_epochs_df even if it contains the desired column already.
     if rebuild_spikes_df_anyway:
-        filter_epoch_spikes_df = filter_epoch_spikes_df.copy() # don't modify the original dataframe
+        spikes_df = spikes_df.copy() # don't modify the original dataframe
         filter_epochs_df = filter_epochs_df.copy()
 
-    if rebuild_spikes_df_anyway or (epoch_id_key_name not in filter_epoch_spikes_df.columns):
+    if rebuild_spikes_df_anyway or (epoch_id_key_name not in spikes_df.columns):
         # missing epoch_id column in the spikes_df, need to rebuild
-        filter_epoch_spikes_df = _prepare_spikes_df_from_filter_epochs(filter_epoch_spikes_df, filter_epochs=filter_epochs_df, included_neuron_ids=included_neuron_ids, epoch_id_key_name=epoch_id_key_name, debug_print=False) # replay_epoch_id
+        spikes_df = _prepare_spikes_df_from_filter_epochs(spikes_df, filter_epochs=filter_epochs_df, included_neuron_ids=included_neuron_ids, epoch_id_key_name=epoch_id_key_name, debug_print=False) # replay_epoch_id
 
     # ## Create the raster plot for the replay:
     # app, win, plots, plots_data = plot_raster_plot(_active_epoch_spikes_df, shared_aclus, scatter_app_name=f"Raster Epoch[{epoch_idx}]")
@@ -596,8 +600,8 @@ def plot_multiple_raster_plot(filter_epochs_df: pd.DataFrame, filter_epoch_spike
     plots.grid = {} # index is the an_epoch.Index
     
     plots_data.all_spots_dict = {}
-
-    plots_data = _build_scatter_plotting_managers(plots_data, included_neuron_ids=included_neuron_ids, unit_sort_order=unit_sort_order, unit_colors_list=unit_colors_list)
+    plots_data.all_scatterplot_tooltips_kwargs_dict = {}
+    plots_data = _build_scatter_plotting_managers(plots_data, spikes_df=spikes_df, included_neuron_ids=included_neuron_ids, unit_sort_order=unit_sort_order, unit_colors_list=unit_colors_list)
 
     # Update the dataframe
     spikes_df = plots_data.unit_sort_manager.update_spikes_df_visualization_columns(spikes_df)
@@ -610,7 +614,7 @@ def plot_multiple_raster_plot(filter_epochs_df: pd.DataFrame, filter_epoch_spike
     for an_epoch in filter_epochs_df.itertuples():
         # print(f'an_epoch: {an_epoch}')
         # if an_epoch.Index < 10:
-        _active_epoch_spikes_df = filter_epoch_spikes_df[filter_epoch_spikes_df[epoch_id_key_name] == an_epoch.Index]
+        _active_epoch_spikes_df = spikes_df[spikes_df[epoch_id_key_name] == an_epoch.Index]
         _active_plot_title: str = f"Epoch[{an_epoch.label}]" # Epoch[idx]
         # _active_plot_title: str = f"[{an_epoch.label}]" # [idx]
         
@@ -621,16 +625,16 @@ def plot_multiple_raster_plot(filter_epochs_df: pd.DataFrame, filter_epoch_spike
         # else:
         # add a new row
         new_ax = plots.layout.addPlot(row=int(an_epoch.Index), col=0)
-        plots_data.all_spots_dict[an_epoch.Index] = Render2DScrollWindowPlotMixin.build_spikes_all_spots_from_df(_active_epoch_spikes_df, plots_data.raster_plot_manager.config_fragile_linear_neuron_IDX_map)
+        plots_data.all_spots_dict[an_epoch.Index], plots_data.all_scatterplot_tooltips_kwargs_dict[an_epoch.Index] = Render2DScrollWindowPlotMixin.build_spikes_all_spots_from_df(_active_epoch_spikes_df, plots_data.raster_plot_manager.config_fragile_linear_neuron_IDX_map, should_return_data_tooltips_kwargs=True)
 
         scatter_plot = pg.ScatterPlotItem(**scatter_plot_kwargs)
         scatter_plot.setObjectName(f'scatter_plot_{_active_plot_title}') # this seems necissary, the 'name' parameter in addPlot(...) seems to only change some internal property related to the legend AND drastically slows down the plotting
         scatter_plot.opts['useCache'] = False
-        scatter_plot.addPoints(plots_data.all_spots_dict[an_epoch.Index]) # , hoverable=True
+        scatter_plot.addPoints(plots_data.all_spots_dict[an_epoch.Index], **(plots_data.all_scatterplot_tooltips_kwargs_dict[an_epoch.Index] or {})) # , hoverable=True
         new_ax.addItem(scatter_plot)
         plots.scatter_plots[an_epoch.Index] = scatter_plot
         new_ax.setXRange(an_epoch.start, an_epoch.stop)
-        new_ax.setYRange(0, n_cells-1)
+        new_ax.setYRange(0, plots_data.n_cells-1)
         # new_ax.showAxes(True, showValues=(True, True, True, False)) # showValues=(left: True, bottom: True, right: False, top: False) # , size=10       
         new_ax.hideButtons() # Hides the auto-scale button
         new_ax.setDefaultPadding(0.0)  # plot without padding data range
@@ -673,8 +677,8 @@ def _prepare_spikes_df_from_filter_epochs(spikes_df: pd.DataFrame, filter_epochs
         short_ratemap = short_pf1D.ratemap
         curr_any_context_neurons = _find_any_context_neurons(*[k.neuron_ids for k in [long_ratemap, short_ratemap]])
 
-        filter_epoch_spikes_df = _prepare_spikes_df_from_filter_epochs(long_session.spikes_df, filter_epochs=long_replays, included_neuron_ids=curr_any_context_neurons, epoch_id_key_name='replay_epoch_id', debug_print=False) # replay_epoch_id
-        filter_epoch_spikes_df
+        spikes_df = _prepare_spikes_df_from_filter_epochs(long_session.spikes_df, filter_epochs=long_replays, included_neuron_ids=curr_any_context_neurons, epoch_id_key_name='replay_epoch_id', debug_print=False) # replay_epoch_id
+        spikes_df
 
     """
     from neuropy.utils.mixins.time_slicing import add_epochs_id_identity

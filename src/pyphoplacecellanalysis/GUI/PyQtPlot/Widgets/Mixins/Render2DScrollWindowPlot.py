@@ -61,9 +61,9 @@ class Render2DScrollWindowPlotMixin:
         ## Bottom Windowed Scroll Plot/Widget:
 
         # ALL Spikes in the preview window:
-        curr_spike_x, curr_spike_y, curr_spike_pens, self.plots_data.all_spots, curr_n = self._build_all_spikes_data_values()
+        curr_spike_x, curr_spike_y, curr_spike_pens, _all_scatterplot_tooltips_kwargs, self.plots_data.all_spots, curr_n = self._build_all_spikes_data_values(should_return_data_tooltips_kwargs=False) #TODO 2023-06-28 21:18: - [ ] Could use returned tooltips to set the spike hover text
         
-        self.plots.preview_overview_scatter_plot = pg.ScatterPlotItem(name='spikeRasterOverviewWindowScatterPlotItem', pxMode=True, symbol=vtick, size=5, pen={'color': 'w', 'width': 1})
+        self.plots.preview_overview_scatter_plot = pg.ScatterPlotItem(name='spikeRasterOverviewWindowScatterPlotItem', pxMode=True, symbol=vtick, size=5, pen={'color': 'w', 'width': 1}, hoverable=True, )
         self.plots.preview_overview_scatter_plot.setObjectName('preview_overview_scatter_plot') # this seems necissary, the 'name' parameter in addPlot(...) seems to only change some internal property related to the legend AND drastically slows down the plotting
         self.plots.preview_overview_scatter_plot.opts['useCache'] = True
         self.plots.preview_overview_scatter_plot.addPoints(self.plots_data.all_spots) # , hoverable=True
@@ -210,8 +210,35 @@ class Render2DScrollWindowPlotMixin:
     # ==================================================================================================================== #
     # Class/Static Methods                                                                                                 #
     # ==================================================================================================================== #
+    
+
     @classmethod
-    def build_spikes_data_values_from_df(cls, spikes_df, config_fragile_linear_neuron_IDX_map, is_spike_included=None, **kwargs):
+    def _build_spike_data_tuples_from_spikes_df(cls, spikes_df, generate_debug_tuples=False) -> dict:
+        """ generates a list of tuples uniquely identifying each spike in the spikes_df as requested by the pg.ScatterPlotItem's `data` argument.
+                data: a list of python objects used to uniquely identify each spot.
+                tip: A string-valued function of a spot's (x, y, data) values. Set to None to prevent a tool tip from being shown.
+        """
+        from pyphocorehelpers.DataStructure.dynamic_parameters import DynamicParameters
+        if generate_debug_tuples:
+            debug_datapoint_column_names = [spikes_df.spikes.time_variable_name, 'shank', 'cluster', 'aclu', 'qclu', 'x', 'y', 'speed', 'traj', 'lap', 'maze_relative_lap', 'maze_id', 'cell_type', 'flat_spike_idx', 'x_loaded', 'y_loaded', 'lin_pos', 'fragile_linear_neuron_IDX', 'PBE_id', 'scISI', 'neuron_IDX', 'replay_epoch_id', 'visualization_raster_y_location', 'visualization_raster_emphasis_state']
+            active_datapoint_column_names = debug_datapoint_column_names # all values for the purpose of debugging
+        else:
+            default_datapoint_column_names = [spikes_df.spikes.time_variable_name, 'aclu', 'fragile_linear_neuron_IDX']
+            active_datapoint_column_names = default_datapoint_column_names
+            
+        def _tip_fn(x, y, data):
+            """ the function required by pg.ScatterPlotItem's `tip` argument to print the tooltip for each spike. """
+            data_string:str = '\n'.join([f"{k}:\t{str(v)}" for k, v in zip(active_datapoint_column_names, data)])
+            return f"spike: (x={x}, y={y})\n{data_string}"
+
+        # spikes_data = spikes_df[active_datapoint_column_names].to_records(index=False).tolist() # list of tuples
+        spikes_data = spikes_df[active_datapoint_column_names].to_dict('records') # list of dicts
+        spikes_data = [DynamicParameters.init_from_dict(v) for v in spikes_data] # convert to list of DynamicParameters objects
+        return dict(data=spikes_data, tip=_tip_fn)
+
+
+    @classmethod
+    def build_spikes_data_values_from_df(cls, spikes_df, config_fragile_linear_neuron_IDX_map, is_spike_included=None, should_return_data_tooltips_kwargs:bool=False, **kwargs):
         """ build global spikes for entire dataframe (not just the current window) 
         
         Called by:
@@ -246,6 +273,14 @@ class Render2DScrollWindowPlotMixin:
         curr_spike_t = filtered_spikes_df[active_time_variable_name].to_numpy() # this will map
         curr_spike_y = filtered_spikes_df['visualization_raster_y_location'].to_numpy() # this will map
         
+        # Build the "tooltips" for each spike:
+        # curr_spike_data_tooltips = [f"{an_aclu}" for an_aclu in spikes_df['aclu'].to_numpy()]
+        if should_return_data_tooltips_kwargs:
+            all_scatterplot_tooltips_kwargs = cls._build_spike_data_tuples_from_spikes_df(spikes_df) # need the full spikes_df, not the filtered one
+            assert len(all_scatterplot_tooltips_kwargs['data']) == np.shape(spikes_df)[0], f"if specified, all_scatterplot_tooltips_kwargs must be the same length as the number of spikes but np.shape(spikes_df)[0]: {np.shape(spikes_df)[0]} and len((all_scatterplot_tooltips_kwargs['data']): {len(all_scatterplot_tooltips_kwargs['data'])}"
+        else:
+            all_scatterplot_tooltips_kwargs = None
+            
         # config_fragile_linear_neuron_IDX_map values are of the form: (i, fragile_linear_neuron_IDX, curr_pen, self._series_identity_lower_y_values[i], self._series_identity_upper_y_values[i])
         # Emphasis/Deemphasis-Dependent Pens:
         curr_spike_pens = [config_fragile_linear_neuron_IDX_map[a_fragile_linear_neuron_IDX][2][a_spike_emphasis_state] for a_fragile_linear_neuron_IDX, a_spike_emphasis_state in zip(filtered_spikes_df['fragile_linear_neuron_IDX'].to_numpy(), filtered_spikes_df['visualization_raster_emphasis_state'].to_numpy())] # get the pens for each spike from the configs map
@@ -254,13 +289,16 @@ class Render2DScrollWindowPlotMixin:
         # builds the 'all_spots' tuples suitable for setting self.plots_data.all_spots from ALL Spikes
         pos = np.vstack((curr_spike_t, curr_spike_y))
         all_spots = [{'pos': pos[:,i], 'data': i, 'pen': curr_spike_pens[i]} for i in range(curr_n)]
-        return curr_spike_t, curr_spike_y, curr_spike_pens, all_spots, curr_n
+        return curr_spike_t, curr_spike_y, curr_spike_pens, all_scatterplot_tooltips_kwargs, all_spots, curr_n
     
+
     @classmethod
-    def build_spikes_all_spots_from_df(cls, spikes_df, config_fragile_linear_neuron_IDX_map, is_spike_included=None, **kwargs):
+    def build_spikes_all_spots_from_df(cls, spikes_df, config_fragile_linear_neuron_IDX_map, is_spike_included=None, should_return_data_tooltips_kwargs:bool=False, **kwargs):
         """ builds the 'all_spots' tuples suitable for setting self.plots_data.all_spots from ALL Spikes 
         Internally calls `cls.build_spikes_data_values_from_df(...)
         """
-        curr_spike_x, curr_spike_y, curr_spike_pens, all_spots, curr_n = cls.build_spikes_data_values_from_df(spikes_df, config_fragile_linear_neuron_IDX_map, is_spike_included=is_spike_included, **kwargs)
-        return all_spots
-    
+        curr_spike_x, curr_spike_y, curr_spike_pens, all_scatterplot_tooltips_kwargs, all_spots, curr_n = cls.build_spikes_data_values_from_df(spikes_df, config_fragile_linear_neuron_IDX_map, is_spike_included=is_spike_included, should_return_data_tooltips_kwargs=should_return_data_tooltips_kwargs, **kwargs)
+        if should_return_data_tooltips_kwargs:
+            return all_spots, all_scatterplot_tooltips_kwargs
+        else:
+            return all_spots
