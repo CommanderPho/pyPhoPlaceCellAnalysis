@@ -1445,6 +1445,7 @@ def plot_kourosh_activity_style_figure(results_obj: LeaveOneOutDecodingAnalysisR
         """ Builds a "callout" graphic for a single timebin within the epoch in question. 
 
         Captures:
+            axs
             timebins_p_x_given_n
             long_results_obj (for long_results_obj.original_1D_decoder.pf.ratemap.unit_max_tuning_curves)
             timebins_active_neuron_IDXs
