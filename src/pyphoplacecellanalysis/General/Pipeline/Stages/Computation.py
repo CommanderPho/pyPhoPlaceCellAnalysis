@@ -955,7 +955,17 @@ class PipelineWithComputedPipelineStageMixin:
     @property
     def global_computation_results_pickle_path(self) -> Path:
         """ The path to pickle the global_computation_results """
-        return self.get_output_path().joinpath(f'global_computation_results.pkl').resolve()
+        # Get special suffix if specified and use that for global result too: 'loadedSessPickle_withDirectionalLaps.pkl'
+        if self.pickle_path is not None:
+            local_pickle_filename = self.pickle_path.name
+            special_designator_suffix = local_pickle_filename.removeprefix('loadedSessPickle').removesuffix('.pkl')
+        else:
+            special_designator_suffix = ""
+        
+        # if len(special_designator_suffix) > 0:
+        desired_global_pickle_filename = f"global_computation_results{special_designator_suffix}.pkl" # 'global_computation_results_withDirectionalLaps.pkl'
+        # desired_global_pickle_filename = f'global_computation_results.pkl' # old way
+        return self.get_output_path().joinpath(desired_global_pickle_filename).resolve()
 
     ## Global Computation Result Persistance Hacks:
     def save_global_computation_results(self):
