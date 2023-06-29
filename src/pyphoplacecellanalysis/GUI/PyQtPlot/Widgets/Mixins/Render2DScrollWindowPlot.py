@@ -6,6 +6,14 @@ from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.GraphicsObjects.CustomLinearReg
 
 from pyphoplacecellanalysis.General.Model.Datasources.Datasources import DataframeDatasource
 
+from attrs import define, field, fields, asdict, astuple
+
+@define(frozen=True)
+class ScatterItemData:
+    t: float = field(alias='t_rel_seconds')
+    aclu: int = field() # alias='neuron_ID'
+    neuron_IDX: int = field(alias='fragile_linear_neuron_IDX')
+    
 
 class Render2DScrollWindowPlotMixin:
     """ Adds a LinearRegionItem to the plot that represents the entire data timerange which defines a user-adjustable window into the data. Finally, also adds a plot that shows only the zoomed-in data within the window. 
@@ -211,14 +219,13 @@ class Render2DScrollWindowPlotMixin:
     # Class/Static Methods                                                                                                 #
     # ==================================================================================================================== #
     
-
     @classmethod
     def _build_spike_data_tuples_from_spikes_df(cls, spikes_df, generate_debug_tuples=False) -> dict:
         """ generates a list of tuples uniquely identifying each spike in the spikes_df as requested by the pg.ScatterPlotItem's `data` argument.
                 data: a list of python objects used to uniquely identify each spot.
                 tip: A string-valued function of a spot's (x, y, data) values. Set to None to prevent a tool tip from being shown.
         """
-        from pyphocorehelpers.DataStructure.dynamic_parameters import DynamicParameters
+        # from pyphocorehelpers.DataStructure.dynamic_parameters import DynamicParameters
         if generate_debug_tuples:
             debug_datapoint_column_names = [spikes_df.spikes.time_variable_name, 'shank', 'cluster', 'aclu', 'qclu', 'x', 'y', 'speed', 'traj', 'lap', 'maze_relative_lap', 'maze_id', 'cell_type', 'flat_spike_idx', 'x_loaded', 'y_loaded', 'lin_pos', 'fragile_linear_neuron_IDX', 'PBE_id', 'scISI', 'neuron_IDX', 'replay_epoch_id', 'visualization_raster_y_location', 'visualization_raster_emphasis_state']
             active_datapoint_column_names = debug_datapoint_column_names # all values for the purpose of debugging
@@ -228,12 +235,16 @@ class Render2DScrollWindowPlotMixin:
             
         def _tip_fn(x, y, data):
             """ the function required by pg.ScatterPlotItem's `tip` argument to print the tooltip for each spike. """
-            data_string:str = '\n'.join([f"{k}:\t{str(v)}" for k, v in zip(active_datapoint_column_names, data)])
+            # data_string:str = '\n'.join([f"{k}:\t{str(v)}" for k, v in zip(active_datapoint_column_names, data)])
+            data_string:str = '\n'.join([f"{k}:\t{str(v)}" for k, v in asdict(data).items()])
+            print(f'_tip_fn(...): data_string: {data_string}')
             return f"spike: (x={x}, y={y})\n{data_string}"
 
         # spikes_data = spikes_df[active_datapoint_column_names].to_records(index=False).tolist() # list of tuples
         spikes_data = spikes_df[active_datapoint_column_names].to_dict('records') # list of dicts
-        spikes_data = [DynamicParameters.init_from_dict(v) for v in spikes_data] # convert to list of DynamicParameters objects
+        spikes_data = [ScatterItemData(**v) for v in spikes_data] 
+        
+        # spikes_data = [DynamicParameters.init_from_dict(v) for v in spikes_data] # convert to list of DynamicParameters objects
         return dict(data=spikes_data, tip=_tip_fn)
 
 
