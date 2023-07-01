@@ -156,7 +156,11 @@ def batch_load_session(global_data_root_parent_path, active_data_mode_name, base
     if debug_print:
         print(f'active_session_filter_configurations: {active_session_filter_configurations}')
     
-    curr_active_pipeline.filter_sessions(active_session_filter_configurations, changed_filters_ignore_list=['maze1','maze2','maze'], debug_print=False)
+    ## Skip the filtering, it used to be performed bere but NOT NOW
+
+
+    
+
 
     ## TODO 2023-05-16 - set `curr_active_pipeline.active_configs[a_name].computation_config.pf_params.computation_epochs = curr_laps_obj` equivalent
     ## TODO 2023-05-16 - determine appropriate binning from `compute_short_long_constrained_decoders` so it's automatically from the long
@@ -204,12 +208,33 @@ def batch_load_session(global_data_root_parent_path, active_data_mode_name, base
         print(f'using provided computation_functions_name_includelist: {computation_functions_name_includelist}')
         computation_functions_name_excludelist=None
 
-    # # excludelist Mode:
-    # computation_functions_name_includelist=None
-    # computation_functions_name_excludelist=['_perform_spike_burst_detection_computation','_perform_recursive_latent_placefield_decoding']
+    # # For every computation config we build a fake (duplicate) filter config).
+    # if len(active_session_computation_configs) == 3:
+    #     # For computing separate filters for each lap, we get filters with names like: `['maze1_odd', 'maze1_even', 'maze1_any', 'maze2_odd', 'maze2_even', 'maze2_any', 'maze_odd', 'maze_even', 'maze_any']`
+    #     updated_active_session_pseudo_filter_configs = {} # empty list, woot!
 
-    ## TODO 2023-01-15 - perform_computations for all configs!!
-    curr_active_pipeline.perform_computations(active_session_computation_configs[0], computation_functions_name_includelist=computation_functions_name_includelist, computation_functions_name_excludelist=computation_functions_name_excludelist, fail_on_exception=fail_on_exception, debug_print=debug_print) #, overwrite_extant_results=False  ], fail_on_exception=True, debug_print=False)
+    #     # so we need the legit list of filter configs first.
+    #     for a_filter_config_name, a_filter_config_fn in active_session_filter_configurations.items():
+    #         # then we duplicate them for each computation config, appending the appropriate suffix.
+    #         for a_computation_suffix_name, a_computation_config in zip(['_odd', '_even', '_any'], active_session_computation_configs):
+    #                 updated_active_session_pseudo_filter_configs[f'{a_filter_config_name}{a_computation_suffix_name}'] = deepcopy(a_filter_config_fn) # this copy is just so that the values are recomputed with the appropriate config. This is a HACK
+    # else:
+    #     updated_active_session_pseudo_filter_configs = active_session_filter_configurations ## just use the default, the above is a hack for when we've split based on lap direction.        
+
+    ## Second attempt knowing what I know about the computation functions:
+    updated_active_session_pseudo_filter_configs = {} # empty list, woot!
+    for a_computation_suffix_name, a_computation_config in zip(['_odd', '_even', '_any'], active_session_computation_configs):
+        # We need to filter and then compute with the appropriate config iteratively.
+        for a_filter_config_name, a_filter_config_fn in active_session_filter_configurations.items():
+            updated_active_session_pseudo_filter_configs[f'{a_filter_config_name}{a_computation_suffix_name}'] = deepcopy(a_filter_config_fn) # this copy is just so that the values are recomputed with the appropriate config. This is a HACK
+
+        ## Actually do the filtering now. We have 
+        curr_active_pipeline.filter_sessions(updated_active_session_pseudo_filter_configs, changed_filters_ignore_list=['maze1','maze2','maze'], debug_print=False)
+
+        ## TODO 2023-01-15 - perform_computations for all configs!!
+        curr_active_pipeline.perform_computations(a_computation_config, computation_functions_name_includelist=computation_functions_name_includelist, computation_functions_name_excludelist=computation_functions_name_excludelist, fail_on_exception=fail_on_exception, debug_print=debug_print) #, overwrite_extant_results=False  ], fail_on_exception=True, debug_print=False)
+
+
 
     if not skip_extended_batch_computations:
         batch_extended_computations(curr_active_pipeline, include_global_functions=False, fail_on_exception=fail_on_exception, progress_print=True, debug_print=False)
