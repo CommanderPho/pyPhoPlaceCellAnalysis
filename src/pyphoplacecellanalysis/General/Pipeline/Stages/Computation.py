@@ -334,8 +334,11 @@ class ComputedPipelineStage(LoadableInput, LoadableSessionInput, FilterablePipel
         """
         include_includelist = self.active_completed_computation_result_names # ['maze', 'sprinkle']
         assert (len(include_includelist) >= 3), "Must have at least 3 completed computation results to find the long, short, and global epoch names."
-        long_epoch_name = include_includelist[0] # 'maze1_PYR'
-        short_epoch_name = include_includelist[1] # 'maze2_PYR'
+        # long_epoch_name = include_includelist[0] # 'maze1_PYR'
+        # short_epoch_name = include_includelist[1] # 'maze2_PYR'
+        # they must all have the same suffix:
+        long_epoch_name = include_includelist[-3] # 'maze1_PYR'
+        short_epoch_name = include_includelist[-2] # 'maze2_PYR'
         global_epoch_name = include_includelist[-1] # 'maze_PYR'
         return long_epoch_name, short_epoch_name, global_epoch_name
 
