@@ -38,10 +38,18 @@ from pyphoplacecellanalysis.General.Mixins.CrossComputationComparisonHelpers imp
 
 from neuropy.analyses import detect_pbe_epochs # used in `_perform_jonathan_replay_firing_rate_analyses(.)` if replays are missing
 
-
 from pyphoplacecellanalysis.General.Pipeline.Stages.Loading import saveData # for `pipeline_complete_compute_long_short_fr_indicies`
 from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.DefaultComputationFunctions import KnownFilterEpochs # for `pipeline_complete_compute_long_short_fr_indicies`
 from neuropy.core.session.dataSession import DataSession # for `pipeline_complete_compute_long_short_fr_indicies`
+
+
+from typing import List, Any
+from scipy.special import factorial, logsumexp
+from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import DecodedFilterEpochsResult
+from nptyping import NDArray, DataFrame, Shape, assert_isinstance, Int, Structure as S
+import awkward as ak # `simpler_compute_measured_vs_expected_firing_rates` new Awkward array for ragged arrays
+
+
 
 @define(slots=False, eq=False)
 class TrackExclusivePartitionSubset:
@@ -1602,15 +1610,6 @@ def compute_evening_morning_parition(neuron_replay_stats_df, firing_rates_activi
     # return (difference_sorted_aclus, evening_sorted_aclus, morning_sorted_aclus)
     return out_dict
 
-
-
-from typing import List, Any
-from scipy.special import factorial, logsumexp
-from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import DecodedFilterEpochsResult
-from nptyping import NDArray, DataFrame, Shape, assert_isinstance, Int, Structure as S
-import awkward as ak # `simpler_compute_measured_vs_expected_firing_rates` new Awkward array for ragged arrays
-
-
 @function_attributes(short_name=None, tags=['measured_vs_expected', 'firing_rate'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-05-26 00:00', related_items=[])
 def compute_measured_vs_expected_firing_rates(active_pos_df, active_filter_epochs, a_decoder_1D: "BasePositionDecoder", a_decoder_result: "DecodedFilterEpochsResult"):
     """ 2023-05-26 - Goal is to compute the expected and measured firing rates for each cell for each epoch. 
@@ -1755,12 +1754,9 @@ def simpler_compute_measured_vs_expected_firing_rates(active_pos_df, active_filt
 
 # returned_shape_tuple, (observed_from_expected_diff_ptp, observed_from_expected_diff_mean, observed_from_expected_diff_std) = simpler_compute_measured_vs_expected_firing_rates(active_pos_df, active_filter_epochs, a_decoder_1D=decoder_1D_LONG, a_decoder_result=decoder_result_LONG)
 
-
-
 # ==================================================================================================================== #
 # Overlap                                                                                                      #
 # ==================================================================================================================== #
-
 
 # Polygon Overlap ____________________________________________________________________________________________________ #
 def compute_polygon_overlap(long_results, short_results, debug_print=False):

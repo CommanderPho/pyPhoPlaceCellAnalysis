@@ -243,6 +243,8 @@ class LongShortTrackComparingDisplayFunctions(AllFunctionEnumeratingMixin, metac
             debug_print = kwargs.pop('debug_print', False)
 
 
+            active_context = kwargs.pop('active_context', owning_pipeline_reference.sess.get_context())
+
             # Plot 1D Keywoard args:
             shared_kwargs = kwargs.pop('shared_kwargs', {})
             long_kwargs = kwargs.pop('long_kwargs', {})
@@ -280,9 +282,9 @@ class LongShortTrackComparingDisplayFunctions(AllFunctionEnumeratingMixin, metac
                 shared_kwargs=shared_kwargs, long_kwargs=long_kwargs, short_kwargs=short_kwargs, debug_print=debug_print)
 
             if single_figure:
-                final_context = owning_pipeline_reference.sess.get_context().adding_context('display_fn', display_fn_name='display_short_long_pf1D_comparison')
+                final_context = active_context.adding_context('display_fn', display_fn_name='display_short_long_pf1D_comparison')
             else:
-                base_final_context = owning_pipeline_reference.sess.get_context().adding_context('display_fn', display_fn_name='display_short_long_pf1D_comparison')
+                base_final_context = active_context.adding_context('display_fn', display_fn_name='display_short_long_pf1D_comparison')
                 final_context = (base_final_context.overwriting_context(track='long'), base_final_context.overwriting_context(track='short'),) # final context is a tuple of contexts
 
             def _perform_write_to_file_callback():
