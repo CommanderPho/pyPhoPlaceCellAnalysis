@@ -242,7 +242,7 @@ class LongShortTrackComparingDisplayFunctions(AllFunctionEnumeratingMixin, metac
                     
 
             """
-            reuse_axs_tuple = kwargs.pop('reuse_axs_tuple', None)            
+            reuse_axs_tuple = kwargs.pop('reuse_axs_tuple', None)
             # reuse_axs_tuple = None # plot fresh
             # reuse_axs_tuple=(ax_long_pf_1D, ax_short_pf_1D)
             # reuse_axs_tuple=(ax_long_pf_1D, ax_long_pf_1D) # plot only on long axis

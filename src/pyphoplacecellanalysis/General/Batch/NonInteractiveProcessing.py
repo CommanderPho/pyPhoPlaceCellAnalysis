@@ -158,10 +158,6 @@ def batch_load_session(global_data_root_parent_path, active_data_mode_name, base
     
     ## Skip the filtering, it used to be performed bere but NOT NOW
 
-
-    
-
-
     ## TODO 2023-05-16 - set `curr_active_pipeline.active_configs[a_name].computation_config.pf_params.computation_epochs = curr_laps_obj` equivalent
     ## TODO 2023-05-16 - determine appropriate binning from `compute_short_long_constrained_decoders` so it's automatically from the long
 
@@ -221,7 +217,9 @@ def batch_load_session(global_data_root_parent_path, active_data_mode_name, base
     # else:
     #     updated_active_session_pseudo_filter_configs = active_session_filter_configurations ## just use the default, the above is a hack for when we've split based on lap direction.        
 
+    
     ## Second attempt knowing what I know about the computation functions:
+    # ['maze1_odd', 'maze1_even', 'maze1_any', 'maze2_odd', 'maze2_even', 'maze2_any', 'maze_odd', 'maze_even', 'maze_any']
     updated_active_session_pseudo_filter_configs = {} # empty list, woot!
     for a_computation_suffix_name, a_computation_config in zip(['_odd', '_even', '_any'], active_session_computation_configs):
         # We need to filter and then compute with the appropriate config iteratively.
