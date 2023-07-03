@@ -948,10 +948,6 @@ def _long_short_decoding_analysis_from_decoders(long_one_step_decoder_1D, short_
 
     return leave_one_out_decoding_analysis_obj
 
-
-
-
-
 # ==================================================================================================================== #
 # Long Short Firing Rate Indicies                                                                                      #
 # ==================================================================================================================== #
@@ -960,7 +956,6 @@ def _unwrap_aclu_epoch_values_dict_to_array(mean_epochs_all_frs):
     aclus = list(mean_epochs_all_frs.keys())
     values = np.array(list(mean_epochs_all_frs.values())) # 
     return aclus, values # values.shape # (108, 36)
-
 
 def _epoch_unit_avg_firing_rates(spikes_df, filter_epochs, included_neuron_ids=None, debug_print=False):
     """Computes the average firing rate for each neuron (unit) in each epoch.
@@ -1016,7 +1011,6 @@ def _epoch_unit_avg_firing_rates(spikes_df, filter_epochs, included_neuron_ids=N
             epoch_avg_firing_rate[aclu].append((float(np.shape(unit_epoch_spikes_df)[0]) / (epoch_end - epoch_start)))  #TODO 2023-06-23 11:52: - [ ] This uses the naive method of computating firing rates (num_spikes/epoch_duration) but this doesn't make sense necissarily as the cell isn't supposed to be firing for the whole epoch.
 
     return epoch_avg_firing_rate, {aclu:np.mean(unit_epoch_avg_frs) for aclu, unit_epoch_avg_frs in epoch_avg_firing_rate.items()}
-
 
 @function_attributes(short_name='_fr_index', tags=['long_short', 'compute', 'fr_index'], input_requires=[], output_provides=[], uses=[], used_by=['_compute_long_short_firing_rate_indicies'], creation_date='2023-01-19 00:00')
 def _fr_index(long_fr, short_fr):
@@ -1074,8 +1068,6 @@ def _compute_long_short_firing_rate_indicies(spikes_df, long_laps, long_replays,
 
     return x_frs_index, y_frs_index, all_results_dict
 
-
-
 def _compute_epochs_num_aclu_inclusions(all_epochs_frs_mat, min_inclusion_fr_thresh=19.01):
     """Finds the number of unique cells that are included (as measured by their firing rate exceeding the `min_inclusion_fr_thresh`) in each epoch of interest.
 
@@ -1090,7 +1082,6 @@ def _compute_epochs_num_aclu_inclusions(all_epochs_frs_mat, min_inclusion_fr_thr
     num_cells_included_in_epoch_mat = np.sum(is_cell_included_in_epoch_mat, 0)
     # num_cells_included_in_epoch_mat
     return num_cells_included_in_epoch_mat
-
 
 @function_attributes(short_name='pipeline_complete_compute_long_short_fr_indicies', tags=['long_short', 'compute', 'fr_index'], input_requires=[], output_provides=[], uses=['_compute_long_short_firing_rate_indicies'], used_by=[], creation_date='2023-01-19 00:00')
 def pipeline_complete_compute_long_short_fr_indicies(curr_active_pipeline, temp_save_filename=None):
@@ -1162,7 +1153,6 @@ def pipeline_complete_compute_long_short_fr_indicies(curr_active_pipeline, temp_
     # all_results_dict.update(dict(zip(['x_frs_index', 'y_frs_index'], [x_frs_index, y_frs_index]))) # append the indicies to the results dict
 
     return x_frs_index, y_frs_index, active_context, all_results_dict # TODO: add to computed_data instead
-
 
 @function_attributes(short_name=None, tags=['rr', 'rate_remapping', 'compute'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-05-18 18:58', related_items=[])
 def compute_rate_remapping_stats(long_short_fr_indicies_analysis, aclu_to_neuron_type_map, considerable_remapping_threshold:float=0.7):
@@ -1279,7 +1269,6 @@ def _final_compute_jonathan_replay_fr_analyses(sess, replays_df, debug_print=Fal
 
     return rdf, aclu_to_idx, irdf, aclu_to_idx_irdf
 
-
 def _subfn_computations_make_jonathan_firing_comparison_df(unit_specific_time_binned_firing_rates, pf1d_short, pf1d_long, aclu_to_idx, rdf, irdf, debug_print=False):
     """ the computations that were factored out of _make_jonathan_interactive_plot(...) 
     Historical: used to be called `_subfn_computations_make_jonathan_interactive_plot(...)`
@@ -1347,7 +1336,6 @@ def _subfn_computations_make_jonathan_firing_comparison_df(unit_specific_time_bi
     ## Compare the number of replay events between the long and the short
 
     return df
-
 
 # Common _____________________________________________________________________________________________________________ #
 def make_fr(rdf):
