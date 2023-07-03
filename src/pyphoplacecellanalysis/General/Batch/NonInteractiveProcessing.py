@@ -204,24 +204,15 @@ def batch_load_session(global_data_root_parent_path, active_data_mode_name, base
         print(f'using provided computation_functions_name_includelist: {computation_functions_name_includelist}')
         computation_functions_name_excludelist=None
 
-    # # For every computation config we build a fake (duplicate) filter config).
-    # if len(active_session_computation_configs) == 3:
-    #     # For computing separate filters for each lap, we get filters with names like: `['maze1_odd', 'maze1_even', 'maze1_any', 'maze2_odd', 'maze2_even', 'maze2_any', 'maze_odd', 'maze_even', 'maze_any']`
-    #     updated_active_session_pseudo_filter_configs = {} # empty list, woot!
-
-    #     # so we need the legit list of filter configs first.
-    #     for a_filter_config_name, a_filter_config_fn in active_session_filter_configurations.items():
-    #         # then we duplicate them for each computation config, appending the appropriate suffix.
-    #         for a_computation_suffix_name, a_computation_config in zip(['_odd', '_even', '_any'], active_session_computation_configs):
-    #                 updated_active_session_pseudo_filter_configs[f'{a_filter_config_name}{a_computation_suffix_name}'] = deepcopy(a_filter_config_fn) # this copy is just so that the values are recomputed with the appropriate config. This is a HACK
-    # else:
-    #     updated_active_session_pseudo_filter_configs = active_session_filter_configurations ## just use the default, the above is a hack for when we've split based on lap direction.        
+    ## For every computation config we build a fake (duplicate) filter config).
+    if len(active_session_computation_configs) > 3:
+        lap_direction_suffix_list = ['_odd', '_even', '_any'] # ['maze1_odd', 'maze1_even', 'maze1_any', 'maze2_odd', 'maze2_even', 'maze2_any', 'maze_odd', 'maze_even', 'maze_any']
+    else:
+        lap_direction_suffix_list = ['']
 
     
-    ## Second attempt knowing what I know about the computation functions:
-    # ['maze1_odd', 'maze1_even', 'maze1_any', 'maze2_odd', 'maze2_even', 'maze2_any', 'maze_odd', 'maze_even', 'maze_any']
     updated_active_session_pseudo_filter_configs = {} # empty list, woot!
-    for a_computation_suffix_name, a_computation_config in zip(['_odd', '_even', '_any'], active_session_computation_configs):
+    for a_computation_suffix_name, a_computation_config in zip(lap_direction_suffix_list, active_session_computation_configs):
         # We need to filter and then compute with the appropriate config iteratively.
         for a_filter_config_name, a_filter_config_fn in active_session_filter_configurations.items():
             updated_active_session_pseudo_filter_configs[f'{a_filter_config_name}{a_computation_suffix_name}'] = deepcopy(a_filter_config_fn) # this copy is just so that the values are recomputed with the appropriate config. This is a HACK
@@ -231,7 +222,6 @@ def batch_load_session(global_data_root_parent_path, active_data_mode_name, base
 
         ## TODO 2023-01-15 - perform_computations for all configs!!
         curr_active_pipeline.perform_computations(a_computation_config, computation_functions_name_includelist=computation_functions_name_includelist, computation_functions_name_excludelist=computation_functions_name_excludelist, fail_on_exception=fail_on_exception, debug_print=debug_print) #, overwrite_extant_results=False  ], fail_on_exception=True, debug_print=False)
-
 
 
     if not skip_extended_batch_computations:
