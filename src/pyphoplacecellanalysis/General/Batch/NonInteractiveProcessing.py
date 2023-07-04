@@ -609,27 +609,33 @@ def batch_perform_all_plots(curr_active_pipeline, enable_neptune=True, neptuner=
     from pyphoplacecellanalysis.General.Batch.NonInteractiveProcessing import batch_perform_all_plots
     
     """
-    from pyphoplacecellanalysis.General.Batch.NeptuneAiHelpers import set_environment_variables, Neptuner
-    if neptuner is None:
-        neptuner = Neptuner.init_with_pipeline(curr_active_pipeline)
-        
+    try:
+        from pyphoplacecellanalysis.General.Batch.NeptuneAiHelpers import set_environment_variables, Neptuner
+        if neptuner is None:
+            neptuner = Neptuner.init_with_pipeline(curr_active_pipeline) 
+    except Exception as e:
+        print(f'in `batch_perform_all_plots(...)`: Neptuner.init_with_pipeline(curr_active_pipeline)(...) failed with exception: {e}. Continuing but disabling neptune.')
+        enable_neptune = False
+        print(f'\t since neptune setup failed, neptune will be disabled going forward.')
+        neptuner = None
+         
     curr_active_pipeline.reload_default_display_functions()
     try:
         active_identifying_session_ctx, active_session_figures_out_path, active_out_figures_list = batch_programmatic_figures(curr_active_pipeline)
     except Exception as e:
-        print(f'in `_perform_plots(...)`: batch_programmatic_figures(...) failed with exception: {e}. Continuing.')
+        print(f'in `batch_perform_all_plots(...)`: batch_programmatic_figures(...) failed with exception: {e}. Continuing.')
     
     try:
         batch_extended_programmatic_figures(curr_active_pipeline=curr_active_pipeline)
     except Exception as e:
-        print(f'in `_perform_plots(...)`: batch_extended_programmatic_figures(...) failed with exception: {e}. Continuing.')
+        print(f'in `batch_perform_all_plots(...)`: batch_extended_programmatic_figures(...) failed with exception: {e}. Continuing.')
     
     if enable_neptune:
         try:
             succeeded_fig_paths, failed_fig_paths = neptuner.upload_figures(curr_active_pipeline)
             # neptune_output_figures(curr_active_pipeline)
         except Exception as e:
-            print(f'in `_perform_plots(...)`: neptune_output_figures(...) failed with exception: {e}. Continuing.')
+            print(f'in `batch_perform_all_plots(...)`: neptune_output_figures(...) failed with exception: {e}. Continuing.')
         finally:
             neptuner.stop()
         neptuner.stop()
