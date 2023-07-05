@@ -42,7 +42,6 @@ def export_pyqtgraph_plot(graphics_item, savepath='fileName.png', progress_print
 
     Usage:
         from pyphoplacecellanalysis.General.Mixins.ExportHelpers import export_pyqtgraph_plot
-        from pyphoplacecellanalysis.Pho2D.PyQtPlots.Extensions.pyqtgraph_helpers.export_pyqtgraph_plot
 
         main_graphics_layout_widget = active_2d_plot.ui.main_graphics_layout_widget # GraphicsLayoutWidget
         main_plot_widget = active_2d_plot.plots.main_plot_widget # PlotItem

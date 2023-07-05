@@ -528,7 +528,7 @@ def _build_scatterplot(new_ax) -> pg.GridItem:
 
 
 @function_attributes(short_name='plot_raster_plot', tags=['pyqtgraph','raster','2D'], input_requires=[], output_provides=[], uses=['_plot_empty_raster_plot_frame'], used_by=[], creation_date='2023-03-31 20:53')
-def plot_raster_plot(spikes_df: pd.DataFrame, included_neuron_ids, unit_sort_order=None, unit_colors_list=None, scatter_plot_kwargs=None, scatter_app_name='pho_test') -> tuple[Any, pg.GraphicsLayoutWidget, RenderPlots, RenderPlotsData]:
+def plot_raster_plot(spikes_df: pd.DataFrame, included_neuron_ids, unit_sort_order=None, unit_colors_list=None, scatter_plot_kwargs=None, scatter_app_name='pho_test', defer_show=False) -> tuple[Any, pg.GraphicsLayoutWidget, RenderPlots, RenderPlotsData]:
     """ This uses pyqtgraph's scatter function like SpikeRaster2D to render a raster plot with colored ticks by default
 
     Usage:
@@ -539,7 +539,7 @@ def plot_raster_plot(spikes_df: pd.DataFrame, included_neuron_ids, unit_sort_ord
     """
     
     # make root container for plots
-    app, win, plots, plots_data = _plot_empty_raster_plot_frame(scatter_app_name=scatter_app_name, defer_show=False)
+    app, win, plots, plots_data = _plot_empty_raster_plot_frame(scatter_app_name=scatter_app_name, defer_show=defer_show)
     
     plots_data = _build_scatter_plotting_managers(plots_data, spikes_df=spikes_df, included_neuron_ids=included_neuron_ids, unit_sort_order=unit_sort_order, unit_colors_list=unit_colors_list)
     # Update the dataframe
@@ -565,7 +565,7 @@ def plot_raster_plot(spikes_df: pd.DataFrame, included_neuron_ids, unit_sort_ord
     return app, win, plots, plots_data
 
 @function_attributes(short_name=None, tags=['pyqtgraph','raster','2D'], input_requires=[], output_provides=[], uses=['_prepare_spikes_df_from_filter_epochs', '_plot_empty_raster_plot_frame'], used_by=[], creation_date='2023-06-16 20:45', related_items=['plot_raster_plot'])
-def plot_multiple_raster_plot(filter_epochs_df: pd.DataFrame, spikes_df: pd.DataFrame, included_neuron_ids=None, unit_sort_order=None, unit_colors_list=None, scatter_plot_kwargs=None, epoch_id_key_name='temp_epoch_id', scatter_app_name="Pho Stacked Replays"):
+def plot_multiple_raster_plot(filter_epochs_df: pd.DataFrame, spikes_df: pd.DataFrame, included_neuron_ids=None, unit_sort_order=None, unit_colors_list=None, scatter_plot_kwargs=None, epoch_id_key_name='temp_epoch_id', scatter_app_name="Pho Stacked Replays", defer_show=False):
     """ This renders a stack of raster plots
 
     Usage:
@@ -589,7 +589,7 @@ def plot_multiple_raster_plot(filter_epochs_df: pd.DataFrame, spikes_df: pd.Data
 
     # ## Create the raster plot for the replay:
     # app, win, plots, plots_data = plot_raster_plot(_active_epoch_spikes_df, shared_aclus, scatter_app_name=f"Raster Epoch[{epoch_idx}]")
-    app, win, plots, plots_data = _plot_empty_raster_plot_frame(scatter_app_name=scatter_app_name, defer_show=False)
+    app, win, plots, plots_data = _plot_empty_raster_plot_frame(scatter_app_name=scatter_app_name, defer_show=defer_show)
     # setting plot window background color to white
     win.setBackground('w')
     # win.setForeground('k')
