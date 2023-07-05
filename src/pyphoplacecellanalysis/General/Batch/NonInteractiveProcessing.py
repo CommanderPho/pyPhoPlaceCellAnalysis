@@ -363,21 +363,21 @@ def batch_programmatic_figures(curr_active_pipeline):
 # import matplotlib as mpl
 # import matplotlib.pyplot as plt
 @function_attributes(short_name='batch_extended_programmatic_figures', tags=['batch', 'automated', 'session', 'display', 'figures', 'extended', 'matplotlib'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-03-28 04:46')
-def batch_extended_programmatic_figures(curr_active_pipeline, write_pdf=False, write_png=True, debug_print=False):
+def batch_extended_programmatic_figures(curr_active_pipeline, write_vector_format=False, write_png=True, debug_print=False):
     _bak_rcParams = mpl.rcParams.copy()
     mpl.rcParams['toolbar'] = 'None' # disable toolbars
     matplotlib.use('AGG') # non-interactive backend ## 2022-08-16 - Surprisingly this works to make the matplotlib figures render only to .png file, not appear on the screen!
     from neuropy.plotting.ratemaps import BackgroundRenderingOptions
     
     # active_identifying_session_ctx = curr_active_pipeline.sess.get_context() # 'bapun_RatN_Day4_2019-10-15_11-30-06'
-    programmatic_render_to_file(curr_active_pipeline, curr_display_function_name='_display_1d_placefields', write_pdf=write_pdf, write_png=write_png, debug_print=debug_print) # 🟢✅ Now seems to be working and saving to PDF!! Still using matplotlib.use('Qt5Agg') mode and plots still appear.
+    programmatic_render_to_file(curr_active_pipeline, curr_display_function_name='_display_1d_placefields', write_vector_format=write_vector_format, write_png=write_png, debug_print=debug_print) # 🟢✅ Now seems to be working and saving to PDF!! Still using matplotlib.use('Qt5Agg') mode and plots still appear.
     
     # '_display_1d_placefield_validations' can't use `programmatic_render_to_file` yet and must rely on `programmatic_display_to_PDF` because it doesn't get a new session for each figure and it overwrites itself a bunch
     programmatic_display_to_PDF(curr_active_pipeline, curr_display_function_name='_display_1d_placefield_validations', debug_print=debug_print) # , filter_name=active_config_name 🟢✅ Now seems to be working and saving to PDF!! Still using matplotlib.use('Qt5Agg') mode and plots still appear. Moderate visual improvements can still be made (titles overlap and stuff). Works with %%capture
-    # programmatic_render_to_file(curr_active_pipeline, curr_display_function_name='_display_1d_placefield_validations', write_pdf=write_pdf, write_png=write_png, debug_print=debug_print) #  UNTESTED 2023-05-29 
+    # programmatic_render_to_file(curr_active_pipeline, curr_display_function_name='_display_1d_placefield_validations', write_vector_format=write_vector_format, write_png=write_png, debug_print=debug_print) #  UNTESTED 2023-05-29 
     
-    programmatic_render_to_file(curr_active_pipeline, curr_display_function_name='_display_2d_placefield_result_plot_ratemaps_2D', write_pdf=write_pdf, write_png=write_png, debug_print=debug_print, bg_rendering_mode=BackgroundRenderingOptions.EMPTY) #  🟢✅ Now seems to be working and saving to PDF!! Still using matplotlib.use('Qt5Agg') mode and plots still appear.
-    programmatic_render_to_file(curr_active_pipeline, curr_display_function_name='_display_2d_placefield_occupancy', write_pdf=write_pdf, write_png=write_png, debug_print=debug_print) #  🟢✅ 2023-05-25
+    programmatic_render_to_file(curr_active_pipeline, curr_display_function_name='_display_2d_placefield_result_plot_ratemaps_2D', write_vector_format=write_vector_format, write_png=write_png, debug_print=debug_print, bg_rendering_mode=BackgroundRenderingOptions.EMPTY) #  🟢✅ Now seems to be working and saving to PDF!! Still using matplotlib.use('Qt5Agg') mode and plots still appear.
+    programmatic_render_to_file(curr_active_pipeline, curr_display_function_name='_display_2d_placefield_occupancy', write_vector_format=write_vector_format, write_png=write_png, debug_print=debug_print) #  🟢✅ 2023-05-25
    
     #TODO 2023-06-14 05:30: - [ ] Refactor these (the global placefields) into a form compatible with the local ones using some sort of shortcut method like `programmatic_render_to_file`
 
@@ -447,7 +447,7 @@ class BatchPhoJonathanFiguresHelper(object):
 
 
     @classmethod
-    def run(cls, curr_active_pipeline, neuron_replay_stats_df, n_max_page_rows=10, write_pdf=False, write_png=True, progress_print=True, debug_print=False):
+    def run(cls, curr_active_pipeline, neuron_replay_stats_df, n_max_page_rows=10, write_vector_format=False, write_png=True, progress_print=True, debug_print=False):
         """ The only public function. Performs the batch plotting. """
 
         ## 🗨️🟢 2022-11-05 - Pho-Jonathan Batch Outputs of Firing Rate Figures
@@ -472,7 +472,7 @@ class BatchPhoJonathanFiguresHelper(object):
         matplotlib.use('AGG') # non-interactive backend ## 2022-08-16 - Surprisingly this works to make the matplotlib figures render only to .png file, not appear on the screen!
 
         _batch_plot_kwargs_list = cls._build_batch_plot_kwargs(long_only_aclus, short_only_aclus, shared_aclus, active_identifying_session_ctx, n_max_page_rows=n_max_page_rows)
-        active_out_figures_list = cls._perform_batch_plot(curr_active_pipeline, _batch_plot_kwargs_list, write_pdf=write_pdf, write_png=write_png, progress_print=progress_print, debug_print=debug_print)
+        active_out_figures_list = cls._perform_batch_plot(curr_active_pipeline, _batch_plot_kwargs_list, write_vector_format=write_vector_format, write_png=write_png, progress_print=progress_print, debug_print=debug_print)
         
         ## PITFALL: Note that depending on the figure output mode there might not be a common parent path for all files from this session, so this variable is just kept around for compatibility.
         active_session_figures_parent_path = curr_active_pipeline.get_output_manager().get_figure_output_parent_path(active_identifying_session_ctx, make_folder_if_needed=False)
@@ -540,13 +540,13 @@ class BatchPhoJonathanFiguresHelper(object):
         return _batch_plot_kwargs_list
 
     @classmethod
-    def _perform_batch_plot(cls, curr_active_pipeline, active_kwarg_list, subset_includelist=None, subset_excludelist=None, write_pdf=False, write_png=True, progress_print=True, debug_print=False):
+    def _perform_batch_plot(cls, curr_active_pipeline, active_kwarg_list, subset_includelist=None, subset_excludelist=None, write_vector_format=False, write_png=True, progress_print=True, debug_print=False):
         """ Plots everything by calling `cls._subfn_batch_plot_automated` using the kwargs provided in `active_kwarg_list`
 
         Args:
             active_kwarg_list (_type_): generated by `_build_batch_plot_kwargs(...)`
             figures_parent_out_path (_type_, optional): _description_. Defaults to None.
-            write_pdf (bool, optional): _description_. Defaults to False.
+            write_vector_format (bool, optional): _description_. Defaults to False.
             write_png (bool, optional): _description_. Defaults to True.
             progress_print (bool, optional): _description_. Defaults to True.
             debug_print (bool, optional): _description_. Defaults to False.
@@ -569,7 +569,7 @@ class BatchPhoJonathanFiguresHelper(object):
             final_figure_file_path = fig_man.get_figure_save_file_path(curr_active_identifying_ctx, make_folder_if_needed=True) # complete file path without extension: e.g. '/ProgrammaticDisplayFunctionTesting/2023-06-15/kdiba_pin01_one_11-03_12-3-25_BatchPhoJonathanReplayFRC_short_only_[13, 22, 28]'
             
             # One plot at a time to PDF:
-            if write_pdf:
+            if write_vector_format:
                 active_pdf_metadata, _UNUSED_pdf_save_filename = build_pdf_metadata_from_display_context(curr_active_identifying_ctx, subset_includelist=subset_includelist, subset_excludelist=subset_excludelist)
                 curr_pdf_save_path = final_figure_file_path.with_suffix('.pdf')
                 with backend_pdf.PdfPages(curr_pdf_save_path, keep_empty=False, metadata=active_pdf_metadata) as pdf:
