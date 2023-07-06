@@ -490,9 +490,12 @@ class BatchPhoJonathanFiguresHelper:
 
 
     @classmethod
-    def run(cls, curr_active_pipeline, neuron_replay_stats_df, n_max_page_rows=10, write_vector_format=False, write_png=True, progress_print=True, debug_print=False):
+    def run(cls, curr_active_pipeline, neuron_replay_stats_df, included_unit_neuron_IDs=None, n_max_page_rows=10, write_vector_format=False, write_png=True, progress_print=True, debug_print=False):
         """ The only public function. Performs the batch plotting. """
-
+        if included_unit_neuron_IDs is not None:
+            ## pre-filter the `neuron_replay_stats_df` by the included_unit_neuron_IDs only:
+            neuron_replay_stats_df = neuron_replay_stats_df[np.isin(neuron_replay_stats_df.index, included_unit_neuron_IDs)]
+            
         ## 🗨️🟢 2022-11-05 - Pho-Jonathan Batch Outputs of Firing Rate Figures
         # %matplotlib qt
         short_only_df = neuron_replay_stats_df[neuron_replay_stats_df.track_membership == SplitPartitionMembership.RIGHT_ONLY]
