@@ -57,7 +57,7 @@ class SpikeRateTrends:
         epoch_agg_firing_rates_list = np.vstack([a_signal.max(axis=0).magnitude for a_signal in _out.inst_fr_signals_list]) # find the peak within each epoch (for all cells) using `.max(...)`
         assert epoch_agg_firing_rates_list.shape == (n_epochs, n_cells)
         _out.epoch_agg_inst_fr_list = epoch_agg_firing_rates_list # .shape (n_epochs, n_cells)
-        cell_agg_firing_rates_list = epoch_agg_firing_rates_list.mean(axis=0) # find the peak over all epochs (for all cells) using `.max(...)`
+        cell_agg_firing_rates_list = epoch_agg_firing_rates_list.mean(axis=0) # find the peak over all epochs (for all cells) using `.max(...)` --- OOPS, what about the zero epochs? Should those actually effect the rate? Should they be excluded?
         assert cell_agg_firing_rates_list.shape == (n_cells,)
         _out.cell_agg_inst_fr_list = cell_agg_firing_rates_list # .shape (n_cells,)
         _out.all_agg_inst_fr = cell_agg_firing_rates_list.mean() # .magnitude.item() # scalar
