@@ -475,7 +475,9 @@ def main(active_global_batch_result_filename='global_batch_result.pkl', debug_pr
     saveData(finalized_loaded_global_batch_result_pickle_path, global_batch_run) # Update the global batch run dictionary
 
 
-
+# ==================================================================================================================== #
+# Exporters                                                                                                            #
+# ==================================================================================================================== #
 def dataframe_functions_test():
     """ 2023-06-13 - Tests loading saved .h5 `global_batch_result` Dataframe. And updating it for the local platform.
 
@@ -498,6 +500,46 @@ def dataframe_functions_test():
     good_only_batch_progress_df = batch_progress_df[batch_progress_df['locally_is_ready']].copy()
     good_only_batch_progress_df
     return good_only_batch_progress_df, batch_progress_df
+
+
+
+## Build a list of the output files for the good sessions:
+@function_attributes(short_name=None, tags=['batch', 'results', 'output'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-07-06 14:09', related_items=[])
+def _build_output_files_list(good_only_batch_progress_df):
+    ## Build a list of the output files for the good sessions:
+    session_result_paths = [str(v.joinpath(f'loadedSessPickle.pkl').resolve()) for v in list(good_only_batch_progress_df.basedirs.values)]
+    global_computation_result_paths = [str(v.joinpath(f'output/global_computation_results.pkl').resolve()) for v in list(good_only_batch_progress_df.basedirs.values)]
+
+    # Write out a GreatlakesOutputs.txt file:
+    with open('GreatlakesOutputs.txt','w') as f:
+        f.write('\n'.join(session_result_paths + global_computation_result_paths))
+        # f.write('\n'.join())
+    return (session_result_paths, global_computation_result_paths)
+        
+@function_attributes(short_name=None, tags=['ripple', 'batch', 'output'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-07-06 14:09', related_items=[])
+def _build_ripple_result_path(good_only_batch_progress_df: pd.DataFrame):
+    """
+    Usage:
+        session_externally_computed_ripple_paths = _build_ripple_result_path(good_only_batch_progress_df)
+        session_externally_computed_ripple_paths
+
+    """
+    def _find_best_ripple_result_path(a_path: Path):
+        _temp_found_path = a_path.joinpath('ripple_df.pkl')
+        if _temp_found_path.exists():
+            return _temp_found_path.resolve()
+        ## try the '.ripple.npy' ripples:
+        _temp_found_path = a_path.joinpath(a_path.name).with_suffix('.ripple.npy')
+        if _temp_found_path.exists():
+            return _temp_found_path.resolve()
+        else:
+            return None # could not find the file.
+        
+    session_ripple_result_paths = [_find_best_ripple_result_path(v) for v in list(good_only_batch_progress_df.basedirs.values)]
+    return session_ripple_result_paths
+    # global_computation_result_paths = [str(v.joinpath(f'output/global_computation_results.pkl').resolve()) for v in list(good_only_batch_progress_df.basedirs.values)]
+    
+
 
 
 if __name__ == "__main__":

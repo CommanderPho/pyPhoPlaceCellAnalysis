@@ -345,7 +345,7 @@ def batch_extended_computations(curr_active_pipeline, include_includelist=None, 
 # Batch Programmatic Figures - 2022-12-08 Batch Programmatic Figures (Currently only Jonathan-style)                                                                                           #
 # ==================================================================================================================== #
 @function_attributes(short_name='batch_programmatic_figures', tags=['batch', 'automated', 'session', 'display', 'figures'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-03-28 04:46')
-def batch_programmatic_figures(curr_active_pipeline):
+def batch_programmatic_figures(curr_active_pipeline, debug_print=False):
     """ programmatically generates and saves the batch figures 2022-12-07 
         curr_active_pipeline is the pipeline for a given session with all computations done.
 
@@ -373,9 +373,10 @@ def batch_programmatic_figures(curr_active_pipeline):
     long_only_aclus = long_only_df.index.values.tolist()
     shared_df = neuron_replay_stats_df[neuron_replay_stats_df.track_membership == SplitPartitionMembership.SHARED]
     shared_aclus = shared_df.index.values.tolist()
-    print(f'shared_aclus: {shared_aclus}')
-    print(f'long_only_aclus: {long_only_aclus}')
-    print(f'short_only_aclus: {short_only_aclus}')
+    if debug_print:
+        print(f'shared_aclus: {shared_aclus}')
+        print(f'long_only_aclus: {long_only_aclus}')
+        print(f'short_only_aclus: {short_only_aclus}')
 
     active_identifying_session_ctx = curr_active_pipeline.sess.get_context() # 'bapun_RatN_Day4_2019-10-15_11-30-06'    
     ## MODE: this mode creates a special folder to contain the outputs for this session.
@@ -467,6 +468,8 @@ def batch_extended_programmatic_figures(curr_active_pipeline, write_vector_forma
         print(f'batch_extended_programmatic_figures(...): _prepare_plot_long_and_short_epochs failed with error: {e}\n skipping.')
         
 
+
+
 class BatchPhoJonathanFiguresHelper(object):
     """Private methods that help with batch figure generator for ClassName.
 
@@ -495,9 +498,10 @@ class BatchPhoJonathanFiguresHelper(object):
         long_only_aclus = long_only_df.index.values.tolist()
         shared_df = neuron_replay_stats_df[neuron_replay_stats_df.track_membership == SplitPartitionMembership.SHARED]
         shared_aclus = shared_df.index.values.tolist()
-        print(f'shared_aclus: {shared_aclus}')
-        print(f'long_only_aclus: {long_only_aclus}')
-        print(f'short_only_aclus: {short_only_aclus}')
+        if debug_print:
+            print(f'shared_aclus: {shared_aclus}')
+            print(f'long_only_aclus: {long_only_aclus}')
+            print(f'short_only_aclus: {short_only_aclus}')
 
         active_identifying_session_ctx = curr_active_pipeline.sess.get_context() # 'bapun_RatN_Day4_2019-10-15_11-30-06'
         
@@ -526,7 +530,7 @@ class BatchPhoJonathanFiguresHelper(object):
         # single_subfigure_size_px = np.array([1920.0, 220.0])
         single_subfigure_size_inches = np.array([19.2,  2.2])
 
-        num_cells = len(included_unit_neuron_IDs)
+        num_cells = len(included_unit_neuron_IDs or [])
         desired_figure_size_inches = single_subfigure_size_inches.copy()
         desired_figure_size_inches[1] = desired_figure_size_inches[1] * num_cells
         graphics_output_dict = curr_active_pipeline.display(cls._display_fn_name, active_identifying_ctx,
