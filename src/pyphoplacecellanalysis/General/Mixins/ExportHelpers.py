@@ -470,6 +470,9 @@ def programmatic_display_to_PDF(curr_active_pipeline, curr_display_function_name
     Looks it this is done for EACH filtered context (in the loop below) whereas the original just did a single specific context
     """
 
+    #TODO 2023-07-06 15:33: - [ ] Currently required for only one display function: `_display_1d_placefield_validations`
+    # raise PendingDeprecationWarning
+
     ## Get the output path (active_session_figures_out_path) for this session (and all of its filtered_contexts as well):
     active_identifying_session_ctx = curr_active_pipeline.sess.get_context() # 'bapun_RatN_Day4_2019-10-15_11-30-06'
     figures_parent_out_path = create_daily_programmatic_display_function_testing_folder_if_needed()
@@ -477,6 +480,7 @@ def programmatic_display_to_PDF(curr_active_pipeline, curr_display_function_name
     if debug_print:
         print(f'curr_session_parent_out_path: {active_session_figures_out_path}')
     active_session_figures_out_path.mkdir(parents=True, exist_ok=True) # make folder if needed
+
 
     with plt.ioff():
         ## Disables showing the figure by default from within the context manager.
