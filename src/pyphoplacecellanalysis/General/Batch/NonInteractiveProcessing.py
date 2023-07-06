@@ -475,9 +475,9 @@ def batch_extended_programmatic_figures(curr_active_pipeline, write_vector_forma
 class BatchPhoJonathanFiguresHelper:
     """Private methods that help with batch figure generator for ClassName.
 
-    In .run(...) it builds the plot_kwargs ahead of time that will be passed to the specific plot function using `cls._build_batch_plot_kwargs(...)`
+    In .run(...) it builds the plot_kwargs (`active_kwarg_list`) ahead of time that will be passed to the specific plot function using `cls._build_batch_plot_kwargs(...)`
         It then calls `active_out_figures_list = cls._perform_batch_plot(...)` to do the plotting, getting the list of figures and output paths
-    
+            -> `cls._subfn_batch_plot_automated()`
     2022-12-08 - Batch Programmatic Figures (Currently only Jonathan-style) 
     2022-12-01 - Automated programmatic output using `_display_batch_pho_jonathan_replay_firing_rate_comparison`
 
@@ -548,11 +548,16 @@ class BatchPhoJonathanFiguresHelper:
     def _build_batch_plot_kwargs(cls, long_only_aclus, short_only_aclus, shared_aclus, active_identifying_session_ctx, n_max_page_rows=10):
         """ builds the list of kwargs for all aclus. """
         _batch_plot_kwargs_list = [] # empty list to start
+
+
+        # _aclu_indicies_list_str_formatter = lambda a_list: ('[' + ','.join(map(str, a_list)) + ']') # Prints an array of integer aclu indicies without spaces and comma separated, surrounded by hard brackets. e.g. '[5,6,7,8,11,12,15,17,18,19,20,21,24,25,26,27,28,31,34,35,39,40,41,43,44,45,48,49,50,51,52,53,55,56,60,62,63,64,65]'
+        _aclu_indicies_list_str_formatter = lambda a_list: ('(' + ','.join(map(str, a_list)) + ')')
+
         ## {long_only, short_only} plot configs (doesn't include the shared_aclus)
         if len(long_only_aclus) > 0:        
             _batch_plot_kwargs_list.append(dict(included_unit_neuron_IDs=long_only_aclus,
             active_identifying_ctx=active_identifying_session_ctx.adding_context(collision_prefix='_batch_plot_test',
-                display_fn_name=cls._display_fn_context_display_name, plot_result_set='long_only', aclus=f"{long_only_aclus}"
+                display_fn_name=cls._display_fn_context_display_name, plot_result_set='long_only', aclus=f"{_aclu_indicies_list_str_formatter(long_only_aclus)}"
             ),
             fignum='long_only', n_max_page_rows=len(long_only_aclus)))
         else:
@@ -561,7 +566,7 @@ class BatchPhoJonathanFiguresHelper:
         if len(short_only_aclus) > 0:
             _batch_plot_kwargs_list.append(dict(included_unit_neuron_IDs=short_only_aclus,
             active_identifying_ctx=active_identifying_session_ctx.adding_context(collision_prefix='_batch_plot_test',
-                display_fn_name=cls._display_fn_context_display_name, plot_result_set='short_only', aclus=f"{short_only_aclus}"
+                display_fn_name=cls._display_fn_context_display_name, plot_result_set='short_only', aclus=f"{_aclu_indicies_list_str_formatter(short_only_aclus)}"
             ),
             fignum='short_only', n_max_page_rows=len(short_only_aclus)))
         else:
@@ -576,7 +581,7 @@ class BatchPhoJonathanFiguresHelper:
             ## paginated outputs for shared cells
             included_unit_indicies_pages = [[curr_included_unit_index for (a_linear_index, curr_row, curr_col, curr_included_unit_index) in v] for page_idx, v in enumerate(included_combined_indicies_pages)] # a list of length `num_pages` containing up to 10 items
             paginated_shared_cells_kwarg_list = [dict(included_unit_neuron_IDs=curr_included_unit_indicies,
-                active_identifying_ctx=active_identifying_session_ctx.adding_context(collision_prefix='_batch_plot_test', display_fn_name=cls._display_fn_context_display_name, plot_result_set='shared', page=f'{page_idx+1}of{num_pages}', aclus=f"{curr_included_unit_indicies}"),
+                active_identifying_ctx=active_identifying_session_ctx.adding_context(collision_prefix='_batch_plot_test', display_fn_name=cls._display_fn_context_display_name, plot_result_set='shared', page=f'{page_idx+1}of{num_pages}', aclus=f"{_aclu_indicies_list_str_formatter(curr_included_unit_indicies)}"),
                 fignum=f'shared_{page_idx}', fig_idx=page_idx, n_max_page_rows=n_max_page_rows) for page_idx, curr_included_unit_indicies in enumerate(included_unit_indicies_pages)]
             _batch_plot_kwargs_list.extend(paginated_shared_cells_kwarg_list) # add paginated_shared_cells_kwarg_list to the list
         else:
@@ -606,28 +611,29 @@ class BatchPhoJonathanFiguresHelper:
 
         active_out_figures_list = [] # empty list to hold figures
         num_pages = len(active_kwarg_list)
+
+        # Each figure:
         for i, curr_batch_plot_kwargs in enumerate(active_kwarg_list):
             curr_active_identifying_ctx = curr_batch_plot_kwargs['active_identifying_ctx'] # this context is good
             
             ## 2023-06-14 - New way using `fig_man.get_figure_save_file_path(...)` - this is correct
             final_figure_file_path = fig_man.get_figure_save_file_path(curr_active_identifying_ctx, make_folder_if_needed=True) # complete file path without extension: e.g. '/ProgrammaticDisplayFunctionTesting/2023-06-15/kdiba_pin01_one_11-03_12-3-25_BatchPhoJonathanReplayFRC_short_only_[13, 22, 28]'
-            
+
+            # Perform the plotting:
+            a_fig = cls._subfn_batch_plot_automated(curr_active_pipeline, **curr_batch_plot_kwargs)
+            active_out_figures_list.append(a_fig)
+
             # One plot at a time to PDF:
             if write_vector_format:
                 active_pdf_metadata, _UNUSED_pdf_save_filename = build_pdf_metadata_from_display_context(curr_active_identifying_ctx, subset_includelist=subset_includelist, subset_excludelist=subset_excludelist)
                 curr_pdf_save_path = final_figure_file_path.with_suffix('.pdf')
                 with backend_pdf.PdfPages(curr_pdf_save_path, keep_empty=False, metadata=active_pdf_metadata) as pdf:
-                    a_fig = cls._subfn_batch_plot_automated(curr_active_pipeline, **curr_batch_plot_kwargs)
-                    active_out_figures_list.append(a_fig)
                     # Save out PDF page:
                     pdf.savefig(a_fig)
                     curr_active_pipeline.register_output_file(output_path=curr_pdf_save_path, output_metadata={'context': curr_active_identifying_ctx, 'fig': (a_fig), 'pdf_metadata': active_pdf_metadata})
                     if progress_print:
                         print(f'\t saved {curr_pdf_save_path}')
-            else:
-                # Don't write the PDF and just plot interactively:
-                a_fig = cls._subfn_batch_plot_automated(curr_active_pipeline, **curr_batch_plot_kwargs)
-                active_out_figures_list.append(a_fig)
+
 
             # Also save .png versions:
             if write_png:
