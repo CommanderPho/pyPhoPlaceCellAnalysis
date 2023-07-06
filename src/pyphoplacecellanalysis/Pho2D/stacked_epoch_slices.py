@@ -358,7 +358,7 @@ def _pagination_helper_plot_single_epoch_slice(curr_ax, params, plots_data, plot
 
 
 # Helper Figure/Plots Builders _______________________________________________________________________________________ #
-@function_attributes(short_name=None, tags=['epoch', 'stacked', 'matplotlib'], input_requires=[], output_provides=[], uses=['stacked_epoch_basic_setup', 'MatplotlibTimeSynchronizedWidget'], used_by=['plot_decoded_epoch_slices'], creation_date='2023-05-30 10:05', related_items=[])
+@function_attributes(short_name=None, tags=['epoch', 'stacked', 'matplotlib', 'TODO:PERFORMANCE'], input_requires=[], output_provides=[], uses=['stacked_epoch_basic_setup', 'MatplotlibTimeSynchronizedWidget'], used_by=['plot_decoded_epoch_slices'], creation_date='2023-05-30 10:05', related_items=[])
 def stacked_epoch_slices_matplotlib_build_view(epoch_slices, name='stacked_epoch_slices_matplotlib_subplots_laps', plot_function_name=None, epoch_labels=None, single_plot_fixed_height=100.0, debug_test_max_num_slices=127, debug_print=False):
     """ Builds a matplotlib figure view with empty subplots that can be plotted after the fact by iterating through plots.axs
         
@@ -409,7 +409,7 @@ def stacked_epoch_slices_matplotlib_build_view(epoch_slices, name='stacked_epoch
         _pagination_helper_plot_single_epoch_slice(curr_ax, params, plots_data, plots, ui, a_slice_idx=a_slice_idx, is_first_setup=True, debug_print=debug_print)
 
     ## Required only for MatplotlibTimeSynchronizedWidget-embedded version:
-    ui.mw.draw()
+    ui.mw.draw() #TODO 2023-07-06 15:08: - [ ] TODO: PERFORMANCE - uneeded-draw
     # ui.mw.ui.scrollAreaContentsWidget.setMinimumHeight(params.all_plots_height)
     ui.mw.show()
     

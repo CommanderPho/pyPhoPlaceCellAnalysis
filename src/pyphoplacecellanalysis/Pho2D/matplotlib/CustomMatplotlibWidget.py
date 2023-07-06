@@ -161,6 +161,10 @@ class CustomMatplotlibWidget(QtWidgets.QWidget):
         return self.plots.fig
         
     def draw(self):
+        """ This is what is taking a ton of time with the .Agg backend at least and complex figures. Need a way to freeze it out so it isn't called until it is needed. 
+        
+        """
+        #TODO 2023-07-06 15:05: - [ ] PERFORMANCE - REDRAW
         self.ui.canvas.draw()
         
 
