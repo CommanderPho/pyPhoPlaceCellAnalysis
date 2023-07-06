@@ -418,35 +418,36 @@ def batch_extended_programmatic_figures(curr_active_pipeline, write_vector_forma
     programmatic_render_to_file(curr_active_pipeline, curr_display_function_name='_display_2d_placefield_occupancy', write_vector_format=write_vector_format, write_png=write_png, debug_print=debug_print) #  🟢✅ 2023-05-25
    
     #TODO 2023-06-14 05:30: - [ ] Refactor these (the global placefields) into a form compatible with the local ones using some sort of shortcut method like `programmatic_render_to_file`
+    save_figure = (write_vector_format or write_png)
 
     # Plot long|short firing rate index:
     try:
-        _out = curr_active_pipeline.display('_display_short_long_firing_rate_index_comparison', curr_active_pipeline.get_session_context(), defer_render=True, save_figure=True)
+        _out = curr_active_pipeline.display('_display_short_long_firing_rate_index_comparison', curr_active_pipeline.get_session_context(), defer_render=True, save_figure=save_figure)
     except Exception as e:
         print(f'batch_extended_programmatic_figures(...): _display_short_long_firing_rate_index_comparison failed with error: {e}\n skipping.')
     
     try:
-        _out = curr_active_pipeline.display('_display_long_short_expected_v_observed_firing_rate', curr_active_pipeline.get_session_context(), defer_render=True, save_figure=True)
+        _out = curr_active_pipeline.display('_display_long_short_expected_v_observed_firing_rate', curr_active_pipeline.get_session_context(), defer_render=True, save_figure=save_figure)
     except Exception as e:
         print(f'batch_extended_programmatic_figures(...): _prepare_plot_expected_vs_observed failed with error: {e}\n skipping.')
     
     try:
-        _out = curr_active_pipeline.display('_display_grid_bin_bounds_validation', curr_active_pipeline.get_session_context(), defer_render=True, save_figure=True)
+        _out = curr_active_pipeline.display('_display_grid_bin_bounds_validation', curr_active_pipeline.get_session_context(), defer_render=True, save_figure=save_figure)
     except Exception as e:
         print(f'batch_extended_programmatic_figures(...): _display_grid_bin_bounds_validation failed with error: {e}\n skipping.')
         
     try:
-        _out = curr_active_pipeline.display('_display_running_and_replay_speeds_over_time', curr_active_pipeline.get_session_context(), defer_render=True, save_figure=True)
+        _out = curr_active_pipeline.display('_display_running_and_replay_speeds_over_time', curr_active_pipeline.get_session_context(), defer_render=True, save_figure=save_figure)
     except Exception as e:
         print(f'batch_extended_programmatic_figures(...): _display_running_and_replay_speeds_over_time failed with error: {e}\n skipping.')
         
     try:
-        _out = curr_active_pipeline.display('_display_long_short_laps', curr_active_pipeline.get_session_context(), defer_render=True, save_figure=True)
+        _out = curr_active_pipeline.display('_display_long_short_laps', curr_active_pipeline.get_session_context(), defer_render=True, save_figure=save_figure)
     except Exception as e:
         print(f'batch_extended_programmatic_figures(...): _display_long_short_laps failed with error: {e}\n skipping.')
         
     try:
-        _out = curr_active_pipeline.display('_display_long_and_short_firing_rate_replays_v_laps', curr_active_pipeline.get_session_context(), defer_render=True, save_figure=True)
+        _out = curr_active_pipeline.display('_display_long_and_short_firing_rate_replays_v_laps', curr_active_pipeline.get_session_context(), defer_render=True, save_figure=save_figure)
     except Exception as e:
         print(f'batch_extended_programmatic_figures(...): _display_long_and_short_firing_rate_replays_v_laps failed with error: {e}\n skipping.')
                 
@@ -457,20 +458,21 @@ def batch_extended_programmatic_figures(curr_active_pipeline, write_vector_forma
         _out = curr_active_pipeline.display('_display_short_long_pf1D_comparison', curr_active_pipeline.get_session_context(), single_figure=False, debug_print=False, fignum='Short v Long pf1D Comparison',
                                    long_kwargs={'sortby': sort_idx, 'single_cell_pfmap_processing_fn': long_single_cell_pfmap_processing_fn},
                                    short_kwargs={'sortby': sort_idx, 'single_cell_pfmap_processing_fn': short_single_cell_pfmap_processing_fn, 'curve_hatch_style': {'hatch':'///', 'edgecolor':'k'}},
-                                   save_figure=True) # defer_render=True, 
+                                   save_figure=save_figure) # defer_render=True, 
     except Exception as e:
         print(f'batch_extended_programmatic_figures(...): _display_short_long_pf1D_comparison failed with error: {e}\n skipping.')
 
     ## TODO 2023-06-02 NOW, NEXT: this might not work in 'AGG' mode because it tries to render it with QT, but we can see.
     try:
-        _out = curr_active_pipeline.display('_display_long_and_short_stacked_epoch_slices', curr_active_pipeline.get_session_context(), defer_render=False, save_figure=True)
+        #TODO 2023-07-06 14:46: - [ ] This is quite slow - can I do defer_render=True?
+        _out = curr_active_pipeline.display('_display_long_and_short_stacked_epoch_slices', curr_active_pipeline.get_session_context(), defer_render=False, save_figure=save_figure)
     except Exception as e:
         print(f'batch_extended_programmatic_figures(...): _prepare_plot_long_and_short_epochs failed with error: {e}\n skipping.')
         
 
 
 
-class BatchPhoJonathanFiguresHelper(object):
+class BatchPhoJonathanFiguresHelper:
     """Private methods that help with batch figure generator for ClassName.
 
     In .run(...) it builds the plot_kwargs ahead of time that will be passed to the specific plot function using `cls._build_batch_plot_kwargs(...)`
@@ -479,6 +481,7 @@ class BatchPhoJonathanFiguresHelper(object):
     2022-12-08 - Batch Programmatic Figures (Currently only Jonathan-style) 
     2022-12-01 - Automated programmatic output using `_display_batch_pho_jonathan_replay_firing_rate_comparison`
 
+    Currently meant to generate and save figures in the background.
     
     
     """
