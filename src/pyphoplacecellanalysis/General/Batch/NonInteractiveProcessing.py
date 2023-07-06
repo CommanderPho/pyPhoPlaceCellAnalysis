@@ -110,6 +110,43 @@ class SpecificComputationValidator:
             raise e
         return newly_computed_values
 
+
+
+
+#TODO 2023-07-06 01:47: - [ ] IDEA: "CallbackSequence"-like object that allows the user to specify several different things to try to get a value that will continue down the list until one succeeds or no more are left.
+    # replaces the fact that Python lacks a good "switch" construct.
+    # Actually see `_execute_computation_functions` for a closer example of what I meant. It's not critical right now though.
+    # # ====================================================================================================
+    # ## Purpose is to convert complex nested try/except blocks such as these into a more readable and exhaustive format.
+    # try:
+    #     ## try method 1 here.
+    #     pass
+    # except (KeyError, AttributeError, ValueError) as e:
+    #     # predictable exception type for when criteria aren't met. Try method 2 here.
+    #     try:
+    #         ## try method 2 here.
+    #         pass
+    #     except (KeyError, AttributeError, ValueError) as e:
+    #         # predictable exception type for when criteria aren't met. Try method 2 here.
+    #         try:
+    #             ## try method 3 here.
+    #             pass
+    #         except Exception as e:
+    #             # ACTUALLY FAIL HERE. No more left to try
+    #             raise NotImplementedError
+
+    #     except Exception as e:
+    #         # Unhandled exception for method 2. Fail here.
+    #         raise e
+
+    # except Exception as e:
+    #     # Unhandled exception for method 1. Fail here.
+    #     raise e
+
+
+
+
+
 # ==================================================================================================================== #
 # 2022-12-07 - batch_load_session - Computes Entire Pipeline                                                           #
 # ==================================================================================================================== #
