@@ -485,7 +485,7 @@ class BatchResultAccessor():
     """
 
     # _required_column_names = ['session_name', 'basedirs', 'status', 'errors']
-    _required_column_names = 'context', 'basedirs', 'status', 'errors']
+    _required_column_names = ['context', 'basedirs', 'status', 'errors']
 
 
     def __init__(self, pandas_obj):
@@ -530,7 +530,7 @@ class BatchResultAccessor():
     @classmethod
     def _validate(cls, obj):
         """ verify there is a column that identifies the spike's neuron, the type of cell of this neuron ('cell_type'), and the timestamp at which each spike occured ('t'||'t_rel_seconds') """       
-        assert np.isin(obj.columns, cls._required_column_names)
+        assert np.all(np.isin(obj.columns, cls._required_column_names))
         return obj # important! Must return the modified obj to be assigned (since its columns were altered by renaming
 
     @property
