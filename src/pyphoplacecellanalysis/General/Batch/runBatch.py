@@ -24,6 +24,10 @@ from pyphoplacecellanalysis.General.Pipeline.Stages.Loading import saveData, loa
 
 from attrs import define, field, Factory
 
+def get_file_str_if_file_exists(v:Path)->str:
+    """ returns the string representation of the resolved file if it exists, or the empty string if not """
+    return (str(v.resolve()) if v.exists() else '')
+    
 @define(slots=False)
 class BatchRun:
     """Docstring for BatchRun."""
@@ -471,7 +475,6 @@ def dataframe_functions_test():
     batch_progress_df = BatchRun.rebuild_basedirs(batch_progress_df, global_data_root_parent_path)
 
     good_only_batch_progress_df = batch_progress_df[batch_progress_df['locally_is_ready']].copy()
-    good_only_batch_progress_df
     return good_only_batch_progress_df, batch_progress_df
 
 
@@ -551,8 +554,8 @@ class BatchResultAccessor():
     def _build_output_files_list(self, save_text_file=False):
         ## Build a list of the output files for the good sessions:
         good_only_batch_progress_df = self._obj
-        session_result_paths = [str(v.joinpath(f'loadedSessPickle.pkl').resolve()) for v in list(good_only_batch_progress_df.basedirs.values)]
-        global_computation_result_paths = [str(v.joinpath(f'output/global_computation_results.pkl').resolve()) for v in list(good_only_batch_progress_df.basedirs.values)]
+        session_result_paths = [get_file_str_if_file_exists(v.joinpath(f'loadedSessPickle.pkl')) for v in list(good_only_batch_progress_df.basedirs.values)]
+        global_computation_result_paths = [get_file_str_if_file_exists(v.joinpath(f'output/global_computation_results.pkl').resolve()) for v in list(good_only_batch_progress_df.basedirs.values)]
 
         # Add dataframe columns:
         good_only_batch_progress_df['global_computation_result_file'] = global_computation_result_paths
