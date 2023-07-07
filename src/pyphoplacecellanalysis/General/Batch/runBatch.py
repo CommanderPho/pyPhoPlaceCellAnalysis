@@ -559,33 +559,32 @@ class BatchResultAccessor():
             # f.write('\n'.join())
         return (session_result_paths, global_computation_result_paths)
         
-@function_attributes(short_name=None, tags=['ripple', 'batch', 'output'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-07-06 14:09', related_items=[])
-def _build_ripple_result_path(good_only_batch_progress_df: pd.DataFrame):
-    """
-    Usage:
-        session_externally_computed_ripple_paths = _build_ripple_result_path(good_only_batch_progress_df)
-        session_externally_computed_ripple_paths
+    @function_attributes(short_name=None, tags=['ripple', 'batch', 'output'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-07-06 14:09', related_items=[])
+    def _build_ripple_result_path(self):
+        """
+        Usage:
+            session_externally_computed_ripple_paths = _build_ripple_result_path(good_only_batch_progress_df)
+            session_externally_computed_ripple_paths
 
-    """
-    def _find_best_ripple_result_path(a_path: Path) -> Optional[Path]:
-        _temp_found_path = a_path.joinpath('ripple_df.pkl')
-        if _temp_found_path.exists():
-            return _temp_found_path.resolve()
-        ## try the '.ripple.npy' ripples:
-        _temp_found_path = a_path.joinpath(a_path.name).with_suffix('.ripple.npy')
-        if _temp_found_path.exists():
-            return _temp_found_path.resolve()
-        else:
-            return None # could not find the file.
-            
-
-    # BEGIN FUNCTION BODY ________________________________________________________________________________________________ #
-    good_only_batch_progress_df = self._obj
-    session_ripple_result_paths: List[Optional[Path]] = [_find_best_ripple_result_path(v) for v in list(good_only_batch_progress_df.basedirs.values)]
-    good_only_batch_progress_df['ripple_result_file'] = [str(v or '') for v in session_ripple_result_paths]
-    return session_ripple_result_paths
-    # global_computation_result_paths = [str(v.joinpath(f'output/global_computation_results.pkl').resolve()) for v in list(good_only_batch_progress_df.basedirs.values)]
-    
+        """
+        def _find_best_ripple_result_path(a_path: Path) -> Optional[Path]:
+            _temp_found_path = a_path.joinpath('ripple_df.pkl')
+            if _temp_found_path.exists():
+                return _temp_found_path.resolve()
+            ## try the '.ripple.npy' ripples:
+            _temp_found_path = a_path.joinpath(a_path.name).with_suffix('.ripple.npy')
+            if _temp_found_path.exists():
+                return _temp_found_path.resolve()
+            else:
+                return None # could not find the file.
+        
+        # BEGIN FUNCTION BODY ________________________________________________________________________________________________ #
+        good_only_batch_progress_df = self._obj
+        session_ripple_result_paths: List[Optional[Path]] = [_find_best_ripple_result_path(v) for v in list(good_only_batch_progress_df.basedirs.values)]
+        good_only_batch_progress_df['ripple_result_file'] = [str(v or '') for v in session_ripple_result_paths]
+        return session_ripple_result_paths
+        # global_computation_result_paths = [str(v.joinpath(f'output/global_computation_results.pkl').resolve()) for v in list(good_only_batch_progress_df.basedirs.values)]
+        
 
 
         
