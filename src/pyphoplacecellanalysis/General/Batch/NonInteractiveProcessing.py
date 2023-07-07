@@ -511,12 +511,12 @@ class BatchPhoJonathanFiguresHelper:
 
         active_identifying_session_ctx = curr_active_pipeline.sess.get_context() # 'bapun_RatN_Day4_2019-10-15_11-30-06'
         
-        # %matplotlib qtagg
-        import matplotlib
-        # configure backend here
-        # matplotlib.use('Qt5Agg')
-        # backend_qt5agg
-        matplotlib.use('AGG') # non-interactive backend ## 2022-08-16 - Surprisingly this works to make the matplotlib figures render only to .png file, not appear on the screen!
+        # # %matplotlib qtagg
+        # import matplotlib
+        # # configure backend here
+        # # matplotlib.use('Qt5Agg')
+        # # backend_qt5agg
+        # matplotlib.use('AGG') # non-interactive backend ## 2022-08-16 - Surprisingly this works to make the matplotlib figures render only to .png file, not appear on the screen!
 
         _batch_plot_kwargs_list = cls._build_batch_plot_kwargs(long_only_aclus, short_only_aclus, shared_aclus, active_identifying_session_ctx, n_max_page_rows=n_max_page_rows)
         active_out_figures_list = cls._perform_batch_plot(curr_active_pipeline, _batch_plot_kwargs_list, write_vector_format=write_vector_format, write_png=write_png, progress_print=progress_print, debug_print=debug_print)
@@ -551,7 +551,6 @@ class BatchPhoJonathanFiguresHelper:
     def _build_batch_plot_kwargs(cls, long_only_aclus, short_only_aclus, shared_aclus, active_identifying_session_ctx, n_max_page_rows=10):
         """ builds the list of kwargs for all aclus. """
         _batch_plot_kwargs_list = [] # empty list to start
-
 
         # _aclu_indicies_list_str_formatter = lambda a_list: ('[' + ','.join(map(str, a_list)) + ']') # Prints an array of integer aclu indicies without spaces and comma separated, surrounded by hard brackets. e.g. '[5,6,7,8,11,12,15,17,18,19,20,21,24,25,26,27,28,31,34,35,39,40,41,43,44,45,48,49,50,51,52,53,55,56,60,62,63,64,65]'
         _aclu_indicies_list_str_formatter = lambda a_list: ('(' + ','.join(map(str, a_list)) + ')')
