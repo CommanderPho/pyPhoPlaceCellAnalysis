@@ -101,35 +101,7 @@ class BatchRun:
     
     def to_dataframe(self, expand_context:bool=True, good_only:bool=False) -> pd.DataFrame:
         """Get a dataframe representation of BatchRun."""
-        non_expanded_context_df = pd.DataFrame({'context': self.session_batch_status.keys(),
-                'basedirs': self.session_batch_basedirs.values(),
-                'status': self.session_batch_status.values(),
-                'errors': self.session_batch_errors.values()})
-        
-        if expand_context:
-            assert len(self.session_contexts) > 0 # must have at least one element
-            first_context = self.session_contexts[0]
-            context_column_names = list(first_context.keys()) # ['format_name', 'animal', 'exper_name', 'session_name']
-            
-            # TODO: self._context_column_names
-            
-            all_sess_context_tuples = [a_ctx.as_tuple() for a_ctx in self.session_contexts] #[('kdiba', 'gor01', 'one', '2006-6-07_11-26-53'), ('kdiba', 'gor01', 'one', '2006-6-08_14-26-15'), ('kdiba', 'gor01', 'one', '2006-6-09_1-22-43'), ...]
-            expanded_context_df = pd.DataFrame.from_records(all_sess_context_tuples, columns=context_column_names)
-            out_df = pd.concat((expanded_context_df, non_expanded_context_df), axis=1)
-        else:
-            out_df = non_expanded_context_df
-
-        ## Add lap/replay counts:
-        out_df = pd.concat((out_df, self.build_batch_lap_replay_counts_df(self)), axis=1) # don't need multiple concatenation operations probably
-        
-        ## Add is_ready
-        self.post_load_find_usable_sessions(out_df, min_required_replays_or_laps=5)
-        
-        if good_only:
-            # Get only the good (is_ready) sessions
-            out_df = out_df[out_df['is_ready']]
-            
-        return out_df
+        return BatchResultAccessor.init_from_BatchRun(self, expand_context=expand_context, good_only=good_only)
 
     # Main functionality _________________________________________________________________________________________________ #
     def execute_session(self, session_context, post_run_callback_fn=None, **kwargs):
@@ -502,13 +474,83 @@ def dataframe_functions_test():
     return good_only_batch_progress_df, batch_progress_df
 
 
+# 2023-07-07
 
-## Build a list of the output files for the good sessions:
-@function_attributes(short_name=None, tags=['batch', 'results', 'output'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-07-06 14:09', related_items=[])
-def _build_output_files_list(good_only_batch_progress_df):
+@pd.api.extensions.register_dataframe_accessor("batch_results")
+class BatchResultAccessor():
+    """ A Pandas pd.DataFrame representation of results from the batch processing of sessions
+    # 2023-07-07
+    Built from `BatchRun`
+
+    """
+
+    # _required_column_names = ['session_name', 'basedirs', 'status', 'errors']
+    _required_column_names = 'context', 'basedirs', 'status', 'errors']
+
+
+    def __init__(self, pandas_obj):
+        pandas_obj = self._validate(pandas_obj)
+        self._obj = pandas_obj
+
+
+    @classmethod
+    def init_from_BatchRun(cls, batchrun_obj: BatchRun, expand_context:bool=True, good_only:bool=False) -> pd.DataFrame:
+        """Get a dataframe representation of BatchRun."""
+        non_expanded_context_df = pd.DataFrame({'context': batchrun_obj.session_batch_status.keys(),
+                'basedirs': batchrun_obj.session_batch_basedirs.values(),
+                'status': batchrun_obj.session_batch_status.values(),
+                'errors': batchrun_obj.session_batch_errors.values()})
+        
+        if expand_context:
+            assert len(batchrun_obj.session_contexts) > 0 # must have at least one element
+            first_context = batchrun_obj.session_contexts[0]
+            context_column_names = list(first_context.keys()) # ['format_name', 'animal', 'exper_name', 'session_name']
+            
+            # TODO: batchrun_obj._context_column_names
+            
+            all_sess_context_tuples = [a_ctx.as_tuple() for a_ctx in batchrun_obj.session_contexts] #[('kdiba', 'gor01', 'one', '2006-6-07_11-26-53'), ('kdiba', 'gor01', 'one', '2006-6-08_14-26-15'), ('kdiba', 'gor01', 'one', '2006-6-09_1-22-43'), ...]
+            expanded_context_df = pd.DataFrame.from_records(all_sess_context_tuples, columns=context_column_names)
+            out_df = pd.concat((expanded_context_df, non_expanded_context_df), axis=1)
+        else:
+            out_df = non_expanded_context_df
+
+        ## Add lap/replay counts:
+        out_df = pd.concat((out_df, batchrun_obj.build_batch_lap_replay_counts_df(batchrun_obj)), axis=1) # don't need multiple concatenation operations probably
+        
+        ## Add is_ready
+        batchrun_obj.post_load_find_usable_sessions(out_df, min_required_replays_or_laps=5)
+        
+        if good_only:
+            # Get only the good (is_ready) sessions
+            out_df = out_df[out_df['is_ready']]
+            
+        return out_df
+
+
+    @classmethod
+    def _validate(cls, obj):
+        """ verify there is a column that identifies the spike's neuron, the type of cell of this neuron ('cell_type'), and the timestamp at which each spike occured ('t'||'t_rel_seconds') """       
+        assert np.isin(obj.columns, cls._required_column_names)
+        return obj # important! Must return the modified obj to be assigned (since its columns were altered by renaming
+
+    @property
+    def is_valid(self):
+        """ The dataframe is valid (because it passed _validate(...) in __init__(...) so just return True."""
+        return True
+
+     def build_all_columns(self):
+        """ builds the optional output columns """
+        # self._build_output_files_list()
+        self._build_ripple_result_path()
+
+
     ## Build a list of the output files for the good sessions:
-    session_result_paths = [str(v.joinpath(f'loadedSessPickle.pkl').resolve()) for v in list(good_only_batch_progress_df.basedirs.values)]
-    global_computation_result_paths = [str(v.joinpath(f'output/global_computation_results.pkl').resolve()) for v in list(good_only_batch_progress_df.basedirs.values)]
+    @function_attributes(short_name=None, tags=['batch', 'results', 'output'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-07-06 14:09', related_items=[])
+    def _build_output_files_list(self):
+        ## Build a list of the output files for the good sessions:
+        good_only_batch_progress_df = self._obj
+        session_result_paths = [str(v.joinpath(f'loadedSessPickle.pkl').resolve()) for v in list(good_only_batch_progress_df.basedirs.values)]
+        global_computation_result_paths = [str(v.joinpath(f'output/global_computation_results.pkl').resolve()) for v in list(good_only_batch_progress_df.basedirs.values)]
 
     # Write out a GreatlakesOutputs.txt file:
     with open('GreatlakesOutputs.txt','w') as f:
@@ -532,14 +574,19 @@ def _build_ripple_result_path(good_only_batch_progress_df: pd.DataFrame):
         _temp_found_path = a_path.joinpath(a_path.name).with_suffix('.ripple.npy')
         if _temp_found_path.exists():
             return _temp_found_path.resolve()
-        else:
-            return None # could not find the file.
+            else:
+                return None # could not find the file.
+            
+        # BEGIN FUNCTION BODY ________________________________________________________________________________________________ #
+        good_only_batch_progress_df = self._obj
+        session_ripple_result_paths: List[Optional[Path]] = [_find_best_ripple_result_path(v) for v in list(good_only_batch_progress_df.basedirs.values)]
+        good_only_batch_progress_df['ripple_result_file'] = [str(v or '') for v in session_ripple_result_paths]
+        return session_ripple_result_paths
+        # global_computation_result_paths = [str(v.joinpath(f'output/global_computation_results.pkl').resolve()) for v in list(good_only_batch_progress_df.basedirs.values)]
         
-    session_ripple_result_paths = [_find_best_ripple_result_path(v) for v in list(good_only_batch_progress_df.basedirs.values)]
-    return session_ripple_result_paths
-    # global_computation_result_paths = [str(v.joinpath(f'output/global_computation_results.pkl').resolve()) for v in list(good_only_batch_progress_df.basedirs.values)]
-    
 
+
+        
 
 
 if __name__ == "__main__":
