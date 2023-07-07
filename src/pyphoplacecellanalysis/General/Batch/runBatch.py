@@ -542,22 +542,27 @@ class BatchResultAccessor():
 
     def build_all_columns(self):
         """ builds the optional output columns """
-        # self._build_output_files_list()
+        self._build_output_files_list()
         self._build_ripple_result_path()
-
+        return self._obj
 
     ## Build a list of the output files for the good sessions:
     @function_attributes(short_name=None, tags=['batch', 'results', 'output'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-07-06 14:09', related_items=[])
-    def _build_output_files_list(self):
+    def _build_output_files_list(self, save_text_file=False):
         ## Build a list of the output files for the good sessions:
         good_only_batch_progress_df = self._obj
         session_result_paths = [str(v.joinpath(f'loadedSessPickle.pkl').resolve()) for v in list(good_only_batch_progress_df.basedirs.values)]
         global_computation_result_paths = [str(v.joinpath(f'output/global_computation_results.pkl').resolve()) for v in list(good_only_batch_progress_df.basedirs.values)]
 
+        # Add dataframe columns:
+        good_only_batch_progress_df['global_computation_result_file'] = global_computation_result_paths
+        good_only_batch_progress_df['loaded_session_pickle_file'] = session_result_paths
+        
         # Write out a GreatlakesOutputs.txt file:
-        with open('GreatlakesOutputs.txt','w') as f:
-            f.write('\n'.join(session_result_paths + global_computation_result_paths))
-            # f.write('\n'.join())
+        if save_text_file:
+            with open('GreatlakesOutputs.txt','w') as f:
+                f.write('\n'.join(session_result_paths + global_computation_result_paths))
+                # f.write('\n'.join())
         return (session_result_paths, global_computation_result_paths)
         
     @function_attributes(short_name=None, tags=['ripple', 'batch', 'output'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-07-06 14:09', related_items=[])
