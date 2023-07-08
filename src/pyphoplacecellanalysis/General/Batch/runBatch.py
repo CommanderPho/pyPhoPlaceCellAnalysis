@@ -106,7 +106,10 @@ class BatchRun:
     
     def to_dataframe(self, expand_context:bool=True, good_only:bool=False) -> pd.DataFrame:
         """Get a dataframe representation of BatchRun."""
-        return BatchResultAccessor.init_from_BatchRun(self, expand_context=expand_context, good_only=good_only)
+        out_df = BatchResultAccessor.init_from_BatchRun(self, expand_context=expand_context, good_only=good_only)
+        out_df = out_df.batch_results.build_all_columns() # this uses the same accessor.
+        return out_df
+
 
     # Main functionality _________________________________________________________________________________________________ #
     def execute_session(self, session_context, post_run_callback_fn=None, **kwargs):
