@@ -752,11 +752,19 @@ class LongShortTrackComparingDisplayFunctions(AllFunctionEnumeratingMixin, metac
 def _temp_draw_jonathan_ax(t_split, time_bins, unit_specific_time_binned_firing_rates, aclu_to_idx, rdf, irdf, show_inter_replay_frs=False, colors=None, fig=None, ax=None, active_aclu:int=0, custom_replay_markers=None, include_horizontal_labels=True, include_vertical_labels=True, should_render=False):
     """ Draws the time binned firing rates and the replay firing rates for a single cell
 
+        This is the top half of each pho-jonathan-style single cell plot
 
         custom_replay_markers:
             # The colors for each point indicating the percentage of participating cells that belong to which track.
                 - More long_only -> more red
                 - More short_only -> more blue
+
+
+    Black circles are replays where this aclu was not active. They'll all be at y=0 because the cell didn't fire during them.
+    Green circles are replays where this aclu did fire, and their y-height indicates the cell's firing rate during that replay.
+    orange circles are this aclu's inter_replay_frs
+    translucent lilac (purple) curve is this aclu's time-binned firing rate
+    
 
 
     Usage:
@@ -798,7 +806,7 @@ def _temp_draw_jonathan_ax(t_split, time_bins, unit_specific_time_binned_firing_
             if is_aclu_active_in_replay[replay_idx]:
                 for i, out_plot_kwarg in enumerate(curr_out_plot_kwargs):
                     # this should be only iterate through the two separate paths to be plotted
-                    ax.plot(centers[replay_idx], heights[replay_idx], markersize=5, **out_plot_kwarg, zorder=7)
+                    ax.plot(centers[replay_idx], heights[replay_idx], markersize=5, **out_plot_kwarg, zorder=7) # , label=f'replay[{replay_idx}]'
             else:
                 # don't do the fancy custom makers for the inactive (zero firing for this aclu) replay points:
                 plot_replays_kwargs = {
@@ -806,11 +814,11 @@ def _temp_draw_jonathan_ax(t_split, time_bins, unit_specific_time_binned_firing_
                     's': 3,
                     'c': 'black'
                 }
-                ax.scatter(centers, heights, **plot_replays_kwargs, zorder=5)
+                ax.scatter(centers, heights, **plot_replays_kwargs, zorder=5) # , label=f'replay[{replay_idx}]'
                 # pass # don't plot at all
 
     else:
-        
+        # else no custom replay markers
         extra_plots_replays_kwargs_list = None
         if 'neuron_type_distribution_color_RGB' in rdf.columns:
             ### Single-SCATTER MODE:
@@ -886,7 +894,7 @@ def _temp_draw_jonathan_ax(t_split, time_bins, unit_specific_time_binned_firing_
         # this would show the inter-replay firing times in orange it's frankly distracting
         centers = (irdf["start"] + irdf["end"])/2
         heights = make_fr(irdf)[:, aclu_to_idx[active_aclu]]
-        ax.plot(centers, heights, '.', color=colors[1]+"80", zorder=4)
+        ax.plot(centers, heights, '.', color=colors[1]+"80", zorder=4, label='inter_replay_frs')
 
     if include_horizontal_labels:
         ax.set_title(f"Replay firing rates for neuron {active_aclu}")
@@ -901,7 +909,7 @@ def _temp_draw_jonathan_ax(t_split, time_bins, unit_specific_time_binned_firing_
         v = unit_specific_time_binned_firing_rates[active_aclu].to_numpy() # index directly by ACLU
         if v is not None:
             # Plot the continuous firing rates
-            ax.plot(t, v, color='#aaaaff8c', zorder=2) # this color is a translucent lilac (purple) color)
+            ax.plot(t, v, color='#aaaaff8c', zorder=2, label='time_binned_frs') # this color is a translucent lilac (purple) color)
     except KeyError:
         print(f'non-placefield neuron. Skipping.')
         t, v = None, None
