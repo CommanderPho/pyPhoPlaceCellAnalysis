@@ -384,14 +384,6 @@ def batch_programmatic_figures(curr_active_pipeline, debug_print=False):
     # ==================================================================================================================== #
     # Output Figures to File                                                                                               #
     # ==================================================================================================================== #
-    ## PDF Output
-    # %matplotlib qtagg
-    import matplotlib
-    # configure backend here
-    # matplotlib.use('Qt5Agg')
-    # backend_qt5agg
-    matplotlib.use('AGG') # non-interactive backend ## 2022-08-16 - Surprisingly this works to make the matplotlib figures render only to .png file, not appear on the screen!
-
     active_out_figures_list, active_session_figures_out_path = BatchPhoJonathanFiguresHelper.run(curr_active_pipeline, neuron_replay_stats_df, n_max_page_rows=10)
     print(f'curr_session_parent_out_path: {active_session_figures_out_path}')
 
@@ -511,13 +503,6 @@ class BatchPhoJonathanFiguresHelper:
 
         active_identifying_session_ctx = curr_active_pipeline.sess.get_context() # 'bapun_RatN_Day4_2019-10-15_11-30-06'
         
-        # # %matplotlib qtagg
-        # import matplotlib
-        # # configure backend here
-        # # matplotlib.use('Qt5Agg')
-        # # backend_qt5agg
-        # matplotlib.use('AGG') # non-interactive backend ## 2022-08-16 - Surprisingly this works to make the matplotlib figures render only to .png file, not appear on the screen!
-
         _batch_plot_kwargs_list = cls._build_batch_plot_kwargs(long_only_aclus, short_only_aclus, shared_aclus, active_identifying_session_ctx, n_max_page_rows=n_max_page_rows)
         active_out_figures_list = cls._perform_batch_plot(curr_active_pipeline, _batch_plot_kwargs_list, write_vector_format=write_vector_format, write_png=write_png, progress_print=progress_print, debug_print=debug_print)
         
