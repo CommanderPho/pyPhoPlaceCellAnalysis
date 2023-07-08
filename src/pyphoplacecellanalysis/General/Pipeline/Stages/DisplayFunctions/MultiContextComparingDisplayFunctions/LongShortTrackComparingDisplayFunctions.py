@@ -1165,7 +1165,7 @@ def _plot_pho_jonathan_batch_plot_single_cell(t_split, time_bins, unit_specific_
     curr_ax_placefield = curr_fig.add_subplot(gs[1, -1], sharey=curr_ax_lap_spikes) # only the last element of the row
 
     # Setup the aclu number ("title axis"):
-    title_axes_kwargs = dict(ha="center", va="center", fontsize=18, color="black")
+    title_axes_kwargs = dict(ha="center", va="center", fontsize=22, color="black")
     curr_ax_cell_label.text(0.5, 0.5, short_title_string, transform=curr_ax_cell_label.transAxes, **title_axes_kwargs)
     curr_ax_cell_label.axis('off')
 
