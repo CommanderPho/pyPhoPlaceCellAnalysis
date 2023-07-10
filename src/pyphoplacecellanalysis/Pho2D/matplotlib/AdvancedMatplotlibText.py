@@ -27,8 +27,11 @@ class FormattedFigureText:
     # fig.subplots_adjust(top=top_margin, left=left_margin, bottom=bottom_margin)
     top_margin: float = 0.8
     left_margin: float = 0.090
+    right_margin: float = 0.91 # (1.0-0.090)
     bottom_margin: float = 0.150
 
+
+    
 
     @classmethod
     def _build_formatted_title_string(cls, epochs_name) -> str:
@@ -52,8 +55,8 @@ class FormattedFigureText:
 
 
     def setup_margins(self, fig, **kwargs):
-        top_margin, left_margin, bottom_margin = kwargs.get('top_margin', self.top_margin), kwargs.get('left_margin', self.left_margin), kwargs.get('bottom_margin', self.bottom_margin)
-        fig.subplots_adjust(top=top_margin, left=left_margin, bottom=bottom_margin) # perform the adjustment on the figure
+        top_margin, left_margin, right_margin, bottom_margin = kwargs.get('top_margin', self.top_margin), kwargs.get('left_margin', self.left_margin), kwargs.get('right_margin', self.right_margin), kwargs.get('bottom_margin', self.bottom_margin)
+        fig.subplots_adjust(top=top_margin, left=left_margin, right=right_margin, bottom=bottom_margin) # perform the adjustment on the figure
 
 
     def add_flexitext(self, fig, **kwargs):
