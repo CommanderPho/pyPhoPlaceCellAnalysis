@@ -6,6 +6,7 @@ import pandas as pd
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 from matplotlib.figure import Figure, FigureBase # FigureBase: both Figure and SubFigure
+from flexitext import flexitext ## flexitext for formatted matplotlib text
 
 from neuropy.core.neuron_identities import PlotStringBrevityModeEnum # for plot_short_v_long_pf1D_comparison (_display_short_long_pf1D_comparison)
 from neuropy.plotting.figure import Fig # for plot_short_v_long_pf1D_comparison (_display_short_long_pf1D_comparison)
@@ -41,6 +42,8 @@ from pyphoplacecellanalysis.General.Mixins.CrossComputationComparisonHelpers imp
 from pyphoplacecellanalysis.General.Mixins.CrossComputationComparisonHelpers import _build_neuron_type_distribution_color # used in _make_pho_jonathan_batch_plots
 from pyphocorehelpers.DataStructure.enum_helpers import ExtendedEnum # for PlacefieldOverlapMetricMode
 from pyphoplacecellanalysis.PhoPositionalData.plotting.placefield import plot_1D_placecell_validation # for _plot_pho_jonathan_batch_plot_single_cell
+from pyphoplacecellanalysis.Pho2D.matplotlib.AdvancedMatplotlibText import FormattedFigureText
+
 
 @unique
 class PlacefieldOverlapMetricMode(ExtendedEnum):
@@ -1525,8 +1528,22 @@ def _plot_long_short_firing_rate_indicies(x_frs_index, y_frs_index, active_conte
     scatter_plot = ax.scatter(x_frs_index.values(), y_frs_index.values(), c=point_colors) # , s=10, alpha=0.5
     plt.xlabel('Replay Firing Rate Index $\\frac{L_{R}-S_{R}}{L_{R} + S_{R}}$', fontsize=16, **xlabel_kwargs)
     plt.ylabel('Laps Firing Rate Index $\\frac{L_{\\theta}-S_{\\theta}}{L_{\\theta} + S_{\\theta}}$', fontsize=16, **ylabel_kwargs)
-    plt.title('Computed long ($L$)|short($S$) firing rate indicies')
-    plt.suptitle(f'{active_context.get_description(separator="/")}')
+
+
+    ## Non-flexitext version:
+    # plt.title('long ($L$)|short($S$) firing rate indicies')
+    # plt.suptitle(f'{active_context.get_description(separator="/")}')
+
+    # `flexitext` version:
+    text_formatter = FormattedFigureText()
+    plt.title('')
+    plt.suptitle('')
+    fig = plt.gcf() # get figure to setup the margins on.
+    text_formatter.setup_margins(fig)
+    flexitext(text_formatter.left_margin, text_formatter.top_margin, '<size:22><color:crimson, weight:bold>long ($L$)</>|<color:royalblue, weight:bold>short($S$)</> <weight:bold>firing rate indicies</></>', va="bottom", xycoords="figure fraction")
+    footer_text_obj = flexitext((text_formatter.left_margin*0.1), (text_formatter.bottom_margin*0.25), text_formatter._build_footer_string(active_context=active_context), va="top", xycoords="figure fraction")
+
+
     # fig = plt.gcf()
     # fig.set_size_inches([8.5, 7.25]) # size figure so the x and y labels aren't cut off
 
