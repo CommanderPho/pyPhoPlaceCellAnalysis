@@ -2184,8 +2184,22 @@ def _plot_session_long_short_track_firing_rate_figures(curr_active_pipeline, jon
         scatter_plot = ax.scatter(x_frs_dict.values(), y_frs_dict.values(), c=point_colors) # , s=10, alpha=0.5
         plt.xlabel('Replay Firing Rate (Hz)', fontsize=16, **xlabel_kwargs)
         plt.ylabel('Laps Firing Rate (Hz)', fontsize=16, **ylabel_kwargs)
-        plt.title('Computed track_replay|track_laps firing rate')
-        plt.suptitle(f'{active_display_context.get_description(separator="/")}')
+        
+        # Non-flexitext title:
+        # plt.title('Computed track_replay|track_laps firing rate')
+        # plt.suptitle(f'{active_display_context.get_description(separator="/")}')
+
+        # `flexitext` version:
+        text_formatter = FormattedFigureText()
+        plt.title('')
+        plt.suptitle('')
+        text_formatter.setup_margins(fig)
+
+        ## Need to extract the track name ('maze1') for the title in this plot. 
+        track_name = active_context.get_description(subset_includelist=['filter_name'], separator=' | ') # 'maze1'
+        # TODO: do we want to convert this into "long" or "short"?
+        flexitext(text_formatter.left_margin, text_formatter.top_margin, f'<size:22><weight:bold>{track_name}</> replay|laps <weight:bold>firing rate</></>', va="bottom", xycoords="figure fraction")
+        footer_text_obj = flexitext((text_formatter.left_margin*0.1), (text_formatter.bottom_margin*0.25), text_formatter._build_footer_string(active_context=active_context), va="top", xycoords="figure fraction")
 
         # add static tiny labels for the neuron_id beside each data point
         text_kwargs = dict(textcoords="offset points", xytext=(0,0)) # (2,2)
