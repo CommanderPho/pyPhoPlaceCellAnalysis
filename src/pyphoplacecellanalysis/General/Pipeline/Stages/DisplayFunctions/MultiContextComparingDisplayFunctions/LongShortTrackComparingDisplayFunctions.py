@@ -1543,8 +1543,6 @@ def _plot_long_short_firing_rate_indicies(x_frs_index, y_frs_index, active_conte
     flexitext(text_formatter.left_margin, text_formatter.top_margin, '<size:22><color:crimson, weight:bold>long ($L$)</>|<color:royalblue, weight:bold>short($S$)</> <weight:bold>firing rate indicies</></>', va="bottom", xycoords="figure fraction")
     footer_text_obj = flexitext((text_formatter.left_margin*0.1), (text_formatter.bottom_margin*0.25), text_formatter._build_footer_string(active_context=active_context), va="top", xycoords="figure fraction")
 
-
-    # fig = plt.gcf()
     # fig.set_size_inches([8.5, 7.25]) # size figure so the x and y labels aren't cut off
 
     # add static tiny labels beside each point
