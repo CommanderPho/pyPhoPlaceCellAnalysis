@@ -621,8 +621,9 @@ class BatchSessionCompletionHandler:
         from pyphoplacecellanalysis.General.Batch.runBatch import BatchSessionCompletionHandler
         
     """
-    saving_mode: PipelineSavingScheme = PipelineSavingScheme.SKIP_SAVING
-    force_global_recompute: bool = False
+    force_reload_all: bool = field(default=False)
+    saving_mode: PipelineSavingScheme = field(default=PipelineSavingScheme.SKIP_SAVING)
+    force_global_recompute: bool = field(default=False)
 
     def post_compute_validate(self, curr_active_pipeline):
         """ 2023-05-16 - Ensures that the laps are used for the placefield computation epochs, the number of bins are the same between the long and short tracks. """
