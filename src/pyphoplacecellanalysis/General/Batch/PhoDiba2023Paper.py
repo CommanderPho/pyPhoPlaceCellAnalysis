@@ -1,6 +1,6 @@
 import sys
 from copy import deepcopy
-from typing import Any, Callable, List
+from typing import List, Any, Tuple, Optional, Callable
 from attrs import define, field, Factory, asdict
 import numpy as np
 import pandas as pd
@@ -751,62 +751,24 @@ def PAPER_FIGURE_figure_1_full(curr_active_pipeline, defer_show=False, save_figu
 # 2023-06-26 - Paper Figure 2 Code                                                                                     #
 # ==================================================================================================================== #
 # Instantaneous versions:
-# @overwriting_display_context(
-@metadata_attributes(short_name=None, tags=['figure_2', 'paper', 'figure'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-06-26 21:36', related_items=[])
-@define(slots=False, repr=False)
-class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
-    """ full instantaneous firing rate computations for both Long and Short epochs
-    
-    Usage:
-        _out_fig_2 = PaperFigureTwo(instantaneous_time_bin_size_seconds=0.01) # 10ms
-        _out_fig_2.compute(curr_active_pipeline=curr_active_pipeline)
-        _out_fig_2.display()
-
-    """
-    instantaneous_time_bin_size_seconds: float = 0.01 # 20ms
+@define(slots=False)
+class InstantaneousSpikeRateGroupsComputation:
+    """ class to handle spike rate computations """
+    instantaneous_time_bin_size_seconds: float = 0.01  # 20ms
     active_identifying_session_ctx: IdentifyingContext = field(init=False)
-    Fig2_Replay_FR: list[tuple[Any, Any]] = field(init=False)
-    Fig2_Laps_FR: list[tuple[Any, Any]] = field(init=False)
 
-    _pipeline_file_callback_fn: Callable = field(init=False, repr=False, default=None) # this callback is 2737.983306 MB!!
+    Fig2_Replay_FR: List[Tuple[Any, Any]] = field(init=False)
+    Fig2_Laps_FR: List[Tuple[Any, Any]] = field(init=False)
 
-    ## Extra Debugging data:
     LxC_ReplayDeltaMinus: SpikeRateTrends = field(init=False, repr=False, default=None)
     LxC_ReplayDeltaPlus: SpikeRateTrends = field(init=False, repr=False, default=None)
     SxC_ReplayDeltaMinus: SpikeRateTrends = field(init=False, repr=False, default=None)
     SxC_ReplayDeltaPlus: SpikeRateTrends = field(init=False, repr=False, default=None)
-    
+
     LxC_ThetaDeltaMinus: SpikeRateTrends = field(init=False, repr=False, default=None)
     LxC_ThetaDeltaPlus: SpikeRateTrends = field(init=False, repr=False, default=None)
     SxC_ThetaDeltaMinus: SpikeRateTrends = field(init=False, repr=False, default=None)
     SxC_ThetaDeltaPlus: SpikeRateTrends = field(init=False, repr=False, default=None)
-
-    @classmethod
-    def get_bar_colors(cls):
-        return [(1.0, 0, 0, 1), (0.65, 0, 0, 1), (0, 0, 0.65, 1), (0, 0, 1.0, 1)]    # corresponding colors
-
-
-    def __add__(self, other):
-        """ for concatenating the fields of two `PaperFigureTwo objects. """
-        if isinstance(other, PaperFigureTwo):
-            new_obj = PaperFigureTwo()
-            new_obj.Fig2_Replay_FR = self.Fig2_Replay_FR + other.Fig2_Replay_FR
-            new_obj.Fig2_Laps_FR = self.Fig2_Laps_FR + other.Fig2_Laps_FR
-
-            # Concatenate SpikeRateTrends members
-            new_obj.LxC_ReplayDeltaMinus = self.LxC_ReplayDeltaMinus + other.LxC_ReplayDeltaMinus
-            new_obj.LxC_ReplayDeltaPlus = self.LxC_ReplayDeltaPlus + other.LxC_ReplayDeltaPlus
-            new_obj.SxC_ReplayDeltaMinus = self.SxC_ReplayDeltaMinus + other.SxC_ReplayDeltaMinus
-            new_obj.SxC_ReplayDeltaPlus = self.SxC_ReplayDeltaPlus + other.SxC_ReplayDeltaPlus
-            new_obj.LxC_ThetaDeltaMinus = self.LxC_ThetaDeltaMinus + other.LxC_ThetaDeltaMinus
-            new_obj.LxC_ThetaDeltaPlus = self.LxC_ThetaDeltaPlus + other.LxC_ThetaDeltaPlus
-            new_obj.SxC_ThetaDeltaMinus = self.SxC_ThetaDeltaMinus + other.SxC_ThetaDeltaMinus
-            new_obj.SxC_ThetaDeltaPlus = self.SxC_ThetaDeltaPlus + other.SxC_ThetaDeltaPlus
-
-            return new_obj
-
-        raise TypeError("Unsupported operand type(s) for +: '{}' and '{}'".format(type(self), type(other)))
-
 
     def compute(self, curr_active_pipeline, **kwargs):
         """ full instantaneous computations for both Long and Short epochs:
@@ -823,19 +785,8 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
         sess = curr_active_pipeline.sess 
         # Get the provided context or use the session context:
         active_context = kwargs.get('active_context', sess.get_context()) 
-        
-        # curr_fig_num = kwargs.pop('fignum', None)
-        # if curr_fig_num is None:
-        #     ## Set the fig_num, if not already set:
-        #     curr_fig_num = f'long|short fr indicies_{active_context.get_description(separator="/")}'
-        # kwargs['fignum'] = curr_fig_num
-
-        # graphics_output_dict: MatplotlibRenderPlots = _make_pho_jonathan_batch_plots(t_split, time_bins, neuron_replay_stats_df, time_binned_unit_specific_binned_spike_rate, pf1D_all, aclu_to_idx, rdf, irdf,
-        #     show_inter_replay_frs=show_inter_replay_frs, n_max_plot_rows=n_max_plot_rows, included_unit_neuron_IDs=included_unit_neuron_IDs, cell_spikes_dfs_dict=cell_spikes_dfs_dict, time_variable_name=time_variable_name, defer_render=defer_render, **kwargs)
 
         self.active_identifying_session_ctx = active_context
-        self._pipeline_file_callback_fn = curr_active_pipeline.output_figure # lambda args, kwargs: self.write_to_file(args, kwargs, curr_active_pipeline)
-
         long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
         long_session, short_session, global_session = [curr_active_pipeline.filtered_sessions[an_epoch_name] for an_epoch_name in [long_epoch_name, short_epoch_name, global_epoch_name]] # only uses global_session
         (epochs_df_L, epochs_df_S), (filter_epoch_spikes_df_L, filter_epoch_spikes_df_S), (good_example_epoch_indicies_L, good_example_epoch_indicies_S), (short_exclusive, long_exclusive, BOTH_subset, EITHER_subset, XOR_subset, NEITHER_subset), new_all_aclus_sort_indicies, assigning_epochs_obj = PAPER_FIGURE_figure_1_add_replay_epoch_rasters(curr_active_pipeline)
@@ -879,6 +830,91 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
 
         # Note that in general LxC and SxC might have differing numbers of cells.
         self.Fig2_Laps_FR: list[tuple[Any, Any]] = [(v.cell_agg_inst_fr_list.mean(), v.cell_agg_inst_fr_list.std(), v.cell_agg_inst_fr_list) for v in (LxC_ThetaDeltaMinus, LxC_ThetaDeltaPlus, SxC_ThetaDeltaMinus, SxC_ThetaDeltaPlus)]
+    
+
+    def __add__(self, other):
+        """ for concatenating the fields of two `InstantaneousSpikeRateGroupsComputation objects. """
+        if isinstance(other, InstantaneousSpikeRateGroupsComputation):
+            new_obj = InstantaneousSpikeRateGroupsComputation()
+            new_obj.Fig2_Replay_FR = self.Fig2_Replay_FR + other.Fig2_Replay_FR
+            new_obj.Fig2_Laps_FR = self.Fig2_Laps_FR + other.Fig2_Laps_FR
+
+            # Concatenate SpikeRateTrends members
+            new_obj.LxC_ReplayDeltaMinus = self.LxC_ReplayDeltaMinus + other.LxC_ReplayDeltaMinus
+            new_obj.LxC_ReplayDeltaPlus = self.LxC_ReplayDeltaPlus + other.LxC_ReplayDeltaPlus
+            new_obj.SxC_ReplayDeltaMinus = self.SxC_ReplayDeltaMinus + other.SxC_ReplayDeltaMinus
+            new_obj.SxC_ReplayDeltaPlus = self.SxC_ReplayDeltaPlus + other.SxC_ReplayDeltaPlus
+            new_obj.LxC_ThetaDeltaMinus = self.LxC_ThetaDeltaMinus + other.LxC_ThetaDeltaMinus
+            new_obj.LxC_ThetaDeltaPlus = self.LxC_ThetaDeltaPlus + other.LxC_ThetaDeltaPlus
+            new_obj.SxC_ThetaDeltaMinus = self.SxC_ThetaDeltaMinus + other.SxC_ThetaDeltaMinus
+            new_obj.SxC_ThetaDeltaPlus = self.SxC_ThetaDeltaPlus + other.SxC_ThetaDeltaPlus
+
+            return new_obj
+
+        raise TypeError("Unsupported operand type(s) for +: '{}' and '{}'".format(type(self), type(other)))
+
+
+
+
+# @overwriting_display_context(
+@metadata_attributes(short_name=None, tags=['figure_2', 'paper', 'figure'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-06-26 21:36', related_items=[])
+@define(slots=False, repr=False)
+class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
+    """ full instantaneous firing rate computations for both Long and Short epochs
+    
+    Usage:
+        _out_fig_2 = PaperFigureTwo(instantaneous_time_bin_size_seconds=0.01) # 10ms
+        _out_fig_2.compute(curr_active_pipeline=curr_active_pipeline)
+        _out_fig_2.display()
+
+    """
+    computation_result: InstantaneousSpikeRateGroupsComputation = field(init=False)
+
+    instantaneous_time_bin_size_seconds: float = 0.01 # 20ms
+
+    active_identifying_session_ctx: IdentifyingContext = field(init=False)
+
+    Fig2_Replay_FR: list[tuple[Any, Any]] = field(init=False)
+    Fig2_Laps_FR: list[tuple[Any, Any]] = field(init=False)
+
+    ## Extra Debugging data:
+    LxC_ReplayDeltaMinus: SpikeRateTrends = field(init=False, repr=False, default=None)
+    LxC_ReplayDeltaPlus: SpikeRateTrends = field(init=False, repr=False, default=None)
+    SxC_ReplayDeltaMinus: SpikeRateTrends = field(init=False, repr=False, default=None)
+    SxC_ReplayDeltaPlus: SpikeRateTrends = field(init=False, repr=False, default=None)
+    
+    LxC_ThetaDeltaMinus: SpikeRateTrends = field(init=False, repr=False, default=None)
+    LxC_ThetaDeltaPlus: SpikeRateTrends = field(init=False, repr=False, default=None)
+    SxC_ThetaDeltaMinus: SpikeRateTrends = field(init=False, repr=False, default=None)
+    SxC_ThetaDeltaPlus: SpikeRateTrends = field(init=False, repr=False, default=None)
+
+    _pipeline_file_callback_fn: Callable = field(init=False, repr=False, default=None) # this callback is 2737.983306 MB!!
+
+
+    @classmethod
+    def get_bar_colors(cls):
+        return [(1.0, 0, 0, 1), (0.65, 0, 0, 1), (0, 0, 0.65, 1), (0, 0, 1.0, 1)]    # corresponding colors
+
+
+    def compute(self, curr_active_pipeline, **kwargs):
+        """ full instantaneous computations for both Long and Short epochs:
+        
+        Can access via:
+            from pyphoplacecellanalysis.General.Batch.PhoDiba2023Paper import PaperFigureTwo
+
+            _out_fig_2 = PaperFigureTwo(instantaneous_time_bin_size_seconds=0.01) # 10ms
+            _out_fig_2.compute(curr_active_pipeline=curr_active_pipeline, active_context=curr_active_pipeline.sess.get_context())
+            LxC_ReplayDeltaMinus, LxC_ReplayDeltaPlus, SxC_ReplayDeltaMinus, SxC_ReplayDeltaPlus = _out_fig_2.LxC_ReplayDeltaMinus, _out_fig_2.LxC_ReplayDeltaPlus, _out_fig_2.SxC_ReplayDeltaMinus, _out_fig_2.SxC_ReplayDeltaPlus
+            LxC_ThetaDeltaMinus, LxC_ThetaDeltaPlus, SxC_ThetaDeltaMinus, SxC_ThetaDeltaPlus = _out_fig_2.LxC_ThetaDeltaMinus, _out_fig_2.LxC_ThetaDeltaPlus, _out_fig_2.SxC_ThetaDeltaMinus, _out_fig_2.SxC_ThetaDeltaPlus
+        
+        """
+        self.computation_result = InstantaneousSpikeRateGroupsComputation(instantaneous_time_bin_size_seconds=self.instantaneous_time_bin_size_seconds)
+        self.computation_result.compute(curr_active_pipeline, **kwargs)
+        self.active_identifying_session_ctx = self.computation_result.active_identifying_session_ctx
+
+        # Set callback, the only self-specific property
+        self._pipeline_file_callback_fn = curr_active_pipeline.output_figure # lambda args, kwargs: self.write_to_file(args, kwargs, curr_active_pipeline)
+        
     
     @classmethod
     def _build_formatted_title_string(cls, epochs_name) -> str:
