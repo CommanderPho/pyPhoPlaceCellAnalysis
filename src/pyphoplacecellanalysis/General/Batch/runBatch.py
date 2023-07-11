@@ -15,6 +15,8 @@ from pyphocorehelpers.function_helpers import function_attributes
 
 # NeuroPy (Diba Lab Python Repo) Loading
 ## For computation parameters:
+from neuropy.core.epoch import Epoch
+from neuropy.utils.matplotlib_helpers import matplotlib_file_only
 from neuropy.utils.result_context import IdentifyingContext
 from neuropy.core.session.Formats.BaseDataSessionFormats import find_local_session_paths
 
@@ -23,6 +25,13 @@ from pyphoplacecellanalysis.General.Pipeline.NeuropyPipeline import PipelineSavi
 from pyphoplacecellanalysis.General.Pipeline.Stages.Loading import saveData, loadData
 
 from attrs import define, field, Factory
+
+from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.LongShortTrackComputations import LongShortPipelineTests
+# from pyphoplacecellanalysis.General.Batch.NeptuneAiHelpers import set_environment_variables, neptune_output_figures
+from pyphoplacecellanalysis.General.Batch.NonInteractiveProcessing import _update_pipeline_missing_preprocessing_parameters
+from Spike3D.PhoDiba2023Paper import main_complete_figure_generations # for `BatchSessionCompletionHandler`
+
+
 
 def get_file_str_if_file_exists(v:Path)->str:
     """ returns the string representation of the resolved file if it exists, or the empty string if not """
@@ -599,7 +608,121 @@ class BatchResultAccessor():
         
 
 
+
         
+@define(repr=False)
+class BatchSessionCompletionHandler:
+    """ handles completion of a single session's batch processing. 
+
+    Allows accumulating results across sessions and runs.
+
+    
+    Usage:
+        from pyphoplacecellanalysis.General.Batch.runBatch import BatchSessionCompletionHandler
+        
+    """
+    saving_mode: PipelineSavingScheme = PipelineSavingScheme.SKIP_SAVING
+    force_global_recompute: bool = False
+
+    def post_compute_validate(self, curr_active_pipeline):
+        """ 2023-05-16 - Ensures that the laps are used for the placefield computation epochs, the number of bins are the same between the long and short tracks. """
+        LongShortPipelineTests(curr_active_pipeline=curr_active_pipeline).validate()
+        # 2023-05-24 - Adds the previously missing `sess.config.preprocessing_parameters` to each session (filtered and base) in the pipeline.
+        was_updated = _update_pipeline_missing_preprocessing_parameters(curr_active_pipeline)
+        print(f'were pipeline preprocessing parameters missing and updated?: {was_updated}')
+
+        ## BUG 2023-05-25 - Found ERROR for a loaded pipeline where for some reason the filtered_contexts[long_epoch_name]'s actual context was the same as the short maze ('...maze2'). Unsure how this happened.
+        long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
+        long_epoch_context, short_epoch_context, global_epoch_context = [curr_active_pipeline.filtered_contexts[a_name] for a_name in (long_epoch_name, short_epoch_name, global_epoch_name)]
+        # assert long_epoch_context.filter_name == long_epoch_name, f"long_epoch_context.filter_name: {long_epoch_context.filter_name} != long_epoch_name: {long_epoch_name}"
+        # fix it if broken
+        long_epoch_context.filter_name = long_epoch_name
+
+
+
+
+    def on_complete_success_execution_session(self, active_batch_run, curr_session_context, curr_session_basedir, curr_active_pipeline):
+        """ called when the execute_session completes like:
+            `post_run_callback_fn_output = post_run_callback_fn(curr_session_context, curr_session_basedir, curr_active_pipeline)`
+            
+            Meant to be assigned like:
+            , post_run_callback_fn=_on_complete_success_execution_session
+            
+            Captures nothing.
+            
+            from Spike3D.scripts.run_BatchAnalysis import _on_complete_success_execution_session
+            
+        """
+        print(f'on_complete_success_execution_session(curr_session_context: {curr_session_context}, curr_session_basedir: {str(curr_session_basedir)}, ...)')
+        # print(f'curr_session_context: {curr_session_context}, curr_session_basedir: {str(curr_session_basedir)}')
+        long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
+        # long_session, short_session, global_session = [curr_active_pipeline.filtered_sessions[an_epoch_name] for an_epoch_name in [long_epoch_name, short_epoch_name, global_epoch_name]]
+        # long_results, short_results, global_results = [curr_active_pipeline.computation_results[an_epoch_name]['computed_data'] for an_epoch_name in [long_epoch_name, short_epoch_name, global_epoch_name]]
+
+        # Get existing laps from session:
+        long_laps, short_laps, global_laps = [curr_active_pipeline.filtered_sessions[an_epoch_name].laps.as_epoch_obj() for an_epoch_name in [long_epoch_name, short_epoch_name, global_epoch_name]]
+        long_replays, short_replays, global_replays = [Epoch(curr_active_pipeline.filtered_sessions[an_epoch_name].replay.epochs.get_valid_df()) for an_epoch_name in [long_epoch_name, short_epoch_name, global_epoch_name]]
+        # short_laps.n_epochs: 40, long_laps.n_epochs: 40
+        # short_replays.n_epochs: 6, long_replays.n_epochs: 8
+        print(f'short_laps.n_epochs: {short_laps.n_epochs}, long_laps.n_epochs: {long_laps.n_epochs}')
+        print(f'short_replays.n_epochs: {short_replays.n_epochs}, long_replays.n_epochs: {long_replays.n_epochs}')
+
+        # ## Post Compute Validate 2023-05-16:
+        self.post_compute_validate(curr_active_pipeline)
+        
+        ## Save the pipeline since that's disabled by default now:
+        try:
+            curr_active_pipeline.save_pipeline(saving_mode=self.saving_mode) # AttributeError: 'PfND_TimeDependent' object has no attribute '_included_thresh_neurons_indx'
+        except Exception as e:
+            ## TODO: catch/log saving error and indicate that it isn't saved.
+            print(f'ERROR SAVING PIPELINE for curr_session_context: {curr_session_context}. error: {e}')
+
+        ## GLOBAL FUNCTION:
+        # FIXME: doesn't seem like we should always use `force_recompute=True`
+        try:
+            # # 2023-01-* - Call extended computations to build `_display_short_long_firing_rate_index_comparison` figures:
+            extended_computations_include_includelist=['long_short_fr_indicies_analyses', 'jonathan_firing_rate_analysis', 'long_short_decoding_analyses', 'long_short_post_decoding'] # do only specifiedl
+            newly_computed_values = batch_extended_computations(curr_active_pipeline, include_includelist=extended_computations_include_includelist, include_global_functions=True, fail_on_exception=True, progress_print=True, force_recompute=self.force_global_recompute, debug_print=False)
+            print(f'newly_computed_values: {newly_computed_values}')        
+            if len(newly_computed_values) > 0:
+                print(f'newly_computed_values: {newly_computed_values}. Saving global results...')
+                try:
+                    # Try to write out the global computation function results:
+                    curr_active_pipeline.save_global_computation_results()
+                except Exception as e:
+                    print(f'!!WARNING!!: saving the global results threw the exception: {e}')
+                    print(f'\tthe global results are currently unsaved! proceed with caution and save as soon as you can!')
+            else:
+                print(f'no changes in global results.')
+        except Exception as e:
+            ## TODO: catch/log saving error and indicate that it isn't saved.
+            print(f'ERROR SAVING GLOBAL COMPUTATION RESULTS for pipeline of curr_session_context: {curr_session_context}. error: {e}')
+            
+
+        # ### Programmatic Figure Outputs:
+        try:
+            ## To file only:
+            with matplotlib_file_only():
+                # Perform non-interactive Matplotlib operations with 'AGG' backend
+                # neptuner = batch_perform_all_plots(curr_active_pipeline, enable_neptune=True, neptuner=None)
+                main_complete_figure_generations(curr_active_pipeline, save_figures_only=True, save_figure=True)
+                
+            # IF thst's done, clear all the plots:
+            from matplotlib import pyplot as plt
+            plt.close('all') # this takes care of the matplotlib-backed figures.
+            curr_active_pipeline.clear_display_outputs()
+            curr_active_pipeline.clear_registered_output_files()
+
+        except Exception as e:
+            print(f'_perform_plots failed with exception: {e}')
+            # raise e
+
+        return {long_epoch_name:(long_laps, long_replays), short_epoch_name:(short_laps, short_replays),
+                'outputs': {'local': curr_active_pipeline.pickle_path,
+                            'global': curr_active_pipeline.global_computation_results_pickle_path}
+            }
+        
+
 
 
 if __name__ == "__main__":

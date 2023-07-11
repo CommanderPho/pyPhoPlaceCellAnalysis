@@ -1,4 +1,4 @@
-from attrs import define, field
+from attrs import define, field, asdict
 import numpy as np
 import pandas as pd
 from indexed import IndexedOrderedDict
