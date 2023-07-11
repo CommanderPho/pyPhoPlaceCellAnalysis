@@ -26,10 +26,11 @@ class FormattedFigureText:
     """
     # fig.subplots_adjust(top=top_margin, left=left_margin, bottom=bottom_margin)
     top_margin: float = 0.8
-    left_margin: float = 0.090
-    right_margin: float = 0.91 # (1.0-0.090)
+    # left_margin: float = 0.090
+    # right_margin: float = 0.91 # (1.0-0.090)
+    left_margin: float = 0.15
+    right_margin: float = 0.85 # (1.0-0.15)
     bottom_margin: float = 0.150
-
 
     
 
