@@ -625,6 +625,7 @@ class BatchSessionCompletionHandler:
     saving_mode: PipelineSavingScheme = field(default=PipelineSavingScheme.SKIP_SAVING)
     force_global_recompute: bool = field(default=False)
 
+
     def post_compute_validate(self, curr_active_pipeline):
         """ 2023-05-16 - Ensures that the laps are used for the placefield computation epochs, the number of bins are the same between the long and short tracks. """
         LongShortPipelineTests(curr_active_pipeline=curr_active_pipeline).validate()
@@ -640,6 +641,25 @@ class BatchSessionCompletionHandler:
         long_epoch_context.filter_name = long_epoch_name
 
 
+    def try_complete_figure_generation_to_file(self, curr_active_pipeline):
+        try:
+            ## To file only:
+            with matplotlib_file_only():
+                # Perform non-interactive Matplotlib operations with 'AGG' backend
+                # neptuner = batch_perform_all_plots(curr_active_pipeline, enable_neptune=True, neptuner=None)
+                main_complete_figure_generations(curr_active_pipeline, save_figures_only=True, save_figure=True)
+                
+            # IF thst's done, clear all the plots:
+            from matplotlib import pyplot as plt
+            plt.close('all') # this takes care of the matplotlib-backed figures.
+            curr_active_pipeline.clear_display_outputs()
+            curr_active_pipeline.clear_registered_output_files()
+
+            return True # completed successfully (without raising an error at least).
+        except Exception as e:
+            print(f'main_complete_figure_generations failed with exception: {e}')
+            # raise e
+            return False
 
 
     def on_complete_success_execution_session(self, active_batch_run, curr_session_context, curr_session_basedir, curr_active_pipeline):
@@ -684,15 +704,15 @@ class BatchSessionCompletionHandler:
             # # 2023-01-* - Call extended computations to build `_display_short_long_firing_rate_index_comparison` figures:
             extended_computations_include_includelist=['long_short_fr_indicies_analyses', 'jonathan_firing_rate_analysis', 'long_short_decoding_analyses', 'long_short_post_decoding'] # do only specifiedl
             newly_computed_values = batch_extended_computations(curr_active_pipeline, include_includelist=extended_computations_include_includelist, include_global_functions=True, fail_on_exception=True, progress_print=True, force_recompute=self.force_global_recompute, debug_print=False)
-            print(f'newly_computed_values: {newly_computed_values}')        
-            if len(newly_computed_values) > 0:
+            if (len(newly_computed_values) > 0) and (self.saving_mode.value != 'skip_saving'):
                 print(f'newly_computed_values: {newly_computed_values}. Saving global results...')
                 try:
+                    # curr_active_pipeline.global_computation_results.persist_time = datetime.now()
                     # Try to write out the global computation function results:
                     curr_active_pipeline.save_global_computation_results()
                 except Exception as e:
-                    print(f'!!WARNING!!: saving the global results threw the exception: {e}')
-                    print(f'\tthe global results are currently unsaved! proceed with caution and save as soon as you can!')
+                    print(f'\n\n!!WARNING!!: saving the global results threw the exception: {e}')
+                    print(f'\tthe global results are currently unsaved! proceed with caution and save as soon as you can!\n\n\n')
             else:
                 print(f'no changes in global results.')
         except Exception as e:
@@ -701,22 +721,12 @@ class BatchSessionCompletionHandler:
             
 
         # ### Programmatic Figure Outputs:
-        try:
-            ## To file only:
-            with matplotlib_file_only():
-                # Perform non-interactive Matplotlib operations with 'AGG' backend
-                # neptuner = batch_perform_all_plots(curr_active_pipeline, enable_neptune=True, neptuner=None)
-                main_complete_figure_generations(curr_active_pipeline, save_figures_only=True, save_figure=True)
-                
-            # IF thst's done, clear all the plots:
-            from matplotlib import pyplot as plt
-            plt.close('all') # this takes care of the matplotlib-backed figures.
-            curr_active_pipeline.clear_display_outputs()
-            curr_active_pipeline.clear_registered_output_files()
+        self.try_complete_figure_generation_to_file(curr_active_pipeline)
 
-        except Exception as e:
-            print(f'_perform_plots failed with exception: {e}')
-            # raise e
+
+        ### Do specific computations:
+        
+
 
         return {long_epoch_name:(long_laps, long_replays), short_epoch_name:(short_laps, short_replays),
                 'outputs': {'local': curr_active_pipeline.pickle_path,
