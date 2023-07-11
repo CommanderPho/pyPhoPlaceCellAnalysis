@@ -753,7 +753,11 @@ def PAPER_FIGURE_figure_1_full(curr_active_pipeline, defer_show=False, save_figu
 # Instantaneous versions:
 @define(slots=False)
 class InstantaneousSpikeRateGroupsComputation:
-    """ class to handle spike rate computations """
+    """ class to handle spike rate computations 
+
+    from pyphoplacecellanalysis.General.Batch.PhoDiba2023Paper import InstantaneousSpikeRateGroupsComputation
+
+    """
     instantaneous_time_bin_size_seconds: float = 0.01  # 20ms
     active_identifying_session_ctx: IdentifyingContext = field(init=False)
 
@@ -774,12 +778,12 @@ class InstantaneousSpikeRateGroupsComputation:
         """ full instantaneous computations for both Long and Short epochs:
         
         Can access via:
-            from pyphoplacecellanalysis.General.Batch.PhoDiba2023Paper import PaperFigureTwo
+            from pyphoplacecellanalysis.General.Batch.PhoDiba2023Paper import InstantaneousSpikeRateGroupsComputation
 
-            _out_fig_2 = PaperFigureTwo(instantaneous_time_bin_size_seconds=0.01) # 10ms
-            _out_fig_2.compute(curr_active_pipeline=curr_active_pipeline, active_context=curr_active_pipeline.sess.get_context())
-            LxC_ReplayDeltaMinus, LxC_ReplayDeltaPlus, SxC_ReplayDeltaMinus, SxC_ReplayDeltaPlus = _out_fig_2.LxC_ReplayDeltaMinus, _out_fig_2.LxC_ReplayDeltaPlus, _out_fig_2.SxC_ReplayDeltaMinus, _out_fig_2.SxC_ReplayDeltaPlus
-            LxC_ThetaDeltaMinus, LxC_ThetaDeltaPlus, SxC_ThetaDeltaMinus, SxC_ThetaDeltaPlus = _out_fig_2.LxC_ThetaDeltaMinus, _out_fig_2.LxC_ThetaDeltaPlus, _out_fig_2.SxC_ThetaDeltaMinus, _out_fig_2.SxC_ThetaDeltaPlus
+            _out_inst_fr_comps = InstantaneousSpikeRateGroupsComputation(instantaneous_time_bin_size_seconds=0.01) # 10ms
+            _out_inst_fr_comps.compute(curr_active_pipeline=curr_active_pipeline, active_context=curr_active_pipeline.sess.get_context())
+            LxC_ReplayDeltaMinus, LxC_ReplayDeltaPlus, SxC_ReplayDeltaMinus, SxC_ReplayDeltaPlus = _out_inst_fr_comps.LxC_ReplayDeltaMinus, _out_inst_fr_comps.LxC_ReplayDeltaPlus, _out_inst_fr_comps.SxC_ReplayDeltaMinus, _out_inst_fr_comps.SxC_ReplayDeltaPlus
+            LxC_ThetaDeltaMinus, LxC_ThetaDeltaPlus, SxC_ThetaDeltaMinus, SxC_ThetaDeltaPlus = _out_inst_fr_comps.LxC_ThetaDeltaMinus, _out_inst_fr_comps.LxC_ThetaDeltaPlus, _out_inst_fr_comps.SxC_ThetaDeltaMinus, _out_inst_fr_comps.SxC_ThetaDeltaPlus
         
         """
         sess = curr_active_pipeline.sess 
@@ -868,25 +872,11 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
         _out_fig_2.display()
 
     """
-    computation_result: InstantaneousSpikeRateGroupsComputation = field(init=False)
 
     instantaneous_time_bin_size_seconds: float = 0.01 # 20ms
-
-    active_identifying_session_ctx: IdentifyingContext = field(init=False)
-
-    Fig2_Replay_FR: list[tuple[Any, Any]] = field(init=False)
-    Fig2_Laps_FR: list[tuple[Any, Any]] = field(init=False)
-
-    ## Extra Debugging data:
-    LxC_ReplayDeltaMinus: SpikeRateTrends = field(init=False, repr=False, default=None)
-    LxC_ReplayDeltaPlus: SpikeRateTrends = field(init=False, repr=False, default=None)
-    SxC_ReplayDeltaMinus: SpikeRateTrends = field(init=False, repr=False, default=None)
-    SxC_ReplayDeltaPlus: SpikeRateTrends = field(init=False, repr=False, default=None)
     
-    LxC_ThetaDeltaMinus: SpikeRateTrends = field(init=False, repr=False, default=None)
-    LxC_ThetaDeltaPlus: SpikeRateTrends = field(init=False, repr=False, default=None)
-    SxC_ThetaDeltaMinus: SpikeRateTrends = field(init=False, repr=False, default=None)
-    SxC_ThetaDeltaPlus: SpikeRateTrends = field(init=False, repr=False, default=None)
+    computation_result: InstantaneousSpikeRateGroupsComputation = field(init=False)
+    active_identifying_session_ctx: IdentifyingContext = field(init=False)
 
     _pipeline_file_callback_fn: Callable = field(init=False, repr=False, default=None) # this callback is 2737.983306 MB!!
 
@@ -904,8 +894,9 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
 
             _out_fig_2 = PaperFigureTwo(instantaneous_time_bin_size_seconds=0.01) # 10ms
             _out_fig_2.compute(curr_active_pipeline=curr_active_pipeline, active_context=curr_active_pipeline.sess.get_context())
-            LxC_ReplayDeltaMinus, LxC_ReplayDeltaPlus, SxC_ReplayDeltaMinus, SxC_ReplayDeltaPlus = _out_fig_2.LxC_ReplayDeltaMinus, _out_fig_2.LxC_ReplayDeltaPlus, _out_fig_2.SxC_ReplayDeltaMinus, _out_fig_2.SxC_ReplayDeltaPlus
-            LxC_ThetaDeltaMinus, LxC_ThetaDeltaPlus, SxC_ThetaDeltaMinus, SxC_ThetaDeltaPlus = _out_fig_2.LxC_ThetaDeltaMinus, _out_fig_2.LxC_ThetaDeltaPlus, _out_fig_2.SxC_ThetaDeltaMinus, _out_fig_2.SxC_ThetaDeltaPlus
+            out_inst_fr_comps = _out_fig_2.computation_result
+            LxC_ReplayDeltaMinus, LxC_ReplayDeltaPlus, SxC_ReplayDeltaMinus, SxC_ReplayDeltaPlus = _out_inst_fr_comps.LxC_ReplayDeltaMinus, _out_inst_fr_comps.LxC_ReplayDeltaPlus, _out_inst_fr_comps.SxC_ReplayDeltaMinus, _out_inst_fr_comps.SxC_ReplayDeltaPlus
+            LxC_ThetaDeltaMinus, LxC_ThetaDeltaPlus, SxC_ThetaDeltaMinus, SxC_ThetaDeltaPlus = _out_inst_fr_comps.LxC_ThetaDeltaMinus, _out_inst_fr_comps.LxC_ThetaDeltaPlus, _out_inst_fr_comps.SxC_ThetaDeltaMinus, _out_inst_fr_comps.SxC_ThetaDeltaPlus
         
         """
         self.computation_result = InstantaneousSpikeRateGroupsComputation(instantaneous_time_bin_size_seconds=self.instantaneous_time_bin_size_seconds)
@@ -1050,20 +1041,8 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
         active_context = kwargs.get('active_context', self.active_identifying_session_ctx)
         top_margin, left_margin, bottom_margin = kwargs.get('top_margin', 0.8), kwargs.get('left_margin', 0.090), kwargs.get('bottom_margin', 0.150)
         
-        # active_context = active_context.adding_context_if_missing(display_fn_name='inst_FR_bar_graphs')
-        # curr_fig_num = kwargs.pop('fignum', None)
-        # if curr_fig_num is None:
-        #     ## Set the fig_num, if not already set:
-        #     curr_fig_num = f'long|short fr indicies_{active_context.get_description(separator="/")}'
-        # kwargs['fignum'] = curr_fig_num
-
-
-        # Matplotlib Mode:
-        # matplotlib.use('Qt5Agg')  # Set the backend to Qt5Agg
-    
-        # Any Mode:
-        _fig_2_theta_out = self.fig_2_Theta_FR_matplotlib(self.Fig2_Laps_FR, defer_show=defer_show, active_context=active_context, top_margin=top_margin, left_margin=left_margin, bottom_margin=bottom_margin)
-        _fig_2_replay_out = self.fig_2_Replay_FR_matplotlib(self.Fig2_Replay_FR, defer_show=defer_show, active_context=active_context, top_margin=top_margin, left_margin=left_margin, bottom_margin=bottom_margin)
+        _fig_2_theta_out = self.fig_2_Theta_FR_matplotlib(self.computation_result.Fig2_Laps_FR, defer_show=defer_show, active_context=active_context, top_margin=top_margin, left_margin=left_margin, bottom_margin=bottom_margin)
+        _fig_2_replay_out = self.fig_2_Replay_FR_matplotlib(self.computation_result.Fig2_Replay_FR, defer_show=defer_show, active_context=active_context, top_margin=top_margin, left_margin=left_margin, bottom_margin=bottom_margin)
 
 
 
