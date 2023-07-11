@@ -22,7 +22,21 @@ class FormattedFigureText:
 
     Usage:
         from pyphoplacecellanalysis.Pho2D.matplotlib.AdvancedMatplotlibText import FormattedFigureText
-        
+
+        # `flexitext` version:
+        text_formatter = FormattedFigureText()
+        plt.title('')
+        plt.suptitle('')
+        text_formatter.setup_margins(fig)
+
+        ## Need to extract the track name ('maze1') for the title in this plot. 
+        track_name = active_context.get_description(subset_includelist=['filter_name'], separator=' | ') # 'maze1'
+        # TODO: do we want to convert this into "long" or "short"?
+        flexitext(text_formatter.left_margin, text_formatter.top_margin, f'<size:22><weight:bold>{track_name}</> replay|laps <weight:bold>firing rate</></>', va="bottom", xycoords="figure fraction")
+        footer_text_obj = flexitext((text_formatter.left_margin*0.1), (text_formatter.bottom_margin*0.25), text_formatter._build_footer_string(active_context=active_context), va="top", xycoords="figure fraction")
+
+
+
     """
     # fig.subplots_adjust(top=top_margin, left=left_margin, bottom=bottom_margin)
     top_margin: float = 0.8
@@ -58,6 +72,11 @@ class FormattedFigureText:
     def setup_margins(self, fig, **kwargs):
         top_margin, left_margin, right_margin, bottom_margin = kwargs.get('top_margin', self.top_margin), kwargs.get('left_margin', self.left_margin), kwargs.get('right_margin', self.right_margin), kwargs.get('bottom_margin', self.bottom_margin)
         fig.subplots_adjust(top=top_margin, left=left_margin, right=right_margin, bottom=bottom_margin) # perform the adjustment on the figure
+
+    def add_flexitext_context_footer(self, active_context):
+        """ adds the default footer  """
+        return flexitext((self.left_margin*0.1), (self.bottom_margin*0.25), self._build_footer_string(active_context=active_context), va="top", xycoords="figure fraction")
+
 
 
     def add_flexitext(self, fig, **kwargs):
