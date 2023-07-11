@@ -124,7 +124,9 @@ class BatchRun:
     def execute_session(self, session_context, post_run_callback_fn=None, **kwargs):
         """ calls `run_specific_batch(...)` to actually execute the session's run. """
         curr_session_status = self.session_batch_status[session_context]
-        if curr_session_status != SessionBatchProgress.COMPLETED:
+        enable_calling_completion_handler_for_previously_completed: bool = kwargs.get('allow_processing_previously_completed', False)
+        print(f'enable_calling_completion_handler_for_previously_completed: {enable_calling_completion_handler_for_previously_completed}')
+        if (curr_session_status != SessionBatchProgress.COMPLETED) or enable_calling_completion_handler_for_previously_completed:
                 curr_session_basedir = self.session_batch_basedirs[session_context]
                 self.session_batch_status[session_context], self.session_batch_errors[session_context], self.session_batch_outputs[session_context] = run_specific_batch(self, session_context, curr_session_basedir, post_run_callback_fn=post_run_callback_fn, **kwargs)
         else:
