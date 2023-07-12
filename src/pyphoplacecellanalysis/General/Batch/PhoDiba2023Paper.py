@@ -1000,9 +1000,19 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
                                                             active_context=active_context, top_margin=top_margin,
                                                             left_margin=left_margin, bottom_margin=bottom_margin,
                                                             title_modifier=title_modifier)
-        return _fig_2_theta_out, _fig_2_replay_out
-    
 
+        def _perform_write_to_file_callback():
+            ## 2023-05-31 - Reference Output of matplotlib figure to file, along with building appropriate context.
+            return (self.perform_save(_fig_2_theta_out.context, _fig_2_theta_out.figures[0]), 
+                    self.perform_save(_fig_2_replay_out.context, _fig_2_replay_out.figures[0]))
+
+        if save_figure:
+            _fig_2_theta_out['saved_figures'], _fig_2_replay_out['saved_figures'] = _perform_write_to_file_callback()
+        else:
+            _fig_2_theta_out['saved_figures'], _fig_2_replay_out['saved_figures'] = [], []
+
+        # Merge the two (_fig_2_theta_out | _fig_2_replay_out)
+        return (_fig_2_theta_out, _fig_2_replay_out)
 
 
     def perform_save(self, *args, **kwargs):
@@ -1011,18 +1021,7 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
         return self._pipeline_file_callback_fn(*args, **kwargs) # call the saved callback
 
 
-        def _perform_write_to_file_callback():
-            ## 2023-05-31 - Reference Output of matplotlib figure to file, along with building appropriate context.
-            return (self.perform_save(_fig_2_theta_out.context, _fig_2_theta_out.figures[0]), 
-                    self.perform_save(_fig_2_replay_out.context, _fig_2_replay_out.figures[0]))
-
-        if save_figure:
-            _fig_2_theta_out['saved_figures'],  _fig_2_replay_out['saved_figures'] = _perform_write_to_file_callback()
-        else:
-            _fig_2_theta_out['saved_figures'],  _fig_2_replay_out['saved_figures'] = [], []
-
-        # Merge the two (_fig_2_theta_out | _fig_2_replay_out)
-        return (_fig_2_theta_out, _fig_2_replay_out)
+        
             
 
     @classmethod
