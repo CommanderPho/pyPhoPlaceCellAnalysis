@@ -630,7 +630,6 @@ class BatchSessionCompletionHandler:
     should_perform_figure_generation_to_file: bool = field(default=True) # controls whether figures are generated to file
     extended_computations_include_includelist: list = field(default=['long_short_fr_indicies_analyses', 'jonathan_firing_rate_analysis', 'long_short_decoding_analyses', 'long_short_post_decoding']) # do only specifiedl
 
-
     across_sessions_instantaneous_fr_dict: dict = Factory(dict) # Dict[IdentifyingContext] = InstantaneousSpikeRateGroupsComputation
 
     def post_compute_validate(self, curr_active_pipeline):
@@ -749,10 +748,12 @@ class BatchSessionCompletionHandler:
             print(f'\t\t done (success). Now have {len(self.across_sessions_instantaneous_fr_dict)} entries in self.across_sessions_instantaneous_fr_dict!')
         except Exception as e:
             print(f"ERROR: encountered exception {e} while trying to compute the instantaneous firing rates and set self.across_sessions_instantaneous_fr_dict[{curr_session_context}]")
-
+            _out_inst_fr_comps = None
+            
         return {long_epoch_name:(long_laps, long_replays), short_epoch_name:(short_laps, short_replays),
                 'outputs': {'local': curr_active_pipeline.pickle_path,
-                            'global': curr_active_pipeline.global_computation_results_pickle_path}
+                            'global': curr_active_pipeline.global_computation_results_pickle_path},
+                'across_sessions_batch_results': {'inst_fr_comps': _out_inst_fr_comps}
             }
         
 
