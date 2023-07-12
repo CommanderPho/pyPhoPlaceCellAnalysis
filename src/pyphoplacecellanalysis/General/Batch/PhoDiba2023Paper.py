@@ -918,121 +918,67 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
 
 
     @classmethod
-    @providing_context(fig='2', frs='Laps')
-    def fig_2_Theta_FR_matplotlib(cls, Fig2_Laps_FR, defer_show=False, **kwargs) -> MatplotlibRenderPlots:
-            active_context = kwargs.get('active_context', None)
-            assert active_context is not None
-            text_formatter = FormattedFigureText()
-        
-            # x_labels = ['LxC_ThetaDeltaMinus', 'LxC_ThetaDeltaPlus', 'SxC_ThetaDeltaMinus', 'SxC_ThetaDeltaPlus']
-            x_labels = ['$L_x C$\t$\\theta_{\\Delta -}$', '$L_x C$\t$\\theta_{\\Delta +}$', '$S_x C$\t$\\theta_{\\Delta -}$', '$S_x C$\t$\\theta_{\\Delta +}$']
-            
-            mean_values = np.array([v[0] for v in Fig2_Laps_FR])
-            std_values = np.array([v[1] for v in Fig2_Laps_FR])
-            all_data_points = np.array([v[2] for v in Fig2_Laps_FR])
-            
-            x = np.arange(len(x_labels)) # x-coordinates of your bars
-            width = 0.3 # bar width            
-            y = all_data_points
-            # y = mean_values
-
-            fig, ax = plt.subplots()
-            text_formatter.setup_margins(fig)
-            bars = ax.bar(x,
-                height=[np.mean(yi) for yi in y], # could just pass `mean_values`
-                yerr=[np.std(yi) for yi in y],    # error bars
-                capsize=5, # error bar cap width in points
-                width=width,    # bar width
-                tick_label=x_labels,
-                color=(0,0,0,0),  # face color transparent
-                edgecolor=cls.get_bar_colors(),
-                #ecolor=colors,    # error bar colors; setting this raises an error for whatever reason.
-                )
-
-            # Add actual datapoints on top:
-            for i in range(len(x)):
-                # distribute scatter randomly across whole width of bar
-                ax.scatter(x[i] + np.random.random(y[i].size) * width - width / 2, y[i], color=cls.get_bar_colors()[i])
-
-            ax.set_xlabel('Groups')
-            ax.set_ylabel('Laps Firing Rates (Hz)')
-
-            # Original title: 'Lap ($\\theta$) Firing Rates\n for Long/Short eXclusive Cells on each track'
-            # Add flexitext
-            title_text_obj = flexitext(text_formatter.left_margin, text_formatter.top_margin, cls._build_formatted_title_string(epochs_name='Lap ($\\theta$)'), va="bottom", xycoords="figure fraction")
-            footer_text_obj = flexitext((text_formatter.left_margin*0.1), (text_formatter.bottom_margin*0.25), text_formatter._build_footer_string(active_context=active_context), va="top", xycoords="figure fraction")
-            ax.set_xticks(x)
-            ax.set_xticklabels(x_labels)
-            
-            # # Add grouping annotations
-            # ax.text((x[0] + x[1]) / 2, -0.25, '$L_x C$', ha='center', va='center')
-            # ax.text((x[2] + x[3]) / 2, -0.25, '$S_x C$', ha='center', va='center')
-            
-            if not defer_show:
-                plt.show()
-                        
-            return MatplotlibRenderPlots(name="fig_2_Theta_FR_matplotlib", figures=[fig], axes=[ax], context=active_context, plot_objects={'bars': bars, 'text_objects': {'title': title_text_obj, 'footer': footer_text_obj}})
-            # return fig, ax, bars
-        
-    @classmethod
-    @providing_context(fig='2', frs='Replay')
-    def fig_2_Replay_FR_matplotlib(cls, Fig2_Replay_FR, defer_show=False, **kwargs) -> MatplotlibRenderPlots:
-        
-        active_context = kwargs.get('active_context', None)
-        assert active_context is not None
+    def create_bar_plot(cls, x_labels, y_values, active_context, ylabel, title):
         text_formatter = FormattedFigureText()
-        
-        # x_labels = ['LxC_RDeltaMinus', 'LxC_RDeltaPlus', 'SxC_RDeltaMinus', 'SxC_RDeltaPlus']
-        x_labels = ['$L_x C$\t$R_{\\Delta -}$', '$L_x C$\t$R_{\\Delta +}$', '$S_x C$\t$R_{\\Delta -}$', '$S_x C$\t$R_{\\Delta +}$']
-        
-        mean_values = np.array([v[0] for v in Fig2_Replay_FR])
-        std_values = np.array([v[1] for v in Fig2_Replay_FR])
-        all_data_points = np.array([v[2] for v in Fig2_Replay_FR])
-        
-        x = np.arange(len(x_labels)) # x-coordinates of your bars
-        width = 0.3 # bar width            
-        y = all_data_points
-        
-        
+        x = np.arange(len(x_labels))
+        width = 0.3
+
         fig, ax = plt.subplots()
         text_formatter.setup_margins(fig)
-        
-        bars = ax.bar(x,
-            height=[np.mean(yi) for yi in y], # could just pass `mean_values`
-            yerr=[np.std(yi) for yi in y],    # error bars
-            capsize=5, # error bar cap width in points
-            width=width,    # bar width
-            tick_label=x_labels,
-            color=(0,0,0,0),  # face color transparent
-            edgecolor=cls.get_bar_colors(),
-            #ecolor=colors,    # error bar colors; setting this raises an error for whatever reason.
-            )
 
-        # Add actual datapoints on top:
+        bars = ax.bar(x, [np.mean(yi) for yi in y_values], yerr=[np.std(yi) for yi in y_values], capsize=5,
+                    width=width, tick_label=x_labels, color=(0, 0, 0, 0), edgecolor=cls.get_bar_colors())
+
         for i in range(len(x)):
-            # distribute scatter randomly across whole width of bar
-            ax.scatter(x[i] + np.random.random(y[i].size) * width - width / 2, y[i], color=cls.get_bar_colors()[i])
-        
+            ax.scatter(x[i] + np.random.random(y_values[i].size) * width - width / 2, y_values[i], color=cls.get_bar_colors()[i])
+
         ax.set_xlabel('Groups')
-        ax.set_ylabel('Replay Firing Rates (Hz)')
-        # ax.set_title('Replay Firing Rates for Long/Short eXclusive Cells on each track')
-        # Add flexitext
-        title_text_obj = flexitext(text_formatter.left_margin, text_formatter.top_margin, cls._build_formatted_title_string(epochs_name='Replay'), va="bottom", xycoords="figure fraction")
-        footer_text_obj = flexitext((text_formatter.left_margin*0.1), (text_formatter.bottom_margin*0.25), text_formatter._build_footer_string(active_context=active_context), va="top", xycoords="figure fraction")
+        ax.set_ylabel(ylabel)
+
+        title_text_obj = flexitext(text_formatter.left_margin, text_formatter.top_margin,
+                                cls._build_formatted_title_string(epochs_name=title), va="bottom", xycoords="figure fraction")
+        footer_text_obj = flexitext(text_formatter.left_margin * 0.1, text_formatter.bottom_margin * 0.25,
+                                    text_formatter._build_footer_string(active_context=active_context), va="top", xycoords="figure fraction")
         ax.set_xticks(x)
         ax.set_xticklabels(x_labels)
 
+        return fig, ax, bars, title_text_obj, footer_text_obj
+
+
+    @classmethod
+    def create_plot(cls, x_labels, y_values, ylabel, title, fig_name, active_context, defer_show):
+        fig, ax, bars, title_text_obj, footer_text_obj = cls.create_bar_plot(x_labels, y_values, active_context, ylabel, title)
+
         if not defer_show:
             plt.show()
-                    
-        # return fig, ax, bars
-        return MatplotlibRenderPlots(name="fig_2_Replay_FR_matplotlib", figures=[fig], axes=[ax], context=active_context, plot_objects={'bars': bars, 'text_objects': {'title': title_text_obj, 'footer': footer_text_obj}})
+
+        return MatplotlibRenderPlots(name=fig_name, figures=[fig], axes=[ax], context=active_context,
+                                    plot_objects={'bars': bars, 'text_objects': {'title': title_text_obj, 'footer': footer_text_obj}})
 
 
-    def perform_save(self, *args, **kwargs):
-        """ used to save the figure without needing a hard reference to curr_active_pipeline """
-        assert self._pipeline_file_callback_fn is not None
-        return self._pipeline_file_callback_fn(*args, **kwargs) # call the saved callback
+    @classmethod
+    @providing_context(fig='F2', frs='Laps')
+    def fig_2_Theta_FR_matplotlib(cls, Fig2_Laps_FR, defer_show=False, **kwargs) -> MatplotlibRenderPlots:
+        active_context = kwargs.get('active_context', None)
+        assert active_context is not None
+
+        x_labels = ['$L_x C$\t$\\theta_{\\Delta -}$', '$L_x C$\t$\\theta_{\\Delta +}$', '$S_x C$\t$\\theta_{\\Delta -}$', '$S_x C$\t$\\theta_{\\Delta +}$']
+        all_data_points = np.array([v[2] for v in Fig2_Laps_FR])
+
+        return cls.create_plot(x_labels, all_data_points, 'Laps Firing Rates (Hz)', 'Lap ($\\theta$)', 'fig_2_Theta_FR_matplotlib', active_context, defer_show)
+
+
+    @classmethod
+    @providing_context(fig='F2', frs='Replay')
+    def fig_2_Replay_FR_matplotlib(cls, Fig2_Replay_FR, defer_show=False, **kwargs) -> MatplotlibRenderPlots:
+        active_context = kwargs.get('active_context', None)
+        assert active_context is not None
+
+        x_labels = ['$L_x C$\t$R_{\\Delta -}$', '$L_x C$\t$R_{\\Delta +}$', '$S_x C$\t$R_{\\Delta -}$', '$S_x C$\t$R_{\\Delta +}$']
+        all_data_points = np.array([v[2] for v in Fig2_Replay_FR])
+
+        return cls.create_plot(x_labels, all_data_points, 'Replay Firing Rates (Hz)', 'Replay', 'fig_2_Replay_FR_matplotlib', active_context, defer_show)
+
 
 
     @providing_context(fig='2', display_fn_name='inst_FR_bar_graphs')
@@ -1044,6 +990,12 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
         _fig_2_theta_out = self.fig_2_Theta_FR_matplotlib(self.computation_result.Fig2_Laps_FR, defer_show=defer_show, active_context=active_context, top_margin=top_margin, left_margin=left_margin, bottom_margin=bottom_margin)
         _fig_2_replay_out = self.fig_2_Replay_FR_matplotlib(self.computation_result.Fig2_Replay_FR, defer_show=defer_show, active_context=active_context, top_margin=top_margin, left_margin=left_margin, bottom_margin=bottom_margin)
 
+
+
+    def perform_save(self, *args, **kwargs):
+        """ used to save the figure without needing a hard reference to curr_active_pipeline """
+        assert self._pipeline_file_callback_fn is not None
+        return self._pipeline_file_callback_fn(*args, **kwargs) # call the saved callback
 
 
         def _perform_write_to_file_callback():
