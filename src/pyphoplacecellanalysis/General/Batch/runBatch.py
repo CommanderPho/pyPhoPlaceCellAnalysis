@@ -756,6 +756,7 @@ class BatchSessionCompletionHandler:
             }
         
 
+    # Across Sessions Helpers
     def save_across_sessions_data(self, global_data_root_parent_path:Path, inst_fr_output_filename:str='across_session_result_long_short_inst_firing_rate.pkl'):
         """ Save the instantaneous firing rate results dict: (# Dict[IdentifyingContext] = InstantaneousSpikeRateGroupsComputation) 
         
@@ -766,6 +767,47 @@ class BatchSessionCompletionHandler:
         saveData(global_batch_result_inst_fr_file_path, self.across_sessions_instantaneous_fr_dict)
 
 
+    def load_across_sessions_data(self, global_data_root_parent_path:Path, inst_fr_output_filename:str='across_session_result_long_short_inst_firing_rate.pkl'):
+        """ Load the instantaneous firing rate results dict: (# Dict[IdentifyingContext] = InstantaneousSpikeRateGroupsComputation) 
+
+            To correctly aggregate results across sessions, it only makes sense to combine entries at the `.cell_agg_inst_fr_list` variable and lower (as the number of cells can be added across sessions, treated as unique for each session).
+        """
+        global_batch_result_inst_fr_file_path = Path(global_data_root_parent_path).joinpath(inst_fr_output_filename).resolve() # Use Default
+        print(f'global_batch_result_inst_fr_file_path: {global_batch_result_inst_fr_file_path}')
+        across_sessions_instantaneous_fr_dict = loadData(global_batch_result_inst_fr_file_path)
+        num_sessions = len(across_sessions_instantaneous_fr_dict)
+        print(f'num_sessions: {num_sessions}')
+        across_sessions_instantaneous_frs_list: List[InstantaneousSpikeRateGroupsComputation] = list(across_sessions_instantaneous_fr_dict.values())
+        ## Aggregate across all of the sessions to build a new combined `InstantaneousSpikeRateGroupsComputation`, which can be used to plot the "PaperFigureTwo", bar plots for many sessions.
+        global_multi_session_context = IdentifyingContext(format_name='kdiba', num_sessions=num_sessions) # some global context across all of the sessions, not sure what to put here.
+        # _out.cell_agg_inst_fr_list = cell_agg_firing_rates_list # .shape (n_cells,)
+        _out = InstantaneousSpikeRateGroupsComputation()
+        _out.active_identifying_session_ctx = global_multi_session_context 
+
+        # Note that in general LxC and SxC might have differing numbers of cells.
+        _out.Fig2_Laps_FR = [(v.mean(), v.std(), v) for v in (np.concatenate([across_sessions_instantaneous_frs_list[i].LxC_ThetaDeltaMinus.cell_agg_inst_fr_list for i in np.arange(num_sessions)]),
+                                                        np.concatenate([across_sessions_instantaneous_frs_list[i].LxC_ThetaDeltaPlus.cell_agg_inst_fr_list for i in np.arange(num_sessions)]),
+                                                        np.concatenate([across_sessions_instantaneous_frs_list[i].SxC_ThetaDeltaMinus.cell_agg_inst_fr_list for i in np.arange(num_sessions)]),
+                                                        np.concatenate([across_sessions_instantaneous_frs_list[i].SxC_ThetaDeltaPlus.cell_agg_inst_fr_list for i in np.arange(num_sessions)]))]
+
+
+        _out.Fig2_Replay_FR = [(v.mean(), v.std(), v) for v in (np.concatenate([across_sessions_instantaneous_frs_list[i].LxC_ReplayDeltaMinus.cell_agg_inst_fr_list for i in np.arange(num_sessions)]),
+                                                        np.concatenate([across_sessions_instantaneous_frs_list[i].LxC_ReplayDeltaPlus.cell_agg_inst_fr_list for i in np.arange(num_sessions)]),
+                                                        np.concatenate([across_sessions_instantaneous_frs_list[i].SxC_ReplayDeltaMinus.cell_agg_inst_fr_list for i in np.arange(num_sessions)]),
+                                                        np.concatenate([across_sessions_instantaneous_frs_list[i].SxC_ReplayDeltaPlus.cell_agg_inst_fr_list for i in np.arange(num_sessions)]))]
+
+        
+
+        # ## Display the aggregate across sessions:
+        # _out_fig_2 = PaperFigureTwo(instantaneous_time_bin_size_seconds=0.01) # WARNING: we didn't save this info
+        # # _out_fig_2.compute(curr_active_pipeline=curr_active_pipeline)
+        # # Cannot call `.compute(curr_active_pipeline=curr_active_pipeline)` like we normally would because everything is manually set.
+        # _out_fig_2.computation_result = _out
+        # _out_fig_2.active_identifying_session_ctx = _out.active_identifying_session_ctx
+        # # Set callback, the only self-specific property
+        # _out_fig_2._pipeline_file_callback_fn = curr_active_pipeline.output_figure # lambda args, kwargs: self.write_to_file(args, kwargs, curr_active_pipeline)
+
+        return across_sessions_instantaneous_fr_dict, across_sessions_instantaneous_frs_list, _out
 
 
 if __name__ == "__main__":
