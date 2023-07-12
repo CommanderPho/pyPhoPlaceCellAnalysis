@@ -946,7 +946,10 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
 
 
     @classmethod
-    def create_plot(cls, x_labels, y_values, ylabel, title, fig_name, active_context, defer_show):
+    def create_plot(cls, x_labels, y_values, ylabel, title, fig_name, active_context, defer_show, title_modifier=None):
+        if title_modifier:
+            title = title_modifier(title)
+
         fig, ax, bars, title_text_obj, footer_text_obj = cls.create_bar_plot(x_labels, y_values, active_context, ylabel, title)
 
         if not defer_show:
@@ -965,7 +968,7 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
         x_labels = ['$L_x C$\t$\\theta_{\\Delta -}$', '$L_x C$\t$\\theta_{\\Delta +}$', '$S_x C$\t$\\theta_{\\Delta -}$', '$S_x C$\t$\\theta_{\\Delta +}$']
         all_data_points = np.array([v[2] for v in Fig2_Laps_FR])
 
-        return cls.create_plot(x_labels, all_data_points, 'Laps Firing Rates (Hz)', 'Lap ($\\theta$)', 'fig_2_Theta_FR_matplotlib', active_context, defer_show)
+        return cls.create_plot(x_labels, all_data_points, 'Laps Firing Rates (Hz)', 'Lap ($\\theta$)', 'fig_2_Theta_FR_matplotlib', active_context, defer_show, kwargs.get('title_modifier'))
 
 
     @classmethod
@@ -977,18 +980,32 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
         x_labels = ['$L_x C$\t$R_{\\Delta -}$', '$L_x C$\t$R_{\\Delta +}$', '$S_x C$\t$R_{\\Delta -}$', '$S_x C$\t$R_{\\Delta +}$']
         all_data_points = np.array([v[2] for v in Fig2_Replay_FR])
 
-        return cls.create_plot(x_labels, all_data_points, 'Replay Firing Rates (Hz)', 'Replay', 'fig_2_Replay_FR_matplotlib', active_context, defer_show)
-
+        return cls.create_plot(x_labels, all_data_points, 'Replay Firing Rates (Hz)', 'Replay', 'fig_2_Replay_FR_matplotlib', active_context, defer_show, kwargs.get('title_modifier'))
 
 
     @providing_context(fig='2', display_fn_name='inst_FR_bar_graphs')
     def display(self, defer_show=False, save_figure=True, **kwargs):
+        """ 
+        
+        title_modifier: lambda original_title: f"{original_title} (all sessions)"
+
+        """
         # Get the provided context or use the session context:
         active_context = kwargs.get('active_context', self.active_identifying_session_ctx)
+        title_modifier = kwargs.get('title_modifier_fn', (lambda original_title: original_title))
         top_margin, left_margin, bottom_margin = kwargs.get('top_margin', 0.8), kwargs.get('left_margin', 0.090), kwargs.get('bottom_margin', 0.150)
-        
-        _fig_2_theta_out = self.fig_2_Theta_FR_matplotlib(self.computation_result.Fig2_Laps_FR, defer_show=defer_show, active_context=active_context, top_margin=top_margin, left_margin=left_margin, bottom_margin=bottom_margin)
-        _fig_2_replay_out = self.fig_2_Replay_FR_matplotlib(self.computation_result.Fig2_Replay_FR, defer_show=defer_show, active_context=active_context, top_margin=top_margin, left_margin=left_margin, bottom_margin=bottom_margin)
+
+        _fig_2_theta_out = self.fig_2_Theta_FR_matplotlib(self.computation_result.Fig2_Laps_FR, defer_show=defer_show,
+                                                        active_context=active_context, top_margin=top_margin,
+                                                        left_margin=left_margin, bottom_margin=bottom_margin,
+                                                        title_modifier=title_modifier)
+
+        _fig_2_replay_out = self.fig_2_Replay_FR_matplotlib(self.computation_result.Fig2_Replay_FR, defer_show=defer_show,
+                                                            active_context=active_context, top_margin=top_margin,
+                                                            left_margin=left_margin, bottom_margin=bottom_margin,
+                                                            title_modifier=title_modifier)
+        return _fig_2_theta_out, _fig_2_replay_out
+    
 
 
 
