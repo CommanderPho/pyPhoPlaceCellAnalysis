@@ -673,14 +673,10 @@ def PAPER_FIGURE_figure_1_full(curr_active_pipeline, defer_show=False, save_figu
     sort_idx = 'peak_long'
     # sort_idx = 'bad'
 
-    # out = curr_active_pipeline.display('_display_short_long_pf1D_comparison', active_identifying_session_ctx, single_figure=False, debug_print=True, fignum='Short v Long pf1D Comparison',
-    #                                    long_kwargs={'included_unit_neuron_IDs': curr_any_context_neurons, 'included_unit_indicies': None, 'sortby': sort_idx, 'single_cell_pfmap_processing_fn': long_single_cell_pfmap_processing_fn},
-    #                                    short_kwargs={'included_unit_neuron_IDs': curr_any_context_neurons, 'included_unit_indicies': None,'sortby': sort_idx, 'single_cell_pfmap_processing_fn': short_single_cell_pfmap_processing_fn, 'curve_hatch_style': {'hatch':'///', 'edgecolor':'k'}},
-    #                                   )
-
     pf1d_compare_graphics = curr_active_pipeline.display('_display_short_long_pf1D_comparison', active_identifying_session_ctx, single_figure=False, debug_print=False, fignum='Short v Long pf1D Comparison',
                                     long_kwargs={'sortby': sort_idx, 'single_cell_pfmap_processing_fn': long_single_cell_pfmap_processing_fn},
                                     short_kwargs={'sortby': sort_idx, 'single_cell_pfmap_processing_fn': short_single_cell_pfmap_processing_fn, 'curve_hatch_style': {'hatch':'///', 'edgecolor':'k'}},
+                                    shared_kwargs={'cmap': 'hsv'},
                                     save_figure=save_figure,
                                     defer_render=defer_show
                                     )
