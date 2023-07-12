@@ -298,7 +298,19 @@ class BatchRun:
         _context_column_names = ['format_name', 'animal', 'exper_name', 'session_name']
 
         assert global_data_root_parent_path.exists()
+        
+        ## Context-based method (loses capitalization):
         session_batch_basedirs = [global_data_root_parent_path.joinpath(*ctx_tuple).resolve() for ctx_tuple in batch_progress_df[_context_column_names].itertuples(index=False)]
+        
+        ## Path-based method using `convert_filelist_to_new_parent(...)`:
+        source_parent_path = cls.find_global_root_path(batch_progress_df) # Path(r'/media/MAX/cloud/turbo/Data')
+        # dest_parent_path = Path(r'/media/MAX/Data')
+        
+
+        # # Build the destination filelist from the source_filelist and the two paths:
+        filelist_dest = convert_filelist_to_new_parent(filelist_source, original_parent_path=source_parent_path, dest_parent_path=global_data_root_parent_path)
+        filelist_dest
+
         session_basedir_exists_locally = [a_basedir.resolve().exists() for a_basedir in session_batch_basedirs]
 
         updated_batch_progress_df = deepcopy(batch_progress_df)
