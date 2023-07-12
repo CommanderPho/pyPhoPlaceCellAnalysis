@@ -612,7 +612,7 @@ class BatchResultAccessor():
 
 
         
-@define(repr=False)
+@define(slots=False, repr=False)
 class BatchSessionCompletionHandler:
     """ handles completion of a single session's batch processing. 
 
@@ -626,6 +626,10 @@ class BatchSessionCompletionHandler:
     force_reload_all: bool = field(default=False)
     saving_mode: PipelineSavingScheme = field(default=PipelineSavingScheme.SKIP_SAVING)
     force_global_recompute: bool = field(default=False)
+    
+    should_perform_figure_generation_to_file: bool = field(default=True) # controls whether figures are generated to file
+    extended_computations_include_includelist: list = field(default=['long_short_fr_indicies_analyses', 'jonathan_firing_rate_analysis', 'long_short_decoding_analyses', 'long_short_post_decoding']) # do only specifiedl
+
 
     across_sessions_instantaneous_fr_dict: dict = Factory(dict) # Dict[IdentifyingContext] = InstantaneousSpikeRateGroupsComputation
 
@@ -705,8 +709,8 @@ class BatchSessionCompletionHandler:
         # FIXME: doesn't seem like we should always use `force_recompute=True`
         try:
             # # 2023-01-* - Call extended computations to build `_display_short_long_firing_rate_index_comparison` figures:
-            extended_computations_include_includelist=['long_short_fr_indicies_analyses', 'jonathan_firing_rate_analysis', 'long_short_decoding_analyses', 'long_short_post_decoding'] # do only specifiedl
-            newly_computed_values = batch_extended_computations(curr_active_pipeline, include_includelist=extended_computations_include_includelist, include_global_functions=True, fail_on_exception=True, progress_print=True, force_recompute=self.force_global_recompute, debug_print=False)
+            
+            newly_computed_values = batch_extended_computations(curr_active_pipeline, include_includelist=self.extended_computations_include_includelist, include_global_functions=True, fail_on_exception=True, progress_print=True, force_recompute=self.force_global_recompute, debug_print=False)
             #TODO 2023-07-11 19:20: - [ ] We want to save the global results if they are computed, but we don't want them to be needlessly written to disk even when they aren't changed.
 
             if (len(newly_computed_values) > 0):
@@ -729,8 +733,10 @@ class BatchSessionCompletionHandler:
             
 
         # ### Programmatic Figure Outputs:
-        self.try_complete_figure_generation_to_file(curr_active_pipeline)
-
+        if self.should_perform_figure_generation_to_file:
+            self.try_complete_figure_generation_to_file(curr_active_pipeline)
+        else:
+            print(f'skipping figure generation because should_perform_figure_generation_to_file == False')
 
         ### Do specific computations:
         try:
@@ -740,7 +746,7 @@ class BatchSessionCompletionHandler:
             self.across_sessions_instantaneous_fr_dict[curr_session_context] = _out_inst_fr_comps # instantaneous firing rates for this session
             # LxC_ReplayDeltaMinus, LxC_ReplayDeltaPlus, SxC_ReplayDeltaMinus, SxC_ReplayDeltaPlus = _out_inst_fr_comps.LxC_ReplayDeltaMinus, _out_inst_fr_comps.LxC_ReplayDeltaPlus, _out_inst_fr_comps.SxC_ReplayDeltaMinus, _out_inst_fr_comps.SxC_ReplayDeltaPlus
             # LxC_ThetaDeltaMinus, LxC_ThetaDeltaPlus, SxC_ThetaDeltaMinus, SxC_ThetaDeltaPlus = _out_inst_fr_comps.LxC_ThetaDeltaMinus, _out_inst_fr_comps.LxC_ThetaDeltaPlus, _out_inst_fr_comps.SxC_ThetaDeltaMinus, _out_inst_fr_comps.SxC_ThetaDeltaPlus
-            print(f'\t done (success). Now have {len(self.across_sessions_instantaneous_fr_dict)} entries in self.across_sessions_instantaneous_fr_dict!')
+            print(f'\t\t done (success). Now have {len(self.across_sessions_instantaneous_fr_dict)} entries in self.across_sessions_instantaneous_fr_dict!')
         except Exception as e:
             print(f"ERROR: encountered exception {e} while trying to compute the instantaneous firing rates and set self.across_sessions_instantaneous_fr_dict[{curr_session_context}]")
 
@@ -749,6 +755,16 @@ class BatchSessionCompletionHandler:
                             'global': curr_active_pipeline.global_computation_results_pickle_path}
             }
         
+
+    def save_across_sessions_data(self, global_data_root_parent_path:Path, inst_fr_output_filename:str='across_session_result_long_short_inst_firing_rate.pkl'):
+        """ Save the instantaneous firing rate results dict: (# Dict[IdentifyingContext] = InstantaneousSpikeRateGroupsComputation) 
+        
+        """
+        global_batch_result_inst_fr_file_path = Path(global_data_root_parent_path).joinpath(inst_fr_output_filename).resolve() # Use Default
+        print(f'global_batch_result_inst_fr_file_path: {global_batch_result_inst_fr_file_path}')
+        # Save the all sessions instantaneous firing rate dict to the path:
+        saveData(global_batch_result_inst_fr_file_path, self.across_sessions_instantaneous_fr_dict)
+
 
 
 
