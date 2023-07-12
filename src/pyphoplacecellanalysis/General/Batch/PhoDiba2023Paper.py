@@ -959,7 +959,7 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
 
             # Original title: 'Lap ($\\theta$) Firing Rates\n for Long/Short eXclusive Cells on each track'
             # Add flexitext
-            flexitext(text_formatter.left_margin, text_formatter.top_margin, cls._build_formatted_title_string(epochs_name='Lap ($\\theta$)'), va="bottom", xycoords="figure fraction")
+            title_text_obj = flexitext(text_formatter.left_margin, text_formatter.top_margin, cls._build_formatted_title_string(epochs_name='Lap ($\\theta$)'), va="bottom", xycoords="figure fraction")
             footer_text_obj = flexitext((text_formatter.left_margin*0.1), (text_formatter.bottom_margin*0.25), text_formatter._build_footer_string(active_context=active_context), va="top", xycoords="figure fraction")
             ax.set_xticks(x)
             ax.set_xticklabels(x_labels)
@@ -971,7 +971,7 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
             if not defer_show:
                 plt.show()
                         
-            return MatplotlibRenderPlots(name="fig_2_Theta_FR_matplotlib", figures=[fig], axes=[ax], context=active_context)
+            return MatplotlibRenderPlots(name="fig_2_Theta_FR_matplotlib", figures=[fig], axes=[ax], context=active_context, plot_objects={'bars': bars, 'text_objects': {'title': title_text_obj, 'footer': footer_text_obj}})
             # return fig, ax, bars
         
     @classmethod
@@ -1017,7 +1017,7 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
         ax.set_ylabel('Replay Firing Rates (Hz)')
         # ax.set_title('Replay Firing Rates for Long/Short eXclusive Cells on each track')
         # Add flexitext
-        flexitext(text_formatter.left_margin, text_formatter.top_margin, cls._build_formatted_title_string(epochs_name='Replay'), va="bottom", xycoords="figure fraction")
+        title_text_obj = flexitext(text_formatter.left_margin, text_formatter.top_margin, cls._build_formatted_title_string(epochs_name='Replay'), va="bottom", xycoords="figure fraction")
         footer_text_obj = flexitext((text_formatter.left_margin*0.1), (text_formatter.bottom_margin*0.25), text_formatter._build_footer_string(active_context=active_context), va="top", xycoords="figure fraction")
         ax.set_xticks(x)
         ax.set_xticklabels(x_labels)
@@ -1026,7 +1026,7 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
             plt.show()
                     
         # return fig, ax, bars
-        return MatplotlibRenderPlots(name="fig_2_Replay_FR_matplotlib", figures=[fig], axes=[ax], context=active_context)
+        return MatplotlibRenderPlots(name="fig_2_Replay_FR_matplotlib", figures=[fig], axes=[ax], context=active_context, plot_objects={'bars': bars, 'text_objects': {'title': title_text_obj, 'footer': footer_text_obj}})
 
 
     def perform_save(self, *args, **kwargs):
