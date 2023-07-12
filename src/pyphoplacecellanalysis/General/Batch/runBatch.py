@@ -10,6 +10,7 @@ from copy import deepcopy
 ## Pho's Custom Libraries:
 from pyphocorehelpers.Filesystem.path_helpers import find_first_extant_path
 from pyphocorehelpers.function_helpers import function_attributes
+from pyphocorehelpers.Filesystem.path_helpers import convert_filelist_to_new_parent
 
 # pyPhoPlaceCellAnalysis:
 
@@ -57,7 +58,7 @@ class BatchRun:
 
 
     @classmethod
-    def try_init_from_file(cls, global_data_root_parent_path, active_global_batch_result_filename='global_batch_result.pkl', debug_print:bool=False):
+    def try_init_from_file(cls, global_data_root_parent_path, active_global_batch_result_filename='global_batch_result.pkl', skip_root_path_conversion:bool=False, debug_print:bool=False):
         """ Loads from a previously saved .pkl file if possible, otherwise start fresh by calling `on_needs_create_callback_fn`.
 
             `on_needs_create_callback_fn`: (global_data_root_parent_path: Path, execute_all:bool = False, extant_batch_run = None, debug_print:bool=False, post_run_callback_fn=None) -> BatchRun: Build `global_batch_run` pre-loading results (before execution)
@@ -94,7 +95,7 @@ class BatchRun:
         ##
 
         global_batch_run = _try_load_global_batch_result()
-        if global_batch_run is not None:
+        if (global_batch_run is not None) and (not skip_root_path_conversion):
             # One was loaded from file, meaning it has the potential to have the wrong paths. Check.
             global_batch_run.change_global_root_path(global_data_root_parent_path) # Convert the paths to work on the new system:
         else:
@@ -145,9 +146,11 @@ class BatchRun:
         if isinstance(global_data_root_parent_path, str):
             global_data_root_parent_path = Path(global_data_root_parent_path)
             
+        assert global_data_root_parent_path.exists(), f"the path provide should be the one for the system (and it should exist)"
         if self.global_data_root_parent_path != global_data_root_parent_path:
             print(f'switching data dir path from {str(self.global_data_root_parent_path)} to {str(global_data_root_parent_path)}')
             self.global_data_root_parent_path = global_data_root_parent_path
+            # Somehow loses the capitalization for 'KDIBA'
             self.session_batch_basedirs = {ctx:global_data_root_parent_path.joinpath(*ctx.as_tuple()).resolve() for ctx in self.session_contexts} # ctx.format_name, ctx.animal, ctx.exper_name
         else:
             print('no difference between provided and internal paths.')
@@ -279,8 +282,8 @@ class BatchRun:
         common_prefix = os.path.commonprefix(paths) # '/nfs/turbo/umms-kdiba/Data/KDIBA/'
         return common_prefix
 
-    @staticmethod
-    def rebuild_basedirs(batch_progress_df, global_data_root_parent_path):
+    @classmethod
+    def rebuild_basedirs(cls, batch_progress_df, global_data_root_parent_path):
         """ replaces basedirs with ones that have been rebuilt from the local `global_data_root_parent_path` and hopefully point to extant paths. 
         
         adds: ['locally_folder_exists', 'locally_is_ready']
