@@ -707,8 +707,13 @@ class BatchSessionCompletionHandler:
             # # 2023-01-* - Call extended computations to build `_display_short_long_firing_rate_index_comparison` figures:
             extended_computations_include_includelist=['long_short_fr_indicies_analyses', 'jonathan_firing_rate_analysis', 'long_short_decoding_analyses', 'long_short_post_decoding'] # do only specifiedl
             newly_computed_values = batch_extended_computations(curr_active_pipeline, include_includelist=extended_computations_include_includelist, include_global_functions=True, fail_on_exception=True, progress_print=True, force_recompute=self.force_global_recompute, debug_print=False)
-            if (len(newly_computed_values) > 0) and (self.saving_mode.value != 'skip_saving'):
+            #TODO 2023-07-11 19:20: - [ ] We want to save the global results if they are computed, but we don't want them to be needlessly written to disk even when they aren't changed.
+
+            if (len(newly_computed_values) > 0):
                 print(f'newly_computed_values: {newly_computed_values}. Saving global results...')
+                if (self.saving_mode.value == 'skip_saving'):
+                    print(f'WARNING: supposed to skip_saving because of self.saving_mode: {self.saving_mode} but supposedly has new global results! Figure out if these are actually new.')
+                
                 try:
                     # curr_active_pipeline.global_computation_results.persist_time = datetime.now()
                     # Try to write out the global computation function results:
