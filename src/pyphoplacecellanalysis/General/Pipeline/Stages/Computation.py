@@ -864,8 +864,6 @@ class PipelineWithComputedPipelineStageMixin:
             if a_config_to_drop is not None:
                 print(f'\tpreparing to drop: {a_config_name}')
                 ## TODO: filtered_sessions, filtered_epochs
-                # curr_active_pipeline.active_configs
-                # curr_active_pipeline.filtered_contexts[a_config_name]
                 _dropped_computation_results = self.computation_results.pop(a_config_name, None)
                 a_filter_context_to_drop = self.filtered_contexts.pop(a_config_name, None)
                 if a_filter_context_to_drop is not None:
