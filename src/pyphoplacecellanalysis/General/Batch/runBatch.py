@@ -553,7 +553,7 @@ def main(active_global_batch_result_filename='global_batch_result.pkl', debug_pr
     from pyphoplacecellanalysis.General.Batch.runBatch import main, BatchRun, run_diba_batch, run_specific_batch
 
     """
-    global_data_root_parent_path = find_first_extant_path([Path(r'W:\Data'), Path(r'/media/MAX/Data'), Path(r'/Volumes/MoverNew/data'), Path(r'/home/halechr/turbo/Data')])
+    global_data_root_parent_path = find_first_extant_path(known_global_data_root_parent_paths)
     assert global_data_root_parent_path.exists(), f"global_data_root_parent_path: {global_data_root_parent_path} does not exist! Is the right computer's config commented out above?"
     
     ## TODO: load the batch result initially:
@@ -586,7 +586,7 @@ def dataframe_functions_test():
     #TODO 2023-06-13 18:09: - [ ] Finish this implementation up and make decision deciding how to use it
         
     """
-    global_data_root_parent_path = find_first_extant_path([Path(r'W:\Data'), Path(r'/media/MAX/Data'), Path(r'/Volumes/MoverNew/data'), Path(r'/home/halechr/turbo/Data')])
+    global_data_root_parent_path = find_first_extant_path(known_global_data_root_parent_paths)
     assert global_data_root_parent_path.exists(), f"global_data_root_parent_path: {global_data_root_parent_path} does not exist! Is the right computer's config commented out above?"
 
     ## Build Pickle Path:
@@ -758,7 +758,8 @@ class BatchSessionCompletionHandler:
 
     across_sessions_instantaneous_fr_dict: dict = Factory(dict) # Dict[IdentifyingContext] = InstantaneousSpikeRateGroupsComputation
 
-    def post_compute_validate(self, curr_active_pipeline):
+    @classmethod
+    def post_compute_validate(cls, curr_active_pipeline) -> bool:
         """ 2023-05-16 - Ensures that the laps are used for the placefield computation epochs, the number of bins are the same between the long and short tracks. """
         LongShortPipelineTests(curr_active_pipeline=curr_active_pipeline).validate()
         # 2023-05-24 - Adds the previously missing `sess.config.preprocessing_parameters` to each session (filtered and base) in the pipeline.
@@ -769,8 +770,13 @@ class BatchSessionCompletionHandler:
         long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
         long_epoch_context, short_epoch_context, global_epoch_context = [curr_active_pipeline.filtered_contexts[a_name] for a_name in (long_epoch_name, short_epoch_name, global_epoch_name)]
         # assert long_epoch_context.filter_name == long_epoch_name, f"long_epoch_context.filter_name: {long_epoch_context.filter_name} != long_epoch_name: {long_epoch_name}"
-        # fix it if broken
-        long_epoch_context.filter_name = long_epoch_name
+        if long_epoch_context.filter_name != long_epoch_name:
+            print(f"WARNING: iltered_contexts[long_epoch_name]'s actual context name is incorrect. \n\tlong_epoch_context.filter_name: {long_epoch_context.filter_name} != long_epoch_name: {long_epoch_name}\n\tUpdating it. (THIS IS A HACK)")
+            # fix it if broken
+            long_epoch_context.filter_name = long_epoch_name
+            was_updated = True
+
+        return was_updated
 
 
     def try_complete_figure_generation_to_file(self, curr_active_pipeline):
@@ -821,7 +827,7 @@ class BatchSessionCompletionHandler:
         print(f'short_replays.n_epochs: {short_replays.n_epochs}, long_replays.n_epochs: {long_replays.n_epochs}')
 
         # ## Post Compute Validate 2023-05-16:
-        self.post_compute_validate(curr_active_pipeline)
+        was_updated = self.post_compute_validate(curr_active_pipeline)
         
         ## Save the pipeline since that's disabled by default now:
         try:

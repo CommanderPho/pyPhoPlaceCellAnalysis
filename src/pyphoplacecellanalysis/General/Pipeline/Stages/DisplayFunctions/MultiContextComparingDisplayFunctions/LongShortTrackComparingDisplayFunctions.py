@@ -2219,9 +2219,10 @@ def _plot_session_long_short_track_firing_rate_figures(curr_active_pipeline, jon
 
         return fig, ax, active_display_context
 
+        
     # BEGIN FUNCTION BODY ________________________________________________________________________________________________ #
     long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
-    long_epoch_context, short_epoch_context, global_epoch_context = [curr_active_pipeline.filtered_contexts[a_name] for a_name in (long_epoch_name, short_epoch_name, global_epoch_name)]
+    long_epoch_context, short_epoch_context, global_epoch_context = [curr_active_pipeline.filtered_contexts[a_name] for a_name in (long_epoch_name, short_epoch_name, global_epoch_name)] # filter_name is wrong for long_epoch_context
 
 
     ## Long Track Replay|Laps FR Figure
