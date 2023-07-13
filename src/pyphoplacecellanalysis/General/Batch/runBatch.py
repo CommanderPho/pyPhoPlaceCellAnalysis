@@ -283,8 +283,11 @@ class BatchRun:
         return common_prefix
 
     @classmethod
-    def rebuild_basedirs(cls, batch_progress_df, global_data_root_parent_path):
+    def rebuild_basedirs(cls, batch_progress_df, desired_global_data_root_parent_path, old_global_data_root_parent_path=None):
         """ replaces basedirs with ones that have been rebuilt from the local `global_data_root_parent_path` and hopefully point to extant paths. 
+        
+        desired_global_data_root_parent_path: the desired new global_data_root path
+        old_global_data_root_parent_path: if provided, the previous global_data_root path that all of the `batch_progress_df['basedirs']` were built with. If not specifieed, tries to infer it using `cls.find_global_root_path(batch_progress_df)`
         
         adds: ['locally_folder_exists', 'locally_is_ready']
         updates: ['basedirs']
@@ -295,21 +298,29 @@ class BatchRun:
             updated_batch_progress_df
 
         """
-        _context_column_names = ['format_name', 'animal', 'exper_name', 'session_name']
-
-        assert global_data_root_parent_path.exists()
+        
+        assert desired_global_data_root_parent_path.exists()
         
         ## Context-based method (loses capitalization):
-        session_batch_basedirs = [global_data_root_parent_path.joinpath(*ctx_tuple).resolve() for ctx_tuple in batch_progress_df[_context_column_names].itertuples(index=False)]
+        # _context_column_names = ['format_name', 'animal', 'exper_name', 'session_name']
+        # session_batch_basedirs = [global_data_root_parent_path.joinpath(*ctx_tuple).resolve() for ctx_tuple in batch_progress_df[_context_column_names].itertuples(index=False)]
         
+        existing_session_batch_basedirs = batch_progress_df['basedirs'].values
         ## Path-based method using `convert_filelist_to_new_parent(...)`:
-        source_parent_path = cls.find_global_root_path(batch_progress_df) # Path(r'/media/MAX/cloud/turbo/Data')
+        if old_global_data_root_parent_path is not None:
+            source_parent_path = old_global_data_root_parent_path
+            # source_parent_path = self.global_data_root_parent_path.copy()
+        else:
+            source_parent_path = cls.find_global_root_path(batch_progress_df) # Path(r'/media/MAX/cloud/turbo/Data')
+            print(f'inferred source_parent_path: {source_parent_path}')
+        
+        if isinstance(source_parent_path, str):
+            source_parent_path = Path(source_parent_path)
         # dest_parent_path = Path(r'/media/MAX/Data')
         
-
         # # Build the destination filelist from the source_filelist and the two paths:
-        filelist_dest = convert_filelist_to_new_parent(filelist_source, original_parent_path=source_parent_path, dest_parent_path=global_data_root_parent_path)
-        filelist_dest
+        session_batch_basedirs = convert_filelist_to_new_parent(existing_session_batch_basedirs, original_parent_path=source_parent_path, dest_parent_path=desired_global_data_root_parent_path)
+        # session_batch_basedirs
 
         session_basedir_exists_locally = [a_basedir.resolve().exists() for a_basedir in session_batch_basedirs]
 
