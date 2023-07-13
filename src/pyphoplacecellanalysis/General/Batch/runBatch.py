@@ -10,9 +10,7 @@ from copy import deepcopy
 ## Pho's Custom Libraries:
 from pyphocorehelpers.Filesystem.path_helpers import find_first_extant_path
 from pyphocorehelpers.function_helpers import function_attributes
-from pyphocorehelpers.Filesystem.path_helpers import convert_filelist_to_new_parent
-
-# pyPhoPlaceCellAnalysis:
+from pyphocorehelpers.Filesystem.path_helpers import set_posix_windows, convert_filelist_to_new_parent
 
 # NeuroPy (Diba Lab Python Repo) Loading
 ## For computation parameters:
@@ -77,14 +75,10 @@ class BatchRun:
                 global_batch_run = loadData(finalized_loaded_global_batch_result_pickle_path, debug_print=debug_print)
                 
             except NotImplementedError:
-                # Fixes issue with pickled POSIX_PATH on windows for path.
-                posix_backup = pathlib.PosixPath # backup the PosixPath definition
-                try:
-                    pathlib.PosixPath = pathlib.PurePosixPath
+                # Fixes issue with pickled POSIX_PATH on windows for path.                    
+                with set_posix_windows():
                     global_batch_run = loadData(finalized_loaded_global_batch_result_pickle_path, debug_print=debug_print) # Fails this time if it still throws an error
-                finally:
-                    pathlib.PosixPath = posix_backup # restore the backup posix path definition
-                    
+
             except (FileNotFoundError, TypeError):
                 # loading failed
                 print(f'Failure loading {finalized_loaded_global_batch_result_pickle_path}.')
