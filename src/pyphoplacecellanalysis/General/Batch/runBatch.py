@@ -8,9 +8,8 @@ import pandas as pd
 from copy import deepcopy
 
 ## Pho's Custom Libraries:
-from pyphocorehelpers.Filesystem.path_helpers import find_first_extant_path
+from pyphocorehelpers.Filesystem.path_helpers import find_first_extant_path, set_posix_windows, convert_filelist_to_new_parent, find_matching_parent_path
 from pyphocorehelpers.function_helpers import function_attributes
-from pyphocorehelpers.Filesystem.path_helpers import set_posix_windows, convert_filelist_to_new_parent
 
 # NeuroPy (Diba Lab Python Repo) Loading
 ## For computation parameters:
@@ -31,6 +30,7 @@ from pyphoplacecellanalysis.General.Batch.NonInteractiveProcessing import _updat
 from pyphoplacecellanalysis.General.Batch.PhoDiba2023Paper import main_complete_figure_generations, InstantaneousSpikeRateGroupsComputation # for `BatchSessionCompletionHandler`
 
 
+known_global_data_root_parent_paths = [Path(r'W:\Data'), Path(r'/media/MAX/Data'), Path(r'/Volumes/MoverNew/data'), Path(r'/home/halechr/turbo/Data'), Path(r'/nfs/turbo/umms-kdiba/Data')]
 
 def get_file_str_if_file_exists(v:Path)->str:
     """ returns the string representation of the resolved file if it exists, or the empty string if not """
@@ -135,17 +135,37 @@ class BatchRun:
 
 
     # Updating ___________________________________________________________________________________________________________ #
-    def change_global_root_path(self, global_data_root_parent_path):
+    def change_global_root_path(self, desired_global_data_root_parent_path):
         """ Changes the self.global_data_root_parent_path for this computer and converts all of the `session_batch_basedirs` paths."""
-        if isinstance(global_data_root_parent_path, str):
-            global_data_root_parent_path = Path(global_data_root_parent_path)
+        if isinstance(desired_global_data_root_parent_path, str):
+            desired_global_data_root_parent_path = Path(desired_global_data_root_parent_path)
             
-        assert global_data_root_parent_path.exists(), f"the path provide should be the one for the system (and it should exist)"
-        if self.global_data_root_parent_path != global_data_root_parent_path:
-            print(f'switching data dir path from {str(self.global_data_root_parent_path)} to {str(global_data_root_parent_path)}')
-            self.global_data_root_parent_path = global_data_root_parent_path
+        assert desired_global_data_root_parent_path.exists(), f"the path provide should be the one for the system (and it should exist)"
+        if self.global_data_root_parent_path != desired_global_data_root_parent_path:
+            print(f'switching data dir path from {str(self.global_data_root_parent_path)} to {str(desired_global_data_root_parent_path)}')
+            prev_global_data_root_parent_path = self.global_data_root_parent_path
+            
+            curr_filelist = list(self.session_batch_basedirs.values())
+            try:
+                prev_global_data_root_parent_path = self.global_data_root_parent_path # normally this would work
+                new_session_batch_basedirs = convert_filelist_to_new_parent(curr_filelist, original_parent_path=prev_global_data_root_parent_path, dest_parent_path=desired_global_data_root_parent_path)
+            except ValueError as e:
+                # The global_batch_run.global_data_root_parent_path is wrong when:`ValueError: '\\nfs\\turbo\\umms-kdiba\\Data\\KDIBA\\gor01\\one\\2006-6-07_11-26-53' is not in the subpath of '\\home\\halechr\\turbo\\Data' OR one path is relative and the other is absolute.`. Try to find the real parent path.
+                prev_global_data_root_parent_path = find_matching_parent_path(known_global_data_root_parent_paths, curr_filelist[0]) # TODO: assumes all have the same root, which is a valid assumption so far. ## prev_global_data_root_parent_path should contain the matching path from the list.
+                assert prev_global_data_root_parent_path is not None, f"No matching root parent path could be found!!"
+                new_session_batch_basedirs = convert_filelist_to_new_parent(curr_filelist, original_parent_path=prev_global_data_root_parent_path, dest_parent_path=desired_global_data_root_parent_path)
+            except Exception as e:
+                ## Unhandled Exception
+                raise
+
+            print(f'Switched data dir path from "{str(prev_global_data_root_parent_path)}" to "{str(desired_global_data_root_parent_path)}"')
+            self.global_data_root_parent_path = desired_global_data_root_parent_path.resolve()
+            self.session_batch_basedirs = {ctx:a_basedir.resolve() for ctx, a_basedir in zip(self.session_contexts, new_session_batch_basedirs)} # ctx.format_name, ctx.animal, ctx.exper_name
+
+            # # Build the destination filelist from the source_filelist and the two paths:
+            # self.session_batch_basedirs = convert_filelist_to_new_parent(self.session_batch_basedirs, original_parent_path=prev_global_data_root_parent_path, dest_parent_path=desired_global_data_root_parent_path)
             # Somehow loses the capitalization for 'KDIBA'
-            self.session_batch_basedirs = {ctx:global_data_root_parent_path.joinpath(*ctx.as_tuple()).resolve() for ctx in self.session_contexts} # ctx.format_name, ctx.animal, ctx.exper_name
+            # self.session_batch_basedirs = {ctx:desired_global_data_root_parent_path.joinpath(*ctx.as_tuple()).resolve() for ctx in self.session_contexts} # ctx.format_name, ctx.animal, ctx.exper_name
         else:
             print('no difference between provided and internal paths.')
 
@@ -157,21 +177,21 @@ class BatchRun:
         self.session_batch_outputs[curr_session_context] = None # indicate that there are no outputs to start
 
     
-    def convert_path_members_to_str(self) -> pd.DataFrame:
-        """ converts the PosixPath columns to str for serialization/pickling 
+    # def convert_path_members_to_str(self) -> pd.DataFrame:
+    #     """ converts the PosixPath columns to str for serialization/pickling 
 
-        Usage:
-            batch_progress_df = batch_progress_df.batch_results.convert_path_columns_to_str()
-            batch_progress_df
+    #     Usage:
+    #         batch_progress_df = batch_progress_df.batch_results.convert_path_columns_to_str()
+    #         batch_progress_df
 
-        TODONOW: Still need to convert the members of `self.session_batch_outputs`, or maybe PosixPath more generally.
-        """
-        new_copy = deepcopy(self)
-        new_copy.session_batch_basedirs = {k:str(v) for k, v in new_copy.session_batch_basedirs.items()}        
-        new_copy.global_data_root_parent_path = str(new_copy.global_data_root_parent_path)
-        # for a_path_column_name in potential_path_columns:
-        #     self._obj[a_path_column_name] = [str(v) for v in self._obj[a_path_column_name].values]
-        return new_copy
+    #     TODONOW: Still need to convert the members of `self.session_batch_outputs`, or maybe PosixPath more generally.
+    #     """
+    #     new_copy = deepcopy(self)
+    #     new_copy.session_batch_basedirs = {k:str(v) for k, v in new_copy.session_batch_basedirs.items()}        
+    #     new_copy.global_data_root_parent_path = str(new_copy.global_data_root_parent_path)
+    #     # for a_path_column_name in potential_path_columns:
+    #     #     self._obj[a_path_column_name] = [str(v) for v in self._obj[a_path_column_name].values]
+    #     return new_copy
 
 
 
