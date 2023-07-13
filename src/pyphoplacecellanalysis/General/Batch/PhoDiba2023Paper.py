@@ -1098,7 +1098,7 @@ def PAPER_FIGURE_figure_3(curr_active_pipeline, defer_render=False, save_figure=
 # ==================================================================================================================== #
 # MAIN RUN FUNCTION TO GENERATE ALL FIGURES                                                                            #
 # ==================================================================================================================== #
-def main_complete_figure_generations(curr_active_pipeline, save_figures_only:bool=False, save_figure=True):
+def main_complete_figure_generations(curr_active_pipeline, enable_default_neptune_plots:bool=True, save_figures_only:bool=False, save_figure=True):
     """ main run function to generate all figures
     
         from pyphoplacecellanalysis.General.Batch.PhoDiba2023Paper import main_complete_figure_generations
@@ -1117,7 +1117,8 @@ def main_complete_figure_generations(curr_active_pipeline, save_figures_only:boo
     # ==================================================================================================================== #
     # Perform `batch_perform_all_plots`                                                                                    #
     # ==================================================================================================================== #
-    neptuner = batch_perform_all_plots(curr_active_pipeline, enable_neptune=True)
+    if enable_default_neptune_plots:
+        neptuner = batch_perform_all_plots(curr_active_pipeline, enable_neptune=True)
 
     # ==================================================================================================================== #
     # Extract Relevent Specific Data Needed for Figure Display                                                             #
@@ -1151,8 +1152,6 @@ def main_complete_figure_generations(curr_active_pipeline, save_figures_only:boo
     # Figure 1) pf1D Ratemaps, Active set, etc                                                                             #
     # ==================================================================================================================== #
     _out_fig_1 = PAPER_FIGURE_figure_1_full(curr_active_pipeline, defer_show=defer_show, save_figure=save_figure) # did not display the pf1
-
-
 
 
 
