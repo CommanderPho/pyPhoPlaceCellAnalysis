@@ -162,6 +162,24 @@ class BatchRun:
         self.session_batch_errors[curr_session_context] = None # indicate that there are no errors to start
         self.session_batch_outputs[curr_session_context] = None # indicate that there are no outputs to start
 
+    
+    def convert_path_members_to_str(self) -> pd.DataFrame:
+        """ converts the PosixPath columns to str for serialization/pickling 
+
+        Usage:
+            batch_progress_df = batch_progress_df.batch_results.convert_path_columns_to_str()
+            batch_progress_df
+
+        TODONOW: Still need to convert the members of `self.session_batch_outputs`, or maybe PosixPath more generally.
+        """
+        new_copy = deepcopy(self)
+        new_copy.session_batch_basedirs = {k:str(v) for k, v in new_copy.session_batch_basedirs.items()}        
+        new_copy.global_data_root_parent_path = str(new_copy.global_data_root_parent_path)
+        # for a_path_column_name in potential_path_columns:
+        #     self._obj[a_path_column_name] = [str(v) for v in self._obj[a_path_column_name].values]
+        return new_copy
+
+
 
     # Class/Static Functions _____________________________________________________________________________________________ #
 
@@ -588,6 +606,21 @@ class BatchResultAccessor():
         self._build_output_files_list()
         self._build_ripple_result_path()
         return self._obj
+
+
+    def convert_path_columns_to_str(self) -> pd.DataFrame:
+        """ converts the PosixPath columns to str for serialization/pickling 
+
+        Usage:
+            batch_progress_df = batch_progress_df.batch_results.convert_path_columns_to_str()
+            batch_progress_df
+        """
+        potential_path_columns = ['basedirs', 'global_computation_result_file', 'loaded_session_pickle_file', 'ripple_result_file']
+        for a_path_column_name in potential_path_columns:
+            self._obj[a_path_column_name] = [str(v) for v in self._obj[a_path_column_name].values]
+
+        return self._obj
+
 
     ## Build a list of the output files for the good sessions:
     @function_attributes(short_name=None, tags=['batch', 'results', 'output'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-07-06 14:09', related_items=[])
