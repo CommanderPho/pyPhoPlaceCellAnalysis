@@ -162,6 +162,24 @@ class BatchRun:
         self.session_batch_errors[curr_session_context] = None # indicate that there are no errors to start
         self.session_batch_outputs[curr_session_context] = None # indicate that there are no outputs to start
 
+    
+    def convert_path_members_to_str(self) -> pd.DataFrame:
+        """ converts the PosixPath columns to str for serialization/pickling 
+
+        Usage:
+            batch_progress_df = batch_progress_df.batch_results.convert_path_columns_to_str()
+            batch_progress_df
+
+        TODONOW: Still need to convert the members of `self.session_batch_outputs`, or maybe PosixPath more generally.
+        """
+        new_copy = deepcopy(self)
+        new_copy.session_batch_basedirs = {k:str(v) for k, v in new_copy.session_batch_basedirs.items()}        
+        new_copy.global_data_root_parent_path = str(new_copy.global_data_root_parent_path)
+        # for a_path_column_name in potential_path_columns:
+        #     self._obj[a_path_column_name] = [str(v) for v in self._obj[a_path_column_name].values]
+        return new_copy
+
+
 
     # Class/Static Functions _____________________________________________________________________________________________ #
 
