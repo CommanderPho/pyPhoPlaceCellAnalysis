@@ -6,6 +6,8 @@ from typing import List, Optional, Union
 import numpy as np
 import pandas as pd
 from copy import deepcopy
+import multiprocessing
+
 
 ## Pho's Custom Libraries:
 from pyphocorehelpers.Filesystem.path_helpers import find_first_extant_path, set_posix_windows, convert_filelist_to_new_parent, find_matching_parent_path
@@ -128,9 +130,42 @@ class BatchRun:
         else:
             print(f'session {session_context} already completed.')
 
-    def execute_all(self, **kwargs):
-        for curr_session_context, curr_session_status in self.session_batch_status.items():
-            self.execute_session(curr_session_context, **kwargs) # evaluate a single session
+    # def execute_all(self, **kwargs):
+    #     for curr_session_context, curr_session_status in self.session_batch_status.items():
+    #         self.execute_session(curr_session_context, **kwargs) # evaluate a single session
+
+
+    # TODO: NOTE: that `execute_session` is not called in mutliprocessing mode!
+    def execute_all(self, use_multiprocessing=True, num_processes=None, **kwargs):
+        """ ChatGPT's multiprocessing edition. """
+        if use_multiprocessing:
+            if num_processes is None:
+                num_processes = multiprocessing.cpu_count()  # Use the number of available CPU cores
+
+            pool = multiprocessing.Pool(processes=num_processes)
+
+            results = []
+            for curr_session_context, curr_session_status in self.session_batch_status.items():
+                if (curr_session_status != SessionBatchProgress.COMPLETED) or kwargs.get('allow_processing_previously_completed', False):
+                    curr_session_basedir = self.session_batch_basedirs[curr_session_context]
+                    result = pool.apply_async(run_specific_batch, (self, curr_session_context, curr_session_basedir), kwargs)
+                    results.append(result)
+                else:
+                    print(f'session {curr_session_context} already completed.')
+
+            pool.close()
+            pool.join()
+
+            for result in results:
+                session_context, status, error, output = result.get()
+                self.session_batch_status[session_context] = status
+                self.session_batch_errors[session_context] = error
+                self.session_batch_outputs[session_context] = output
+        else:
+            # No multiprocessing, fall back to the normal way.
+            for curr_session_context, curr_session_status in self.session_batch_status.items():
+                self.execute_session(curr_session_context, **kwargs) # evaluate a single session
+
 
 
     # Updating ___________________________________________________________________________________________________________ #
