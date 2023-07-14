@@ -346,15 +346,6 @@ class BatchRun:
 
             return convert_filelist_to_new_parent(existing_session_batch_basedirs, original_parent_path=source_parent_path, dest_parent_path=desired_global_data_root_parent_path)
             
-            
-
-            
-
-
-
-
-
-
     @classmethod
     def rebuild_basedirs(cls, batch_progress_df, desired_global_data_root_parent_path, old_global_data_root_parent_path=None):
         """ replaces basedirs with ones that have been rebuilt from the local `global_data_root_parent_path` and hopefully point to extant paths. 
@@ -760,6 +751,7 @@ class BatchSessionCompletionHandler:
     force_global_recompute: bool = field(default=False)
     
     should_perform_figure_generation_to_file: bool = field(default=True) # controls whether figures are generated to file
+    should_generate_all_plots: bool = field(default=False) # controls whether all plots are generated (when True) or if only non-Neptune paper figure specific plots are generated. Has no effect if self.should_perform_figure_generation_to_file is False.
     extended_computations_include_includelist: list = field(default=['long_short_fr_indicies_analyses', 'jonathan_firing_rate_analysis', 'long_short_decoding_analyses', 'long_short_post_decoding']) # do only specifiedl
 
     across_sessions_instantaneous_fr_dict: dict = Factory(dict) # Dict[IdentifyingContext] = InstantaneousSpikeRateGroupsComputation
@@ -785,13 +777,13 @@ class BatchSessionCompletionHandler:
         return was_updated
 
 
-    def try_complete_figure_generation_to_file(self, curr_active_pipeline):
+    def try_complete_figure_generation_to_file(self, curr_active_pipeline, enable_default_neptune_plots=False):
         try:
             ## To file only:
             with matplotlib_file_only():
                 # Perform non-interactive Matplotlib operations with 'AGG' backend
                 # neptuner = batch_perform_all_plots(curr_active_pipeline, enable_neptune=True, neptuner=None)
-                main_complete_figure_generations(curr_active_pipeline, save_figures_only=True, save_figure=True)
+                main_complete_figure_generations(curr_active_pipeline, enable_default_neptune_plots=enable_default_neptune_plots, save_figures_only=True, save_figure=True, )
                 
             # IF thst's done, clear all the plots:
             from matplotlib import pyplot as plt
@@ -816,6 +808,10 @@ class BatchSessionCompletionHandler:
             Captures nothing.
             
             from Spike3D.scripts.run_BatchAnalysis import _on_complete_success_execution_session
+            
+            
+            LOGIC: really we want to recompute global whenever local is recomputed.
+            
             
         """
         print(f'on_complete_success_execution_session(curr_session_context: {curr_session_context}, curr_session_basedir: {str(curr_session_basedir)}, ...)')
@@ -843,10 +839,23 @@ class BatchSessionCompletionHandler:
             print(f'ERROR SAVING PIPELINE for curr_session_context: {curr_session_context}. error: {e}')
 
         ## GLOBAL FUNCTION:
-        # FIXME: doesn't seem like we should always use `force_recompute=True`
+        if self.force_reload_all and (not self.force_global_recompute):
+            print(f'WARNING: self.force_global_recompute was False but self.force_reload_all was true. The global properties must be recomputed when the local functions change, so self.force_global_recompute will be set to True and computation will continue.')
+            self.force_global_recompute = True
+            
+        if was_updated and (not self.force_global_recompute):
+            print(f'WARNING: self.force_global_recompute was False but pipeline was_updated. The global properties must be recomputed when the local functions change, so self.force_global_recompute will be set to True and computation will continue.')
+            self.force_global_recompute = True
+
+        if not self.force_global_recompute: # not just force_reload, needs to recompute whenever the computation fails.
+            try:
+                curr_active_pipeline.load_pickled_global_computation_results()
+            except Exception as e:
+                print(f'cannot load global results: {e}')
+                
         try:
             # # 2023-01-* - Call extended computations to build `_display_short_long_firing_rate_index_comparison` figures:
-            
+            curr_active_pipeline.reload_default_computation_functions()
             newly_computed_values = batch_extended_computations(curr_active_pipeline, include_includelist=self.extended_computations_include_includelist, include_global_functions=True, fail_on_exception=True, progress_print=True, force_recompute=self.force_global_recompute, debug_print=False)
             #TODO 2023-07-11 19:20: - [ ] We want to save the global results if they are computed, but we don't want them to be needlessly written to disk even when they aren't changed.
 
@@ -871,7 +880,7 @@ class BatchSessionCompletionHandler:
 
         # ### Programmatic Figure Outputs:
         if self.should_perform_figure_generation_to_file:
-            self.try_complete_figure_generation_to_file(curr_active_pipeline)
+            self.try_complete_figure_generation_to_file(curr_active_pipeline, enable_default_neptune_plots=self.should_generate_all_plots)
         else:
             print(f'skipping figure generation because should_perform_figure_generation_to_file == False')
 
