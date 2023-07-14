@@ -38,7 +38,10 @@ def get_file_str_if_file_exists(v:Path)->str:
     
 @define(slots=False)
 class BatchRun:
-    """Docstring for BatchRun."""
+    """An object that manages a Batch of runs for many different session folders.
+    
+    
+    """
     global_data_root_parent_path: Path
     session_batch_status: dict = Factory(dict)
     session_batch_basedirs: dict = Factory(dict)
@@ -106,10 +109,9 @@ class BatchRun:
         assert global_batch_run is not None
         return global_batch_run
 
-    
     def to_dataframe(self, expand_context:bool=True, good_only:bool=False) -> pd.DataFrame:
         """Get a dataframe representation of BatchRun."""
-        out_df = BatchResultAccessor.init_from_BatchRun(self, expand_context=expand_context, good_only=good_only)
+        out_df = BatchResultDataframeAccessor.init_from_BatchRun(self, expand_context=expand_context, good_only=good_only)
         out_df = out_df.batch_results.build_all_columns() # this uses the same accessor.
         return out_df
 
@@ -168,31 +170,11 @@ class BatchRun:
         else:
             print('no difference between provided and internal paths.')
 
-
     def reset_session(self, curr_session_context: IdentifyingContext):
         """ resets all progress, dumping the outputs, errors, etc. """
         self.session_batch_status[curr_session_context] = SessionBatchProgress.NOT_STARTED # set to not started if not present
         self.session_batch_errors[curr_session_context] = None # indicate that there are no errors to start
         self.session_batch_outputs[curr_session_context] = None # indicate that there are no outputs to start
-
-    
-    # def convert_path_members_to_str(self) -> pd.DataFrame:
-    #     """ converts the PosixPath columns to str for serialization/pickling 
-
-    #     Usage:
-    #         batch_progress_df = batch_progress_df.batch_results.convert_path_columns_to_str()
-    #         batch_progress_df
-
-    #     TODONOW: Still need to convert the members of `self.session_batch_outputs`, or maybe PosixPath more generally.
-    #     """
-    #     new_copy = deepcopy(self)
-    #     new_copy.session_batch_basedirs = {k:str(v) for k, v in new_copy.session_batch_basedirs.items()}        
-    #     new_copy.global_data_root_parent_path = str(new_copy.global_data_root_parent_path)
-    #     # for a_path_column_name in potential_path_columns:
-    #     #     self._obj[a_path_column_name] = [str(v) for v in self._obj[a_path_column_name].values]
-    #     return new_copy
-
-
 
     # Class/Static Functions _____________________________________________________________________________________________ #
 
@@ -300,24 +282,6 @@ class BatchRun:
         assert np.all([v.is_relative_to(common_prefix) for v in curr_filelist]), f"some of the paths don't match the detected prev root! common_prefix: {common_prefix}"
         return common_prefix
 
-
-    # @classmethod
-    # def find_global_root_path(cls, batch_progress_df: pd.DataFrame) -> str:
-    #     """ extracts the common prefix from the 'basedirs' column of the df and returns it. """
-        
-    #     # # os.path.commonprefix version: this one has the potential to return a deeper directory than the real global data path:
-    #     # paths = batch_progress_df['basedirs'].apply(lambda x: str(x)).to_list()
-    #     # common_prefix = os.path.commonprefix(paths) # '/nfs/turbo/umms-kdiba/Data/KDIBA/'
-
-    #     # Searches `known_global_data_root_parent_paths` to find one that matches:
-    #     curr_filelist = batch_progress_df['basedirs'].to_list()
-    #     common_prefix = find_matching_parent_path(known_global_data_root_parent_paths, curr_filelist[0]) # TODO: assumes all have the same root, which is a valid assumption so far. ## prev_global_data_root_parent_path should contain the matching path from the list.
-    #     assert common_prefix is not None, f"No matching root parent path could be found!!"
-    #     common_prefix = common_prefix.resolve()
-    #     assert np.all([v.is_relative_to(common_prefix) for v in curr_filelist]), f"some of the paths don't match the detected prev root! common_prefix: {common_prefix}"
-    #     return common_prefix
-
-
     @classmethod
     def convert_filelist_to_new_global_root(cls, existing_session_batch_basedirs, desired_global_data_root_parent_path, old_global_data_root_parent_path=None) -> List[Path]:
             """ converts a list of files List[Path] containing the common parent root specified by `old_global_data_root_parent_path` or inferred from the list itself to a new parent specified by `desired_global_data_root_parent_path` 
@@ -378,197 +342,9 @@ class BatchRun:
         return updated_batch_progress_df
 
 
-# ==================================================================================================================== #
-# Global/Helper Functions                                                                                              #
-# ==================================================================================================================== #
-@function_attributes(short_name='run_diba_batch', tags=['batch', 'automated', 'kdiba'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-03-28 04:46')
-def run_diba_batch(global_data_root_parent_path: Path, execute_all:bool = False, extant_batch_run = None, debug_print:bool=False, post_run_callback_fn=None):
-    """ 
-    from pyphoplacecellanalysis.General.Batch.runBatch import BatchRun, run_diba_batch, run_specific_batch
-
-    """
-    # ==================================================================================================================== #
-    # Load Data                                                                                                            #
-    # ==================================================================================================================== #
-    # global_data_root_parent_path = Path(r'W:\Data') # Windows Apogee
-    # global_data_root_parent_path = Path(r'/media/MAX/Data') # Diba Lab Workstation Linux
-    # global_data_root_parent_path = Path(r'/Volumes/MoverNew/data') # rMBP
-    assert global_data_root_parent_path.exists(), f"global_data_root_parent_path: {global_data_root_parent_path} does not exist! Is the right computer's config commented out above?"
-
-    if extant_batch_run is None:
-        print(f'creating new batch_run')
-        active_batch_run = BatchRun(global_data_root_parent_path=global_data_root_parent_path)
-    else:
-        print(f'resusing extant_batch_run: {extant_batch_run}')
-        active_batch_run = extant_batch_run
-
-
-    active_data_mode_name = 'kdiba'
-
-    ## Data must be pre-processed using the MATLAB script located here: 
-    #     neuropy/data_session_pre_processing_scripts/KDIBA/IIDataMat_Export_ToPython_2022_08_01.m
-    # From pre-computed .mat files:
-
-    local_session_root_parent_context = IdentifyingContext(format_name=active_data_mode_name) # , animal_name='', configuration_name='one', session_name=self.session_name
-    local_session_root_parent_path = global_data_root_parent_path.joinpath('KDIBA')
-
-    animal_names = ['gor01', 'vvp01', 'pin01']
-    experiment_names_lists = [['one', 'two'], ['one', 'two'], ['one']] # there is no 'two' for animal 'pin01'
-    exclude_lists = [['PhoHelpers', 'Spike3D-Minimal-Test', 'Unused'], [], [], [], ['redundant','showclus','sleep','tmaze']]
-
-    for animal_name, an_experiment_names_list, exclude_list in zip(animal_names, experiment_names_lists, exclude_lists):
-        for an_experiment_name in an_experiment_names_list:
-            local_session_parent_context = local_session_root_parent_context.adding_context(collision_prefix='animal', animal=animal_name, exper_name=an_experiment_name)
-            local_session_parent_path = local_session_root_parent_path.joinpath(local_session_parent_context.animal, local_session_parent_context.exper_name)
-            local_session_paths_list, local_session_names_list =  find_local_session_paths(local_session_parent_path, exclude_list=exclude_list)
-
-            if debug_print:
-                print(f'local_session_paths_list: {local_session_paths_list}')
-                print(f'local_session_names_list: {local_session_names_list}')
-
-            ## Build session contexts list:
-            local_session_contexts_list = [local_session_parent_context.adding_context(collision_prefix='sess', session_name=a_name) for a_name in local_session_names_list] # [IdentifyingContext<('kdiba', 'gor01', 'one', '2006-6-07_11-26-53')>, ..., IdentifyingContext<('kdiba', 'gor01', 'one', '2006-6-13_14-42-6')>]
-
-            ## Initialize `session_batch_status` with the NOT_STARTED status if it doesn't already have a different status
-            for curr_session_basedir, curr_session_context in zip(local_session_paths_list, local_session_contexts_list):
-                # basedir might be different (e.g. on different platforms), but context should be the same
-                curr_session_status = active_batch_run.session_batch_status.get(curr_session_context, None)
-                if curr_session_status is None:
-                    active_batch_run.session_batch_basedirs[curr_session_context] = curr_session_basedir # use the current basedir if we're compute from this machine instead of loading a previous computed session
-                    active_batch_run.session_batch_status[curr_session_context] = SessionBatchProgress.NOT_STARTED # set to not started if not present
-                    active_batch_run.session_batch_errors[curr_session_context] = None # indicate that there are no errors to start
-                    active_batch_run.session_batch_outputs[curr_session_context] = None # indicate that there are no outputs to start
-
-                    ## TODO: 2023-03-14 - Kick off computation?
-                    if execute_all:
-                        active_batch_run.session_batch_status[curr_session_context], active_batch_run.session_batch_errors[curr_session_context], active_batch_run.session_batch_outputs[curr_session_context] = run_specific_batch(active_batch_run, curr_session_context, curr_session_basedir, post_run_callback_fn=post_run_callback_fn)
-
-                else:
-                    print(f'EXTANT SESSION! curr_session_context: {curr_session_context} curr_session_status: {curr_session_status}, curr_session_errors: {active_batch_run.session_batch_errors.get(curr_session_context, None)}')
-                    ## TODO 2023-04-19: shouldn't computation happen here too if needed?
-
-
-    ## end for
-    return active_batch_run
-
-
-@function_attributes(short_name='run_specific_batch', tags=['batch', 'automated'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-03-28 04:46')
-def run_specific_batch(active_batch_run: BatchRun, curr_session_context: IdentifyingContext, curr_session_basedir: Path, force_reload=True, post_run_callback_fn=None, **kwargs):
-    """ For a specific session (identified by the session context) - calls batch_load_session(...) to get the curr_active_pipeline.
-            - Then calls `post_run_callback_fn(...)
-    
-    """
-    ## Extract the default session loading vars from the session context: 
-    # basedir = local_session_paths_list[1] # NOT 3
-    basedir = curr_session_basedir
-    print(f'basedir: {str(basedir)}')
-    active_data_mode_name = curr_session_context.format_name
-    print(f'active_data_mode_name: {active_data_mode_name}')
-    # post_run_callback_fn = kwargs.pop('post_run_callback_fn', None)
-    post_run_callback_fn_output = None
-    
-    # ==================================================================================================================== #
-    # Load Pipeline                                                                                                        #
-    # ==================================================================================================================== #
-    # epoch_name_includelist = ['maze']
-    epoch_name_includelist = kwargs.pop('epoch_name_includelist', None)
-    active_computation_functions_name_includelist = kwargs.pop('computation_functions_name_includelist', None) or ['_perform_baseline_placefield_computation',
-                                            # '_perform_time_dependent_placefield_computation',
-                                            # '_perform_extended_statistics_computation',
-                                            '_perform_position_decoding_computation', 
-                                            '_perform_firing_rate_trends_computation',
-                                            # '_perform_pf_find_ratemap_peaks_computation',
-                                            # '_perform_time_dependent_pf_sequential_surprise_computation'
-                                            # '_perform_two_step_position_decoding_computation',
-                                            # '_perform_recursive_latent_placefield_decoding'
-                                        ]
-    
-    saving_mode = kwargs.pop('saving_mode', None) or PipelineSavingScheme.OVERWRITE_IN_PLACE
-    skip_extended_batch_computations = kwargs.pop('skip_extended_batch_computations', True)
-    fail_on_exception = kwargs.pop('fail_on_exception', True)
-    debug_print = kwargs.pop('debug_print', False)
-
-    try:
-        curr_active_pipeline = batch_load_session(active_batch_run.global_data_root_parent_path, active_data_mode_name, basedir, epoch_name_includelist=epoch_name_includelist,
-                                        computation_functions_name_includelist=active_computation_functions_name_includelist,
-                                        saving_mode=saving_mode, force_reload=force_reload, skip_extended_batch_computations=skip_extended_batch_computations, debug_print=debug_print, fail_on_exception=fail_on_exception, **kwargs)
-        
-    except Exception as e:
-        return (SessionBatchProgress.FAILED, e, None) # return the Failed status and the exception that occured.
-
-    if post_run_callback_fn is not None:
-        if fail_on_exception:
-            post_run_callback_fn_output = post_run_callback_fn(active_batch_run, curr_session_context, curr_session_basedir, curr_active_pipeline)
-        else:
-            try:
-                # handle exceptions in callback:
-                post_run_callback_fn_output = post_run_callback_fn(active_batch_run, curr_session_context, curr_session_basedir, curr_active_pipeline)
-            except Exception as e:
-                print(f'error occured in post_run_callback_fn: {e}. Suppressing.')
-                
-    return (SessionBatchProgress.COMPLETED, None, post_run_callback_fn_output) # return the success status and None to indicate that no error occured.
-
-
-@function_attributes(short_name='main', tags=['batch', 'automated'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-03-28 04:46')
-def main(active_global_batch_result_filename='global_batch_result.pkl', debug_print=True):
-    """ 
-    from pyphoplacecellanalysis.General.Batch.runBatch import main, BatchRun, run_diba_batch, run_specific_batch
-
-    """
-    global_data_root_parent_path = find_first_extant_path(known_global_data_root_parent_paths)
-    assert global_data_root_parent_path.exists(), f"global_data_root_parent_path: {global_data_root_parent_path} does not exist! Is the right computer's config commented out above?"
-    
-    ## TODO: load the batch result initially:
-
-    ## Build Pickle Path:
-    finalized_loaded_global_batch_result_pickle_path = Path(global_data_root_parent_path).joinpath(active_global_batch_result_filename).resolve()
-    if debug_print:
-        print(f'finalized_loaded_global_batch_result_pickle_path: {finalized_loaded_global_batch_result_pickle_path}')
-    # try to load an existing batch result:
-    try:
-        global_batch_run = loadData(finalized_loaded_global_batch_result_pickle_path, debug_print=debug_print)
-    except (FileNotFoundError, TypeError):
-        # loading failed
-        print(f'Failure loading {finalized_loaded_global_batch_result_pickle_path}.')
-        global_batch_run = None
-
-    # global_batch_result = loadData('global_batch_result.pkl')
-    global_batch_run = run_diba_batch(global_data_root_parent_path, execute_all=False, extant_batch_run=global_batch_run, debug_print=True)
-    print(f'global_batch_result: {global_batch_run}')
-    # Save to file:
-    saveData(finalized_loaded_global_batch_result_pickle_path, global_batch_run) # Update the global batch run dictionary
-
-
-# ==================================================================================================================== #
-# Exporters                                                                                                            #
-# ==================================================================================================================== #
-def dataframe_functions_test():
-    """ 2023-06-13 - Tests loading saved .h5 `global_batch_result` Dataframe. And updating it for the local platform.
-
-    #TODO 2023-06-13 18:09: - [ ] Finish this implementation up and make decision deciding how to use it
-        
-    """
-    global_data_root_parent_path = find_first_extant_path(known_global_data_root_parent_paths)
-    assert global_data_root_parent_path.exists(), f"global_data_root_parent_path: {global_data_root_parent_path} does not exist! Is the right computer's config commented out above?"
-
-    ## Build Pickle Path:
-    pkl_path = 'global_batch_result_2023-06-08.pkl'
-    csv_path = 'global_batch_result_2023-06-08.csv'
-    h5_path = 'global_batch_result_2023-06-08.h5'
-
-    global_batch_result_file_path = Path(global_data_root_parent_path).joinpath(h5_path).resolve() # Use Default
-
-    batch_progress_df = BatchRun.load_batch_progress_df_from_h5(global_batch_result_file_path)
-    batch_progress_df = BatchRun.rebuild_basedirs(batch_progress_df, global_data_root_parent_path)
-
-    good_only_batch_progress_df = batch_progress_df[batch_progress_df['locally_is_ready']].copy()
-    return good_only_batch_progress_df, batch_progress_df
-
-
-# 2023-07-07
 
 @pd.api.extensions.register_dataframe_accessor("batch_results")
-class BatchResultAccessor():
+class BatchResultDataframeAccessor():
     """ A Pandas pd.DataFrame representation of results from the batch processing of sessions
     # 2023-07-07
     Built from `BatchRun`
@@ -730,11 +506,8 @@ class BatchResultAccessor():
         good_only_batch_progress_df['ripple_result_file'] = [str(v or '') for v in session_ripple_result_paths]
         return session_ripple_result_paths
         # global_computation_result_paths = [str(v.joinpath(f'output/global_computation_results.pkl').resolve()) for v in list(good_only_batch_progress_df.basedirs.values)]
-        
 
 
-
-        
 @define(slots=False, repr=False)
 class BatchSessionCompletionHandler:
     """ handles completion of a single session's batch processing. 
@@ -981,6 +754,246 @@ class BatchSessionCompletionHandler:
         # _out_fig_2._pipeline_file_callback_fn = curr_active_pipeline.output_figure # lambda args, kwargs: self.write_to_file(args, kwargs, curr_active_pipeline)
 
         return across_session_inst_fr_computation, across_sessions_instantaneous_fr_dict, across_sessions_instantaneous_frs_list
+
+
+
+
+# ==================================================================================================================== #
+# Global/Helper Functions                                                                                              #
+# ==================================================================================================================== #
+@function_attributes(short_name='run_diba_batch', tags=['batch', 'automated', 'kdiba'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-03-28 04:46')
+def run_diba_batch(global_data_root_parent_path: Path, execute_all:bool = False, extant_batch_run = None, debug_print:bool=False, post_run_callback_fn=None):
+    """ 
+    from pyphoplacecellanalysis.General.Batch.runBatch import BatchRun, run_diba_batch, run_specific_batch
+
+    """
+    # ==================================================================================================================== #
+    # Load Data                                                                                                            #
+    # ==================================================================================================================== #
+    # global_data_root_parent_path = Path(r'W:\Data') # Windows Apogee
+    # global_data_root_parent_path = Path(r'/media/MAX/Data') # Diba Lab Workstation Linux
+    # global_data_root_parent_path = Path(r'/Volumes/MoverNew/data') # rMBP
+    assert global_data_root_parent_path.exists(), f"global_data_root_parent_path: {global_data_root_parent_path} does not exist! Is the right computer's config commented out above?"
+
+    if extant_batch_run is None:
+        print(f'creating new batch_run')
+        active_batch_run = BatchRun(global_data_root_parent_path=global_data_root_parent_path)
+    else:
+        print(f'resusing extant_batch_run: {extant_batch_run}')
+        active_batch_run = extant_batch_run
+
+
+    active_data_mode_name = 'kdiba'
+
+    ## Data must be pre-processed using the MATLAB script located here: 
+    #     neuropy/data_session_pre_processing_scripts/KDIBA/IIDataMat_Export_ToPython_2022_08_01.m
+    # From pre-computed .mat files:
+
+    local_session_root_parent_context = IdentifyingContext(format_name=active_data_mode_name) # , animal_name='', configuration_name='one', session_name=self.session_name
+    local_session_root_parent_path = global_data_root_parent_path.joinpath('KDIBA')
+
+    animal_names = ['gor01', 'vvp01', 'pin01']
+    experiment_names_lists = [['one', 'two'], ['one', 'two'], ['one']] # there is no 'two' for animal 'pin01'
+    exclude_lists = [['PhoHelpers', 'Spike3D-Minimal-Test', 'Unused'], [], [], [], ['redundant','showclus','sleep','tmaze']]
+
+    for animal_name, an_experiment_names_list, exclude_list in zip(animal_names, experiment_names_lists, exclude_lists):
+        for an_experiment_name in an_experiment_names_list:
+            local_session_parent_context = local_session_root_parent_context.adding_context(collision_prefix='animal', animal=animal_name, exper_name=an_experiment_name)
+            local_session_parent_path = local_session_root_parent_path.joinpath(local_session_parent_context.animal, local_session_parent_context.exper_name)
+            local_session_paths_list, local_session_names_list =  find_local_session_paths(local_session_parent_path, exclude_list=exclude_list)
+
+            if debug_print:
+                print(f'local_session_paths_list: {local_session_paths_list}')
+                print(f'local_session_names_list: {local_session_names_list}')
+
+            ## Build session contexts list:
+            local_session_contexts_list = [local_session_parent_context.adding_context(collision_prefix='sess', session_name=a_name) for a_name in local_session_names_list] # [IdentifyingContext<('kdiba', 'gor01', 'one', '2006-6-07_11-26-53')>, ..., IdentifyingContext<('kdiba', 'gor01', 'one', '2006-6-13_14-42-6')>]
+
+            ## Initialize `session_batch_status` with the NOT_STARTED status if it doesn't already have a different status
+            for curr_session_basedir, curr_session_context in zip(local_session_paths_list, local_session_contexts_list):
+                # basedir might be different (e.g. on different platforms), but context should be the same
+                curr_session_status = active_batch_run.session_batch_status.get(curr_session_context, None)
+                if curr_session_status is None:
+                    active_batch_run.session_batch_basedirs[curr_session_context] = curr_session_basedir # use the current basedir if we're compute from this machine instead of loading a previous computed session
+                    active_batch_run.session_batch_status[curr_session_context] = SessionBatchProgress.NOT_STARTED # set to not started if not present
+                    active_batch_run.session_batch_errors[curr_session_context] = None # indicate that there are no errors to start
+                    active_batch_run.session_batch_outputs[curr_session_context] = None # indicate that there are no outputs to start
+
+                    ## TODO: 2023-03-14 - Kick off computation?
+                    if execute_all:
+                        active_batch_run.session_batch_status[curr_session_context], active_batch_run.session_batch_errors[curr_session_context], active_batch_run.session_batch_outputs[curr_session_context] = run_specific_batch(active_batch_run, curr_session_context, curr_session_basedir, post_run_callback_fn=post_run_callback_fn)
+
+                else:
+                    print(f'EXTANT SESSION! curr_session_context: {curr_session_context} curr_session_status: {curr_session_status}, curr_session_errors: {active_batch_run.session_batch_errors.get(curr_session_context, None)}')
+                    ## TODO 2023-04-19: shouldn't computation happen here too if needed?
+
+
+    ## end for
+    return active_batch_run
+
+
+@function_attributes(short_name='run_specific_batch', tags=['batch', 'automated'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-03-28 04:46')
+def run_specific_batch(active_batch_run: BatchRun, curr_session_context: IdentifyingContext, curr_session_basedir: Path, force_reload=True, post_run_callback_fn=None, **kwargs):
+    """ For a specific session (identified by the session context) - calls batch_load_session(...) to get the curr_active_pipeline.
+            - Then calls `post_run_callback_fn(...)
+    
+    """
+    ## Extract the default session loading vars from the session context: 
+    # basedir = local_session_paths_list[1] # NOT 3
+    basedir = curr_session_basedir
+    print(f'basedir: {str(basedir)}')
+    active_data_mode_name = curr_session_context.format_name
+    print(f'active_data_mode_name: {active_data_mode_name}')
+    # post_run_callback_fn = kwargs.pop('post_run_callback_fn', None)
+    post_run_callback_fn_output = None
+    
+    # ==================================================================================================================== #
+    # Load Pipeline                                                                                                        #
+    # ==================================================================================================================== #
+    # epoch_name_includelist = ['maze']
+    epoch_name_includelist = kwargs.pop('epoch_name_includelist', None)
+    active_computation_functions_name_includelist = kwargs.pop('computation_functions_name_includelist', None) or ['_perform_baseline_placefield_computation',
+                                            # '_perform_time_dependent_placefield_computation',
+                                            # '_perform_extended_statistics_computation',
+                                            '_perform_position_decoding_computation', 
+                                            '_perform_firing_rate_trends_computation',
+                                            # '_perform_pf_find_ratemap_peaks_computation',
+                                            # '_perform_time_dependent_pf_sequential_surprise_computation'
+                                            # '_perform_two_step_position_decoding_computation',
+                                            # '_perform_recursive_latent_placefield_decoding'
+                                        ]
+    
+    saving_mode = kwargs.pop('saving_mode', None) or PipelineSavingScheme.OVERWRITE_IN_PLACE
+    skip_extended_batch_computations = kwargs.pop('skip_extended_batch_computations', True)
+    fail_on_exception = kwargs.pop('fail_on_exception', True)
+    debug_print = kwargs.pop('debug_print', False)
+
+    try:
+        curr_active_pipeline = batch_load_session(active_batch_run.global_data_root_parent_path, active_data_mode_name, basedir, epoch_name_includelist=epoch_name_includelist,
+                                        computation_functions_name_includelist=active_computation_functions_name_includelist,
+                                        saving_mode=saving_mode, force_reload=force_reload, skip_extended_batch_computations=skip_extended_batch_computations, debug_print=debug_print, fail_on_exception=fail_on_exception, **kwargs)
+        
+    except Exception as e:
+        return (SessionBatchProgress.FAILED, e, None) # return the Failed status and the exception that occured.
+
+    if post_run_callback_fn is not None:
+        if fail_on_exception:
+            post_run_callback_fn_output = post_run_callback_fn(active_batch_run, curr_session_context, curr_session_basedir, curr_active_pipeline)
+        else:
+            try:
+                # handle exceptions in callback:
+                post_run_callback_fn_output = post_run_callback_fn(active_batch_run, curr_session_context, curr_session_basedir, curr_active_pipeline)
+            except Exception as e:
+                print(f'error occured in post_run_callback_fn: {e}. Suppressing.')
+                
+    return (SessionBatchProgress.COMPLETED, None, post_run_callback_fn_output) # return the success status and None to indicate that no error occured.
+
+
+@function_attributes(short_name='main', tags=['batch', 'automated'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-03-28 04:46')
+def main(active_global_batch_result_filename='global_batch_result.pkl', debug_print=True):
+    """ 
+    from pyphoplacecellanalysis.General.Batch.runBatch import main, BatchRun, run_diba_batch, run_specific_batch
+
+    """
+    global_data_root_parent_path = find_first_extant_path(known_global_data_root_parent_paths)
+    assert global_data_root_parent_path.exists(), f"global_data_root_parent_path: {global_data_root_parent_path} does not exist! Is the right computer's config commented out above?"
+    
+    ## TODO: load the batch result initially:
+
+    ## Build Pickle Path:
+    finalized_loaded_global_batch_result_pickle_path = Path(global_data_root_parent_path).joinpath(active_global_batch_result_filename).resolve()
+    if debug_print:
+        print(f'finalized_loaded_global_batch_result_pickle_path: {finalized_loaded_global_batch_result_pickle_path}')
+    # try to load an existing batch result:
+    try:
+        global_batch_run = BatchRun.try_init_from_file(global_data_root_parent_path, active_global_batch_result_filename=active_global_batch_result_filename,
+						skip_root_path_conversion=False, debug_print=debug_print) # on_needs_create_callback_fn=run_diba_batch
+        # If we reach here than loading is good:
+        batch_progress_df = global_batch_run.to_dataframe(expand_context=True, good_only=False) # all
+        good_only_batch_progress_df = global_batch_run.to_dataframe(expand_context=True, good_only=True)
+
+
+    except (FileNotFoundError, TypeError):
+        # loading failed
+        print(f'Failure loading {finalized_loaded_global_batch_result_pickle_path}.')
+        global_batch_run = None
+
+    # global_batch_result = loadData('global_batch_result.pkl')
+    if global_batch_run is None:
+        print(f'global_batch_run is None (does not exist). It will be initialized by calling `run_diba_batch(...)`...')
+        # Build `global_batch_run` pre-loading results (before execution)
+        global_batch_run = run_diba_batch(global_data_root_parent_path, execute_all=False, extant_batch_run=global_batch_run, debug_print=True)
+        
+    print(f'global_batch_result: {global_batch_run}')
+    # Save to file:
+    saveData(finalized_loaded_global_batch_result_pickle_path, global_batch_run) # Update the global batch run dictionary
+
+
+    # Run Batch Executions/Computations
+    ## I got it doing the bare-minimum loading and computations, so it should be ready to update the laps and constraint the placefields to those. Then we should be able to set up the replays at the same time.
+    # finally, we then finish by computing.
+    # force_reload = True
+    force_reload = False
+    result_handler = BatchSessionCompletionHandler(force_reload_all=force_reload, should_perform_figure_generation_to_file=False, saving_mode=PipelineSavingScheme.SKIP_SAVING, force_global_recompute=False)
+
+    ## Execute with the custom arguments.
+    active_computation_functions_name_includelist=['_perform_baseline_placefield_computation',
+                                            # '_perform_time_dependent_placefield_computation',
+                                            '_perform_extended_statistics_computation',
+                                            '_perform_position_decoding_computation', 
+                                            '_perform_firing_rate_trends_computation',
+                                            '_perform_pf_find_ratemap_peaks_computation',
+                                            # '_perform_time_dependent_pf_sequential_surprise_computation'
+                                            '_perform_two_step_position_decoding_computation',
+                                            # '_perform_recursive_latent_placefield_decoding'
+                                        ]
+    # active_computation_functions_name_includelist=['_perform_baseline_placefield_computation']
+    global_batch_run.execute_all(force_reload=force_reload, saving_mode=PipelineSavingScheme.SKIP_SAVING, skip_extended_batch_computations=True, post_run_callback_fn=result_handler.on_complete_success_execution_session,
+                                                                                            **{'computation_functions_name_includelist': active_computation_functions_name_includelist,
+                                                                                                'active_session_computation_configs': None,
+                                                                                                'allow_processing_previously_completed': True}) # can override `active_session_computation_configs` if we want to set custom ones like only the laps.)
+
+    # Save to file:
+    saveData(global_batch_result_file_path, global_batch_run) # Update the global batch run dictionary
+
+    ## Save the instantaneous firing rate results dict: (# Dict[IdentifyingContext] = InstantaneousSpikeRateGroupsComputation)
+    #TODO 2023-07-12 10:12: - [ ] New save way after we save out current result and reload
+    result_handler.save_across_sessions_data(global_data_root_parent_path=global_data_root_parent_path, inst_fr_output_filename='across_session_result_long_short_inst_firing_rate.pkl')
+    num_sessions = len(result_handler.across_sessions_instantaneous_fr_dict)
+    print(f'num_sessions: {num_sessions}')
+
+
+    # 4m 39.8s
+
+
+
+# ==================================================================================================================== #
+# Exporters                                                                                                            #
+# ==================================================================================================================== #
+def dataframe_functions_test():
+    """ 2023-06-13 - Tests loading saved .h5 `global_batch_result` Dataframe. And updating it for the local platform.
+
+    #TODO 2023-06-13 18:09: - [ ] Finish this implementation up and make decision deciding how to use it
+        
+    """
+    global_data_root_parent_path = find_first_extant_path(known_global_data_root_parent_paths)
+    assert global_data_root_parent_path.exists(), f"global_data_root_parent_path: {global_data_root_parent_path} does not exist! Is the right computer's config commented out above?"
+
+    ## Build Pickle Path:
+    pkl_path = 'global_batch_result_2023-06-08.pkl'
+    csv_path = 'global_batch_result_2023-06-08.csv'
+    h5_path = 'global_batch_result_2023-06-08.h5'
+
+    global_batch_result_file_path = Path(global_data_root_parent_path).joinpath(h5_path).resolve() # Use Default
+
+    batch_progress_df = BatchRun.load_batch_progress_df_from_h5(global_batch_result_file_path)
+    batch_progress_df = BatchRun.rebuild_basedirs(batch_progress_df, global_data_root_parent_path)
+
+    good_only_batch_progress_df = batch_progress_df[batch_progress_df['locally_is_ready']].copy()
+    return good_only_batch_progress_df, batch_progress_df
+
+
+# 2023-07-07
 
 
 if __name__ == "__main__":
