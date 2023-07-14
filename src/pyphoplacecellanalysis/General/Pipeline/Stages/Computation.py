@@ -930,7 +930,8 @@ class PipelineWithComputedPipelineStageMixin:
     # @property
     def get_output_manager(self) -> FigureOutputManager:
         """ returns the FigureOutputManager that specifies where outputs are stored. """
-        return FigureOutputManager(figure_output_location=FigureOutputLocation.DAILY_PROGRAMMATIC_OUTPUT_FOLDER, context_to_path_mode=ContextToPathMode.GLOBAL_UNIQUE)
+        # return FigureOutputManager(figure_output_location=FigureOutputLocation.DAILY_PROGRAMMATIC_OUTPUT_FOLDER, context_to_path_mode=ContextToPathMode.GLOBAL_UNIQUE)
+        return FigureOutputManager(figure_output_location=FigureOutputLocation.DAILY_PROGRAMMATIC_OUTPUT_FOLDER, context_to_path_mode=ContextToPathMode.HIERARCHY_UNIQUE)
 
     def get_computation_times(self, debug_print=False):
         return self.stage.get_computation_times(debug_print=debug_print)
