@@ -121,7 +121,7 @@ class BatchRun:
         """ calls `run_specific_batch(...)` to actually execute the session's run. """
         curr_session_status = self.session_batch_status[session_context]
         enable_calling_completion_handler_for_previously_completed: bool = kwargs.get('allow_processing_previously_completed', False)
-        print(f'enable_calling_completion_handler_for_previously_completed: {enable_calling_completion_handler_for_previously_completed}')
+        # print(f'enable_calling_completion_handler_for_previously_completed: {enable_calling_completion_handler_for_previously_completed}')
         if (curr_session_status != SessionBatchProgress.COMPLETED) or enable_calling_completion_handler_for_previously_completed:
                 curr_session_basedir = self.session_batch_basedirs[session_context]
                 self.session_batch_status[session_context], self.session_batch_errors[session_context], self.session_batch_outputs[session_context] = run_specific_batch(self, session_context, curr_session_basedir, post_run_callback_fn=post_run_callback_fn, **kwargs)
@@ -130,8 +130,6 @@ class BatchRun:
 
     def execute_all(self, **kwargs):
         for curr_session_context, curr_session_status in self.session_batch_status.items():
-            # with neptune.init_run() as run: #TODO 2023-06-09 11:37: - [ ] refactor neptune
-            #     run[f"session/{curr_session_context}"] = curr_session_status
             self.execute_session(curr_session_context, **kwargs) # evaluate a single session
 
 
@@ -838,8 +836,7 @@ def run_specific_batch(active_batch_run: BatchRun, curr_session_context: Identif
             - Then calls `post_run_callback_fn(...)
     
     """
-    ## Extract the default session loading vars from the session context: 
-    # basedir = local_session_paths_list[1] # NOT 3
+    ## Extract the default session loading vars from the session context:
     basedir = curr_session_basedir
     print(f'basedir: {str(basedir)}')
     active_data_mode_name = curr_session_context.format_name
@@ -853,14 +850,10 @@ def run_specific_batch(active_batch_run: BatchRun, curr_session_context: Identif
     # epoch_name_includelist = ['maze']
     epoch_name_includelist = kwargs.pop('epoch_name_includelist', None)
     active_computation_functions_name_includelist = kwargs.pop('computation_functions_name_includelist', None) or ['_perform_baseline_placefield_computation',
-                                            # '_perform_time_dependent_placefield_computation',
-                                            # '_perform_extended_statistics_computation',
+                                            # '_perform_time_dependent_placefield_computation', '_perform_extended_statistics_computation',
                                             '_perform_position_decoding_computation', 
                                             '_perform_firing_rate_trends_computation',
-                                            # '_perform_pf_find_ratemap_peaks_computation',
-                                            # '_perform_time_dependent_pf_sequential_surprise_computation'
-                                            # '_perform_two_step_position_decoding_computation',
-                                            # '_perform_recursive_latent_placefield_decoding'
+                                            # '_perform_pf_find_ratemap_peaks_computation', '_perform_time_dependent_pf_sequential_surprise_computation' '_perform_two_step_position_decoding_computation', '_perform_recursive_latent_placefield_decoding'
                                         ]
     
     saving_mode = kwargs.pop('saving_mode', None) or PipelineSavingScheme.OVERWRITE_IN_PLACE
@@ -889,6 +882,8 @@ def run_specific_batch(active_batch_run: BatchRun, curr_session_context: Identif
     return (SessionBatchProgress.COMPLETED, None, post_run_callback_fn_output) # return the success status and None to indicate that no error occured.
 
 
+
+
 @function_attributes(short_name='main', tags=['batch', 'automated'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-03-28 04:46')
 def main(active_global_batch_result_filename='global_batch_result.pkl', debug_print=True):
     """ 
@@ -898,8 +893,6 @@ def main(active_global_batch_result_filename='global_batch_result.pkl', debug_pr
     global_data_root_parent_path = find_first_extant_path(known_global_data_root_parent_paths)
     assert global_data_root_parent_path.exists(), f"global_data_root_parent_path: {global_data_root_parent_path} does not exist! Is the right computer's config commented out above?"
     
-    ## TODO: load the batch result initially:
-
     ## Build Pickle Path:
     finalized_loaded_global_batch_result_pickle_path = Path(global_data_root_parent_path).joinpath(active_global_batch_result_filename).resolve()
     if debug_print:
@@ -911,7 +904,6 @@ def main(active_global_batch_result_filename='global_batch_result.pkl', debug_pr
         # If we reach here than loading is good:
         batch_progress_df = global_batch_run.to_dataframe(expand_context=True, good_only=False) # all
         good_only_batch_progress_df = global_batch_run.to_dataframe(expand_context=True, good_only=True)
-
 
     except (FileNotFoundError, TypeError):
         # loading failed
