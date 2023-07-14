@@ -243,7 +243,8 @@ class AssigningEpochs:
         
         Adds the ['long_is_user_included', 'short_is_user_included'] columns to the `filter_epochs_df` DataFrame
         """
-        user_annotations = UserAnnotationsManager.get_user_annotations()
+        user_annotation_man = UserAnnotationsManager()
+        user_annotations = user_annotation_man.get_user_annotations()
 
         final_context_L = curr_active_pipeline.build_display_context_for_session(display_fn_name='DecodedEpochSlices', epochs='replays', decoder='long_results_obj')
         final_context_S = curr_active_pipeline.build_display_context_for_session(display_fn_name='DecodedEpochSlices', epochs='replays', decoder='short_results_obj')
@@ -252,9 +253,18 @@ class AssigningEpochs:
         selections_context_S = final_context_S.adding_context(None,  user_annotation="selections")
         
         ## try to get the user annotations for this session:
-        selection_idxs_L = user_annotations[selections_context_L]
-        selection_idxs_S = user_annotations[selections_context_S]
-        
+        try:
+            selection_idxs_L = user_annotations[selections_context_L]
+            selection_idxs_S = user_annotations[selections_context_S]
+        except KeyError as e:
+            print(f'user annotations <good replay selections> are not found. Creating them interactively...')
+            user_annotation_man.interactive_good_epoch_selections(curr_active_pipeline=curr_active_pipeline) # perform interactive selection. Should block here.
+            selection_idxs_L = user_annotations[selections_context_L]
+            selection_idxs_S = user_annotations[selections_context_S]
+        except Exception as e:
+            print('Unhandled exception: {e}')
+            raise
+
         # for updating the filter_epochs_df (`filter_epochs_df`) from the selections:
         self.filter_epochs_df['long_is_user_included'] = np.isin(self.filter_epochs_df.index, selection_idxs_L)
         self.filter_epochs_df['short_is_user_included'] = np.isin(self.filter_epochs_df.index, selection_idxs_S)
