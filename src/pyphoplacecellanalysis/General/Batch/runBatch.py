@@ -236,35 +236,6 @@ class BatchRun:
         
         return batch_run
 
-
-    ## Add detected laps/replays to the batch_progress_df:
-    @classmethod
-    def build_batch_lap_replay_counts_df(cls, global_batch_run):
-        """ returns lap_replay_counts_df """
-        out_counts = []
-        out_new_column_names = ['n_long_laps', 'n_long_replays', 'n_short_laps', 'n_short_replays']
-        for ctx, output_v in global_batch_run.session_batch_outputs.items():
-            if output_v is not None:
-                # {long_epoch_name:(long_laps, long_replays), short_epoch_name:(short_laps, short_replays)}
-                (long_laps, long_replays), (short_laps, short_replays) = list(output_v.values())[:2] # only get the first four outputs
-                out_counts.append((long_laps.n_epochs, long_replays.n_epochs, short_laps.n_epochs, short_replays.n_epochs))
-            else:
-                out_counts.append((0, 0, 0, 0))
-        return pd.DataFrame.from_records(out_counts, columns=out_new_column_names)
-                
-
-
-    @classmethod
-    def post_load_find_usable_sessions(cls, batch_progress_df, min_required_replays_or_laps=5):
-        """ updates batch_progress_df['is_ready'] and returns only the good frames. """
-        has_no_errors = np.array([(an_err_v is None) for an_err_v in batch_progress_df['errors'].to_numpy()])
-        has_required_laps_and_replays = np.all((batch_progress_df[['n_long_laps','n_long_replays','n_short_laps','n_short_replays']].to_numpy() >= min_required_replays_or_laps), axis=1)
-        ## Adds 'is_ready' to the dataframe to indicate that all required properties are intact and that it's ready to process further:
-        batch_progress_df['is_ready'] = np.logical_and(has_no_errors, has_required_laps_and_replays) # Add 'is_ready' column
-        good_batch_progress_df = deepcopy(batch_progress_df)
-        good_batch_progress_df = good_batch_progress_df[good_batch_progress_df['is_ready']]
-        return good_batch_progress_df
-        
     
     # ==================================================================================================================== #
     # New 2023-06-13 File Loading functions                                                                                #
@@ -644,16 +615,47 @@ class BatchResultAccessor():
             out_df = non_expanded_context_df
 
         ## Add lap/replay counts:
-        out_df = pd.concat((out_df, batchrun_obj.build_batch_lap_replay_counts_df(batchrun_obj)), axis=1) # don't need multiple concatenation operations probably
+        out_df = pd.concat((out_df, cls.build_batch_lap_replay_counts_df(batchrun_obj)), axis=1) # don't need multiple concatenation operations probably
         
         ## Add is_ready
-        batchrun_obj.post_load_find_usable_sessions(out_df, min_required_replays_or_laps=5)
+        cls.post_load_find_usable_sessions(out_df, min_required_replays_or_laps=5)
         
         if good_only:
             # Get only the good (is_ready) sessions
             out_df = out_df[out_df['is_ready']]
             
         return out_df
+
+    ## Add detected laps/replays to the batch_progress_df:
+    @classmethod
+    def build_batch_lap_replay_counts_df(cls, global_batch_run: BatchRun):
+        """ Adds detected laps/replays to the batch_progress_df. returns lap_replay_counts_df """
+        out_counts = []
+        out_new_column_names = ['n_long_laps', 'n_long_replays', 'n_short_laps', 'n_short_replays']
+        for ctx, output_v in global_batch_run.session_batch_outputs.items():
+            if output_v is not None:
+                # {long_epoch_name:(long_laps, long_replays), short_epoch_name:(short_laps, short_replays)}
+                (long_laps, long_replays), (short_laps, short_replays) = list(output_v.values())[:2] # only get the first four outputs
+                out_counts.append((long_laps.n_epochs, long_replays.n_epochs, short_laps.n_epochs, short_replays.n_epochs))
+            else:
+                out_counts.append((0, 0, 0, 0))
+        return pd.DataFrame.from_records(out_counts, columns=out_new_column_names)
+                
+
+
+    @classmethod
+    def post_load_find_usable_sessions(cls, batch_progress_df, min_required_replays_or_laps=5, require_user_annotations=False):
+        """ updates batch_progress_df['is_ready'] and returns only the good frames. """
+        has_no_errors = np.array([(an_err_v is None) for an_err_v in batch_progress_df['errors'].to_numpy()])
+        has_required_laps_and_replays = np.all((batch_progress_df[['n_long_laps','n_long_replays','n_short_laps','n_short_replays']].to_numpy() >= min_required_replays_or_laps), axis=1)
+        # if require_user_annotations:
+        #     has_required_user_annotations = 
+        ## Adds 'is_ready' to the dataframe to indicate that all required properties are intact and that it's ready to process further:
+        batch_progress_df['is_ready'] = np.logical_and(has_no_errors, has_required_laps_and_replays) # Add 'is_ready' column
+        good_batch_progress_df = deepcopy(batch_progress_df)
+        good_batch_progress_df = good_batch_progress_df[good_batch_progress_df['is_ready']]
+        return good_batch_progress_df
+
 
 
     @classmethod
@@ -672,6 +674,10 @@ class BatchResultAccessor():
         """ builds the optional output columns """
         self._build_output_files_list()
         self._build_ripple_result_path()
+        ## TODO: append to the non-dataframe object?
+        user_is_replay_good_annotations = UserAnnotationsManager.get_user_annotations()
+        self._obj['has_user_replay_annotations'] = [(a_row_context.adding_context_if_missing(display_fn_name='DecodedEpochSlices',epochs='replays',decoder='long_results_obj',user_annotation='selections') in user_is_replay_good_annotations) for a_row_context in self._obj['context']]
+
         return self._obj
 
 
