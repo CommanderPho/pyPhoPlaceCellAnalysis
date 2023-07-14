@@ -946,7 +946,9 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
 
         ax.set_xlabel('Groups')
         ax.set_ylabel(ylabel)
-
+        # Hide the right and top spines (box components)
+        ax.spines[['right', 'top']].set_visible(False)
+        
         title_text_obj = flexitext(text_formatter.left_margin, text_formatter.top_margin,
                                 cls._build_formatted_title_string(epochs_name=title), va="bottom", xycoords="figure fraction")
         footer_text_obj = flexitext(text_formatter.left_margin * 0.1, text_formatter.bottom_margin * 0.25,

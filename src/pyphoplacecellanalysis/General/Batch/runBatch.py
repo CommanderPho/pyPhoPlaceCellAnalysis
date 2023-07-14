@@ -869,7 +869,7 @@ class BatchSessionCompletionHandler:
         else:
             print(f'skipping figure generation because should_perform_figure_generation_to_file == False')
 
-        ### Do specific computations:
+        ### Do specific computations for aggregate outputs:
         try:
             print(f'\t doing specific instantaneous firing rate computation for context: {curr_session_context}...')
             _out_inst_fr_comps = InstantaneousSpikeRateGroupsComputation(instantaneous_time_bin_size_seconds=0.01) # 10ms

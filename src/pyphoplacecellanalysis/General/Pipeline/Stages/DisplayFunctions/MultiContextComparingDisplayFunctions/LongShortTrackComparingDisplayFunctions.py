@@ -1563,12 +1563,15 @@ def _plot_long_short_firing_rate_indicies(x_frs_index, y_frs_index, active_conte
     # Set the x and y axes to standard limits for easy visual comparison across sessions
     ax.set_xlim([-1.1, 1.1])
     ax.set_ylim([-1.1, 1.1])
-
+    
     if is_centered:
         ## The "spines" are the vertical and horizontal "axis" bars where the tick marks are drawn.
         ax.spines[['left', 'bottom']].set_position('center')
         ax.spines[['top', 'right']].set_visible(False)
-
+    else:
+        # Hide the right and top spines (box components)
+        ax.spines[['right', 'top']].set_visible(False)
+        
 
     # # Call the function above. All the magic happens there.
     # add_value_labels(ax, labels=x_labels) # 
@@ -2213,6 +2216,10 @@ def _plot_session_long_short_track_firing_rate_figures(curr_active_pipeline, jon
             ## The "spines" are the vertical and horizontal "axis" bars where the tick marks are drawn.
             ax.spines[['left', 'bottom']].set_position('center')
             ax.spines[['top', 'right']].set_visible(False)
+        else:
+            # Hide the right and top spines (box components)
+            ax.spines[['right', 'top']].set_visible(False)
+    
 
         if not defer_render:
             fig.show()
