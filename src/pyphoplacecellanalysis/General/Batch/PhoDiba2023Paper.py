@@ -37,7 +37,7 @@ from pyphoplacecellanalysis.Pho2D.matplotlib.AdvancedMatplotlibText import Forma
 
 from typing import Any, List
 
-from pyphoplacecellanalysis.General.Batch.NonInteractiveProcessing import batch_perform_all_plots
+from pyphoplacecellanalysis.General.Batch.NonInteractiveProcessing import batch_perform_all_plots, BatchPhoJonathanFiguresHelper
 from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.SpikeAnalysis import SpikeRateTrends
 import pyphoplacecellanalysis.External.pyqtgraph as pg # pyqtgraph
 
@@ -121,7 +121,7 @@ def build_shared_sorted_neuronIDs(ratemap, included_unit_neuron_IDs, sort_ind):
 # ==================================================================================================================== #
 
 # ==================================================================================================================== #
-# 2023-06-21 User Annotations and Paper Figure 1                                                                       #
+# 2023-06-21 User Annotations                                                                      #
 # ==================================================================================================================== #
 
 @define(slots=False)
@@ -278,11 +278,9 @@ class UserAnnotationsManager:
         print(f"user_annotations[{final_S_context.get_initialization_code_string()}] = np.array({list(saved_selection_S.flat_all_data_indicies[saved_selection_S.is_selected])})")
 
 
-
-
-
-
-
+# ==================================================================================================================== #
+# 2023-07-14 - Iterative Epoch Track Assignment                                                                        #
+# ==================================================================================================================== #
 class TrackAssignmentState(ExtendedEnum):
     """Docstring for TrackAssignmentState."""
     UNASSIGNED = "unassigned"
@@ -563,6 +561,10 @@ class AssigningEpochs:
             
         return fig, axs
 
+
+# ==================================================================================================================== #
+# 2023-07-14 - Paper Figure 1                                                                                          #
+# ==================================================================================================================== #
 @function_attributes(short_name=None, tags=['FIGURE1', 'figure'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-06-21 21:40', related_items=[])
 def PAPER_FIGURE_figure_1_add_replay_epoch_rasters(curr_active_pipeline, debug_print=True):
     """ 
@@ -741,7 +743,21 @@ def PAPER_FIGURE_figure_1_full(curr_active_pipeline, defer_show=False, save_figu
     ## Stacked Epoch Plot: this is the slowest part of the figure by far as it renders in a scrollable pyqtgraph window.
     example_stacked_epoch_graphics = curr_active_pipeline.display('_display_long_and_short_stacked_epoch_slices', defer_render=defer_show, save_figure=save_figure)
 
-    return pf1d_compare_graphics, (example_epoch_rasters_L, example_epoch_rasters_S), example_stacked_epoch_graphics
+
+
+    # ==================================================================================================================== #
+    # Fig 1c) 2023-07-14 - LxC and SxC PhoJonathanSession plots                                                            #
+    # ==================================================================================================================== #
+
+    ## Get global 'jonathan_firing_rate_analysis' results:
+    curr_jonathan_firing_rate_analysis = curr_active_pipeline.global_computation_results.computed_data['jonathan_firing_rate_analysis']
+    neuron_replay_stats_df, rdf, aclu_to_idx, irdf = curr_jonathan_firing_rate_analysis['neuron_replay_stats_df'], curr_jonathan_firing_rate_analysis['rdf']['rdf'], curr_jonathan_firing_rate_analysis['rdf']['aclu_to_idx'], curr_jonathan_firing_rate_analysis['irdf']['irdf']
+
+    fig_1c_figures_out_dict = BatchPhoJonathanFiguresHelper.run(curr_active_pipeline, neuron_replay_stats_df, included_unit_neuron_IDs=XOR_subset.track_exclusive_aclus, n_max_page_rows=20, write_vector_format=False, write_png=save_figure) # active_out_figures_dict: {IdentifyingContext<('kdiba', 'gor01', 'two', '2006-6-07_16-40-19', 'BatchPhoJonathanReplayFRC', 'long_only', '(12,21,48)')>: <Figure size 1920x660 with 12 Axes>, IdentifyingContext<('kdiba', 'gor01', 'two', '2006-6-07_16-40-19', 'BatchPhoJonathanReplayFRC', 'short_only', '(18,19,65)')>: <Figure size 1920x660 with 12 Axes>}
+    # print(f'fig_1c_figures_out_dict: {fig_1c_figures_out_dict}')
+
+
+    return pf1d_compare_graphics, (example_epoch_rasters_L, example_epoch_rasters_S), example_stacked_epoch_graphics, fig_1c_figures_out_dict
 
 # ==================================================================================================================== #
 # 2023-06-26 - Paper Figure 2 Code                                                                                     #
