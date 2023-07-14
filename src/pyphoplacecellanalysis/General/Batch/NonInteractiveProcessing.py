@@ -351,7 +351,7 @@ def batch_programmatic_figures(curr_active_pipeline, debug_print=False):
 
     ## TODO: curr_session_parent_out_path
 
-    active_identifying_session_ctx, active_session_figures_out_path, active_out_figures_list = batch_programmatic_figures(curr_active_pipeline)
+    active_identifying_session_ctx, active_out_figures_dict = batch_programmatic_figures(curr_active_pipeline)
     
     """
     ## 🗨️🟢 2022-10-26 - Jonathan Firing Rate Analyses
@@ -384,10 +384,8 @@ def batch_programmatic_figures(curr_active_pipeline, debug_print=False):
     # ==================================================================================================================== #
     # Output Figures to File                                                                                               #
     # ==================================================================================================================== #
-    active_out_figures_list, active_session_figures_out_path = BatchPhoJonathanFiguresHelper.run(curr_active_pipeline, neuron_replay_stats_df, n_max_page_rows=10)
-    print(f'curr_session_parent_out_path: {active_session_figures_out_path}')
-
-    return active_identifying_session_ctx, active_session_figures_out_path, active_out_figures_list
+    active_out_figures_dict = BatchPhoJonathanFiguresHelper.run(curr_active_pipeline, neuron_replay_stats_df, n_max_page_rows=10)
+    return active_identifying_session_ctx, active_out_figures_dict
 
 
 # import matplotlib as mpl
@@ -504,11 +502,9 @@ class BatchPhoJonathanFiguresHelper:
         active_identifying_session_ctx = curr_active_pipeline.sess.get_context() # 'bapun_RatN_Day4_2019-10-15_11-30-06'
         
         _batch_plot_kwargs_list = cls._build_batch_plot_kwargs(long_only_aclus, short_only_aclus, shared_aclus, active_identifying_session_ctx, n_max_page_rows=n_max_page_rows)
-        active_out_figures_list = cls._perform_batch_plot(curr_active_pipeline, _batch_plot_kwargs_list, write_vector_format=write_vector_format, write_png=write_png, progress_print=progress_print, debug_print=debug_print)
+        active_out_figures_dict = cls._perform_batch_plot(curr_active_pipeline, _batch_plot_kwargs_list, write_vector_format=write_vector_format, write_png=write_png, progress_print=progress_print, debug_print=debug_print)
         
-        ## PITFALL: Note that depending on the figure output mode there might not be a common parent path for all files from this session, so this variable is just kept around for compatibility.
-        active_session_figures_parent_path = curr_active_pipeline.get_output_manager().get_figure_output_parent_path(active_identifying_session_ctx, make_folder_if_needed=False)
-        return active_out_figures_list, active_session_figures_parent_path
+        return active_out_figures_dict
 
     @classmethod
     def _subfn_batch_plot_automated(cls, curr_active_pipeline, included_unit_neuron_IDs=None, active_identifying_ctx=None, fignum=None, fig_idx=0, n_max_page_rows=10):
@@ -596,7 +592,7 @@ class BatchPhoJonathanFiguresHelper:
         #TODO 2023-06-14 21:53: - [ ] REPLACE `create_daily_programmatic_display_function_testing_folder_if_needed` with `curr_active_pipeline.get_figure_manager()` approach
         fig_man = curr_active_pipeline.get_output_manager()
 
-        active_out_figures_list = [] # empty list to hold figures
+        active_out_figures_dict = {} # empty dict to hold figures
         num_pages = len(active_kwarg_list)
 
         # Each figure:
@@ -608,7 +604,7 @@ class BatchPhoJonathanFiguresHelper:
 
             # Perform the plotting:
             a_fig = cls._subfn_batch_plot_automated(curr_active_pipeline, **curr_batch_plot_kwargs)
-            active_out_figures_list.append(a_fig)
+            active_out_figures_dict[curr_active_identifying_ctx] = a_fig
 
             # One plot at a time to PDF:
             if write_vector_format:
@@ -633,7 +629,7 @@ class BatchPhoJonathanFiguresHelper:
                     print(f'\t saved {fig_png_out_path}')
 
 
-        return active_out_figures_list
+        return active_out_figures_dict
 
 
 # ==================================================================================================================== #
@@ -658,7 +654,7 @@ def batch_perform_all_plots(curr_active_pipeline, enable_neptune=True, neptuner=
          
     curr_active_pipeline.reload_default_display_functions()
     try:
-        active_identifying_session_ctx, active_session_figures_out_path, active_out_figures_list = batch_programmatic_figures(curr_active_pipeline)
+        active_identifying_session_ctx, active_out_figures_dict = batch_programmatic_figures(curr_active_pipeline)
     except Exception as e:
         print(f'in `batch_perform_all_plots(...)`: batch_programmatic_figures(...) failed with exception: {e}. Continuing.')
     
