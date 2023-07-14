@@ -238,7 +238,7 @@ class AssigningEpochs:
         return filter_epoch_spikes_df, self.filter_epochs_df
 
 
-    def filter_by_user_selections(self, curr_active_pipeline):
+    def filter_by_user_selections(self, curr_active_pipeline, allow_interactive_selection:bool = False):
         """Get the manual user annotations to determine the good replays for both long/short decoding
         
         Adds the ['long_is_user_included', 'short_is_user_included'] columns to the `filter_epochs_df` DataFrame
@@ -257,10 +257,14 @@ class AssigningEpochs:
             selection_idxs_L = user_annotations[selections_context_L]
             selection_idxs_S = user_annotations[selections_context_S]
         except KeyError as e:
-            print(f'user annotations <good replay selections> are not found. Creating them interactively...')
-            user_annotation_man.interactive_good_epoch_selections(curr_active_pipeline=curr_active_pipeline) # perform interactive selection. Should block here.
-            selection_idxs_L = user_annotations[selections_context_L]
-            selection_idxs_S = user_annotations[selections_context_S]
+            if allow_interactive_selection:
+                print(f'user annotations <good replay selections> are not found. Creating them interactively...')
+                user_annotation_man.interactive_good_epoch_selections(curr_active_pipeline=curr_active_pipeline) # perform interactive selection. Should block here.
+                selection_idxs_L = user_annotations[selections_context_L]
+                selection_idxs_S = user_annotations[selections_context_S]
+            else:
+                print(f'interactive annotation is not permitted. Failing.')
+                raise e
         except Exception as e:
             print('Unhandled exception: {e}')
             raise
@@ -442,7 +446,6 @@ def PAPER_FIGURE_figure_1_add_replay_epoch_rasters(curr_active_pipeline, debug_p
     neuron_replay_stats_df, short_exclusive, long_exclusive, BOTH_subset, EITHER_subset, XOR_subset, NEITHER_subset = jonathan_firing_rate_analysis_result.get_cell_track_partitions()
 
     assigning_epochs_obj = AssigningEpochs(filter_epochs_df=deepcopy(long_results_obj.active_filter_epochs.to_dataframe()))
-
 
     # included_neuron_ids = deepcopy(exclusive_aclus)
     # included_neuron_ids = None
@@ -658,8 +661,13 @@ class InstantaneousSpikeRateGroupsComputation:
         self.active_identifying_session_ctx = active_context
         long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
         long_session, short_session, global_session = [curr_active_pipeline.filtered_sessions[an_epoch_name] for an_epoch_name in [long_epoch_name, short_epoch_name, global_epoch_name]] # only uses global_session
-        (epochs_df_L, epochs_df_S), (filter_epoch_spikes_df_L, filter_epoch_spikes_df_S), (good_example_epoch_indicies_L, good_example_epoch_indicies_S), (short_exclusive, long_exclusive, BOTH_subset, EITHER_subset, XOR_subset, NEITHER_subset), new_all_aclus_sort_indicies, assigning_epochs_obj = PAPER_FIGURE_figure_1_add_replay_epoch_rasters(curr_active_pipeline)
-        
+        # (epochs_df_L, epochs_df_S), (filter_epoch_spikes_df_L, filter_epoch_spikes_df_S), (good_example_epoch_indicies_L, good_example_epoch_indicies_S), (short_exclusive, long_exclusive, BOTH_subset, EITHER_subset, XOR_subset, NEITHER_subset), new_all_aclus_sort_indicies, assigning_epochs_obj = PAPER_FIGURE_figure_1_add_replay_epoch_rasters(curr_active_pipeline)
+
+        ## Use the `JonathanFiringRateAnalysisResult` to get info about the long/short placefields:
+        jonathan_firing_rate_analysis_result = JonathanFiringRateAnalysisResult(**curr_active_pipeline.global_computation_results.computed_data.jonathan_firing_rate_analysis.to_dict())
+        neuron_replay_stats_df, short_exclusive, long_exclusive, BOTH_subset, EITHER_subset, XOR_subset, NEITHER_subset = jonathan_firing_rate_analysis_result.get_cell_track_partitions()
+    
+
         long_short_fr_indicies_analysis_results = curr_active_pipeline.global_computation_results.computed_data['long_short_fr_indicies_analysis']
         long_laps, long_replays, short_laps, short_replays, global_laps, global_replays = [long_short_fr_indicies_analysis_results[k] for k in ['long_laps', 'long_replays', 'short_laps', 'short_replays', 'global_laps', 'global_replays']]
 
