@@ -144,20 +144,24 @@ class BatchRun:
 
             pool = multiprocessing.Pool(processes=num_processes)
 
-            results = []
+            # results = []
+            results = {} # dict form
             for curr_session_context, curr_session_status in self.session_batch_status.items():
                 if (curr_session_status != SessionBatchProgress.COMPLETED) or kwargs.get('allow_processing_previously_completed', False):
                     curr_session_basedir = self.session_batch_basedirs[curr_session_context]
-                    result = pool.apply_async(run_specific_batch, (self, curr_session_context, curr_session_basedir), kwargs)
-                    results.append(result)
+                    result = pool.apply_async(run_specific_batch, (self, curr_session_context, curr_session_basedir), kwargs) # it can actually take a callback too.
+                    # results.append(result) # list form
+                    results[curr_session_context] = result
                 else:
                     print(f'session {curr_session_context} already completed.')
 
             pool.close()
             pool.join()
 
-            for result in results:
-                session_context, status, error, output = result.get()
+            # for result in results:
+            #     session_context, status, error, output = result.get()
+            for session_context, result in results.items():
+                status, error, output = result.get()
                 self.session_batch_status[session_context] = status
                 self.session_batch_errors[session_context] = error
                 self.session_batch_outputs[session_context] = output
@@ -913,6 +917,7 @@ def run_specific_batch(active_batch_run: BatchRun, curr_session_context: Identif
                 post_run_callback_fn_output = post_run_callback_fn(active_batch_run, curr_session_context, curr_session_basedir, curr_active_pipeline)
             except Exception as e:
                 print(f'error occured in post_run_callback_fn: {e}. Suppressing.')
+                post_run_callback_fn_output = None
                 
     return (SessionBatchProgress.COMPLETED, None, post_run_callback_fn_output) # return the success status and None to indicate that no error occured.
 
