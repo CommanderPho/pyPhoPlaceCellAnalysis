@@ -957,15 +957,26 @@ class PipelineWithComputedPipelineStageMixin:
     `load_pickled_global_computation_results(self, override_global_computation_results_pickle_path=None)`
     
     """
+    
     @property
-    def global_computation_results_pickle_path(self) -> Path:
-        """ The path to pickle the global_computation_results """
+    def special_pickle_designator_suffix(self) -> str:
         # Get special suffix if specified and use that for global result too: 'loadedSessPickle_withDirectionalLaps.pkl'
         if self.pickle_path is not None:
             local_pickle_filename = self.pickle_path.name
             special_designator_suffix = local_pickle_filename.removeprefix('loadedSessPickle').removesuffix('.pkl')
         else:
             special_designator_suffix = ""
+        return special_designator_suffix
+
+
+
+    @property
+    def global_computation_results_pickle_path(self) -> Path:
+        """ The path to pickle the global_computation_results 
+        Looks in the `output/global_computation_results.pkl` folder first.
+        
+        """
+        special_designator_suffix = self.special_pickle_designator_suffix
         
         # if len(special_designator_suffix) > 0:
         desired_global_pickle_filename = f"global_computation_results{special_designator_suffix}.pkl" # 'global_computation_results_withDirectionalLaps.pkl'
@@ -973,13 +984,19 @@ class PipelineWithComputedPipelineStageMixin:
         return self.get_output_path().joinpath(desired_global_pickle_filename).resolve()
 
     ## Global Computation Result Persistance Hacks:
-    def save_global_computation_results(self):
+    def save_global_computation_results(self, override_global_pickle_filename='global_computation_results.pkl'):
         """Save out the `global_computation_results` which are not currently saved with the pipeline
         Usage:
             curr_active_pipeline.save_global_computation_results()
         """
-        print(f'global_computation_results_pickle_path: {self.global_computation_results_pickle_path}')
-        saveData(self.global_computation_results_pickle_path, (self.global_computation_results.to_dict()))
+        if override_global_pickle_filename is None:
+            global_computation_results_pickle_path = self.global_computation_results_pickle_path
+        else:
+            global_computation_results_pickle_path = self.get_output_path().joinpath(override_global_pickle_filename).resolve() 
+        print(f'global_computation_results_pickle_path: {global_computation_results_pickle_path}')
+        saveData(global_computation_results_pickle_path, (self.global_computation_results.to_dict()))
+        return global_computation_results_pickle_path
+
 
     def load_pickled_global_computation_results(self, override_global_computation_results_pickle_path=None):
         """ loads the previously pickled `global_computation_results` into `self.global_computation_results`, replacing the current values.
