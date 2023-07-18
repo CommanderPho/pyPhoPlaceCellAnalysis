@@ -449,13 +449,19 @@ class BatchResultDataframeAccessor():
 
     @classmethod
     def post_load_find_usable_sessions(cls, batch_progress_df, min_required_replays_or_laps=5, require_user_annotations=False):
-        """ updates batch_progress_df['is_ready'] and returns only the good frames. """
+        """ updates batch_progress_df['is_ready'] and returns only the good frames.
+        Called by cls.init_from_BatchRun(...)
+        
+        """
         has_no_errors = np.array([(an_err_v is None) for an_err_v in batch_progress_df['errors'].to_numpy()])
         has_required_laps_and_replays = np.all((batch_progress_df[['n_long_laps','n_long_replays','n_short_laps','n_short_replays']].to_numpy() >= min_required_replays_or_laps), axis=1)
-        # if require_user_annotations:
-        #     has_required_user_annotations = 
+        if require_user_annotations:
+            has_required_user_annotations = batch_progress_df['has_user_replay_annotations'].to_numpy()
         ## Adds 'is_ready' to the dataframe to indicate that all required properties are intact and that it's ready to process further:
         batch_progress_df['is_ready'] = np.logical_and(has_no_errors, has_required_laps_and_replays) # Add 'is_ready' column
+        if require_user_annotations:
+            batch_progress_df['is_ready'] = np.logical_and(batch_progress_df['is_ready'], has_required_user_annotations)
+            
         good_batch_progress_df = deepcopy(batch_progress_df)
         good_batch_progress_df = good_batch_progress_df[good_batch_progress_df['is_ready']]
         return good_batch_progress_df
