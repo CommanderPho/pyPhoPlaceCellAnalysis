@@ -600,7 +600,8 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
                 finalized_loaded_sess_pickle_path = self.pickle_path # get the internal pickle path that it was loaded from if none specified
                 used_existing_pickle_path = True
             else:        
-                finalized_loaded_sess_pickle_path = Path(self.sess.basepath).joinpath(active_pickle_filename).resolve()
+                finalized_loaded_sess_pickle_path = Path(self.sess.basepath).joinpath(active_pickle_filename).resolve() # Uses the './loadedSessPickle.pkl' path
+                # finalized_loaded_sess_pickle_path = self.get_output_path().joinpath(active_pickle_filename).resolve() # Changed to use the 'output/loadedSessPickle.pkl' directory 
                 used_existing_pickle_path = (finalized_loaded_sess_pickle_path == self.pickle_path) # used the existing path if they're the same
             
             self.logger.info(f'save_pipeline(): Attempting to save pipeline to disk...')
