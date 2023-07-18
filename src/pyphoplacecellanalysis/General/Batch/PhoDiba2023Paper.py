@@ -618,6 +618,17 @@ def PAPER_FIGURE_figure_1_full(curr_active_pipeline, defer_show=False, save_figu
 # ==================================================================================================================== #
 # 2023-06-26 - Paper Figure 2 Code                                                                                     #
 # ==================================================================================================================== #
+
+@define(slots=False)
+class SingleBarResult:
+    """ a simple replacement for the tuple that's current passed """
+    mean: float
+    std: float
+    values: np.ndarray
+    LxC_aclus: np.ndarray # the list of long-eXclusive cell aclus
+    SxC_aclus: np.ndarray # the list of short-eXclusive cell aclus
+
+
 # Instantaneous versions:
 @define(slots=False)
 class InstantaneousSpikeRateGroupsComputation:
@@ -629,6 +640,9 @@ class InstantaneousSpikeRateGroupsComputation:
     instantaneous_time_bin_size_seconds: float = 0.01  # 20ms
     active_identifying_session_ctx: IdentifyingContext = field(init=False)
 
+    LxC_aclus: np.ndarray = field(init=False) # the list of long-eXclusive cell aclus
+    SxC_aclus: np.ndarray = field(init=False) # the list of short-eXclusive cell aclus
+    
     Fig2_Replay_FR: List[Tuple[Any, Any]] = field(init=False)
     Fig2_Laps_FR: List[Tuple[Any, Any]] = field(init=False)
 
@@ -661,15 +675,17 @@ class InstantaneousSpikeRateGroupsComputation:
         self.active_identifying_session_ctx = active_context
         long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
         long_session, short_session, global_session = [curr_active_pipeline.filtered_sessions[an_epoch_name] for an_epoch_name in [long_epoch_name, short_epoch_name, global_epoch_name]] # only uses global_session
-        # (epochs_df_L, epochs_df_S), (filter_epoch_spikes_df_L, filter_epoch_spikes_df_S), (good_example_epoch_indicies_L, good_example_epoch_indicies_S), (short_exclusive, long_exclusive, BOTH_subset, EITHER_subset, XOR_subset, NEITHER_subset), new_all_aclus_sort_indicies, assigning_epochs_obj = PAPER_FIGURE_figure_1_add_replay_epoch_rasters(curr_active_pipeline)
-
+        
         ## Use the `JonathanFiringRateAnalysisResult` to get info about the long/short placefields:
         jonathan_firing_rate_analysis_result = JonathanFiringRateAnalysisResult(**curr_active_pipeline.global_computation_results.computed_data.jonathan_firing_rate_analysis.to_dict())
         neuron_replay_stats_df, short_exclusive, long_exclusive, BOTH_subset, EITHER_subset, XOR_subset, NEITHER_subset = jonathan_firing_rate_analysis_result.get_cell_track_partitions()
-    
 
         long_short_fr_indicies_analysis_results = curr_active_pipeline.global_computation_results.computed_data['long_short_fr_indicies_analysis']
         long_laps, long_replays, short_laps, short_replays, global_laps, global_replays = [long_short_fr_indicies_analysis_results[k] for k in ['long_laps', 'long_replays', 'short_laps', 'short_replays', 'global_laps', 'global_replays']]
+
+        # Store the Long and Short exclusive ACLUs:
+        self.LxC_aclus = long_exclusive.track_exclusive_aclus
+        self.SxC_aclus = short_exclusive.track_exclusive_aclus
 
         # Replays: Uses `global_session.spikes_df`, `long_exclusive.track_exclusive_aclus, `short_exclusive.track_exclusive_aclus`, `long_replays`, `short_replays`
         # LxC: `long_exclusive.track_exclusive_aclus`
@@ -687,9 +703,9 @@ class InstantaneousSpikeRateGroupsComputation:
         self.LxC_ReplayDeltaMinus, self.LxC_ReplayDeltaPlus, self.SxC_ReplayDeltaMinus, self.SxC_ReplayDeltaPlus = LxC_ReplayDeltaMinus, LxC_ReplayDeltaPlus, SxC_ReplayDeltaMinus, SxC_ReplayDeltaPlus
 
         # Note that in general LxC and SxC might have differing numbers of cells.
-        self.Fig2_Replay_FR: list[tuple[Any, Any]] = [(v.cell_agg_inst_fr_list.mean(), v.cell_agg_inst_fr_list.std(), v.cell_agg_inst_fr_list) for v in (LxC_ReplayDeltaMinus, LxC_ReplayDeltaPlus, SxC_ReplayDeltaMinus, SxC_ReplayDeltaPlus)]
+        # self.Fig2_Replay_FR: list[tuple[Any, Any]] = [(v.cell_agg_inst_fr_list.mean(), v.cell_agg_inst_fr_list.std(), v.cell_agg_inst_fr_list) for v in (LxC_ReplayDeltaMinus, LxC_ReplayDeltaPlus, SxC_ReplayDeltaMinus, SxC_ReplayDeltaPlus)]
+        self.Fig2_Replay_FR: list[SingleBarResult] = [SingleBarResult(v.cell_agg_inst_fr_list.mean(), v.cell_agg_inst_fr_list.std(), v.cell_agg_inst_fr_list, self.LxC_aclus, self.SxC_aclus) for v in (LxC_ReplayDeltaMinus, LxC_ReplayDeltaPlus, SxC_ReplayDeltaMinus, SxC_ReplayDeltaPlus)]
         
-
         # Laps/Theta: Uses `global_session.spikes_df`, `long_exclusive.track_exclusive_aclus, `short_exclusive.track_exclusive_aclus`, `long_laps`, `short_laps`
         # LxC: `long_exclusive.track_exclusive_aclus`
         # ThetaDeltaMinus: `long_laps`
@@ -706,11 +722,12 @@ class InstantaneousSpikeRateGroupsComputation:
         self.LxC_ThetaDeltaMinus, self.LxC_ThetaDeltaPlus, self.SxC_ThetaDeltaMinus, self.SxC_ThetaDeltaPlus = LxC_ThetaDeltaMinus, LxC_ThetaDeltaPlus, SxC_ThetaDeltaMinus, SxC_ThetaDeltaPlus
 
         # Note that in general LxC and SxC might have differing numbers of cells.
-        self.Fig2_Laps_FR: list[tuple[Any, Any]] = [(v.cell_agg_inst_fr_list.mean(), v.cell_agg_inst_fr_list.std(), v.cell_agg_inst_fr_list) for v in (LxC_ThetaDeltaMinus, LxC_ThetaDeltaPlus, SxC_ThetaDeltaMinus, SxC_ThetaDeltaPlus)]
-    
+        self.Fig2_Laps_FR: list[SingleBarResult] = [SingleBarResult(v.cell_agg_inst_fr_list.mean(), v.cell_agg_inst_fr_list.std(), v.cell_agg_inst_fr_list, self.LxC_aclus, self.SxC_aclus) for v in (LxC_ThetaDeltaMinus, LxC_ThetaDeltaPlus, SxC_ThetaDeltaMinus, SxC_ThetaDeltaPlus)]
+        
 
     def __add__(self, other):
         """ for concatenating the fields of two `InstantaneousSpikeRateGroupsComputation objects. """
+        #TODO 2023-07-18 11:37: - [ ] Doesn't account for self.LxC_aclus, self.SxC_aclus, or self.active_context. Should probably form a context-specific SxC_aclus and LxC_aclus array if needed.
         if isinstance(other, InstantaneousSpikeRateGroupsComputation):
             new_obj = InstantaneousSpikeRateGroupsComputation()
             new_obj.Fig2_Replay_FR = self.Fig2_Replay_FR + other.Fig2_Replay_FR
@@ -746,7 +763,7 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
 
     """
 
-    instantaneous_time_bin_size_seconds: float = 0.01 # 20ms
+    instantaneous_time_bin_size_seconds: float = 0.01 # 10ms
     
     computation_result: InstantaneousSpikeRateGroupsComputation = field(init=False)
     active_identifying_session_ctx: IdentifyingContext = field(init=False)
@@ -802,9 +819,15 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
         bars = ax.bar(x, [np.mean(yi) for yi in y_values], yerr=[np.std(yi) for yi in y_values], capsize=5,
                     width=width, tick_label=x_labels, color=(0, 0, 0, 0), edgecolor=cls.get_bar_colors())
 
-        for i in range(len(x)):
-            ax.scatter(x[i] + np.random.random(y_values[i].size) * width - width / 2, y_values[i], color=cls.get_bar_colors()[i])
+        scatter_plots = []
+        x_values_list = []
 
+        for i in range(len(x)):
+            x_values = (x[i] + np.random.random(y_values[i].size) * width - width / 2)
+            scatter_plot = ax.scatter(x_values, y_values[i], color=cls.get_bar_colors()[i]) # the np.random part is to spread the points out along the x-axis within their bar so they're visible and don't overlap.
+            scatter_plots.append(scatter_plot)
+            x_values_list.append(x_values)
+            
         ax.set_xlabel('Groups')
         ax.set_ylabel(ylabel)
         # Hide the right and top spines (box components)
@@ -817,7 +840,8 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
         ax.set_xticks(x)
         ax.set_xticklabels(x_labels)
 
-        return fig, ax, bars, title_text_obj, footer_text_obj
+        plot_data = (x_values, y_values)
+        return fig, ax, bars, scatter_plots, title_text_obj, footer_text_obj, plot_data
 
 
     @classmethod
@@ -825,13 +849,14 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
         if title_modifier:
             title = title_modifier(title)
 
-        fig, ax, bars, title_text_obj, footer_text_obj = cls.create_bar_plot(x_labels, y_values, active_context, ylabel, title)
+        fig, ax, bars, scatter_plots, title_text_obj, footer_text_obj, plot_data = cls.create_bar_plot(x_labels, y_values, active_context, ylabel, title)
 
         if not defer_show:
             plt.show()
 
         return MatplotlibRenderPlots(name=fig_name, figures=[fig], axes=[ax], context=active_context,
-                                    plot_objects={'bars': bars, 'text_objects': {'title': title_text_obj, 'footer': footer_text_obj}})
+                                    plot_objects={'bars': bars, 'scatter_plots': scatter_plots, 'text_objects': {'title': title_text_obj, 'footer': footer_text_obj}},
+                                    plot_data=plot_data)
 
 
     @classmethod
@@ -841,8 +866,7 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
         assert active_context is not None
 
         x_labels = ['$L_x C$\t$\\theta_{\\Delta -}$', '$L_x C$\t$\\theta_{\\Delta +}$', '$S_x C$\t$\\theta_{\\Delta -}$', '$S_x C$\t$\\theta_{\\Delta +}$']
-        all_data_points = np.array([v[2] for v in Fig2_Laps_FR])
-
+        all_data_points = np.array([v.values for v in Fig2_Laps_FR])
         return cls.create_plot(x_labels, all_data_points, 'Laps Firing Rates (Hz)', 'Lap ($\\theta$)', 'fig_2_Theta_FR_matplotlib', active_context, defer_show, kwargs.get('title_modifier'))
 
 
@@ -853,7 +877,7 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
         assert active_context is not None
 
         x_labels = ['$L_x C$\t$R_{\\Delta -}$', '$L_x C$\t$R_{\\Delta +}$', '$S_x C$\t$R_{\\Delta -}$', '$S_x C$\t$R_{\\Delta +}$']
-        all_data_points = np.array([v[2] for v in Fig2_Replay_FR])
+        all_data_points = np.array([v.values for v in Fig2_Replay_FR])
 
         return cls.create_plot(x_labels, all_data_points, 'Replay Firing Rates (Hz)', 'Replay', 'fig_2_Replay_FR_matplotlib', active_context, defer_show, kwargs.get('title_modifier'))
 

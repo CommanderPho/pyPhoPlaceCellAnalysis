@@ -213,7 +213,7 @@ class LongShortTrackComputations(AllFunctionEnumeratingMixin, metaclass=Computat
 
     @function_attributes(short_name='_perform_long_short_decoding_analyses', tags=['long_short', 'short_long','replay', 'decoding', 'computation'], input_requires=[], output_provides=['global_computation_results.computed_data.long_short_leave_one_out_decoding_analysis'], uses=['_long_short_decoding_analysis_from_decoders'], used_by=[], creation_date='2023-05-10 15:10')
     def _perform_long_short_decoding_analyses(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, debug_print=False, decoding_time_bin_size=None, perform_cache_load=False, always_recompute_replays=False):
-        """ 
+        """ Performs decoding for replay epochs after ensuring that the long and short placefields are properly constrained to match one another.
         
         Requires:
             ['sess']
@@ -259,9 +259,9 @@ class LongShortTrackComputations(AllFunctionEnumeratingMixin, metaclass=Computat
 
             # 3m 40.3s
         else:
-            print(f'is_certain_properly_constrained: True - Correctly initialized pipelines (pfs limited to laps, decoders already long/short constrainted by default, replays already the estimated versions')
+            print(f'`is_certain_properly_constrained`: True - Correctly initialized pipelines (pfs limited to laps, decoders already long/short constrainted by default, replays already the estimated versions')
             if always_recompute_replays:
-               print(f'\t is_certain_properly_constrained IGNORES always_recompute_replays!')
+                print(f'\t `is_certain_properly_constrained` IGNORES always_recompute_replays!')
             long_epoch_name, short_epoch_name, global_epoch_name = owning_pipeline_reference.find_LongShortGlobal_epoch_names()
             long_session, short_session, global_session = [owning_pipeline_reference.filtered_sessions[an_epoch_name] for an_epoch_name in [long_epoch_name, short_epoch_name, global_epoch_name]]
             long_results, short_results, global_results = [owning_pipeline_reference.computation_results[an_epoch_name]['computed_data'] for an_epoch_name in [long_epoch_name, short_epoch_name, global_epoch_name]]
@@ -273,7 +273,7 @@ class LongShortTrackComputations(AllFunctionEnumeratingMixin, metaclass=Computat
         else:
             # check if decoding_time_bin_size is the same
             if not (decoding_time_bin_size == long_one_step_decoder_1D.time_bin_size):
-                print(f'decoding_time_bin_size different than decoder: decoding_time_bin_size: {decoding_time_bin_size}, long_one_step_decoder_1D.time_bin_size: {long_one_step_decoder_1D.time_bin_size}')
+                print(f'`decoding_time_bin_size` different than decoder: decoding_time_bin_size: {decoding_time_bin_size}, long_one_step_decoder_1D.time_bin_size: {long_one_step_decoder_1D.time_bin_size}')
                 raise NotImplementedError
                 # TODO: invalidate cached
                 perform_cache_load = False
