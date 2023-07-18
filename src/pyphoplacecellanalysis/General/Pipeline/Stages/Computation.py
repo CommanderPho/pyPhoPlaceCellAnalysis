@@ -444,12 +444,15 @@ class ComputedPipelineStage(LoadableInput, LoadableSessionInput, FilterablePipel
                     pass
 
             # Re-apply changes when done:
-            print(f'updating computation_results...')
+            if debug_print:
+                print(f'updating computation_results...')
             if are_global:
                 self.global_computation_results = active_computation_results
             else:
                 self.computation_results = active_computation_results
-            print(f'done.')
+            if debug_print:
+                print(f'done.')
+
 
 
     def perform_specific_computation(self, active_computation_params=None, enabled_filter_names=None, computation_functions_name_includelist=None, computation_kwargs_list=None, fail_on_exception:bool=False, debug_print=False):
