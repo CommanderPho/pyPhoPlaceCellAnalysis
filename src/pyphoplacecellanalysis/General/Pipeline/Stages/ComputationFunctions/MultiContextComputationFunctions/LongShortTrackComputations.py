@@ -672,8 +672,8 @@ class LongShortTrackComputations(AllFunctionEnumeratingMixin, metaclass=Computat
         assert (decoder_1D_LONG.neuron_IDs == decoder_1D_SHORT.neuron_IDs).all()
         assert not (decoder_1D_LONG.P_x == decoder_1D_SHORT.P_x).all() # the occupancies shouldn't be identical between the two encoders, this might indicate an error
         assert not (decoder_1D_LONG.F == decoder_1D_SHORT.F).all() # the placefields shouldn't be identical between the two encoders, this might indicate an error
-
-        print(f"returned_shape_tuple_LONG: {returned_shape_tuple_LONG}, returned_shape_tuple_SHORT: {returned_shape_tuple_SHORT}")
+        if debug_print:
+            print(f"returned_shape_tuple_LONG: {returned_shape_tuple_LONG}, returned_shape_tuple_SHORT: {returned_shape_tuple_SHORT}")
         assert (returned_shape_tuple_LONG[0] == returned_shape_tuple_SHORT[0]) and (returned_shape_tuple_LONG[-1] == returned_shape_tuple_SHORT[-1]) , f"returned_shape_tuple_LONG: {returned_shape_tuple_LONG}, returned_shape_tuple_SHORT: {returned_shape_tuple_SHORT}"
         num_neurons, num_timebins_in_epoch, num_total_flat_timebins = returned_shape_tuple_LONG # after the assert they're guaranteed to be the same for short
         # assert not np.array([(Flat_all_epochs_computed_expected_cell_num_spikes_LONG[i] == Flat_all_epochs_computed_expected_cell_num_spikes_SHORT[i]).all() for i in np.arange(active_filter_epochs.n_epochs)]).all(), "all expected number spikes for all cells should not be the same for two different decoders! This likely indicates an error!"
@@ -701,9 +701,9 @@ class LongShortTrackComputations(AllFunctionEnumeratingMixin, metaclass=Computat
         # np.mean(short_short_diff)
 
         # ttest_results = scipy.stats.ttest_rel(long_long_diff, short_short_diff)
-
-        print(f'long_test: {np.mean(long_long_diff)}')
-        print(f'short_test: {np.mean(short_short_diff)}')
+        if debug_print:
+            print(f'long_test: {np.mean(long_long_diff)}')
+            print(f'short_test: {np.mean(short_short_diff)}')
 
 
         ### 2023-05-25 - Radon Transform approach to finding line of best fit for each replay Epoch. Modifies the original: `long_results_obj`, `short_results_obj`, `curr_long_short_decoding_analyses`
@@ -1711,7 +1711,7 @@ def compute_measured_vs_expected_firing_rates(active_pos_df, active_filter_epoch
     return decoder_time_bin_centers, all_epochs_computed_expected_cell_num_spikes, all_epochs_computed_observed_from_expected_difference, measured_pos_window_centers, (all_epochs_decoded_epoch_time_bins_mean, all_epochs_computed_expected_cell_firing_rates_mean, all_epochs_computed_expected_cell_firing_rates_stddev, all_epochs_computed_observed_from_expected_difference_maximum)
 
 @function_attributes(short_name=None, tags=['measured_vs_expected', 'firing_rate'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-05-30 00:00', related_items=[])
-def simpler_compute_measured_vs_expected_firing_rates(active_pos_df, active_filter_epochs, a_decoder_1D: "BasePositionDecoder", a_decoder_result: "DecodedFilterEpochsResult"):
+def simpler_compute_measured_vs_expected_firing_rates(active_pos_df, active_filter_epochs, a_decoder_1D: "BasePositionDecoder", a_decoder_result: "DecodedFilterEpochsResult", debug_print:bool=False):
     """ 2023-05-30 - Goal is to compute the expected and measured firing rates for each cell for each epoch. 
             Attempting a smarter and more refined implementation.
     Want to be able to get a vector of firing rates (one for each cell) for an epoch i.
@@ -1736,7 +1736,8 @@ def simpler_compute_measured_vs_expected_firing_rates(active_pos_df, active_filt
     ragged_expected_firing_rates_arr = ak.Array(all_cells_decoded_expected_firing_rates_list) # awkward array
     num_timebins_in_epoch = ak.num(ragged_expected_firing_rates_arr, axis=1).to_numpy()
     num_total_flat_timebins: int = np.sum(num_timebins_in_epoch)
-    print(f'num_neurons: {num_neurons}, num_epochs: {num_epochs}, num_total_flat_timebins: {num_total_flat_timebins}')
+    if debug_print:
+        print(f'num_neurons: {num_neurons}, num_epochs: {num_epochs}, num_total_flat_timebins: {num_total_flat_timebins}')
 
     ragged_expected_num_spikes_arr = ragged_expected_firing_rates_arr * a_decoder_result.decoding_time_bin_size
     ragged_observed_from_expected_diff = ragged_expected_num_spikes_arr - ak.Array([v.T for v in a_decoder_result.spkcount])
