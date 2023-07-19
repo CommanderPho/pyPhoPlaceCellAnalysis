@@ -3,7 +3,7 @@ from pathlib import Path
 from typing import Callable
 import numpy as np
 from enum import unique # SessionBatchProgress
-import traceback # for stack trace formatting
+
 
 from attrs import define, Factory, fields
 
@@ -67,7 +67,28 @@ filters should be checkable to express whether we want to build that one or not
 
 @define(repr=None, slots=False)
 class SpecificComputationValidator:
-    """ This encapsulates the logic for testing if a computation already complete or needs to be completed, and calling the compute function if needed. """
+    """ This encapsulates the logic for testing if a computation already complete or needs to be completed, and calling the compute function if needed.
+
+    Usage:
+        ## Specify the computations and the requirements to validate them.
+        _comp_specifiers = [
+            SpecificComputationValidator(short_name='firing_rate_trends', computation_fn_name='_perform_firing_rate_trends_computation', validate_computation_test=lambda curr_active_pipeline: (curr_active_pipeline.computation_results[global_epoch_name].computed_data['firing_rate_trends'], curr_active_pipeline.computation_results[global_epoch_name].computed_data['extended_stats']['time_binned_position_df']), is_global=False),
+            SpecificComputationValidator(short_name='relative_entropy_analyses', computation_fn_name='_perform_time_dependent_pf_sequential_surprise_computation', validate_computation_test=lambda curr_active_pipeline: (np.sum(curr_active_pipeline.global_computation_results.computed_data['relative_entropy_analyses']['flat_relative_entropy_results'], axis=1), np.sum(curr_active_pipeline.global_computation_results.computed_data['relative_entropy_analyses']['flat_jensen_shannon_distance_results'], axis=1)), is_global=False),  # flat_surprise_across_all_positions
+            SpecificComputationValidator(short_name='jonathan_firing_rate_analysis', computation_fn_name='_perform_jonathan_replay_firing_rate_analyses', validate_computation_test=lambda curr_active_pipeline: curr_active_pipeline.global_computation_results.computed_data['jonathan_firing_rate_analysis']['neuron_replay_stats_df'], is_global=True),  # active_context
+            SpecificComputationValidator(short_name='short_long_pf_overlap_analyses', computation_fn_name='_perform_long_short_pf_overlap_analyses', validate_computation_test=lambda curr_active_pipeline: (curr_active_pipeline.global_computation_results.computed_data['short_long_pf_overlap_analyses']['relative_entropy_overlap_scalars_df'], curr_active_pipeline.global_computation_results.computed_data['short_long_pf_overlap_analyses']['relative_entropy_overlap_dict']), is_global=True),  # relative_entropy_overlap_scalars_df
+            SpecificComputationValidator(short_name='long_short_fr_indicies_analyses', computation_fn_name='_perform_long_short_firing_rate_analyses', validate_computation_test=lambda curr_active_pipeline: curr_active_pipeline.global_computation_results.computed_data['long_short_fr_indicies_analysis']['x_frs_index'], is_global=True),  # active_context
+            SpecificComputationValidator(short_name='long_short_decoding_analyses', computation_fn_name='_perform_long_short_decoding_analyses', validate_computation_test=lambda curr_active_pipeline: (curr_active_pipeline.global_computation_results.computed_data['long_short_leave_one_out_decoding_analysis'].long_results_obj, curr_active_pipeline.global_computation_results.computed_data['long_short_leave_one_out_decoding_analysis'].short_results_obj), is_global=True),
+            SpecificComputationValidator(short_name='long_short_post_decoding', computation_fn_name='_perform_long_short_post_decoding_analysis', validate_computation_test=lambda curr_active_pipeline: curr_active_pipeline.global_computation_results.computed_data['long_short_post_decoding'].rate_remapping.rr_df, is_global=True)
+        ]
+
+        for _comp_specifier in _comp_specifiers:
+            if (not _comp_specifier.is_global) or include_global_functions:
+                if _comp_specifier.short_name in include_includelist:
+                    newly_computed_values += _comp_specifier.try_computation_if_needed(curr_active_pipeline, on_already_computed_fn=_subfn_on_already_computed, fail_on_exception=fail_on_exception, progress_print=progress_print, debug_print=debug_print, force_recompute=force_recompute)
+
+
+
+    """
     short_name:str # 'long_short_post_decoding'
     computation_fn_name:str # '_perform_long_short_post_decoding_analysis'
     validate_computation_test:Callable
@@ -93,9 +114,11 @@ class SpecificComputationValidator:
                 on_already_computed_fn(comp_short_name)
                 
         except (AttributeError, KeyError) as e:
+
             if progress_print or debug_print:
                 print(f'{comp_short_name} missing.')
             if debug_print:
+                import traceback # for stack trace formatting
                 print(f'\t encountered error: {e}\n{traceback.format_exc()}\n.')
             if progress_print or debug_print:
                 print(f'\t Recomputing {comp_short_name}...')
@@ -267,7 +290,14 @@ def batch_load_session(global_data_root_parent_path, active_data_mode_name, base
 
     curr_active_pipeline.prepare_for_display(root_output_dir=global_data_root_parent_path.joinpath('Output'), should_smooth_maze=True) # TODO: pass a display config
 
-    curr_active_pipeline.save_pipeline(saving_mode=saving_mode)
+    try:
+        curr_active_pipeline.save_pipeline(saving_mode=saving_mode)
+    except Exception as e:
+        print(f'WARNING: Failed to save pipeline via `curr_active_pipeline.save_pipeline(...)` with error: {e}')
+        if fail_on_exception:
+            raise
+
+
     if not saving_mode.shouldSave:
         print(f'saving_mode.shouldSave == False, so not saving at the end of batch_load_session')
 
