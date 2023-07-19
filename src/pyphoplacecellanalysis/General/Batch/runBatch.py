@@ -851,12 +851,25 @@ class BatchSessionCompletionHandler:
         across_session_inst_fr_computation = InstantaneousSpikeRateGroupsComputation()
         across_session_inst_fr_computation.active_identifying_session_ctx = global_multi_session_context 
 
-        def _build_session_dep_aclu_identifier(session_context: IdentifyingContext, session_relative_aclus: np.ndarray):
-            """ kdiba_pin01_one_fet11-01_12-58-54_{aclu} """
-            return [f"{session_context}_{aclu}" for aclu in session_relative_aclus] # need very short version
+        all_contexts_list: List[IdentifyingContext] = list(across_sessions_instantaneous_fr_dict.keys())
+        assert len(all_contexts_list) > 0 # must have at least one element
+        first_context = all_contexts_list[0]
+        context_column_names = list(first_context.keys()) # ['format_name', 'animal', 'exper_name', 'session_name']
+        expanded_context_df = pd.DataFrame.from_records([a_ctx.as_tuple() for a_ctx in all_contexts_list], columns=context_column_names)
+        context_minimal_names = expanded_context_df.batch_results._build_minimal_session_identifiers_list()
+        # print(f"context_minimal_names: {context_minimal_names}")
+        assert len(context_minimal_names) == len(all_contexts_list)
 
-        
-        
+        context_minimal_names_map = dict(zip(all_contexts_list, context_minimal_names))
+        def _build_session_dep_aclu_identifier(session_context: IdentifyingContext, session_relative_aclus: np.ndarray):
+            """ kdiba_pin01_one_fet11-01_12-58-54_{aclu} 
+                with `context_minimal_names_map` - get tiny names like: a0s1, a0s2
+            Captures: `context_minimal_names_map`
+            """
+            # return [f"{session_context}_{aclu}" for aclu in session_relative_aclus] # need very short version
+            return [f"{context_minimal_names_map[session_context]}_{aclu}" for aclu in session_relative_aclus] # need very short version
+
+
         LxC_aclus = np.concatenate([_build_session_dep_aclu_identifier(k, v.LxC_aclus) for k, v in across_sessions_instantaneous_fr_dict.items()])
         SxC_aclus = np.concatenate([_build_session_dep_aclu_identifier(k, v.SxC_aclus) for k, v in across_sessions_instantaneous_fr_dict.items()])
 
