@@ -2,7 +2,7 @@ import sys
 import os
 import pathlib
 from pathlib import Path
-from typing import List, Optional, Union
+from typing import List, Dict, Optional, Union, Callable
 import numpy as np
 import pandas as pd
 from copy import deepcopy
@@ -119,47 +119,51 @@ class BatchRun:
 
 
     # Main functionality _________________________________________________________________________________________________ #
-    def execute_session(self, session_context, post_run_callback_fn=None, **kwargs):
+    def execute_session(self, session_context, **kwargs):
         """ calls `run_specific_batch(...)` to actually execute the session's run. """
         curr_session_status = self.session_batch_status[session_context]
-        enable_calling_completion_handler_for_previously_completed: bool = kwargs.get('allow_processing_previously_completed', False)
-        # print(f'enable_calling_completion_handler_for_previously_completed: {enable_calling_completion_handler_for_previously_completed}')
-        if (curr_session_status != SessionBatchProgress.COMPLETED) or enable_calling_completion_handler_for_previously_completed:
-                curr_session_basedir = self.session_batch_basedirs[session_context]
-                self.session_batch_status[session_context], self.session_batch_errors[session_context], self.session_batch_outputs[session_context] = run_specific_batch(self, session_context, curr_session_basedir, post_run_callback_fn=post_run_callback_fn, **kwargs)
-        else:
-            print(f'session {session_context} already completed.')
-
-    # def execute_all(self, **kwargs):
-    #     for curr_session_context, curr_session_status in self.session_batch_status.items():
-    #         self.execute_session(curr_session_context, **kwargs) # evaluate a single session
+        curr_session_basedir = self.session_batch_basedirs[session_context]
+        self.session_batch_status[session_context], self.session_batch_errors[session_context], self.session_batch_outputs[session_context] = run_specific_batch(self, session_context, curr_session_basedir, **kwargs)
 
 
     # TODO: NOTE: that `execute_session` is not called in mutliprocessing mode!
-    def execute_all(self, use_multiprocessing=True, num_processes=None, **kwargs):
+    def execute_all(self, use_multiprocessing=True, num_processes=None, included_session_contexts: Optional[List[IdentifyingContext]]=None, session_inclusion_filter:Optional[Callable]=None, **kwargs):
         """ ChatGPT's multiprocessing edition. """
+        if included_session_contexts is not None:
+            # use `included_session_contexts` list over the filter function.
+            assert session_inclusion_filter is None, f"You cannot provide both a `session_inclusion_filter` and a `included_session_contexts` list. Include one or the other."
+            # ready to go
+        else:
+            if session_inclusion_filter is None:
+                session_inclusion_filter = (lambda curr_session_context, curr_session_status: (curr_session_status != SessionBatchProgress.COMPLETED) or kwargs.get('allow_processing_previously_completed', False))
+            else:
+                # `session_inclusion_filter` was provided, make sure there is no list.
+                assert included_session_contexts is None, f"You cannot provide both a `session_inclusion_filter` and a `included_session_contexts` list. Include one or the other."
+            # either way now build the contexts list:
+            included_session_contexts: List[IdentifyingContext] = [curr_session_context for curr_session_context, curr_session_status in self.session_batch_status.items() if session_inclusion_filter(curr_session_context, curr_session_status)]
+
+        # Now `included_session_contexts` list should be good either way:
+        assert included_session_contexts is not None
+        assert isinstance(included_session_contexts, list)
+        # filter for inclusion here instead of in the loop:        
+        # a list of included_session_contexts:
+        # included_session_contexts: List[IdentifyingContext] = [curr_session_context for curr_session_context, curr_session_status in self.session_batch_status.items() if session_inclusion_filter(curr_session_context, curr_session_status)]
+
         if use_multiprocessing:
             if num_processes is None:
                 num_processes = multiprocessing.cpu_count()  # Use the number of available CPU cores
 
             pool = multiprocessing.Pool(processes=num_processes)
-
-            # results = []
             results = {} # dict form
-            for curr_session_context, curr_session_status in self.session_batch_status.items():
-                if (curr_session_status != SessionBatchProgress.COMPLETED) or kwargs.get('allow_processing_previously_completed', False):
-                    curr_session_basedir = self.session_batch_basedirs[curr_session_context]
-                    result = pool.apply_async(run_specific_batch, (self, curr_session_context, curr_session_basedir), kwargs) # it can actually take a callback too.
-                    # results.append(result) # list form
-                    results[curr_session_context] = result
-                else:
-                    print(f'session {curr_session_context} already completed.')
+            
+            for curr_session_context in included_session_contexts:
+                curr_session_basedir = self.session_batch_basedirs[curr_session_context]
+                result = pool.apply_async(run_specific_batch, (self, curr_session_context, curr_session_basedir), kwargs) # it can actually take a callback too.
+                results[curr_session_context] = result
 
             pool.close()
             pool.join()
 
-            # for result in results:
-            #     session_context, status, error, output = result.get()
             for session_context, result in results.items():
                 status, error, output = result.get()
                 self.session_batch_status[session_context] = status
@@ -167,7 +171,7 @@ class BatchRun:
                 self.session_batch_outputs[session_context] = output
         else:
             # No multiprocessing, fall back to the normal way.
-            for curr_session_context, curr_session_status in self.session_batch_status.items():
+            for curr_session_context in included_session_contexts:
                 self.execute_session(curr_session_context, **kwargs) # evaluate a single session
 
 
