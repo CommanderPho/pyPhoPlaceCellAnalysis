@@ -423,7 +423,7 @@ class AssigningEpochs:
 # 2023-07-14 - Paper Figure 1                                                                                          #
 # ==================================================================================================================== #
 @function_attributes(short_name=None, tags=['FIGURE1', 'figure'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-06-21 21:40', related_items=[])
-def PAPER_FIGURE_figure_1_add_replay_epoch_rasters(curr_active_pipeline, debug_print=True):
+def PAPER_FIGURE_figure_1_add_replay_epoch_rasters(curr_active_pipeline, debug_print=False):
     """ 
     
     # general approach copied from `pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.LongShortTrackComputations._epoch_unit_avg_firing_rates`

@@ -171,7 +171,8 @@ class DefaultDecoderDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Disp
         # Add in the desired display variable:
         active_identifying_ctx = active_display_fn_identifying_ctx.adding_context('filter_epochs', filter_epochs=filter_epochs) # filter_epochs: 'ripple'
         active_identifying_ctx_string = active_identifying_ctx.get_description(separator='|') # Get final discription string
-        print(f'active_identifying_ctx_string: "{active_identifying_ctx_string}"')
+        if kwargs.get('debug_print', False):
+            print(f'active_identifying_ctx_string: "{active_identifying_ctx_string}"')
         
         ## TODO: use active_display_fn_identifying_ctx to add it to the display function:
         

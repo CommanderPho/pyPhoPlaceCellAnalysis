@@ -198,7 +198,8 @@ class PaginatedFigureBaseController:
 
             final_context = active_identifying_ctx # Display/Variable context mode
             active_identifying_ctx_string = final_context.get_description(separator='|') # Get final discription string
-            print(f'active_identifying_ctx_string: "{active_identifying_ctx_string}"')
+            if kwargs.get('debug_print', False):
+                print(f'active_identifying_ctx_string: "{active_identifying_ctx_string}"')
             self.update_titles(active_identifying_ctx_string)
         else:
             active_identifying_ctx = None

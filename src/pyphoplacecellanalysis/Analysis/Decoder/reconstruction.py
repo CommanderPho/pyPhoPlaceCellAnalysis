@@ -177,7 +177,8 @@ class ZhangReconstructionImplementation:
         F_i = [np.reshape(f_i[i], (-1, 1)) for i in neuron_IDXs] # Convert each function to a column vector
         if debug_print:
             print(f'np.shape(F_i[i]): {np.shape(F_i[0])}') # (288, 1)
-        F = np.hstack(F_i) # Concatenate each individual F_i to produce F
+        # Concatenate each individual F_i to produce F
+        F = np.hstack(F_i) #@IgnoreException  
         if debug_print:
             print(f'np.shape(F): {np.shape(F)}') # (288, 40)
         P_x = np.reshape(pf.occupancy, (-1, 1)) # occupancy gives the P(x) in general.
