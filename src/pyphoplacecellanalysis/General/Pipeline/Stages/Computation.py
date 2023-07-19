@@ -940,16 +940,6 @@ class PipelineWithComputedPipelineStageMixin:
         return self.stage.get_computation_times(debug_print=debug_print)
     
 
-    # def get_daily_programmatic_session_output_path(self, debug_print=False) -> Path:
-    #     from pyphoplacecellanalysis.General.Mixins.ExportHelpers import create_daily_programmatic_display_function_testing_folder_if_needed, session_context_to_relative_path # for `perform_write_to_file`
-    #     active_identifying_session_ctx = self.get_session_context() # 'bapun_RatN_Day4_2019-10-15_11-30-06'
-    #     figures_parent_out_path = create_daily_programmatic_display_function_testing_folder_if_needed()
-    #     active_session_figures_out_path = session_context_to_relative_path(figures_parent_out_path, active_identifying_session_ctx)
-    #     if debug_print:
-    #         print(f'curr_session_parent_out_path: {active_session_figures_out_path}')
-    #     active_session_figures_out_path.mkdir(parents=True, exist_ok=True) # make folder if needed
-    #     return active_session_figures_out_path
-
     """ Global Computation Results Persistance: Loads/Saves out the `global_computation_results` which are not currently saved with the pipeline
     
     `self.global_computation_results_pickle_path`
@@ -967,8 +957,6 @@ class PipelineWithComputedPipelineStageMixin:
         else:
             special_designator_suffix = ""
         return special_designator_suffix
-
-
 
     @property
     def global_computation_results_pickle_path(self) -> Path:
@@ -996,7 +984,6 @@ class PipelineWithComputedPipelineStageMixin:
         print(f'global_computation_results_pickle_path: {global_computation_results_pickle_path}')
         saveData(global_computation_results_pickle_path, (self.global_computation_results.to_dict()))
         return global_computation_results_pickle_path
-
 
     def load_pickled_global_computation_results(self, override_global_computation_results_pickle_path=None):
         """ loads the previously pickled `global_computation_results` into `self.global_computation_results`, replacing the current values.

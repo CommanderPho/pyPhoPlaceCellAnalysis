@@ -437,9 +437,6 @@ class PipelineWithDisplayPipelineStageMixin:
         return curr_display_output
 
 
-    # def _pdf_display(self, display_function, active_session_configuration_context, **kwargs):
-    #     ## TODO:
-    
 
 # ==================================================================================================================== #
 # Figure Saving and Outputs                                                                                            #

@@ -6,6 +6,7 @@ import numpy as np
 import pandas as pd
 
 from neuropy.utils.result_context import IdentifyingContext
+from pyphoplacecellanalysis.GUI.Qt.Mixins.PaginationMixins import SelectionsObject
 
 # ==================================================================================================================== #
 # 2023-06-21 User Annotations                                                                      #
@@ -128,7 +129,7 @@ class UserAnnotationsManager:
         return was_annotation_found
 
     @staticmethod
-    def update_selections_from_annotations(saved_selection, user_anootations, debug_print=True):
+    def update_selections_from_annotations(saved_selection: SelectionsObject, user_anootations, debug_print=True):
         """ 
         
         saved_selection_L.is_selected
