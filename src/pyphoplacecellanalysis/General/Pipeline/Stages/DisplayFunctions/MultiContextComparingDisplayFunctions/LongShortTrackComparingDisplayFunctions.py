@@ -1145,6 +1145,24 @@ def _plot_pho_jonathan_batch_plot_single_cell(t_split, time_bins, unit_specific_
 
 
     """
+    # short_title_string = f'{aclu:02d}'
+
+    formatted_cell_label_string = (f"<size:22><weight:bold>{aclu:02d}</></>")
+    
+    # the index passed into `plot_1D_placecell_validation(...)` must be in terms of the `pf1D_all` ratemap that's provided. the `rdf_aclu_to_idx` does NOT work and will result in indexing errors
+    # pf1D_aclu_to_idx = {aclu:i for i, aclu in enumerate(pf1D_all.ratemap.neuron_ids)}
+
+    # Not sure if this is okay, but it's possible that the aclu isn't in the ratemap, in which case currently we'll just skip plotting?
+    cell_linear_fragile_IDX = pf1D_aclu_to_idx.get(aclu, None)
+    if cell_linear_fragile_IDX is None:
+        print(f'WARNING: aclu {aclu} is not present in the `pf1D_all` ratemaps. Which contain aclus: {pf1D_all.ratemap.neuron_ids}') #TODO 2023-07-07 20:55: - [ ] Note this is hit all the time, not sure what it's supposed to warn about
+    else:
+        cell_neuron_extended_ids = pf1D_all.ratemap.neuron_extended_ids[cell_linear_fragile_IDX]
+        # print(f'aclu: {aclu}, cell_neuron_extended_ids: {cell_neuron_extended_ids}')
+        subtitle_string = f'(shk <size:10><weight:bold>{cell_neuron_extended_ids.shank}</></>, clu <size:10><weight:bold>{cell_neuron_extended_ids.cluster}</></>)'
+        # print(f'\tsubtitle_string: {subtitle_string}')
+        formatted_cell_label_string = f'{formatted_cell_label_string}\n<size:9>{subtitle_string}</>'
+    
     # cell_linear_fragile_IDX = rdf_aclu_to_idx[aclu] # get the cell_linear_fragile_IDX from aclu
     # title_string = ' '.join(['pf1D', f'Cell {aclu:02d}'])
     # subtitle_string = ' '.join([f'{pf1D_all.config.str_for_display(False)}'])
@@ -1152,8 +1170,6 @@ def _plot_pho_jonathan_batch_plot_single_cell(t_split, time_bins, unit_specific_
     #     print(f'\t{title_string}\n\t{subtitle_string}')
     from pyphoplacecellanalysis.PhoPositionalData.plotting.placefield import plot_1D_placecell_validation
     
-    short_title_string = f'{aclu:02d}'
-
     # gridspec mode:
     curr_fig.set_facecolor('0.75')
 
@@ -1168,8 +1184,10 @@ def _plot_pho_jonathan_batch_plot_single_cell(t_split, time_bins, unit_specific_
     curr_ax_placefield = curr_fig.add_subplot(gs[1, -1], sharey=curr_ax_lap_spikes) # only the last element of the row
 
     # Setup the aclu number ("title axis"):
-    title_axes_kwargs = dict(ha="center", va="center", fontsize=22, color="black")
-    curr_ax_cell_label.text(0.5, 0.5, short_title_string, transform=curr_ax_cell_label.transAxes, **title_axes_kwargs)
+    # title_axes_kwargs = dict(ha="center", va="center", fontsize=22, color="black")
+    # curr_ax_cell_label.text(0.5, 0.5, short_title_string, transform=curr_ax_cell_label.transAxes, **title_axes_kwargs)
+    # flexitext version:
+    title_text_obj = flexitext(0.5, 0.5, formatted_cell_label_string, xycoords='axes fraction', ax=curr_ax_cell_label, ha="center", va="center")
     curr_ax_cell_label.axis('off')
 
     custom_replay_scatter_markers_plot_kwargs_list = kwargs.pop('custom_replay_scatter_markers_plot_kwargs_list', None)
@@ -1199,14 +1217,6 @@ def _plot_pho_jonathan_batch_plot_single_cell(t_split, time_bins, unit_specific_
 
 
     ## I think that `plot_1D_placecell_validation` is used to plot the little placefield on the right
-
-    # the index passed into plot_1D_placecell_validation(...) must be in terms of the pf1D_all ratemap that's provided. the rdf_aclu_to_idx does not work and will result in indexing errors
-    # pf1D_aclu_to_idx = {aclu:i for i, aclu in enumerate(pf1D_all.ratemap.neuron_ids)}
-
-    # Not sure if this is okay, but it's possible that the aclu isn't in the ratemap, in which case currently we'll just skip plotting?
-    cell_linear_fragile_IDX = pf1D_aclu_to_idx.get(aclu, None)
-    if cell_linear_fragile_IDX is None:
-        print(f'WARNING: aclu {aclu} is not present in the pf1D_all ratemaps. Which contain aclus: {pf1D_all.ratemap.neuron_ids}') #TODO 2023-07-07 20:55: - [ ] Note this is hit all the time, not sure what it's supposed to warn about
     _ = plot_1D_placecell_validation(pf1D_all, cell_linear_fragile_IDX, extant_fig=curr_fig, extant_axes=(curr_ax_lap_spikes, curr_ax_placefield),
             **({'should_include_labels': False, 'should_plot_spike_indicator_points_on_placefield': should_plot_spike_indicator_points_on_placefield, 
                 'should_plot_spike_indicator_lines_on_trajectory': False, 'spike_indicator_lines_alpha': 0.2,
