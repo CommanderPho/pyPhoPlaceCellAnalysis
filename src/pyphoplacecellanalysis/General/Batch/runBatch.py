@@ -615,7 +615,7 @@ class BatchSessionCompletionHandler:
         long_epoch_context, short_epoch_context, global_epoch_context = [curr_active_pipeline.filtered_contexts[a_name] for a_name in (long_epoch_name, short_epoch_name, global_epoch_name)]
         # assert long_epoch_context.filter_name == long_epoch_name, f"long_epoch_context.filter_name: {long_epoch_context.filter_name} != long_epoch_name: {long_epoch_name}"
         if long_epoch_context.filter_name != long_epoch_name:
-            print(f"WARNING: iltered_contexts[long_epoch_name]'s actual context name is incorrect. \n\tlong_epoch_context.filter_name: {long_epoch_context.filter_name} != long_epoch_name: {long_epoch_name}\n\tUpdating it. (THIS IS A HACK)")
+            print(f"WARNING: filtered_contexts[long_epoch_name]'s actual context name is incorrect. \n\tlong_epoch_context.filter_name: {long_epoch_context.filter_name} != long_epoch_name: {long_epoch_name}\n\tUpdating it. (THIS IS A HACK)")
             # fix it if broken
             long_epoch_context.filter_name = long_epoch_name
             was_updated = True
@@ -632,8 +632,8 @@ class BatchSessionCompletionHandler:
                 main_complete_figure_generations(curr_active_pipeline, enable_default_neptune_plots=enable_default_neptune_plots, save_figures_only=True, save_figure=True, )
                 
             # IF thst's done, clear all the plots:
-            from matplotlib import pyplot as plt
-            plt.close('all') # this takes care of the matplotlib-backed figures.
+            # from matplotlib import pyplot as plt
+            # plt.close('all') # this takes care of the matplotlib-backed figures.
             curr_active_pipeline.clear_display_outputs()
             curr_active_pipeline.clear_registered_output_files()
 
