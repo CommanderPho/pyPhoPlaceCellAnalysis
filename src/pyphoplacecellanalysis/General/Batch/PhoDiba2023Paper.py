@@ -495,7 +495,7 @@ def PAPER_FIGURE_figure_1_add_replay_epoch_rasters(curr_active_pipeline, debug_p
 
 
 @function_attributes(short_name=None, tags=['FINAL', 'publication', 'figure', 'combined'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-06-21 14:33', related_items=[])
-def PAPER_FIGURE_figure_1_full(curr_active_pipeline, defer_show=False, save_figure=True):
+def PAPER_FIGURE_figure_1_full(curr_active_pipeline, defer_show=False, save_figure=True, should_plot_pf1d_compare=True, should_plot_example_rasters=True, should_plot_stacked_epoch_slices=True, should_plot_pho_jonathan_figures=True):
     ## long_short_decoding_analyses:
     curr_long_short_decoding_analyses = curr_active_pipeline.global_computation_results.computed_data['long_short_leave_one_out_decoding_analysis']
     ## Extract variables from results object:
@@ -522,83 +522,92 @@ def PAPER_FIGURE_figure_1_full(curr_active_pipeline, defer_show=False, save_figu
     # ==================================================================================================================== #
     active_identifying_session_ctx = curr_active_pipeline.sess.get_context() # 'bapun_RatN_Day4_2019-10-15_11-30-06'
 
-    long_single_cell_pfmap_processing_fn = None
-    short_single_cell_pfmap_processing_fn = None
-    # sort_idx = None
-    # sort_idx = sort_ind
-    # sort_idx = sort_indicies
-    # sort_idx = new_all_aclus_sort_indicies
-    sort_idx = 'peak_long'
-    # sort_idx = 'bad'
+    if should_plot_pf1d_compare:
+        long_single_cell_pfmap_processing_fn = None
+        short_single_cell_pfmap_processing_fn = None
+        # sort_idx = None
+        # sort_idx = sort_ind
+        # sort_idx = sort_indicies
+        # sort_idx = new_all_aclus_sort_indicies
+        sort_idx = 'peak_long'
+        # sort_idx = 'bad'
 
-    pf1d_compare_graphics = curr_active_pipeline.display('_display_short_long_pf1D_comparison', active_identifying_session_ctx, single_figure=False, debug_print=False, fignum='Short v Long pf1D Comparison',
-                                    long_kwargs={'sortby': sort_idx, 'single_cell_pfmap_processing_fn': long_single_cell_pfmap_processing_fn},
-                                    short_kwargs={'sortby': sort_idx, 'single_cell_pfmap_processing_fn': short_single_cell_pfmap_processing_fn, 'curve_hatch_style': {'hatch':'///', 'edgecolor':'k'}},
-                                    shared_kwargs={'cmap': 'hsv'},
-                                    save_figure=save_figure,
-                                    defer_render=defer_show
-                                    )
-                                    
-
-    # ax = out.axes[0]
+        pf1d_compare_graphics = curr_active_pipeline.display('_display_short_long_pf1D_comparison', active_identifying_session_ctx, single_figure=False, debug_print=False, fignum='Short v Long pf1D Comparison',
+                                        long_kwargs={'sortby': sort_idx, 'single_cell_pfmap_processing_fn': long_single_cell_pfmap_processing_fn},
+                                        short_kwargs={'sortby': sort_idx, 'single_cell_pfmap_processing_fn': short_single_cell_pfmap_processing_fn, 'curve_hatch_style': {'hatch':'///', 'edgecolor':'k'}},
+                                        shared_kwargs={'cmap': 'hsv'},
+                                        save_figure=save_figure,
+                                        defer_render=defer_show
+                                        )
+                                        
+    else:
+        pf1d_compare_graphics = None
 
 
     # ==================================================================================================================== #
     # Show Example Replay Epochs containing the long or short only cells                                                                  #
     # ==================================================================================================================== #
+
     (epochs_df_L, epochs_df_S), (filter_epoch_spikes_df_L, filter_epoch_spikes_df_S), (good_example_epoch_indicies_L, good_example_epoch_indicies_S), (short_exclusive, long_exclusive, BOTH_subset, EITHER_subset, XOR_subset, NEITHER_subset), new_all_aclus_sort_indicies, assigning_epochs_obj = PAPER_FIGURE_figure_1_add_replay_epoch_rasters(curr_active_pipeline)
 
-    # unit_colors_list = None # default rainbow of colors for the raster plots
-    neuron_qcolors_list = [pg.mkColor('black') for aclu in EITHER_subset.track_exclusive_aclus] # solid green for all
-    unit_colors_list = DataSeriesColorHelpers.qColorsList_to_NDarray(neuron_qcolors_list, is_255_array=True)
 
-    # Copy and modify the colors for the cells that are long/short exclusive:
-    unit_colors_list_L = deepcopy(unit_colors_list)
-    is_L_exclusive = np.isin(EITHER_subset.track_exclusive_aclus, long_exclusive.track_exclusive_aclus) # get long exclusive
-    unit_colors_list_L[0, is_L_exclusive] = 255 # [1.0, 0.0, 0.0, 1.0]
-    unit_colors_list_L[1, is_L_exclusive] = 0.0
-    unit_colors_list_L[2, is_L_exclusive] = 0.0
-    
-    unit_colors_list_S = deepcopy(unit_colors_list)
-    is_S_exclusive = np.isin(EITHER_subset.track_exclusive_aclus, short_exclusive.track_exclusive_aclus) # get short exclusive
-    unit_colors_list_S[0, is_S_exclusive] = 0.0 # [1.0, 0.0, 0.0, 1.0]
-    unit_colors_list_S[1, is_S_exclusive] = 0.0
-    unit_colors_list_S[2, is_S_exclusive] = 255.0
-    
-    
-    ## Build scatterplot args:    
-    # Common Tick Label
-    vtick = pg.QtGui.QPainterPath()
+    if should_plot_example_rasters:
+        # unit_colors_list = None # default rainbow of colors for the raster plots
+        neuron_qcolors_list = [pg.mkColor('black') for aclu in EITHER_subset.track_exclusive_aclus] # solid green for all
+        unit_colors_list = DataSeriesColorHelpers.qColorsList_to_NDarray(neuron_qcolors_list, is_255_array=True)
 
-    # Thicker Tick Label:
-    tick_width = 0.25
-    # tick_width = 10.0
-    half_tick_width = 0.5 * tick_width
-    vtick.moveTo(-half_tick_width, -0.5)
-    vtick.addRect(-half_tick_width, -0.5, tick_width, 1.0) # x, y, width, height
-    pen = {'color': 'white', 'width': 1}
-    override_scatter_plot_kwargs = dict(pxMode=True, symbol=vtick, size=6, pen=pen)
+        # Copy and modify the colors for the cells that are long/short exclusive:
+        unit_colors_list_L = deepcopy(unit_colors_list)
+        is_L_exclusive = np.isin(EITHER_subset.track_exclusive_aclus, long_exclusive.track_exclusive_aclus) # get long exclusive
+        unit_colors_list_L[0, is_L_exclusive] = 255 # [1.0, 0.0, 0.0, 1.0]
+        unit_colors_list_L[1, is_L_exclusive] = 0.0
+        unit_colors_list_L[2, is_L_exclusive] = 0.0
+        
+        unit_colors_list_S = deepcopy(unit_colors_list)
+        is_S_exclusive = np.isin(EITHER_subset.track_exclusive_aclus, short_exclusive.track_exclusive_aclus) # get short exclusive
+        unit_colors_list_S[0, is_S_exclusive] = 0.0 # [1.0, 0.0, 0.0, 1.0]
+        unit_colors_list_S[1, is_S_exclusive] = 0.0
+        unit_colors_list_S[2, is_S_exclusive] = 255.0
+        
+        
+        ## Build scatterplot args:    
+        # Common Tick Label
+        vtick = pg.QtGui.QPainterPath()
 
-    # Not sure if needed:
-    # filter_epoch_spikes_df_L.spikes.rebuild_fragile_linear_neuron_IDXs()
+        # Thicker Tick Label:
+        tick_width = 0.25
+        # tick_width = 10.0
+        half_tick_width = 0.5 * tick_width
+        vtick.moveTo(-half_tick_width, -0.5)
+        vtick.addRect(-half_tick_width, -0.5, tick_width, 1.0) # x, y, width, height
+        pen = {'color': 'white', 'width': 1}
+        override_scatter_plot_kwargs = dict(pxMode=True, symbol=vtick, size=6, pen=pen)
 
-    example_epoch_rasters_L = plot_multiple_raster_plot(epochs_df_L, filter_epoch_spikes_df_L, included_neuron_ids=EITHER_subset.track_exclusive_aclus, unit_sort_order=new_all_aclus_sort_indicies, unit_colors_list=unit_colors_list_L, scatter_plot_kwargs=override_scatter_plot_kwargs,
-                                        epoch_id_key_name='replay_epoch_id', scatter_app_name="Long Decoded Example Replays", defer_show=defer_show,
-                                         active_context=curr_active_pipeline.build_display_context_for_session('plot_multiple_raster_plot', fig=1, track='long', epoch='example_replays'))
-    app_L, win_L, plots_L, plots_data_L = example_epoch_rasters_L
-    if save_figure:
-        curr_active_pipeline.output_figure(plots_data_L.active_context, win_L) 
+        # Not sure if needed:
+        # filter_epoch_spikes_df_L.spikes.rebuild_fragile_linear_neuron_IDXs()
 
-    example_epoch_rasters_S = plot_multiple_raster_plot(epochs_df_S, filter_epoch_spikes_df_S, included_neuron_ids=EITHER_subset.track_exclusive_aclus, unit_sort_order=new_all_aclus_sort_indicies, unit_colors_list=unit_colors_list_S, scatter_plot_kwargs=override_scatter_plot_kwargs,
-                                                                    epoch_id_key_name='replay_epoch_id', scatter_app_name="Short Decoded Example Replays", defer_show=defer_show,
-                                                                     active_context=curr_active_pipeline.build_display_context_for_session('plot_multiple_raster_plot', fig=1, track='short', epoch='example_replays'))
-    app_S, win_S, plots_S, plots_data_S = example_epoch_rasters_S
-    if save_figure:
-        curr_active_pipeline.output_figure(plots_data_S.active_context, win_S)
+        example_epoch_rasters_L = plot_multiple_raster_plot(epochs_df_L, filter_epoch_spikes_df_L, included_neuron_ids=EITHER_subset.track_exclusive_aclus, unit_sort_order=new_all_aclus_sort_indicies, unit_colors_list=unit_colors_list_L, scatter_plot_kwargs=override_scatter_plot_kwargs,
+                                            epoch_id_key_name='replay_epoch_id', scatter_app_name="Long Decoded Example Replays", defer_show=defer_show,
+                                            active_context=curr_active_pipeline.build_display_context_for_session('plot_multiple_raster_plot', fig=1, track='long', epoch='example_replays'))
+        app_L, win_L, plots_L, plots_data_L = example_epoch_rasters_L
+        if save_figure:
+            curr_active_pipeline.output_figure(plots_data_L.active_context, win_L) 
+
+        example_epoch_rasters_S = plot_multiple_raster_plot(epochs_df_S, filter_epoch_spikes_df_S, included_neuron_ids=EITHER_subset.track_exclusive_aclus, unit_sort_order=new_all_aclus_sort_indicies, unit_colors_list=unit_colors_list_S, scatter_plot_kwargs=override_scatter_plot_kwargs,
+                                                                        epoch_id_key_name='replay_epoch_id', scatter_app_name="Short Decoded Example Replays", defer_show=defer_show,
+                                                                        active_context=curr_active_pipeline.build_display_context_for_session('plot_multiple_raster_plot', fig=1, track='short', epoch='example_replays'))
+        app_S, win_S, plots_S, plots_data_S = example_epoch_rasters_S
+        if save_figure:
+            curr_active_pipeline.output_figure(plots_data_S.active_context, win_S)
+    else:
+        example_epoch_rasters_L, example_epoch_rasters_S = None, None
+        
 
     ## Stacked Epoch Plot: this is the slowest part of the figure by far as it renders in a scrollable pyqtgraph window.
-    example_stacked_epoch_graphics = curr_active_pipeline.display('_display_long_and_short_stacked_epoch_slices', defer_render=defer_show, save_figure=save_figure)
-
+    if should_plot_stacked_epoch_slices:
+        example_stacked_epoch_graphics = curr_active_pipeline.display('_display_long_and_short_stacked_epoch_slices', defer_render=defer_show, save_figure=save_figure)
+    else: 
+        example_stacked_epoch_graphics = None
 
 
     # ==================================================================================================================== #
@@ -609,9 +618,10 @@ def PAPER_FIGURE_figure_1_full(curr_active_pipeline, defer_show=False, save_figu
     curr_jonathan_firing_rate_analysis = curr_active_pipeline.global_computation_results.computed_data['jonathan_firing_rate_analysis']
     neuron_replay_stats_df, rdf, aclu_to_idx, irdf = curr_jonathan_firing_rate_analysis['neuron_replay_stats_df'], curr_jonathan_firing_rate_analysis['rdf']['rdf'], curr_jonathan_firing_rate_analysis['rdf']['aclu_to_idx'], curr_jonathan_firing_rate_analysis['irdf']['irdf']
 
-    fig_1c_figures_out_dict = BatchPhoJonathanFiguresHelper.run(curr_active_pipeline, neuron_replay_stats_df, included_unit_neuron_IDs=XOR_subset.track_exclusive_aclus, n_max_page_rows=20, write_vector_format=False, write_png=save_figure) # active_out_figures_dict: {IdentifyingContext<('kdiba', 'gor01', 'two', '2006-6-07_16-40-19', 'BatchPhoJonathanReplayFRC', 'long_only', '(12,21,48)')>: <Figure size 1920x660 with 12 Axes>, IdentifyingContext<('kdiba', 'gor01', 'two', '2006-6-07_16-40-19', 'BatchPhoJonathanReplayFRC', 'short_only', '(18,19,65)')>: <Figure size 1920x660 with 12 Axes>}
-    # print(f'fig_1c_figures_out_dict: {fig_1c_figures_out_dict}')
-
+    if should_plot_pho_jonathan_figures:
+        fig_1c_figures_out_dict = BatchPhoJonathanFiguresHelper.run(curr_active_pipeline, neuron_replay_stats_df, included_unit_neuron_IDs=XOR_subset.track_exclusive_aclus, n_max_page_rows=20, write_vector_format=False, write_png=save_figure) # active_out_figures_dict: {IdentifyingContext<('kdiba', 'gor01', 'two', '2006-6-07_16-40-19', 'BatchPhoJonathanReplayFRC', 'long_only', '(12,21,48)')>: <Figure size 1920x660 with 12 Axes>, IdentifyingContext<('kdiba', 'gor01', 'two', '2006-6-07_16-40-19', 'BatchPhoJonathanReplayFRC', 'short_only', '(18,19,65)')>: <Figure size 1920x660 with 12 Axes>}
+    else:
+        fig_1c_figures_out_dict = None
 
     return pf1d_compare_graphics, (example_epoch_rasters_L, example_epoch_rasters_S), example_stacked_epoch_graphics, fig_1c_figures_out_dict
 
