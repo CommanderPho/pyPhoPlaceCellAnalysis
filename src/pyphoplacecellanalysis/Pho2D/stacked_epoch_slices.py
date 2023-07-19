@@ -2,6 +2,8 @@ from copy import deepcopy
 import numpy as np
 import pandas as pd
 
+
+from pyphocorehelpers.indexing_helpers import safe_find_index_in_list
 from pyphocorehelpers.function_helpers import function_attributes
 from pyphocorehelpers.DataStructure.general_parameter_containers import VisualizationParameters, RenderPlotsData, RenderPlots
 from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer
@@ -9,7 +11,6 @@ import pyphoplacecellanalysis.External.pyqtgraph as pg
 
 import matplotlib.pyplot as plt # for stacked_epoch_slices_matplotlib_view(...)
 from mpl_toolkits.axes_grid1.inset_locator import inset_axes  # for stacked_epoch_slices_matplotlib_view(...)
-
 
 from pyphoplacecellanalysis.Pho2D.PyQtPlots.Extensions.pyqtgraph_helpers import build_scrollable_graphics_layout_widget_ui, build_scrollable_graphics_layout_widget_with_nested_viewbox_ui
 
@@ -598,7 +599,7 @@ class DecodedEpochSlicesPaginatedFigureController(PaginatedFigureController):
     ## Supposed to be the right callback:
     def on_selected_epochs_changed(self, event):
         ## Forward the click event to the `_out_pagination_controller.on_click` callback. This will update the `_out_pagination_controller.params.is_selected`
-        print(f'on_selected_epochs_changed(...)')
+        print(f'DecodedEpochSlicesPaginatedFigureController.on_selected_epochs_changed(...)')
         self.on_click(event=event)
         ## Determine the Epochs that have actually been selected so they can be saved/stored somehow:
         # selected_epoch_times = self.selected_epoch_times # returns an S x 2 array of epoch start/end times that are currently selected.
@@ -733,3 +734,55 @@ class DecodedEpochSlicesPaginatedFigureController(PaginatedFigureController):
         self.perform_update_titles_from_context(page_idx=page_idx, included_page_data_indicies=included_page_data_indicies) # , collision_prefix='_DecodedEpochSlices_plot_test_', display_fn_name='plot_single_epoch_slice', plot_result_set='shared'
         self.ui.mw.draw()
 
+    # ==================================================================================================================== #
+    # Interactive Selection Overrides                                                                                      #
+    # ==================================================================================================================== #
+    def on_click(self, event):
+        """ called when an axis is clicked to toggle the selection. """
+        print(f'DecodedEpochSlicesPaginatedFigureController.on_click(...) OVERRIDE:')
+        # Get the clicked Axes object
+        ax = event.inaxes
+        # Find the axes
+        found_index = safe_find_index_in_list(self.plots.axs, ax) # find the index on the page of the ax that was clicked
+        # print(f'{found_index = }')
+        current_page_idx = self.current_page_idx
+        curr_page_data_indicies = self.paginator.get_page_data(page_idx=current_page_idx)[0] # the [0] returns only the indicies and not the data
+        found_data_index = curr_page_data_indicies[found_index]
+        print(f'{current_page_idx = }, {found_data_index =}')
+        # Toggle the selection status of the clicked Axes
+        self.params.is_selected[found_data_index] = not self.params.is_selected.get(found_data_index, False) # if never set before, assume that it's not selected
+        ## Update visual apperance of axis:
+        self.perform_update_ax_selected_state(ax=ax, is_selected=self.params.is_selected[found_data_index])
+
+        # Redraw the figure to show the updated selection
+        # event.canvas.draw()
+        # event.canvas.draw_idle()
+
+
+    def perform_update_ax_selected_state(self, ax, is_selected: bool):
+        """ simply updates the visual appearance of the provided ax to indicate whether it's selected. """
+        print(f'DecodedEpochSlicesPaginatedFigureController.perform_update_ax_selected_state(...) OVERRIDE:')
+        # Set the face color of the clicked Axes based on its selection status
+        if is_selected:
+            ax.patch.set_facecolor('gray')
+        else:
+            ax.patch.set_facecolor('white')
+
+    def perform_update_selections(self, defer_render:bool=True):
+        """ called to update the selection when the page is changed or something else happens. """        
+        print(f'DecodedEpochSlicesPaginatedFigureController.perform_update_selections(...) OVERRIDE:')
+        current_page_idx = self.current_page_idx
+        curr_page_data_indicies = self.paginator.get_page_data(page_idx=current_page_idx)[0] # the [0] returns only the indicies and not the data
+        assert len(self.plots.axs) == len(curr_page_data_indicies), f"len(plots.axs): {len(self.plots.axs)}, len(curr_page_data_indicies): {len(curr_page_data_indicies)}"
+        for ax, found_data_idx in zip(self.plots.axs, list(curr_page_data_indicies)): # TODO: might fail for the last page?
+            # print(f'found_data_idx: {found_data_idx}')
+            # found_data_index = curr_page_data_indicies[found_index]
+            # print(f'{current_page_idx = }, {found_data_index =}')
+            is_selected = self.params.is_selected.get(found_data_idx, False)
+            self.perform_update_ax_selected_state(ax=ax, is_selected=is_selected)
+                
+        # Redraw the figure to show the updated selection
+        assert defer_render
+        if not defer_render:
+            self.plots.fig.canvas.draw_idle()
+            
