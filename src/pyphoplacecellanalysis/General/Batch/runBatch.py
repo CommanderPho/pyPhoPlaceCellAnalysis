@@ -489,6 +489,7 @@ class BatchResultDataframeAccessor():
         """ builds the optional output columns """
         self._build_output_files_list()
         self._build_ripple_result_path()
+        self._build_minimal_session_identifiers_list()
         ## TODO: append to the non-dataframe object?
         user_is_replay_good_annotations = UserAnnotationsManager.get_user_annotations()
         self._obj['has_user_replay_annotations'] = [(a_row_context.adding_context_if_missing(display_fn_name='DecodedEpochSlices',epochs='replays',decoder='long_results_obj',user_annotation='selections') in user_is_replay_good_annotations) for a_row_context in self._obj['context']]
@@ -554,6 +555,37 @@ class BatchResultDataframeAccessor():
         good_only_batch_progress_df['ripple_result_file'] = [str(v or '') for v in session_ripple_result_paths]
         return session_ripple_result_paths
         # global_computation_result_paths = [str(v.joinpath(f'output/global_computation_results.pkl').resolve()) for v in list(good_only_batch_progress_df.basedirs.values)]
+
+
+    def _build_minimal_session_identifiers_list(self):
+        """Build a list of the output files for the good sessions:
+        Adds Column: ['context_minimal_name']
+        
+        """
+        df = self._obj
+        # Extract unique values for each column
+        unique_format_names = df['format_name'].unique()
+        unique_animals = df['animal'].unique()
+        unique_exper_names = df['exper_name'].unique()
+        unique_session_names = df['session_name'].unique()
+
+        # Create mapping to shorthand notation for each column
+        format_name_mapping = {name: f'f{i}' for i, name in enumerate(unique_format_names)}
+        animal_mapping = {name: f'a{i}' for i, name in enumerate(unique_animals)}
+        exper_name_mapping = {name: f'e{i}' for i, name in enumerate(unique_exper_names)}
+        session_name_mapping = {name: f's{i}' for i, name in enumerate(unique_session_names)}
+
+        # Create a mapping for 'session_name' within each 'animal'
+        # animal_session_mapping = {animal: {session: f'{animal[0]}{i}s{j}' for j, session in enumerate(df[df['animal'] == animal]['session_name'].unique())} for i, animal in enumerate(df['animal'].unique())} # 'g0s0'
+        animal_session_mapping = {animal: {session: f'{animal_mapping[animal]}s{j}' for j, session in enumerate(df[df['animal'] == animal]['session_name'].unique())} for i, animal in enumerate(df['animal'].unique())} # 'g0s0'
+
+        # Replace original values with shorthand notation
+        for animal, session_mapping in animal_session_mapping.items():
+            # df.loc[df['animal'] == animal, 'session_name'] = df.loc[df['animal'] == animal, 'session_name'].replace(session_mapping)
+            df.loc[df['animal'] == animal, 'context_minimal_name'] = df.loc[df['animal'] == animal, 'session_name'].replace(session_mapping)
+
+        return df['context_minimal_name']
+        
 
 @define(slots=False)
 class BatchComputationProcessOptions:
@@ -819,8 +851,22 @@ class BatchSessionCompletionHandler:
         across_session_inst_fr_computation = InstantaneousSpikeRateGroupsComputation()
         across_session_inst_fr_computation.active_identifying_session_ctx = global_multi_session_context 
 
-        LxC_aclus = across_sessions_instantaneous_frs_list[0].LxC_aclus
-        SxC_aclus = across_sessions_instantaneous_frs_list[0].SxC_aclus
+        def _build_session_dep_aclu_identifier(session_context: IdentifyingContext, session_relative_aclus: np.ndarray):
+            """ kdiba_pin01_one_fet11-01_12-58-54_{aclu} """
+            return [f"{session_context}_{aclu}" for aclu in session_relative_aclus] # need very short version
+
+        
+        
+        LxC_aclus = np.concatenate([_build_session_dep_aclu_identifier(k, v.LxC_aclus) for k, v in across_sessions_instantaneous_fr_dict.items()])
+        SxC_aclus = np.concatenate([_build_session_dep_aclu_identifier(k, v.SxC_aclus) for k, v in across_sessions_instantaneous_fr_dict.items()])
+
+        across_session_inst_fr_computation.LxC_aclus = LxC_aclus
+        across_session_inst_fr_computation.SxC_aclus = SxC_aclus
+
+        # i = 0
+        # across_sessions_instantaneous_frs_list[i].LxC_aclus
+        # LxC_aclus = across_sessions_instantaneous_frs_list[0].LxC_ThetaDeltaPlus.LxC_aclus
+        # SxC_aclus = across_sessions_instantaneous_frs_list[0].LxC_ThetaDeltaPlus.SxC_aclus
 
         # Note that in general LxC and SxC might have differing numbers of cells.
         across_session_inst_fr_computation.Fig2_Laps_FR = [SingleBarResult(v.mean(), v.std(), v, LxC_aclus, SxC_aclus) for v in (np.concatenate([across_sessions_instantaneous_frs_list[i].LxC_ThetaDeltaMinus.cell_agg_inst_fr_list for i in np.arange(num_sessions)]),
