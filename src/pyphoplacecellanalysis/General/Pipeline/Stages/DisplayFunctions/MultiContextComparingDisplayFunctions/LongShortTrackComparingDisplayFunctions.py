@@ -42,7 +42,7 @@ from pyphoplacecellanalysis.General.Mixins.CrossComputationComparisonHelpers imp
 from pyphoplacecellanalysis.General.Mixins.CrossComputationComparisonHelpers import _build_neuron_type_distribution_color # used in _make_pho_jonathan_batch_plots
 from pyphocorehelpers.DataStructure.enum_helpers import ExtendedEnum # for PlacefieldOverlapMetricMode
 from pyphoplacecellanalysis.PhoPositionalData.plotting.placefield import plot_1D_placecell_validation # for _plot_pho_jonathan_batch_plot_single_cell
-from pyphoplacecellanalysis.Pho2D.matplotlib.AdvancedMatplotlibText import FormattedFigureText
+from neuropy.utils.matplotlib_helpers import FormattedFigureText
 
 
 @unique
