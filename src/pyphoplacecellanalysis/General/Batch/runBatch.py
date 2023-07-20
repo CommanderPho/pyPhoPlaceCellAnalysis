@@ -585,7 +585,17 @@ class BatchResultDataframeAccessor():
             df.loc[df['animal'] == animal, 'context_minimal_name'] = df.loc[df['animal'] == animal, 'session_name'].replace(session_mapping)
 
         return df['context_minimal_name']
-        
+
+
+    def export_csv(self, global_data_root_parent_path: Path, csv_batch_filename:str) -> Path:
+        # Export CSV:
+        # pickle path is: `global_batch_result_file_path`
+        csv_batch_filename = csv_batch_filename.replace('.pkl', '.csv')
+        global_batch_result_CSV_export_file_path = Path(global_data_root_parent_path).joinpath(csv_batch_filename).resolve() # Use Default
+        print(f'global_batch_result_CSV_export_file_path: {global_batch_result_CSV_export_file_path}')
+        self._obj.to_csv(global_batch_result_CSV_export_file_path)
+        return global_batch_result_CSV_export_file_path
+
 
 @define(slots=False)
 class BatchComputationProcessOptions:

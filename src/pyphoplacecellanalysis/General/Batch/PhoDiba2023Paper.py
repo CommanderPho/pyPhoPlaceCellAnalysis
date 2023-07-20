@@ -1167,7 +1167,7 @@ def main_complete_figure_generations(curr_active_pipeline, enable_default_neptun
     # # HELPERS: Interactive Components                                                                                      #
     # # ==================================================================================================================== #
     # from neuropy.utils.matplotlib_helpers import interactive_select_grid_bin_bounds_2D
-    # # fig, ax, rect_selector, set_extents = interactive_select_grid_bin_bounds_2D(curr_active_pipeline, epoch_name='maze', should_block_for_input=True)
+    # # fig, ax, rect_selector, set_extents, reset_extents = interactive_select_grid_bin_bounds_2D(curr_active_pipeline, epoch_name='maze', should_block_for_input=True)
 
     # grid_bin_bounds = interactive_select_grid_bin_bounds_2D(curr_active_pipeline, epoch_name='maze', should_block_for_input=True, should_apply_updates_to_pipeline=False)
     # print(f'grid_bin_bounds: {grid_bin_bounds}')
