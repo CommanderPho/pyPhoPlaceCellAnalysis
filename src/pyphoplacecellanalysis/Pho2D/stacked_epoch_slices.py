@@ -537,6 +537,9 @@ from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer
 from pyphoplacecellanalysis.External.pyqtgraph import QtCore
 from pyphoplacecellanalysis.GUI.Qt.Mixins.PaginationMixins import PaginatedFigureController
 
+from neuropy.core.user_annotations import UserAnnotationsManager # used in `interactive_good_epoch_selections`
+from pyphoplacecellanalysis.GUI.Qt.Mixins.PaginationMixins import SelectionsObject # used in `interactive_good_epoch_selections`
+
 
 class DecodedEpochSlicesPaginatedFigureController(PaginatedFigureController):
     """2023-05-09 - Aims to refactor `plot_paginated_decoded_epoch_slices`, a series of nested functions, into a stateful class
@@ -786,9 +789,6 @@ class DecodedEpochSlicesPaginatedFigureController(PaginatedFigureController):
         if not defer_render:
             self.plots.fig.canvas.draw_idle()
             
-
-from neuropy.core.user_annotations import UserAnnotationsManager
-from pyphoplacecellanalysis.GUI.Qt.Mixins.PaginationMixins import SelectionsObject
 
 
 def interactive_good_epoch_selections(annotations_man: UserAnnotationsManager, curr_active_pipeline) -> dict:

@@ -425,7 +425,7 @@ class AssigningEpochs:
 # 2023-07-14 - Paper Figure 1                                                                                          #
 # ==================================================================================================================== #
 @function_attributes(short_name=None, tags=['FIGURE1', 'figure'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-06-21 21:40', related_items=[])
-def PAPER_FIGURE_figure_1_add_replay_epoch_rasters(curr_active_pipeline, debug_print=False):
+def PAPER_FIGURE_figure_1_add_replay_epoch_rasters(curr_active_pipeline, allow_interactive_good_epochs_selection=False, debug_print=False):
     """ 
     
     # general approach copied from `pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.LongShortTrackComputations._epoch_unit_avg_firing_rates`
@@ -461,7 +461,7 @@ def PAPER_FIGURE_figure_1_add_replay_epoch_rasters(curr_active_pipeline, debug_p
     # filter_epochs_df['has_LONG_exclusive_aclu'] = [np.isin(epoch_spikes_unique_aclus, long_exclusive.track_exclusive_aclus).any() for epoch_spikes_unique_aclus in filter_epochs_df['active_unique_aclus']]
 
     # Get the manual user annotations to determine the good replays for both long/short decoding:
-    assigning_epochs_obj.filter_by_user_selections(curr_active_pipeline=curr_active_pipeline)
+    assigning_epochs_obj.filter_by_user_selections(curr_active_pipeline=curr_active_pipeline, allow_interactive_selection=allow_interactive_good_epochs_selection)
     
 
     #### Finally, get only the epochs that meet the criteria:
