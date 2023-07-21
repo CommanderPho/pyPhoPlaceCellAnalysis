@@ -489,7 +489,7 @@ class BatchResultDataframeAccessor():
         """ builds the optional output columns """
         self._build_output_files_list()
         self._build_ripple_result_path()
-        self._build_minimal_session_identifiers_list()
+        # self._build_minimal_session_identifiers_list()
         ## TODO: append to the non-dataframe object?
         user_is_replay_good_annotations = UserAnnotationsManager.get_user_annotations()
         self._obj['has_user_replay_annotations'] = [(a_row_context.adding_context_if_missing(display_fn_name='DecodedEpochSlices',epochs='replays',decoder='long_results_obj',user_annotation='selections') in user_is_replay_good_annotations) for a_row_context in self._obj['context']]
