@@ -60,12 +60,25 @@ class SelectionsObject(SubsettableDictRepresentable):
         saved_selection_L.is_selected
 
 
-        saved_selection_L = update_selections_from_annotations(saved_selection_L, user_anootations)
-        saved_selection_S = update_selections_from_annotations(saved_selection_S, user_anootations)
+        saved_selection_L = pagination_controller_L.save_selection()
+        saved_selection_S = pagination_controller_S.save_selection()
+
+        saved_selection_L.update_selections_from_annotations(user_annotations_dict=user_annotations)
+        saved_selection_S.update_selections_from_annotations(user_annotations_dict=user_annotations)
+                
         ## re-apply the selections:
         pagination_controller_L.restore_selections(saved_selection_L)
         pagination_controller_S.restore_selections(saved_selection_S)
 
+        History:
+        
+            Old Usage:
+                ## Capture current user selection
+                saved_selection_L = pagination_controller_L.save_selection()
+                saved_selection_S = pagination_controller_S.save_selection()
+
+                saved_selection_L = UserAnnotationsManager.update_selections_from_annotations(saved_selection_L, user_annotations)
+                saved_selection_S = UserAnnotationsManager.update_selections_from_annotations(saved_selection_S, user_annotations)
         """
         final_figure_context = self.figure_ctx
         was_annotation_found = False
