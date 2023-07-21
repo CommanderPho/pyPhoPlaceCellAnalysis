@@ -24,35 +24,67 @@ TypeError: super(type, obj): obj must be an instance or subtype of type
 
 @define(slots=False, eq=False)
 class SelectionsObject(SubsettableDictRepresentable):
-	global_epoch_start_t: float
-	global_epoch_end_t: float
-	variable_name: str
-	figure_ctx: "IdentifyingContext" = field(alias='active_identifying_figure_ctx')
+    global_epoch_start_t: float
+    global_epoch_end_t: float
+    variable_name: str
+    figure_ctx: "IdentifyingContext" = field(alias='active_identifying_figure_ctx')
 
-	flat_all_data_indicies: np.ndarray
-	is_selected: np.ndarray
-	epoch_labels: np.ndarray
+    flat_all_data_indicies: np.ndarray
+    is_selected: np.ndarray
+    epoch_labels: np.ndarray
 
-	@property
-	def selected_indicies(self):
-		"""The selected_indicies property."""
-		return self.flat_all_data_indicies[self.is_selected]
-	
-	def to_dataframe(self) -> pd.DataFrame:
-		# to dataframe:
-		dict_repr = self.to_dict()
-		selection_epochs_df = pd.DataFrame(dict_repr.subset(['epoch_labels', 'flat_all_data_indicies']))
-		selection_epochs_df['is_selected'] = dict_repr['is_selected'].values()
-		return selection_epochs_df
+    @property
+    def selected_indicies(self):
+        """The selected_indicies property."""
+        return self.flat_all_data_indicies[self.is_selected]
+    
+    def to_dataframe(self) -> pd.DataFrame:
+        # to dataframe:
+        dict_repr = self.to_dict()
+        selection_epochs_df = pd.DataFrame(dict_repr.subset(['epoch_labels', 'flat_all_data_indicies']))
+        selection_epochs_df['is_selected'] = dict_repr['is_selected'].values()
+        return selection_epochs_df
 
 
-	@classmethod
-	def init_from_visualization_params(cls, params: VisualizationParameters):
-		active_params_dict: benedict = benedict(params.to_dict())
-		active_params_dict = active_params_dict.subset(['global_epoch_start_t', 'global_epoch_end_t', 'variable_name', 'active_identifying_figure_ctx', 'flat_all_data_indicies', 'epoch_labels', 'is_selected'])
-		active_params_dict['is_selected'] = np.array(list(active_params_dict['is_selected'].values())) # dump the keys
-		return cls(**active_params_dict)
+    @classmethod
+    def init_from_visualization_params(cls, params: VisualizationParameters):
+        active_params_dict: benedict = benedict(params.to_dict())
+        active_params_dict = active_params_dict.subset(['global_epoch_start_t', 'global_epoch_end_t', 'variable_name', 'active_identifying_figure_ctx', 'flat_all_data_indicies', 'epoch_labels', 'is_selected'])
+        active_params_dict['is_selected'] = np.array(list(active_params_dict['is_selected'].values())) # dump the keys
+        return cls(**active_params_dict)
         
+
+    def update_selections_from_annotations(self, user_annotations_dict:dict, debug_print=True):
+        """ 
+
+        saved_selection_L.is_selected
+
+
+        saved_selection_L = update_selections_from_annotations(saved_selection_L, user_anootations)
+        saved_selection_S = update_selections_from_annotations(saved_selection_S, user_anootations)
+        ## re-apply the selections:
+        pagination_controller_L.restore_selections(saved_selection_L)
+        pagination_controller_S.restore_selections(saved_selection_S)
+
+        """
+        final_figure_context = self.figure_ctx
+        was_annotation_found = False
+        # try to find a matching user_annotation for the final_context_L
+        for a_ctx, selections_array in user_annotations_dict.items():
+            an_item_diff = a_ctx.diff(final_figure_context)
+            if debug_print:
+                print(an_item_diff)
+                print(f'\t{len(an_item_diff)}')
+            if an_item_diff == {('user_annotation', 'selections')}:
+                print(f'item found: {a_ctx}\nselections_array: {selections_array}')
+                was_annotation_found = True
+                self.is_selected = np.isin(self.flat_all_data_indicies, selections_array) # update the is_selected
+                break # done looking
+            
+            # print(IdentifyingContext.subtract(a_ctx, final_context_L))
+        if not was_annotation_found:
+            print(f'WARNING: no matching context found in {len(user_annotations_dict)} annotations. `saved_selection` will be returned unaltered.')
+        return self
 
 
 
@@ -246,7 +278,7 @@ class PaginatedFigureController(PaginatedFigureBaseController):
         - docking widgets in figures
         - from pyphoplacecellanalysis.GUI.Qt.PlaybackControls.Spike3DRasterBottomPlaybackControlBarWidget import Spike3DRasterBottomPlaybackControlBar, on_jump_left
         
-	Usage:
+    Usage:
     
     from pyphoplacecellanalysis.GUI.Qt.Mixins.PaginationMixins import PaginatedFigureController
         

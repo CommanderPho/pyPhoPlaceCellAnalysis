@@ -27,7 +27,7 @@ from pyphocorehelpers.mixins.serialized import SerializedAttributesAllowBlockSpe
 
 from neuropy.utils.result_context import IdentifyingContext
 from neuropy.utils.result_context import overwriting_display_context, providing_context
-from pyphoplacecellanalysis.General.Model.user_annotations import UserAnnotationsManager
+from neuropy.core.user_annotations import UserAnnotationsManager
 from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.SpikeRasters import plot_multiple_raster_plot
 from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.MultiContextComparingDisplayFunctions.LongShortTrackComparingDisplayFunctions import determine_long_short_pf1D_indicies_sort_by_peak
 from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.SpikeRasters import _prepare_spikes_df_from_filter_epochs
@@ -39,6 +39,7 @@ from neuropy.utils.matplotlib_helpers import FormattedFigureText
 
 from pyphoplacecellanalysis.General.Batch.NonInteractiveProcessing import batch_perform_all_plots, BatchPhoJonathanFiguresHelper
 from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.SpikeAnalysis import SpikeRateTrends
+from pyphoplacecellanalysis.Pho2D.stacked_epoch_slices import interactive_good_epoch_selections
 
 import pyphoplacecellanalysis.External.pyqtgraph as pg # pyqtgraph
 import matplotlib.pyplot as plt
@@ -259,7 +260,7 @@ class AssigningEpochs:
         except KeyError as e:
             if allow_interactive_selection:
                 print(f'user annotations <good replay selections> are not found. Creating them interactively...')
-                user_annotation_man.interactive_good_epoch_selections(curr_active_pipeline=curr_active_pipeline) # perform interactive selection. Should block here.
+                user_annotations = interactive_good_epoch_selections(annotations_man=user_annotation_man, curr_active_pipeline=curr_active_pipeline)  # perform interactive selection. Should block here.
                 selection_idxs_L = user_annotations[selections_context_L]
                 selection_idxs_S = user_annotations[selections_context_S]
             else:
