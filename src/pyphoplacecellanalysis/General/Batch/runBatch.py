@@ -130,13 +130,15 @@ class BatchRun:
     # TODO: NOTE: that `execute_session` is not called in mutliprocessing mode!
     def execute_all(self, use_multiprocessing=True, num_processes=None, included_session_contexts: Optional[List[IdentifyingContext]]=None, session_inclusion_filter:Optional[Callable]=None, **kwargs):
         """ ChatGPT's multiprocessing edition. """
+        allow_processing_previously_completed: bool = kwargs.pop('allow_processing_previously_completed', False)
+        
         if included_session_contexts is not None:
             # use `included_session_contexts` list over the filter function.
             assert session_inclusion_filter is None, f"You cannot provide both a `session_inclusion_filter` and a `included_session_contexts` list. Include one or the other."
             # ready to go
         else:
             if session_inclusion_filter is None:
-                session_inclusion_filter = (lambda curr_session_context, curr_session_status: (curr_session_status != SessionBatchProgress.COMPLETED) or kwargs.get('allow_processing_previously_completed', False))
+                session_inclusion_filter = (lambda curr_session_context, curr_session_status: (curr_session_status != SessionBatchProgress.COMPLETED) or allow_processing_previously_completed)
             else:
                 # `session_inclusion_filter` was provided, make sure there is no list.
                 assert included_session_contexts is None, f"You cannot provide both a `session_inclusion_filter` and a `included_session_contexts` list. Include one or the other."
@@ -146,6 +148,8 @@ class BatchRun:
         # Now `included_session_contexts` list should be good either way:
         assert included_session_contexts is not None
         assert isinstance(included_session_contexts, list)
+        print(f'Beginning processing with len(included_session_contexts): {len(included_session_contexts)}')        
+
         # filter for inclusion here instead of in the loop:        
         # a list of included_session_contexts:
         # included_session_contexts: List[IdentifyingContext] = [curr_session_context for curr_session_context, curr_session_status in self.session_batch_status.items() if session_inclusion_filter(curr_session_context, curr_session_status)]
@@ -561,7 +565,12 @@ class BatchResultDataframeAccessor():
         """Build a list of the output files for the good sessions:
         Adds Column: ['context_minimal_name']
         
+        
+        TODO: Critical: this 
+        #TODO 2023-07-20 21:23: - [ ] This needs to only be ran on a dataframe containing all of the sessions! If it's filtered at all, the session numbers will vary depending on how it's filtered!
+        
         """
+        
         df = self._obj
         # Extract unique values for each column
         unique_format_names = df['format_name'].unique()
