@@ -78,7 +78,7 @@ class DefaultRatemapDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Disp
         active_display_ctx = active_context.adding_context('display_fn', display_fn_name='plot_occupancy_1D')
         # active_display_ctx_string = active_display_ctx.get_description(separator='|')
         
-        display_outputs = computation_result.computed_data['pf1D'].plot_occupancy(**({} | kwargs))
+        display_outputs = computation_result.computed_data['pf1D'].plot_occupancy(active_context=active_display_ctx, **({} | kwargs))
         
         # plot_variable_name = ({'plot_variable': None} | kwargs)
         plot_variable_name = kwargs.get('plot_variable', enumTuningMap2DPlotVariables.OCCUPANCY).name
