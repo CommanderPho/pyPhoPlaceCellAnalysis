@@ -33,11 +33,6 @@ from pyphoplacecellanalysis.General.Batch.PhoDiba2023Paper import main_complete_
 from pyphoplacecellanalysis.General.Model.user_annotations import UserAnnotationsManager
 
 
-
-specific_session_override_dict = KDibaOldDataSessionFormatRegisteredClass._specific_session_override_dict
-specific_session_override_dict
-
-
 known_global_data_root_parent_paths = [Path(r'W:\Data'), Path(r'/media/MAX/Data'), Path(r'/Volumes/MoverNew/data'), Path(r'/home/halechr/turbo/Data'), Path(r'/nfs/turbo/umms-kdiba/Data')]
 
 def get_file_str_if_file_exists(v:Path)->str:
