@@ -33,6 +33,11 @@ from pyphoplacecellanalysis.General.Batch.PhoDiba2023Paper import main_complete_
 from pyphoplacecellanalysis.General.Model.user_annotations import UserAnnotationsManager
 
 
+
+specific_session_override_dict = KDibaOldDataSessionFormatRegisteredClass._specific_session_override_dict
+specific_session_override_dict
+
+
 known_global_data_root_parent_paths = [Path(r'W:\Data'), Path(r'/media/MAX/Data'), Path(r'/Volumes/MoverNew/data'), Path(r'/home/halechr/turbo/Data'), Path(r'/nfs/turbo/umms-kdiba/Data')]
 
 def get_file_str_if_file_exists(v:Path)->str:
@@ -497,6 +502,11 @@ class BatchResultDataframeAccessor():
         ## TODO: append to the non-dataframe object?
         user_is_replay_good_annotations = UserAnnotationsManager.get_user_annotations()
         self._obj['has_user_replay_annotations'] = [(a_row_context.adding_context_if_missing(display_fn_name='DecodedEpochSlices',epochs='replays',decoder='long_results_obj',user_annotation='selections') in user_is_replay_good_annotations) for a_row_context in self._obj['context']]
+
+        user_override_dict_annotations = UserAnnotationsManager.get_hardcoded_specific_session_override_dict()
+        ## Get specific grid_bin_bounds overrides from the `UserAnnotationsManager.get_hardcoded_specific_session_override_dict()`
+        self._obj['has_user_grid_bin_bounds_annotations'] = [(user_override_dict_annotations.get(a_row_context, {}).get('grid_bin_bounds', None) is not None) for a_row_context in self._obj['context']]
+        
 
         return self._obj
 
