@@ -820,7 +820,7 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
 
 
     @classmethod
-    def create_bar_plot(cls, x_labels, y_values, active_context, ylabel, title):
+    def create_bar_plot(cls, x_labels, y_values, scatter_props, active_context, ylabel, title):
         text_formatter = FormattedFigureText()
         x = np.arange(len(x_labels))
         width = 0.3
@@ -836,7 +836,7 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
 
         for i in range(len(x)):
             x_values = (x[i] + np.random.random(y_values[i].size) * width - width / 2)
-            scatter_plot = ax.scatter(x_values, y_values[i], color=cls.get_bar_colors()[i]) # the np.random part is to spread the points out along the x-axis within their bar so they're visible and don't overlap.
+            scatter_plot = ax.scatter(x_values, y_values[i], color=cls.get_bar_colors()[i], **scatter_props[i]) # the np.random part is to spread the points out along the x-axis within their bar so they're visible and don't overlap.
             scatter_plots.append(scatter_plot)
             x_values_list.append(x_values)
             
@@ -857,11 +857,11 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
 
 
     @classmethod
-    def create_plot(cls, x_labels, y_values, ylabel, title, fig_name, active_context, defer_show, title_modifier=None):
+    def create_plot(cls, x_labels, y_values, scatter_props, ylabel, title, fig_name, active_context, defer_show, title_modifier=None):
         if title_modifier:
             title = title_modifier(title)
 
-        fig, ax, bars, scatter_plots, title_text_obj, footer_text_obj, plot_data = cls.create_bar_plot(x_labels, y_values, active_context, ylabel, title)
+        fig, ax, bars, scatter_plots, title_text_obj, footer_text_obj, plot_data = cls.create_bar_plot(x_labels, y_values, scatter_props, active_context, ylabel, title)
 
         if not defer_show:
             plt.show()
@@ -879,7 +879,7 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
 
         x_labels = ['$L_x C$\t$\\theta_{\\Delta -}$', '$L_x C$\t$\\theta_{\\Delta +}$', '$S_x C$\t$\\theta_{\\Delta -}$', '$S_x C$\t$\\theta_{\\Delta +}$']
         all_data_points = np.array([v.values for v in Fig2_Laps_FR])
-        return cls.create_plot(x_labels, all_data_points, 'Laps Firing Rates (Hz)', 'Lap ($\\theta$)', 'fig_2_Theta_FR_matplotlib', active_context, defer_show, kwargs.get('title_modifier'))
+        return cls.create_plot(x_labels, all_data_points, kwargs.get('scatter_props', {}), 'Laps Firing Rates (Hz)', 'Lap ($\\theta$)', 'fig_2_Theta_FR_matplotlib', active_context, defer_show, kwargs.get('title_modifier'))
 
 
     @classmethod
@@ -891,7 +891,7 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
         x_labels = ['$L_x C$\t$R_{\\Delta -}$', '$L_x C$\t$R_{\\Delta +}$', '$S_x C$\t$R_{\\Delta -}$', '$S_x C$\t$R_{\\Delta +}$']
         all_data_points = np.array([v.values for v in Fig2_Replay_FR])
 
-        return cls.create_plot(x_labels, all_data_points, 'Replay Firing Rates (Hz)', 'Replay', 'fig_2_Replay_FR_matplotlib', active_context, defer_show, kwargs.get('title_modifier'))
+        return cls.create_plot(x_labels, all_data_points, kwargs.get('scatter_props', {}), 'Replay Firing Rates (Hz)', 'Replay', 'fig_2_Replay_FR_matplotlib', active_context, defer_show, kwargs.get('title_modifier'))
 
     @classmethod
     def add_optional_aclu_labels(cls, a_fig_container, LxC_aclus, SxC_aclus, enable_hover_labels=True, enable_tiny_point_labels=True):
@@ -974,7 +974,7 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
         _fig_2_replay_out = self.fig_2_Replay_FR_matplotlib(self.computation_result.Fig2_Replay_FR, defer_show=defer_show,
                                                             active_context=active_context, top_margin=top_margin,
                                                             left_margin=left_margin, bottom_margin=bottom_margin,
-                                                            title_modifier=title_modifier)
+                                                            title_modifier=title_modifier, scatter_props=kwargs.get('scatter_props', {}))
 
 
         if enable_hover_labels or enable_tiny_point_labels:
