@@ -559,7 +559,7 @@ class BatchResultDataframeAccessor():
 
 
     def _build_minimal_session_identifiers_list(self):
-        """Build a list of the output files for the good sessions:
+        """Build a list of short unique identifiers for the good sessions:
         Adds Column: ['context_minimal_name']
         
         

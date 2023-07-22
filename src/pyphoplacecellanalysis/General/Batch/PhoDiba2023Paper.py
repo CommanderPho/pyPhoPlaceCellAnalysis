@@ -1000,15 +1000,10 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
         # Merge the two (_fig_2_theta_out | _fig_2_replay_out)
         return (_fig_2_theta_out, _fig_2_replay_out)
 
-
     def perform_save(self, *args, **kwargs):
         """ used to save the figure without needing a hard reference to curr_active_pipeline """
         assert self._pipeline_file_callback_fn is not None
         return self._pipeline_file_callback_fn(*args, **kwargs) # call the saved callback
-
-
-        
-            
 
     @classmethod
     def serialized_key_blocklist(cls):
@@ -1056,12 +1051,11 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
 
 # 2023-07-21 - Across Sessions Aggregate Figure: __________________________________________________________________________________ #
 
-def across_sessions_bar_graphs(across_session_inst_fr_computation: Dict[IdentifyingContext, InstantaneousSpikeRateGroupsComputation]):
+def across_sessions_bar_graphs(across_session_inst_fr_computation: Dict[IdentifyingContext, InstantaneousSpikeRateGroupsComputation], num_sessions:int, **kwargs):
     ## Aggregate across all of the sessions to build a new combined `InstantaneousSpikeRateGroupsComputation`, which can be used to plot the "PaperFigureTwo", bar plots for many sessions.
 
-    num_sessions = len(across_sessions_instantaneous_fr_dict)
+    # num_sessions = len(across_sessions_instantaneous_fr_dict)
     print(f'num_sessions: {num_sessions}')
-
 
     global_multi_session_context = IdentifyingContext(format_name='kdiba', num_sessions=num_sessions) # some global context across all of the sessions, not sure what to put here.
 
@@ -1097,10 +1091,11 @@ def across_sessions_bar_graphs(across_session_inst_fr_computation: Dict[Identify
     # Showing
     restore_previous_matplotlib_settings_callback = matplotlib_configuration_update(is_interactive=True, backend='Qt5Agg')
     # Perform interactive Matplotlib operations with 'Qt5Agg' backend
-    _fig_2_theta_out, _fig_2_replay_out = _out_aggregate_fig_2.display(active_context=global_multi_session_context, title_modifier_fn=lambda original_title: f"{original_title} ({num_sessions} sessions)", save_figure=True)
+    _fig_2_theta_out, _fig_2_replay_out = _out_aggregate_fig_2.display(active_context=global_multi_session_context, title_modifier_fn=lambda original_title: f"{original_title} ({num_sessions} sessions)", save_figure=True, **kwargs)
         
     _out_aggregate_fig_2.perform_save()
 
+    global_multi_session_context, _out_aggregate_fig_2
 
 # ==================================================================================================================== #
 # 2023-06-26 Figure 3                                                                                                  #
