@@ -120,18 +120,11 @@ class BatchRun:
 
 
     # Main functionality _________________________________________________________________________________________________ #
-    def execute_session(self, session_context, **kwargs):
-        """ calls `run_specific_batch(...)` to actually execute the session's run. """
-        curr_session_status = self.session_batch_status[session_context]
-        curr_session_basedir = self.session_batch_basedirs[session_context]
-        self.session_batch_status[session_context], self.session_batch_errors[session_context], self.session_batch_outputs[session_context] = run_specific_batch(self, session_context, curr_session_basedir, **kwargs)
-
-
-    # TODO: NOTE: that `execute_session` is not called in mutliprocessing mode!
     def execute_all(self, use_multiprocessing=True, num_processes=None, included_session_contexts: Optional[List[IdentifyingContext]]=None, session_inclusion_filter:Optional[Callable]=None, **kwargs):
-        """ ChatGPT's multiprocessing edition. """
+        """ calls `run_specific_batch(...)` for each session context to actually execute the session's run. """
         allow_processing_previously_completed: bool = kwargs.pop('allow_processing_previously_completed', False)
         
+        # filter for inclusion here instead of in the loop:  
         if included_session_contexts is not None:
             # use `included_session_contexts` list over the filter function.
             assert session_inclusion_filter is None, f"You cannot provide both a `session_inclusion_filter` and a `included_session_contexts` list. Include one or the other."
@@ -149,10 +142,6 @@ class BatchRun:
         assert included_session_contexts is not None
         assert isinstance(included_session_contexts, list)
         print(f'Beginning processing with len(included_session_contexts): {len(included_session_contexts)}')        
-
-        # filter for inclusion here instead of in the loop:        
-        # a list of included_session_contexts:
-        # included_session_contexts: List[IdentifyingContext] = [curr_session_context for curr_session_context, curr_session_status in self.session_batch_status.items() if session_inclusion_filter(curr_session_context, curr_session_status)]
 
         if use_multiprocessing:
             if num_processes is None:
@@ -177,7 +166,10 @@ class BatchRun:
         else:
             # No multiprocessing, fall back to the normal way.
             for curr_session_context in included_session_contexts:
-                self.execute_session(curr_session_context, **kwargs) # evaluate a single session
+                # evaluate a single session
+                curr_session_status = self.session_batch_status[curr_session_context]
+                curr_session_basedir = self.session_batch_basedirs[curr_session_context]
+                self.session_batch_status[curr_session_context], self.session_batch_errors[curr_session_context], self.session_batch_outputs[curr_session_context] = run_specific_batch(self, curr_session_context, curr_session_basedir, **kwargs)
 
 
 
@@ -1027,10 +1019,8 @@ def run_specific_batch(active_batch_run: BatchRun, curr_session_context: Identif
     # epoch_name_includelist = ['maze']
     epoch_name_includelist = kwargs.pop('epoch_name_includelist', None)
     active_computation_functions_name_includelist = kwargs.pop('computation_functions_name_includelist', None) or ['_perform_baseline_placefield_computation',
-                                            # '_perform_time_dependent_placefield_computation', '_perform_extended_statistics_computation',
                                             '_perform_position_decoding_computation', 
                                             '_perform_firing_rate_trends_computation',
-                                            # '_perform_pf_find_ratemap_peaks_computation', '_perform_time_dependent_pf_sequential_surprise_computation' '_perform_two_step_position_decoding_computation', '_perform_recursive_latent_placefield_decoding'
                                         ]
     
     saving_mode = kwargs.pop('saving_mode', None) or PipelineSavingScheme.OVERWRITE_IN_PLACE
