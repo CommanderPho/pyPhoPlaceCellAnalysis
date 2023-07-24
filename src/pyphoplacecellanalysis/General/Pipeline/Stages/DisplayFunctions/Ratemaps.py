@@ -39,24 +39,26 @@ class DefaultRatemapDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Disp
     """ Functions related to visualizing Bayesian Decoder performance. """
     
     @function_attributes(short_name='1d_placefields', tags=['display', 'placefields', '1D', 'matplotlib'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-04-11 03:05')
-    def _display_1d_placefields(computation_result, active_config, owning_pipeline=None, active_context=None, **kwargs):
+    def _display_1d_placefields(computation_result, active_config, owning_pipeline=None, active_context=None, defer_display=False, **kwargs):
         assert active_context is not None
         assert owning_pipeline is not None
 
         ## Finally, add the display function to the active context
-        active_display_fn_identifying_ctx = active_context.adding_context('display_fn', display_fn_name='_display_1d_placefields')
+        active_display_fn_identifying_ctx = active_context.adding_context('display_fn', display_fn_name='1d_placefields') # using short name instead of full name here
         # _build_safe_kwargs
         ax_pf_1D = computation_result.computed_data['pf1D'].plot_ratemaps_1D(**kwargs)
         active_figure = plt.gcf()
         
         ## Setup the plot title and add the session information:
         session_identifier = computation_result.sess.get_description() # 'sess_bapun_RatN_Day4_2019-10-15_11-30-06'
-        fig_label = f'display_1d_placefields | {session_identifier} | {active_figure.number}'
+        fig_label = f'1d_placefields | {session_identifier} | {active_figure.number}'
         # print(f'fig_label: {fig_label}')
         active_figure.set_label(fig_label)
         active_figure.canvas.manager.set_window_title(fig_label) # sets the window's title
-        
-        active_figure.show()
+    
+        if not defer_display:
+            active_figure.show()
+    
         # active_pf_2D_figures = [active_figure]            
         
         # # Save the figure out to disk if we need to:
@@ -65,10 +67,49 @@ class DefaultRatemapDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Disp
         #     _save_displayed_figure_if_needed(active_config.plotting_config, plot_type_name='_display_2d_placefield_result_plot_ratemaps_2D', active_variant_name=plot_variable_name, active_figures=active_pf_2D_figures)
 
         # return dict(fig=active_figure, ax=ax_pf_1D)
-        return MatplotlibRenderPlots(figures=[active_figure], axes=[ax_pf_1D])   
+        return MatplotlibRenderPlots(figures=[active_figure], axes=[ax_pf_1D], context=active_display_fn_identifying_ctx)
+
+     
+    @function_attributes(short_name='1d_placefield_occupancy', tags=['display', 'placefields', '1D', 'occupancy', 'matplotlib'], input_requires=[], output_provides=[], uses=['PfND.plot_ratemaps_2D', 'neuropy.plotting.ratemaps.plot_ratemap_1D'], used_by=[], creation_date='2023-06-15 17:24')
+    def _display_1d_placefield_occupancy(computation_result, active_config, enable_saving_to_disk=False, active_context=None, **kwargs):
+        """ displays placefield occupancy in a MATPLOTLIB window 
+        """
+        assert active_context is not None
+        active_display_ctx = active_context.adding_context('display_fn', display_fn_name='plot_occupancy_1D')
+        # active_display_ctx_string = active_display_ctx.get_description(separator='|')
+        
+        display_outputs = computation_result.computed_data['pf1D'].plot_occupancy(active_context=active_display_ctx, **({} | kwargs))
+        
+        # plot_variable_name = ({'plot_variable': None} | kwargs)
+        plot_variable_name = kwargs.get('plot_variable', enumTuningMap2DPlotVariables.OCCUPANCY).name
+        active_display_ctx = active_display_ctx.adding_context(None, plot_variable=plot_variable_name)
+
+        active_figure = plt.gcf()
+        
+        # TODO 2023-06-02 - should drop the: 'computation_epochs', 'speed_thresh', 'frate_thresh', 'time_bin_size'
+        active_pf_computation_params = unwrap_placefield_computation_parameters(active_config.computation_config)
+        _display_add_computation_param_text_box(active_figure, active_pf_computation_params, subset_excludelist=['computation_epochs', 'speed_thresh', 'frate_thresh', 'time_bin_size','frateThresh'], override_float_precision=2) # Adds the parameters text.
+        
+        ## Setup the plot title and add the session information:
+        session_identifier = computation_result.sess.get_description() # 'sess_bapun_RatN_Day4_2019-10-15_11-30-06'
+        fig_label = f'{plot_variable_name} | occupancy_1D | {session_identifier} | {active_figure.number}'
+        # print(f'fig_label: {fig_label}')
+        active_figure.set_label(fig_label)
+        active_figure.canvas.manager.set_window_title(fig_label) # sets the window's title
+        
+        active_figures_list = [active_figure]
+        
+        # Save the figure out to disk if we need to:
+        should_save_to_disk = enable_saving_to_disk
+        if should_save_to_disk:
+            _save_displayed_figure_if_needed(active_config.plotting_config, plot_type_name='_display_1d_placefield_occupancy', active_variant_name=plot_variable_name, active_figures=active_figures_list)
+
+        return MatplotlibRenderPlots(figures=active_figures_list, axes=display_outputs[1], graphics=[], context=active_display_ctx)
+
+
 
     @function_attributes(short_name='2d_placefield_result_plot_ratemaps_2D', tags=['display', 'placefields', '2D', 'matplotlib'], input_requires=[], output_provides=[], uses=['PfND.plot_ratemaps_2D', 'neuropy.plotting.ratemaps.plot_ratemap_2D'], used_by=[], creation_date='2023-04-11 03:05')
-    def _display_2d_placefield_result_plot_ratemaps_2D(computation_result, active_config, enable_saving_to_disk=False, **kwargs):
+    def _display_2d_placefield_result_plot_ratemaps_2D(computation_result, active_config, enable_saving_to_disk=False, active_context=None, **kwargs):
         """ displays 2D placefields in a MATPLOTLIB window 
         
         Internally wraps `PfND.plot_ratemaps_2D` which itself wraps `neuropy.plotting.ratemaps.plot_ratemap_2D`
@@ -78,6 +119,9 @@ class DefaultRatemapDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Disp
         TODO: plot the information about the source of the data, such as the session information? Or perhaps we could just leave that encoded in the exported file name? It is hard to track the figures though
         
         """
+        assert active_context is not None
+        active_display_ctx = active_context.adding_context('display_fn', display_fn_name='_display_2d_placefield_result_plot_ratemaps_2D')
+        
         display_outputs = computation_result.computed_data['pf2D'].plot_ratemaps_2D(**({'subplots': (None, 3), 'resolution_multiplier': 1.0, 'enable_spike_overlay': False, 'brev_mode': PlotStringBrevityModeEnum.MINIMAL} | kwargs))
         
         # plot_variable_name = ({'plot_variable': None} | kwargs)
@@ -85,7 +129,9 @@ class DefaultRatemapDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Disp
         active_figure = plt.gcf()
         
         active_pf_computation_params = unwrap_placefield_computation_parameters(active_config.computation_config)
-        _display_add_computation_param_text_box(active_figure, active_pf_computation_params) # Adds the parameters text.
+        
+        
+        _display_add_computation_param_text_box(active_figure, active_pf_computation_params) # Adds the parameters text. #TODO 2023-06-13 11:10: - [ ] Fix how this renders at least for PDF output. It's too big and positioned poorly.
         
         ## Setup the plot title and add the session information:
         session_identifier = computation_result.sess.get_description() # 'sess_bapun_RatN_Day4_2019-10-15_11-30-06'
@@ -94,6 +140,11 @@ class DefaultRatemapDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Disp
         active_figure.set_label(fig_label)
         active_figure.canvas.manager.set_window_title(fig_label) # sets the window's title
         
+
+        # build final context:
+        active_display_ctx.adding_context(None, plot_variable=plot_variable_name) # TODO: enable adding other important info like the params and stuff.
+
+        
         active_pf_2D_figures = [active_figure]            
         
         # Save the figure out to disk if we need to:
@@ -101,8 +152,8 @@ class DefaultRatemapDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Disp
         if should_save_to_disk:
             _save_displayed_figure_if_needed(active_config.plotting_config, plot_type_name='_display_2d_placefield_result_plot_ratemaps_2D', active_variant_name=plot_variable_name, active_figures=active_pf_2D_figures)
         
-        # return active_pf_2D_figures
-        return MatplotlibRenderPlots(figures=active_pf_2D_figures, axes=display_outputs[1], graphics=display_outputs[2])
+        return MatplotlibRenderPlots(figures=active_pf_2D_figures, axes=display_outputs[1], graphics=display_outputs[2], context=active_display_ctx)
+    
 
     @function_attributes(short_name='2d_placefield_occupancy', tags=['display', 'placefields', '2D', 'occupancy', 'matplotlib'], input_requires=[], output_provides=[], uses=['PfND.plot_ratemaps_2D', 'neuropy.plotting.ratemaps.plot_ratemap_2D'], used_by=[], creation_date='2023-04-11 03:05')
     def _display_2d_placefield_occupancy(computation_result, active_config, enable_saving_to_disk=False, active_context=None, **kwargs):
@@ -116,34 +167,36 @@ class DefaultRatemapDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Disp
         
         """
         assert active_context is not None
-        active_identifying_sub_ctx = active_context.adding_context('display_fn', display_fn_name='plot_occupancy')
-        active_identifying_sub_ctx_string = active_identifying_sub_ctx.get_description(separator='|')
+        active_display_ctx = active_context.adding_context('display_fn', display_fn_name='plot_occupancy')
+        # active_display_ctx_string = active_display_ctx.get_description(separator='|')
         
         display_outputs = computation_result.computed_data['pf2D'].plot_occupancy(**({} | kwargs))
         
         # plot_variable_name = ({'plot_variable': None} | kwargs)
         plot_variable_name = kwargs.get('plot_variable', enumTuningMap2DPlotVariables.OCCUPANCY).name
+        active_display_ctx = active_display_ctx.adding_context(None, plot_variable=plot_variable_name)
+
         active_figure = plt.gcf()
         
-        # TODO 2023-06-02 - should drop the computation_epochs, speed_thresh
+        # TODO 2023-06-02 - should drop the: 'computation_epochs', 'speed_thresh', 'frate_thresh', 'time_bin_size'
         active_pf_computation_params = unwrap_placefield_computation_parameters(active_config.computation_config)
-        _display_add_computation_param_text_box(active_figure, active_pf_computation_params) # Adds the parameters text.
+        _display_add_computation_param_text_box(active_figure, active_pf_computation_params, subset_excludelist=['computation_epochs', 'speed_thresh', 'frate_thresh', 'time_bin_size','frateThresh'], override_float_precision=2) # Adds the parameters text.
         
         ## Setup the plot title and add the session information:
         session_identifier = computation_result.sess.get_description() # 'sess_bapun_RatN_Day4_2019-10-15_11-30-06'
-        fig_label = f'{plot_variable_name} | plot_occupancy_2D | {session_identifier} | {active_figure.number}'
+        fig_label = f'{plot_variable_name} | occupancy_2D | {session_identifier} | {active_figure.number}'
         # print(f'fig_label: {fig_label}')
         active_figure.set_label(fig_label)
         active_figure.canvas.manager.set_window_title(fig_label) # sets the window's title
         
-        active_pf_2D_figures = [active_figure]            
+        active_pf_2D_figures = [active_figure]
         
         # Save the figure out to disk if we need to:
         should_save_to_disk = enable_saving_to_disk
         if should_save_to_disk:
             _save_displayed_figure_if_needed(active_config.plotting_config, plot_type_name='_display_2d_placefield_occupancy', active_variant_name=plot_variable_name, active_figures=active_pf_2D_figures)
 
-        return MatplotlibRenderPlots(figures=active_pf_2D_figures, axes=display_outputs[1], graphics=[])
+        return MatplotlibRenderPlots(figures=active_pf_2D_figures, axes=display_outputs[1], graphics=[], context=active_display_ctx)
 
 
     @function_attributes(short_name='normal', tags=['display', 'placefields', '2D', 'matplotlib'], input_requires=[], output_provides=[], uses=['neuropy.plotting.placemaps.plot_all_placefields', 'neuropy.plotting.ratemaps.plot_ratemap_2D'], used_by=[], creation_date='2023-04-11 03:05')
@@ -162,10 +215,12 @@ class DefaultRatemapDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Disp
         # return occupancy_fig, active_pf_2D_figures
         return MatplotlibRenderPlots(figures=[occupancy_fig, active_pf_2D_figures])   
 
-    @function_attributes(short_name='placemaps_pyqtplot_2D', tags=['display', 'placefields', '2D', 'pyqtplot'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-04-11 03:05')
+    @function_attributes(short_name='placemaps_pyqtplot_2D', tags=['display', 'placefields', '2D', 'pyqtplot'], conforms_to=['context_returning'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-04-11 03:05')
     def _display_placemaps_pyqtplot_2D(computation_result, active_config, enable_saving_to_disk=False, active_context=None, defer_show:bool=False, **kwargs):
         """  displays 2D placefields in a pyqtgraph window
         """
+        #TODO 2023-06-13 19:54: - [ ] Update to conform_to: ['output_registering', 'figure_saving']
+
         # Get the decoders from the computation result:
         # active_one_step_decoder = computation_result.computed_data['pf2D_Decoder'] # doesn't actually require the Decoder, could just use computation_result.computed_data['pf2D']            
         # # Get flat list of images:
@@ -193,7 +248,7 @@ class DefaultRatemapDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Disp
         if not defer_show:
             out_all_pf_2D_pyqtgraph_binned_image_fig.show()
 
-        return PyqtgraphRenderPlots(parent_root_widget=out_all_pf_2D_pyqtgraph_binned_image_fig)
+        return PyqtgraphRenderPlots(parent_root_widget=out_all_pf_2D_pyqtgraph_binned_image_fig, context=active_context)
 
     @function_attributes(short_name='recurrsive_latent_placefield_comparisons', tags=['display', 'recurrsive', 'placefields', '2D', 'pyqtplot'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-04-11 03:05')
     def _display_recurrsive_latent_placefield_comparisons(computation_result, active_config, owning_pipeline_reference=None, enable_saving_to_disk=False, active_context=None, defer_show:bool=False, **kwargs):
@@ -266,7 +321,7 @@ class DefaultRatemapDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Disp
 
 
 
-def _plot_latent_recursive_pfs_depth_level(master_dock_win, active_decoder, active_identifying_ctx, active_dock_config=None, plot_ratemaps_2D_kwargs=None): # , recursive_depth = 1, recursive_depth_label = 'second'
+def _plot_latent_recursive_pfs_depth_level(master_dock_win, active_decoder, active_identifying_ctx, active_dock_config=None, plot_ratemaps_2D_kwargs=None, defer_render=False): # , recursive_depth = 1, recursive_depth_label = 'second'
     """ Used by _display_recurrsive_latent_placefield_comparisons to plot a single depth level of the latent recursive pf analysis.
 
     active_second_order_2D_decoder = active_recursive_latent_pf_2Ds[recursive_depth].get('pf2D_Decoder', None)
@@ -276,22 +331,23 @@ def _plot_latent_recursive_pfs_depth_level(master_dock_win, active_decoder, acti
     ## Nth Order:
     curr_out_items = {}
     ## Add the occupancy:
-    active_identifying_sub_ctx = active_identifying_ctx.adding_context('display_fn', display_fn_name='plot_occupancy')
-    active_identifying_sub_ctx_string = active_identifying_sub_ctx.get_description(separator='|')
+    active_display_ctx = active_identifying_ctx.adding_context('display_fn', display_fn_name='plot_occupancy')
+    active_display_ctx_string = active_display_ctx.get_description(separator='|')
     mw = CustomMatplotlibWidget(size=(15,15), dpi=72, constrained_layout=True, scrollable_figure=False) # , scrollAreaContents_MinimumHeight=params.all_plots_height
     subplot = mw.getFigure().add_subplot(111)
     active_decoder.pf.plot_occupancy(fig=mw.getFigure(), ax=subplot)
-    mw.show()
+    if not defer_render:
+        mw.show()
     ## Install the matplotlib-widget in the dock
     # dockAddLocationOpts = ['right', _last_dock_item] # position relative to the _last_dock_outer_nested_item for this figure
     dockAddLocationOpts = ['bottom']
-    _last_widget, _last_dock_item = master_dock_win.add_display_dock(identifier=active_identifying_sub_ctx_string, widget=mw, display_config=active_dock_config, dockSize=(10, 100), dockAddLocationOpts=dockAddLocationOpts)
-    curr_out_items[active_identifying_sub_ctx] = (mw, mw.getFigure(), subplot)
+    _last_widget, _last_dock_item = master_dock_win.add_display_dock(identifier=active_display_ctx_string, widget=mw, display_config=active_dock_config, dockSize=(10, 100), dockAddLocationOpts=dockAddLocationOpts)
+    curr_out_items[active_display_ctx] = (mw, mw.getFigure(), subplot)
     # mw.draw()
 
     ## Add the placemaps:
-    active_identifying_sub_ctx = active_identifying_ctx.adding_context('display_fn', display_fn_name='plot_ratemaps_2D')
-    active_identifying_sub_ctx_string = active_identifying_sub_ctx.get_description(separator='|')
+    active_display_ctx = active_identifying_ctx.adding_context('display_fn', display_fn_name='plot_ratemaps_2D')
+    active_display_ctx_string = active_display_ctx.get_description(separator='|')
     mw = CustomMatplotlibWidget(size=(15,15*4), dpi=72, scrollable_figure=False) # , constrained_layout=True, scrollAreaContents_MinimumHeight=params.all_plots_height
     if plot_ratemaps_2D_kwargs is None:
         plot_ratemaps_2D_kwargs = {} 
@@ -300,12 +356,13 @@ def _plot_latent_recursive_pfs_depth_level(master_dock_win, active_decoder, acti
     _out_plot_ratemaps = active_decoder.pf.plot_ratemaps_2D(fig=mw.getFigure(), **({'subplots': (None, 3), 'brev_mode': PlotStringBrevityModeEnum.NONE, 'plot_variable': enumTuningMap2DPlotVariables.TUNING_MAPS, 'bg_rendering_mode': BackgroundRenderingOptions.EMPTY} | plot_ratemaps_2D_kwargs)) # 5
 
     mw.getFigure().tight_layout() ## This actually fixes the tiny figure in the middle
-    mw.show()
+    if not defer_render:
+        mw.show()
     ## Install the matplotlib-widget in the dock
     # dockAddLocationOpts = ['bottom', _last_dock_item] # position relative to the _last_dock_outer_nested_item for this figure
     dockAddLocationOpts = ['bottom']
-    _last_widget, _last_dock_item = master_dock_win.add_display_dock(identifier=active_identifying_sub_ctx_string, widget=mw, display_config=active_dock_config, dockSize=(10, 400), dockAddLocationOpts=dockAddLocationOpts)
-    curr_out_items[active_identifying_sub_ctx] = (mw, mw.getFigure(), *_out_plot_ratemaps)
+    _last_widget, _last_dock_item = master_dock_win.add_display_dock(identifier=active_display_ctx_string, widget=mw, display_config=active_dock_config, dockSize=(10, 400), dockAddLocationOpts=dockAddLocationOpts)
+    curr_out_items[active_display_ctx] = (mw, mw.getFigure(), *_out_plot_ratemaps)
     mw.draw()
     return curr_out_items
 

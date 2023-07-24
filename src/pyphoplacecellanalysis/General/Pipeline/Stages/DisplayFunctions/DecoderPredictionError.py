@@ -136,7 +136,7 @@ class DefaultDecoderDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Disp
             axs[1].plot(active_time_window_variable, active_most_likely_positions_y, lw=1.0, color='#00ff7f99', alpha=0.6, label='2-step: most likely positions y') # (Num windows x 2)
             
     @function_attributes(short_name='decoded_epoch_slices', tags=['display', 'decoder', 'epoch','slices'], input_requires=[], output_provides=[], uses=['plot_decoded_epoch_slices', '_compute_specific_decoded_epochs', 'DefaultComputationFunctions._perform_specific_epochs_decoding'], used_by=[], creation_date='2023-03-23 15:49')
-    def _display_plot_decoded_epoch_slices(computation_result, active_config, active_context=None, filter_epochs='ripple', **kwargs):
+    def _display_plot_decoded_epoch_slices(computation_result, active_config, active_context=None, filter_epochs='ripple', included_epoch_indicies=None, **kwargs):
         """ renders a plot with the 1D Marginals either (x and y position axes): the computed posterior for the position from the Bayesian decoder and overlays the animal's actual position over the top. 
         
         TODO: This display function is currently atypically implemented as it performs computations as needed.
@@ -161,7 +161,7 @@ class DefaultDecoderDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Disp
         active_decoder = computation_result.computed_data['pf2D_Decoder']
         
         ## Actual plotting portion:
-        out_plot_tuple = plot_decoded_epoch_slices(active_filter_epochs, filter_epochs_decoder_result, global_pos_df=computation_result.sess.position.to_dataframe(), xbin=active_decoder.xbin,
+        out_plot_tuple = plot_decoded_epoch_slices(active_filter_epochs, filter_epochs_decoder_result, global_pos_df=computation_result.sess.position.to_dataframe(), xbin=active_decoder.xbin, included_epoch_indicies=included_epoch_indicies,
                                                                 **overriding_dict_with(lhs_dict={'name':default_figure_name, 'debug_test_max_num_slices':256, 'enable_flat_line_drawing':False, 'debug_print': False}, **kwargs))
         params, plots_data, plots, ui = out_plot_tuple
         
@@ -171,7 +171,8 @@ class DefaultDecoderDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Disp
         # Add in the desired display variable:
         active_identifying_ctx = active_display_fn_identifying_ctx.adding_context('filter_epochs', filter_epochs=filter_epochs) # filter_epochs: 'ripple'
         active_identifying_ctx_string = active_identifying_ctx.get_description(separator='|') # Get final discription string
-        print(f'active_identifying_ctx_string: "{active_identifying_ctx_string}"')
+        if kwargs.get('debug_print', False):
+            print(f'active_identifying_ctx_string: "{active_identifying_ctx_string}"')
         
         ## TODO: use active_display_fn_identifying_ctx to add it to the display function:
         
@@ -253,6 +254,8 @@ def plot_1D_most_likely_position_comparsions(measured_position_df, time_window_c
                                                         enable_flat_line_drawing=False, debug_print=False)
         fig.show()
             
+        
+    NOTES: `, animated=True` allows blitting to speed up updates in the future with only minor overhead if blitting isn't fully implemented.
             
     """
     with plt.ion():
@@ -263,9 +266,10 @@ def plot_1D_most_likely_position_comparsions(measured_position_df, time_window_c
             # fig = plt.gcf()
         
         # Actual Position Plots (red line):
-        ax.plot(measured_position_df['t'].to_numpy(), measured_position_df[variable_name].to_numpy(), label=f'measured {variable_name}', color='#ff000066', alpha=0.8, marker='+', markersize=4) # Opaque RED # , linestyle='dashed', linewidth=2, color='#ff0000ff'
+        ax.plot(measured_position_df['t'].to_numpy(), measured_position_df[variable_name].to_numpy(), label=f'measured {variable_name}', color='#ff000066', alpha=0.8, marker='+', markersize=4, animated=True) # Opaque RED # , linestyle='dashed', linewidth=2, color='#ff0000ff'
         ax.set_title(variable_name)
        
+        # Posterior distribution heatmap:
         if posterior is not None:
             # Compute extents for imshow:
             main_plot_kwargs = {
@@ -278,15 +282,15 @@ def plot_1D_most_likely_position_comparsions(measured_position_df, time_window_c
             }
                 
             # Posterior distribution heatmaps at each point.
-
             # X
             xmin, xmax, ymin, ymax = (time_window_centers[0], time_window_centers[-1], xbin[0], xbin[-1])           
             x_first_extent = (xmin, xmax, ymin, ymax)
             active_extent = x_first_extent
-            im_posterior_x = ax.imshow(posterior, extent=active_extent, **main_plot_kwargs)
+            im_posterior_x = ax.imshow(posterior, extent=active_extent, animated=True, **main_plot_kwargs)
             ax.set_xlim((xmin, xmax))
             ax.set_ylim((ymin, ymax))
 
+        # Most-likely Estimated Position Plots (grey line):
         if active_most_likely_positions_1D is not None:
             # Most likely position plots:
 
@@ -309,11 +313,11 @@ def plot_1D_most_likely_position_comparsions(measured_position_df, time_window_c
             else:
                 active_time_window_variable = time_window_centers
             
-            ax.plot(active_time_window_variable, active_most_likely_positions_1D, lw=1.0, color='gray', alpha=0.8, marker='+', markersize=6, label=f'1-step: most likely positions {variable_name}') # (Num windows x 2)
+            ax.plot(active_time_window_variable, active_most_likely_positions_1D, lw=1.0, color='gray', alpha=0.8, marker='+', markersize=6, label=f'1-step: most likely positions {variable_name}', animated=True) # (Num windows x 2)
             # ax.plot(active_time_window_variable, active_most_likely_positions_1D, lw=1.0, color='gray', alpha=0.4, label=f'1-step: most likely positions {variable_name}') # (Num windows x 2)
-            
-            
+        
         return fig, ax
+    
 
 def plot_most_likely_position_comparsions(pho_custom_decoder, position_df, axs=None, show_posterior=True, show_one_step_most_likely_positions_plots=True, enable_flat_line_drawing=True, debug_print=False):
     """ renders a 2D plot in MATPLOTLIB with separate subplots for the (x and y position axes): the computed posterior for the position from the Bayesian decoder and overlays the animal's actual position over the top.
@@ -539,12 +543,12 @@ def _subfn_update_decoded_epoch_slices(params, plots_data, plots, ui, debug_prin
 
 
 @function_attributes(short_name=None, tags=['epoch','slices','decoder','figure'], input_requires=[], output_provides=[], uses=['stacked_epoch_slices_matplotlib_build_view'], used_by=['_display_plot_decoded_epoch_slices'], creation_date='2023-05-08 16:31', related_items=[])
-def plot_decoded_epoch_slices(filter_epochs, filter_epochs_decoder_result, global_pos_df, variable_name:str='lin_pos', xbin=None, enable_flat_line_drawing=False, debug_test_max_num_slices=20, name='stacked_epoch_slices_matplotlib_subplots', debug_print=False):
+def plot_decoded_epoch_slices(filter_epochs, filter_epochs_decoder_result, global_pos_df, included_epoch_indicies=None, variable_name:str='lin_pos', xbin=None, enable_flat_line_drawing=False, debug_test_max_num_slices=20, name='stacked_epoch_slices_matplotlib_subplots', debug_print=False):
     """ plots the decoded epoch results in a stacked slices view 
     
     Parameters:
-    variable_name: str - the name of the column in the global_pos_df that contains the variable to plot. 
-
+        variable_name: str - the name of the column in the global_pos_df that contains the variable to plot. 
+        included_epoch_indicies: Optional[np.ndarray] - an optional list of epoch indicies to plot instead of all of them in filter_epochs. Uses `.filtered_by_epochs(...)` to filter the filter_epochs_decoder_result.
 
     Usage:    
         from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import plot_decoded_epoch_slices
@@ -590,6 +594,16 @@ def plot_decoded_epoch_slices(filter_epochs, filter_epochs_decoder_result, globa
     else:
         raise NotImplementedError
     
+    if included_epoch_indicies is not None:
+        # Allow specifying a subset of the epochs to be plotted
+        if not isinstance(included_epoch_indicies, np.ndarray):
+            included_epoch_indicies = np.array(included_epoch_indicies)
+            
+        # Filter the active filter epochs:
+        is_included_in_subset = np.isin(epochs_df.index, included_epoch_indicies)
+        epochs_df = epochs_df[is_included_in_subset]
+        filter_epochs_decoder_result = filter_epochs_decoder_result.filtered_by_epochs(included_epoch_indicies)
+
     # if 'label' not in epochs_df.columns:
     epochs_df['label'] = epochs_df.index.to_numpy() # integer ripple indexing
     epoch_slices = epochs_df[['start', 'stop']].to_numpy()
@@ -624,15 +638,21 @@ class RadonTransformPlotData:
     speed_text: str
 
 
-@function_attributes(short_name=None, tags=['epoch','slices','decoder','figure','paginated','output'], input_requires=[], output_provides=[], uses=['DecodedEpochSlicesPaginatedFigureController'], used_by=[], creation_date='2023-06-02 13:36')
-def plot_decoded_epoch_slices_paginated(curr_active_pipeline, curr_results_obj, display_context, save_figure=True):
+@function_attributes(short_name=None, tags=['epoch','slices','decoder','figure','paginated','output'], input_requires=[], output_provides=[], uses=['DecodedEpochSlicesPaginatedFigureController', 'add_inner_title', 'RadonTransformPlotData'], used_by=[], creation_date='2023-06-02 13:36')
+def plot_decoded_epoch_slices_paginated(curr_active_pipeline, curr_results_obj, display_context, included_epoch_indicies=None, save_figure=True):
     """ Plots a `DecodedEpochSlicesPaginatedFigureController`
 
         display_context is kinda mixed up, DecodedEpochSlicesPaginatedFigureController builds its own kind of display context but this isn't the one that we want for the file outputs usually.
 
     Usage:
         from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import plot_decoded_epoch_slices_paginated
+        
+        
+    
     """
+    #TODO 2023-06-21 14:58: - [ ] Need to be able to filter down to just a few epochs with a list
+        #TODO 2023-06-23 02:00: - [ ] Added `included_epoch_indicies` filtering of the epochs, but need to use this value to also filter the `epochs_linear_fit_df`, the `curr_results_obj.all_included_filter_epochs_decoder_result` which is used to get `.num_filter_epochs` and `.time_bin_containers[epoch_idx].centers` 
+
     from pyphoplacecellanalysis.Pho2D.stacked_epoch_slices import DecodedEpochSlicesPaginatedFigureController # `plot_decoded_epoch_slices_paginated`
     from neuropy.utils.matplotlib_helpers import add_inner_title # plot_decoded_epoch_slices_paginated
 
@@ -645,7 +665,7 @@ def plot_decoded_epoch_slices_paginated(curr_active_pipeline, curr_results_obj, 
     
     # active_identifying_session_ctx = curr_active_pipeline.sess.get_context()
     _out_pagination_controller = DecodedEpochSlicesPaginatedFigureController.init_from_decoder_data(curr_results_obj.active_filter_epochs, curr_results_obj.all_included_filter_epochs_decoder_result, 
-        xbin=curr_results_obj.original_1D_decoder.xbin, global_pos_df=global_session.position.df, a_name='TestDecodedEpochSlicesPaginationController', active_context=display_context,  max_subplots_per_page=200) # 10
+        xbin=curr_results_obj.original_1D_decoder.xbin, global_pos_df=global_session.position.df, a_name='TestDecodedEpochSlicesPaginationController', active_context=display_context,  max_subplots_per_page=200, included_epoch_indicies=included_epoch_indicies) # 10
     # _out_pagination_controller
 
     ### 2023-05-30 - Add the radon-transformed linear fits to each epoch to the stacked epoch plots:
@@ -714,13 +734,13 @@ def plot_decoded_epoch_slices_paginated(curr_active_pipeline, curr_results_obj, 
     _out_pagination_controller.on_paginator_control_widget_jump_to_page(0)
 
     # ## 2023-05-31 - Reference Output of matplotlib figure to file, along with building appropriate context.
-    # active_session_figures_out_path = curr_active_pipeline.get_daily_programmatic_session_output_path()
     final_context = _out_pagination_controller.params.active_identifying_figure_ctx | display_context
     # print(f'final_context: {final_context}')
     # active_out_figure_paths = perform_write_to_file(fig, final_context, figures_parent_out_path=active_session_figures_out_path, register_output_file_fn=curr_active_pipeline.register_output_file)
     if save_figure:
         fig = _out_pagination_controller.plots.fig # get the figure
-        active_out_figure_paths, final_context = curr_active_pipeline.write_figure_to_daily_programmatic_session_output_path(fig, final_context, debug_print=True)
+        # active_out_figure_paths, final_context = curr_active_pipeline.write_figure_to_daily_programmatic_session_output_path(fig, final_context, debug_print=True)
+        active_out_figure_paths = curr_active_pipeline.output_figure(final_context, fig, debug_print=True) 
     else:
         active_out_figure_paths = None
 
@@ -791,8 +811,6 @@ def plot_spike_count_and_firing_rate_normalizations(pho_custom_decoder, axs=None
 # from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import plot_most_likely_position_comparsions, plot_1D_most_likely_position_comparsions
 
 
-
-
 # ==================================================================================================================== #
 # Menu Commands                                                                                                        #
 # ==================================================================================================================== #
@@ -822,7 +840,6 @@ class CreateNewStackedDecodedEpochSlicesPlotCommand(BaseMenuCommand):
         self._display_output[_out_display_key] = _out_plot_tuple
         
 
-
 class AddNewDecodedPosition_MatplotlibPlotCommand(BaseMenuCommand):
     """ analagous to CreateNewDataExplorer_ipspikes_PlotterCommand, holds references to the variables needed to perform the entire action (such as the reference to the decoder) which aren't accessible during the building of the menus. """
     def __init__(self, spike_raster_window, curr_active_pipeline, active_config_name, display_output={}) -> None:
@@ -847,11 +864,9 @@ class AddNewDecodedPosition_MatplotlibPlotCommand(BaseMenuCommand):
         active_2d_plot.sync_matplotlib_render_plot_widget('MenuCommand_display_plot_marginal_1D_most_likely_position_comparisons') # Sync it with the active window:
         # print(f'\t AddNewDecodedPosition_MatplotlibPlotCommand.execute() is done.')
         
-        
 # ==================================================================================================================== #
 # Potentially Unused                                                                                                   #
 # ==================================================================================================================== #
-
         
 def _temp_debug_two_step_plots(active_one_step_decoder, active_two_step_decoder, variable_name='all_scaling_factors_k', override_variable_value=None):
     """ Handles plots using the plot command """
@@ -872,7 +887,6 @@ def _temp_debug_two_step_plots(active_one_step_decoder, active_two_step_decoder,
     plt.xlabel('time window')
     plt.ylabel(variable_name)
     plt.title(f'debug_two_step: variable_name={variable_name}')
-    
     
 def _temp_debug_two_step_plots_imshow(active_one_step_decoder, active_two_step_decoder, variable_name='p_x_given_n_and_x_prev', override_variable_value=None, timewindow: int=None):
     if override_variable_value is None:
@@ -909,8 +923,6 @@ def _temp_debug_two_step_plots_imshow(active_one_step_decoder, active_two_step_d
     plt.title(f'debug_two_step: {variable_name}')
     # return im_out
 
-    
-    
 # ==================================================================================================================== #
 # Functions for drawing the decoded position and the animal position as a callback                                     #
 # ==================================================================================================================== #
@@ -946,8 +958,6 @@ def _temp_debug_draw_predicted_position_difference(predicted_positions, measured
     fig.legend((predicted_line, measured_line), ('Predicted', 'Measured'), 'upper right')
     return {'ax':ax, 'predicted_line':predicted_line, 'measured_line':measured_line, 'active_arrow':active_arrow}
     # update function:
-    
-    
     
 def _temp_debug_draw_update_predicted_position_difference(predicted_positions, measured_positions, time_window, ax=None, predicted_line=None, measured_line=None, active_arrow=None):
     assert measured_line is not None, "measured_line is required!"

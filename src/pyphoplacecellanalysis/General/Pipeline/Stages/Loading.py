@@ -140,7 +140,7 @@ class LoadableSessionInput:
         self.sess.name = value
 
 
-@metadata_attributes(short_name=None, tags=['registered_output_files'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-05-24 09:00', related_items=[])
+@metadata_attributes(short_name=None, tags=['registered_output_files', 'output'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-05-24 09:00', related_items=[])
 class RegisteredOutputsMixin:
     """ Allow pipeline to register its outputs so they can be found/saved/moved, etc.  
     Internal Properties:

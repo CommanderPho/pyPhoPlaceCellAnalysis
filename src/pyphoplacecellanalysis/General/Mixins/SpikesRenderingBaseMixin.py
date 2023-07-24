@@ -5,6 +5,7 @@ import pandas as pd
 # from pyphoplacecellanalysis.PhoPositionalData.plotting.mixins.spikes_mixins import SpikesDataframeOwningMixin, SpikeRenderingMixin, HideShowSpikeRenderingMixin
 from pyphocorehelpers.indexing_helpers import safe_get
 from pyphocorehelpers.DataStructure.enum_helpers import OrderedEnum
+from pyphoplacecellanalysis.General.Mixins.DataSeriesColorHelpers import UnitColoringMode
 
 from qtpy import QtGui # for QColor
 
@@ -261,8 +262,7 @@ class SpikeRenderingBaseMixin:
         assert len(raster_plotter._unit_sort_order) == len(raster_plotter.fragile_linear_neuron_IDXs), f"len(raster_plotter._unit_sort_order): {len(raster_plotter._unit_sort_order)} must equal len(raster_plotter.fragile_linear_neuron_IDXs): {len(raster_plotter.fragile_linear_neuron_IDXs)} but it does not!"
         
         # Setup Coloring:
-        raster_plotter._setup_neurons_color_data(neuron_colors, coloring_mode='color_by_index_order')
+        raster_plotter._setup_neurons_color_data(neuron_colors, coloring_mode=UnitColoringMode.COLOR_BY_INDEX_ORDER)
         
-    
 
     

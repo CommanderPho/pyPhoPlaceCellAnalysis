@@ -2,6 +2,8 @@ from copy import deepcopy
 import numpy as np
 import pandas as pd
 
+
+from pyphocorehelpers.indexing_helpers import safe_find_index_in_list
 from pyphocorehelpers.function_helpers import function_attributes
 from pyphocorehelpers.DataStructure.general_parameter_containers import VisualizationParameters, RenderPlotsData, RenderPlots
 from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer
@@ -9,7 +11,6 @@ import pyphoplacecellanalysis.External.pyqtgraph as pg
 
 import matplotlib.pyplot as plt # for stacked_epoch_slices_matplotlib_view(...)
 from mpl_toolkits.axes_grid1.inset_locator import inset_axes  # for stacked_epoch_slices_matplotlib_view(...)
-
 
 from pyphoplacecellanalysis.Pho2D.PyQtPlots.Extensions.pyqtgraph_helpers import build_scrollable_graphics_layout_widget_ui, build_scrollable_graphics_layout_widget_with_nested_viewbox_ui
 
@@ -358,7 +359,7 @@ def _pagination_helper_plot_single_epoch_slice(curr_ax, params, plots_data, plot
 
 
 # Helper Figure/Plots Builders _______________________________________________________________________________________ #
-@function_attributes(short_name=None, tags=['epoch', 'stacked', 'matplotlib'], input_requires=[], output_provides=[], uses=['stacked_epoch_basic_setup', 'MatplotlibTimeSynchronizedWidget'], used_by=['plot_decoded_epoch_slices'], creation_date='2023-05-30 10:05', related_items=[])
+@function_attributes(short_name=None, tags=['epoch', 'stacked', 'matplotlib', 'TODO:PERFORMANCE'], input_requires=[], output_provides=[], uses=['stacked_epoch_basic_setup', 'MatplotlibTimeSynchronizedWidget'], used_by=['plot_decoded_epoch_slices'], creation_date='2023-05-30 10:05', related_items=[])
 def stacked_epoch_slices_matplotlib_build_view(epoch_slices, name='stacked_epoch_slices_matplotlib_subplots_laps', plot_function_name=None, epoch_labels=None, single_plot_fixed_height=100.0, debug_test_max_num_slices=127, debug_print=False):
     """ Builds a matplotlib figure view with empty subplots that can be plotted after the fact by iterating through plots.axs
         
@@ -409,7 +410,7 @@ def stacked_epoch_slices_matplotlib_build_view(epoch_slices, name='stacked_epoch
         _pagination_helper_plot_single_epoch_slice(curr_ax, params, plots_data, plots, ui, a_slice_idx=a_slice_idx, is_first_setup=True, debug_print=debug_print)
 
     ## Required only for MatplotlibTimeSynchronizedWidget-embedded version:
-    ui.mw.draw()
+    ui.mw.draw() #TODO 2023-07-06 15:08: - [ ] TODO: PERFORMANCE - uneeded-draw
     # ui.mw.ui.scrollAreaContentsWidget.setMinimumHeight(params.all_plots_height)
     ui.mw.show()
     
@@ -536,6 +537,9 @@ from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer
 from pyphoplacecellanalysis.External.pyqtgraph import QtCore
 from pyphoplacecellanalysis.GUI.Qt.Mixins.PaginationMixins import PaginatedFigureController
 
+from neuropy.core.user_annotations import UserAnnotationsManager # used in `interactive_good_epoch_selections`
+from pyphoplacecellanalysis.GUI.Qt.Mixins.PaginationMixins import SelectionsObject # used in `interactive_good_epoch_selections`
+
 
 class DecodedEpochSlicesPaginatedFigureController(PaginatedFigureController):
     """2023-05-09 - Aims to refactor `plot_paginated_decoded_epoch_slices`, a series of nested functions, into a stateful class
@@ -559,11 +563,12 @@ class DecodedEpochSlicesPaginatedFigureController(PaginatedFigureController):
     """
 
     @classmethod
-    def init_from_decoder_data(cls, active_filter_epochs, filter_epochs_decoder_result, xbin, global_pos_df, a_name:str = 'DecodedEpochSlicesPaginationController', active_context=None, max_subplots_per_page=20, debug_print=False):
+    def init_from_decoder_data(cls, active_filter_epochs, filter_epochs_decoder_result, xbin, global_pos_df, included_epoch_indicies=None, a_name:str = 'DecodedEpochSlicesPaginationController', active_context=None, max_subplots_per_page=20, debug_print=False):
         """ new version (replacing `plot_paginated_decoded_epoch_slices`) calls `plot_decoded_epoch_slices` which produces the state variables (params, plots_data, plots, ui), a new instance of this object type is then initialized with those variables and then updated with any specific properties. """
         from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import plot_decoded_epoch_slices #, _helper_update_decoded_single_epoch_slice_plot #, _subfn_update_decoded_epoch_slices
         
-        params, plots_data, plots, ui = plot_decoded_epoch_slices(deepcopy(active_filter_epochs), deepcopy(filter_epochs_decoder_result), global_pos_df=global_pos_df, variable_name='lin_pos', xbin=xbin,
+        
+        params, plots_data, plots, ui = plot_decoded_epoch_slices(deepcopy(active_filter_epochs), deepcopy(filter_epochs_decoder_result), global_pos_df=global_pos_df, variable_name='lin_pos', xbin=xbin, included_epoch_indicies=included_epoch_indicies,
                                                                 name=a_name, debug_print=False, debug_test_max_num_slices=max_subplots_per_page)
         # new_obj = cls(params=params, plots_data=plots_data, plots=plots, ui=ui)
 
@@ -597,7 +602,7 @@ class DecodedEpochSlicesPaginatedFigureController(PaginatedFigureController):
     ## Supposed to be the right callback:
     def on_selected_epochs_changed(self, event):
         ## Forward the click event to the `_out_pagination_controller.on_click` callback. This will update the `_out_pagination_controller.params.is_selected`
-        print(f'on_selected_epochs_changed(...)')
+        print(f'DecodedEpochSlicesPaginatedFigureController.on_selected_epochs_changed(...)')
         self.on_click(event=event)
         ## Determine the Epochs that have actually been selected so they can be saved/stored somehow:
         # selected_epoch_times = self.selected_epoch_times # returns an S x 2 array of epoch start/end times that are currently selected.
@@ -732,3 +737,106 @@ class DecodedEpochSlicesPaginatedFigureController(PaginatedFigureController):
         self.perform_update_titles_from_context(page_idx=page_idx, included_page_data_indicies=included_page_data_indicies) # , collision_prefix='_DecodedEpochSlices_plot_test_', display_fn_name='plot_single_epoch_slice', plot_result_set='shared'
         self.ui.mw.draw()
 
+    # ==================================================================================================================== #
+    # Interactive Selection Overrides                                                                                      #
+    # ==================================================================================================================== #
+    def on_click(self, event):
+        """ called when an axis is clicked to toggle the selection. """
+        print(f'DecodedEpochSlicesPaginatedFigureController.on_click(...) OVERRIDE:')
+        # Get the clicked Axes object
+        ax = event.inaxes
+        # Find the axes
+        found_index = safe_find_index_in_list(self.plots.axs, ax) # find the index on the page of the ax that was clicked
+        # print(f'{found_index = }')
+        current_page_idx = self.current_page_idx
+        curr_page_data_indicies = self.paginator.get_page_data(page_idx=current_page_idx)[0] # the [0] returns only the indicies and not the data
+        found_data_index = curr_page_data_indicies[found_index]
+        print(f'{current_page_idx = }, {found_data_index =}')
+        # Toggle the selection status of the clicked Axes
+        self.params.is_selected[found_data_index] = not self.params.is_selected.get(found_data_index, False) # if never set before, assume that it's not selected
+        ## Update visual apperance of axis:
+        self.perform_update_ax_selected_state(ax=ax, is_selected=self.params.is_selected[found_data_index])
+
+        # Redraw the figure to show the updated selection
+        # event.canvas.draw()
+        # event.canvas.draw_idle()
+
+
+    def perform_update_ax_selected_state(self, ax, is_selected: bool):
+        """ simply updates the visual appearance of the provided ax to indicate whether it's selected. """
+        print(f'DecodedEpochSlicesPaginatedFigureController.perform_update_ax_selected_state(...) OVERRIDE:')
+        # Set the face color of the clicked Axes based on its selection status
+        if is_selected:
+            ax.patch.set_facecolor('gray')
+        else:
+            ax.patch.set_facecolor('white')
+
+    def perform_update_selections(self, defer_render:bool=True):
+        """ called to update the selection when the page is changed or something else happens. """        
+        print(f'DecodedEpochSlicesPaginatedFigureController.perform_update_selections(...) OVERRIDE:')
+        current_page_idx = self.current_page_idx
+        curr_page_data_indicies = self.paginator.get_page_data(page_idx=current_page_idx)[0] # the [0] returns only the indicies and not the data
+        assert len(self.plots.axs) == len(curr_page_data_indicies), f"len(plots.axs): {len(self.plots.axs)}, len(curr_page_data_indicies): {len(curr_page_data_indicies)}"
+        for ax, found_data_idx in zip(self.plots.axs, list(curr_page_data_indicies)): # TODO: might fail for the last page?
+            # print(f'found_data_idx: {found_data_idx}')
+            # found_data_index = curr_page_data_indicies[found_index]
+            # print(f'{current_page_idx = }, {found_data_index =}')
+            is_selected = self.params.is_selected.get(found_data_idx, False)
+            self.perform_update_ax_selected_state(ax=ax, is_selected=is_selected)
+                
+        # Redraw the figure to show the updated selection
+        assert defer_render
+        if not defer_render:
+            self.plots.fig.canvas.draw_idle()
+            
+
+
+def interactive_good_epoch_selections(annotations_man: UserAnnotationsManager, curr_active_pipeline) -> dict:
+    """Allows the user to interactively select good epochs and generate hardcoded user_annotation entries from the results:
+    
+    Usage:
+        from pyphoplacecellanalysis.Pho2D.stacked_epoch_slices import interactive_good_epoch_selections
+        
+        user_annotation_man = UserAnnotationsManager()
+        user_annotations = user_annotation_man.get_user_annotations()
+        user_annotations = interactive_good_epoch_selections(annotations_man=user_annotation_man, curr_active_pipeline=curr_active_pipeline) # perform interactive selection. Should block here.
+        
+        
+    History:
+        Extracted from `UserAnnotationsManager.interactive_good_epoch_selections(...)
+        
+        Old usage:
+            user_annotation_man = UserAnnotationsManager()
+            user_annotations = user_annotation_man.get_user_annotations()
+            user_annotation_man.interactive_good_epoch_selections(curr_active_pipeline=curr_active_pipeline) # perform interactive selection. Should block here.
+    """
+    ## Stacked Epoch Plot
+    
+    # from pyphoplacecellanalysis.Pho2D.stacked_epoch_slices import DecodedEpochSlicesPaginatedFigureController
+
+
+    ## Stacked Epoch Plot
+    example_stacked_epoch_graphics = curr_active_pipeline.display('_display_long_and_short_stacked_epoch_slices', defer_render=False, save_figure=False)
+    pagination_controller_L, pagination_controller_S = example_stacked_epoch_graphics.plot_data['controllers']
+    ax_L, ax_S = example_stacked_epoch_graphics.axes
+    figure_context_L, figure_context_S = example_stacked_epoch_graphics.context
+
+
+    # user_annotations = UserAnnotationsManager.get_user_annotations()
+    user_annotations = annotations_man.get_user_annotations()
+
+    ## Capture current user selection
+    saved_selection_L: SelectionsObject = pagination_controller_L.save_selection()
+    saved_selection_S: SelectionsObject = pagination_controller_S.save_selection()
+    final_L_context = saved_selection_L.figure_ctx.adding_context_if_missing(user_annotation='selections')
+    final_S_context = saved_selection_S.figure_ctx.adding_context_if_missing(user_annotation='selections')
+    user_annotations[final_L_context] = saved_selection_L.flat_all_data_indicies[saved_selection_L.is_selected]
+    user_annotations[final_S_context] = saved_selection_S.flat_all_data_indicies[saved_selection_S.is_selected]
+    # Updates the context. Needs to generate the code.
+
+    ## Generate code to insert int user_annotations:
+    print('Add the following code to `pyphoplacecellanalysis.General.Model.user_annotations.UserAnnotationsManager.get_user_annotations()` function body:')
+    print(f"user_annotations[{final_L_context.get_initialization_code_string()}] = np.array({list(saved_selection_L.flat_all_data_indicies[saved_selection_L.is_selected])})")
+    print(f"user_annotations[{final_S_context.get_initialization_code_string()}] = np.array({list(saved_selection_S.flat_all_data_indicies[saved_selection_S.is_selected])})")
+
+    return user_annotations

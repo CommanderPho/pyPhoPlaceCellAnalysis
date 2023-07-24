@@ -177,7 +177,8 @@ class ZhangReconstructionImplementation:
         F_i = [np.reshape(f_i[i], (-1, 1)) for i in neuron_IDXs] # Convert each function to a column vector
         if debug_print:
             print(f'np.shape(F_i[i]): {np.shape(F_i[0])}') # (288, 1)
-        F = np.hstack(F_i) # Concatenate each individual F_i to produce F
+        # Concatenate each individual F_i to produce F
+        F = np.hstack(F_i) #@IgnoreException  
         if debug_print:
             print(f'np.shape(F): {np.shape(F)}') # (288, 40)
         P_x = np.reshape(pf.occupancy, (-1, 1)) # occupancy gives the P(x) in general.
@@ -385,18 +386,19 @@ class DecodedFilterEpochsResult(object):
         from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import DecodedFilterEpochsResult
 
     """
+    decoding_time_bin_size: float
+    num_filter_epochs: int # depends on the number of epochs
     most_likely_positions_list: list = field(metadata={'shape': ('n_epochs',)})
     p_x_given_n_list: list = field(metadata={'shape': ('n_epochs',)})
     marginal_x_list: list = field(metadata={'shape': ('n_epochs',)})
     marginal_y_list: list = field(metadata={'shape': ('n_epochs',)})
     most_likely_position_indicies_list: list = field(metadata={'shape': ('n_epochs',)})
     spkcount: list = field(metadata={'shape': ('n_epochs',)})
-    nbins: np.ndarray
+    nbins: np.ndarray = field(metadata={'shape': ('n_epochs',)}) # an array of the number of time bins in each epoch
     time_bin_containers: list = field(metadata={'shape': ('n_epochs',)})
-    decoding_time_bin_size: float
-    num_filter_epochs: int
-    time_bin_edges: list
-    epoch_description_list: list[str] = Factory(list)
+    time_bin_edges: list = field(metadata={'shape': ('n_epochs',)}) # depends on the number of epochs, one per epoch
+    epoch_description_list: list[str] = field(default=Factory(list), metadata={'shape': ('n_epochs',)}) # depends on the number of epochs, one for each
+    
 
     def flatten(self):
         """ flattens the result over all epochs to produce one per time bin """
@@ -408,6 +410,27 @@ class DecodedFilterEpochsResult(object):
         # TODO 2023-04-13 -can these squished similar way?: most_likely_positions_list, most_likely_position_indicies_list 
         return n_timebins, flat_time_bin_containers, timebins_p_x_given_n
 
+
+    def filtered_by_epochs(self, included_epoch_indicies):
+        """Returns a copy of itself with the fields with the n_epochs related metadata sliced by the included_epoch_indicies."""
+        subset = deepcopy(self)
+        original_num_filter_epochs = subset.num_filter_epochs
+        subset.most_likely_positions_list = [subset.most_likely_positions_list[i] for i in included_epoch_indicies]
+        subset.p_x_given_n_list = [subset.p_x_given_n_list[i] for i in included_epoch_indicies]
+        subset.marginal_x_list = [subset.marginal_x_list[i] for i in included_epoch_indicies]
+        subset.marginal_y_list = [subset.marginal_y_list[i] for i in included_epoch_indicies]
+        subset.most_likely_position_indicies_list = [subset.most_likely_position_indicies_list[i] for i in included_epoch_indicies]
+        subset.spkcount = [subset.spkcount[i] for i in included_epoch_indicies]
+        subset.nbins = subset.nbins[included_epoch_indicies] # can be subset because it's an ndarray
+        subset.time_bin_containers = [subset.time_bin_containers[i] for i in included_epoch_indicies]
+        subset.num_filter_epochs = len(included_epoch_indicies)
+        subset.time_bin_edges = [subset.time_bin_edges[i] for i in included_epoch_indicies]
+        if len(subset.epoch_description_list) == original_num_filter_epochs:
+            # sometimes epoch_description_list is empty and so it doesn't need to be subsetted.
+            subset.epoch_description_list = [subset.epoch_description_list[i] for i in included_epoch_indicies]
+            
+        # Only `decoding_time_bin_size` is unchanged
+        return subset
 # ==================================================================================================================== #
 # Placemap Position Decoders                                                                                           #
 # ==================================================================================================================== #
@@ -726,7 +749,7 @@ class BasePositionDecoder(NeuronUnitSlicableObjectProtocol):
             np.shape(F): (288, 40)
             np.shape(P_x): (288, 1)
         """
-        self.neuron_IDXs, self.neuron_IDs, f_i, F_i, self.F, self.P_x = ZhangReconstructionImplementation.build_concatenated_F(self.pf, debug_print=self.debug_print)
+        self.neuron_IDXs, self.neuron_IDs, f_i, F_i, self.F, self.P_x = ZhangReconstructionImplementation.build_concatenated_F(self.pf, debug_print=self.debug_print) # fails when `self.pf.ratemap.n_neurons == 0` aka `self.pf.ratemap.ndim == 0`
         if not isinstance(self.neuron_IDs, np.ndarray):
             self.neuron_IDs = np.array(self.neuron_IDs)
         if not isinstance(self.neuron_IDXs, np.ndarray):

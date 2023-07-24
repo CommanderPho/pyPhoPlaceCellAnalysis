@@ -96,7 +96,7 @@ class FlowchartNodePipelineHelpers:
             # for (name, filter_fcn) in all_filters.items():
             #     if 'maze' in name:
             #         maze_only_filters[name] = filter_fcn
-            # maze_only_filters = build_custom_epochs_filters(sess, epoch_name_whitelist=['maze1','maze2'])
+            # maze_only_filters = build_custom_epochs_filters(sess, epoch_name_includelist=['maze1','maze2'])
             # { key:value for (key,value) in dictOfNames.items() if key % 2 == 0}
             # dict(filter(lambda elem: len(elem[1]) == 6,dictOfNames.items()))
             # maze_only_name_filter_fn = lambda dict: dict(filter(lambda elem: 'maze' in elem[0], dict.items()))
@@ -104,7 +104,7 @@ class FlowchartNodePipelineHelpers:
             # print(f'callable(maze_only_name_filter_fn): {callable(maze_only_name_filter_fn)}')
             # print(maze_only_name_filter_fn(['pre', 'maze1', 'post1', 'maze2', 'post2']))
             # lambda elem: elem[0] % 2 == 0
-            maze_only_filters = build_custom_epochs_filters(sess, epoch_name_whitelist=maze_only_name_filter_fn)
+            maze_only_filters = build_custom_epochs_filters(sess, epoch_name_includelist=maze_only_name_filter_fn)
             # print(f'maze_only_filters: {maze_only_filters}')
             return maze_only_filters
 

@@ -10,7 +10,7 @@ from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import ZhangReconstr
 
 
 def _wrap_multi_context_computation_function(global_comp_fcn):
-    """ captures global_comp_fcn and unwraps its arguments: owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_whitelist=None, debug_print=False """
+    """ captures global_comp_fcn and unwraps its arguments: owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, debug_print=False """
     def _(x):
         assert len(x) > 4, f"{x}"
         x[1] = global_comp_fcn(*x) # update global_computation_results
@@ -25,7 +25,7 @@ class MultiContextComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Co
     _is_global = True
 
 
-    def _perform_PBE_stats_analyses(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_whitelist=None, debug_print=False):
+    def _perform_PBE_stats_analyses(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, debug_print=False):
         """ 
         
         Requires:
@@ -37,10 +37,10 @@ class MultiContextComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Co
                 ['PBE_stats_analyses']['all_epochs_info']
         
         """
-        if include_whitelist is None:
-            include_whitelist = owning_pipeline_reference.active_completed_computation_result_names # ['maze', 'sprinkle']
+        if include_includelist is None:
+            include_includelist = owning_pipeline_reference.active_completed_computation_result_names # ['maze', 'sprinkle']
         
-        pbe_analyses_result_df, all_epochs_info = _perform_PBE_stats(owning_pipeline_reference, include_whitelist=include_whitelist, debug_print=debug_print)
+        pbe_analyses_result_df, all_epochs_info = _perform_PBE_stats(owning_pipeline_reference, include_includelist=include_includelist, debug_print=debug_print)
 
         global_computation_results.computed_data['PBE_stats_analyses'] = DynamicParameters.init_from_dict({
             'pbe_analyses_result_df': pbe_analyses_result_df,
@@ -49,7 +49,7 @@ class MultiContextComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Co
         return global_computation_results
 
 
-    # def _perform_relative_entropy_analyses(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_whitelist=None, debug_print=False):
+    # def _perform_relative_entropy_analyses(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, debug_print=False):
     #     """ NOTE: 2022-12-14 - this mirrors the non-global version at `pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.ExtendedStats.ExtendedStatsComputations._perform_time_dependent_pf_sequential_surprise_computation` that I just modified except it only uses the global epoch.
         
     #     Requires:
@@ -65,11 +65,11 @@ class MultiContextComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Co
     #     # use_extant_pf1D_dt_mode = TimeDependentPlacefieldSurpriseMode.STATIC_METHOD_ONLY
     #     use_extant_pf1D_dt_mode = TimeDependentPlacefieldSurpriseMode.USING_EXTANT # reuse the existing pf1D_dt
 
-    #     if include_whitelist is None:
-    #         include_whitelist = owning_pipeline_reference.active_completed_computation_result_names # ['maze', 'sprinkle']
+    #     if include_includelist is None:
+    #         include_includelist = owning_pipeline_reference.active_completed_computation_result_names # ['maze', 'sprinkle']
 
     #     # Epoch dataframe stuff:
-    #     global_epoch_name = include_whitelist[-1] # 'maze_PYR'
+    #     global_epoch_name = include_includelist[-1] # 'maze_PYR'
         
     #     computation_result = computation_results[global_epoch_name]
     #     global_results_data = computation_result['computed_data']
@@ -145,7 +145,7 @@ class MultiContextComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Co
 # ==================================================================================================================== #
 # PBE Stats                                                                                                            #
 # ==================================================================================================================== #
-def _perform_PBE_stats(owning_pipeline_reference, include_whitelist=None, debug_print = False):
+def _perform_PBE_stats(owning_pipeline_reference, include_includelist=None, debug_print = False):
     """ # Analyze PBEs by looping through the filtered epochs:
         This whole implementation seems silly and inefficient        
         Can't I use .agg(['count', 'mean']) or something? 
@@ -157,8 +157,8 @@ def _perform_PBE_stats(owning_pipeline_reference, include_whitelist=None, debug_
         pbe_analyses_result_df
 
     """
-    if include_whitelist is None:
-        include_whitelist = owning_pipeline_reference.active_completed_computation_result_names # ['maze', 'sprinkle']
+    if include_includelist is None:
+        include_includelist = owning_pipeline_reference.active_completed_computation_result_names # ['maze', 'sprinkle']
 
     all_epochs_labels = []
     all_epochs_total_durations = []
@@ -171,7 +171,7 @@ def _perform_PBE_stats(owning_pipeline_reference, include_whitelist=None, debug_
     all_epochs_intra_pbe_interval_lists = []
     
     for (name, filtered_sess) in owning_pipeline_reference.filtered_sessions.items():
-        if name in include_whitelist:
+        if name in include_includelist:
             # interested in analyzing both the filtered_sess.pbe and the filtered_sess.spikes_df (as they relate to the PBEs)
             all_epochs_labels.append(name)
             curr_named_time_range = owning_pipeline_reference.sess.epochs.get_named_timerange(name) # for 'maze' key, the total duration is being set to array([], dtype=float64) for some reason. all_epochs_total_durations: [1716.8933641185379, 193.26664069312392, array([], dtype=float64)]

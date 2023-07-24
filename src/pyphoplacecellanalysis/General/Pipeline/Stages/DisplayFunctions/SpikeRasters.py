@@ -1,3 +1,4 @@
+from typing import Any, Union
 from copy import deepcopy
 import numpy as np
 import pandas as pd
@@ -6,7 +7,10 @@ from attrs import define, Factory
 from indexed import IndexedOrderedDict
 
 from neuropy.core.neuron_identities import NeuronIdentityAccessingMixin
+from neuropy.utils.result_context import overwriting_display_context, providing_context
 
+
+from pyphocorehelpers.indexing_helpers import partition # needed by `_find_example_epochs` to partition the dataframe by aclus
 from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer
 from pyphocorehelpers.mixins.member_enumerating import AllFunctionEnumeratingMixin
 from pyphocorehelpers.function_helpers import function_attributes
@@ -17,7 +21,7 @@ import pyphoplacecellanalysis.External.pyqtgraph as pg
 from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.Mixins.Render2DScrollWindowPlot import Render2DScrollWindowPlotMixin
 from pyphoplacecellanalysis.General.DataSeriesToSpatial import DataSeriesToSpatial
 from pyphoplacecellanalysis.General.Mixins.SpikesRenderingBaseMixin import SpikeEmphasisState
-from pyphoplacecellanalysis.General.Mixins.DataSeriesColorHelpers import DataSeriesColorHelpers # for build_neurons_color_data
+from pyphoplacecellanalysis.General.Mixins.DataSeriesColorHelpers import DataSeriesColorHelpers, UnitColoringMode # for build_neurons_color_data
 from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtGui # for QColor build_neurons_color_data
 from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DisplayFunctionRegistryHolder import DisplayFunctionRegistryHolder
 
@@ -151,67 +155,6 @@ class SpikeRastersDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Displa
 """
 
 # Windowing helpers for spikes_df:
-def _add_spikes_df_visualization_columns(manager, spikes_df):
-    if 'visualization_raster_y_location' not in spikes_df.columns:
-        all_y = [manager.y_fragile_linear_neuron_IDX_map[a_cell_IDX] for a_cell_IDX in spikes_df['fragile_linear_neuron_IDX'].to_numpy()]
-        spikes_df['visualization_raster_y_location'] = all_y # adds as a column to the dataframe. Only needs to be updated when the number of active units changes. BUG? NO, RESOLVED: actually, this should be updated when anything that would change .y_fragile_linear_neuron_IDX_map would change, right? Meaning: .y, ... oh, I see. y doesn't change because params.center_mode, params.bin_position_mode, and params.side_bin_margins aren't expected to change. 
-
-    if 'visualization_raster_emphasis_state' not in spikes_df.columns:
-        spikes_df['visualization_raster_emphasis_state'] = SpikeEmphasisState.Default
-    return spikes_df
-
-def _build_neurons_color_data(params, fragile_linear_neuron_IDXs, neuron_colors_list=None, coloring_mode='color_by_index_order'):
-    """ Cell Coloring function
-
-    neuron_colors_list: a list of neuron colors
-        if None provided will call DataSeriesColorHelpers._build_cell_color_map(...) to build them.
-    
-    Requires:
-        fragile_linear_neuron_IDXs
-        
-    Sets:
-        params.neuron_qcolors
-        params.neuron_qcolors_map
-        params.neuron_colors: ndarray of shape (4, self.n_cells)
-        params.neuron_colors_hex
-
-    Known Calls: Seemingly only called from:
-        SpikesRenderingBaseMixin.helper_setup_neuron_colors_and_order(...)
-
-    History: Factored out of SpikeRasterBase on 2023-03-31
-
-    Usage:
-
-        params = build_neurons_color_data(params, fragile_linear_neuron_IDXs)
-        params
-
-    """	
-    unsorted_fragile_linear_neuron_IDXs = fragile_linear_neuron_IDXs
-    n_cells = len(unsorted_fragile_linear_neuron_IDXs)
-
-    if neuron_colors_list is None:
-        neuron_qcolors_list = DataSeriesColorHelpers._build_cell_color_map(unsorted_fragile_linear_neuron_IDXs, mode=coloring_mode, provided_cell_colors=None)
-        for a_color in neuron_qcolors_list:
-            a_color.setAlphaF(0.5)
-    else:
-        neuron_qcolors_list = DataSeriesColorHelpers._build_cell_color_map(unsorted_fragile_linear_neuron_IDXs, mode=coloring_mode, provided_cell_colors=neuron_colors_list.copy()) # builts a list of qcolors
-                            
-    neuron_qcolors_map = dict(zip(unsorted_fragile_linear_neuron_IDXs, neuron_qcolors_list))
-
-    params.neuron_qcolors = deepcopy(neuron_qcolors_list)
-    params.neuron_qcolors_map = deepcopy(neuron_qcolors_map)
-
-    # allocate new neuron_colors array:
-    params.neuron_colors = np.zeros((4, n_cells))
-    for i, curr_qcolor in enumerate(params.neuron_qcolors):
-        curr_color = curr_qcolor.getRgbF() # (1.0, 0.0, 0.0, 0.5019607843137255)
-        params.neuron_colors[:, i] = curr_color[:]
-    
-    params.neuron_colors_hex = None
-    
-    # get hex colors:
-    params.neuron_colors_hex = [params.neuron_qcolors[i].name(QtGui.QColor.HexRgb) for i, cell_id in enumerate(fragile_linear_neuron_IDXs)]
-    return params
 
 @define 
 class RasterPlotParams:
@@ -229,11 +172,19 @@ class RasterPlotParams:
     # Configs:
     config_items: IndexedOrderedDict = Factory(IndexedOrderedDict)
 
-    def build_neurons_color_data(self, fragile_linear_neuron_IDXs, neuron_colors_list=None, coloring_mode='color_by_index_order'):
+    def build_neurons_color_data(self, fragile_linear_neuron_IDXs, neuron_colors_list=None, coloring_mode:UnitColoringMode=UnitColoringMode.COLOR_BY_INDEX_ORDER) -> None:
         """ Cell Coloring function
 
-        neuron_colors_list: a list of neuron colors
-            if None provided will call DataSeriesColorHelpers._build_cell_color_map(...) to build them.
+        Inputs:
+            neuron_colors_list: a list of neuron colors
+                if None provided will call DataSeriesColorHelpers._build_cell_color_map(...) to build them.
+            
+            mode:
+                'preserve_fragile_linear_neuron_IDXs': color is assigned based off of fragile_linear_neuron_IDX value, meaning after re-sorting the fragile_linear_neuron_IDXs the colors will appear visually different along y but will correspond to the same units as before the sort.
+                'color_by_index_order': color is assigned based of the raw index order of the passed-in unit ids. This means after re-sorting the units the colors will appear visually the same along y, but will not correspond to the same units.
+        
+        Requires:
+            fragile_linear_neuron_IDXs
             
         Sets:
             params.neuron_qcolors
@@ -241,10 +192,48 @@ class RasterPlotParams:
             params.neuron_colors: ndarray of shape (4, self.n_cells)
             params.neuron_colors_hex
 
+        Known Calls: Seemingly only called from:
+            SpikesRenderingBaseMixin.helper_setup_neuron_colors_and_order(...)
+
         History: Factored out of SpikeRasterBase on 2023-03-31
 
+        Usage:
+
+            params = build_neurons_color_data(params, fragile_linear_neuron_IDXs)
+            params
+
         """
-        self = _build_neurons_color_data(self, fragile_linear_neuron_IDXs, neuron_colors_list=neuron_colors_list, coloring_mode=coloring_mode)
+        unsorted_fragile_linear_neuron_IDXs = fragile_linear_neuron_IDXs
+        n_cells = len(unsorted_fragile_linear_neuron_IDXs)
+
+        if neuron_colors_list is None:
+            neuron_qcolors_list = DataSeriesColorHelpers._build_cell_color_map(unsorted_fragile_linear_neuron_IDXs, mode=coloring_mode, provided_cell_colors=None)
+            for a_color in neuron_qcolors_list:
+                a_color.setAlphaF(0.5)
+        else:
+            neuron_qcolors_list = DataSeriesColorHelpers._build_cell_color_map(unsorted_fragile_linear_neuron_IDXs, mode=coloring_mode, provided_cell_colors=neuron_colors_list.copy()) # builts a list of qcolors
+                                
+        neuron_qcolors_map = dict(zip(unsorted_fragile_linear_neuron_IDXs, neuron_qcolors_list))
+
+        self.neuron_qcolors = deepcopy(neuron_qcolors_list)
+        self.neuron_qcolors_map = deepcopy(neuron_qcolors_map)
+
+        # allocate new neuron_colors array:
+        self.neuron_colors = np.zeros((4, n_cells))
+        for i, curr_qcolor in enumerate(self.neuron_qcolors):
+            curr_color = curr_qcolor.getRgbF() # (1.0, 0.0, 0.0, 0.5019607843137255)
+            self.neuron_colors[:, i] = curr_color[:]
+        
+        self.neuron_colors_hex = None
+        
+        # get hex colors:
+        self.neuron_colors_hex = [self.neuron_qcolors[i].name(QtGui.QColor.HexRgb) for i, cell_id in enumerate(fragile_linear_neuron_IDXs)]
+        return self
+
+
+
+
+
 
 @define
 class UnitSortOrderManager(NeuronIdentityAccessingMixin):
@@ -295,7 +284,6 @@ class UnitSortOrderManager(NeuronIdentityAccessingMixin):
                 print(f'update_series_identity_y_values(): (self.unit_sort_order == self.fragile_linear_neuron_IDXs) (default sort).')
             self.y_fragile_linear_neuron_IDX_map = dict(zip(self.fragile_linear_neuron_IDXs, self._series_identity_y_values)) # Old way 
 
-
     ## Required for DataSeriesToSpatialTransformingMixin
     def fragile_linear_neuron_IDX_to_spatial(self, fragile_linear_neuron_IDXs):
         """ transforms the fragile_linear_neuron_IDXs in fragile_linear_neuron_IDXs to a spatial offset (such as the y-positions for a 3D raster plot) """
@@ -303,6 +291,19 @@ class UnitSortOrderManager(NeuronIdentityAccessingMixin):
             self.update_series_identity_y_values()
         fragile_linear_neuron_IDX_series_indicies = self.unit_sort_order[fragile_linear_neuron_IDXs] # get the appropriate series index for each fragile_linear_neuron_IDX given their sort order
         return self.series_identity_y_values[fragile_linear_neuron_IDX_series_indicies]
+
+
+    def update_spikes_df_visualization_columns(self, spikes_df: pd.DataFrame, overwrite_existing:bool=True):
+        """ updates spike_df's columns: ['visualization_raster_y_location', 'visualization_raster_emphasis_state'] """
+        if overwrite_existing or ('visualization_raster_y_location' not in spikes_df.columns):
+            all_y = [self.y_fragile_linear_neuron_IDX_map[a_cell_IDX] for a_cell_IDX in spikes_df['fragile_linear_neuron_IDX'].to_numpy()]
+            spikes_df['visualization_raster_y_location'] = all_y # adds as a column to the dataframe. Only needs to be updated when the number of active units changes. BUG? NO, RESOLVED: actually, this should be updated when anything that would change .y_fragile_linear_neuron_IDX_map would change, right? Meaning: .y, ... oh, I see. y doesn't change because params.center_mode, params.bin_position_mode, and params.side_bin_margins aren't expected to change. 
+
+        if overwrite_existing or ('visualization_raster_emphasis_state' not in spikes_df.columns):
+            # TODO: This might be the one we don't want to overwrite unless it's missing, as we probably don't want to always reset it to default emphasis if a column with customized values already exists.
+            spikes_df['visualization_raster_emphasis_state'] = SpikeEmphasisState.Default
+        return spikes_df
+
 
 @define
 class RasterScatterPlotManager:
@@ -342,7 +343,7 @@ class RasterScatterPlotManager:
         # SpikeEmphasisState
         state_alpha = {SpikeEmphasisState.Hidden: 0.01,
                         SpikeEmphasisState.Deemphasized: 0.1,
-                        SpikeEmphasisState.Default: 0.5,
+                        SpikeEmphasisState.Default: 0.95, # SpikeEmphasisState.Default: 0.5,
                         SpikeEmphasisState.Emphasized: 1.0,
         }
         
@@ -386,57 +387,27 @@ class RasterScatterPlotManager:
 
 # Note that these raster plots could implement some variant of HideShowSpikeRenderingMixin, SpikeRenderingMixin, etc but these classes frankly suck. 
 
-
-@function_attributes(short_name='plot_raster_plot', tags=['pyqtgraph','raster','2D'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-03-31 20:53')
-def plot_raster_plot(spikes_df, shared_aclus, scatter_app_name='pho_test'):
-    """ This uses pyqtgraph's scatter function like SpikeRaster2D to render a raster plot with colored ticks by default
-
-    Usage:
-        from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.SpikeRasters import plot_raster_plot
-
-        app, win, plots, plots_data = plot_raster_plot(_temp_active_spikes_df, shared_aclus)
-
-    """
-    neuron_ids = deepcopy(shared_aclus)
-    n_cells = len(shared_aclus)
-    fragile_linear_neuron_IDXs = np.arange(n_cells)
-    unit_sort_order = np.arange(n_cells) # in-line sort order
-    params = RasterPlotParams()
-    params.build_neurons_color_data(fragile_linear_neuron_IDXs=fragile_linear_neuron_IDXs)
-    manager = UnitSortOrderManager(neuron_ids=neuron_ids, fragile_linear_neuron_IDXs=fragile_linear_neuron_IDXs, n_cells=n_cells, unit_sort_order=unit_sort_order, params=params)
-    manager.update_series_identity_y_values()
-    raster_plot_manager = RasterScatterPlotManager(unit_sort_manager=manager)
-    raster_plot_manager._build_cell_configs()
-
-    # Update the dataframe
-    spikes_df = _add_spikes_df_visualization_columns(manager, spikes_df)
-
-    # make root container for plots
-    
-    plots = RenderPlots(scatter_app_name)
-    plots_data = RenderPlotsData(scatter_app_name)
-
-    # each entry in `config_fragile_linear_neuron_IDX_map` has the form:
-    # 	(i, fragile_linear_neuron_IDX, curr_pen, _series_identity_lower_y_values[i], _series_identity_upper_y_values[i])
-
-    ## Build the spots for the raster plot:
-    plots_data.all_spots = Render2DScrollWindowPlotMixin.build_spikes_all_spots_from_df(spikes_df, raster_plot_manager.config_fragile_linear_neuron_IDX_map)
-
+def _plot_empty_raster_plot_frame(scatter_app_name='pho_test', defer_show=False, active_context=None) -> tuple[Any, pg.GraphicsLayoutWidget, RenderPlots, RenderPlotsData]:
+    """ simple helper to initialize the mkQApp, spawn the window, and build the plots and plots_data. """
     ## Perform the plotting:
     app = pg.mkQApp(scatter_app_name)
-    win = pg.GraphicsLayoutWidget(show=True, title=scatter_app_name)
+    win = pg.GraphicsLayoutWidget(show=(not defer_show), title=scatter_app_name)
     win.resize(1000,600)
-    win.setWindowTitle(f'pyqtgraph: Raster Spikes: {scatter_app_name}')
+    # window_title_prefix = 'pyqtgraph: Raster Spikes: '
+    window_title_prefix = '' # no prefix before the provided title
+    win.setWindowTitle(f'{window_title_prefix}{scatter_app_name}')
 
     # Enable antialiasing for prettier plots
     pg.setConfigOptions(antialias=True)
+    
+    plots = RenderPlots(scatter_app_name)
+    plots_data = RenderPlotsData(scatter_app_name)
+    if active_context is not None:
+        plots_data.active_context = active_context
 
-    # # Actually setup the plot:
-    plots.root_plot = win.addPlot()
+    return app, win, plots, plots_data
 
-    # p1 = win.addPlot(title="SpikesDataframe", x=x, y=y, connect='pairs')
-    # p1.setLabel('bottom', 'Timestamp', units='[sec]') # set the x-axis label
-
+def _build_default_tick(tick_width: float = 0.1) -> QtGui.QPainterPath:
     # Common Tick Label
     vtick = QtGui.QPainterPath()
 
@@ -446,21 +417,306 @@ def plot_raster_plot(spikes_df, shared_aclus, scatter_app_name='pho_test'):
     # vtick.moveTo(0, -0.5)
     # vtick.lineTo(0, 0.5)
 
-    # Thicker Tick Label:
-    tick_width = 0.1
+    # Thicker (Rect) Tick Label:
     half_tick_width = 0.5 * tick_width
     vtick.moveTo(-half_tick_width, -0.5)
     vtick.addRect(-half_tick_width, -0.5, tick_width, 1.0) # x, y, width, height
+    return vtick
+    
 
-    plots.scatter_plot = pg.ScatterPlotItem(name='spikeRasterOverviewWindowScatterPlotItem', pxMode=True, symbol=vtick, size=10, pen={'color': 'w', 'width': 1})
+def build_scatter_plot_kwargs(scatter_plot_kwargs=None):
+    """build the default scatter plot kwargs, and merge them with the provided kwargs"""
+    # Common Tick Label 
+    vtick = _build_default_tick(tick_width=1.0)
+    default_scatter_plot_kwargs = dict(name='spikeRasterOverviewWindowScatterPlotItem', pxMode=True, symbol=vtick, size=2, pen={'color': 'w', 'width': 1}, hoverable=True)
+
+    if scatter_plot_kwargs is None:
+        merged_kwargs = default_scatter_plot_kwargs
+    else:
+        # merge the two
+        # scatter_plot_kwargs = default_scatter_plot_kwargs | scatter_plot_kwargs
+        # Merge the default kwargs with the user-provided kwargs
+        merged_kwargs = {**default_scatter_plot_kwargs, **scatter_plot_kwargs}
+
+    print(f'merged_kwargs: {merged_kwargs}')
+    return merged_kwargs
+
+
+
+
+def _build_units_y_grid(plot_item) -> pg.GridItem:
+	"""create a GridItem and add it to the plot
+	
+	Usage:
+		grid = _build_units_y_grid(plot_item)
+	
+	"""
+	grid = pg.GridItem()
+	plot_item.addItem(grid)
+	# set the properties of the grid
+	grid.setTickSpacing([], [1, 5, 10 ]) # on the y-axis (units) set lines every 1, 5, and 10 units. Looks great on linux.
+	grid.setPen(pg.mkPen('#888888', width=1))
+	grid.setZValue(-100)
+	return grid
+
+
+def _build_scatter_plotting_managers(plots_data, spikes_df, included_neuron_ids=None, unit_sort_order=None, unit_colors_list=None):
+    """ 
+    Does not modify `spikes_df` and it's unused when included_neuron_ids is provided
+
+    Usage:
+        plots_data = _build_scatter_plotting_managers(plots_data, included_neuron_ids=included_neuron_ids, unit_sort_order=unit_sort_order, unit_colors_list=unit_colors_list)
+    """
+    if included_neuron_ids is not None:
+        neuron_ids = deepcopy(included_neuron_ids) # use the provided neuron_ids
+    else:
+        neuron_ids = np.sort(spikes_df.aclu.unique()) # get all the aclus from the entire spikes_df frame
+    plots_data.n_cells = len(neuron_ids)
+    fragile_linear_neuron_IDXs = np.arange(plots_data.n_cells)
+    if unit_sort_order is None:
+        unit_sort_order = np.arange(plots_data.n_cells) # in-line sort order
+    else:
+        assert len(unit_sort_order) == plots_data.n_cells
+
+    params = RasterPlotParams()
+    # params.build_neurons_color_data(fragile_linear_neuron_IDXs=fragile_linear_neuron_IDXs) # normal coloring of neurons
+    params.build_neurons_color_data(fragile_linear_neuron_IDXs=fragile_linear_neuron_IDXs, neuron_colors_list=unit_colors_list)
+    
+    manager = UnitSortOrderManager(neuron_ids=neuron_ids, fragile_linear_neuron_IDXs=fragile_linear_neuron_IDXs, n_cells=plots_data.n_cells, unit_sort_order=unit_sort_order, params=params)
+    manager.update_series_identity_y_values()
+    raster_plot_manager = RasterScatterPlotManager(unit_sort_manager=manager)
+    raster_plot_manager._build_cell_configs()
+    ## Add the managers to the plot_data
+    plots_data.params = params
+    plots_data.unit_sort_manager = manager
+    plots_data.raster_plot_manager = raster_plot_manager
+    return plots_data
+
+
+def _build_scatterplot(new_ax) -> pg.GridItem:
+    """create a GridItem and add it to the plot
+
+    Usage:
+        plots.scatter_plots[an_epoch.Index] = _build_scatterplot(new_ax)
+
+    """
+    scatter_plot = pg.ScatterPlotItem(name='spikeRasterOverviewWindowScatterPlotItem', **scatter_plot_kwargs)
+    scatter_plot.setObjectName(f'scatter_plot_{_active_plot_title}') # this seems necissary, the 'name' parameter in addPlot(...) seems to only change some internal property related to the legend AND drastically slows down the plotting
+    scatter_plot.opts['useCache'] = False
+    scatter_plot.addPoints(plots_data.all_spots_dict[an_epoch.Index]) # , hoverable=True
+
+    ## Add to the axis and set up the axis:
+    new_ax.addItem(scatter_plot)
+
+    new_ax.setXRange(an_epoch.start, an_epoch.stop)
+    new_ax.setYRange(0, n_cells-1)
+    # new_ax.showAxes(True, showValues=(True, True, True, False)) # showValues=(left: True, bottom: True, right: False, top: False) # , size=10       
+    new_ax.hideButtons() # Hides the auto-scale button
+    new_ax.setDefaultPadding(0.0)  # plot without padding data range
+    # Format Labels:
+    # left_label: str = f'Epoch[{an_epoch.label}]: {an_epoch.start:.2f}' # Full label
+    # left_label: str = f'Epoch[{an_epoch.label}]' # Epoch[idx] style label
+    left_label: str = f'[{an_epoch.label}]' # very short (index only) label
+    new_ax.getAxis('left').setLabel(left_label)
+    # new_ax.getAxis('bottom').setLabel('t')
+    # new_ax.getAxis('right').setLabel(f'Epoch[{an_epoch.label}]: {an_epoch.stop:.2f}')
+
+    # new_ax.getAxis('bottom').setTickSpacing(1.0) # 5.0, 1.0 .setTickSpacing(x=[None], y=[1.0])
+    # new_ax.showGrid(x=False, y=True, alpha=1.0)
+    new_ax.getAxis('bottom').setStyle(showValues=False)
+
+    # Disable Interactivity
+    new_ax.setMouseEnabled(x=False, y=False)
+    new_ax.setMenuEnabled(False)
+    return scatter_plot
+
+@providing_context(fn_name='plot_raster_plot')
+@function_attributes(short_name='plot_raster_plot', tags=['pyqtgraph','raster','2D'], input_requires=[], output_provides=[], uses=['_plot_empty_raster_plot_frame'], used_by=[], creation_date='2023-03-31 20:53')
+def plot_raster_plot(spikes_df: pd.DataFrame, included_neuron_ids, unit_sort_order=None, unit_colors_list=None, scatter_plot_kwargs=None, scatter_app_name='pho_test', defer_show=False, active_context=None, **kwargs) -> tuple[Any, pg.GraphicsLayoutWidget, RenderPlots, RenderPlotsData]:
+    """ This uses pyqtgraph's scatter function like SpikeRaster2D to render a raster plot with colored ticks by default
+
+    Usage:
+        from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.SpikeRasters import plot_raster_plot
+
+        app, win, plots, plots_data = plot_raster_plot(_temp_active_spikes_df, shared_aclus)
+
+    """
+    
+    # make root container for plots
+    app, win, plots, plots_data = _plot_empty_raster_plot_frame(scatter_app_name=scatter_app_name, defer_show=defer_show, active_context=active_context)
+    
+    plots_data = _build_scatter_plotting_managers(plots_data, spikes_df=spikes_df, included_neuron_ids=included_neuron_ids, unit_sort_order=unit_sort_order, unit_colors_list=unit_colors_list)
+    # Update the dataframe
+    spikes_df = plots_data.unit_sort_manager.update_spikes_df_visualization_columns(spikes_df)
+    
+    ## Build the spots for the raster plot:
+    plots_data.all_spots, plots_data.all_scatterplot_tooltips_kwargs = Render2DScrollWindowPlotMixin.build_spikes_all_spots_from_df(spikes_df, plots_data.raster_plot_manager.config_fragile_linear_neuron_IDX_map, should_return_data_tooltips_kwargs=True)
+
+    # # Actually setup the plot:
+    plots.root_plot = win.addPlot() # this seems to be the equivalent to an 'axes'
+
+    scatter_plot_kwargs = build_scatter_plot_kwargs(scatter_plot_kwargs=scatter_plot_kwargs)
+    
+    plots.scatter_plot = pg.ScatterPlotItem(**scatter_plot_kwargs)
     plots.scatter_plot.setObjectName('scatter_plot') # this seems necissary, the 'name' parameter in addPlot(...) seems to only change some internal property related to the legend AND drastically slows down the plotting
     plots.scatter_plot.opts['useCache'] = True
-    plots.scatter_plot.addPoints(plots_data.all_spots) # , hoverable=True
+    plots.scatter_plot.addPoints(plots_data.all_spots, **(plots_data.all_scatterplot_tooltips_kwargs or {})) # , hoverable=True
     plots.root_plot.addItem(plots.scatter_plot)
 
-    plots.scatter_plot.addPoints(plots_data.all_spots)
+    # build the y-axis grid to separate the units
+    plots.grid = _build_units_y_grid(plots.root_plot)
 
     return app, win, plots, plots_data
+
+@providing_context(fn_name='plot_multiple_raster_plot')
+@function_attributes(short_name=None, tags=['pyqtgraph','raster','2D'], input_requires=[], output_provides=[], uses=['_prepare_spikes_df_from_filter_epochs', '_plot_empty_raster_plot_frame'], used_by=[], creation_date='2023-06-16 20:45', related_items=['plot_raster_plot'])
+def plot_multiple_raster_plot(filter_epochs_df: pd.DataFrame, spikes_df: pd.DataFrame, included_neuron_ids=None, unit_sort_order=None, unit_colors_list=None, scatter_plot_kwargs=None, epoch_id_key_name='temp_epoch_id', scatter_app_name="Pho Stacked Replays", defer_show=False, active_context=None, **kwargs):
+    """ This renders a stack of raster plots
+
+    Usage:
+        from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.SpikeRasters import plot_multiple_raster_plot
+
+        
+        app, win, plots, plots_data = plot_multiple_raster_plot(filter_epochs_df, spikes_df, included_neuron_ids=shared_aclus, epoch_id_key_name='replay_epoch_id', scatter_app_name="Pho Stacked Replays")
+
+    """
+
+    #TODO 2023-06-20 08:59: - [ ] Can potentially reuse `stacked_epoch_slices_view` (the pyqtgraph version)?
+
+    rebuild_spikes_df_anyway = True # if True, `_prepare_spikes_df_from_filter_epochs` is called to rebuild spikes_df given the filter_epochs_df even if it contains the desired column already.
+    if rebuild_spikes_df_anyway:
+        spikes_df = spikes_df.copy() # don't modify the original dataframe
+        filter_epochs_df = filter_epochs_df.copy()
+
+    if rebuild_spikes_df_anyway or (epoch_id_key_name not in spikes_df.columns):
+        # missing epoch_id column in the spikes_df, need to rebuild
+        spikes_df = _prepare_spikes_df_from_filter_epochs(spikes_df, filter_epochs=filter_epochs_df, included_neuron_ids=included_neuron_ids, epoch_id_key_name=epoch_id_key_name, debug_print=False) # replay_epoch_id
+
+    # ## Create the raster plot for the replay:
+    # app, win, plots, plots_data = plot_raster_plot(_active_epoch_spikes_df, shared_aclus, scatter_app_name=f"Raster Epoch[{epoch_idx}]")
+    app, win, plots, plots_data = _plot_empty_raster_plot_frame(scatter_app_name=scatter_app_name, defer_show=defer_show, active_context=active_context)
+    # setting plot window background color to white
+    win.setBackground('w')
+    # win.setForeground('k')
+    
+    plots.layout = win.addLayout()
+    plots.ax = {}
+    plots.scatter_plots = {} # index is the an_epoch.Index
+    plots.grid = {} # index is the an_epoch.Index
+    
+    plots_data.all_spots_dict = {}
+    plots_data.all_scatterplot_tooltips_kwargs_dict = {}
+    plots_data = _build_scatter_plotting_managers(plots_data, spikes_df=spikes_df, included_neuron_ids=included_neuron_ids, unit_sort_order=unit_sort_order, unit_colors_list=unit_colors_list)
+
+    # Update the dataframe
+    spikes_df = plots_data.unit_sort_manager.update_spikes_df_visualization_columns(spikes_df)
+    
+    # Common Tick Label 
+    scatter_plot_kwargs = build_scatter_plot_kwargs(scatter_plot_kwargs=scatter_plot_kwargs)
+    # print(f'scatter_plot_kwargs: {scatter_plot_kwargs}')
+
+    ## Build the individual epoch raster plot rows:
+    for an_epoch in filter_epochs_df.itertuples():
+        # print(f'an_epoch: {an_epoch}')
+        # if an_epoch.Index < 10:
+        _active_epoch_spikes_df = spikes_df[spikes_df[epoch_id_key_name] == an_epoch.Index]
+        _active_plot_title: str = f"Epoch[{an_epoch.label}]" # Epoch[idx]
+        # _active_plot_title: str = f"[{an_epoch.label}]" # [idx]
+        
+        ## Create the raster plot for the replay:
+        # if win is None:
+        # 	# Initialize
+        # 	app, win, plots, plots_data = plot_raster_plot(_active_epoch_spikes_df, shared_aclus, scatter_app_name=f"Raster Epoch[{an_epoch.label}]")
+        # else:
+        # add a new row
+        new_ax = plots.layout.addPlot(row=int(an_epoch.Index), col=0)
+        plots_data.all_spots_dict[an_epoch.Index], plots_data.all_scatterplot_tooltips_kwargs_dict[an_epoch.Index] = Render2DScrollWindowPlotMixin.build_spikes_all_spots_from_df(_active_epoch_spikes_df, plots_data.raster_plot_manager.config_fragile_linear_neuron_IDX_map, should_return_data_tooltips_kwargs=True)
+
+        scatter_plot = pg.ScatterPlotItem(**scatter_plot_kwargs)
+        scatter_plot.setObjectName(f'scatter_plot_{_active_plot_title}') # this seems necissary, the 'name' parameter in addPlot(...) seems to only change some internal property related to the legend AND drastically slows down the plotting
+        scatter_plot.opts['useCache'] = False
+        scatter_plot.addPoints(plots_data.all_spots_dict[an_epoch.Index], **(plots_data.all_scatterplot_tooltips_kwargs_dict[an_epoch.Index] or {})) # , hoverable=True
+        new_ax.addItem(scatter_plot)
+        plots.scatter_plots[an_epoch.Index] = scatter_plot
+        new_ax.setXRange(an_epoch.start, an_epoch.stop)
+        new_ax.setYRange(0, plots_data.n_cells-1)
+        # new_ax.showAxes(True, showValues=(True, True, True, False)) # showValues=(left: True, bottom: True, right: False, top: False) # , size=10       
+        new_ax.hideButtons() # Hides the auto-scale button
+        new_ax.setDefaultPadding(0.0)  # plot without padding data range
+        # Format Labels:
+        # left_label: str = f'Epoch[{an_epoch.label}]: {an_epoch.start:.2f}' # Full label
+        # left_label: str = f'Epoch[{an_epoch.label}]' # Epoch[idx] style label
+        left_label: str = f'[{an_epoch.label}]' # very short (index only) label
+        new_ax.getAxis('left').setLabel(left_label)
+        # new_ax.getAxis('bottom').setLabel('t')
+        # new_ax.getAxis('right').setLabel(f'Epoch[{an_epoch.label}]: {an_epoch.stop:.2f}')
+
+        # new_ax.getAxis('bottom').setTickSpacing(1.0) # 5.0, 1.0 .setTickSpacing(x=[None], y=[1.0])
+        # new_ax.showGrid(x=False, y=True, alpha=1.0)
+        new_ax.getAxis('bottom').setStyle(showValues=False)
+
+        # Disable Interactivity
+        new_ax.setMouseEnabled(x=False, y=False)
+        new_ax.setMenuEnabled(False)
+
+        # build the y-axis grid to separate the units
+        plots.grid[an_epoch.Index] = _build_units_y_grid(new_ax)
+
+        plots.ax[an_epoch.Index] = new_ax
+
+    return app, win, plots, plots_data
+
+
+    
+@function_attributes(short_name=None, tags=['spikes_df', 'raster', 'helper',' filter'], input_requires=[], output_provides=[], uses=[], used_by=['plot_multiple_raster_plot'], creation_date='2023-06-19 15:25', related_items=['plot_multiple_raster_plot'])
+def _prepare_spikes_df_from_filter_epochs(spikes_df: pd.DataFrame, filter_epochs, included_neuron_ids=None, epoch_id_key_name='temp_epoch_id', no_interval_fill_value=-1, debug_print=False) -> pd.DataFrame:
+    """ Prepares the spikes_df to be plotted for a given set of filter_epochs and included_neuron_ids by restricting to these periods/aclus, 
+            - rebuilding the fragile_linear_neuron_IDXs by calling `.rebuild_fragile_linear_neuron_IDXs(...)`
+            - adding an additional column to each spike specifying the epoch it belongs to (`epoch_id_key_name`).
+    
+    Usage:
+        from pyphoplacecellanalysis.General.Mixins.CrossComputationComparisonHelpers import _find_any_context_neurons
+        from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.SpikeRasters import _prepare_spikes_df_from_filter_epochs
+
+        long_ratemap = long_pf1D.ratemap
+        short_ratemap = short_pf1D.ratemap
+        curr_any_context_neurons = _find_any_context_neurons(*[k.neuron_ids for k in [long_ratemap, short_ratemap]])
+
+        spikes_df = _prepare_spikes_df_from_filter_epochs(long_session.spikes_df, filter_epochs=long_replays, included_neuron_ids=curr_any_context_neurons, epoch_id_key_name='replay_epoch_id', debug_print=False) # replay_epoch_id
+        spikes_df
+
+    """
+    from neuropy.utils.mixins.time_slicing import add_epochs_id_identity
+
+
+    if isinstance(filter_epochs, pd.DataFrame):
+        filter_epochs_df = filter_epochs
+    else:
+        filter_epochs_df = filter_epochs.to_dataframe()
+        
+        
+    ## Get the spikes during these epochs to attempt to decode from:
+    filter_epoch_spikes_df = deepcopy(spikes_df)
+    filter_epochs_df = deepcopy(filter_epochs_df) # copy just to make sure no modifications happen.
+        
+    if included_neuron_ids is not None:
+        # filter_epoch_spikes_df = filter_epoch_spikes_df[filter_epoch_spikes_df['aclu'].isin(included_neuron_ids)]
+        filter_epoch_spikes_df = filter_epoch_spikes_df.spikes.sliced_by_neuron_id(included_neuron_ids) ## restrict to only the shared aclus for both short and long
+
+    filter_epoch_spikes_df, _temp_neuron_id_to_new_IDX_map = filter_epoch_spikes_df.spikes.rebuild_fragile_linear_neuron_IDXs() # I think this must be done prior to restricting to the current epoch, but after restricting to the shared_aclus
+
+    ## Add the epoch ids to each spike so we can easily filter on them:
+    filter_epoch_spikes_df = add_epochs_id_identity(filter_epoch_spikes_df, filter_epochs_df, epoch_id_key_name=epoch_id_key_name, epoch_label_column_name=None, no_interval_fill_value=no_interval_fill_value)
+    if debug_print:
+        print(f'np.shape(filter_epoch_spikes_df): {np.shape(filter_epoch_spikes_df)}')
+    filter_epoch_spikes_df = filter_epoch_spikes_df[filter_epoch_spikes_df[epoch_id_key_name] != no_interval_fill_value] # Drop all non-included spikes
+    if debug_print:
+        print(f'np.shape(filter_epoch_spikes_df): {np.shape(filter_epoch_spikes_df)}')
+
+    # returns `filter_epoch_spikes_df`
+    return filter_epoch_spikes_df
+
+
 
 
 

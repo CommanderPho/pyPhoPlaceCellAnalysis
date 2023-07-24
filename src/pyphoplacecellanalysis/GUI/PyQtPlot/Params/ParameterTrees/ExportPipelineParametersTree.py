@@ -62,7 +62,7 @@ def build_export_parameters_tree(curr_active_pipeline, parameter_names='ExportPa
 
         
     """
-    def _build_current_export_keys(all_computed_config_names, include_whitelist = None):
+    def _build_current_export_keys(all_computed_config_names, include_includelist = None):
         """ builds the list of default export keys for the keys list given the currently selected configs """
         # List existing keys in the file:
         # loaded_extant_keys = get_h5_data_keys(finalized_output_cache_file=finalized_output_cache_file)
@@ -71,11 +71,11 @@ def build_export_parameters_tree(curr_active_pipeline, parameter_names='ExportPa
         
         # Filter existing keys to selections only:
         key_children_list = []
-        if include_whitelist is None:
+        if include_includelist is None:
             active_config_names_list = all_computed_config_names
         else:
-            # otherwise only include the items in include_whitelist
-            active_config_names_list = [value for value in include_whitelist if value in all_computed_config_names] # entry must be in all_computed_config_names
+            # otherwise only include the items in include_includelist
+            active_config_names_list = [value for value in include_includelist if value in all_computed_config_names] # entry must be in all_computed_config_names
             
         for a_key in active_config_names_list:
             curr_default_key_children_dict = get_default_pipeline_data_keys(a_key)
@@ -88,7 +88,7 @@ def build_export_parameters_tree(curr_active_pipeline, parameter_names='ExportPa
         return key_children_list
         
     def _simple_export_dict_params(all_computed_config_names):
-        key_children_list = _build_current_export_keys(all_computed_config_names, include_whitelist=None)
+        key_children_list = _build_current_export_keys(all_computed_config_names, include_includelist=None)
         children = [
                 dict(name='Export Path', type='file', dialogLabel='test label', value=finalized_output_cache_file, default='<Select Path>'),
                 dict(name='Included Exports', type='checklist', value=all_computed_config_names, limits=all_computed_config_names),
@@ -135,7 +135,7 @@ def build_export_parameters_tree(curr_active_pipeline, parameter_names='ExportPa
                 if debug_print:
                     print(f'matched uncheck event. data: {data}')
                 # data: the list of currently checked changes:
-                updated_key_children_list = _build_current_export_keys(all_computed_config_names, include_whitelist=data)
+                updated_key_children_list = _build_current_export_keys(all_computed_config_names, include_includelist=data)
                 if debug_print:
                     print(f'\tupdated_key_children_list: {updated_key_children_list}')    
                 # replace the children keys:

@@ -1,3 +1,4 @@
+from copy import deepcopy
 import numpy as np
 import matplotlib.pyplot as plt
 
@@ -27,8 +28,48 @@ class MultiContextComparingDisplayFunctions(AllFunctionEnumeratingMixin, metacla
     Must have a signature of: (owning_pipeline_reference, global_computation_results, computation_results, active_configs, ..., **kwargs) at a minimum
     """
 
+    @function_attributes(short_name='grid_bin_bounds_validation', tags=['grid_bin_bounds','validation','pandas'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-06-14 18:17', related_items=[], is_global=True)
+    def _display_grid_bin_bounds_validation(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, defer_render=False, save_figure=True, **kwargs):
+        """ Renders a single figure that shows the 1D linearized position from several different sources to ensure sufficient overlap. Useful for validating that the grid_bin_bounds are chosen reasonably.
+
+        """
+        assert owning_pipeline_reference is not None
+        long_epoch_name, short_epoch_name, global_epoch_name = owning_pipeline_reference.find_LongShortGlobal_epoch_names()
+        long_grid_bin_bounds, short_grid_bin_bounds, global_grid_bin_bounds = [owning_pipeline_reference.computation_results[a_name].computation_config['pf_params'].grid_bin_bounds for a_name in (long_epoch_name, short_epoch_name, global_epoch_name)]
+        # print(long_grid_bin_bounds, short_grid_bin_bounds, global_grid_bin_bounds)
+        
+        long_epoch_context, short_epoch_context, global_epoch_context = [owning_pipeline_reference.filtered_contexts[a_name] for a_name in (long_epoch_name, short_epoch_name, global_epoch_name)]
+        long_session, short_session, global_session = [owning_pipeline_reference.filtered_sessions[an_epoch_name] for an_epoch_name in [long_epoch_name, short_epoch_name, global_epoch_name]]
+        
+        long_pos_df, short_pos_df, global_pos_df, all_pos_df = [a_sess.position.to_dataframe() for a_sess in (long_session, short_session, global_session, owning_pipeline_reference.sess)]
+        combined_pos_df = deepcopy(all_pos_df)
+        combined_pos_df.loc[long_pos_df.index, 'long_lin_pos'] = long_pos_df.lin_pos
+        combined_pos_df.loc[short_pos_df.index, 'short_pos_df'] = short_pos_df.lin_pos
+        combined_pos_df.loc[global_pos_df.index, 'global_lin_pos'] = global_pos_df.lin_pos
+
+        # ['long_lin_pos', 'short_pos_df', 'global_lin_pos']
+        # combined_pos_df
+        title = 'grid_bin_bounds validation across epochs'
+        
+        # Plot it:
+        combined_pos_df.plot(x='t', y=['x', 'lin_pos', 'long_lin_pos', 'short_pos_df', 'global_lin_pos'], title='grid_bin_bounds validation across epochs')
+        fig = plt.gcf()
+        ax = plt.gca()
+        ax.set_title(title)
+        fig.canvas.manager.set_window_title(title)
+        
+        final_context = owning_pipeline_reference.sess.get_context().adding_context('display_fn', display_fn_name='_display_grid_bin_bounds_validation')
+        
+        if save_figure:
+            saved_figure_paths = owning_pipeline_reference.output_figure(final_context, fig)
+        else:
+            saved_figure_paths = []
+
+        graphics_output_dict = MatplotlibRenderPlots(name='_display_grid_bin_bounds_validation', figures=(fig,), axes=(ax,), plot_data={}, context=final_context, saved_figures=[])
+        return graphics_output_dict
+ 
     @function_attributes(short_name='context_nested_docks', tags=['display','docks','pyqtgraph', 'interactive'], is_global=True, input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-04-11 03:14')
-    def _display_context_nested_docks(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_whitelist=None, **kwargs):
+    def _display_context_nested_docks(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, **kwargs):
         """ Create `master_dock_win` - centralized plot output window to collect individual figures/controls in (2022-08-18)
         NOTE: Ignores `active_config` because context_nested_docks is for all contexts
 
@@ -45,11 +86,11 @@ class MultiContextComparingDisplayFunctions(AllFunctionEnumeratingMixin, metacla
         """
         assert owning_pipeline_reference is not None
         #
-        if include_whitelist is None:
-            include_whitelist = owning_pipeline_reference.active_completed_computation_result_names # ['maze', 'sprinkle']
+        if include_includelist is None:
+            include_includelist = owning_pipeline_reference.active_completed_computation_result_names # ['maze', 'sprinkle']
 
         out_items = {}
-        master_dock_win, app, out_items = _context_nested_docks(owning_pipeline_reference, active_config_names=include_whitelist, **overriding_dict_with(lhs_dict={'enable_gui': False, 'debug_print': False}, **kwargs))
+        master_dock_win, app, out_items = _context_nested_docks(owning_pipeline_reference, active_config_names=include_includelist, **overriding_dict_with(lhs_dict={'enable_gui': False, 'debug_print': False}, **kwargs))
 
         # return master_dock_win, app, out_items
         return {'master_dock_win': master_dock_win, 'app': app, 'out_items': out_items}
@@ -161,7 +202,7 @@ def _context_nested_docks(curr_active_pipeline, active_config_names, enable_gui=
     Usage:
         master_dock_win, app, out_items = context_nested_docks(curr_active_pipeline, enable_gui=False, debug_print=True)
     """
-    # include_whitelist = curr_active_pipeline.active_completed_computation_result_names # ['maze', 'sprinkle']
+    # include_includelist = curr_active_pipeline.active_completed_computation_result_names # ['maze', 'sprinkle']
 
     if enable_gui:
         master_dock_win, app = DockAreaWrapper._build_default_dockAreaWindow(title='active_global_window', defer_show=False)

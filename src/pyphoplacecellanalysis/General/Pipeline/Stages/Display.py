@@ -6,7 +6,10 @@ import numpy as np
 
 from neuropy.core.neuron_identities import NeuronIdentity, build_units_colormap, PlotStringBrevityModeEnum
 from neuropy.utils.result_context import IdentifyingContext
+
 from pyphocorehelpers.DataStructure.dynamic_parameters import DynamicParameters # to replace simple PlacefieldComputationParameters
+from pyphocorehelpers.programming_helpers import metadata_attributes
+from pyphocorehelpers.function_helpers import function_attributes
 
 from pyphoplacecellanalysis.General.Pipeline.Stages.Computation import ComputedPipelineStage
 from pyphoplacecellanalysis.General.Pipeline.Stages.BaseNeuropyPipelineStage import PipelineStage
@@ -21,6 +24,9 @@ from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.Interactive
 from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.FiringStatisticsDisplayFunctions import FiringStatisticsDisplayFunctions
 from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.MultiContextComparingDisplayFunctions.MultiContextComparingDisplayFunctions import MultiContextComparingDisplayFunctions
 from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.MultiContextComparingDisplayFunctions.LongShortTrackComparingDisplayFunctions import LongShortTrackComparingDisplayFunctions
+
+
+
 
 class Plot:
     """a member dot accessor for display functions.
@@ -422,7 +428,7 @@ class PipelineWithDisplayPipelineStageMixin:
         ## Build the final display context: 
         found_display_fcn_index = self.registered_display_functions.index(display_function)
         display_fn_name = self.registered_display_function_names[found_display_fcn_index]
-        active_display_fn_identifying_ctx = active_session_configuration_context.adding_context('display_fn', display_fn_name=display_fn_name) # display_fn_name should be like '_display_1d_placefields'
+        active_display_fn_identifying_ctx = active_session_configuration_context.adding_context_if_missing(display_fn_name=display_fn_name) # display_fn_name should be like '_display_1d_placefields'
 
         # Add the display outputs to the active context. Each display function should return a structure like: dict(fig=active_figure, ax=ax_pf_1D)
         # owning_pipeline.display_output[active_display_fn_identifying_ctx] = (active_figure, ax_pf_1D)
@@ -431,10 +437,10 @@ class PipelineWithDisplayPipelineStageMixin:
         return curr_display_output
 
 
-    # def _pdf_display(self, display_function, active_session_configuration_context, **kwargs):
-    #     ## TODO:
-    
 
+# ==================================================================================================================== #
+# Figure Saving and Outputs                                                                                            #
+# ==================================================================================================================== #
 class PipelineWithDisplaySavingMixin:
     """ provides functionality for saving figures to file.
     
@@ -453,6 +459,7 @@ class PipelineWithDisplaySavingMixin:
         return active_identifying_session_ctx.merging_context('display_', display_subcontext)
     
 
+    
     def build_display_context_for_filtered_session(self, filtered_session_name:str, display_fn_name:str, **kwargs) -> "IdentifyingContext":
         """ builds a new display context for a filtered session out of kwargs 
         Usage:
@@ -463,37 +470,16 @@ class PipelineWithDisplaySavingMixin:
         display_subcontext = IdentifyingContext(display_fn_name=display_fn_name, **kwargs)
         return active_identifying_session_ctx.merging_context('display_', display_subcontext)
 
-
-
-
-    def write_figure_to_daily_programmatic_session_output_path(self, fig, display_context=None, override_figures_parent_out_path=None, debug_print=True):
-        """ Writes the provided figure to the daily_programmatic_session_output_path.
-            This function writes a figure to the daily programmatic session output path.
-            It imports the perform_write_to_file function from the ExportHelpers Mixin.
-            It then gets the daily programmatic session output path and the session context.
-            If a display context is provided, it combines the active identifying session context
-        """
-        from pyphoplacecellanalysis.General.Mixins.ExportHelpers import perform_write_to_file
-        if override_figures_parent_out_path is not None:
-            active_figures_out_path = override_figures_parent_out_path
-        else:
-            active_figures_out_path = self.get_daily_programmatic_session_output_path()
-        return self.write_figure_to_output_path(fig, figures_parent_out_path=active_figures_out_path, display_context=display_context, debug_print=debug_print)
-    
-
-    def write_figure_to_output_path(self, fig, figures_parent_out_path, display_context=None, debug_print=True):
-        """ Writes the provided figure to the figures_parent_out_path. """
-        from pyphoplacecellanalysis.General.Mixins.ExportHelpers import perform_write_to_file
-        
-        active_identifying_session_ctx = self.sess.get_context()
-        if display_context is not None:
-            final_context = active_identifying_session_ctx | display_context
-
-        if debug_print:
-            print(f'final_context: {final_context}')
-        active_out_figure_paths = perform_write_to_file(fig, final_context, figures_parent_out_path=figures_parent_out_path, register_output_file_fn=self.register_output_file)
+    @function_attributes(short_name=None, tags=['save','figure'], input_requires=[], output_provides=[], uses=['build_and_write_to_file'], used_by=[], creation_date='2023-06-14 19:26', related_items=[])
+    def output_figure(self, final_context: IdentifyingContext, fig, write_vector_format:bool=False, write_png:bool=True, debug_print=True):
+        """ outputs the figure using the provided context. """
+        from pyphoplacecellanalysis.General.Mixins.ExportHelpers import build_and_write_to_file
+        # fig_man: FigureOutputManager = self.get_output_manager() # get the output manager
+        # figures_parent_out_path, fig_save_basename = fig_man.get_figure_output_parent_and_basename(final_context, make_folder_if_needed=True)
+        # active_out_figure_paths = perform_write_to_file(fig, final_context, figures_parent_out_path=figures_parent_out_path, write_vector_format=write_vector_format, write_png=write_png, register_output_file_fn=self.register_output_file)
+        # final_context = final_context.adding_context_if_missing(self.sess.get_context()) # add the session context if it's missing
+        active_out_figure_paths = build_and_write_to_file(fig, final_context, self.get_output_manager(), write_vector_format=write_vector_format, write_png=write_png, register_output_file_fn=self.register_output_file)
         return active_out_figure_paths, final_context
-
 
 
     @classmethod
@@ -516,8 +502,10 @@ class PipelineWithDisplaySavingMixin:
         
         conform_to_implementing_method(cls.build_display_context_for_session)
         conform_to_implementing_method(cls.build_display_context_for_filtered_session)
-        conform_to_implementing_method(cls.write_figure_to_daily_programmatic_session_output_path)
-        conform_to_implementing_method(cls.write_figure_to_output_path)
+        # conform_to_implementing_method(cls.write_figure_to_daily_programmatic_session_output_path)
+        # conform_to_implementing_method(cls.write_figure_to_output_path)
+        conform_to_implementing_method(cls.output_figure)
+        
 
 
 

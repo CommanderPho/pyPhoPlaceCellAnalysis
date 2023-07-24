@@ -1,22 +1,105 @@
 import numpy as np
+import pandas as pd
+from attrs import define, field, Factory
+from benedict import benedict # https://github.com/fabiocaccamo/python-benedict#usage
+
+from neuropy.utils.mixins.dict_representable import SubsettableDictRepresentable
 
 from pyphocorehelpers.indexing_helpers import Paginator
 from pyphocorehelpers.DataStructure.general_parameter_containers import VisualizationParameters, RenderPlotsData, RenderPlots
 from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer
 from pyphocorehelpers.gui.Qt.connections_container import ConnectionsContainer
-
 from pyphocorehelpers.indexing_helpers import safe_find_index_in_list
 
 from pyphoplacecellanalysis.External.pyqtgraph import QtCore
 from pyphoplacecellanalysis.GUI.Qt.Widgets.PaginationCtrl.PaginationControlWidget import PaginationControlWidget
 
-from attrs import define, field, Factory
+
 
 """ refactored to avoid:
 
 TypeError: super(type, obj): obj must be an instance or subtype of type
 
 """
+
+@define(slots=False, eq=False)
+class SelectionsObject(SubsettableDictRepresentable):
+    global_epoch_start_t: float
+    global_epoch_end_t: float
+    variable_name: str
+    figure_ctx: "IdentifyingContext" = field(alias='active_identifying_figure_ctx')
+
+    flat_all_data_indicies: np.ndarray
+    is_selected: np.ndarray
+    epoch_labels: np.ndarray
+
+    @property
+    def selected_indicies(self):
+        """The selected_indicies property."""
+        return self.flat_all_data_indicies[self.is_selected]
+    
+    def to_dataframe(self) -> pd.DataFrame:
+        # to dataframe:
+        dict_repr = self.to_dict()
+        selection_epochs_df = pd.DataFrame(dict_repr.subset(['epoch_labels', 'flat_all_data_indicies']))
+        selection_epochs_df['is_selected'] = dict_repr['is_selected'].values()
+        return selection_epochs_df
+
+
+    @classmethod
+    def init_from_visualization_params(cls, params: VisualizationParameters):
+        active_params_dict: benedict = benedict(params.to_dict())
+        active_params_dict = active_params_dict.subset(['global_epoch_start_t', 'global_epoch_end_t', 'variable_name', 'active_identifying_figure_ctx', 'flat_all_data_indicies', 'epoch_labels', 'is_selected'])
+        active_params_dict['is_selected'] = np.array(list(active_params_dict['is_selected'].values())) # dump the keys
+        return cls(**active_params_dict)
+        
+
+    def update_selections_from_annotations(self, user_annotations_dict:dict, debug_print=True):
+        """ 
+
+        saved_selection_L.is_selected
+
+
+        saved_selection_L = pagination_controller_L.save_selection()
+        saved_selection_S = pagination_controller_S.save_selection()
+
+        saved_selection_L.update_selections_from_annotations(user_annotations_dict=user_annotations)
+        saved_selection_S.update_selections_from_annotations(user_annotations_dict=user_annotations)
+                
+        ## re-apply the selections:
+        pagination_controller_L.restore_selections(saved_selection_L)
+        pagination_controller_S.restore_selections(saved_selection_S)
+
+        History:
+        
+            Old Usage:
+                ## Capture current user selection
+                saved_selection_L = pagination_controller_L.save_selection()
+                saved_selection_S = pagination_controller_S.save_selection()
+
+                saved_selection_L = UserAnnotationsManager.update_selections_from_annotations(saved_selection_L, user_annotations)
+                saved_selection_S = UserAnnotationsManager.update_selections_from_annotations(saved_selection_S, user_annotations)
+        """
+        final_figure_context = self.figure_ctx
+        was_annotation_found = False
+        # try to find a matching user_annotation for the final_context_L
+        for a_ctx, selections_array in user_annotations_dict.items():
+            an_item_diff = a_ctx.diff(final_figure_context)
+            if debug_print:
+                print(an_item_diff)
+                print(f'\t{len(an_item_diff)}')
+            if an_item_diff == {('user_annotation', 'selections')}:
+                print(f'item found: {a_ctx}\nselections_array: {selections_array}')
+                was_annotation_found = True
+                self.is_selected = np.isin(self.flat_all_data_indicies, selections_array) # update the is_selected
+                break # done looking
+            
+            # print(IdentifyingContext.subtract(a_ctx, final_context_L))
+        if not was_annotation_found:
+            print(f'WARNING: no matching context found in {len(user_annotations_dict)} annotations. `saved_selection` will be returned unaltered.')
+        return self
+
+
 
 @define(slots=False, eq=False) # eq=False makes hashing and equality by identity, which is appropriate for this type of object
 class PaginatedFigureBaseController:
@@ -56,6 +139,29 @@ class PaginatedFigureBaseController:
         return self.params.flat_all_data_indicies[self.is_selected]
 
 
+    def save_selection(self) -> SelectionsObject:
+        # active_params_backup: VisualizationParameters = _out_pagination_controller.params
+        # list(_out_pagination_controller.params.keys())
+        # active_params_dict: benedict = benedict(active_params_backup.to_dict())
+        # active_params_dict = active_params_dict.subset(['global_epoch_start_t', 'global_epoch_end_t', 'variable_name', 'active_identifying_figure_ctx', 'flat_all_data_indicies', 'epoch_labels', 'is_selected'])
+        # active_params_dict['is_selected'] = active_params_dict['is_selected'].values() # dump
+        active_selections_object = SelectionsObject.init_from_visualization_params(self.params)
+        return active_selections_object
+
+    def restore_selections(self, selections: SelectionsObject, defer_render=False):
+        # if not isinstance(selections_dict, benedict):
+        # 	selections_dict = benedict(selections_dict)
+        # Validate the restore by making sure that we're restoring onto the valid objects
+        assert self.params.active_identifying_figure_ctx == selections.figure_ctx
+        assert self.params.variable_name == selections.variable_name
+        # were_any_updated = False
+        for a_selected_index in selections.selected_indicies:
+            assert a_selected_index in self.params.flat_all_data_indicies, f"a_selected_index: {a_selected_index} is not in flat_all_data_indicies: {self.params.flat_all_data_indicies}"
+            self.params.is_selected[a_selected_index] = True
+        # Post:
+        self.perform_update_selections(defer_render=defer_render)
+        
+
     def on_click(self, event):
         """ called when an axis is clicked to toggle the selection. """
         # Get the clicked Axes object
@@ -73,7 +179,9 @@ class PaginatedFigureBaseController:
         self.perform_update_ax_selected_state(ax=ax, is_selected=self.params.is_selected[found_data_index])
 
         # Redraw the figure to show the updated selection
-        event.canvas.draw()
+        # event.canvas.draw()
+        event.canvas.draw_idle()
+
 
     def perform_update_ax_selected_state(self, ax, is_selected: bool):
         """ simply updates the visual appearance of the provided ax to indicate whether it's selected. """
@@ -97,7 +205,7 @@ class PaginatedFigureBaseController:
                 
         # Redraw the figure to show the updated selection
         if not defer_render:
-            self.plots.fig.canvas.draw()
+            self.plots.fig.canvas.draw_idle()
 
     def _subfn_helper_setup_selectability(self):
         """ sets up selectability of items. 
@@ -123,11 +231,20 @@ class PaginatedFigureBaseController:
         """
         if self.params.get('active_identifying_figure_ctx', None) is not None:
             collision_prefix = kwargs.pop('collision_prefix', '_DecodedEpochSlices_plot_test_')
-            active_identifying_ctx = self.params.active_identifying_figure_ctx.adding_context(collision_prefix, **kwargs, page=f'{page_idx+1}of{self.paginator.num_pages}', aclus=f"{included_page_data_indicies}")
+            context_kwargs = kwargs
+            if (self.paginator.num_pages > 1):
+                 # ideally wouldn't include page number unless (self.paginator.num_pages > 1)
+                 context_kwargs['page'] = f'{page_idx+1}of{self.paginator.num_pages}'
+            context_kwargs['aclus'] = f"{included_page_data_indicies}" # BUG: these aren't aclus when plotting epochs or something else.
+            # Build the context:
+            active_identifying_ctx = self.params.active_identifying_figure_ctx
+            if len(context_kwargs) > 0:
+                active_identifying_ctx = active_identifying_ctx.adding_context(collision_prefix, **context_kwargs) 
+
             final_context = active_identifying_ctx # Display/Variable context mode
             active_identifying_ctx_string = final_context.get_description(separator='|') # Get final discription string
-            print(f'active_identifying_ctx_string: "{active_identifying_ctx_string}"')
-            # active_figure_save_basename = build_figure_basename_from_display_context(final_context)
+            if kwargs.get('debug_print', False):
+                print(f'active_identifying_ctx_string: "{active_identifying_ctx_string}"')
             self.update_titles(active_identifying_ctx_string)
         else:
             active_identifying_ctx = None
@@ -174,7 +291,7 @@ class PaginatedFigureController(PaginatedFigureBaseController):
         - docking widgets in figures
         - from pyphoplacecellanalysis.GUI.Qt.PlaybackControls.Spike3DRasterBottomPlaybackControlBarWidget import Spike3DRasterBottomPlaybackControlBar, on_jump_left
         
-	Usage:
+    Usage:
     
     from pyphoplacecellanalysis.GUI.Qt.Mixins.PaginationMixins import PaginatedFigureController
         
@@ -202,60 +319,4 @@ class PaginatedFigureController(PaginatedFigureBaseController):
     
 
 
-# class PaginatedFigureController(QtCore.QObject):
-#     """2023-05-08 - Holds the current state for real-time pagination 
-    
-#     Potential existing similar implementations
-#         - that Spike3DWindow event jump utility used to jump to next/prev/specific event (like replays, etc)
-#         - create_new_figure_if_needed(a_name) or something similar
-#         - that tabbed matplotlib figure implementation
-#         - docking widgets in figures
-#         - from pyphoplacecellanalysis.GUI.Qt.PlaybackControls.Spike3DRasterBottomPlaybackControlBarWidget import Spike3DRasterBottomPlaybackControlBar, on_jump_left
-        
-# 	Usage:
-    
-#     from pyphoplacecellanalysis.GUI.Qt.Mixins.PaginationMixins import PaginatedFigureController
-        
-#     """
-#     params: VisualizationParameters
-#     plots_data: RenderPlotsData
-#     plots: RenderPlots
-#     ui: PhoUIContainer
-
-#     ## Computed properties:
-#     @property
-#     def paginator(self):
-#         """The paginator property."""
-#         return self.plots_data.paginator
-
-#     @property
-#     def current_page_idx(self):
-#         """The curr_page_index property."""
-#         return self.ui.mw.ui.paginator_controller_widget.current_page_idx
-
-#     @property
-#     def total_number_of_items_to_show(self):
-#         """The total number of items (subplots usually) to be shown across all pages)."""
-#         return self.paginator.nItemsToShow
-
-#     def __init__(self, params, plots_data, plots, ui, parent=None):
-#         super(PaginatedFigureController, self).__init__(parent=parent)
-#         self.params, self.plots_data, self.plots, self.ui = params, plots_data, plots, ui
-
-#     def configure(self, **kwargs):
-#         """ assigns and computes needed variables for rendering. """
-#         self._subfn_helper_setup_selectability()
-
-#     def initialize(self, **kwargs):
-#         """ sets up Figures """
-#         # self.fig, self.axs = plt.subplots(nrows=len(rr_replays))
-#         pass
-
-#     def update(self, **kwargs):
-#         """ called to specifically render data on the figure. """
-#         pass
-
-#     def on_close(self):
-#         """ called when the figure is closed. """
-#         pass
     

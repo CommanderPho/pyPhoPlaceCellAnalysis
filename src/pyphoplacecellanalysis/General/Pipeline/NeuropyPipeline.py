@@ -580,7 +580,12 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
 
         Returns:
             _type_: returns the finalized save path if the file was saved, or none if saving_mode=PipelineSavingScheme.SKIP_SAVING
+            
+            
+        TODO
         """
+        #TODO 2023-06-13 17:30: - [ ] The current operation doesn't make sense for PipelineSavingScheme.TEMP_THEN_OVERWRITE: it currently saves the new pipeline to a temporary file before replacing the existing file. This means after the operation there are two identical copies of the same pipeline. 
+            # should make a backup of the existing file, not the new one
         saving_mode = PipelineSavingScheme.init(saving_mode)
 
         if not saving_mode.shouldSave:
@@ -595,7 +600,8 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
                 finalized_loaded_sess_pickle_path = self.pickle_path # get the internal pickle path that it was loaded from if none specified
                 used_existing_pickle_path = True
             else:        
-                finalized_loaded_sess_pickle_path = Path(self.sess.basepath).joinpath(active_pickle_filename).resolve()
+                finalized_loaded_sess_pickle_path = Path(self.sess.basepath).joinpath(active_pickle_filename).resolve() # Uses the './loadedSessPickle.pkl' path
+                # finalized_loaded_sess_pickle_path = self.get_output_path().joinpath(active_pickle_filename).resolve() # Changed to use the 'output/loadedSessPickle.pkl' directory 
                 used_existing_pickle_path = (finalized_loaded_sess_pickle_path == self.pickle_path) # used the existing path if they're the same
             
             self.logger.info(f'save_pipeline(): Attempting to save pipeline to disk...')
@@ -619,8 +625,11 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
                     self.logger.warning(f'WARNING: saving_mode is OVERWRITE_IN_PLACE so {finalized_loaded_sess_pickle_path} will be overwritten even though exists.')
                 
             # Save reloaded pipeline out to pickle for future loading
-            saveData(finalized_loaded_sess_pickle_path, db=self) # Save the pipeline out to pickle.
-
+            try:
+                saveData(finalized_loaded_sess_pickle_path, db=self) # Save the pipeline out to pickle.
+            except Exception as e:
+                raise e
+            
             # If we saved to a temporary name, now see if we should overwrite or backup and then replace:
             if (is_temporary_file_used and (saving_mode.name == PipelineSavingScheme.TEMP_THEN_OVERWRITE.name)):
                 assert _desired_finalized_loaded_sess_pickle_path is not None
