@@ -903,9 +903,7 @@ class BatchSessionCompletionHandler:
         marker_list = [(5, i) for i in np.arange(len(unique_animals))] # [(5, 0), (5, 1), (5, 2)]
         scatter_props = [{'marker': mkr} for mkr in marker_list]  # Example, you should provide your own scatter properties
         scatter_props_dict = dict(zip(unique_animals, scatter_props))
-        # {'pin01': {'marker': (5, 0)},
-        #  'gor01': {'marker': (5, 1)},
-        #  'vvp01': {'marker': (5, 2)}}
+        # {'pin01': {'marker': (5, 0)}, 'gor01': {'marker': (5, 1)}, 'vvp01': {'marker': (5, 2)}}
         # Pass a function that will return a set of kwargs for a given context
         def _return_scatter_props_fn(ctxt: IdentifyingContext):
             """ captures `scatter_props_dict` """
