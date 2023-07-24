@@ -637,6 +637,8 @@ class SingleBarResult:
     values: np.ndarray
     LxC_aclus: np.ndarray # the list of long-eXclusive cell aclus
     SxC_aclus: np.ndarray # the list of short-eXclusive cell aclus
+    LxC_scatter_props: Optional[Dict]
+    SxC_scatter_props: Optional[Dict]
 
 
 # Instantaneous versions:
@@ -653,8 +655,8 @@ class InstantaneousSpikeRateGroupsComputation:
     LxC_aclus: np.ndarray = field(init=False) # the list of long-eXclusive cell aclus
     SxC_aclus: np.ndarray = field(init=False) # the list of short-eXclusive cell aclus
     
-    Fig2_Replay_FR: List[Tuple[Any, Any]] = field(init=False)
-    Fig2_Laps_FR: List[Tuple[Any, Any]] = field(init=False)
+    Fig2_Replay_FR: List[SingleBarResult] = field(init=False) # a list of the four single-bar results.
+    Fig2_Laps_FR: List[SingleBarResult] = field(init=False) # a list of the four single-bar results.
 
     LxC_ReplayDeltaMinus: SpikeRateTrends = field(init=False, repr=False, default=None)
     LxC_ReplayDeltaPlus: SpikeRateTrends = field(init=False, repr=False, default=None)
@@ -714,7 +716,7 @@ class InstantaneousSpikeRateGroupsComputation:
 
         # Note that in general LxC and SxC might have differing numbers of cells.
         # self.Fig2_Replay_FR: list[tuple[Any, Any]] = [(v.cell_agg_inst_fr_list.mean(), v.cell_agg_inst_fr_list.std(), v.cell_agg_inst_fr_list) for v in (LxC_ReplayDeltaMinus, LxC_ReplayDeltaPlus, SxC_ReplayDeltaMinus, SxC_ReplayDeltaPlus)]
-        self.Fig2_Replay_FR: list[SingleBarResult] = [SingleBarResult(v.cell_agg_inst_fr_list.mean(), v.cell_agg_inst_fr_list.std(), v.cell_agg_inst_fr_list, self.LxC_aclus, self.SxC_aclus) for v in (LxC_ReplayDeltaMinus, LxC_ReplayDeltaPlus, SxC_ReplayDeltaMinus, SxC_ReplayDeltaPlus)]
+        self.Fig2_Replay_FR: list[SingleBarResult] = [SingleBarResult(v.cell_agg_inst_fr_list.mean(), v.cell_agg_inst_fr_list.std(), v.cell_agg_inst_fr_list, self.LxC_aclus, self.SxC_aclus, None, None) for v in (LxC_ReplayDeltaMinus, LxC_ReplayDeltaPlus, SxC_ReplayDeltaMinus, SxC_ReplayDeltaPlus)]
         
         # Laps/Theta: Uses `global_session.spikes_df`, `long_exclusive.track_exclusive_aclus, `short_exclusive.track_exclusive_aclus`, `long_laps`, `short_laps`
         # LxC: `long_exclusive.track_exclusive_aclus`
@@ -732,7 +734,7 @@ class InstantaneousSpikeRateGroupsComputation:
         self.LxC_ThetaDeltaMinus, self.LxC_ThetaDeltaPlus, self.SxC_ThetaDeltaMinus, self.SxC_ThetaDeltaPlus = LxC_ThetaDeltaMinus, LxC_ThetaDeltaPlus, SxC_ThetaDeltaMinus, SxC_ThetaDeltaPlus
 
         # Note that in general LxC and SxC might have differing numbers of cells.
-        self.Fig2_Laps_FR: list[SingleBarResult] = [SingleBarResult(v.cell_agg_inst_fr_list.mean(), v.cell_agg_inst_fr_list.std(), v.cell_agg_inst_fr_list, self.LxC_aclus, self.SxC_aclus) for v in (LxC_ThetaDeltaMinus, LxC_ThetaDeltaPlus, SxC_ThetaDeltaMinus, SxC_ThetaDeltaPlus)]
+        self.Fig2_Laps_FR: list[SingleBarResult] = [SingleBarResult(v.cell_agg_inst_fr_list.mean(), v.cell_agg_inst_fr_list.std(), v.cell_agg_inst_fr_list, self.LxC_aclus, self.SxC_aclus, None, None) for v in (LxC_ThetaDeltaMinus, LxC_ThetaDeltaPlus, SxC_ThetaDeltaMinus, SxC_ThetaDeltaPlus)]
         
 
     def __add__(self, other):
