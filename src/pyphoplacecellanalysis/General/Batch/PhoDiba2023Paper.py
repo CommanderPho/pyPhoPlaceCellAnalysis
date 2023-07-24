@@ -820,7 +820,12 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
 
 
     @classmethod
-    def create_bar_plot(cls, x_labels, y_values, scatter_props, active_context, ylabel, title):
+    def create_plot(cls, x_labels, y_values, scatter_props, ylabel, title, fig_name, active_context, defer_show, title_modifier=None):
+        """ """
+        if title_modifier:
+            title = title_modifier(title)
+
+        # fig, ax, bars, scatter_plots, title_text_obj, footer_text_obj, plot_data = cls.create_bar_plot(x_labels, y_values, scatter_props, active_context, ylabel, title)
         text_formatter = FormattedFigureText()
         x = np.arange(len(x_labels))
         width = 0.3
@@ -828,8 +833,7 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
         fig, ax = plt.subplots()
         text_formatter.setup_margins(fig)
 
-        bars = ax.bar(x, [np.mean(yi) for yi in y_values], yerr=[np.std(yi) for yi in y_values], capsize=5,
-                    width=width, tick_label=x_labels, color=(0, 0, 0, 0), edgecolor=cls.get_bar_colors())
+        bars = ax.bar(x, [np.mean(yi) for yi in y_values], yerr=[np.std(yi) for yi in y_values], capsize=5, width=width, tick_label=x_labels, color=(0, 0, 0, 0), edgecolor=cls.get_bar_colors())
 
         scatter_plots = []
         x_values_list = []
@@ -859,16 +863,7 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
         ax.set_xticklabels(x_labels)
 
         plot_data = (x_values_list, y_values)
-        return fig, ax, bars, scatter_plots, title_text_obj, footer_text_obj, plot_data
-
-
-    @classmethod
-    def create_plot(cls, x_labels, y_values, scatter_props, ylabel, title, fig_name, active_context, defer_show, title_modifier=None):
-        """ """
-        if title_modifier:
-            title = title_modifier(title)
-
-        fig, ax, bars, scatter_plots, title_text_obj, footer_text_obj, plot_data = cls.create_bar_plot(x_labels, y_values, scatter_props, active_context, ylabel, title)
+        
 
         if not defer_show:
             plt.show()
