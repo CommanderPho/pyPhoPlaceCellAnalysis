@@ -54,6 +54,16 @@ _bak_rcParams = mpl.rcParams.copy()
 # mpl.rcParams['toolbar'] = 'None' # disable toolbars
 # %matplotlib qt
 
+def list_of_dicts_to_dict_of_lists(list_of_dicts):
+    dict_of_lists = {}
+    for item in list_of_dicts:
+        for key, value in item.items():
+            if key in dict_of_lists:
+                dict_of_lists[key].append(value)
+            else:
+                dict_of_lists[key] = [value]
+    return dict_of_lists
+
 
 # ==================================================================================================================== #
 # 2023-06-29 - Build Properly sorted ratemaps with potentially missing entries                                         #
@@ -846,7 +856,7 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
 
         for i in range(len(x)):
             x_values = (x[i] + np.random.random(y_values[i].size) * width - width / 2)
-            scatter_plot = ax.scatter(x_values, y_values[i], color=cls.get_bar_colors()[i], **scatter_props[i]) # the np.random part is to spread the points out along the x-axis within their bar so they're visible and don't overlap.
+            scatter_plot = ax.scatter(x_values, y_values[i], color=cls.get_bar_colors()[i], **list_of_dicts_to_dict_of_lists(scatter_props[i])) # the np.random part is to spread the points out along the x-axis within their bar so they're visible and don't overlap.
             scatter_plots.append(scatter_plot)
             x_values_list.append(x_values)
             
@@ -880,7 +890,15 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
 
         x_labels = ['$L_x C$\t$\\theta_{\\Delta -}$', '$L_x C$\t$\\theta_{\\Delta +}$', '$S_x C$\t$\\theta_{\\Delta -}$', '$S_x C$\t$\\theta_{\\Delta +}$']
         all_data_points = np.array([v.values for v in Fig2_Laps_FR])
-        all_scatter_props =  Fig2_Laps_FR[0].LxC_scatter_props + Fig2_Laps_FR[1].LxC_scatter_props + Fig2_Laps_FR[2].SxC_scatter_props + Fig2_Laps_FR[3].SxC_scatter_props # the LxC_scatter_props and SxC_scatter_props are actually the same for all entries in this list, but get em like this anyway. 
+        # all_scatter_props =  Fig2_Laps_FR[0].LxC_scatter_props + Fig2_Laps_FR[1].LxC_scatter_props + Fig2_Laps_FR[2].SxC_scatter_props + Fig2_Laps_FR[3].SxC_scatter_props # the LxC_scatter_props and SxC_scatter_props are actually the same for all entries in this list, but get em like this anyway. 
+
+        if Fig2_Laps_FR[0].LxC_scatter_props is not None:
+            # all_scatter_props =  Fig2_Laps_FR[0].LxC_scatter_props + Fig2_Laps_FR[1].LxC_scatter_props + Fig2_Laps_FR[2].SxC_scatter_props + Fig2_Laps_FR[3].SxC_scatter_props # the LxC_scatter_props and SxC_scatter_props are actually the same for all entries in this list, but get em like this anyway. 
+            all_scatter_props =  [Fig2_Laps_FR[0].LxC_scatter_props, Fig2_Laps_FR[1].LxC_scatter_props, Fig2_Laps_FR[2].SxC_scatter_props, Fig2_Laps_FR[3].SxC_scatter_props]
+
+        else:
+            all_scatter_props = [{}, {}, {}, {}]
+
         return cls.create_plot(x_labels, all_data_points, all_scatter_props, 'Laps Firing Rates (Hz)', 'Lap ($\\theta$)', 'fig_2_Theta_FR_matplotlib', active_context, defer_show, kwargs.get('title_modifier'))
 
 
@@ -900,7 +918,8 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
 
     @classmethod
     def add_optional_aclu_labels(cls, a_fig_container, LxC_aclus, SxC_aclus, enable_hover_labels=True, enable_tiny_point_labels=True):
-        """ 
+        """ Adds disambiguating labels to each of the scatterplot points. Important for specifying which ACLU is plotted.
+
 
         Parameters:
             enable_hover_labels = True # add interactive point hover labels using mplcursors
