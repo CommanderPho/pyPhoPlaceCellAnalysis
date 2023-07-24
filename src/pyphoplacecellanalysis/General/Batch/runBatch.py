@@ -118,7 +118,6 @@ class BatchRun:
         out_df = out_df.batch_results.build_all_columns() # this uses the same accessor.
         return out_df
 
-
     # Main functionality _________________________________________________________________________________________________ #
     def execute_all(self, use_multiprocessing=True, num_processes=None, included_session_contexts: Optional[List[IdentifyingContext]]=None, session_inclusion_filter:Optional[Callable]=None, **kwargs):
         """ calls `run_specific_batch(...)` for each session context to actually execute the session's run. """
@@ -170,8 +169,6 @@ class BatchRun:
                 curr_session_status = self.session_batch_status[curr_session_context]
                 curr_session_basedir = self.session_batch_basedirs[curr_session_context]
                 self.session_batch_status[curr_session_context], self.session_batch_errors[curr_session_context], self.session_batch_outputs[curr_session_context] = run_specific_batch(self, curr_session_context, curr_session_basedir, **kwargs)
-
-
 
     # Updating ___________________________________________________________________________________________________________ #
     def change_global_root_path(self, desired_global_data_root_parent_path):
@@ -255,7 +252,6 @@ class BatchRun:
         batch_run.session_contexts = session_contexts
         
         return batch_run
-
     
     # ==================================================================================================================== #
     # New 2023-06-13 File Loading functions                                                                                #
@@ -380,7 +376,6 @@ class BatchRun:
         return updated_batch_progress_df
 
 
-
 @pd.api.extensions.register_dataframe_accessor("batch_results")
 class BatchResultDataframeAccessor():
     """ A Pandas pd.DataFrame representation of results from the batch processing of sessions
@@ -446,8 +441,6 @@ class BatchResultDataframeAccessor():
                 out_counts.append((0, 0, 0, 0))
         return pd.DataFrame.from_records(out_counts, columns=out_new_column_names)
                 
-
-
     @classmethod
     def post_load_find_usable_sessions(cls, batch_progress_df, min_required_replays_or_laps=5, require_user_annotations=False):
         """ updates batch_progress_df['is_ready'] and returns only the good frames.
@@ -466,8 +459,6 @@ class BatchResultDataframeAccessor():
         good_batch_progress_df = deepcopy(batch_progress_df)
         good_batch_progress_df = good_batch_progress_df[good_batch_progress_df['is_ready']]
         return good_batch_progress_df
-
-
 
     @classmethod
     def _validate(cls, obj):
@@ -602,6 +593,28 @@ class BatchResultDataframeAccessor():
         self._obj.to_csv(global_batch_result_CSV_export_file_path)
         return global_batch_result_CSV_export_file_path
 
+    @staticmethod
+    def dataframe_functions_test():
+        """ 2023-06-13 - Tests loading saved .h5 `global_batch_result` Dataframe. And updating it for the local platform.
+
+        #TODO 2023-06-13 18:09: - [ ] Finish this implementation up and make decision deciding how to use it
+            
+        """
+        global_data_root_parent_path = find_first_extant_path(known_global_data_root_parent_paths)
+        assert global_data_root_parent_path.exists(), f"global_data_root_parent_path: {global_data_root_parent_path} does not exist! Is the right computer's config commented out above?"
+
+        ## Build Pickle Path:
+        pkl_path = 'global_batch_result_2023-06-08.pkl'
+        csv_path = 'global_batch_result_2023-06-08.csv'
+        h5_path = 'global_batch_result_2023-06-08.h5'
+
+        global_batch_result_file_path = Path(global_data_root_parent_path).joinpath(h5_path).resolve() # Use Default
+
+        batch_progress_df = BatchRun.load_batch_progress_df_from_h5(global_batch_result_file_path)
+        batch_progress_df = BatchRun.rebuild_basedirs(batch_progress_df, global_data_root_parent_path)
+
+        good_only_batch_progress_df = batch_progress_df[batch_progress_df['locally_is_ready']].copy()
+        return good_only_batch_progress_df, batch_progress_df
 
 @define(slots=False)
 class BatchComputationProcessOptions:
@@ -885,12 +898,32 @@ class BatchSessionCompletionHandler:
             # return [f"{session_context}_{aclu}" for aclu in session_relative_aclus] # need very short version
             return [f"{context_minimal_names_map[session_context]}_{aclu}" for aclu in session_relative_aclus] # need very short version
 
+        unique_animals = IdentifyingContext.find_unique_values(all_contexts_list)['animal'] # {'gor01', 'pin01', 'vvp01'}
+        # Get number of animals to plot
+        marker_list = [(5, i) for i in np.arange(len(unique_animals))] # [(5, 0), (5, 1), (5, 2)]
+        scatter_props = [{'marker': mkr} for mkr in marker_list]  # Example, you should provide your own scatter properties
+        scatter_props_dict = dict(zip(unique_animals, scatter_props))
+        # {'pin01': {'marker': (5, 0)},
+        #  'gor01': {'marker': (5, 1)},
+        #  'vvp01': {'marker': (5, 2)}}
+        # Pass a function that will return a set of kwargs for a given context
+        def _return_scatter_props_fn(ctxt: IdentifyingContext):
+            """ captures `scatter_props_dict` """
+            animal_id = str(ctxt.animal)
+            return scatter_props_dict[animal_id]
 
         LxC_aclus = np.concatenate([_build_session_dep_aclu_identifier(k, v.LxC_aclus) for k, v in across_sessions_instantaneous_fr_dict.items()])
         SxC_aclus = np.concatenate([_build_session_dep_aclu_identifier(k, v.SxC_aclus) for k, v in across_sessions_instantaneous_fr_dict.items()])
 
         across_session_inst_fr_computation.LxC_aclus = LxC_aclus
         across_session_inst_fr_computation.SxC_aclus = SxC_aclus
+        
+        ## Scatter props:
+        LxC_scatter_props = [_return_scatter_props_fn(k) for k, v in across_sessions_instantaneous_fr_dict.items()]
+        SxC_scatter_props = [_return_scatter_props_fn(k) for k, v in across_sessions_instantaneous_fr_dict.items()]
+        
+        across_session_inst_fr_computation.LxC_scatter_props = LxC_scatter_props
+        across_session_inst_fr_computation.SxC_scatter_props = SxC_scatter_props
 
         # i = 0
         # across_sessions_instantaneous_frs_list[i].LxC_aclus
@@ -1130,27 +1163,6 @@ def main(active_global_batch_result_filename='global_batch_result.pkl', debug_pr
 # ==================================================================================================================== #
 # Exporters                                                                                                            #
 # ==================================================================================================================== #
-def dataframe_functions_test():
-    """ 2023-06-13 - Tests loading saved .h5 `global_batch_result` Dataframe. And updating it for the local platform.
-
-    #TODO 2023-06-13 18:09: - [ ] Finish this implementation up and make decision deciding how to use it
-        
-    """
-    global_data_root_parent_path = find_first_extant_path(known_global_data_root_parent_paths)
-    assert global_data_root_parent_path.exists(), f"global_data_root_parent_path: {global_data_root_parent_path} does not exist! Is the right computer's config commented out above?"
-
-    ## Build Pickle Path:
-    pkl_path = 'global_batch_result_2023-06-08.pkl'
-    csv_path = 'global_batch_result_2023-06-08.csv'
-    h5_path = 'global_batch_result_2023-06-08.h5'
-
-    global_batch_result_file_path = Path(global_data_root_parent_path).joinpath(h5_path).resolve() # Use Default
-
-    batch_progress_df = BatchRun.load_batch_progress_df_from_h5(global_batch_result_file_path)
-    batch_progress_df = BatchRun.rebuild_basedirs(batch_progress_df, global_data_root_parent_path)
-
-    good_only_batch_progress_df = batch_progress_df[batch_progress_df['locally_is_ready']].copy()
-    return good_only_batch_progress_df, batch_progress_df
 
 
 # 2023-07-07

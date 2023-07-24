@@ -287,8 +287,6 @@ class AssigningEpochs:
         return num_unassigned, num_disregarded, num_assigned
     
 
-    
-
     def _subfn_plot_epoch_track_assignments(self, axis_idx:int, fig=None, axs=None, defer_render=False):
         """ Plots a figure that represents each epoch as a little box that can be colored in based on the track assignment: grey for Unassigned, blue for Long, red for Short, black for Neither.
 
@@ -833,6 +831,12 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
 
         scatter_plots = []
         x_values_list = []
+        
+        if hasattr(cls, 'scatter_props_fn'):
+            # get individual scatter_props_Fn
+            _output = cls.scatter_props_fn(active_context)
+            print(f'_output: {_output}')
+
 
         for i in range(len(x)):
             x_values = (x[i] + np.random.random(y_values[i].size) * width - width / 2)
@@ -858,6 +862,7 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
 
     @classmethod
     def create_plot(cls, x_labels, y_values, scatter_props, ylabel, title, fig_name, active_context, defer_show, title_modifier=None):
+        """ """
         if title_modifier:
             title = title_modifier(title)
 
@@ -969,7 +974,7 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
         _fig_2_theta_out = self.fig_2_Theta_FR_matplotlib(self.computation_result.Fig2_Laps_FR, defer_show=defer_show,
                                                         active_context=active_context, top_margin=top_margin,
                                                         left_margin=left_margin, bottom_margin=bottom_margin,
-                                                        title_modifier=title_modifier)
+                                                        title_modifier=title_modifier, scatter_props=kwargs.get('scatter_props', {}))
 
         _fig_2_replay_out = self.fig_2_Replay_FR_matplotlib(self.computation_result.Fig2_Replay_FR, defer_show=defer_show,
                                                             active_context=active_context, top_margin=top_margin,
@@ -1089,7 +1094,7 @@ def across_sessions_bar_graphs(across_session_inst_fr_computation: Dict[Identify
     _out_aggregate_fig_2._pipeline_file_callback_fn = output_figure
 
     # Showing
-    restore_previous_matplotlib_settings_callback = matplotlib_configuration_update(is_interactive=True, backend='Qt5Agg')
+    matplotlib_configuration_update(is_interactive=True, backend='Qt5Agg')
     # Perform interactive Matplotlib operations with 'Qt5Agg' backend
     _fig_2_theta_out, _fig_2_replay_out = _out_aggregate_fig_2.display(active_context=global_multi_session_context, title_modifier_fn=lambda original_title: f"{original_title} ({num_sessions} sessions)", save_figure=True, **kwargs)
         
