@@ -864,7 +864,6 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
 
         plot_data = (x_values_list, y_values)
         
-
         if not defer_show:
             plt.show()
 
@@ -873,27 +872,31 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
                                     plot_data=plot_data)
 
 
+    # @providing_context(fig='F2', frs='Laps')
     @classmethod
-    @providing_context(fig='F2', frs='Laps')
     def fig_2_Theta_FR_matplotlib(cls, Fig2_Laps_FR, defer_show=False, **kwargs) -> MatplotlibRenderPlots:
         active_context = kwargs.get('active_context', None)
         assert active_context is not None
 
         x_labels = ['$L_x C$\t$\\theta_{\\Delta -}$', '$L_x C$\t$\\theta_{\\Delta +}$', '$S_x C$\t$\\theta_{\\Delta -}$', '$S_x C$\t$\\theta_{\\Delta +}$']
         all_data_points = np.array([v.values for v in Fig2_Laps_FR])
-        return cls.create_plot(x_labels, all_data_points, kwargs.get('scatter_props', {}), 'Laps Firing Rates (Hz)', 'Lap ($\\theta$)', 'fig_2_Theta_FR_matplotlib', active_context, defer_show, kwargs.get('title_modifier'))
+        all_scatter_props =  Fig2_Laps_FR[0].LxC_scatter_props + Fig2_Laps_FR[1].LxC_scatter_props + Fig2_Laps_FR[2].SxC_scatter_props + Fig2_Laps_FR[3].SxC_scatter_props # the LxC_scatter_props and SxC_scatter_props are actually the same for all entries in this list, but get em like this anyway. 
+        return cls.create_plot(x_labels, all_data_points, all_scatter_props, 'Laps Firing Rates (Hz)', 'Lap ($\\theta$)', 'fig_2_Theta_FR_matplotlib', active_context, defer_show, kwargs.get('title_modifier'))
 
 
+    # @providing_context(fig='F2', frs='Replay')
     @classmethod
-    @providing_context(fig='F2', frs='Replay')
     def fig_2_Replay_FR_matplotlib(cls, Fig2_Replay_FR, defer_show=False, **kwargs) -> MatplotlibRenderPlots:
         active_context = kwargs.get('active_context', None)
         assert active_context is not None
 
         x_labels = ['$L_x C$\t$R_{\\Delta -}$', '$L_x C$\t$R_{\\Delta +}$', '$S_x C$\t$R_{\\Delta -}$', '$S_x C$\t$R_{\\Delta +}$']
+        assert len(Fig2_Replay_FR) == 4
         all_data_points = np.array([v.values for v in Fig2_Replay_FR])
-
-        return cls.create_plot(x_labels, all_data_points, kwargs.get('scatter_props', {}), 'Replay Firing Rates (Hz)', 'Replay', 'fig_2_Replay_FR_matplotlib', active_context, defer_show, kwargs.get('title_modifier'))
+        all_scatter_props = Fig2_Replay_FR[0].LxC_scatter_props + Fig2_Replay_FR[1].LxC_scatter_props + Fig2_Replay_FR[2].SxC_scatter_props + Fig2_Replay_FR[3].SxC_scatter_props # the LxC_scatter_props and SxC_scatter_props are actually the same for all entries in this list, but get em like this anyway. 
+        
+        # label_list = [LxC_aclus, LxC_aclus, SxC_aclus, SxC_aclus]
+        return cls.create_plot(x_labels, all_data_points, all_scatter_props, 'Replay Firing Rates (Hz)', 'Replay', 'fig_2_Replay_FR_matplotlib', active_context, defer_show, kwargs.get('title_modifier'))
 
     @classmethod
     def add_optional_aclu_labels(cls, a_fig_container, LxC_aclus, SxC_aclus, enable_hover_labels=True, enable_tiny_point_labels=True):
@@ -971,12 +974,12 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
         _fig_2_theta_out = self.fig_2_Theta_FR_matplotlib(self.computation_result.Fig2_Laps_FR, defer_show=defer_show,
                                                         active_context=active_context, top_margin=top_margin,
                                                         left_margin=left_margin, bottom_margin=bottom_margin,
-                                                        title_modifier=title_modifier, scatter_props=kwargs.get('scatter_props', {}))
+                                                        title_modifier=title_modifier)
 
         _fig_2_replay_out = self.fig_2_Replay_FR_matplotlib(self.computation_result.Fig2_Replay_FR, defer_show=defer_show,
                                                             active_context=active_context, top_margin=top_margin,
                                                             left_margin=left_margin, bottom_margin=bottom_margin,
-                                                            title_modifier=title_modifier, scatter_props=kwargs.get('scatter_props', {}))
+                                                            title_modifier=title_modifier)
 
 
         if enable_hover_labels or enable_tiny_point_labels:
