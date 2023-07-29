@@ -1026,49 +1026,6 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
         assert self._pipeline_file_callback_fn is not None
         return self._pipeline_file_callback_fn(*args, **kwargs) # call the saved callback
 
-    @classmethod
-    def serialized_key_blocklist(cls):
-        """ specifies specific keys NOT to serialize (to remove before serialization). If `serialized_key_allowlist` is specified, this variable will be ignored. """
-        return ['_pipeline_file_callback_fn'] # no keys by default
-
-    def to_dict(self):
-        if self.serialized_key_allowlist() is not None:
-            # Only use the allow list
-            state = {}
-            for an_included_key in self.serialized_key_allowlist():
-                state[an_included_key] = self.__dict__[an_included_key]
-        else:
-            # no allowlist specified
-            # state = self.serialization_perform_drop_blocklist(self.__dict__.copy())
-            state = self.serialization_perform_drop_blocklist(asdict(self))
-
-        return state
-
-    ## For serialization/pickling:
-    def __getstate__(self):
-        # Copy the object's state from self.__dict__ which contains
-        # all our instance attributes (_mapping and _keys_at_init). Always use the dict.copy()
-        # method to avoid modifying the original state.
-        state = self.to_dict().copy()
-        # state = self.to_dict().copy()
-        # Remove the unpicklable entries.
-        # del state['_pipeline_file_callback_fn']
-        return state
-
-    def __setstate__(self, state):
-        # Restore instance attributes (i.e., _mapping and _keys_at_init).
-        # print(f'SessionConfig.__setstate__(state: {state})')
-        if 'session_context' not in state:
-            from neuropy.core.session.Formats.BaseDataSessionFormats import DataSessionFormatRegistryHolder
-            # self.session_context = None
-            state['session_context'] = None
-            ## Tries to get the appropriate class using its self.format_name and compute its context
-            active_data_mode_registered_class = DataSessionFormatRegistryHolder.get_registry_data_session_type_class_name_dict()[state['format_name']]
-            state['session_context'] = active_data_mode_registered_class.parse_session_basepath_to_context(state['basepath'])
-
-        self.__dict__.update(state)
-        
-
 
 # 2023-07-21 - Across Sessions Aggregate Figure: __________________________________________________________________________________ #
 
