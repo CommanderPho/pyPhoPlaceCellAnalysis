@@ -747,30 +747,6 @@ class InstantaneousSpikeRateGroupsComputation:
         self.Fig2_Laps_FR: list[SingleBarResult] = [SingleBarResult(v.cell_agg_inst_fr_list.mean(), v.cell_agg_inst_fr_list.std(), v.cell_agg_inst_fr_list, self.LxC_aclus, self.SxC_aclus, None, None) for v in (LxC_ThetaDeltaMinus, LxC_ThetaDeltaPlus, SxC_ThetaDeltaMinus, SxC_ThetaDeltaPlus)]
         
 
-    def __add__(self, other):
-        """ for concatenating the fields of two `InstantaneousSpikeRateGroupsComputation objects. """
-        #TODO 2023-07-18 11:37: - [ ] Doesn't account for self.LxC_aclus, self.SxC_aclus, or self.active_context. Should probably form a context-specific SxC_aclus and LxC_aclus array if needed.
-        if isinstance(other, InstantaneousSpikeRateGroupsComputation):
-            new_obj = InstantaneousSpikeRateGroupsComputation()
-            new_obj.Fig2_Replay_FR = self.Fig2_Replay_FR + other.Fig2_Replay_FR
-            new_obj.Fig2_Laps_FR = self.Fig2_Laps_FR + other.Fig2_Laps_FR
-
-            # Concatenate SpikeRateTrends members
-            new_obj.LxC_ReplayDeltaMinus = self.LxC_ReplayDeltaMinus + other.LxC_ReplayDeltaMinus
-            new_obj.LxC_ReplayDeltaPlus = self.LxC_ReplayDeltaPlus + other.LxC_ReplayDeltaPlus
-            new_obj.SxC_ReplayDeltaMinus = self.SxC_ReplayDeltaMinus + other.SxC_ReplayDeltaMinus
-            new_obj.SxC_ReplayDeltaPlus = self.SxC_ReplayDeltaPlus + other.SxC_ReplayDeltaPlus
-            new_obj.LxC_ThetaDeltaMinus = self.LxC_ThetaDeltaMinus + other.LxC_ThetaDeltaMinus
-            new_obj.LxC_ThetaDeltaPlus = self.LxC_ThetaDeltaPlus + other.LxC_ThetaDeltaPlus
-            new_obj.SxC_ThetaDeltaMinus = self.SxC_ThetaDeltaMinus + other.SxC_ThetaDeltaMinus
-            new_obj.SxC_ThetaDeltaPlus = self.SxC_ThetaDeltaPlus + other.SxC_ThetaDeltaPlus
-
-            return new_obj
-
-        raise TypeError("Unsupported operand type(s) for +: '{}' and '{}'".format(type(self), type(other)))
-
-
-
 
 # @overwriting_display_context(
 @metadata_attributes(short_name=None, tags=['figure_2', 'paper', 'figure'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-06-26 21:36', related_items=[])
