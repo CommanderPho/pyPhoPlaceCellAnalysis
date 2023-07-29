@@ -821,7 +821,7 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
     
     @classmethod
     def _build_formatted_title_string(cls, epochs_name) -> str:
-        """ buidls the two line colored string figure's footer that is passed into `flexitext`.
+        """ buidls the two line colored string that is passed into `flexitext`.
         """
         return (f"<size:22><weight:bold>{epochs_name}</> Firing Rates\n"
                 "<size:14>for the "
@@ -1007,10 +1007,6 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
             _fig_2_theta_out = self.add_optional_aclu_labels(_fig_2_theta_out, LxC_aclus, SxC_aclus, enable_tiny_point_labels=enable_tiny_point_labels, enable_hover_labels=enable_hover_labels)
             _fig_2_replay_out = self.add_optional_aclu_labels(_fig_2_replay_out, LxC_aclus, SxC_aclus, enable_tiny_point_labels=enable_tiny_point_labels, enable_hover_labels=enable_hover_labels)
         
-        """
-        LxC_aclus = _out_fig_2.computation_result.LxC_aclus
-        SxC_aclus = _out_fig_2.computation_result.SxC_aclus
-        """
         def _perform_write_to_file_callback():
             ## 2023-05-31 - Reference Output of matplotlib figure to file, along with building appropriate context.
             return (self.perform_save(_fig_2_theta_out.context, _fig_2_theta_out.figures[0]), 
@@ -1023,6 +1019,7 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
 
         # Merge the two (_fig_2_theta_out | _fig_2_replay_out)
         return (_fig_2_theta_out, _fig_2_replay_out)
+
 
     def perform_save(self, *args, **kwargs):
         """ used to save the figure without needing a hard reference to curr_active_pipeline """
