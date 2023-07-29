@@ -2,7 +2,7 @@ from copy import deepcopy
 from enum import Enum # required by `FiringRateActivitySource` enum
 from dataclasses import dataclass # required by `SortOrderMetric` class
 
-import h5py # for to_hdf5 and from_hdf5 definitions
+import h5py # for to_hdf and read_hdf definitions
 import numpy as np
 import pandas as pd
 from attrs import define, field # used for `JonathanFiringRateAnalysisResult`, `LongShortPipelineTests`, `LeaveOneOutDecodingAnalysis`
@@ -53,7 +53,7 @@ class TrackExclusivePartitionSubset:
     track_exclusive_aclus: np.ndarray
     track_exclusive_df: pd.DataFrame
     
-    def to_hdf5(self, file_path):
+    def to_hdf(self, file_path):
         with h5py.File(file_path, 'w') as f:
             for attribute, value in self.__dict__.items():
                 if isinstance(value, pd.DataFrame):
@@ -63,7 +63,7 @@ class TrackExclusivePartitionSubset:
                 # ... handle other attribute types as needed ...
 
     @classmethod
-    def from_hdf5(cls, file_path):
+    def read_hdf(cls, file_path):
         with h5py.File(file_path, 'r') as f:
             attrs_dict = {}
             for attribute in cls.__annotations__:
