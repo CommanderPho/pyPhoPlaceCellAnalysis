@@ -9,7 +9,6 @@ from attrs import define, field # used for `JonathanFiringRateAnalysisResult`, `
 from pyphocorehelpers.mixins.member_enumerating import AllFunctionEnumeratingMixin
 from pyphocorehelpers.function_helpers import function_attributes
 from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.ComputationFunctionRegistryHolder import ComputationFunctionRegistryHolder
-from pyphoplacecellanalysis.General.Model.ComputationResults import ComputationResult
 from pyphocorehelpers.DataStructure.dynamic_parameters import DynamicParameters
 
 from neuropy.analyses.placefields import PfND # used in `constrain_to_laps` to construct new objects

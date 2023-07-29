@@ -2,10 +2,6 @@ from copy import deepcopy
 from pathlib import Path
 
 import numpy as np
-from enum import unique # SessionBatchProgress
-
-
-
 
 ## MATPLOTLIB Imports:
 import matplotlib
@@ -18,7 +14,7 @@ from neuropy.core.session.Formats.BaseDataSessionFormats import DataSessionForma
 from neuropy.utils.misc import compute_paginated_grid_config # for paginating shared aclus
 
 # pyphocorehelpers
-from pyphocorehelpers.DataStructure.enum_helpers import ExtendedEnum # required for SessionBatchProgress
+
 from pyphocorehelpers.function_helpers import function_attributes
 
 # pyPhoPlaceCellAnalysis:

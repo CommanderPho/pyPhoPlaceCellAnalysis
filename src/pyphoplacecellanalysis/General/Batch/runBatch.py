@@ -1,18 +1,18 @@
 import sys
 import os
 import pathlib
-from General.Pipeline.NeuropyPipeline import PipelineSavingScheme
 from pathlib import Path
 from typing import List, Dict, Optional, Union, Callable
 import numpy as np
 import pandas as pd
 from copy import deepcopy
 import multiprocessing
-
+from enum import unique # SessionBatchProgress
 
 ## Pho's Custom Libraries:
 from pyphocorehelpers.Filesystem.path_helpers import find_first_extant_path, set_posix_windows, convert_filelist_to_new_parent, find_matching_parent_path
 from pyphocorehelpers.function_helpers import function_attributes
+from pyphocorehelpers.DataStructure.enum_helpers import ExtendedEnum # required for SessionBatchProgress
 
 # NeuroPy (Diba Lab Python Repo) Loading
 ## For computation parameters:
@@ -39,7 +39,33 @@ known_global_data_root_parent_paths = [Path(r'W:\Data'), Path(r'/media/MAX/Data'
 def get_file_str_if_file_exists(v:Path)->str:
     """ returns the string representation of the resolved file if it exists, or the empty string if not """
     return (str(v.resolve()) if v.exists() else '')
-    
+
+
+@unique
+class SessionBatchProgress(ExtendedEnum):
+    """Indicates the progress state for a given session in a batch processing queue """
+    NOT_STARTED = "NOT_STARTED"
+    RUNNING = "RUNNING"
+    COMPLETED = "COMPLETED"
+    FAILED = "FAILED"
+    ABORTED = "ABORTED"
+
+@define(slots=False)
+class BatchComputationProcessOptions:
+	should_load: bool # should try to load from existing results from disk at all
+		# never
+		# always (fail if loading unsuccessful)
+		# always (warning but continue if unsuccessful)
+	should_compute: bool # should try to run computations (which will just verify that loaded computations are good if that option is true)
+		# never
+		# if needed (required results are missing)
+		# always
+	should_save: bool # should consider save at all
+		# never
+		# if changed
+		# always
+
+
 @define(slots=False)
 class BatchRun:
     """An object that manages a Batch of runs for many different session folders.
@@ -617,20 +643,7 @@ class BatchResultDataframeAccessor():
         good_only_batch_progress_df = batch_progress_df[batch_progress_df['locally_is_ready']].copy()
         return good_only_batch_progress_df, batch_progress_df
 
-@define(slots=False)
-class BatchComputationProcessOptions:
-	should_load: bool # should try to load from existing results from disk at all
-		# never
-		# always (fail if loading unsuccessful)
-		# always (warning but continue if unsuccessful)
-	should_compute: bool # should try to run computations (which will just verify that loaded computations are good if that option is true)
-		# never
-		# if needed (required results are missing)
-		# always
-	should_save: bool # should consider save at all
-		# never
-		# if changed
-		# always
+
 
 
 @define(slots=False, repr=False)
@@ -1154,14 +1167,6 @@ if __name__ == "__main__":
     main()
 
 
-@unique
-class SessionBatchProgress(ExtendedEnum):
-    """Indicates the progress state for a given session in a batch processing queue """
-    NOT_STARTED = "NOT_STARTED"
-    RUNNING = "RUNNING"
-    COMPLETED = "COMPLETED"
-    FAILED = "FAILED"
-    ABORTED = "ABORTED"
 
 
 def _update_pipeline_missing_preprocessing_parameters(curr_active_pipeline, debug_print=False):
