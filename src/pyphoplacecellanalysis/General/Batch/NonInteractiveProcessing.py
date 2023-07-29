@@ -28,16 +28,6 @@ from pyphoplacecellanalysis.General.Mixins.ExportHelpers import programmatic_dis
 from pyphoplacecellanalysis.General.Mixins.ExportHelpers import build_pdf_metadata_from_display_context # newer version of build_pdf_export_metadata
 from pyphoplacecellanalysis.General.Pipeline.NeuropyPipeline import NeuropyPipeline, PipelineSavingScheme # for batch_load_session
 
-@unique
-class SessionBatchProgress(ExtendedEnum):
-    """Indicates the progress state for a given session in a batch processing queue """
-    NOT_STARTED = "NOT_STARTED"
-    RUNNING = "RUNNING"
-    COMPLETED = "COMPLETED"
-    FAILED = "FAILED"
-    ABORTED = "ABORTED"
-    
-
 """ 
 
 filters should be checkable to express whether we want to build that one or not
@@ -647,49 +637,6 @@ def batch_perform_all_plots(curr_active_pipeline, enable_neptune=True, neptuner=
 
 from neuropy.utils.dynamic_container import DynamicContainer
 from pyphoplacecellanalysis.General.Pipeline.NeuropyPipeline import PipelineSavingScheme
-
-def _update_pipeline_missing_preprocessing_parameters(curr_active_pipeline, debug_print=False):
-    """ 2023-05-24 - Adds the previously missing `sess.config.preprocessing_parameters` to each session (filtered and base) in the pipeline. 
-    
-    Usage:
-        from pyphoplacecellanalysis.General.Batch.NonInteractiveProcessing import _update_pipeline_missing_preprocessing_parameters
-        was_updated = _update_pipeline_missing_preprocessing_parameters(curr_active_pipeline)
-        was_updated
-    """
-    def _subfn_update_session_missing_preprocessing_parameters(sess):
-        """ 2023-05-24 - Adds the previously missing `sess.config.preprocessing_parameters` to a single session. Called only by `_update_pipeline_missing_preprocessing_parameters` """
-        preprocessing_parameters = getattr(sess.config, 'preprocessing_parameters', None)
-        if preprocessing_parameters is None:
-            print(f'No existing preprocessing parameters! Assigning them!')
-            default_lap_estimation_parameters = DynamicContainer(N=20, should_backup_extant_laps_obj=True) # Passed as arguments to `sess.replace_session_laps_with_estimates(...)`
-            default_PBE_estimation_parameters = DynamicContainer(sigma=0.030, thresh=(0, 1.5), min_dur=0.030, merge_dur=0.100, max_dur=0.300) # NewPaper's Parameters        
-            default_replay_estimation_parameters = DynamicContainer(require_intersecting_epoch=None, min_epoch_included_duration=0.06, max_epoch_included_duration=None, maximum_speed_thresh=None, min_inclusion_fr_active_thresh=0.01, min_num_unique_aclu_inclusions=3)
-            
-            sess.config.preprocessing_parameters = DynamicContainer(epoch_estimation_parameters=DynamicContainer.init_from_dict({
-                    'laps': default_lap_estimation_parameters,
-                    'PBEs': default_PBE_estimation_parameters,
-                    'replays': default_replay_estimation_parameters
-                }))
-            return True
-        else:
-            if debug_print:
-                print(f'preprocessing parameters exist.')
-            return False
-    
-    # BEGIN MAIN FUNCTION BODY
-    was_updated = False
-    was_updated = was_updated | _subfn_update_session_missing_preprocessing_parameters(curr_active_pipeline.sess)
-
-    long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
-    for an_epoch_name in [long_epoch_name, short_epoch_name, global_epoch_name]:
-        was_updated = was_updated | _subfn_update_session_missing_preprocessing_parameters(curr_active_pipeline.filtered_sessions[an_epoch_name])
-
-    if was_updated:
-        print(f'config was updated. Saving pipeline.')
-        curr_active_pipeline.save_pipeline(saving_mode=PipelineSavingScheme.OVERWRITE_IN_PLACE)
-    return was_updated
-
-
 
 # ==================================================================================================================== #
 # 2023-05-25 - Separate Generalized Plot Saving/Registering Function                                                   #
