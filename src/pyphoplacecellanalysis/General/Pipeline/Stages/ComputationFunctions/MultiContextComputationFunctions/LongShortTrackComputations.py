@@ -16,12 +16,7 @@ from neuropy.analyses.placefields import PfND # used in `constrain_to_laps` to c
 from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BasePositionDecoder, BayesianPlacemapPositionDecoder
 from pyphoplacecellanalysis.Analysis.Decoder.decoder_result import perform_full_session_leave_one_out_decoding_analysis
 from pyphoplacecellanalysis.Analysis.Decoder.decoder_result import LeaveOneOutDecodingAnalysisResult
-
-from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BayesianPlacemapPositionDecoder
-from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BasePositionDecoder
 from pyphoplacecellanalysis.General.Mixins.CrossComputationComparisonHelpers import SetPartition
-from pyphoplacecellanalysis.Analysis.Decoder.decoder_result import LeaveOneOutDecodingAnalysisResult
-
 from pyphoplacecellanalysis.General.Model.ComputationResults import ComputedResult
 
 ## Private Computation Function Includes:
@@ -165,9 +160,7 @@ class LeaveOneOutDecodingAnalysis(ComputedResult):
     n_neurons: int
     long_results_obj: LeaveOneOutDecodingAnalysisResult
     short_results_obj: LeaveOneOutDecodingAnalysisResult
-
     is_global: bool = True
-
 
 
 @define(slots=False, repr=False)
