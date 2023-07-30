@@ -13,7 +13,7 @@ from neuropy.utils.result_context import IdentifyingContext
 from pyphocorehelpers.DataStructure.dynamic_parameters import DynamicParameters
 from pyphocorehelpers.function_helpers import function_attributes
 
-from pyphoplacecellanalysis.General.Mixins.AttrsClassHelpers import AttrsBasedClassHelperMixin, serialized_field, computed_field
+from neuropy.utils.mixins.AttrsClassHelpers import AttrsBasedClassHelperMixin, custom_define, serialized_field, computed_field
 
 # ==================================================================================================================== #
 # FIGURE/GRAPHICS EXPORT                                                                                               #
@@ -1034,7 +1034,7 @@ def post_deserialize(func):
 
 
 
-class HDF_DeserializationMixin:
+class HDF_DeserializationMixin(AttrsBasedClassHelperMixin):
     def deserialize(self, *args, **kwargs):
         # Your deserialization logic here
         
@@ -1044,9 +1044,39 @@ class HDF_DeserializationMixin:
             if hasattr(attr, '_is_post_deserialize'):
                 attr()
 
+
+    @classmethod
+    def read_hdf(cls, file_path, key: str, **kwargs):
+        """ Reads the data from the key in the hdf5 file at file_path
+        Usage:
+            _reread_pos_obj = cls.read_hdf(hdf5_output_path, key='pos')
+            _reread_pos_obj
+        """
+        raise NotImplementedError # implementor must override!
+
+        # # Read the DataFrame using pandas
+        # pos_df = pd.read_hdf(file_path, key=key)
+
+        # # Open the file with h5py to read attributes
+        # with h5py.File(file_path, 'r') as f:
+        #     dataset = f[key]
+        #     metadata = {
+        #         'time_variable_name': dataset.attrs['time_variable_name'],
+        #         'sampling_rate': dataset.attrs['sampling_rate'],
+        #         't_start': dataset.attrs['t_start'],
+        #         't_stop': dataset.attrs['t_stop'],
+        #     }
+
+        # # Reconstruct the object using the class constructor
+        # _out = cls(pos_df=pos_df, metadata=metadata)
+        # _out.filename = file_path # set the filename it was loaded from
+        # return _out
+
+
+
 """ Usage of DeserializationMixin
 
-from pyphoplacecellanalysis.General.Mixins.AttrsClassHelpers import AttrsBasedClassHelperMixin, serialized_field, computed_field
+from neuropy.utils.mixins.AttrsClassHelpers import AttrsBasedClassHelperMixin, serialized_field, computed_field
 from pyphoplacecellanalysis.General.Mixins.ExportHelpers import HDF_DeserializationMixin, post_deserialize, HDF_SerializationMixin, HDFMixin
 
 
@@ -1065,17 +1095,10 @@ class MyClass(DeserializationMixin):
 
 
 
-class HDF_SerializationMixin:
-     
-
-    @classmethod
-    def get_serialized_fields(cls, serialization_format:str='hdf') -> List:
-        hdf_fields = []
-        for attr_field in fields(cls):
-            serialization_metadata = attr_field.metadata.get('serialization', {})
-            if serialization_metadata.get(serialization_format, False) is True:
-                hdf_fields.append(attr_field.name)
-        return hdf_fields
+class HDF_SerializationMixin(AttrsBasedClassHelperMixin):
+    """
+    Inherits `get_serialized_fields` from AttrsBasedClassHelperMixin
+    """
 
 
     def to_hdf(self, file_path, key: str, **kwargs):
@@ -1121,7 +1144,7 @@ class HDFMixin(HDF_DeserializationMixin, HDF_SerializationMixin):
 
 """
 
-from pyphoplacecellanalysis.General.Mixins.AttrsClassHelpers import AttrsBasedClassHelperMixin, serialized_field, computed_field
+from neuropy.utils.mixins.AttrsClassHelpers import AttrsBasedClassHelperMixin, serialized_field, computed_field
 from pyphoplacecellanalysis.General.Mixins.ExportHelpers import HDF_DeserializationMixin, post_deserialize, HDF_SerializationMixin, HDFMixin
 
 class SpecialClassHDFMixin(HDFMixin):

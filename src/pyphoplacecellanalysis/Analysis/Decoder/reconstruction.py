@@ -24,7 +24,7 @@ from pyphocorehelpers.print_helpers import WrappingMessagePrinter, SimplePrintab
 from pyphocorehelpers.mixins.serialized import SerializedAttributesAllowBlockSpecifyingClass
 
 from pyphoplacecellanalysis.General.Mixins.CrossComputationComparisonHelpers import _compare_computation_results # for finding common neurons in `prune_to_shared_aclus_only`
-from pyphoplacecellanalysis.General.Mixins.AttrsClassHelpers import AttrsBasedClassHelperMixin, custom_define, serialized_field, computed_field
+from neuropy.utils.mixins.AttrsClassHelpers import AttrsBasedClassHelperMixin, custom_define, serialized_field, computed_field
 from pyphoplacecellanalysis.General.Mixins.ExportHelpers import HDF_DeserializationMixin, post_deserialize, HDF_SerializationMixin, HDFMixin
 
 
