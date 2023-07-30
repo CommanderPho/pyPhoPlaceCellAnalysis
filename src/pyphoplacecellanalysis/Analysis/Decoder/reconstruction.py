@@ -988,14 +988,16 @@ class BasePositionDecoder(HDFMixin, AttrsBasedClassHelperMixin, NeuronUnitSlicab
     # ==================================================================================================================== #
     # HDF5 Methods:                                                                                                        #
     # ==================================================================================================================== #
-    def to_hdf(self, file_path, key: str, **kwargs):
-            """ Saves the object to key in the hdf5 file specified by file_path
-            Usage:
-                hdf5_output_path: Path = curr_active_pipeline.get_output_path().joinpath('test_data.h5')
-                _pfnd_obj: PfND = long_one_step_decoder_1D.pf
-                _pfnd_obj.to_hdf(hdf5_output_path, key='test_pfnd')
-            """
-            raise NotImplementedError # implementor must override!
+    # def to_hdf(self, file_path, key: str, **kwargs):
+    #         """ Saves the object to key in the hdf5 file specified by file_path
+    #         Usage:
+    #             hdf5_output_path: Path = curr_active_pipeline.get_output_path().joinpath('test_data.h5')
+    #             _pfnd_obj: PfND = long_one_step_decoder_1D.pf
+    #             _pfnd_obj.to_hdf(hdf5_output_path, key='test_pfnd')
+    #         """
+    #         raise NotImplementedError # implementor must override!
+
+
 
 
 # ==================================================================================================================== #
