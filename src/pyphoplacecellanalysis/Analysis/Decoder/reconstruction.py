@@ -24,6 +24,9 @@ from pyphocorehelpers.print_helpers import WrappingMessagePrinter, SimplePrintab
 from pyphocorehelpers.mixins.serialized import SerializedAttributesAllowBlockSpecifyingClass
 
 from pyphoplacecellanalysis.General.Mixins.CrossComputationComparisonHelpers import _compare_computation_results # for finding common neurons in `prune_to_shared_aclus_only`
+from pyphoplacecellanalysis.General.Mixins.AttrsClassHelpers import AttrsBasedClassHelperMixin, custom_define, serialized_field, computed_field
+from pyphoplacecellanalysis.General.Mixins.ExportHelpers import HDF_DeserializationMixin, post_deserialize, HDF_SerializationMixin, HDFMixin
+
 
 
 # cut_bins = np.linspace(59200, 60800, 9)
@@ -379,8 +382,8 @@ class Zhang_Two_Step:
     
 
 
-@define(slots=False, repr=False)
-class DecodedFilterEpochsResult(object):
+@custom_define(repr=False)
+class DecodedFilterEpochsResult(AttrsBasedClassHelperMixin):
     """ Container for the results of decoding a set of epochs (filter_epochs) using a decoder (active_decoder) 
     Usage:
         from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import DecodedFilterEpochsResult
@@ -441,8 +444,8 @@ class DecodedFilterEpochsResult(object):
 # Stateless Decoders (New 2023-04-06)                                                                                  #
 # ==================================================================================================================== #
 
-@define(slots=False)
-class BasePositionDecoder(NeuronUnitSlicableObjectProtocol):
+@custom_define()
+class BasePositionDecoder(HDFMixin, AttrsBasedClassHelperMixin, NeuronUnitSlicableObjectProtocol):
     """ 2023-04-06 - A simplified data-only version of the decoder that serves to remove all state related to specific computations to make each run independent 
     Stores only the raw inputs that are used to decode, with the user specifying the specifics for a given decoding (like time_time_sizes, etc.
 
@@ -452,12 +455,12 @@ class BasePositionDecoder(NeuronUnitSlicableObjectProtocol):
 
 
     """
-    pf: PfND
+    pf: PfND = serialized_field()
 
-    neuron_IDXs: np.ndarray = None
-    neuron_IDs: np.ndarray = None
-    F: np.ndarray = None
-    P_x: np.ndarray = None
+    neuron_IDXs: np.ndarray = computed_field(default=None)
+    neuron_IDs: np.ndarray = computed_field(default=None)
+    F: np.ndarray = computed_field(default=None)
+    P_x: np.ndarray = computed_field(default=None)
 
     setup_on_init:bool = True 
     post_load_on_init:bool = False
@@ -533,6 +536,7 @@ class BasePositionDecoder(NeuronUnitSlicableObjectProtocol):
         
         self._setup_concatenated_F()
 
+    @post_deserialize
     def post_load(self):
         """ Called after deserializing/loading saved result from disk to rebuild the needed computed variables. """
         with WrappingMessagePrinter(f'post_load() called.', begin_line_ending='... ', finished_message='all rebuilding completed.', enable_print=self.debug_print):
@@ -979,6 +983,19 @@ class BasePositionDecoder(NeuronUnitSlicableObjectProtocol):
         # Forward fill the now NaN positions with the last good value (for the both axes):
         revised_most_likely_positions = np_ffill_1D(revised_most_likely_positions.T).T
         return revised_most_likely_positions
+
+
+    # ==================================================================================================================== #
+    # HDF5 Methods:                                                                                                        #
+    # ==================================================================================================================== #
+    def to_hdf(self, file_path, key: str, **kwargs):
+            """ Saves the object to key in the hdf5 file specified by file_path
+            Usage:
+                hdf5_output_path: Path = curr_active_pipeline.get_output_path().joinpath('test_data.h5')
+                _pfnd_obj: PfND = long_one_step_decoder_1D.pf
+                _pfnd_obj.to_hdf(hdf5_output_path, key='test_pfnd')
+            """
+            raise NotImplementedError # implementor must override!
 
 
 # ==================================================================================================================== #

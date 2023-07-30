@@ -1,16 +1,19 @@
+from functools import wraps
 from copy import deepcopy
 from datetime import datetime
 from enum import Enum # for getting the current date to set the ouptut folder name
 from pathlib import Path
-from typing import Any, Callable, List, Optional
+from typing import Any, Callable, List, Optional, Union, Dict
 import pandas as pd
 import numpy as np
-from attrs import define, field, Factory
+from attrs import define, field, Factory, fields
 
 from neuropy.utils.result_context import IdentifyingContext
 
 from pyphocorehelpers.DataStructure.dynamic_parameters import DynamicParameters
 from pyphocorehelpers.function_helpers import function_attributes
+
+from pyphoplacecellanalysis.General.Mixins.AttrsClassHelpers import AttrsBasedClassHelperMixin, serialized_field, computed_field
 
 # ==================================================================================================================== #
 # FIGURE/GRAPHICS EXPORT                                                                                               #
@@ -1008,3 +1011,123 @@ def _test_save_pipeline_data_to_h5(curr_active_pipeline, finalized_output_cache_
     # save_spikes_data_to_h5(curr_active_pipeline, finalized_output_cache_file=finalized_output_cache_file)
     
     return finalized_output_cache_file
+
+
+
+
+
+# ==================================================================================================================== #
+# 2023-07-30 HDF5 General Object Serialization Classes                                                                 #
+# ==================================================================================================================== #
+
+
+# Deserialization ____________________________________________________________________________________________________ #
+
+def post_deserialize(func):
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        return func(*args, **kwargs)
+    
+    wrapper._is_post_deserialize = True
+    return wrapper
+
+
+
+
+class HDF_DeserializationMixin:
+    def deserialize(self, *args, **kwargs):
+        # Your deserialization logic here
+        
+        # Call post-deserialization methods
+        for attr_name in dir(self):
+            attr = getattr(self, attr_name)
+            if hasattr(attr, '_is_post_deserialize'):
+                attr()
+
+""" Usage of DeserializationMixin
+
+from pyphoplacecellanalysis.General.Mixins.AttrsClassHelpers import AttrsBasedClassHelperMixin, serialized_field, computed_field
+from pyphoplacecellanalysis.General.Mixins.ExportHelpers import HDF_DeserializationMixin, post_deserialize, HDF_SerializationMixin, HDFMixin
+
+
+class MyClass(DeserializationMixin):
+    def __init__(self, value):
+        self.value = value
+
+    @post_deserialize
+    def setup(self):
+        print(f"Post-deserialization setup for value: {self.value}")
+
+        
+"""
+
+
+
+
+
+class HDF_SerializationMixin:
+     
+
+    @classmethod
+    def get_serialized_fields(cls, serialization_format:str='hdf') -> List:
+        hdf_fields = []
+        for attr_field in fields(cls):
+            serialization_metadata = attr_field.metadata.get('serialization', {})
+            if serialization_metadata.get(serialization_format, False) is True:
+                hdf_fields.append(attr_field.name)
+        return hdf_fields
+
+
+    def to_hdf(self, file_path, key: str, **kwargs):
+        """ Saves the object to key in the hdf5 file specified by file_path
+        Usage:
+            hdf5_output_path: Path = curr_active_pipeline.get_output_path().joinpath('test_data.h5')
+            _pfnd_obj: PfND = long_one_step_decoder_1D.pf
+            _pfnd_obj.to_hdf(hdf5_output_path, key='test_pfnd')
+        """
+        raise NotImplementedError # implementor must override!
+        # self.position.to_hdf(file_path=file_path, key=f'{key}/pos')
+        # if self.epochs is not None:
+        #     self.epochs.to_hdf(file_path=file_path, key=f'{key}/epochs') #TODO 2023-07-30 11:13: - [ ] What if self.epochs is None?
+        # else:
+        #     # if self.epochs is None
+        #     pass
+        # self.spikes_df.spikes.to_hdf(file_path, key=f'{key}/spikes')
+
+        # # Open the file with h5py to add attributes to the group. The pandas.HDFStore object doesn't provide a direct way to manipulate groups as objects, as it is primarily intended to work with datasets (i.e., pandas DataFrames)
+        # with h5py.File(file_path, 'r+') as f:
+        #     ## Unfortunately, you cannot directly assign a dictionary to the attrs attribute of an h5py group or dataset. The attrs attribute is an instance of a special class that behaves like a dictionary in some ways but not in others. You must assign attributes individually
+        #     group = f[key]
+        #     group.attrs['position_srate'] = self.position_srate
+        #     group.attrs['ndim'] = self.ndim
+
+        #     # can't just set the dict directly
+        #     # group.attrs['config'] = str(self.config.to_dict())  # Store as string if it's a complex object
+        #     # Manually set the config attributes
+        #     config_dict = self.config.to_dict()
+        #     group.attrs['config/speed_thresh'] = config_dict['speed_thresh']
+        #     group.attrs['config/grid_bin'] = config_dict['grid_bin']
+        #     group.attrs['config/grid_bin_bounds'] = config_dict['grid_bin_bounds']
+        #     group.attrs['config/smooth'] = config_dict['smooth']
+        #     group.attrs['config/frate_thresh'] = config_dict['frate_thresh']
+            
+
+
+# General/Combined ___________________________________________________________________________________________________ #
+
+class HDFMixin(HDF_DeserializationMixin, HDF_SerializationMixin):
+    # Common methods for serialization and deserialization
+    pass
+
+"""
+
+from pyphoplacecellanalysis.General.Mixins.AttrsClassHelpers import AttrsBasedClassHelperMixin, serialized_field, computed_field
+from pyphoplacecellanalysis.General.Mixins.ExportHelpers import HDF_DeserializationMixin, post_deserialize, HDF_SerializationMixin, HDFMixin
+
+class SpecialClassHDFMixin(HDFMixin):
+    # Custom methods for a specific class
+
+class MyClass(SpecialClassHDFMixin):
+    # MyClass definition
+
+"""
