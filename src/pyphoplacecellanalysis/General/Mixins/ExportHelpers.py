@@ -12,7 +12,7 @@ from neuropy.utils.result_context import IdentifyingContext
 from pyphocorehelpers.DataStructure.dynamic_parameters import DynamicParameters
 from pyphocorehelpers.function_helpers import function_attributes
 
-from neuropy.utils.mixins.AttrsClassHelpers import AttrsBasedClassHelperMixin, custom_define, serialized_field, computed_field
+from neuropy.utils.mixins.AttrsClassHelpers import AttrsBasedClassHelperMixin, custom_define, serialized_field, serialized_attribute_field, non_serialized_field
 
 # ==================================================================================================================== #
 # FIGURE/GRAPHICS EXPORT                                                                                               #

@@ -24,9 +24,8 @@ from pyphocorehelpers.print_helpers import WrappingMessagePrinter, SimplePrintab
 from pyphocorehelpers.mixins.serialized import SerializedAttributesAllowBlockSpecifyingClass
 
 from pyphoplacecellanalysis.General.Mixins.CrossComputationComparisonHelpers import _compare_computation_results # for finding common neurons in `prune_to_shared_aclus_only`
-from neuropy.utils.mixins.AttrsClassHelpers import AttrsBasedClassHelperMixin, custom_define, serialized_field, computed_field
+from neuropy.utils.mixins.AttrsClassHelpers import AttrsBasedClassHelperMixin, custom_define, serialized_field, serialized_attribute_field, non_serialized_field
 from neuropy.utils.mixins.HDF5_representable import HDF_DeserializationMixin, post_deserialize, HDF_SerializationMixin, HDFMixin
-
 
 
 # cut_bins = np.linspace(59200, 60800, 9)
@@ -382,7 +381,7 @@ class Zhang_Two_Step:
     
 
 
-@custom_define(repr=False)
+@custom_define(slots=False, repr=False)
 class DecodedFilterEpochsResult(AttrsBasedClassHelperMixin):
     """ Container for the results of decoding a set of epochs (filter_epochs) using a decoder (active_decoder) 
     Usage:
@@ -444,7 +443,7 @@ class DecodedFilterEpochsResult(AttrsBasedClassHelperMixin):
 # Stateless Decoders (New 2023-04-06)                                                                                  #
 # ==================================================================================================================== #
 
-@custom_define()
+@custom_define(slots=False)
 class BasePositionDecoder(HDFMixin, AttrsBasedClassHelperMixin, NeuronUnitSlicableObjectProtocol):
     """ 2023-04-06 - A simplified data-only version of the decoder that serves to remove all state related to specific computations to make each run independent 
     Stores only the raw inputs that are used to decode, with the user specifying the specifics for a given decoding (like time_time_sizes, etc.
@@ -457,10 +456,10 @@ class BasePositionDecoder(HDFMixin, AttrsBasedClassHelperMixin, NeuronUnitSlicab
     """
     pf: PfND = serialized_field()
 
-    neuron_IDXs: np.ndarray = computed_field(default=None)
-    neuron_IDs: np.ndarray = computed_field(default=None)
-    F: np.ndarray = computed_field(default=None)
-    P_x: np.ndarray = computed_field(default=None)
+    neuron_IDXs: np.ndarray = serialized_field(default=None, is_computable=True)
+    neuron_IDs: np.ndarray = serialized_field(default=None, is_computable=True)
+    F: np.ndarray = non_serialized_field(default=None)
+    P_x: np.ndarray = non_serialized_field(default=None)
 
     setup_on_init:bool = True 
     post_load_on_init:bool = False
@@ -1003,8 +1002,8 @@ class BasePositionDecoder(HDFMixin, AttrsBasedClassHelperMixin, NeuronUnitSlicab
 # ==================================================================================================================== #
 # Bayesian Decoder                                                                                                     #
 # ==================================================================================================================== #
-@define(slots=False)
-class BayesianPlacemapPositionDecoder(SerializedAttributesAllowBlockSpecifyingClass, BasePositionDecoder):
+@custom_define(slots=False)
+class BayesianPlacemapPositionDecoder(SerializedAttributesAllowBlockSpecifyingClass, BasePositionDecoder): # needs `HDFMixin, `
     """ Holds the placefields. Can be called on any spike data to compute the most likely position given the spike data.
 
     Used to try to decode everything in one go, meaning it took the parameters (like the time window) and the spikes to decode as well and did the computation internally, but the concept of a decoder is that it is a stateless object that can be called on any spike data to decode it, so this concept is depricated.
