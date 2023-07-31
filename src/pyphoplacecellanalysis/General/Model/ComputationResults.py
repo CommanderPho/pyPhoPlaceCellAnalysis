@@ -65,3 +65,4 @@ class ComputedResult:
             
     """
     is_global: bool = False
+

@@ -2,23 +2,23 @@ from copy import deepcopy
 from datetime import datetime
 from enum import Enum # for getting the current date to set the ouptut folder name
 from pathlib import Path
-from typing import Any, Callable, List, Optional
+from typing import Any, Callable, List, Optional, Union, Dict
 import pandas as pd
 import numpy as np
-from attrs import define, field, Factory
+from attrs import define, field, Factory, fields
 
 from neuropy.utils.result_context import IdentifyingContext
 
 from pyphocorehelpers.DataStructure.dynamic_parameters import DynamicParameters
 from pyphocorehelpers.function_helpers import function_attributes
 
+from neuropy.utils.mixins.AttrsClassHelpers import AttrsBasedClassHelperMixin, custom_define, serialized_field, serialized_attribute_field, non_serialized_field
+
 # ==================================================================================================================== #
 # FIGURE/GRAPHICS EXPORT                                                                                               #
 # ==================================================================================================================== #
 
 import pyphoplacecellanalysis.External.pyqtgraph as pg
-# import pyphoplacecellanalysis.External.pyqtgraph.exporters
-# import pyphoplacecellanalysis.External.pyqtgraph.widgets.GraphicsLayoutWidget
 from pyphoplacecellanalysis.External.pyqtgraph.widgets.GraphicsView import GraphicsView
 
 # ==================================================================================================================== #
@@ -88,13 +88,6 @@ def export_pyqtgraph_plot(graphics_item, savepath='fileName.png', progress_print
         print(f'exported plot to {savepath}')
 
 
-
-
-# ==================================================================================================================== #
-# PDF Output                                                                                                           #
-# ==================================================================================================================== #
-
-
 # ==================================================================================================================== #
 # Modern 2022-10-04 PDF                                                                                                #
 # from pyphoplacecellanalysis.General.Mixins.ExportHelpers import create_daily_programmatic_display_function_testing_folder_if_needed, build_pdf_metadata_from_display_context
@@ -113,7 +106,6 @@ def create_daily_programmatic_display_function_testing_folder_if_needed(out_path
         out_path = Path(out_path) # make sure it's a Path
     out_path.mkdir(exist_ok=True, parents=True) # parents=True creates all necessary parent folders
     return out_path
-
 
 @function_attributes(tags=['context','output','path','important'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-05-25 12:54')
 def session_context_to_relative_path(parent_path, session_ctx):
@@ -143,7 +135,6 @@ def session_context_to_relative_path(parent_path, session_ctx):
     curr_sess_ctx_tuple = session_ctx.as_tuple(subset_includelist=subset_includelist, drop_missing=True) # ('kdiba', 'gor01', 'one', '2006-6-07_11-26-53')
     return parent_path.joinpath(*curr_sess_ctx_tuple).resolve()
 
-
 @function_attributes(tags=['figure','context','output','path','important'], input_requires=[], output_provides=[], uses=[], used_by=['build_pdf_metadata_from_display_context'], creation_date='2023-05-25 12:54')
 def build_figure_basename_from_display_context(active_identifying_ctx, subset_includelist=None, subset_excludelist=None, context_tuple_join_character='_', debug_print=False):
     """ 
@@ -163,7 +154,6 @@ def build_figure_basename_from_display_context(active_identifying_ctx, subset_in
 # ==================================================================================================================== #
 # 2023-06-14 - Configurable Figure Output Functions                                                                    #
 # ==================================================================================================================== #
-
 
 class FigureOutputLocation(Enum):
     """Specifies the filesystem location for the parent folder where figures are output."""
@@ -274,8 +264,6 @@ class ContextToPathMode(Enum):
         return fig_save_basename
 
 
-
-
 @define(slots=False)
 class FigureOutputManager:
     """ 2023-06-14 - Manages figure output. Singleton/not persisted.
@@ -311,10 +299,6 @@ class FigureOutputManager:
         """ 
         parent_save_path, fig_save_basename = self.get_figure_output_parent_and_basename(final_context, make_folder_if_needed=make_folder_if_needed, **kwargs)
         return parent_save_path.joinpath(fig_save_basename).resolve()
-
-
-
-
 
 # ==================================================================================================================== #
 # Split Pre-2023-06-14 Functions                                                                                       #
@@ -1008,3 +992,8 @@ def _test_save_pipeline_data_to_h5(curr_active_pipeline, finalized_output_cache_
     # save_spikes_data_to_h5(curr_active_pipeline, finalized_output_cache_file=finalized_output_cache_file)
     
     return finalized_output_cache_file
+
+
+
+
+

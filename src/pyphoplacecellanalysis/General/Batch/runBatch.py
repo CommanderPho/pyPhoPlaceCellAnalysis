@@ -7,11 +7,12 @@ import numpy as np
 import pandas as pd
 from copy import deepcopy
 import multiprocessing
-
+from enum import unique # SessionBatchProgress
 
 ## Pho's Custom Libraries:
 from pyphocorehelpers.Filesystem.path_helpers import find_first_extant_path, set_posix_windows, convert_filelist_to_new_parent, find_matching_parent_path
 from pyphocorehelpers.function_helpers import function_attributes
+from pyphocorehelpers.DataStructure.enum_helpers import ExtendedEnum # required for SessionBatchProgress
 
 # NeuroPy (Diba Lab Python Repo) Loading
 ## For computation parameters:
@@ -20,7 +21,8 @@ from neuropy.utils.matplotlib_helpers import matplotlib_file_only
 from neuropy.utils.result_context import IdentifyingContext
 from neuropy.core.session.Formats.BaseDataSessionFormats import find_local_session_paths
 
-from pyphoplacecellanalysis.General.Batch.NonInteractiveProcessing import batch_load_session, batch_extended_computations, SessionBatchProgress, batch_programmatic_figures, batch_extended_programmatic_figures
+from pyphoplacecellanalysis.General.Batch.NonInteractiveProcessing import batch_load_session, batch_extended_computations, \
+    batch_programmatic_figures, batch_extended_programmatic_figures
 from pyphoplacecellanalysis.General.Pipeline.NeuropyPipeline import PipelineSavingScheme
 from pyphoplacecellanalysis.General.Pipeline.Stages.Loading import saveData, loadData
 
@@ -28,7 +30,6 @@ from attrs import define, field, Factory
 
 from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.LongShortTrackComputations import LongShortPipelineTests
 # from pyphoplacecellanalysis.General.Batch.NeptuneAiHelpers import set_environment_variables, neptune_output_figures
-from pyphoplacecellanalysis.General.Batch.NonInteractiveProcessing import _update_pipeline_missing_preprocessing_parameters
 from pyphoplacecellanalysis.General.Batch.PhoDiba2023Paper import main_complete_figure_generations, InstantaneousSpikeRateGroupsComputation, SingleBarResult # for `BatchSessionCompletionHandler`
 from neuropy.core.user_annotations import UserAnnotationsManager
 
@@ -38,7 +39,33 @@ known_global_data_root_parent_paths = [Path(r'W:\Data'), Path(r'/media/MAX/Data'
 def get_file_str_if_file_exists(v:Path)->str:
     """ returns the string representation of the resolved file if it exists, or the empty string if not """
     return (str(v.resolve()) if v.exists() else '')
-    
+
+
+@unique
+class SessionBatchProgress(ExtendedEnum):
+    """Indicates the progress state for a given session in a batch processing queue """
+    NOT_STARTED = "NOT_STARTED"
+    RUNNING = "RUNNING"
+    COMPLETED = "COMPLETED"
+    FAILED = "FAILED"
+    ABORTED = "ABORTED"
+
+@define(slots=False)
+class BatchComputationProcessOptions:
+	should_load: bool # should try to load from existing results from disk at all
+		# never
+		# always (fail if loading unsuccessful)
+		# always (warning but continue if unsuccessful)
+	should_compute: bool # should try to run computations (which will just verify that loaded computations are good if that option is true)
+		# never
+		# if needed (required results are missing)
+		# always
+	should_save: bool # should consider save at all
+		# never
+		# if changed
+		# always
+
+
 @define(slots=False)
 class BatchRun:
     """An object that manages a Batch of runs for many different session folders.
@@ -616,20 +643,7 @@ class BatchResultDataframeAccessor():
         good_only_batch_progress_df = batch_progress_df[batch_progress_df['locally_is_ready']].copy()
         return good_only_batch_progress_df, batch_progress_df
 
-@define(slots=False)
-class BatchComputationProcessOptions:
-	should_load: bool # should try to load from existing results from disk at all
-		# never
-		# always (fail if loading unsuccessful)
-		# always (warning but continue if unsuccessful)
-	should_compute: bool # should try to run computations (which will just verify that loaded computations are good if that option is true)
-		# never
-		# if needed (required results are missing)
-		# always
-	should_save: bool # should consider save at all
-		# never
-		# if changed
-		# always
+
 
 
 @define(slots=False, repr=False)
@@ -1151,3 +1165,47 @@ def main(active_global_batch_result_filename='global_batch_result.pkl', debug_pr
 
 if __name__ == "__main__":
     main()
+
+
+
+
+def _update_pipeline_missing_preprocessing_parameters(curr_active_pipeline, debug_print=False):
+    """ 2023-05-24 - Adds the previously missing `sess.config.preprocessing_parameters` to each session (filtered and base) in the pipeline.
+
+    Usage:
+        from pyphoplacecellanalysis.General.Batch.NonInteractiveProcessing import _update_pipeline_missing_preprocessing_parameters
+        was_updated = _update_pipeline_missing_preprocessing_parameters(curr_active_pipeline)
+        was_updated
+    """
+    def _subfn_update_session_missing_preprocessing_parameters(sess):
+        """ 2023-05-24 - Adds the previously missing `sess.config.preprocessing_parameters` to a single session. Called only by `_update_pipeline_missing_preprocessing_parameters` """
+        preprocessing_parameters = getattr(sess.config, 'preprocessing_parameters', None)
+        if preprocessing_parameters is None:
+            print(f'No existing preprocessing parameters! Assigning them!')
+            default_lap_estimation_parameters = DynamicContainer(N=20, should_backup_extant_laps_obj=True) # Passed as arguments to `sess.replace_session_laps_with_estimates(...)`
+            default_PBE_estimation_parameters = DynamicContainer(sigma=0.030, thresh=(0, 1.5), min_dur=0.030, merge_dur=0.100, max_dur=0.300) # NewPaper's Parameters
+            default_replay_estimation_parameters = DynamicContainer(require_intersecting_epoch=None, min_epoch_included_duration=0.06, max_epoch_included_duration=None, maximum_speed_thresh=None, min_inclusion_fr_active_thresh=0.01, min_num_unique_aclu_inclusions=3)
+
+            sess.config.preprocessing_parameters = DynamicContainer(epoch_estimation_parameters=DynamicContainer.init_from_dict({
+                    'laps': default_lap_estimation_parameters,
+                    'PBEs': default_PBE_estimation_parameters,
+                    'replays': default_replay_estimation_parameters
+                }))
+            return True
+        else:
+            if debug_print:
+                print(f'preprocessing parameters exist.')
+            return False
+
+    # BEGIN MAIN FUNCTION BODY
+    was_updated = False
+    was_updated = was_updated | _subfn_update_session_missing_preprocessing_parameters(curr_active_pipeline.sess)
+
+    long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
+    for an_epoch_name in [long_epoch_name, short_epoch_name, global_epoch_name]:
+        was_updated = was_updated | _subfn_update_session_missing_preprocessing_parameters(curr_active_pipeline.filtered_sessions[an_epoch_name])
+
+    if was_updated:
+        print(f'config was updated. Saving pipeline.')
+        curr_active_pipeline.save_pipeline(saving_mode=PipelineSavingScheme.OVERWRITE_IN_PLACE)
+    return was_updated
