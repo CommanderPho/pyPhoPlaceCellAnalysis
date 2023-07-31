@@ -2,13 +2,13 @@ from copy import deepcopy
 from enum import Enum # required by `FiringRateActivitySource` enum
 from dataclasses import dataclass # required by `SortOrderMetric` class
 
+import h5py # for to_hdf and read_hdf definitions
 import numpy as np
 import pandas as pd
 from attrs import define, field # used for `JonathanFiringRateAnalysisResult`, `LongShortPipelineTests`, `LeaveOneOutDecodingAnalysis`
 from pyphocorehelpers.mixins.member_enumerating import AllFunctionEnumeratingMixin
 from pyphocorehelpers.function_helpers import function_attributes
 from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.ComputationFunctionRegistryHolder import ComputationFunctionRegistryHolder
-from pyphoplacecellanalysis.General.Model.ComputationResults import ComputationResult
 from pyphocorehelpers.DataStructure.dynamic_parameters import DynamicParameters
 
 from neuropy.analyses.placefields import PfND # used in `constrain_to_laps` to construct new objects
@@ -16,12 +16,7 @@ from neuropy.analyses.placefields import PfND # used in `constrain_to_laps` to c
 from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BasePositionDecoder, BayesianPlacemapPositionDecoder
 from pyphoplacecellanalysis.Analysis.Decoder.decoder_result import perform_full_session_leave_one_out_decoding_analysis
 from pyphoplacecellanalysis.Analysis.Decoder.decoder_result import LeaveOneOutDecodingAnalysisResult
-
-from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BayesianPlacemapPositionDecoder
-from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BasePositionDecoder
 from pyphoplacecellanalysis.General.Mixins.CrossComputationComparisonHelpers import SetPartition
-from pyphoplacecellanalysis.Analysis.Decoder.decoder_result import LeaveOneOutDecodingAnalysisResult
-
 from pyphoplacecellanalysis.General.Model.ComputationResults import ComputedResult
 
 ## Private Computation Function Includes:
@@ -57,6 +52,28 @@ class TrackExclusivePartitionSubset:
     is_aclu_pf_track_exclusive: np.ndarray
     track_exclusive_aclus: np.ndarray
     track_exclusive_df: pd.DataFrame
+    
+    def to_hdf(self, file_path):
+        with h5py.File(file_path, 'w') as f:
+            for attribute, value in self.__dict__.items():
+                if isinstance(value, pd.DataFrame):
+                    value.to_hdf(file_path, key=attribute)
+                elif isinstance(value, np.ndarray):
+                    f.create_dataset(attribute, data=value)
+                # ... handle other attribute types as needed ...
+
+    @classmethod
+    def read_hdf(cls, file_path):
+        with h5py.File(file_path, 'r') as f:
+            attrs_dict = {}
+            for attribute in cls.__annotations__:
+                if attribute in f:
+                    if pd.api.types.is_categorical_dtype(f[attribute]):
+                        attrs_dict[attribute] = pd.read_hdf(file_path, key=attribute)
+                    else:
+                        attrs_dict[attribute] = np.array(f[attribute])
+                # ... handle other attribute types as needed ...
+        return cls(**attrs_dict)
 
 
 @define(slots=False)
@@ -165,9 +182,7 @@ class LeaveOneOutDecodingAnalysis(ComputedResult):
     n_neurons: int
     long_results_obj: LeaveOneOutDecodingAnalysisResult
     short_results_obj: LeaveOneOutDecodingAnalysisResult
-
     is_global: bool = True
-
 
 
 @define(slots=False, repr=False)

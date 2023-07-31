@@ -1,6 +1,8 @@
 # CrossComputationComparisonHelpers
+from typing import Dict, List, Optional, Tuple
 import numpy as np
 from functools import reduce # _find_any_context_neurons
+from attrs import define, field, Factory
 
 from neuropy.utils.dynamic_container import DynamicContainer, override_dict, overriding_dict_with, get_dict_subset
 from neuropy.utils.misc import safe_item
@@ -23,33 +25,37 @@ class SplitPartitionMembership(Enum):
     RIGHT_ONLY = 2
     
 
-class SetPartition(object):
+
+@define(slots=False)
+class SetPartition_SharedPartitionStructure:
+    """ DynamicContainer(n_neurons=n_neurons, shared_fragile_neuron_IDXs=shared_fragile_neuron_IDXs, pairs=shared_fragile_neuron_IDXs_to_pairs, missing_neuron_IDXs=all_missing_IDXs, missing_neuron_ids=pf_neurons_missing_from_any, aclu_to_shared_fragile_IDX_map=aclu_to_shared_fragile_IDX_map) """
+    n_neurons: int
+    shared_fragile_neuron_IDXs: np.ndarray
+    pairs: List[Tuple[Optional[int], Optional[int]]]
+    missing_neuron_IDXs: np.ndarray
+    missing_neuron_ids: np.ndarray
+    aclu_to_shared_fragile_IDX_map: Dict
+
+
+@define(slots=False)
+class SetPartition:
     """ Converted from a one-off structure produced by `_compare_computation_results` as illustrated below:
         pf_neurons_diff = DynamicContainer(lhs_only=pf_neurons_lhs_unique, rhs_only=pf_neurons_rhs_unique, intersection=pf_neurons_both, either=pf_neurons_either,
              shared=DynamicContainer(n_neurons=n_neurons, shared_fragile_neuron_IDXs=shared_fragile_neuron_IDXs, pairs=shared_fragile_neuron_IDXs_to_pairs, missing_neuron_IDXs=all_missing_IDXs, missing_neuron_ids=pf_neurons_missing_from_any, aclu_to_shared_fragile_IDX_map=aclu_to_shared_fragile_IDX_map)) 
 
         TODO: perhaps bring computations in here?
     """
-    def __init__(self, lhs_only, rhs_only, either, intersection, shared_structure):
-        super(SetPartition, self).__init__()
-        self.lhs_only = lhs_only
-        self.rhs_only = rhs_only
-        self.intersection = intersection
-        self.either = either
-        self._shared = shared_structure
+    lhs_only: np.ndarray
+    rhs_only: np.ndarray
+    intersection: np.ndarray
+    either: np.ndarray
+    shared: SetPartition_SharedPartitionStructure = field(alias='shared_structure')
 
     @property
     def n_neurons(self):
         """The n_neurons property."""
         return len(self.either)
-        
-    @property
-    def shared(self):
-        """ DynamicContainer(n_neurons=self.n_neurons, shared_fragile_neuron_IDXs=shared_fragile_neuron_IDXs, pairs=shared_fragile_neuron_IDXs_to_pairs, missing_neuron_IDXs=all_missing_IDXs, missing_neuron_ids=pf_neurons_missing_from_any, aclu_to_shared_fragile_IDX_map=aclu_to_shared_fragile_IDX_map) """
-        return self._shared
-    @shared.setter
-    def shared(self, value):
-        self._shared = value
+
 
 
 @function_attributes(short_name=None, tags=['compare','private','computation_result'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-05-11 20:06', related_items=[])
@@ -101,19 +107,16 @@ def _compare_computation_results(lhs_computation_results, rhs_computation_result
     # lhs_missing_IDXs = [aclu_to_shared_fragile_IDX_map.get(aclu, np.nan) for aclu in pf_neurons_rhs_unique if aclu in aclu_to_shared_fragile_IDX_map]
     # rhs_missing_IDXs = [aclu_to_shared_fragile_IDX_map.get(aclu, np.nan) for aclu in pf_neurons_lhs_unique if aclu in aclu_to_shared_fragile_IDX_map]
 
-    lhs_shared_IDXs_map = [safe_item(np.squeeze(np.argwhere(aclu == lhs_neuron_ids)), default=None) for aclu in pf_neurons_either] # [0, 1, None, 2, 3, 4, 5, None, 6, 7, 8, None, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66]
-    rhs_shared_IDXs_map = [safe_item(np.squeeze(np.argwhere(aclu == rhs_neuron_ids)), default=None) for aclu in pf_neurons_either] # [None, 0, 1, 2, None, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, None, 65, None]
+    lhs_shared_IDXs_map: List[Optional[int]] = [safe_item(np.squeeze(np.argwhere(aclu == lhs_neuron_ids)), default=None) for aclu in pf_neurons_either] # [0, 1, None, 2, 3, 4, 5, None, 6, 7, 8, None, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66]
+    rhs_shared_IDXs_map: List[Optional[int]] = [safe_item(np.squeeze(np.argwhere(aclu == rhs_neuron_ids)), default=None) for aclu in pf_neurons_either] # [None, 0, 1, 2, None, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, None, 65, None]
 
     assert len(rhs_shared_IDXs_map) == n_neurons
     assert len(lhs_shared_IDXs_map) == n_neurons
-    shared_fragile_neuron_IDXs_to_pairs = list(zip(lhs_shared_IDXs_map, rhs_shared_IDXs_map)) # [(0, None), (1, 0), (None, 1), (2, 2), (3, None), (4, 3), (5, 4), (None, 5), (6, 6), (7, 7), (8, 8), (None, 9), (9, 10), (10, 11), (11, 12), (12, 13), (13, 14), (14, 15), (15, 16), (16, 17), (17, 18), (18, 19), (19, 20), (20, 21), (21, 22), (22, 23), (23, 24), (24, 25), (25, 26), (26, 27), (27, 28), (28, 29), (29, 30), (30, 31), (31, 32), (32, 33), (33, 34), (34, 35), (35, 36), (36, 37), (37, 38), (38, 39), (39, 40), (40, 41), (41, 42), (42, 43), (43, 44), (44, 45), (45, 46), (46, 47), (47, 48), (48, 49), (49, 50), (50, 51), (51, 52), (52, 53), (53, 54), (54, 55), (55, 56), (56, 57), (57, 58), (58, 59), (59, 60), (60, 61), (61, 62), (62, 63), (63, 64), (64, None), (65, 65), (66, None)]
-    # shared_fragile_neuron_IDXs_to_pairs 
-
-    # pf_neurons_diff = DynamicContainer(lhs_only=pf_neurons_lhs_unique, rhs_only=pf_neurons_rhs_unique, intersection=pf_neurons_both, either=pf_neurons_either,
-    #  	shared=DynamicContainer(n_neurons=n_neurons, shared_fragile_neuron_IDXs=shared_fragile_neuron_IDXs, pairs=shared_fragile_neuron_IDXs_to_pairs, missing_neuron_IDXs=all_missing_IDXs, missing_neuron_ids=pf_neurons_missing_from_any, aclu_to_shared_fragile_IDX_map=aclu_to_shared_fragile_IDX_map))
+    shared_fragile_neuron_IDXs_to_pairs: List[Tuple[Optional[int], Optional[int]]] = list(zip(lhs_shared_IDXs_map, rhs_shared_IDXs_map)) # [(0, None), (1, 0), (None, 1), (2, 2), (3, None), (4, 3), (5, 4), (None, 5), (6, 6), (7, 7), (8, 8), (None, 9), (9, 10), (10, 11), (11, 12), (12, 13), (13, 14), (14, 15), (15, 16), (16, 17), (17, 18), (18, 19), (19, 20), (20, 21), (21, 22), (22, 23), (23, 24), (24, 25), (25, 26), (26, 27), (27, 28), (28, 29), (29, 30), (30, 31), (31, 32), (32, 33), (33, 34), (34, 35), (35, 36), (36, 37), (37, 38), (38, 39), (39, 40), (40, 41), (41, 42), (42, 43), (43, 44), (44, 45), (45, 46), (46, 47), (47, 48), (48, 49), (49, 50), (50, 51), (51, 52), (52, 53), (53, 54), (54, 55), (55, 56), (56, 57), (57, 58), (58, 59), (59, 60), (60, 61), (61, 62), (62, 63), (63, 64), (64, None), (65, 65), (66, None)]
     pf_neurons_diff = SetPartition(lhs_only=pf_neurons_lhs_unique, rhs_only=pf_neurons_rhs_unique, intersection=pf_neurons_both, either=pf_neurons_either,
-        shared_structure=DynamicContainer(n_neurons=n_neurons, shared_fragile_neuron_IDXs=shared_fragile_neuron_IDXs, pairs=shared_fragile_neuron_IDXs_to_pairs, missing_neuron_IDXs=all_missing_IDXs, missing_neuron_ids=pf_neurons_missing_from_any, aclu_to_shared_fragile_IDX_map=aclu_to_shared_fragile_IDX_map)
+        shared_structure=SetPartition_SharedPartitionStructure(n_neurons=n_neurons, shared_fragile_neuron_IDXs=shared_fragile_neuron_IDXs, pairs=shared_fragile_neuron_IDXs_to_pairs, missing_neuron_IDXs=np.array(all_missing_IDXs), missing_neuron_ids=pf_neurons_missing_from_any, aclu_to_shared_fragile_IDX_map=aclu_to_shared_fragile_IDX_map)
         )
+    
     return pf_neurons_diff
 
 

@@ -22,6 +22,8 @@ from tqdm.notebook import tqdm
 
 from neuropy.utils.misc import safe_pandas_get_group # for _compute_pybursts_burst_interval_detection
 from neuropy.utils.mixins.binning_helpers import BinningContainer # used in _perform_firing_rate_trends_computation
+from neuropy.utils.mixins.AttrsClassHelpers import AttrsBasedClassHelperMixin, serialized_field, serialized_attribute_field, non_serialized_field, custom_define
+from neuropy.utils.mixins.HDF5_representable import HDF_DeserializationMixin, post_deserialize, HDF_SerializationMixin, HDFMixin
 
 from pyphocorehelpers.mixins.member_enumerating import AllFunctionEnumeratingMixin
 from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.ComputationFunctionRegistryHolder import ComputationFunctionRegistryHolder
@@ -35,16 +37,23 @@ import multiprocessing
 
 
 
-@define(slots=False)
-class SpikeRateTrends:
-    """ holds information relating to the firing rates of cells across time. """
-    inst_fr_df_list: list[pd.DataFrame] # a list containing a inst_fr_df for each epoch. 
-    inst_fr_signals_list: list[AnalogSignal]
-    # a `inst_fr_df` is a df with time bins along the rows and aclu values along the columns in the style of unit_specific_binned_spike_counts
+@custom_define(slots=False)
+class SpikeRateTrends(HDFMixin, AttrsBasedClassHelperMixin):
 
-    epoch_agg_inst_fr_list: np.ndarray = field(init=False) # .shape (n_epochs, n_cells)
-    cell_agg_inst_fr_list: np.ndarray = field(init=False) # .shape (n_cells,)
-    all_agg_inst_fr: float = field(init=False) # the scalar value that results from aggregating over ALL (timebins, epochs, cells)
+    epoch_agg_inst_fr_list: np.ndarray = serialized_field(is_computable=True, init=False) # .shape (n_epochs, n_cells)
+    cell_agg_inst_fr_list: np.ndarray = serialized_field(is_computable=True, init=False) # .shape (n_cells,)
+    all_agg_inst_fr: float = serialized_attribute_field(is_computable=True, init=False) # the scalar value that results from aggregating over ALL (timebins, epochs, cells)
+    """ holds information relating to the firing rates of cells across time. 
+    
+    In general I'd want access to:
+    filter_epochs
+    instantaneous_time_bin_size_seconds=0.5, kernel=GaussianKernel(200*ms), t_start=0.0, t_stop=1000.0, included_neuron_ids=None
+    
+    a `inst_fr_df` is a df with time bins along the rows and aclu values along the columns in the style of `unit_specific_binned_spike_counts`
+    """
+    #TODO 2023-07-31 08:36: - [ ] both of these properties would ideally be serialized to HDF, but they can't be right now.`
+    inst_fr_df_list: list[pd.DataFrame] = non_serialized_field() # a list containing a inst_fr_df for each epoch. 
+    inst_fr_signals_list: list[AnalogSignal] = non_serialized_field()
     
 
     @classmethod

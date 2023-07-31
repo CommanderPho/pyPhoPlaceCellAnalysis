@@ -24,6 +24,8 @@ from pyphocorehelpers.print_helpers import WrappingMessagePrinter, SimplePrintab
 from pyphocorehelpers.mixins.serialized import SerializedAttributesAllowBlockSpecifyingClass
 
 from pyphoplacecellanalysis.General.Mixins.CrossComputationComparisonHelpers import _compare_computation_results # for finding common neurons in `prune_to_shared_aclus_only`
+from neuropy.utils.mixins.AttrsClassHelpers import AttrsBasedClassHelperMixin, custom_define, serialized_field, serialized_attribute_field, non_serialized_field
+from neuropy.utils.mixins.HDF5_representable import HDF_DeserializationMixin, post_deserialize, HDF_SerializationMixin, HDFMixin
 
 
 # cut_bins = np.linspace(59200, 60800, 9)
@@ -379,8 +381,8 @@ class Zhang_Two_Step:
     
 
 
-@define(slots=False, repr=False)
-class DecodedFilterEpochsResult(object):
+@custom_define(slots=False, repr=False)
+class DecodedFilterEpochsResult(AttrsBasedClassHelperMixin):
     """ Container for the results of decoding a set of epochs (filter_epochs) using a decoder (active_decoder) 
     Usage:
         from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import DecodedFilterEpochsResult
@@ -431,6 +433,7 @@ class DecodedFilterEpochsResult(object):
             
         # Only `decoding_time_bin_size` is unchanged
         return subset
+    
 # ==================================================================================================================== #
 # Placemap Position Decoders                                                                                           #
 # ==================================================================================================================== #
@@ -440,8 +443,8 @@ class DecodedFilterEpochsResult(object):
 # Stateless Decoders (New 2023-04-06)                                                                                  #
 # ==================================================================================================================== #
 
-@define(slots=False)
-class BasePositionDecoder(NeuronUnitSlicableObjectProtocol):
+@custom_define(slots=False)
+class BasePositionDecoder(HDFMixin, AttrsBasedClassHelperMixin, NeuronUnitSlicableObjectProtocol):
     """ 2023-04-06 - A simplified data-only version of the decoder that serves to remove all state related to specific computations to make each run independent 
     Stores only the raw inputs that are used to decode, with the user specifying the specifics for a given decoding (like time_time_sizes, etc.
 
@@ -451,12 +454,12 @@ class BasePositionDecoder(NeuronUnitSlicableObjectProtocol):
 
 
     """
-    pf: PfND
+    pf: PfND = serialized_field()
 
-    neuron_IDXs: np.ndarray = None
-    neuron_IDs: np.ndarray = None
-    F: np.ndarray = None
-    P_x: np.ndarray = None
+    neuron_IDXs: np.ndarray = serialized_field(default=None, is_computable=True)
+    neuron_IDs: np.ndarray = serialized_field(default=None, is_computable=True)
+    F: np.ndarray = non_serialized_field(default=None)
+    P_x: np.ndarray = non_serialized_field(default=None)
 
     setup_on_init:bool = True 
     post_load_on_init:bool = False
@@ -532,6 +535,7 @@ class BasePositionDecoder(NeuronUnitSlicableObjectProtocol):
         
         self._setup_concatenated_F()
 
+    @post_deserialize
     def post_load(self):
         """ Called after deserializing/loading saved result from disk to rebuild the needed computed variables. """
         with WrappingMessagePrinter(f'post_load() called.', begin_line_ending='... ', finished_message='all rebuilding completed.', enable_print=self.debug_print):
@@ -980,121 +984,26 @@ class BasePositionDecoder(NeuronUnitSlicableObjectProtocol):
         return revised_most_likely_positions
 
 
-
-# @define(slots=False)
-# class PlacemapPositionDecoder(SerializedAttributesSpecifyingClass, BasePositionDecoder):
-#     """docstring for PlacemapPositionDecoder.
-    
-#     Call flow:
-#         ## Init/Setup Section:
-#         .__init__()
-#             .setup()
-#             .post_load() - Called after deserializing/loading saved result from disk to rebuild the needed computed variables. 
-#                 self._setup_concatenated_F()
-#                 self._setup_time_bin_spike_counts_N_i()
-#                 self._setup_time_window_centers()
-    
-    
-#         ## Computation Section
-#         .compute_all()
-#             .perform_compute_single_time_bin(...)
-#             .perform_compute_most_likely_positions(...)
-#     """     
-#     # # Time Binning:
-#     time_bin_size: float
-#     spikes_df: pd.DataFrame
-
-#     # time_binning_container: BinningContainer
-#     # unit_specific_time_binned_spike_counts: np.ndarray
-#     # total_spike_counts_per_window: np.ndarray
-
-#     # # Computed Results:
-#     # flat_p_x_given_n: np.ndarray
-#     # p_x_given_n: np.ndarray
-#     # most_likely_position_flat_indicies: np.ndarray
-#     # most_likely_position_indicies: type
-#     # marginal: DynamicContainer
-#     # most_likely_positions: np.ndarray
-#     # revised_most_likely_positions: np.ndarray
-
-#     # def __init__(self, time_bin_size: float, pf, spikes_df: pd.DataFrame, setup_on_init:bool=True, post_load_on_init:bool=False, debug_print:bool=False):
-#     #     super(PlacemapPositionDecoder, self).__init__()
-#     #     self.time_bin_size = time_bin_size
-#     #     self.pf = pf
-#     #     self.spikes_df = spikes_df        
-#     #     self.debug_print = debug_print
-#     #     if setup_on_init:
-#     #         self.setup() # setup on init
-#     #     if post_load_on_init:
-#     #         self.post_load()
-            
-#     # def __repr__(self) -> str:
-#     #     return f"<{self.__class__.__name__}: {self.__dict__.keys()};>"
-    
-#     # def setup(self):
-#     #     raise NotImplementedError
-    
-#     # def post_load(self):
-#     #     raise NotImplementedError
-
-        
-#     @classmethod
-#     def serialized_keys(cls):
-#         input_keys = ['time_bin_size', 'pf', 'spikes_df', 'debug_print']
-#         return input_keys
-    
-#     def to_dict(self):
-#         return self.__dict__
+    # ==================================================================================================================== #
+    # HDF5 Methods:                                                                                                        #
+    # ==================================================================================================================== #
+    # def to_hdf(self, file_path, key: str, **kwargs):
+    #         """ Saves the object to key in the hdf5 file specified by file_path
+    #         Usage:
+    #             hdf5_output_path: Path = curr_active_pipeline.get_output_path().joinpath('test_data.h5')
+    #             _pfnd_obj: PfND = long_one_step_decoder_1D.pf
+    #             _pfnd_obj.to_hdf(hdf5_output_path, key='test_pfnd')
+    #         """
+    #         raise NotImplementedError # implementor must override!
 
 
-#     # ## FileRepresentable protocol:
-#     # @classmethod
-#     # def from_file(cls, f):
-#     #     if f.is_file():
-#     #         dict_rep = None
-#     #         dict_rep = np.load(f, allow_pickle=True).item()
-#     #         if dict_rep is not None:
-#     #             # Convert to object
-#     #             dict_rep['setup_on_init'] = False
-#     #             dict_rep['post_load_on_init'] = False # set that to false too
-#     #             obj = cls.from_dict(dict_rep)
-#     #             post_load_dict = {k: v for k, v in dict_rep.items() if k in ['flat_p_x_given_n']}
-#     #             print(f'post_load_dict: {post_load_dict.keys()}')
-#     #             obj.flat_p_x_given_n = post_load_dict['flat_p_x_given_n']
-#     #             obj.post_load() # call the post_load function to update all the required variables
-#     #             return obj
-#     #         return dict_rep
-#     #     else:
-#     #         return None
-        
-#     # @classmethod
-#     # def to_file(cls, data: dict, f, status_print=True):
-#     #     assert (f is not None), "WARNING: filename can not be None"
-#     #     if isinstance(f, str):
-#     #         f = Path(f) # conver to pathlib path
-#     #     assert isinstance(f, Path)
-    
-#     #     with WrappingMessagePrinter(f'saving obj to file f: {str(f)}', begin_line_ending='... ', finished_message=f"{f.name} saved", enable_print=status_print):
-#     #         if not f.parent.exists():
-#     #             with WrappingMessagePrinter(f'parent path: {str(f.parent)} does not exist. Creating', begin_line_ending='... ', finished_message=f"{str(f.parent)} created.", enable_print=status_print):
-#     #                 f.parent.mkdir(parents=True, exist_ok=True) 
-#     #         np.save(f, data)
-            
-#     # def save(self, f, status_print=True, debug_print=False):
-#     #     active_serialization_keys = self.__class__.serialized_keys()
-#     #     all_data = self.to_dict()
-#     #     data = { a_serialized_key: all_data[a_serialized_key] for a_serialized_key in active_serialization_keys} # only get the serialized keys
-#     #     if debug_print:
-#     #         print(f'all_data.keys(): {all_data.keys()}, serialization_only_data.keys(): {data.keys()}')
-#     #     self.__class__.to_file(data, f, status_print=status_print)
-        
 
 
 # ==================================================================================================================== #
 # Bayesian Decoder                                                                                                     #
 # ==================================================================================================================== #
-@define(slots=False)
-class BayesianPlacemapPositionDecoder(SerializedAttributesAllowBlockSpecifyingClass, BasePositionDecoder):
+@custom_define(slots=False)
+class BayesianPlacemapPositionDecoder(SerializedAttributesAllowBlockSpecifyingClass, BasePositionDecoder): # needs `HDFMixin, `
     """ Holds the placefields. Can be called on any spike data to compute the most likely position given the spike data.
 
     Used to try to decode everything in one go, meaning it took the parameters (like the time window) and the spikes to decode as well and did the computation internally, but the concept of a decoder is that it is a stateless object that can be called on any spike data to decode it, so this concept is depricated.

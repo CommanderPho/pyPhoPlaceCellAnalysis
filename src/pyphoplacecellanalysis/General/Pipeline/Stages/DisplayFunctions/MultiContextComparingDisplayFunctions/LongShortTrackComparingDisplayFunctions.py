@@ -164,7 +164,6 @@ class LongShortTrackComparingDisplayFunctions(AllFunctionEnumeratingMixin, metac
                 global_results.sess.spikes_df['is_included_global_pf1D'] = False
                 global_results.sess.spikes_df.loc[np.isin(global_results.sess.spikes_df.index, global_results.computed_data.pf1D.filtered_spikes_df.index),'is_included_global_pf1D'] = True
 
-            # cell_spikes_dfs_list, aclu_to_fragile_linear_idx_map = _build_spikes_df_interpolated_props(global_results) # cell_spikes_dfs_list is indexed by aclu_to_fragile_linear_idx_map
             cell_spikes_dfs_dict, aclu_to_fragile_linear_idx_map = _build_spikes_df_interpolated_props(global_results) # cell_spikes_dfs_list is indexed by aclu_to_fragile_linear_idx_map
             time_variable_name = global_results.sess.spikes_df.spikes.time_variable_name
 

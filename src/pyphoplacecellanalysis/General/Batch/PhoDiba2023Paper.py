@@ -29,6 +29,9 @@ from pyphocorehelpers.mixins.serialized import SerializedAttributesAllowBlockSpe
 from neuropy.utils.result_context import IdentifyingContext
 from neuropy.utils.result_context import overwriting_display_context, providing_context
 from neuropy.core.user_annotations import UserAnnotationsManager
+from neuropy.utils.mixins.AttrsClassHelpers import custom_define, AttrsBasedClassHelperMixin, serialized_field, serialized_attribute_field, non_serialized_field
+from neuropy.utils.mixins.HDF5_representable import HDF_DeserializationMixin, post_deserialize, HDF_SerializationMixin, HDFMixin
+
 from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.SpikeRasters import plot_multiple_raster_plot
 from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.MultiContextComparingDisplayFunctions.LongShortTrackComparingDisplayFunctions import determine_long_short_pf1D_indicies_sort_by_peak
 from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.SpikeRasters import _prepare_spikes_df_from_filter_epochs
@@ -53,6 +56,16 @@ from pyphocorehelpers.plotting.figure_management import capture_new_figures_deco
 _bak_rcParams = mpl.rcParams.copy()
 # mpl.rcParams['toolbar'] = 'None' # disable toolbars
 # %matplotlib qt
+
+def list_of_dicts_to_dict_of_lists(list_of_dicts):
+    dict_of_lists = {}
+    for item in list_of_dicts:
+        for key, value in item.items():
+            if key in dict_of_lists:
+                dict_of_lists[key].append(value)
+            else:
+                dict_of_lists[key] = [value]
+    return dict_of_lists
 
 
 # ==================================================================================================================== #
@@ -629,44 +642,64 @@ def PAPER_FIGURE_figure_1_full(curr_active_pipeline, defer_show=False, save_figu
 # 2023-06-26 - Paper Figure 2 Code                                                                                     #
 # ==================================================================================================================== #
 
-@define(slots=False)
-class SingleBarResult:
+@custom_define(slots=False)
+class SingleBarResult(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
     """ a simple replacement for the tuple that's current passed """
-    mean: float
-    std: float
-    values: np.ndarray
-    LxC_aclus: np.ndarray # the list of long-eXclusive cell aclus
-    SxC_aclus: np.ndarray # the list of short-eXclusive cell aclus
-    LxC_scatter_props: Optional[Dict]
-    SxC_scatter_props: Optional[Dict]
+    mean: float = serialized_attribute_field()
+    std: float = serialized_attribute_field()
+    values: np.ndarray = serialized_field()
+    LxC_aclus: np.ndarray = serialized_field(hdf_metadata={'track_eXclusive_cells': 'LxC'}) # the list of long-eXclusive cell aclus
+    SxC_aclus: np.ndarray = serialized_field(hdf_metadata={'track_eXclusive_cells': 'SxC'}) # the list of short-eXclusive cell aclus
+    LxC_scatter_props: Optional[Dict] = non_serialized_field(is_computable=False)
+    SxC_scatter_props: Optional[Dict] = non_serialized_field(is_computable=False)
 
 
 # Instantaneous versions:
-@define(slots=False)
-class InstantaneousSpikeRateGroupsComputation:
+
+def _InstantaneousSpikeRateGroupsComputation_convert_Fig2_ANY_FR_to_hdf_fn(f, key: str, value):
+    """ Converts `Fig2_Replay_FR: List[SingleBarResult]` or `Fig2_Laps_FR: List[SingleBarResult]` into something serializable. Unfortunately has to be defined outside the `InstantaneousSpikeRateGroupsComputation` definition so it can be used in the field. value: List[SingleBarResult] """
+    assert isinstance(value, list)
+    assert len(value) == 4
+    if key.endswith('/Fig2_Replay_FR'):
+        key = key.removesuffix('/Fig2_Replay_FR')
+        Fig2_Replay_FR_key:str = f"{key}/Fig2/Replay/inst_FR_Bars"
+        for specific_bar_key, specific_bar_SingleBarResult in zip(['LxC_ReplayDeltaMinus', 'LxC_ReplayDeltaPlus', 'SxC_ReplayDeltaMinus', 'SxC_ReplayDeltaPlus'], value):
+            specific_bar_SingleBarResult.to_hdf(f, f'{Fig2_Replay_FR_key}/{specific_bar_key}')
+    elif key.endswith('/Fig2_Laps_FR'):
+        key = key.removesuffix('/Fig2_Laps_FR')
+        Fig2_Laps_FR_key:str = f"{key}/Fig2/Laps/inst_FR_Bars"
+        for specific_bar_key, specific_bar_SingleBarResult in zip(['LxC_ThetaDeltaMinus', 'LxC_ThetaDeltaPlus', 'SxC_ThetaDeltaMinus', 'SxC_ThetaDeltaPlus'], value):
+            specific_bar_SingleBarResult.to_hdf(f, f'{Fig2_Laps_FR_key}/{specific_bar_key}')
+    else:
+        raise NotImplementedError
+    
+
+@custom_define(slots=False)
+class InstantaneousSpikeRateGroupsComputation(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
     """ class to handle spike rate computations 
 
     from pyphoplacecellanalysis.General.Batch.PhoDiba2023Paper import InstantaneousSpikeRateGroupsComputation
 
     """
-    instantaneous_time_bin_size_seconds: float = 0.01  # 20ms
-    active_identifying_session_ctx: IdentifyingContext = field(init=False)
+    instantaneous_time_bin_size_seconds: float = serialized_attribute_field(default=0.01) # 20ms
+    active_identifying_session_ctx: IdentifyingContext = serialized_attribute_field(init=False, serialization_fn=(lambda f, k, v: HDF_SerializationMixin._convert_dict_to_hdf_attrs_fn(f, k, v.to_dict()))) # need to write custom serialization to attributes I think
 
-    LxC_aclus: np.ndarray = field(init=False) # the list of long-eXclusive cell aclus
-    SxC_aclus: np.ndarray = field(init=False) # the list of short-eXclusive cell aclus
+    LxC_aclus: np.ndarray = serialized_field(init=False, hdf_metadata={'track_eXclusive_cells': 'LxC'}) # the list of long-eXclusive cell aclus
+    SxC_aclus: np.ndarray = serialized_field(init=False, hdf_metadata={'track_eXclusive_cells': 'SxC'}) # the list of short-eXclusive cell aclus
     
-    Fig2_Replay_FR: List[SingleBarResult] = field(init=False) # a list of the four single-bar results.
-    Fig2_Laps_FR: List[SingleBarResult] = field(init=False) # a list of the four single-bar results.
+    Fig2_Replay_FR: List[SingleBarResult] = serialized_field(init=False, is_computable=True, serialization_fn=_InstantaneousSpikeRateGroupsComputation_convert_Fig2_ANY_FR_to_hdf_fn, hdf_metadata={'epochs': 'Replay'}) # a list of the four single-bar results.
+    Fig2_Laps_FR: List[SingleBarResult] = serialized_field(init=False, is_computable=True, serialization_fn=_InstantaneousSpikeRateGroupsComputation_convert_Fig2_ANY_FR_to_hdf_fn, hdf_metadata={'epochs': 'Laps'}) # a list of the four single-bar results.
 
-    LxC_ReplayDeltaMinus: SpikeRateTrends = field(init=False, repr=False, default=None)
-    LxC_ReplayDeltaPlus: SpikeRateTrends = field(init=False, repr=False, default=None)
-    SxC_ReplayDeltaMinus: SpikeRateTrends = field(init=False, repr=False, default=None)
-    SxC_ReplayDeltaPlus: SpikeRateTrends = field(init=False, repr=False, default=None)
+    LxC_ReplayDeltaMinus: SpikeRateTrends = serialized_field(init=False, repr=False, default=None, is_computable=True, hdf_metadata={'track_eXclusive_cells': 'LxC', 'epochs': 'Replay', 'track_change_relative_period': 'DeltaMinus'})
+    LxC_ReplayDeltaPlus: SpikeRateTrends = serialized_field(init=False, repr=False, default=None, is_computable=True, hdf_metadata={'track_eXclusive_cells': 'LxC', 'epochs': 'Replay', 'track_change_relative_period': 'DeltaPlus'})
+    SxC_ReplayDeltaMinus: SpikeRateTrends = serialized_field(init=False, repr=False, default=None, is_computable=True, hdf_metadata={'track_eXclusive_cells': 'SxC', 'epochs': 'Replay', 'track_change_relative_period': 'DeltaMinus'})
+    SxC_ReplayDeltaPlus: SpikeRateTrends = serialized_field(init=False, repr=False, default=None, is_computable=True, hdf_metadata={'track_eXclusive_cells': 'SxC', 'epochs': 'Replay', 'track_change_relative_period': 'DeltaPlus'})
 
-    LxC_ThetaDeltaMinus: SpikeRateTrends = field(init=False, repr=False, default=None)
-    LxC_ThetaDeltaPlus: SpikeRateTrends = field(init=False, repr=False, default=None)
-    SxC_ThetaDeltaMinus: SpikeRateTrends = field(init=False, repr=False, default=None)
-    SxC_ThetaDeltaPlus: SpikeRateTrends = field(init=False, repr=False, default=None)
+    LxC_ThetaDeltaMinus: SpikeRateTrends = serialized_field(init=False, repr=False, default=None, is_computable=True, hdf_metadata={'track_eXclusive_cells': 'LxC', 'epochs': 'Laps', 'track_change_relative_period': 'DeltaMinus'})
+    LxC_ThetaDeltaPlus: SpikeRateTrends = serialized_field(init=False, repr=False, default=None, is_computable=True, hdf_metadata={'track_eXclusive_cells': 'LxC', 'epochs': 'Laps', 'track_change_relative_period': 'DeltaPlus'})
+    SxC_ThetaDeltaMinus: SpikeRateTrends = serialized_field(init=False, repr=False, default=None, is_computable=True, hdf_metadata={'track_eXclusive_cells': 'SxC', 'epochs': 'Laps', 'track_change_relative_period': 'DeltaMinus'})
+    SxC_ThetaDeltaPlus: SpikeRateTrends = serialized_field(init=False, repr=False, default=None, is_computable=True, hdf_metadata={'track_eXclusive_cells': 'SxC', 'epochs': 'Laps', 'track_change_relative_period': 'DeltaPlus'})
+
 
     def compute(self, curr_active_pipeline, **kwargs):
         """ full instantaneous computations for both Long and Short epochs:
@@ -737,30 +770,6 @@ class InstantaneousSpikeRateGroupsComputation:
         self.Fig2_Laps_FR: list[SingleBarResult] = [SingleBarResult(v.cell_agg_inst_fr_list.mean(), v.cell_agg_inst_fr_list.std(), v.cell_agg_inst_fr_list, self.LxC_aclus, self.SxC_aclus, None, None) for v in (LxC_ThetaDeltaMinus, LxC_ThetaDeltaPlus, SxC_ThetaDeltaMinus, SxC_ThetaDeltaPlus)]
         
 
-    def __add__(self, other):
-        """ for concatenating the fields of two `InstantaneousSpikeRateGroupsComputation objects. """
-        #TODO 2023-07-18 11:37: - [ ] Doesn't account for self.LxC_aclus, self.SxC_aclus, or self.active_context. Should probably form a context-specific SxC_aclus and LxC_aclus array if needed.
-        if isinstance(other, InstantaneousSpikeRateGroupsComputation):
-            new_obj = InstantaneousSpikeRateGroupsComputation()
-            new_obj.Fig2_Replay_FR = self.Fig2_Replay_FR + other.Fig2_Replay_FR
-            new_obj.Fig2_Laps_FR = self.Fig2_Laps_FR + other.Fig2_Laps_FR
-
-            # Concatenate SpikeRateTrends members
-            new_obj.LxC_ReplayDeltaMinus = self.LxC_ReplayDeltaMinus + other.LxC_ReplayDeltaMinus
-            new_obj.LxC_ReplayDeltaPlus = self.LxC_ReplayDeltaPlus + other.LxC_ReplayDeltaPlus
-            new_obj.SxC_ReplayDeltaMinus = self.SxC_ReplayDeltaMinus + other.SxC_ReplayDeltaMinus
-            new_obj.SxC_ReplayDeltaPlus = self.SxC_ReplayDeltaPlus + other.SxC_ReplayDeltaPlus
-            new_obj.LxC_ThetaDeltaMinus = self.LxC_ThetaDeltaMinus + other.LxC_ThetaDeltaMinus
-            new_obj.LxC_ThetaDeltaPlus = self.LxC_ThetaDeltaPlus + other.LxC_ThetaDeltaPlus
-            new_obj.SxC_ThetaDeltaMinus = self.SxC_ThetaDeltaMinus + other.SxC_ThetaDeltaMinus
-            new_obj.SxC_ThetaDeltaPlus = self.SxC_ThetaDeltaPlus + other.SxC_ThetaDeltaPlus
-
-            return new_obj
-
-        raise TypeError("Unsupported operand type(s) for +: '{}' and '{}'".format(type(self), type(other)))
-
-
-
 
 # @overwriting_display_context(
 @metadata_attributes(short_name=None, tags=['figure_2', 'paper', 'figure'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-06-26 21:36', related_items=[])
@@ -811,7 +820,7 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
     
     @classmethod
     def _build_formatted_title_string(cls, epochs_name) -> str:
-        """ buidls the two line colored string figure's footer that is passed into `flexitext`.
+        """ buidls the two line colored string that is passed into `flexitext`.
         """
         return (f"<size:22><weight:bold>{epochs_name}</> Firing Rates\n"
                 "<size:14>for the "
@@ -846,7 +855,7 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
 
         for i in range(len(x)):
             x_values = (x[i] + np.random.random(y_values[i].size) * width - width / 2)
-            scatter_plot = ax.scatter(x_values, y_values[i], color=cls.get_bar_colors()[i], **scatter_props[i]) # the np.random part is to spread the points out along the x-axis within their bar so they're visible and don't overlap.
+            scatter_plot = ax.scatter(x_values, y_values[i], color=cls.get_bar_colors()[i], **list_of_dicts_to_dict_of_lists(scatter_props[i])) # the np.random part is to spread the points out along the x-axis within their bar so they're visible and don't overlap.
             scatter_plots.append(scatter_plot)
             x_values_list.append(x_values)
             
@@ -880,7 +889,15 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
 
         x_labels = ['$L_x C$\t$\\theta_{\\Delta -}$', '$L_x C$\t$\\theta_{\\Delta +}$', '$S_x C$\t$\\theta_{\\Delta -}$', '$S_x C$\t$\\theta_{\\Delta +}$']
         all_data_points = np.array([v.values for v in Fig2_Laps_FR])
-        all_scatter_props =  Fig2_Laps_FR[0].LxC_scatter_props + Fig2_Laps_FR[1].LxC_scatter_props + Fig2_Laps_FR[2].SxC_scatter_props + Fig2_Laps_FR[3].SxC_scatter_props # the LxC_scatter_props and SxC_scatter_props are actually the same for all entries in this list, but get em like this anyway. 
+        # all_scatter_props =  Fig2_Laps_FR[0].LxC_scatter_props + Fig2_Laps_FR[1].LxC_scatter_props + Fig2_Laps_FR[2].SxC_scatter_props + Fig2_Laps_FR[3].SxC_scatter_props # the LxC_scatter_props and SxC_scatter_props are actually the same for all entries in this list, but get em like this anyway. 
+
+        if Fig2_Laps_FR[0].LxC_scatter_props is not None:
+            # all_scatter_props =  Fig2_Laps_FR[0].LxC_scatter_props + Fig2_Laps_FR[1].LxC_scatter_props + Fig2_Laps_FR[2].SxC_scatter_props + Fig2_Laps_FR[3].SxC_scatter_props # the LxC_scatter_props and SxC_scatter_props are actually the same for all entries in this list, but get em like this anyway. 
+            all_scatter_props =  [Fig2_Laps_FR[0].LxC_scatter_props, Fig2_Laps_FR[1].LxC_scatter_props, Fig2_Laps_FR[2].SxC_scatter_props, Fig2_Laps_FR[3].SxC_scatter_props]
+
+        else:
+            all_scatter_props = [{}, {}, {}, {}]
+
         return cls.create_plot(x_labels, all_data_points, all_scatter_props, 'Laps Firing Rates (Hz)', 'Lap ($\\theta$)', 'fig_2_Theta_FR_matplotlib', active_context, defer_show, kwargs.get('title_modifier'))
 
 
@@ -900,7 +917,8 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
 
     @classmethod
     def add_optional_aclu_labels(cls, a_fig_container, LxC_aclus, SxC_aclus, enable_hover_labels=True, enable_tiny_point_labels=True):
-        """ 
+        """ Adds disambiguating labels to each of the scatterplot points. Important for specifying which ACLU is plotted.
+
 
         Parameters:
             enable_hover_labels = True # add interactive point hover labels using mplcursors
@@ -988,10 +1006,6 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
             _fig_2_theta_out = self.add_optional_aclu_labels(_fig_2_theta_out, LxC_aclus, SxC_aclus, enable_tiny_point_labels=enable_tiny_point_labels, enable_hover_labels=enable_hover_labels)
             _fig_2_replay_out = self.add_optional_aclu_labels(_fig_2_replay_out, LxC_aclus, SxC_aclus, enable_tiny_point_labels=enable_tiny_point_labels, enable_hover_labels=enable_hover_labels)
         
-        """
-        LxC_aclus = _out_fig_2.computation_result.LxC_aclus
-        SxC_aclus = _out_fig_2.computation_result.SxC_aclus
-        """
         def _perform_write_to_file_callback():
             ## 2023-05-31 - Reference Output of matplotlib figure to file, along with building appropriate context.
             return (self.perform_save(_fig_2_theta_out.context, _fig_2_theta_out.figures[0]), 
@@ -1005,53 +1019,11 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
         # Merge the two (_fig_2_theta_out | _fig_2_replay_out)
         return (_fig_2_theta_out, _fig_2_replay_out)
 
+
     def perform_save(self, *args, **kwargs):
         """ used to save the figure without needing a hard reference to curr_active_pipeline """
         assert self._pipeline_file_callback_fn is not None
         return self._pipeline_file_callback_fn(*args, **kwargs) # call the saved callback
-
-    @classmethod
-    def serialized_key_blocklist(cls):
-        """ specifies specific keys NOT to serialize (to remove before serialization). If `serialized_key_allowlist` is specified, this variable will be ignored. """
-        return ['_pipeline_file_callback_fn'] # no keys by default
-
-    def to_dict(self):
-        if self.serialized_key_allowlist() is not None:
-            # Only use the allow list
-            state = {}
-            for an_included_key in self.serialized_key_allowlist():
-                state[an_included_key] = self.__dict__[an_included_key]
-        else:
-            # no allowlist specified
-            # state = self.serialization_perform_drop_blocklist(self.__dict__.copy())
-            state = self.serialization_perform_drop_blocklist(asdict(self))
-
-        return state
-
-    ## For serialization/pickling:
-    def __getstate__(self):
-        # Copy the object's state from self.__dict__ which contains
-        # all our instance attributes (_mapping and _keys_at_init). Always use the dict.copy()
-        # method to avoid modifying the original state.
-        state = self.to_dict().copy()
-        # state = self.to_dict().copy()
-        # Remove the unpicklable entries.
-        # del state['_pipeline_file_callback_fn']
-        return state
-
-    def __setstate__(self, state):
-        # Restore instance attributes (i.e., _mapping and _keys_at_init).
-        # print(f'SessionConfig.__setstate__(state: {state})')
-        if 'session_context' not in state:
-            from neuropy.core.session.Formats.BaseDataSessionFormats import DataSessionFormatRegistryHolder
-            # self.session_context = None
-            state['session_context'] = None
-            ## Tries to get the appropriate class using its self.format_name and compute its context
-            active_data_mode_registered_class = DataSessionFormatRegistryHolder.get_registry_data_session_type_class_name_dict()[state['format_name']]
-            state['session_context'] = active_data_mode_registered_class.parse_session_basepath_to_context(state['basepath'])
-
-        self.__dict__.update(state)
-        
 
 
 # 2023-07-21 - Across Sessions Aggregate Figure: __________________________________________________________________________________ #
