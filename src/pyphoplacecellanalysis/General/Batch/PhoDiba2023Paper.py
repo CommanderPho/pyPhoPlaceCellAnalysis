@@ -29,6 +29,9 @@ from pyphocorehelpers.mixins.serialized import SerializedAttributesAllowBlockSpe
 from neuropy.utils.result_context import IdentifyingContext
 from neuropy.utils.result_context import overwriting_display_context, providing_context
 from neuropy.core.user_annotations import UserAnnotationsManager
+from neuropy.utils.mixins.AttrsClassHelpers import custom_define, AttrsBasedClassHelperMixin, serialized_field, serialized_attribute_field, non_serialized_field
+from neuropy.utils.mixins.HDF5_representable import HDF_DeserializationMixin, post_deserialize, HDF_SerializationMixin, HDFMixin
+
 from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.SpikeRasters import plot_multiple_raster_plot
 from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.MultiContextComparingDisplayFunctions.LongShortTrackComparingDisplayFunctions import determine_long_short_pf1D_indicies_sort_by_peak
 from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.SpikeRasters import _prepare_spikes_df_from_filter_epochs
@@ -639,44 +642,64 @@ def PAPER_FIGURE_figure_1_full(curr_active_pipeline, defer_show=False, save_figu
 # 2023-06-26 - Paper Figure 2 Code                                                                                     #
 # ==================================================================================================================== #
 
-@define(slots=False)
-class SingleBarResult:
+@custom_define(slots=False)
+class SingleBarResult(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
     """ a simple replacement for the tuple that's current passed """
-    mean: float
-    std: float
-    values: np.ndarray
-    LxC_aclus: np.ndarray # the list of long-eXclusive cell aclus
-    SxC_aclus: np.ndarray # the list of short-eXclusive cell aclus
-    LxC_scatter_props: Optional[Dict]
-    SxC_scatter_props: Optional[Dict]
+    mean: float = serialized_attribute_field()
+    std: float = serialized_attribute_field()
+    values: np.ndarray = serialized_field()
+    LxC_aclus: np.ndarray = serialized_field(hdf_metadata={'track_eXclusive_cells': 'LxC'}) # the list of long-eXclusive cell aclus
+    SxC_aclus: np.ndarray = serialized_field(hdf_metadata={'track_eXclusive_cells': 'SxC'}) # the list of short-eXclusive cell aclus
+    LxC_scatter_props: Optional[Dict] = non_serialized_field(is_computable=False)
+    SxC_scatter_props: Optional[Dict] = non_serialized_field(is_computable=False)
 
 
 # Instantaneous versions:
-@define(slots=False)
-class InstantaneousSpikeRateGroupsComputation:
+
+def _InstantaneousSpikeRateGroupsComputation_convert_Fig2_ANY_FR_to_hdf_fn(f, key: str, value):
+    """ Converts `Fig2_Replay_FR: List[SingleBarResult]` or `Fig2_Laps_FR: List[SingleBarResult]` into something serializable. Unfortunately has to be defined outside the `InstantaneousSpikeRateGroupsComputation` definition so it can be used in the field. value: List[SingleBarResult] """
+    assert isinstance(value, list)
+    assert len(value) == 4
+    if key.endswith('/Fig2_Replay_FR'):
+        key = key.removesuffix('/Fig2_Replay_FR')
+        Fig2_Replay_FR_key:str = f"{key}/Fig2/Replay/inst_FR_Bars"
+        for specific_bar_key, specific_bar_SingleBarResult in zip(['LxC_ReplayDeltaMinus', 'LxC_ReplayDeltaPlus', 'SxC_ReplayDeltaMinus', 'SxC_ReplayDeltaPlus'], value):
+            specific_bar_SingleBarResult.to_hdf(f, f'{Fig2_Replay_FR_key}/{specific_bar_key}')
+    elif key.endswith('/Fig2_Laps_FR'):
+        key = key.removesuffix('/Fig2_Laps_FR')
+        Fig2_Laps_FR_key:str = f"{key}/Fig2/Laps/inst_FR_Bars"
+        for specific_bar_key, specific_bar_SingleBarResult in zip(['LxC_ThetaDeltaMinus', 'LxC_ThetaDeltaPlus', 'SxC_ThetaDeltaMinus', 'SxC_ThetaDeltaPlus'], value):
+            specific_bar_SingleBarResult.to_hdf(f, f'{Fig2_Laps_FR_key}/{specific_bar_key}')
+    else:
+        raise NotImplementedError
+    
+
+@custom_define(slots=False)
+class InstantaneousSpikeRateGroupsComputation(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
     """ class to handle spike rate computations 
 
     from pyphoplacecellanalysis.General.Batch.PhoDiba2023Paper import InstantaneousSpikeRateGroupsComputation
 
     """
-    instantaneous_time_bin_size_seconds: float = 0.01  # 20ms
-    active_identifying_session_ctx: IdentifyingContext = field(init=False)
+    instantaneous_time_bin_size_seconds: float = serialized_attribute_field(default=0.01) # 20ms
+    active_identifying_session_ctx: IdentifyingContext = serialized_attribute_field(init=False, serialization_fn=HDF_SerializationMixin._convert_dict_to_hdf_attrs_fn) # need to write custom serialization to attributes I think
 
-    LxC_aclus: np.ndarray = field(init=False) # the list of long-eXclusive cell aclus
-    SxC_aclus: np.ndarray = field(init=False) # the list of short-eXclusive cell aclus
+    LxC_aclus: np.ndarray = serialized_field(init=False, hdf_metadata={'track_eXclusive_cells': 'LxC'}) # the list of long-eXclusive cell aclus
+    SxC_aclus: np.ndarray = serialized_field(init=False, hdf_metadata={'track_eXclusive_cells': 'SxC'}) # the list of short-eXclusive cell aclus
     
-    Fig2_Replay_FR: List[SingleBarResult] = field(init=False) # a list of the four single-bar results.
-    Fig2_Laps_FR: List[SingleBarResult] = field(init=False) # a list of the four single-bar results.
+    Fig2_Replay_FR: List[SingleBarResult] = serialized_field(init=False, is_computable=True, serialization_fn=_InstantaneousSpikeRateGroupsComputation_convert_Fig2_ANY_FR_to_hdf_fn) # a list of the four single-bar results.
+    Fig2_Laps_FR: List[SingleBarResult] = serialized_field(init=False, is_computable=True, serialization_fn=_InstantaneousSpikeRateGroupsComputation_convert_Fig2_ANY_FR_to_hdf_fn) # a list of the four single-bar results.
 
-    LxC_ReplayDeltaMinus: SpikeRateTrends = field(init=False, repr=False, default=None)
-    LxC_ReplayDeltaPlus: SpikeRateTrends = field(init=False, repr=False, default=None)
-    SxC_ReplayDeltaMinus: SpikeRateTrends = field(init=False, repr=False, default=None)
-    SxC_ReplayDeltaPlus: SpikeRateTrends = field(init=False, repr=False, default=None)
+    LxC_ReplayDeltaMinus: SpikeRateTrends = serialized_field(init=False, repr=False, default=None, is_computable=True, hdf_metadata={'track_eXclusive_cells': 'LxC', 'epochs': 'Replay', 'track_change_relative_period': 'DeltaMinus'})
+    LxC_ReplayDeltaPlus: SpikeRateTrends = serialized_field(init=False, repr=False, default=None, is_computable=True, hdf_metadata={'track_eXclusive_cells': 'LxC', 'epochs': 'Replay', 'track_change_relative_period': 'DeltaPlus'})
+    SxC_ReplayDeltaMinus: SpikeRateTrends = serialized_field(init=False, repr=False, default=None, is_computable=True, hdf_metadata={'track_eXclusive_cells': 'SxC', 'epochs': 'Replay', 'track_change_relative_period': 'DeltaMinus'})
+    SxC_ReplayDeltaPlus: SpikeRateTrends = serialized_field(init=False, repr=False, default=None, is_computable=True, hdf_metadata={'track_eXclusive_cells': 'SxC', 'epochs': 'Replay', 'track_change_relative_period': 'DeltaPlus'})
 
-    LxC_ThetaDeltaMinus: SpikeRateTrends = field(init=False, repr=False, default=None)
-    LxC_ThetaDeltaPlus: SpikeRateTrends = field(init=False, repr=False, default=None)
-    SxC_ThetaDeltaMinus: SpikeRateTrends = field(init=False, repr=False, default=None)
-    SxC_ThetaDeltaPlus: SpikeRateTrends = field(init=False, repr=False, default=None)
+    LxC_ThetaDeltaMinus: SpikeRateTrends = serialized_field(init=False, repr=False, default=None, is_computable=True, hdf_metadata={'track_eXclusive_cells': 'LxC', 'epochs': 'Theta', 'track_change_relative_period': 'DeltaMinus'})
+    LxC_ThetaDeltaPlus: SpikeRateTrends = serialized_field(init=False, repr=False, default=None, is_computable=True, hdf_metadata={'track_eXclusive_cells': 'LxC', 'epochs': 'Theta', 'track_change_relative_period': 'DeltaPlus'})
+    SxC_ThetaDeltaMinus: SpikeRateTrends = serialized_field(init=False, repr=False, default=None, is_computable=True, hdf_metadata={'track_eXclusive_cells': 'SxC', 'epochs': 'Theta', 'track_change_relative_period': 'DeltaMinus'})
+    SxC_ThetaDeltaPlus: SpikeRateTrends = serialized_field(init=False, repr=False, default=None, is_computable=True, hdf_metadata={'track_eXclusive_cells': 'SxC', 'epochs': 'Theta', 'track_change_relative_period': 'DeltaPlus'})
+
 
     def compute(self, curr_active_pipeline, **kwargs):
         """ full instantaneous computations for both Long and Short epochs:
