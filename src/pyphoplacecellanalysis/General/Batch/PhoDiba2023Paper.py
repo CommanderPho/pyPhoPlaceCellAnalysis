@@ -682,23 +682,23 @@ class InstantaneousSpikeRateGroupsComputation(HDF_SerializationMixin, AttrsBased
 
     """
     instantaneous_time_bin_size_seconds: float = serialized_attribute_field(default=0.01) # 20ms
-    active_identifying_session_ctx: IdentifyingContext = serialized_attribute_field(init=False, serialization_fn=HDF_SerializationMixin._convert_dict_to_hdf_attrs_fn) # need to write custom serialization to attributes I think
+    active_identifying_session_ctx: IdentifyingContext = serialized_attribute_field(init=False, serialization_fn=(lambda f, k, v: HDF_SerializationMixin._convert_dict_to_hdf_attrs_fn(f, k, v.to_dict()))) # need to write custom serialization to attributes I think
 
     LxC_aclus: np.ndarray = serialized_field(init=False, hdf_metadata={'track_eXclusive_cells': 'LxC'}) # the list of long-eXclusive cell aclus
     SxC_aclus: np.ndarray = serialized_field(init=False, hdf_metadata={'track_eXclusive_cells': 'SxC'}) # the list of short-eXclusive cell aclus
     
-    Fig2_Replay_FR: List[SingleBarResult] = serialized_field(init=False, is_computable=True, serialization_fn=_InstantaneousSpikeRateGroupsComputation_convert_Fig2_ANY_FR_to_hdf_fn) # a list of the four single-bar results.
-    Fig2_Laps_FR: List[SingleBarResult] = serialized_field(init=False, is_computable=True, serialization_fn=_InstantaneousSpikeRateGroupsComputation_convert_Fig2_ANY_FR_to_hdf_fn) # a list of the four single-bar results.
+    Fig2_Replay_FR: List[SingleBarResult] = serialized_field(init=False, is_computable=True, serialization_fn=_InstantaneousSpikeRateGroupsComputation_convert_Fig2_ANY_FR_to_hdf_fn, hdf_metadata={'epochs': 'Replay'}) # a list of the four single-bar results.
+    Fig2_Laps_FR: List[SingleBarResult] = serialized_field(init=False, is_computable=True, serialization_fn=_InstantaneousSpikeRateGroupsComputation_convert_Fig2_ANY_FR_to_hdf_fn, hdf_metadata={'epochs': 'Laps'}) # a list of the four single-bar results.
 
     LxC_ReplayDeltaMinus: SpikeRateTrends = serialized_field(init=False, repr=False, default=None, is_computable=True, hdf_metadata={'track_eXclusive_cells': 'LxC', 'epochs': 'Replay', 'track_change_relative_period': 'DeltaMinus'})
     LxC_ReplayDeltaPlus: SpikeRateTrends = serialized_field(init=False, repr=False, default=None, is_computable=True, hdf_metadata={'track_eXclusive_cells': 'LxC', 'epochs': 'Replay', 'track_change_relative_period': 'DeltaPlus'})
     SxC_ReplayDeltaMinus: SpikeRateTrends = serialized_field(init=False, repr=False, default=None, is_computable=True, hdf_metadata={'track_eXclusive_cells': 'SxC', 'epochs': 'Replay', 'track_change_relative_period': 'DeltaMinus'})
     SxC_ReplayDeltaPlus: SpikeRateTrends = serialized_field(init=False, repr=False, default=None, is_computable=True, hdf_metadata={'track_eXclusive_cells': 'SxC', 'epochs': 'Replay', 'track_change_relative_period': 'DeltaPlus'})
 
-    LxC_ThetaDeltaMinus: SpikeRateTrends = serialized_field(init=False, repr=False, default=None, is_computable=True, hdf_metadata={'track_eXclusive_cells': 'LxC', 'epochs': 'Theta', 'track_change_relative_period': 'DeltaMinus'})
-    LxC_ThetaDeltaPlus: SpikeRateTrends = serialized_field(init=False, repr=False, default=None, is_computable=True, hdf_metadata={'track_eXclusive_cells': 'LxC', 'epochs': 'Theta', 'track_change_relative_period': 'DeltaPlus'})
-    SxC_ThetaDeltaMinus: SpikeRateTrends = serialized_field(init=False, repr=False, default=None, is_computable=True, hdf_metadata={'track_eXclusive_cells': 'SxC', 'epochs': 'Theta', 'track_change_relative_period': 'DeltaMinus'})
-    SxC_ThetaDeltaPlus: SpikeRateTrends = serialized_field(init=False, repr=False, default=None, is_computable=True, hdf_metadata={'track_eXclusive_cells': 'SxC', 'epochs': 'Theta', 'track_change_relative_period': 'DeltaPlus'})
+    LxC_ThetaDeltaMinus: SpikeRateTrends = serialized_field(init=False, repr=False, default=None, is_computable=True, hdf_metadata={'track_eXclusive_cells': 'LxC', 'epochs': 'Laps', 'track_change_relative_period': 'DeltaMinus'})
+    LxC_ThetaDeltaPlus: SpikeRateTrends = serialized_field(init=False, repr=False, default=None, is_computable=True, hdf_metadata={'track_eXclusive_cells': 'LxC', 'epochs': 'Laps', 'track_change_relative_period': 'DeltaPlus'})
+    SxC_ThetaDeltaMinus: SpikeRateTrends = serialized_field(init=False, repr=False, default=None, is_computable=True, hdf_metadata={'track_eXclusive_cells': 'SxC', 'epochs': 'Laps', 'track_change_relative_period': 'DeltaMinus'})
+    SxC_ThetaDeltaPlus: SpikeRateTrends = serialized_field(init=False, repr=False, default=None, is_computable=True, hdf_metadata={'track_eXclusive_cells': 'SxC', 'epochs': 'Laps', 'track_change_relative_period': 'DeltaPlus'})
 
 
     def compute(self, curr_active_pipeline, **kwargs):
