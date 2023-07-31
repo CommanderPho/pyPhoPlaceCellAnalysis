@@ -845,6 +845,7 @@ class BatchSessionCompletionHandler:
     def save_across_sessions_data(self, global_data_root_parent_path:Path, inst_fr_output_filename:str='across_session_result_long_short_inst_firing_rate.pkl'):
         """ Save the instantaneous firing rate results dict: (# Dict[IdentifyingContext] = InstantaneousSpikeRateGroupsComputation) 
         
+        Saves the `self.across_sessions_instantaneous_fr_dict`
         """
         global_batch_result_inst_fr_file_path = Path(global_data_root_parent_path).joinpath(inst_fr_output_filename).resolve() # Use Default
         print(f'global_batch_result_inst_fr_file_path: {global_batch_result_inst_fr_file_path}')
