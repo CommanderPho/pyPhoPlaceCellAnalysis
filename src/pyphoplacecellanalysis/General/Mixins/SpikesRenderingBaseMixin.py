@@ -179,10 +179,7 @@ class SpikeRenderingBaseMixin:
                 print(f'neuron_id: {neuron_id}: converted_color.getRgbF(): {converted_color.getRgbF()}, converted_color.name(QtGui.QColor.HexRgb): {converted_color.name(QtGui.QColor.HexRgb)}')
             self.spikes_df.loc[self.spikes_df['aclu'] == neuron_id, ['R','G','B']] = converted_color.getRgbF()[:-1] # converted_color.getRgbF(): (0.2, 0.2, 0.2, 1.0), so we need to get rid of the last elements. (alternatively we could set ,'render_opacity' if we wanted.
             self.spikes_df.loc[self.spikes_df['aclu'] == neuron_id, ['rgb_hex']] = converted_color.name(QtGui.QColor.HexRgb) #  getting the name of a QColor with .name(QtGui.QColor.HexRgb) results in a string like '#ff0000' 
-            
-
-    
-              
+                 
     def setup_spike_rendering_mixin(self):
         """ Add the required spike colors built from the self.neuron_colors. Spikes from cells that do not contribute to a placefield are assigned a black color by default
         By Calling self._build_flat_color_data():
