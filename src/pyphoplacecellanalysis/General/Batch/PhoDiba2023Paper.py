@@ -1026,53 +1026,6 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
         return self._pipeline_file_callback_fn(*args, **kwargs) # call the saved callback
 
 
-# 2023-07-21 - Across Sessions Aggregate Figure: __________________________________________________________________________________ #
-
-def across_sessions_bar_graphs(across_session_inst_fr_computation: Dict[IdentifyingContext, InstantaneousSpikeRateGroupsComputation], num_sessions:int, **kwargs):
-    ## Aggregate across all of the sessions to build a new combined `InstantaneousSpikeRateGroupsComputation`, which can be used to plot the "PaperFigureTwo", bar plots for many sessions.
-
-    # num_sessions = len(across_sessions_instantaneous_fr_dict)
-    print(f'num_sessions: {num_sessions}')
-
-    global_multi_session_context = IdentifyingContext(format_name='kdiba', num_sessions=num_sessions) # some global context across all of the sessions, not sure what to put here.
-
-    # To correctly aggregate results across sessions, it only makes sense to combine entries at the `.cell_agg_inst_fr_list` variable and lower (as the number of cells can be added across sessions, treated as unique for each session).
-
-    ## Display the aggregate across sessions:
-    _out_aggregate_fig_2 = PaperFigureTwo(instantaneous_time_bin_size_seconds=0.01) # WARNING: we didn't save this info
-    _out_aggregate_fig_2.computation_result = across_session_inst_fr_computation
-    _out_aggregate_fig_2.active_identifying_session_ctx = across_session_inst_fr_computation.active_identifying_session_ctx
-    # Set callback, the only self-specific property
-    # _out_fig_2._pipeline_file_callback_fn = curr_active_pipeline.output_figure # lambda args, kwargs: self.write_to_file(args, kwargs, curr_active_pipeline)
-
-    from pyphoplacecellanalysis.General.Mixins.ExportHelpers import FigureOutputManager, FigureOutputLocation, ContextToPathMode
-
-    registered_output_files = {}
-
-    def output_figure(final_context: IdentifyingContext, fig, write_vector_format:bool=False, write_png:bool=True, debug_print=True):
-        """ outputs the figure using the provided context. """
-        from pyphoplacecellanalysis.General.Mixins.ExportHelpers import build_and_write_to_file
-        def register_output_file(output_path, output_metadata=None):
-            """ registers a new output file for the pipeline """
-            print(f'register_output_file(output_path: {output_path}, ...)')
-            registered_output_files[output_path] = output_metadata or {}
-
-        fig_out_man = FigureOutputManager(figure_output_location=FigureOutputLocation.DAILY_PROGRAMMATIC_OUTPUT_FOLDER, context_to_path_mode=ContextToPathMode.HIERARCHY_UNIQUE)
-        active_out_figure_paths = build_and_write_to_file(fig, final_context, fig_out_man, write_vector_format=write_vector_format, write_png=write_png, register_output_file_fn=register_output_file)
-        return active_out_figure_paths, final_context
-
-
-    # Set callback, the only self-specific property
-    _out_aggregate_fig_2._pipeline_file_callback_fn = output_figure
-
-    # Showing
-    matplotlib_configuration_update(is_interactive=True, backend='Qt5Agg')
-    # Perform interactive Matplotlib operations with 'Qt5Agg' backend
-    _fig_2_theta_out, _fig_2_replay_out = _out_aggregate_fig_2.display(active_context=global_multi_session_context, title_modifier_fn=lambda original_title: f"{original_title} ({num_sessions} sessions)", save_figure=True, **kwargs)
-        
-    _out_aggregate_fig_2.perform_save()
-
-    global_multi_session_context, _out_aggregate_fig_2
 
 # ==================================================================================================================== #
 # 2023-06-26 Figure 3                                                                                                  #
