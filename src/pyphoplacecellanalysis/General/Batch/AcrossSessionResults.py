@@ -21,6 +21,14 @@ import numpy as np
 import pandas as pd
 from copy import deepcopy
 from attrs import define, field, Factory
+import tables as tb
+from tables import (
+    Int8Col, Int16Col, Int32Col, Int64Col,
+    UInt8Col, UInt16Col, UInt32Col, UInt64Col,
+    Float32Col, Float64Col,
+    TimeCol, ComplexCol, StringCol, BoolCol, EnumCol
+)
+
 
 ## Pho's Custom Libraries:
 from pyphocorehelpers.Filesystem.path_helpers import find_first_extant_path, set_posix_windows, convert_filelist_to_new_parent, find_matching_parent_path
@@ -32,6 +40,7 @@ from neuropy.core.epoch import Epoch
 from neuropy.utils.result_context import IdentifyingContext
 from neuropy.core.session.Formats.BaseDataSessionFormats import find_local_session_paths
 from neuropy.utils.matplotlib_helpers import matplotlib_configuration_update
+from neuropy.core.neuron_identities import NeuronExtendedIdentityTuple, neuronTypesEnum, NeuronIdentityTable
 
 
 from pyphoplacecellanalysis.General.Batch.NonInteractiveProcessing import batch_load_session, batch_extended_computations, \
