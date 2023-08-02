@@ -580,6 +580,7 @@ class BatchResultDataframeAccessor():
         """Build a list of short unique identifiers for the good sessions:
         Adds Column: ['context_minimal_name']
         
+        ['a0s0', 'a0s1', 'a0s2', 'a0s3', 'a0s4', 'a0s5', 'a0s6', ... 'a2s10', 'a2s11', 'a2s12', 'a2s13', 'a2s14', 'a2s15', 'a2s16', 'a2s17', 'a2s18', 'a2s19']
         
         TODO: Critical: this 
         #TODO 2023-07-20 21:23: - [ ] This needs to only be ran on a dataframe containing all of the sessions! If it's filtered at all, the session numbers will vary depending on how it's filtered!
