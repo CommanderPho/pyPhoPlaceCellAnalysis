@@ -80,6 +80,11 @@ class BatchRun:
     session_batch_errors: dict = Factory(dict)
     session_batch_outputs: dict = Factory(dict) # optional selected outputs that can hold information from the computation
     enable_saving_to_disk: bool = False
+    
+    use_multiprocessing_mode: bool = False
+    num_processes: Optional[int] = field(default=None)
+    
+
     ## TODO: could keep session-specific kwargs to be passed to run_specific_batch(...) as a member variable if needed
     _context_column_names = ['format_name', 'animal', 'exper_name', 'session_name']
     
@@ -830,11 +835,16 @@ class BatchSessionCompletionHandler:
             print(f'\t doing specific instantaneous firing rate computation for context: {curr_session_context}...')
             _out_inst_fr_comps = InstantaneousSpikeRateGroupsComputation(instantaneous_time_bin_size_seconds=0.01) # 10ms
             _out_inst_fr_comps.compute(curr_active_pipeline=curr_active_pipeline, active_context=curr_active_pipeline.sess.get_context())
-            self.across_sessions_instantaneous_fr_dict[curr_session_context] = _out_inst_fr_comps # instantaneous firing rates for this session, doesn't work in multiprocessing mode.
             
+            if not self.use_multiprocessing:
+                # Only modify self in non-multiprocessing mode (only shows 1 always).
+                self.across_sessions_instantaneous_fr_dict[curr_session_context] = _out_inst_fr_comps # instantaneous firing rates for this session, doesn't work in multiprocessing mode.
+                print(f'\t\t Now have {len(self.across_sessions_instantaneous_fr_dict)} entries in self.across_sessions_instantaneous_fr_dict!')
+                
             # LxC_ReplayDeltaMinus, LxC_ReplayDeltaPlus, SxC_ReplayDeltaMinus, SxC_ReplayDeltaPlus = _out_inst_fr_comps.LxC_ReplayDeltaMinus, _out_inst_fr_comps.LxC_ReplayDeltaPlus, _out_inst_fr_comps.SxC_ReplayDeltaMinus, _out_inst_fr_comps.SxC_ReplayDeltaPlus
             # LxC_ThetaDeltaMinus, LxC_ThetaDeltaPlus, SxC_ThetaDeltaMinus, SxC_ThetaDeltaPlus = _out_inst_fr_comps.LxC_ThetaDeltaMinus, _out_inst_fr_comps.LxC_ThetaDeltaPlus, _out_inst_fr_comps.SxC_ThetaDeltaMinus, _out_inst_fr_comps.SxC_ThetaDeltaPlus
-            print(f'\t\t done (success). Now have {len(self.across_sessions_instantaneous_fr_dict)} entries in self.across_sessions_instantaneous_fr_dict!') # incorrect in in multiprocessing mode (only shows 1 always).
+            print(f'\t\t done (success).') 
+
         except Exception as e:
             print(f"ERROR: encountered exception {e} while trying to compute the instantaneous firing rates and set self.across_sessions_instantaneous_fr_dict[{curr_session_context}]")
             _out_inst_fr_comps = None
@@ -925,7 +935,7 @@ def run_diba_batch(global_data_root_parent_path: Path, execute_all:bool = False,
 
 
 @function_attributes(short_name='run_specific_batch', tags=['batch', 'automated'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-03-28 04:46')
-def run_specific_batch(active_batch_run: BatchRun, curr_session_context: IdentifyingContext, curr_session_basedir: Path, force_reload=True, post_run_callback_fn=None, **kwargs):
+def run_specific_batch(active_batch_run: BatchRun, curr_session_context: IdentifyingContext, curr_session_basedir: Path, force_reload=True, post_run_callback_fn:Optional[Callable]=None, **kwargs):
     """ For a specific session (identified by the session context) - calls batch_load_session(...) to get the curr_active_pipeline.
             - Then calls `post_run_callback_fn(...)
     
