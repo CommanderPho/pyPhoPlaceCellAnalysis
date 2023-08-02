@@ -1,6 +1,6 @@
 from collections import OrderedDict
 import sys
-from datetime import datetime
+from datetime import datetime, timedelta
 import typing
 from typing import Optional
 from warnings import warn
@@ -17,6 +17,7 @@ from neuropy.utils.result_context import IdentifyingContext
 
 from pyphocorehelpers.DataStructure.dynamic_parameters import DynamicParameters # to replace simple PlacefieldComputationParameters, `load_pickled_global_computation_results`
 from pyphocorehelpers.function_helpers import compose_functions, compose_functions_with_error_handling
+from pyphocorehelpers.print_helpers import format_seconds_human_readable
 
 from pyphoplacecellanalysis.General.Pipeline.Stages.BaseNeuropyPipelineStage import BaseNeuropyPipelineStage, PipelineStage
 from pyphoplacecellanalysis.General.Pipeline.Stages.Filtering import FilterablePipelineStage
@@ -323,7 +324,21 @@ class ComputedPipelineStage(LoadableInput, LoadableSessionInput, FilterablePipel
             print(f'each_epoch_latest_computation_time: {each_epoch_latest_computation_time}')
         return any_most_recent_computation_time, each_epoch_latest_computation_time, each_epoch_each_result_computation_completion_times
         
-
+    def get_time_since_last_computation(self, debug_print_timedelta:bool=False) -> timedelta:
+        ## Successfully prints the time since the last calculation was performed:
+        run_time = datetime.now()
+        any_most_recent_computation_time, each_epoch_latest_computation_time, each_epoch_each_result_computation_completion_times = self.get_computation_times()
+        
+        delta = run_time - any_most_recent_computation_time
+        if debug_print_timedelta:
+            # Strangely gives days and then seconds in the remaining day (the days aren't included in the seconds)
+            days = delta.days
+            total_seconds = delta.seconds
+            h, m, s, fractional_seconds, formatted_timestamp_str = format_seconds_human_readable(total_seconds)
+            print(f"time since latest calculation performed (days::hours:minutes:seconds): {days}::{formatted_timestamp_str}")
+        return delta
+        # run_time - any_most_recent_computation_time # datetime.timedelta(days=1, seconds=72179, microseconds=316519)
+        # {k:(run_time - v) for k, v in each_epoch_latest_computation_time.items()}
 
 
     def find_LongShortGlobal_epoch_names(self):
@@ -943,6 +958,9 @@ class PipelineWithComputedPipelineStageMixin:
     def get_computation_times(self, debug_print=False):
         return self.stage.get_computation_times(debug_print=debug_print)
     
+    def get_time_since_last_computation(self, debug_print_timedelta:bool=False) -> timedelta:
+        ## Successfully prints the time since the last calculation was performed:
+        return self.stage.get_time_since_last_computation(debug_print_timedelta=debug_print_timedelta)
 
     """ Global Computation Results Persistance: Loads/Saves out the `global_computation_results` which are not currently saved with the pipeline
     
