@@ -66,8 +66,57 @@ trackMembershipTypesEnum = tb.Enum(trackMembershipTypesList)
 
 class AcrossSessionsResults:
 
-
     
+    @classmethod
+    def build_neuron_identity_table_to_hdf(cls, file_path, key: str, spikes_df: pd.DataFrame, session_uid:str="test_session_uid"):
+        """ extracts a NeuronIdentityTable from the complete session spikes_df """
+        unique_rows_df = spikes_df.spikes.extract_unique_neuron_identities()
+        # Extract the selected columns as NumPy arrays
+        aclu_array = unique_rows_df['aclu'].values
+        shank_array = unique_rows_df['shank'].values
+        cluster_array = unique_rows_df['cluster'].values
+        qclu_array = unique_rows_df['qclu'].values
+        neuron_type_array = unique_rows_df['cell_type'].values
+        neuron_types_enum_array = np.array([neuronTypesEnum[a_type.hdfcodingClassName] for a_type in neuron_type_array]) # convert NeuronTypes to neuronTypesEnum
+        n_neurons = len(aclu_array)
+        
+        # Open the file with h5py to add attributes to the group. The pandas.HDFStore object doesn't provide a direct way to manipulate groups as objects, as it is primarily intended to work with datasets (i.e., pandas DataFrames)
+        # with h5py.File(file_path, 'r+') as f:
+        with tb.open_file(file_path, mode='w') as f:
+            
+            # f.create_dataset(f'{key}/neuron_ids', data=self.neuron_ids)
+            # f.create_dataset(f'{key}/shank_ids', data=self.shank_ids)
+            
+            group = f.create_group(key, 'neuron_identities', title='each row uniquely identifies a neuron and its various loaded, labeled, and computed properties', createparents=True)
+
+            table = f.create_table(group, 'table', NeuronIdentityTable, "Neuron identities")
+
+            # Serialization
+            row = table.row
+            for i in np.arange(n_neurons):
+                ## Build the row here from aclu_array, etc
+                row['global_uid'] = f"{session_uid}-{aclu_array[i]}"
+                row['session_uid'] = session_uid  # Provide an appropriate session identifier here
+                row['neuron_id'] = aclu_array[i]
+                row['neuron_type'] = neuron_types_enum_array[i]
+                row['shank_index'] = shank_array[i]
+                row['cluster_index'] = cluster_array[i] # self.peak_channels[i]
+                row['qclu'] = qclu_array[i]  # Replace with appropriate value if available                
+                row.append()
+                
+            table.flush()
+            
+            # Metadata:
+            # NOTE: group objects must use `_v_attrs` instead of `attrs` to set their attributes
+            group._v_attrs['n_neurons'] = n_neurons
+            group._v_attrs['session_uid'] = session_uid
+            # group.attrs['dat_sampling_rate'] = self.sampling_rate
+            # group.attrs['t_start'] = self.t_start
+            # group.attrs['t_start'] = self.t_start
+            # group.attrs['t_stop'] = self.t_stop
+            
+
+
 
     class ProcessedSessionResultsTable(tb.IsDescription):
         """ represents a single session's processing results in the scope of multiple sessions for use in a PyTables table or HDF5 output file """
