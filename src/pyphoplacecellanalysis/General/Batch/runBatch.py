@@ -80,10 +80,6 @@ class BatchRun:
     session_batch_errors: dict = Factory(dict)
     session_batch_outputs: dict = Factory(dict) # optional selected outputs that can hold information from the computation
     enable_saving_to_disk: bool = False
-    
-    use_multiprocessing_mode: bool = False
-    num_processes: Optional[int] = field(default=None)
-    
 
     ## TODO: could keep session-specific kwargs to be passed to run_specific_batch(...) as a member variable if needed
     _context_column_names = ['format_name', 'animal', 'exper_name', 'session_name']
@@ -669,6 +665,10 @@ class BatchSessionCompletionHandler:
     force_reload_all: bool = field(default=False)
     saving_mode: PipelineSavingScheme = field(default=PipelineSavingScheme.SKIP_SAVING)
     
+    # Multiprocessing    
+    use_multiprocessing: bool = field(default=False) 
+    num_processes: Optional[int] = field(default=None)
+
     # Computations
     override_session_computation_results_pickle_filename: Optional[str] = field(default=None) # 'output/loadedSessPickle.pkl'
 
