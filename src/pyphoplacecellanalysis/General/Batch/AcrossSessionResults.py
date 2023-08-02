@@ -65,6 +65,52 @@ trackMembershipTypesEnum = tb.Enum(trackMembershipTypesList)
 
 
 class AcrossSessionsResults:
+    """
+    
+    
+    """
+
+
+
+    class ProcessedSessionResultsTable(tb.IsDescription):
+        """ represents a single session's processing results in the scope of multiple sessions for use in a PyTables table or HDF5 output file """
+        global_uid = StringCol(16)   # 16-character String, globally unique neuron identifier (across all sessions) composed of a session_uid and the neuron's (session-specific) aclu
+        session_uid = StringCol(16)
+        neuron_identities = tb.NeuronIdentityTable()            
+
+        class LongShortNeuronComputedPropertiesTable(tb.IsDescription):
+            """ Represents computed properties for a single neuron """
+            long_pf_peak_x = tb.Float64Col()
+            has_long_pf = tb.BoolCol()
+            short_pf_peak_x = tb.Float64Col()
+            has_short_pf = tb.BoolCol()
+            has_na = tb.BoolCol()
+            track_membership = EnumCol(trackMembershipTypesEnum, 'neither', base='uint8') 
+            long_non_replay_mean = tb.Float64Col()
+            short_non_replay_mean = tb.Float64Col()
+            non_replay_diff = tb.Float64Col()
+            long_replay_mean = tb.Float64Col()
+            short_replay_mean = tb.Float64Col()
+            replay_diff = tb.Float64Col()
+            long_mean = tb.Float64Col()
+            short_mean = tb.Float64Col()
+            mean_diff = tb.Float64Col()
+            neuron_IDX = tb.Int64Col()
+            num_replays = tb.Int32Col()
+            long_num_replays = tb.Int32Col()
+            short_num_replays = tb.Int32Col()
+            neuron_type = tb.StringCol(itemsize=50)  # Adjust 'itemsize' based on your maximum string length
+        
+
+        class SessionIdentityTable(tb.IsDescription):
+            """ represents a single session's processing results in the scope of multiple sessions for use in a PyTables table or HDF5 output file """
+            session_uid = StringCol(32) # globally unique session identifier (across all sessions)
+            format_name = StringCol(16)
+            animal = StringCol(16)
+            exper_name  = StringCol(32)
+            session_name  = StringCol(32)
+            
+    
 
     
     @classmethod
@@ -115,48 +161,6 @@ class AcrossSessionsResults:
             # group.attrs['t_start'] = self.t_start
             # group.attrs['t_stop'] = self.t_stop
             
-
-
-
-    class ProcessedSessionResultsTable(tb.IsDescription):
-        """ represents a single session's processing results in the scope of multiple sessions for use in a PyTables table or HDF5 output file """
-        global_uid = StringCol(16)   # 16-character String, globally unique neuron identifier (across all sessions) composed of a session_uid and the neuron's (session-specific) aclu
-        session_uid = StringCol(16)
-            
-        class LongShortNeuronComputedPropertiesTable(tb.IsDescription):
-            """ Represents computed properties for a single neuron """
-            long_pf_peak_x = tb.Float64Col()
-            has_long_pf = tb.BoolCol()
-            short_pf_peak_x = tb.Float64Col()
-            has_short_pf = tb.BoolCol()
-            has_na = tb.BoolCol()
-            track_membership = EnumCol(trackMembershipTypesEnum, 'neither', base='uint8') 
-            long_non_replay_mean = tb.Float64Col()
-            short_non_replay_mean = tb.Float64Col()
-            non_replay_diff = tb.Float64Col()
-            long_replay_mean = tb.Float64Col()
-            short_replay_mean = tb.Float64Col()
-            replay_diff = tb.Float64Col()
-            long_mean = tb.Float64Col()
-            short_mean = tb.Float64Col()
-            mean_diff = tb.Float64Col()
-            neuron_IDX = tb.Int64Col()
-            num_replays = tb.Int32Col()
-            long_num_replays = tb.Int32Col()
-            short_num_replays = tb.Int32Col()
-            neuron_type = tb.StringCol(itemsize=50)  # Adjust 'itemsize' based on your maximum string length
-        
-
-        class SessionIdentityTable(tb.IsDescription):
-            """ represents a single session's processing results in the scope of multiple sessions for use in a PyTables table or HDF5 output file """
-            session_uid = StringCol(32) # globally unique session identifier (across all sessions)
-            format_name = StringCol(16)
-            animal = StringCol(16)
-            exper_name  = StringCol(32)
-            session_name  = StringCol(32)
-            
-    
-
 
 
 
