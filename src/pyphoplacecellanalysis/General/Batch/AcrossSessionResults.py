@@ -65,9 +65,13 @@ trackMembershipTypesEnum = tb.Enum(trackMembershipTypesList)
 
 
 class AcrossSessionsResults:
-    """
+    """ Batch Processing goes like:
+    1. Discover Sessions
+    2. Load the Session Data to gain access to the pipeline
     
+    an_active_pipeline: NeuropyPipeline = all_sessions.get_pipeline(context: a_session_context)
     
+        
     """
 
 
@@ -76,7 +80,7 @@ class AcrossSessionsResults:
         """ represents a single session's processing results in the scope of multiple sessions for use in a PyTables table or HDF5 output file """
         global_uid = StringCol(16)   # 16-character String, globally unique neuron identifier (across all sessions) composed of a session_uid and the neuron's (session-specific) aclu
         session_uid = StringCol(16)
-        neuron_identities = tb.NeuronIdentityTable()            
+        neuron_identities = NeuronIdentityTable()
 
         class LongShortNeuronComputedPropertiesTable(tb.IsDescription):
             """ Represents computed properties for a single neuron """
@@ -101,7 +105,6 @@ class AcrossSessionsResults:
             short_num_replays = tb.Int32Col()
             neuron_type = tb.StringCol(itemsize=50)  # Adjust 'itemsize' based on your maximum string length
         
-
         class SessionIdentityTable(tb.IsDescription):
             """ represents a single session's processing results in the scope of multiple sessions for use in a PyTables table or HDF5 output file """
             session_uid = StringCol(32) # globally unique session identifier (across all sessions)
@@ -109,7 +112,15 @@ class AcrossSessionsResults:
             animal = StringCol(16)
             exper_name  = StringCol(32)
             session_name  = StringCol(32)
-            
+
+
+        # class GlobalComputationsTable(tb.IsDescription):
+        #     """ represents a single session's processing results in the scope of multiple sessions for use in a PyTables table or HDF5 output file """
+        #     session_uid = StringCol(32) # globally unique session identifier (across all sessions)
+        #     format_name = StringCol(16)
+        #     animal = StringCol(16)
+        #     exper_name  = StringCol(32)
+        #     session_name  = StringCol(32)
     
 
     
@@ -128,7 +139,7 @@ class AcrossSessionsResults:
         
         # Open the file with h5py to add attributes to the group. The pandas.HDFStore object doesn't provide a direct way to manipulate groups as objects, as it is primarily intended to work with datasets (i.e., pandas DataFrames)
         # with h5py.File(file_path, 'r+') as f:
-        with tb.open_file(file_path, mode='w') as f:
+        with tb.open_file(file_path, mode='a') as f:
             
             # f.create_dataset(f'{key}/neuron_ids', data=self.neuron_ids)
             # f.create_dataset(f'{key}/shank_ids', data=self.shank_ids)

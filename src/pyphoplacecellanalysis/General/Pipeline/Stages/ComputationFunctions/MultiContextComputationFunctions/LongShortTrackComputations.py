@@ -53,6 +53,9 @@ class TrackExclusivePartitionSubset:
     track_exclusive_aclus: np.ndarray
     track_exclusive_df: pd.DataFrame
     
+
+    #TODO 2023-08-02 05:58: - [ ] These (`to_hdf`, `read_hdf`) were auto-generated and not sure if they work:
+
     def to_hdf(self, file_path):
         with h5py.File(file_path, 'w') as f:
             for attribute, value in self.__dict__.items():
