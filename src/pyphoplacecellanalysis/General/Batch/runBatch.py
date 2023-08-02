@@ -652,8 +652,6 @@ class BatchResultDataframeAccessor():
         return good_only_batch_progress_df, batch_progress_df
 
 
-
-
 @define(slots=False, repr=False)
 class BatchSessionCompletionHandler:
     """ handles completion of a single session's batch processing. 
