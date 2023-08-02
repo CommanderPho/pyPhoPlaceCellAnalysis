@@ -18,12 +18,16 @@ from pyphocorehelpers.function_helpers import function_attributes
 from enum import Enum
 
 
+
+
 class SplitPartitionMembership(Enum):
-    """Docstring for SplitPartitionMembership."""
+    """ from pyphoplacecellanalysis.General.Mixins.CrossComputationComparisonHelpers import SplitPartitionMembership    
+    """
     LEFT_ONLY = 0
     SHARED = 1
     RIGHT_ONLY = 2
-    
+    # WHERE IS NEITHER!!?
+
 
 
 @define(slots=False)
