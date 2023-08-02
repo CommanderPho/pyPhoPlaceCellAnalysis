@@ -42,10 +42,10 @@ from neuropy.core.session.Formats.BaseDataSessionFormats import find_local_sessi
 from neuropy.utils.matplotlib_helpers import matplotlib_configuration_update
 from neuropy.core.neuron_identities import NeuronExtendedIdentityTuple, neuronTypesEnum, NeuronIdentityTable
 
+from neuropy.utils.mixins.AttrsClassHelpers import custom_define, AttrsBasedClassHelperMixin, serialized_field, serialized_attribute_field, non_serialized_field
+# from neuropy.utils.mixins.HDF5_representable import HDF_DeserializationMixin, post_deserialize, HDF_SerializationMixin, HDFMixin
 
-from pyphoplacecellanalysis.General.Batch.NonInteractiveProcessing import batch_load_session, batch_extended_computations, \
-    batch_programmatic_figures, batch_extended_programmatic_figures
-from pyphoplacecellanalysis.General.Pipeline.NeuropyPipeline import PipelineSavingScheme
+
 from pyphoplacecellanalysis.General.Pipeline.Stages.Loading import saveData, loadData
 
 
@@ -54,6 +54,8 @@ from pyphoplacecellanalysis.General.Pipeline.Stages.Loading import saveData, loa
 from pyphoplacecellanalysis.General.Batch.PhoDiba2023Paper import main_complete_figure_generations, InstantaneousSpikeRateGroupsComputation, SingleBarResult, PaperFigureTwo # for `BatchSessionCompletionHandler`
 from neuropy.core.user_annotations import UserAnnotationsManager
 from pyphoplacecellanalysis.General.Mixins.ExportHelpers import FigureOutputManager, FigureOutputLocation, ContextToPathMode
+
+
 
 """
 from pyphoplacecellanalysis.General.Batch.AcrossSessionResults import AcrossSessionsResults, AcrossSessionsVisualizations
@@ -65,7 +67,20 @@ trackMembershipTypesEnum = tb.Enum(trackMembershipTypesList)
 
 
 class AcrossSessionsResults:
-    """ Batch Processing goes like:
+    """ 
+
+    Holds a reference to a centralized HDF5 file and a way of registering entries into it.
+    
+    Entries consist of:
+        - AcrossSessionAggregating-level Results (such as those used in PhoDiba2023Paper
+        - Links or References
+    
+    
+    
+    
+    
+    
+    Batch Processing goes like:
     1. Discover Sessions
     2. Load the Session Data to gain access to the pipeline
     
@@ -124,6 +139,7 @@ class AcrossSessionsResults:
     
 
     
+    ## This seems definitionally a single-session result! It can be concatenated across sessions to make a multi-session one though!
     @classmethod
     def build_neuron_identity_table_to_hdf(cls, file_path, key: str, spikes_df: pd.DataFrame, session_uid:str="test_session_uid"):
         """ extracts a NeuronIdentityTable from the complete session spikes_df """
@@ -174,6 +190,14 @@ class AcrossSessionsResults:
             
 
 
+
+
+
+
+
+    # ==================================================================================================================== #
+    # Old (Pre 2023-07-30 Rewrite)                                                                                         #
+    # ==================================================================================================================== #
 
     # Across Sessions Helpers
     @classmethod
