@@ -174,6 +174,61 @@ class AcrossSessionsResults:
             
 
 
+    @classmethod
+    def build_session_pipeline_to_hdf(cls, file_path, key: str, curr_active_pipeline, debug_print=False):
+        """ Saves out the entire session pipeline (corresponding for all processing on a single session) out to an HDF5 readable format. 
+
+        """
+        if debug_print:
+            print(f'file_path: {file_path}')
+
+        long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
+
+        # f.create_dataset(f'{key}/neuron_ids', data=a_sess.neuron_ids)
+        # f.create_dataset(f'{key}/shank_ids', data=self.shank_ids)            
+        session_context = curr_active_pipeline.get_session_context() 
+        session_group_key: str = "/" + session_context.get_description(separator="/", include_property_names=False) # 'kdiba/gor01/one/2006-6-08_14-26-15'
+        session_uid: str = session_context.get_description(separator="|", include_property_names=False)
+        if debug_print:
+            print(f'session_group_key: {session_group_key}')
+
+        a_sess = deepcopy(curr_active_pipeline.sess)
+        a_sess.to_hdf(file_path=file_path, key=f"{session_group_key}/sess")
+
+        with tb.open_file(file_path, mode='w') as f: # this mode='w' is correct because it should overwrite the previous file and not append to it.
+            a_global_computations_group = f.create_group(session_group_key, 'global_computations', title='the result of computations that operate over many or all of the filters in the session.', createparents=True)
+
+
+        # if self.epochs is not None:
+        # 	self.epochs.to_hdf(file_path=file_path, key=f'{session_group_key}/epochs')
+
+
+
+        # session_group = f.create_group(key, session_group_key, title='a single recording session corresponding to a data folder', createparents=True) # '/kdiba/gor01/one/2006-6-08_14-26-15'
+
+        # neuron_identities_group = f.create_group(key, 'neuron_identities', title='each row uniquely identifies a neuron and its various loaded, labeled, and computed properties', createparents=True)
+
+        for an_epoch_name in (long_epoch_name, short_epoch_name, global_epoch_name):
+            filter_context_key:str = "/" + curr_active_pipeline.filtered_contexts[an_epoch_name].get_description(separator="/", include_property_names=False) # '/kdiba/gor01/one/2006-6-08_14-26-15/maze1'
+            print(f'\tfilter_context_key: {filter_context_key}')
+            with tb.open_file(file_path, mode='a') as f:
+                a_filter_group = f.create_group(session_group_key, an_epoch_name, title='the result of a filter function applied to the session.', createparents=True)
+
+
+            filtered_session = curr_active_pipeline.filtered_sessions[an_epoch_name]
+            filtered_session.to_hdf(file_path=file_path, key=f"{filter_context_key}/sess")
+
+            a_results = curr_active_pipeline.computation_results[an_epoch_name]
+            a_computed_data = a_results['computed_data']
+            a_computed_data.pf1D.to_hdf(file_path=file_path, key=f"{filter_context_key}/pf1D") # damn this will be called with the `tb` still having the thingy open
+            a_computed_data.pf2D.to_hdf(file_path=file_path, key=f"{filter_context_key}/pf2D")
+
+        # group = f.create_group(key, 'filters', title='each row uniquely identifies a neuron and its various loaded, labeled, and computed properties', createparents=True)
+        cls.build_neuron_identity_table_to_hdf(file_path, key=session_group_key, spikes_df=curr_active_pipeline.sess.spikes_df, session_uid=session_uid)
+
+
+
+
 
     # Across Sessions Helpers
     @classmethod
