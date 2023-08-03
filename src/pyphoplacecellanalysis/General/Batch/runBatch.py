@@ -75,6 +75,7 @@ class BatchComputationProcessOptions(HDF_SerializationMixin):
 
 
 
+
 @custom_define(slots=False)
 class BatchRun(HDF_SerializationMixin):
     """An object that manages a Batch of runs for many different session folders.
@@ -85,7 +86,7 @@ class BatchRun(HDF_SerializationMixin):
     session_batch_status: dict = Factory(dict)
     session_batch_basedirs: dict = Factory(dict)
     session_batch_errors: dict = Factory(dict)
-    session_batch_outputs: dict = Factory(dict) # optional selected outputs that can hold information from the computation
+    session_batch_outputs: dict =  Factory(dict) # optional selected outputs that can hold information from the computation
     enable_saving_to_disk: bool = serialized_attribute_field(default=False) 
 
     ## TODO: could keep session-specific kwargs to be passed to run_specific_batch(...) as a member variable if needed
@@ -680,6 +681,22 @@ class BatchSessionCompletionHandler:
         from pyphoplacecellanalysis.General.Batch.runBatch import BatchSessionCompletionHandler
         
     """
+
+    @define(slots=False)
+    class PipelineCompletionResult:
+        """ Class representing epoch data built from a dictionary. """
+        long_epoch_name: str = serialized_attribute_field()
+        long_laps: Epoch = serialized_field()
+        long_replays: Epoch = serialized_field()
+        short_epoch_name: str = serialized_attribute_field()
+        short_laps: Epoch = serialized_field()
+        short_replays: Epoch = serialized_field()
+        delta_since_last_compute: timedelta
+        outputs_local: str
+        outputs_global: str
+        across_sessions_batch_results_inst_fr_comps: dict
+
+
     # General:
     debug_print: bool = field(default=False)
 
@@ -699,7 +716,6 @@ class BatchSessionCompletionHandler:
     extended_computations_include_includelist: list = field(default=['long_short_fr_indicies_analyses', 'jonathan_firing_rate_analysis', 'long_short_decoding_analyses', 'long_short_post_decoding']) # do only specifiedl
     force_global_recompute: bool = field(default=False)
     override_global_computation_results_pickle_path: Optional[Path] = field(default=None)
-
 
     # Figures:
     should_perform_figure_generation_to_file: bool = field(default=True) # controls whether figures are generated to file
@@ -777,10 +793,10 @@ class BatchSessionCompletionHandler:
         # Get existing laps from session:
         long_laps, short_laps, global_laps = [curr_active_pipeline.filtered_sessions[an_epoch_name].laps.as_epoch_obj() for an_epoch_name in [long_epoch_name, short_epoch_name, global_epoch_name]]
         long_replays, short_replays, global_replays = [Epoch(curr_active_pipeline.filtered_sessions[an_epoch_name].replay.epochs.get_valid_df()) for an_epoch_name in [long_epoch_name, short_epoch_name, global_epoch_name]]
-        # short_laps.n_epochs: 40, long_laps.n_epochs: 40
+        # short_laps.n_epochs: 40, n_long_laps.n_epochs: 40
         # short_replays.n_epochs: 6, long_replays.n_epochs: 8
         if self.debug_print:
-            print(f'short_laps.n_epochs: {short_laps.n_epochs}, long_laps.n_epochs: {long_laps.n_epochs}')
+            print(f'short_laps.n_epochs: {short_laps.n_epochs}, n_long_laps.n_epochs: {long_laps.n_epochs}')
             print(f'short_replays.n_epochs: {short_replays.n_epochs}, long_replays.n_epochs: {long_replays.n_epochs}')
 
         # ## Post Compute Validate 2023-05-16:
@@ -860,14 +876,14 @@ class BatchSessionCompletionHandler:
         delta_since_last_compute: timedelta = curr_active_pipeline.get_time_since_last_computation()
         print(f'\t time since last computation: {delta_since_last_compute}')
 
-        # Export the HDF5:
+        # Export the pipeline's HDF5:
+        hdf5_output_path: Path = curr_active_pipeline.get_output_path().joinpath('pipeline_results.h5').resolve()
+        print(f'pipeline hdf5_output_path: {hdf5_output_path}')
         try:
-            hdf5_output_path: Path = curr_active_pipeline.get_output_path().joinpath('pipeline_results.h5').resolve()
-            print(f'hdf5_output_path: {hdf5_output_path}')
             AcrossSessionsResults.build_session_pipeline_to_hdf(hdf5_output_path, "/", curr_active_pipeline, debug_print=False) # coulduse key of "/{curr_session_context}" with context properly expanded.
         except Exception as e:
             print(f"ERROR: encountered exception {e} while trying to build the session HDF output for {curr_session_context}")
-            hdf5_output_path = None
+            hdf5_output_path = None # set to None because it failed.
 
 
 
@@ -891,7 +907,7 @@ class BatchSessionCompletionHandler:
             
 
         # add `hdf5_output_path`, delta_since_last_compute
-        
+        output = PipelineCompletionResult(
 
         return {long_epoch_name:(long_laps, long_replays), short_epoch_name:(short_laps, short_replays),
                 'outputs': {'local': curr_active_pipeline.pickle_path,
@@ -899,6 +915,7 @@ class BatchSessionCompletionHandler:
                 'across_sessions_batch_results': {'inst_fr_comps': _out_inst_fr_comps}
             }
         
+
 
 
 
