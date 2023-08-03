@@ -696,22 +696,22 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
 
         self.sess.to_hdf(file_path=file_path, key=f"{session_group_key}/sess")
 
+        ## Global Computations
+        a_global_computations_group_key: str = f"{session_group_key}/global_computations"
         with tb.open_file(file_path, mode='w') as f: # this mode='w' is correct because it should overwrite the previous file and not append to it.
             a_global_computations_group = f.create_group(session_group_key, 'global_computations', title='the result of computations that operate over many or all of the filters in the session.', createparents=True)
 
-
-        # self.sess.flattened_spiketrains.to_hdf(file_path=file_path, key=f"{session_group_key}/flattened_spiketrains")
-        # self.sess.position.pos_df
-
-        # self.position.to_hdf(file_path=file_path, key=f'{session_group_key}/pos')
-        # if self.epochs is not None:
-        # 	self.epochs.to_hdf(file_path=file_path, key=f'{session_group_key}/epochs')
+        # InstantaneousSpikeRateGroupsComputation ____________________________________________________________________________ #
+        _out_inst_fr_comps = InstantaneousSpikeRateGroupsComputation(instantaneous_time_bin_size_seconds=0.01) # 10ms
+        _out_inst_fr_comps.compute(curr_active_pipeline=self, active_context=self.sess.get_context())
+        _out_inst_fr_comps.to_hdf(file_path, f'{a_global_computations_group_key}/inst_fr_comps') # held up by SpikeRateTrends.inst_fr_df_list  # to HDF, don't need to split it
+        # LxC_ReplayDeltaMinus, LxC_ReplayDeltaPlus, SxC_ReplayDeltaMinus, SxC_ReplayDeltaPlus = _out_inst_fr_comps.LxC_ReplayDeltaMinus, _out_inst_fr_comps.LxC_ReplayDeltaPlus, _out_inst_fr_comps.SxC_ReplayDeltaMinus, _out_inst_fr_comps.SxC_ReplayDeltaPlus
+        # LxC_ThetaDeltaMinus, LxC_ThetaDeltaPlus, SxC_ThetaDeltaMinus, SxC_ThetaDeltaPlus = _out_inst_fr_comps.LxC_ThetaDeltaMinus, _out_inst_fr_comps.LxC_ThetaDeltaPlus, _out_inst_fr_comps.SxC_ThetaDeltaMinus, _out_inst_fr_comps.SxC_ThetaDeltaPlus
 
 
         # a_computed_data.pf1D.to_hdf(file_path=file_path, key=f"{filter_context_key}/pf1D")
 
         # session_group = f.create_group(key, session_group_key, title='a single recording session corresponding to a data folder', createparents=True) # '/kdiba/gor01/one/2006-6-08_14-26-15'
-
         # neuron_identities_group = f.create_group(key, 'neuron_identities', title='each row uniquely identifies a neuron and its various loaded, labeled, and computed properties', createparents=True)
 
         for an_epoch_name in (long_epoch_name, short_epoch_name, global_epoch_name):
