@@ -34,7 +34,7 @@ from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiCo
 # from pyphoplacecellanalysis.General.Batch.NeptuneAiHelpers import set_environment_variables, neptune_output_figures
 from pyphoplacecellanalysis.General.Batch.PhoDiba2023Paper import main_complete_figure_generations, InstantaneousSpikeRateGroupsComputation, SingleBarResult # for `BatchSessionCompletionHandler`
 from neuropy.core.user_annotations import UserAnnotationsManager
-
+from pyphoplacecellanalysis.General.Batch.AcrossSessionResults import AcrossSessionsResults, AcrossSessionsVisualizations
 
 known_global_data_root_parent_paths = [Path(r'W:\Data'), Path(r'/media/MAX/Data'), Path(r'/Volumes/MoverNew/data'), Path(r'/home/halechr/turbo/Data'), Path(r'/nfs/turbo/umms-kdiba/Data')]
 
@@ -828,7 +828,20 @@ class BatchSessionCompletionHandler:
         else:
             print(f'skipping figure generation because should_perform_figure_generation_to_file == False')
 
-        ### Do specific computations for aggregate outputs:
+
+
+        ### Aggregate Outputs specific computations:
+
+        ## Get some more interesting session properties:
+        
+        maximum_timedelta: timedelta = timedelta(1, 0, 0) # 1 Day maximum time
+        delta_since_last_compute: timedelta = curr_active_pipeline.get_time_since_last_computation()
+
+        delta_since_last_compute > maximum_timedelta
+        
+        AcrossSessionsResults.build_session_pipeline_to_hdf(cls, file_path, key: str, curr_active_pipeline, debug_print=False)
+        curr_active_pipeline
+
         try:
             print(f'\t doing specific instantaneous firing rate computation for context: {curr_session_context}...')
             _out_inst_fr_comps = InstantaneousSpikeRateGroupsComputation(instantaneous_time_bin_size_seconds=0.01) # 10ms
