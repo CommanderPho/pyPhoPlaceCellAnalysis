@@ -776,6 +776,7 @@ class BatchSessionCompletionHandler:
             ## TODO: catch/log saving error and indicate that it isn't saved.
             print(f'ERROR SAVING PIPELINE for curr_session_context: {curr_session_context}. error: {e}')
 
+
         ## GLOBAL FUNCTION:
         if self.force_reload_all and (not self.force_global_recompute):
             print(f'WARNING: self.force_global_recompute was False but self.force_reload_all was true. The global properties must be recomputed when the local functions change, so self.force_global_recompute will be set to True and computation will continue.')
@@ -839,8 +840,14 @@ class BatchSessionCompletionHandler:
 
         delta_since_last_compute > maximum_timedelta
         
-        AcrossSessionsResults.build_session_pipeline_to_hdf(cls, file_path, key: str, curr_active_pipeline, debug_print=False)
-        curr_active_pipeline
+        try:
+            pipeline_hdf_filepath = file_path
+            AcrossSessionsResults.build_session_pipeline_to_hdf(file_path, key: str, curr_active_pipeline, debug_print=False)
+        except Exception as e:
+            print(f"ERROR: encountered exception {e} while trying to compute the instantaneous firing rates and set self.across_sessions_instantaneous_fr_dict[{curr_session_context}]")
+            _out_inst_fr_comps = None
+
+
 
         try:
             print(f'\t doing specific instantaneous firing rate computation for context: {curr_session_context}...')
