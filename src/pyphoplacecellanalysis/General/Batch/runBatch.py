@@ -22,6 +22,10 @@ from neuropy.core.epoch import Epoch
 from neuropy.utils.matplotlib_helpers import matplotlib_file_only
 from neuropy.utils.result_context import IdentifyingContext
 from neuropy.core.session.Formats.BaseDataSessionFormats import find_local_session_paths
+from neuropy.utils.mixins.AttrsClassHelpers import AttrsBasedClassHelperMixin, custom_define, serialized_field, serialized_attribute_field, non_serialized_field
+from neuropy.utils.mixins.HDF5_representable import HDF_DeserializationMixin, post_deserialize, HDF_SerializationMixin, HDFMixin, HDF_Converter
+
+
 
 from pyphoplacecellanalysis.General.Batch.NonInteractiveProcessing import batch_load_session, batch_extended_computations, \
     batch_programmatic_figures, batch_extended_programmatic_figures
@@ -52,34 +56,37 @@ class SessionBatchProgress(ExtendedEnum):
     FAILED = "FAILED"
     ABORTED = "ABORTED"
 
-@define(slots=False)
-class BatchComputationProcessOptions:
-	should_load: bool # should try to load from existing results from disk at all
+@custom_define(slots=False)
+class BatchComputationProcessOptions(HDF_SerializationMixin):
+	should_load: bool = serialized_attribute_field() # should try to load from existing results from disk at all
 		# never
 		# always (fail if loading unsuccessful)
 		# always (warning but continue if unsuccessful)
-	should_compute: bool # should try to run computations (which will just verify that loaded computations are good if that option is true)
+	should_compute: bool = serialized_attribute_field() # should try to run computations (which will just verify that loaded computations are good if that option is true)
 		# never
 		# if needed (required results are missing)
 		# always
-	should_save: bool # should consider save at all
+	should_save: bool = serialized_attribute_field() # should consider save at all
 		# never
 		# if changed
 		# always
 
 
-@define(slots=False)
-class BatchRun:
+
+
+
+@custom_define(slots=False)
+class BatchRun(HDF_SerializationMixin):
     """An object that manages a Batch of runs for many different session folders.
     
     
     """
-    global_data_root_parent_path: Path
+    global_data_root_parent_path: Path = serialized_attribute_field(init=False, serialization_fn=(lambda f, k, v: str(v.resolve())))
     session_batch_status: dict = Factory(dict)
     session_batch_basedirs: dict = Factory(dict)
     session_batch_errors: dict = Factory(dict)
     session_batch_outputs: dict = Factory(dict) # optional selected outputs that can hold information from the computation
-    enable_saving_to_disk: bool = False
+    enable_saving_to_disk: bool = serialized_attribute_field(default=False) 
 
     ## TODO: could keep session-specific kwargs to be passed to run_specific_batch(...) as a member variable if needed
     _context_column_names = ['format_name', 'animal', 'exper_name', 'session_name']
@@ -89,7 +96,6 @@ class BatchRun:
     def session_contexts(self):
         """The session_contexts property."""
         return list(self.session_batch_status.keys())
-
 
     @classmethod
     def try_init_from_file(cls, global_data_root_parent_path, active_global_batch_result_filename='global_batch_result.pkl', skip_root_path_conversion:bool=False, debug_print:bool=False):
@@ -245,7 +251,11 @@ class BatchRun:
 
     @classmethod
     def from_dataframe(cls, df: pd.DataFrame):
-        """Create a BatchRun object from a dataframe representation."""
+        """Create a BatchRun object from a dataframe representation.
+            Note the outputs are left out of the dataframe.
+            
+        
+        """
         #TODO 2023-06-13 16:31: - [ ] Not yet completed!
 
         # Extract non-expanded context columns
@@ -405,6 +415,17 @@ class BatchRun:
         updated_batch_progress_df['locally_is_ready'] = np.logical_and(updated_batch_progress_df.is_ready, session_basedir_exists_locally)
         return updated_batch_progress_df
 
+    # HDFMixin Conformances ______________________________________________________________________________________________ #
+
+    def to_hdf(self, file_path, key: str, **kwargs):
+        """ Saves the object to key in the hdf5 file specified by file_path
+        Usage:
+            hdf5_output_path: Path = curr_active_pipeline.get_output_path().joinpath('test_data.h5')
+            _pfnd_obj: PfND = long_one_step_decoder_1D.pf
+            _pfnd_obj.to_hdf(hdf5_output_path, key='test_pfnd')
+        """
+        session_batch_status
+        pass
 
 @pd.api.extensions.register_dataframe_accessor("batch_results")
 class BatchResultDataframeAccessor():
@@ -835,17 +856,18 @@ class BatchSessionCompletionHandler:
 
         ## Get some more interesting session properties:
         
-        maximum_timedelta: timedelta = timedelta(1, 0, 0) # 1 Day maximum time
-        delta_since_last_compute: timedelta = curr_active_pipeline.get_time_since_last_computation()
-
-        delta_since_last_compute > maximum_timedelta
         
+        delta_since_last_compute: timedelta = curr_active_pipeline.get_time_since_last_computation()
+        print(f'\t time since last computation: {delta_since_last_compute}')
+
+        # Export the HDF5:
         try:
-            pipeline_hdf_filepath = file_path
-            AcrossSessionsResults.build_session_pipeline_to_hdf(file_path, key: str, curr_active_pipeline, debug_print=False)
+            hdf5_output_path: Path = curr_active_pipeline.get_output_path().joinpath('pipeline_results.h5').resolve()
+            print(f'hdf5_output_path: {hdf5_output_path}')
+            AcrossSessionsResults.build_session_pipeline_to_hdf(hdf5_output_path, "/", curr_active_pipeline, debug_print=False) # coulduse key of "/{curr_session_context}" with context properly expanded.
         except Exception as e:
-            print(f"ERROR: encountered exception {e} while trying to compute the instantaneous firing rates and set self.across_sessions_instantaneous_fr_dict[{curr_session_context}]")
-            _out_inst_fr_comps = None
+            print(f"ERROR: encountered exception {e} while trying to build the session HDF output for {curr_session_context}")
+            hdf5_output_path = None
 
 
 
@@ -867,6 +889,10 @@ class BatchSessionCompletionHandler:
             print(f"ERROR: encountered exception {e} while trying to compute the instantaneous firing rates and set self.across_sessions_instantaneous_fr_dict[{curr_session_context}]")
             _out_inst_fr_comps = None
             
+
+        # add `hdf5_output_path`, delta_since_last_compute
+        
+
         return {long_epoch_name:(long_laps, long_replays), short_epoch_name:(short_laps, short_replays),
                 'outputs': {'local': curr_active_pipeline.pickle_path,
                             'global': curr_active_pipeline.global_computation_results_pickle_path},
