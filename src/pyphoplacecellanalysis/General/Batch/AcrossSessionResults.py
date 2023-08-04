@@ -45,17 +45,12 @@ from neuropy.core.neuron_identities import NeuronExtendedIdentityTuple, neuronTy
 from neuropy.utils.mixins.AttrsClassHelpers import custom_define, AttrsBasedClassHelperMixin, serialized_field, serialized_attribute_field, non_serialized_field
 # from neuropy.utils.mixins.HDF5_representable import HDF_DeserializationMixin, post_deserialize, HDF_SerializationMixin, HDFMixin
 
-
 from pyphoplacecellanalysis.General.Pipeline.Stages.Loading import saveData, loadData
-
-
 
 # from pyphoplacecellanalysis.General.Batch.NeptuneAiHelpers import set_environment_variables, neptune_output_figures
 from pyphoplacecellanalysis.General.Batch.PhoDiba2023Paper import main_complete_figure_generations, InstantaneousSpikeRateGroupsComputation, SingleBarResult, PaperFigureTwo # for `BatchSessionCompletionHandler`
 from neuropy.core.user_annotations import UserAnnotationsManager
 from pyphoplacecellanalysis.General.Mixins.ExportHelpers import FigureOutputManager, FigureOutputLocation, ContextToPathMode
-
-
 
 """
 from pyphoplacecellanalysis.General.Batch.AcrossSessionResults import AcrossSessionsResults, AcrossSessionsVisualizations
@@ -226,7 +221,8 @@ class AcrossSessionsResults:
 
         for an_epoch_name in (long_epoch_name, short_epoch_name, global_epoch_name):
             filter_context_key:str = "/" + curr_active_pipeline.filtered_contexts[an_epoch_name].get_description(separator="/", include_property_names=False) # '/kdiba/gor01/one/2006-6-08_14-26-15/maze1'
-            print(f'\tfilter_context_key: {filter_context_key}')
+            if debug_print:
+                print(f'\tfilter_context_key: {filter_context_key}')
             with tb.open_file(file_path, mode='a') as f:
                 a_filter_group = f.create_group(session_group_key, an_epoch_name, title='the result of a filter function applied to the session.', createparents=True)
 

@@ -9,12 +9,13 @@ import pandas as pd
 import tables as tb
 from copy import deepcopy
 import multiprocessing
-from enum import unique # SessionBatchProgress
+from enum import Enum, unique # SessionBatchProgress
 
 ## Pho's Custom Libraries:
 from pyphocorehelpers.Filesystem.path_helpers import find_first_extant_path, set_posix_windows, convert_filelist_to_new_parent, find_matching_parent_path
+from pyphocorehelpers.Filesystem.metadata_helpers import FilesystemMetadata
 from pyphocorehelpers.function_helpers import function_attributes
-from pyphocorehelpers.DataStructure.enum_helpers import ExtendedEnum # required for SessionBatchProgress
+
 
 # NeuroPy (Diba Lab Python Repo) Loading
 ## For computation parameters:
@@ -47,8 +48,10 @@ def get_file_str_if_file_exists(v:Path)->str:
     return (str(v.resolve()) if v.exists() else '')
 
 
+
+
 @unique
-class SessionBatchProgress(ExtendedEnum):
+class SessionBatchProgress(Enum):
     """Indicates the progress state for a given session in a batch processing queue """
     NOT_STARTED = "NOT_STARTED"
     RUNNING = "RUNNING"
@@ -73,20 +76,60 @@ class BatchComputationProcessOptions(HDF_SerializationMixin):
 
 
 
+@custom_define(slots=False)
+class PipelineCompletionResult(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
+    """ Class representing epoch data built from a dictionary. """
+    long_epoch_name: str = serialized_attribute_field()
+    long_laps: Epoch = serialized_field()
+    long_replays: Epoch = serialized_field()
+    
+    short_epoch_name: str = serialized_attribute_field()
+    short_laps: Epoch = serialized_field()
+    short_replays: Epoch = serialized_field()
+    
+    delta_since_last_compute: timedelta = serialized_attribute_field()
+    outputs_local: Dict[str, Optional[Path]] = serialized_field() # outputs_local
+    outputs_global: Dict[str, Optional[Path]] = serialized_field()
 
+    across_session_results: Dict[str, Optional[object]] = serialized_field()
 
+# PyTables Definitions for Output Tables: ____________________________________________________________________________ #
+
+class EpochTable(tb.IsDescription):
+    """ a conversion of an Epoch object. """
+    start_t = tb.Float32Col()
+    end_t = tb.Float32Col()
+    label = tb.StringCol(itemsize=100)  # the identifier for the Epoch
+
+class OutputFilesTable(tb.IsDescription):
+    """ a single session might have: 'local_pickle_path', 'global_pickle_path', 'session_h5_path' """
+    resource_name = tb.StringCol(itemsize=100)
+    filesystem_path = tb.StringCol(itemsize=500)
+    
+# Define the PipelineCompletionResult as a PyTables class
+class PipelineCompletionResultTable(tb.IsDescription):
+    """ PyTables class representing epoch data built from a dictionary. """
+    long_epoch_name = tb.StringCol(itemsize=100)
+    long_laps = EpochTable()
+    long_replays = EpochTable()
+    short_epoch_name = tb.StringCol(itemsize=100)
+    short_laps = EpochTable()
+    short_replays = EpochTable()
+    delta_since_last_compute = tb.Time64Col()  # Use tb.Time64Col for timedelta
+    
+    outputs_local = OutputFilesTable()  
+    outputs_global = OutputFilesTable()
+    
+    # across_sessions_batch_results_inst_fr_comps = tb.StringCol(itemsize=100)
 
 @custom_define(slots=False)
 class BatchRun(HDF_SerializationMixin):
-    """An object that manages a Batch of runs for many different session folders.
-    
-    
-    """
-    global_data_root_parent_path: Path = serialized_attribute_field(init=False, serialization_fn=(lambda f, k, v: str(v.resolve())))
-    session_batch_status: dict = Factory(dict)
-    session_batch_basedirs: dict = Factory(dict)
-    session_batch_errors: dict = Factory(dict)
-    session_batch_outputs: dict =  Factory(dict) # optional selected outputs that can hold information from the computation
+    """An object that manages a Batch of runs for many different session folders."""
+    global_data_root_parent_path: Path = serialized_attribute_field(serialization_fn=(lambda f, k, v: str(v.resolve())))
+    session_batch_status: Dict[IdentifyingContext, SessionBatchProgress] = serialized_field(default=Factory(dict)) 
+    session_batch_basedirs: Dict[IdentifyingContext, Path] = serialized_field(default=Factory(dict))
+    session_batch_errors: Dict[IdentifyingContext, Optional[str]] = serialized_field(default=Factory(dict))
+    session_batch_outputs: Dict[IdentifyingContext, Optional[PipelineCompletionResult]] = serialized_field(default=Factory(dict)) # optional selected outputs that can hold information from the computation
     enable_saving_to_disk: bool = serialized_attribute_field(default=False) 
 
     ## TODO: could keep session-specific kwargs to be passed to run_specific_batch(...) as a member variable if needed
@@ -425,8 +468,83 @@ class BatchRun(HDF_SerializationMixin):
             _pfnd_obj: PfND = long_one_step_decoder_1D.pf
             _pfnd_obj.to_hdf(hdf5_output_path, key='test_pfnd')
         """
-        session_batch_status
-        pass
+        
+        session_contexts: List[IdentifyingContext] = list(self.session_batch_status.keys())
+        session_batch_status: List[SessionBatchProgress] = list(self.session_batch_status.values())
+
+        session_batch_basedirs: List[Path] = list(self.session_batch_basedirs.values())
+        session_batch_errors: List[Optional[str]] = list(self.session_batch_errors.values())
+        session_batch_outputs: List[Optional[PipelineCompletionResult]] = list(self.session_batch_outputs.values())
+
+        assert key == "/", "key must be '/' for this because it's global level."
+
+        ## Don't forget attributes: global_data_root_parent_path
+        # Open the HDF5 file for writing
+        with tb.open_file(file_path, mode='w') as h5file:
+            # Create a new group at the specified key
+            root_group = h5file.create_group("/", key, "Pipeline Completion Results")
+
+            # Iterate through the PipelineCompletionResult objects and store them in the HDF5 file
+            for session_context, result in zip(session_contexts, session_batch_outputs):
+                if result is not None:
+                    session_context_key: str = session_context.get_description(separator="/", include_property_names=False)
+                    session_group_key: str = '/' + session_context_key # 'kdiba/gor01/one/2006-6-08_14-26-15'
+                    
+
+                    # Create a new table for each PipelineCompletionResult object
+                    table = h5file.create_table(root_group, f"result_{session_context_key}", PipelineCompletionResultTable) # the table is actually at the top level yeah? Each session only has one of these?
+
+                    # Fill in the fields of the table with data from the PipelineCompletionResult object
+                    table.row['long_epoch_name'] = result.long_epoch_name
+                    
+                    table.row['long_laps'] = .... EpochTable?? 
+                    
+                    # Epoch object: iterate through all columns to build the EpochTable
+                    
+                    for a_start_t, a_stop_t, a_label in zip(result.long_laps.starts, result.long_laps.stops, result.long_laps.labels):
+
+                    #TODO 2023-08-03 20:17: - [ ] finish this for the other Epoch objects: long_replays, short_laps, short_replays
+                    
+
+                    
+                    table.row['long_replays'] = result.long_replays.to_dict()
+                    table.row['short_epoch_name'] = result.short_epoch_name
+                    table.row['short_laps'] = result.short_laps.to_dict()
+                    table.row['short_replays'] = result.short_replays.to_dict()
+                    table.row['delta_since_last_compute'] = result.delta_since_last_compute
+
+                    # Handle outputs_local and outputs_global dictionaries
+                    if result.outputs_local is not None:
+                        table.row['outputs_local/resource_name'] = list(result.outputs_local.keys())
+                        table.row['outputs_local/filesystem_path'] = list(result.outputs_local.values())
+                    if result.outputs_global is not None:
+                        table.row['outputs_global/resource_name'] = list(result.outputs_global.keys())
+                        table.row['outputs_global/filesystem_path'] = list(result.outputs_global.values())
+
+                    # Append the row to the table and flush the changes
+                    table.row.append()
+                    table.flush()
+
+        # Save the remaining attributes (global_data_root_parent_path, etc.) using the HDF_SerializationMixin
+        super().to_hdf(file_path, key=key, **kwargs)
+
+
+        # Iterate through the PipelineCompletionResult objects and store them in the HDF5 file
+        for session_context, result in zip(session_contexts, session_batch_outputs):
+            if result is not None:
+                # result is PipelineCompletionResult and will be written out with its own .to_hdf
+                value.to_hdf(file_path, session_context.to_key()) 
+                # # Handle across_session_results dictionary
+                # if result.across_session_results is not None:
+                #     ## Write this out to HDF5 file independently using `PipelineCompletionResult.to_hdf(...)`
+                #     for key, value in result.across_session_results.items():
+                #         if value is not None:
+                            
+                #             table.row[f'across_sessions_batch_results_inst_fr_comps_{key}'] = value.to_dict()
+                                
+
+
+        raise NotImplementedError
 
 @pd.api.extensions.register_dataframe_accessor("batch_results")
 class BatchResultDataframeAccessor():
@@ -670,6 +788,8 @@ class BatchResultDataframeAccessor():
         return good_only_batch_progress_df, batch_progress_df
 
 
+
+
 @define(slots=False, repr=False)
 class BatchSessionCompletionHandler:
     """ handles completion of a single session's batch processing. 
@@ -682,19 +802,10 @@ class BatchSessionCompletionHandler:
         
     """
 
-    @define(slots=False)
-    class PipelineCompletionResult:
-        """ Class representing epoch data built from a dictionary. """
-        long_epoch_name: str = serialized_attribute_field()
-        long_laps: Epoch = serialized_field()
-        long_replays: Epoch = serialized_field()
-        short_epoch_name: str = serialized_attribute_field()
-        short_laps: Epoch = serialized_field()
-        short_replays: Epoch = serialized_field()
-        delta_since_last_compute: timedelta
-        outputs_local: str
-        outputs_global: str
-        across_sessions_batch_results_inst_fr_comps: dict
+    # Completion Result object returned from callback ____________________________________________________________________ #
+
+    
+
 
 
     # General:
@@ -768,7 +879,7 @@ class BatchSessionCompletionHandler:
 
 
     ## Main function that's called with the complete pipeline:
-    def on_complete_success_execution_session(self, active_batch_run, curr_session_context, curr_session_basedir, curr_active_pipeline):
+    def on_complete_success_execution_session(self, active_batch_run, curr_session_context, curr_session_basedir, curr_active_pipeline) -> PipelineCompletionResult:
         """ called when the execute_session completes like:
             `post_run_callback_fn_output = post_run_callback_fn(curr_session_context, curr_session_basedir, curr_active_pipeline)`
             
@@ -874,6 +985,7 @@ class BatchSessionCompletionHandler:
         
         
         delta_since_last_compute: timedelta = curr_active_pipeline.get_time_since_last_computation()
+        
         print(f'\t time since last computation: {delta_since_last_compute}')
 
         # Export the pipeline's HDF5:
@@ -905,15 +1017,19 @@ class BatchSessionCompletionHandler:
             print(f"ERROR: encountered exception {e} while trying to compute the instantaneous firing rates and set self.across_sessions_instantaneous_fr_dict[{curr_session_context}]")
             _out_inst_fr_comps = None
             
+        return PipelineCompletionResult(long_epoch_name=long_epoch_name, long_laps=long_laps, long_replays=long_replays,
+                                           short_epoch_name=short_epoch_name, short_laps=short_laps, short_replays=short_replays,
+                                           delta_since_last_compute=delta_since_last_compute,
+                                           outputs_local={'pkl': curr_active_pipeline.pickle_path},
+                                            outputs_global={'pkl': curr_active_pipeline.global_computation_results_pickle_path, 'hdf5': hdf5_output_path},
+                                            across_session_results={'inst_fr_comps': _out_inst_fr_comps})
+                                          
 
-        # add `hdf5_output_path`, delta_since_last_compute
-        output = PipelineCompletionResult(
-
-        return {long_epoch_name:(long_laps, long_replays), short_epoch_name:(short_laps, short_replays),
-                'outputs': {'local': curr_active_pipeline.pickle_path,
-                            'global': curr_active_pipeline.global_computation_results_pickle_path},
-                'across_sessions_batch_results': {'inst_fr_comps': _out_inst_fr_comps}
-            }
+        # return {long_epoch_name:(long_laps, long_replays), short_epoch_name:(short_laps, short_replays),
+        #         'outputs': {'local': curr_active_pipeline.pickle_path,
+        #                     'global': curr_active_pipeline.global_computation_results_pickle_path},
+        #         'across_sessions_batch_results': {'inst_fr_comps': _out_inst_fr_comps}
+        #     }
         
 
 
@@ -1030,7 +1146,7 @@ def run_specific_batch(active_batch_run: BatchRun, curr_session_context: Identif
                                         saving_mode=saving_mode, force_reload=force_reload, skip_extended_batch_computations=skip_extended_batch_computations, debug_print=debug_print, fail_on_exception=fail_on_exception, **kwargs)
         
     except Exception as e:
-        return (SessionBatchProgress.FAILED, e, None) # return the Failed status and the exception that occured.
+        return (SessionBatchProgress.FAILED, f"{e}", None) # return the Failed status and the exception that occured.
 
     if post_run_callback_fn is not None:
         if fail_on_exception:
