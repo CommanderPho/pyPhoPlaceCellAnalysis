@@ -482,36 +482,53 @@ class BatchRun(HDF_SerializationMixin):
         # Open the HDF5 file for writing
         with tb.open_file(file_path, mode='w') as h5file:
             # Create a new group at the specified key
-            root_group = h5file.create_group("/", key, "Pipeline Completion Results")
+            root_group = h5file.create_group("/", name='batch_run', title="Pipeline Completion Results")
 
             # Iterate through the PipelineCompletionResult objects and store them in the HDF5 file
             for session_context, result in zip(session_contexts, session_batch_outputs):
                 if result is not None:
-                    session_context_key: str = session_context.get_description(separator="/", include_property_names=False)
+                    session_context_key: str = session_context.get_description(separator="|", include_property_names=False)
                     session_group_key: str = '/' + session_context_key # 'kdiba/gor01/one/2006-6-08_14-26-15'
                     
-
                     # Create a new table for each PipelineCompletionResult object
                     table = h5file.create_table(root_group, f"result_{session_context_key}", PipelineCompletionResultTable) # the table is actually at the top level yeah? Each session only has one of these?
 
                     # Fill in the fields of the table with data from the PipelineCompletionResult object
                     table.row['long_epoch_name'] = result.long_epoch_name
                     
-                    table.row['long_laps'] = .... EpochTable?? 
-                    
                     # Epoch object: iterate through all columns to build the EpochTable
-                    
                     for a_start_t, a_stop_t, a_label in zip(result.long_laps.starts, result.long_laps.stops, result.long_laps.labels):
+                        table.row['long_laps/start_t'] = a_start_t
+                        table.row['long_laps/end_t'] = a_stop_t
+                        table.row['long_laps/label'] = a_label
+                        
+                    # Store data for long_replays in the EpochTable
+                    for a_start_t, a_stop_t, a_label in zip(result.long_replays.starts, result.long_replays.stops, result.long_replays.labels):
+                        table.row['long_replays/start_t'] = a_start_t
+                        table.row['long_replays/end_t'] = a_stop_t
+                        table.row['long_replays/label'] = a_label
 
-                    #TODO 2023-08-03 20:17: - [ ] finish this for the other Epoch objects: long_replays, short_laps, short_replays
-                    
+                    # Store data for short_laps in the EpochTable
+                    for a_start_t, a_stop_t, a_label in zip(result.short_laps.starts, result.short_laps.stops, result.short_laps.labels):
+                        table.row['short_laps/start_t'] = a_start_t
+                        table.row['short_laps/end_t'] = a_stop_t
+                        table.row['short_laps/label'] = a_label
 
+                    # Store data for short_replays in the EpochTable
+                    for a_start_t, a_stop_t, a_label in zip(result.short_replays.starts, result.short_replays.stops, result.short_replays.labels):
+                        table.row['short_replays/start_t'] = a_start_t
+                        table.row['short_replays/end_t'] = a_stop_t
+                        table.row['short_replays/label'] = a_label
                     
-                    table.row['long_replays'] = result.long_replays.to_dict()
                     table.row['short_epoch_name'] = result.short_epoch_name
-                    table.row['short_laps'] = result.short_laps.to_dict()
-                    table.row['short_replays'] = result.short_replays.to_dict()
-                    table.row['delta_since_last_compute'] = result.delta_since_last_compute
+
+                    # Convert timedelta to seconds and then to nanoseconds
+                    time_in_seconds = result.delta_since_last_compute.total_seconds()
+                    time_in_nanoseconds = int(time_in_seconds * 1e9)
+                    # Convert to np.int64 (64-bit integer) for tb.Time64Col()
+                    time_as_np_int64 = np.int64(time_in_nanoseconds)
+
+                    table.row['delta_since_last_compute'] = time_as_np_int64
 
                     # Handle outputs_local and outputs_global dictionaries
                     if result.outputs_local is not None:
@@ -523,17 +540,22 @@ class BatchRun(HDF_SerializationMixin):
 
                     # Append the row to the table and flush the changes
                     table.row.append()
+                    
+                    # Flush the table after storing all the data for this result
                     table.flush()
+                    
 
         # Save the remaining attributes (global_data_root_parent_path, etc.) using the HDF_SerializationMixin
-        super().to_hdf(file_path, key=key, **kwargs)
+        # super().to_hdf(file_path, key=key, **kwargs)
 
 
         # Iterate through the PipelineCompletionResult objects and store them in the HDF5 file
         for session_context, result in zip(session_contexts, session_batch_outputs):
             if result is not None:
+                session_context_key: str = session_context.get_description(separator="/", include_property_names=False)
+                session_group_key: str = '/' + session_context_key # 'kdiba/gor01/one/2006-6-08_14-26-15'
                 # result is PipelineCompletionResult and will be written out with its own .to_hdf
-                value.to_hdf(file_path, session_context.to_key()) 
+                result.to_hdf(file_path, f"{session_group_key}/batch_result") 
                 # # Handle across_session_results dictionary
                 # if result.across_session_results is not None:
                 #     ## Write this out to HDF5 file independently using `PipelineCompletionResult.to_hdf(...)`
@@ -543,8 +565,8 @@ class BatchRun(HDF_SerializationMixin):
                 #             table.row[f'across_sessions_batch_results_inst_fr_comps_{key}'] = value.to_dict()
                                 
 
+        print(f'done outputting HDF file.')
 
-        raise NotImplementedError
 
 @pd.api.extensions.register_dataframe_accessor("batch_results")
 class BatchResultDataframeAccessor():
@@ -605,7 +627,13 @@ class BatchResultDataframeAccessor():
         for ctx, output_v in global_batch_run.session_batch_outputs.items():
             if output_v is not None:
                 # {long_epoch_name:(long_laps, long_replays), short_epoch_name:(short_laps, short_replays)}
-                (long_laps, long_replays), (short_laps, short_replays) = list(output_v.values())[:2] # only get the first four outputs
+                # Extracting (long_laps, long_replays) tuple
+                long_laps = output_v.long_laps
+                long_replays = output_v.long_replays
+
+                # Extracting (short_laps, short_replays) tuple
+                short_laps = output_v.short_laps
+                short_replays = output_v.short_replays
                 out_counts.append((long_laps.n_epochs, long_replays.n_epochs, short_laps.n_epochs, short_replays.n_epochs))
             else:
                 out_counts.append((0, 0, 0, 0))
