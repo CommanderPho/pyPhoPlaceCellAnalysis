@@ -87,11 +87,37 @@ class PipelineCompletionResult(HDF_SerializationMixin, AttrsBasedClassHelperMixi
     short_laps: Epoch = serialized_field()
     short_replays: Epoch = serialized_field()
     
-    delta_since_last_compute: timedelta = serialized_attribute_field()
-    outputs_local: Dict[str, Optional[Path]] = serialized_field() # outputs_local
-    outputs_global: Dict[str, Optional[Path]] = serialized_field()
+    delta_since_last_compute: timedelta = non_serialized_field() #serialized_attribute_field(serialization_fn=HDF_Converter._prepare_datetime_timedelta_value_to_for_hdf_fn)
+    outputs_local: Dict[str, Optional[Path]] = non_serialized_field() # serialization_fn=(lambda f, k, v: f[f'{key}/{sub_k}'] = str(sub_v) for sub_k, sub_v in value.items()), is_hdf_handled_custom=True
+    outputs_global: Dict[str, Optional[Path]] = non_serialized_field()
 
-    across_session_results: Dict[str, Optional[object]] = serialized_field()
+    across_session_results: Dict[str, Optional[object]] = non_serialized_field()
+
+     # HDFMixin Conformances ______________________________________________________________________________________________ #
+    
+    def to_hdf(self, file_path, key: str, **kwargs):
+        """ Saves the object to key in the hdf5 file specified by file_path"""
+        super().to_hdf(file_path, key=key, **kwargs)
+        # Finish for the custom properties
+        
+        #TODO 2023-08-04 12:09: - [ ] Included outputs_local/global
+
+        # with tb.open_file(file_path, mode='a') as f:
+
+        #     outputs_local_key = f"{key}/outputs_local"
+        #     an_outputs_local_group = f.create_group(key, 'outputs_local', title='the sessions output file paths.', createparents=True)
+
+        #     value = self.outputs_local
+        #     for sub_k, sub_v in value.items():
+        #         an_outputs_local_group[f'{outputs_local_key}/{sub_k}'] = str(sub_v) 
+
+        #     an_outputs_global_group = f.create_group(key, 'outputs_global', title='the sessions output file paths.', createparents=True)
+        #     value = self.outputs_global
+        #     outputs_global_key = f"{key}/outputs_global"
+        #     for sub_k, sub_v in value.items():
+        #         an_outputs_global_group[f'{outputs_global_key}/{sub_k}'] = str(sub_v) 
+
+
 
 # PyTables Definitions for Output Tables: ____________________________________________________________________________ #
 
@@ -484,43 +510,45 @@ class BatchRun(HDF_SerializationMixin):
             # Create a new group at the specified key
             root_group = h5file.create_group("/", name='batch_run', title="Pipeline Completion Results")
 
+            # Create a new table for each PipelineCompletionResult object
+            table = h5file.create_table(root_group, f"batch_run_table", PipelineCompletionResultTable) # the table is actually at the top level yeah? Each session only has one of these?
+            
             # Iterate through the PipelineCompletionResult objects and store them in the HDF5 file
             for session_context, result in zip(session_contexts, session_batch_outputs):
                 if result is not None:
                     session_context_key: str = session_context.get_description(separator="|", include_property_names=False)
                     session_group_key: str = '/' + session_context_key # 'kdiba/gor01/one/2006-6-08_14-26-15'
                     
-                    # Create a new table for each PipelineCompletionResult object
-                    table = h5file.create_table(root_group, f"result_{session_context_key}", PipelineCompletionResultTable) # the table is actually at the top level yeah? Each session only has one of these?
+                    row = table.row
 
                     # Fill in the fields of the table with data from the PipelineCompletionResult object
-                    table.row['long_epoch_name'] = result.long_epoch_name
+                    row['long_epoch_name'] = result.long_epoch_name
                     
                     # Epoch object: iterate through all columns to build the EpochTable
                     for a_start_t, a_stop_t, a_label in zip(result.long_laps.starts, result.long_laps.stops, result.long_laps.labels):
-                        table.row['long_laps/start_t'] = a_start_t
-                        table.row['long_laps/end_t'] = a_stop_t
-                        table.row['long_laps/label'] = a_label
+                        row['long_laps/start_t'] = a_start_t
+                        row['long_laps/end_t'] = a_stop_t
+                        row['long_laps/label'] = a_label
                         
                     # Store data for long_replays in the EpochTable
                     for a_start_t, a_stop_t, a_label in zip(result.long_replays.starts, result.long_replays.stops, result.long_replays.labels):
-                        table.row['long_replays/start_t'] = a_start_t
-                        table.row['long_replays/end_t'] = a_stop_t
-                        table.row['long_replays/label'] = a_label
+                        row['long_replays/start_t'] = a_start_t
+                        row['long_replays/end_t'] = a_stop_t
+                        row['long_replays/label'] = a_label
 
                     # Store data for short_laps in the EpochTable
                     for a_start_t, a_stop_t, a_label in zip(result.short_laps.starts, result.short_laps.stops, result.short_laps.labels):
-                        table.row['short_laps/start_t'] = a_start_t
-                        table.row['short_laps/end_t'] = a_stop_t
-                        table.row['short_laps/label'] = a_label
+                        row['short_laps/start_t'] = a_start_t
+                        row['short_laps/end_t'] = a_stop_t
+                        row['short_laps/label'] = a_label
 
                     # Store data for short_replays in the EpochTable
                     for a_start_t, a_stop_t, a_label in zip(result.short_replays.starts, result.short_replays.stops, result.short_replays.labels):
-                        table.row['short_replays/start_t'] = a_start_t
-                        table.row['short_replays/end_t'] = a_stop_t
-                        table.row['short_replays/label'] = a_label
+                        row['short_replays/start_t'] = a_start_t
+                        row['short_replays/end_t'] = a_stop_t
+                        row['short_replays/label'] = a_label
                     
-                    table.row['short_epoch_name'] = result.short_epoch_name
+                    row['short_epoch_name'] = result.short_epoch_name
 
                     # Convert timedelta to seconds and then to nanoseconds
                     time_in_seconds = result.delta_since_last_compute.total_seconds()
@@ -528,21 +556,41 @@ class BatchRun(HDF_SerializationMixin):
                     # Convert to np.int64 (64-bit integer) for tb.Time64Col()
                     time_as_np_int64 = np.int64(time_in_nanoseconds)
 
-                    table.row['delta_since_last_compute'] = time_as_np_int64
+                    row['delta_since_last_compute'] = time_as_np_int64
 
                     # Handle outputs_local and outputs_global dictionaries
-                    if result.outputs_local is not None:
-                        table.row['outputs_local/resource_name'] = list(result.outputs_local.keys())
-                        table.row['outputs_local/filesystem_path'] = list(result.outputs_local.values())
-                    if result.outputs_global is not None:
-                        table.row['outputs_global/resource_name'] = list(result.outputs_global.keys())
-                        table.row['outputs_global/filesystem_path'] = list(result.outputs_global.values())
+                    # if result.outputs_local is not None:
+                    #     row['outputs_local/filesystem_path'] = list(result.outputs_local.values())
+                    #     row['outputs_local/filesystem_path'] = list([str(v) for v in result.outputs_local.values()])
+
+
+                    #     # # Create a new table for outputs_local
+                    #     # output_local_table = h5file.create_table(table, 'outputs_local', OutputFilesTable)
+                    #     for resource_name, filesystem_path in result.outputs_local.items():
+                    #         row['outputs_local/resource_name'] = resource_name
+                    #         output_local_row['resource_name'] = resource_name
+                    #         output_local_row['filesystem_path'] = str(filesystem_path)
+                    #         # output_local_row.append()
+                    #     # # output_local_table.flush()
+
+                    # if result.outputs_global is not None:
+                    #     row['outputs_global/resource_name'] = list(result.outputs_global.keys())
+                    #     row['outputs_global/filesystem_path'] = list(result.outputs_global.values())
+
+                    #     # Create a new table for outputs_global
+                    #     # output_global_table = h5file.create_table(table, 'outputs_global', OutputFilesTable)
+                    #     # for resource_name, filesystem_path in result.outputs_global.items():
+                    #     #     # output_global_row['resource_name'] = resource_name
+                    #     #     # output_global_row['filesystem_path'] = str(filesystem_path)
+                    #     #     # output_global_row.append()
+                    #     # # output_global_table.flush()
+
 
                     # Append the row to the table and flush the changes
-                    table.row.append()
-                    
-                    # Flush the table after storing all the data for this result
-                    table.flush()
+                    row.append()
+                
+            # Flush the table after storing all the data for this result
+            table.flush()
                     
 
         # Save the remaining attributes (global_data_root_parent_path, etc.) using the HDF_SerializationMixin
