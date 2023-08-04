@@ -513,6 +513,7 @@ class BatchRun(HDF_SerializationMixin):
             # Create a new table for each PipelineCompletionResult object
             table = h5file.create_table(root_group, f"batch_run_table", PipelineCompletionResultTable) # the table is actually at the top level yeah? Each session only has one of these?
             
+            # table.
             # Iterate through the PipelineCompletionResult objects and store them in the HDF5 file
             for session_context, result in zip(session_contexts, session_batch_outputs):
                 if result is not None:
@@ -526,28 +527,45 @@ class BatchRun(HDF_SerializationMixin):
                     
                     # Epoch object: iterate through all columns to build the EpochTable
                     for a_start_t, a_stop_t, a_label in zip(result.long_laps.starts, result.long_laps.stops, result.long_laps.labels):
-                        row['long_laps/start_t'] = a_start_t
-                        row['long_laps/end_t'] = a_stop_t
-                        row['long_laps/label'] = a_label
+                        # row['long_laps/start_t'] = a_start_t
+                        # row['long_laps/end_t'] = a_stop_t
+                        # row['long_laps/label'] = a_label
                         
+                        row['long_laps']['start_t'] = a_start_t
+                        row['long_laps']['end_t'] = a_stop_t
+                        row['long_laps']['label'] = a_label
+
                     # Store data for long_replays in the EpochTable
                     for a_start_t, a_stop_t, a_label in zip(result.long_replays.starts, result.long_replays.stops, result.long_replays.labels):
-                        row['long_replays/start_t'] = a_start_t
-                        row['long_replays/end_t'] = a_stop_t
-                        row['long_replays/label'] = a_label
+                        # row['long_replays/start_t'] = a_start_t
+                        # row['long_replays/end_t'] = a_stop_t
+                        # row['long_replays/label'] = a_label
+                        
+                        row['long_replays']['start_t'] = a_start_t
+                        row['long_replays']['end_t'] = a_stop_t
+                        row['long_replays']['label'] = a_label
 
                     # Store data for short_laps in the EpochTable
                     for a_start_t, a_stop_t, a_label in zip(result.short_laps.starts, result.short_laps.stops, result.short_laps.labels):
-                        row['short_laps/start_t'] = a_start_t
-                        row['short_laps/end_t'] = a_stop_t
-                        row['short_laps/label'] = a_label
+                        # row['short_laps/start_t'] = a_start_t
+                        # row['short_laps/end_t'] = a_stop_t
+                        # row['short_laps/label'] = a_label
+
+                        row['short_laps']['start_t'] = a_start_t
+                        row['short_laps']['end_t'] = a_stop_t
+                        row['short_laps']['label'] = a_label
 
                     # Store data for short_replays in the EpochTable
                     for a_start_t, a_stop_t, a_label in zip(result.short_replays.starts, result.short_replays.stops, result.short_replays.labels):
-                        row['short_replays/start_t'] = a_start_t
-                        row['short_replays/end_t'] = a_stop_t
-                        row['short_replays/label'] = a_label
+                        # row['short_replays/start_t'] = a_start_t
+                        # row['short_replays/end_t'] = a_stop_t
+                        # row['short_replays/label'] = a_label
                     
+                        row['short_replays']['start_t'] = a_start_t
+                        row['short_replays']['end_t'] = a_stop_t
+                        row['short_replays']['label'] = a_label
+
+
                     row['short_epoch_name'] = result.short_epoch_name
 
                     # Convert timedelta to seconds and then to nanoseconds
