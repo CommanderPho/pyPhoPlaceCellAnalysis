@@ -511,22 +511,22 @@ class BatchRun(HDF_SerializationMixin):
             root_group = h5file.create_group("/", name='batch_run', title="Pipeline Completion Results")
 
             # Create a new table for each PipelineCompletionResult object
-            table = h5file.create_table(root_group, f"batch_run_table", PipelineCompletionResultTable) # the table is actually at the top level yeah? Each session only has one of these?
+            files_table = h5file.create_table(root_group, f"batch_run_table", PipelineCompletionResultTable) # the table is actually at the top level yeah? Each session only has one of these?
             
             # table.
             # Iterate through the PipelineCompletionResult objects and store them in the HDF5 file
-            for session_context, result in zip(session_contexts, session_batch_outputs):
-                if result is not None:
+            for session_context, a_result in zip(session_contexts, session_batch_outputs):
+                if a_result is not None:
                     session_context_key: str = session_context.get_description(separator="|", include_property_names=False)
                     session_group_key: str = '/' + session_context_key # 'kdiba/gor01/one/2006-6-08_14-26-15'
                     
-                    row = table.row
+                    row = files_table.row
 
                     # Fill in the fields of the table with data from the PipelineCompletionResult object
-                    row['long_epoch_name'] = result.long_epoch_name
+                    row['long_epoch_name'] = a_result.long_epoch_name
                     
                     # Epoch object: iterate through all columns to build the EpochTable
-                    for a_start_t, a_stop_t, a_label in zip(result.long_laps.starts, result.long_laps.stops, result.long_laps.labels):
+                    for a_start_t, a_stop_t, a_label in zip(a_result.long_laps.starts, a_result.long_laps.stops, a_result.long_laps.labels):
                         # row['long_laps/start_t'] = a_start_t
                         # row['long_laps/end_t'] = a_stop_t
                         # row['long_laps/label'] = a_label
@@ -536,7 +536,7 @@ class BatchRun(HDF_SerializationMixin):
                         row['long_laps']['label'] = a_label
 
                     # Store data for long_replays in the EpochTable
-                    for a_start_t, a_stop_t, a_label in zip(result.long_replays.starts, result.long_replays.stops, result.long_replays.labels):
+                    for a_start_t, a_stop_t, a_label in zip(a_result.long_replays.starts, a_result.long_replays.stops, a_result.long_replays.labels):
                         # row['long_replays/start_t'] = a_start_t
                         # row['long_replays/end_t'] = a_stop_t
                         # row['long_replays/label'] = a_label
@@ -546,7 +546,7 @@ class BatchRun(HDF_SerializationMixin):
                         row['long_replays']['label'] = a_label
 
                     # Store data for short_laps in the EpochTable
-                    for a_start_t, a_stop_t, a_label in zip(result.short_laps.starts, result.short_laps.stops, result.short_laps.labels):
+                    for a_start_t, a_stop_t, a_label in zip(a_result.short_laps.starts, a_result.short_laps.stops, a_result.short_laps.labels):
                         # row['short_laps/start_t'] = a_start_t
                         # row['short_laps/end_t'] = a_stop_t
                         # row['short_laps/label'] = a_label
@@ -556,7 +556,7 @@ class BatchRun(HDF_SerializationMixin):
                         row['short_laps']['label'] = a_label
 
                     # Store data for short_replays in the EpochTable
-                    for a_start_t, a_stop_t, a_label in zip(result.short_replays.starts, result.short_replays.stops, result.short_replays.labels):
+                    for a_start_t, a_stop_t, a_label in zip(a_result.short_replays.starts, a_result.short_replays.stops, a_result.short_replays.labels):
                         # row['short_replays/start_t'] = a_start_t
                         # row['short_replays/end_t'] = a_stop_t
                         # row['short_replays/label'] = a_label
@@ -566,10 +566,10 @@ class BatchRun(HDF_SerializationMixin):
                         row['short_replays']['label'] = a_label
 
 
-                    row['short_epoch_name'] = result.short_epoch_name
+                    row['short_epoch_name'] = a_result.short_epoch_name
 
                     # Convert timedelta to seconds and then to nanoseconds
-                    time_in_seconds = result.delta_since_last_compute.total_seconds()
+                    time_in_seconds = a_result.delta_since_last_compute.total_seconds()
                     time_in_nanoseconds = int(time_in_seconds * 1e9)
                     # Convert to np.int64 (64-bit integer) for tb.Time64Col()
                     time_as_np_int64 = np.int64(time_in_nanoseconds)
@@ -608,20 +608,82 @@ class BatchRun(HDF_SerializationMixin):
                     row.append()
                 
             # Flush the table after storing all the data for this result
-            table.flush()
+            files_table.flush()
                     
 
+        files_table_path: Path = Path(file_path).with_name(f"{file_path.stem}_outputfiles.h5")
+        
+        with tb.open_file(files_table_path, mode='w') as h5file:
+            # Create a new group at the specified key
+            root_group = h5file.create_group("/", name='batch_run', title="Pipeline Completion Results")
+
+            # Create a new table for each PipelineCompletionResult object
+            files_table = h5file.create_table(root_group, f"batch_run_table", OutputFilesTable) # the table is actually at the top level yeah? Each session only has one of these?
+            
+            # Separate files table instead of nested?
+
+            # Iterate through the PipelineCompletionResult objects and store them in the HDF5 file
+            for session_context, a_result in zip(session_contexts, session_batch_outputs):
+                if a_result is not None:
+                    session_context_key: str = session_context.get_description(separator="|", include_property_names=False)
+                    session_group_key: str = '/' + session_context_key # 'kdiba/gor01/one/2006-6-08_14-26-15'
+                    
+                    row = files_table.row
+
+                    # Fill in the fields of the table with data from the PipelineCompletionResult object
+                    # row['long_epoch_name'] = result.long_epoch_name
+                    
+                    
+                    # Handle outputs_local and outputs_global dictionaries
+                    if a_result.outputs_local is not None:
+                        row['outputs_local/filesystem_path'] = list(a_result.outputs_local.values())
+                        row['outputs_local/filesystem_path'] = list([str(v) for v in a_result.outputs_local.values()])
+
+
+                        # # Create a new table for outputs_local
+                        # output_local_table = h5file.create_table(table, 'outputs_local', OutputFilesTable)
+                        for resource_name, filesystem_path in a_result.outputs_local.items():
+                            row['outputs_local/resource_name'] = resource_name
+                            output_local_row['resource_name'] = resource_name
+                            output_local_row['filesystem_path'] = str(filesystem_path)
+                            # output_local_row.append()
+                        # # output_local_table.flush()
+
+                    if a_result.outputs_global is not None:
+                        row['outputs_global/resource_name'] = list(a_result.outputs_global.keys())
+                        row['outputs_global/filesystem_path'] = list(a_result.outputs_global.values())
+
+                        # Create a new table for outputs_global
+                        # output_global_table = h5file.create_table(table, 'outputs_global', OutputFilesTable)
+                        # for resource_name, filesystem_path in result.outputs_global.items():
+                        #     # output_global_row['resource_name'] = resource_name
+                        #     # output_global_row['filesystem_path'] = str(filesystem_path)
+                        #     # output_global_row.append()
+                        # # output_global_table.flush()
+
+
+                    # Append the row to the table and flush the changes
+                    row.append()
+                
+            # Flush the table after storing all the data for this result
+            files_table.flush()
+            
         # Save the remaining attributes (global_data_root_parent_path, etc.) using the HDF_SerializationMixin
         # super().to_hdf(file_path, key=key, **kwargs)
 
 
         # Iterate through the PipelineCompletionResult objects and store them in the HDF5 file
-        for session_context, result in zip(session_contexts, session_batch_outputs):
-            if result is not None:
-                session_context_key: str = session_context.get_description(separator="/", include_property_names=False)
-                session_group_key: str = '/' + session_context_key # 'kdiba/gor01/one/2006-6-08_14-26-15'
+        for session_context, a_status, a_basedir, an_error, a_result in zip(session_contexts, session_batch_status, session_batch_basedirs, session_batch_errors, session_batch_outputs):
+            session_context_key: str = session_context.get_description(separator="/", include_property_names=False)
+            session_group_key: str = '/' + session_context_key # 'kdiba/gor01/one/2006-6-08_14-26-15'
+        
+            # if a_basedir is not None:
+                
+
+            if a_result is not None:
                 # result is PipelineCompletionResult and will be written out with its own .to_hdf
-                result.to_hdf(file_path, f"{session_group_key}/batch_result") 
+                a_result.to_hdf(file_path, f"{session_group_key}/batch_result") 
+                # a_result
                 # # Handle across_session_results dictionary
                 # if result.across_session_results is not None:
                 #     ## Write this out to HDF5 file independently using `PipelineCompletionResult.to_hdf(...)`
