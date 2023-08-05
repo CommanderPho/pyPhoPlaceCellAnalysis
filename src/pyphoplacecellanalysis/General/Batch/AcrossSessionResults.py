@@ -69,12 +69,7 @@ class AcrossSessionsResults:
     Entries consist of:
         - AcrossSessionAggregating-level Results (such as those used in PhoDiba2023Paper
         - Links or References
-    
-    
-    
-    
-    
-    
+     
     Batch Processing goes like:
     1. Discover Sessions
     2. Load the Session Data to gain access to the pipeline
@@ -83,9 +78,7 @@ class AcrossSessionsResults:
     
         
     """
-
-
-
+ 
     class ProcessedSessionResultsTable(tb.IsDescription):
         """ represents a single session's processing results in the scope of multiple sessions for use in a PyTables table or HDF5 output file """
         global_uid = StringCol(16)   # 16-character String, globally unique neuron identifier (across all sessions) composed of a session_uid and the neuron's (session-specific) aclu
@@ -154,7 +147,6 @@ class AcrossSessionsResults:
             
             # f.create_dataset(f'{key}/neuron_ids', data=self.neuron_ids)
             # f.create_dataset(f'{key}/shank_ids', data=self.shank_ids)
-            
             group = f.create_group(key, 'neuron_identities', title='each row uniquely identifies a neuron and its various loaded, labeled, and computed properties', createparents=True)
 
             table = f.create_table(group, 'table', NeuronIdentityTable, "Neuron identities")

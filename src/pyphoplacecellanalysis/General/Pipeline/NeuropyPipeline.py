@@ -682,6 +682,7 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
         
         """
         from pyphoplacecellanalysis.General.Batch.AcrossSessionResults import AcrossSessionsResults # for to_hdf
+        from pyphoplacecellanalysis.General.Batch.PhoDiba2023Paper import InstantaneousSpikeRateGroupsComputation
         
         # print(f'file_path: {file_path}')
 

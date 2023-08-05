@@ -78,7 +78,7 @@ class BatchComputationProcessOptions(HDF_SerializationMixin):
 
 @custom_define(slots=False)
 class PipelineCompletionResult(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
-    """ Class representing epoch data built from a dictionary. """
+    """ Class representing the specific results extratracted from the loaded pipeline and returned as return values from the post-execution callback function. """
     long_epoch_name: str = serialized_attribute_field()
     long_laps: Epoch = serialized_field()
     long_replays: Epoch = serialized_field()
@@ -120,20 +120,6 @@ class PipelineCompletionResult(HDF_SerializationMixin, AttrsBasedClassHelperMixi
 
 
 # PyTables Definitions for Output Tables: ____________________________________________________________________________ #
-
-
-# class EpochTable(tb.IsDescription):
-#     """ a conversion of an Epoch object. """
-#     start_t = tb.Float32Col()
-#     end_t = tb.Float32Col()
-#     label = tb.StringCol(itemsize=100)  # the identifier for the Epoch
-
-# class OutputFilesTable(tb.IsDescription):
-#     """ a single session might have: 'local_pickle_path', 'global_pickle_path', 'session_h5_path' """
-#     resource_name = tb.StringCol(itemsize=100)
-#     filesystem_path = tb.StringCol(itemsize=500)
-    
-# Define the PipelineCompletionResult as a PyTables class
 class PipelineCompletionResultTable(tb.IsDescription):
     """ PyTables class representing epoch data built from a dictionary. """
     long_epoch_name = tb.StringCol(itemsize=100)
@@ -153,6 +139,9 @@ class PipelineCompletionResultTable(tb.IsDescription):
     # outputs_global = OutputFilesTable()
     
     # across_sessions_batch_results_inst_fr_comps = tb.StringCol(itemsize=100)
+
+
+
 
 @custom_define(slots=False)
 class BatchRun(HDF_SerializationMixin):
@@ -628,7 +617,6 @@ class BatchResultDataframeAccessor():
         pandas_obj = self._validate(pandas_obj)
         self._obj = pandas_obj
 
-
     @classmethod
     def init_from_BatchRun(cls, batchrun_obj: BatchRun, expand_context:bool=True, good_only:bool=False) -> pd.DataFrame:
         """Get a dataframe representation of BatchRun."""
@@ -875,10 +863,6 @@ class BatchSessionCompletionHandler:
     """
 
     # Completion Result object returned from callback ____________________________________________________________________ #
-
-    
-
-
 
     # General:
     debug_print: bool = field(default=False)
