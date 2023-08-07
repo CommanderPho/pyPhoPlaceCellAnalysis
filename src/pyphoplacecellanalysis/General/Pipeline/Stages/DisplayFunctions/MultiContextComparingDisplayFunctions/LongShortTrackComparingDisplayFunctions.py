@@ -1250,9 +1250,6 @@ def _make_pho_jonathan_batch_plots(t_split, time_bins, neuron_replay_stats_df, u
 
 
     """
-    
-    
-        
     if included_unit_neuron_IDs is None:
         n_all_neuron_IDs = np.shape(neuron_replay_stats_df)[0] 
         n_max_plot_rows = min(n_all_neuron_IDs, n_max_plot_rows) # don't allow more than the possible number of neuronIDs
@@ -1275,7 +1272,8 @@ def _make_pho_jonathan_batch_plots(t_split, time_bins, neuron_replay_stats_df, u
     subfigs = fig.subfigures(actual_num_subfigures, 1, wspace=0.07)
     ##########################
 
-    rdf, (_percent_long_only, _percent_shared, _percent_short_only, _percent_short_long_diff) = _build_neuron_type_distribution_color(rdf)
+    rdf, (_percent_long_only, _percent_shared, _percent_short_only, _percent_short_long_diff) = _build_neuron_type_distribution_color(rdf) # for building partially filled scatter plot points.
+    
 
     # Build custom replay markers:
     custom_replay_scatter_markers_plot_kwargs_list = build_replays_custom_scatter_markers(rdf, marker_split_mode=marker_split_mode, debug_print=debug_print)
