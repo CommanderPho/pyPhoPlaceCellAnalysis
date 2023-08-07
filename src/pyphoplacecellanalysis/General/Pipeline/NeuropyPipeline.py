@@ -743,7 +743,7 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
 
 
     @classmethod
-    def read_hdf(cls, file_path, key: str, **kwargs) -> "Neurons":
+    def read_hdf(cls, file_path, key: str, **kwargs) -> "NeuropyPipeline":
         """ Reads the data from the key in the hdf5 file at file_path
         
         """
