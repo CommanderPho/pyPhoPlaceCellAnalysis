@@ -155,7 +155,7 @@ class AcrossSessionsResults:
             row = table.row
             for i in np.arange(n_neurons):
                 ## Build the row here from aclu_array, etc
-                row['global_uid'] = f"{session_uid}-{aclu_array[i]}"
+                row['global_uid'] = f"{session_uid}|{aclu_array[i]}"
                 row['session_uid'] = session_uid  # Provide an appropriate session identifier here
                 row['neuron_id'] = aclu_array[i]
                 row['neuron_type'] = neuron_types_enum_array[i]
