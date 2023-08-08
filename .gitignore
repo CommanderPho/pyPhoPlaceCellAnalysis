@@ -63,3 +63,4 @@ desktop.ini
 src/cscope.files
 src/cscope.out
 src/myproject.db
+.sourcery.yaml
