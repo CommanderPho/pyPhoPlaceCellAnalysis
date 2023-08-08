@@ -1273,7 +1273,7 @@ def run_specific_batch(active_batch_run: BatchRun, curr_session_context: Identif
 
 
 @function_attributes(short_name='main', tags=['batch', 'automated'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-03-28 04:46')
-def main(active_global_batch_result_suffix:str='CHANGEME_TEST', included_session_contexts: Optional[List[IdentifyingContext]]=None, num_processes:int=4, should_force_reload_all:bool=False, should_perform_figure_generation_to_file:bool=False, debug_print=True):
+def main(active_result_suffix:str='CHANGEME_TEST', included_session_contexts: Optional[List[IdentifyingContext]]=None, num_processes:int=4, should_force_reload_all:bool=False, should_perform_figure_generation_to_file:bool=False, debug_print=True):
     """ 
     
     should_perform_figure_generation_to_file: Whether to output figures
@@ -1284,9 +1284,9 @@ def main(active_global_batch_result_suffix:str='CHANGEME_TEST', included_session
     
 
     """
-    # active_global_batch_result_suffix=f"{BATCH_DATE_TO_USE}_GL"
-    print(f'Starting runBatch.main(active_global_batch_result_suffix: "{active_global_batch_result_suffix}", ...) ...')
-    active_global_batch_result_filename:str = f'global_batch_result_{active_global_batch_result_suffix}.pkl'
+    # active_result_suffix=f"{BATCH_DATE_TO_USE}_GL"
+    print(f'Starting runBatch.main(active_result_suffix: "{active_result_suffix}", ...) ...')
+    active_global_batch_result_filename:str = f'global_batch_result_{active_result_suffix}.pkl'
     global_data_root_parent_path = find_first_extant_path(known_global_data_root_parent_paths)
     assert global_data_root_parent_path.exists(), f"global_data_root_parent_path: {global_data_root_parent_path} does not exist! Is the right computer's config commented out above?"
     
@@ -1358,7 +1358,7 @@ def main(active_global_batch_result_suffix:str='CHANGEME_TEST', included_session
     # Save to pickle:
     saveData(finalized_loaded_global_batch_result_pickle_path, global_batch_run) # Update the global batch run dictionary
 
-    hdf5_file_path = global_data_root_parent_path.joinpath(f'global_batch_output_{active_global_batch_result_suffix}.h5').resolve()
+    hdf5_file_path = global_data_root_parent_path.joinpath(f'global_batch_output_{active_result_suffix}.h5').resolve()
     try:
         global_batch_run.to_hdf(hdf5_file_path,'/')
     except Exception as e:
@@ -1388,7 +1388,7 @@ def main(active_global_batch_result_suffix:str='CHANGEME_TEST', included_session
     # When done, `result_handler.across_sessions_instantaneous_fr_dict` is now equivalent to what it would have been before. It can be saved using the normal `.save_across_sessions_data(...)`
 
     ## Save the instantaneous firing rate results dict: (# Dict[IdentifyingContext] = InstantaneousSpikeRateGroupsComputation)
-    inst_fr_output_filename = f'across_session_result_long_short_inst_firing_rate_{active_global_batch_result_suffix}.pkl'
+    inst_fr_output_filename = f'across_session_result_long_short_inst_firing_rate_{active_result_suffix}.pkl'
 
     AcrossSessionsResults.save_across_sessions_data(across_sessions_instantaneous_fr_dict=across_sessions_instantaneous_fr_dict, global_data_root_parent_path=global_data_root_parent_path, inst_fr_output_filename=inst_fr_output_filename)
     return global_batch_run, result_handler, across_sessions_instantaneous_fr_dict, (finalized_loaded_global_batch_result_pickle_path, inst_fr_output_filename)
