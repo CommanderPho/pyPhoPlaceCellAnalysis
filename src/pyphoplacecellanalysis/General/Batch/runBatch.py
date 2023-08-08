@@ -1002,6 +1002,8 @@ class BatchSessionCompletionHandler:
     num_processes: Optional[int] = field(default=None)
 
     # Computations
+    enable_full_pipeline_in_ram: bool = field(default=False)
+    
     override_session_computation_results_pickle_filename: Optional[str] = field(default=None) # 'output/loadedSessPickle.pkl'
 
     session_computations_options: BatchComputationProcessOptions = field(default=BatchComputationProcessOptions(should_load=True, should_compute=True, should_save=True))
@@ -1216,24 +1218,22 @@ class BatchSessionCompletionHandler:
             print(f"ERROR: encountered exception {e} while trying to compute the instantaneous firing rates and set self.across_sessions_instantaneous_fr_dict[{curr_session_context}]")
             _out_inst_fr_comps = None
             
+        # On large ram systems, we can return the whole pipeline?
+        
+        if self.enable_full_pipeline_in_ram:
+            across_session_results_extended_dict = {'curr_active_pipeline': curr_active_pipeline}
+        else:
+            across_session_results_extended_dict = {}
+            
         return PipelineCompletionResult(long_epoch_name=long_epoch_name, long_laps=long_laps, long_replays=long_replays,
                                            short_epoch_name=short_epoch_name, short_laps=short_laps, short_replays=short_replays,
                                            delta_since_last_compute=delta_since_last_compute,
                                            outputs_local={'pkl': curr_active_pipeline.pickle_path},
                                             outputs_global={'pkl': curr_active_pipeline.global_computation_results_pickle_path, 'hdf5': hdf5_output_path},
-                                            across_session_results={'inst_fr_comps': _out_inst_fr_comps})
+                                            across_session_results={'inst_fr_comps': _out_inst_fr_comps, **across_session_results_extended_dict})
                                           
 
-        # return {long_epoch_name:(long_laps, long_replays), short_epoch_name:(short_laps, short_replays),
-        #         'outputs': {'local': curr_active_pipeline.pickle_path,
-        #                     'global': curr_active_pipeline.global_computation_results_pickle_path},
-        #         'across_sessions_batch_results': {'inst_fr_comps': _out_inst_fr_comps}
-        #     }
         
-
-
-
-
 
 
 # ==================================================================================================================== #
