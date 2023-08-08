@@ -561,7 +561,52 @@ class BatchRun(HDF_SerializationMixin):
 
         return session_identifiers, pkl_output_paths, hdf5_output_paths
 
-    
+    def generate_batch_slurm_jobs(self, included_session_contexts, output_directory):
+        """
+
+        output_directory
+        
+        """
+        output_python_scripts = []
+        output_slurm_scripts = []
+        # Make sure the output directory exists
+        os.makedirs(output_directory, mode=755, exist_ok=True)
+        
+        for curr_session_context in included_session_contexts:
+            curr_session_basedir = self.session_batch_basedirs[curr_session_context]
+
+            # Create the Python script
+            python_script_path = os.path.join(output_directory, f'run_{curr_session_context}.py')
+            with open(python_script_path, 'w') as script_file:
+                script_file.write(f"""
+    import run_specific_batch
+    run_specific_batch(self.global_data_root_parent_path, '{curr_session_context}', '{curr_session_basedir}', **kwargs)
+    """)
+
+            # Create the SLURM script
+            slurm_script_path = os.path.join(output_directory, f'run_{curr_session_context}.sh')
+            with open(slurm_script_path, 'w') as script_file:
+                script_file.write(f"""
+    #!/bin/bash
+    #SBATCH --job-name=job_{curr_session_context}
+    #SBATCH --output=out_{curr_session_context}.txt
+    #SBATCH --error=err_{curr_session_context}.txt
+    #SBATCH --ntasks=1
+    #SBATCH --time=01:00:00
+    #SBATCH --mem-per-cpu=2000
+
+    module load python/3.8.0
+    srun python {python_script_path}
+    """)
+
+        # Add the output files:
+        output_python_scripts.append(python_script_path)
+        output_slurm_scripts.append(slurm_script_path)
+        
+        # Submit the SLURM job
+        # os.system(f'sbatch {slurm_script_path}')
+        return included_session_contexts, output_python_scripts, output_slurm_scripts
+
     # HDFMixin Conformances ______________________________________________________________________________________________ #
 
     def to_hdf(self, file_path, key: str, **kwargs):
@@ -1304,7 +1349,7 @@ def run_specific_batch(global_data_root_parent_path: Path, curr_session_context:
         
     except Exception as e:
         ## can fail here before callback function is even called.
-        
+
         return (SessionBatchProgress.FAILED, f"{e}", None) # return the Failed status and the exception that occured.
 
     if post_run_callback_fn is not None:
@@ -1444,6 +1489,14 @@ def main(active_result_suffix:str='CHANGEME_TEST', included_session_contexts: Op
 
     AcrossSessionsResults.save_across_sessions_data(across_sessions_instantaneous_fr_dict=across_sessions_instantaneous_fr_dict, global_data_root_parent_path=global_data_root_parent_path, inst_fr_output_filename=inst_fr_output_filename)
     return global_batch_run, result_handler, across_sessions_instantaneous_fr_dict, (finalized_loaded_global_batch_result_pickle_path, inst_fr_output_filename)
+
+
+
+
+
+
+
+
 
 
 
