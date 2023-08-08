@@ -1320,6 +1320,7 @@ def main(active_result_suffix:str='CHANGEME_TEST', included_session_contexts: Op
 
     if should_force_reload_all:
         # Forced Reloading:
+        print(f'forced reloading...')
         result_handler = BatchSessionCompletionHandler(force_reload_all=True,
                                                         session_computations_options=BatchComputationProcessOptions(should_load=False, should_compute=True, should_save=True),
                                                         global_computations_options=BatchComputationProcessOptions(should_load=False, should_compute=True, should_save=True),
