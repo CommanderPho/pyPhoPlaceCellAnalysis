@@ -8,7 +8,10 @@ import numpy as np
 import pandas as pd
 import tables as tb
 from copy import deepcopy
-import multiprocessing
+# import multiprocessing
+import concurrent.futures
+from tqdm import tqdm
+
 from enum import Enum, unique # SessionBatchProgress
 
 ## Pho's Custom Libraries:
@@ -230,12 +233,15 @@ class BatchRun(HDF_SerializationMixin):
             assert session_inclusion_filter is None, f"You cannot provide both a `session_inclusion_filter` and a `included_session_contexts` list. Include one or the other."
             # ready to go
         else:
+            ## no included_session_contexts provided.
             if session_inclusion_filter is None:
+                ## no filter provided either
                 session_inclusion_filter = (lambda curr_session_context, curr_session_status: (curr_session_status != SessionBatchProgress.COMPLETED) or allow_processing_previously_completed)
             else:
                 # `session_inclusion_filter` was provided, make sure there is no list.
                 assert included_session_contexts is None, f"You cannot provide both a `session_inclusion_filter` and a `included_session_contexts` list. Include one or the other."
-            # either way now build the contexts list:
+                
+            # either way now build the contexts list using the filter:
             included_session_contexts: List[IdentifyingContext] = [curr_session_context for curr_session_context, curr_session_status in self.session_batch_status.items() if session_inclusion_filter(curr_session_context, curr_session_status)]
 
         # Now `included_session_contexts` list should be good either way:
@@ -244,25 +250,66 @@ class BatchRun(HDF_SerializationMixin):
         print(f'Beginning processing with len(included_session_contexts): {len(included_session_contexts)}')        
 
         if use_multiprocessing:
-            if num_processes is None:
-                num_processes = multiprocessing.cpu_count()  # Use the number of available CPU cores
-
-            pool = multiprocessing.Pool(processes=num_processes)
-            results = {} # dict form
             
-            for curr_session_context in included_session_contexts:
-                curr_session_basedir = self.session_batch_basedirs[curr_session_context]
-                result = pool.apply_async(run_specific_batch, (self, curr_session_context, curr_session_basedir), kwargs) # it can actually take a callback too.
-                results[curr_session_context] = result
+            # # pre-2023-08-08 `multiprocessing`-based version _____________________________________________________________________ #
+            # if num_processes is None:
+            #     num_processes = multiprocessing.cpu_count()  # Use the number of available CPU cores
 
-            pool.close()
-            pool.join()
+            # pool = multiprocessing.Pool(processes=num_processes)
+            # results = {} # dict form
+            
+            # for curr_session_context in included_session_contexts:
+            #     curr_session_basedir = self.session_batch_basedirs[curr_session_context]
+            #     result = pool.apply_async(run_specific_batch, (self, curr_session_context, curr_session_basedir), kwargs) # it can actually take a callback too.
+            #     results[curr_session_context] = result
 
-            for session_context, result in results.items():
-                status, error, output = result.get()
-                self.session_batch_status[session_context] = status
-                self.session_batch_errors[session_context] = error
-                self.session_batch_outputs[session_context] = output
+            # pool.close()
+            # pool.join()
+
+            # for session_context, result in results.items():
+            #     status, error, output = result.get()
+            #     self.session_batch_status[session_context] = status
+            #     self.session_batch_errors[session_context] = error
+            #     self.session_batch_outputs[session_context] = output
+                
+            # `concurrent.futures` version instead of `multiprocessing` __________________________________________________________ #
+            if num_processes is None:
+                num_processes = concurrent.futures.ProcessPoolExecutor().max_workers
+
+            with concurrent.futures.ProcessPoolExecutor(max_workers=num_processes) as executor:
+                futures = {executor.submit(run_specific_batch, self, curr_session_context, self.session_batch_basedirs[curr_session_context], **kwargs): curr_session_context for curr_session_context in included_session_contexts}
+
+                for future in tqdm(concurrent.futures.as_completed(futures), total=len(futures)):
+                    session_context = futures[future]  # get the context for this future
+                    status, error, output = future.result()
+                    self.session_batch_status[session_context] = status
+                    self.session_batch_errors[session_context] = error
+                    self.session_batch_outputs[session_context] = output
+    
+            # with concurrent.futures.ProcessPoolExecutor(max_workers=num_processes) as executor:
+            #     futures = {executor.submit(run_specific_batch, self, curr_session_context, curr_session_basedir, **kwargs): curr_session_context for curr_session_context in included_session_contexts}
+
+            #     for future in tqdm(concurrent.futures.as_completed(futures), total=len(futures)):
+            #         session_context = futures[future]  # get the context for this future
+            #         status, error, output = future.result()
+            #         self.session_batch_status[session_context] = status
+            #         self.session_batch_errors[session_context] = error
+            #         self.session_batch_outputs[session_context] = output
+
+            # with concurrent.futures.ProcessPoolExecutor(max_workers=num_processes) as executor:
+            #     futures = {}
+            #     for curr_session_context in included_session_contexts:
+            #         curr_session_basedir = self.session_batch_basedirs[curr_session_context]
+            #         future = executor.submit(run_specific_batch, self, curr_session_context, curr_session_basedir, **kwargs)
+            #         futures[curr_session_context] = future
+
+            #     #for session_context, future in futures.items():
+            #     for session_context, future in tqdm(concurrent.futures.as_completed(futures.values()), total=len(futures)):
+            #         status, error, output = future.result()
+            #         self.session_batch_status[session_context] = status
+            #         self.session_batch_errors[session_context] = error
+            #         self.session_batch_outputs[session_context] = output
+                    
         else:
             # No multiprocessing, fall back to the normal way.
             for curr_session_context in included_session_contexts:
