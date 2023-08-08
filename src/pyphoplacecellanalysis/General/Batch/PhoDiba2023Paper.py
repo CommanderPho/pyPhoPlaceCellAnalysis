@@ -645,8 +645,8 @@ def PAPER_FIGURE_figure_1_full(curr_active_pipeline, defer_show=False, save_figu
 @custom_define(slots=False)
 class SingleBarResult(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
     """ a simple replacement for the tuple that's current passed """
-    mean: float = serialized_attribute_field()
-    std: float = serialized_attribute_field()
+    mean: float = serialized_attribute_field() # computable
+    std: float = serialized_attribute_field() # effectively computable
     values: np.ndarray = serialized_field()
     LxC_aclus: np.ndarray = serialized_field(hdf_metadata={'track_eXclusive_cells': 'LxC'}) # the list of long-eXclusive cell aclus
     SxC_aclus: np.ndarray = serialized_field(hdf_metadata={'track_eXclusive_cells': 'SxC'}) # the list of short-eXclusive cell aclus

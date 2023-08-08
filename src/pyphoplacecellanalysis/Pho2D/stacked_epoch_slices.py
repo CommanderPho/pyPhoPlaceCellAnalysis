@@ -742,7 +742,8 @@ class DecodedEpochSlicesPaginatedFigureController(PaginatedFigureController):
     # ==================================================================================================================== #
     def on_click(self, event):
         """ called when an axis is clicked to toggle the selection. """
-        print(f'DecodedEpochSlicesPaginatedFigureController.on_click(...) OVERRIDE:')
+        if self.params.debug_print:
+            print(f'DecodedEpochSlicesPaginatedFigureController.on_click(...) OVERRIDE:')
         # Get the clicked Axes object
         ax = event.inaxes
         # Find the axes
@@ -764,7 +765,8 @@ class DecodedEpochSlicesPaginatedFigureController(PaginatedFigureController):
 
     def perform_update_ax_selected_state(self, ax, is_selected: bool):
         """ simply updates the visual appearance of the provided ax to indicate whether it's selected. """
-        print(f'DecodedEpochSlicesPaginatedFigureController.perform_update_ax_selected_state(...) OVERRIDE:')
+        if self.params.debug_print:
+            print(f'DecodedEpochSlicesPaginatedFigureController.perform_update_ax_selected_state(...) OVERRIDE:')
         # Set the face color of the clicked Axes based on its selection status
         if is_selected:
             ax.patch.set_facecolor('gray')
@@ -772,8 +774,9 @@ class DecodedEpochSlicesPaginatedFigureController(PaginatedFigureController):
             ax.patch.set_facecolor('white')
 
     def perform_update_selections(self, defer_render:bool=True):
-        """ called to update the selection when the page is changed or something else happens. """        
-        print(f'DecodedEpochSlicesPaginatedFigureController.perform_update_selections(...) OVERRIDE:')
+        """ called to update the selection when the page is changed or something else happens. """
+        if self.params.debug_print:
+            print(f'DecodedEpochSlicesPaginatedFigureController.perform_update_selections(...) OVERRIDE:')
         current_page_idx = self.current_page_idx
         curr_page_data_indicies = self.paginator.get_page_data(page_idx=current_page_idx)[0] # the [0] returns only the indicies and not the data
         assert len(self.plots.axs) == len(curr_page_data_indicies), f"len(plots.axs): {len(self.plots.axs)}, len(curr_page_data_indicies): {len(curr_page_data_indicies)}"
