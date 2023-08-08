@@ -1158,7 +1158,8 @@ def _plot_pho_jonathan_batch_plot_single_cell(t_split, time_bins, unit_specific_
     else:
         cell_neuron_extended_ids = pf1D_all.ratemap.neuron_extended_ids[cell_linear_fragile_IDX]
         # print(f'aclu: {aclu}, cell_neuron_extended_ids: {cell_neuron_extended_ids}')
-        subtitle_string = f'(shk <size:10><weight:bold>{cell_neuron_extended_ids.shank}</></>, clu <size:10><weight:bold>{cell_neuron_extended_ids.cluster}</></>)'
+        # subtitle_string = f'(shk <size:10><weight:bold>{cell_neuron_extended_ids.shank}</></>, clu <size:10><weight:bold>{cell_neuron_extended_ids.cluster}</></>)'
+        subtitle_string = f'shk <size:10><weight:bold>{cell_neuron_extended_ids.shank}</></>, clu <size:10><weight:bold>{cell_neuron_extended_ids.cluster}</></>\nqclu <size:10><weight:bold>{cell_neuron_extended_ids.quality}</></>\ntype <size:10><weight:bold>{cell_neuron_extended_ids.cell_type}</></>'
         # print(f'\tsubtitle_string: {subtitle_string}')
         formatted_cell_label_string = f'{formatted_cell_label_string}\n<size:9>{subtitle_string}</>'
     
