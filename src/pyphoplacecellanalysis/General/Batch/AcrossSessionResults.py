@@ -61,6 +61,55 @@ trackMembershipTypesList: List[str] = ['long_only', 'short_only', 'both', 'neith
 trackMembershipTypesEnum = tb.Enum(trackMembershipTypesList)
 
 
+
+
+
+
+@define(slots=False)
+class H5Loader:
+    """
+    H5Loader class for loading and consolidating .h5 files
+    Usage:
+
+        session_group_keys: List[str] = [("/" + a_ctxt.get_description(separator="/", include_property_names=False)) for a_ctxt in session_identifiers] # 'kdiba/gor01/one/2006-6-08_14-26-15'
+        neuron_identities_table_keys = [f"{session_group_key}/neuron_identities/table" for session_group_key in session_group_keys]
+        a_loader = H5Loader(file_list=hdf5_output_paths, table_key_list=neuron_identities_table_keys)
+        _out_table = a_loader.load_and_consolidate()
+        _out_table
+
+
+    """
+    file_list: List[str] = field(default=Factory(list))
+    table_key_list: List[str] = field(default=Factory(list))
+    
+    def load_and_consolidate(self) -> pd.DataFrame:
+        """
+        Loads .h5 files and consolidates into a master table
+        """
+        data_frames = []
+        for file, table_key in zip(self.file_list, self.table_key_list):
+            with tb.open_file(file) as h5_file:
+                a_table = h5_file.get_node(table_key)
+                print(f'a_table: {a_table}')
+                # for a_record in a_table
+                
+                # data_frames.append(a_table)
+#                 for table in h5_file.get_node(table_key):
+#                 # for table in h5_file.root:
+                # df = pd.DataFrame.from_records(a_table[:]) # .read()
+                df = pd.DataFrame.from_records(a_table.read()) 
+                data_frames.append(df)
+
+        master_table = pd.concat(data_frames, ignore_index=True)
+        return master_table
+
+    
+    
+    
+
+
+
+
 class AcrossSessionsResults:
     """ 
 
@@ -459,3 +508,12 @@ class AcrossSessionsAggregator(AttrsBasedClassHelperMixin):
 
         # def to_hdf(self, file_path, key: str, **kwargs):
 
+
+
+def build_linking_results(file_path, session_identifiers, external_h5_links):
+    with tb.open_file(file_path, mode='w') as f: # this mode='w' is correct because it should overwrite the previous file and not append to it.
+        # a_global_computations_group = f.create_group(session_group_key, 'global_computations', title='the result of computations that operate over many or all of the filters in the session.', createparents=True)
+        an_external_link = f.create_external_link(f'file:/path/to/node', name, target, createparents=False)
+
+        # File.create_external_link(where, name, target, createparents=False)
+        # 

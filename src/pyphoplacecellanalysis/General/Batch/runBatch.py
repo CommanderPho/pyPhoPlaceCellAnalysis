@@ -480,6 +480,42 @@ class BatchRun(HDF_SerializationMixin):
         updated_batch_progress_df['locally_is_ready'] = np.logical_and(updated_batch_progress_df.is_ready, session_basedir_exists_locally)
         return updated_batch_progress_df
 
+
+    # kdiba_vvp01_two_2006-4-10_12-58-3
+    # 	outputs_local ={'pkl': PosixPath('/nfs/turbo/umms-kdiba/Data/KDIBA/vvp01/two/2006-4-10_12-58-3/loadedSessPickle.pkl')}
+    # 	outputs_global ={'pkl': PosixPath('/nfs/turbo/umms-kdiba/Data/KDIBA/vvp01/two/2006-4-10_12-58-3/output/global_computation_results.pkl'), 'hdf5': PosixPath('/nfs/turbo/umms-kdiba/Data/KDIBA/vvp01/two/2006-4-10_12-58-3/output/pipeline_results.h5')}
+
+    def build_output_files_lists(self):
+        """
+        Uses `global_batch_run.session_batch_outputs`
+
+        session_identifiers, pkl_output_paths, hdf5_output_paths = global_batch_run.build_output_files_lists()
+
+        """
+        session_identifiers = []
+        pkl_output_paths = []
+        hdf5_output_paths = []
+
+        for k, v in self.session_batch_outputs.items():
+            # v is PipelineCompletionResult
+            if v is not None:
+                # print(f'{k}')
+                outputs_local = v.outputs_local
+                outputs_global= v.outputs_global
+                # print(f'\t{outputs_local =}\n\t{outputs_global =}\n\n')
+                session_identifiers.append(k)
+                if outputs_local.get('pkl', None) is not None:
+                    pkl_output_paths.append(outputs_local.get('pkl', None))
+                if outputs_global.get('pkl', None) is not None:
+                    pkl_output_paths.append(outputs_global.get('pkl', None))
+                if outputs_local.get('hdf5', None) is not None:
+                    hdf5_output_paths.append(outputs_local.get('hdf5', None))
+                if outputs_global.get('hdf5', None) is not None:
+                    hdf5_output_paths.append(outputs_global.get('hdf5', None))
+
+        return session_identifiers, pkl_output_paths, hdf5_output_paths
+
+    
     # HDFMixin Conformances ______________________________________________________________________________________________ #
 
     def to_hdf(self, file_path, key: str, **kwargs):
@@ -932,6 +968,22 @@ class BatchSessionCompletionHandler:
             print(f'main_complete_figure_generations failed with exception: {e}')
             # raise e
             return False
+
+
+    def try_output_neruon_identity_table_to_File(self, file_path, curr_active_pipeline):
+        try:
+            session_context = curr_active_pipeline.get_session_context() 
+            session_group_key: str = "/" + session_context.get_description(separator="/", include_property_names=False) # 'kdiba/gor01/one/2006-6-08_14-26-15'
+            session_uid: str = session_context.get_description(separator="|", include_property_names=False)
+
+            AcrossSessionsResults.build_neuron_identity_table_to_hdf(file_path, key=session_group_key, spikes_df=curr_active_pipeline.sess.spikes_df, session_uid=session_uid)
+            return True # completed successfully
+
+        except Exception as e:
+            print(f'try_output_neruon_identity_table_to_File failed with exception: {e}')
+            # raise e
+            return False
+
 
 
     ## Main function that's called with the complete pipeline:
