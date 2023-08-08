@@ -249,8 +249,7 @@ class BatchRun(HDF_SerializationMixin):
         assert isinstance(included_session_contexts, list)
         print(f'Beginning processing with len(included_session_contexts): {len(included_session_contexts)}')        
 
-        if use_multiprocessing:
-            
+        if use_multiprocessing:            
             # # pre-2023-08-08 `multiprocessing`-based version _____________________________________________________________________ #
             # if num_processes is None:
             #     num_processes = multiprocessing.cpu_count()  # Use the number of available CPU cores
@@ -260,7 +259,7 @@ class BatchRun(HDF_SerializationMixin):
             
             # for curr_session_context in included_session_contexts:
             #     curr_session_basedir = self.session_batch_basedirs[curr_session_context]
-            #     result = pool.apply_async(run_specific_batch, (self, curr_session_context, curr_session_basedir), kwargs) # it can actually take a callback too.
+            #     result = pool.apply_async(run_specific_batch, (self.global_data_root_parent_path, curr_session_context, curr_session_basedir), kwargs) # it can actually take a callback too.
             #     results[curr_session_context] = result
 
             # pool.close()
@@ -277,7 +276,7 @@ class BatchRun(HDF_SerializationMixin):
                 num_processes = concurrent.futures.ProcessPoolExecutor().max_workers
 
             with concurrent.futures.ProcessPoolExecutor(max_workers=num_processes) as executor:
-                futures = {executor.submit(run_specific_batch, self, curr_session_context, self.session_batch_basedirs[curr_session_context], **kwargs): curr_session_context for curr_session_context in included_session_contexts}
+                futures = {executor.submit(run_specific_batch, self.global_data_root_parent_path, curr_session_context, self.session_batch_basedirs[curr_session_context], **kwargs): curr_session_context for curr_session_context in included_session_contexts}
 
                 for future in tqdm(concurrent.futures.as_completed(futures), total=len(futures)):
                     session_context = futures[future]  # get the context for this future
@@ -287,7 +286,7 @@ class BatchRun(HDF_SerializationMixin):
                     self.session_batch_outputs[session_context] = output
     
             # with concurrent.futures.ProcessPoolExecutor(max_workers=num_processes) as executor:
-            #     futures = {executor.submit(run_specific_batch, self, curr_session_context, curr_session_basedir, **kwargs): curr_session_context for curr_session_context in included_session_contexts}
+            #     futures = {executor.submit(run_specific_batch, self.global_data_root_parent_path, curr_session_context, curr_session_basedir, **kwargs): curr_session_context for curr_session_context in included_session_contexts}
 
             #     for future in tqdm(concurrent.futures.as_completed(futures), total=len(futures)):
             #         session_context = futures[future]  # get the context for this future
@@ -300,7 +299,7 @@ class BatchRun(HDF_SerializationMixin):
             #     futures = {}
             #     for curr_session_context in included_session_contexts:
             #         curr_session_basedir = self.session_batch_basedirs[curr_session_context]
-            #         future = executor.submit(run_specific_batch, self, curr_session_context, curr_session_basedir, **kwargs)
+            #         future = executor.submit(run_specific_batch, self.global_data_root_parent_path, curr_session_context, curr_session_basedir, **kwargs)
             #         futures[curr_session_context] = future
 
             #     #for session_context, future in futures.items():
@@ -316,7 +315,7 @@ class BatchRun(HDF_SerializationMixin):
                 # evaluate a single session
                 curr_session_status = self.session_batch_status[curr_session_context]
                 curr_session_basedir = self.session_batch_basedirs[curr_session_context]
-                self.session_batch_status[curr_session_context], self.session_batch_errors[curr_session_context], self.session_batch_outputs[curr_session_context] = run_specific_batch(self, curr_session_context, curr_session_basedir, **kwargs)
+                self.session_batch_status[curr_session_context], self.session_batch_errors[curr_session_context], self.session_batch_outputs[curr_session_context] = run_specific_batch(self.global_data_root_parent_path, curr_session_context, curr_session_basedir, **kwargs)
 
     # Updating ___________________________________________________________________________________________________________ #
     def change_global_root_path(self, desired_global_data_root_parent_path):
@@ -1034,7 +1033,7 @@ class BatchSessionCompletionHandler:
 
 
     ## Main function that's called with the complete pipeline:
-    def on_complete_success_execution_session(self, active_batch_run, curr_session_context, curr_session_basedir, curr_active_pipeline) -> PipelineCompletionResult:
+    def on_complete_success_execution_session(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline) -> PipelineCompletionResult:
         """ called when the execute_session completes like:
             `post_run_callback_fn_output = post_run_callback_fn(curr_session_context, curr_session_basedir, curr_active_pipeline)`
             
@@ -1255,7 +1254,7 @@ def run_diba_batch(global_data_root_parent_path: Path, execute_all:bool = False,
 
                     ## TODO: 2023-03-14 - Kick off computation?
                     if execute_all:
-                        active_batch_run.session_batch_status[curr_session_context], active_batch_run.session_batch_errors[curr_session_context], active_batch_run.session_batch_outputs[curr_session_context] = run_specific_batch(active_batch_run, curr_session_context, curr_session_basedir, post_run_callback_fn=post_run_callback_fn)
+                        active_batch_run.session_batch_status[curr_session_context], active_batch_run.session_batch_errors[curr_session_context], active_batch_run.session_batch_outputs[curr_session_context] = run_specific_batch(active_batch_run.global_data_root_parent_path, curr_session_context, curr_session_basedir, post_run_callback_fn=post_run_callback_fn)
 
                 else:
                     print(f'EXTANT SESSION! curr_session_context: {curr_session_context} curr_session_status: {curr_session_status}, curr_session_errors: {active_batch_run.session_batch_errors.get(curr_session_context, None)}')
@@ -1267,10 +1266,13 @@ def run_diba_batch(global_data_root_parent_path: Path, execute_all:bool = False,
 
 
 @function_attributes(short_name='run_specific_batch', tags=['batch', 'automated'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-03-28 04:46')
-def run_specific_batch(active_batch_run: BatchRun, curr_session_context: IdentifyingContext, curr_session_basedir: Path, force_reload=True, post_run_callback_fn:Optional[Callable]=None, **kwargs):
+def run_specific_batch(global_data_root_parent_path: Path, curr_session_context: IdentifyingContext, curr_session_basedir: Path, force_reload=True, post_run_callback_fn:Optional[Callable]=None, **kwargs):
     """ For a specific session (identified by the session context) - calls batch_load_session(...) to get the curr_active_pipeline.
             - Then calls `post_run_callback_fn(...)
-    
+            
+    History:
+        Used to take a `active_batch_run: BatchRun` as the first parameter, but to remove the coupling I replaced it.
+        
     """
     ## Extract the default session loading vars from the session context:
     basedir = curr_session_basedir
@@ -1296,20 +1298,22 @@ def run_specific_batch(active_batch_run: BatchRun, curr_session_context: Identif
     debug_print = kwargs.pop('debug_print', False)
 
     try:
-        curr_active_pipeline = batch_load_session(active_batch_run.global_data_root_parent_path, active_data_mode_name, basedir, epoch_name_includelist=epoch_name_includelist,
+        curr_active_pipeline = batch_load_session(global_data_root_parent_path, active_data_mode_name, basedir, epoch_name_includelist=epoch_name_includelist,
                                         computation_functions_name_includelist=active_computation_functions_name_includelist,
                                         saving_mode=saving_mode, force_reload=force_reload, skip_extended_batch_computations=skip_extended_batch_computations, debug_print=debug_print, fail_on_exception=fail_on_exception, **kwargs)
         
     except Exception as e:
+        ## can fail here before callback function is even called.
+        
         return (SessionBatchProgress.FAILED, f"{e}", None) # return the Failed status and the exception that occured.
 
     if post_run_callback_fn is not None:
         if fail_on_exception:
-            post_run_callback_fn_output = post_run_callback_fn(active_batch_run, curr_session_context, curr_session_basedir, curr_active_pipeline)
+            post_run_callback_fn_output = post_run_callback_fn(global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline)
         else:
             try:
                 # handle exceptions in callback:
-                post_run_callback_fn_output = post_run_callback_fn(active_batch_run, curr_session_context, curr_session_basedir, curr_active_pipeline)
+                post_run_callback_fn_output = post_run_callback_fn(global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline)
             except Exception as e:
                 print(f'error occured in post_run_callback_fn: {e}. Suppressing.')
                 post_run_callback_fn_output = None
