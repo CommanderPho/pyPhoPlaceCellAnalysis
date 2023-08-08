@@ -599,9 +599,9 @@ class BatchRun(HDF_SerializationMixin):
     srun python {python_script_path}
     """)
 
-        # Add the output files:
-        output_python_scripts.append(python_script_path)
-        output_slurm_scripts.append(slurm_script_path)
+            # Add the output files:
+            output_python_scripts.append(python_script_path)
+            output_slurm_scripts.append(slurm_script_path)
         
         # Submit the SLURM job
         # os.system(f'sbatch {slurm_script_path}')
