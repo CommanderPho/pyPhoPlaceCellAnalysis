@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import List, Dict, Optional, Union, Callable
 import numpy as np
 import pandas as pd
+from pyphocorehelpers.print_helpers import CapturedException
 import tables as tb
 from copy import deepcopy
 import multiprocessing
@@ -1370,7 +1371,6 @@ def run_specific_batch(global_data_root_parent_path: Path, curr_session_context:
         
     """
 
-    batch_processing_session_task_identifier:str = build_batch_processing_session_task_identifier(curr_session_context)
     curr_task_logger = build_batch_task_logger(session_context=curr_session_context) # create logger , file_logging_dir=
     _line_sweep = '=========================='
     ## REPLACES THE `print` function within this scope
@@ -1420,9 +1420,14 @@ def run_specific_batch(global_data_root_parent_path: Path, curr_session_context:
         
     except Exception as e:
         ## can fail here before callback function is even called.
-        new_print(f'exception occured: {e}')
+        exception_info = sys.exc_info()
+        an_error = CapturedException(e, exception_info, curr_active_pipeline)
+        new_print(f'exception occured: {an_error}')
+        if fail_on_exception:
+            raise e
         new_print(f'"{_line_sweep} END BATCH {_line_sweep}\n\n')
-        return (SessionBatchProgress.FAILED, f"{e}", None) # return the Failed status and the exception that occured.
+        
+        return (SessionBatchProgress.FAILED, f"{an_error}", None) # return the Failed status and the exception that occured.
     # finally:
     #     print = _backup_print # restore default print, I think it's okay because it's only used in this context.
 
@@ -1434,7 +1439,9 @@ def run_specific_batch(global_data_root_parent_path: Path, curr_session_context:
                 # handle exceptions in callback:
                 post_run_callback_fn_output = post_run_callback_fn(global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline)
             except Exception as e:
-                new_print(f'error occured in post_run_callback_fn: {e}. Suppressing.')
+                exception_info = sys.exc_info()
+                an_error = CapturedException(e, exception_info, curr_active_pipeline)
+                new_print(f'error occured in post_run_callback_fn: {an_error}. Suppressing.')
                 post_run_callback_fn_output = None
     #         finally:
     #             print = _backup_print # restore default print, I think it's okay because it's only used in this context.
