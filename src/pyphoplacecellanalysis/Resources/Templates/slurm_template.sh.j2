@@ -69,5 +69,7 @@ module load globus-cli
 	/home/halechr/repos/Spike3D/.venv/bin:/home/halechr/.local/bin:/home/halechr/bin
 	source "$( poetry env list --full-path | grep Activated | cut -d' ' -f1 )/bin/activate"
 #}
-source /home/halechr/repos/Spike3D/.venv/bin/bin/activate
-srun /home/halechr/repos/Spike3D/.venv/bin/python {{ python_script_path }}
+source '/home/halechr/repos/Spike3D/.venv/bin/bin/activate'
+srun '/home/halechr/repos/Spike3D/.venv/bin/python' '{{ python_script_path }}'
+
+
