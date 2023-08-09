@@ -1,6 +1,7 @@
 import sys
 import os
-import pkg_resources
+import pkg_resources # for Slurm templating
+from jinja2 import Environment, FileSystemLoader # for Slurm templating
 from datetime import datetime, timedelta
 import pathlib
 from pathlib import Path
@@ -545,7 +546,7 @@ class BatchRun(HDF_SerializationMixin):
         output_directory
         
         """
-        from jinja2 import Environment, FileSystemLoader
+        
         # Set up Jinja2 environment
         template_path = pkg_resources.resource_filename('pyphoplacecellanalysis.Resources', 'Templates')
         # template_path = Path('Resources/Templates/slurm_template.sh.j2')
