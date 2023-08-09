@@ -67,8 +67,7 @@ trackMembershipTypesEnum = tb.Enum(trackMembershipTypesList)
 
 @define(slots=False)
 class H5Loader:
-    """
-    H5Loader class for loading and consolidating .h5 files
+    """ H5Loader class for loading and consolidating .h5 files
     Usage:
         from pyphoplacecellanalysis.General.Batch.AcrossSessionResults import H5Loader
         session_group_keys: List[str] = [("/" + a_ctxt.get_description(separator="/", include_property_names=False)) for a_ctxt in session_identifiers] # 'kdiba/gor01/one/2006-6-08_14-26-15'
