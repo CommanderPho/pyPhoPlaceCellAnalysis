@@ -1,5 +1,6 @@
 import sys
 import os
+import pkg_resources
 from datetime import datetime, timedelta
 import pathlib
 from pathlib import Path
@@ -544,6 +545,17 @@ class BatchRun(HDF_SerializationMixin):
         output_directory
         
         """
+        from jinja2 import Environment, FileSystemLoader
+        # Set up Jinja2 environment
+        template_path = pkg_resources.resource_filename('pyphoplacecellanalysis.Resources', 'Templates')
+        # template_path = Path('Resources/Templates/slurm_template.sh.j2')
+        env = Environment(loader=FileSystemLoader(template_path))
+        python_template = env.get_template('python_template.py.j2')
+        slurm_template = env.get_template('slurm_template.sh.j2')
+
+        'slurm_python_template.py.j2'
+
+
         output_python_scripts = []
         output_slurm_scripts = []
         # Make sure the output directory exists
@@ -555,26 +567,30 @@ class BatchRun(HDF_SerializationMixin):
             # Create the Python script
             python_script_path = os.path.join(output_directory, f'run_{curr_session_context}.py')
             with open(python_script_path, 'w') as script_file:
-                script_file.write(f"""
-    import run_specific_batch
-    run_specific_batch(self.global_data_root_parent_path, '{curr_session_context}', '{curr_session_basedir}', **kwargs)
-    """)
+                script_content = python_template.render(global_data_root_parent_path=self.global_data_root_parent_path,
+                                                        curr_session_context=curr_session_context,
+                                                        curr_session_basedir=curr_session_basedir)
+                script_file.write(script_content)
+            
 
             # Create the SLURM script
             slurm_script_path = os.path.join(output_directory, f'run_{curr_session_context}.sh')
             with open(slurm_script_path, 'w') as script_file:
-                script_file.write(f"""
-    #!/bin/bash
-    #SBATCH --job-name=job_{curr_session_context}
-    #SBATCH --output=out_{curr_session_context}.txt
-    #SBATCH --error=err_{curr_session_context}.txt
-    #SBATCH --ntasks=1
-    #SBATCH --time=01:00:00
-    #SBATCH --mem-per-cpu=2000
+                script_content = output_slurm_scripts.render(curr_session_context=curr_session_context, python_script_path=python_script_path)
+                script_file.write(script_content)
 
-    module load python/3.8.0
-    srun python {python_script_path}
-    """)
+    #             script_file.write(f"""
+    # #!/bin/bash
+    # #SBATCH --job-name=job_{curr_session_context}
+    # #SBATCH --output=out_{curr_session_context}.txt
+    # #SBATCH --error=err_{curr_session_context}.txt
+    # #SBATCH --ntasks=1
+    # #SBATCH --time=01:00:00
+    # #SBATCH --mem-per-cpu=2000
+
+    # module load python/3.8.0
+    # srun python {python_script_path}
+    # """)
 
             # Add the output files:
             output_python_scripts.append(python_script_path)
