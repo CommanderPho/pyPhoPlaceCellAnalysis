@@ -2,6 +2,8 @@ import sys
 import os
 import pkg_resources # for Slurm templating
 from jinja2 import Environment, FileSystemLoader # for Slurm templating
+import logging
+import socket # for getting hostname in `build_batch_processing_session_task_identifier`
 from datetime import datetime, timedelta
 import pathlib
 from pathlib import Path
@@ -46,12 +48,69 @@ from pyphoplacecellanalysis.General.Batch.PhoDiba2023Paper import main_complete_
 from neuropy.core.user_annotations import UserAnnotationsManager
 from pyphoplacecellanalysis.General.Batch.AcrossSessionResults import AcrossSessionsResults, AcrossSessionsVisualizations
 
+
 known_global_data_root_parent_paths = [Path(r'W:\Data'), Path(r'/media/MAX/Data'), Path(r'/Volumes/MoverNew/data'), Path(r'/home/halechr/turbo/Data'), Path(r'/nfs/turbo/umms-kdiba/Data')]
 
 def get_file_str_if_file_exists(v:Path)->str:
     """ returns the string representation of the resolved file if it exists, or the empty string if not """
     return (str(v.resolve()) if v.exists() else '')
 
+def build_batch_processing_session_task_identifier(session_context: IdentifyingContext) -> str:
+    """ Builds an identifier string for logging task progress like 'LNX00052.kdiba.gor01.two.2006-6-07_16-40-19' """
+    import socket
+    hostname: str = socket.gethostname() # get the system's hostname
+    # print(f"Hostname: {hostname}") # Hostname: LNX00052
+    session_component: str = session_context.get_description(separator='.') # 'kdiba.gor01.two.2006-6-07_16-40-19'
+    return f"{hostname}.{session_component}"
+
+def build_batch_processing_session_task_logger(session_context: IdentifyingContext, additional_suffix:Optional[str]=None, file_logging_dir=Path('EXTERNAL/TESTING/Logging'), debug_print=False):
+    """ Builds a logger for a specific module that logs to console output and a file. 
+    History:
+        Built from `pyphocorehelpers.print_helpers.build_module_logger` for task building
+    
+    Testing:
+    
+        module_logger.debug (f'DEBUG: module_logger: "com.PhoHale.Spike3D.notebook"')
+        module_logger.info(f'INFO: module_logger: "com.PhoHale.Spike3D.notebook"')
+        module_logger.warning(f'WARNING: module_logger: "com.PhoHale.Spike3D.notebook"')
+        module_logger.error(f'ERROR: module_logger: "com.PhoHale.Spike3D.notebook"')
+        module_logger.critical(f'CRITICAL: module_logger: "com.PhoHale.Spike3D.notebook"')
+        module_logger.exception(f'EXCEPTION: module_logger: "com.PhoHale.Spike3D.notebook"')
+
+    """
+    # logFormatter = logging.Formatter("%(asctime)s [%(threadName)-12.12s] %(name)s [%(levelname)-5.5s]  %(message)s")
+    logFormatter = logging.Formatter("%(relativeCreated)d %(name)s]  [%(levelname)-5.5s]  %(message)s")
+    
+    batch_processing_session_task_identifier:str = build_batch_processing_session_task_identifier(session_context)
+    batch_task_logger = logging.getLogger(f'com.PhoHale.PhoPy3DPositionAnalyis.Batch.runBatch.run_specific_batch.{batch_processing_session_task_identifier}') # create logger
+    print(f'build_module_logger(module_name="{module_name}"):')
+    if debug_print:
+        print(f'\t module_logger.handlers: {batch_task_logger.handlers}')
+    batch_task_logger.handlers = []
+    # module_logger.removeHandler()
+
+    if file_logging_dir is not None:
+        # file logging enabled:
+        # Create logging directory if it doesn't exist
+        file_logging_dir.mkdir(parents=True, exist_ok=True)
+
+        # file_logging_dir = Path('EXTERNAL/TESTING/Logging') # 'C:\Users\pho\repos\PhoPy3DPositionAnalysis2021\EXTERNAL\TESTING\Logging'
+        module_logging_path = file_logging_dir.joinpath(f'debug_{batch_task_logger.name}.log') # module_logger.name # 'com.PhoHale.Spike3D.notebook'
+
+        # File Logging:    
+        print(f'\t Batch Task logger {batch_task_logger.name} has file logging enabled and will log to {str(module_logging_path)}')
+        fileHandler = logging.FileHandler(module_logging_path)
+        fileHandler.setFormatter(logFormatter)
+        batch_task_logger.addHandler(fileHandler)
+
+    # consoleHandler = logging.StreamHandler(sys.stdout)
+    # consoleHandler.setFormatter(logFormatter)
+    # # module_logger.addHandler(consoleHandler)
+
+    # General Logger Setup:
+    batch_task_logger.setLevel(logging.DEBUG)
+    batch_task_logger.info(f'==========================================================================================\n========== Module Logger INIT "{batch_task_logger.name}" ==============================')
+    return batch_task_logger
 
 
 
