@@ -602,21 +602,24 @@ class BatchRun(HDF_SerializationMixin):
 
         return session_identifiers, pkl_output_paths, hdf5_output_paths
 
-    def generate_batch_slurm_jobs(self, included_session_contexts, output_directory):
+    def generate_batch_slurm_jobs(self, included_session_contexts, output_directory, use_separate_run_directories:bool=True):
         """
 
         output_directory
-        
+        use_separate_run_directories:bool = True - If True, separate directories are made in `output_directory` containing each script for all sessions.
+
+
+        Usage:
+            ## Build Slurm Scripts:
+            global_batch_run.generate_batch_slurm_jobs(included_session_contexts, Path('output/generated_slurm_scripts/').resolve(), use_separate_run_directories=True)
+
         """
         
         # Set up Jinja2 environment
         template_path = pkg_resources.resource_filename('pyphoplacecellanalysis.Resources', 'Templates')
-        # template_path = Path('Resources/Templates/slurm_template.sh.j2')
         env = Environment(loader=FileSystemLoader(template_path))
-        python_template = env.get_template('python_template.py.j2')
+        python_template = env.get_template('slurm_python_template.py.j2')
         slurm_template = env.get_template('slurm_template.sh.j2')
-
-        'slurm_python_template.py.j2'
 
 
         output_python_scripts = []
@@ -626,41 +629,31 @@ class BatchRun(HDF_SerializationMixin):
         
         for curr_session_context in included_session_contexts:
             curr_session_basedir = self.session_batch_basedirs[curr_session_context]
+            if use_separate_run_directories:
+                curr_batch_script_rundir = os.path.join(output_directory, f"run_{curr_session_context}")
+                os.makedirs(curr_batch_script_rundir, mode=755, exist_ok=True)
+            else:
+                curr_batch_script_rundir = output_directory
 
             # Create the Python script
-            python_script_path = os.path.join(output_directory, f'run_{curr_session_context}.py')
+            python_script_path = os.path.join(curr_batch_script_rundir, f'run_{curr_session_context}.py')
             with open(python_script_path, 'w') as script_file:
                 script_content = python_template.render(global_data_root_parent_path=self.global_data_root_parent_path,
-                                                        curr_session_context=curr_session_context,
+                                                        curr_session_context=curr_session_context.get_initialization_code_string().strip("'"),
                                                         curr_session_basedir=curr_session_basedir)
                 script_file.write(script_content)
             
 
             # Create the SLURM script
-            slurm_script_path = os.path.join(output_directory, f'run_{curr_session_context}.sh')
+            slurm_script_path = os.path.join(curr_batch_script_rundir, f'run_{curr_session_context}.sh')
             with open(slurm_script_path, 'w') as script_file:
-                script_content = output_slurm_scripts.render(curr_session_context=curr_session_context, python_script_path=python_script_path)
+                script_content = slurm_template.render(curr_session_context=f"{curr_session_context}", python_script_path=python_script_path, curr_batch_script_rundir=curr_batch_script_rundir)
                 script_file.write(script_content)
-
-    #             script_file.write(f"""
-    # #!/bin/bash
-    # #SBATCH --job-name=job_{curr_session_context}
-    # #SBATCH --output=out_{curr_session_context}.txt
-    # #SBATCH --error=err_{curr_session_context}.txt
-    # #SBATCH --ntasks=1
-    # #SBATCH --time=01:00:00
-    # #SBATCH --mem-per-cpu=2000
-
-    # module load python/3.8.0
-    # srun python {python_script_path}
-    # """)
 
             # Add the output files:
             output_python_scripts.append(python_script_path)
             output_slurm_scripts.append(slurm_script_path)
         
-        # Submit the SLURM job
-        # os.system(f'sbatch {slurm_script_path}')
         return included_session_contexts, output_python_scripts, output_slurm_scripts
 
     # HDFMixin Conformances ______________________________________________________________________________________________ #

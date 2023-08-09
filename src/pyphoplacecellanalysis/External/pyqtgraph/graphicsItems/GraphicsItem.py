@@ -499,7 +499,7 @@ class GraphicsItem(object):
                                  ('sigTransformChanged', self.viewTransformChanged), 
                                  ('sigDeviceTransformChanged', self.viewTransformChanged)]:
                 try:
-                    getattr(oldView, signal).disconnect(slot)
+                    getattr(oldView, signal).disconnect(slot)  #@IgnoreException 
                 except (TypeError, AttributeError, RuntimeError):
                     # TypeError and RuntimeError are from pyqt and pyside, respectively
                     pass

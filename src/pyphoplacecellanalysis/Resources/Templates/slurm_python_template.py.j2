@@ -1,2 +1,9 @@
-import run_specific_batch
-run_specific_batch('{{ global_data_root_parent_path }}', '{{ curr_session_context }}', '{{ curr_session_basedir }}', **kwargs)
+from pathlib import Path
+from typing import Optional, List, Dict
+
+from neuropy.utils.result_context import IdentifyingContext
+from pyphoplacecellanalysis.General.Batch.runBatch import run_specific_batch, BatchRun, BatchResultDataframeAccessor, run_diba_batch, BatchComputationProcessOptions, BatchSessionCompletionHandler
+
+
+run_status, run_errors, run_outputs = run_specific_batch(r'{{ global_data_root_parent_path }}', {{ curr_session_context }}, r'{{ curr_session_basedir }}')
+print(f'finished run: {run_status}, errors: {run_errors}, outputs: {run_outputs}')
