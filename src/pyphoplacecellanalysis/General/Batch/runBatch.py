@@ -63,10 +63,10 @@ def build_batch_processing_session_task_identifier(session_context: IdentifyingC
     session_component: str = session_context.get_description(separator='.') # 'kdiba.gor01.two.2006-6-07_16-40-19'
     return f"{hostname}.{session_component}"
 
-def build_batch_processing_session_task_logger(session_context: IdentifyingContext, additional_suffix:Optional[str]=None, file_logging_dir=Path('EXTERNAL/TESTING/Logging'), debug_print=False):
+def build_batch_task_logger(session_context: IdentifyingContext, additional_suffix:Optional[str]=None, file_logging_dir=Path('EXTERNAL/TESTING/Logging'), debug_print=False):
     """ Builds a logger for a specific module that logs to console output and a file. 
     History:
-        Built from `pyphocorehelpers.print_helpers.build_module_logger` for task building
+        Built from `pyphocorehelpers.print_helpers.build_batch_task_logger` for task building
     
     Testing:
     
@@ -77,17 +77,20 @@ def build_batch_processing_session_task_logger(session_context: IdentifyingConte
         module_logger.critical(f'CRITICAL: module_logger: "com.PhoHale.Spike3D.notebook"')
         module_logger.exception(f'EXCEPTION: module_logger: "com.PhoHale.Spike3D.notebook"')
 
+    batch_task_logger = build_batch_task_logger()
     """
     # logFormatter = logging.Formatter("%(asctime)s [%(threadName)-12.12s] %(name)s [%(levelname)-5.5s]  %(message)s")
     logFormatter = logging.Formatter("%(relativeCreated)d %(name)s]  [%(levelname)-5.5s]  %(message)s")
     
     batch_processing_session_task_identifier:str = build_batch_processing_session_task_identifier(session_context)
+    if additional_suffix is not None:
+        batch_processing_session_task_identifier = f"{batch_processing_session_task_identifier}.{additional_suffix.lstrip('.')}"
     batch_task_logger = logging.getLogger(f'com.PhoHale.PhoPy3DPositionAnalyis.Batch.runBatch.run_specific_batch.{batch_processing_session_task_identifier}') # create logger
-    print(f'build_module_logger(module_name="{module_name}"):')
+    print(f'build_batch_task_logger(module_name="{batch_processing_session_task_identifier}"):')
     if debug_print:
-        print(f'\t module_logger.handlers: {batch_task_logger.handlers}')
+        print(f'\t batch_task_logger.handlers: {batch_task_logger.handlers}')
     batch_task_logger.handlers = []
-    # module_logger.removeHandler()
+    # batch_task_logger.removeHandler()
 
     if file_logging_dir is not None:
         # file logging enabled:
@@ -95,7 +98,7 @@ def build_batch_processing_session_task_logger(session_context: IdentifyingConte
         file_logging_dir.mkdir(parents=True, exist_ok=True)
 
         # file_logging_dir = Path('EXTERNAL/TESTING/Logging') # 'C:\Users\pho\repos\PhoPy3DPositionAnalysis2021\EXTERNAL\TESTING\Logging'
-        module_logging_path = file_logging_dir.joinpath(f'debug_{batch_task_logger.name}.log') # module_logger.name # 'com.PhoHale.Spike3D.notebook'
+        module_logging_path = file_logging_dir.joinpath(f'debug_{batch_task_logger.name}.log') # batch_task_logger.name # 'com.PhoHale.Spike3D.notebook'
 
         # File Logging:    
         print(f'\t Batch Task logger {batch_task_logger.name} has file logging enabled and will log to {str(module_logging_path)}')
@@ -105,7 +108,7 @@ def build_batch_processing_session_task_logger(session_context: IdentifyingConte
 
     # consoleHandler = logging.StreamHandler(sys.stdout)
     # consoleHandler.setFormatter(logFormatter)
-    # # module_logger.addHandler(consoleHandler)
+    # # batch_task_logger.addHandler(consoleHandler)
 
     # General Logger Setup:
     batch_task_logger.setLevel(logging.DEBUG)
@@ -1372,11 +1375,32 @@ def run_specific_batch(global_data_root_parent_path: Path, curr_session_context:
         Used to take a `active_batch_run: BatchRun` as the first parameter, but to remove the coupling I replaced it.
         
     """
+
+    batch_processing_session_task_identifier:str = build_batch_processing_session_task_identifier(curr_session_context)
+    curr_task_logger = build_batch_task_logger(session_context=curr_session_context) # create logger , file_logging_dir=
+    _line_sweep = '=========================='
+    ## REPLACES THE `print` function within this scope
+    def new_print(*args):
+        # Call both regular print and logger.info
+        print(*args)
+        curr_task_logger.info(*args)
+
+    # Replace the print function within this scope
+    # _backup_print = print
+    # print = new_print
+
+
+    new_print(f'{_line_sweep} runBatch STARTING {_line_sweep}')
+    new_print(f'\tglobal_data_root_parent_path: {str(global_data_root_parent_path)}')
+    new_print(f'\tsession_context: {curr_session_context}')
+    new_print(f'\tsession_basedir: {str(curr_session_basedir)}')    
+    new_print('__________________________________________________________________')
+
     ## Extract the default session loading vars from the session context:
     basedir = curr_session_basedir
-    print(f'basedir: {str(basedir)}')
+    new_print(f'basedir: {str(basedir)}')
     active_data_mode_name = curr_session_context.format_name
-    print(f'active_data_mode_name: {active_data_mode_name}')
+    new_print(f'active_data_mode_name: {active_data_mode_name}')
     # post_run_callback_fn = kwargs.pop('post_run_callback_fn', None)
     post_run_callback_fn_output = None
     
@@ -1402,8 +1426,11 @@ def run_specific_batch(global_data_root_parent_path: Path, curr_session_context:
         
     except Exception as e:
         ## can fail here before callback function is even called.
-
+        new_print(f'exception occured: {e}')
+        new_print(f'"{_line_sweep} END BATCH {_line_sweep}\n\n')
         return (SessionBatchProgress.FAILED, f"{e}", None) # return the Failed status and the exception that occured.
+    # finally:
+    #     print = _backup_print # restore default print, I think it's okay because it's only used in this context.
 
     if post_run_callback_fn is not None:
         if fail_on_exception:
@@ -1413,9 +1440,13 @@ def run_specific_batch(global_data_root_parent_path: Path, curr_session_context:
                 # handle exceptions in callback:
                 post_run_callback_fn_output = post_run_callback_fn(global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline)
             except Exception as e:
-                print(f'error occured in post_run_callback_fn: {e}. Suppressing.')
+                new_print(f'error occured in post_run_callback_fn: {e}. Suppressing.')
                 post_run_callback_fn_output = None
-                
+    #         finally:
+    #             print = _backup_print # restore default print, I think it's okay because it's only used in this context.
+
+    # print = _backup_print # restore default print, I think it's okay because it's only used in this context.
+    new_print(f'"{_line_sweep} END BATCH {_line_sweep}\n\n')
     return (SessionBatchProgress.COMPLETED, None, post_run_callback_fn_output) # return the success status and None to indicate that no error occured.
 
 
