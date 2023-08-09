@@ -602,6 +602,7 @@ class BatchRun(HDF_SerializationMixin):
 
         return session_identifiers, pkl_output_paths, hdf5_output_paths
 
+    @function_attributes(short_name=None, tags=['slurm','jobs','files','batch'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-08-09 19:14', related_items=[])
     def generate_batch_slurm_jobs(self, included_session_contexts, output_directory, use_separate_run_directories:bool=True):
         """
 
