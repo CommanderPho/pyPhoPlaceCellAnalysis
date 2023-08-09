@@ -1,7 +1,11 @@
 from pathlib import Path
 from typing import Optional, List, Dict
 
+# NeuroPy (Diba Lab Python Repo) Loading
+from neuropy.core.session.Formats.BaseDataSessionFormats import DataSessionFormatRegistryHolder
+from neuropy.core.session.Formats.Specific.KDibaOldDataSessionFormat import KDibaOldDataSessionFormatRegisteredClass
 from neuropy.utils.result_context import IdentifyingContext
+
 from pyphoplacecellanalysis.General.Batch.runBatch import run_specific_batch, BatchRun, BatchResultDataframeAccessor, run_diba_batch, BatchComputationProcessOptions, BatchSessionCompletionHandler
 
 

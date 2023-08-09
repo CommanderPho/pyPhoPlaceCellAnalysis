@@ -625,13 +625,13 @@ class BatchRun(HDF_SerializationMixin):
         output_python_scripts = []
         output_slurm_scripts = []
         # Make sure the output directory exists
-        os.makedirs(output_directory, mode=755, exist_ok=True)
+        os.makedirs(output_directory, exist_ok=True)
         
         for curr_session_context in included_session_contexts:
             curr_session_basedir = self.session_batch_basedirs[curr_session_context]
             if use_separate_run_directories:
                 curr_batch_script_rundir = os.path.join(output_directory, f"run_{curr_session_context}")
-                os.makedirs(curr_batch_script_rundir, mode=755, exist_ok=True)
+                os.makedirs(curr_batch_script_rundir, exist_ok=True)
             else:
                 curr_batch_script_rundir = output_directory
 
