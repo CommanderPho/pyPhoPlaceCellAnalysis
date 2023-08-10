@@ -170,6 +170,17 @@ class RegisteredOutputsMixin:
         self.registered_output_files = DynamicParameters()
                 
 
+    @property
+    def outputs_specifier(self):
+        """The outputs property."""
+        if self._outputs_specifier is None:
+            """ initialize if needed. """
+            self._outputs_specifier = DynamicParameters()
+        return self._outputs_specifier
+    @outputs_specifier.setter
+    def outputs_specifier(self, value):
+        self._outputs_specifier = value
+    
 
 # ____________________________________________________________________________________________________________________ #
 
@@ -181,14 +192,16 @@ class RegisteredOutputsMixin:
 # ==================================================================================================================== #
 @dataclass
 class InputPipelineStage(LoadableInput, BaseNeuropyPipelineStage):
-    """Docstring for InputPipelineStage.
+    """ The first stage of the NeuropyPipeline. Allows specifying the inputs that will be used.
     
-    post_load_functions: List[Callable] a list of Callables that accept the loaded session as input and return the potentially modified session as output.
+        post_load_functions: List[Callable] a list of Callables that accept the loaded session as input and return the potentially modified session as output.
     """
     identity: PipelineStage = PipelineStage.Input
     basedir: Path = Path("")
     load_function: Callable = None
     post_load_functions: List[Callable] = dataclasses.field(default_factory=list)
+
+
 # ==================================================================================================================== #
 # PIPELINE MIXIN                                                                                                       #
 # ==================================================================================================================== #
