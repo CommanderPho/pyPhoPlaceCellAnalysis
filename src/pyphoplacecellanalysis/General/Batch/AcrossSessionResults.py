@@ -66,10 +66,10 @@ trackMembershipTypesEnum = tb.Enum(trackMembershipTypesList)
 
 
 @define(slots=False)
-class H5Loader:
+class H5ExternalLinkBuilder:
     """ H5Loader class for loading and consolidating .h5 files
     Usage:
-        from pyphoplacecellanalysis.General.Batch.AcrossSessionResults import H5Loader
+        from pyphoplacecellanalysis.General.Batch.AcrossSessionResults import H5ExternalLinkBuilder
         session_group_keys: List[str] = [("/" + a_ctxt.get_description(separator="/", include_property_names=False)) for a_ctxt in session_identifiers] # 'kdiba/gor01/one/2006-6-08_14-26-15'
         neuron_identities_table_keys = [f"{session_group_key}/neuron_identities/table" for session_group_key in session_group_keys]
         a_loader = H5Loader(file_list=hdf5_output_paths, table_key_list=neuron_identities_table_keys)
