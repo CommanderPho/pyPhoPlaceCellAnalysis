@@ -25,7 +25,7 @@ from pyphoplacecellanalysis.General.Pipeline.Stages.Loading import LoadableInput
 from pyphoplacecellanalysis.General.Pipeline.Stages.Loading import loadData # used for `load_pickled_global_computation_results`
 from pyphoplacecellanalysis.General.Pipeline.Stages.Loading import saveData # used for `save_global_computation_results`
 from pyphoplacecellanalysis.General.Model.ComputationResults import ComputationResult
-from pyphoplacecellanalysis.General.Mixins.ExportHelpers import FigureOutputManager, FigureOutputLocation, ContextToPathMode
+from pyphoplacecellanalysis.General.Mixins.ExportHelpers import FileOutputManager, FigureOutputLocation, ContextToPathMode
 
 import pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions
 # from General.Pipeline.Stages.ComputationFunctions import ComputationFunctionRegistryHolder # should include ComputationFunctionRegistryHolder and all specifics
@@ -940,20 +940,25 @@ class PipelineWithComputedPipelineStageMixin:
 
         # print(f'\tpost keys: {list(self.active_configs.keys())}')
 
-    def get_output_path(self) -> Path:
-        """ returns the appropriate output path to store the outputs for this session. Usually '$session_folder/outputs/' """
-        return self.sess.get_output_path()
-
-
     def get_session_context(self) -> IdentifyingContext:
         """ returns the context of the unfiltered session (self.sess) """
         return self.sess.get_context()
 
+
+
+    def get_output_path(self) -> Path:
+        """ returns the appropriate output path to store the outputs for this session. Usually '$session_folder/outputs/' """
+        if self.outputs_specifier is not None:
+            return self.outputs_specifier.get_output_path()
+        else:
+            return self.sess.get_output_path()
+
+
     # @property
-    def get_output_manager(self) -> FigureOutputManager:
-        """ returns the FigureOutputManager that specifies where outputs are stored. """
-        # return FigureOutputManager(figure_output_location=FigureOutputLocation.DAILY_PROGRAMMATIC_OUTPUT_FOLDER, context_to_path_mode=ContextToPathMode.GLOBAL_UNIQUE)
-        return FigureOutputManager(figure_output_location=FigureOutputLocation.DAILY_PROGRAMMATIC_OUTPUT_FOLDER, context_to_path_mode=ContextToPathMode.HIERARCHY_UNIQUE)
+    def get_output_manager(self) -> FileOutputManager:
+        """ returns the FileOutputManager that specifies where outputs are stored. """
+        # return FileOutputManager(figure_output_location=FigureOutputLocation.DAILY_PROGRAMMATIC_OUTPUT_FOLDER, context_to_path_mode=ContextToPathMode.GLOBAL_UNIQUE)
+        return FileOutputManager(figure_output_location=FigureOutputLocation.DAILY_PROGRAMMATIC_OUTPUT_FOLDER, context_to_path_mode=ContextToPathMode.HIERARCHY_UNIQUE)
 
     def get_computation_times(self, debug_print=False):
         return self.stage.get_computation_times(debug_print=debug_print)
@@ -991,7 +996,11 @@ class PipelineWithComputedPipelineStageMixin:
         # if len(special_designator_suffix) > 0:
         desired_global_pickle_filename = f"global_computation_results{special_designator_suffix}.pkl" # 'global_computation_results_withDirectionalLaps.pkl'
         # desired_global_pickle_filename = f'global_computation_results.pkl' # old way
-        return self.get_output_path().joinpath(desired_global_pickle_filename).resolve()
+        if self.outputs_specifier is not None:
+            return self.outputs_specifier.get_global_computations_output_path()
+        else:
+            return self.get_output_path().joinpath(desired_global_pickle_filename).resolve()
+
 
     ## Global Computation Result Persistance Hacks:
     def save_global_computation_results(self, override_global_pickle_filename='global_computation_results.pkl'):

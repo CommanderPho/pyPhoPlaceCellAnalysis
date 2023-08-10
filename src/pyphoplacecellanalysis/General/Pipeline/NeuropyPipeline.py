@@ -10,7 +10,7 @@ import sys
 from pathlib import Path
 import shutil # for _backup_extant_file(...)
 
-from typing import Callable, List
+from typing import Callable, List, Optional
 import inspect # used for filter_sessions(...)'s inspect.getsource to compare filters:
 
 import numpy as np
@@ -78,6 +78,30 @@ class PipelineSavingScheme(ExtendedEnum):
         return cls.build_member_value_dict([False, True, True])
 
 
+@custom_define(slots=False)
+class OutputsSpecifier:
+    """ outputs_specifier: a class that specifies how to save outputs from a pipeline. """
+    output_basepath: Path # path to write out to
+
+    def get_output_path(self) -> Path:
+        """ returns the appropriate output path to store the outputs for this session. Usually '$session_folder/outputs/' """
+        return self.output_basepath.joinpath('output').resolve()
+
+
+    # def get_global_computations_output_path(self) -> Path:
+    #     """ could be customized to redirect global computations outputs """
+    #     return self.output_basepath.joinpath('output').resolve()
+
+    def get_global_computations_output_path(self) -> Path:
+        """ could be customized to redirect global computations outputs """
+        return self.output_basepath.joinpath('output').resolve()
+
+    # @property
+    # def global_computations_basepath(self) -> Path:
+    #     return self.output_basepath.joinpath('output').resolve()
+
+
+
 
 class LoadedObjectPersistanceState(object):
     """Keeps track of the persistance state for an object that has been loaded from disk to keep track of how the object's state relates to the version on disk (the persisted version) """
@@ -123,7 +147,7 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
     sigStageChanged = QtCore.Signal(object) # Emitted when the pipeline stage changes
     
     
-    def __init__(self, name="pipeline", session_data_type='kdiba', basedir=None, load_function: Callable = None, post_load_functions: List[Callable] = [], parent=None, **kwargs):
+    def __init__(self, name="pipeline", session_data_type='kdiba', basedir=None, outputs_specifier: Optional[OutputsSpecifier]=None, load_function: Callable = None, post_load_functions: List[Callable] = [], parent=None, **kwargs):
         """ 
         Captures:
             pipeline_module_logger (from module)
@@ -139,9 +163,14 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
         
         self._plot_object = None
         self._registered_output_files = None # for RegisteredOutputsMixin
-
+        
         _stage_changed_connection = self.sigStageChanged.connect(self.on_stage_changed)
         self.set_input(name=name, session_data_type=session_data_type, basedir=basedir, load_function=load_function, post_load_functions=post_load_functions)
+
+        if outputs_specifier is None:
+            outputs_specifier = OutputsSpecifier(basedir)
+        self._outputs_specifier = outputs_specifier
+
 
 
     def on_stage_changed(self, new_stage):
@@ -149,7 +178,7 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
         self.logger.info(f'NeuropyPipeline.on_stage_changed(new_stage="{new_stage.identity}")')
 
     @classmethod
-    def init_from_known_data_session_type(cls, type_name: str, known_type_properties: KnownDataSessionTypeProperties, override_basepath=None, override_post_load_functions=None):
+    def init_from_known_data_session_type(cls, type_name: str, known_type_properties: KnownDataSessionTypeProperties, override_basepath=None, outputs_specifier: Optional[OutputsSpecifier]=None, override_post_load_functions=None):
         """ Initializes a new pipeline from a known data session type (e.g. 'bapun' or 'kdiba', which loads some defaults) """
         if override_basepath is not None:
             basepath = override_basepath
@@ -160,17 +189,18 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
         else:
             post_load_functions = known_type_properties.post_load_functions
             
-        return cls(name=f'{type_name}_pipeline', session_data_type=type_name, basedir=basepath,
+        return cls(name=f'{type_name}_pipeline', session_data_type=type_name, basedir=basepath, outputs_specifier=outputs_specifier,
             load_function=known_type_properties.load_function, post_load_functions=post_load_functions)
 
     # Load/Save Persistance and Comparison _______________________________________________________________________________ #
     @classmethod
-    def try_init_from_saved_pickle_or_reload_if_needed(cls, type_name: str, known_type_properties: KnownDataSessionTypeProperties, override_basepath=None, override_post_load_functions=None, force_reload=False, active_pickle_filename='loadedSessPickle.pkl', skip_save_on_initial_load=True, progress_print=True, debug_print=False):
+    def try_init_from_saved_pickle_or_reload_if_needed(cls, type_name: str, known_type_properties: KnownDataSessionTypeProperties, override_basepath=None, outputs_specifier: Optional[OutputsSpecifier]=None, override_post_load_functions=None, force_reload=False, active_pickle_filename='loadedSessPickle.pkl', skip_save_on_initial_load=True, progress_print=True, debug_print=False):
         """ After a session has completed the loading stage prior to filtering (after all objects are built and such), it can be pickled to a file to drastically speed up future loading requests (as would have to be done when the notebook is restarted, etc) 
         Tries to find an extant pickled pipeline, and if it exists it loads and returns that. Otherwise, it loads/rebuilds the pipeline from scratch (from the initial raw data files) and then saves a pickled copy out to disk to speed up future loading attempts.
         
         force_reload: bool - If True, the pipeline isn't attempted to be loaded and instead is created fresh each time
         # skip_save_on_initial_load: Bool - if True, the resultant pipeline is not saved to the pickle when done (allowing more computations before saving)
+        override_output_basepath: specifies an alternative output folder that things are saved to.
         
         """
         def _ensure_unpickled_pipeline_up_to_date(curr_active_pipeline, active_data_mode_name, basedir, desired_time_variable_name, debug_print=False):
@@ -289,7 +319,7 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
             # Otherwise load failed, perform the fallback computation
             if debug_print:
                 print(f'Must reload/rebuild.')
-            curr_active_pipeline = cls.init_from_known_data_session_type(type_name, known_type_properties, override_basepath=Path(basepath), override_post_load_functions=post_load_functions)
+            curr_active_pipeline = cls.init_from_known_data_session_type(type_name, known_type_properties, override_basepath=Path(basepath), outputs_specifier=outputs_specifier, override_post_load_functions=post_load_functions)
             # Save reloaded pipeline out to pickle for future loading
             if not skip_save_on_initial_load:
                 saveData(finalized_loaded_sess_pickle_path, db=curr_active_pipeline) # 589 MB
@@ -557,6 +587,7 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
         #TODO 2023-06-09 12:06: - [ ] What about the display objects?
         
         del state['_registered_output_files']
+        del state['_outputs_specifier']
         # del state['_pickle_path']
         return state
 
@@ -573,6 +604,7 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
         self._persistance_state = None # the pickle_path has to be set manually after loading
         self._plot_object = None
         self._registered_output_files = None # for RegisteredOutputsMixin
+        self._outputs_specifier = None
         
         _stage_changed_connection = self.sigStageChanged.connect(self.on_stage_changed)
          
