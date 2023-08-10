@@ -265,11 +265,11 @@ class ContextToPathMode(Enum):
 
 
 @define(slots=False)
-class FigureOutputManager:
+class FileOutputManager:
     """ 2023-06-14 - Manages figure output. Singleton/not persisted.
 
     Usage:
-        fig_man = FigureOutputManager(figure_output_location=FigureOutputLocation.DAILY_PROGRAMMATIC_OUTPUT_FOLDER, context_to_path_mode=ContextToPathMode.GLOBAL_UNIQUE)
+        fig_man = FileOutputManager(figure_output_location=FigureOutputLocation.DAILY_PROGRAMMATIC_OUTPUT_FOLDER, context_to_path_mode=ContextToPathMode.GLOBAL_UNIQUE)
         test_context = IdentifyingContext(format_name='kdiba',animal='gor01',exper_name='one',session_name='2006-6-08_14-26-15',display_fn_name='display_long_short_laps')
         fig_man.get_figure_save_file_path(test_context, make_folder_if_needed=False)
         >>> Path('/home/halechr/repo/Spike3D/EXTERNAL/Screenshots/ProgrammaticDisplayFunctionTesting/2023-06-14/kdiba_gor01_one_2006-6-08_14-26-15_display_long_short_laps')
@@ -292,13 +292,17 @@ class FigureOutputManager:
         parent_save_path, _ = self.get_figure_output_parent_and_basename(final_context, make_folder_if_needed=make_folder_if_needed, **kwargs)
         return parent_save_path
 
-
     def get_figure_save_file_path(self, final_context: IdentifyingContext, make_folder_if_needed:bool=True, **kwargs) -> Path:
         """ Returns a complete path to a file without the extension (as a basepath). Same information output by `get_figure_output_parent_and_basename` but returns a single output path instead of the parent_path and basename.
         
         """ 
         parent_save_path, fig_save_basename = self.get_figure_output_parent_and_basename(final_context, make_folder_if_needed=make_folder_if_needed, **kwargs)
         return parent_save_path.joinpath(fig_save_basename).resolve()
+
+
+
+
+
 
 # ==================================================================================================================== #
 # Split Pre-2023-06-14 Functions                                                                                       #
@@ -553,7 +557,7 @@ def programmatic_render_to_file(curr_active_pipeline, curr_display_function_name
 
 
 @function_attributes(short_name=None, tags=['file','export','output','matplotlib','display','active','PDF','batch','automated'], input_requires=[], output_provides=[], uses=['write_to_file'], used_by=[], creation_date='2023-06-14 19:06', related_items=[])
-def build_and_write_to_file(a_fig, active_identifying_ctx, fig_man:Optional[FigureOutputManager]=None, subset_includelist=None, subset_excludelist=None, write_vector_format=False, write_png=True, register_output_file_fn=None, progress_print=True, debug_print=False):
+def build_and_write_to_file(a_fig, active_identifying_ctx, fig_man:Optional[FileOutputManager]=None, subset_includelist=None, subset_excludelist=None, write_vector_format=False, write_png=True, register_output_file_fn=None, progress_print=True, debug_print=False):
     """ From the context, fig_man, and arguments builds the final save path for the figure and calls `write_to_file` with these values. """
     active_out_figure_paths = []
     write_any_figs = write_vector_format or write_png
@@ -561,7 +565,7 @@ def build_and_write_to_file(a_fig, active_identifying_ctx, fig_man:Optional[Figu
         return active_out_figure_paths # return empty list if no output formats are requested.
 
     # Use fig_man to build the path
-    fig_man = fig_man or FigureOutputManager(figure_output_location=FigureOutputLocation.DAILY_PROGRAMMATIC_OUTPUT_FOLDER, context_to_path_mode=ContextToPathMode.GLOBAL_UNIQUE)
+    fig_man = fig_man or FileOutputManager(figure_output_location=FigureOutputLocation.DAILY_PROGRAMMATIC_OUTPUT_FOLDER, context_to_path_mode=ContextToPathMode.GLOBAL_UNIQUE)
     curr_fig_save_path = fig_man.get_figure_save_file_path(active_identifying_ctx, make_folder_if_needed=True, subset_includelist=subset_includelist, subset_excludelist=subset_excludelist, context_tuple_join_character='_')
 
     return write_to_file(a_fig, active_identifying_ctx, final_fig_save_basename_path=curr_fig_save_path, subset_includelist=subset_includelist, subset_excludelist=subset_excludelist, write_vector_format=write_vector_format, write_png=write_png, register_output_file_fn=register_output_file_fn, progress_print=progress_print, debug_print=debug_print)

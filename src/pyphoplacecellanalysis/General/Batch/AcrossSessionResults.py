@@ -50,7 +50,7 @@ from pyphoplacecellanalysis.General.Pipeline.Stages.Loading import saveData, loa
 # from pyphoplacecellanalysis.General.Batch.NeptuneAiHelpers import set_environment_variables, neptune_output_figures
 from pyphoplacecellanalysis.General.Batch.PhoDiba2023Paper import main_complete_figure_generations, InstantaneousSpikeRateGroupsComputation, SingleBarResult, PaperFigureTwo # for `BatchSessionCompletionHandler`
 from neuropy.core.user_annotations import UserAnnotationsManager
-from pyphoplacecellanalysis.General.Mixins.ExportHelpers import FigureOutputManager, FigureOutputLocation, ContextToPathMode
+from pyphoplacecellanalysis.General.Mixins.ExportHelpers import FileOutputManager, FigureOutputLocation, ContextToPathMode
 
 """
 from pyphoplacecellanalysis.General.Batch.AcrossSessionResults import AcrossSessionsResults, AcrossSessionsVisualizations
@@ -66,10 +66,10 @@ trackMembershipTypesEnum = tb.Enum(trackMembershipTypesList)
 
 
 @define(slots=False)
-class H5Loader:
+class H5ExternalLinkBuilder:
     """ H5Loader class for loading and consolidating .h5 files
     Usage:
-        from pyphoplacecellanalysis.General.Batch.AcrossSessionResults import H5Loader
+        from pyphoplacecellanalysis.General.Batch.AcrossSessionResults import H5ExternalLinkBuilder
         session_group_keys: List[str] = [("/" + a_ctxt.get_description(separator="/", include_property_names=False)) for a_ctxt in session_identifiers] # 'kdiba/gor01/one/2006-6-08_14-26-15'
         neuron_identities_table_keys = [f"{session_group_key}/neuron_identities/table" for session_group_key in session_group_keys]
         a_loader = H5Loader(file_list=hdf5_output_paths, table_key_list=neuron_identities_table_keys)
@@ -446,7 +446,7 @@ class AcrossSessionsVisualizations:
                 print(f'register_output_file(output_path: {output_path}, ...)')
                 registered_output_files[output_path] = output_metadata or {}
 
-            fig_out_man = FigureOutputManager(figure_output_location=FigureOutputLocation.DAILY_PROGRAMMATIC_OUTPUT_FOLDER, context_to_path_mode=ContextToPathMode.HIERARCHY_UNIQUE)
+            fig_out_man = FileOutputManager(figure_output_location=FigureOutputLocation.DAILY_PROGRAMMATIC_OUTPUT_FOLDER, context_to_path_mode=ContextToPathMode.HIERARCHY_UNIQUE)
             active_out_figure_paths = build_and_write_to_file(fig, final_context, fig_out_man, write_vector_format=write_vector_format, write_png=write_png, register_output_file_fn=register_output_file)
             return active_out_figure_paths, final_context
 

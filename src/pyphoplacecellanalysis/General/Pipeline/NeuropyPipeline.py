@@ -10,7 +10,7 @@ import sys
 from pathlib import Path
 import shutil # for _backup_extant_file(...)
 
-from typing import Callable, List
+from typing import Callable, List, Optional
 import inspect # used for filter_sessions(...)'s inspect.getsource to compare filters:
 
 import numpy as np
@@ -76,8 +76,6 @@ class PipelineSavingScheme(ExtendedEnum):
     @classmethod
     def shouldSaveList(cls):
         return cls.build_member_value_dict([False, True, True])
-
-
 
 class LoadedObjectPersistanceState(object):
     """Keeps track of the persistance state for an object that has been loaded from disk to keep track of how the object's state relates to the version on disk (the persisted version) """

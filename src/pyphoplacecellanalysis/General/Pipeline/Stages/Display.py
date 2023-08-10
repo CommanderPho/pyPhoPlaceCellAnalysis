@@ -474,7 +474,7 @@ class PipelineWithDisplaySavingMixin:
     def output_figure(self, final_context: IdentifyingContext, fig, write_vector_format:bool=False, write_png:bool=True, debug_print=True):
         """ outputs the figure using the provided context. """
         from pyphoplacecellanalysis.General.Mixins.ExportHelpers import build_and_write_to_file
-        # fig_man: FigureOutputManager = self.get_output_manager() # get the output manager
+        # fig_man: FileOutputManager = self.get_output_manager() # get the output manager
         # figures_parent_out_path, fig_save_basename = fig_man.get_figure_output_parent_and_basename(final_context, make_folder_if_needed=True)
         # active_out_figure_paths = perform_write_to_file(fig, final_context, figures_parent_out_path=figures_parent_out_path, write_vector_format=write_vector_format, write_png=write_png, register_output_file_fn=self.register_output_file)
         # final_context = final_context.adding_context_if_missing(self.sess.get_context()) # add the session context if it's missing

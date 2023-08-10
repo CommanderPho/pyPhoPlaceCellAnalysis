@@ -8,7 +8,7 @@ from pathlib import Path
 from pyphocorehelpers.programming_helpers import metadata_attributes
 from pyphocorehelpers.function_helpers import function_attributes
 from pyphocorehelpers.function_helpers import compose_functions
-from pyphocorehelpers.DataStructure.dynamic_parameters import DynamicParameters # to replace simple PlacefieldComputationParameters
+from pyphocorehelpers.DataStructure.dynamic_parameters import DynamicParameters
 from pyphoplacecellanalysis.General.Pipeline.Stages.BaseNeuropyPipelineStage import BaseNeuropyPipelineStage, PipelineStage
 from pyphoplacecellanalysis.General.Pipeline.Stages.LoadFunctions.LoadFunctionRegistryHolder import LoadFunctionRegistryHolder
 
@@ -170,6 +170,7 @@ class RegisteredOutputsMixin:
         self.registered_output_files = DynamicParameters()
                 
 
+    
 
 # ____________________________________________________________________________________________________________________ #
 
@@ -181,14 +182,16 @@ class RegisteredOutputsMixin:
 # ==================================================================================================================== #
 @dataclass
 class InputPipelineStage(LoadableInput, BaseNeuropyPipelineStage):
-    """Docstring for InputPipelineStage.
+    """ The first stage of the NeuropyPipeline. Allows specifying the inputs that will be used.
     
-    post_load_functions: List[Callable] a list of Callables that accept the loaded session as input and return the potentially modified session as output.
+        post_load_functions: List[Callable] a list of Callables that accept the loaded session as input and return the potentially modified session as output.
     """
     identity: PipelineStage = PipelineStage.Input
     basedir: Path = Path("")
     load_function: Callable = None
     post_load_functions: List[Callable] = dataclasses.field(default_factory=list)
+
+
 # ==================================================================================================================== #
 # PIPELINE MIXIN                                                                                                       #
 # ==================================================================================================================== #
