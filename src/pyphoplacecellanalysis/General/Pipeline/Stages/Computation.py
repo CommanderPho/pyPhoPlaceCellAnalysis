@@ -25,7 +25,8 @@ from pyphoplacecellanalysis.General.Pipeline.Stages.Loading import LoadableInput
 from pyphoplacecellanalysis.General.Pipeline.Stages.Loading import loadData # used for `load_pickled_global_computation_results`
 from pyphoplacecellanalysis.General.Pipeline.Stages.Loading import saveData # used for `save_global_computation_results`
 from pyphoplacecellanalysis.General.Model.ComputationResults import ComputationResult
-from pyphoplacecellanalysis.General.Mixins.ExportHelpers import FileOutputManager, FigureOutputLocation, ContextToPathMode, OutputsSpecifier
+from pyphoplacecellanalysis.General.Mixins.ExportHelpers import FigureOutputManager, FigureOutputLocation, ContextToPathMode
+
 import pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions
 # from General.Pipeline.Stages.ComputationFunctions import ComputationFunctionRegistryHolder # should include ComputationFunctionRegistryHolder and all specifics
 from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.ComputationFunctionRegistryHolder import ComputationFunctionRegistryHolder
@@ -939,29 +940,14 @@ class PipelineWithComputedPipelineStageMixin:
 
         # print(f'\tpost keys: {list(self.active_configs.keys())}')
 
+    def get_output_path(self) -> Path:
+        """ returns the appropriate output path to store the outputs for this session. Usually '$session_folder/outputs/' """
+        return self.sess.get_output_path()
+
+
     def get_session_context(self) -> IdentifyingContext:
         """ returns the context of the unfiltered session (self.sess) """
         return self.sess.get_context()
-
-
-    @property
-    def outputs_specifier(self) -> OutputsSpecifier:
-        """The outputs property."""
-        if self._outputs_specifier is None:
-            """ initialize if needed. """
-            self._outputs_specifier = OutputsSpecifier(self.basedir) # sets on initial access if it's None.
-        return self._outputs_specifier
-    @outputs_specifier.setter
-    def outputs_specifier(self, value):
-        self._outputs_specifier = value
-
-
-    def get_output_path(self) -> Path:
-        """ returns the appropriate output path to store the outputs for this session. Usually '$session_folder/outputs/' """
-        if self._outputs_specifier is not None:
-            return self._outputs_specifier.get_output_path()
-        else:
-            return self.sess.get_output_path()
 
 
     # @property
@@ -1006,11 +992,7 @@ class PipelineWithComputedPipelineStageMixin:
         # if len(special_designator_suffix) > 0:
         desired_global_pickle_filename = f"global_computation_results{special_designator_suffix}.pkl" # 'global_computation_results_withDirectionalLaps.pkl'
         # desired_global_pickle_filename = f'global_computation_results.pkl' # old way
-        if self._outputs_specifier is not None:
-            return self._outputs_specifier.get_global_computations_output_path()
-        else:
-            return self.get_output_path().joinpath(desired_global_pickle_filename).resolve()
-
+        return self.get_output_path().joinpath(desired_global_pickle_filename).resolve()
 
     ## Global Computation Result Persistance Hacks:
     def save_global_computation_results(self, override_global_pickle_filename='global_computation_results.pkl'):
@@ -1038,18 +1020,3 @@ class PipelineWithComputedPipelineStageMixin:
             global_computation_results_pickle_path = override_global_computation_results_pickle_path
         loaded_global_computation_results = DynamicParameters(**loadData(global_computation_results_pickle_path))
         self.stage.global_computation_results = loaded_global_computation_results # TODO 2023-05-19 - Merge results instead of replacing. Requires checking parameters.
-
-
-
-    # def export_computation_results(self,  override_global_pickle_filename='global_computation_results.pkl'):
-    #     """Save out the `global_computation_results` which are not currently saved with the pipeline
-    #     Usage:
-    #         curr_active_pipeline.save_global_computation_results()
-    #     """
-    #     if override_global_pickle_filename is None:
-    #         global_computation_results_pickle_path = self.global_computation_results_pickle_path
-    #     else:
-    #         global_computation_results_pickle_path = self.get_output_path().joinpath(override_global_pickle_filename).resolve() 
-    #     print(f'global_computation_results_pickle_path: {global_computation_results_pickle_path}')
-    #     saveData(global_computation_results_pickle_path, (self.global_computation_results.to_dict()))
-    #     return global_computation_results_pickle_path
