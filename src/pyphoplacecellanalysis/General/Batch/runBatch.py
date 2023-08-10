@@ -1421,7 +1421,7 @@ def run_specific_batch(global_data_root_parent_path: Path, curr_session_context:
     except Exception as e:
         ## can fail here before callback function is even called.
         exception_info = sys.exc_info()
-        an_error = CapturedException(e, exception_info, curr_active_pipeline)
+        an_error = CapturedException(e, exception_info, None)
         new_print(f'exception occured: {an_error}')
         if fail_on_exception:
             raise e
