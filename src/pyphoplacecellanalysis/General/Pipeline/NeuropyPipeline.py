@@ -38,7 +38,7 @@ from pyphoplacecellanalysis.General.Pipeline.Stages.Display import PipelineWithD
 from pyphoplacecellanalysis.General.Pipeline.Stages.Filtering import FilteredPipelineMixin
 from pyphoplacecellanalysis.General.Pipeline.Stages.Loading import PipelineWithInputStage, PipelineWithLoadableStage, loadData, saveData
 from pyphoplacecellanalysis.General.Pipeline.Stages.BaseNeuropyPipelineStage import PipelineStage
-
+from pyphoplacecellanalysis.General.Mixins.ExportHelpers import OutputsSpecifier
 
 ## For serialization:
 from neuropy.utils.mixins.AttrsClassHelpers import custom_define, AttrsBasedClassHelperMixin, serialized_field, serialized_attribute_field, non_serialized_field
@@ -76,32 +76,6 @@ class PipelineSavingScheme(ExtendedEnum):
     @classmethod
     def shouldSaveList(cls):
         return cls.build_member_value_dict([False, True, True])
-
-
-@custom_define(slots=False)
-class OutputsSpecifier:
-    """ outputs_specifier: a class that specifies how to save outputs from a pipeline. """
-    output_basepath: Path # path to write out to
-
-    def get_output_path(self) -> Path:
-        """ returns the appropriate output path to store the outputs for this session. Usually '$session_folder/outputs/' """
-        return self.output_basepath.joinpath('output').resolve()
-
-
-    # def get_global_computations_output_path(self) -> Path:
-    #     """ could be customized to redirect global computations outputs """
-    #     return self.output_basepath.joinpath('output').resolve()
-
-    def get_global_computations_output_path(self) -> Path:
-        """ could be customized to redirect global computations outputs """
-        return self.output_basepath.joinpath('output').resolve()
-
-    # @property
-    # def global_computations_basepath(self) -> Path:
-    #     return self.output_basepath.joinpath('output').resolve()
-
-
-
 
 class LoadedObjectPersistanceState(object):
     """Keeps track of the persistance state for an object that has been loaded from disk to keep track of how the object's state relates to the version on disk (the persisted version) """

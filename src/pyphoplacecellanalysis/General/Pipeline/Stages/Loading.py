@@ -8,7 +8,7 @@ from pathlib import Path
 from pyphocorehelpers.programming_helpers import metadata_attributes
 from pyphocorehelpers.function_helpers import function_attributes
 from pyphocorehelpers.function_helpers import compose_functions
-from pyphocorehelpers.DataStructure.dynamic_parameters import DynamicParameters # to replace simple PlacefieldComputationParameters
+from pyphocorehelpers.DataStructure.dynamic_parameters import DynamicParameters
 from pyphoplacecellanalysis.General.Pipeline.Stages.BaseNeuropyPipelineStage import BaseNeuropyPipelineStage, PipelineStage
 from pyphoplacecellanalysis.General.Pipeline.Stages.LoadFunctions.LoadFunctionRegistryHolder import LoadFunctionRegistryHolder
 
@@ -170,16 +170,6 @@ class RegisteredOutputsMixin:
         self.registered_output_files = DynamicParameters()
                 
 
-    @property
-    def outputs_specifier(self):
-        """The outputs property."""
-        if self._outputs_specifier is None:
-            """ initialize if needed. """
-            self._outputs_specifier = DynamicParameters()
-        return self._outputs_specifier
-    @outputs_specifier.setter
-    def outputs_specifier(self, value):
-        self._outputs_specifier = value
     
 
 # ____________________________________________________________________________________________________________________ #

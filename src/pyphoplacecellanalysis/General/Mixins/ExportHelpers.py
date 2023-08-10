@@ -14,6 +14,34 @@ from pyphocorehelpers.function_helpers import function_attributes
 
 from neuropy.utils.mixins.AttrsClassHelpers import AttrsBasedClassHelperMixin, custom_define, serialized_field, serialized_attribute_field, non_serialized_field
 
+## General Output Helpers
+@custom_define(slots=False)
+class OutputsSpecifier:
+    """ outputs_specifier: a class that specifies how to save outputs from a pipeline.
+
+    from pyphoplacecellanalysis.General.Mixins.ExportHelpers import OutputsSpecifier
+
+    """
+    output_basepath: Path # path to write out to
+
+    def get_output_path(self) -> Path:
+        """ returns the appropriate output path to store the outputs for this session. Usually '$session_folder/outputs/' """
+        return self.output_basepath.joinpath('output').resolve()
+
+
+    # def get_global_computations_output_path(self) -> Path:
+    #     """ could be customized to redirect global computations outputs """
+    #     return self.output_basepath.joinpath('output').resolve()
+
+    def get_global_computations_output_path(self) -> Path:
+        """ could be customized to redirect global computations outputs """
+        return self.output_basepath.joinpath('output').resolve()
+
+    # @property
+    # def global_computations_basepath(self) -> Path:
+    #     return self.output_basepath.joinpath('output').resolve()
+
+
 # ==================================================================================================================== #
 # FIGURE/GRAPHICS EXPORT                                                                                               #
 # ==================================================================================================================== #
