@@ -1109,6 +1109,8 @@ class BatchSessionCompletionHandler:
 
             return True # completed successfully (without raising an error at least).
         except Exception as e:
+            exception_info = sys.exc_info()
+            e = CapturedException(e, exception_info)
             print(f'main_complete_figure_generations failed with exception: {e}')
             # raise e
             return False
@@ -1124,6 +1126,8 @@ class BatchSessionCompletionHandler:
             return True # completed successfully
 
         except Exception as e:
+            exception_info = sys.exc_info()
+            e = CapturedException(e, exception_info)
             print(f'try_output_neruon_identity_table_to_File failed with exception: {e}')
             # raise e
             return False
@@ -1166,7 +1170,9 @@ class BatchSessionCompletionHandler:
         try:
             was_updated = self.post_compute_validate(curr_active_pipeline)
         except Exception as e:
-            print(f'self.post_compute_validate(...) failed with exception: {e}')
+            exception_info = sys.exc_info()
+            an_err = CapturedException(e, exception_info)
+            print(f'self.post_compute_validate(...) failed with exception: {an_err}')
             raise 
 
         ## Save the pipeline since that's disabled by default now:
@@ -1174,6 +1180,8 @@ class BatchSessionCompletionHandler:
             curr_active_pipeline.save_pipeline(saving_mode=self.saving_mode, active_pickle_filename=self.override_session_computation_results_pickle_filename) # AttributeError: 'PfND_TimeDependent' object has no attribute '_included_thresh_neurons_indx'
         except Exception as e:
             ## TODO: catch/log saving error and indicate that it isn't saved.
+            exception_info = sys.exc_info()
+            e = CapturedException(e, exception_info)
             print(f'ERROR SAVING PIPELINE for curr_session_context: {curr_session_context}. error: {e}')
 
 
@@ -1192,6 +1200,8 @@ class BatchSessionCompletionHandler:
                 try:
                     curr_active_pipeline.load_pickled_global_computation_results(override_global_computation_results_pickle_path=self.override_global_computation_results_pickle_path)
                 except Exception as e:
+                    exception_info = sys.exc_info()
+                    e = CapturedException(e, exception_info)
                     print(f'cannot load global results: {e}')
                 
 
@@ -1220,6 +1230,8 @@ class BatchSessionCompletionHandler:
                     print(f'no changes in global results.')
             except Exception as e:
                 ## TODO: catch/log saving error and indicate that it isn't saved.
+                exception_info = sys.exc_info()
+                e = CapturedException(e, exception_info)
                 print(f'ERROR SAVING GLOBAL COMPUTATION RESULTS for pipeline of curr_session_context: {curr_session_context}. error: {e}')
                 
 
@@ -1246,6 +1258,8 @@ class BatchSessionCompletionHandler:
         try:
             AcrossSessionsResults.build_session_pipeline_to_hdf(hdf5_output_path, "/", curr_active_pipeline, debug_print=False) # coulduse key of "/{curr_session_context}" with context properly expanded.
         except Exception as e:
+            exception_info = sys.exc_info()
+            e = CapturedException(e, exception_info)
             print(f"ERROR: encountered exception {e} while trying to build the session HDF output for {curr_session_context}")
             hdf5_output_path = None # set to None because it failed.
 
@@ -1266,6 +1280,8 @@ class BatchSessionCompletionHandler:
             print(f'\t\t done (success).') 
 
         except Exception as e:
+            exception_info = sys.exc_info()
+            e = CapturedException(e, exception_info)
             print(f"ERROR: encountered exception {e} while trying to compute the instantaneous firing rates and set self.across_sessions_instantaneous_fr_dict[{curr_session_context}]")
             _out_inst_fr_comps = None
             
