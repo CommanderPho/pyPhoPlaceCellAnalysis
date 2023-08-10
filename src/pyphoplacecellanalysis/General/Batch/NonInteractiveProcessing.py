@@ -1,3 +1,4 @@
+import sys
 from copy import deepcopy
 from pathlib import Path
 
@@ -16,6 +17,7 @@ from neuropy.utils.misc import compute_paginated_grid_config # for paginating sh
 # pyphocorehelpers
 
 from pyphocorehelpers.function_helpers import function_attributes
+from pyphocorehelpers.print_helpers import CapturedException
 
 # pyPhoPlaceCellAnalysis:
 from pyphoplacecellanalysis.General.Model.SpecificComputationValidation import SpecificComputationValidator
@@ -210,7 +212,9 @@ def batch_load_session(global_data_root_parent_path, active_data_mode_name, base
     try:
         curr_active_pipeline.save_pipeline(saving_mode=saving_mode)
     except Exception as e:
-        print(f'WARNING: Failed to save pipeline via `curr_active_pipeline.save_pipeline(...)` with error: {e}')
+        exception_info = sys.exc_info()
+        an_error = CapturedException(e, exception_info, curr_active_pipeline)
+        print(f'WARNING: Failed to save pipeline via `curr_active_pipeline.save_pipeline(...)` with error: {an_error}')
         if fail_on_exception:
             raise
 
