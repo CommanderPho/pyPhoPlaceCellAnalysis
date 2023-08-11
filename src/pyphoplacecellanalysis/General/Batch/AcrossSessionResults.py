@@ -59,9 +59,8 @@ from pyphoplacecellanalysis.General.Batch.AcrossSessionResults import AcrossSess
 
 trackMembershipTypesList: List[str] = ['long_only', 'short_only', 'both', 'neither']
 trackMembershipTypesEnum = tb.Enum(trackMembershipTypesList)
-
-
 trackExclusiveToMembershipTypeDict: Dict = dict(zip(['LxC', 'SxC', 'shared', 'neither'], trackMembershipTypesList))
+trackExclusiveToMembershipTypeReverseDict: Dict = dict(zip(trackMembershipTypesList, ['LxC', 'SxC', 'shared', 'neither'])) # inverse of `trackExclusiveToMembershipTypeDict`
 
 
 
@@ -103,10 +102,6 @@ class H5ExternalLinkBuilder:
         return master_table
 
     
-    
-    
-
-
 
 class FiringRatesDeltaTable(tb.IsDescription):
     delta_minus = tb.Float64Col()
@@ -135,20 +130,12 @@ class AcrossSessionsResults:
 
 
     #TODO 2023-08-10 21:34: - [ ] Ready to accumulate results!
-    class ScatterPlotResultsTable(tb.IsDescription):
-        """ """        
-        neuron_identity = NeuronIdentityTable()
-        
-        lap_firing_rates_delta = FiringRatesDeltaTable()
-        replay_firing_rates_delta = FiringRatesDeltaTable()
-        
-        active_set_membership = EnumCol(trackMembershipTypesEnum, 'neither', base='uint8')
 
  
     class ProcessedSessionResultsTable(tb.IsDescription):
         """ represents a single session's processing results in the scope of multiple sessions for use in a PyTables table or HDF5 output file """
-        global_uid = StringCol(16)   # 16-character String, globally unique neuron identifier (across all sessions) composed of a session_uid and the neuron's (session-specific) aclu
-        session_uid = StringCol(16)
+        global_uid = StringCol(68)   # 16-character String, globally unique neuron identifier (across all sessions) composed of a session_uid and the neuron's (session-specific) aclu
+        session_uid = StringCol(64)
         neuron_identities = NeuronIdentityTable()
 
         class LongShortNeuronComputedPropertiesTable(tb.IsDescription):
@@ -174,13 +161,7 @@ class AcrossSessionsResults:
             short_num_replays = tb.Int32Col()
             neuron_type = tb.StringCol(itemsize=50)  # Adjust 'itemsize' based on your maximum string length
         
-        class SessionIdentityTable(tb.IsDescription):
-            """ represents a single session's processing results in the scope of multiple sessions for use in a PyTables table or HDF5 output file """
-            session_uid = StringCol(32) # globally unique session identifier (across all sessions)
-            format_name = StringCol(16)
-            animal = StringCol(16)
-            exper_name  = StringCol(32)
-            session_name  = StringCol(32)
+
 
 
         # class GlobalComputationsTable(tb.IsDescription):
@@ -193,9 +174,30 @@ class AcrossSessionsResults:
     
 
 
+    # ==================================================================================================================== #
+    # ScatterPlotResultsTable                                                                                              #
+    # ==================================================================================================================== #
+    
+    class ScatterPlotResultsTable(tb.IsDescription):
+        """ """        
+        neuron_identity = NeuronIdentityTable()
+        
+        lap_firing_rates_delta = FiringRatesDeltaTable()
+        replay_firing_rates_delta = FiringRatesDeltaTable()
+        
+        active_set_membership = EnumCol(trackMembershipTypesEnum, 'neither', base='uint8')
+
+
     @classmethod
     def scatter_plot_results_table_to_hdf(cls, file_path, result_df: pd.DataFrame, file_mode='a'):
-        """ writes the table to a .h5 file at the specified file path"""
+        """ writes the table to a .h5 file at the specified file path
+
+
+        common_file_path = Path('output/test_across_session_scatter_plot.h5')
+        print(f'common_file_path: {common_file_path}')
+        AcrossSessionsResults.scatter_plot_results_table_to_hdf(file_path=common_file_path, result_df=result_df, file_mode='w')
+
+        """
         with tb.open_file(file_path, mode=file_mode) as file:
             # Create the table
             table = file.create_table('/', 'ScatterPlotResults', AcrossSessionsResults.ScatterPlotResultsTable)
@@ -230,7 +232,61 @@ class AcrossSessionsResults:
                 row.append()
                 
             table.flush()
+            
+    @classmethod
+    def read_scatter_plot_results_table(cls, file_path) -> pd.DataFrame:
+        """ the reciprocal operation to `scatter_plot_results_table_to_hdf(..)`. Reads the table from file to produce a dataframe.
+        
+        common_file_path = Path('output/test_across_session_scatter_plot.h5')
+        print(f'common_file_path: {common_file_path}')
+        loaded_result_df = AcrossSessionsResults.read_scatter_plot_results_table(file_path=common_file_path)
+        
+        
+        """
+        with tb.open_file(file_path, mode='r') as file:
+            table = file.root.ScatterPlotResults
 
+            data = []
+            for row in table.iterrows():
+                # neuron_identity = row['neuron_identity']
+                # session_uid_parts = row['neuron_identity/session_uid'].decode().split("|")
+
+                global_uid = row['neuron_identity/global_uid'].decode()
+                session_uid = row['neuron_identity/session_uid'].decode()
+                session_uid_parts = session_uid.split("|")
+                global_uid_parts = global_uid.split("|")
+                print(f'global_uid: {global_uid}, global_uid_parts: {global_uid_parts}')
+            
+                # global_uid, session_uid, neuron_id, neuron_type, shank_index, cluster_index, qclu = neuron_identity
+                
+                row_data = {
+                    'format_name': global_uid_parts[0],
+                    'animal': global_uid_parts[1],
+                    'exper_name': global_uid_parts[2],
+                    'session_name': global_uid_parts[3],
+                    'aclu': row['neuron_identity/neuron_id'],
+                    'shank': row['neuron_identity/shank_index'],
+                    'cluster': row['neuron_identity/cluster_index'],
+                    'qclu': row['neuron_identity/qclu'],
+                    # 'cell_type': neuronTypesEnum(row['neuron_identity/neuron_type']).hdfcodingClassName, # Assuming reverse mapping is available
+                    # 'active_set_membership': trackMembershipTypesEnum(row['active_set_membership']).name, # Assuming reverse mapping is available
+                    'cell_type': neuronTypesEnum(row['neuron_identity/neuron_type']),
+                    'active_set_membership': trackExclusiveToMembershipTypeReverseDict[trackMembershipTypesEnum(row['active_set_membership'])], # Assuming reverse mapping is available
+                    'lap_delta_minus': row['lap_firing_rates_delta/delta_minus'],
+                    'lap_delta_plus': row['lap_firing_rates_delta/delta_plus'],
+                    'replay_delta_minus': row['replay_firing_rates_delta/delta_minus'],
+                    'replay_delta_plus': row['replay_firing_rates_delta/delta_plus'],
+                }
+                data.append(row_data)
+
+            loaded_result_df = pd.DataFrame(data)
+            
+        return loaded_result_df
+
+
+    # ==================================================================================================================== #
+    # NeuronIdentityTable                                                                                                  #
+    # ==================================================================================================================== #
     
     ## This seems definitionally a single-session result! It can be concatenated across sessions to make a multi-session one though!
     @classmethod
