@@ -126,6 +126,36 @@ class AcrossSessionsResults:
     
         
     """
+    
+
+
+
+    #TODO 2023-08-10 21:34: - [ ] Ready to accumulate results!
+    class ScatterPlotResultsTable(tb.IsDescription):
+        """ 
+
+        from pyphoplacecellanalysis.General.Batch.AcrossSessionResults import AcrossSessionsResults
+
+        AcrossSessionsResults.ScatterPlotResultsTable
+
+        """        
+        neuron_identity = NeuronIdentityTable()
+        
+        class LapFiringRatesDeltaTable(tb.IsDescription):
+            delta_minus = tb.Float64Col()
+            delta_plus = tb.Float64Col()
+            
+        class ReplayFiringRatesDeltaTable(tb.IsDescription):
+            delta_minus = tb.Float64Col()
+            delta_plus = tb.Float64Col()
+
+        active_set_membership = EnumCol(trackMembershipTypesEnum, 'neither', base='uint8')
+
+
+            
+
+
+
  
     class ProcessedSessionResultsTable(tb.IsDescription):
         """ represents a single session's processing results in the scope of multiple sessions for use in a PyTables table or HDF5 output file """
