@@ -64,49 +64,145 @@ trackExclusiveToMembershipTypeReverseDict: Dict = dict(zip(trackMembershipTypesL
 
 
 
-@define(slots=False)
-class H5ExternalLinkBuilder:
-    """ H5Loader class for loading and consolidating .h5 files
-    Usage:
-        from pyphoplacecellanalysis.General.Batch.AcrossSessionResults import H5ExternalLinkBuilder
-        session_group_keys: List[str] = [("/" + a_ctxt.get_description(separator="/", include_property_names=False)) for a_ctxt in session_identifiers] # 'kdiba/gor01/one/2006-6-08_14-26-15'
-        neuron_identities_table_keys = [f"{session_group_key}/neuron_identities/table" for session_group_key in session_group_keys]
-        a_loader = H5Loader(file_list=hdf5_output_paths, table_key_list=neuron_identities_table_keys)
-        _out_table = a_loader.load_and_consolidate()
-        _out_table
-
-
-    """
-    file_list: List[str] = field(default=Factory(list))
-    table_key_list: List[str] = field(default=Factory(list))
-    
-    def load_and_consolidate(self) -> pd.DataFrame:
-        """
-        Loads .h5 files and consolidates into a master table
-        """
-        data_frames = []
-        for file, table_key in zip(self.file_list, self.table_key_list):
-            with tb.open_file(file) as h5_file:
-                a_table = h5_file.get_node(table_key)
-                print(f'a_table: {a_table}')
-                # for a_record in a_table
-                
-                # data_frames.append(a_table)
-#                 for table in h5_file.get_node(table_key):
-#                 # for table in h5_file.root:
-                # df = pd.DataFrame.from_records(a_table[:]) # .read()
-                df = pd.DataFrame.from_records(a_table.read()) 
-                data_frames.append(df)
-
-        master_table = pd.concat(data_frames, ignore_index=True)
-        return master_table
-
-    
-
 class FiringRatesDeltaTable(tb.IsDescription):
     delta_minus = tb.Float64Col()
     delta_plus = tb.Float64Col()
     
+
+
+
+@pd.api.extensions.register_dataframe_accessor("inst_fr_results")
+class InstantaneousFiringRatesDataframeAccessor():
+    """ A Pandas pd.DataFrame representation of results from the batch processing of sessions
+    # 2023-07-07
+    Built from `BatchRun`
+
+    """
+
+    # _required_column_names = ['session_name', 'basedirs', 'status', 'errors']
+    _required_column_names = ['context', 'basedirs', 'status', 'errors']
+
+    # ==================================================================================================================== #
+    # ScatterPlotResultsTable                                                                                              #
+    # ==================================================================================================================== #
+    
+    class ScatterPlotResultsTable(tb.IsDescription):
+        """ """        
+        neuron_identity = NeuronIdentityTable()
+        
+        lap_firing_rates_delta = FiringRatesDeltaTable()
+        replay_firing_rates_delta = FiringRatesDeltaTable()
+        
+        active_set_membership = EnumCol(trackMembershipTypesEnum, 'neither', base='uint8')
+
+
+    def __init__(self, pandas_obj):
+        pandas_obj = self._validate(pandas_obj)
+        self._obj = pandas_obj
+        
+    @classmethod
+    def _validate(cls, obj):
+        """ verify there is a column that identifies the spike's neuron, the type of cell of this neuron ('cell_type'), and the timestamp at which each spike occured ('t'||'t_rel_seconds') """       
+        # assert np.all(np.isin(obj.columns, cls._required_column_names))
+        return obj # important! Must return the modified obj to be assigned (since its columns were altered by renaming
+
+
+
+    @classmethod
+    def scatter_plot_results_table_to_hdf(cls, file_path, result_df: pd.DataFrame, file_mode='a'):
+        """ writes the table to a .h5 file at the specified file path
+
+
+        common_file_path = Path('output/test_across_session_scatter_plot.h5')
+        print(f'common_file_path: {common_file_path}')
+        AcrossSessionsResults.scatter_plot_results_table_to_hdf(file_path=common_file_path, result_df=result_df, file_mode='w')
+
+        """
+        with tb.open_file(file_path, mode=file_mode) as file:
+            # Create the table
+            table = file.create_table('/', 'ScatterPlotResults', cls.ScatterPlotResultsTable)
+
+            # Serialization
+            row = table.row
+            for i in np.arange(len(result_df)):
+                row_data = result_df.iloc[i]
+                
+                session_uid: str = f"|".join([row_data['format_name'], row_data['animal'], row_data['exper_name'], row_data['session_name']])
+                
+                # NeuronIdentityTable
+                row['neuron_identity/global_uid'] = f"{session_uid}|{row_data['aclu']}"
+                row['neuron_identity/session_uid'] = session_uid
+                row['neuron_identity/neuron_id'] = row_data['aclu']
+                row['neuron_identity/neuron_type'] = neuronTypesEnum[row_data['cell_type'].hdfcodingClassName]
+                row['neuron_identity/shank_index'] = row_data['shank']
+                row['neuron_identity/cluster_index'] = row_data['cluster']
+                row['neuron_identity/qclu'] = row_data['qclu']
+
+                # # LapFiringRatesDeltaTable
+                row['lap_firing_rates_delta/delta_minus'] = row_data['lap_delta_minus']
+                row['lap_firing_rates_delta/delta_plus'] = row_data['lap_delta_plus']
+
+                # # ReplayFiringRatesDeltaTable
+                row['replay_firing_rates_delta/delta_minus'] = row_data['replay_delta_minus']
+                row['replay_firing_rates_delta/delta_plus'] = row_data['replay_delta_plus']
+
+                # active_set_membership
+                row['active_set_membership'] = trackMembershipTypesEnum[trackExclusiveToMembershipTypeDict[row_data['active_set_membership']]]
+                
+                row.append()
+                
+            table.flush()
+            
+    @classmethod
+    def read_scatter_plot_results_table(cls, file_path) -> pd.DataFrame:
+        """ the reciprocal operation to `scatter_plot_results_table_to_hdf(..)`. Reads the table from file to produce a dataframe.
+        
+        common_file_path = Path('output/test_across_session_scatter_plot.h5')
+        print(f'common_file_path: {common_file_path}')
+        loaded_result_df = AcrossSessionsResults.read_scatter_plot_results_table(file_path=common_file_path)
+        
+        
+        """
+        with tb.open_file(file_path, mode='r') as file:
+            table = file.root.ScatterPlotResults
+
+            data = []
+            for row in table.iterrows():
+                global_uid = row['neuron_identity/global_uid'].decode()
+                session_uid = row['neuron_identity/session_uid'].decode()
+                session_uid_parts = session_uid.split("|")
+                # global_uid_parts = global_uid.split("|")
+                # print(f'global_uid: {global_uid}, global_uid_parts: {global_uid_parts}')
+            
+                # global_uid, session_uid, neuron_id, neuron_type, shank_index, cluster_index, qclu = neuron_identity
+                
+                row_data = {
+                    'global_uid': global_uid,
+                    'format_name': session_uid_parts[0],
+                    'animal': session_uid_parts[1],
+                    'exper_name': session_uid_parts[2],
+                    'session_name': session_uid_parts[3],
+                    'aclu': row['neuron_identity/neuron_id'],
+                    'shank': row['neuron_identity/shank_index'],
+                    'cluster': row['neuron_identity/cluster_index'],
+                    'qclu': row['neuron_identity/qclu'],
+                    # 'cell_type': neuronTypesEnum(row['neuron_identity/neuron_type']).hdfcodingClassName, # Assuming reverse mapping is available
+                    # 'active_set_membership': trackMembershipTypesEnum(row['active_set_membership']).name, # Assuming reverse mapping is available
+                    'cell_type': neuronTypesEnum(row['neuron_identity/neuron_type']),
+                    'active_set_membership': trackExclusiveToMembershipTypeReverseDict[trackMembershipTypesEnum(row['active_set_membership'])], # Assuming reverse mapping is available
+                    'lap_delta_minus': row['lap_firing_rates_delta/delta_minus'],
+                    'lap_delta_plus': row['lap_firing_rates_delta/delta_plus'],
+                    'replay_delta_minus': row['replay_firing_rates_delta/delta_minus'],
+                    'replay_delta_plus': row['replay_firing_rates_delta/delta_plus'],
+                }
+                data.append(row_data)
+
+            loaded_result_df = pd.DataFrame(data)
+            
+        return loaded_result_df
+
+
+
 
 
 class AcrossSessionsResults:
@@ -174,111 +270,7 @@ class AcrossSessionsResults:
     
 
 
-    # ==================================================================================================================== #
-    # ScatterPlotResultsTable                                                                                              #
-    # ==================================================================================================================== #
-    
-    class ScatterPlotResultsTable(tb.IsDescription):
-        """ """        
-        neuron_identity = NeuronIdentityTable()
-        
-        lap_firing_rates_delta = FiringRatesDeltaTable()
-        replay_firing_rates_delta = FiringRatesDeltaTable()
-        
-        active_set_membership = EnumCol(trackMembershipTypesEnum, 'neither', base='uint8')
 
-
-    @classmethod
-    def scatter_plot_results_table_to_hdf(cls, file_path, result_df: pd.DataFrame, file_mode='a'):
-        """ writes the table to a .h5 file at the specified file path
-
-
-        common_file_path = Path('output/test_across_session_scatter_plot.h5')
-        print(f'common_file_path: {common_file_path}')
-        AcrossSessionsResults.scatter_plot_results_table_to_hdf(file_path=common_file_path, result_df=result_df, file_mode='w')
-
-        """
-        with tb.open_file(file_path, mode=file_mode) as file:
-            # Create the table
-            table = file.create_table('/', 'ScatterPlotResults', AcrossSessionsResults.ScatterPlotResultsTable)
-
-            # Serialization
-            row = table.row
-            for i in np.arange(len(result_df)):
-                row_data = result_df.iloc[i]
-                
-                session_uid: str = f"|".join([row_data['format_name'], row_data['animal'], row_data['exper_name'], row_data['session_name']])
-                
-                # NeuronIdentityTable
-                row['neuron_identity/global_uid'] = f"{session_uid}|{row_data['aclu']}"
-                row['neuron_identity/session_uid'] = session_uid
-                row['neuron_identity/neuron_id'] = row_data['aclu']
-                row['neuron_identity/neuron_type'] = neuronTypesEnum[row_data['cell_type'].hdfcodingClassName]
-                row['neuron_identity/shank_index'] = row_data['shank']
-                row['neuron_identity/cluster_index'] = row_data['cluster']
-                row['neuron_identity/qclu'] = row_data['qclu']
-
-                # # LapFiringRatesDeltaTable
-                row['lap_firing_rates_delta/delta_minus'] = row_data['lap_delta_minus']
-                row['lap_firing_rates_delta/delta_plus'] = row_data['lap_delta_plus']
-
-                # # ReplayFiringRatesDeltaTable
-                row['replay_firing_rates_delta/delta_minus'] = row_data['replay_delta_minus']
-                row['replay_firing_rates_delta/delta_plus'] = row_data['replay_delta_plus']
-
-                # active_set_membership
-                row['active_set_membership'] = trackMembershipTypesEnum[trackExclusiveToMembershipTypeDict[row_data['active_set_membership']]]
-                
-                row.append()
-                
-            table.flush()
-            
-    @classmethod
-    def read_scatter_plot_results_table(cls, file_path) -> pd.DataFrame:
-        """ the reciprocal operation to `scatter_plot_results_table_to_hdf(..)`. Reads the table from file to produce a dataframe.
-        
-        common_file_path = Path('output/test_across_session_scatter_plot.h5')
-        print(f'common_file_path: {common_file_path}')
-        loaded_result_df = AcrossSessionsResults.read_scatter_plot_results_table(file_path=common_file_path)
-        
-        
-        """
-        with tb.open_file(file_path, mode='r') as file:
-            table = file.root.ScatterPlotResults
-
-            data = []
-            for row in table.iterrows():
-                # global_uid = row['neuron_identity/global_uid'].decode()
-                session_uid = row['neuron_identity/session_uid'].decode()
-                session_uid_parts = session_uid.split("|")
-                # global_uid_parts = global_uid.split("|")
-                # print(f'global_uid: {global_uid}, global_uid_parts: {global_uid_parts}')
-            
-                # global_uid, session_uid, neuron_id, neuron_type, shank_index, cluster_index, qclu = neuron_identity
-                
-                row_data = {
-                    'format_name': session_uid_parts[0],
-                    'animal': session_uid_parts[1],
-                    'exper_name': session_uid_parts[2],
-                    'session_name': session_uid_parts[3],
-                    'aclu': row['neuron_identity/neuron_id'],
-                    'shank': row['neuron_identity/shank_index'],
-                    'cluster': row['neuron_identity/cluster_index'],
-                    'qclu': row['neuron_identity/qclu'],
-                    # 'cell_type': neuronTypesEnum(row['neuron_identity/neuron_type']).hdfcodingClassName, # Assuming reverse mapping is available
-                    # 'active_set_membership': trackMembershipTypesEnum(row['active_set_membership']).name, # Assuming reverse mapping is available
-                    'cell_type': neuronTypesEnum(row['neuron_identity/neuron_type']),
-                    'active_set_membership': trackExclusiveToMembershipTypeReverseDict[trackMembershipTypesEnum(row['active_set_membership'])], # Assuming reverse mapping is available
-                    'lap_delta_minus': row['lap_firing_rates_delta/delta_minus'],
-                    'lap_delta_plus': row['lap_firing_rates_delta/delta_plus'],
-                    'replay_delta_minus': row['replay_firing_rates_delta/delta_minus'],
-                    'replay_delta_plus': row['replay_firing_rates_delta/delta_plus'],
-                }
-                data.append(row_data)
-
-            loaded_result_df = pd.DataFrame(data)
-            
-        return loaded_result_df
 
 
     # ==================================================================================================================== #
@@ -528,7 +520,7 @@ class AcrossSessionsVisualizations:
     # 2023-07-21 - Across Sessions Aggregate Figure: __________________________________________________________________________________ #
 
     @classmethod
-    def across_sessions_bar_graphs(cls, across_session_inst_fr_computation: Dict[IdentifyingContext, InstantaneousSpikeRateGroupsComputation], num_sessions:int, **kwargs):
+    def across_sessions_bar_graphs(cls, across_session_inst_fr_computation: Dict[IdentifyingContext, InstantaneousSpikeRateGroupsComputation], num_sessions:int, save_figure=True, **kwargs):
         """ 2023-07-21 - Across Sessions Aggregate Figure - I know this is hacked-up to use `PaperFigureTwo`'s existing plotting machinery (which was made to plot a single session) to plot something it isn't supposed to.
         Aggregate across all of the sessions to build a new combined `InstantaneousSpikeRateGroupsComputation`, which can be used to plot the "PaperFigureTwo", bar plots for many sessions."""
 
@@ -567,16 +559,20 @@ class AcrossSessionsVisualizations:
         # Showing
         matplotlib_configuration_update(is_interactive=True, backend='Qt5Agg')
         # Perform interactive Matplotlib operations with 'Qt5Agg' backend
-        _fig_2_theta_out, _fig_2_replay_out = _out_aggregate_fig_2.display(active_context=global_multi_session_context, title_modifier_fn=lambda original_title: f"{original_title} ({num_sessions} sessions)", save_figure=True, **kwargs)
-            
-        _out_aggregate_fig_2.perform_save()
+        _fig_2_theta_out, _fig_2_replay_out = _out_aggregate_fig_2.display(active_context=global_multi_session_context, title_modifier_fn=lambda original_title: f"{original_title} ({num_sessions} sessions)", save_figure=save_figure, **kwargs)
+        if save_figure:
+            _out_aggregate_fig_2.perform_save()
 
-        global_multi_session_context, _out_aggregate_fig_2
+        return global_multi_session_context, _out_aggregate_fig_2
 
 
 # AttrsBasedClassHelperMixin, serialized_field, serialized_attribute_field, non_serialized_field
 
 from pyphoplacecellanalysis.General.Batch.PhoDiba2023Paper import main_complete_figure_generations, InstantaneousSpikeRateGroupsComputation, SingleBarResult # for `AcrossSessionsAggregator`
+
+
+
+
 
 
 @custom_define(slots=False, repr=False)
@@ -619,6 +615,45 @@ class AcrossSessionsAggregator(AttrsBasedClassHelperMixin):
 
 
 
+
+@define(slots=False)
+class H5ExternalLinkBuilder:
+    """ H5Loader class for loading and consolidating .h5 files
+    Usage:
+        from pyphoplacecellanalysis.General.Batch.AcrossSessionResults import H5ExternalLinkBuilder
+        session_group_keys: List[str] = [("/" + a_ctxt.get_description(separator="/", include_property_names=False)) for a_ctxt in session_identifiers] # 'kdiba/gor01/one/2006-6-08_14-26-15'
+        neuron_identities_table_keys = [f"{session_group_key}/neuron_identities/table" for session_group_key in session_group_keys]
+        a_loader = H5Loader(file_list=hdf5_output_paths, table_key_list=neuron_identities_table_keys)
+        _out_table = a_loader.load_and_consolidate()
+        _out_table
+
+
+    """
+    file_list: List[str] = field(default=Factory(list))
+    table_key_list: List[str] = field(default=Factory(list))
+    
+    def load_and_consolidate(self) -> pd.DataFrame:
+        """
+        Loads .h5 files and consolidates into a master table
+        """
+        data_frames = []
+        for file, table_key in zip(self.file_list, self.table_key_list):
+            with tb.open_file(file) as h5_file:
+                a_table = h5_file.get_node(table_key)
+                print(f'a_table: {a_table}')
+                # for a_record in a_table
+                
+                # data_frames.append(a_table)
+#                 for table in h5_file.get_node(table_key):
+#                 # for table in h5_file.root:
+                # df = pd.DataFrame.from_records(a_table[:]) # .read()
+                df = pd.DataFrame.from_records(a_table.read()) 
+                data_frames.append(df)
+
+        master_table = pd.concat(data_frames, ignore_index=True)
+        return master_table
+
+    
 def build_linking_results(file_path, session_identifiers, external_h5_links):
     with tb.open_file(file_path, mode='w') as f: # this mode='w' is correct because it should overwrite the previous file and not append to it.
         # a_global_computations_group = f.create_group(session_group_key, 'global_computations', title='the result of computations that operate over many or all of the filters in the session.', createparents=True)
