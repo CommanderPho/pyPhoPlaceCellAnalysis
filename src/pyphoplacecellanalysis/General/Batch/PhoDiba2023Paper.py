@@ -928,7 +928,11 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
         x_labels = ['$L_x C$\t$R_{\\Delta -}$', '$L_x C$\t$R_{\\Delta +}$', '$S_x C$\t$R_{\\Delta -}$', '$S_x C$\t$R_{\\Delta +}$']
         assert len(Fig2_Replay_FR) == 4
         all_data_points = np.array([v.values for v in Fig2_Replay_FR])
-        all_scatter_props = Fig2_Replay_FR[0].LxC_scatter_props + Fig2_Replay_FR[1].LxC_scatter_props + Fig2_Replay_FR[2].SxC_scatter_props + Fig2_Replay_FR[3].SxC_scatter_props # the LxC_scatter_props and SxC_scatter_props are actually the same for all entries in this list, but get em like this anyway. 
+        # all_scatter_props = Fig2_Replay_FR[0].LxC_scatter_props + Fig2_Replay_FR[1].LxC_scatter_props + Fig2_Replay_FR[2].SxC_scatter_props + Fig2_Replay_FR[3].SxC_scatter_props # the LxC_scatter_props and SxC_scatter_props are actually the same for all entries in this list, but get em like this anyway. 
+
+        if Fig2_Replay_FR[0].LxC_scatter_props is not None:
+            # all_scatter_props =  Fig2_Laps_FR[0].LxC_scatter_props + Fig2_Laps_FR[1].LxC_scatter_props + Fig2_Laps_FR[2].SxC_scatter_props + Fig2_Laps_FR[3].SxC_scatter_props # the LxC_scatter_props and SxC_scatter_props are actually the same for all entries in this list, but get em like this anyway. 
+            all_scatter_props =  [Fig2_Replay_FR[0].LxC_scatter_props, Fig2_Replay_FR[1].LxC_scatter_props, Fig2_Replay_FR[2].SxC_scatter_props, Fig2_Replay_FR[3].SxC_scatter_props]
         
         # label_list = [LxC_aclus, LxC_aclus, SxC_aclus, SxC_aclus]
         return cls.create_plot(x_labels, all_data_points, all_scatter_props, 'Replay Firing Rates (Hz)', 'Replay', 'fig_2_Replay_FR_matplotlib', active_context, defer_show, kwargs.get('title_modifier'))
