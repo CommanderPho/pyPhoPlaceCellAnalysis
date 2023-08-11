@@ -73,11 +73,13 @@ class FiringRatesDeltaTable(tb.IsDescription):
 
 
 
-@pd.api.extensions.register_dataframe_accessor("inst_fr_results")
+# @pd.api.extensions.register_dataframe_accessor("inst_fr_results")
 class InstantaneousFiringRatesDataframeAccessor():
     """ A Pandas pd.DataFrame representation of results from the batch processing of sessions
     # 2023-07-07
     Built from `BatchRun`
+    
+    Used for FigureTwo: the cross-session scatter plot of firing rates during laps v replays for the LxCs vs. SxCs.
 
     """
 
@@ -96,18 +98,6 @@ class InstantaneousFiringRatesDataframeAccessor():
         replay_firing_rates_delta = FiringRatesDeltaTable()
         
         active_set_membership = EnumCol(trackMembershipTypesEnum, 'neither', base='uint8')
-
-
-    def __init__(self, pandas_obj):
-        pandas_obj = self._validate(pandas_obj)
-        self._obj = pandas_obj
-        
-    @classmethod
-    def _validate(cls, obj):
-        """ verify there is a column that identifies the spike's neuron, the type of cell of this neuron ('cell_type'), and the timestamp at which each spike occured ('t'||'t_rel_seconds') """       
-        # assert np.all(np.isin(obj.columns, cls._required_column_names))
-        return obj # important! Must return the modified obj to be assigned (since its columns were altered by renaming
-
 
 
     @classmethod
