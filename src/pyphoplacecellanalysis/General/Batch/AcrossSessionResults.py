@@ -61,7 +61,7 @@ trackMembershipTypesList: List[str] = ['long_only', 'short_only', 'both', 'neith
 trackMembershipTypesEnum = tb.Enum(trackMembershipTypesList)
 
 
-
+trackExclusiveToMembershipTypeDict: Dict = dict(zip(['LxC', 'SxC', 'shared', 'neither'], trackMembershipTypesList))
 
 
 
@@ -132,13 +132,7 @@ class AcrossSessionsResults:
 
     #TODO 2023-08-10 21:34: - [ ] Ready to accumulate results!
     class ScatterPlotResultsTable(tb.IsDescription):
-        """ 
-
-        from pyphoplacecellanalysis.General.Batch.AcrossSessionResults import AcrossSessionsResults
-
-        AcrossSessionsResults.ScatterPlotResultsTable
-
-        """        
+        """ """        
         neuron_identity = NeuronIdentityTable()
         
         class LapFiringRatesDeltaTable(tb.IsDescription):

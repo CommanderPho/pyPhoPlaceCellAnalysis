@@ -774,7 +774,7 @@ class InstantaneousSpikeRateGroupsComputation(HDF_SerializationMixin, AttrsBased
         """ Returns a summary datatable for each neuron with one entry for each cell in (self.LxC_aclus + self.SxC_aclus)
 
         """
-        table_columns = ['aclu_uid', 'lap_delta_minus', 'lap_delta_plus', 'replay_delta_minus', 'replay_delta_plus', 'active_set_membership']
+        table_columns = ['aclu', 'lap_delta_minus', 'lap_delta_plus', 'replay_delta_minus', 'replay_delta_plus', 'active_set_membership']
         n_LxC_aclus: int = len(self.LxC_aclus)
         v_LxC_aclus = [list(self.LxC_aclus)] + [v.cell_agg_inst_fr_list for v in (self.LxC_ThetaDeltaMinus, self.LxC_ThetaDeltaPlus, self.LxC_ReplayDeltaMinus, self.LxC_ReplayDeltaPlus)] + [(['LxC'] * n_LxC_aclus)]
         df_LxC_aclus = pd.DataFrame(dict(zip(table_columns, v_LxC_aclus)))
