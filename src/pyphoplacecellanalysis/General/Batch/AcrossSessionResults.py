@@ -16,11 +16,12 @@ import sys
 import os
 import pathlib
 from pathlib import Path
-from typing import List, Dict, Optional, Union, Callable
+from typing import List, Dict, Optional, Union, Callable, Tuple
 import numpy as np
 import pandas as pd
 from copy import deepcopy
 from attrs import define, field, Factory
+from pyphocorehelpers.print_helpers import CapturedException
 import tables as tb
 from tables import (
     Int8Col, Int16Col, Int32Col, Int64Col,
@@ -28,7 +29,8 @@ from tables import (
     Float32Col, Float64Col,
     TimeCol, ComplexCol, StringCol, BoolCol, EnumCol
 )
-
+import seaborn as sns
+# from pyphocorehelpers.indexing_helpers import partition, safe_pandas_get_group
 
 ## Pho's Custom Libraries:
 from pyphocorehelpers.Filesystem.path_helpers import find_first_extant_path, set_posix_windows, convert_filelist_to_new_parent, find_matching_parent_path
@@ -202,7 +204,149 @@ class InstantaneousFiringRatesDataframeAccessor():
         return loaded_result_df
 
 
+    @classmethod
+    def add_results_to_inst_fr_results_table(cls, curr_active_pipeline, common_file_path, file_mode='w') -> bool:
+        """ computes the InstantaneousSpikeRateGroupsComputation needed for FigureTwo and serializes it out to an HDF file.
+        Our final output table will be indexed by unique cells but the `InstantaneousSpikeRateGroupsComputation` data structure is currently organized by graph results.
 
+        Usage:
+            ## Specify the output file:
+            common_file_path = Path('output/test_across_session_scatter_plot_new.h5')
+            print(f'common_file_path: {common_file_path}')
+            InstantaneousFiringRatesDataframeAccessor.add_results_to_inst_fr_results_table(curr_active_pipeline, common_file_path)
+
+        """
+        curr_session_context = curr_active_pipeline.get_session_context() 
+
+        try:
+            print(f'\t doing specific instantaneous firing rate computation for context: {curr_session_context}...')
+            _out_inst_fr_comps = InstantaneousSpikeRateGroupsComputation(instantaneous_time_bin_size_seconds=0.01) # 10ms
+            _out_inst_fr_comps.compute(curr_active_pipeline=curr_active_pipeline, active_context=curr_session_context)
+            
+            ## Build the Output Dataframe:
+            cell_firing_rate_summary_df: pd.DataFrame = _out_inst_fr_comps.get_summary_dataframe() # Returns the dataframe with columns ['aclu', 'lap_delta_minus', 'lap_delta_plus', 'replay_delta_minus', 'replay_delta_plus', 'active_set_membership']
+
+            # Get the aclu information for each aclu in the dataframe. Adds the ['aclu', 'shank', 'cluster', 'qclu', 'cell_type'] columns
+            unique_aclu_information_df: pd.DataFrame = curr_active_pipeline.sess.spikes_df.spikes.extract_unique_neuron_identities()
+
+            # Horizontally join (merge) the dataframes
+            result_df: pd.DataFrame = pd.merge(unique_aclu_information_df, cell_firing_rate_summary_df, left_on='aclu', right_on='aclu', how='inner')
+
+            # Add this session context columns for each entry: creates the columns ['format_name', 'animal', 'exper_name', 'session_name']
+            result_df[curr_session_context._get_session_context_keys()] = curr_session_context.as_tuple()
+
+            # Reordering the columns to place the new columns on the left
+            result_df = result_df[['format_name', 'animal', 'exper_name', 'session_name', 'aclu', 'shank', 'cluster', 'qclu', 'cell_type', 'active_set_membership', 'lap_delta_minus', 'lap_delta_plus', 'replay_delta_minus', 'replay_delta_plus']]
+            
+            cls.scatter_plot_results_table_to_hdf(file_path=common_file_path, result_df=result_df, file_mode=file_mode)
+
+            print(f'\t\t done (success).') 
+            return True
+
+        except Exception as e:
+            exception_info = sys.exc_info()
+            e = CapturedException(e, exception_info)
+            print(f"ERROR: encountered exception {e} while trying to compute the instantaneous firing rates and set self.across_sessions_instantaneous_fr_dict[{curr_session_context}]")
+            _out_inst_fr_comps = None
+            return False
+
+
+    @classmethod
+    def load_and_prepare_for_plot(cls, common_file_path) -> Tuple[InstantaneousSpikeRateGroupsComputation, pd.DataFrame]:
+        """ loads the previously saved out inst_fr_scatter_plot_results_table and prepares it for plotting. 
+
+        returns a `InstantaneousSpikeRateGroupsComputation` _shell_obj which can be plotted
+        
+        Usage:        
+            _shell_obj, loaded_result_df = InstantaneousFiringRatesDataframeAccessor.load_and_prepare_for_plot(common_file_path)
+            # Perform the actual plotting:
+            AcrossSessionsVisualizations.across_sessions_bar_graphs(_shell_obj, num_sessions=1, save_figure=False, enable_tiny_point_labels=False, enable_hover_labels=False)
+        
+        """
+
+        ## Read the previously saved-out result:
+        loaded_result_df = cls.read_scatter_plot_results_table(file_path=common_file_path)
+        
+        ## Scatter props:
+        def build_unique_colors_mapping_for_column(df, column_name:str):
+            # Get unique values and map them to colors
+            unique_values = df[column_name].unique()
+            colors = sns.color_palette('husl', n_colors=len(unique_values)) # Using seaborn to get a set of distinct colors
+            # Create a mapping from unique values to colors
+            color_mapping = {value: color for value, color in zip(unique_values, colors)}
+            return color_mapping
+
+        def build_unique_markers_mapping_for_column(df, column_name:str):
+            # Get unique values and map them to colors
+            unique_values = df[column_name].unique()
+            marker_list = [(5, i) for i in np.arange(len(unique_values))] # [(5, 0), (5, 1), (5, 2)]
+            
+            # Create a mapping from unique values to colors
+            marker_mapping = {value: color for value, color in zip(unique_values, marker_list)}
+            return marker_mapping
+
+        scatter_props_column_names = ['color', 'marker']
+        # column_name_to_colorize:str = 'session_name'
+        column_name_to_colorize:str = 'qclu'
+        color_mapping = build_unique_colors_mapping_for_column(loaded_result_df, column_name_to_colorize)
+        # Apply the mapping to the 'property' column to create a new 'color' column
+        loaded_result_df['color'] = loaded_result_df[column_name_to_colorize].map(color_mapping)
+
+        column_name_to_markerize:str = 'animal'
+        marker_mapping =  build_unique_markers_mapping_for_column(loaded_result_df, column_name_to_markerize)
+        loaded_result_df['marker'] = loaded_result_df[column_name_to_markerize].map(marker_mapping)
+
+        # build the final 'scatter_props' column
+        # loaded_result_df['scatter_props'] = [{'edgecolor': a_color, 'marker': a_marker} for a_color, a_marker in zip(loaded_result_df['color'], loaded_result_df['marker'])]
+        loaded_result_df['scatter_props'] = [{'marker': a_marker} for a_color, a_marker in zip(loaded_result_df['color'], loaded_result_df['marker'])]
+
+
+        # For `loaded_result_df`, to recover the plottable FigureTwo points:
+        table_columns = ['global_uid', 'aclu', 'lap_delta_minus', 'lap_delta_plus', 'replay_delta_minus', 'replay_delta_plus', 'active_set_membership']
+        # 1. Group by 'active_set_membership' (to get LxC and SxC groups which are processed separately)
+
+        # loaded_result_df.groupby('active_set_membership')
+        # 2. FigureTwo_a uses the lap_* columns and FigureTwo_b uses the replay_* columns
+
+        # 3. Compute the mean and error bars for each of the four columns
+        data_columns = ['lap_delta_minus', 'lap_delta_plus', 'replay_delta_minus', 'replay_delta_plus']  
+
+        grouped_df = loaded_result_df.groupby(['active_set_membership'])
+        LxC_df, SxC_df = [grouped_df.get_group(aValue) for aValue in ['LxC','SxC']] # Note that in general LxC and SxC might have differing numbers of cells.
+
+        #TODO 2023-08-11 02:09: - [ ] These LxC/SxC_aclus need to be globally unique probably.
+        # LxC_aclus = LxC_df.aclu.values
+        # SxC_aclus = SxC_df.aclu.values
+        LxC_aclus = LxC_df.global_uid.values
+        SxC_aclus = SxC_df.global_uid.values
+        # The arguments should be determined by the neuron information or the session, etc. Let's color based on session here.
+
+        # LxC_scatter_props = [{'edge_color': a_color, 'marker': a_marker} for a_color, a_marker in zip(LxC_df['color'], LxC_df['marker'])]
+        # SxC_scatter_props = [{'edge_color': a_color, 'marker': a_marker} for a_color, a_marker in zip(SxC_df['color'], SxC_df['marker'])]
+
+        LxC_scatter_props = [{'alpha': 0.2} for a_color, a_marker in zip(LxC_df['color'], LxC_df['marker'])]
+        SxC_scatter_props = [{'alpha': 0.2} for a_color, a_marker in zip(SxC_df['color'], SxC_df['marker'])]
+
+        # LxC_scatter_props = LxC_df['scatter_props'].values
+        # SxC_scatter_props = SxC_df['scatter_props'].values
+
+        # ## Empty scatter_props
+        # LxC_scatter_props = [{} for a_color, a_marker in zip(LxC_df['color'], LxC_df['marker'])]
+        # SxC_scatter_props = [{} for a_color, a_marker in zip(SxC_df['color'], SxC_df['marker'])]
+
+        ## Convert back to `InstantaneousSpikeRateGroupsComputation`'s language:
+        Fig2_Laps_FR: list[SingleBarResult] = [SingleBarResult(v.mean(), v.std(), v, LxC_aclus, SxC_aclus, LxC_scatter_props, SxC_scatter_props) for v in (LxC_df['lap_delta_minus'].values, LxC_df['lap_delta_plus'].values, SxC_df['lap_delta_minus'].values, SxC_df['lap_delta_plus'].values)]
+        Fig2_Replay_FR: list[SingleBarResult] = [SingleBarResult(v.mean(), v.std(), v, LxC_aclus, SxC_aclus, LxC_scatter_props, SxC_scatter_props) for v in (LxC_df['replay_delta_minus'].values, LxC_df['replay_delta_plus'].values, SxC_df['replay_delta_minus'].values, SxC_df['replay_delta_plus'].values)]
+
+        _shell_obj = InstantaneousSpikeRateGroupsComputation()
+        _shell_obj.Fig2_Laps_FR = Fig2_Laps_FR
+        _shell_obj.Fig2_Replay_FR = Fig2_Replay_FR
+        _shell_obj.LxC_aclus = LxC_aclus
+        _shell_obj.SxC_aclus = SxC_aclus
+        # _shell_obj.LxC_scatter_props = LxC_scatter_props
+        # _shell_obj.SxC_scatter_props = SxC_scatter_props
+
+        return _shell_obj, loaded_result_df
 
 
 class AcrossSessionsResults:
