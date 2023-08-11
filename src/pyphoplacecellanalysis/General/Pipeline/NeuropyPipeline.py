@@ -563,6 +563,30 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
         del state['_registered_output_files']
         del state['_outputs_specifier']
         # del state['_pickle_path']
+
+        ## What about the registered functions? It seems like there are a lot of objects to drop.
+        
+        #TODO 2023-08-10 19:24: - [ ] Looks like the majority of the data (which is in `self.stage` aka `state['_stage']`) is pickled as a `DisplayPipelineStage` object and not a dictionary, meaning there might be considerable overhead.
+        # Below was my cursory attempt to remove these extra properties.`
+
+        # state_variable_names_to_remove = [
+        #     "registered_computation_function_dict",
+        #     "registered_global_computation_function_dict",
+        #     "display_output",
+        #     "render_actions",
+        #     "registered_display_function_dict",
+        #     "post_load_functions",
+        #     "registered_load_function_dict"
+        # ]
+        
+        # stage = state['_stage'] #.__dict__
+        # # remove properties from the stage
+
+        # for state_v_name in state_variable_names_to_remove:
+        #     if hasattr(stage, state_v_name):
+        #         delattr(stage, state_v_name) # removes the attribute from the class 
+        #         # del state['_stage'][state_v_name]
+        
         return state
 
     def __setstate__(self, state):
