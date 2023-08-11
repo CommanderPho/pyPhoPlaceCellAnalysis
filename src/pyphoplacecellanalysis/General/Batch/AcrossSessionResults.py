@@ -108,6 +108,11 @@ class H5ExternalLinkBuilder:
 
 
 
+class FiringRatesDeltaTable(tb.IsDescription):
+    delta_minus = tb.Float64Col()
+    delta_plus = tb.Float64Col()
+    
+
 
 class AcrossSessionsResults:
     """ 
@@ -129,26 +134,15 @@ class AcrossSessionsResults:
     
 
 
-
     #TODO 2023-08-10 21:34: - [ ] Ready to accumulate results!
     class ScatterPlotResultsTable(tb.IsDescription):
         """ """        
         neuron_identity = NeuronIdentityTable()
         
-        class LapFiringRatesDeltaTable(tb.IsDescription):
-            delta_minus = tb.Float64Col()
-            delta_plus = tb.Float64Col()
-            
-        class ReplayFiringRatesDeltaTable(tb.IsDescription):
-            delta_minus = tb.Float64Col()
-            delta_plus = tb.Float64Col()
-
+        lap_firing_rates_delta = FiringRatesDeltaTable()
+        replay_firing_rates_delta = FiringRatesDeltaTable()
+        
         active_set_membership = EnumCol(trackMembershipTypesEnum, 'neither', base='uint8')
-
-
-            
-
-
 
  
     class ProcessedSessionResultsTable(tb.IsDescription):
@@ -197,6 +191,45 @@ class AcrossSessionsResults:
         #     exper_name  = StringCol(32)
         #     session_name  = StringCol(32)
     
+
+
+    @classmethod
+    def scatter_plot_results_table_to_hdf(cls, file_path, result_df: pd.DataFrame, file_mode='a'):
+        """ writes the table to a .h5 file at the specified file path"""
+        with tb.open_file(file_path, mode=file_mode) as file:
+            # Create the table
+            table = file.create_table('/', 'ScatterPlotResults', AcrossSessionsResults.ScatterPlotResultsTable)
+
+            # Serialization
+            row = table.row
+            for i in np.arange(len(result_df)):
+                row_data = result_df.iloc[i]
+                
+                session_uid: str = f"|".join([row_data['format_name'], row_data['animal'], row_data['exper_name'], row_data['session_name']])
+                
+                # NeuronIdentityTable
+                row['neuron_identity/global_uid'] = f"{session_uid}|{row_data['aclu']}"
+                row['neuron_identity/session_uid'] = session_uid
+                row['neuron_identity/neuron_id'] = row_data['aclu']
+                row['neuron_identity/neuron_type'] = neuronTypesEnum[row_data['cell_type'].hdfcodingClassName]
+                row['neuron_identity/shank_index'] = row_data['shank']
+                row['neuron_identity/cluster_index'] = row_data['cluster']
+                row['neuron_identity/qclu'] = row_data['qclu']
+
+                # # LapFiringRatesDeltaTable
+                row['lap_firing_rates_delta/delta_minus'] = row_data['lap_delta_minus']
+                row['lap_firing_rates_delta/delta_plus'] = row_data['lap_delta_plus']
+
+                # # ReplayFiringRatesDeltaTable
+                row['replay_firing_rates_delta/delta_minus'] = row_data['replay_delta_minus']
+                row['replay_firing_rates_delta/delta_plus'] = row_data['replay_delta_plus']
+
+                # active_set_membership
+                row['active_set_membership'] = trackMembershipTypesEnum[trackExclusiveToMembershipTypeDict[row_data['active_set_membership']]]
+                
+                row.append()
+                
+            table.flush()
 
     
     ## This seems definitionally a single-session result! It can be concatenated across sessions to make a multi-session one though!
