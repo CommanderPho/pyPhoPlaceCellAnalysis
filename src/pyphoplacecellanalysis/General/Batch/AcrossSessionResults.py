@@ -248,22 +248,19 @@ class AcrossSessionsResults:
 
             data = []
             for row in table.iterrows():
-                # neuron_identity = row['neuron_identity']
-                # session_uid_parts = row['neuron_identity/session_uid'].decode().split("|")
-
-                global_uid = row['neuron_identity/global_uid'].decode()
+                # global_uid = row['neuron_identity/global_uid'].decode()
                 session_uid = row['neuron_identity/session_uid'].decode()
                 session_uid_parts = session_uid.split("|")
-                global_uid_parts = global_uid.split("|")
-                print(f'global_uid: {global_uid}, global_uid_parts: {global_uid_parts}')
+                # global_uid_parts = global_uid.split("|")
+                # print(f'global_uid: {global_uid}, global_uid_parts: {global_uid_parts}')
             
                 # global_uid, session_uid, neuron_id, neuron_type, shank_index, cluster_index, qclu = neuron_identity
                 
                 row_data = {
-                    'format_name': global_uid_parts[0],
-                    'animal': global_uid_parts[1],
-                    'exper_name': global_uid_parts[2],
-                    'session_name': global_uid_parts[3],
+                    'format_name': session_uid_parts[0],
+                    'animal': session_uid_parts[1],
+                    'exper_name': session_uid_parts[2],
+                    'session_name': session_uid_parts[3],
                     'aclu': row['neuron_identity/neuron_id'],
                     'shank': row['neuron_identity/shank_index'],
                     'cluster': row['neuron_identity/cluster_index'],
