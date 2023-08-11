@@ -873,7 +873,24 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
 
         for i in range(len(x)):
             x_values = (x[i] + np.random.random(y_values[i].size) * width - width / 2)
-            scatter_plot = ax.scatter(x_values, y_values[i], color=cls.get_bar_colors()[i], **list_of_dicts_to_dict_of_lists(scatter_props[i])) # the np.random part is to spread the points out along the x-axis within their bar so they're visible and don't overlap.
+            scatter_props_kwargs: Dict = list_of_dicts_to_dict_of_lists(scatter_props[i])
+            had_custom_marker_handling = False
+            user_markers = scatter_props_kwargs.get('marker', None)
+            if user_markers is not None:
+                # if marker is just a scalar we can do the normal (flat) ax.scatter(...) command. Otherwise we have to loop.
+                if isinstance(user_markers, (list, tuple, np.ndarray)):
+                    ## have to loop. 
+                    user_markers = scatter_props_kwargs.pop('marker') # remove from `scatter_props_kwargs`
+                    scatter_plot = [] # scatter plot is just going to be a list here, hope that's okay.
+                    for point_index, a_marker in enumerate(user_markers):
+                        a_sub_scatter_plot = ax.scatter(x_values[point_index], y_values[i][point_index], color=cls.get_bar_colors()[i], marker=user_markers[point_index], **scatter_props_kwargs) # the np.random part is to spread the points out along the x-axis within their bar so they're visible and don't overlap.
+                        scatter_plot.append(a_sub_scatter_plot)
+                    had_custom_marker_handling = True # indicate that this was handled in this manner
+
+            if not had_custom_marker_handling:
+                # No special marker or just a scalar specific marker value, no need to loop
+                scatter_plot = ax.scatter(x_values, y_values[i], color=cls.get_bar_colors()[i], **scatter_props_kwargs) # the np.random part is to spread the points out along the x-axis within their bar so they're visible and don't overlap.
+    
             scatter_plots.append(scatter_plot)
             x_values_list.append(x_values)
             

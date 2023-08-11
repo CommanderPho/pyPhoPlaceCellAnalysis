@@ -47,7 +47,7 @@ from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiCo
 # from pyphoplacecellanalysis.General.Batch.NeptuneAiHelpers import set_environment_variables, neptune_output_figures
 from pyphoplacecellanalysis.General.Batch.PhoDiba2023Paper import main_complete_figure_generations, InstantaneousSpikeRateGroupsComputation, SingleBarResult # for `BatchSessionCompletionHandler`
 from neuropy.core.user_annotations import UserAnnotationsManager
-from pyphoplacecellanalysis.General.Batch.AcrossSessionResults import AcrossSessionsResults, AcrossSessionsVisualizations
+from pyphoplacecellanalysis.General.Batch.AcrossSessionResults import AcrossSessionsResults, AcrossSessionsVisualizations, InstantaneousFiringRatesDataframeAccessor
 
 
 known_global_data_root_parent_paths = [Path(r'W:\Data'), Path(r'/media/MAX/Data'), Path(r'/Volumes/MoverNew/data'), Path(r'/home/halechr/turbo/Data'), Path(r'/nfs/turbo/umms-kdiba/Data')]
@@ -1263,6 +1263,12 @@ class BatchSessionCompletionHandler:
             print(f"ERROR: encountered exception {e} while trying to build the session HDF output for {curr_session_context}")
             hdf5_output_path = None # set to None because it failed.
 
+
+        print(f'\t doing specific instantaneous firing rate computation for context: {curr_session_context}...')
+        ## Specify the output file:
+        common_file_path = Path('output/active_across_session_scatter_plot_results.h5')
+        print(f'common_file_path: {common_file_path}')
+        InstantaneousFiringRatesDataframeAccessor.add_results_to_inst_fr_results_table(curr_active_pipeline, common_file_path, file_mode='a')
 
 
         try:
