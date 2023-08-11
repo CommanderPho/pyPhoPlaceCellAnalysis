@@ -787,6 +787,8 @@ class InstantaneousSpikeRateGroupsComputation(HDF_SerializationMixin, AttrsBased
         df_combined = pd.concat([df_LxC_aclus, df_SxC_aclus], ignore_index=True)
         return df_combined
 
+
+
 # @overwriting_display_context(
 @metadata_attributes(short_name=None, tags=['figure_2', 'paper', 'figure'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-06-26 21:36', related_items=[])
 @define(slots=False, repr=False)
@@ -931,6 +933,54 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
         # label_list = [LxC_aclus, LxC_aclus, SxC_aclus, SxC_aclus]
         return cls.create_plot(x_labels, all_data_points, all_scatter_props, 'Replay Firing Rates (Hz)', 'Replay', 'fig_2_Replay_FR_matplotlib', active_context, defer_show, kwargs.get('title_modifier'))
 
+    @providing_context(fig='2', display_fn_name='inst_FR_bar_graphs')
+    def display(self, defer_show=False, save_figure=True, enable_tiny_point_labels=True, enable_hover_labels=False, **kwargs):
+        """ 
+        
+        title_modifier: lambda original_title: f"{original_title} (all sessions)"
+
+        """
+        # Get the provided context or use the session context:
+        active_context = kwargs.get('active_context', self.active_identifying_session_ctx)
+        title_modifier = kwargs.get('title_modifier_fn', (lambda original_title: original_title))
+        top_margin, left_margin, bottom_margin = kwargs.get('top_margin', 0.8), kwargs.get('left_margin', 0.090), kwargs.get('bottom_margin', 0.150)
+
+        _fig_2_theta_out = self.fig_2_Theta_FR_matplotlib(self.computation_result.Fig2_Laps_FR, defer_show=defer_show,
+                                                        active_context=active_context, top_margin=top_margin,
+                                                        left_margin=left_margin, bottom_margin=bottom_margin,
+                                                        title_modifier=title_modifier)
+
+        _fig_2_replay_out = self.fig_2_Replay_FR_matplotlib(self.computation_result.Fig2_Replay_FR, defer_show=defer_show,
+                                                            active_context=active_context, top_margin=top_margin,
+                                                            left_margin=left_margin, bottom_margin=bottom_margin,
+                                                            title_modifier=title_modifier)
+
+
+        if enable_hover_labels or enable_tiny_point_labels:
+            LxC_aclus = self.computation_result.LxC_aclus
+            SxC_aclus = self.computation_result.SxC_aclus
+            _fig_2_theta_out = self.add_optional_aclu_labels(_fig_2_theta_out, LxC_aclus, SxC_aclus, enable_tiny_point_labels=enable_tiny_point_labels, enable_hover_labels=enable_hover_labels)
+            _fig_2_replay_out = self.add_optional_aclu_labels(_fig_2_replay_out, LxC_aclus, SxC_aclus, enable_tiny_point_labels=enable_tiny_point_labels, enable_hover_labels=enable_hover_labels)
+        
+        def _perform_write_to_file_callback():
+            ## 2023-05-31 - Reference Output of matplotlib figure to file, along with building appropriate context.
+            return (self.perform_save(_fig_2_theta_out.context, _fig_2_theta_out.figures[0]), 
+                    self.perform_save(_fig_2_replay_out.context, _fig_2_replay_out.figures[0]))
+
+        if save_figure:
+            _fig_2_theta_out['saved_figures'], _fig_2_replay_out['saved_figures'] = _perform_write_to_file_callback()
+        else:
+            _fig_2_theta_out['saved_figures'], _fig_2_replay_out['saved_figures'] = [], []
+
+        # Merge the two (_fig_2_theta_out | _fig_2_replay_out)
+        return (_fig_2_theta_out, _fig_2_replay_out)
+
+
+    def perform_save(self, *args, **kwargs):
+        """ used to save the figure without needing a hard reference to curr_active_pipeline """
+        assert self._pipeline_file_callback_fn is not None
+        return self._pipeline_file_callback_fn(*args, **kwargs) # call the saved callback
+
     @classmethod
     def add_optional_aclu_labels(cls, a_fig_container, LxC_aclus, SxC_aclus, enable_hover_labels=True, enable_tiny_point_labels=True):
         """ Adds disambiguating labels to each of the scatterplot points. Important for specifying which ACLU is plotted.
@@ -991,57 +1041,6 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
                     a_fig_container['plot_objects']['hover_label_objects'].append(hover_label_obj)
 
         return a_fig_container
-
-
-    @providing_context(fig='2', display_fn_name='inst_FR_bar_graphs')
-    def display(self, defer_show=False, save_figure=True, enable_tiny_point_labels=True, enable_hover_labels=False, **kwargs):
-        """ 
-        
-        title_modifier: lambda original_title: f"{original_title} (all sessions)"
-
-        """
-        # Get the provided context or use the session context:
-        active_context = kwargs.get('active_context', self.active_identifying_session_ctx)
-        title_modifier = kwargs.get('title_modifier_fn', (lambda original_title: original_title))
-        top_margin, left_margin, bottom_margin = kwargs.get('top_margin', 0.8), kwargs.get('left_margin', 0.090), kwargs.get('bottom_margin', 0.150)
-
-        _fig_2_theta_out = self.fig_2_Theta_FR_matplotlib(self.computation_result.Fig2_Laps_FR, defer_show=defer_show,
-                                                        active_context=active_context, top_margin=top_margin,
-                                                        left_margin=left_margin, bottom_margin=bottom_margin,
-                                                        title_modifier=title_modifier)
-
-        _fig_2_replay_out = self.fig_2_Replay_FR_matplotlib(self.computation_result.Fig2_Replay_FR, defer_show=defer_show,
-                                                            active_context=active_context, top_margin=top_margin,
-                                                            left_margin=left_margin, bottom_margin=bottom_margin,
-                                                            title_modifier=title_modifier)
-
-
-        if enable_hover_labels or enable_tiny_point_labels:
-            LxC_aclus = self.computation_result.LxC_aclus
-            SxC_aclus = self.computation_result.SxC_aclus
-            _fig_2_theta_out = self.add_optional_aclu_labels(_fig_2_theta_out, LxC_aclus, SxC_aclus, enable_tiny_point_labels=enable_tiny_point_labels, enable_hover_labels=enable_hover_labels)
-            _fig_2_replay_out = self.add_optional_aclu_labels(_fig_2_replay_out, LxC_aclus, SxC_aclus, enable_tiny_point_labels=enable_tiny_point_labels, enable_hover_labels=enable_hover_labels)
-        
-        def _perform_write_to_file_callback():
-            ## 2023-05-31 - Reference Output of matplotlib figure to file, along with building appropriate context.
-            return (self.perform_save(_fig_2_theta_out.context, _fig_2_theta_out.figures[0]), 
-                    self.perform_save(_fig_2_replay_out.context, _fig_2_replay_out.figures[0]))
-
-        if save_figure:
-            _fig_2_theta_out['saved_figures'], _fig_2_replay_out['saved_figures'] = _perform_write_to_file_callback()
-        else:
-            _fig_2_theta_out['saved_figures'], _fig_2_replay_out['saved_figures'] = [], []
-
-        # Merge the two (_fig_2_theta_out | _fig_2_replay_out)
-        return (_fig_2_theta_out, _fig_2_replay_out)
-
-
-    def perform_save(self, *args, **kwargs):
-        """ used to save the figure without needing a hard reference to curr_active_pipeline """
-        assert self._pipeline_file_callback_fn is not None
-        return self._pipeline_file_callback_fn(*args, **kwargs) # call the saved callback
-
-
 
 # ==================================================================================================================== #
 # 2023-06-26 Figure 3                                                                                                  #
