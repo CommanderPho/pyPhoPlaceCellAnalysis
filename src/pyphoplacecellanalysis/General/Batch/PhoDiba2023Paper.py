@@ -770,6 +770,22 @@ class InstantaneousSpikeRateGroupsComputation(HDF_SerializationMixin, AttrsBased
         self.Fig2_Laps_FR: list[SingleBarResult] = [SingleBarResult(v.cell_agg_inst_fr_list.mean(), v.cell_agg_inst_fr_list.std(), v.cell_agg_inst_fr_list, self.LxC_aclus, self.SxC_aclus, None, None) for v in (LxC_ThetaDeltaMinus, LxC_ThetaDeltaPlus, SxC_ThetaDeltaMinus, SxC_ThetaDeltaPlus)]
         
 
+    def get_summary_dataframe(self) -> pd.DataFrame:
+        """ Returns a summary datatable for each neuron with one entry for each cell in (self.LxC_aclus + self.SxC_aclus)
+
+        """
+        table_columns = ['aclu_uid', 'lap_delta_minus', 'lap_delta_plus', 'replay_delta_minus', 'replay_delta_plus', 'active_set_membership']
+        n_LxC_aclus: int = len(self.LxC_aclus)
+        v_LxC_aclus = [list(self.LxC_aclus)] + [v.cell_agg_inst_fr_list for v in (self.LxC_ThetaDeltaMinus, self.LxC_ThetaDeltaPlus, self.LxC_ReplayDeltaMinus, self.LxC_ReplayDeltaPlus)] + [(['LxC'] * n_LxC_aclus)]
+        df_LxC_aclus = pd.DataFrame(dict(zip(table_columns, v_LxC_aclus)))
+
+        n_SxC_aclus: int = len(self.SxC_aclus)
+        v_SxC_aclus = [list(self.SxC_aclus)] + [v.cell_agg_inst_fr_list for v in (self.SxC_ThetaDeltaMinus, self.SxC_ThetaDeltaPlus, self.SxC_ReplayDeltaMinus, self.SxC_ReplayDeltaPlus)] + [(['SxC'] * n_SxC_aclus)]
+        df_SxC_aclus = pd.DataFrame(dict(zip(table_columns, v_SxC_aclus)))
+
+        # Concatenate the two dataframes
+        df_combined = pd.concat([df_LxC_aclus, df_SxC_aclus], ignore_index=True)
+        return df_combined
 
 # @overwriting_display_context(
 @metadata_attributes(short_name=None, tags=['figure_2', 'paper', 'figure'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-06-26 21:36', related_items=[])
