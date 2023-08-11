@@ -30,8 +30,7 @@ from pyphocorehelpers.Filesystem.path_helpers import build_unique_filename, back
 
 from neuropy.core.session.Formats.BaseDataSessionFormats import DataSessionFormatRegistryHolder # hopefully this works without all the other imports
 from neuropy.core.session.KnownDataSessionTypeProperties import KnownDataSessionTypeProperties
-
-
+from neuropy.utils.result_context import IdentifyingContext
 
 from pyphoplacecellanalysis.General.Pipeline.Stages.Computation import PipelineWithComputedPipelineStageMixin, ComputedPipelineStage
 from pyphoplacecellanalysis.General.Pipeline.Stages.Display import PipelineWithDisplayPipelineStageMixin, PipelineWithDisplaySavingMixin
@@ -731,6 +730,22 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
         a_global_computations_group_key: str = f"{session_group_key}/global_computations"
         with tb.open_file(file_path, mode='w') as f: # this mode='w' is correct because it should overwrite the previous file and not append to it.
             a_global_computations_group = f.create_group(session_group_key, 'global_computations', title='the result of computations that operate over many or all of the filters in the session.', createparents=True)
+
+
+
+        ##TODO 2023-08-11 14:44: - [ ] Global Computations Output Here:
+        # Plot long|short firing rate index:
+        long_short_fr_indicies_analysis_results = self.global_computation_results.computed_data['long_short_fr_indicies_analysis']
+        x_frs_index, y_frs_index = long_short_fr_indicies_analysis_results['x_frs_index'], long_short_fr_indicies_analysis_results['y_frs_index'] # use the all_results_dict as the computed data value
+        active_context = long_short_fr_indicies_analysis_results['active_context']
+        # Need to map keys of dict to an absolute dict value:
+        sess_specific_aclus = list(x_frs_index.keys())
+        session_ctxt_key:str = active_context.get_description(separator='|', subset_includelist=IdentifyingContext._get_session_context_keys())
+
+        long_short_fr_indicies_analysis_results_h5_df = pd.DataFrame([(f"{session_ctxt_key}|{aclu}", session_ctxt_key, aclu, x_frs_index[aclu], y_frs_index[aclu]) for aclu in sess_specific_aclus], columns=['neuron_uid', 'session_uid', 'aclu','x_frs_index', 'y_frs_index'])
+        long_short_fr_indicies_analysis_results_h5_df.to_hdf(file_path, key=f'{a_global_computations_group_key}/long_short_fr_indicies_analysis', format='table', data_columns=True)
+
+        
 
         # InstantaneousSpikeRateGroupsComputation ____________________________________________________________________________ #
         _out_inst_fr_comps = InstantaneousSpikeRateGroupsComputation(instantaneous_time_bin_size_seconds=0.01) # 10ms
