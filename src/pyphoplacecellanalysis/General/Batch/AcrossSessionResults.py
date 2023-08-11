@@ -120,9 +120,17 @@ class InstantaneousFiringRatesDataframeAccessor():
         AcrossSessionsResults.scatter_plot_results_table_to_hdf(file_path=common_file_path, result_df=result_df, file_mode='w')
 
         """
-        with tb.open_file(file_path, mode=file_mode) as file:
-            # Create the table
-            table = file.create_table('/', 'ScatterPlotResults', cls.ScatterPlotResultsTable)
+        with tb.open_file(file_path, mode=file_mode) as file:    
+            # Check if the table exists
+            # if file.root.has_node('ScatterPlotResults'):
+            if 'ScatterPlotResults' in file.root:
+                table = file.root.ScatterPlotResults
+                # The table exists; you can now append to it
+            else:
+                # The table doesn't exist; you can create it
+                table = file.create_table('/', 'ScatterPlotResults', cls.ScatterPlotResultsTable)
+
+
 
             # Serialization
             row = table.row
@@ -263,6 +271,9 @@ class InstantaneousFiringRatesDataframeAccessor():
             AcrossSessionsVisualizations.across_sessions_bar_graphs(_shell_obj, num_sessions=1, save_figure=False, enable_tiny_point_labels=False, enable_hover_labels=False)
         
         """
+        from matplotlib.markers import MarkerStyle
+        from matplotlib.lines import Line2D
+        from matplotlib.transforms import Affine2D
 
         ## Read the previously saved-out result:
         loaded_result_df = cls.read_scatter_plot_results_table(file_path=common_file_path)
@@ -279,10 +290,13 @@ class InstantaneousFiringRatesDataframeAccessor():
         def build_unique_markers_mapping_for_column(df, column_name:str):
             # Get unique values and map them to colors
             unique_values = df[column_name].unique()
-            marker_list = [(5, i) for i in np.arange(len(unique_values))] # [(5, 0), (5, 1), (5, 2)]
             
+            pho_custom_allowed_filled_markers_list = ['o','^','8','s','p','d','P','X'] # all of these filled markers were chosen because they look like they represent similar quantities (they are the approx. same size and area.
+            
+            # marker_list = [(5, i) for i in np.arange(len(unique_values))] # [(5, 0), (5, 1), (5, 2)]
+            marker_list = [pho_custom_allowed_filled_markers_list[i] for i in np.arange(len(unique_values))] # Each marker is of the form: (numsides, 1, angle)
             # Create a mapping from unique values to colors
-            marker_mapping = {value: color for value, color in zip(unique_values, marker_list)}
+            marker_mapping = {value: a_marker for value, a_marker in zip(unique_values, marker_list)}
             return marker_mapping
 
         scatter_props_column_names = ['color', 'marker']
@@ -321,11 +335,14 @@ class InstantaneousFiringRatesDataframeAccessor():
         SxC_aclus = SxC_df.global_uid.values
         # The arguments should be determined by the neuron information or the session, etc. Let's color based on session here.
 
-        # LxC_scatter_props = [{'edge_color': a_color, 'marker': a_marker} for a_color, a_marker in zip(LxC_df['color'], LxC_df['marker'])]
-        # SxC_scatter_props = [{'edge_color': a_color, 'marker': a_marker} for a_color, a_marker in zip(SxC_df['color'], SxC_df['marker'])]
+        # LxC_scatter_props = [{'edgecolor': a_color, 'marker': a_marker} for a_color, a_marker in zip(LxC_df['color'], LxC_df['marker'])]
+        # SxC_scatter_props = [{'edgecolor': a_color, 'marker': a_marker} for a_color, a_marker in zip(SxC_df['color'], SxC_df['marker'])]
 
-        LxC_scatter_props = [{'alpha': 0.2} for a_color, a_marker in zip(LxC_df['color'], LxC_df['marker'])]
-        SxC_scatter_props = [{'alpha': 0.2} for a_color, a_marker in zip(SxC_df['color'], SxC_df['marker'])]
+        ## Hardcoded-override here:
+        LxC_scatter_props = [{'alpha': 0.5, 'edgecolors':'black', 'linewidths':1, 'marker':a_marker} for a_color, a_marker in zip(LxC_df['color'], LxC_df['marker'])]
+        SxC_scatter_props = [{'alpha': 0.5, 'edgecolors':'black', 'linewidths':1, 'marker':a_marker} for a_color, a_marker in zip(SxC_df['color'], SxC_df['marker'])] # a_marker, 's':80
+
+        # , markeredgecolor="orange", markeredgewidth=5
 
         # LxC_scatter_props = LxC_df['scatter_props'].values
         # SxC_scatter_props = SxC_df['scatter_props'].values
