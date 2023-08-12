@@ -36,9 +36,12 @@ else:
 
 
 
-run_status, run_errors, run_outputs = run_specific_batch(r'{{ global_data_root_parent_path }}', {{ curr_session_context }}, r'{{ curr_session_basedir }}', 
-												fail_on_exception=True,
-												post_run_callback_fn=result_handler.on_complete_success_execution_session)
+run_status, run_errors, run_outputs = run_specific_batch(Path(global_data_root_parent_path=r'{{ global_data_root_parent_path }}'),
+												curr_session_context={{ curr_session_context }},
+												curr_session_basedir = Path(r'{{ curr_session_basedir }}'),
+												force_reload = result_handler.force_reload_all,
+												post_run_callback_fn=result_handler.on_complete_success_execution_session,
+												fail_on_exception=True)
 
 print(f'finished run: {run_status}, errors: {run_errors}, outputs: {run_outputs}')
 

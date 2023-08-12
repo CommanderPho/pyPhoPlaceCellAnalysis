@@ -1412,6 +1412,13 @@ def run_specific_batch(global_data_root_parent_path: Path, curr_session_context:
     new_print(f'\tsession_basedir: {str(curr_session_basedir)}')    
     new_print('__________________________________________________________________')
 
+    if not isinstance(global_data_root_parent_path, Path):
+        global_data_root_parent_path = Path(global_data_root_parent_path).resolve()
+        
+    if not isinstance(curr_session_basedir, Path):
+        curr_session_basedir = Path(curr_session_basedir).resolve()
+
+
     ## Extract the default session loading vars from the session context:
     basedir = curr_session_basedir
     new_print(f'basedir: {str(basedir)}')
