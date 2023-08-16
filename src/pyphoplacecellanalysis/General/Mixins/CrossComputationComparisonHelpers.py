@@ -6,18 +6,20 @@ from attrs import define, field, Factory
 
 from neuropy.utils.dynamic_container import DynamicContainer, override_dict, overriding_dict_with, get_dict_subset
 from neuropy.utils.misc import safe_item
+import pandas as pd
+from pandas import CategoricalDtype
 
 from pyphocorehelpers.DataStructure.dynamic_parameters import DynamicParameters
 from pyphoplacecellanalysis.General.Model.ComputationResults import ComputationResult
 
 from neuropy.utils.colors_util import get_neuron_colors # required for build_neurons_color_map 
+from neuropy.utils.mixins.AttrsClassHelpers import AttrsBasedClassHelperMixin, serialized_field, serialized_attribute_field, non_serialized_field, custom_define
+from neuropy.utils.mixins.HDF5_representable import HDF_DeserializationMixin, post_deserialize, HDF_SerializationMixin, HDFMixin
 
 from pyphocorehelpers.programming_helpers import metadata_attributes
 from pyphocorehelpers.function_helpers import function_attributes
 
 from enum import Enum
-
-
 
 
 class SplitPartitionMembership(Enum):
@@ -28,32 +30,46 @@ class SplitPartitionMembership(Enum):
     RIGHT_ONLY = 2
     # WHERE IS NEITHER!!?
 
+    @classmethod
+    def hdf_coding_ClassNames(cls):
+        return [cls.LEFT_ONLY.name, cls.SHARED.name, cls.RIGHT_ONLY.name]
+    
+    @classmethod
+    def get_pandas_categories_type(cls) -> CategoricalDtype:
+        return CategoricalDtype(categories=list(cls.hdf_coding_ClassNames()), ordered=True)
+        
+    @classmethod
+    def from_hdf_coding_string(cls, string_value: str) -> "SplitPartitionMembership":
+        string_value = string_value.lower()
+        itemindex = np.where(cls.hdf_coding_ClassNames()==string_value)
+        return SplitPartitionMembership(itemindex[0])
 
 
-@define(slots=False)
-class SetPartition_SharedPartitionStructure:
+
+@custom_define(slots=False)
+class SetPartition_SharedPartitionStructure(HDFMixin, AttrsBasedClassHelperMixin):
     """ DynamicContainer(n_neurons=n_neurons, shared_fragile_neuron_IDXs=shared_fragile_neuron_IDXs, pairs=shared_fragile_neuron_IDXs_to_pairs, missing_neuron_IDXs=all_missing_IDXs, missing_neuron_ids=pf_neurons_missing_from_any, aclu_to_shared_fragile_IDX_map=aclu_to_shared_fragile_IDX_map) """
-    n_neurons: int
-    shared_fragile_neuron_IDXs: np.ndarray
-    pairs: List[Tuple[Optional[int], Optional[int]]]
-    missing_neuron_IDXs: np.ndarray
-    missing_neuron_ids: np.ndarray
-    aclu_to_shared_fragile_IDX_map: Dict
+    n_neurons: int = serialized_attribute_field()
+    shared_fragile_neuron_IDXs: np.ndarray = serialized_field()
+    pairs: List[Tuple[Optional[int], Optional[int]]] = non_serialized_field(is_computable=True)
+    missing_neuron_IDXs: np.ndarray = serialized_field()
+    missing_neuron_ids: np.ndarray = serialized_field()
+    aclu_to_shared_fragile_IDX_map: Dict = non_serialized_field(is_computable=False)
 
 
-@define(slots=False)
-class SetPartition:
+@custom_define(slots=False)
+class SetPartition(HDFMixin, AttrsBasedClassHelperMixin):
     """ Converted from a one-off structure produced by `_compare_computation_results` as illustrated below:
         pf_neurons_diff = DynamicContainer(lhs_only=pf_neurons_lhs_unique, rhs_only=pf_neurons_rhs_unique, intersection=pf_neurons_both, either=pf_neurons_either,
              shared=DynamicContainer(n_neurons=n_neurons, shared_fragile_neuron_IDXs=shared_fragile_neuron_IDXs, pairs=shared_fragile_neuron_IDXs_to_pairs, missing_neuron_IDXs=all_missing_IDXs, missing_neuron_ids=pf_neurons_missing_from_any, aclu_to_shared_fragile_IDX_map=aclu_to_shared_fragile_IDX_map)) 
 
         TODO: perhaps bring computations in here?
     """
-    lhs_only: np.ndarray
-    rhs_only: np.ndarray
-    intersection: np.ndarray
-    either: np.ndarray
-    shared: SetPartition_SharedPartitionStructure = field(alias='shared_structure')
+    lhs_only: np.ndarray = serialized_field()
+    rhs_only: np.ndarray = serialized_field()
+    intersection: np.ndarray = serialized_field()
+    either: np.ndarray = serialized_field()
+    shared: SetPartition_SharedPartitionStructure = serialized_field(alias='shared_structure')
 
     @property
     def n_neurons(self):

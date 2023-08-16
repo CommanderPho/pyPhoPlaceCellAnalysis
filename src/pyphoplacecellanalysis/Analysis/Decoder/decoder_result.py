@@ -1,12 +1,13 @@
 from copy import deepcopy
 from dataclasses import dataclass
-from typing import Union
+from typing import Dict, Union
 from attrs import define, field, Factory # used for several things
 import matplotlib.pyplot as plt
 from matplotlib import cm # used for plot_kourosh_activity_style_figure version too to get a good colormap 
 import numpy as np
 import numpy.ma as ma # for masked array
 import pandas as pd
+import h5py
 from pyphocorehelpers.DataStructure.general_parameter_containers import RenderPlots
 from scipy.spatial.distance import cdist
 # Distance metrics used by `_new_compute_surprise`
@@ -15,7 +16,6 @@ import random # for random.choice(mylist)
 # from PendingNotebookCode import _scramble_curve
 from scipy.stats import wasserstein_distance
 from scipy.stats import pearsonr
-
 
 # Neuropy:
 from neuropy.core.position import build_position_df_resampled_to_time_windows # used in DecoderResultDisplayingPlot2D.setup()
@@ -26,6 +26,8 @@ from neuropy.core.epoch import Epoch
 from neuropy.utils.dynamic_container import DynamicContainer
 from neuropy.utils.misc import shuffle_ids # used in _SHELL_analyze_leave_one_out_decoding_results
 from neuropy.utils.misc import split_array
+from neuropy.utils.mixins.AttrsClassHelpers import AttrsBasedClassHelperMixin, serialized_field, serialized_attribute_field, non_serialized_field, custom_define
+from neuropy.utils.mixins.HDF5_representable import HDF_DeserializationMixin, post_deserialize, HDF_SerializationMixin, HDFMixin, HDF_Converter
 
 from pyphocorehelpers.indexing_helpers import find_neighbours
 from pyphocorehelpers.function_helpers import function_attributes
@@ -259,39 +261,79 @@ from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BasePositionD
 #     return flat_all_epochs_cell_data, all_epochs_cell_data
 
 
-from attrs import define, field, Factory
+def _convert_dict_to_hdf_attrs_fn(f, key: str, value):
+    """ value: dict-like """
+    # if isinstance(f, h5py.File):
+    with h5py.File(f, "a") as f:
+        for sub_k, sub_v in value.items():
+            f[f'{key}/{sub_k}'] = sub_v
+
+        # with f.create_group(key) as g:
+        #     for sub_k, sub_v in value.items():
+        #         g[f'{key}/{sub_k}'] = sub_v
+
+def _convert_optional_ndarray_to_hdf_attrs_fn(f, key: str, value):
+    """ value: dict-like """
+    # if isinstance(f, h5py.File):
+    with h5py.File(f, "a") as f:
+        if value is not None:
+            f[f'{key}'] = value
+        else:
+            f[f'{key}'] = np.ndarray([])
 
 
-@define(slots=False, repr=False)
-class LeaveOneOutDecodingResult(object):
+
+
+@custom_define(slots=False, repr=False)
+class LeaveOneOutDecodingResult(HDFMixin):
     """Newer things to merge into LeaveOneOutDecodingAnalysisResult
     
     Usage:
         from pyphoplacecellanalysis.Analysis.Decoder.decoder_result import LeaveOneOutDecodingResult
+        
+        
+    Seems to contain dictionaries for each value type with keys being the neuron_IDs that were left out and values usually being np.array
 
-    """
-    one_left_out_to_global_surprises: dict = Factory(dict)
-    one_left_out_posterior_to_pf_surprises: dict = Factory(dict)
-    one_left_out_posterior_to_scrambled_pf_surprises: dict = Factory(dict)
-
-    one_left_out_to_global_surprises_mean: dict = Factory(dict)
-    shuffle_IDXs: np.array = None
-
-
-@define(slots=False, repr=False)
-class TimebinnedNeuronActivity:
-    """ 2023-04-18 - keeps track of which neurons are active and inactive in each decoded timebin """
-    n_timebins: int
-    active_IDXs: np.ndarray
-    active_aclus: np.ndarray
-    inactive_IDXs: np.ndarray
-    inactive_aclus: np.ndarray
+    ['one_left_out_to_global_surprises', 'one_left_out_posterior_to_pf_surprises', 'one_left_out_posterior_to_scrambled_pf_surprises', 'one_left_out_to_global_surprises_mean', 'shuffle_IDXs',
+     'random_noise_curves', 'decoded_timebins_p_x_given_n', 'one_left_out_posterior_to_pf_surprises_mean', 'one_left_out_posterior_to_scrambled_pf_surprises_mean']
     
-    time_bin_centers: np.ndarray # the timebin center times that each time bin corresponds to
+    random_noise_curves: Dict[int, np.ndarray] = Factory(dict) # LeaveOneOutDecodingResult
+    decoded_timebins_p_x_given_n: Dict[int, np.ndarray]
+    """
+    one_left_out_to_global_surprises: Dict[int, np.ndarray] = serialized_field(default=Factory(dict), serialization_fn=(lambda f, k, v: _convert_dict_to_hdf_attrs_fn(f, k, v))) # empty {}
+    one_left_out_posterior_to_pf_surprises: Dict[int, np.ndarray] = serialized_field(default=Factory(dict), serialization_fn=(lambda f, k, v: _convert_dict_to_hdf_attrs_fn(f, k, v)))
+    one_left_out_posterior_to_pf_surprises_mean: Dict[int, float] = serialized_field(default=Factory(dict), is_computable=True, serialization_fn=(lambda f, k, v: _convert_dict_to_hdf_attrs_fn(f, k, v)))
+    one_left_out_posterior_to_scrambled_pf_surprises: Dict[int, np.ndarray] = serialized_field(default=Factory(dict), serialization_fn=(lambda f, k, v: _convert_dict_to_hdf_attrs_fn(f, k, v)))
+    one_left_out_posterior_to_scrambled_pf_surprises_mean: Dict[int, float] = serialized_field(default=Factory(dict), is_computable=True, serialization_fn=(lambda f, k, v: _convert_dict_to_hdf_attrs_fn(f, k, v)))
+
+    one_left_out_to_global_surprises_mean: dict = serialized_field(default=Factory(dict), serialization_fn=(lambda f, k, v: _convert_dict_to_hdf_attrs_fn(f, k, v))) # empty {]
+    shuffle_IDXs: np.array = serialized_field(default=None, serialization_fn=(lambda f, k, v: _convert_optional_ndarray_to_hdf_attrs_fn(f, k, v)))
+    
+    random_noise_curves: Dict[int, np.ndarray] = serialized_field(default=Factory(dict), serialization_fn=(lambda f, k, v: _convert_dict_to_hdf_attrs_fn(f, k, v)))
+    decoded_timebins_p_x_given_n: Dict[int, np.ndarray] = serialized_field(default=Factory(dict), serialization_fn=(lambda f, k, v: _convert_dict_to_hdf_attrs_fn(f, k, v)))
+
+    
+    
+
+
+@custom_define(slots=False, repr=False)
+class TimebinnedNeuronActivity(HDFMixin):
+    """ 2023-04-18 - keeps track of which neurons are active and inactive in each decoded timebin
+    
+    TODO TimebinnedNeuronActivity is not HDF serializable, and it doesn't make sense to make it such. It should be a non_serialized_field
+    
+    """
+    n_timebins: int = serialized_attribute_field()
+    active_IDXs: np.ndarray = serialized_field() # a ragged list of different length np.ndarrays, each containing the neuron_IDXs that are active in that timebin
+    active_aclus: np.ndarray = serialized_field()
+    inactive_IDXs: np.ndarray = serialized_field()
+    inactive_aclus: np.ndarray = serialized_field()
+    
+    time_bin_centers: np.ndarray = serialized_field() # the timebin center times that each time bin corresponds to
 
     # derived
-    num_timebin_active_aclus: np.ndarray = None # int ndarray, the number of active aclus in each timebin
-    is_timebin_valid: np.ndarray = None # bool ndarray, whether there is at least one aclu active in each timebin
+    num_timebin_active_aclus: np.ndarray = non_serialized_field(default=None, is_computable=True) # int ndarray, the number of active aclus in each timebin
+    is_timebin_valid: np.ndarray = non_serialized_field(default=None, is_computable=True) # bool ndarray, whether there is at least one aclu active in each timebin
 
     def __attrs_post_init__(self):
         """ called after initializer built by `attrs` library. """
@@ -316,8 +358,8 @@ class TimebinnedNeuronActivity:
                     time_bin_centers=time_bin_centers)
 
 
-@define(slots=False, repr=False)
-class LeaveOneOutDecodingAnalysisResult:
+@custom_define(slots=False, repr=False)
+class LeaveOneOutDecodingAnalysisResult(HDFMixin):
     """ 2023-03-27 - Holds the results from a surprise analysis
 
     Built with:
@@ -328,33 +370,33 @@ class LeaveOneOutDecodingAnalysisResult:
     Usage:
         from pyphoplacecellanalysis.Analysis.Decoder.decoder_result import LeaveOneOutDecodingAnalysisResult
     """
-    active_filter_epochs: Epoch
-    original_1D_decoder: BasePositionDecoder # BayesianPlacemapPositionDecoder
-    all_included_filter_epochs_decoder_result: DynamicContainer
+    active_filter_epochs: Epoch = serialized_field()
+    original_1D_decoder: BasePositionDecoder = serialized_field() # BayesianPlacemapPositionDecoder
+    all_included_filter_epochs_decoder_result: DynamicContainer = non_serialized_field()
     
-    flat_all_epochs_measured_cell_spike_counts: np.ndarray = field(metadata={'shape': ('n_neurons', 'n_total_time_bins'), 'tags': ('firing_rate', 'measured')})
-    flat_all_epochs_measured_cell_firing_rates: np.ndarray = field(metadata={'shape': ('n_neurons', 'n_total_time_bins'), 'tags': ('firing_rate', 'measured')})
-    flat_all_epochs_decoded_epoch_time_bins: np.ndarray = field(metadata={'shape': ('n_neurons', 'n_total_time_bins')})
-    flat_all_epochs_computed_surprises: np.ndarray = field(metadata={'shape': ('n_neurons', 'n_total_time_bins')})
-    flat_all_epochs_computed_expected_cell_firing_rates: np.ndarray = field(metadata={'shape': ('n_neurons', 'n_total_time_bins'), 'tags': ('firing_rate', 'computed', 'expected')})
-    flat_all_epochs_difference_from_expected_cell_spike_counts: np.ndarray = field(metadata={'shape': ('n_neurons', 'n_total_time_bins'), 'tags': ('firing_rate', 'computed', 'expected')})
-    flat_all_epochs_difference_from_expected_cell_firing_rates: np.ndarray = field(metadata={'shape': ('n_neurons', 'n_total_time_bins'), 'tags': ('firing_rate', 'computed', 'expected')})
-    all_epochs_decoded_epoch_time_bins_mean: np.ndarray = field(metadata={'shape': ('n_epochs', 'n_neurons')})
-    all_epochs_computed_cell_surprises_mean: np.ndarray = field(metadata={'shape': ('n_epochs', 'n_neurons')})
-    all_epochs_all_cells_computed_surprises_mean: np.ndarray = field(metadata={'shape': ('n_epochs',)})
-    flat_all_epochs_computed_one_left_out_to_global_surprises: np.ndarray = field(metadata={'shape': ('n_neurons', 'n_total_time_bins')})
-    all_epochs_computed_cell_one_left_out_to_global_surprises_mean: np.ndarray = field(metadata={'shape': ('n_epochs', 'n_neurons')})
-    all_epochs_all_cells_computed_one_left_out_to_global_surprises_mean: np.ndarray = field(metadata={'shape': ('n_epochs',)})
-    one_left_out_omitted_aclu_distance_df: pd.core.frame.DataFrame = field(metadata={'shape': ('n_neurons', 3)})
-    most_contributing_aclus: np.ndarray = field(metadata={'shape': ('n_neurons',)})
+    flat_all_epochs_measured_cell_spike_counts: np.ndarray = serialized_field(metadata={'shape': ('n_neurons', 'n_total_time_bins'), 'tags': ('firing_rate', 'measured')})
+    flat_all_epochs_measured_cell_firing_rates: np.ndarray = serialized_field(metadata={'shape': ('n_neurons', 'n_total_time_bins'), 'tags': ('firing_rate', 'measured')})
+    flat_all_epochs_decoded_epoch_time_bins: np.ndarray = serialized_field(metadata={'shape': ('n_neurons', 'n_total_time_bins')})
+    flat_all_epochs_computed_surprises: np.ndarray = serialized_field(metadata={'shape': ('n_neurons', 'n_total_time_bins')})
+    flat_all_epochs_computed_expected_cell_firing_rates: np.ndarray = serialized_field(metadata={'shape': ('n_neurons', 'n_total_time_bins'), 'tags': ('firing_rate', 'computed', 'expected')})
+    flat_all_epochs_difference_from_expected_cell_spike_counts: np.ndarray = serialized_field(metadata={'shape': ('n_neurons', 'n_total_time_bins'), 'tags': ('firing_rate', 'computed', 'expected')})
+    flat_all_epochs_difference_from_expected_cell_firing_rates: np.ndarray = serialized_field(metadata={'shape': ('n_neurons', 'n_total_time_bins'), 'tags': ('firing_rate', 'computed', 'expected')})
+    all_epochs_decoded_epoch_time_bins_mean: np.ndarray = serialized_field(metadata={'shape': ('n_epochs', 'n_neurons')})
+    all_epochs_computed_cell_surprises_mean: np.ndarray = serialized_field(metadata={'shape': ('n_epochs', 'n_neurons')})
+    all_epochs_all_cells_computed_surprises_mean: np.ndarray = serialized_field(metadata={'shape': ('n_epochs',)})
+    flat_all_epochs_computed_one_left_out_to_global_surprises: np.ndarray = serialized_field(metadata={'shape': ('n_neurons', 'n_total_time_bins')})
+    all_epochs_computed_cell_one_left_out_to_global_surprises_mean: np.ndarray = serialized_field(metadata={'shape': ('n_epochs', 'n_neurons')})
+    all_epochs_all_cells_computed_one_left_out_to_global_surprises_mean: np.ndarray = serialized_field(metadata={'shape': ('n_epochs',)})
+    one_left_out_omitted_aclu_distance_df: pd.DataFrame = serialized_field(metadata={'shape': ('n_neurons', 3)})
+    most_contributing_aclus: np.ndarray = serialized_field(metadata={'shape': ('n_neurons',)})
     
-    result: LeaveOneOutDecodingResult = None
+    result: LeaveOneOutDecodingResult = non_serialized_field(default=None)
 
-    new_result: LeaveOneOutDecodingResult = None # this is stupid, just done for compatibility with old `_new_compute_surprise` implementation
+    new_result: LeaveOneOutDecodingResult = non_serialized_field(default=None) # this is stupid, just done for compatibility with old `_new_compute_surprise` implementation
     
-    timebinned_neuron_info: "TimebinnedNeuronActivity" = None
-    result_df: pd.DataFrame = None
-    result_df_grouped: pd.DataFrame = None
+    timebinned_neuron_info: "TimebinnedNeuronActivity" = non_serialized_field(default=None, is_computable=True)
+    result_df: pd.DataFrame = serialized_field(default=None)
+    result_df_grouped: pd.DataFrame = serialized_field(default=None)
 
     def supplement_results(self):
         """ 2023-03-27 11:14pm - add the extra stuff to the surprise computation results

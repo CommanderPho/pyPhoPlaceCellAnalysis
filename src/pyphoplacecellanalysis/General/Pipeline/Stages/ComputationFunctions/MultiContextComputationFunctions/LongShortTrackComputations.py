@@ -4,6 +4,7 @@ from dataclasses import dataclass # required by `SortOrderMetric` class
 
 import h5py # for to_hdf and read_hdf definitions
 import numpy as np
+import tables as tb # for to_hdf and read_hdf definitions
 import pandas as pd
 from attrs import define, field # used for `JonathanFiringRateAnalysisResult`, `LongShortPipelineTests`, `LeaveOneOutDecodingAnalysis`
 from pyphocorehelpers.mixins.member_enumerating import AllFunctionEnumeratingMixin
@@ -30,6 +31,7 @@ from scipy.special import rel_entr # alternative for compute_relative_entropy_di
 
 from collections import Counter # Count the Number of Occurrences in a Python list using Counter
 from pyphoplacecellanalysis.General.Mixins.CrossComputationComparisonHelpers import SplitPartitionMembership
+from neuropy.core.neurons import NeuronType
 
 from neuropy.analyses import detect_pbe_epochs # used in `_perform_jonathan_replay_firing_rate_analyses(.)` if replays are missing
 
@@ -38,20 +40,24 @@ from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.Default
 from neuropy.core.session.dataSession import DataSession # for `pipeline_complete_compute_long_short_fr_indicies`
 
 
-from typing import List, Any
+from typing import Dict, List, Any
 from scipy.special import factorial, logsumexp
 from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import DecodedFilterEpochsResult
 from nptyping import NDArray, DataFrame, Shape, assert_isinstance, Int, Structure as S
 import awkward as ak # `simpler_compute_measured_vs_expected_firing_rates` new Awkward array for ragged arrays
 
 
+from neuropy.utils.mixins.AttrsClassHelpers import AttrsBasedClassHelperMixin, serialized_field, serialized_attribute_field, non_serialized_field, custom_define
+from neuropy.utils.mixins.HDF5_representable import HDF_DeserializationMixin, post_deserialize, HDF_SerializationMixin, HDFMixin
 
-@define(slots=False, eq=False)
-class TrackExclusivePartitionSubset:
+
+
+@custom_define(slots=False, eq=False)
+class TrackExclusivePartitionSubset(HDFMixin, AttrsBasedClassHelperMixin):
     """ holds information about a subset of aclus, e.g. that contain long-only placefields, etc. """
-    is_aclu_pf_track_exclusive: np.ndarray
-    track_exclusive_aclus: np.ndarray
-    track_exclusive_df: pd.DataFrame
+    is_aclu_pf_track_exclusive: np.ndarray = serialized_field()
+    track_exclusive_aclus: np.ndarray = serialized_field()
+    track_exclusive_df: pd.DataFrame = serialized_field()
     
 
     #TODO 2023-08-02 05:58: - [ ] These (`to_hdf`, `read_hdf`) were auto-generated and not sure if they work:
@@ -79,19 +85,27 @@ class TrackExclusivePartitionSubset:
         return cls(**attrs_dict)
 
 
-@define(slots=False)
-class JonathanFiringRateAnalysisResult:
+# @custom_define(slots=False)
+# class 
+
+@custom_define(slots=False)
+class EpochStatsResult(HDFMixin, AttrsBasedClassHelperMixin):
+    df: pd.DataFrame = serialized_field()
+    aclu_to_idx: Dict = non_serialized_field(is_computable=False)
+    
+@custom_define(slots=False)
+class JonathanFiringRateAnalysisResult(HDFMixin, AttrsBasedClassHelperMixin):
     """ holds the outputs of `_perform_jonathan_replay_firing_rate_analyses` 
     Usage:
         from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.LongShortTrackComputations import JonathanFiringRateAnalysisResult
         jonathan_firing_rate_analysis_result = JonathanFiringRateAnalysisResult(**curr_active_pipeline.global_computation_results.computed_data.jonathan_firing_rate_analysis.to_dict())
         jonathan_firing_rate_analysis_result.neuron_replay_stats_df.to_clipboard()
     """
-    rdf: DynamicParameters
-    irdf: DynamicParameters
-    time_binned_unit_specific_spike_rate: DynamicParameters
-    time_binned_instantaneous_unit_specific_spike_rate: DynamicParameters
-    neuron_replay_stats_df: pd.DataFrame
+    rdf: DynamicParameters = serialized_field(is_hdf_handled_custom=True, metadata={'tags':['custom_hdf_implementation', 'is_hdf_handled_custom'], 'description': 'replay data frame'})
+    irdf: DynamicParameters = serialized_field(is_hdf_handled_custom=True, metadata={'tags':['custom_hdf_implementation', 'is_hdf_handled_custom'], 'description': 'replay data frame'})
+    time_binned_unit_specific_spike_rate: DynamicParameters = non_serialized_field(is_computable=False)
+    time_binned_instantaneous_unit_specific_spike_rate: DynamicParameters = non_serialized_field(is_computable=False)
+    neuron_replay_stats_df: pd.DataFrame = non_serialized_field() # serialized_field(is_hdf_handled_custom=True, metadata={'tags':['custom_hdf_implementation', 'is_hdf_handled_custom']})
     
     def get_cell_track_partitions(self):
         """ 2023-06-20 - Partition the neuron_replay_stats_df into subsets by seeing whether each aclu has a placefield for the long/short track.
@@ -165,27 +179,87 @@ class JonathanFiringRateAnalysisResult:
 
         return neuron_replay_stats_df, short_exclusive, long_exclusive, BOTH_subset, EITHER_subset, XOR_subset, NEITHER_subset
 
+    # HDFMixin Conformances ______________________________________________________________________________________________ #
+    
+    def to_hdf(self, file_path, key: str, **kwargs):
+        """ Saves the object to key in the hdf5 file specified by file_path"""
+        # super().to_hdf(file_path, key=key, **kwargs)
+        # Finish for the custom properties
+        
+        #TODO 2023-08-04 12:09: - [ ] Included outputs_local/global
+                 
+        # df: pd.DataFrame = self.rdf.rdf
+        # aclu_to_idx: Dict = self.rdf.aclu_to_idx
+        # aclu_to_idx_df: pd.DataFrame = pd.DataFrame({'aclu': list(aclu_to_idx.keys()), 'fragile_linear_idx': list(aclu_to_idx.values())})
+        
+        # with tb.open_file(file_path, mode='a') as f:
+        #     # f.get_node(f'{key}/rdf/df')._f_remove(recursive=True)
+
+        #     try:
+        #         rdf_group = f.create_group(key, 'rdf', title='replay data frame', createparents=True)
+        #     except tb.exceptions.NodeError:
+        #         # Node already exists
+        #         pass
+        #     except BaseException as e:
+        #         raise
+        #     # rdf_group[f'{outputs_local_key}/df'] = self.rdf.rdf
+        #     try:
+        #         irdf_group = f.create_group(key, 'irdf', title='intra-replay data frame', createparents=True)
+        #     except tb.exceptions.NodeError:
+        #         # Node already exists
+        #         pass
+        #     except BaseException as e:
+        #         raise
 
 
-@define(slots=False, repr=False)
-class LeaveOneOutDecodingAnalysis(ComputedResult):
+        # Convert the ['track_membership', 'neuron_type'] columns of self._neuron_replay_stats_df to the categorical type if needed
+        
+        _neuron_replay_stats_df = deepcopy(self.neuron_replay_stats_df)
+        # Convert the 'cell_type' column of the dataframe to the categorical type if needed
+        cat_type = NeuronType.get_pandas_categories_type()
+        if _neuron_replay_stats_df["neuron_type"].dtype != cat_type:
+            # If this type check ever becomes a problem and we want a more liberal constraint, All instances of CategoricalDtype compare equal to the string 'category'.
+            _neuron_replay_stats_df["neuron_type"] = _neuron_replay_stats_df["neuron_type"].apply(lambda x: x.hdfcodingClassName).astype(cat_type) # NeuronType can't seem to be cast directly to the new categorical type, it results in the column being filled with NaNs. Instead cast to string first.
+
+        # Convert the 'track_membership' column of the dataframe to the categorical type if needed
+        cat_type = SplitPartitionMembership.get_pandas_categories_type()
+        if _neuron_replay_stats_df["track_membership"].dtype != cat_type:
+            # If this type check ever becomes a problem and we want a more liberal constraint, All instances of CategoricalDtype compare equal to the string 'category'.
+            _neuron_replay_stats_df["track_membership"] = _neuron_replay_stats_df["track_membership"].apply(lambda x: x.name).astype(cat_type)
+        _neuron_replay_stats_df.to_hdf(file_path, key=f'{key}/neuron_replay_stats_df', format='table', data_columns=True)
+
+        self.rdf.rdf.to_hdf(file_path, key=f'{key}/rdf/df') # , format='table', data_columns=True
+        aclu_to_idx: Dict = self.rdf.aclu_to_idx
+        aclu_to_idx_df: pd.DataFrame = pd.DataFrame({'aclu': list(aclu_to_idx.keys()), 'fragile_linear_idx': list(aclu_to_idx.values())})
+        aclu_to_idx_df.to_hdf(file_path, key=f'{key}/rdf/aclu_to_idx_df', format='table', data_columns=True)
+
+        # irdf_group[f'{outputs_local_key}/df'] = self.irdf.irdf
+        self.irdf.irdf.to_hdf(file_path, key=f'{key}/irdf/df') # , format='table', data_columns=True
+        aclu_to_idx: Dict = self.irdf.aclu_to_idx
+        aclu_to_idx_df: pd.DataFrame = pd.DataFrame({'aclu': list(aclu_to_idx.keys()), 'fragile_linear_idx': list(aclu_to_idx.values())})
+        aclu_to_idx_df.to_hdf(file_path, key=f'{key}/irdf/aclu_to_idx_df', format='table', data_columns=True)
+
+
+
+@custom_define(slots=False, repr=False)
+class LeaveOneOutDecodingAnalysis(HDFMixin, AttrsBasedClassHelperMixin, ComputedResult):
     """ 2023-05-10 - holds the results of a leave-one-out decoding analysis of the long and short track 
     Usage:
         leave_one_out_decoding_analysis_obj = LeaveOneOutDecodingAnalysis(long_decoder, short_decoder, long_replays, short_replays, global_replays, long_shared_aclus_only_decoder, short_shared_aclus_only_decoder, shared_aclus, long_short_pf_neurons_diff, n_neurons, long_results_obj, short_results_obj)
     """    
-    long_decoder: BayesianPlacemapPositionDecoder
-    short_decoder: BayesianPlacemapPositionDecoder
-    long_replays: pd.DataFrame
-    short_replays: pd.DataFrame
-    global_replays: pd.DataFrame
-    long_shared_aclus_only_decoder: BasePositionDecoder
-    short_shared_aclus_only_decoder: BasePositionDecoder
-    shared_aclus: np.ndarray
-    long_short_pf_neurons_diff: SetPartition
-    n_neurons: int
-    long_results_obj: LeaveOneOutDecodingAnalysisResult
-    short_results_obj: LeaveOneOutDecodingAnalysisResult
-    is_global: bool = True
+    long_decoder: BayesianPlacemapPositionDecoder = serialized_field()
+    short_decoder: BayesianPlacemapPositionDecoder = serialized_field()
+    long_replays: pd.DataFrame = serialized_field()
+    short_replays: pd.DataFrame = serialized_field()
+    global_replays: pd.DataFrame = serialized_field()
+    long_shared_aclus_only_decoder: BasePositionDecoder = serialized_field()
+    short_shared_aclus_only_decoder: BasePositionDecoder = serialized_field()
+    shared_aclus: np.ndarray = serialized_field()
+    long_short_pf_neurons_diff: SetPartition = serialized_field()
+    n_neurons: int = serialized_attribute_field()
+    long_results_obj: LeaveOneOutDecodingAnalysisResult = serialized_field()
+    short_results_obj: LeaveOneOutDecodingAnalysisResult = serialized_field()
+    is_global: bool = serialized_attribute_field(default=True)
 
 
 @define(slots=False, repr=False)
@@ -555,7 +629,7 @@ class LongShortTrackComputations(AllFunctionEnumeratingMixin, metaclass=Computat
             'instantaneous_unit_specific_spike_rate_values': instantaneous_unit_specific_spike_rate_values,           
         })
 
-        final_jonathan_df = _subfn_computations_make_jonathan_firing_comparison_df(time_binned_unit_specific_binned_spike_rate, pf1d_short, pf1d_long, aclu_to_idx, rdf, irdf)
+        final_jonathan_df: pd.DataFrame = _subfn_computations_make_jonathan_firing_comparison_df(time_binned_unit_specific_binned_spike_rate, pf1d_short, pf1d_long, aclu_to_idx, rdf, irdf)
         final_jonathan_df = final_jonathan_df.join(neuron_replay_stats_df, how='outer')
 
         # Uses `aclu_to_idx` to add the ['active_aclus', 'is_neuron_active'] columns
@@ -1277,7 +1351,7 @@ def _final_compute_jonathan_replay_fr_analyses(sess, replays_df, debug_print=Fal
         replays_df['end'] = replays_df['stop']
 
     ### Make `rdf` (replay dataframe)
-    rdf = make_rdf(sess, replays_df) # this creates the replay dataframe variable
+    rdf: pd.DataFrame = make_rdf(sess, replays_df) # this creates the replay dataframe variable
     rdf = remove_repeated_replays(rdf)
     rdf, aclu_to_idx = add_spike_counts(sess, rdf)
 
@@ -1287,7 +1361,7 @@ def _final_compute_jonathan_replay_fr_analyses(sess, replays_df, debug_print=Fal
         print(f"RDF has {len(rdf)} rows.")
 
     ### Make `irdf` (inter-replay dataframe)
-    irdf = make_irdf(sess, rdf)
+    irdf: pd.DataFrame = make_irdf(sess, rdf)
     irdf = remove_repeated_replays(irdf) # TODO: make the removal process more meaningful
     irdf, aclu_to_idx_irdf = add_spike_counts(sess, irdf)
     irdf['duration'] = irdf['end'] - irdf['start']
@@ -1373,7 +1447,7 @@ def make_fr(rdf):
 def add_spike_counts(sess, rdf):
     """ adds the spike counts vector to the dataframe """
     aclus = np.sort(sess.spikes_df.aclu.unique())
-    aclu_to_idx = {aclus[i]:i for i in range(len(aclus))}
+    aclu_to_idx: dict[int, int] = {aclus[i]:i for i in range(len(aclus))}
 
     spike_counts_list = []
 
