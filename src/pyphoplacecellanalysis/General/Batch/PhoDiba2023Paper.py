@@ -681,7 +681,7 @@ class InstantaneousSpikeRateGroupsComputation(HDF_SerializationMixin, AttrsBased
     from pyphoplacecellanalysis.General.Batch.PhoDiba2023Paper import InstantaneousSpikeRateGroupsComputation
 
     """
-    instantaneous_time_bin_size_seconds: float = serialized_attribute_field(default=0.01) # 20ms
+    instantaneous_time_bin_size_seconds: float = serialized_attribute_field(default=0.01) # 10ms
     active_identifying_session_ctx: IdentifyingContext = serialized_attribute_field(init=False, serialization_fn=(lambda f, k, v: HDF_Converter._convert_dict_to_hdf_attrs_fn(f, k, v.to_dict()))) # need to write custom serialization to attributes I think
 
     LxC_aclus: np.ndarray = serialized_field(init=False, hdf_metadata={'track_eXclusive_cells': 'LxC'}) # the list of long-eXclusive cell aclus

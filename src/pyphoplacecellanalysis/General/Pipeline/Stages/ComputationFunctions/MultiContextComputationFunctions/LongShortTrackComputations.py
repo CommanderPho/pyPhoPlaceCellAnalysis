@@ -858,6 +858,108 @@ class LongShortTrackComputations(AllFunctionEnumeratingMixin, metaclass=Computat
         return global_computation_results
 
 
+    # InstantaneousSpikeRateGroupsComputation
+    @function_attributes(short_name='long_short_inst_spike_rate_groups', tags=['long_short', 'LxC', 'SxC', 'Figure2','replay', 'decoding', 'computation'], input_requires=['global_computation_results.computed_data.jonathan_firing_rate_analysis', 'global_computation_results.computed_data.long_short_fr_indicies_analysis'], output_provides=['global_computation_results.computed_data.long_short_inst_spike_rate_groups'], uses=[], used_by=[], creation_date='2023-08-21 16:52', related_items=[])
+    def _perform_long_short_instantaneous_spike_rate_groups_analysis(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, debug_print=False):
+        """ Must be performed after `_perform_jonathan_replay_firing_rate_analyses`
+        
+        Factoring out of `InstantaneousSpikeRateGroupsComputation`
+        
+    
+        Requires:
+            ['global_computation_results.computed_data.jonathan_firing_rate_analysis', 'global_computation_results.computed_data.long_short_fr_indicies_analysis']
+            
+        Provides:
+            computation_result.computed_data['long_short_inst_spike_rate_groups']
+                # ['long_short_rate_remapping']['rr_df']
+                # ['long_short_rate_remapping']['high_only_rr_df']
+        
+        """
+        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.SpikeAnalysis import SpikeRateTrends # for `_perform_long_short_instantaneous_spike_rate_groups_analysis`
+        from pyphoplacecellanalysis.General.Batch.PhoDiba2023Paper import InstantaneousSpikeRateGroupsComputation, SingleBarResult
+
+        # Could also use `owning_pipeline_reference.global_computation_results.computation_config`
+        assert (global_computation_results.computation_config is not None), f"requires `global_computation_results.computation_config.instantaneous_time_bin_size_seconds`"
+        assert ('instantaneous_time_bin_size_seconds' in global_computation_results.computation_config)
+        ## TODO: get from active_configs or something similar
+        instantaneous_time_bin_size_seconds: float = global_computation_results.computation_config.instantaneous_time_bin_size_seconds # 0.01 # 10ms
+        
+        
+
+        sess = owning_pipeline_reference.sess 
+        # Get the provided context or use the session context:
+        active_context = sess.get_context()
+
+        # Build the output result:
+        inst_spike_rate_groups_result: InstantaneousSpikeRateGroupsComputation = InstantaneousSpikeRateGroupsComputation(instantaneous_time_bin_size_seconds=instantaneous_time_bin_size_seconds)
+
+        ## Extracted from `InstantaneousSpikeRateGroupsComputation.compute(...)`
+        inst_spike_rate_groups_result.active_identifying_session_ctx = active_context
+        long_epoch_name, short_epoch_name, global_epoch_name = owning_pipeline_reference.find_LongShortGlobal_epoch_names()
+        long_session, short_session, global_session = [owning_pipeline_reference.filtered_sessions[an_epoch_name] for an_epoch_name in [long_epoch_name, short_epoch_name, global_epoch_name]] # only uses global_session
+        
+        ## Use the `JonathanFiringRateAnalysisResult` to get info about the long/short placefields:
+        jonathan_firing_rate_analysis_result = JonathanFiringRateAnalysisResult(**owning_pipeline_reference.global_computation_results.computed_data.jonathan_firing_rate_analysis.to_dict())
+        neuron_replay_stats_df, short_exclusive, long_exclusive, BOTH_subset, EITHER_subset, XOR_subset, NEITHER_subset = jonathan_firing_rate_analysis_result.get_cell_track_partitions()
+
+        long_short_fr_indicies_analysis_results = owning_pipeline_reference.global_computation_results.computed_data['long_short_fr_indicies_analysis']
+        long_laps, long_replays, short_laps, short_replays, global_laps, global_replays = [long_short_fr_indicies_analysis_results[k] for k in ['long_laps', 'long_replays', 'short_laps', 'short_replays', 'global_laps', 'global_replays']]
+
+        # Store the Long and Short exclusive ACLUs:
+        inst_spike_rate_groups_result.LxC_aclus = long_exclusive.track_exclusive_aclus
+        inst_spike_rate_groups_result.SxC_aclus = short_exclusive.track_exclusive_aclus
+
+        # Replays: Uses `global_session.spikes_df`, `long_exclusive.track_exclusive_aclus, `short_exclusive.track_exclusive_aclus`, `long_replays`, `short_replays`
+        # LxC: `long_exclusive.track_exclusive_aclus`
+        # ReplayDeltaMinus: `long_replays`
+        LxC_ReplayDeltaMinus: SpikeRateTrends = SpikeRateTrends.init_from_spikes_and_epochs(spikes_df=global_session.spikes_df, filter_epochs=long_replays, included_neuron_ids=long_exclusive.track_exclusive_aclus, instantaneous_time_bin_size_seconds=inst_spike_rate_groups_result.instantaneous_time_bin_size_seconds)
+        # ReplayDeltaPlus: `short_replays`
+        LxC_ReplayDeltaPlus: SpikeRateTrends = SpikeRateTrends.init_from_spikes_and_epochs(spikes_df=global_session.spikes_df, filter_epochs=short_replays, included_neuron_ids=long_exclusive.track_exclusive_aclus, instantaneous_time_bin_size_seconds=inst_spike_rate_groups_result.instantaneous_time_bin_size_seconds)
+
+        # SxC: `short_exclusive.track_exclusive_aclus`
+        # ReplayDeltaMinus: `long_replays`
+        SxC_ReplayDeltaMinus: SpikeRateTrends = SpikeRateTrends.init_from_spikes_and_epochs(spikes_df=global_session.spikes_df, filter_epochs=long_replays, included_neuron_ids=short_exclusive.track_exclusive_aclus, instantaneous_time_bin_size_seconds=inst_spike_rate_groups_result.instantaneous_time_bin_size_seconds)
+        # ReplayDeltaPlus: `short_replays`
+        SxC_ReplayDeltaPlus: SpikeRateTrends = SpikeRateTrends.init_from_spikes_and_epochs(spikes_df=global_session.spikes_df, filter_epochs=short_replays, included_neuron_ids=short_exclusive.track_exclusive_aclus, instantaneous_time_bin_size_seconds=inst_spike_rate_groups_result.instantaneous_time_bin_size_seconds)
+
+        inst_spike_rate_groups_result.LxC_ReplayDeltaMinus, inst_spike_rate_groups_result.LxC_ReplayDeltaPlus, inst_spike_rate_groups_result.SxC_ReplayDeltaMinus, inst_spike_rate_groups_result.SxC_ReplayDeltaPlus = LxC_ReplayDeltaMinus, LxC_ReplayDeltaPlus, SxC_ReplayDeltaMinus, SxC_ReplayDeltaPlus
+
+        # Note that in general LxC and SxC might have differing numbers of cells.
+        # inst_spike_rate_groups_result.Fig2_Replay_FR: list[tuple[Any, Any]] = [(v.cell_agg_inst_fr_list.mean(), v.cell_agg_inst_fr_list.std(), v.cell_agg_inst_fr_list) for v in (LxC_ReplayDeltaMinus, LxC_ReplayDeltaPlus, SxC_ReplayDeltaMinus, SxC_ReplayDeltaPlus)]
+        inst_spike_rate_groups_result.Fig2_Replay_FR: list[SingleBarResult] = [SingleBarResult(v.cell_agg_inst_fr_list.mean(), v.cell_agg_inst_fr_list.std(), v.cell_agg_inst_fr_list, inst_spike_rate_groups_result.LxC_aclus, inst_spike_rate_groups_result.SxC_aclus, None, None) for v in (LxC_ReplayDeltaMinus, LxC_ReplayDeltaPlus, SxC_ReplayDeltaMinus, SxC_ReplayDeltaPlus)]
+        
+        # Laps/Theta: Uses `global_session.spikes_df`, `long_exclusive.track_exclusive_aclus, `short_exclusive.track_exclusive_aclus`, `long_laps`, `short_laps`
+        # LxC: `long_exclusive.track_exclusive_aclus`
+        # ThetaDeltaMinus: `long_laps`
+        LxC_ThetaDeltaMinus: SpikeRateTrends = SpikeRateTrends.init_from_spikes_and_epochs(spikes_df=global_session.spikes_df, filter_epochs=long_laps, included_neuron_ids=long_exclusive.track_exclusive_aclus, instantaneous_time_bin_size_seconds=inst_spike_rate_groups_result.instantaneous_time_bin_size_seconds)
+        # ThetaDeltaPlus: `short_laps`
+        LxC_ThetaDeltaPlus: SpikeRateTrends = SpikeRateTrends.init_from_spikes_and_epochs(spikes_df=global_session.spikes_df, filter_epochs=short_laps, included_neuron_ids=long_exclusive.track_exclusive_aclus, instantaneous_time_bin_size_seconds=inst_spike_rate_groups_result.instantaneous_time_bin_size_seconds)
+
+        # SxC: `short_exclusive.track_exclusive_aclus`
+        # ThetaDeltaMinus: `long_laps`
+        SxC_ThetaDeltaMinus: SpikeRateTrends = SpikeRateTrends.init_from_spikes_and_epochs(spikes_df=global_session.spikes_df, filter_epochs=long_laps, included_neuron_ids=short_exclusive.track_exclusive_aclus, instantaneous_time_bin_size_seconds=inst_spike_rate_groups_result.instantaneous_time_bin_size_seconds)
+        # ThetaDeltaPlus: `short_laps`
+        SxC_ThetaDeltaPlus: SpikeRateTrends = SpikeRateTrends.init_from_spikes_and_epochs(spikes_df=global_session.spikes_df, filter_epochs=short_laps, included_neuron_ids=short_exclusive.track_exclusive_aclus, instantaneous_time_bin_size_seconds=inst_spike_rate_groups_result.instantaneous_time_bin_size_seconds)
+
+        inst_spike_rate_groups_result.LxC_ThetaDeltaMinus, inst_spike_rate_groups_result.LxC_ThetaDeltaPlus, inst_spike_rate_groups_result.SxC_ThetaDeltaMinus, inst_spike_rate_groups_result.SxC_ThetaDeltaPlus = LxC_ThetaDeltaMinus, LxC_ThetaDeltaPlus, SxC_ThetaDeltaMinus, SxC_ThetaDeltaPlus
+
+        # Note that in general LxC and SxC might have differing numbers of cells.
+        inst_spike_rate_groups_result.Fig2_Laps_FR: list[SingleBarResult] = [SingleBarResult(v.cell_agg_inst_fr_list.mean(), v.cell_agg_inst_fr_list.std(), v.cell_agg_inst_fr_list, inst_spike_rate_groups_result.LxC_aclus, inst_spike_rate_groups_result.SxC_aclus, None, None) for v in (LxC_ThetaDeltaMinus, LxC_ThetaDeltaPlus, SxC_ThetaDeltaMinus, SxC_ThetaDeltaPlus)]
+        
+        
+        # Add to computed results:
+        global_computation_results.computed_data['long_short_inst_spike_rate_groups'] = inst_spike_rate_groups_result
+        
+        """ Getting outputs:
+        
+            ## long_short_post_decoding:
+            curr_long_short_inst_spike_rate_groups = curr_active_pipeline.global_computation_results.computed_data['long_short_inst_spike_rate_groups']
+            
+
+        """
+        return global_computation_results
+
+
 # ==================================================================================================================== #
 # BEGIN PRIVATE IMPLEMENTATIONS                                                                                        #
 # ==================================================================================================================== #

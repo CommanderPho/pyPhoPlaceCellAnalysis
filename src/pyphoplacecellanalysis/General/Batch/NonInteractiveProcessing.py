@@ -248,7 +248,7 @@ def batch_extended_computations(curr_active_pipeline, include_includelist=None, 
     newly_computed_values = []
 
     non_global_comp_names = ['firing_rate_trends', 'relative_entropy_analyses']
-    global_comp_names = ['jonathan_firing_rate_analysis', 'short_long_pf_overlap_analyses', 'long_short_fr_indicies_analyses', 'long_short_decoding_analyses', 'long_short_post_decoding'] # , 'long_short_rate_remapping'
+    global_comp_names = ['jonathan_firing_rate_analysis', 'short_long_pf_overlap_analyses', 'long_short_fr_indicies_analyses', 'long_short_decoding_analyses', 'long_short_post_decoding', 'long_short_inst_spike_rate_groups'] # , 'long_short_rate_remapping'
 
     # 'firing_rate_trends', 'relative_entropy_analyses'
     # '_perform_firing_rate_trends_computation', '_perform_time_dependent_pf_sequential_surprise_computation'
@@ -276,7 +276,8 @@ def batch_extended_computations(curr_active_pipeline, include_includelist=None, 
         SpecificComputationValidator(short_name='short_long_pf_overlap_analyses', computation_fn_name='_perform_long_short_pf_overlap_analyses', validate_computation_test=lambda curr_active_pipeline: (curr_active_pipeline.global_computation_results.computed_data['short_long_pf_overlap_analyses']['relative_entropy_overlap_scalars_df'], curr_active_pipeline.global_computation_results.computed_data['short_long_pf_overlap_analyses']['relative_entropy_overlap_dict']), is_global=True),  # relative_entropy_overlap_scalars_df
         SpecificComputationValidator(short_name='long_short_fr_indicies_analyses', computation_fn_name='_perform_long_short_firing_rate_analyses', validate_computation_test=lambda curr_active_pipeline: curr_active_pipeline.global_computation_results.computed_data['long_short_fr_indicies_analysis']['x_frs_index'], is_global=True),  # active_context
         SpecificComputationValidator(short_name='long_short_decoding_analyses', computation_fn_name='_perform_long_short_decoding_analyses', validate_computation_test=lambda curr_active_pipeline: (curr_active_pipeline.global_computation_results.computed_data['long_short_leave_one_out_decoding_analysis'].long_results_obj, curr_active_pipeline.global_computation_results.computed_data['long_short_leave_one_out_decoding_analysis'].short_results_obj), is_global=True),
-        SpecificComputationValidator(short_name='long_short_post_decoding', computation_fn_name='_perform_long_short_post_decoding_analysis', validate_computation_test=lambda curr_active_pipeline: curr_active_pipeline.global_computation_results.computed_data['long_short_post_decoding'].rate_remapping.rr_df, is_global=True)
+        SpecificComputationValidator(short_name='long_short_post_decoding', computation_fn_name='_perform_long_short_post_decoding_analysis', validate_computation_test=lambda curr_active_pipeline: curr_active_pipeline.global_computation_results.computed_data['long_short_post_decoding'].rate_remapping.rr_df, is_global=True),
+        SpecificComputationValidator(short_name='long_short_inst_spike_rate_groups', computation_fn_name='_perform_long_short_instantaneous_spike_rate_groups_analysis', validate_computation_test=lambda curr_active_pipeline: (curr_active_pipeline.global_computation_results.computed_data['long_short_inst_spike_rate_groups'] is not None), is_global=True)
     ]
 
     for _comp_specifier in _comp_specifiers:
