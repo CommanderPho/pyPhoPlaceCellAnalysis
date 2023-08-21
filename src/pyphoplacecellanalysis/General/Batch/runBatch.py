@@ -1044,6 +1044,7 @@ class BatchSessionCompletionHandler:
 
     # General:
     debug_print: bool = field(default=False)
+    fail_on_exception: bool = field(default=False) # whether to raise exceptions that occur during the callback completion handler or not.
 
     force_reload_all: bool = field(default=False)
     saving_mode: PipelineSavingScheme = field(default=PipelineSavingScheme.SKIP_SAVING)
@@ -1106,13 +1107,15 @@ class BatchSessionCompletionHandler:
             # plt.close('all') # this takes care of the matplotlib-backed figures.
             curr_active_pipeline.clear_display_outputs()
             curr_active_pipeline.clear_registered_output_files()
-
             return True # completed successfully (without raising an error at least).
+        
         except Exception as e:
             exception_info = sys.exc_info()
             e = CapturedException(e, exception_info)
             print(f'main_complete_figure_generations failed with exception: {e}')
-            # raise e
+            if self.fail_on_exception:
+                raise e.exc
+
             return False
 
 
@@ -1132,6 +1135,60 @@ class BatchSessionCompletionHandler:
             # raise e
             return False
 
+
+    def try_compute_global_computations_if_needed(self, curr_active_pipeline, curr_session_context):
+        """ tries to load/compute the global computations if needed depending on the self.global_computations_options specifications.
+        
+        Updates the passed `curr_active_pipeline` pipeline object.
+
+        If computations are loaded, they are loaded via `curr_active_pipeline.load_pickled_global_computation_results(...)`
+        If computations are needed, they are performed with the `batch_extended_computations(...)` function.
+
+        
+        """
+        if self.global_computations_options.should_load:
+            if not self.force_global_recompute: # not just force_reload, needs to recompute whenever the computation fails.
+                try:
+                    curr_active_pipeline.load_pickled_global_computation_results(override_global_computation_results_pickle_path=self.override_global_computation_results_pickle_path)
+                except Exception as e:
+                    exception_info = sys.exc_info()
+                    e = CapturedException(e, exception_info)
+                    print(f'cannot load global results: {e}')
+                    if self.fail_on_exception:
+                        raise e.exc
+
+        if self.global_computations_options.should_compute:
+            try:
+                # # 2023-01-* - Call extended computations to build `_display_short_long_firing_rate_index_comparison` figures:
+                curr_active_pipeline.reload_default_computation_functions()
+                newly_computed_values = batch_extended_computations(curr_active_pipeline, include_includelist=self.extended_computations_include_includelist, include_global_functions=True, fail_on_exception=True, progress_print=True, force_recompute=self.force_global_recompute, debug_print=False)
+                #TODO 2023-07-11 19:20: - [ ] We want to save the global results if they are computed, but we don't want them to be needlessly written to disk even when they aren't changed.
+
+                if (len(newly_computed_values) > 0):
+                    print(f'newly_computed_values: {newly_computed_values}. Saving global results...')
+                    if (self.saving_mode.value == 'skip_saving'):
+                        print(f'WARNING: supposed to skip_saving because of self.saving_mode: {self.saving_mode} but supposedly has new global results! Figure out if these are actually new.')
+                    if self.global_computations_options.should_save:
+                        try:
+                            # curr_active_pipeline.global_computation_results.persist_time = datetime.now()
+                            # Try to write out the global computation function results:
+                            curr_active_pipeline.save_global_computation_results()
+                        except Exception as e:
+                            print(f'\n\n!!WARNING!!: saving the global results threw the exception: {e}')
+                            print(f'\tthe global results are currently unsaved! proceed with caution and save as soon as you can!\n\n\n')
+                            if self.fail_on_exception:
+                                raise e.exc
+                    else:
+                        print(f'\n\n!!WARNING!!: self.global_computations_options.should_save == False, so the global results are unsaved!')
+                else:
+                    print(f'no changes in global results.')
+            except Exception as e:
+                ## TODO: catch/log saving error and indicate that it isn't saved.
+                exception_info = sys.exc_info()
+                e = CapturedException(e, exception_info)
+                print(f'ERROR SAVING GLOBAL COMPUTATION RESULTS for pipeline of curr_session_context: {curr_session_context}. error: {e}')
+                if self.fail_on_exception:
+                    raise e.exc
 
 
     ## Main function that's called with the complete pipeline:
@@ -1183,7 +1240,8 @@ class BatchSessionCompletionHandler:
             exception_info = sys.exc_info()
             e = CapturedException(e, exception_info)
             print(f'ERROR SAVING PIPELINE for curr_session_context: {curr_session_context}. error: {e}')
-
+            if self.fail_on_exception:
+                raise e.exc
 
         ## GLOBAL FUNCTION:
         if self.force_reload_all and (not self.force_global_recompute):
@@ -1194,46 +1252,7 @@ class BatchSessionCompletionHandler:
             print(f'WARNING: self.force_global_recompute was False but pipeline was_updated. The global properties must be recomputed when the local functions change, so self.force_global_recompute will be set to True and computation will continue.')
             self.force_global_recompute = True
 
-
-        if self.global_computations_options.should_load:
-            if not self.force_global_recompute: # not just force_reload, needs to recompute whenever the computation fails.
-                try:
-                    curr_active_pipeline.load_pickled_global_computation_results(override_global_computation_results_pickle_path=self.override_global_computation_results_pickle_path)
-                except Exception as e:
-                    exception_info = sys.exc_info()
-                    e = CapturedException(e, exception_info)
-                    print(f'cannot load global results: {e}')
-                
-
-        if self.global_computations_options.should_compute:
-            try:
-                # # 2023-01-* - Call extended computations to build `_display_short_long_firing_rate_index_comparison` figures:
-                curr_active_pipeline.reload_default_computation_functions()
-                newly_computed_values = batch_extended_computations(curr_active_pipeline, include_includelist=self.extended_computations_include_includelist, include_global_functions=True, fail_on_exception=True, progress_print=True, force_recompute=self.force_global_recompute, debug_print=False)
-                #TODO 2023-07-11 19:20: - [ ] We want to save the global results if they are computed, but we don't want them to be needlessly written to disk even when they aren't changed.
-
-                if (len(newly_computed_values) > 0):
-                    print(f'newly_computed_values: {newly_computed_values}. Saving global results...')
-                    if (self.saving_mode.value == 'skip_saving'):
-                        print(f'WARNING: supposed to skip_saving because of self.saving_mode: {self.saving_mode} but supposedly has new global results! Figure out if these are actually new.')
-                    if self.global_computations_options.should_save:
-                        try:
-                            # curr_active_pipeline.global_computation_results.persist_time = datetime.now()
-                            # Try to write out the global computation function results:
-                            curr_active_pipeline.save_global_computation_results()
-                        except Exception as e:
-                            print(f'\n\n!!WARNING!!: saving the global results threw the exception: {e}')
-                            print(f'\tthe global results are currently unsaved! proceed with caution and save as soon as you can!\n\n\n')
-                    else:
-                        print(f'\n\n!!WARNING!!: self.global_computations_options.should_save == False, so the global results are unsaved!')
-                else:
-                    print(f'no changes in global results.')
-            except Exception as e:
-                ## TODO: catch/log saving error and indicate that it isn't saved.
-                exception_info = sys.exc_info()
-                e = CapturedException(e, exception_info)
-                print(f'ERROR SAVING GLOBAL COMPUTATION RESULTS for pipeline of curr_session_context: {curr_session_context}. error: {e}')
-                
+        self.try_compute_global_computations_if_needed(curr_active_pipeline, curr_session_context=curr_session_context)     
 
         # ### Programmatic Figure Outputs:
         if self.should_perform_figure_generation_to_file:
@@ -1261,6 +1280,8 @@ class BatchSessionCompletionHandler:
             exception_info = sys.exc_info()
             e = CapturedException(e, exception_info)
             print(f"ERROR: encountered exception {e} while trying to build the session HDF output for {curr_session_context}")
+            if self.fail_on_exception:
+                raise e.exc
             hdf5_output_path = None # set to None because it failed.
 
 
@@ -1289,6 +1310,8 @@ class BatchSessionCompletionHandler:
             exception_info = sys.exc_info()
             e = CapturedException(e, exception_info)
             print(f"ERROR: encountered exception {e} while trying to compute the instantaneous firing rates and set self.across_sessions_instantaneous_fr_dict[{curr_session_context}]")
+            if self.fail_on_exception:
+                raise e.exc
             _out_inst_fr_comps = None
             
         # On large ram systems, we can return the whole pipeline?
@@ -1471,6 +1494,8 @@ def run_specific_batch(global_data_root_parent_path: Path, curr_session_context:
                 exception_info = sys.exc_info()
                 an_error = CapturedException(e, exception_info, curr_active_pipeline)
                 new_print(f'error occured in post_run_callback_fn: {an_error}. Suppressing.')
+                # if fail_on_exception:
+                    # raise e.exc
                 post_run_callback_fn_output = None
     #         finally:
     #             print = _backup_print # restore default print, I think it's okay because it's only used in this context.
