@@ -66,7 +66,13 @@ def loadData(pkl_path, debug_print=False, **kwargs):
                 else:
                     print("Unknown issue with pickled path for path {}, performing pathlib workaround...".format(pkl_path))
                     raise
-                                
+                
+            except EOFError as e:
+                # occurs when the pickle saving is interrupted and the output file is ruined. # cannot load global results: !! Ran out of input ::::: (<class 'EOFError'>, EOFError('Ran out of input'), <traceback object at 0x000002015BC7BF80>)
+                raise
+                # often we'll want to delete the fragmented pickle file and continue
+
+            
             except Exception as e:
                 # unhandled exception
                 raise
@@ -84,6 +90,14 @@ def loadData(pkl_path, debug_print=False, **kwargs):
         # return db
     return db
 
+def delete_fragmented_pickle_file(pkl_path: Path, debug_print:bool=True):
+    assert pkl_path.exists()
+    # file corrupted.
+    print(f'Failure loading {pkl_path}, the file is corrupted and incomplete (REACHED END OF FILE).')
+    print(f'\t deleting it and continuing. ')
+    pkl_path.unlink() # .unlink() deletes a file
+    if debug_print:
+        print(f"\t {pkl_path} deleted.")
 
 # ==================================================================================================================== #
 # BEGIN STAGE/PIPELINE IMPLEMENTATION                                                                                  #
