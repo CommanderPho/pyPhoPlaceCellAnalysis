@@ -1018,5 +1018,9 @@ class PipelineWithComputedPipelineStageMixin:
             global_computation_results_pickle_path = self.global_computation_results_pickle_path
         else:
             global_computation_results_pickle_path = override_global_computation_results_pickle_path
-        loaded_global_computation_results = DynamicParameters(**loadData(global_computation_results_pickle_path))
+
+        loaded_global_computation_dict = loadData(global_computation_results_pickle_path)
+
+        loaded_global_computation_results = ComputationResult(**loaded_global_computation_dict)
+
         self.stage.global_computation_results = loaded_global_computation_results # TODO 2023-05-19 - Merge results instead of replacing. Requires checking parameters.
