@@ -871,12 +871,18 @@ class LongShortTrackComputations(AllFunctionEnumeratingMixin, metaclass=Computat
             
         Provides:
             computation_result.computed_data['long_short_inst_spike_rate_groups']
-                # ['long_short_rate_remapping']['rr_df']
-                # ['long_short_rate_remapping']['high_only_rr_df']
         
         """
         from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.SpikeAnalysis import SpikeRateTrends # for `_perform_long_short_instantaneous_spike_rate_groups_analysis`
         from pyphoplacecellanalysis.General.Batch.PhoDiba2023Paper import InstantaneousSpikeRateGroupsComputation, SingleBarResult
+        from neuropy.utils.dynamic_container import DynamicContainer
+
+        if global_computation_results.computation_config is None:
+            # Create a DynamicContainer-backed computation_config
+            print(f'_perform_long_short_instantaneous_spike_rate_groups_analysis is lacking a required computation config parameter! creating a new curr_active_pipeline.global_computation_results.computation_config')
+            global_computation_results.computation_config = DynamicContainer(instantaneous_time_bin_size_seconds=0.01)
+        else:
+            print(f'have an existing curr_active_pipeline.global_computation_results.computation_config: {curr_active_pipeline.global_computation_results.computation_config}')	
 
         # Could also use `owning_pipeline_reference.global_computation_results.computation_config`
         assert (global_computation_results.computation_config is not None), f"requires `global_computation_results.computation_config.instantaneous_time_bin_size_seconds`"
@@ -884,8 +890,6 @@ class LongShortTrackComputations(AllFunctionEnumeratingMixin, metaclass=Computat
         ## TODO: get from active_configs or something similar
         instantaneous_time_bin_size_seconds: float = global_computation_results.computation_config.instantaneous_time_bin_size_seconds # 0.01 # 10ms
         
-        
-
         sess = owning_pipeline_reference.sess 
         # Get the provided context or use the session context:
         active_context = sess.get_context()
@@ -953,7 +957,8 @@ class LongShortTrackComputations(AllFunctionEnumeratingMixin, metaclass=Computat
         """ Getting outputs:
         
             ## long_short_post_decoding:
-            curr_long_short_inst_spike_rate_groups = curr_active_pipeline.global_computation_results.computed_data['long_short_inst_spike_rate_groups']
+            inst_spike_rate_groups_result: InstantaneousSpikeRateGroupsComputation = curr_active_pipeline.global_computation_results.computed_data.long_short_inst_spike_rate_groups
+            inst_spike_rate_groups_result
             
 
         """
