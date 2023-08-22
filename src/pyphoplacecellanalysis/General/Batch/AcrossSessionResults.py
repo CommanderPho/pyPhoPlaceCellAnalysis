@@ -50,7 +50,9 @@ from neuropy.utils.mixins.AttrsClassHelpers import custom_define, AttrsBasedClas
 from pyphoplacecellanalysis.General.Pipeline.Stages.Loading import saveData, loadData
 
 # from pyphoplacecellanalysis.General.Batch.NeptuneAiHelpers import set_environment_variables, neptune_output_figures
-from pyphoplacecellanalysis.General.Batch.PhoDiba2023Paper import main_complete_figure_generations, InstantaneousSpikeRateGroupsComputation, SingleBarResult, PaperFigureTwo # for `BatchSessionCompletionHandler`
+from pyphoplacecellanalysis.General.Batch.PhoDiba2023Paper import main_complete_figure_generations, PaperFigureTwo # for `BatchSessionCompletionHandler`
+from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.LongShortTrackComputations import \
+    SingleBarResult, InstantaneousSpikeRateGroupsComputation
 from neuropy.core.user_annotations import UserAnnotationsManager
 from pyphoplacecellanalysis.General.Mixins.ExportHelpers import FileOutputManager, FigureOutputLocation, ContextToPathMode
 

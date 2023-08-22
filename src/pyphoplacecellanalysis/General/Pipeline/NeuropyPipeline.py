@@ -711,8 +711,9 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
         
         """
         from pyphoplacecellanalysis.General.Batch.AcrossSessionResults import AcrossSessionsResults # for to_hdf
-        from pyphoplacecellanalysis.General.Batch.PhoDiba2023Paper import InstantaneousSpikeRateGroupsComputation
-        
+        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.LongShortTrackComputations import \
+            InstantaneousSpikeRateGroupsComputation
+
         # print(f'file_path: {file_path}')
 
         long_epoch_name, short_epoch_name, global_epoch_name = self.find_LongShortGlobal_epoch_names()
