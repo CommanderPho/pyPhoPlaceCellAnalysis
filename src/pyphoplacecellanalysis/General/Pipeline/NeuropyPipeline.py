@@ -76,6 +76,8 @@ class PipelineSavingScheme(ExtendedEnum):
     def shouldSaveList(cls):
         return cls.build_member_value_dict([False, True, True])
 
+
+
 class LoadedObjectPersistanceState(object):
     """Keeps track of the persistance state for an object that has been loaded from disk to keep track of how the object's state relates to the version on disk (the persisted version) """
     def __init__(self, file_path, compare_state_on_load):
@@ -256,12 +258,14 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
             
 
         else:
-            # Otherwise force recompute:
+            # Otherwise force recompute by setting 'loaded_pipeline = None':
             if progress_print:
                 print(f'Skipping loading from pickled file because force_reload == True.')
             loaded_pipeline = None
 
+
         if loaded_pipeline is not None:
+            ## Successful (at least partially) load
             if progress_print:
                 print(f'Loading pickled pipeline success: {finalized_loaded_sess_pickle_path}.')
             if isinstance(loaded_pipeline, NeuropyPipeline):        
@@ -286,8 +290,13 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
                         print(f'pipeline_needs_resave but skip_save_on_initial_load == True, so saving will be skipped entirely. Be sure to save manually if there are changes.')
             else:
                 if progress_print:
-                    print(f'property already present in pickled version. No need to save.')
+                    print(f'properties already present in pickled version. No need to save.')
     
+            # If we reach this point, the load was a success
+            if progress_print:
+                print(f'pipeline load success!')
+
+
         else:
             # Otherwise load failed, perform the fallback computation
             if debug_print:
