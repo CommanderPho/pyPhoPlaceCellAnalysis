@@ -106,6 +106,7 @@ class SpikeRateTrends(HDFMixin, AttrsBasedClassHelperMixin):
         # elephant.statistics.instantaneous_rate
 
         inst_rate = instantaneous_rate(unit_split_spiketrains, sampling_period=time_bin_size_seconds*s, kernel=kernel) # ValueError: `bins` must be positive, when an integer
+            # Raises `TypeError: The input must be a list of SpikeTrain` when the unit_split_spiketrains are empty, which occurs at least when included_neuron_ids is empty
         # AnalogSignal
         # print(type(inst_rate), f"of shape {inst_rate.shape}: {inst_rate.shape[0]} samples, {inst_rate.shape[1]} channel")
         # print('sampling rate:', inst_rate.sampling_rate)
