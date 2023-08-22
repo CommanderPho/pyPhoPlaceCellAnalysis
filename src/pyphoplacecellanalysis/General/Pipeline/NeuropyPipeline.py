@@ -356,8 +356,17 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
             if hasattr(a_pipeline, 'computation_results'):
                 comp_config_results_list = {}
                 for a_name, a_result in a_pipeline.computation_results.items():
-                    # ['sess', 'computation_config', 'computed_data', 'accumulated_errors']
-                    comp_config_results_list[a_name] = dict(computation_config=a_result['computation_config'], computed_data=tuple(a_result['computed_data'].keys()))
+                    # ['sess', 'computation_config', 'computed_data', 'accumulated_errors']                    
+                    try:
+                        comp_config_results_list[a_name] = dict(computation_config=a_result.computation_config, computed_data=tuple((a_result.computed_data or {}).keys()))
+                    except AttributeError as e:
+                        # revert to old way
+                        comp_config_results_list[a_name] = dict(computation_config=a_result['computation_config'], computed_data=tuple(a_result['computed_data'].keys())) # old way
+                        # New way should raise `TypeError`: TypeError: 'ComputationResult' object is not subscriptable
+
+                    except Exception:
+                        # unhandled exception
+                        raise
             else:
                 comp_config_results_list = None
 
