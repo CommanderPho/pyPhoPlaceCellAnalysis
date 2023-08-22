@@ -704,18 +704,55 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
     # HDF_SerializationMixin
 
     # HDFMixin Conformances ______________________________________________________________________________________________ #
+    def _export_global_computations_to_hdf(self, file_path, key: str, **kwargs):
+        from pyphoplacecellanalysis.General.Batch.AcrossSessionResults import AcrossSessionsResults # for build_neuron_identity_table_to_hdf
+        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.LongShortTrackComputations import InstantaneousSpikeRateGroupsComputation
+        
+        session_context = self.get_session_context() 
+        session_group_key: str = "/" + session_context.get_description(separator="/", include_property_names=False) # 'kdiba/gor01/one/2006-6-08_14-26-15'
+        session_uid: str = session_context.get_description(separator="|", include_property_names=False)
+        ## Global Computations
+        a_global_computations_group_key: str = f"{session_group_key}/global_computations"
+        with tb.open_file(file_path, mode='w') as f:
+            a_global_computations_group = f.create_group(session_group_key, 'global_computations', title='the result of computations that operate over many or all of the filters in the session.', createparents=True)
+            print(f'a_global_computations_group: {a_global_computations_group}')
+            # out_df.to_hdf(f, key=f'{a_global_computations_group_key}/long_short_fr_indicies_analysis') # , mode='w'
+
+
+        a_global_computations_group_key: str = f"{session_group_key}/global_computations"
+        with tb.open_file(file_path, mode='w') as f: # this mode='w' is correct because it should overwrite the previous file and not append to it.
+            a_global_computations_group = f.create_group(session_group_key, 'global_computations', title='the result of computations that operate over many or all of the filters in the session.', createparents=True)
+
+        # Handle long|short firing rate index:
+        long_short_fr_indicies_analysis_results = self.global_computation_results.computed_data['long_short_fr_indicies_analysis']
+        x_frs_index, y_frs_index = long_short_fr_indicies_analysis_results['x_frs_index'], long_short_fr_indicies_analysis_results['y_frs_index'] # use the all_results_dict as the computed data value
+        active_context = long_short_fr_indicies_analysis_results['active_context']
+        # Need to map keys of dict to an absolute dict value:
+        sess_specific_aclus = list(x_frs_index.keys())
+        session_ctxt_key:str = active_context.get_description(separator='|', subset_includelist=IdentifyingContext._get_session_context_keys())
+
+        long_short_fr_indicies_analysis_results_h5_df = pd.DataFrame([(f"{session_ctxt_key}|{aclu}", session_ctxt_key, aclu, x_frs_index[aclu], y_frs_index[aclu]) for aclu in sess_specific_aclus], columns=['neuron_uid', 'session_uid', 'aclu','x_frs_index', 'y_frs_index'])
+        long_short_fr_indicies_analysis_results_h5_df.to_hdf(file_path, key=f'{a_global_computations_group_key}/long_short_fr_indicies_analysis', format='table', data_columns=True)
+
+        # InstantaneousSpikeRateGroupsComputation ____________________________________________________________________________ #
+        inst_spike_rate_groups_result: InstantaneousSpikeRateGroupsComputation = self.global_computation_results.computed_data.long_short_inst_spike_rate_groups # = InstantaneousSpikeRateGroupsComputation(instantaneous_time_bin_size_seconds=0.01) # 10ms
+        # inst_spike_rate_groups_result.compute(curr_active_pipeline=self, active_context=self.sess.get_context())
+        inst_spike_rate_groups_result.to_hdf(file_path, f'{a_global_computations_group_key}/inst_fr_comps') # held up by SpikeRateTrends.inst_fr_df_list  # to HDF, don't need to split it
+
+        ##TODO: remainder of global_computations
+        # self.global_computation_results.to_hdf(file_path, key=f'{a_global_computations_group_key}')
+
+        AcrossSessionsResults.build_neuron_identity_table_to_hdf(file_path, key=session_group_key, spikes_df=self.sess.spikes_df, session_uid=session_uid)
+
+        
+
     def to_hdf(self, file_path, key: str, **kwargs):
         """ Saves the object to key in the hdf5 file specified by file_path
         
         Built from `build_processed_session_to_hdf(...)` on 2023-08-02
         
         """
-        from pyphoplacecellanalysis.General.Batch.AcrossSessionResults import AcrossSessionsResults # for to_hdf
-        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.LongShortTrackComputations import \
-            InstantaneousSpikeRateGroupsComputation
-
-        # print(f'file_path: {file_path}')
-
+        
         long_epoch_name, short_epoch_name, global_epoch_name = self.find_LongShortGlobal_epoch_names()
 
         # f.create_dataset(f'{key}/neuron_ids', data=a_sess.neuron_ids)
@@ -728,39 +765,9 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
         self.sess.to_hdf(file_path=file_path, key=f"{session_group_key}/sess")
 
         ## Global Computations
-        a_global_computations_group_key: str = f"{session_group_key}/global_computations"
-        with tb.open_file(file_path, mode='w') as f: # this mode='w' is correct because it should overwrite the previous file and not append to it.
-            a_global_computations_group = f.create_group(session_group_key, 'global_computations', title='the result of computations that operate over many or all of the filters in the session.', createparents=True)
+        self._export_global_computations_to_hdf(file_path, key=key)
 
-
-
-        ##TODO 2023-08-11 14:44: - [ ] Global Computations Output Here:
-        # Plot long|short firing rate index:
-        long_short_fr_indicies_analysis_results = self.global_computation_results.computed_data['long_short_fr_indicies_analysis']
-        x_frs_index, y_frs_index = long_short_fr_indicies_analysis_results['x_frs_index'], long_short_fr_indicies_analysis_results['y_frs_index'] # use the all_results_dict as the computed data value
-        active_context = long_short_fr_indicies_analysis_results['active_context']
-        # Need to map keys of dict to an absolute dict value:
-        sess_specific_aclus = list(x_frs_index.keys())
-        session_ctxt_key:str = active_context.get_description(separator='|', subset_includelist=IdentifyingContext._get_session_context_keys())
-
-        long_short_fr_indicies_analysis_results_h5_df = pd.DataFrame([(f"{session_ctxt_key}|{aclu}", session_ctxt_key, aclu, x_frs_index[aclu], y_frs_index[aclu]) for aclu in sess_specific_aclus], columns=['neuron_uid', 'session_uid', 'aclu','x_frs_index', 'y_frs_index'])
-        long_short_fr_indicies_analysis_results_h5_df.to_hdf(file_path, key=f'{a_global_computations_group_key}/long_short_fr_indicies_analysis', format='table', data_columns=True)
-
-        
-
-        # InstantaneousSpikeRateGroupsComputation ____________________________________________________________________________ #
-        _out_inst_fr_comps = InstantaneousSpikeRateGroupsComputation(instantaneous_time_bin_size_seconds=0.01) # 10ms
-        _out_inst_fr_comps.compute(curr_active_pipeline=self, active_context=self.sess.get_context())
-        _out_inst_fr_comps.to_hdf(file_path, f'{a_global_computations_group_key}/inst_fr_comps') # held up by SpikeRateTrends.inst_fr_df_list  # to HDF, don't need to split it
-        # LxC_ReplayDeltaMinus, LxC_ReplayDeltaPlus, SxC_ReplayDeltaMinus, SxC_ReplayDeltaPlus = _out_inst_fr_comps.LxC_ReplayDeltaMinus, _out_inst_fr_comps.LxC_ReplayDeltaPlus, _out_inst_fr_comps.SxC_ReplayDeltaMinus, _out_inst_fr_comps.SxC_ReplayDeltaPlus
-        # LxC_ThetaDeltaMinus, LxC_ThetaDeltaPlus, SxC_ThetaDeltaMinus, SxC_ThetaDeltaPlus = _out_inst_fr_comps.LxC_ThetaDeltaMinus, _out_inst_fr_comps.LxC_ThetaDeltaPlus, _out_inst_fr_comps.SxC_ThetaDeltaMinus, _out_inst_fr_comps.SxC_ThetaDeltaPlus
-
-
-        # a_computed_data.pf1D.to_hdf(file_path=file_path, key=f"{filter_context_key}/pf1D")
-
-        # session_group = f.create_group(key, session_group_key, title='a single recording session corresponding to a data folder', createparents=True) # '/kdiba/gor01/one/2006-6-08_14-26-15'
-        # neuron_identities_group = f.create_group(key, 'neuron_identities', title='each row uniquely identifies a neuron and its various loaded, labeled, and computed properties', createparents=True)
-
+        # Filtered Session Results:
         for an_epoch_name in (long_epoch_name, short_epoch_name, global_epoch_name):
             filter_context_key:str = "/" + self.filtered_contexts[an_epoch_name].get_description(separator="/", include_property_names=False) # '/kdiba/gor01/one/2006-6-08_14-26-15/maze1'
             # print(f'\tfilter_context_key: {filter_context_key}')
@@ -776,7 +783,7 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
             a_computed_data.pf2D.to_hdf(file_path=file_path, key=f"{filter_context_key}/pf2D")
 
         # group = f.create_group(key, 'filters', title='each row uniquely identifies a neuron and its various loaded, labeled, and computed properties', createparents=True)
-        AcrossSessionsResults.build_neuron_identity_table_to_hdf(file_path, key=session_group_key, spikes_df=self.sess.spikes_df, session_uid=session_uid)
+
 
         # Done, in future could potentially return the properties that it couldn't serialize so the defaults can be tried on them.
         # or maybe returns groups? a_filter_group
