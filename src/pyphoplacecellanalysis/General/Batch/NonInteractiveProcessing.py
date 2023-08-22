@@ -260,7 +260,7 @@ def batch_extended_computations(curr_active_pipeline, include_includelist=None, 
         print(f'included includelist is specified: {include_includelist}, so only performing these extended computations.')
     ## Get computed relative entropy measures:
     global_epoch_name = curr_active_pipeline.active_completed_computation_result_names[-1] # 'maze'
-    global_results = curr_active_pipeline.computation_results[global_epoch_name]['computed_data']
+    global_results = curr_active_pipeline.computation_results[global_epoch_name].computed_data #['computed_data']
 
     # ## Get existing `pf1D_dt`:
     # active_pf_1D = global_results.pf1D

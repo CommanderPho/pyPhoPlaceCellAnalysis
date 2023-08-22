@@ -5,7 +5,7 @@ import sys
 import typing
 from typing import Optional, Dict, Any
 
-from attrs import define, field # used for `ComputedResult`
+from attrs import define, field, Factory, asdict # used for `ComputedResult`
 
 import numpy as np
 from neuropy import core
@@ -13,6 +13,8 @@ from neuropy.core.session.dataSession import DataSession
 from neuropy.analyses.placefields import PlacefieldComputationParameters
 
 from pyphocorehelpers.DataStructure.dynamic_parameters import DynamicParameters
+from neuropy.utils.mixins.AttrsClassHelpers import AttrsBasedClassHelperMixin, custom_define, serialized_field, serialized_attribute_field, non_serialized_field
+from neuropy.utils.mixins.HDF5_representable import HDF_DeserializationMixin, post_deserialize, HDF_SerializationMixin, HDFMixin
 
 ## Import with: from pyphoplacecellanalysis.General.Model.ComputationResults import ComputationResult
 
@@ -93,23 +95,45 @@ global_computation_results: pyphocorehelpers.DataStructure.dynamic_parameters.Dy
 
     
 """
-class ComputationResult(DynamicParameters):
+
+
+@custom_define(slots=False)
+class ComputationResult(HDF_SerializationMixin):
     """
         The result of a single computation, on a filtered session with a specified config 
         The primary output data is stored in self.computed_data's dict
     """
-    sess: DataSession
-    computation_config: Optional[DynamicParameters]
-    computed_data: Optional[DynamicParameters]
-    accumulated_errors: Optional[DynamicParameters]
-    computation_times: Optional[DynamicParameters]
+    sess: DataSession = serialized_field()
+    computation_config: Optional[DynamicParameters] = serialized_field(default=None, is_computable=False)
+    computed_data: Optional[DynamicParameters] = serialized_field(default=None)
+    accumulated_errors: Optional[DynamicParameters] = non_serialized_field(default=Factory(DynamicParameters), is_computable=True)
+    computation_times: Optional[DynamicParameters] = serialized_field(default=Factory(DynamicParameters), is_computable=False)
+    
+    ## For serialization/pickling:
 
-    def __init__(self, sess: DataSession, computation_config: DynamicParameters, computed_data: DynamicParameters, accumulated_errors: Optional[DynamicParameters]=None, computation_times: Optional[DynamicParameters]=None):
-        if accumulated_errors is None:
-            accumulated_errors = DynamicParameters()
-        if computation_times is None:
-            computation_times = DynamicParameters()
-        super(ComputationResult, self).__init__(sess=sess, computation_config=computation_config, computed_data=computed_data, accumulated_errors=accumulated_errors, computation_times=computation_times)
+    def __setstate__(self, state):
+        # Restore instance attributes (i.e., _mapping and _keys_at_init).
+        if ('_mapping' in state) and ('_keys_at_init' in state):
+            # unpickling from the old DynamicParameters-based ComputationResult
+            print(f'unpickling from old DynamicParameters-based computationResult')
+            self.__dict__.update(state['_mapping'])
+        else:
+             # typical update
+            self.__dict__.update(state)
+
+
+    
+
+    # LEGACY WORKAROUND __________________________________________________________________________________________________ #
+    def to_dict(self):
+        """ TEMPORARY WORK AROUND: workaround after conversion from DynamicParameters-based class. """
+        return asdict(self)
+
+    def __getitem__(self, key: str):
+        """ TEMPORARY WORK AROUND: workaround after conversion from DynamicParameters-based class. """
+        print(f'DEPRICATION WARNING: workaround to allow subscripting ComputationResult objects. Will be depricated. key: {key}')
+        return getattr(self, key)
+
 
 
 @define(slots=False, repr=False)
