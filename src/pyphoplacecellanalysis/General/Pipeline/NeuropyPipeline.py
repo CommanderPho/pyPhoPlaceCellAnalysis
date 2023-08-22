@@ -718,7 +718,7 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
         from pyphoplacecellanalysis.General.Batch.AcrossSessionResults import AcrossSessionsResults # for build_neuron_identity_table_to_hdf
         from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.LongShortTrackComputations import JonathanFiringRateAnalysisResult        
         from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.LongShortTrackComputations import InstantaneousSpikeRateGroupsComputation
-        
+        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.LongShortTrackComputations import ExpectedVsObservedResult
 
         session_context = self.get_session_context() 
         session_group_key: str = "/" + session_context.get_description(separator="/", include_property_names=False) # 'kdiba/gor01/one/2006-6-08_14-26-15'
@@ -748,14 +748,23 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
 
 
         # jonathan_firing_rate_analysis_result _______________________________________________________________________________ #
-        jonathan_firing_rate_analysis_result: JonathanFiringRateAnalysisResult = JonathanFiringRateAnalysisResult(**self.global_computation_results.computed_data.jonathan_firing_rate_analysis.to_dict())
+        if not isinstance(self.global_computation_results.computed_data.jonathan_firing_rate_analysis, JonathanFiringRateAnalysisResult):
+                jonathan_firing_rate_analysis_result = JonathanFiringRateAnalysisResult(**self.global_computation_results.computed_data.jonathan_firing_rate_analysis.to_dict())
+        else:
+            jonathan_firing_rate_analysis_result = self.global_computation_results.computed_data.jonathan_firing_rate_analysis
+        
         jonathan_firing_rate_analysis_result.to_hdf(file_path=file_path, key=f'{a_global_computations_group_key}/jonathan_fr_analysis')
-
 
         # InstantaneousSpikeRateGroupsComputation ____________________________________________________________________________ #
         inst_spike_rate_groups_result: InstantaneousSpikeRateGroupsComputation = self.global_computation_results.computed_data.long_short_inst_spike_rate_groups # = InstantaneousSpikeRateGroupsComputation(instantaneous_time_bin_size_seconds=0.01) # 10ms
         # inst_spike_rate_groups_result.compute(curr_active_pipeline=self, active_context=self.sess.get_context())
         inst_spike_rate_groups_result.to_hdf(file_path, f'{a_global_computations_group_key}/inst_fr_comps') # held up by SpikeRateTrends.inst_fr_df_list  # to HDF, don't need to split it
+
+        if not isinstance(expected_v_observed_result, ExpectedVsObservedResult):
+            expected_v_observed_result = ExpectedVsObservedResult(**expected_v_observed_result.to_dict())
+        
+        expected_v_observed_result.to_hdf('output/test_ExpectedVsObservedResult.h5', '/expected_v_observed_result')
+
 
         ##TODO: remainder of global_computations
         # self.global_computation_results.to_hdf(file_path, key=f'{a_global_computations_group_key}')

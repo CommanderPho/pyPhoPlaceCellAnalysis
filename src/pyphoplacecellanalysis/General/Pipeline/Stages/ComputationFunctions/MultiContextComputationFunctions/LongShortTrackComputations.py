@@ -232,13 +232,13 @@ class JonathanFiringRateAnalysisResult(HDFMixin, AttrsBasedClassHelperMixin):
             _neuron_replay_stats_df["track_membership"] = _neuron_replay_stats_df["track_membership"].apply(lambda x: x.name).astype(cat_type)
         _neuron_replay_stats_df.to_hdf(file_path, key=f'{key}/neuron_replay_stats_df', format='table', data_columns=True)
 
-        self.rdf.rdf.to_hdf(file_path, key=f'{key}/rdf/df') # , format='table', data_columns=True
+        self.rdf.rdf.to_hdf(file_path, key=f'{key}/rdf/df', format='table', data_columns=True) # , format='table', data_columns=True
         aclu_to_idx: Dict = self.rdf.aclu_to_idx
         aclu_to_idx_df: pd.DataFrame = pd.DataFrame({'aclu': list(aclu_to_idx.keys()), 'fragile_linear_idx': list(aclu_to_idx.values())})
         aclu_to_idx_df.to_hdf(file_path, key=f'{key}/rdf/aclu_to_idx_df', format='table', data_columns=True)
 
         # irdf_group[f'{outputs_local_key}/df'] = self.irdf.irdf
-        self.irdf.irdf.to_hdf(file_path, key=f'{key}/irdf/df') # , format='table', data_columns=True
+        self.irdf.irdf.to_hdf(file_path, key=f'{key}/irdf/df', format='table', data_columns=True) # , format='table', data_columns=True
         aclu_to_idx: Dict = self.irdf.aclu_to_idx
         aclu_to_idx_df: pd.DataFrame = pd.DataFrame({'aclu': list(aclu_to_idx.keys()), 'fragile_linear_idx': list(aclu_to_idx.values())})
         aclu_to_idx_df.to_hdf(file_path, key=f'{key}/irdf/aclu_to_idx_df', format='table', data_columns=True)
@@ -264,6 +264,56 @@ class LeaveOneOutDecodingAnalysis(HDFMixin, AttrsBasedClassHelperMixin, Computed
     long_results_obj: LeaveOneOutDecodingAnalysisResult = serialized_field()
     short_results_obj: LeaveOneOutDecodingAnalysisResult = serialized_field()
     is_global: bool = serialized_attribute_field(default=True)
+
+
+@custom_define(slots=False, kw_only=True) # NOTE: kw_only=True prevents errors from only assigning some of the attributes with a specific field
+class ExpectedVsObservedResult(HDFMixin, ComputedResult):
+    """ Allows initialization from 
+    curr_long_short_post_decoding = curr_active_pipeline.global_computation_results.computed_data['long_short_post_decoding']
+    expected_v_observed_result = curr_long_short_post_decoding.expected_v_observed_result
+    expected_v_observed_result_obj = ExpectedVsObservedResult(**expected_v_observed_result.to_dict())
+    expected_v_observed_result_obj
+    """
+
+    Flat_epoch_time_bins_mean: np.ndarray = serialized_field()
+    Flat_decoder_time_bin_centers: np.ndarray
+    num_neurons: int = serialized_attribute_field()
+    num_timebins_in_epoch: np.ndarray
+    num_total_flat_timebins: np.int64 = serialized_attribute_field()
+    decoder_time_bin_centers_LONG: list
+    all_epochs_computed_expected_cell_num_spikes_LONG: list
+    all_epochs_computed_observed_from_expected_difference_LONG: list
+    measured_pos_window_centers_LONG: list
+    all_epochs_decoded_epoch_time_bins_mean_LONG: np.ndarray
+    all_epochs_computed_expected_cell_firing_rates_mean_LONG: np.ndarray
+    all_epochs_computed_expected_cell_firing_rates_stddev_LONG: np.ndarray
+    all_epochs_computed_observed_from_expected_difference_maximum_LONG: list
+    Flat_decoder_time_bin_centers_LONG: np.ndarray
+    Flat_all_epochs_computed_expected_cell_num_spikes_LONG: np.ndarray = serialized_field()
+    returned_shape_tuple_LONG: tuple
+    observed_from_expected_diff_ptp_LONG: np.ma.core.MaskedArray = serialized_field()
+    observed_from_expected_diff_mean_LONG: np.ndarray = serialized_field(is_computable=True)
+    observed_from_expected_diff_std_LONG: np.ndarray = serialized_field(is_computable=True)
+    # Short properties:
+    decoder_time_bin_centers_SHORT: list
+    all_epochs_computed_expected_cell_num_spikes_SHORT: list
+    all_epochs_computed_observed_from_expected_difference_SHORT: list
+    measured_pos_window_centers_SHORT: list
+    all_epochs_decoded_epoch_time_bins_mean_SHORT: np.ndarray
+    all_epochs_computed_expected_cell_firing_rates_mean_SHORT: np.ndarray
+    all_epochs_computed_expected_cell_firing_rates_stddev_SHORT: np.ndarray
+    all_epochs_computed_observed_from_expected_difference_maximum_SHORT: list
+    Flat_decoder_time_bin_centers_SHORT: np.ndarray
+    Flat_all_epochs_computed_expected_cell_num_spikes_SHORT: np.ndarray = serialized_field()
+    returned_shape_tuple_SHORT: tuple
+    observed_from_expected_diff_ptp_SHORT: np.ma.core.MaskedArray = serialized_field()
+    observed_from_expected_diff_mean_SHORT: np.ndarray = serialized_field(is_computable=True)
+    observed_from_expected_diff_std_SHORT: np.ndarray = serialized_field(is_computable=True)
+    is_short_track_epoch: np.ndarray
+    is_long_track_epoch: np.ndarray
+    short_short_diff: np.ndarray
+    long_long_diff: np.ndarray
+    
 
 
 @define(slots=False, repr=False)
@@ -686,8 +736,10 @@ class LongShortTrackComputations(AllFunctionEnumeratingMixin, metaclass=Computat
         })
 
         # Convert to explicit `JonathanFiringRateAnalysisResult` object:
-        # jonathan_firing_rate_analysis_result = JonathanFiringRateAnalysisResult(**global_computation_results.computed_data['jonathan_firing_rate_analysis'].to_dict())
+        jonathan_firing_rate_analysis_result = JonathanFiringRateAnalysisResult(**global_computation_results.computed_data['jonathan_firing_rate_analysis'].to_dict())
+        global_computation_results.computed_data['jonathan_firing_rate_analysis'] = jonathan_firing_rate_analysis_result # set the actual result object
         
+
         return global_computation_results
 
 
@@ -830,7 +882,7 @@ class LongShortTrackComputations(AllFunctionEnumeratingMixin, metaclass=Computat
 
         
         # Add to computed results:
-        expected_v_observed_result = DynamicParameters(Flat_epoch_time_bins_mean=Flat_epoch_time_bins_mean, Flat_decoder_time_bin_centers=Flat_decoder_time_bin_centers, num_neurons=num_neurons, num_timebins_in_epoch=num_timebins_in_epoch, num_total_flat_timebins=num_total_flat_timebins, 
+        expected_v_observed_result = ExpectedVsObservedResult(Flat_epoch_time_bins_mean=Flat_epoch_time_bins_mean, Flat_decoder_time_bin_centers=Flat_decoder_time_bin_centers, num_neurons=num_neurons, num_timebins_in_epoch=num_timebins_in_epoch, num_total_flat_timebins=num_total_flat_timebins, 
                                                     decoder_time_bin_centers_LONG=decoder_time_bin_centers_LONG, all_epochs_computed_expected_cell_num_spikes_LONG=all_epochs_computed_expected_cell_num_spikes_LONG, all_epochs_computed_observed_from_expected_difference_LONG=all_epochs_computed_observed_from_expected_difference_LONG, measured_pos_window_centers_LONG=measured_pos_window_centers_LONG, all_epochs_decoded_epoch_time_bins_mean_LONG=all_epochs_decoded_epoch_time_bins_mean_LONG, all_epochs_computed_expected_cell_firing_rates_mean_LONG=all_epochs_computed_expected_cell_firing_rates_mean_LONG, all_epochs_computed_expected_cell_firing_rates_stddev_LONG=all_epochs_computed_expected_cell_firing_rates_stddev_LONG, all_epochs_computed_observed_from_expected_difference_maximum_LONG=all_epochs_computed_observed_from_expected_difference_maximum_LONG, Flat_decoder_time_bin_centers_LONG=Flat_decoder_time_bin_centers_LONG, Flat_all_epochs_computed_expected_cell_num_spikes_LONG=Flat_all_epochs_computed_expected_cell_num_spikes_LONG, returned_shape_tuple_LONG=returned_shape_tuple_LONG, observed_from_expected_diff_ptp_LONG=observed_from_expected_diff_ptp_LONG, observed_from_expected_diff_mean_LONG=observed_from_expected_diff_mean_LONG, observed_from_expected_diff_std_LONG=observed_from_expected_diff_std_LONG,
                                                     decoder_time_bin_centers_SHORT=decoder_time_bin_centers_SHORT, all_epochs_computed_expected_cell_num_spikes_SHORT=all_epochs_computed_expected_cell_num_spikes_SHORT, all_epochs_computed_observed_from_expected_difference_SHORT=all_epochs_computed_observed_from_expected_difference_SHORT, measured_pos_window_centers_SHORT=measured_pos_window_centers_SHORT, all_epochs_decoded_epoch_time_bins_mean_SHORT=all_epochs_decoded_epoch_time_bins_mean_SHORT, all_epochs_computed_expected_cell_firing_rates_mean_SHORT=all_epochs_computed_expected_cell_firing_rates_mean_SHORT, all_epochs_computed_expected_cell_firing_rates_stddev_SHORT=all_epochs_computed_expected_cell_firing_rates_stddev_SHORT, all_epochs_computed_observed_from_expected_difference_maximum_SHORT=all_epochs_computed_observed_from_expected_difference_maximum_SHORT, Flat_decoder_time_bin_centers_SHORT=Flat_decoder_time_bin_centers_SHORT, Flat_all_epochs_computed_expected_cell_num_spikes_SHORT=Flat_all_epochs_computed_expected_cell_num_spikes_SHORT, returned_shape_tuple_SHORT=returned_shape_tuple_SHORT, observed_from_expected_diff_ptp_SHORT=observed_from_expected_diff_ptp_SHORT, observed_from_expected_diff_mean_SHORT=observed_from_expected_diff_mean_SHORT, observed_from_expected_diff_std_SHORT=observed_from_expected_diff_std_SHORT,
                                                     is_short_track_epoch=is_short_track_epoch, is_long_track_epoch=is_long_track_epoch, short_short_diff=short_short_diff, long_long_diff=long_long_diff,
@@ -906,7 +958,12 @@ class LongShortTrackComputations(AllFunctionEnumeratingMixin, metaclass=Computat
         long_session, short_session, global_session = [owning_pipeline_reference.filtered_sessions[an_epoch_name] for an_epoch_name in [long_epoch_name, short_epoch_name, global_epoch_name]] # only uses global_session
         
         ## Use the `JonathanFiringRateAnalysisResult` to get info about the long/short placefields:
-        jonathan_firing_rate_analysis_result = JonathanFiringRateAnalysisResult(**owning_pipeline_reference.global_computation_results.computed_data.jonathan_firing_rate_analysis.to_dict())
+        if not isinstance(owning_pipeline_reference.global_computation_results.computed_data.jonathan_firing_rate_analysis, JonathanFiringRateAnalysisResult):
+            jonathan_firing_rate_analysis_result = JonathanFiringRateAnalysisResult(**owning_pipeline_reference.global_computation_results.computed_data.jonathan_firing_rate_analysis.to_dict())
+        else:
+            jonathan_firing_rate_analysis_result = owning_pipeline_reference.global_computation_results.computed_data.jonathan_firing_rate_analysis
+            
+
         neuron_replay_stats_df, short_exclusive, long_exclusive, BOTH_subset, EITHER_subset, XOR_subset, NEITHER_subset = jonathan_firing_rate_analysis_result.get_cell_track_partitions()
 
         long_short_fr_indicies_analysis_results = owning_pipeline_reference.global_computation_results.computed_data['long_short_fr_indicies_analysis']
@@ -2293,7 +2350,11 @@ class InstantaneousSpikeRateGroupsComputation(HDF_SerializationMixin, AttrsBased
         long_session, short_session, global_session = [curr_active_pipeline.filtered_sessions[an_epoch_name] for an_epoch_name in [long_epoch_name, short_epoch_name, global_epoch_name]] # only uses global_session
 
         ## Use the `JonathanFiringRateAnalysisResult` to get info about the long/short placefields:
-        jonathan_firing_rate_analysis_result = JonathanFiringRateAnalysisResult(**curr_active_pipeline.global_computation_results.computed_data.jonathan_firing_rate_analysis.to_dict())
+        if not isinstance(curr_active_pipeline.global_computation_results.computed_data.jonathan_firing_rate_analysis, JonathanFiringRateAnalysisResult):
+            jonathan_firing_rate_analysis_result = JonathanFiringRateAnalysisResult(**curr_active_pipeline.global_computation_results.computed_data.jonathan_firing_rate_analysis.to_dict())
+        else:
+            jonathan_firing_rate_analysis_result = curr_active_pipeline.global_computation_results.computed_data.jonathan_firing_rate_analysis
+
         neuron_replay_stats_df, short_exclusive, long_exclusive, BOTH_subset, EITHER_subset, XOR_subset, NEITHER_subset = jonathan_firing_rate_analysis_result.get_cell_track_partitions()
 
         long_short_fr_indicies_analysis_results = curr_active_pipeline.global_computation_results.computed_data['long_short_fr_indicies_analysis']
