@@ -937,7 +937,7 @@ class LongShortTrackComputations(AllFunctionEnumeratingMixin, metaclass=Computat
             print(f'_perform_long_short_instantaneous_spike_rate_groups_analysis is lacking a required computation config parameter! creating a new curr_active_pipeline.global_computation_results.computation_config')
             global_computation_results.computation_config = DynamicContainer(instantaneous_time_bin_size_seconds=0.01)
         else:
-            print(f'have an existing curr_active_pipeline.global_computation_results.computation_config: {curr_active_pipeline.global_computation_results.computation_config}')	
+            print(f'have an existing `global_computation_results.computation_config`: {global_computation_results.computation_config}')	
 
         # Could also use `owning_pipeline_reference.global_computation_results.computation_config`
         assert (global_computation_results.computation_config is not None), f"requires `global_computation_results.computation_config.instantaneous_time_bin_size_seconds`"
