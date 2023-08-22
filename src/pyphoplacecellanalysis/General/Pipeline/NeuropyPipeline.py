@@ -714,9 +714,12 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
 
     # HDFMixin Conformances ______________________________________________________________________________________________ #
     def _export_global_computations_to_hdf(self, file_path, key: str, **kwargs):
+        """ exports the self.global_computation_results to HDF file specified by file_path, key. """
         from pyphoplacecellanalysis.General.Batch.AcrossSessionResults import AcrossSessionsResults # for build_neuron_identity_table_to_hdf
+        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.LongShortTrackComputations import JonathanFiringRateAnalysisResult        
         from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.LongShortTrackComputations import InstantaneousSpikeRateGroupsComputation
         
+
         session_context = self.get_session_context() 
         session_group_key: str = "/" + session_context.get_description(separator="/", include_property_names=False) # 'kdiba/gor01/one/2006-6-08_14-26-15'
         session_uid: str = session_context.get_description(separator="|", include_property_names=False)
@@ -724,14 +727,7 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
         a_global_computations_group_key: str = f"{session_group_key}/global_computations"
         with tb.open_file(file_path, mode='w') as f:
             a_global_computations_group = f.create_group(session_group_key, 'global_computations', title='the result of computations that operate over many or all of the filters in the session.', createparents=True)
-            print(f'a_global_computations_group: {a_global_computations_group}')
-            # out_df.to_hdf(f, key=f'{a_global_computations_group_key}/long_short_fr_indicies_analysis') # , mode='w'
-
-
-        a_global_computations_group_key: str = f"{session_group_key}/global_computations"
-        with tb.open_file(file_path, mode='w') as f: # this mode='w' is correct because it should overwrite the previous file and not append to it.
-            a_global_computations_group = f.create_group(session_group_key, 'global_computations', title='the result of computations that operate over many or all of the filters in the session.', createparents=True)
-
+            
         # Handle long|short firing rate index:
         long_short_fr_indicies_analysis_results = self.global_computation_results.computed_data['long_short_fr_indicies_analysis']
         x_frs_index, y_frs_index = long_short_fr_indicies_analysis_results['x_frs_index'], long_short_fr_indicies_analysis_results['y_frs_index'] # use the all_results_dict as the computed data value
@@ -742,6 +738,19 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
 
         long_short_fr_indicies_analysis_results_h5_df = pd.DataFrame([(f"{session_ctxt_key}|{aclu}", session_ctxt_key, aclu, x_frs_index[aclu], y_frs_index[aclu]) for aclu in sess_specific_aclus], columns=['neuron_uid', 'session_uid', 'aclu','x_frs_index', 'y_frs_index'])
         long_short_fr_indicies_analysis_results_h5_df.to_hdf(file_path, key=f'{a_global_computations_group_key}/long_short_fr_indicies_analysis', format='table', data_columns=True)
+
+        # long_short_post_decoding result: __________________________________________________________________________________ #
+        curr_long_short_post_decoding = self.global_computation_results.computed_data['long_short_post_decoding']
+        expected_v_observed_result, curr_long_short_rr = curr_long_short_post_decoding.expected_v_observed_result, curr_long_short_post_decoding.rate_remapping
+        rate_remapping_df, high_remapping_cells_only = curr_long_short_rr.rr_df, curr_long_short_rr.high_only_rr_df
+        Flat_epoch_time_bins_mean, Flat_decoder_time_bin_centers, num_neurons, num_timebins_in_epoch, num_total_flat_timebins, is_short_track_epoch, is_long_track_epoch, short_short_diff, long_long_diff = expected_v_observed_result['Flat_epoch_time_bins_mean'], expected_v_observed_result['Flat_decoder_time_bin_centers'], expected_v_observed_result['num_neurons'], expected_v_observed_result['num_timebins_in_epoch'], expected_v_observed_result['num_total_flat_timebins'], expected_v_observed_result['is_short_track_epoch'], expected_v_observed_result['is_long_track_epoch'], expected_v_observed_result['short_short_diff'], expected_v_observed_result['long_long_diff']
+
+
+
+        # jonathan_firing_rate_analysis_result _______________________________________________________________________________ #
+        jonathan_firing_rate_analysis_result: JonathanFiringRateAnalysisResult = JonathanFiringRateAnalysisResult(**self.global_computation_results.computed_data.jonathan_firing_rate_analysis.to_dict())
+        jonathan_firing_rate_analysis_result.to_hdf(file_path=file_path, key=f'{a_global_computations_group_key}/jonathan_fr_analysis')
+
 
         # InstantaneousSpikeRateGroupsComputation ____________________________________________________________________________ #
         inst_spike_rate_groups_result: InstantaneousSpikeRateGroupsComputation = self.global_computation_results.computed_data.long_short_inst_spike_rate_groups # = InstantaneousSpikeRateGroupsComputation(instantaneous_time_bin_size_seconds=0.01) # 10ms
