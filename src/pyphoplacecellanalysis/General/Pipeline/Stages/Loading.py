@@ -1,4 +1,5 @@
-from typing import Callable, List
+from typing import Callable, List, Dict, Optional
+from types import ModuleType
 import dataclasses
 from dataclasses import dataclass
 from datetime import datetime
@@ -8,6 +9,8 @@ from pathlib import Path
 from pyphocorehelpers.programming_helpers import metadata_attributes
 from pyphocorehelpers.function_helpers import function_attributes
 from pyphocorehelpers.function_helpers import compose_functions
+from pyphocorehelpers.Filesystem.pickling_helpers import RenameUnpickler, renamed_load
+
 from pyphocorehelpers.DataStructure.dynamic_parameters import DynamicParameters
 from pyphoplacecellanalysis.General.Pipeline.Stages.BaseNeuropyPipelineStage import BaseNeuropyPipelineStage, PipelineStage
 from pyphoplacecellanalysis.General.Pipeline.Stages.LoadFunctions.LoadFunctionRegistryHolder import LoadFunctionRegistryHolder
@@ -35,14 +38,26 @@ def saveData(pkl_path, db, should_append=False):
             pickle.dump(db, dbfile)
             dbfile.close()
 
+
+# global_move_modules_list: Dict[str, str] - a dict with keys equal to the old full path to a class and values equal to the updated (replacement) full path to the class. Used to update the path to class definitions for loading previously pickled results after refactoring.
+
+global_move_modules_list:Dict={
+    'pyphoplacecellanalysis.General.Batch.PhoDiba2023Paper.SingleBarResult':'pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.LongShortTrackComputations.SingleBarResult',
+    'pyphoplacecellanalysis.General.Batch.PhoDiba2023Paper.InstantaneousSpikeRateGroupsComputation':'pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.LongShortTrackComputations.InstantaneousSpikeRateGroupsComputation',
+}
+
+
 def loadData(pkl_path, debug_print=False, **kwargs):
     # for reading also binary mode is important
     db = None
+    active_move_modules_list: Dict = kwargs.pop('move_modules_list', global_move_modules_list)
+    
     with ProgressMessagePrinter(pkl_path, 'Loading', 'loaded session pickle file'):
+        
         with open(pkl_path, 'rb') as dbfile:
             try:
-                db = pickle.load(dbfile, **kwargs)
-                
+                db = renamed_load(dbfile, move_modules_list=active_move_modules_list, **kwargs)
+
             except NotImplementedError as err:
                 error_message = str(err)
                 if 'WindowsPath' in error_message:  # Check if WindowsPath is missing
@@ -50,7 +65,8 @@ def loadData(pkl_path, debug_print=False, **kwargs):
                     win_backup = pathlib.WindowsPath  # Backup the WindowsPath definition
                     try:
                         pathlib.WindowsPath = pathlib.PureWindowsPath
-                        db = pickle.load(dbfile, **kwargs) # Fails this time if it still throws an error
+                        db = renamed_load(dbfile, move_modules_list=active_move_modules_list, **kwargs)
+                        
                     finally:
                         pathlib.WindowsPath = win_backup  # Restore the backup WindowsPath definition
                         
@@ -59,7 +75,7 @@ def loadData(pkl_path, debug_print=False, **kwargs):
                     posix_backup = pathlib.PosixPath # backup the PosixPath definition
                     try:
                         pathlib.PosixPath = pathlib.PurePosixPath
-                        db = pickle.load(dbfile, **kwargs) # Fails this time if it still throws an error
+                        db = renamed_load(dbfile, move_modules_list=active_move_modules_list, **kwargs) # Fails this time if it still throws an error
                     finally:
                         pathlib.PosixPath = posix_backup # restore the backup posix path definition
                                         
