@@ -128,18 +128,18 @@ class SessionBatchProgress(Enum):
 
 @custom_define(slots=False)
 class BatchComputationProcessOptions(HDF_SerializationMixin):
-	should_load: bool = serialized_attribute_field() # should try to load from existing results from disk at all
-		# never
-		# always (fail if loading unsuccessful)
-		# always (warning but continue if unsuccessful)
-	should_compute: bool = serialized_attribute_field() # should try to run computations (which will just verify that loaded computations are good if that option is true)
-		# never
-		# if needed (required results are missing)
-		# always
-	should_save: bool = serialized_attribute_field() # should consider save at all
-		# never
-		# if changed
-		# always
+    should_load: bool = serialized_attribute_field() # should try to load from existing results from disk at all
+        # never
+        # always (fail if loading unsuccessful)
+        # always (warning but continue if unsuccessful)
+    should_compute: bool = serialized_attribute_field() # should try to run computations (which will just verify that loaded computations are good if that option is true)
+        # never
+        # if needed (required results are missing)
+        # always
+    should_save: bool = serialized_attribute_field() # should consider save at all
+        # never
+        # if changed
+        # always
 
 
 
