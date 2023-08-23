@@ -741,7 +741,7 @@ class H5ExternalLinkBuilder:
         from pyphoplacecellanalysis.General.Batch.AcrossSessionResults import H5ExternalLinkBuilder
         session_group_keys: List[str] = [("/" + a_ctxt.get_description(separator="/", include_property_names=False)) for a_ctxt in session_identifiers] # 'kdiba/gor01/one/2006-6-08_14-26-15'
         neuron_identities_table_keys = [f"{session_group_key}/neuron_identities/table" for session_group_key in session_group_keys]
-        a_loader = H5ExternalLinkBuilder.init_from_file_lists(file_list=hdf5_output_paths, table_key_list=neuron_identities_table_keys)
+        a_loader = H5ExternalLinkBuilder.init_from_file_lists(file_list=included_h5_paths, table_key_list=neuron_identities_table_keys)
         _out_table = a_loader.load_and_consolidate()
         _out_table
 
@@ -772,6 +772,17 @@ class H5ExternalLinkBuilder:
     def load_and_consolidate(self) -> pd.DataFrame:
         """
         Loads .h5 files and consolidates into a master table
+        
+        Usage:
+            from pyphoplacecellanalysis.General.Batch.AcrossSessionResults import H5FileReference, H5ExternalLinkBuilder
+
+            session_short_names: List[str] = [a_ctxt.get_description(separator='_') for a_ctxt in included_session_contexts] # 'kdiba.gor01.one.2006-6-08_14-26-15'
+            session_group_keys: List[str] = [("/" + a_ctxt.get_description(separator="/", include_property_names=False)) for a_ctxt in included_session_contexts] # 'kdiba/gor01/one/2006-6-08_14-26-15'
+            neuron_identities_table_keys = [f"{session_group_key}/neuron_identities/table" for session_group_key in session_group_keys]
+            a_loader = H5ExternalLinkBuilder.init_from_file_lists(file_list=included_h5_paths, table_key_list=neuron_identities_table_keys, short_name_list=session_short_names)
+            _out_table = a_loader.load_and_consolidate()
+            _out_table
+
         """
         data_frames = []
         for file, table_key in zip(self.file_list, self.table_key_list):
@@ -794,6 +805,19 @@ class H5ExternalLinkBuilder:
     def build_linking_results(self, destination_file_path, fail_on_exception:bool=True):
         """ Creates (or overwrites) a new .h5 file at `destination_file_path` containing external links to existing files in self.file_list
         
+        Usage:
+            from pyphoplacecellanalysis.General.Batch.AcrossSessionResults import H5FileReference, H5ExternalLinkBuilder
+
+            session_short_names: List[str] = [a_ctxt.get_description(separator='_') for a_ctxt in included_session_contexts] # 'kdiba.gor01.one.2006-6-08_14-26-15'
+            session_group_keys: List[str] = [("/" + a_ctxt.get_description(separator="/", include_property_names=False)) for a_ctxt in included_session_contexts] # 'kdiba/gor01/one/2006-6-08_14-26-15'
+            neuron_identities_table_keys = [f"{session_group_key}/neuron_identities/table" for session_group_key in session_group_keys]
+            a_loader = H5ExternalLinkBuilder.init_from_file_lists(file_list=included_h5_paths, table_key_list=neuron_identities_table_keys, short_name_list=session_short_names)
+            # _out_table = a_loader.load_and_consolidate()
+            # _out_table
+
+            destination_file_path, external_file_links = a_loader.build_linking_results('output/test_linking_file.h5', fail_on_exception=False)
+            external_file_links
+
         """
         # , session_identifiers, external_h5_links
         external_file_links: Dict = {}
@@ -818,4 +842,4 @@ class H5ExternalLinkBuilder:
                 
 
         print(f'added {len(external_file_links)} links to file.')
-        return external_file_links
+        return destination_file_path, external_file_links
