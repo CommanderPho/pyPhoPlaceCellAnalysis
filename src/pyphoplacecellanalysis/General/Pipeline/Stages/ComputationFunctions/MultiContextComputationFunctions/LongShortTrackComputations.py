@@ -220,7 +220,7 @@ class JonathanFiringRateAnalysisResult(HDFMixin, AttrsBasedClassHelperMixin):
         
         _neuron_replay_stats_df = deepcopy(self.neuron_replay_stats_df)
         
-        active_context = kwargs.pop('active_context', None)
+        active_context = kwargs.pop('active_context', None) # TODO: requiring that the caller pass active_context isn't optimal
         _neuron_replay_stats_df = HDF_Converter.prepare_neuron_indexed_dataframe_for_hdf(_neuron_replay_stats_df, active_context=active_context, aclu_column_name=None)
         _neuron_replay_stats_df.to_hdf(file_path, key=f'{key}/neuron_replay_stats_df', format='table', data_columns=True)
 

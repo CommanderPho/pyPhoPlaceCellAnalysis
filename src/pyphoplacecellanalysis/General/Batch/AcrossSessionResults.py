@@ -820,7 +820,7 @@ class H5ExternalLinkBuilder:
         return master_table
     
         
-    def build_linking_results(self, destination_file_path, referential_group_key: str = 'referential_group', table_key_list=None, fail_on_exception:bool=True):
+    def build_linking_results(self, destination_file_path, referential_group_key: str = 'referential_group', table_key_list=None, destination_file_mode='w', fail_on_exception:bool=True):
         """ Creates (or overwrites) a new .h5 file at `destination_file_path` containing external links to existing files in self.file_list
         
         Usage:
@@ -841,7 +841,7 @@ class H5ExternalLinkBuilder:
 
         # , session_identifiers, external_h5_links
         external_file_links: Dict = {}
-        with tb.open_file(destination_file_path, mode='w') as f: # this mode='w' is correct because it should overwrite the previous file and not append to it.
+        with tb.open_file(destination_file_path, mode=destination_file_mode) as f: # this mode='w' is correct because it should overwrite the previous file and not append to it.
             a_referential_group: Group = f.create_group('/', referential_group_key, title='external links to all of the files in the H5ExternalLinkBuilder', createparents=True)            
             for file_short_name, file, table_key in zip(self.file_short_name, self.file_list, table_key_list):
                 try:
