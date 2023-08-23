@@ -7,7 +7,7 @@ import socket # for getting hostname in `build_batch_processing_session_task_ide
 from datetime import datetime, timedelta
 import pathlib
 from pathlib import Path
-from typing import List, Dict, Optional, Union, Callable
+from typing import List, Dict, Optional, Tuple, Union, Callable
 import numpy as np
 import pandas as pd
 from pyphocorehelpers.print_helpers import CapturedException
@@ -1190,6 +1190,23 @@ class BatchSessionCompletionHandler:
                     raise e.exc
 
 
+    def try_export_pipeline_hdf5_if_needed(self, curr_active_pipeline, curr_session_context) -> Tuple[Optional[Path], Optional[CapturedException]]:
+        """ Export the pipeline's HDF5 as 'pipeline_results.h5' """
+        hdf5_output_path: Path = curr_active_pipeline.get_output_path().joinpath('pipeline_results.h5').resolve()
+        print(f'pipeline hdf5_output_path: {hdf5_output_path}')
+        try:
+            AcrossSessionsResults.build_session_pipeline_to_hdf(hdf5_output_path, "/", curr_active_pipeline, debug_print=False) # coulduse key of "/{curr_session_context}" with context properly expanded.
+            e = None
+        except Exception as e:
+            exception_info = sys.exc_info()
+            e = CapturedException(e, exception_info)
+            print(f"ERROR: encountered exception {e} while trying to build the session HDF output for {curr_session_context}")
+            if self.fail_on_exception:
+                raise e.exc
+            hdf5_output_path = None # set to None because it failed.
+        return (hdf5_output_path, e)
+    
+
     ## Main function that's called with the complete pipeline:
     def on_complete_success_execution_session(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline) -> PipelineCompletionResult:
         """ called when the execute_session completes like:
@@ -1271,18 +1288,8 @@ class BatchSessionCompletionHandler:
         print(f'\t time since last computation: {delta_since_last_compute}')
 
         # Export the pipeline's HDF5:
-        hdf5_output_path: Path = curr_active_pipeline.get_output_path().joinpath('pipeline_results.h5').resolve()
-        print(f'pipeline hdf5_output_path: {hdf5_output_path}')
-        try:
-            AcrossSessionsResults.build_session_pipeline_to_hdf(hdf5_output_path, "/", curr_active_pipeline, debug_print=False) # coulduse key of "/{curr_session_context}" with context properly expanded.
-        except Exception as e:
-            exception_info = sys.exc_info()
-            e = CapturedException(e, exception_info)
-            print(f"ERROR: encountered exception {e} while trying to build the session HDF output for {curr_session_context}")
-            if self.fail_on_exception:
-                raise e.exc
-            hdf5_output_path = None # set to None because it failed.
-
+        hdf5_output_path, hdf5_output_err = self.try_export_pipeline_hdf5_if_needed(curr_active_pipeline=curr_active_pipeline, curr_session_context=curr_session_context)
+        
 
         print(f'\t doing specific instantaneous firing rate computation for context: {curr_session_context}...')
         ## Specify the output file:
