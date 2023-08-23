@@ -14,15 +14,14 @@ from pyphoplacecellanalysis.General.Model.ComputationResults import ComputationR
 
 from neuropy.utils.colors_util import get_neuron_colors # required for build_neurons_color_map 
 from neuropy.utils.mixins.AttrsClassHelpers import AttrsBasedClassHelperMixin, serialized_field, serialized_attribute_field, non_serialized_field, custom_define
-from neuropy.utils.mixins.HDF5_representable import HDF_DeserializationMixin, post_deserialize, HDF_SerializationMixin, HDFMixin
-
+from neuropy.utils.mixins.HDF5_representable import HDF_DeserializationMixin, post_deserialize, HDF_SerializationMixin, HDFMixin, HDF_Converter
 from pyphocorehelpers.programming_helpers import metadata_attributes
 from pyphocorehelpers.function_helpers import function_attributes
 
 from enum import Enum
 
 
-class SplitPartitionMembership(Enum):
+class SplitPartitionMembership(HDF_Converter.HDFConvertableEnum, Enum):
     """ from pyphoplacecellanalysis.General.Mixins.CrossComputationComparisonHelpers import SplitPartitionMembership    
     """
     LEFT_ONLY = 0
@@ -34,9 +33,7 @@ class SplitPartitionMembership(Enum):
     def hdf_coding_ClassNames(cls):
         return [cls.LEFT_ONLY.name, cls.SHARED.name, cls.RIGHT_ONLY.name]
     
-    @classmethod
-    def get_pandas_categories_type(cls) -> CategoricalDtype:
-        return CategoricalDtype(categories=list(cls.hdf_coding_ClassNames()), ordered=True)
+
         
     @classmethod
     def from_hdf_coding_string(cls, string_value: str) -> "SplitPartitionMembership":
@@ -44,6 +41,14 @@ class SplitPartitionMembership(Enum):
         itemindex = np.where(cls.hdf_coding_ClassNames()==string_value)
         return SplitPartitionMembership(itemindex[0])
 
+    # HDFConvertableEnum Conformances ____________________________________________________________________________________ #
+    @classmethod
+    def get_pandas_categories_type(cls) -> CategoricalDtype:
+        return CategoricalDtype(categories=list(cls.hdf_coding_ClassNames()), ordered=True)
+
+    @classmethod
+    def convert_to_hdf(cls, value) -> str:
+        return value.name
 
 
 @custom_define(slots=False)
