@@ -10,13 +10,16 @@ import sys
 from pathlib import Path
 import shutil # for _backup_extant_file(...)
 
-from typing import Callable, List, Optional
+from typing import Callable, List, Optional, Dict
 import inspect # used for filter_sessions(...)'s inspect.getsource to compare filters:
 
 import numpy as np
 import pandas as pd
 import tables as tb
 import h5py
+
+from attrs import define, field, Factory
+
 
 # NeuroPy (Diba Lab Python Repo) Loading
 from neuropy import core
@@ -69,27 +72,32 @@ class PipelineSavingScheme(ExtendedEnum):
 
     @property
     def shouldSave(self):
-        return PipelineSavingScheme.shouldSaveList()[self]
+        return PipelineSavingScheme.shouldSaveList()[self.value]
 
     # Static properties
     @classmethod
     def shouldSaveList(cls):
-        return cls.build_member_value_dict([False, True, True])
+        values_list = [False, True, True]
+        assert len(values_list) == len(cls.all_member_values()), f"values_list must have one value for each member of the enum, but got {len(values_list)} values for {len(cls.all_members())} members."
+        return dict(zip(cls.all_member_values(), values_list)) # doing it this way (comparing the string value) requires self.value in the shouldSave property!
+        # return cls.build_member_value_dict([False, True, True])
 
 
 
-class LoadedObjectPersistanceState(object):
-    """Keeps track of the persistance state for an object that has been loaded from disk to keep track of how the object's state relates to the version on disk (the persisted version) """
-    def __init__(self, file_path, compare_state_on_load):
-        super(LoadedObjectPersistanceState, self).__init__()
-        self.file_path = file_path
-        self.load_compare_state = deepcopy(compare_state_on_load)
-        
+
+
+@define(slots=False)
+class LoadedObjectPersistanceState:
+    """Keeps track of the persistence state for an object that has been loaded from disk to keep track of how the object's state relates to the version on disk (the persisted version)"""
+    file_path: Path = field(converter=Path)
+    load_compare_state: Dict = field(alias='compare_state_on_load', converter=deepcopy)
+
     def needs_save(self, curr_object) -> bool:
-        """ compares the curr_object's state to its state when loaded from disk to see if anything changed and it needs to be re-persisted (by saving) """
+        """Compares the curr_object's state to its state when loaded from disk to see if anything changed and it needs to be re-persisted (by saving)"""
         # lhs_compare_dict = NeuropyPipeline.build_pipeline_compare_dict(curr_object)
         curr_diff = DiffableObject.compute_diff(curr_object.pipeline_compare_dict, self.load_compare_state)
         return len(curr_diff) > 0
+
 
     
 
