@@ -219,17 +219,9 @@ class JonathanFiringRateAnalysisResult(HDFMixin, AttrsBasedClassHelperMixin):
         # Convert the ['track_membership', 'neuron_type'] columns of self._neuron_replay_stats_df to the categorical type if needed
         
         _neuron_replay_stats_df = deepcopy(self.neuron_replay_stats_df)
-        # Convert the 'cell_type' column of the dataframe to the categorical type if needed
-        cat_type = NeuronType.get_pandas_categories_type()
-        if _neuron_replay_stats_df["neuron_type"].dtype != cat_type:
-            # If this type check ever becomes a problem and we want a more liberal constraint, All instances of CategoricalDtype compare equal to the string 'category'.
-            _neuron_replay_stats_df["neuron_type"] = _neuron_replay_stats_df["neuron_type"].apply(lambda x: x.hdfcodingClassName).astype(cat_type) # NeuronType can't seem to be cast directly to the new categorical type, it results in the column being filled with NaNs. Instead cast to string first.
-
-        # Convert the 'track_membership' column of the dataframe to the categorical type if needed
-        cat_type = SplitPartitionMembership.get_pandas_categories_type()
-        if _neuron_replay_stats_df["track_membership"].dtype != cat_type:
-            # If this type check ever becomes a problem and we want a more liberal constraint, All instances of CategoricalDtype compare equal to the string 'category'.
-            _neuron_replay_stats_df["track_membership"] = _neuron_replay_stats_df["track_membership"].apply(lambda x: x.name).astype(cat_type)
+        
+        active_context = kwargs.pop('active_context', None)
+        _neuron_replay_stats_df = HDF_Converter.prepare_neuron_indexed_dataframe_for_hdf(_neuron_replay_stats_df, active_context=active_context, aclu_column_name=None)
         _neuron_replay_stats_df.to_hdf(file_path, key=f'{key}/neuron_replay_stats_df', format='table', data_columns=True)
 
         self.rdf.rdf.to_hdf(file_path, key=f'{key}/rdf/df') # , format='table', data_columns=True Can't do 'table' format because `TypeError: Cannot serialize the column [firing_rates] because its data contents are not [string] but [mixed] object dtype`
@@ -242,6 +234,8 @@ class JonathanFiringRateAnalysisResult(HDFMixin, AttrsBasedClassHelperMixin):
         aclu_to_idx: Dict = self.irdf.aclu_to_idx
         aclu_to_idx_df: pd.DataFrame = pd.DataFrame({'aclu': list(aclu_to_idx.keys()), 'fragile_linear_idx': list(aclu_to_idx.values())})
         aclu_to_idx_df.to_hdf(file_path, key=f'{key}/irdf/aclu_to_idx_df', format='table', data_columns=True)
+
+
 
 
 

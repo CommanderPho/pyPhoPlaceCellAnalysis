@@ -35,11 +35,7 @@ class SplitPartitionMembership(HDF_Converter.HDFConvertableEnum, Enum):
     
 
         
-    @classmethod
-    def from_hdf_coding_string(cls, string_value: str) -> "SplitPartitionMembership":
-        string_value = string_value.lower()
-        itemindex = np.where(cls.hdf_coding_ClassNames()==string_value)
-        return SplitPartitionMembership(itemindex[0])
+
 
     # HDFConvertableEnum Conformances ____________________________________________________________________________________ #
     @classmethod
@@ -49,6 +45,13 @@ class SplitPartitionMembership(HDF_Converter.HDFConvertableEnum, Enum):
     @classmethod
     def convert_to_hdf(cls, value) -> str:
         return value.name
+
+    @classmethod
+    def from_hdf_coding_string(cls, string_value: str) -> "SplitPartitionMembership":
+        string_value = string_value.lower()
+        itemindex = np.where(cls.hdf_coding_ClassNames()==string_value)
+        return SplitPartitionMembership(itemindex[0])
+
 
 
 @custom_define(slots=False)
