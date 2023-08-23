@@ -769,7 +769,7 @@ class H5ExternalLinkBuilder:
         return cls(file_reference_list=[H5FileReference(short_name=a_short_name, path=a_file) for a_short_name, a_file in zip(short_name_list, file_list)], table_key_list=table_key_list)
     
     
-    def load_and_consolidate(self) -> pd.DataFrame:
+    def load_and_consolidate(self, table_key_list=None, fail_on_exception:bool=True) -> pd.DataFrame:
         """
         Loads .h5 files and consolidates into a master table
         
@@ -784,25 +784,35 @@ class H5ExternalLinkBuilder:
             _out_table
 
         """
+        table_key_list = table_key_list or self.table_key_list
         data_frames = []
-        for file, table_key in zip(self.file_list, self.table_key_list):
-            with tb.open_file(file) as h5_file:
-                a_table = h5_file.get_node(table_key)
-                print(f'a_table: {a_table}')
-                # for a_record in a_table
-                
-                # data_frames.append(a_table)
+        for file, table_key in zip(self.file_list, table_key_list):
+            try:
+                with tb.open_file(file, mode='r') as h5_file:
+                        a_table = h5_file.get_node(table_key)
+                        # print(f'a_table: {a_table}')
+                        # for a_record in a_table
+                        
+                        # data_frames.append(a_table)
 #                 for table in h5_file.get_node(table_key):
 #                 # for table in h5_file.root:
-                # df = pd.DataFrame.from_records(a_table[:]) # .read()
-                df = pd.DataFrame.from_records(a_table.read()) 
-                data_frames.append(df)
-
+                        # df = pd.DataFrame.from_records(a_table[:]) # .read()
+                        df = pd.DataFrame.from_records(a_table.read()) 
+                        data_frames.append(df)
+            # except NoSuchNodeError:
+            except Exception as e:
+                if fail_on_exception:
+                    raise
+                else:
+                    print(f'failed for file path: {str(file)}, table_key: {table_key}. wth exception {e}. Skipping.')
+                    
+                        
+        print(f'concatenating dataframes from {len(data_frames)} of {len(self.file_list)} files')
         master_table = pd.concat(data_frames, ignore_index=True)
         return master_table
     
         
-    def build_linking_results(self, destination_file_path, fail_on_exception:bool=True):
+    def build_linking_results(self, destination_file_path, referential_group_key: str = 'referential_group', table_key_list=None, fail_on_exception:bool=True):
         """ Creates (or overwrites) a new .h5 file at `destination_file_path` containing external links to existing files in self.file_list
         
         Usage:
@@ -819,13 +829,15 @@ class H5ExternalLinkBuilder:
             external_file_links
 
         """
+        table_key_list = table_key_list or self.table_key_list
+
         # , session_identifiers, external_h5_links
         external_file_links: Dict = {}
         with tb.open_file(destination_file_path, mode='w') as f: # this mode='w' is correct because it should overwrite the previous file and not append to it.
-            a_referential_group: Group = f.create_group('/', 'referential_group', title='external links to all of the files in the H5ExternalLinkBuilder', createparents=True)            
-            for file_short_name, file, table_key in zip(self.file_short_name, self.file_list, self.table_key_list):
+            a_referential_group: Group = f.create_group('/', referential_group_key, title='external links to all of the files in the H5ExternalLinkBuilder', createparents=True)            
+            for file_short_name, file, table_key in zip(self.file_short_name, self.file_list, table_key_list):
                 try:
-                    with tb.open_file(file) as h5_file:
+                    with tb.open_file(file, mode='r') as h5_file:
                         a_table = h5_file.get_node(table_key)
                         # print(f'a_table: {a_table}')
                         an_external_link = f.create_external_link(where=a_referential_group, name=file_short_name, target=a_table, createparents=False)
