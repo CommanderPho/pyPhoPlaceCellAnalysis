@@ -1194,9 +1194,10 @@ class BatchSessionCompletionHandler:
         """ Export the pipeline's HDF5 as 'pipeline_results.h5' """
         hdf5_output_path: Path = curr_active_pipeline.get_output_path().joinpath('pipeline_results.h5').resolve()
         print(f'pipeline hdf5_output_path: {hdf5_output_path}')
+        e = None
         try:
             AcrossSessionsResults.build_session_pipeline_to_hdf(hdf5_output_path, "/", curr_active_pipeline, debug_print=False) # coulduse key of "/{curr_session_context}" with context properly expanded.
-            e = None
+            return (hdf5_output_path, None)
         except Exception as e:
             exception_info = sys.exc_info()
             e = CapturedException(e, exception_info)
@@ -1204,7 +1205,7 @@ class BatchSessionCompletionHandler:
             if self.fail_on_exception:
                 raise e.exc
             hdf5_output_path = None # set to None because it failed.
-        return (hdf5_output_path, e)
+            return (hdf5_output_path, e)
     
 
     ## Main function that's called with the complete pipeline:

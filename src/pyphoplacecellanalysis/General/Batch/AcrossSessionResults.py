@@ -734,6 +734,14 @@ class H5FileReference:
     path: Path
 
 
+
+@define(slots=False)
+class ExternallyReferencedItem:
+    foreign_key: str # the key in the external file that is referenced
+    local_key: str # the key that will be created in the new reference table
+    
+
+
 @define(slots=False)
 class H5ExternalLinkBuilder:
     """ H5Loader class for loading and consolidating .h5 files
@@ -794,8 +802,8 @@ class H5ExternalLinkBuilder:
                         # for a_record in a_table
                         
                         # data_frames.append(a_table)
-#                 for table in h5_file.get_node(table_key):
-#                 # for table in h5_file.root:
+        #                 for table in h5_file.get_node(table_key):
+        #                 # for table in h5_file.root:
                         # df = pd.DataFrame.from_records(a_table[:]) # .read()
                         df = pd.DataFrame.from_records(a_table.read()) 
                         data_frames.append(df)
