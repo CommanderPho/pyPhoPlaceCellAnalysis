@@ -33,7 +33,7 @@ from scipy.special import rel_entr # alternative for compute_relative_entropy_di
 
 from collections import Counter # Count the Number of Occurrences in a Python list using Counter
 from pyphoplacecellanalysis.General.Mixins.CrossComputationComparisonHelpers import SplitPartitionMembership
-from neuropy.core.neurons import NeuronType
+from neuropy.core.neuron_identities import NeuronType
 
 from neuropy.analyses import detect_pbe_epochs # used in `_perform_jonathan_replay_firing_rate_analyses(.)` if replays are missing
 

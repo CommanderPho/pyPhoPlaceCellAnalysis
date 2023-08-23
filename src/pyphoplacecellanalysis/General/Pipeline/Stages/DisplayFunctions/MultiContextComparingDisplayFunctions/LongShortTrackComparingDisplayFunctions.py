@@ -8,12 +8,11 @@ import matplotlib.pyplot as plt
 from matplotlib.figure import Figure, FigureBase # FigureBase: both Figure and SubFigure
 from flexitext import flexitext ## flexitext for formatted matplotlib text
 
-from neuropy.core.neuron_identities import PlotStringBrevityModeEnum # for plot_short_v_long_pf1D_comparison (_display_short_long_pf1D_comparison)
+from neuropy.core.neuron_identities import PlotStringBrevityModeEnum, NeuronType  # for plot_short_v_long_pf1D_comparison (_display_short_long_pf1D_comparison)
 from neuropy.plotting.figure import Fig # for plot_short_v_long_pf1D_comparison (_display_short_long_pf1D_comparison)
 from neuropy.plotting.ratemaps import plot_ratemap_1D # for plot_short_v_long_pf1D_comparison (_display_short_long_pf1D_comparison)
 from neuropy.utils.matplotlib_helpers import build_or_reuse_figure # used for `_make_pho_jonathan_batch_plots(...)`
 from neuropy.utils.mixins.print_helpers import ProgressMessagePrinter # for `_plot_long_short_firing_rate_indicies`
-from neuropy.core.neurons import NeuronType
 from neuropy.utils.matplotlib_helpers import fit_both_axes
 from neuropy.utils.matplotlib_helpers import draw_epoch_regions # plot_expected_vs_observed
 
