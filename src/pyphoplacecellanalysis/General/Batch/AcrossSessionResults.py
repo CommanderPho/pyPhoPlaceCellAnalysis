@@ -24,7 +24,7 @@ from attrs import define, field, Factory
 from pyphocorehelpers.print_helpers import CapturedException
 import tables as tb
 from tables import (
-    Int8Col, Int16Col, Int32Col, Int64Col,
+    Group, Int8Col, Int16Col, Int32Col, Int64Col, NoSuchNodeError,
     UInt8Col, UInt16Col, UInt32Col, UInt64Col,
     Float32Col, Float64Col,
     TimeCol, ComplexCol, StringCol, BoolCol, EnumCol
@@ -354,6 +354,12 @@ class InstantaneousFiringRatesDataframeAccessor():
         # _shell_obj.SxC_scatter_props = SxC_scatter_props
 
         return _shell_obj, loaded_result_df
+
+
+
+
+
+
 
 
 class AcrossSessionsResults:
@@ -720,6 +726,12 @@ class AcrossSessionsVisualizations:
 #         # def to_hdf(self, file_path, key: str, **kwargs):
 
 
+# session_name
+
+@define(slots=False)
+class H5FileReference:
+    short_name: str
+    path: Path
 
 
 @define(slots=False)
@@ -729,14 +741,33 @@ class H5ExternalLinkBuilder:
         from pyphoplacecellanalysis.General.Batch.AcrossSessionResults import H5ExternalLinkBuilder
         session_group_keys: List[str] = [("/" + a_ctxt.get_description(separator="/", include_property_names=False)) for a_ctxt in session_identifiers] # 'kdiba/gor01/one/2006-6-08_14-26-15'
         neuron_identities_table_keys = [f"{session_group_key}/neuron_identities/table" for session_group_key in session_group_keys]
-        a_loader = H5Loader(file_list=hdf5_output_paths, table_key_list=neuron_identities_table_keys)
+        a_loader = H5ExternalLinkBuilder.init_from_file_lists(file_list=hdf5_output_paths, table_key_list=neuron_identities_table_keys)
         _out_table = a_loader.load_and_consolidate()
         _out_table
 
 
     """
-    file_list: List[str] = field(default=Factory(list))
+    file_reference_list: List[H5FileReference] = field(default=Factory(list))
     table_key_list: List[str] = field(default=Factory(list))
+    
+
+    @property
+    def file_short_name(self) -> list[Path]: 
+        return [a_ref.short_name for a_ref in self.file_reference_list]
+
+    @property
+    def file_list(self) -> list[Path]: 
+        return [a_ref.path for a_ref in self.file_reference_list]
+
+
+    @classmethod
+    def init_from_file_lists(cls, file_list, table_key_list, short_name_list=None):
+        if short_name_list is None:
+            short_name_list = [a_file.filename for a_file in file_list]
+        assert len(short_name_list) == len(file_list)
+        assert len(table_key_list) == len(file_list)
+        return cls(file_reference_list=[H5FileReference(short_name=a_short_name, path=a_file) for a_short_name, a_file in zip(short_name_list, file_list)], table_key_list=table_key_list)
+    
     
     def load_and_consolidate(self) -> pd.DataFrame:
         """
@@ -758,12 +789,33 @@ class H5ExternalLinkBuilder:
 
         master_table = pd.concat(data_frames, ignore_index=True)
         return master_table
-
     
-def build_linking_results(file_path, session_identifiers, external_h5_links):
-    with tb.open_file(file_path, mode='w') as f: # this mode='w' is correct because it should overwrite the previous file and not append to it.
-        # a_global_computations_group = f.create_group(session_group_key, 'global_computations', title='the result of computations that operate over many or all of the filters in the session.', createparents=True)
-        an_external_link = f.create_external_link(f'file:/path/to/node', name, target, createparents=False)
+        
+    def build_linking_results(self, destination_file_path, fail_on_exception:bool=True):
+        """ Creates (or overwrites) a new .h5 file at `destination_file_path` containing external links to existing files in self.file_list
+        
+        """
+        # , session_identifiers, external_h5_links
+        external_file_links: Dict = {}
+        with tb.open_file(destination_file_path, mode='w') as f: # this mode='w' is correct because it should overwrite the previous file and not append to it.
+            a_referential_group: Group = f.create_group('/', 'referential_group', title='external links to all of the files in the H5ExternalLinkBuilder', createparents=True)            
+            for file_short_name, file, table_key in zip(self.file_short_name, self.file_list, self.table_key_list):
+                try:
+                    with tb.open_file(file) as h5_file:
+                        a_table = h5_file.get_node(table_key)
+                        # print(f'a_table: {a_table}')
+                        an_external_link = f.create_external_link(where=a_referential_group, name=file_short_name, target=a_table, createparents=False)
+                        # an_external_link = f.create_external_link(where=f'file:/path/to/node', name, target=f'file:{file}{table_key}', createparents=False)
+                        # external_file_links.append(an_external_link)
+                        external_file_links[file_short_name] = an_external_link
+                # except NoSuchNodeError:
+                except Exception as e:
+                    if fail_on_exception:
+                        raise
+                    else:
+                        print(f'failed for file: {file_short_name}, path: {str(file)}, table_key: {table_key}. wth exception {e}. Skipping.')                    
+                        external_file_links[file_short_name] = None
+                
 
-        # File.create_external_link(where, name, target, createparents=False)
-        # 
+        print(f'added {len(external_file_links)} links to file.')
+        return external_file_links
