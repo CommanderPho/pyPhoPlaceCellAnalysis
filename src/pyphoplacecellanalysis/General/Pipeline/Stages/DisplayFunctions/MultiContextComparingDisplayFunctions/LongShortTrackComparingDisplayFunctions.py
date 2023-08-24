@@ -1499,16 +1499,20 @@ def plot_short_v_long_pf1D_scalar_overlap_comparison(overlap_scalars_df, pf_neur
 
 
 @function_attributes(short_name='long_short_fr_indicies', tags=['private', 'long_short', 'long_short_firing_rate', 'firing_rate', 'display', 'matplotlib'], input_requires=[], output_provides=[], uses=[], used_by=['_display_short_long_firing_rate_index_comparison'], creation_date='2023-03-28 14:20')
-def _plot_long_short_firing_rate_indicies(x_frs_index, y_frs_index, active_context, neurons_colors=None, debug_print=False, is_centered = False):
+def _plot_long_short_firing_rate_indicies(x_frs_index, y_frs_index, active_context, neurons_colors=None, debug_print=False, is_centered = False, enable_hover_labels=True, enable_tiny_point_labels=True):
     """ Plot long|short firing rate index 
     Each datapoint is a neuron.
 
     used in `_display_short_long_firing_rate_index_comparison()`
 
-    is_centered: bool - if True, the spines are centered at (0, 0)
+    Parameters:
+        is_centered: bool - if True, the spines are centered at (0, 0)
+        enable_hover_labels = True # add interactive point hover labels using mplcursors
+        enable_tiny_point_labels = True # add static tiny aclu labels beside each point
 
     """
-    import mplcursors # for hover tooltips that specify the aclu of the selected point
+    if enable_hover_labels:
+        import mplcursors # for hover tooltips that specify the aclu of the selected point
 
     # from neuropy.utils.matplotlib_helpers import add_value_labels # for adding small labels beside each point indicating their ACLU
 
@@ -1519,7 +1523,6 @@ def _plot_long_short_firing_rate_indicies(x_frs_index, y_frs_index, active_conte
         # convert to pd.Series
         y_frs_index = pd.Series(y_frs_index.values(), index=y_frs_index.keys(), copy=False)
                 
-
     if neurons_colors is not None:
         if isinstance(neurons_colors, dict):
             point_colors = [neurons_colors[aclu] for aclu in list(x_frs_index.keys())]
@@ -1532,11 +1535,9 @@ def _plot_long_short_firing_rate_indicies(x_frs_index, y_frs_index, active_conte
             # point_colors = [f'{i}' for i in list(x_frs_index.keys())] 
     else:
         point_colors = None
-
-    point_hover_labels = [f'{i}' for i in list(x_frs_index.keys())] # point_hover_labels will be added as tooltip annotations to the datapoints
+    
     fig, ax = plt.subplots(figsize=(8.5, 7.25), num=f'long|short fr indicies_{active_context.get_description(separator="/")}', clear=True)
 
-    
     xlabel_kwargs = {}
     ylabel_kwargs = {}
     if is_centered:
@@ -1563,20 +1564,20 @@ def _plot_long_short_firing_rate_indicies(x_frs_index, y_frs_index, active_conte
 
     # fig.set_size_inches([8.5, 7.25]) # size figure so the x and y labels aren't cut off
 
-    # add static tiny labels beside each point
-    for i, (x, y, label) in enumerate(zip(x_frs_index.values, y_frs_index.values, point_hover_labels)):
-        # x = x_frs_index.values[i]
-        # y = y_frs_index.values[i]
-        ax.annotate(label, (x, y), textcoords="offset points", xytext=(2,2), ha='left', va='bottom', fontsize=8) # , color=rect.get_facecolor()
+    if enable_hover_labels or enable_tiny_point_labels:
+        point_hover_labels = [f'{i}' for i in list(x_frs_index.keys())] # point_hover_labels will be added as tooltip annotations to the datapoints
 
-    # add hover labels:
-    # https://stackoverflow.com/questions/7908636/possible-to-make-labels-appear-when-hovering-over-a-point-in-matplotlib
-    # https://stackoverflow.com/questions/7908636/possible-to-make-labels-appear-when-hovering-over-a-point-in-matplotlib/21654635#21654635
-    # add hover labels using mplcursors
-    mplcursors.cursor(scatter_plot, hover=True).connect("add", lambda sel: sel.annotation.set_text(point_hover_labels[sel.index]))
+        if enable_tiny_point_labels:
+            # add static tiny labels beside each point
+            for i, (x, y, label) in enumerate(zip(x_frs_index.values, y_frs_index.values, point_hover_labels)):
+                ax.annotate(label, (x, y), textcoords="offset points", xytext=(2,2), ha='left', va='bottom', fontsize=8) # , color=rect.get_facecolor()
 
-    ## get current axes:
-    # ax = plt.gca()
+        if enable_hover_labels:
+            # add hover labels:
+            # https://stackoverflow.com/questions/7908636/possible-to-make-labels-appear-when-hovering-over-a-point-in-matplotlib
+            # https://stackoverflow.com/questions/7908636/possible-to-make-labels-appear-when-hovering-over-a-point-in-matplotlib/21654635#21654635
+            # add hover labels using mplcursors
+            mplcursors.cursor(scatter_plot, hover=True).connect("add", lambda sel: sel.annotation.set_text(point_hover_labels[sel.index]))
 
     # Set the x and y axes to standard limits for easy visual comparison across sessions
     ax.set_xlim([-1.1, 1.1])
@@ -1595,7 +1596,6 @@ def _plot_long_short_firing_rate_indicies(x_frs_index, y_frs_index, active_conte
     # add_value_labels(ax, labels=x_labels) # 
 
     return fig
-    # return MatplotlibRenderPlots(name='', figures=(fig), axes=(ax))
 
 
 # ==================================================================================================================== #
