@@ -913,6 +913,13 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
 
 # ==================================================================================================================== #
 # 2023-06-26 Figure 3                                                                                                  #
+""" Firing rate index, Long|Short firing rate figures 
+
+        Renders 3 Subfigures:
+            a) Shows the firing rate index between the long and short track computed for two different periods: the laps along the x-axis and the replays along the y-axis.
+            b) The ratio of lap to replay firing rate on the long track.
+            c) The ratio of lap to replay firing rate on the short track
+"""
 # ==================================================================================================================== #
 
 @function_attributes(short_name=None, tags=['figure_3', 'paper'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-06-27 03:03', related_items=[])
