@@ -802,15 +802,8 @@ class BatchResultDataframeAccessor():
                 'errors': batchrun_obj.session_batch_errors.values()})
         
         if expand_context:
-            assert len(batchrun_obj.session_contexts) > 0 # must have at least one element
-            first_context = batchrun_obj.session_contexts[0]
-            context_column_names = list(first_context.keys()) # ['format_name', 'animal', 'exper_name', 'session_name']
-            
-            # TODO: batchrun_obj._context_column_names
-            
-            all_sess_context_tuples = [a_ctx.as_tuple() for a_ctx in batchrun_obj.session_contexts] #[('kdiba', 'gor01', 'one', '2006-6-07_11-26-53'), ('kdiba', 'gor01', 'one', '2006-6-08_14-26-15'), ('kdiba', 'gor01', 'one', '2006-6-09_1-22-43'), ...]
-            expanded_context_df = pd.DataFrame.from_records(all_sess_context_tuples, columns=context_column_names)
-            out_df = pd.concat((expanded_context_df, non_expanded_context_df), axis=1)
+            out_df = HDF_Converter.expand_dataframe_session_context_column(non_expanded_context_df, session_uid_column_name='context')
+
         else:
             out_df = non_expanded_context_df
 
