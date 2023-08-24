@@ -1512,6 +1512,14 @@ def _plot_long_short_firing_rate_indicies(x_frs_index, y_frs_index, active_conte
 
     # from neuropy.utils.matplotlib_helpers import add_value_labels # for adding small labels beside each point indicating their ACLU
 
+    if isinstance(x_frs_index, dict):
+        # convert to pd.Series
+        x_frs_index = pd.Series(x_frs_index.values(), index=x_frs_index.keys(), copy=False)
+    if isinstance(y_frs_index, dict):
+        # convert to pd.Series
+        y_frs_index = pd.Series(y_frs_index.values(), index=y_frs_index.keys(), copy=False)
+                
+
     if neurons_colors is not None:
         if isinstance(neurons_colors, dict):
             point_colors = [neurons_colors[aclu] for aclu in list(x_frs_index.keys())]
@@ -1535,7 +1543,7 @@ def _plot_long_short_firing_rate_indicies(x_frs_index, y_frs_index, active_conte
         xlabel_kwargs = dict(loc='left')
         ylabel_kwargs = dict(loc='bottom')
 
-    scatter_plot = ax.scatter(x_frs_index.values(), y_frs_index.values(), c=point_colors) # , s=10, alpha=0.5
+    scatter_plot = ax.scatter(x_frs_index.values, y_frs_index.values, c=point_colors) # , s=10, alpha=0.5
     plt.xlabel('Replay Firing Rate Index $\\frac{L_{R}-S_{R}}{L_{R} + S_{R}}$', fontsize=16, **xlabel_kwargs)
     plt.ylabel('Laps Firing Rate Index $\\frac{L_{\\theta}-S_{\\theta}}{L_{\\theta} + S_{\\theta}}$', fontsize=16, **ylabel_kwargs)
 
@@ -1556,9 +1564,9 @@ def _plot_long_short_firing_rate_indicies(x_frs_index, y_frs_index, active_conte
     # fig.set_size_inches([8.5, 7.25]) # size figure so the x and y labels aren't cut off
 
     # add static tiny labels beside each point
-    for i, (x, y, label) in enumerate(zip(x_frs_index.values(), y_frs_index.values(), point_hover_labels)):
-        # x = x_frs_index.values()[i]
-        # y = y_frs_index.values()[i]
+    for i, (x, y, label) in enumerate(zip(x_frs_index.values, y_frs_index.values, point_hover_labels)):
+        # x = x_frs_index.values[i]
+        # y = y_frs_index.values[i]
         ax.annotate(label, (x, y), textcoords="offset points", xytext=(2,2), ha='left', va='bottom', fontsize=8) # , color=rect.get_facecolor()
 
     # add hover labels:
