@@ -33,10 +33,6 @@ class SplitPartitionMembership(HDF_Converter.HDFConvertableEnum, Enum):
     def hdf_coding_ClassNames(cls):
         return [cls.LEFT_ONLY.name, cls.SHARED.name, cls.RIGHT_ONLY.name]
     
-
-        
-
-
     # HDFConvertableEnum Conformances ____________________________________________________________________________________ #
     @classmethod
     def get_pandas_categories_type(cls) -> CategoricalDtype:
