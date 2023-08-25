@@ -43,9 +43,13 @@ from neuropy.utils.result_context import IdentifyingContext
 from neuropy.core.session.Formats.BaseDataSessionFormats import find_local_session_paths
 from neuropy.utils.matplotlib_helpers import matplotlib_configuration_update
 from neuropy.core.neuron_identities import NeuronExtendedIdentityTuple, neuronTypesEnum, NeuronIdentityTable
+from neuropy.utils.mixins.HDF5_representable import HDF_Converter
 
 from neuropy.utils.mixins.AttrsClassHelpers import custom_define, AttrsBasedClassHelperMixin, serialized_field, serialized_attribute_field, non_serialized_field
 # from neuropy.utils.mixins.HDF5_representable import HDF_DeserializationMixin, post_deserialize, HDF_SerializationMixin, HDFMixin
+
+from pyphocorehelpers.Filesystem.metadata_helpers import FilesystemMetadata, get_file_metadata
+
 
 from pyphoplacecellanalysis.General.Pipeline.Stages.Loading import saveData, loadData
 
@@ -628,6 +632,65 @@ class AcrossSessionsResults:
 
         return across_session_inst_fr_computation, across_sessions_instantaneous_fr_dict, across_sessions_instantaneous_frs_list
 
+def check_output_h5_files(included_file_paths, minimum_good_file_size_GB:float=0.01, include_too_small_files:bool=False):
+        """
+        Usage:
+
+        df = check_output_h5_files(included_file_paths=included_h5_paths)
+        df
+        """
+        metadata = []
+
+        for a_file in included_file_paths:
+            # if not a_file.exists():
+            fetched_metadata = get_file_metadata(a_file)
+            if fetched_metadata is None:
+                print(f'file {a_file} does not exist. Skipping.')
+            else:
+                if fetched_metadata['file_size'] < minimum_good_file_size_GB:
+                    print(f'WARN: file_size < {minimum_good_file_size_GB} for {a_file}!')
+                    if include_too_small_files:
+                        print(f'\t Continuing hesitantly.')
+                        metadata.append(fetched_metadata)
+                else:
+                    # file size is reasonable:
+                    metadata.append(fetched_metadata)
+                
+
+        # pd.options.display.float_format = '{:.2f}'.format
+        df = pd.DataFrame(metadata)
+        # df.style.format("{:.1f}") # suppresses scientific notation display only for this dataframe. Alternatively: pd.options.display.float_format = '{:.2f}'.format
+        # df['file_size'] = df['file_size'].round(decimals=2)
+
+        # with pd.option_context('display.float_format', lambda x: f'{x:,.3f}'):
+            # print(df)
+        return df
+
+
+class AcrossSessionTables:
+
+    @function_attributes(short_name=None, tags=[''], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-08-25 14:28', related_items=[])
+    def build_neuron_replay_stats_table(included_session_contexts, included_h5_paths):
+        # included_h5_paths = [a_dir.joinpath('output','pipeline_results.h5').resolve() for a_dir in included_session_batch_progress_df['basedirs']]
+        # included_global_computation_h5_paths = [a_dir.joinpath('output','global_computations.h5').resolve() for a_dir in included_session_batch_progress_df['basedirs']] 
+
+        session_short_names: List[str] = [a_ctxt.get_description(separator='_') for a_ctxt in included_session_contexts] # 'kdiba.gor01.one.2006-6-08_14-26-15'
+        session_group_keys: List[str] = [("/" + a_ctxt.get_description(separator="/", include_property_names=False)) for a_ctxt in included_session_contexts] # 'kdiba/gor01/one/2006-6-08_14-26-15'
+        # Particular Table Keys:
+        neuron_replay_stats_df_table_keys = [f"{session_group_key}/global_computations/jonathan_fr_analysis/neuron_replay_stats_df/table" for session_group_key in session_group_keys]
+        neuron_identities_table_keys = [f"{session_group_key}/neuron_identities/table" for session_group_key in session_group_keys]
+        long_short_fr_indicies_analysis_table_keys = [f"{session_group_key}/global_computations/long_short_fr_indicies_analysis/table" for session_group_key in session_group_keys]
+
+        a_loader = H5ExternalLinkBuilder.init_from_file_lists(file_list=included_h5_paths, table_key_list=[f"{session_group_key}/neuron_identities/table" for session_group_key in session_group_keys], short_name_list=session_short_names)
+
+        _out_table = a_loader.load_and_consolidate(table_key_list=neuron_replay_stats_df_table_keys, fail_on_exception=False)
+        _out_table = HDF_Converter.general_post_load_restore_table_as_needed(_out_table)
+        # Drop columns: 'neuron_IDX', 'has_short_pf' and 3 other columns
+        _out_table = _out_table.drop(columns=['neuron_IDX', 'has_short_pf', 'has_na', 'has_long_pf', 'index'])
+        return _out_table
+
+
+
 
 
 
@@ -895,3 +958,5 @@ class H5ExternalLinkBuilder:
 
         print(f'added {len(external_file_links)} links to file.')
         return destination_file_path, external_file_links
+
+
