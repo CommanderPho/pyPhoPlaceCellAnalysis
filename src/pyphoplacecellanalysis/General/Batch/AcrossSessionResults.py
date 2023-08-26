@@ -677,11 +677,18 @@ class H5FileAggregator:
 
 
     @classmethod
-    def init_from_file_lists(cls, file_list, table_key_list, short_name_list=None):
+    def init_from_file_lists(cls, file_list, table_key_list=None, short_name_list=None):
+        """ 
+        
+        
+        table_key_list: only used for external linking mode, which was initially concieved of being a property of the class which was called H5ExternalLinker or something at the time.
+        
+        """
         if short_name_list is None:
             short_name_list = [a_file.filename for a_file in file_list]
         assert len(short_name_list) == len(file_list)
-        assert len(table_key_list) == len(file_list)
+        if table_key_list is not None:
+            assert len(table_key_list) == len(file_list)
         return cls(file_reference_list=[H5FileReference(short_name=a_short_name, path=a_file) for a_short_name, a_file in zip(short_name_list, file_list)], table_key_list=table_key_list)
     
     
@@ -813,148 +820,59 @@ def check_output_h5_files(included_file_paths, minimum_good_file_size_GB:float=0
 class AcrossSessionTables:
 
     @function_attributes(short_name=None, tags=[''], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-08-25 14:28', related_items=[])
-    def build_neuron_replay_stats_table(included_session_contexts, included_h5_paths):
-        # included_h5_paths = [a_dir.joinpath('output','pipeline_results.h5').resolve() for a_dir in included_session_batch_progress_df['basedirs']]
-        # included_global_computation_h5_paths = [a_dir.joinpath('output','global_computations.h5').resolve() for a_dir in included_session_batch_progress_df['basedirs']] 
-
+    def build_custom_table(included_session_contexts, included_h5_paths, df_table_keys, drop_columns_list:Optional[List]=None):
+        """
+        like:
+        
+        df_table_keys: like [f"{session_group_key}/global_computations/jonathan_fr_analysis/neuron_replay_stats_df/table" for session_group_key in session_group_keys]
+        drop_columns_list: list of columns to drop after loading is complete. e.g. ['neuron_IDX', 'has_short_pf', 'has_na', 'has_long_pf', 'index']
+        
+        
+        """
         session_short_names: List[str] = [a_ctxt.get_description(separator='_') for a_ctxt in included_session_contexts] # 'kdiba.gor01.one.2006-6-08_14-26-15'
+        # session_group_keys: List[str] = [("/" + a_ctxt.get_description(separator="/", include_property_names=False)) for a_ctxt in included_session_contexts] # 'kdiba/gor01/one/2006-6-08_14-26-15'  
+        a_loader = H5FileAggregator.init_from_file_lists(file_list=included_h5_paths, short_name_list=session_short_names)
+        _out_table = a_loader.load_and_consolidate(table_key_list=df_table_keys, fail_on_exception=False)
+        _out_table = HDF_Converter.general_post_load_restore_table_as_needed(_out_table)
+        if drop_columns_list is not None:
+            # Drop columns: 'neuron_IDX', 'has_short_pf' and 3 other columns
+            _out_table = _out_table.drop(columns=drop_columns_list)
+        return _out_table
+    
+
+
+    @function_attributes(short_name=None, tags=[''], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-08-25 14:28', related_items=[])
+    def build_neuron_replay_stats_table(included_session_contexts, included_h5_paths):
         session_group_keys: List[str] = [("/" + a_ctxt.get_description(separator="/", include_property_names=False)) for a_ctxt in included_session_contexts] # 'kdiba/gor01/one/2006-6-08_14-26-15'
         # Particular Table Keys:
         neuron_replay_stats_df_table_keys = [f"{session_group_key}/global_computations/jonathan_fr_analysis/neuron_replay_stats_df/table" for session_group_key in session_group_keys]
-        neuron_identities_table_keys = [f"{session_group_key}/neuron_identities/table" for session_group_key in session_group_keys]
-        long_short_fr_indicies_analysis_table_keys = [f"{session_group_key}/global_computations/long_short_fr_indicies_analysis/table" for session_group_key in session_group_keys]
-
-        a_loader = H5FileAggregator.init_from_file_lists(file_list=included_h5_paths, table_key_list=[f"{session_group_key}/neuron_identities/table" for session_group_key in session_group_keys], short_name_list=session_short_names)
-
-        _out_table = a_loader.load_and_consolidate(table_key_list=neuron_replay_stats_df_table_keys, fail_on_exception=False)
-        _out_table = HDF_Converter.general_post_load_restore_table_as_needed(_out_table)
-        # Drop columns: 'neuron_IDX', 'has_short_pf' and 3 other columns
-        _out_table = _out_table.drop(columns=['neuron_IDX', 'has_short_pf', 'has_na', 'has_long_pf', 'index'])
-        return _out_table
+        drop_columns_list = ['neuron_IDX', 'has_short_pf', 'has_na', 'has_long_pf', 'index']
+        return AcrossSessionTables.build_custom_table(included_session_contexts, included_h5_paths, df_table_keys=neuron_replay_stats_df_table_keys, drop_columns_list=drop_columns_list)
 
 
-from datetime import datetime, timedelta
-from pyphocorehelpers.print_helpers import CapturedException
-from pyphoplacecellanalysis.General.Batch.runBatch import PipelineCompletionResult
-from pyphoplacecellanalysis.General.Batch.runBatch import BatchSessionCompletionHandler # for HDFSpecificBatchSessionCompletionHandler
+    @function_attributes(short_name=None, tags=[''], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-08-25 14:28', related_items=[])
+    def build_long_short_fr_indicies_analysis_table(included_session_contexts, included_h5_paths):
+        """ 
+            long_short_fr_indicies_analysis_table = AcrossSessionTables.build_long_short_fr_indicies_analysis_table(included_session_contexts, included_h5_paths)
+            long_short_fr_indicies_analysis_table
 
-@define(slots=False, repr=False)
-class HDFSpecificBatchSessionCompletionHandler(BatchSessionCompletionHandler):
-    """ handles completion of a single session's batch processing. 
-
-    Allows accumulating results across sessions and runs.
-
-    
-    Usage:
-        from pyphoplacecellanalysis.General.Batch.runBatch import BatchSessionCompletionHandler
-        
-    """
-
-    # Completion Result object returned from callback ____________________________________________________________________ #
- 
-    # Cross-session Results:
-    across_sessions_instantaneous_fr_dict: dict = Factory(dict) # Dict[IdentifyingContext] = InstantaneousSpikeRateGroupsComputation
-
-    ## Main function that's called with the complete pipeline:
-    def on_complete_success_execution_session(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline) -> PipelineCompletionResult:
-        """ called when the execute_session completes like:
-            `post_run_callback_fn_output = post_run_callback_fn(curr_session_context, curr_session_basedir, curr_active_pipeline)`
-            
-            Meant to be assigned like:
-            , post_run_callback_fn=_on_complete_success_execution_session
-            
-            Captures nothing.
-            
-            from Spike3D.scripts.run_BatchAnalysis import _on_complete_success_execution_session
-            
-            
-            LOGIC: really we want to recompute global whenever local is recomputed.
-            
-            
         """
-        print(f'HDFProcessing.on_complete_success_execution_session(curr_session_context: {curr_session_context}, curr_session_basedir: {str(curr_session_basedir)}, ...)')
-        # print(f'curr_session_context: {curr_session_context}, curr_session_basedir: {str(curr_session_basedir)}')
-        long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
-        # long_session, short_session, global_session = [curr_active_pipeline.filtered_sessions[an_epoch_name] for an_epoch_name in [long_epoch_name, short_epoch_name, global_epoch_name]]
-        # long_results, short_results, global_results = [curr_active_pipeline.computation_results[an_epoch_name]['computed_data'] for an_epoch_name in [long_epoch_name, short_epoch_name, global_epoch_name]]
-
-        # Get existing laps from session:
-        long_laps, short_laps, global_laps = [curr_active_pipeline.filtered_sessions[an_epoch_name].laps.as_epoch_obj() for an_epoch_name in [long_epoch_name, short_epoch_name, global_epoch_name]]
-        long_replays, short_replays, global_replays = [Epoch(curr_active_pipeline.filtered_sessions[an_epoch_name].replay.epochs.get_valid_df()) for an_epoch_name in [long_epoch_name, short_epoch_name, global_epoch_name]]
-        # short_laps.n_epochs: 40, n_long_laps.n_epochs: 40
-        # short_replays.n_epochs: 6, long_replays.n_epochs: 8
-        if self.debug_print:
-            print(f'short_laps.n_epochs: {short_laps.n_epochs}, n_long_laps.n_epochs: {long_laps.n_epochs}')
-            print(f'short_replays.n_epochs: {short_replays.n_epochs}, long_replays.n_epochs: {long_replays.n_epochs}')
-
-        # ## Post Compute Validate 2023-05-16:
-        try:
-            was_updated = self.post_compute_validate(curr_active_pipeline)
-        except Exception as e:
-            exception_info = sys.exc_info()
-            an_err = CapturedException(e, exception_info)
-            print(f'self.post_compute_validate(...) failed with exception: {an_err}')
-            raise 
-
-        delta_since_last_compute: timedelta = curr_active_pipeline.get_time_since_last_computation()
-        print(f'\t time since last computation: {delta_since_last_compute}')
-        
-        ## Save the pipeline since that's disabled by default now:
-        try:
-            curr_active_pipeline.save_pipeline(saving_mode=self.saving_mode, active_pickle_filename=self.override_session_computation_results_pickle_filename) # AttributeError: 'PfND_TimeDependent' object has no attribute '_included_thresh_neurons_indx'
-        except Exception as e:
-            ## TODO: catch/log saving error and indicate that it isn't saved.
-            exception_info = sys.exc_info()
-            e = CapturedException(e, exception_info)
-            print(f'ERROR SAVING PIPELINE for curr_session_context: {curr_session_context}. error: {e}')
-
-
-        ## GLOBAL FUNCTION:
-        if self.force_reload_all and (not self.force_global_recompute):
-            print(f'WARNING: self.force_global_recompute was False but self.force_reload_all was true. The global properties must be recomputed when the local functions change, so self.force_global_recompute will be set to True and computation will continue.')
-            self.force_global_recompute = True
-            
-        if was_updated and (not self.force_global_recompute):
-            print(f'WARNING: self.force_global_recompute was False but pipeline was_updated. The global properties must be recomputed when the local functions change, so self.force_global_recompute will be set to True and computation will continue.')
-            self.force_global_recompute = True
-
-
-        ## GLOBAL FUNCTION:
-        if self.force_reload_all and (not self.force_global_recompute):
-            print(f'WARNING: self.force_global_recompute was False but self.force_reload_all was true. The global properties must be recomputed when the local functions change, so self.force_global_recompute will be set to True and computation will continue.')
-            self.force_global_recompute = True
-            
-        if was_updated and (not self.force_global_recompute):
-            print(f'WARNING: self.force_global_recompute was False but pipeline was_updated. The global properties must be recomputed when the local functions change, so self.force_global_recompute will be set to True and computation will continue.')
-            self.force_global_recompute = True
-
-        self.try_compute_global_computations_if_needed(curr_active_pipeline, curr_session_context=curr_session_context)
-
-        ### Aggregate Outputs specific computations:
-
-        ## Get some more interesting session properties:
-        
-        delta_since_last_compute: timedelta = curr_active_pipeline.get_time_since_last_computation()
-        
-        print(f'\t time since last computation: {delta_since_last_compute}')
-
-        # Export the pipeline's HDF5:
-        hdf5_output_path, hdf5_output_err = self.try_export_pipeline_hdf5_if_needed(curr_active_pipeline=curr_active_pipeline, curr_session_context=curr_session_context)
-        
-        # ## Specify the output file:
-        # common_file_path = Path('output/active_across_session_scatter_plot_results.h5')
-        # print(f'common_file_path: {common_file_path}')
-        # InstantaneousFiringRatesDataframeAccessor.add_results_to_inst_fr_results_table(curr_active_pipeline, common_file_path, file_mode='a')
-
-        across_session_results_extended_dict = {}
-            
-        return PipelineCompletionResult(long_epoch_name=long_epoch_name, long_laps=long_laps, long_replays=long_replays,
-                                           short_epoch_name=short_epoch_name, short_laps=short_laps, short_replays=short_replays,
-                                           delta_since_last_compute=delta_since_last_compute,
-                                           outputs_local={'pkl': curr_active_pipeline.pickle_path},
-                                            outputs_global={'pkl': curr_active_pipeline.global_computation_results_pickle_path, 'hdf5': hdf5_output_path},
-                                            across_session_results=across_session_results_extended_dict)
-                                          
+        session_group_keys: List[str] = [("/" + a_ctxt.get_description(separator="/", include_property_names=False)) for a_ctxt in included_session_contexts] # 'kdiba/gor01/one/2006-6-08_14-26-15'
+        # Particular Table Keys:
+        long_short_fr_indicies_analysis_table_keys = [f"{session_group_key}/global_computations/long_short_fr_indicies_analysis/table" for session_group_key in session_group_keys]
+        drop_columns_list = None # []
+        return AcrossSessionTables.build_custom_table(included_session_contexts, included_h5_paths, df_table_keys=long_short_fr_indicies_analysis_table_keys, drop_columns_list=drop_columns_list)
+    
+    @function_attributes(short_name=None, tags=[''], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-08-25 14:28', related_items=[])
+    def build_neuron_identities_table(included_session_contexts, included_h5_paths):
+        """ 
+        """
+        session_group_keys: List[str] = [("/" + a_ctxt.get_description(separator="/", include_property_names=False)) for a_ctxt in included_session_contexts] # 'kdiba/gor01/one/2006-6-08_14-26-15'
+        # Particular Table Keys:
+        neuron_identities_table_keys = [f"{session_group_key}/neuron_identities/table" for session_group_key in session_group_keys]
+        drop_columns_list = None
+        return AcrossSessionTables.build_custom_table(included_session_contexts, included_h5_paths, df_table_keys=neuron_identities_table_keys, drop_columns_list=drop_columns_list)
+    
 
 
 
