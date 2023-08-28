@@ -842,7 +842,8 @@ class AcrossSessionTables:
     @function_attributes(short_name=None, tags=[''], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-08-25 14:28', related_items=[])
     def build_neuron_replay_stats_table(included_session_contexts, included_h5_paths):
         """ 
-
+            neuron_replay_stats_table = AcrossSessionTables.build_neuron_replay_stats_table(included_session_contexts, included_h5_paths)
+            neuron_replay_stats_table
         """
         session_group_keys: List[str] = [("/" + a_ctxt.get_description(separator="/", include_property_names=False)) for a_ctxt in included_session_contexts] # 'kdiba/gor01/one/2006-6-08_14-26-15'
         neuron_replay_stats_df_table_keys = [f"{session_group_key}/global_computations/jonathan_fr_analysis/neuron_replay_stats_df/table" for session_group_key in session_group_keys]
@@ -874,8 +875,12 @@ class AcrossSessionTables:
         session_group_keys: List[str] = [("/" + a_ctxt.get_description(separator="/", include_property_names=False)) for a_ctxt in included_session_contexts] # 'kdiba/gor01/one/2006-6-08_14-26-15'
         neuron_identities_table_keys = [f"{session_group_key}/neuron_identities/table" for session_group_key in session_group_keys]
         drop_columns_list = None
-        custom_table = AcrossSessionTables.build_custom_table(included_session_contexts, included_h5_paths, df_table_keys=neuron_identities_table_keys, drop_columns_list=drop_columns_list)
-        return custom_table
+        neuron_identities_table = AcrossSessionTables.build_custom_table(included_session_contexts, included_h5_paths, df_table_keys=neuron_identities_table_keys, drop_columns_list=drop_columns_list)
+        neuron_identities_table = HDF_Converter.general_post_load_restore_table_as_needed(neuron_identities_table)
+        neuron_identities_table = neuron_identities_table[['global_uid', 'session_uid', 'session_datetime', 
+                                    'format_name', 'animal', 'exper_name', 'session_name',
+                                    'neuron_id', 'neuron_type', 'cluster_index', 'qclu', 'shank_index']]
+        return neuron_identities_table
 
 
 
