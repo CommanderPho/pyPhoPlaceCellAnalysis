@@ -92,19 +92,19 @@ class LongShortTrackComparingDisplayFunctions(AllFunctionEnumeratingMixin, metac
 
             ## Proper global-computations based way:
             sess = owning_pipeline_reference.sess
-            aclu_to_idx = global_computation_results.computed_data['jonathan_firing_rate_analysis']['rdf']['aclu_to_idx']
-            rdf = global_computation_results.computed_data['jonathan_firing_rate_analysis']['rdf']['rdf']
-            irdf = global_computation_results.computed_data['jonathan_firing_rate_analysis']['irdf']['irdf']
+            aclu_to_idx = global_computation_results.computed_data['jonathan_firing_rate_analysis'].rdf.aclu_to_idx
+            rdf = global_computation_results.computed_data['jonathan_firing_rate_analysis'].rdf.rdf
+            irdf = global_computation_results.computed_data['jonathan_firing_rate_analysis'].irdf.irdf
             pos_df = global_computation_results.sess.position.to_dataframe()
 
             ## time_binned_unit_specific_binned_spike_rate mode:
-            time_bins = global_computation_results.computed_data['jonathan_firing_rate_analysis']['time_binned_unit_specific_spike_rate']['time_bins']
-            time_binned_unit_specific_binned_spike_rate = global_computation_results.computed_data['jonathan_firing_rate_analysis']['time_binned_unit_specific_spike_rate']['time_binned_unit_specific_binned_spike_rate']
+            time_bins = global_computation_results.computed_data['jonathan_firing_rate_analysis'].time_binned_unit_specific_spike_rate['time_bins']
+            time_binned_unit_specific_binned_spike_rate = global_computation_results.computed_data['jonathan_firing_rate_analysis'].time_binned_unit_specific_spike_rate['time_binned_unit_specific_binned_spike_rate']
             # ## instantaneous_unit_specific_spike_rate mode:
             # time_bins = global_computation_results.computed_data['jonathan_firing_rate_analysis']['time_binned_instantaneous_unit_specific_spike_rate']['time_bins']
             # time_binned_unit_specific_binned_spike_rate = global_computation_results.computed_data['jonathan_firing_rate_analysis']['time_binned_instantaneous_unit_specific_spike_rate']['instantaneous_unit_specific_spike_rate_values']
 
-            neuron_replay_stats_df = deepcopy(global_computation_results.computed_data['jonathan_firing_rate_analysis']['neuron_replay_stats_df'])
+            neuron_replay_stats_df = deepcopy(global_computation_results.computed_data['jonathan_firing_rate_analysis'].neuron_replay_stats_df)
 
             if 'neuron_type' not in neuron_replay_stats_df.columns:
                 ## Add neuron type to the replay stats dataframe:
@@ -118,7 +118,7 @@ class LongShortTrackComparingDisplayFunctions(AllFunctionEnumeratingMixin, metac
                 neuron_replay_stats_df = neuron_replay_stats_df[np.logical_or(neuron_replay_stats_df['has_long_pf'], neuron_replay_stats_df['has_short_pf'])]
 
             graphics_output_dict, neuron_df = _make_jonathan_interactive_plot(sess, time_bins, neuron_replay_stats_df, time_binned_unit_specific_binned_spike_rate, pos_df, aclu_to_idx, rdf, irdf, show_inter_replay_frs=True)
-            graphics_output_dict['plot_data'] = {'df': neuron_replay_stats_df, 'rdf':rdf, 'aclu_to_idx':aclu_to_idx, 'irdf':irdf, 'time_binned_unit_specific_spike_rate': global_computation_results.computed_data['jonathan_firing_rate_analysis']['time_binned_unit_specific_spike_rate']}
+            graphics_output_dict['plot_data'] = {'df': neuron_replay_stats_df, 'rdf':rdf, 'aclu_to_idx':aclu_to_idx, 'irdf':irdf, 'time_binned_unit_specific_spike_rate': global_computation_results.computed_data['jonathan_firing_rate_analysis'].time_binned_unit_specific_spike_rate}
 
             return graphics_output_dict
 
@@ -175,17 +175,17 @@ class LongShortTrackComparingDisplayFunctions(AllFunctionEnumeratingMixin, metac
             active_identifying_session_ctx = sess.get_context()
             t_split = sess.paradigm[0][0,1] # passed to _make_pho_jonathan_batch_plots(t_split, ...)
 
-            aclu_to_idx = global_computation_results.computed_data['jonathan_firing_rate_analysis']['rdf']['aclu_to_idx']
-            rdf = global_computation_results.computed_data['jonathan_firing_rate_analysis']['rdf']['rdf']
-            irdf = global_computation_results.computed_data['jonathan_firing_rate_analysis']['irdf']['irdf']
+            aclu_to_idx = global_computation_results.computed_data['jonathan_firing_rate_analysis'].rdf.aclu_to_idx
+            rdf = global_computation_results.computed_data['jonathan_firing_rate_analysis'].rdf.rdf
+            irdf = global_computation_results.computed_data['jonathan_firing_rate_analysis'].irdf.irdf
             # pos_df = global_computation_results.sess.position.to_dataframe()
             ## time_binned_unit_specific_binned_spike_rate mode:
-            time_bins = global_computation_results.computed_data['jonathan_firing_rate_analysis']['time_binned_unit_specific_spike_rate']['time_bins']
-            time_binned_unit_specific_binned_spike_rate = global_computation_results.computed_data['jonathan_firing_rate_analysis']['time_binned_unit_specific_spike_rate']['time_binned_unit_specific_binned_spike_rate']
+            time_bins = global_computation_results.computed_data['jonathan_firing_rate_analysis'].time_binned_unit_specific_spike_rate['time_bins']
+            time_binned_unit_specific_binned_spike_rate = global_computation_results.computed_data['jonathan_firing_rate_analysis'].time_binned_unit_specific_spike_rate['time_binned_unit_specific_binned_spike_rate']
             # ## instantaneous_unit_specific_spike_rate mode:
             # time_bins = global_computation_results.computed_data['jonathan_firing_rate_analysis']['time_binned_instantaneous_unit_specific_spike_rate']['time_bins']
             # time_binned_unit_specific_binned_spike_rate = global_computation_results.computed_data['jonathan_firing_rate_analysis']['time_binned_instantaneous_unit_specific_spike_rate']['instantaneous_unit_specific_spike_rate_values']
-            neuron_replay_stats_df = global_computation_results.computed_data['jonathan_firing_rate_analysis']['neuron_replay_stats_df']
+            neuron_replay_stats_df = global_computation_results.computed_data['jonathan_firing_rate_analysis'].neuron_replay_stats_df
             # compare_firing_rates(rdf, irdf)
 
             n_max_plot_rows = kwargs.pop('n_max_plot_rows', 6)
@@ -208,7 +208,7 @@ class LongShortTrackComparingDisplayFunctions(AllFunctionEnumeratingMixin, metac
 
             final_context = active_context
             graphics_output_dict['context'] = final_context
-            graphics_output_dict['plot_data'] |= {'df': neuron_replay_stats_df, 'rdf':rdf, 'aclu_to_idx':aclu_to_idx, 'irdf':irdf, 'time_binned_unit_specific_spike_rate': global_computation_results.computed_data['jonathan_firing_rate_analysis']['time_binned_unit_specific_spike_rate'],
+            graphics_output_dict['plot_data'] |= {'df': neuron_replay_stats_df, 'rdf':rdf, 'aclu_to_idx':aclu_to_idx, 'irdf':irdf, 'time_binned_unit_specific_spike_rate': global_computation_results.computed_data['jonathan_firing_rate_analysis'].time_binned_unit_specific_spike_rate,
                 'time_variable_name':time_variable_name, 'fignum':curr_fig_num}
 
             def _perform_write_to_file_callback():
@@ -2403,7 +2403,7 @@ def determine_long_short_pf1D_indicies_sort_by_peak(curr_active_pipeline, curr_a
     #### BEGIN FUNCTION BODY ###
     
 
-    ## Sorts aclus using `neuron_replay_stats_df`'s columns (  neuron_replay_stats_df = curr_active_pipeline.global_computation_results.computed_data['jonathan_firing_rate_analysis']['neuron_replay_stats_df'] -- this is produced by '_perform_jonathan_replay_firing_rate_analyses') :
+    ## Sorts aclus using `neuron_replay_stats_df`'s columns (  neuron_replay_stats_df = curr_active_pipeline.global_computation_results.computed_data['jonathan_firing_rate_analysis'].neuron_replay_stats_df -- this is produced by '_perform_jonathan_replay_firing_rate_analyses') :
     if not isinstance(curr_active_pipeline.global_computation_results.computed_data.jonathan_firing_rate_analysis, JonathanFiringRateAnalysisResult):
         jonathan_firing_rate_analysis_result = JonathanFiringRateAnalysisResult(**curr_active_pipeline.global_computation_results.computed_data.jonathan_firing_rate_analysis.to_dict())
     else:

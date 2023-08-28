@@ -563,21 +563,21 @@ class LongShortTrackComputations(AllFunctionEnumeratingMixin, metaclass=Computat
             computation_result.computed_data['jonathan_firing_rate_analysis']
                 ['jonathan_firing_rate_analysis']['rdf']:
                     ['jonathan_firing_rate_analysis']['rdf']['rdf']
-                    ['jonathan_firing_rate_analysis']['rdf']['aclu_to_idx']
+                    ['jonathan_firing_rate_analysis'].rdf.aclu_to_idx
                     
                 ['jonathan_firing_rate_analysis']['irdf']:
-                    ['jonathan_firing_rate_analysis']['irdf']['irdf']
+                    ['jonathan_firing_rate_analysis'].irdf.irdf
                     ['jonathan_firing_rate_analysis']['irdf']['aclu_to_idx']
 
-                ['jonathan_firing_rate_analysis']['time_binned_unit_specific_spike_rate']:
-                    ['jonathan_firing_rate_analysis']['time_binned_unit_specific_spike_rate']['time_bins']
-                    ['jonathan_firing_rate_analysis']['time_binned_unit_specific_spike_rate']['time_binned_unit_specific_binned_spike_rate']
+                ['jonathan_firing_rate_analysis'].time_binned_unit_specific_spike_rate:
+                    ['jonathan_firing_rate_analysis'].time_binned_unit_specific_spike_rate['time_bins']
+                    ['jonathan_firing_rate_analysis'].time_binned_unit_specific_spike_rate['time_binned_unit_specific_binned_spike_rate']
 
                 ['jonathan_firing_rate_analysis']['time_binned_instantaneous_unit_specific_spike_rate']:
                     ['jonathan_firing_rate_analysis']['time_binned_instantaneous_unit_specific_spike_rate']['time_bins']
                     ['jonathan_firing_rate_analysis']['time_binned_instantaneous_unit_specific_spike_rate']['instantaneous_unit_specific_spike_rate_values']
 
-                ['jonathan_firing_rate_analysis']['neuron_replay_stats_df']
+                ['jonathan_firing_rate_analysis'].neuron_replay_stats_df
         
         """
         def _subfn_compute_custom_PBEs(sess):

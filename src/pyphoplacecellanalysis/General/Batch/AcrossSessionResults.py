@@ -892,7 +892,11 @@ class AcrossSessionTables:
     def save_out_to_combined_h5(cls, included_session_contexts, included_h5_paths):
         """Save converted back to .h5 file, .csv file, and several others
         
-        included_h5_paths = [a_dir.joinpath('output','pipeline_results.h5').resolve() for a_dir in included_session_batch_progress_df['basedirs']]
+        Usage:
+            from pyphoplacecellanalysis.General.Batch.AcrossSessionResults import AcrossSessionTables
+
+            AcrossSessionTables.save_out_to_combined_h5(included_session_contexts, included_h5_paths)
+            included_h5_paths = [a_dir.joinpath('output','pipeline_results.h5').resolve() for a_dir in included_session_batch_progress_df['basedirs']]
         
         """
 
@@ -901,6 +905,10 @@ class AcrossSessionTables:
         long_short_fr_indicies_analysis_table = AcrossSessionTables.build_long_short_fr_indicies_analysis_table(included_session_contexts, included_h5_paths)
         neuron_identities_table = AcrossSessionTables.build_neuron_identities_table(included_session_contexts, included_h5_paths)
         
+        ## Potentially:
+        # neuron_replay_stats_table = HDF_Converter.prepare_neuron_indexed_dataframe_for_hdf(neuron_replay_stats_table, active_context=curr_active_pipeline.get_session_context(), aclu_column_name=None)
+
+
         # Build the output paths:
         across_session_outputs = {'output/across_session_results/neuron_identities_table.h5': neuron_identities_table,
         'output/across_session_results/long_short_fr_indicies_analysis_table.h5': long_short_fr_indicies_analysis_table,
