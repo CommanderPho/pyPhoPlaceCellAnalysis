@@ -842,6 +842,7 @@ class AcrossSessionTables:
     @function_attributes(short_name=None, tags=[''], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-08-25 14:28', related_items=[])
     def build_neuron_replay_stats_table(included_session_contexts, included_h5_paths):
         """ 
+        Usage:
             neuron_replay_stats_table = AcrossSessionTables.build_neuron_replay_stats_table(included_session_contexts, included_h5_paths)
             neuron_replay_stats_table
         """
@@ -855,6 +856,7 @@ class AcrossSessionTables:
         """ 
         One row for each long/short neuron?
 
+        Usage:
             long_short_fr_indicies_analysis_table = AcrossSessionTables.build_long_short_fr_indicies_analysis_table(included_session_contexts, included_h5_paths)
             long_short_fr_indicies_analysis_table
 
@@ -863,7 +865,7 @@ class AcrossSessionTables:
         long_short_fr_indicies_analysis_table_keys = [f"{session_group_key}/global_computations/long_short_fr_indicies_analysis/table" for session_group_key in session_group_keys]
         drop_columns_list = None # []
         long_short_fr_indicies_analysis_table = AcrossSessionTables.build_custom_table(included_session_contexts, included_h5_paths, df_table_keys=long_short_fr_indicies_analysis_table_keys, drop_columns_list=drop_columns_list)
-        long_short_fr_indicies_analysis_table = HDF_Converter.general_post_load_restore_table_as_needed(long_short_fr_indicies_analysis_table)
+        # long_short_fr_indicies_analysis_table = HDF_Converter.general_post_load_restore_table_as_needed(long_short_fr_indicies_analysis_table)
         return long_short_fr_indicies_analysis_table    
 
     @function_attributes(short_name=None, tags=[''], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-08-25 14:28', related_items=[])
@@ -871,19 +873,36 @@ class AcrossSessionTables:
         """ Extracts the neuron identities table from across the .h5 files.
         One row for each neuron.
 
+        Usage:
+            neuron_identities_table = AcrossSessionTables.build_neuron_identities_table(included_session_contexts, included_h5_paths)
+            neuron_identities_table
         """
         session_group_keys: List[str] = [("/" + a_ctxt.get_description(separator="/", include_property_names=False)) for a_ctxt in included_session_contexts] # 'kdiba/gor01/one/2006-6-08_14-26-15'
         neuron_identities_table_keys = [f"{session_group_key}/neuron_identities/table" for session_group_key in session_group_keys]
         drop_columns_list = None
         neuron_identities_table = AcrossSessionTables.build_custom_table(included_session_contexts, included_h5_paths, df_table_keys=neuron_identities_table_keys, drop_columns_list=drop_columns_list)
-        neuron_identities_table = HDF_Converter.general_post_load_restore_table_as_needed(neuron_identities_table)
+        # neuron_identities_table = HDF_Converter.general_post_load_restore_table_as_needed(neuron_identities_table)
         neuron_identities_table = neuron_identities_table[['global_uid', 'session_uid', 'session_datetime', 
                                     'format_name', 'animal', 'exper_name', 'session_name',
                                     'neuron_id', 'neuron_type', 'cluster_index', 'qclu', 'shank_index']]
         return neuron_identities_table
 
 
+    @classmethod
+    def save_out_to_combined_h5(cls):
+        ## Save converted back to .h5 file, .csv file, and several others
 
+        across_session_outputs = {'output/across_session_results/neuron_identities_table.h5': neuron_identities_table,
+        'output/across_session_results/long_short_fr_indicies_analysis_table.h5': long_short_fr_indicies_analysis_table,
+        'output/across_session_results/neuron_replay_stats_table.h5': neuron_replay_stats_table}
+
+
+        for k, v in across_session_outputs.items():
+            k = Path(k)
+            a_name = k.name
+            print(f'a_name: {a_name}')
+            v.to_hdf(k, key=f'/{a_name}')    
+            
 
 # ==================================================================================================================== #
 # Visualizations                                                                                                       #
