@@ -839,8 +839,6 @@ class AcrossSessionTables:
             _out_table = _out_table.drop(columns=drop_columns_list)
         return _out_table
     
-
-
     @function_attributes(short_name=None, tags=[''], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-08-25 14:28', related_items=[])
     def build_neuron_replay_stats_table(included_session_contexts, included_h5_paths):
         """ 
@@ -850,7 +848,6 @@ class AcrossSessionTables:
         neuron_replay_stats_df_table_keys = [f"{session_group_key}/global_computations/jonathan_fr_analysis/neuron_replay_stats_df/table" for session_group_key in session_group_keys]
         drop_columns_list = ['neuron_IDX', 'has_short_pf', 'has_na', 'has_long_pf', 'index']
         return AcrossSessionTables.build_custom_table(included_session_contexts, included_h5_paths, df_table_keys=neuron_replay_stats_df_table_keys, drop_columns_list=drop_columns_list)
-
 
     @function_attributes(short_name=None, tags=[''], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-08-25 14:28', related_items=[])
     def build_long_short_fr_indicies_analysis_table(included_session_contexts, included_h5_paths):
