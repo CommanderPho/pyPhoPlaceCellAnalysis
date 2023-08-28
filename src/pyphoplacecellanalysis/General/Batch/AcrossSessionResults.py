@@ -889,9 +889,19 @@ class AcrossSessionTables:
 
 
     @classmethod
-    def save_out_to_combined_h5(cls):
-        ## Save converted back to .h5 file, .csv file, and several others
+    def save_out_to_combined_h5(cls, included_session_contexts, included_h5_paths):
+        """Save converted back to .h5 file, .csv file, and several others
+        
+        included_h5_paths = [a_dir.joinpath('output','pipeline_results.h5').resolve() for a_dir in included_session_batch_progress_df['basedirs']]
+        
+        """
 
+        # Get the combined tables: 
+        neuron_replay_stats_table = AcrossSessionTables.build_neuron_replay_stats_table(included_session_contexts, included_h5_paths)
+        long_short_fr_indicies_analysis_table = AcrossSessionTables.build_long_short_fr_indicies_analysis_table(included_session_contexts, included_h5_paths)
+        neuron_identities_table = AcrossSessionTables.build_neuron_identities_table(included_session_contexts, included_h5_paths)
+        
+        # Build the output paths:
         across_session_outputs = {'output/across_session_results/neuron_identities_table.h5': neuron_identities_table,
         'output/across_session_results/long_short_fr_indicies_analysis_table.h5': long_short_fr_indicies_analysis_table,
         'output/across_session_results/neuron_replay_stats_table.h5': neuron_replay_stats_table}
