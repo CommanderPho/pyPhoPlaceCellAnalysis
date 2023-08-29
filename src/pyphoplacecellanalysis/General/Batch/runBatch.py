@@ -603,7 +603,7 @@ class BatchRun(HDF_SerializationMixin):
 
     @function_attributes(short_name=None, tags=['slurm','jobs','files','batch'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-08-09 19:14', related_items=[])
     def generate_batch_slurm_jobs(self, included_session_contexts, output_directory, use_separate_run_directories:bool=True):
-        """
+        """ Creates a series of standalone scripts (one for each included_session_contexts) in the `output_directory`
 
         output_directory
         use_separate_run_directories:bool = True - If True, separate directories are made in `output_directory` containing each script for all sessions.
@@ -613,6 +613,10 @@ class BatchRun(HDF_SerializationMixin):
             ## Build Slurm Scripts:
             global_batch_run.generate_batch_slurm_jobs(included_session_contexts, Path('output/generated_slurm_scripts/').resolve(), use_separate_run_directories=True)
 
+        Uses:
+            self.global_data_root_parent_path
+            self.session_batch_basedirs
+            
         """
         
         # Set up Jinja2 environment

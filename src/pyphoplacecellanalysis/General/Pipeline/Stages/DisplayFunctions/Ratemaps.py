@@ -3,6 +3,7 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 
+from neuropy.analyses.placefields import PfND
 from pyphocorehelpers.mixins.member_enumerating import AllFunctionEnumeratingMixin
 from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DisplayFunctionRegistryHolder import DisplayFunctionRegistryHolder
 from pyphoplacecellanalysis.Pho2D.PyQtPlots.plot_placefields import pyqtplot_plot_image_array
@@ -46,7 +47,8 @@ class DefaultRatemapDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Disp
         ## Finally, add the display function to the active context
         active_display_fn_identifying_ctx = active_context.adding_context('display_fn', display_fn_name='1d_placefields') # using short name instead of full name here
         # _build_safe_kwargs
-        ax_pf_1D = computation_result.computed_data['pf1D'].plot_ratemaps_1D(**kwargs)
+        pf1D: PfND = computation_result.computed_data['pf1D']
+        ax_pf_1D = pf1D.plot_ratemaps_1D(**kwargs)
         active_figure = plt.gcf()
         
         ## Setup the plot title and add the session information:
