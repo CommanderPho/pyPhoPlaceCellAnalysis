@@ -48,7 +48,7 @@ class DefaultRatemapDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Disp
         active_display_fn_identifying_ctx = active_context.adding_context('display_fn', display_fn_name='1d_placefields') # using short name instead of full name here
         # _build_safe_kwargs
         pf1D: PfND = computation_result.computed_data['pf1D']
-        ax_pf_1D = pf1D.plot_ratemaps_1D(**kwargs)
+        ax_pf_1D = pf1D.plot_ratemaps_1D(active_context=active_display_fn_identifying_ctx, **kwargs)
         active_figure = plt.gcf()
         
         ## Setup the plot title and add the session information:
