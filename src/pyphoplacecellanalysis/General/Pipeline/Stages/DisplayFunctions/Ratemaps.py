@@ -41,6 +41,7 @@ class DefaultRatemapDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Disp
     
     @function_attributes(short_name='1d_placefields', tags=['display', 'placefields', '1D', 'matplotlib'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-04-11 03:05')
     def _display_1d_placefields(computation_result, active_config, owning_pipeline=None, active_context=None, defer_display=False, **kwargs):
+        from neuropy.core.neuron_identities import PlotStringBrevityModeEnum
         assert active_context is not None
         assert owning_pipeline is not None
 
@@ -48,7 +49,7 @@ class DefaultRatemapDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Disp
         active_display_fn_identifying_ctx = active_context.adding_context('display_fn', display_fn_name='1d_placefields') # using short name instead of full name here
         # _build_safe_kwargs
         pf1D: PfND = computation_result.computed_data['pf1D']
-        ax_pf_1D = pf1D.plot_ratemaps_1D(active_context=active_display_fn_identifying_ctx, **kwargs)
+        ax_pf_1D = pf1D.plot_ratemaps_1D(active_context=active_display_fn_identifying_ctx, brev_mode=kwargs.pop('brev_mode', PlotStringBrevityModeEnum.MINIMAL), **kwargs)
         active_figure = plt.gcf()
         
         ## Setup the plot title and add the session information:
