@@ -114,10 +114,15 @@ class SpikeRastersDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Displa
     @staticmethod
     def _display_spike_rasters_window(computation_result, active_config, enable_saving_to_disk=False, **kwargs):
         """ Displays a Spike3DRasterWindowWidget with a configurable set of raster widgets and controls in it.
+        
+        Uses:
+            computation_result.sess.spikes_df
+            
+        
         """
         use_separate_windows = kwargs.get('separate_windows', False)
         type_of_3d_plotter = kwargs.get('type_of_3d_plotter', 'pyqtgraph')
-        active_plotting_config = active_config.plotting_config
+        # active_plotting_config = active_config.plotting_config # active_config is unused
         active_config_name = kwargs.get('active_config_name', 'Unknown')
         active_identifying_context = kwargs.get('active_context', None)
         assert active_identifying_context is not None
@@ -129,10 +134,10 @@ class SpikeRastersDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Displa
 
         ## It's passed a specific computation_result which has a .sess attribute that's used to determine which spikes are displayed or not.
         spike_raster_window = Spike3DRasterWindowWidget(computation_result.sess.spikes_df, type_of_3d_plotter=type_of_3d_plotter, application_name=f'Spike Raster Window - {active_display_fn_identifying_ctx_string}')
-        
         # Set Window Title Options:
-        spike_raster_window.setWindowFilePath(str(computation_result.sess.filePrefix.resolve()))
-        spike_raster_window.setWindowTitle(f'Spike Raster Window - {active_config_name} - {str(computation_result.sess.filePrefix.resolve())}')
+        a_file_prefix = str(computation_result.sess.filePrefix.resolve())
+        spike_raster_window.setWindowFilePath(a_file_prefix)
+        spike_raster_window.setWindowTitle(f'Spike Raster Window - {active_config_name} - {a_file_prefix}')
         
         ## Build the additional menus:
         output_references = _build_additional_window_menus(spike_raster_window, owning_pipeline_reference, computation_result, active_display_fn_identifying_ctx)

@@ -268,7 +268,7 @@ class PipelineWithDisplayPipelineStageMixin:
         return last_added_display_output
 
     @property
-    def plot(self):
+    def plot(self) -> Plot:
         """An interactive accessor object for display functions."""
         return self._plot_object
     
