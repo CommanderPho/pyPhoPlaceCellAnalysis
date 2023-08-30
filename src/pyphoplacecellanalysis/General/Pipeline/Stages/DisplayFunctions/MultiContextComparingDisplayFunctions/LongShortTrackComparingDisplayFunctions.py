@@ -1925,7 +1925,9 @@ def plot_rr_aclu(aclu: list, rr_laps: np.ndarray, rr_replays: np.ndarray, rr_neu
         _subfn_draw_tick_and_label(ax, x=1, y=aclu_y, label='Short Only', sub_label='(long fr = 0)', tick_half_height=0.2, supress_labels=supress_labels)
 
         # Add markers for rr_laps and rr_replays
-        ax.plot(rr_laps, aclu_y, marker='^', markersize=10, color='black', label='rr_laps')
+        laps_marker = r'$\theta$'
+        # laps_marker = '^'
+        ax.plot(rr_laps, aclu_y, marker=laps_marker, markersize=10, color='black', label='rr_laps')
         ax.plot(rr_replays, aclu_y, marker='o', markersize=10, fillstyle='none', color='black', label='rr_replays')
 
         # Add text for aclu to the left of the plot
