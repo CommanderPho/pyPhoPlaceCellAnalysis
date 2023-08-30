@@ -762,6 +762,11 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
         rate_remapping_df, high_remapping_cells_only = curr_long_short_rr.rr_df, curr_long_short_rr.high_only_rr_df
         # Flat_epoch_time_bins_mean, Flat_decoder_time_bin_centers, num_neurons, num_timebins_in_epoch, num_total_flat_timebins, is_short_track_epoch, is_long_track_epoch, short_short_diff, long_long_diff = expected_v_observed_result.Flat_epoch_time_bins_mean, expected_v_observed_result.Flat_decoder_time_bin_centers, expected_v_observed_result.num_neurons, expected_v_observed_result.num_timebins_in_epoch, expected_v_observed_result.num_total_flat_timebins, expected_v_observed_result.is_short_track_epoch, expected_v_observed_result.is_long_track_epoch, expected_v_observed_result.short_short_diff, expected_v_observed_result.long_long_diff
 
+
+        # Rate Remapping _____________________________________________________________________________________________________ #
+        rate_remapping_df = rate_remapping_df[['laps',	'replays',	'skew',	'max_axis_distance_from_center',	'distance_from_center', 	'has_considerable_remapping']]
+        rate_remapping_df.to_hdf(file_path, key=f'{a_global_computations_group_key}/rate_remapping', format='table', data_columns=True)
+
         # jonathan_firing_rate_analysis_result _______________________________________________________________________________ #
         jonathan_firing_rate_analysis_result: JonathanFiringRateAnalysisResult = self.global_computation_results.computed_data.jonathan_firing_rate_analysis
         jonathan_firing_rate_analysis_result.to_hdf(file_path=file_path, key=f'{a_global_computations_group_key}/jonathan_fr_analysis', active_context=session_context)
