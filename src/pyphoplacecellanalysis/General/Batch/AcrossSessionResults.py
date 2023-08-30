@@ -881,6 +881,8 @@ class AcrossSessionTables:
         neuron_identities_table_keys = [f"{session_group_key}/neuron_identities/table" for session_group_key in session_group_keys]
         drop_columns_list = None
         neuron_identities_table = AcrossSessionTables.build_custom_table(included_session_contexts, included_h5_paths, df_table_keys=neuron_identities_table_keys, drop_columns_list=drop_columns_list)
+        neuron_identities_table['session_uid'] = neuron_identities_table['session_uid'].astype(object)
+        
         # neuron_identities_table = HDF_Converter.general_post_load_restore_table_as_needed(neuron_identities_table)
         neuron_identities_table = neuron_identities_table[['global_uid', 'session_uid', 'session_datetime', 
                                     'format_name', 'animal', 'exper_name', 'session_name',
@@ -889,7 +891,7 @@ class AcrossSessionTables:
 
 
     @classmethod
-    def save_out_to_combined_h5(cls, included_session_contexts, included_h5_paths):
+    def save_out_to_combined_file(cls, included_session_contexts, included_h5_paths):
         """Save converted back to .h5 file, .csv file, and several others
         
         Usage:
@@ -910,16 +912,16 @@ class AcrossSessionTables:
 
 
         # Build the output paths:
-        across_session_outputs = {'output/across_session_results/neuron_identities_table.h5': neuron_identities_table,
-        'output/across_session_results/long_short_fr_indicies_analysis_table.h5': long_short_fr_indicies_analysis_table,
-        'output/across_session_results/neuron_replay_stats_table.h5': neuron_replay_stats_table}
-
+        across_session_outputs = {'output/across_session_results/neuron_identities_table': neuron_identities_table,
+        'output/across_session_results/long_short_fr_indicies_analysis_table': long_short_fr_indicies_analysis_table,
+        'output/across_session_results/neuron_replay_stats_table': neuron_replay_stats_table}
 
         for k, v in across_session_outputs.items():
             k = Path(k)
             a_name = k.name
             print(f'a_name: {a_name}')
-            v.to_hdf(k, key=f'/{a_name}')    
+            v.to_csv(k.with_suffix(suffix='.csv'))
+            # v.to_hdf(k, key=f'/{a_name}', format='table', data_columns=True)    # TypeError: objects of type ``StringArray`` are not supported in this context, sorry; supported objects are: NumPy array, record or scalar; homogeneous list or tuple, integer, float, complex or bytes
             
 
 # ==================================================================================================================== #
