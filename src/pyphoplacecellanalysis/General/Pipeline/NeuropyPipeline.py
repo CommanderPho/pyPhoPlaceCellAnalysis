@@ -779,7 +779,7 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
         if not isinstance(expected_v_observed_result, ExpectedVsObservedResult):
             expected_v_observed_result = ExpectedVsObservedResult(**expected_v_observed_result.to_dict())
         
-        expected_v_observed_result.to_hdf('output/test_ExpectedVsObservedResult.h5', '/expected_v_observed_result')
+        expected_v_observed_result.to_hdf(file_path=file_path, key=f'{a_global_computations_group_key}/expected_v_observed_result', active_context=session_context) # 'output/test_ExpectedVsObservedResult.h5', '/expected_v_observed_result')
 
 
         ##TODO: remainder of global_computations
