@@ -678,7 +678,7 @@ class LongShortTrackComparingDisplayFunctions(AllFunctionEnumeratingMixin, metac
             # # figsize=(32,16)
             # figsize=(4, 13) #(24, 8)
             
-            fig, axes = plot_expected_vs_observed(t_SHARED, y_SHORT, y_LONG, neuron_IDXs=neuron_IDXs, neuron_IDs=neuron_IDs, track_epochs=track_epochs, sharey=True, figsize=(4, 13), max_num_rows=150, y_scale="linear")
+            fig, axes = plot_expected_vs_observed(t_SHARED, y_SHORT, y_LONG, neuron_IDXs=neuron_IDXs, neuron_IDs=neuron_IDs, track_epochs=track_epochs, sharey=True, figsize=(4, 13), max_num_rows=10, y_scale="linear")
             if not defer_render:
                 plt.show()
 
