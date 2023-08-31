@@ -307,7 +307,7 @@ class ComputedPipelineStage(LoadableInput, LoadableSessionInput, FilterablePipel
         """ gets the latest computation_times from `curr_active_pipeline.computation_results`
         
         Usage:
-            any_most_recent_computation_time, each_epoch_latest_computation_time, each_epoch_each_result_computation_completion_times = curr_active_pipeline.stage.get_computation_times()
+            any_most_recent_computation_time, each_epoch_latest_computation_time, each_epoch_each_result_computation_completion_times, (global_computations_latest_computation_time, global_computation_completion_times) = curr_active_pipeline.stage.get_computation_times()
             each_epoch_latest_computation_time
         """
         each_epoch_each_result_computation_completion_times = {}
@@ -318,16 +318,26 @@ class ComputedPipelineStage(LoadableInput, LoadableSessionInput, FilterablePipel
             each_epoch_each_result_computation_completion_times[k] = {k.__name__:v for k,v in extracted_computation_times_dict.items()}
             each_epoch_latest_computation_time[k] = max(list(each_epoch_each_result_computation_completion_times[k].values()))
 
-        any_most_recent_computation_time: datetime = max(list(each_epoch_latest_computation_time.values())) # newest computation out of any of the epochs
+        non_global_any_most_recent_computation_time: datetime = max(list(each_epoch_latest_computation_time.values())) # newest computation out of any of the epochs
+
+        ## Global computations:
+        global_computation_completion_times = {k.__name__:v for k,v in self.global_computation_results.computation_times.items()}
+        global_computations_latest_computation_time: datetime = max(list(global_computation_completion_times.values()))
+
+        ## Any (global or non-global) computation most recent time):
+        any_most_recent_computation_time: datetime = max(non_global_any_most_recent_computation_time, global_computations_latest_computation_time)
+
         if debug_print:
             print(f'any_most_recent_computation_time: {any_most_recent_computation_time}')
             print(f'each_epoch_latest_computation_time: {each_epoch_latest_computation_time}')
-        return any_most_recent_computation_time, each_epoch_latest_computation_time, each_epoch_each_result_computation_completion_times
+            print(f'global_computation_completion_times: {global_computation_completion_times}')
+        return any_most_recent_computation_time, each_epoch_latest_computation_time, each_epoch_each_result_computation_completion_times, (global_computations_latest_computation_time, global_computation_completion_times)
         
+
     def get_time_since_last_computation(self, debug_print_timedelta:bool=False) -> timedelta:
         ## Successfully prints the time since the last calculation was performed:
         run_time = datetime.now()
-        any_most_recent_computation_time, each_epoch_latest_computation_time, each_epoch_each_result_computation_completion_times = self.get_computation_times()
+        any_most_recent_computation_time, each_epoch_latest_computation_time, each_epoch_each_result_computation_completion_times, (global_computations_latest_computation_time, global_computation_completion_times) = self.get_computation_times()
         
         delta = run_time - any_most_recent_computation_time
         if debug_print_timedelta:
