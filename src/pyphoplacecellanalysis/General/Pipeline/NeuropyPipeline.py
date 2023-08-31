@@ -35,6 +35,7 @@ from neuropy.core.session.Formats.BaseDataSessionFormats import DataSessionForma
 from neuropy.core.session.KnownDataSessionTypeProperties import KnownDataSessionTypeProperties
 from neuropy.utils.result_context import IdentifyingContext
 
+from pyphocorehelpers.print_helpers import CapturedException
 from pyphoplacecellanalysis.General.Pipeline.Stages.Computation import PipelineWithComputedPipelineStageMixin, ComputedPipelineStage
 from pyphoplacecellanalysis.General.Pipeline.Stages.Display import PipelineWithDisplayPipelineStageMixin, PipelineWithDisplaySavingMixin
 from pyphoplacecellanalysis.General.Pipeline.Stages.Filtering import FilteredPipelineMixin
@@ -805,7 +806,6 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
 
         AcrossSessionsResults.build_neuron_identity_table_to_hdf(file_path, key=session_group_key, spikes_df=self.sess.spikes_df, session_uid=session_uid)
 
-        
 
     def to_hdf(self, file_path, key: str, **kwargs):
         """ Saves the object to key in the hdf5 file specified by file_path
@@ -852,6 +852,28 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
         # super().to_hdf(self, file_path, key, **kwargs)
 
 
+    @property
+    def h5_export_path(self):
+        hdf5_output_path: Path = self.get_output_path().joinpath('pipeline_results.h5').resolve()
+        return hdf5_output_path
+
+
+    def export_pipeline_to_h5(self):
+        """ Export the pipeline's HDF5 as 'pipeline_results.h5' """
+        hdf5_output_path: Path = self.h5_export_path # get_output_path().joinpath('pipeline_results.h5').resolve()
+        print(f'pipeline hdf5_output_path: {hdf5_output_path}')
+        e = None
+        try:
+            self.to_hdf(file_path=hdf5_output_path, key="/")
+            return (hdf5_output_path, None)
+        except Exception as e:
+            exception_info = sys.exc_info()
+            e = CapturedException(e, exception_info)
+            print(f"ERROR: encountered exception {e} while trying to build the session HDF output for {curr_session_context}")
+            if self.fail_on_exception:
+                raise e.exc
+            hdf5_output_path = None # set to None because it failed.
+            return (hdf5_output_path, e)
         
     
 
