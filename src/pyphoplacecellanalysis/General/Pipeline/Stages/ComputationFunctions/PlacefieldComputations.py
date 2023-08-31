@@ -6,6 +6,8 @@ from neuropy.analyses.placefields import PlacefieldComputationParameters, perfor
 from copy import deepcopy
 from neuropy.analyses.time_dependent_placefields import PfND_TimeDependent, perform_compute_time_dependent_placefields
 
+from pyphocorehelpers.programming_helpers import metadata_attributes
+from pyphocorehelpers.function_helpers import function_attributes
 from pyphocorehelpers.mixins.member_enumerating import AllFunctionEnumeratingMixin
 from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.ComputationFunctionRegistryHolder import ComputationFunctionRegistryHolder
 from pyphoplacecellanalysis.General.Model.ComputationResults import ComputationResult
@@ -15,7 +17,8 @@ class PlacefieldComputations(AllFunctionEnumeratingMixin, metaclass=ComputationF
     _computationPrecidence = 0 # must be done first.
     _is_global = False
 
-
+    @function_attributes(short_name='pf_computation', tags=[''], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-08-30 19:50', related_items=[],
+                        validate_computation_test=lambda curr_active_pipeline, global_epoch_name='maze': (curr_active_pipeline.computation_results[global_epoch_name].computed_data['pf1D_dt'], curr_active_pipeline.computation_results[global_epoch_name].computed_data['pf2D_dt']))
     def _perform_baseline_placefield_computation(computation_result: ComputationResult, debug_print=False):
         """ Builds the initial 1D and 2D placefields 
         
@@ -41,7 +44,8 @@ class PlacefieldComputations(AllFunctionEnumeratingMixin, metaclass=ComputationF
     
     
 
-
+    @function_attributes(short_name='pfdt_computation', tags=[''], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-08-30 19:58', related_items=[],
+                         validate_computation_test=lambda curr_active_pipeline, global_epoch_name='maze': (curr_active_pipeline.computation_results[global_epoch_name].computed_data['pf1D_dt'], curr_active_pipeline.computation_results[global_epoch_name].computed_data['pf2D_dt']))
     def _perform_time_dependent_placefield_computation(computation_result: ComputationResult, debug_print=False):
         """ Builds the time-dependent 2D placefields 
         

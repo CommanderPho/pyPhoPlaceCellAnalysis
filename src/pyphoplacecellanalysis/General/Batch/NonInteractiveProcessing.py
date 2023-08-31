@@ -247,7 +247,7 @@ def batch_extended_computations(curr_active_pipeline, include_includelist=None, 
 
     newly_computed_values = []
 
-    non_global_comp_names = ['firing_rate_trends', 'relative_entropy_analyses']
+    non_global_comp_names = ['pf_computation', 'pfdt_computation', 'firing_rate_trends', 'relative_entropy_analyses']
     global_comp_names = ['jonathan_firing_rate_analysis', 'short_long_pf_overlap_analyses', 'long_short_fr_indicies_analyses', 'long_short_decoding_analyses', 'long_short_post_decoding', 'long_short_inst_spike_rate_groups'] # , 'long_short_rate_remapping'
 
     # 'firing_rate_trends', 'relative_entropy_analyses'
@@ -269,7 +269,10 @@ def batch_extended_computations(curr_active_pipeline, include_includelist=None, 
         print(f'Running batch_extended_computations(...) with global_epoch_name: "{global_epoch_name}"')
 
     ## Specify the computations and the requirements to validate them.
+
     _comp_specifiers = [
+        SpecificComputationValidator(short_name='pf_computation', computation_fn_name='_perform_baseline_placefield_computation', validate_computation_test=lambda curr_active_pipeline: (curr_active_pipeline.computation_results[global_epoch_name].computed_data['pf1D'], curr_active_pipeline.computation_results[global_epoch_name].computed_data['pf2D']), is_global=False),
+        SpecificComputationValidator(short_name='pfdt_computation', computation_fn_name='_perform_time_dependent_placefield_computation', validate_computation_test=lambda curr_active_pipeline: (curr_active_pipeline.computation_results[global_epoch_name].computed_data['pf1D_dt'], curr_active_pipeline.computation_results[global_epoch_name].computed_data['pf2D_dt']), is_global=False),
         SpecificComputationValidator(short_name='firing_rate_trends', computation_fn_name='_perform_firing_rate_trends_computation', validate_computation_test=lambda curr_active_pipeline: (curr_active_pipeline.computation_results[global_epoch_name].computed_data['firing_rate_trends'], curr_active_pipeline.computation_results[global_epoch_name].computed_data['extended_stats']['time_binned_position_df']), is_global=False),
         SpecificComputationValidator(short_name='relative_entropy_analyses', computation_fn_name='_perform_time_dependent_pf_sequential_surprise_computation', validate_computation_test=lambda curr_active_pipeline: (np.sum(curr_active_pipeline.global_computation_results.computed_data['relative_entropy_analyses']['flat_relative_entropy_results'], axis=1), np.sum(curr_active_pipeline.global_computation_results.computed_data['relative_entropy_analyses']['flat_jensen_shannon_distance_results'], axis=1)), is_global=False),  # flat_surprise_across_all_positions
         SpecificComputationValidator(short_name='jonathan_firing_rate_analysis', computation_fn_name='_perform_jonathan_replay_firing_rate_analyses', validate_computation_test=lambda curr_active_pipeline: curr_active_pipeline.global_computation_results.computed_data['jonathan_firing_rate_analysis'].neuron_replay_stats_df, is_global=True),  # active_context
