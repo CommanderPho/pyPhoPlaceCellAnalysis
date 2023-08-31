@@ -17,12 +17,12 @@ from neuropy.core.position import build_position_df_resampled_to_time_windows
 
 # from neuropy.analyses.laps import _build_new_lap_and_intra_lap_intervals # for _perform_time_dependent_pf_sequential_surprise_computation
 
-# For _perform_relative_entropy_analyses
+# For _perform_pf_dt_sequential_surprise
 from neuropy.analyses.time_dependent_placefields import PfND_TimeDependent
 from pyphocorehelpers.DataStructure.enum_helpers import ExtendedEnum
 
 class TimeDependentPlacefieldSurpriseMode(ExtendedEnum):
-    """for _perform_relative_entropy_analyses """
+    """for _perform_pf_dt_sequential_surprise """
     STATIC_METHOD_ONLY = "static_method_only"
     USING_EXTANT = "using_extant"
     BUILD_NEW = "build_new"
@@ -56,7 +56,8 @@ class ExtendedStatsComputations(AllFunctionEnumeratingMixin, metaclass=Computati
 
     @function_attributes(short_name='extended_stats', tags=['statistics'], 
         input_requires=["computation_result.sess.position", "computation_result.computation_config.pf_params.time_bin_size"], 
-        output_provides=["computation_result.computed_data['extended_stats']['time_binned_positioned_resampler']", "computation_result.computed_data['extended_stats']['time_binned_position_df']", "computation_result.computed_data['extended_stats']['time_binned_position_mean']", "computation_result.computed_data['extended_stats']['time_binned_position_covariance']"])
+        output_provides=["computation_result.computed_data['extended_stats']['time_binned_positioned_resampler']", "computation_result.computed_data['extended_stats']['time_binned_position_df']", "computation_result.computed_data['extended_stats']['time_binned_position_mean']", "computation_result.computed_data['extended_stats']['time_binned_position_covariance']"],
+        validate_computation_test=lambda curr_active_pipeline, computation_filter_name='maze': (curr_active_pipeline.computation_results[computation_filter_name].computed_data['extended_stats']['time_binned_position_df']), is_global=False)
     def _perform_extended_statistics_computation(computation_result: ComputationResult, debug_print=False):
         """ Computes extended statistics regarding firing rates and such from the various dataframes.
         
@@ -93,7 +94,8 @@ class ExtendedStatsComputations(AllFunctionEnumeratingMixin, metaclass=Computati
 
     @function_attributes(short_name='pf_dt_sequential_surprise', tags=['surprise', 'time_dependent_pf'], 
         input_requires=["computed_data['firing_rate_trends']", "computed_data['pf1D_dt']", "computation_result.sess.position", "computation_result.computation_config.pf_params.time_bin_size"], 
-        output_provides=["computation_result.computed_data['extended_stats']['time_binned_positioned_resampler']", "computation_result.computed_data['extended_stats']['time_binned_position_df']", "computation_result.computed_data['extended_stats']['time_binned_position_mean']", "computation_result.computed_data['extended_stats']['time_binned_position_covariance']"])
+        output_provides=["computation_result.computed_data['extended_stats']['time_binned_positioned_resampler']", "computation_result.computed_data['extended_stats']['time_binned_position_df']", "computation_result.computed_data['extended_stats']['time_binned_position_mean']", "computation_result.computed_data['extended_stats']['time_binned_position_covariance']"],
+        validate_computation_test=lambda curr_active_pipeline, computation_filter_name='maze': (np.sum(curr_active_pipeline.global_computation_results.computed_data['pf_dt_sequential_surprise']['flat_relative_entropy_results'], axis=1), np.sum(curr_active_pipeline.global_computation_results.computed_data['pf_dt_sequential_surprise']['flat_jensen_shannon_distance_results'], axis=1)), is_global=False)
     def _perform_time_dependent_pf_sequential_surprise_computation(computation_result: ComputationResult, debug_print=False):
         """ Computes extended statistics regarding firing rates and such from the various dataframes.
         NOTE: 2022-12-14 - previously this version only did laps, but now it does the binned times for the entire epoch from ['firing_rate_trends']
@@ -193,7 +195,7 @@ class ExtendedStatsComputations(AllFunctionEnumeratingMixin, metaclass=Computati
             computation_result.computed_data['extended_stats'] = DynamicParameters() # new 'extended_stats' dict
  
 
-        computation_result.computed_data['extended_stats']['relative_entropy_analyses'] = DynamicParameters.init_from_dict({
+        computation_result.computed_data['extended_stats']['pf_dt_sequential_surprise'] = DynamicParameters.init_from_dict({
             'time_bin_size_seconds': time_bin_size_seconds,
             'historical_snapshots': historical_snapshots,
             'post_update_times': post_update_times,
@@ -202,10 +204,10 @@ class ExtendedStatsComputations(AllFunctionEnumeratingMixin, metaclass=Computati
             'flat_relative_entropy_results': flat_relative_entropy_results, 'flat_jensen_shannon_distance_results': flat_jensen_shannon_distance_results
         })
         """ 
-        Access via ['extended_stats']['relative_entropy_analyses']
+        Access via ['extended_stats']['pf_dt_sequential_surprise']
         Example:
             active_extended_stats = curr_active_pipeline.computation_results['maze'].computed_data['extended_stats']
-            active_relative_entropy_results = active_extended_stats['relative_entropy_analyses']
+            active_relative_entropy_results = active_extended_stats['pf_dt_sequential_surprise']
             post_update_times = active_relative_entropy_results['post_update_times']
             snapshot_differences_result_dict = active_relative_entropy_results['snapshot_differences_result_dict']
             time_intervals = active_relative_entropy_results['time_intervals']

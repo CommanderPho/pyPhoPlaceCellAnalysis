@@ -25,6 +25,8 @@ from neuropy.utils.mixins.binning_helpers import BinningContainer # used in _per
 from neuropy.utils.mixins.AttrsClassHelpers import AttrsBasedClassHelperMixin, serialized_field, serialized_attribute_field, non_serialized_field, custom_define
 from neuropy.utils.mixins.HDF5_representable import HDF_DeserializationMixin, post_deserialize, HDF_SerializationMixin, HDFMixin
 
+from pyphocorehelpers.programming_helpers import metadata_attributes
+from pyphocorehelpers.function_helpers import function_attributes
 from pyphocorehelpers.mixins.member_enumerating import AllFunctionEnumeratingMixin
 from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.ComputationFunctionRegistryHolder import ComputationFunctionRegistryHolder
 from pyphoplacecellanalysis.General.Model.ComputationResults import ComputationResult
@@ -274,6 +276,9 @@ class SpikeAnalysisComputations(AllFunctionEnumeratingMixin, metaclass=Computati
         return computation_result
     
     
+
+    @function_attributes(short_name='firing_rate_trends', tags=[''], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-08-31 00:00', related_items=[],
+                         validate_computation_test=lambda curr_active_pipeline, computation_filter_name='maze': (curr_active_pipeline.computation_results[computation_filter_name].computed_data['firing_rate_trends'], curr_active_pipeline.computation_results[computation_filter_name].computed_data['extended_stats']['time_binned_position_df']), is_global=False)
     def _perform_firing_rate_trends_computation(computation_result: ComputationResult, debug_print=False):
         """ Computes trends and time-courses of each neuron's firing rate. 
         

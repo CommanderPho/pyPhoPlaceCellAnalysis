@@ -235,11 +235,11 @@ def batch_load_session(global_data_root_parent_path, active_data_mode_name, base
 @function_attributes(short_name='batch_extended_computations', tags=['batch', 'automated', 'session', 'compute'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-03-28 04:46')
 def batch_extended_computations(curr_active_pipeline, include_includelist=None, include_global_functions=False, fail_on_exception=False, progress_print=True, debug_print=False, force_recompute:bool = False):
     """ performs the remaining required global computations """
-    def _subfn_on_already_computed(_comp_name):
+    def _subfn_on_already_computed(_comp_name, computation_filter_name):
         """ captures: `progress_print`, `force_recompute`
         raises AttributeError if force_recompute is true to trigger recomputation """
         if progress_print:
-            print(f'{_comp_name} already computed.')
+            print(f'{_comp_name}, {computation_filter_name} already computed.')
         if force_recompute:
             if progress_print:
                 print(f'\tforce_recompute is true so recomputing anyway')
@@ -247,10 +247,10 @@ def batch_extended_computations(curr_active_pipeline, include_includelist=None, 
 
     newly_computed_values = []
 
-    non_global_comp_names = ['pf_computation', 'pfdt_computation', 'firing_rate_trends', 'relative_entropy_analyses']
+    non_global_comp_names = ['pf_computation', 'pfdt_computation', 'firing_rate_trends', 'pf_dt_sequential_surprise']
     global_comp_names = ['jonathan_firing_rate_analysis', 'short_long_pf_overlap_analyses', 'long_short_fr_indicies_analyses', 'long_short_decoding_analyses', 'long_short_post_decoding', 'long_short_inst_spike_rate_groups'] # , 'long_short_rate_remapping'
 
-    # 'firing_rate_trends', 'relative_entropy_analyses'
+    # 'firing_rate_trends', 'pf_dt_sequential_surprise'
     # '_perform_firing_rate_trends_computation', '_perform_time_dependent_pf_sequential_surprise_computation'
     
     if include_includelist is None:
@@ -272,23 +272,39 @@ def batch_extended_computations(curr_active_pipeline, include_includelist=None, 
 
     #TODO 2023-08-30 22:19: - [ ] Currently have ` validate_computation_test=...` part implemented in the decorator for _perform_baseline_placefield_computation and _perform_time_dependent_placefield_computation.
         # - [ ] Need to build their SpecificComputationValidator from these instead of defining it below.
+
+
+
+    ## Hardcoded comp_specifiers
     _comp_specifiers = [
-        SpecificComputationValidator(short_name='pf_computation', computation_fn_name='_perform_baseline_placefield_computation', validate_computation_test=lambda curr_active_pipeline: (curr_active_pipeline.computation_results[global_epoch_name].computed_data['pf1D'], curr_active_pipeline.computation_results[global_epoch_name].computed_data['pf2D']), is_global=False),
-        SpecificComputationValidator(short_name='pfdt_computation', computation_fn_name='_perform_time_dependent_placefield_computation', validate_computation_test=lambda curr_active_pipeline: (curr_active_pipeline.computation_results[global_epoch_name].computed_data['pf1D_dt'], curr_active_pipeline.computation_results[global_epoch_name].computed_data['pf2D_dt']), is_global=False),
-        SpecificComputationValidator(short_name='firing_rate_trends', computation_fn_name='_perform_firing_rate_trends_computation', validate_computation_test=lambda curr_active_pipeline: (curr_active_pipeline.computation_results[global_epoch_name].computed_data['firing_rate_trends'], curr_active_pipeline.computation_results[global_epoch_name].computed_data['extended_stats']['time_binned_position_df']), is_global=False),
-        SpecificComputationValidator(short_name='relative_entropy_analyses', computation_fn_name='_perform_time_dependent_pf_sequential_surprise_computation', validate_computation_test=lambda curr_active_pipeline: (np.sum(curr_active_pipeline.global_computation_results.computed_data['relative_entropy_analyses']['flat_relative_entropy_results'], axis=1), np.sum(curr_active_pipeline.global_computation_results.computed_data['relative_entropy_analyses']['flat_jensen_shannon_distance_results'], axis=1)), is_global=False),  # flat_surprise_across_all_positions
-        SpecificComputationValidator(short_name='jonathan_firing_rate_analysis', computation_fn_name='_perform_jonathan_replay_firing_rate_analyses', validate_computation_test=lambda curr_active_pipeline: curr_active_pipeline.global_computation_results.computed_data['jonathan_firing_rate_analysis'].neuron_replay_stats_df, is_global=True),  # active_context
-        SpecificComputationValidator(short_name='short_long_pf_overlap_analyses', computation_fn_name='_perform_long_short_pf_overlap_analyses', validate_computation_test=lambda curr_active_pipeline: (curr_active_pipeline.global_computation_results.computed_data['short_long_pf_overlap_analyses']['relative_entropy_overlap_scalars_df'], curr_active_pipeline.global_computation_results.computed_data['short_long_pf_overlap_analyses']['relative_entropy_overlap_dict']), is_global=True),  # relative_entropy_overlap_scalars_df
-        SpecificComputationValidator(short_name='long_short_fr_indicies_analyses', computation_fn_name='_perform_long_short_firing_rate_analyses', validate_computation_test=lambda curr_active_pipeline: curr_active_pipeline.global_computation_results.computed_data['long_short_fr_indicies_analysis']['x_frs_index'], is_global=True),  # active_context
-        SpecificComputationValidator(short_name='long_short_decoding_analyses', computation_fn_name='_perform_long_short_decoding_analyses', validate_computation_test=lambda curr_active_pipeline: (curr_active_pipeline.global_computation_results.computed_data['long_short_leave_one_out_decoding_analysis'].long_results_obj, curr_active_pipeline.global_computation_results.computed_data['long_short_leave_one_out_decoding_analysis'].short_results_obj), is_global=True),
-        SpecificComputationValidator(short_name='long_short_post_decoding', computation_fn_name='_perform_long_short_post_decoding_analysis', validate_computation_test=lambda curr_active_pipeline: curr_active_pipeline.global_computation_results.computed_data['long_short_post_decoding'].rate_remapping.rr_df, is_global=True),
-        SpecificComputationValidator(short_name='long_short_inst_spike_rate_groups', computation_fn_name='_perform_long_short_instantaneous_spike_rate_groups_analysis', validate_computation_test=lambda curr_active_pipeline: curr_active_pipeline.global_computation_results.computed_data['long_short_inst_spike_rate_groups'], is_global=True)
+        # SpecificComputationValidator(short_name='pf_computation', computation_fn_name='_perform_baseline_placefield_computation', validate_computation_test=lambda curr_active_pipeline, computation_filter_name='maze': (curr_active_pipeline.computation_results[computation_filter_name].computed_data['pf1D'], curr_active_pipeline.computation_results[computation_filter_name].computed_data['pf2D']), is_global=False),
+        # SpecificComputationValidator(short_name='pfdt_computation', computation_fn_name='_perform_time_dependent_placefield_computation', validate_computation_test=lambda curr_active_pipeline, computation_filter_name='maze': (curr_active_pipeline.computation_results[computation_filter_name].computed_data['pf1D_dt'], curr_active_pipeline.computation_results[computation_filter_name].computed_data['pf2D_dt']), is_global=False),
+        # SpecificComputationValidator(short_name='firing_rate_trends', computation_fn_name='_perform_firing_rate_trends_computation', validate_computation_test=lambda curr_active_pipeline, computation_filter_name='maze': (curr_active_pipeline.computation_results[computation_filter_name].computed_data['firing_rate_trends'], curr_active_pipeline.computation_results[computation_filter_name].computed_data['extended_stats']['time_binned_position_df']), is_global=False),
+        # SpecificComputationValidator(short_name='pf_dt_sequential_surprise', computation_fn_name='_perform_time_dependent_pf_sequential_surprise_computation', validate_computation_test=lambda curr_active_pipeline, computation_filter_name='maze': (np.sum(curr_active_pipeline.global_computation_results.computed_data['pf_dt_sequential_surprise']['flat_relative_entropy_results'], axis=1), np.sum(curr_active_pipeline.global_computation_results.computed_data['pf_dt_sequential_surprise']['flat_jensen_shannon_distance_results'], axis=1)), is_global=False),  # flat_surprise_across_all_positions
+        # SpecificComputationValidator(short_name='jonathan_firing_rate_analysis', computation_fn_name='_perform_jonathan_replay_firing_rate_analyses', validate_computation_test=lambda curr_active_pipeline, computation_filter_name='maze': curr_active_pipeline.global_computation_results.computed_data['jonathan_firing_rate_analysis'].neuron_replay_stats_df, is_global=True),  # active_context
+        SpecificComputationValidator(short_name='short_long_pf_overlap_analyses', computation_fn_name='_perform_long_short_pf_overlap_analyses', validate_computation_test=lambda curr_active_pipeline, computation_filter_name='maze': (curr_active_pipeline.global_computation_results.computed_data['short_long_pf_overlap_analyses']['relative_entropy_overlap_scalars_df'], curr_active_pipeline.global_computation_results.computed_data['short_long_pf_overlap_analyses']['relative_entropy_overlap_dict']), is_global=True),  # relative_entropy_overlap_scalars_df
+        SpecificComputationValidator(short_name='long_short_fr_indicies_analyses', computation_fn_name='_perform_long_short_firing_rate_analyses', validate_computation_test=lambda curr_active_pipeline, computation_filter_name='maze': curr_active_pipeline.global_computation_results.computed_data['long_short_fr_indicies_analysis']['x_frs_index'], is_global=True),  # active_context
+        SpecificComputationValidator(short_name='long_short_decoding_analyses', computation_fn_name='_perform_long_short_decoding_analyses', validate_computation_test=lambda curr_active_pipeline, computation_filter_name='maze': (curr_active_pipeline.global_computation_results.computed_data['long_short_leave_one_out_decoding_analysis'].long_results_obj, curr_active_pipeline.global_computation_results.computed_data['long_short_leave_one_out_decoding_analysis'].short_results_obj), is_global=True),
+        SpecificComputationValidator(short_name='long_short_post_decoding', computation_fn_name='_perform_long_short_post_decoding_analysis', validate_computation_test=lambda curr_active_pipeline, computation_filter_name='maze': curr_active_pipeline.global_computation_results.computed_data['long_short_post_decoding'].rate_remapping.rr_df, is_global=True),
+        SpecificComputationValidator(short_name='long_short_inst_spike_rate_groups', computation_fn_name='_perform_long_short_instantaneous_spike_rate_groups_analysis', validate_computation_test=lambda curr_active_pipeline, computation_filter_name='maze': curr_active_pipeline.global_computation_results.computed_data['long_short_inst_spike_rate_groups'], is_global=True)
     ]
+    
+    ## From the registered computation functions, gather any validators and build the SpecificComputationValidator for them, then append them to `_comp_specifiers`:
+    for a_fn_name, a_fn in curr_active_pipeline.registered_computation_function_dict.items():
+        # print(f'{a_fn_name}')
+        if hasattr(a_fn, 'validate_computation_test') and (a_fn.validate_computation_test is not None):
+            print(f'{a_fn_name}')
+            print(a_fn.__name__)
+            # a_fn.validate_computation_test
+            a_fn_validator: SpecificComputationValidator = SpecificComputationValidator.init_from_decorated_fn(a_fn) # (short_name=a_fn_name.short_name, computation_fn_name='_perform_baseline_placefield_computation', validate_computation_test=lambda curr_active_pipeline: (curr_active_pipeline.computation_results[global_epoch_name].computed_data['pf1D'], curr_active_pipeline.computation_results[global_epoch_name].computed_data['pf2D']), is_global=False),
+            _comp_specifiers.append(a_fn_validator)        
+            
+    #TODO 2023-08-31 11:05: - [ ] Do local computations first for all valid filter_epochs, then do global
 
     for _comp_specifier in _comp_specifiers:
         if (not _comp_specifier.is_global) or include_global_functions:
             if _comp_specifier.short_name in include_includelist:
-                newly_computed_values += _comp_specifier.try_computation_if_needed(curr_active_pipeline, on_already_computed_fn=_subfn_on_already_computed, fail_on_exception=fail_on_exception, progress_print=progress_print, debug_print=debug_print, force_recompute=force_recompute)
+                newly_computed_values += _comp_specifier.try_computation_if_needed(curr_active_pipeline, computation_filter_name='maze', on_already_computed_fn=_subfn_on_already_computed, fail_on_exception=fail_on_exception, progress_print=progress_print, debug_print=debug_print, force_recompute=force_recompute)
 
     if progress_print:
         print('done with all batch_extended_computations(...).')

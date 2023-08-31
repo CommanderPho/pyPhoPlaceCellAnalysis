@@ -7,7 +7,7 @@ from pyphocorehelpers.function_helpers import function_attributes
 from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.ComputationFunctionRegistryHolder import ComputationFunctionRegistryHolder
 from pyphocorehelpers.DataStructure.dynamic_parameters import DynamicParameters
 
-from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import ZhangReconstructionImplementation # for _perform_relative_entropy_analyses
+from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import ZhangReconstructionImplementation # for _perform_pf_dt_sequential_surprise
 
 
 def _wrap_multi_context_computation_function(global_comp_fcn):
@@ -51,7 +51,7 @@ class MultiContextComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Co
         return global_computation_results
 
 
-    # def _perform_relative_entropy_analyses(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, debug_print=False):
+    # def _perform_pf_dt_sequential_surprise(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, debug_print=False):
     #     """ NOTE: 2022-12-14 - this mirrors the non-global version at `pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.ExtendedStats.ExtendedStatsComputations._perform_time_dependent_pf_sequential_surprise_computation` that I just modified except it only uses the global epoch.
         
     #     Requires:
@@ -59,9 +59,9 @@ class MultiContextComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Co
     #         pf1D_dt (or it can build a new one)
             
     #     Provides:
-    #         computation_result.computed_data['relative_entropy_analyses']
-    #             ['relative_entropy_analyses']['short_long_neurons_diff']
-    #             ['relative_entropy_analyses']['poly_overlap_df']
+    #         computation_result.computed_data['pf_dt_sequential_surprise']
+    #             ['pf_dt_sequential_surprise']['short_long_neurons_diff']
+    #             ['pf_dt_sequential_surprise']['poly_overlap_df']
         
     #     """
     #     # use_extant_pf1D_dt_mode = TimeDependentPlacefieldSurpriseMode.STATIC_METHOD_ONLY
@@ -132,7 +132,7 @@ class MultiContextComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Co
     #     long_short_rel_entr_curves_frames = np.stack([a_val_dict['long_short_rel_entr_curve'] for a_val_dict in relative_entropy_result_dicts_list]) # build a 3D array (4152, 108, 63) = (n_post_update_times, n_neurons, n_xbins)
     #     short_long_rel_entr_curves_frames = np.stack([a_val_dict['short_long_rel_entr_curve'] for a_val_dict in relative_entropy_result_dicts_list]) # build a 3D array (4152, 108, 63) = (n_post_update_times, n_neurons, n_xbins)
 
-    #     global_computation_results.computed_data['relative_entropy_analyses'] = DynamicParameters.init_from_dict({
+    #     global_computation_results.computed_data['pf_dt_sequential_surprise'] = DynamicParameters.init_from_dict({
     #         'time_bin_size_seconds': time_bin_size_seconds,
     #         'historical_snapshots': historical_snapshots,
     #         'post_update_times': post_update_times,
