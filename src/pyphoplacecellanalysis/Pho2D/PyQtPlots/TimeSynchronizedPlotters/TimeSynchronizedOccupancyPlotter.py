@@ -19,7 +19,7 @@ class TimeSynchronizedOccupancyPlotter(AnimalTrajectoryPlottingMixin, TimeSynchr
     """ Plots the time-dependent occupancy produced by a PfND_TimeDependent instance.
     
     Usage:
-    
+        from pyphoplacecellanalysis.Pho2D.PyQtPlots.TimeSynchronizedPlotters.TimeSynchronizedOccupancyPlotter import TimeSynchronizedOccupancyPlotter
         included_epochs = None
         computation_config = active_session_computation_configs[0]
         # PfND version:
