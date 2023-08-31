@@ -5,7 +5,7 @@ from qtpy import QtCore, QtWidgets
 from neuropy.analyses.time_dependent_placefields import PfND_TimeDependent
 
 import pyphoplacecellanalysis.External.pyqtgraph as pg
-# from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtCore, QtGui
+from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtCore, QtGui
 from pyphocorehelpers.DataStructure.general_parameter_containers import VisualizationParameters
 from pyphocorehelpers.DataStructure.data_structure_builders import Width_Height_Tuple
 from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer
@@ -134,9 +134,20 @@ class TimeSynchronizedPlacefieldsPlotter(AnimalTrajectoryPlottingMixin, TimeSync
             
             img_item = pg.ImageItem(image=image, levels=(0,1), border='w')
             
-            curr_plot = self.ui.root_graphics_layout_widget.addPlot(row=curr_row, col=curr_col, title=curr_cell_identifier_string) # , name=curr_plot_identifier_string
+            curr_plot = self.ui.root_graphics_layout_widget.addPlot(row=curr_row, col=curr_col, title=curr_cell_identifier_string) #, font_size=8, font= font , name=curr_plot_identifier_string
             curr_plot.setObjectName(curr_plot_identifier_string)
             curr_plot.addItem(img_item, defaultPadding=0.0)  # add ImageItem to PlotItem
+            
+            #TODO 2023-08-31 15:39: - [ ] Tried to make the title font smaller but doesn't work 
+            # font = QtGui.QFont()
+            # font.setPixelSize(8)
+
+            # old_font = curr_plot.titleLabel.item.font()
+            # old_font.setFamily("Serif")
+            # old_font.setPixelSize(8)
+            # curr_plot.titleLabel.item.setFont(old_font)
+
+
             # curr_plot.showAxes(True)
             
             # if not is_last_row and not is_first_column:
@@ -174,16 +185,17 @@ class TimeSynchronizedPlacefieldsPlotter(AnimalTrajectoryPlottingMixin, TimeSync
             # curr_plot.setLimits(xMin=self.params.x_range[0], xMax=self.params.x_range[-1], yMin=self.params.y_range[0], yMax=self.params.y_range[-1])
             curr_plot.setMouseEnabled(x=False, y=False)
             curr_plot.setMenuEnabled(enableMenu=False)
-            
-            # Lock the aspect ratio AFTER setting the x/y range:
-            # curr_plot.setAspectLocked(lock=True, ratio=self.params.image_aspect_ratio)
-            
+
             # Link Axes to previous item:
             if a_linear_index > 0:
                 prev_plot_item = self.ui.plot_array[a_linear_index-1]
                 curr_plot.setXLink(prev_plot_item)
                 curr_plot.setYLink(prev_plot_item)
-                
+
+            # Lock the aspect ratio AFTER setting the x/y range:
+            # curr_plot.setAspectLocked(lock=True, ratio=self.params.image_aspect_ratio) # # caused some sort of infinite loop in `linkedViewChanged`! 
+            # curr_plot.setAspectLocked(True) # caused some sort of infinite loop in `linkedViewChanged`! 
+
             # Interactive Color Bar:
             # bar = pg.ColorBarItem(values= (0, 1), colorMap=self.params.cmap, width=5, interactive=False) # prepare interactive color bar
             # # Have ColorBarItem control colors of img and appear in 'plot':
