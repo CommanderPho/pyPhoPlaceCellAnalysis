@@ -638,7 +638,7 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
 
 
 
-    def save_pipeline(self, saving_mode=PipelineSavingScheme.TEMP_THEN_OVERWRITE, active_pickle_filename='loadedSessPickle.pkl'):
+    def save_pipeline(self, saving_mode=PipelineSavingScheme.TEMP_THEN_OVERWRITE, active_pickle_filename='loadedSessPickle.pkl', override_pickle_path: Optional[Path]=None):
         """ pickles (saves) the entire pipeline to a file that can be loaded later without recomputing.
 
         Args:
@@ -661,12 +661,30 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
         else:
             ## Build Pickle Path:
             used_existing_pickle_path = False
-            if active_pickle_filename is None:
+            if (active_pickle_filename is None) and (override_pickle_path is None):
+                # simplest case, use existing path because nothing is provided
                 assert self.has_associated_pickle
                 finalized_loaded_sess_pickle_path = self.pickle_path # get the internal pickle path that it was loaded from if none specified
+                
+                # get existing pickle path:
+                finalized_loaded_sess_pickle_path.stem()
                 used_existing_pickle_path = True
-            else:        
-                finalized_loaded_sess_pickle_path = Path(self.sess.basepath).joinpath(active_pickle_filename).resolve() # Uses the './loadedSessPickle.pkl' path
+
+            else:
+                if override_pickle_path is not None:
+                    if not override_pickle_path.is_dir():
+                        # a full filepath, just use that directly
+                        finalized_loaded_sess_pickle_path = override_pickle_path.resolve()
+                    else:
+                        # default case, assumed to be a directory and we'll use the normal filename.
+                        assert self.has_associated_pickle
+                        # get existing pickle filename:
+                        active_pickle_filename = self.pickle_path.name()
+                        finalized_loaded_sess_pickle_path = Path(override_pickle_path).joinpath(active_pickle_filename).resolve()                     
+                else:
+                    # use `self.sess.basepath`
+                    finalized_loaded_sess_pickle_path = Path(self.sess.basepath).joinpath(active_pickle_filename).resolve() # Uses the './loadedSessPickle.pkl' path
+
                 # finalized_loaded_sess_pickle_path = self.get_output_path().joinpath(active_pickle_filename).resolve() # Changed to use the 'output/loadedSessPickle.pkl' directory 
                 used_existing_pickle_path = (finalized_loaded_sess_pickle_path == self.pickle_path) # used the existing path if they're the same
             
