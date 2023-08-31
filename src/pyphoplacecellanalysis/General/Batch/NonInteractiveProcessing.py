@@ -270,6 +270,8 @@ def batch_extended_computations(curr_active_pipeline, include_includelist=None, 
 
     ## Specify the computations and the requirements to validate them.
 
+    #TODO 2023-08-30 22:19: - [ ] Currently have ` validate_computation_test=...` part implemented in the decorator for _perform_baseline_placefield_computation and _perform_time_dependent_placefield_computation.
+        # - [ ] Need to build their SpecificComputationValidator from these instead of defining it below.
     _comp_specifiers = [
         SpecificComputationValidator(short_name='pf_computation', computation_fn_name='_perform_baseline_placefield_computation', validate_computation_test=lambda curr_active_pipeline: (curr_active_pipeline.computation_results[global_epoch_name].computed_data['pf1D'], curr_active_pipeline.computation_results[global_epoch_name].computed_data['pf2D']), is_global=False),
         SpecificComputationValidator(short_name='pfdt_computation', computation_fn_name='_perform_time_dependent_placefield_computation', validate_computation_test=lambda curr_active_pipeline: (curr_active_pipeline.computation_results[global_epoch_name].computed_data['pf1D_dt'], curr_active_pipeline.computation_results[global_epoch_name].computed_data['pf2D_dt']), is_global=False),
