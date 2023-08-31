@@ -912,15 +912,20 @@ class AcrossSessionTables:
 
 
         # Build the output paths:
-        across_session_outputs = {'output/across_session_results/neuron_identities_table': neuron_identities_table,
-        'output/across_session_results/long_short_fr_indicies_analysis_table': long_short_fr_indicies_analysis_table,
-        'output/across_session_results/neuron_replay_stats_table': neuron_replay_stats_table}
+        out_parent_path = Path('output/across_session_results').resolve()
+        out_parent_path.mkdir(parents=True, exist_ok=True)
+        
+        across_session_outputs = {'neuron_identities_table': neuron_identities_table,
+        'long_short_fr_indicies_analysis_table': long_short_fr_indicies_analysis_table,
+        'neuron_replay_stats_table': neuron_replay_stats_table}
 
         for k, v in across_session_outputs.items():
             k = Path(k)
             a_name = k.name
             print(f'a_name: {a_name}')
-            v.to_csv(k.with_suffix(suffix='.csv'))
+            csv_out_path = out_parent_path.joinpath(k.with_suffix(suffix='.csv'))
+            print(f'writing {csv_out_path}.')
+            v.to_csv(csv_out_path)
             # v.to_hdf(k, key=f'/{a_name}', format='table', data_columns=True)    # TypeError: objects of type ``StringArray`` are not supported in this context, sorry; supported objects are: NumPy array, record or scalar; homogeneous list or tuple, integer, float, complex or bytes
             
 
