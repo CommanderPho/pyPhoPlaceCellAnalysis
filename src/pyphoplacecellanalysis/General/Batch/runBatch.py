@@ -1192,7 +1192,7 @@ class BatchSessionCompletionHandler:
         print(f'pipeline hdf5_output_path: {hdf5_output_path}')
         e = None
         try:
-            AcrossSessionsResults.build_session_pipeline_to_hdf(hdf5_output_path, "/", curr_active_pipeline, debug_print=False) # coulduse key of "/{curr_session_context}" with context properly expanded.
+            curr_active_pipeline.export_pipeline_to_h5()
             return (hdf5_output_path, None)
         except Exception as e:
             exception_info = sys.exc_info()
