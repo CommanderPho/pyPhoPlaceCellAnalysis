@@ -869,7 +869,7 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
         except Exception as e:
             exception_info = sys.exc_info()
             e = CapturedException(e, exception_info)
-            print(f"ERROR: encountered exception {e} while trying to build the session HDF output for {curr_session_context}")
+            print(f"ERROR: encountered exception {e} while trying to build the session HDF output.")
             if self.fail_on_exception:
                 raise e.exc
             hdf5_output_path = None # set to None because it failed.
