@@ -2,7 +2,7 @@ from collections import OrderedDict
 import sys
 from datetime import datetime, timedelta
 import typing
-from typing import Optional
+from typing import Optional, Dict, List
 from warnings import warn
 import numpy as np
 import pandas as pd
@@ -26,6 +26,8 @@ from pyphoplacecellanalysis.General.Pipeline.Stages.Loading import loadData # us
 from pyphoplacecellanalysis.General.Pipeline.Stages.Loading import saveData # used for `save_global_computation_results`
 from pyphoplacecellanalysis.General.Model.ComputationResults import ComputationResult
 from pyphoplacecellanalysis.General.Mixins.ExportHelpers import FileOutputManager, FigureOutputLocation, ContextToPathMode
+from pyphoplacecellanalysis.General.Model.SpecificComputationValidation import SpecificComputationValidator
+
 
 import pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions
 # from General.Pipeline.Stages.ComputationFunctions import ComputationFunctionRegistryHolder # should include ComputationFunctionRegistryHolder and all specifics
@@ -832,6 +834,11 @@ class PipelineWithComputedPipelineStageMixin:
     @property
     def registered_merged_computation_function_names(self):
         return self.stage.registered_merged_computation_function_names
+
+    def get_merged_computation_function_validators(self) -> Dict[str, SpecificComputationValidator]:
+        return {k:SpecificComputationValidator.init_from_decorated_fn(v) for k,v in self.registered_merged_computation_function_dict.items() if hasattr(v, 'validate_computation_test') and (v.validate_computation_test is not None)}
+
+
     def reload_default_computation_functions(self):
         """ reloads/re-registers the default display functions after adding a new one """
         self.stage.reload_default_computation_functions()
