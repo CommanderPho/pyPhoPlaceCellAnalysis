@@ -308,6 +308,66 @@ class ExpectedVsObservedResult(HDFMixin, ComputedResult):
     short_short_diff: np.ndarray
     long_long_diff: np.ndarray
     
+@custom_define(slots=False, kw_only=True) # NOTE: kw_only=True prevents errors from only assigning some of the attributes with a specific field
+class RateRemappingResult(HDFMixin, ComputedResult):
+    """ 
+        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.LongShortTrackComputations import RateRemappingResult
+
+    """
+    rr_df: pd.DataFrame = serialized_field()
+    high_only_rr_df: pd.DataFrame = serialized_field(is_computable=True)
+    considerable_remapping_threshold: float = serialized_attribute_field(default=0.7)
+    
+    # HDFMixin Conformances ______________________________________________________________________________________________ #
+    
+    def to_hdf(self, file_path, key: str, **kwargs):
+        """ Saves the object to key in the hdf5 file specified by file_path"""
+        # super().to_hdf(file_path, key=key, **kwargs)
+        # Finish for the custom properties
+        
+        #TODO 2023-08-04 12:09: - [ ] Included outputs_local/global
+                 
+        # df: pd.DataFrame = self.rdf.rdf
+        # aclu_to_idx: Dict = self.rdf.aclu_to_idx
+        # aclu_to_idx_df: pd.DataFrame = pd.DataFrame({'aclu': list(aclu_to_idx.keys()), 'fragile_linear_idx': list(aclu_to_idx.values())})
+        
+        # with tb.open_file(file_path, mode='a') as f:
+        #     # f.get_node(f'{key}/rdf/df')._f_remove(recursive=True)
+
+        #     try:
+        #         rdf_group = f.create_group(key, 'rdf', title='replay data frame', createparents=True)
+        #     except tb.exceptions.NodeError:
+        #         # Node already exists
+        #         pass
+        #     except BaseException as e:
+        #         raise
+        #     # rdf_group[f'{outputs_local_key}/df'] = self.rdf.rdf
+        #     try:
+        #         irdf_group = f.create_group(key, 'irdf', title='intra-replay data frame', createparents=True)
+        #     except tb.exceptions.NodeError:
+        #         # Node already exists
+        #         pass
+        #     except BaseException as e:
+        #         raise
+
+        active_context = kwargs.pop('active_context', None) # TODO: requiring that the caller pass active_context isn't optimal
+        assert active_context is not None
+
+        ## New
+        # session_context = curr_active_pipeline.get_session_context() 
+        # session_group_key: str = "/" + session_context.get_description(separator="/", include_property_names=False) # 'kdiba/gor01/one/2006-6-08_14-26-15'
+        # session_uid: str = session_context.get_description(separator="|", include_property_names=False)
+        ## Global Computations
+        # a_global_computations_group_key: str = f"{session_group_key}/global_computations"
+        # with tb.open_file(file_path, mode='w') as f:
+        #     a_global_computations_group = f.create_group(session_group_key, 'global_computations', title='the result of computations that operate over many or all of the filters in the session.', createparents=True)
+
+        rate_remapping_df = deepcopy(self.rr_df)
+        rate_remapping_df = rate_remapping_df[['laps', 'replays', 'skew', 'max_axis_distance_from_center', 'distance_from_center', 'has_considerable_remapping']]
+        rate_remapping_df = HDF_Converter.prepare_neuron_indexed_dataframe_for_hdf(rate_remapping_df, active_context=active_context, aclu_column_name=None)
+        # rate_remapping_df.to_hdf(file_path, key=f'{key}/rate_remapping_df', format='table', data_columns=True)
+        rate_remapping_df.to_hdf(file_path, key=f'{key}/rate_remapping', format='table', data_columns=True)
+
 
 
 @define(slots=False, repr=False)
@@ -893,12 +953,14 @@ class LongShortTrackComputations(AllFunctionEnumeratingMixin, metaclass=Computat
         # Flat_epoch_time_bins_mean, Flat_decoder_time_bin_centers, num_neurons, num_timebins_in_epoch, num_total_flat_timebins
         
         ## Compute Rate Remapping Dataframe:
-        rate_remapping_df = compute_rate_remapping_stats(long_short_fr_indicies_analysis_results, global_session.neurons.aclu_to_neuron_type_map, considerable_remapping_threshold=0.7)
-        high_remapping_cells_only = rate_remapping_df[rate_remapping_df['has_considerable_remapping']]
-
+        rate_remapping_result: RateRemappingResult = compute_rate_remapping_stats(long_short_fr_indicies_analysis_results, global_session.neurons.aclu_to_neuron_type_map, considerable_remapping_threshold=0.7)
+        # rr_df: pd.DataFrame = rate_remapping_result.rr_df
+        # high_remapping_cells_only = rate_remapping_result.high_only_rr_df
+       
+        
         # Add to computed results:
         global_computation_results.computed_data['long_short_post_decoding'] = DynamicParameters(expected_v_observed_result=expected_v_observed_result,
-                                                                                               rate_remapping=DynamicParameters(rr_df=rate_remapping_df, high_only_rr_df=high_remapping_cells_only)
+                                                                                               rate_remapping=rate_remapping_result
                                                                                             )
         
         """ Getting outputs:
@@ -1423,7 +1485,7 @@ def pipeline_complete_compute_long_short_fr_indicies(curr_active_pipeline, temp_
     return x_frs_index, y_frs_index, active_context, all_results_dict # TODO: add to computed_data instead
 
 @function_attributes(short_name=None, tags=['rr', 'rate_remapping', 'compute'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-05-18 18:58', related_items=[])
-def compute_rate_remapping_stats(long_short_fr_indicies_analysis, aclu_to_neuron_type_map, considerable_remapping_threshold:float=0.7):
+def compute_rate_remapping_stats(long_short_fr_indicies_analysis, aclu_to_neuron_type_map, considerable_remapping_threshold:float=0.7) -> RateRemappingResult:
     """ 2023-05-18 - Yet another form of measuring rate-remapping. 
     
     Usage:
@@ -1480,13 +1542,18 @@ def compute_rate_remapping_stats(long_short_fr_indicies_analysis, aclu_to_neuron
     rate_remapping_df['distance_from_center'] = np.sqrt(rate_remapping_df['laps'].to_numpy() ** 2 + rate_remapping_df['replays'].to_numpy() ** 2)
 
     ## Find only the cells that exhibit considerable remapping:
-    considerable_remapping_threshold = 0.7 # cells exhibit "considerable remapping" when they exceed 0.7
+    # considerable_remapping_threshold = 0.7 # cells exhibit "considerable remapping" when they exceed 0.7
     rate_remapping_df['has_considerable_remapping'] = rate_remapping_df['max_axis_distance_from_center'] > considerable_remapping_threshold
     
     # rendering only:
     rate_remapping_df['render_color'] = [a_neuron_type.renderColor for a_neuron_type in rate_remapping_df.neuron_type] # Get color corresponding to each neuron type (`NeuronType`):
 
-    return rate_remapping_df
+    
+    high_remapping_cells_only = rate_remapping_df[rate_remapping_df['has_considerable_remapping']]
+    rate_remapping_result = RateRemappingResult(rr_df=rate_remapping_df, high_only_rr_df=high_remapping_cells_only, considerable_remapping_threshold=considerable_remapping_threshold, is_global=True)
+
+
+    return rate_remapping_result
 
 # ==================================================================================================================== #
 # Jonathan's helper functions                                                                                          #
