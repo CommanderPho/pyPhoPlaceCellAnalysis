@@ -820,6 +820,18 @@ class PipelineWithComputedPipelineStageMixin:
         """Returns the doc strings for each registered computation function. This is taken from their docstring at the start of the function defn, and provides an overview into what the function will do."""
         return {a_fn_name:a_fn.__doc__ for a_fn_name, a_fn in self.registered_global_computation_function_dict.items()}
     
+
+    # 'merged' refers to the fact that both global and non-global computation functions are included _____________________ #
+    @property
+    def registered_merged_computation_function_dict(self):
+        """build a merged function dictionary containing both global and non-global functions:"""
+        return self.stage.registered_merged_computation_function_dict
+    @property
+    def registered_merged_computation_functions(self):
+        return self.stage.registered_merged_computation_functions
+    @property
+    def registered_merged_computation_function_names(self):
+        return self.stage.registered_merged_computation_function_names
     def reload_default_computation_functions(self):
         """ reloads/re-registers the default display functions after adding a new one """
         self.stage.reload_default_computation_functions()
