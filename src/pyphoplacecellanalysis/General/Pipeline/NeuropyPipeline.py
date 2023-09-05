@@ -859,7 +859,11 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
 
 
     def export_pipeline_to_h5(self):
-        """ Export the pipeline's HDF5 as 'pipeline_results.h5' """
+        """ Export the pipeline's HDF5 as 'pipeline_results.h5'
+
+        TODO: check timestamp of last computed file.
+
+        """
         hdf5_output_path: Path = self.h5_export_path # get_output_path().joinpath('pipeline_results.h5').resolve()
         print(f'pipeline hdf5_output_path: {hdf5_output_path}')
         e = None
