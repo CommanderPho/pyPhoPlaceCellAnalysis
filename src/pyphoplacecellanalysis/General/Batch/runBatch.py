@@ -17,7 +17,7 @@ import multiprocessing
 # import concurrent.futures
 # from tqdm import tqdm
 
-from enum import Enum, unique # SessionBatchProgress
+from enum import Enum, unique, auto # SessionBatchProgress
 
 ## Pho's Custom Libraries:
 from pyphocorehelpers.Filesystem.path_helpers import find_first_extant_path, set_posix_windows, convert_filelist_to_new_parent, find_matching_parent_path
@@ -125,11 +125,12 @@ class SessionBatchProgress(Enum):
     FAILED = "FAILED"
     ABORTED = "ABORTED"
 
-from enum import Enum, auto
+@unique
 class SavingOptions(Enum):
-    NEVER = auto()
-    IF_CHANGED = auto()
-    ALWAYS = auto()
+    NEVER = "NEVER"
+    IF_CHANGED = "IF_CHANGED"
+    ALWAYS = "ALWAYS"
+
 
 @custom_define(slots=False)
 class BatchComputationProcessOptions(HDF_SerializationMixin):
@@ -1158,7 +1159,7 @@ class BatchSessionCompletionHandler:
                     if self.fail_on_exception:
                         raise e.exc
 
-        if self.global_computations_options.should_save == SavingOptions.ALWAYS
+        if self.global_computations_options.should_save == SavingOptions.ALWAYS:
             assert self.global_computations_options.should_compute, f"currently  SavingOptions.ALWAYS requires that self.global_computations_options.should_compute == True also but this is not the case!"
 
         if self.global_computations_options.should_compute:
