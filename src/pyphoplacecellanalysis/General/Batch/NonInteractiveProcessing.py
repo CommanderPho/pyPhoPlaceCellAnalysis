@@ -248,7 +248,7 @@ def batch_extended_computations(curr_active_pipeline, include_includelist=None, 
     newly_computed_values = []
 
     non_global_comp_names = ['pf_computation', 'pfdt_computation', 'firing_rate_trends', 'pf_dt_sequential_surprise']
-    global_comp_names = ['jonathan_firing_rate_analysis', 'short_long_pf_overlap_analyses', 'long_short_fr_indicies_analyses', 'long_short_decoding_analyses', 'long_short_post_decoding', 'long_short_inst_spike_rate_groups'] # , 'long_short_rate_remapping'
+    global_comp_names = ['long_short_decoding_analyses', 'long_short_fr_indicies_analyses', 'jonathan_firing_rate_analysis', 'short_long_pf_overlap_analyses', 'long_short_post_decoding', 'long_short_rate_remapping', 'long_short_inst_spike_rate_groups'] # , 'long_short_rate_remapping'
 
     # 'firing_rate_trends', 'pf_dt_sequential_surprise'
     # '_perform_firing_rate_trends_computation', '_perform_time_dependent_pf_sequential_surprise_computation'
