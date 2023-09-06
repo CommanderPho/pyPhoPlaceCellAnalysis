@@ -979,7 +979,7 @@ class LongShortTrackComputations(AllFunctionEnumeratingMixin, metaclass=Computat
 
     # InstantaneousSpikeRateGroupsComputation
     @function_attributes(short_name='long_short_inst_spike_rate_groups', tags=['long_short', 'LxC', 'SxC', 'Figure2','replay', 'decoding', 'computation'], input_requires=['global_computation_results.computed_data.jonathan_firing_rate_analysis', 'global_computation_results.computed_data.long_short_fr_indicies_analysis'], output_provides=['global_computation_results.computed_data.long_short_inst_spike_rate_groups'], uses=[], used_by=[], creation_date='2023-08-21 16:52', related_items=[],
-                        validate_computation_test=lambda curr_active_pipeline, computation_filter_name='maze': curr_active_pipeline.global_computation_results.computed_data['long_short_inst_spike_rate_groups'], is_global=True)
+                        validate_computation_test=lambda curr_active_pipeline, computation_filter_name='maze': (curr_active_pipeline.global_computation_results.computed_data['long_short_inst_spike_rate_groups'], curr_active_pipeline.global_computation_results.computed_data['long_short_inst_spike_rate_groups'].all_incl_endPlatforms_InstSpikeRateTrends_df), is_global=True)
     def _perform_long_short_instantaneous_spike_rate_groups_analysis(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, debug_print=False):
         """ Must be performed after `_perform_jonathan_replay_firing_rate_analyses`
         
@@ -1074,14 +1074,14 @@ class LongShortTrackComputations(AllFunctionEnumeratingMixin, metaclass=Computat
         # Note that in general LxC and SxC might have differing numbers of cells.
         inst_spike_rate_groups_result.Fig2_Laps_FR: list[SingleBarResult] = [SingleBarResult(v.cell_agg_inst_fr_list.mean(), v.cell_agg_inst_fr_list.std(), v.cell_agg_inst_fr_list, inst_spike_rate_groups_result.LxC_aclus, inst_spike_rate_groups_result.SxC_aclus, None, None) for v in (LxC_ThetaDeltaMinus, LxC_ThetaDeltaPlus, SxC_ThetaDeltaMinus, SxC_ThetaDeltaPlus)]
         
-        # Add to computed results:
-        global_computation_results.computed_data['long_short_inst_spike_rate_groups'] = inst_spike_rate_groups_result
+
         
 
         # Find instantaneous firing rate for spikes outside of replays
         # 2023-09-06 - Method Kamran and I dicusssed in his office last Thursday
         # Uses instantaneous firing rates for each cell computed during any non-replay epoch. Kamran was concerned that some cells fire spikes on the end platforms during either short or long, but because we're only considering spikes that contribute to placefeields (of which the endcap spikes are omitted due to velocity requirements) these cells are said to be long/short exclusive despite firing frequently on the end caps.
-        
+        #TODO 2023-09-06 00:56: - [ ] Add the results to the output structure somehow:
+
         long_epoch_obj, short_epoch_obj = [Epoch(owning_pipeline_reference.sess.epochs.to_dataframe().epochs.label_slice(an_epoch_name)) for an_epoch_name in [long_epoch_name, short_epoch_name]]
         
         # non_running_periods = Epoch.from_PortionInterval(owning_pipeline_reference.sess.laps.as_epoch_obj().to_PortionInterval().complement())
@@ -1089,9 +1089,7 @@ class LongShortTrackComputations(AllFunctionEnumeratingMixin, metaclass=Computat
         long_only_non_replay_periods = non_replay_periods.time_slice(t_start=long_epoch_obj.t_start, t_stop=long_epoch_obj.t_stop) # any period except the replay ones
         short_only_non_replay_periods = non_replay_periods.time_slice(t_start=short_epoch_obj.t_start, t_stop=short_epoch_obj.t_stop) # any period except the replay ones
 
-        # instantaneous_time_bin_size_seconds: float = 0.01
-        # instantaneous_time_bin_size_seconds: float = 0.05
-
+        
         # custom_InstSpikeRateTrends: SpikeRateTrends = SpikeRateTrends.init_from_spikes_and_epochs(spikes_df=deepcopy(owning_pipeline_reference.sess.spikes_df),
         #                                                                                            filter_epochs=non_replay_periods,
         #                                                                                         #    included_neuron_ids=long_exclusive.track_exclusive_aclus,
@@ -1117,15 +1115,18 @@ class LongShortTrackComputations(AllFunctionEnumeratingMixin, metaclass=Computat
         # Sort by column: 'custom_frs_index' (ascending)
         custom_InstSpikeRateTrends_df = custom_InstSpikeRateTrends_df.sort_values(['custom_frs_index'])
         
+        inst_spike_rate_groups_result.all_incl_endPlatforms_InstSpikeRateTrends_df = custom_InstSpikeRateTrends_df
+        
+        # # Calculate 10th and 90th percentiles
+        # lower_bound = custom_InstSpikeRateTrends_df['custom_frs_index'].quantile(0.10)
+        # upper_bound = custom_InstSpikeRateTrends_df['custom_frs_index'].quantile(0.90)
 
-        # Calculate 10th and 90th percentiles
-        lower_bound = custom_InstSpikeRateTrends_df['custom_frs_index'].quantile(0.10)
-        upper_bound = custom_InstSpikeRateTrends_df['custom_frs_index'].quantile(0.90)
+        # # Filter rows
+        # bottom_10_percent = custom_InstSpikeRateTrends_df[custom_InstSpikeRateTrends_df['custom_frs_index'] <= lower_bound]
+        # top_10_percent = custom_InstSpikeRateTrends_df[custom_InstSpikeRateTrends_df['custom_frs_index'] >= upper_bound]
 
-        # Filter rows
-        bottom_10_percent = custom_InstSpikeRateTrends_df[custom_InstSpikeRateTrends_df['custom_frs_index'] <= lower_bound]
-        top_10_percent = custom_InstSpikeRateTrends_df[custom_InstSpikeRateTrends_df['custom_frs_index'] >= upper_bound]
-
+        # Add to computed results:
+        global_computation_results.computed_data['long_short_inst_spike_rate_groups'] = inst_spike_rate_groups_result
 
         """ Getting outputs:
         
@@ -2446,6 +2447,8 @@ class InstantaneousSpikeRateGroupsComputation(HDF_SerializationMixin, AttrsBased
     SxC_ThetaDeltaMinus: SpikeRateTrends = serialized_field(init=False, repr=False, default=None, is_computable=True, hdf_metadata={'track_eXclusive_cells': 'SxC', 'epochs': 'Laps', 'track_change_relative_period': 'DeltaMinus'})
     SxC_ThetaDeltaPlus: SpikeRateTrends = serialized_field(init=False, repr=False, default=None, is_computable=True, hdf_metadata={'track_eXclusive_cells': 'SxC', 'epochs': 'Laps', 'track_change_relative_period': 'DeltaPlus'})
 
+    ## New
+    all_incl_endPlatforms_InstSpikeRateTrends_df: pd.DataFrame = serialized_field(init=False, repr=False, default=None, is_computable=False)
 
     def compute(self, curr_active_pipeline, **kwargs):
         """ full instantaneous computations for both Long and Short epochs:
