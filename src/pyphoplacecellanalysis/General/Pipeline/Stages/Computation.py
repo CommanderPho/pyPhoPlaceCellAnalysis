@@ -318,16 +318,16 @@ class ComputedPipelineStage(LoadableInput, LoadableSessionInput, FilterablePipel
         for k, v in self.computation_results.items():
             extracted_computation_times_dict = v['computation_times']
             each_epoch_each_result_computation_completion_times[k] = {k.__name__:v for k,v in extracted_computation_times_dict.items()}
-            each_epoch_latest_computation_time[k] = max(list(each_epoch_each_result_computation_completion_times[k].values()))
+            each_epoch_latest_computation_time[k] = max(list(each_epoch_each_result_computation_completion_times[k].values()), default=datetime.min)
 
-        non_global_any_most_recent_computation_time: datetime = max(list(each_epoch_latest_computation_time.values())) # newest computation out of any of the epochs
+        non_global_any_most_recent_computation_time: datetime = max(list(each_epoch_latest_computation_time.values()), default=datetime.min) # newest computation out of any of the epochs
 
         ## Global computations:
         global_computation_completion_times = {k.__name__:v for k,v in self.global_computation_results.computation_times.items()}
-        global_computations_latest_computation_time: datetime = max(list(global_computation_completion_times.values()))
+        global_computations_latest_computation_time: datetime = max(list(global_computation_completion_times.values()), default=datetime.min)
 
         ## Any (global or non-global) computation most recent time):
-        any_most_recent_computation_time: datetime = max(non_global_any_most_recent_computation_time, global_computations_latest_computation_time)
+        any_most_recent_computation_time: datetime = max(non_global_any_most_recent_computation_time, global_computations_latest_computation_time, datetime.min) # returns `datetime.min` if the first arguments are empty
 
         if debug_print:
             print(f'any_most_recent_computation_time: {any_most_recent_computation_time}')
