@@ -1315,12 +1315,11 @@ class BatchSessionCompletionHandler:
         hdf5_output_path, hdf5_output_err = self.try_export_pipeline_hdf5_if_needed(curr_active_pipeline=curr_active_pipeline, curr_session_context=curr_session_context)
         
 
-        print(f'\t doing specific instantaneous firing rate computation for context: {curr_session_context}...')
-        ## Specify the output file:
-        common_file_path = Path('output/active_across_session_scatter_plot_results.h5')
-        print(f'common_file_path: {common_file_path}')
-        InstantaneousFiringRatesDataframeAccessor.add_results_to_inst_fr_results_table(curr_active_pipeline, common_file_path, file_mode='a')
-
+        # print(f'\t doing specific instantaneous firing rate computation for context: {curr_session_context}...')
+        # ## Specify the output file:
+        # common_file_path = Path('output/active_across_session_scatter_plot_results.h5')
+        # print(f'common_file_path: {common_file_path}')
+        # InstantaneousFiringRatesDataframeAccessor.add_results_to_inst_fr_results_table(curr_active_pipeline, common_file_path, file_mode='a')
 
         try:
             print(f'\t doing specific instantaneous firing rate computation for context: {curr_session_context}...')
