@@ -2448,7 +2448,7 @@ class InstantaneousSpikeRateGroupsComputation(HDF_SerializationMixin, AttrsBased
     SxC_ThetaDeltaPlus: SpikeRateTrends = serialized_field(init=False, repr=False, default=None, is_computable=True, hdf_metadata={'track_eXclusive_cells': 'SxC', 'epochs': 'Laps', 'track_change_relative_period': 'DeltaPlus'})
 
     ## New
-    all_incl_endPlatforms_InstSpikeRateTrends_df: pd.DataFrame = serialized_field(init=False, repr=False, default=None, is_computable=False)
+    all_incl_endPlatforms_InstSpikeRateTrends_df: pd.DataFrame = serialized_field(init=False, repr=False, default=pd.DataFrame({}), is_computable=False)
 
     def compute(self, curr_active_pipeline, **kwargs):
         """ full instantaneous computations for both Long and Short epochs:
