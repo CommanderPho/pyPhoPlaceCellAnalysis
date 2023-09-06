@@ -51,7 +51,7 @@ class InteractiveCustomDataExplorer(InteractiveDataExplorerBase):
             else:
                 p = self.p
                 
-        self.plots['maze_bg'] = perform_plot_flat_arena(p, self.x, self.y, bShowSequenceTraversalGradient=False, smoothing=self.active_config.plotting_config.use_smoothed_maze_rendering)
+        self.plots['maze_bg'] = perform_plot_flat_arena(p, self.x, self.y, bShowSequenceTraversalGradient=False, smoothing=self.active_config.plotting_config.get('use_smoothed_maze_rendering', True))
 
         p.hide_axes()
         # self.p.camera_position = 'xy' # Overhead (top) view

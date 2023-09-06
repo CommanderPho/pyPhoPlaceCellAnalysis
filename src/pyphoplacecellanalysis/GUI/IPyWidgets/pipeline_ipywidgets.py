@@ -23,3 +23,28 @@ def interactive_pipeline_files(curr_active_pipeline, defer_display:bool=False) -
 	button_executor = JupyterButtonRowWidget(button_defns=button_defns, defer_display=defer_display)
 	return button_executor
 
+
+def fullwidth_path_widget(a_path):
+	left_label = widgets.Label("session path:", layout=widgets.Layout(width='auto'))
+	right_label = widgets.Label(a_path, layout=widgets.Layout(width='auto', flex='1'))
+	hbox = widgets.HBox([left_label, right_label], layout=widgets.Layout(display='flex'))
+	return hbox
+
+
+def interactive_pipeline_widget(curr_active_pipeline):
+	""" 
+	Usage:
+		import ipywidgets as widgets
+		from IPython.display import display
+		from pyphoplacecellanalysis.GUI.IPyWidgets.pipeline_ipywidgets import interactive_pipeline_widget, fullwidth_path_widget, interactive_pipeline_files
+
+
+		_out_widget = interactive_pipeline_widget(curr_active_pipeline=curr_active_pipeline)
+		display(_out_widget)
+
+	"""
+	session_path = str(curr_active_pipeline.get_output_path())
+	_session_path_widget = fullwidth_path_widget(a_path=session_path)
+	_button_executor = interactive_pipeline_files(curr_active_pipeline, defer_display=True)
+	_out_widget = widgets.VBox([_session_path_widget, _button_executor.root_widget])
+	return _out_widget
