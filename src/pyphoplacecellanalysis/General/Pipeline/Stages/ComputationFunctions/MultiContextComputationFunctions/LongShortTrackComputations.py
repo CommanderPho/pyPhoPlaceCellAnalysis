@@ -15,6 +15,7 @@ from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.Computa
 from pyphocorehelpers.DataStructure.dynamic_parameters import DynamicParameters
 
 from neuropy.analyses.placefields import PfND # used in `constrain_to_laps` to construct new objects
+from neuropy.core.epoch import Epoch
 
 from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BasePositionDecoder, BayesianPlacemapPositionDecoder
 from pyphoplacecellanalysis.Analysis.Decoder.decoder_result import perform_full_session_leave_one_out_decoding_analysis
@@ -1073,10 +1074,59 @@ class LongShortTrackComputations(AllFunctionEnumeratingMixin, metaclass=Computat
         # Note that in general LxC and SxC might have differing numbers of cells.
         inst_spike_rate_groups_result.Fig2_Laps_FR: list[SingleBarResult] = [SingleBarResult(v.cell_agg_inst_fr_list.mean(), v.cell_agg_inst_fr_list.std(), v.cell_agg_inst_fr_list, inst_spike_rate_groups_result.LxC_aclus, inst_spike_rate_groups_result.SxC_aclus, None, None) for v in (LxC_ThetaDeltaMinus, LxC_ThetaDeltaPlus, SxC_ThetaDeltaMinus, SxC_ThetaDeltaPlus)]
         
-        
         # Add to computed results:
         global_computation_results.computed_data['long_short_inst_spike_rate_groups'] = inst_spike_rate_groups_result
         
+
+        # Find instantaneous firing rate for spikes outside of replays
+        # 2023-09-06 - Method Kamran and I dicusssed in his office last Thursday
+        # Uses instantaneous firing rates for each cell computed during any non-replay epoch. Kamran was concerned that some cells fire spikes on the end platforms during either short or long, but because we're only considering spikes that contribute to placefeields (of which the endcap spikes are omitted due to velocity requirements) these cells are said to be long/short exclusive despite firing frequently on the end caps.
+        
+        long_epoch_obj, short_epoch_obj = [Epoch(owning_pipeline_reference.sess.epochs.to_dataframe().epochs.label_slice(an_epoch_name)) for an_epoch_name in [long_epoch_name, short_epoch_name]]
+        
+        # non_running_periods = Epoch.from_PortionInterval(owning_pipeline_reference.sess.laps.as_epoch_obj().to_PortionInterval().complement())
+        non_replay_periods: Epoch = Epoch(Epoch.from_PortionInterval(owning_pipeline_reference.sess.replay.epochs.to_PortionInterval().complement()).time_slice(t_start=long_epoch_obj.t_start, t_stop=short_epoch_obj.t_stop).to_dataframe()[:-1]) #[:-1] # any period except the replay ones, drop the infinite last entry
+        long_only_non_replay_periods = non_replay_periods.time_slice(t_start=long_epoch_obj.t_start, t_stop=long_epoch_obj.t_stop) # any period except the replay ones
+        short_only_non_replay_periods = non_replay_periods.time_slice(t_start=short_epoch_obj.t_start, t_stop=short_epoch_obj.t_stop) # any period except the replay ones
+
+        # instantaneous_time_bin_size_seconds: float = 0.01
+        # instantaneous_time_bin_size_seconds: float = 0.05
+
+        # custom_InstSpikeRateTrends: SpikeRateTrends = SpikeRateTrends.init_from_spikes_and_epochs(spikes_df=deepcopy(owning_pipeline_reference.sess.spikes_df),
+        #                                                                                            filter_epochs=non_replay_periods,
+        #                                                                                         #    included_neuron_ids=long_exclusive.track_exclusive_aclus,
+        #                                                                                            instantaneous_time_bin_size_seconds=instantaneous_time_bin_size_seconds)
+
+        # ~20sec computation
+        long_custom_InstSpikeRateTrends: SpikeRateTrends = SpikeRateTrends.init_from_spikes_and_epochs(spikes_df=deepcopy(owning_pipeline_reference.sess.spikes_df),
+                                                                                                filter_epochs=long_only_non_replay_periods,
+                                                                                                #    included_neuron_ids=long_exclusive.track_exclusive_aclus,
+                                                                                                instantaneous_time_bin_size_seconds=instantaneous_time_bin_size_seconds)
+
+        short_custom_InstSpikeRateTrends: SpikeRateTrends = SpikeRateTrends.init_from_spikes_and_epochs(spikes_df=deepcopy(owning_pipeline_reference.sess.spikes_df),
+                                                                                                filter_epochs=short_only_non_replay_periods,
+                                                                                                #    included_neuron_ids=long_exclusive.track_exclusive_aclus,
+                                                                                                instantaneous_time_bin_size_seconds=instantaneous_time_bin_size_seconds)
+
+
+        custom_InstSpikeRateTrends_df = pd.DataFrame({'aclu': long_custom_InstSpikeRateTrends.included_neuron_ids, 'long_inst_fr': long_custom_InstSpikeRateTrends.cell_agg_inst_fr_list,  'short_inst_fr': short_custom_InstSpikeRateTrends.cell_agg_inst_fr_list})
+        # ,  'global_inst_fr': custom_InstSpikeRateTrends.cell_agg_inst_fr_list
+
+        # Compute the single-dimensional firing rate index for the custom epochs and add it as a column to the dataframe:
+        custom_InstSpikeRateTrends_df['custom_frs_index'] = _fr_index(long_fr=long_custom_InstSpikeRateTrends.cell_agg_inst_fr_list, short_fr=short_custom_InstSpikeRateTrends.cell_agg_inst_fr_list)
+        # Sort by column: 'custom_frs_index' (ascending)
+        custom_InstSpikeRateTrends_df = custom_InstSpikeRateTrends_df.sort_values(['custom_frs_index'])
+        
+
+        # Calculate 10th and 90th percentiles
+        lower_bound = custom_InstSpikeRateTrends_df['custom_frs_index'].quantile(0.10)
+        upper_bound = custom_InstSpikeRateTrends_df['custom_frs_index'].quantile(0.90)
+
+        # Filter rows
+        bottom_10_percent = custom_InstSpikeRateTrends_df[custom_InstSpikeRateTrends_df['custom_frs_index'] <= lower_bound]
+        top_10_percent = custom_InstSpikeRateTrends_df[custom_InstSpikeRateTrends_df['custom_frs_index'] >= upper_bound]
+
+
         """ Getting outputs:
         
             ## long_short_post_decoding:
