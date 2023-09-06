@@ -1513,7 +1513,7 @@ def compute_rate_remapping_stats(long_short_fr_indicies_analysis, aclu_to_neuron
         a_paginator = _out_rr_pagination_controller.plots_data.paginator
 
     """
-    rr_aclus = np.array(list(long_short_fr_indicies_analysis.y_frs_index.keys()))
+    rr_aclus = np.array(list(long_short_fr_indicies_analysis.y_frs_index.keys())) # uses the .keys()
     rr_neuron_type = np.array([aclu_to_neuron_type_map[aclu] for aclu in rr_aclus])
     rr_laps = np.array(list(long_short_fr_indicies_analysis.y_frs_index.values()))
     rr_replays = np.array(list(long_short_fr_indicies_analysis.x_frs_index.values()))
