@@ -125,6 +125,12 @@ class SessionBatchProgress(Enum):
     FAILED = "FAILED"
     ABORTED = "ABORTED"
 
+from enum import Enum, auto
+class SavingOptions(Enum):
+    NEVER = auto()
+    IF_CHANGED = auto()
+    ALWAYS = auto()
+
 @custom_define(slots=False)
 class BatchComputationProcessOptions(HDF_SerializationMixin):
     should_load: bool = serialized_attribute_field() # should try to load from existing results from disk at all
@@ -135,7 +141,7 @@ class BatchComputationProcessOptions(HDF_SerializationMixin):
         # never
         # if needed (required results are missing)
         # always
-    should_save: bool = serialized_attribute_field() # should consider save at all
+    should_save: SavingOptions = serialized_attribute_field(default=SavingOptions.NEVER) # should consider save at all
         # never
         # if changed
         # always
@@ -1053,9 +1059,9 @@ class BatchSessionCompletionHandler:
     
     override_session_computation_results_pickle_filename: Optional[str] = field(default=None) # 'output/loadedSessPickle.pkl'
 
-    session_computations_options: BatchComputationProcessOptions = field(default=BatchComputationProcessOptions(should_load=True, should_compute=True, should_save=True))
+    session_computations_options: BatchComputationProcessOptions = field(default=BatchComputationProcessOptions(should_load=True, should_compute=True, should_save=SavingOptions.IF_CHANGED))
 
-    global_computations_options: BatchComputationProcessOptions = field(default=BatchComputationProcessOptions(should_load=True, should_compute=True, should_save=True))
+    global_computations_options: BatchComputationProcessOptions = field(default=BatchComputationProcessOptions(should_load=True, should_compute=True, should_save=SavingOptions.IF_CHANGED))
     extended_computations_include_includelist: list = field(default=['long_short_fr_indicies_analyses', 'jonathan_firing_rate_analysis', 'long_short_decoding_analyses', 'long_short_post_decoding', 'long_short_inst_spike_rate_groups']) # do only specifiedl
     force_global_recompute: bool = field(default=False)
     override_global_computation_results_pickle_path: Optional[Path] = field(default=None)
@@ -1152,6 +1158,9 @@ class BatchSessionCompletionHandler:
                     if self.fail_on_exception:
                         raise e.exc
 
+        if self.global_computations_options.should_save == SavingOptions.ALWAYS
+            assert self.global_computations_options.should_compute, f"currently  SavingOptions.ALWAYS requires that self.global_computations_options.should_compute == True also but this is not the case!"
+
         if self.global_computations_options.should_compute:
             try:
                 # # 2023-01-* - Call extended computations to build `_display_short_long_firing_rate_index_comparison` figures:
@@ -1163,7 +1172,7 @@ class BatchSessionCompletionHandler:
                     print(f'newly_computed_values: {newly_computed_values}. Saving global results...')
                     if (self.saving_mode.value == 'skip_saving'):
                         print(f'WARNING: supposed to skip_saving because of self.saving_mode: {self.saving_mode} but supposedly has new global results! Figure out if these are actually new.')
-                    if self.global_computations_options.should_save:
+                    if self.global_computations_options.should_save != SavingOptions.NEVER:
                         try:
                             # curr_active_pipeline.global_computation_results.persist_time = datetime.now()
                             # Try to write out the global computation function results:
@@ -1177,6 +1186,17 @@ class BatchSessionCompletionHandler:
                         print(f'\n\n!!WARNING!!: self.global_computations_options.should_save == False, so the global results are unsaved!')
                 else:
                     print(f'no changes in global results.')
+                    if self.global_computations_options.should_save == SavingOptions.ALWAYS:
+                        print(f'Saving mode == ALWAYS so trying to save despite no changes.')
+                        try:
+                            # curr_active_pipeline.global_computation_results.persist_time = datetime.now()
+                            # Try to write out the global computation function results:
+                            curr_active_pipeline.save_global_computation_results()
+                        except Exception as e:
+                            print(f'\n\n!!WARNING!!: saving the global results threw the exception: {e}')
+                            if self.fail_on_exception:
+                                raise e.exc
+                            
             except Exception as e:
                 ## TODO: catch/log saving error and indicate that it isn't saved.
                 exception_info = sys.exc_info()
@@ -1674,16 +1694,16 @@ def main(active_result_suffix:str='CHANGEME_TEST', included_session_contexts: Op
         # Forced Reloading:
         print(f'forced reloading...')
         result_handler = BatchSessionCompletionHandler(force_reload_all=True,
-                                                        session_computations_options=BatchComputationProcessOptions(should_load=False, should_compute=True, should_save=True),
-                                                        global_computations_options=BatchComputationProcessOptions(should_load=False, should_compute=True, should_save=True),
+                                                        session_computations_options=BatchComputationProcessOptions(should_load=False, should_compute=True, should_save=SavingOptions.ALWAYS),
+                                                        global_computations_options=BatchComputationProcessOptions(should_load=False, should_compute=True, should_save=SavingOptions.ALWAYS),
                                                         should_perform_figure_generation_to_file=should_perform_figure_generation_to_file, saving_mode=PipelineSavingScheme.OVERWRITE_IN_PLACE, force_global_recompute=True,
                                                         **multiprocessing_kwargs)
 
     else:
         # No Reloading
         result_handler = BatchSessionCompletionHandler(force_reload_all=False,
-                                                        session_computations_options=BatchComputationProcessOptions(should_load=True, should_compute=False, should_save=False),
-                                                        global_computations_options=BatchComputationProcessOptions(should_load=True, should_compute=False, should_save=False),
+                                                        session_computations_options=BatchComputationProcessOptions(should_load=True, should_compute=False, should_save=SavingOptions.NEVER),
+                                                        global_computations_options=BatchComputationProcessOptions(should_load=True, should_compute=False, should_save=SavingOptions.IF_CHANGED),
                                                         should_perform_figure_generation_to_file=should_perform_figure_generation_to_file, saving_mode=PipelineSavingScheme.SKIP_SAVING, force_global_recompute=False,
                                                         **multiprocessing_kwargs)
 
