@@ -668,7 +668,7 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
                 finalized_loaded_sess_pickle_path = self.pickle_path # get the internal pickle path that it was loaded from if none specified
                 
                 # get existing pickle path:
-                finalized_loaded_sess_pickle_path.stem()
+                # finalized_loaded_sess_pickle_path.stem
                 used_existing_pickle_path = True
 
             else:
@@ -680,7 +680,7 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
                         # default case, assumed to be a directory and we'll use the normal filename.
                         assert self.has_associated_pickle
                         # get existing pickle filename:
-                        active_pickle_filename = self.pickle_path.name()
+                        active_pickle_filename = self.pickle_path.name
                         finalized_loaded_sess_pickle_path = Path(override_pickle_path).joinpath(active_pickle_filename).resolve()                     
                 else:
                     # use `self.sess.basepath`
