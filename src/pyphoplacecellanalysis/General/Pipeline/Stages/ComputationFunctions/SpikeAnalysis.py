@@ -41,10 +41,16 @@ import multiprocessing
 
 @custom_define(slots=False)
 class SpikeRateTrends(HDFMixin, AttrsBasedClassHelperMixin):
-
+    """ Computes instantaneous firing rates for each cell
+    
+    """
     epoch_agg_inst_fr_list: np.ndarray = serialized_field(is_computable=True, init=False) # .shape (n_epochs, n_cells)
     cell_agg_inst_fr_list: np.ndarray = serialized_field(is_computable=True, init=False) # .shape (n_cells,)
     all_agg_inst_fr: float = serialized_attribute_field(is_computable=True, init=False) # the scalar value that results from aggregating over ALL (timebins, epochs, cells)
+    
+    # Add aclu values:
+
+
     """ holds information relating to the firing rates of cells across time. 
     
     In general I'd want access to:
@@ -56,23 +62,42 @@ class SpikeRateTrends(HDFMixin, AttrsBasedClassHelperMixin):
     #TODO 2023-07-31 08:36: - [ ] both of these properties would ideally be serialized to HDF, but they can't be right now.`
     inst_fr_df_list: list[pd.DataFrame] = non_serialized_field() # a list containing a inst_fr_df for each epoch. 
     inst_fr_signals_list: list[AnalogSignal] = non_serialized_field()
+    included_neuron_ids: np.ndarray = serialized_field(is_computable=False) # .shape (n_cells,)
+    filter_epochs_df: pd.DataFrame = serialized_field(is_computable=False) # .shape (n_epochs, ...)
     
-
+    instantaneous_time_bin_size_seconds: float = serialized_attribute_field(default=0.01, is_computable=False)
+    kernel_width_ms: float = serialized_attribute_field(default=10.0, is_computable=False)
+    
+    
     @classmethod
     def init_from_spikes_and_epochs(cls, spikes_df: pd.DataFrame, filter_epochs, included_neuron_ids=None, instantaneous_time_bin_size_seconds=0.01, kernel=GaussianKernel(10*ms)) -> "SpikeRateTrends":
-        epoch_inst_fr_df_list, epoch_inst_fr_signal_list, epoch_agg_firing_rates_list = cls.compute_epochs_unit_avg_inst_firing_rates(spikes_df=spikes_df, filter_epochs=filter_epochs, included_neuron_ids=included_neuron_ids, instantaneous_time_bin_size_seconds=instantaneous_time_bin_size_seconds, kernel=kernel)
-        _out = cls(inst_fr_df_list=epoch_inst_fr_df_list, inst_fr_signals_list=epoch_inst_fr_signal_list)
-        n_epochs = len(epoch_inst_fr_df_list)
+        if included_neuron_ids is None:
+            included_neuron_ids = spikes_df.spikes.neuron_ids
+        if isinstance(filter_epochs, pd.DataFrame):
+            filter_epochs_df = filter_epochs
+        else:
+            filter_epochs_df = filter_epochs.to_dataframe()
+            
+        epoch_inst_fr_df_list, epoch_inst_fr_signal_list, epoch_agg_firing_rates_list = cls.compute_epochs_unit_avg_inst_firing_rates(spikes_df=spikes_df, filter_epochs=filter_epochs_df, included_neuron_ids=included_neuron_ids, instantaneous_time_bin_size_seconds=instantaneous_time_bin_size_seconds, kernel=kernel)
+        _out = cls(inst_fr_df_list=epoch_inst_fr_df_list, inst_fr_signals_list=epoch_inst_fr_signal_list, included_neuron_ids=included_neuron_ids, filter_epochs_df=filter_epochs_df,
+                    instantaneous_time_bin_size_seconds=instantaneous_time_bin_size_seconds, kernel_width_ms=kernel.sigma.magnitude)
+        _out.recompute_on_update()
+        return _out
+
+    def recompute_on_update(self):
+        """ called after update to self.inst_fr_df_list or self.inst_fr_signals_list to update all of the aggregate properties. 
+
+        """
+        n_epochs = len(self.inst_fr_df_list)
         assert n_epochs > 0        
-        n_cells = epoch_inst_fr_df_list[0].shape[1]
-        epoch_agg_firing_rates_list = np.vstack([a_signal.max(axis=0).magnitude for a_signal in _out.inst_fr_signals_list]) # find the peak within each epoch (for all cells) using `.max(...)`
+        n_cells = self.inst_fr_df_list[0].shape[1]
+        epoch_agg_firing_rates_list = np.vstack([a_signal.max(axis=0).magnitude for a_signal in self.inst_fr_signals_list]) # find the peak within each epoch (for all cells) using `.max(...)`
         assert epoch_agg_firing_rates_list.shape == (n_epochs, n_cells)
-        _out.epoch_agg_inst_fr_list = epoch_agg_firing_rates_list # .shape (n_epochs, n_cells)
+        self.epoch_agg_inst_fr_list = epoch_agg_firing_rates_list # .shape (n_epochs, n_cells)
         cell_agg_firing_rates_list = epoch_agg_firing_rates_list.mean(axis=0) # find the peak over all epochs (for all cells) using `.max(...)` --- OOPS, what about the zero epochs? Should those actually effect the rate? Should they be excluded?
         assert cell_agg_firing_rates_list.shape == (n_cells,)
-        _out.cell_agg_inst_fr_list = cell_agg_firing_rates_list # .shape (n_cells,)
-        _out.all_agg_inst_fr = cell_agg_firing_rates_list.mean() # .magnitude.item() # scalar
-        return _out
+        self.cell_agg_inst_fr_list = cell_agg_firing_rates_list # .shape (n_cells,)
+        self.all_agg_inst_fr = cell_agg_firing_rates_list.mean() # .magnitude.item() # scalar
 
 
     @classmethod
