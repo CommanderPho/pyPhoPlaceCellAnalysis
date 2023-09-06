@@ -858,7 +858,7 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
         return hdf5_output_path
 
 
-    def export_pipeline_to_h5(self):
+    def export_pipeline_to_h5(self, fail_on_exception:bool=True):
         """ Export the pipeline's HDF5 as 'pipeline_results.h5'
 
         TODO: check timestamp of last computed file.
@@ -874,7 +874,7 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
             exception_info = sys.exc_info()
             e = CapturedException(e, exception_info)
             print(f"ERROR: encountered exception {e} while trying to build the session HDF output.")
-            if self.fail_on_exception:
+            if fail_on_exception:
                 raise e.exc
             hdf5_output_path = None # set to None because it failed.
             return (hdf5_output_path, e)

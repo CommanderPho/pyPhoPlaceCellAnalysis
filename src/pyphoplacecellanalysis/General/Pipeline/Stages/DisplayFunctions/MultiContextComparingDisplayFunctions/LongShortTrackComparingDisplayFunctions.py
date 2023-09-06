@@ -1179,7 +1179,7 @@ def _plot_pho_jonathan_batch_plot_single_cell(t_split, time_bins, unit_specific_
     from pyphoplacecellanalysis.PhoPositionalData.plotting.placefield import plot_1D_placecell_validation
     
     # gridspec mode:
-    curr_fig.set_facecolor('0.75')
+    curr_fig.set_facecolor('0.65') # light grey
 
     num_gridspec_columns = 8 # hardcoded
     gs_kw = dict(width_ratios=np.repeat(1, num_gridspec_columns).tolist(), height_ratios=[1, 1], wspace=0.0, hspace=0.0)
@@ -1230,7 +1230,7 @@ def _plot_pho_jonathan_batch_plot_single_cell(t_split, time_bins, unit_specific_
                 'should_plot_spike_indicator_lines_on_trajectory': False, 'spike_indicator_lines_alpha': 0.2,
                 'spikes_color':(0.1, 0.1, 0.1), 'spikes_alpha':0.1, 'should_include_spikes': False} | kwargs))
 
-    # Custom All Spikes: Note that I set `'should_include_spikes': False` in call to `plot_1D_placecell_validation` above so the native spikes aren't plotted
+    # Custom All Spikes: Note that I set `'should_include_spikes': False` in call to `plot_1D_placecell_validation` above so the native spikes from that function aren't plotted
     cell_spikes_dfs_dict = kwargs.get('cell_spikes_dfs_dict', None)
     time_variable_name = kwargs.get('time_variable_name', None)
     if cell_spikes_dfs_dict is not None:
@@ -1246,7 +1246,7 @@ def _plot_pho_jonathan_batch_plot_single_cell(t_split, time_bins, unit_specific_
     return {'firing_rate':curr_ax_firing_rate, 'lap_spikes': curr_ax_lap_spikes, 'placefield': curr_ax_placefield, 'labels': curr_ax_cell_label}
 
 
-@function_attributes(short_name='_make_pho_jonathan_batch_plots', tags=['private', 'matplotlib', 'active','jonathan'], input_requires=[], output_provides=[], uses=['_plot_pho_jonathan_batch_plot_single_cell', 'build_replays_custom_scatter_markers', '_build_neuron_type_distribution_color', 'build_or_reuse_figure'], used_by=[], creation_date='2023-04-11 08:06')
+@function_attributes(short_name='_make_pho_jonathan_batch_plots', tags=['private', 'matplotlib', 'active','jonathan'], input_requires=[], output_provides=[], uses=['_plot_pho_jonathan_batch_plot_single_cell', 'build_replays_custom_scatter_markers', '_build_neuron_type_distribution_color', 'build_or_reuse_figure'], used_by=['_display_batch_pho_jonathan_replay_firing_rate_comparison'], creation_date='2023-04-11 08:06')
 def _make_pho_jonathan_batch_plots(t_split, time_bins, neuron_replay_stats_df, unit_specific_time_binned_firing_rates, pf1D_all, aclu_to_idx, rdf, irdf, show_inter_replay_frs=False, included_unit_neuron_IDs=None, marker_split_mode=CustomScatterMarkerMode.TriSplit, n_max_plot_rows:int=4, debug_print=False, defer_render=False, **kwargs) -> MatplotlibRenderPlots:
     """ Stacked Jonathan-style firing-rate-across-epochs-plot
     Internally calls `_plot_pho_jonathan_batch_plot_single_cell`
@@ -2006,6 +2006,10 @@ def plot_rr_aclu(aclu: list, rr_laps: np.ndarray, rr_replays: np.ndarray, rr_neu
 class RateRemappingPaginatedFigureController(PaginatedFigureController):
     """2023-05-09 - Aims to refactor `build_figure_and_control_widget_from_paginator`, a series of nested functions, into a stateful class
 
+    At its core uses `plot_rr_aclu` to plot the rate remapping number lines
+    
+    
+    
     Usage:
         import matplotlib.pyplot as plt
         %matplotlib qt
