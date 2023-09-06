@@ -1270,7 +1270,7 @@ class BatchSessionCompletionHandler:
         ## Save the pipeline since that's disabled by default now:
         if was_updated and (self.session_computations_options.should_save != SavingOptions.NEVER):
             # override the saving mode:
-            print(f'basic pipleine was updated by post_compute_validate and needs to be saved to be correct.Overriding self.save_mode to ensure pipeline is saved!')
+            print(f'WARNING: basic pipleine was updated by post_compute_validate and needs to be saved to be correct.Overriding self.save_mode to ensure pipeline is saved!')
             self.saving_mode = PipelineSavingScheme.TEMP_THEN_OVERWRITE
             
         try:
