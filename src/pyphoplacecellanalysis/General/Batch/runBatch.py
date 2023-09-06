@@ -1267,6 +1267,11 @@ class BatchSessionCompletionHandler:
             raise 
 
         ## Save the pipeline since that's disabled by default now:
+        if was_updated and (self.session_computations_options.should_save != SavingOptions.NEVER):
+            # override the saving mode:
+            print(f'basic pipleine was updated by post_compute_validate and needs to be saved to be correct.Overriding self.save_mode to ensure pipeline is saved!')
+            self.saving_mode = PipelineSavingScheme.TEMP_THEN_OVERWRITE
+            
         try:
             curr_active_pipeline.save_pipeline(saving_mode=self.saving_mode, active_pickle_filename=self.override_session_computation_results_pickle_filename) # AttributeError: 'PfND_TimeDependent' object has no attribute '_included_thresh_neurons_indx'
         except Exception as e:
