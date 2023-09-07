@@ -39,27 +39,30 @@ class LinearTrackDimensions:
 
 
         if self.alignment_axis == 'x':
-            track_center_y = major_axis_factor * self.platform_side_length / 2.0
-            track_origin_y = track_center_y - minor_axis_factor * self.track_width / 2.0
+            scaled_track_length = (major_axis_factor * self.track_length)
+            scaled_track_width = (minor_axis_factor * self.track_width)
+            scaled_platform_size = ((major_axis_factor * self.platform_side_length), (minor_axis_factor * self.platform_side_length))
 
-            cap_size = ((major_axis_factor * self.platform_side_length), (minor_axis_factor * self.platform_side_length))
+            track_center_y = major_axis_factor * self.platform_side_length / 2.0
+            track_origin_y = track_center_y - (scaled_track_width / 2.0)
+            
             rects = [
-                (0, 0, *cap_size, pen, brush),
-                (major_axis_factor * self.platform_side_length, track_origin_y, major_axis_factor * self.track_length, minor_axis_factor * self.track_width, pen, brush),
-                (major_axis_factor * (self.platform_side_length + self.track_length), 0, *cap_size, pen, brush)
+                (0, 0, *scaled_platform_size, pen, brush),
+                (scaled_platform_size[0], track_origin_y, scaled_track_length, scaled_track_width, pen, brush),
+                (major_axis_factor * (self.platform_side_length + self.track_length), 0, *scaled_platform_size, pen, brush)
             ]
 
         elif self.alignment_axis == 'y':
             track_center_x = major_axis_factor * self.platform_side_length / 2.0
             track_origin_x = track_center_x - minor_axis_factor * self.track_width / 2.0
-            cap_size = ((minor_axis_factor * self.platform_side_length), (major_axis_factor * self.platform_side_length))
+            scaled_platform_size = ((minor_axis_factor * self.platform_side_length), (major_axis_factor * self.platform_side_length))
             rects = [
-                (0, 0, *cap_size, pen, brush),
+                (0, 0, *scaled_platform_size, pen, brush),
                 (track_origin_x, major_axis_factor * self.platform_side_length,
                     (minor_axis_factor * self.track_width), 
                     (major_axis_factor * self.track_length),
                     pen, brush),
-                (0, major_axis_factor * (self.platform_side_length + self.track_length),*cap_size, pen, brush)
+                (0, major_axis_factor * (self.platform_side_length + self.track_length),*scaled_platform_size, pen, brush)
             ]
         else:
             raise ValueError(f"Unsupported alignment_axis: {self.alignment_axis}")
