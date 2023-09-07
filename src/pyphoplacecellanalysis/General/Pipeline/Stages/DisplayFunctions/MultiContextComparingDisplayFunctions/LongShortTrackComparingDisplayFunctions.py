@@ -425,7 +425,7 @@ class LongShortTrackComparingDisplayFunctions(AllFunctionEnumeratingMixin, metac
             # graphics_output_dict['plot_data'] = {'sort_indicies': (long_sort_ind, short_sort_ind), 'colors':(long_neurons_colors_array, short_neurons_colors_array)}            
             return graphics_output_dict
 
-    @function_attributes(short_name=None, tags=['display', 'long_short', 'laps', 'position', 'behavior'], conforms_to=['output_registering', 'figure_saving'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-05-29 18:20', related_items=[], is_global=True)
+    @function_attributes(short_name=None, tags=['display', 'long_short', 'laps', 'position', 'behavior', 'needs_footer'], conforms_to=['output_registering', 'figure_saving'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-05-29 18:20', related_items=[], is_global=True)
     def _display_long_short_laps(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, defer_render=False, save_figure=True, **kwargs):
             """ Displays a figure displaying the 1D laps detected for both the long and short tracks.
                 Usage:
