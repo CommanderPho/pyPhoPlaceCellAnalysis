@@ -11,6 +11,8 @@ def interactive_pipeline_files(curr_active_pipeline, defer_display:bool=False) -
 	button_executor = interactive_pipeline_files(curr_active_pipeline)
 
 	"""
+	
+
 	# Define the set of buttons:
 	button_defns = [("Output Folder", lambda _: reveal_in_system_file_manager(curr_active_pipeline.get_output_path())),
 			("global pickle", lambda _: reveal_in_system_file_manager(curr_active_pipeline.global_computation_results_pickle_path)),
@@ -18,6 +20,11 @@ def interactive_pipeline_files(curr_active_pipeline, defer_display:bool=False) -
 			(".h5 export", lambda _: reveal_in_system_file_manager(curr_active_pipeline.h5_export_path)),
 			# ("ViTables .h5 export", lambda _: reveal_in_system_file_manager(curr_active_pipeline.h5_export_path))
 		]
+		
+	outman = curr_active_pipeline.get_output_manager()
+	figure_output_path = outman.get_figure_save_file_path(curr_active_pipeline.get_session_context(), make_folder_if_needed=False)
+	if figure_output_path.exists():
+		button_defns.append(("Figure Export Folder", lambda _: reveal_in_system_file_manager(figure_output_path)))
 
 	# Create and display the button
 	button_executor = JupyterButtonRowWidget(button_defns=button_defns, defer_display=defer_display)
