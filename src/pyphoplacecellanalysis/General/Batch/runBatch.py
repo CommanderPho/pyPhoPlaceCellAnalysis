@@ -1067,7 +1067,7 @@ class BatchSessionCompletionHandler:
                                         # '_perform_position_decoding_computation', 
                                         'firing_rate_trends',
                                         # '_perform_pf_find_ratemap_peaks_computation',
-                                         'long_short_decoding_analyses', 'long_short_fr_indicies_analyses', 'jonathan_firing_rate_analysis', 'long_short_post_decoding', 'pf_dt_sequential_surprise', 'long_short_rate_remapping', 'long_short_inst_spike_rate_groups']) # do only specified
+                                         'long_short_decoding_analyses', 'jonathan_firing_rate_analysis', 'long_short_fr_indicies_analyses', 'long_short_post_decoding', 'pf_dt_sequential_surprise', 'long_short_rate_remapping', 'long_short_inst_spike_rate_groups']) # do only specified
     
     force_global_recompute: bool = field(default=False)
     override_global_computation_results_pickle_path: Optional[Path] = field(default=None)
